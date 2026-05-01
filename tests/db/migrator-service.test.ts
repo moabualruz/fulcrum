@@ -57,6 +57,7 @@ import {
   LossyCheckFailedError,
   LossyDownProtectedError,
   MigrationChecksumMismatchError,
+  MigrationFileMissingError,
 } from "../../src/db/migrator-service.ts";
 import { sha256Hex } from "../../src/db/migration-checksums.ts";
 import { dbMigrationVersion, dbCanRunOnCurrentBinary, MAX_KNOWN_MIGRATION_VERSION } from "../../src/db/doctor-checks.ts";
@@ -536,16 +537,12 @@ describe("MigratorService — checksum mismatch (P1#19 round-2)", () => {
       // First run: apply all migrations, storing real checksums.
       // Use a custom checksumReader that returns a known value on first call,
       // then a different value on second call (simulating file edit).
-      let callCount = 0;
       const ORIGINAL_CHECKSUM = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
       const TAMPERED_CHECKSUM = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
       const serviceFirstRun = buildService(freshOrm, {
         // Non-empty stable checksum so it gets stored.
-        checksumReader: async (_path: string) => {
-          callCount++;
-          return ORIGINAL_CHECKSUM;
-        },
+        checksumReader: async (_path: string) => ORIGINAL_CHECKSUM,
         isLossyResolver: async (_path: string) => false,
       });
       await serviceFirstRun.migrate();
@@ -577,12 +574,55 @@ describe("MigratorService — checksum mismatch (P1#19 round-2)", () => {
 });
 
 // ────────────────────────────────────────────────────────────────────────────
-// Suite 10: Round-trip up/down on all 5 migration classes (MED 5 — P1#19 round-2)
+// Suite 9b: MigrationFileMissingError — unreadable applied-migration file throws
+// (HIGH 2 caveat — P1#19 round-3)
+// ────────────────────────────────────────────────────────────────────────────
+
+describe("MigratorService — unreadable applied-migration file (P1#19 round-3)", () => {
+  it("migrate() throws MigrationFileMissingError when checksumReader throws for an applied migration", async () => {
+    const freshOrm = await buildOrm();
+    try {
+      // First run: apply all migrations with a stable checksum so the ledger has rows.
+      const serviceFirstRun = buildService(freshOrm, {
+        checksumReader: async (_path: string) => "stable-checksum-value",
+        isLossyResolver: async (_path: string) => false,
+      });
+      await serviceFirstRun.migrate();
+
+      // Second run: checksumReader throws (simulates deleted / unreadable file).
+      const FILE_READ_ERROR = new Error("ENOENT: no such file or directory");
+      const serviceSecondRun = buildService(freshOrm, {
+        checksumReader: async (_path: string) => {
+          throw FILE_READ_ERROR;
+        },
+        isLossyResolver: async (_path: string) => false,
+      });
+
+      // Fail-closed: must throw MigrationFileMissingError, not silently skip.
+      await expect(serviceSecondRun.migrate()).rejects.toThrow(MigrationFileMissingError);
+    } finally {
+      await freshOrm.close(true);
+    }
+  });
+
+  it("MigrationFileMissingError has correct code and message", () => {
+    const cause = new Error("ENOENT");
+    const err = new MigrationFileMissingError("Migration20260501104413_auth", cause);
+    expect(err.code).toBe("MIGRATION_FILE_MISSING");
+    expect(err.message).toContain("Migration20260501104413_auth");
+    expect(err.message).toContain("re-apply attack");
+    expect(err.cause).toBe(cause);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Suite 10: Round-trip up/down on all 6 migration classes (MED 5 — P1#19 round-3)
 // ────────────────────────────────────────────────────────────────────────────
 
 const MIGRATION_CLASSES = [
   "Migration20260501104413_auth",
   "Migration20260501120537_events_org_id_backfill",
+  "Migration20260501120538_events_org_id_notnull",
   "Migration20260501130000_composite_indexes",
   "Migration20260501130100_flag_stubs",
   "Migration20260501140000_schema_migration_ledger",

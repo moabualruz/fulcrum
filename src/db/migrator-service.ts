@@ -82,6 +82,27 @@ export class MigrationChecksumMismatchError extends Error {
 }
 
 /**
+ * Thrown when an applied migration's source file cannot be read during
+ * pre-flight checksum validation.
+ *
+ * Fail-closed semantics: an unreadable file for an already-applied migration
+ * is treated as suspicious (possible file deletion + re-apply attack) rather
+ * than silently skipped.
+ */
+export class MigrationFileMissingError extends Error {
+  readonly code = "MIGRATION_FILE_MISSING";
+  override readonly cause: unknown;
+
+  constructor(name: string, cause: unknown) {
+    super(
+      `Applied migration ${name} source file unreadable — possible deletion + re-apply attack: ${cause}`,
+    );
+    this.name = "MigrationFileMissingError";
+    this.cause = cause;
+  }
+}
+
+/**
  * Thrown when `down()` is called on a migration with `static isLossy = true`
  * without passing `force = true`.
  */
@@ -347,10 +368,12 @@ export class MigratorService {
       let currentChecksum: string;
       try {
         currentChecksum = await this.#checksumReader(migPath);
-      } catch {
-        // File not readable — skip (e.g. migration file was deleted post-apply).
-        // A future doctor check can flag missing migration files separately.
-        continue;
+      } catch (cause) {
+        // File not readable — fail closed (C6 / security).
+        // An applied migration with an unreadable source file is suspicious:
+        // it may indicate deliberate deletion to mask a re-apply attack.
+        // Do NOT skip silently; throw and surface to the caller.
+        throw new MigrationFileMissingError(row.name, cause);
       }
 
       if (currentChecksum !== row.checksum) {

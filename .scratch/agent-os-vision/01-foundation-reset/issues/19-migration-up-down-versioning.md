@@ -4,9 +4,8 @@ Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 03-composite-indexes-and-flag-stub-tables
 Owner: claude-orchestrator
-ClaimedAt: 2026-05-01T07:00:00Z
-ReviewVerdict: SPEC FAIL / CHANGES_REQUIRED — 4 HIGH (serial PK / lossy fail-open / null-container CLI / permission no-op) + 3 MED per .scratch/agent-os-vision/research/p1-19-review.md
-Round2Fix: 2026-05-01 — all 7 findings addressed; 35 tests pass; CI 11/11
+ClaimedAt: 2026-05-01T18:00:00Z
+ReviewVerdict: ROUND-3 SPEC FAIL — Suite 10 missing 6th migration class (Migration20260501120538) + checksum-skip silently continues + 2 hygiene; per .scratch/agent-os-vision/research/p1-19-round2-review.md
 PRD: .scratch/agent-os-vision/prds/01-foundation-reset.md
 Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 1 section)
 Decisions: [A3, C2, A2, C6, C7, C9]

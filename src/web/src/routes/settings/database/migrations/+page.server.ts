@@ -17,9 +17,9 @@
  *       3. OR: Expose a REST endpoint via the `/api/db` route when P1#04's API
  *          layer lands.
  *
- *     Until one of the above is in place, this page loads stub data in
- *     production builds and is fully functional in `bun run dev` mode
- *     (which uses Bun's native runtime, not Vite's Node.js build).
+ *     Until one of the above is in place (specifically Pillar 13 tRPC wiring),
+ *     the `load` function always throws error(501, INTERNAL_NOT_WIRED_YET).
+ *     There is no conditional stub-data path — it is unconditionally unimplemented.
  *
  * ⚠️  FLAG (P1#06): No permission gate yet — waiting for Better-Auth middleware.
  *
