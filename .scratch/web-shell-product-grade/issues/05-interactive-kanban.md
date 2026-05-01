@@ -32,7 +32,7 @@ Acceptance criteria:
 
 - [x] **05.1 — Server actions for tasks.** Owns: `src/web/src/lib/server/tasks.ts`, `.test.ts`. RED: PGlite tests for create/update/delete/moveStatus + matching `task.<verb>` event rows.
 - [x] **05.2 — Board helpers (`optimisticMove`, `keyboardMove`).** Owns: `src/web/src/lib/components/board/board-helpers.ts`, `.test.ts`. RED: optimistic move keeps order stable in same column; cross-column move appends to end of target.
-- [ ] **05.3 — `BoardCard` component.** Owns: `src/web/src/lib/components/board/BoardCard.svelte`, `.svelte.test.ts`. RED: click fires `onEdit` callback with task id.
+- [x] **05.3 — `BoardCard` component.** Owns: `src/web/src/lib/components/board/BoardCard.svelte`, `.svelte.test.ts`. RED: click fires `onEdit` callback with task id.
 - [ ] **05.4 — `BoardColumn` with `svelte-dnd-action`.** Owns: `src/web/src/lib/components/board/BoardColumn.svelte`, `.svelte.test.ts`. RED: `finalize` handler emits server-action call with `{ taskId, fromStatus, toStatus }`.
 - [ ] **05.5 — `BoardSheet` editor + keyboard accessibility.** Owns: `src/web/src/lib/components/board/BoardSheet.svelte`, `KeyboardMoveAnnouncer.svelte`. RED: keyboard helper triggers `optimisticMove`; `aria-live` region updated with move description.
 - [ ] **05.6 — `/boards/+page` wiring + project filter.** Owns: `src/web/src/routes/boards/+page.server.ts`, `+page.svelte`. RED: page renders five columns with seeded counts; project filter narrows results.
@@ -60,3 +60,15 @@ Pure board helpers in `src/web/src/lib/components/board/board-helpers.ts` (115 L
 - `describeStatus` exports human labels (`"In progress"`, `"Pending"`, …) reused by both intra-column reorder announcements and cross-column moves.
 
 Gates: `bun run check` 0/0/0; `bun run build` ok; repo `bun run ci` 9/9. (Pre-existing 31 component-test failures from earlier sub-tasks are unchanged — none introduced by 05.2.)
+
+### 05.3 — landed
+
+`BoardCard.svelte` (35 LOC) renders a flat shadcn-shape `<button data-board-card>` exposing `data-task-id`, `data-status`, `data-priority`, `data-draggable`, and `aria-label="Edit task: <title>"`. Inner spans carry `data-board-card-title`, `data-board-card-priority` (rendered as `P<priority>`), and an optional `data-board-card-project` marker (only when `task.project_id` is set). No dnd integration — that lives in 05.4.
+
+Click fan-out lives in `board-card-handlers.ts` (`makeBoardCardClick(taskId, onEdit?)`, 5 LOC) so the callback wiring is unit-testable without booting the DOM.
+
+Tests:
+- `BoardCard.svelte.test.ts` (4 SSR cases): data-attribute hooks + aria-label, title slot, priority slot, project marker presence/absence.
+- `board-card-handlers.test.ts` (3 cases): fires `onEdit(taskId)` once, no-op when `onEdit` undefined, multi-click counts.
+
+Gates: `bun run check` 0/0/0; `bun run build` ok; repo `bun run ci` 9/9.
