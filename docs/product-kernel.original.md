@@ -77,3 +77,7 @@ fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
 ## Web shell (parked)
 
 The SvelteKit + shadcn-svelte web app referenced in HANDOVER §6 is staged but parked behind `.scratch/product-kernel/issues/02-ui-compatibility-spike.md` and `.scratch/product-kernel/issues/11-web-shell-and-state-bridge.md`. The CLI surface above is the canonical entry point until the framework lock-in is human-approved. The vanilla state store under `src/product-kernel/state/store.ts` is ready to be wrapped for Svelte once that work resumes.
+
+## Web shell testing
+
+Vitest + Playwright scaffold for the web shell under `src/web/`. Unit tests cover store logic, filtering, validation, and component rendering. E2E tests run against a temp PGlite instance and verify the user journey: create project → task → drag → search → toast. Run `bun run web:test` for units; `FULCRUM_RUN_E2E=1 bun run web:e2e` for e2e. See `src/web/README.md` for full invocation details.
