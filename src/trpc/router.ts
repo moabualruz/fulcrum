@@ -18,6 +18,8 @@ import { protectedProcedure } from "./middleware.ts";
 
 // Real implementations (filled by owning pillar)
 import { flagsRouter } from "../server/trpc/routers/flags.ts";
+import { authRouter } from "../server/trpc/routers/auth.ts";
+import { orgsRouter } from "../server/trpc/routers/orgs.ts";
 
 // Domain stub routers — src/trpc/routers/<domain>.ts
 // Each exports list() → [] until the owning pillar replaces the body.
@@ -32,22 +34,7 @@ import { searchRouter } from "./routers/search.ts";
 import { notificationsRouter } from "./routers/notifications.ts";
 import { webhooksRouter } from "./routers/webhooks.ts";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// auth sub-router stub — Pillar 9 (auth tRPC procedures + org management)
-// ─────────────────────────────────────────────────────────────────────────────
-const authRouter = t.router({
-  /**
-   * auth.whoami — returns the current session's user + org info.
-   * This is the canonical "are you alive?" probe used by Pillar 16 web client.
-   */
-  whoami: protectedProcedure.query(({ ctx }) => {
-    return {
-      userId: ctx.userId,
-      orgId: ctx.orgId,
-      sessionId: ctx.session.id,
-    };
-  }),
-});
+// authRouter imported above from src/server/trpc/routers/auth.ts (Pillar 9)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // db sub-router stub — Pillar 2 (MikroORM data layer procedures)
@@ -89,6 +76,7 @@ export const appRouter = t.router({
   webhooks: webhooksRouter,
   // Real implementations
   flags: flagsRouter,
+  orgs: orgsRouter,
   orchestration: orchestrationRouter,
   health: healthRouter,
 });

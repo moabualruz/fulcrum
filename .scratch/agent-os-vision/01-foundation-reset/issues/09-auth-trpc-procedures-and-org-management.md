@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: completed
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 07-feature-flag-registry
