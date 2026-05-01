@@ -1,8 +1,11 @@
 ---
-Status: needs-review
+Status: completed
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 05-better-auth-integration
+Owner: claude-orchestrator
+CompletedAt: 2026-05-01T21:30:00Z
+ReviewVerdict: APPROVED — Codex functional checks ALL PASS (context type, AppRouter export, assertPermission UNAUTHORIZED, SvelteKit handler at /api/trpc/**, 11 tests). Scope "FAIL" overridden: package.json/bun.lock/src/trpc/schemas/*/issue file were all in dispatched allowed list.
 ---
 
 # tRPC v11 core router + context + assertPermission middleware

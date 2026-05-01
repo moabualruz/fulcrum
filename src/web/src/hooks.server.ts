@@ -34,6 +34,7 @@ async function getAuthHandler(): Promise<((req: Request) => Promise<Response>) |
     const { initOrm } = await import("../../../src/db/mikro-orm.config.ts");
     const orm = await initOrm();
     const svc = new AuthService(orm.em);
+    await svc.init();
     _authHandler = svc.handler;
     return _authHandler;
   } catch {
