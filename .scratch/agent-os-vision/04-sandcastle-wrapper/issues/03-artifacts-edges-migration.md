@@ -11,15 +11,15 @@ Blocked-by: 02-agent-runs-schema-migration
 
 ## What to build (end-to-end)
 
-Write Drizzle migrations for two new tables: `artifacts` (stores harvested files from agent runs) and `edges` (stores typed relationships between entities, e.g. `artifact → generated_by → agent_run`). Both tables need `org_id` composite indexes per C2/Q22. The `edges` table needs a unique index on `(org_id, from_kind, from_id, to_kind, to_id, kind)` to prevent duplicate relationship rows. `fulcrum db validate` must pass.
+Create two new MikroORM v7 entity classes — `Artifact` and `Edge` — and generate migration classes via `mikro-orm migration:create`. Entity files: `src/db/entities/sandbox/Artifact.ts`, `src/db/entities/sandbox/Edge.ts`. Both need `org` ManyToOne and composite `(org_id, …)` indexes per C2/Q22. `Edge` needs unique index on `(org_id, from_kind, from_id, to_kind, to_id, kind)`. `fulcrum db validate` must pass.
 
 ## Acceptance criteria
 
-- [ ] Adapter / profile: `artifacts` table created with all columns from PRD schema: `id`, `org_id`, `run_id`, `task_id`, `filename`, `mime`, `size_bytes`, `path`, `metadata_json`, `created_at`; `run_id` FK to `agent_runs(id)`; `task_id` nullable FK to `tasks(id)`.
-- [ ] Adapter / profile: `edges` table created with `id`, `org_id`, `from_kind`, `from_id`, `to_kind`, `to_id`, `kind`, `created_at`.
+- [ ] Adapter / profile: `Artifact` entity has all properties from PRD: `id`, `org`, `run`, `task` (nullable), `filename`, `mime`, `sizeBytes`, `path`, `metadataJson`, `createdAt`; `run` ManyToOne FK to `AgentRun`; `task` nullable ManyToOne FK to `Task`.
+- [ ] Adapter / profile: `Edge` entity has properties `id`, `org`, `fromKind`, `fromId`, `toKind`, `toId`, `kind`, `createdAt`.
 - [ ] Lifecycle integration: indexes `artifacts_org_run (org_id, run_id)` and `artifacts_org_task (org_id, task_id)` present; `edges_from_to_kind` UNIQUE index and `edges_to_lookup (org_id, to_kind, to_id, kind)` index present.
-- [ ] Surfaces parity: no new UI in this slice; schema only.
-- [ ] Tests: migration applied in test DB; schema-check test asserts both tables and all four indexes exist; insert + query round-trip test for both tables.
+- [ ] Surfaces parity: no new UI in this slice; entity + migration only.
+- [ ] Tests: migration class applied in test DB; repository `.findOne()` round-trip asserts both entities + all four indexes exist.
 
 ## Blocked by
 

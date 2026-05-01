@@ -24,7 +24,7 @@ Pillar 9 capstone: `fulcrum doctor` repos section + full Playwright e2e test sui
 - [ ] `hyperfine` benchmark: `WatcherRegistry.startAll()` for 20 repos < 500 ms; result captured in `bench/repos-watcher-startup.json`.
 - [ ] `hyperfine` benchmark: `repo.sync.local` on 1k-file fixture repo < 3 s; result in `bench/repos-sync-local.json`.
 - [ ] `bun run ci` includes the Playwright repos suite; no skip markers.
-- [ ] Search integration: after sync, `SELECT * FROM search_documents WHERE source_kind='repo_file'` returns rows; FTS on filename returns correct repo.
+- [ ] Search integration: after sync, `searchDocRepo.find({ sourceKind: 'repo_file' })` returns rows; FTS on filename returns correct repo.
 
 ## Blocked by
 

@@ -42,6 +42,6 @@ CLI edits description as plain text (round-trip safe). TUI uses plain `<Textarea
 
 ## Notes / Tech-stack hints
 - TipTap instance shared with Pillar 7 (docs editor) — import extension set from `src/editor/extensions.ts`
-- `tiptap_content` column added to `tasks` in this slice via migration (`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS tiptap_content jsonb`)
+- `tiptapContent` property added to `Task` entity in this slice via additive MikroORM migration class (`mikro-orm migration:create`)
 - Real-time collab (Yjs) for task description is gated behind `real-time-collab-server` flag — wired in slice 27
 - Autosave must not fire if content is unchanged (deep-equal check before tRPC call)

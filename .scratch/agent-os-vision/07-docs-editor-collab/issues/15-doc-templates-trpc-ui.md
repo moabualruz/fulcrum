@@ -44,5 +44,5 @@ at cursor.
 `01-docs-schema-foundation.md`, `04-doc-template-seeds.md`, `05-doc-crud-trpc.md`
 
 ## Notes / Tech-stack hints
-- `is_default` toggle: use a DB transaction — `UPDATE … SET is_default=false WHERE org_id=? AND project_id=? AND doc_type=?`, then `UPDATE … SET is_default=true WHERE id=?`
+- `is_default` toggle: use `em.transactional(async em => { await docTemplateRepo.nativeUpdate({ org, project, docType }, { isDefault: false }); await docTemplateRepo.nativeUpdate({ id }, { isDefault: true }); })` — single transaction, no raw SQL
 - Template CRUD settings page lives at `/projects/<id>/settings/templates`; org-level templates at `/settings/templates`

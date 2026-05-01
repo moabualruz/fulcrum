@@ -16,28 +16,21 @@ Docs: []
 PRD: `.scratch/agent-os-vision/prds/06-tasks-and-scrum.md` (issues breakdown lines T6-01, T6-05)
 
 ## What to build
-Idempotent migration that creates `custom_field_defs` with all columns,
-`type IN ('text','select','multi_select','number','date','user','url','json')`
-CHECK constraint, `UNIQUE(project_id, slug)`, composite index
-`custom_field_defs_org_project(org_id, project_id)`. Includes a `seedDefaultFields(projectId)`
-helper that inserts the nine canonical defaults (`status`, `priority`, `assignee`,
-`due_date`, `estimate`, `parent`, `tags`, `repo`, `sprint`) at project creation
-time; seeder is idempotent (`INSERT … ON CONFLICT DO NOTHING`). Per-type `config_json`
-Zod discriminated union exported from `src/db/schema/custom-fields.ts`.
+MikroORM v7 migration creating the `CustomFieldDef` entity (`src/db/entities/tasks/CustomFieldDef.ts`) with all properties, `type IN ('text','select','multi_select','number','date','user','url','json')` CHECK constraint, `UNIQUE(project_id, slug)`, composite index `custom_field_defs_org_project(org_id, project_id)`. Includes a `seedDefaultFields(projectId, orgId)` helper that upserts the nine canonical defaults (`status`, `priority`, `assignee`, `due_date`, `estimate`, `parent`, `tags`, `repo`, `sprint`) via `customFieldDefRepo.upsert(...)` on project creation; seeder idempotent (upsert on `(project_id, slug)` conflict). Per-type `configJson` Zod discriminated union exported from `src/db/entities/tasks/CustomFieldDef.ts`.
 
 ## Acceptance criteria
-- [ ] Schema migration: `custom_field_defs` created with all columns; re-run is no-op
-- [ ] Schema migration: `type` CHECK constraint rejects unknown types
-- [ ] Schema migration: `UNIQUE(project_id, slug)` rejects duplicate slug per project
-- [ ] Schema migration: `custom_field_defs_org_project` composite index present
-- [ ] Logic: `CustomFieldDefRow` Drizzle inferred type exported
-- [ ] Logic: `CustomFieldConfigSchema` discriminated union (one Zod schema per type) validates `config_json`; e.g. `select` requires `options: [{value, label, color}][]`; `number` allows `{unit, decimals, min, max}`
-- [ ] Logic: `seedDefaultFields(projectId, orgId)` inserts nine rows on project create; second call is no-op
-- [ ] Tests: migration idempotency
-- [ ] Tests: `type` CHECK violation
-- [ ] Tests: `UNIQUE(project_id, slug)` violation on duplicate slug
-- [ ] Tests: `seedDefaultFields` runs twice — row count stays at 9
-- [ ] Tests: each type's `config_json` validated by discriminated union (happy path + bad shape rejects)
+- [ ] Migration class: `CustomFieldDef` entity table created; idempotent (`mikro-orm migration:up` twice = no-op)
+- [ ] Migration class: `type` CHECK constraint rejects unknown types
+- [ ] Migration class: `UNIQUE(project_id, slug)` rejects duplicate slug per project
+- [ ] Migration class: `custom_field_defs_org_project` composite index present
+- [ ] Logic: `CustomFieldDef` MikroORM entity type exported
+- [ ] Logic: `CustomFieldConfigSchema` Zod discriminated union (one schema per type) validates `configJson`; e.g. `select` requires `options: [{value, label, color}][]`; `number` allows `{unit, decimals, min, max}`
+- [ ] Logic: `seedDefaultFields(projectId, orgId)` upserts nine rows on project create; second call is no-op
+- [ ] Tests: migration class idempotency
+- [ ] Tests: `type` CHECK violation via repository insert
+- [ ] Tests: `UNIQUE(project_id, slug)` violation on duplicate slug via repository insert
+- [ ] Tests: `seedDefaultFields` runs twice — repository count stays at 9
+- [ ] Tests: each type's `configJson` validated by discriminated union (happy path + bad shape rejects)
 
 ## Blocked by
 None — can start immediately (parallel to slices 01 and 02)

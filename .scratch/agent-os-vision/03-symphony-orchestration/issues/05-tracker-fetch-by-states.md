@@ -12,8 +12,8 @@ PRD: `.scratch/agent-os-vision/prds/03-symphony-orchestration.md`
 
 ## What to build
 Implement the two remaining Symphony tracker operations in `src/orchestration/symphony/tracker.ts`:
-- `fetchIssuesByStates(orgId, states[], limit?)` — batch query `agent_runs` filtered by `symphony_state IN (states)`; returns full run + task rows; Zod-validated output.
-- `fetchIssueStatesByIds(orgId, runIds[])` — lightweight `SELECT id, symphony_state FROM agent_runs WHERE id = ANY($1)`; returns `{id, state}[]`; used for fast polling without fetching full row.
+- `fetchIssuesByStates(orgId, states[], limit?)` — repository call `agentRunRepo.find({ org: orgId, orchestrationState: { $in: states } }, { limit })`; returns full run + task rows; Zod-validated output.
+- `fetchIssueStatesByIds(orgId, runIds[])` — lightweight `agentRunRepo.find({ id: { $in: runIds }, org: orgId }, { fields: ['id', 'orchestrationState'] })`; returns `{id, state}[]`; used for fast polling without fetching full row.
 Both exposed as tRPC procedures `orchestration.fetchIssuesByStates` and `orchestration.fetchIssueStatesByIds`.
 
 ## Acceptance criteria
@@ -28,4 +28,4 @@ Both exposed as tRPC procedures `orchestration.fetchIssuesByStates` and `orchest
 03-schema-agent-runs-symphony-columns
 
 ## Notes
-`fetchIssueStatesByIds` is the hot polling path; must stay SELECT-only with no joins heavier than the partial index allows.
+`fetchIssueStatesByIds` is the hot polling path; must stay read-only with no joins heavier than the partial index allows. Use `{ fields: ['id','orchestrationState'] }` in MikroORM `find()` to avoid loading full entity.
