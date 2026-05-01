@@ -16,7 +16,6 @@
 //   - Fail-soft per tool: log warning and continue on any error.
 
 import { stat } from "node:fs/promises";
-import { join } from "node:path";
 import { AGENTS } from "../agents/registry.ts";
 import type { AgentId } from "./mcp-registry.ts";
 import { which, run as runProc } from "../utils/proc.ts";
@@ -26,10 +25,6 @@ import { stripVendorRuleBlocks } from "./install.ts";
 
 async function isDir(p: string): Promise<boolean> {
   try { return (await stat(p)).isDirectory(); } catch { return false; }
-}
-
-function componentLedgerPath(home: string): string {
-  return join(home, ".fulcrum", "state", "global", "components.db");
 }
 
 /** Run a vendor command, log warning on failure, never throw. */
@@ -69,10 +64,10 @@ async function detectedAgentIds(home: string): Promise<Set<string>> {
   return detected;
 }
 
-function recordVendorComponent(componentId: string, agentIds: readonly AgentId[] = [], home?: string): void {
+function recordVendorComponent(componentId: string, agentIds: readonly AgentId[] = []): void {
   const component = getComponent(componentId);
   if (component === null) return;
-  const ledger = ComponentLedger.open(home ? componentLedgerPath(home) : undefined);
+  const ledger = ComponentLedger.open();
   try {
     ledger.recordComponent({ id: component.id, kind: component.kind, status: "installed" });
     for (const surface of component.surfaces) {
@@ -142,7 +137,7 @@ export async function runGraphifyIntegration(
       console.log("  · graphify: Pi not supported by graphify CLI; skipping (file copy via upstream skills covers fallback)");
     }
     if (!dryRun && installedAgents.length > 0) {
-      recordVendorComponent("package.graphify", installedAgents, home);
+      recordVendorComponent("package.graphify", installedAgents);
     }
     return installedAgents.length > 0;
   }
@@ -151,7 +146,7 @@ export async function runGraphifyIntegration(
   return false;
 }
 
-export async function runAstGrepIntegration(dir: string, dryRun: boolean, home?: string): Promise<boolean> {
+export async function runAstGrepIntegration(dir: string, dryRun: boolean): Promise<boolean> {
   const hasNpx = !!(await which("npx"));
   if (!hasNpx) return false;
   const ok = await vendorRun(
@@ -161,12 +156,12 @@ export async function runAstGrepIntegration(dir: string, dryRun: boolean, home?:
     dryRun,
   );
   if (ok && !dryRun) {
-    recordVendorComponent("package.ast-grep", [], home);
+    recordVendorComponent("package.ast-grep");
   }
   return ok;
 }
 
-export async function runTavilyIntegration(dir: string, dryRun: boolean, home?: string): Promise<boolean> {
+export async function runTavilyIntegration(dir: string, dryRun: boolean): Promise<boolean> {
   const hasNpx = !!(await which("npx"));
   if (!hasNpx) return false;
   const ok = await vendorRun(
@@ -176,7 +171,7 @@ export async function runTavilyIntegration(dir: string, dryRun: boolean, home?: 
     dryRun,
   );
   if (ok && !dryRun) {
-    recordVendorComponent("package.tavily", [], home);
+    recordVendorComponent("package.tavily");
   }
   return ok;
 }
@@ -202,7 +197,7 @@ export async function runPiMcpAdapterIntegration(
       dryRun,
     );
     if (installOk && initOk && !dryRun) {
-      recordVendorComponent("package.pi-mcp-adapter", ["pi"], home);
+      recordVendorComponent("package.pi-mcp-adapter", ["pi"]);
     }
     return installOk && initOk;
   }
@@ -242,11 +237,11 @@ export async function runVendorIntegrations(
 
   // ── ast-grep/agent-skill ──────────────────────────────────────────────────
   // Single canonical command; auto-detects agent.
-  await runAstGrepIntegration(dir, dryRun, home);
+  await runAstGrepIntegration(dir, dryRun);
 
   // ── tavily skills ─────────────────────────────────────────────────────────
   // Single canonical command covers all 7 tavily skills.
-  await runTavilyIntegration(dir, dryRun, home);
+  await runTavilyIntegration(dir, dryRun);
 
   // ── repomix ───────────────────────────────────────────────────────────────
   // Claude Code plugins handled by install.ts (W2 logic — 3 plugins via

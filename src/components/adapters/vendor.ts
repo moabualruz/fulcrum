@@ -112,10 +112,10 @@ async function installVendor(
       await runGraphifyIntegration(process.cwd(), process.env["HOME"] ?? "", dryRun);
       return;
     case "ast-grep":
-      await runAstGrepIntegration(process.cwd(), dryRun, process.env["HOME"] ?? "");
+      await runAstGrepIntegration(process.cwd(), dryRun);
       return;
     case "tavily":
-      await runTavilyIntegration(process.cwd(), dryRun, process.env["HOME"] ?? "");
+      await runTavilyIntegration(process.cwd(), dryRun);
       return;
     case "pi-mcp-adapter":
       await runPiMcpAdapterIntegration(process.cwd(), process.env["HOME"] ?? "", dryRun);
