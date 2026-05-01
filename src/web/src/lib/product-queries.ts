@@ -43,12 +43,26 @@ async function open(): Promise<ProductDb> {
   return db;
 }
 
+function isoStamp(value: string | Date): string {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+function isoStampOrNull(value: string | Date | null): string | null {
+  if (value === null) return null;
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+interface RawProject { id: string; slug: string; name: string; description: string | null; updated_at: string | Date }
+interface RawDocument { id: string; title: string; kind: string; updated_at: string | Date }
+interface RawTask { id: string; title: string; status: string; priority: number; project_id: string | null; updated_at: string | Date }
+
 export async function listProjects(): Promise<ProjectListing[]> {
   const db = await open();
   try {
-    return await db.query<ProjectListing>(
+    const rows = await db.query<RawProject>(
       `SELECT id, slug, name, description, updated_at FROM projects ORDER BY created_at ASC, id ASC`,
     );
+    return rows.map((r) => ({ ...r, updated_at: isoStamp(r.updated_at) }));
   } finally {
     await db.close();
   }
@@ -57,17 +71,20 @@ export async function listProjects(): Promise<ProjectListing[]> {
 export async function listDocuments(projectId?: string | null): Promise<DocumentListing[]> {
   const db = await open();
   try {
+    let rows: RawDocument[];
     if (projectId) {
-      return await db.query<DocumentListing>(
+      rows = await db.query<RawDocument>(
         `SELECT id, title, kind, updated_at FROM documents
           WHERE project_id = $1
           ORDER BY updated_at DESC, id ASC`,
         [projectId],
       );
+    } else {
+      rows = await db.query<RawDocument>(
+        `SELECT id, title, kind, updated_at FROM documents ORDER BY updated_at DESC, id ASC`,
+      );
     }
-    return await db.query<DocumentListing>(
-      `SELECT id, title, kind, updated_at FROM documents ORDER BY updated_at DESC, id ASC`,
-    );
+    return rows.map((r) => ({ ...r, updated_at: isoStamp(r.updated_at) }));
   } finally {
     await db.close();
   }
@@ -76,38 +93,50 @@ export async function listDocuments(projectId?: string | null): Promise<Document
 export async function listBoardTasks(projectId?: string | null): Promise<BoardTask[]> {
   const db = await open();
   try {
+    let rows: RawTask[];
     if (projectId) {
-      return await db.query<BoardTask>(
+      rows = await db.query<RawTask>(
         `SELECT id, title, status, priority, project_id, updated_at
            FROM tasks WHERE project_id = $1
           ORDER BY priority DESC, updated_at DESC, id ASC`,
         [projectId],
       );
+    } else {
+      rows = await db.query<RawTask>(
+        `SELECT id, title, status, priority, project_id, updated_at
+           FROM tasks ORDER BY priority DESC, updated_at DESC, id ASC`,
+      );
     }
-    return await db.query<BoardTask>(
-      `SELECT id, title, status, priority, project_id, updated_at
-         FROM tasks ORDER BY priority DESC, updated_at DESC, id ASC`,
-    );
+    return rows.map((r) => ({ ...r, updated_at: isoStamp(r.updated_at) }));
   } finally {
     await db.close();
   }
 }
 
+interface RawRun { id: string; agent: string; model: string | null; status: string; started_at: string | Date; ended_at: string | Date | null }
+
 export async function listRuns(projectId?: string | null): Promise<RunListing[]> {
   const db = await open();
   try {
+    let rows: RawRun[];
     if (projectId) {
-      return await db.query<RunListing>(
+      rows = await db.query<RawRun>(
         `SELECT id, agent, model, status, started_at, ended_at
            FROM agent_runs WHERE project_id = $1
           ORDER BY started_at DESC, id ASC`,
         [projectId],
       );
+    } else {
+      rows = await db.query<RawRun>(
+        `SELECT id, agent, model, status, started_at, ended_at
+           FROM agent_runs ORDER BY started_at DESC, id ASC`,
+      );
     }
-    return await db.query<RunListing>(
-      `SELECT id, agent, model, status, started_at, ended_at
-         FROM agent_runs ORDER BY started_at DESC, id ASC`,
-    );
+    return rows.map((r) => ({
+      ...r,
+      started_at: isoStamp(r.started_at),
+      ended_at: isoStampOrNull(r.ended_at),
+    }));
   } finally {
     await db.close();
   }

@@ -6,7 +6,11 @@ interface ProjectRow {
   slug: string;
   name: string;
   description: string | null;
-  updated_at: string;
+  updated_at: string | Date;
+}
+
+function isoStamp(value: string | Date): string {
+  return value instanceof Date ? value.toISOString() : value;
 }
 
 export const load: PageServerLoad = ({ locals }) => {
@@ -17,10 +21,11 @@ export const load: PageServerLoad = ({ locals }) => {
       data: (async () => {
         const db = await openProductDb();
         try {
-          const projects = await db.query<ProjectRow>(
+          const rows = await db.query<ProjectRow>(
             `SELECT id, slug, name, description, updated_at
                FROM projects ORDER BY created_at ASC, id ASC`,
           );
+          const projects = rows.map((r) => ({ ...r, updated_at: isoStamp(r.updated_at) }));
           return { projects };
         } finally {
           await db.close();
