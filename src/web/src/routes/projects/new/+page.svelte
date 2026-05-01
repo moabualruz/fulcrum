@@ -1,13 +1,14 @@
 <script lang="ts">
-	import type { PageData } from "./$types";
+	import type { ActionData, PageData } from "./$types";
 	import ProjectForm from "$lib/components/projects/ProjectForm.svelte";
 	import { cn } from "$lib/utils.js";
 
 	interface Props {
 		data: PageData;
+		form: ActionData;
 	}
 
-	let { data }: Props = $props();
+	let { data, form }: Props = $props();
 </script>
 
 <header
@@ -24,4 +25,4 @@
 	</div>
 </header>
 
-<ProjectForm form={data.form} />
+<ProjectForm form={form?.form ?? data.form} />
