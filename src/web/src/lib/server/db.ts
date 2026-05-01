@@ -13,3 +13,18 @@ export async function openProductDb(): Promise<ProductDb> {
   await runMigrations(db);
   return db;
 }
+
+/**
+ * Resolve the default org id (slug='default'). Throws when no org row
+ * exists — callers should treat that as a hard error since every load
+ * path requires an org for tenancy scoping.
+ */
+export async function getDefaultOrgId(db: ProductDb): Promise<string> {
+  const rows = await db.query<{ id: string }>(
+    `SELECT id FROM orgs WHERE slug = $1`,
+    ["default"],
+  );
+  const id = rows[0]?.id;
+  if (!id) throw new Error("default org not found — run `fulcrum product init`");
+  return id;
+}

@@ -74,6 +74,6 @@ fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
 
 `--json` parseable every verb. `--org-slug` defaults `default` (local org `fulcrum product init` creates).
 
-## Web shell (parked)
+## Web shell
 
-SvelteKit + shadcn-svelte web app from HANDOVER §6 staged but parked behind `.scratch/product-kernel/issues/02-ui-compatibility-spike.md` + `.scratch/product-kernel/issues/11-web-shell-and-state-bridge.md`. CLI surface above = canonical entry point until framework lock-in human-approved. Vanilla state store at `src/product-kernel/state/store.ts` ready to wrap for Svelte when work resumes.
+SvelteKit 2 + shadcn-svelte web shell at `src/web/`, same PGlite product DB CLI uses (`${FULCRUM_HOME}/state/product/db/main`). Surfaces all CLI domains as interactive views: `/` dashboard, `/projects`, `/docs` (Markdown editor), `/boards` (drag/drop kanban), `/runs` (filterable run list + detail w/ cancel/retry), `/search` (full-text), global cmd+K palette. Form actions return uniform `ActionResult` shape; layout `Toaster` bridge surfaces success/error toasts. Heavy queries stream via SvelteKit `streamed` loader so route headers paint while data resolves; `RouteSkeleton` placeholders fill pending branch.

@@ -72,7 +72,7 @@ describe("server actions: projects", () => {
     const { db, orgId } = await freshDb("update-name");
     try {
       const { id } = await createProjectAction(db, { orgId, slug: "a", name: "A" });
-      const result = await updateProjectAction(db, { id, name: "Renamed" });
+      const result = await updateProjectAction(db, { id, orgId, name: "Renamed" });
       expect(result).toEqual({ ok: true });
 
       const row = await readProject(db, id);
@@ -91,7 +91,7 @@ describe("server actions: projects", () => {
     const { db, orgId } = await freshDb("update-desc");
     try {
       const { id } = await createProjectAction(db, { orgId, slug: "b", name: "B" });
-      await updateProjectAction(db, { id, description: "new" });
+      await updateProjectAction(db, { id, orgId, description: "new" });
 
       const row = await readProject(db, id);
       expect(row?.description).toBe("new");
@@ -108,7 +108,7 @@ describe("server actions: projects", () => {
     const { db, orgId } = await freshDb("update-both");
     try {
       const { id } = await createProjectAction(db, { orgId, slug: "c", name: "C" });
-      await updateProjectAction(db, { id, name: "C2", description: "d2" });
+      await updateProjectAction(db, { id, orgId, name: "C2", description: "d2" });
 
       const row = await readProject(db, id);
       expect(row?.name).toBe("C2");
@@ -127,7 +127,7 @@ describe("server actions: projects", () => {
     const { db, orgId } = await freshDb("update-none");
     try {
       const { id } = await createProjectAction(db, { orgId, slug: "d", name: "D" });
-      expect(updateProjectAction(db, { id })).rejects.toThrow();
+      expect(updateProjectAction(db, { id, orgId })).rejects.toThrow();
     } finally {
       await db.close();
     }
@@ -136,7 +136,7 @@ describe("server actions: projects", () => {
   test("updateProjectAction throws when id is missing", async () => {
     const { db } = await freshDb("update-noid");
     try {
-      expect(updateProjectAction(db, { id: "", name: "X" })).rejects.toThrow();
+      expect(updateProjectAction(db, { id: "", orgId: "00000000000000000000000000", name: "X" })).rejects.toThrow();
     } finally {
       await db.close();
     }
@@ -146,7 +146,7 @@ describe("server actions: projects", () => {
     const { db, orgId } = await freshDb("delete-existing");
     try {
       const { id } = await createProjectAction(db, { orgId, slug: "e", name: "E" });
-      const result = await deleteProjectAction(db, id);
+      const result = await deleteProjectAction(db, id, orgId);
       expect(result).toEqual({ ok: true });
 
       const row = await readProject(db, id);
@@ -164,7 +164,7 @@ describe("server actions: projects", () => {
   test("deleteProjectAction on missing row returns ok and emits no event", async () => {
     const { db } = await freshDb("delete-missing");
     try {
-      const result = await deleteProjectAction(db, "01J0NONEXISTENTULIDAAAAAAAA");
+      const result = await deleteProjectAction(db, "01J0NONEXISTENTULIDAAAAAAAA", "00000000000000000000000000");
       expect(result).toEqual({ ok: true });
 
       const events = await db.query<EventRow>(

@@ -1,6 +1,6 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb } from "$lib/server/db";
+import { openProductDb, getDefaultOrgId } from "$lib/server/db";
 import { deleteDocumentAction } from "$lib/server/documents";
 
 interface DocRow {
@@ -16,7 +16,7 @@ interface DocRow {
 
 type ProductDb = Awaited<ReturnType<typeof openProductDb>>;
 
-async function loadDoc(db: ProductDb, id: string): Promise<{ doc: {
+async function loadDoc(db: ProductDb, id: string, orgId: string): Promise<{ doc: {
   id: string;
   org_id: string;
   project_id: string | null;
@@ -28,8 +28,8 @@ async function loadDoc(db: ProductDb, id: string): Promise<{ doc: {
 } }> {
   const rows = await db.query<DocRow>(
     `SELECT id, org_id, project_id, kind, title, body, frontmatter, updated_at
-       FROM documents WHERE id = $1`,
-    [id],
+       FROM documents WHERE id = $1 AND org_id = $2`,
+    [id, orgId],
   );
   if (rows.length === 0) throw error(404, "Document not found");
   const row = rows[0]!;
@@ -56,7 +56,8 @@ export const load: PageServerLoad = ({ params, locals }) => ({
     data: (async () => {
       const db = await openProductDb();
       try {
-        return await loadDoc(db, params.id);
+        const orgId = await getDefaultOrgId(db);
+        return await loadDoc(db, params.id, orgId);
       } finally {
         await db.close();
       }
@@ -68,7 +69,8 @@ export const actions: Actions = {
   delete: async ({ params }) => {
   const db = await openProductDb();
   try {
-    await deleteDocumentAction(db, params.id!);
+    const orgId = await getDefaultOrgId(db);
+    await deleteDocumentAction(db, params.id!, orgId);
   } finally {
     await db.close();
   }

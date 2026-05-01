@@ -15,6 +15,7 @@ export interface CreateDocumentInput {
 
 export interface UpdateDocumentInput {
   id: string;
+  orgId: string;
   title?: string;
   body?: string;
   kind?: string;
@@ -75,9 +76,13 @@ export async function updateDocumentAction(
   if (changed.length === 0) throw new Error("updateDocumentAction: no fields to update");
   sets.push(`updated_at = now()`);
   params.push(input.id);
+  const idIdx = params.length;
+  params.push(input.orgId);
+  const orgIdx = params.length;
   const rows = await db.query<DocRow>(
-    `UPDATE documents SET ${sets.join(", ")} WHERE id = $${params.length}
-       RETURNING org_id, project_id, kind, title, body, frontmatter`,
+    `UPDATE documents SET ${sets.join(", ")}
+       WHERE id = $${idIdx} AND org_id = $${orgIdx}
+     RETURNING org_id, project_id, kind, title, body, frontmatter`,
     params,
   );
   const row = rows[0];
@@ -93,11 +98,15 @@ export async function updateDocumentAction(
   return { ok: true };
 }
 
-export async function deleteDocumentAction(db: ProductDb, id: string): Promise<{ ok: true }> {
-  await db.query(`DELETE FROM search_documents WHERE source_kind = 'document' AND source_id = $1`, [id]);
+export async function deleteDocumentAction(db: ProductDb, id: string, orgId: string): Promise<{ ok: true }> {
+  await db.query(
+    `DELETE FROM search_documents
+       WHERE source_kind = 'document' AND source_id = $1 AND org_id = $2`,
+    [id, orgId],
+  );
   const rows = await db.query<{ org_id: string; project_id: string | null }>(
-    `DELETE FROM documents WHERE id = $1 RETURNING org_id, project_id`,
-    [id],
+    `DELETE FROM documents WHERE id = $1 AND org_id = $2 RETURNING org_id, project_id`,
+    [id, orgId],
   );
   const row = rows[0];
   if (row) {

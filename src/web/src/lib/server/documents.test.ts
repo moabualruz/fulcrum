@@ -119,7 +119,7 @@ describe("server actions: documents", () => {
         title: "Old",
         body: "body",
       });
-      const result = await updateDocumentAction(db, { id, title: "New" });
+      const result = await updateDocumentAction(db, { id, orgId, title: "New" });
       expect(result).toEqual({ ok: true });
 
       const row = await readDoc(db, id);
@@ -147,7 +147,7 @@ describe("server actions: documents", () => {
         title: "Title",
         body: "before",
       });
-      await updateDocumentAction(db, { id, body: "after" });
+      await updateDocumentAction(db, { id, orgId, body: "after" });
 
       const row = await readDoc(db, id);
       expect(row?.body).toBe("after");
@@ -173,7 +173,7 @@ describe("server actions: documents", () => {
         title: "T",
         body: "b",
       });
-      await updateDocumentAction(db, { id, kind: "spec" });
+      await updateDocumentAction(db, { id, orgId, kind: "spec" });
 
       const row = await readDoc(db, id);
       expect(row?.kind).toBe("spec");
@@ -198,6 +198,7 @@ describe("server actions: documents", () => {
       });
       await updateDocumentAction(db, {
         id,
+        orgId,
         frontmatter: { labels: ["a", "b"] },
       });
 
@@ -225,7 +226,7 @@ describe("server actions: documents", () => {
         title: "T",
         body: "b",
       });
-      expect(updateDocumentAction(db, { id })).rejects.toThrow();
+      expect(updateDocumentAction(db, { id, orgId })).rejects.toThrow();
     } finally {
       await db.close();
     }
@@ -234,7 +235,7 @@ describe("server actions: documents", () => {
   test("updateDocumentAction throws when id is missing", async () => {
     const { db } = await freshDb("update-noid");
     try {
-      expect(updateDocumentAction(db, { id: "", title: "X" })).rejects.toThrow();
+      expect(updateDocumentAction(db, { id: "", orgId: "00000000000000000000000000", title: "X" })).rejects.toThrow();
     } finally {
       await db.close();
     }
@@ -250,7 +251,7 @@ describe("server actions: documents", () => {
         title: "T",
         body: "b",
       });
-      const result = await deleteDocumentAction(db, id);
+      const result = await deleteDocumentAction(db, id, orgId);
       expect(result).toEqual({ ok: true });
 
       const row = await readDoc(db, id);
@@ -271,7 +272,7 @@ describe("server actions: documents", () => {
   test("deleteDocumentAction on missing row returns ok and emits no event", async () => {
     const { db } = await freshDb("delete-missing");
     try {
-      const result = await deleteDocumentAction(db, "01J0NONEXISTENTULIDAAAAAAAA");
+      const result = await deleteDocumentAction(db, "01J0NONEXISTENTULIDAAAAAAAA", "00000000000000000000000000");
       expect(result).toEqual({ ok: true });
 
       const events = await db.query<EventRow>(

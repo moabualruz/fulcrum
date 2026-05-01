@@ -89,7 +89,7 @@ describe("server actions: runs", () => {
     const { db, orgId, projectId } = await freshDb("cancel-ok");
     try {
       const id = await seedRun(db, orgId, projectId, "running");
-      const result = await cancelRunAction(db, id);
+      const result = await cancelRunAction(db, id, orgId);
       expect(result).toEqual({ ok: true });
 
       const row = await readRun(db, id);
@@ -110,7 +110,7 @@ describe("server actions: runs", () => {
     const { db, orgId, projectId } = await freshDb("cancel-idem");
     try {
       const id = await seedRun(db, orgId, projectId, "cancelled");
-      const result = await cancelRunAction(db, id);
+      const result = await cancelRunAction(db, id, orgId);
       expect(result).toEqual({ ok: true });
 
       const events = await readEventsForSubject(db, id);
@@ -130,7 +130,7 @@ describe("server actions: runs", () => {
         prompt: "Original prompt",
       });
 
-      const { id: newId } = await retryRunAction(db, parentId);
+      const { id: newId } = await retryRunAction(db, parentId, orgId);
       expect(newId).not.toBe(parentId);
 
       const newRow = await readRun(db, newId);
@@ -168,7 +168,7 @@ describe("server actions: runs", () => {
   test("retryRunAction throws when original run is missing", async () => {
     const { db } = await freshDb("retry-missing");
     try {
-      expect(retryRunAction(db, "01J0NONEXISTENTULIDAAAAAAAA")).rejects.toThrow();
+      expect(retryRunAction(db, "01J0NONEXISTENTULIDAAAAAAAA", "00000000000000000000000000")).rejects.toThrow();
     } finally {
       await db.close();
     }

@@ -7,7 +7,7 @@ import { superValidate } from "sveltekit-superforms/server";
 import { valibot } from "sveltekit-superforms/adapters";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb } from "$lib/server/db";
+import { openProductDb, getDefaultOrgId } from "$lib/server/db";
 import { updateProjectAction, deleteProjectAction } from "$lib/server/projects";
 
 // Detail-page rename uses a narrower schema than `ProjectFormSchema` — slug
@@ -47,9 +47,11 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       : ({ activeProjectId: null } as { activeProjectId: string | null });
   const db = await openProductDb();
   try {
+    const orgId = await getDefaultOrgId(db);
     const rows = await db.query<ProjectRow>(
-      `SELECT id, slug, name, description, updated_at FROM projects WHERE id = $1`,
-      [params.id],
+      `SELECT id, slug, name, description, updated_at FROM projects
+         WHERE id = $1 AND org_id = $2`,
+      [params.id, orgId],
     );
     if (rows.length === 0) throw error(404, "Project not found");
     const row = rows[0]!;
@@ -79,8 +81,10 @@ export const actions: Actions = {
     if (!form.valid) return fail(400, { form });
     const db = await openProductDb();
     try {
+      const orgId = await getDefaultOrgId(db);
       await updateProjectAction(db, {
         id: params.id!,
+        orgId,
         name: form.data.name,
         description: form.data.description ?? null,
       });
@@ -92,7 +96,8 @@ export const actions: Actions = {
   delete: async ({ params }) => {
     const db = await openProductDb();
     try {
-      await deleteProjectAction(db, params.id!);
+      const orgId = await getDefaultOrgId(db);
+      await deleteProjectAction(db, params.id!, orgId);
     } finally {
       await db.close();
     }

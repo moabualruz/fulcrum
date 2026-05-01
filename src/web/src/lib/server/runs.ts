@@ -27,13 +27,14 @@ interface RunSourceRow {
 export async function cancelRunAction(
   db: ProductDb,
   id: string,
+  orgId: string,
 ): Promise<{ ok: boolean }> {
   const rows = await db.query<RunScopeRow>(
     `UPDATE agent_runs
         SET status = 'cancelled', ended_at = now()
-      WHERE id = $1 AND status IN ('queued', 'running')
+      WHERE id = $1 AND org_id = $2 AND status IN ('queued', 'running')
       RETURNING org_id, project_id`,
-    [id],
+    [id, orgId],
   );
   const row = rows[0];
   if (row) {
@@ -52,11 +53,12 @@ export async function cancelRunAction(
 export async function retryRunAction(
   db: ProductDb,
   id: string,
+  orgId: string,
 ): Promise<{ id: string }> {
   const sourceRows = await db.query<RunSourceRow>(
     `SELECT id, org_id, project_id, agent, model, prompt
-       FROM agent_runs WHERE id = $1`,
-    [id],
+       FROM agent_runs WHERE id = $1 AND org_id = $2`,
+    [id, orgId],
   );
   const source = sourceRows[0];
   if (!source) throw new Error(`retryRunAction: run not found: ${id}`);

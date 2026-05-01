@@ -7,7 +7,7 @@ import { valibot } from "sveltekit-superforms/adapters";
 import type { Actions, PageServerLoad } from "./$types";
 import { DocumentFormSchema } from "$lib/server/documents.schema";
 import { updateDocumentAction } from "$lib/server/documents";
-import { openProductDb } from "$lib/server/db";
+import { openProductDb, getDefaultOrgId } from "$lib/server/db";
 import { parseLabels, serializeLabels } from "$lib/markdown/labels";
 
 interface DocRow {
@@ -31,10 +31,11 @@ function extractLabels(fm: Record<string, unknown>): string[] {
 export const load: PageServerLoad = async ({ params }) => {
   const db = await openProductDb();
   try {
+    const orgId = await getDefaultOrgId(db);
     const rows = await db.query<DocRow>(
       `SELECT id, org_id, project_id, kind, title, body, frontmatter, updated_at
-         FROM documents WHERE id = $1`,
-      [params.id],
+         FROM documents WHERE id = $1 AND org_id = $2`,
+      [params.id, orgId],
     );
     if (rows.length === 0) throw error(404, "Document not found");
     const row = rows[0]!;
@@ -73,19 +74,21 @@ export const actions: Actions = {
     if (!form.valid) return fail(400, { form });
     const db = await openProductDb();
     try {
+      const orgId = await getDefaultOrgId(db);
       // Re-read current frontmatter so non-form keys (e.g. `id`, `status`,
       // anything 04.2's `readFrontmatterForm` would route to `rawFrontmatter`)
       // survive the round-trip — issue 15 byte-stability follow-up depends
       // on this.
       const rows = await db.query<{ frontmatter: Record<string, unknown> }>(
-        `SELECT frontmatter FROM documents WHERE id = $1`,
-        [params.id],
+        `SELECT frontmatter FROM documents WHERE id = $1 AND org_id = $2`,
+        [params.id, orgId],
       );
       if (rows.length === 0) throw error(404, "Document not found");
       const rawFm = rows[0]?.frontmatter ?? {};
       const labels = parseLabels(form.data.labels ?? "");
       await updateDocumentAction(db, {
         id: params.id!,
+        orgId,
         title: form.data.title,
         kind: form.data.kind,
         body: form.data.body,

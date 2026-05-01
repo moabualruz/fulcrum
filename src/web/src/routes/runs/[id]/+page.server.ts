@@ -1,6 +1,6 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb } from "$lib/server/db";
+import { openProductDb, getDefaultOrgId } from "$lib/server/db";
 import { cancelRunAction, retryRunAction, type RunStatus } from "$lib/server/runs";
 import { actionOk } from "$lib/feedback/action-result";
 
@@ -44,11 +44,12 @@ export const load: PageServerLoad = ({ params, locals }) => {
       data: (async () => {
         const db = await openProductDb();
         try {
+          const orgId = await getDefaultOrgId(db);
           const rows = await db.query<AgentRunDetail>(
             `SELECT id, org_id, project_id, agent, model, prompt, status,
                     parent_run_id, started_at, ended_at, transcript_path
-               FROM agent_runs WHERE id = $1`,
-            [params.id],
+               FROM agent_runs WHERE id = $1 AND org_id = $2`,
+            [params.id, orgId],
           );
           if (rows.length === 0) throw error(404, "Run not found");
           const raw = rows[0]!;
@@ -73,8 +74,9 @@ export const load: PageServerLoad = ({ params, locals }) => {
           const eventRows = await db.query<EventRow>(
             `SELECT * FROM events
               WHERE subject_kind = 'agent_run' AND subject_id = $1
+                AND org_id = $2
               ORDER BY created_at DESC, id DESC`,
-            [run.id],
+            [run.id, orgId],
           );
           const events = eventRows.map((e) => ({
             ...e,
@@ -94,7 +96,8 @@ export const actions: Actions = {
   cancel: async ({ params }) => {
     const db = await openProductDb();
     try {
-      await cancelRunAction(db, params.id!);
+      const orgId = await getDefaultOrgId(db);
+      await cancelRunAction(db, params.id!, orgId);
     } finally {
       await db.close();
     }
@@ -104,7 +107,8 @@ export const actions: Actions = {
     let newId: string;
     const db = await openProductDb();
     try {
-      const result = await retryRunAction(db, params.id!);
+      const orgId = await getDefaultOrgId(db);
+      const result = await retryRunAction(db, params.id!, orgId);
       newId = result.id;
     } finally {
       await db.close();
