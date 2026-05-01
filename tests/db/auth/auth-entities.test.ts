@@ -6,7 +6,7 @@
  *   2. em.create / em.persist / em.flush / em.getRepository().findOne() for each entity.
  *
  * Per C6: NO raw SQL strings outside src/db/migrations/.
- *         Schema setup via orm.schema.refreshDatabase(); fixtures via em.create + em.persistAndFlush.
+ *         Schema setup via orm.schema.create(); fixtures via em.create + em.persist + em.flush.
  * Per C7: MikroORM v7 @Entity decorator-class pattern.
  * Per C9: entities at src/db/entities/auth/, repositories at src/db/repositories/auth/.
  */

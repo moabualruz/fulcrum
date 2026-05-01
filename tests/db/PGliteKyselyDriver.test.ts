@@ -122,6 +122,54 @@ describe("splitStatements — dollar-quoted blocks", () => {
   });
 });
 
+describe("splitStatements — SQL comment handling (regression)", () => {
+  it("does NOT split on semicolons inside a -- line comment", () => {
+    // The '; with ; semicolons' after '--' must not be treated as boundaries.
+    const sql = "CREATE TABLE x (\n  -- inline comment ; with ; semicolons\n  y int\n)";
+    const stmts = splitStatements(sql);
+    expect(stmts).toHaveLength(1);
+    expect(stmts[0]).toContain("y int");
+  });
+
+  it("does NOT split on semicolons inside a /* block comment */", () => {
+    const sql = "CREATE TABLE x (/* multi ; line ; comment */ y int)";
+    const stmts = splitStatements(sql);
+    expect(stmts).toHaveLength(1);
+    expect(stmts[0]).toBe("CREATE TABLE x (/* multi ; line ; comment */ y int)");
+  });
+
+  it("does NOT treat '--' inside a single-quoted string as a comment start", () => {
+    // The '--' is inside the string literal; ';' after the string IS a real boundary.
+    const sql = "CREATE TABLE x (y text DEFAULT 'a -- b'); CREATE TABLE z (id int)";
+    const stmts = splitStatements(sql);
+    expect(stmts).toHaveLength(2);
+    expect(stmts[0]).toBe("CREATE TABLE x (y text DEFAULT 'a -- b')");
+    expect(stmts[1]).toBe("CREATE TABLE z (id int)");
+  });
+
+  it("does NOT treat quotes inside /* */ block comments as string delimiters", () => {
+    // 'quotes' inside the comment should not open/close a string context.
+    const sql = "CREATE TABLE x (/* contains 'quotes' */ y int)";
+    const stmts = splitStatements(sql);
+    expect(stmts).toHaveLength(1);
+    expect(stmts[0]).toBe("CREATE TABLE x (/* contains 'quotes' */ y int)");
+  });
+
+  it("handles mixed quotes and comment forms in a single DDL string", () => {
+    // Multi-statement DDL combining: string default, line comment, block comment.
+    const sql = [
+      "CREATE TABLE a (col text DEFAULT 'val;ue')",
+      "/* block ; comment */ CREATE TABLE b (id int)",
+      "CREATE TABLE c (\n  -- line ; comment\n  val int\n)",
+    ].join(";\n");
+    const stmts = splitStatements(sql);
+    expect(stmts).toHaveLength(3);
+    expect(stmts[0]).toBe("CREATE TABLE a (col text DEFAULT 'val;ue')");
+    expect(stmts[1]).toBe("/* block ; comment */ CREATE TABLE b (id int)");
+    expect(stmts[2]).toContain("val int");
+  });
+});
+
 describe("splitStatements — MikroORM schema generator output patterns", () => {
   it("handles gen_random_uuid() default without corruption", () => {
     // Actual MikroORM DDL output for a UUID primary key

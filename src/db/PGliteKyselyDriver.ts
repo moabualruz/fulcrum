@@ -30,12 +30,13 @@ import type { PGlite } from "@electric-sql/pglite";
  * Quote-aware SQL statement splitter.
  *
  * Splits a multi-statement DDL string into individual statements, correctly
- * handling single-quoted strings ('…'), double-quoted identifiers ("…"), and
- * dollar-quoted blocks ($tag$…$tag$).  A semicolon that appears inside any of
- * these quoting forms is NOT treated as a statement boundary.
+ * handling single-quoted strings ('…'), double-quoted identifiers ("…"),
+ * dollar-quoted blocks ($tag$…$tag$), SQL line comments (-- … \n), and
+ * C-style block comments (/* … *\/).  A semicolon that appears inside any of
+ * these quoting or comment forms is NOT treated as a statement boundary.
  *
- * Limitations: C-style block comments (/* … *\/) are not tracked, but MikroORM's
- * schema generator never emits them, so this is a non-issue for our use-case.
+ * Quote/string branches execute before comment branches so that `--` or `/*`
+ * inside a string literal (e.g. DEFAULT 'a -- b') is never treated as a comment.
  *
  * @returns Array of trimmed, non-empty SQL statements (without trailing `;`).
  */
@@ -43,12 +44,16 @@ export function splitStatements(sql: string): string[] {
   const stmts: string[] = [];
   let current = "";
   let i = 0;
+  let inLine = false; // inside -- … \n line comment
+  let inBlock = false; // inside /* … */ block comment
 
   while (i < sql.length) {
     const ch = sql[i]!;
 
     // Single-quoted string literal: scan until closing ' (handle '' escapes)
-    if (ch === "'") {
+    // NOTE: quote branches run before comment branches so that '--' or '/*'
+    // inside a string is consumed as string content, not as a comment start.
+    if (!inLine && !inBlock && ch === "'") {
       current += ch;
       i++;
       while (i < sql.length) {
@@ -69,7 +74,7 @@ export function splitStatements(sql: string): string[] {
     }
 
     // Double-quoted identifier: scan until closing "
-    if (ch === '"') {
+    if (!inLine && !inBlock && ch === '"') {
       current += ch;
       i++;
       while (i < sql.length) {
@@ -90,7 +95,7 @@ export function splitStatements(sql: string): string[] {
     }
 
     // Dollar-quoted block: $tag$…$tag$ where tag may be empty ($$ … $$)
-    if (ch === "$") {
+    if (!inLine && !inBlock && ch === "$") {
       // Try to read the dollar-quote tag: $[A-Za-z0-9_]*$
       let tag = "$";
       let j = i + 1;
@@ -119,6 +124,46 @@ export function splitStatements(sql: string): string[] {
         continue;
       }
       // Not a dollar-quote — fall through as regular character
+    }
+
+    // Line comment: -- ... \n
+    // Guard: only start when not already inside any quote/comment form.
+    if (!inLine && !inBlock && ch === "-" && sql[i + 1] === "-") {
+      inLine = true;
+      current += ch + sql[i + 1]!;
+      i += 2;
+      continue;
+    }
+    if (inLine && ch === "\n") {
+      inLine = false;
+      current += ch;
+      i++;
+      continue;
+    }
+    if (inLine) {
+      current += ch;
+      i++;
+      continue;
+    }
+
+    // Block comment: /* ... */
+    // Guard: only start when not already inside any quote/comment form.
+    if (!inLine && !inBlock && ch === "/" && sql[i + 1] === "*") {
+      inBlock = true;
+      current += ch + sql[i + 1]!;
+      i += 2;
+      continue;
+    }
+    if (inBlock && ch === "*" && sql[i + 1] === "/") {
+      inBlock = false;
+      current += ch + sql[i + 1]!;
+      i += 2;
+      continue;
+    }
+    if (inBlock) {
+      current += ch;
+      i++;
+      continue;
     }
 
     // Statement boundary
