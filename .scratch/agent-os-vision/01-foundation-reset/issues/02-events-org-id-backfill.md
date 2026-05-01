@@ -4,8 +4,9 @@ Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 01-schema-auth-migration
 Owner: claude-orchestrator
-ClaimedAt: 2026-05-01T04:00:00Z
-CompletedAt: 2026-05-01T12:05:37Z
+ClaimedAt: 2026-05-01T05:00:00Z
+CompletedAt: 2026-05-01T13:00:00Z
+ReviewVerdict: CHANGES_REQUIRED resolved — 3 blockers fixed per follow-up commit (migrator round-trip test + nullable→backfill→NOT NULL ordering + @Index expression form with DESC)
 ---
 
 # Events org_id backfill migration class — NOT NULL + default-org backfill

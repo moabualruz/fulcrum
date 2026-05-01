@@ -28,14 +28,17 @@ import { EventRepository } from "../../repositories/core/EventRepository.ts";
 
 @Entity({ tableName: "events", repository: () => EventRepository })
 // Composite index for timeline queries: events per org sorted by recency.
+// expression form required to encode "created_at DESC" direction, since
+// MikroORM v7 @Index({ properties }) doesn't support per-property ordering.
 @Index({
   name: "idx_events_org_created",
-  properties: ["org", "createdAt"],
+  expression: 'CREATE INDEX "idx_events_org_created" ON "events" ("org_id", "created_at" DESC)',
 })
 // Composite index for subject-scoped queries: audit trail for a specific entity.
+// Same rationale: expression form preserves "created_at DESC" in ORM metadata.
 @Index({
   name: "idx_events_subject",
-  properties: ["org", "subjectKind", "subjectId", "createdAt"],
+  expression: 'CREATE INDEX "idx_events_subject" ON "events" ("org_id", "subject_kind", "subject_id", "created_at" DESC)',
 })
 export class Event {
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
