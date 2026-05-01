@@ -180,7 +180,9 @@ Length: 8 pillars. Every link in this chain is blocking sequential work:
 ## Execution waves
 
 ### Wave 0 — Bootstrapping (pre-code)
-No code changes. Read all artifacts; verify toolchain (Bun pinned, Rust stable, PGlite file-backed); confirm `bun run ci` currently green baseline; install missing dev deps (`fastembed-rs` POC, OpenTUI hello-world, vendor/openai-symphony submodule); document wave-0 checkpoints in HANDOVER.md.
+No code changes. Read all artifacts; verify toolchain (Bun ≥ 1.3.10 pinned for Stage-3 decorators per C8, Rust stable, PGlite file-backed via `mikro-orm-pglite`, MikroORM v7 ES-decorator mode per C7, needle-di Stage-3 DI per C8); confirm `bun run ci` currently green baseline; install missing dev deps (`@mikro-orm/core`, `@mikro-orm/postgresql`, `mikro-orm-pglite`, `@needle-di/core`, `pgvector/mikro-orm` VectorType, `fastembed-rs` POC, OpenTUI hello-world, vendor/openai-symphony submodule); document wave-0 checkpoints in HANDOVER.md.
+
+**No-plaintext-SQL guarantee (C6):** all schema changes ship as MikroORM migration classes at `src/db/migrations/Migration<timestamp>.ts` auto-generated from entity decorator diffs. Hand-written `.sql` files are forbidden in repo (test fixtures excepted). Tagged-template SQL outside ORM-generated migration class files is forbidden. Reviewer enforces.
 
 **Risk items:** PGlite WASM + Bun `--compile` binary size; `fastembed-rs` ONNX link on ARM64 macOS; OpenTUI maturity (fallback: ratatui in Rust workspace).
 
@@ -416,7 +418,7 @@ Full integration runs: cross-pillar e2e Playwright (create-project → create-ta
 - **Enterprise SSO (WorkOS / Authelia / SAML / SCIM):** Captured for follow-up vision pass; not in current 17-pillar scope. Better-Auth `saas-auth` flag is the extension point.
 - **Plugin system for user-defined agent types:** Captured for follow-up vision pass; agent profile registry in P4 is the extension point; plugin loading mechanism is a separate initiative.
 - **Model-cost accounting and budget enforcement:** Captured for follow-up vision pass; `agent_runs.cost_usd` column exists in schema; cost reporting UI and budget gates are a separate initiative.
-- **Migration downgrade strategy (`down_XXXX.sql`):** Captured for follow-up vision pass; current execution plan uses up-only migrations; downgrade tooling is a separate initiative post-v1.0 needed before SaaS multi-tenant launch.
+- **Migration downgrade strategy (paired `Migration<timestamp>.down()` methods):** Captured for follow-up vision pass; MikroORM auto-emits both `up()` and `down()` methods on every generated migration class, but the downgrade-from-current execution plan uses up-only migrations operationally; downgrade tooling (running `down()` against a target version + lossy-write protections) is a separate initiative post-v1.0 needed before SaaS multi-tenant launch.
 
 ---
 

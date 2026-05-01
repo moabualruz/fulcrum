@@ -277,11 +277,11 @@ Pillar 1's `src/flags/registry.ts` ships an initial set of 16 flags. Additional 
 
 **Source:** EXTRA-GAPS.md §A3; DECISIONS.md auto-lock list covers A1/A2/A4/A6 only — A3 is absent.
 
-**What's missing:** No `down_0XXX.sql` reversal files, no `schema_migrations` table contract, no `fulcrum db migrate --target-version X` command with downgrade support. P1 PRD references `PRAGMA user_version` and `schema_migrations` table for forward version checks but says nothing about a downgrade path. The `MIGRATION_FAILED` error model points to `fulcrum db migrate --target-version X` in P1's error table, implying the command is planned, but its contract (including downgrade) is never specified.
+**What's missing:** No paired `Migration<timestamp>.down()` reversal contract operationalized, no `mikro_orm_migrations` table audit doc'd (note: MikroORM creates the table automatically per C7), no `fulcrum db migrate --target-version <Migration<timestamp>>` command with downgrade support. P1 PRD references migration class versioning for forward checks but says nothing about a downgrade path. The `MIGRATION_FAILED` error model points to `fulcrum db migrate --target-version X` in P1's error table, implying the command is planned, but its contract (including downgrade) is never specified.
 
 **Impact:** Multi-version clusters, user downgrades from v0.2→v0.1, and rollback-after-failed-migration are undefined. For a local-first tool this is low-criticality short-term but becomes a support problem at SaaS launch.
 
-**Recommended action:** Add to Pillar 1 PRD §Migration architecture: (a) every migration ships a paired `down_NNNN.sql`; (b) `schema_migrations(version int, applied_at, rolled_back_at)` table; (c) `fulcrum db migrate --target-version N` applies up/down as needed with safety check (reject downgrade if data would be destroyed); (d) add `foundation.schema-version` doctor check to warn on version mismatch. Add auto-lock entry to DECISIONS.md as A3.
+**Recommended action:** Add to Pillar 1 PRD §Migration architecture: (a) every MikroORM migration class ships paired `up()` + `down()` methods (auto-emitted by `mikro-orm migration:create`); (b) MikroORM-managed `mikro_orm_migrations` table is the version-tracking contract; (c) `fulcrum db migrate --target-version <Migration<timestamp>>` applies up/down as needed with safety check (reject downgrade if `down()` is marked lossy via the migration class `isLossy = true` flag and `--force` is absent); (d) add `foundation.schema-version` doctor check (`MikroORM.getMigrator().getExecutedMigrations()`) to warn on version mismatch. Add auto-lock entry to DECISIONS.md as A3.
 
 **Severity: PARTIAL** — the forward path is covered; the downgrade path is absent. Requires a pre-execution amendment to Pillar 1 PRD.
 
@@ -339,7 +339,7 @@ Pillar 1's `src/flags/registry.ts` ships an initial set of 16 flags. Additional 
 
 Three PARTIAL items were found. None blocks the architecture or causes scope drift in any existing pillar. Each requires a targeted amendment before execution begins:
 
-1. **A3 (migration downgrade)** → add `down_NNNN.sql` contract + `fulcrum db migrate --target-version` spec to Pillar 1 PRD + DECISIONS.md A3 auto-lock. Estimated: 1 PRD section + 1 issue in P1.
+1. **A3 (migration downgrade)** → add paired-`up()`/`down()` MikroORM migration-class contract + `fulcrum db migrate --target-version <Migration<timestamp>>` spec to Pillar 1 PRD + DECISIONS.md A3 auto-lock. Estimated: 1 PRD section + 1 issue in P1.
 2. **A5 (license CI gate)** → add `license-checker` CI gate acceptance criterion to P17 (or P1) + DECISIONS.md A5 auto-lock. Estimated: 1 acceptance criterion in an existing issue.
 3. **B4-TUI (terminal a11y targets)** → add `NO_COLOR` / high-contrast acceptance criterion to P15 §Done when. Estimated: 2 lines.
 

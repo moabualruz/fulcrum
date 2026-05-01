@@ -2,6 +2,8 @@
 
 **As of:** 2026-05-01
 
+> **Historical snapshot.** Records the v0 Drizzle / `.schema.ts` / raw-SQL state of the repo at the start of the agent-os rebuild. The forward stack is locked at DECISIONS C6–C9 (no plaintext SQL; MikroORM v7 + needle-di + class-driven entities + paired migration-class up/down). Mentions of Drizzle / `schema.ts` / `.sql` files in this file describe what existed before the rebuild, NOT the target state.
+
 ---
 
 ## User's Verbatim Original Ask

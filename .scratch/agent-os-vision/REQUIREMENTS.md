@@ -20,10 +20,12 @@ Fulcrum is a local-first Agent OS with a Jira-plus-Confluence-class product surf
 | Layer | Pick | Why | Failure gate / 2nd choice |
 |---|---|---|---|
 | Runtime | Bun + TypeScript | 3/5 agent CLIs; single-binary compile | Node.js on Bun compat break |
-| DB local | PGlite file-backed | In-process WASM Postgres; pgvector bundled; zero service | sql.js on WASM/OPFS limits |
-| DB server | PostgreSQL | Same schema; swap `DATABASE_URL` | Neon serverless |
-| Auth | Better Auth v1 (MIT) | SQLite adapter; org+teams+roles plugin; SvelteKit native; 28k stars | Auth.js v5 |
-| Permissions | Better Auth org plugin + node-casbin (`FULCRUM_FEATURES=casbin-policies`) | In-process RBAC; Casbin ABAC when roles too coarse | OpenFGA sidecar |
+| DB local | PGlite file-backed via `mikro-orm-pglite` driver | In-process WASM Postgres; pgvector bundled; zero service | sql.js on WASM/OPFS limits; TypeORM if MikroORM PGlite spike fails |
+| DB server | PostgreSQL via `@mikro-orm/postgresql` | Same entity classes; swap `DATABASE_URL` to flip driver | Neon serverless |
+| ORM | MikroORM v7 (MIT) — ES decorators (Stage-3) — C7 | Class-driven entities, repositories, migrations; needle-di compatible; ESM-native; PR #7622 official PGlite driver in flight | Kysely + custom decorator wrapper (loses NestJS aesthetic); TypeORM (loses FTS) |
+| DI / decorators | needle-di v1.x (MIT) — Stage-3 — C8 | 7 KB; `@Injectable()` + `inject(Dep)` constructor injection; `Symbol.metadata` native on Bun ≥ 1.3.10 | inversify v8.1 (legacy decorators, 79 KB); `@nestjs/core` standalone (435 KB) |
+| Auth | Better Auth v1 (MIT) — wrapped via MikroORM `BetterAuthAdapter` (custom ~150 LOC) | Better Auth's adapter contract is ORM-agnostic; org+teams+roles plugin; SvelteKit native; 28k stars | Auth.js v5 |
+| Permissions | Better Auth org plugin + node-casbin via custom `FulcrumCasbinAdapter` (~200 LOC against MikroORM `EntityRepository`) (`FULCRUM_FEATURES=casbin-policies`) | In-process RBAC; Casbin ABAC when roles too coarse; Fulcrum-owned `casbin_policies` `@Entity` (no library-managed table) | OpenFGA sidecar |
 | Web | SvelteKit 2 + Tailwind v4 + shadcn-svelte | Existing stack; Svelte 5 runes; owned components | committed |
 | Block editor | TipTap v2 (MIT) | ProseMirror; Svelte 5 wrappers (Tipex/svelte-tiptap 3); May 2026 Pro→MIT; 92% fit | Milkdown → svelte-lexical |
 | CRDT/collab | Yjs + Hocuspocus v4 (MIT) | De-facto standard; offline-first; `FULCRUM_FEATURES=real-time-collab-server` | Y-WebRTC P2P → Automerge 3 |

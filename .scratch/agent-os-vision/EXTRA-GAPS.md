@@ -52,7 +52,7 @@
 
 **Why it matters:** Multi-version clusters (SaaS tenants at different schema versions, or local users who skip releases) require deterministic downgrade paths. Silent schema incompatibility leads to data corruption or loss.
 
-**Which pillar should own it:** Pillar 1 (Foundation) should mandate: every migration includes a `down_0XXX.sql` reversal, a `schema_version` table or pragma tracking, and a pre-upgrade compatibility check.
+**Which pillar should own it:** Pillar 1 (Foundation) should mandate: every MikroORM `Migration<timestamp>` class implements a paired `down()` method (auto-emitted by `mikro-orm migration:create`; per C7), MikroORM-managed `mikro_orm_migrations` table provides version tracking, and a pre-upgrade compatibility check (`MikroORM.getMigrator().getPendingMigrations()`).
 
 **Recommended action:** Add to Foundation PRD: migration architecture (up/down contract), schema versioning API, and a `fulcrum db migrate --target-version X` command with safety gates.
 
@@ -485,7 +485,7 @@
 
 1. **Doctor surface incomplete:** Health checks don't cover future pillars (inference sidecar, job queue, routing engine, memory extractor, search index, TUI, web app). No unified `fulcrum doctor` coverage path means operators can't diagnose failures. Adds to each pillar's scope immediately.
 
-2. **Migration downgrade strategy absent:** Every schema version lacks a `down_*.sql` reversal and versioning mechanism. Multi-version clusters (SaaS, local user skips releases) become data-loss risks. Needs Foundation PRD lock now.
+2. **Migration downgrade strategy absent:** Every schema version lacks a paired `Migration<timestamp>.down()` reversal contract + lossy-write guard (MikroORM emits `down()` automatically but Fulcrum hasn't operationalized it). Multi-version clusters (SaaS, local user skips releases) become data-loss risks. Needs Foundation PRD lock now.
 
 3. **API contract (tRPC procedures) not designed:** Three surfaces (Web, CLI, TUI) all consume the API, but no procedure signatures, Zod schemas, or OpenAPI spec exist. Development is blocked pending Foundation + API pillars. Lock tRPC domain/procedure skeleton in Pillar 1 now to unblock parallel work.
 
