@@ -19,16 +19,16 @@ PRD: `.scratch/agent-os-vision/prds/12-notifications-activity-audit.md` (Issues 
 `audit.*` tRPC procedures in `src/trpc/routers/audit.ts`. `audit.query` (filters: org_id, project_id, user_id, subject_kind, verb, date_range; default last 7 days; paginated; `created_at DESC`); `audit.export` (streams <100k rows directly; enqueues graphile-worker job for larger; returns `{jobId}` or `{rows: []}`; formats: JSON, CSV); `audit.retentionPolicy.get`; `audit.retentionPolicy.set(orgId, days)`; `audit.retentionPolicy.list`. All Zod-validated; `assertPermission(ctx, 'audit:read')` on queries; `assertPermission(ctx, 'audit:admin')` on retention CRUD. Per-event-type Zod payload schemas registered at module-init (A4).
 
 ## Acceptance criteria
-- [ ] Schema migration: reads `events` (Pillar 1 DDL); reads/writes `event_retention_policy` (created in `0012_notifications`).
+- [ ] Schema migration: reads `Event` (Pillar 1 entity); reads/writes `EventRetentionPolicy` (created in migration class `Migration<timestamp>`).
 - [ ] tRPC procedure / module: `audit.query` returns paginated events with filter combos; `audit.export` streams JSON/CSV; `audit.retentionPolicy.set` updates org's retention days; per-event-type Zod schemas registered in `src/notifications/event-schemas.ts`.
 - [ ] Web surface: `/audit` route uses `audit.query` with filter params; CSV export button calls `audit.export`; retention settings on `/settings/notifications` uses `audit.retentionPolicy.*`.
 - [ ] CLI command: `fulcrum audit query --kind task --verb status_changed --since 2026-01-01 --json` returns filtered events; `fulcrum audit export --format csv --output ./audit.csv`.
 - [ ] TUI screen: Audit panel uses `audit.query`; `E` key triggers `audit.export --format json`.
-- [ ] Tests: filter combos (kind+verb+date_range) — correct WHERE; pagination — page 2 offset correct; export CSV — headers + rows correct; retention policy CRUD round-trips; `retain_days=0` = forever; per-event Zod schemas validated on write; RED→GREEN.
+- [ ] Tests: filter combos (kind+verb+date_range) — correct repository filter; pagination — page 2 offset correct; export CSV — headers + rows correct; retention policy CRUD round-trips; `retain_days=0` = forever; per-event Zod schemas validated on write; RED→GREEN.
 
 ## Blocked by
-- `01-schema-migration.md` — `event_retention_policy` table.
-- Pillar 1 (Foundation) — `events` table DDL + Q23 `org_id` backfill.
+- `01-schema-migration.md` — `EventRetentionPolicy` entity.
+- Pillar 1 (Foundation) — `Event` entity + Q23 `org_id` backfill.
 
 ## Notes / Tech-stack hints
 - A4: `audit.list` is the same as `audit.query` (different naming in A4 vs PRD — use `audit.query`).

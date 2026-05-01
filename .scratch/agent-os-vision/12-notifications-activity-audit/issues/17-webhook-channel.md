@@ -16,11 +16,11 @@ Docs: []
 PRD: `.scratch/agent-os-vision/prds/12-notifications-activity-audit.md` (Issues T12-32, T12-33)
 
 ## What to build
-When `FULCRUM_FEATURES=notify-webhook` ON: `notify-deliver-webhook` graphile-worker task sends HTTP POST to `webhook_rule_configs.url` with `X-Fulcrum-Signature-256` HMAC header (HMAC-SHA-256 of request body, signed with `webhook_rule_configs.secret`); exponential backoff on 4xx/5xx (max 5 retries; `retry_after` column); 200 → `status='sent'`; max retries exceeded → `status='failed'`. Separate `notify-webhook-retry` cron job reschedules held deliveries. Flag OFF → no outbound requests.
+When `FULCRUM_FEATURES=notify-webhook` ON: `notify-deliver-webhook` graphile-worker task calls `@Injectable()` `WebhookNotificationDispatcher` (needle-di), which sends HTTP POST to `WebhookRuleConfig.url` with `X-Fulcrum-Signature-256` HMAC header (HMAC-SHA-256 of request body, signed with decrypted `WebhookRuleConfig.encryptedSecret`); exponential backoff on 4xx/5xx (max 5 retries; `NotificationDelivery.retryAfter`); 200 → `status='sent'`; max retries exceeded → `status='failed'`. Separate `notify-webhook-retry` cron job reschedules held deliveries. Flag OFF → no outbound requests.
 
 ## Acceptance criteria
-- [ ] Schema migration: reads `webhook_rule_configs` + `notification_deliveries`.
-- [ ] tRPC procedure / module: `notify-deliver-webhook` task; `src/notifications/channels/webhook.ts` with HMAC signing.
+- [ ] Schema migration: reads `WebhookRuleConfig` + `NotificationDelivery`.
+- [ ] tRPC procedure / module: `notify-deliver-webhook` task; `src/notifications/channels/webhook.ts` exports `@Injectable()` dispatcher with HMAC signing.
 - [ ] Web surface: webhook channel config page: URL input + secret input (masked); test delivery button.
 - [ ] CLI command: `fulcrum notify channels config webhook --url https://... --secret mysecret`; `fulcrum notify channels test webhook` sends test POST.
 - [ ] TUI screen: Settings channels shows webhook config + last delivery status.
@@ -29,9 +29,9 @@ When `FULCRUM_FEATURES=notify-webhook` ON: `notify-deliver-webhook` graphile-wor
 ## Blocked by
 - `04-fanout-worker.md` — fan-out enqueues `notify-deliver-webhook`.
 - `07-quiet-hours.md` — quiet-hours suppression.
-- `01-schema-migration.md` — `webhook_rule_configs` table.
+- `01-schema-migration.md` — `WebhookRuleConfig` entity.
 
 ## Notes / Tech-stack hints
 - HMAC: `node:crypto` `createHmac('sha256', secret).update(body).digest('hex')`; header value: `sha256=<hex>`.
 - Retry: graphile-worker `run_at` scheduling for `retry_after`; not a separate cron — use graphile-worker's built-in `attempts` and `max_attempts`.
-- Secret storage: encrypted in `credentials` table or `webhook_rule_configs.secret` (store nacl-encrypted, decrypt at delivery time).
+- Secret storage: encrypted in `Credential` entity or `WebhookRuleConfig.encryptedSecret` (store nacl-encrypted, decrypt at delivery time).

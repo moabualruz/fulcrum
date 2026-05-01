@@ -25,8 +25,8 @@ None of these belong exclusively to one domain pillar. All are required before a
 
 C5 carve-out (2) — owned by another pillar:
 
-- **Pillar 1:** `feature_flags(org_id, name, enabled)` base DDL, `tenant_settings` base DDL, `FULCRUM_FEATURES` env-var parser, `assertPermission()`, auth + tenancy context injected into tRPC. This pillar extends the flag schema with rollout/cohort/experiment columns and adds application-layer behaviours; it does not re-create base DDL.
-- **Pillar 12:** `events` DDL, audit-log query/retention surface (`audit.query` tRPC, `/audit` web route, `fulcrum audit-log` CLI, `event_retention_policy` table). This pillar emits events from backup, secrets, and telemetry flows; Pillar 12 owns the audit viewer.
+- **Pillar 1:** `FeatureFlag`, `TenantSetting`, `FULCRUM_FEATURES` env-var parser, `assertPermission()`, auth + tenancy context injected into tRPC. This pillar adds `FeatureFlagRollout` / `ExperimentAssignment` application-layer behaviour; it does not re-create base entities.
+- **Pillar 12:** `Event` entity, audit-log query/retention surface (`audit.query` tRPC, `/audit` web route, `fulcrum audit-log` CLI, `EventRetentionPolicy` entity). This pillar emits events from backup, secrets, and telemetry flows; Pillar 12 owns the audit viewer.
 - **Pillar 13:** connector framework for external importers (Linear, Jira, Plane). This pillar ships the `import-linear`, `import-jira`, `import-plane` feature-flag stubs and parser skeletons; Pillar 13 owns the connector protocol, rate-limit handling, and API client plumbing.
 - **Pillar 14:** CLI codegen pipeline. This pillar defines the tRPC procedures; Pillar 14 auto-generates the `fulcrum <domain> <verb>` bindings from them.
 - **Pillar 15:** TUI framework selection (OpenTUI / ratatui fallback). This pillar ships TUI screens for themes, secrets, backups, flags, and errors; Pillar 15 owns the runtime.
@@ -47,15 +47,15 @@ Ships unconditionally, all surfaces.
 
 ### Theme engine
 
-`tenant_settings(org_id, user_id, key, value)` stores per-org and per-user preferences. Key namespace: `theme.*` (accent color HEX, base hue, radius, font-family, font-size-scale, spacing-scale, animation-duration-scale, dark-mode-preference: `light | dark | auto`).
+`TenantSetting` is `@Entity({ tableName: 'tenant_settings' })` with composite key `(org, user, key)` and `@Property({ type: 'json' }) value`. It stores per-org and per-user preferences. Key namespace: `theme.*` (accent color HEX, base hue, radius, font-family, font-size-scale, spacing-scale, animation-duration-scale, dark-mode-preference: `light | dark | auto`).
 
-`src/theme/generator.ts` reads all `theme.*` settings for the current org + user (user wins on conflict) and emits a CSS custom-property block (`--fulcrum-accent`, `--fulcrum-radius`, `--fulcrum-font-family`, etc.). In Web: injected as a `<style>` tag in the SvelteKit root layout on every SSR render; updated client-side via reactive store on preference change.
+`src/theme/generator.ts` reads all `theme.*` settings with `tenantSettingsRepo.find({ org, key: { $like: 'theme.%' } })` plus user-scoped overrides (user wins on conflict) and emits a CSS custom-property block (`--fulcrum-accent`, `--fulcrum-radius`, `--fulcrum-font-family`, etc.). In Web: injected as a `<style>` tag in the SvelteKit root layout on every SSR render; updated client-side via reactive store on preference change.
 
 `src/theme/composable.ts` — `useTheme()` Svelte composable. Returns reactive `{ accent, radius, fontFamily, darkMode }` derived from tRPC `theme.get` result; subscribes to `theme.onSettingsChange` subscription for live updates. Used by every themed component.
 
 `theme.get` / `theme.update` tRPC procedures with `assertPermission()`.
 
-TUI: theme preferences read from `tenant_settings` via tRPC at startup; OpenTUI primitives apply accent color to focused borders and selected items.
+TUI: theme preferences read through `tenantSettingsRepo.find({...})` behind tRPC at startup; OpenTUI primitives apply accent color to focused borders and selected items.
 
 CLI: `fulcrum theme list --json` / `fulcrum theme set <key> <value>` / `fulcrum theme reset`.
 
@@ -79,9 +79,9 @@ On any uncaught exception or unhandled promise rejection in the Bun process, a c
 }
 ```
 
-`error_logs` PGlite table mirrors the JSONL for queryability. `src/errors/crashlog.ts` installs the global handler at process start (Pillar 1 calls it in `fulcrum init` and `fulcrum web`).
+`ErrorLog` entity mirrors the JSONL for queryability. `src/errors/crashlog.ts` installs the global handler at process start (Pillar 1 calls it in `fulcrum init` and `fulcrum web`).
 
-`error_logs.list` / `.get(id)` / `.clear(before?)` tRPC procedures.
+`errorLogs.list` / `.get(id)` / `.clear(before?)` tRPC procedures.
 
 CLI: `fulcrum errors list [--limit <n>] [--since <ISO>] [--json]` / `fulcrum errors show <id>` / `fulcrum errors clear [--before <ISO>]`.
 
@@ -91,7 +91,7 @@ TUI: Settings → Errors tab, scrollable list, `Enter` expands, `D` deletes entr
 
 ### Secret management + encryption-at-rest
 
-`credentials(id, org_id, user_id, name, encrypted_value, algo, kdf, created_at, last_used_at, archived)` table. `encrypted_value` is `nacl.secretbox` ciphertext (XSalsa20-Poly1305). Encryption key derived with Argon2id (`node:crypto` webcrypto + argon2 npm package) from a master key sourced in priority order:
+`Credential(id, org_id, user_id, name, encrypted_value, algo, kdf, created_at, last_used_at, archived)` entity. `encrypted_value` is `nacl.secretbox` ciphertext (XSalsa20-Poly1305). Encryption key derived with Argon2id (`node:crypto` webcrypto + argon2 npm package) from a master key sourced in priority order:
 
 1. **System keyring** — macOS: `node-keytar` → `Keychain`; Linux: `node-keytar` → Secret Service via D-Bus; Windows: `node-keytar` → Credential Manager.
 2. **Fallback** — PBKDF2-derived key from a per-install salt stored in `~/.fulcrum/state/keyring-fallback.key` (mode 0600).
@@ -110,16 +110,16 @@ TUI: Settings → Secrets tab, same CRUD, values masked by default, `U` to unmas
 
 `fulcrum backup [--output <path>] [--encrypt] [--no-artifacts]` — exports:
 
-1. Full PGlite SQL dump via `pg_dump`-equivalent (row-by-row INSERT statements per table, ordered by FK dependency).
+1. Fulcrum-native JSON manifest generated by repository snapshot readers, ordered by entity dependency.
 2. Artifacts tarball (`~/.fulcrum/state/artifacts/**`) unless `--no-artifacts`.
 3. `~/.fulcrum/state/errors/` JSONL files.
-4. `fulcrum-backup-manifest.json` with schema version, Fulcrum version, export timestamp, table row counts.
+4. `fulcrum-backup-manifest.json` with schema version, Fulcrum version, export timestamp, entity counts.
 
 When `--encrypt` passed (or when `FULCRUM_BACKUP_ENCRYPT=1`): re-encrypts the tarball using `nacl.secretbox` with a one-time key written to a `<backup-name>.key` file alongside the archive. The `.key` file is also stored in the system keyring under `fulcrum-backup-<timestamp>`.
 
-`fulcrum restore --input <path> [--key <keyfile>] [--dry-run]` — reads manifest, checks schema version compatibility (warns on mismatch), detects collisions (UUID conflicts in `orgs`, `projects`, `tasks`), applies with `ON CONFLICT DO UPDATE` by default, reports counts.
+`fulcrum restore --input <path> [--key <keyfile>] [--dry-run]` — reads manifest, checks schema version compatibility (warns on mismatch), detects collisions (UUID conflicts in `orgs`, `projects`, `tasks`), applies through repository `upsertFromManifest()` calls by default, reports counts.
 
-`backup.create` / `backup.list` / `restore.preflight(path)` tRPC procedures. Backup files stored in `~/.fulcrum/state/backups/` by default; configurable via `tenant_settings(key='backup.output_dir')`.
+`backup.create` / `backup.list` / `restore.preflight(path)` tRPC procedures. Backup files stored in `~/.fulcrum/state/backups/` by default; configurable via `TenantSetting` key `backup.output_dir`.
 
 Web: `/settings/backup` — "Create Backup" button, download link, restore upload form.
 
@@ -127,9 +127,9 @@ TUI: Settings → Backup tab.
 
 ### Local telemetry collection
 
-On first `fulcrum init` or first web-app load: one-time opt-in prompt (CLI: interactive Y/N; Web: banner with "Enable" / "No thanks" buttons; TUI: modal). Choice stored in `tenant_settings(key='telemetry.opted_in', value='true|false')`.
+On first `fulcrum init` or first web-app load: one-time opt-in prompt (CLI: interactive Y/N; Web: banner with "Enable" / "No thanks" buttons; TUI: modal). Choice stored in `TenantSetting` key `telemetry.opted_in` with JSON boolean value.
 
-When opted in: `telemetry_events(id, org_id, user_id, kind, payload, occurred_at)` PGlite table receives one row per significant user action (task created, doc saved, agent run dispatched, CLI command executed). Payload is stripped of all content (titles, bodies, file paths); only event kind + aggregate counts + duration metrics.
+When opted in: `TelemetryEvent(id, org_id, user_id, kind, payload, occurred_at)` receives one entity per significant user action (task created, doc saved, agent run dispatched, CLI command executed). Payload is stripped of all content (titles, bodies, file paths); only event kind + aggregate counts + duration metrics.
 
 `telemetry.optIn` / `.optOut` / `.status` / `.purge` tRPC procedures.
 
@@ -141,20 +141,11 @@ TUI: Settings → Telemetry tab.
 
 ### Feature-flag rollout + cohorts + experiments
 
-Extends Pillar 1's `feature_flags` table with additional columns (migration addendum owned by this pillar):
-
-```sql
-ALTER TABLE feature_flags
-  ADD COLUMN rollout_percent int NOT NULL DEFAULT 100
-    CHECK (rollout_percent BETWEEN 0 AND 100),
-  ADD COLUMN cohort_rules jsonb NOT NULL DEFAULT '{}',
-  ADD COLUMN updated_by uuid REFERENCES users(id),
-  ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now();
-```
+Adds `FeatureFlagRollout` entity owned by this pillar. It keeps rollout percentage, cohort rules, updater, and timestamps outside Pillar 1's base `FeatureFlag` entity.
 
 `cohort_rules` JSON schema: `{ "include_user_ids"?: string[], "exclude_user_ids"?: string[], "org_plan"?: string[], "created_after"?: string }`.
 
-`experiment_assignment(id, org_id, user_id, experiment_id, variant, assigned_at)` table. Assignment is deterministic: `sha256(user_id + experiment_id) % 100 < rollout_percent`. Variant chosen from `feature_flags.cohort_rules.variants` array (index by assignment bucket).
+`ExperimentAssignment(id, org_id, user_id, experiment_id, variant, assigned_at)` entity. Assignment is deterministic: `sha256(user_id + experiment_id) % 100 < rollout_percent`. Variant chosen from `FeatureFlagRollout.cohortRules.variants` array (index by assignment bucket).
 
 `src/features/rollout.ts` — `isEnabled(flagName, orgId, userId): boolean` evaluates: base `enabled` → cohort rules → rollout percentage. Replaces Pillar 1's simple `enabled` check. Pillar 1 calls this module; no change to tRPC call sites.
 
@@ -168,11 +159,11 @@ TUI: Settings → Feature Flags tab.
 
 ### Native JSON import/export
 
-Full org dump and restore in Fulcrum-native JSON format. This is separate from SQL backup: JSON export is human-readable, version-stamped, and useful for migration between Fulcrum instances.
+Full org dump and restore in Fulcrum-native JSON format. Same manifest family as local backup: human-readable, version-stamped, and useful for migration between Fulcrum instances.
 
 `fulcrum export [--org <id>] [--output <path>] [--pretty] [--json]` — streams all org data (orgs, projects, tasks, docs, memories, sprints, agent_runs summary, repos, artifacts metadata, events summary) as a single JSON object. Large collections paged internally; output is one top-level JSON array per entity kind.
 
-`fulcrum import --input <path> [--dry-run] [--on-conflict skip|update|error]` — reads the JSON manifest, validates Zod schemas per entity, inserts rows.
+`fulcrum import --input <path> [--dry-run] [--on-conflict skip|update|error]` — reads the JSON manifest, validates Zod schemas per entity, and calls repository create/update methods.
 
 `dataExport.create` / `dataImport.preflight(path)` / `dataImport.run(importId)` tRPC procedures.
 
@@ -189,11 +180,11 @@ All shipped + implemented + tested; OFF by default. Flip the named flag to enabl
 | Feature | Flag | What it does |
 |---|---|---|
 | i18n | `i18n` | paraglide-js + locale picker UI + per-locale translation JSON + RTL CSS flip for Arabic/Hebrew/Persian. CI gate: `bun run i18n:extract` must produce 0 untranslated keys before merge. |
-| Remote telemetry | `telemetry-remote` | Batches `telemetry_events` rows and POSTs to a user-configured endpoint (env `FULCRUM_TELEMETRY_ENDPOINT`). Batch signed with HMAC-SHA256 (`FULCRUM_TELEMETRY_SECRET`). Retried with graphile-worker. |
-| Remote error reports | `error-reporting-remote` | Sends crash entries from `error_logs` to a user-configured endpoint. Same signing as telemetry-remote. No PII included; stack traces scrubbed of absolute paths. |
-| Vault integration | `vault-integration` | Fetch/store secrets from HashiCorp Vault (KV v2), AWS Secrets Manager, GCP Secret Manager, or 1Password Connect. `credentials.provider` column switches path. `src/secrets/vault-adapter.ts` per provider. |
+| Remote telemetry | `telemetry-remote` | Batches `TelemetryEvent` entities and POSTs to a user-configured endpoint (env `FULCRUM_TELEMETRY_ENDPOINT`). Batch signed with HMAC-SHA256 (`FULCRUM_TELEMETRY_SECRET`). Retried with graphile-worker. |
+| Remote error reports | `error-reporting-remote` | Sends crash entries from `ErrorLog` to a user-configured endpoint. Same signing as telemetry-remote. No PII included; stack traces scrubbed of absolute paths. |
+| Vault integration | `vault-integration` | Fetch/store secrets from HashiCorp Vault (KV v2), AWS Secrets Manager, GCP Secret Manager, or 1Password Connect. `Credential.provider` property switches path. `src/secrets/vault-adapter.ts` per provider. |
 | Scheduled backups | `scheduled-backups` | Cron-triggered (graphile-worker recurring task) backup + upload to remote storage. Providers: S3, Cloudflare R2, Backblaze B2, GCS, Azure Blob. Per-provider adapter in `src/backup/remotes/`. `FULCRUM_BACKUP_REMOTE_DSN` env var. |
-| Experiments | `experiments` | Full A/B experiment tracking admin UI at `/settings/experiments`: create experiment, define variants, set rollout %, view assignment counts, view conversion metrics per variant. Backed by `experiment_assignment` table. |
+| Experiments | `experiments` | Full A/B experiment tracking admin UI at `/settings/experiments`: create experiment, define variants, set rollout %, view assignment counts, view conversion metrics per variant. Backed by `ExperimentAssignment` entity. |
 | CSV import | `import-csv` | Generic CSV → tasks or docs import. Column mapper UI (web), `--column-map` flag (CLI). Schema inferred from headers + user mapping. |
 | CSV export | `export-csv` | Tasks, docs, or memories exported as CSV. `fulcrum export --format csv --entity tasks`. |
 | Linear importer | `import-linear` | Reads Linear issues via Linear GraphQL API (user provides API key stored in `credentials`). Maps to Fulcrum tasks. Connector framework from Pillar 13. |
@@ -214,102 +205,109 @@ All shipped + implemented + tested; OFF by default. Flip the named flag to enabl
 | OS keyring | `node-keytar` | MIT | Native addon build fails or service unreachable → fallback to encrypted-file key at `~/.fulcrum/state/keyring-fallback.key` (0600) | `@napi-rs/keyring` (MIT) |
 | i18n | `paraglide-js` (ParaglideJS) | MIT | If Svelte plugin breaks on rune update → `svelte-i18n` (MIT) | `@inlang/sdk` (MIT) |
 | Backup tarball | `node:zlib` + `tar` (npm, MIT) | MIT | `tar` API drift → `node:stream` pipe to `zlib.createGzip()` raw | `archiver` (MIT) |
-| Telemetry/error remote | `fetch` (Bun built-in) + `node:crypto` HMAC | — | Network unreachable → retry queue in `telemetry_outbox` table via graphile-worker | same |
+| Telemetry/error remote | `fetch` (Bun built-in) + `node:crypto` HMAC | — | Network unreachable → retry queue in `TelemetryOutbox` entity via graphile-worker | same |
 | Remote backup storage | Per-adapter: `@aws-sdk/client-s3` / `@cloudflare/workers-types` R2 / `@google-cloud/storage` / `@azure/storage-blob` | MIT / Apache-2.0 | Adapter fails → local-only backup always works; remote silently disabled with doctor warning | — |
 | CSS var generation | `src/theme/generator.ts` (pure TS, 100 LOC) | — | — | `postcss` plugin if complexity grows |
 | TUI | OpenTUI (Bun-native TS) | MIT | Too immature → ratatui pane in Rust sidecar via Unix socket | — |
 
 ---
 
-## Schema changes
+### Stack (DECISIONS.md C7-C9)
+- C7: MikroORM v7 primary; `mikro-orm-pglite` local driver.
+- C7: migrations are classes at `src/db/migrations/Migration<timestamp>.ts`.
+- C8: services are `@Injectable()` classes resolved by needle-di.
+- C9: entities live under `src/db/entities/platform/`.
+- C9: repositories live under `src/db/repositories/platform/`.
 
-All tables: composite `(org_id, …)` indexes mandatory (Q22). All migrations idempotent.
+---
 
-```sql
--- tenant_settings: stores theme + backup + telemetry + other per-org/user prefs
--- Pillar 1 owns base DDL; this pillar's migration adds no new table but seeds theme keys.
--- Composite index already in Pillar 1 migration.
+## Entity changes
 
--- credentials: secret storage
--- (org_id, user_id, name) UNIQUE; (org_id, user_id, last_used_at DESC); (org_id, archived)
-CREATE TABLE credentials (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name text NOT NULL,
-  encrypted_value bytea NOT NULL,
-  algo text NOT NULL DEFAULT 'nacl-secretbox',
-  kdf text NOT NULL DEFAULT 'argon2id',
-  provider text NOT NULL DEFAULT 'local'
-    CHECK (provider IN ('local','vault','aws-sm','gcp-sm','1password')),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  last_used_at timestamptz,
-  archived boolean NOT NULL DEFAULT false,
-  UNIQUE (org_id, user_id, name)
-);
-CREATE INDEX credentials_org_user_lastused
-  ON credentials (org_id, user_id, last_used_at DESC NULLS LAST);
-CREATE INDEX credentials_org_archived
-  ON credentials (org_id, archived);
+All entities carry composite `(org_id, …)` indexes mandatory (Q22). Migration class: `Migration<timestamp>` covering platform entities.
 
--- telemetry_events: local opt-in telemetry sink
--- (org_id, occurred_at DESC); (org_id, user_id, kind)
-CREATE TABLE telemetry_events (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  user_id uuid REFERENCES users(id) ON DELETE SET NULL,
-  kind text NOT NULL,
-  payload jsonb NOT NULL DEFAULT '{}',
-  occurred_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX telemetry_events_org_occurred
-  ON telemetry_events (org_id, occurred_at DESC);
-CREATE INDEX telemetry_events_org_user_kind
-  ON telemetry_events (org_id, user_id, kind);
+```ts
+@Entity({ tableName: 'tenant_settings' })
+@Unique({ properties: ['org', 'user', 'key'] })
+@Index({ properties: ['org', 'key'] })
+export class TenantSetting {
+  @ManyToOne(() => Org, { primary: true, deleteRule: 'cascade' }) org!: Org;
+  @ManyToOne(() => User, { primary: true, nullable: true, deleteRule: 'cascade' }) user?: User;
+  @Property({ primary: true }) key!: string;
+  @Property({ type: 'json' }) value!: unknown;
+  @Property({ onUpdate: () => new Date() }) updatedAt = new Date();
+}
 
--- error_logs: mirrors ~/.fulcrum/state/errors/*.jsonl in PGlite for queryability
--- (org_id, occurred_at DESC)
-CREATE TABLE error_logs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  user_id uuid REFERENCES users(id) ON DELETE SET NULL,
-  occurred_at timestamptz NOT NULL DEFAULT now(),
-  os text,
-  arch text,
-  bun_version text,
-  fulcrum_version text,
-  recent_cli_command text,
-  recent_trpc_procedure text,
-  error_message text NOT NULL,
-  stack_trace text,
-  context jsonb NOT NULL DEFAULT '{}'
-);
-CREATE INDEX error_logs_org_occurred
-  ON error_logs (org_id, occurred_at DESC);
+@Entity({ tableName: 'credentials' })
+@Unique({ properties: ['org', 'user', 'name'] })
+@Index({ properties: ['org', 'user', 'lastUsedAt'] })
+@Index({ properties: ['org', 'archived'] })
+export class Credential {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => Org, { deleteRule: 'cascade' }) org!: Org;
+  @ManyToOne(() => User, { deleteRule: 'cascade' }) user!: User;
+  @Property() name!: string;
+  @Property({ type: 'bytea' }) encryptedValue!: Uint8Array;
+  @Property() algo = 'nacl-secretbox';
+  @Property() kdf = 'argon2id';
+  @Enum(() => CredentialProvider) provider = CredentialProvider.Local;
+  @Property() createdAt = new Date();
+  @Property({ nullable: true }) lastUsedAt?: Date;
+  @Property() archived = false;
+}
 
--- experiment_assignment: deterministic A/B variant assignment
--- UNIQUE (org_id, user_id, experiment_id); (org_id, experiment_id)
-CREATE TABLE experiment_assignment (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  experiment_id text NOT NULL,
-  variant text NOT NULL,
-  assigned_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (org_id, user_id, experiment_id)
-);
-CREATE INDEX experiment_assignment_org_experiment
-  ON experiment_assignment (org_id, experiment_id);
+@Entity({ tableName: 'telemetry_events' })
+@Index({ properties: ['org', 'occurredAt'] })
+@Index({ properties: ['org', 'user', 'kind'] })
+export class TelemetryEvent {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => Org, { deleteRule: 'cascade' }) org!: Org;
+  @ManyToOne(() => User, { nullable: true, deleteRule: 'set null' }) user?: User;
+  @Property() kind!: string;
+  @Property({ type: 'json' }) payload: Record<string, unknown> = {};
+  @Property() occurredAt = new Date();
+}
 
--- feature_flags extension (addendum migration; base table owned by Pillar 1)
-ALTER TABLE feature_flags
-  ADD COLUMN IF NOT EXISTS rollout_percent int NOT NULL DEFAULT 100
-    CHECK (rollout_percent BETWEEN 0 AND 100),
-  ADD COLUMN IF NOT EXISTS cohort_rules jsonb NOT NULL DEFAULT '{}',
-  ADD COLUMN IF NOT EXISTS updated_by uuid REFERENCES users(id) ON DELETE SET NULL,
-  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
-CREATE INDEX IF NOT EXISTS feature_flags_org_name
-  ON feature_flags (org_id, name);
+@Entity({ tableName: 'error_logs' })
+@Index({ properties: ['org', 'occurredAt'] })
+export class ErrorLog {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => Org, { deleteRule: 'cascade' }) org!: Org;
+  @ManyToOne(() => User, { nullable: true, deleteRule: 'set null' }) user?: User;
+  @Property() occurredAt = new Date();
+  @Property({ nullable: true }) os?: string;
+  @Property({ nullable: true }) arch?: string;
+  @Property({ nullable: true }) bunVersion?: string;
+  @Property({ nullable: true }) fulcrumVersion?: string;
+  @Property({ nullable: true }) recentCliCommand?: string;
+  @Property({ nullable: true }) recentTrpcProcedure?: string;
+  @Property() errorMessage!: string;
+  @Property({ nullable: true }) stackTrace?: string;
+  @Property({ type: 'json' }) context: Record<string, unknown> = {};
+}
+
+@Entity({ tableName: 'feature_flag_rollouts' })
+@Unique({ properties: ['org', 'flag'] })
+export class FeatureFlagRollout {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => Org, { deleteRule: 'cascade' }) org!: Org;
+  @ManyToOne(() => FeatureFlag, { deleteRule: 'cascade' }) flag!: FeatureFlag;
+  @Property() rolloutPercent = 100;
+  @Property({ type: 'json' }) cohortRules: Record<string, unknown> = {};
+  @ManyToOne(() => User, { nullable: true, deleteRule: 'set null' }) updatedBy?: User;
+  @Property({ onUpdate: () => new Date() }) updatedAt = new Date();
+}
+
+@Entity({ tableName: 'experiment_assignment' })
+@Unique({ properties: ['org', 'user', 'experimentId'] })
+@Index({ properties: ['org', 'experimentId'] })
+export class ExperimentAssignment {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => Org, { deleteRule: 'cascade' }) org!: Org;
+  @ManyToOne(() => User, { deleteRule: 'cascade' }) user!: User;
+  @Property() experimentId!: string;
+  @Property() variant!: string;
+  @Property() assignedAt = new Date();
+}
 ```
 
 ---
@@ -320,15 +318,15 @@ CREATE INDEX IF NOT EXISTS feature_flags_org_name
 
 `/settings/theme` — accent-color picker (HSL wheel), radius slider, font-family selector, font-size-scale slider, spacing-scale, animation-duration toggle, dark/light/auto selector. Live preview panel. "Reset to defaults" button.
 
-`/settings/secrets` — list of `credentials` rows (name, provider, last-used, archived toggle). Add-secret sheet (name + value; value field type=password, never echoed in logs). Rotate, archive, delete actions.
+`/settings/secrets` — list of `Credential` entities (name, provider, last-used, archived toggle). Add-secret sheet (name + value; value field type=password, never echoed in logs). Rotate, archive, delete actions.
 
-`/settings/errors` — paginated crash log (`error_logs` DESC); per-row expandable stack trace + context JSON viewer. "Clear all before date" action.
+`/settings/errors` — paginated crash log (`ErrorLog` newest first); per-entry expandable stack trace + context JSON viewer. "Clear all before date" action.
 
 `/settings/backup` — "Create Backup" button → polling job → download link. Backup history list. Restore upload form → preflight summary modal → confirm.
 
-`/settings/telemetry` — opt-in toggle, "Purge local telemetry data" button, row count badge, opt-out confirmation.
+`/settings/telemetry` — opt-in toggle, "Purge local telemetry data" button, entity count badge, opt-out confirmation.
 
-`/settings/feature-flags` — flag table (name, enabled toggle, rollout-% slider, cohort-rules JSON editor, last updated). Experiment viewer sub-tab.
+`/settings/feature-flags` — flag grid (name, enabled toggle, rollout-% slider, cohort-rules JSON editor, last updated). Experiment viewer sub-tab.
 
 `/settings/data` — Export JSON (all / per entity kind), Import JSON upload + preflight.
 
@@ -382,7 +380,7 @@ Settings screen → sub-tabs:
 - **Errors** — scrollable crash list, `Enter` expand, `D` delete entry, `C` clear all.
 - **Backup** — `B` create backup (progress indicator), `R` restore (file picker), history list.
 - **Telemetry** — toggle, `P` purge.
-- **Feature Flags** — table, `Space` toggle, `E` edit rollout %, `Enter` edit cohort rules.
+- **Feature Flags** — grid, `Space` toggle, `E` edit rollout %, `Enter` edit cohort rules.
 - **Data** — `E` export JSON, `I` import JSON (file picker + preflight modal).
 
 ### API (tRPC always-on + gated OpenAPI via Pillar 13)
@@ -421,19 +419,19 @@ flowchart TD
         VAULT["src/secrets/vault.ts\nnacl.secretbox"]
         KEYRING["src/secrets/keyring.ts\nOS keyring abstraction"]
         CRASH["src/errors/crashlog.ts\nglobal handler"]
-        BACKUP["src/backup/runner.ts\nSQL dump + tar"]
+        BACKUP["src/backup/runner.ts\nJSON manifest + tar"]
         TELEM["src/telemetry/collector.ts\nopt-in write"]
         ROLLOUT["src/features/rollout.ts\nisEnabled()"]
         IMEX["src/data/export.ts\nsrc/data/import.ts"]
     end
 
-    subgraph store["PGlite / PostgreSQL"]
-        TS["tenant_settings"]
-        CRED["credentials"]
-        EL_T["error_logs"]
-        TE_T["telemetry_events"]
-        EA_T["experiment_assignment"]
-        FF_T["feature_flags +\nrollout_percent,cohort_rules"]
+    subgraph store["PGlite / Postgres"]
+        TS["TenantSetting"]
+        CRED["Credential"]
+        EL_T["ErrorLog"]
+        TE_T["TelemetryEvent"]
+        EA_T["ExperimentAssignment"]
+        FF_T["FeatureFlagRollout"]
     end
 
     subgraph fs["~/.fulcrum/state/"]
@@ -478,7 +476,7 @@ sequenceDiagram
     participant VAULT as src/secrets/vault.ts
     participant KR as src/secrets/keyring.ts
     participant OS as OS Keyring
-    participant DB as PGlite credentials table
+    participant Repo as CredentialRepository
 
     User->>CLI: echo "sk-..." | fulcrum secrets set MY_KEY
     CLI->>tRPC: credentials.set({name:"MY_KEY", value:"sk-..."})
@@ -489,24 +487,23 @@ sequenceDiagram
     KR-->>VAULT: masterKey
     VAULT->>VAULT: nacl.secretbox(value, nonce, masterKey)
     VAULT-->>tRPC: encryptedValue (bytea)
-    tRPC->>DB: INSERT INTO credentials (..., encrypted_value)
-    DB-->>tRPC: id
+    tRPC->>Repo: credentialRepo.upsertEncrypted({name, encryptedValue})
+    Repo-->>tRPC: id
     tRPC-->>CLI: {id, name, created_at}
     CLI-->>User: {"id":"...","name":"MY_KEY",...}
 ```
 
-### ERD (Pillar 17 tables only)
+### ERD (Pillar 17 entities only)
 
 ```mermaid
 erDiagram
     orgs ||--o{ tenant_settings : "org_id"
     users ||--o{ tenant_settings : "user_id"
     tenant_settings {
-        uuid id PK
         uuid org_id FK
         uuid user_id FK "NULL = org-wide"
         text key
-        text value
+        json value
     }
 
     orgs ||--o{ credentials : "org_id"
@@ -563,12 +560,12 @@ erDiagram
         timestamptz assigned_at
     }
 
-    orgs ||--o{ feature_flags : "org_id (Pillar 1 base)"
-    feature_flags {
+    orgs ||--o{ feature_flag_rollouts : "org_id"
+    feature_flags ||--o{ feature_flag_rollouts : "flag_id"
+    feature_flag_rollouts {
         uuid id PK
         uuid org_id FK
-        text name
-        boolean enabled
+        uuid flag_id FK
         int rollout_percent
         jsonb cohort_rules
         uuid updated_by FK_nullable
@@ -581,17 +578,17 @@ erDiagram
 | Error path | Behaviour |
 |---|---|
 | OS keyring unavailable at boot | Log warning to `~/.fulcrum/state/errors/YYYY-MM-DD.jsonl`; fall back to `keyring-fallback.key`. Doctor reports `keyring: degraded`. |
-| `keyring-fallback.key` missing | First run: auto-generate random 32-byte key, write mode 0600. Subsequent: if file deleted while DB has credentials → `credentials.get` returns `DECRYPTION_KEY_MISSING` error; user prompted to restore from backup. |
-| `nacl.secretbox` decryption failure (wrong key or corruption) | Return `{ error: "DECRYPTION_FAILED" }` to caller; log to `error_logs`; never expose ciphertext. |
+| `keyring-fallback.key` missing | First run: auto-generate random 32-byte key, write mode 0600. Subsequent: if file deleted while credentials exist → `credentials.get` returns `DECRYPTION_KEY_MISSING` error; user prompted to restore from backup. |
+| `nacl.secretbox` decryption failure (wrong key or corruption) | Return `{ error: "DECRYPTION_FAILED" }` to caller; log to `ErrorLog`; never expose ciphertext. |
 | Backup tar creation fails (disk full) | `backup.create` returns `{ error: "DISK_FULL", available_bytes: N }`. Partial archive deleted. |
 | Backup restore collision detected | `restore.preflight` returns list of colliding UUIDs with entity types. `restore.run` proceeds only when `--on-conflict` specified. |
 | Telemetry opt-in never answered | Default to opted-out. Prompt shown again on next major version or `fulcrum telemetry prompt`. |
-| Remote backup upload fails | `scheduled-backups` job retries 3× with exponential backoff; on final failure writes `events` row `kind=backup_upload_failed` and emails if `notify-email` on. |
+| Remote backup upload fails | `scheduled-backups` job retries 3× with exponential backoff; on final failure writes `Event` kind `backup_upload_failed` and emails if `notify-email` on. |
 | i18n translation key missing | Paraglide fallback to `en` locale silently; CI `i18n:extract` gate catches missing keys before merge. |
 
 ### Observability
 
-Every tRPC procedure in this pillar emits an `events` row (consumed by Pillar 12) with:
+Every tRPC procedure in this pillar emits an `Event` entity (consumed by Pillar 12) with:
 
 ```jsonc
 {
@@ -601,12 +598,12 @@ Every tRPC procedure in this pillar emits an `events` row (consumed by Pillar 12
 }
 ```
 
-Metrics (Bun `performance.now()` spans, logged to `telemetry_events.payload.duration_ms` when opted in):
+Metrics (Bun `performance.now()` spans, logged to `TelemetryEvent.payload.duration_ms` when opted in):
 
 - `credentials.set` → encryption duration.
-- `backup.create` → total duration, table row counts, artifact file count.
+- `backup.create` → total duration, entity counts, artifact file count.
 - `flags.set` → rollout evaluation duration.
-- `dataExport.create` → rows-per-second throughput.
+- `dataExport.create` → entities-per-second throughput.
 
 ### Performance budgets
 
@@ -616,8 +613,8 @@ Metrics (Bun `performance.now()` spans, logged to `telemetry_events.payload.dura
 | `theme.get` (CSS var block, cold) | < 10 ms p99 |
 | `flags.isEnabled()` (in-process, after warm cache) | < 1 ms p99 |
 | `backup.create` (10k tasks, 1k docs, no artifacts) | < 30 s p99 |
-| `dataExport.create` (full org, 50k rows total) | < 60 s p99 |
-| `telemetry_events` write (single row) | < 2 ms p99 |
+| `dataExport.create` (full org, 50k entities total) | < 60 s p99 |
+| `TelemetryEvent` write (single entity) | < 2 ms p99 |
 | `/settings/secrets` cold load (20 credentials) | < 150 ms p99 |
 
 ---
@@ -628,15 +625,15 @@ Metrics (Bun `performance.now()` spans, logged to `telemetry_events.payload.dura
 
 | Check | Pass condition | Failure recovery |
 |---|---|---|
-| `platform.theme` | `tenant_settings` readable; `theme.accent` parseable HEX | Run `fulcrum theme reset` |
+| `platform.theme` | `TenantSettingRepository` readable; `theme.accent` parseable HEX | Run `fulcrum theme reset` |
 | `platform.keyring` | OS keyring reachable OR `keyring-fallback.key` exists (mode 0600) | If neither: `fulcrum secrets init-keyring` |
 | `platform.keyring_mode` | If fallback key in use, warns `keyring: degraded` (not failure) | Install `node-keytar` native module or fix D-Bus / Keychain |
-| `platform.credentials` | `credentials` table exists; at least one encryption round-trip succeeds | Run migration; check keyring |
+| `platform.credentials` | `Credential` metadata registered; at least one encryption round-trip succeeds | Run migration; check keyring |
 | `platform.crashlog_dir` | `~/.fulcrum/state/errors/` exists and writable | `mkdir -p ~/.fulcrum/state/errors/` |
 | `platform.backup_last_run` | Last backup < 7 days ago OR no backup policy set (info only, not failure) | Run `fulcrum backup` |
 | `platform.telemetry` | `telemetry.opted_in` has a value (either true or false) | Run `fulcrum telemetry opt-in` or `opt-out` |
 | `platform.flags_registry` | Feature-flag registry loads without error; count reported | Check `src/features/index.ts` for syntax errors |
-| `platform.experiment_table` | `experiment_assignment` table exists | Run migration |
+| `platform.experiment_entity` | `ExperimentAssignment` metadata registered | Run migration |
 | `platform.i18n` (when flag on) | All locale JSON files present; no missing keys vs. `en` | Run `bun run i18n:extract` |
 | `platform.remote_backup` (when flag on) | Remote storage DSN reachable; test PUT succeeds | Check `FULCRUM_BACKUP_REMOTE_DSN`, credentials |
 
@@ -658,7 +655,7 @@ Doctor JSON shape per check:
 
 | Pillar | Need |
 |---|---|
-| 1 | `tenant_settings` base DDL; `feature_flags` base DDL; `FULCRUM_FEATURES` env-var parser; `assertPermission()`; `graphile-worker` for scheduled-backups + telemetry-remote retries; `events` table (this pillar emits audit events). |
+| 1 | `TenantSetting` base entity; `FeatureFlag` base entity; `FULCRUM_FEATURES` env-var parser; `assertPermission()`; `graphile-worker` for scheduled-backups + telemetry-remote retries; `Event` entity (this pillar emits audit events). |
 | 12 | Audit-log viewer for events emitted by this pillar (backup events, secret rotation events, flag-change events). |
 | 13 | Connector framework consumed by `import-linear` / `import-jira` / `import-plane` gated features. `public-api` flag exposes this pillar's tRPC procedures as REST. |
 | 14 | CLI codegen auto-generates all `fulcrum theme/secrets/errors/backup/telemetry/flags/export/import` commands from tRPC schema. |
@@ -682,38 +679,38 @@ Per Q-governance, the following files ship as part of this pillar (authored by t
 
 **Foundation — schema + encryption core**
 
-- `P17-01` Migration: `credentials`, `telemetry_events`, `error_logs`, `experiment_assignment` tables. `feature_flags` addendum columns. Tests: schema correct; UNIQUE constraints; composite indexes; FK cascades; idempotent re-run.
+- `P17-01` Migration class `Migration<timestamp>`: `Credential`, `TelemetryEvent`, `ErrorLog`, `ExperimentAssignment`, and `FeatureFlagRollout` entities. Tests: metadata correct; UNIQUE constraints; composite indexes; FK cascades; idempotent re-run.
 - `P17-02` `src/secrets/keyring.ts` — OS keyring abstraction. Tests: macOS path (mocked `node-keytar`); Linux path; Windows path; fallback-file path; `chmod 0600` enforced; missing fallback → auto-generate.
 - `P17-03` `src/secrets/vault.ts` — `nacl.secretbox` encrypt/decrypt. Tests: round-trip correct; wrong key → `DECRYPTION_FAILED`; corrupted ciphertext → `DECRYPTION_FAILED`; nonce unique per call.
-- `P17-04` `credentials.*` tRPC procedures. Tests: `assertPermission` enforced; `set` stores ciphertext (plaintext never in DB); `get` returns plaintext to authorized caller; `rotate` replaces encrypted value; `archive` soft-deletes; `list` excludes archived by default.
-- `P17-05` `src/errors/crashlog.ts` — global handler + JSONL writer. Tests: uncaught exception → file written; unhandled rejection → file written; `error_logs` row mirrored; stack trace included; no PII leak in path scrubbing.
-- `P17-06` `errorLogs.*` tRPC procedures. Tests: `list` paginated; `get(id)` returns full entry; `clear(before)` deletes rows + JSONL files.
+- `P17-04` `credentials.*` tRPC procedures. Tests: `assertPermission` enforced; `set` stores ciphertext (plaintext never in persistence); `get` returns plaintext to authorized caller; `rotate` replaces encrypted value; `archive` soft-deletes; `list` excludes archived by default.
+- `P17-05` `src/errors/crashlog.ts` — global handler + JSONL writer. Tests: uncaught exception → file written; unhandled rejection → file written; `ErrorLog` entity mirrored; stack trace included; no PII leak in path scrubbing.
+- `P17-06` `errorLogs.*` tRPC procedures. Tests: `list` paginated; `get(id)` returns full entry; `clear(before)` deletes entities + JSONL files.
 
 **Theme engine**
 
 - `P17-07` `src/theme/generator.ts` — CSS-var block builder. Tests: all keys produce valid CSS custom properties; missing keys use defaults; accent color HEX validation; dark/light/auto modes produce correct `prefers-color-scheme` media block.
-- `P17-08` `src/theme/composable.ts` — `useTheme()` Svelte composable. Tests: reactive update on `tenant_settings` change; SSR-safe (no window access during hydration); defaults applied when no settings row.
+- `P17-08` `src/theme/composable.ts` — `useTheme()` Svelte composable. Tests: reactive refresh after `TenantSetting` change; SSR-safe (no window access during hydration); defaults applied when no setting entity exists.
 - `P17-09` `theme.*` tRPC procedures. Tests: `get` returns flat key-value map; `update` validates types per key (HEX, number 0–2, enum); `reset` restores defaults.
 
 **Backup + restore**
 
-- `P17-10` `src/backup/runner.ts` — SQL dump. Tests: all tables included; FK-ordered output; idempotent on re-import; row counts match manifest.
+- `P17-10` `src/backup/runner.ts` — JSON manifest snapshot. Tests: all entity kinds included; dependency-ordered output; idempotent on re-import; entity counts match manifest.
 - `P17-11` Artifact tarball + JSONL collection. Tests: all `~/.fulcrum/state/artifacts/**` included; `--no-artifacts` excludes; symlinks not followed.
 - `P17-12` Backup encryption (`--encrypt`). Tests: `.enc` extension; decryptable with stored key; wrong key → error; key stored in keyring.
-- `P17-13` `backup.*` / `restore.*` tRPC procedures. Tests: `backup.create` writes manifest; `restore.preflight` returns collision list; `restore.run` ON CONFLICT UPDATE; `--dry-run` reports changes without writing.
+- `P17-13` `backup.*` / `restore.*` tRPC procedures. Tests: `backup.create` writes manifest; `restore.preflight` returns collision list; `restore.run` calls repository upserts; `--dry-run` reports changes without writing.
 - `P17-14` `fulcrum backup` / `fulcrum restore` CLI integration. Tests: `--json` manifest output; `--encrypt --no-artifacts`; `--dry-run`; restore file-not-found error.
 
 **Telemetry**
 
-- `P17-15` `src/telemetry/collector.ts` — opt-in write gate. Tests: opted-out → no write; opted-in → row written; payload strips content fields; `kind` enum validated.
+- `P17-15` `src/telemetry/collector.ts` — opt-in write gate. Tests: opted-out → no write; opted-in → entity written; payload strips content fields; `kind` enum validated.
 - `P17-16` First-run opt-in prompt (CLI interactive + Web banner + TUI modal). Tests: CLI Y → `opted_in=true`; CLI N → `opted_in=false`; idempotent (no double-prompt); Web banner dismissed → `opted_in=false`.
-- `P17-17` `telemetry.*` tRPC procedures. Tests: `status` returns `opted_in` + row count; `purge` deletes all rows; `optIn`/`optOut` toggle.
+- `P17-17` `telemetry.*` tRPC procedures. Tests: `status` returns `opted_in` + entity count; `purge` deletes all telemetry entities; `optIn`/`optOut` toggle.
 
 **Feature-flag rollout + experiments**
 
-- `P17-18` `src/features/rollout.ts` — `isEnabled(flagName, orgId, userId)`. Tests: `enabled=false` → always false; `rollout_percent=0` → false; `rollout_percent=100` → true; `rollout_percent=50` → ~50% deterministic; cohort `include_user_ids` takes priority; assignment cached per request.
-- `P17-19` `experiment_assignment` write path — deterministic SHA256 bucket assignment. Tests: same `(userId, experimentId)` always returns same variant; different users distributed per rollout_percent; assignment row idempotent.
-- `P17-20` `flags.*` / `flags.experiments.*` tRPC procedures. Tests: `set` validates cohort_rules JSON schema; `list` includes rollout_percent; experiments list shows assignment counts.
+- `P17-18` `src/features/rollout.ts` — `isEnabled(flagName, orgId, userId)`. Tests: `enabled=false` → always false; `rolloutPercent=0` → false; `rolloutPercent=100` → true; `rolloutPercent=50` → ~50% deterministic; cohort `include_user_ids` takes priority; assignment cached per request.
+- `P17-19` `ExperimentAssignment` write path — deterministic SHA256 bucket assignment. Tests: same `(userId, experimentId)` always returns same variant; different users distributed per `rolloutPercent`; assignment idempotent.
+- `P17-20` `flags.*` / `flags.experiments.*` tRPC procedures. Tests: `set` validates cohortRules JSON schema; `list` includes rolloutPercent; experiments list shows assignment counts.
 
 **Import / export**
 
@@ -731,8 +728,8 @@ Per Q-governance, the following files ship as part of this pillar (authored by t
 **Web surfaces**
 
 - `P17-28` `/settings/theme` route. Tests: all controls render; live preview updates CSS vars; save round-trips; reset restores defaults.
-- `P17-29` `/settings/secrets` route. Tests: list shows 3 credentials; add sheet saves; value never exposed in DOM; rotate updates `last_used_at`; delete removes row.
-- `P17-30` `/settings/errors` route. Tests: crash list paginated; expand shows stack trace; clear deletes rows.
+- `P17-29` `/settings/secrets` route. Tests: list shows 3 credentials; add sheet saves; value never exposed in DOM; rotate updates `lastUsedAt`; delete removes entity.
+- `P17-30` `/settings/errors` route. Tests: crash list paginated; expand shows stack trace; clear deletes entities.
 - `P17-31` `/settings/backup` route. Tests: create button triggers job; download link appears; restore upload + preflight modal + confirm.
 - `P17-32` `/settings/telemetry` route. Tests: toggle persists; purge shows count before and after.
 - `P17-33` `/settings/feature-flags` route. Tests: toggle changes `enabled`; rollout slider changes `rollout_percent`; cohort JSON editor validates.
@@ -762,13 +759,13 @@ Per Q-governance, the following files ship as part of this pillar (authored by t
 **Gated features**
 
 - `P17-50` `i18n` flag: paraglide-js bootstrap, locale picker `/settings/language`, RTL CSS flip (`dir="rtl"` on `<html>`). Tests: flag OFF → no locale picker; flag ON → `en` default; switch to `ar` → RTL class applied; CI gate `bun run i18n:extract` fails on missing keys.
-- `P17-51` `telemetry-remote` flag: HMAC batch POST job. Tests: flag OFF → no outbound; flag ON → batch of N rows POSTed; HMAC header valid; 4xx → retry; 5xx backoff; `telemetry_outbox` drained after success.
-- `P17-52` `error-reporting-remote` flag: crash POST on new `error_logs` row. Tests: flag OFF → no POST; flag ON → POST on insert; stack trace scrubbed of absolute paths; HMAC valid.
+- `P17-51` `telemetry-remote` flag: HMAC batch POST job. Tests: flag OFF → no outbound; flag ON → batch of N telemetry entities POSTed; HMAC header valid; 4xx → retry; 5xx backoff; `TelemetryOutbox` drained after success.
+- `P17-52` `error-reporting-remote` flag: crash POST on new `ErrorLog` entity. Tests: flag OFF → no POST; flag ON → POST after persist; stack trace scrubbed of absolute paths; HMAC valid.
 - `P17-53` `vault-integration` flag: HashiCorp Vault KV v2 adapter. Tests: flag OFF → local path only; flag ON → `credentials.get` fetches from Vault; `credentials.set` writes to Vault; Vault unreachable → fall back to local with doctor warning.
 - `P17-54` `vault-integration` flag: AWS Secrets Manager adapter. Tests: same pattern.
-- `P17-55` `scheduled-backups` flag: graphile-worker recurring task + S3 upload adapter. Tests: flag OFF → no job; flag ON → job runs; S3 PUT succeeds; retry on failure; events row on failure.
-- `P17-56` `export-csv` flag: tasks CSV export. Tests: flag OFF → 404 on CSV endpoint; flag ON → CSV headers match task fields; all rows present.
-- `P17-57` `import-csv` flag: column mapper + import. Tests: flag OFF → no CLI option; flag ON → `--column-map` JSON validated; rows imported; skipped rows reported.
+- `P17-55` `scheduled-backups` flag: graphile-worker recurring task + S3 upload adapter. Tests: flag OFF → no job; flag ON → job runs; S3 PUT succeeds; retry on failure; `Event` emitted on failure.
+- `P17-56` `export-csv` flag: tasks CSV export. Tests: flag OFF → 404 on CSV endpoint; flag ON → CSV headers match task fields; all entities present.
+- `P17-57` `import-csv` flag: column mapper + import. Tests: flag OFF → no CLI option; flag ON → `--column-map` JSON validated; entities imported; skipped entities reported.
 - `P17-58` `import-linear` stub: Linear GraphQL client + task mapper. Tests: flag OFF → no option; flag ON → mock Linear response → tasks created; API key read from `credentials`.
 - `P17-59` `import-jira` stub: Jira REST v3 client + issue mapper. Tests: same pattern.
 - `P17-60` `import-plane` stub: Plane API client + issue mapper. Tests: same pattern.
@@ -787,7 +784,7 @@ Per Q-governance, the following files ship as part of this pillar (authored by t
 - **`paraglide-js` Svelte plugin breaks on Svelte 5 rune update:** fall back to `svelte-i18n` (MIT); locale picker UI unchanged; CI gate catches missing keys in both cases.
 - **`tar` npm API drift:** swap to `node:stream` + `node:zlib` pipe chain; `src/backup/archiver.ts` factory owns the swap.
 - **OpenTUI too immature for Settings sub-tabs:** ratatui pane in Rust sidecar via same Unix socket/stdio RPC as inference sidecar (shared binary, separate command namespace).
-- **Remote backup provider unavailable:** local backup always completes; remote upload retried by graphile-worker 3× exponential; on final failure emits `events` row + doctor warning; no data loss.
+- **Remote backup provider unavailable:** local backup always completes; remote upload retried by graphile-worker 3× exponential; on final failure emits `Event` + doctor warning; no data loss.
 
 ---
 
@@ -803,34 +800,34 @@ All three surfaces must pass every criterion before this pillar is marked done.
 **Secrets — all surfaces parity**
 
 - `fulcrum secrets set MY_KEY` (value from stdin) → encrypted in `credentials`; `fulcrum secrets get MY_KEY --json` returns plaintext; web `/settings/secrets` shows `MY_KEY` (masked) + last-used; TUI Settings → Secrets shows same; `fulcrum secrets rotate MY_KEY` → new value decryptable; `fulcrum secrets rm MY_KEY` → 404 on next get.
-- Plaintext never appears in `credentials.encrypted_value`; never appears in `events.payload`; never appears in `error_logs`.
+- Plaintext never appears in `Credential.encryptedValue`; never appears in `Event.payload`; never appears in `ErrorLog`.
 
 **Error crashlog — all surfaces parity**
 
-- Trigger uncaught exception in a test harness → `~/.fulcrum/state/errors/YYYY-MM-DD.jsonl` entry written within 500ms; `error_logs` row present; `fulcrum errors list --json` returns it; web `/settings/errors` shows it; TUI Settings → Errors shows it.
-- `fulcrum errors clear` → JSONL file entries deleted + DB rows deleted.
+- Trigger uncaught exception in a test harness → `~/.fulcrum/state/errors/YYYY-MM-DD.jsonl` entry written within 500ms; `ErrorLog` entity present; `fulcrum errors list --json` returns it; web `/settings/errors` shows it; TUI Settings → Errors shows it.
+- `fulcrum errors clear` → JSONL file entries deleted + `ErrorLog` entities deleted.
 
 **Backup + restore — all surfaces parity**
 
-- `fulcrum backup --output /tmp/test.tar.gz` → manifest present; all tables included; artifact files present; `fulcrum restore --input /tmp/test.tar.gz --dry-run` reports counts; `fulcrum restore --input /tmp/test.tar.gz` → task count matches pre-backup.
+- `fulcrum backup --output /tmp/test.tar.gz` → manifest present; all entity kinds included; artifact files present; `fulcrum restore --input /tmp/test.tar.gz --dry-run` reports counts; `fulcrum restore --input /tmp/test.tar.gz` → task count matches pre-backup.
 - Web `/settings/backup` → Create Backup → download link → restore upload → preflight modal → confirm → success toast.
 - TUI Settings → Backup → `B` → progress → completes; `R` → file picker → preflight → confirm → success.
 - `fulcrum backup --encrypt` → `.enc` file produced; `fulcrum restore --input /tmp/test.tar.gz.enc --key /tmp/test.key` → succeeds.
 
 **Telemetry — all surfaces parity**
 
-- First run shows prompt; `Y` → `telemetry.opted_in=true` → `telemetry_events` rows written; `N` → no rows; `fulcrum telemetry status --json` reports correct state; web `/settings/telemetry` toggle matches; TUI toggle matches.
-- `fulcrum telemetry purge` → row count goes to 0 on all surfaces.
+- First run shows prompt; `Y` → `telemetry.opted_in=true` → `TelemetryEvent` entities written; `N` → no entities; `fulcrum telemetry status --json` reports correct state; web `/settings/telemetry` toggle matches; TUI toggle matches.
+- `fulcrum telemetry purge` → entity count goes to 0 on all surfaces.
 
 **Feature-flag rollout — all surfaces parity**
 
 - `fulcrum flags set my-feature --enabled --rollout-percent 0` → `isEnabled('my-feature', orgId, userId)` returns `false` for all users; `--rollout-percent 100` → `true` for all; `--rollout-percent 50` → roughly half users (statistical test over 100 synthetic userIds).
-- Web `/settings/feature-flags` slider change persists; TUI `Space` toggle persists; all three read same DB value.
+- Web `/settings/feature-flags` slider change persists; TUI `Space` toggle persists; all three read same repository value.
 
 **JSON import/export — all surfaces parity**
 
-- `fulcrum export --output /tmp/org.json` → valid JSON with all entity kinds; `fulcrum import --input /tmp/org.json --dry-run` reports entity counts; `fulcrum import --input /tmp/org.json --on-conflict update` imports all rows.
-- Web `/settings/data` export download → same file; import upload → preflight → confirm → row counts match.
+- `fulcrum export --output /tmp/org.json` → valid JSON with all entity kinds; `fulcrum import --input /tmp/org.json --dry-run` reports entity counts; `fulcrum import --input /tmp/org.json --on-conflict update` imports all entities.
+- Web `/settings/data` export download → same file; import upload → preflight → confirm → entity counts match.
 - TUI Settings → Data → `E` exports; `I` imports.
 
 **Governance files**
@@ -844,16 +841,16 @@ All three surfaces must pass every criterion before this pillar is marked done.
 - `telemetry-remote` OFF → no outbound; ON → batch POSTed; HMAC valid; retry on failure.
 - `error-reporting-remote` OFF → no POST; ON → POST on new crash; paths scrubbed.
 - `vault-integration` OFF → local only; ON → Vault KV v2 roundtrip (mocked); unreachable → degraded not crash.
-- `scheduled-backups` OFF → no job; ON → S3 PUT (mocked); retry on 5xx; events row on failure.
+- `scheduled-backups` OFF → no job; ON → S3 PUT (mocked); retry on 5xx; `Event` on failure.
 - `import-linear` OFF → CLI option absent; ON → mock Linear → tasks created; API key from `credentials`.
-- `import-csv` OFF → no CLI option; ON → CSV imported; skipped rows reported.
-- `export-csv` OFF → 404; ON → CSV headers + rows correct.
+- `import-csv` OFF → no CLI option; ON → CSV imported; skipped entities reported.
+- `export-csv` OFF → 404; ON → CSV headers + entities correct.
 
 **Performance:**
 
 - `credentials.get` decrypt < 5ms p99.
 - `flags.isEnabled()` in-process warm < 1ms p99.
 - `backup.create` (10k tasks, no artifacts) < 30s p99.
-- `dataExport.create` (50k rows) < 60s p99.
+- `dataExport.create` (50k entities) < 60s p99.
 - `/settings/secrets` cold load (20 credentials) < 150ms p99.
 - `fulcrum doctor --json` (all checks) < 3s p99.

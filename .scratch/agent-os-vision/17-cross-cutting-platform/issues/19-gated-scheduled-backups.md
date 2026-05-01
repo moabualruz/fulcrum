@@ -14,18 +14,18 @@ Docs: https://github.com/graphile/worker, https://docs.aws.amazon.com/AmazonS3/l
 
 ## What to build
 
-Behind `FULCRUM_FEATURES=scheduled-backups`. graphile-worker recurring task `backups:scheduled` (cron expression stored in `tenant_settings(key='backup.cron', value='0 2 * * *')` — daily at 2am default). Each run: calls `src/backup/runner.ts` → generates local `.tar.gz` → uploads to remote storage via per-provider adapter. Providers: S3 (`@aws-sdk/client-s3`), Cloudflare R2 (S3-compatible, same SDK), Backblaze B2 (S3-compatible), GCS (`@google-cloud/storage`), Azure Blob (`@azure/storage-blob`). DSN string format: `s3://bucket/prefix`, `r2://bucket/prefix`, `b2://bucket/prefix`, `gcs://bucket/prefix`, `azure://container/prefix`. Retry: 3× exponential on failure; on final failure → `events` row `kind=backup_upload_failed` + doctor `platform.remote_backup: fail`. After successful upload → local backup pruned if >7 copies. Web: `/settings/backup → Schedule tab` (Pillar 16 issue 18).
+Behind `FULCRUM_FEATURES=scheduled-backups`. graphile-worker recurring task `backups:scheduled` (cron expression stored through `TenantSettingRepository.upsertValue('backup.cron', '0 2 * * *')` — daily at 2am default). Each run: calls `src/backup/runner.ts` → generates local `.tar.gz` → uploads to remote storage via per-provider adapter. Providers: S3 (`@aws-sdk/client-s3`), Cloudflare R2 (S3-compatible, same SDK), Backblaze B2 (S3-compatible), GCS (`@google-cloud/storage`), Azure Blob (`@azure/storage-blob`). DSN string format: `s3://bucket/prefix`, `r2://bucket/prefix`, `b2://bucket/prefix`, `gcs://bucket/prefix`, `azure://container/prefix`. Retry: 3× exponential on failure; on final failure → `Event` kind `backup_upload_failed` + doctor `platform.remote_backup: fail`. After successful upload → local backup pruned if >7 copies. Web: `/settings/backup → Schedule tab` (Pillar 16 issue 18).
 
 ## Acceptance criteria
 
 - [ ] Flag OFF: no graphile-worker `backups:scheduled` task registered; `/settings/backup` shows no Schedule tab.
-- [ ] Flag ON: task registered with correct cron expression; manual trigger via `fulcrum backup --remote` → upload to mocked S3 adapter; success → `events` row `kind=backup_upload_succeeded`.
+- [ ] Flag ON: task registered with correct cron expression; manual trigger via `fulcrum backup --remote` → upload to mocked S3 adapter; success → `Event` kind `backup_upload_succeeded`.
 - [ ] S3 adapter: `PutObjectCommand` called with correct bucket/key/body; mocked 200 → success.
-- [ ] 5xx response → retry 3× exponential; final failure → `events` row + doctor fail.
+- [ ] 5xx response → retry 3× exponential; final failure → `Event` + doctor fail.
 - [ ] R2/B2: same S3-compatible adapter, DSN parsing differs only in endpoint URL.
 - [ ] GCS adapter: `file.save()` called; mocked success.
 - [ ] Local pruning: >7 backup files in `~/.fulcrum/state/backups/` → oldest pruned after successful remote upload.
-- [ ] Web: cron builder saves to `tenant_settings`; "Remote storage DSN" field saves to `tenant_settings(key='backup.remote_dsn')`.
+- [ ] Web: cron builder saves to `TenantSetting`; "Remote storage DSN" field saves to `TenantSetting` key `backup.remote_dsn`.
 - [ ] Vitest: S3 adapter with mocked `@aws-sdk/client-s3`; GCS with mocked SDK; retry behavior.
 
 ## Blocked by

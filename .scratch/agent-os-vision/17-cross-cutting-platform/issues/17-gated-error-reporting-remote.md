@@ -10,18 +10,18 @@ Vision: .scratch/agent-os-vision/EXTRA-GAPS.md (B6 error reporting)
 Docs: https://bun.sh/docs/api/fetch
 ---
 
-# GATED: error-reporting-remote — crash POST on new error_logs row, path scrubbing, HMAC
+# GATED: error-reporting-remote — crash POST on new ErrorLog entity, path scrubbing, HMAC
 
 ## What to build
 
-Behind `FULCRUM_FEATURES=error-reporting-remote`. Sends crash entries from `error_logs` to user-configured endpoint (`FULCRUM_ERROR_REPORT_ENDPOINT` env var) on INSERT trigger (graphile-worker job `errors:report` triggered by `error_logs` table notification or polling). Stack traces scrubbed of absolute paths (regex replace `/Users/*/` + `/home/*/` + `C:\Users\*\` with `<homedir>/`). Same HMAC-SHA256 signing as telemetry-remote. No PII included.
+Behind `FULCRUM_FEATURES=error-reporting-remote`. Sends crash entries from `ErrorLog` to user-configured endpoint (`FULCRUM_ERROR_REPORT_ENDPOINT` env var) via graphile-worker job `errors:report`, enqueued after `errorLogRepo.createFromCrash(entry)`. Stack traces scrubbed of absolute paths (regex replace `/Users/*/` + `/home/*/` + `C:\Users\*\` with `<homedir>/`). Same HMAC-SHA256 signing as telemetry-remote. No PII included.
 
-Flag OFF: no POST on crash; `error_logs` rows accumulate locally only.
+Flag OFF: no POST on crash; `ErrorLog` entities accumulate locally only.
 
 ## Acceptance criteria
 
-- [ ] Flag OFF: new `error_logs` row → no outbound POST.
-- [ ] Flag ON: new `error_logs` row → `errors:report` graphile-worker job → POST with scrubbed stack trace; `X-Fulcrum-Signature` header valid.
+- [ ] Flag OFF: new `ErrorLog` entity → no outbound POST.
+- [ ] Flag ON: new `ErrorLog` entity → `errors:report` graphile-worker job → POST with scrubbed stack trace; `X-Fulcrum-Signature` header valid.
 - [ ] Path scrubbing: `/Users/mkh/projects/fulcrum/src/...` → `<homedir>/projects/fulcrum/src/...`; Windows paths scrubbed too.
 - [ ] No email addresses, secret values, or file contents in payload.
 - [ ] HMAC: verified by mocked server test.
@@ -31,4 +31,4 @@ Flag OFF: no POST on crash; `error_logs` rows accumulate locally only.
 
 ## Blocked by
 
-- Issue 05 (error crashlog) — `error_logs` table populated by crashlog.ts.
+- Issue 05 (error crashlog) — `ErrorLog` entity populated by crashlog.ts.

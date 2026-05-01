@@ -18,15 +18,15 @@ PRD: `.scratch/agent-os-vision/prds/12-notifications-activity-audit.md` (Issues 
 ## What to build
 Two delivery channel implementations, each gated independently:
 
-**`notify-slack`** (`FULCRUM_FEATURES=notify-slack`): `notify-deliver-slack` graphile-worker task; `fetch` POST to `SLACK_WEBHOOK_URL` with Slack Block Kit JSON; quiet-hours respected; rate-limit backoff same as webhook channel; `status='sent'|'failed'|'suppressed'`.
+**`notify-slack`** (`FULCRUM_FEATURES=notify-slack`): `notify-deliver-slack` graphile-worker task; `@Injectable()` `SlackNotificationDispatcher` (needle-di) uses `fetch` POST to `SLACK_WEBHOOK_URL` with Slack Block Kit JSON; quiet-hours respected; rate-limit backoff same as webhook channel; `status='sent'|'failed'|'suppressed'`.
 
-**`notify-discord`** (`FULCRUM_FEATURES=notify-discord`): `notify-deliver-discord` task; `fetch` POST to Discord webhook URL with embed JSON; same patterns. Discord rate-limit (429) → exponential backoff.
+**`notify-discord`** (`FULCRUM_FEATURES=notify-discord`): `notify-deliver-discord` task; `@Injectable()` `DiscordNotificationDispatcher` uses `fetch` POST to Discord webhook URL with embed JSON; same patterns. Discord rate-limit (429) → exponential backoff.
 
 Both: flag OFF → no outbound requests; channels config page shows URL input; test delivery button.
 
 ## Acceptance criteria
-- [ ] Schema migration: reads `notification_deliveries`; Slack/Discord URL stored in `webhook_rule_configs` (reuse table with `channel='slack'|'discord'`).
-- [ ] tRPC procedure / module: two graphile-worker tasks; `src/notifications/channels/slack.ts` + `discord.ts`.
+- [ ] Schema migration: reads `NotificationDelivery`; Slack/Discord URL stored in `WebhookRuleConfig` (reuse entity with `channel='slack'|'discord'`).
+- [ ] tRPC procedure / module: two graphile-worker tasks; `src/notifications/channels/slack.ts` + `discord.ts` export `@Injectable()` dispatchers.
 - [ ] Web surface: channels config page shows Slack + Discord URL inputs; test delivery buttons.
 - [ ] CLI command: `fulcrum notify channels config slack --url https://hooks.slack.com/...`; `fulcrum notify channels test slack`.
 - [ ] TUI screen: Settings channels shows Slack/Discord config + last status.
@@ -40,4 +40,4 @@ Both: flag OFF → no outbound requests; channels config page shows URL input; t
 - Slack Block Kit format: `{ "blocks": [{ "type": "section", "text": { "type": "mrkdwn", "text": "*{{title}}*\n{{body}}" } }] }`.
 - Discord embed: `{ "embeds": [{ "title": "{{title}}", "description": "{{body}}", "color": 0x5865F2 }] }`.
 - Failure gate: Slack deprecates incoming webhooks → switch to OAuth app via `notify-slack-api` flag.
-- Rate limit: Slack has ~1 msg/sec per webhook; Discord has 5 req/sec; implement token bucket in Redis or simple `retry_after` DB column.
+- Rate limit: Slack has ~1 msg/sec per webhook; Discord has 5 req/sec; implement token bucket in memory or persist `NotificationDelivery.retryAfter`.

@@ -16,10 +16,10 @@ Docs: []
 PRD: `.scratch/agent-os-vision/prds/12-notifications-activity-audit.md` (Always-on: Audit log surface; A4 retention requirement)
 
 ## What to build
-Daily graphile-worker cron task `audit.prune-events`: for each org with `event_retention_policy.retain_days > 0`, deletes `events WHERE created_at < now() - interval '{N} days' AND org_id=$1`. Audit the prune action itself (write an `events` row for the deletion to org's audit trail before deleting — or write to a separate `audit_prune_log` table). `retain_days = 0` means keep forever. Doctor integration: reports oldest event timestamp per org and current retention setting.
+Daily graphile-worker cron task `audit.prune-events`: for each org with `EventRetentionPolicy.retainDays > 0`, loads expired events through `eventRepo.findExpiredForRetention(org, retainDays)` and deletes them in batches. Audit the prune action itself by creating a summary `Event` before deleting expired entries. `retain_days = 0` means keep forever. Doctor integration: reports oldest event timestamp per org and current retention setting.
 
 ## Acceptance criteria
-- [ ] Schema migration: reads `event_retention_policy` (from `0012_notifications`); deletes from `events` (Pillar 1 DDL).
+- [ ] Schema migration: reads `EventRetentionPolicy` (from migration class `Migration<timestamp>`); deletes through `EventRepository` (Pillar 1 entity).
 - [ ] tRPC procedure / module: `audit.prune` manual trigger procedure; `registerAuditPruneCron(worker)` in worker bootstrap.
 - [ ] Web surface: `/settings/notifications` retention policy setting controls `retain_days`; shows "Events older than N days will be deleted" message.
 - [ ] CLI command: `fulcrum audit query --since 2025-01-01 --json` returns no events older than `retain_days`; doctor reports retention setting.
@@ -28,7 +28,7 @@ Daily graphile-worker cron task `audit.prune-events`: for each org with `event_r
 
 ## Blocked by
 - `06-trpc-audit-procedures.md` — `audit.retentionPolicy.*` procedures.
-- Pillar 1 (Foundation) — graphile-worker cron + `events` table DDL.
+- Pillar 1 (Foundation) — graphile-worker cron + `Event` entity.
 
 ## Notes / Tech-stack hints
 - A4: default 1 year (`retain_days=365`) per org; configurable per org via `event_retention_policy`.

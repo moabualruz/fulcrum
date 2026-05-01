@@ -15,14 +15,14 @@
 
 ## Vision
 
-Every event fans out to signals. Always-on: in-app activity feed per project + per user, bell-icon unread counter, `notification_rules` rule engine against `events` table, audit log viewer, mute/quiet-hours. Gated but fully shipped: email SMTP, outbound webhooks (HMAC), Slack webhook, Discord webhook, VAPID push. Mute/snooze per entity; quiet hours; per-user rule CRUD. Audit log: filters + CSV/JSON export; retention policy per project. C4 parity: Web (`/inbox`, `/settings/notifications`, `/audit`) + CLI + TUI + API.
+Every event fans out to signals. Always-on: in-app activity feed per project + per user, bell-icon unread counter, `NotificationRule` rule engine against the Pillar 1 `Event` entity, audit log viewer, mute/quiet-hours. Gated but fully shipped: email SMTP, outbound webhooks (HMAC), Slack webhook, Discord webhook, VAPID push. Mute/snooze per entity; quiet hours; per-user rule CRUD. Audit log: filters + CSV/JSON export; retention policy per project. C4 parity: Web (`/inbox`, `/settings/notifications`, `/audit`) + CLI + TUI + API.
 
 ---
 
 ## Out-of-scope
 
 C5 carve-out (2) — owned by another pillar:
-- **Pillar 1:** `events` DDL + `org_id` backfill (Q23). This pillar consumes `events`, does not own schema.
+- **Pillar 1:** `Event` entity + `org_id` backfill (Q23). This pillar consumes events, does not own the event model.
 - **Pillars 3/6/7/8/9/10:** emitting specific event rows. This pillar evaluates rules against them.
 - **Pillar 2:** embedding model lifecycle.
 
@@ -39,9 +39,9 @@ Ships unconditionally, all surfaces.
 
 ### `events` consumption
 
-P1 owns `events` DDL. This pillar: `graphile-worker` `notify-fan-out` job on insert → `src/notifications/rule-engine.ts` matches against `notification_rules` per org user → writes `user_notifications` per in-app match.
+P1 owns the `Event` entity. This pillar: `graphile-worker` `notify-fan-out` job after event write → `src/notifications/rule-engine.ts` matches against `NotificationRuleRepository` per org user → writes `Notification` entities per in-app match.
 
-### `notification_rules` table
+### `NotificationRule` entity
 
 Per-user declarative rules; in-process per-event evaluation. Pattern jsonb AST fields: `subject_kind`, `verb`, `payload_path` (dot-path into `events.payload`), `project_id`, `sprint_id`. Example: `{"subject_kind":"task","verb":"assigned","payload_path_eq":[{"path":"assignee_id","value":"$current_user_id"}]}`.
 
@@ -49,17 +49,17 @@ Per-user declarative rules; in-process per-event evaluation. Pattern jsonb AST f
 
 ### In-app notifications + activity feed
 
-`user_notifications`: one row per (user, event, rule). Bell badge = `count WHERE read_at IS NULL`. Card: icon + title + verb + actor + time. Click navigates. Infinite scroll 20/page.
+`Notification`: one entity per (user, event, rule). Bell badge = `notificationRepo.count({ user, readAt: null })`. Card: icon + title + verb + actor + time. Click navigates. Infinite scroll 20/page.
 
-`/projects/<id>/activity`: `events WHERE project_id=?` DESC, filter kind/verb/actor/date (TanStack Virtual). `/inbox`: "For you" (`user_notifications`) + "My activity" (`events WHERE actor_id=$me`) tabs.
+`/projects/<id>/activity`: `eventRepo.find({ project }, { orderBy: { createdAt: 'DESC' } })`, filter kind/verb/actor/date (TanStack Virtual). `/inbox`: "For you" (`Notification`) + "My activity" (`eventRepo.find({ actor: currentUser })`) tabs.
 
 ### Mute + quiet hours
 
-`notification_mutes(user_id, subject_kind, subject_id, muted_until)` — `NULL`=permanent; rule engine checks before writing. `notification_quiet_hours(user_id, tz, start_hour, end_hour, days_of_week[])` — gated deliveries suppressed in window; `retry-after-quiet` job reschedules. In-app unaffected.
+`NotificationMute(user_id, subject_kind, subject_id, muted_until)` — `null`=permanent; rule engine checks before writing. `NotificationQuietHours(user_id, tz, start_hour, end_hour, days_of_week[])` — gated deliveries suppressed in window; `retry-after-quiet` job reschedules. In-app unaffected.
 
 ### Audit log surface
 
-Read-only `events` viewer: filters `org_id`/`project_id`/`user_id`/`subject_kind`/`verb`/`date_range`, default last 7 days, `created_at DESC`. Export CSV/JSON — streams for <100k rows; `graphile-worker` job for larger. Retention policy via `audit_retention_policies(retain_days DEFAULT 0 = keep-forever)`; daily cron prunes matching rows.
+Read-only `Event` viewer: filters `org_id`/`project_id`/`user_id`/`subject_kind`/`verb`/`date_range`, default last 7 days, `created_at DESC`. Export CSV/JSON — streams for <100k entities; `graphile-worker` job for larger. Retention policy via `EventRetentionPolicy(retain_days DEFAULT 0 = keep-forever)`; daily cron prunes matching events.
 
 ### Bell-icon counter
 
@@ -77,7 +77,7 @@ All shipped + tested; OFF by default; flip individual flag to enable.
 | Outbound webhooks | `notify-webhook` | HTTP POST + `X-Fulcrum-Signature-256` HMAC. Exponential backoff, max 5 retries. `HMAC_SECRET` per rule. |
 | Slack webhook | `notify-slack` | fetch POST to `SLACK_WEBHOOK_URL`. Block Kit format. |
 | Discord webhook | `notify-discord` | fetch POST to Discord webhook URL. Embed format. |
-| Web push (VAPID) | `notify-push` | `web-push` + service worker. `VAPID_PUBLIC/PRIVATE_KEY`. `push_subscriptions` table. Quiet hours respected. |
+| Web push (VAPID) | `notify-push` | `web-push` + service worker. `VAPID_PUBLIC/PRIVATE_KEY`. `PushSubscription` entity. Quiet hours respected. |
 | Real-time bell | `real-time-collab-server` | Hocuspocus WebSocket replaces 60s poll. Cross-ref Pillar 5/6 (same flag). |
 | Public REST/OpenAPI | `public-api` | `GET|POST|PATCH|DELETE /api/v1/notifications/*`, `GET /api/v1/audit` via `@hono/zod-openapi`. |
 
@@ -94,108 +94,131 @@ All shipped + tested; OFF by default; flip individual flag to enable.
 | Slack delivery | `fetch` to incoming-webhook URL | — | Slack deprecates → OAuth app `notify-slack-api` flag | — |
 | Discord delivery | `fetch` to Discord URL | — | Rate-limit → same backoff as webhook path | — |
 | Web push | `web-push` | MIT | VAPID <95% → degrade gracefully; in-app always-on | — |
-| Rule engine | In-process jsonb match | — | >5ms → compile to SQL WHERE | `json-rules-engine` (MIT, P3 reuse) |
+| Rule engine | In-process jsonb match | — | >5ms → pre-index common patterns in repository filters | `json-rules-engine` (MIT, P3 reuse) |
 | TUI | OpenTUI | MIT | Too immature → ratatui in Rust sidecar | — |
+
+### Stack (DECISIONS.md C7-C9)
+- C7: MikroORM v7 primary; entities use `@mikro-orm/decorators/es`.
+- C7: migrations are classes at `src/db/migrations/Migration<timestamp>.ts`.
+- C8: channel dispatchers are `@Injectable()` services resolved by needle-di.
+- C9: entity paths live under `src/db/entities/notifications/`.
+- C9: repositories live under `src/db/repositories/notifications/`.
 
 ---
 
-## Schema changes
+## Entity changes
 
-All tables: composite `(org_id, …)` indexes (Q22 mandate). All migrations idempotent.
+All entities carry composite `(org_id, …)` indexes (Q22 mandate). Migration class: `Migration<timestamp>` covering notifications.
 
-```sql
--- notification_rules: (org_id, user_id) idx, partial idx WHERE enabled, GIN(event_pattern)
-CREATE TABLE notification_rules (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name text NOT NULL, event_pattern jsonb NOT NULL DEFAULT '{}',
-  channels text[] NOT NULL DEFAULT '{in-app}',
-  enabled boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
-);
+```ts
+@Entity({ tableName: 'notification_rules' })
+@Index({ properties: ['org', 'user'] })
+@Index({ properties: ['org', 'enabled'] })
+export class NotificationRule {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => Org, { deleteRule: 'cascade' }) org!: Org;
+  @ManyToOne(() => User, { deleteRule: 'cascade' }) user!: User;
+  @Property() name!: string;
+  @Property({ type: 'json' }) eventPattern: Record<string, unknown> = {};
+  @Property({ type: 'array' }) channels: string[] = ['in-app'];
+  @Property() enabled = true;
+  @Property() createdAt = new Date();
+  @Property({ onUpdate: () => new Date() }) updatedAt = new Date();
+}
 
--- user_notifications: (org_id, user_id, read_at) WHERE NULL, (org_id, user_id, created_at DESC)
--- UNIQUE (user_id, event_id, rule_id)
-CREATE TABLE user_notifications (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  rule_id uuid REFERENCES notification_rules(id) ON DELETE SET NULL,
-  event_id uuid NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-  title text NOT NULL, body text NOT NULL DEFAULT '',
-  entity_kind text NOT NULL, entity_id uuid NOT NULL,
-  read_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (user_id, event_id, rule_id)
-);
+@Entity({ tableName: 'user_notifications' })
+@Unique({ properties: ['user', 'event', 'rule'] })
+@Index({ properties: ['org', 'user', 'readAt'] })
+@Index({ properties: ['org', 'user', 'createdAt'] })
+export class Notification {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => Org, { deleteRule: 'cascade' }) org!: Org;
+  @ManyToOne(() => User, { deleteRule: 'cascade' }) user!: User;
+  @ManyToOne(() => NotificationRule, { nullable: true, deleteRule: 'set null' }) rule?: NotificationRule;
+  @ManyToOne(() => Event, { deleteRule: 'cascade' }) event!: Event;
+  @Property() title!: string;
+  @Property() body = '';
+  @Property() entityKind!: string;
+  @Property({ type: 'uuid' }) entityId!: string;
+  @Property({ nullable: true }) readAt?: Date;
+  @Property() createdAt = new Date();
+}
 
--- notification_deliveries: (org_id, user_id, channel, status), (retry_after) WHERE pending
-CREATE TABLE notification_deliveries (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  rule_id uuid NOT NULL REFERENCES notification_rules(id) ON DELETE CASCADE,
-  notification_id uuid REFERENCES user_notifications(id) ON DELETE SET NULL,
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  channel text NOT NULL,
-  status text NOT NULL DEFAULT 'pending'
-    CHECK (status IN ('pending','sent','failed','suppressed','held-quiet-hours')),
-  attempt_count int NOT NULL DEFAULT 0, last_error text,
-  payload jsonb NOT NULL DEFAULT '{}', sent_at timestamptz, retry_after timestamptz,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
+@Entity({ tableName: 'notification_deliveries' })
+@Index({ properties: ['org', 'user', 'channel', 'status'] })
+@Index({ properties: ['retryAfter'] })
+export class NotificationDelivery {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => Org, { deleteRule: 'cascade' }) org!: Org;
+  @ManyToOne(() => NotificationRule, { deleteRule: 'cascade' }) rule!: NotificationRule;
+  @ManyToOne(() => Notification, { nullable: true, deleteRule: 'set null' }) notification?: Notification;
+  @ManyToOne(() => User, { deleteRule: 'cascade' }) user!: User;
+  @Property() channel!: string;
+  @Enum(() => DeliveryStatus) status = DeliveryStatus.Pending;
+  @Property() attemptCount = 0;
+  @Property({ nullable: true }) lastError?: string;
+  @Property({ type: 'json' }) payload: Record<string, unknown> = {};
+  @Property({ nullable: true }) sentAt?: Date;
+  @Property({ nullable: true }) retryAfter?: Date;
+  @Property() createdAt = new Date();
+}
 
--- notification_mutes: UNIQUE(user_id, subject_kind, subject_id); idx (org_id, user_id)
-CREATE TABLE notification_mutes (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  subject_kind text NOT NULL, subject_id uuid NOT NULL, muted_until timestamptz,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (user_id, subject_kind, subject_id)
-);
+@Entity({ tableName: 'notification_mutes' })
+@Unique({ properties: ['user', 'subjectKind', 'subjectId'] })
+export class NotificationMute {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => Org, { deleteRule: 'cascade' }) org!: Org;
+  @ManyToOne(() => User, { deleteRule: 'cascade' }) user!: User;
+  @Property() subjectKind!: string;
+  @Property({ type: 'uuid' }) subjectId!: string;
+  @Property({ nullable: true }) mutedUntil?: Date;
+}
 
--- notification_quiet_hours: UNIQUE(user_id); idx (org_id, user_id)
-CREATE TABLE notification_quiet_hours (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  tz text NOT NULL DEFAULT 'UTC',
-  start_hour int NOT NULL CHECK (start_hour BETWEEN 0 AND 23),
-  end_hour int NOT NULL CHECK (end_hour BETWEEN 0 AND 23),
-  days_of_week int[] NOT NULL DEFAULT '{0,1,2,3,4,5,6}',
-  UNIQUE (user_id)
-);
+@Entity({ tableName: 'notification_quiet_hours' })
+@Unique({ properties: ['user'] })
+export class NotificationQuietHours {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => Org, { deleteRule: 'cascade' }) org!: Org;
+  @ManyToOne(() => User, { deleteRule: 'cascade' }) user!: User;
+  @Property() tz = 'UTC';
+  @Property() startHour!: number;
+  @Property() endHour!: number;
+  @Property({ type: 'array' }) daysOfWeek: number[] = [0, 1, 2, 3, 4, 5, 6];
+}
 
--- audit_retention_policies: UNIQUE(org_id, project_id)
-CREATE TABLE audit_retention_policies (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  project_id uuid REFERENCES projects(id) ON DELETE CASCADE,
-  retain_days int NOT NULL DEFAULT 0, created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (org_id, project_id)
-);
+@Entity({ tableName: 'event_retention_policy' })
+@Unique({ properties: ['org', 'project'] })
+export class EventRetentionPolicy {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => Org, { deleteRule: 'cascade' }) org!: Org;
+  @ManyToOne(() => Project, { nullable: true, deleteRule: 'cascade' }) project?: Project;
+  @Property() retainDays = 0;
+}
 
--- webhook_rule_configs: UNIQUE(rule_id); secret app-level encrypted
-CREATE TABLE webhook_rule_configs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  rule_id uuid NOT NULL REFERENCES notification_rules(id) ON DELETE CASCADE,
-  url text NOT NULL, secret text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(), UNIQUE (rule_id)
-);
+@Entity({ tableName: 'webhook_rule_configs' })
+@Unique({ properties: ['rule'] })
+export class WebhookRuleConfig {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => Org, { deleteRule: 'cascade' }) org!: Org;
+  @ManyToOne(() => NotificationRule, { deleteRule: 'cascade' }) rule!: NotificationRule;
+  @Property() url!: string;
+  @Property() encryptedSecret!: string;
+}
 
--- push_subscriptions: UNIQUE(user_id, endpoint); idx (org_id, user_id)
-CREATE TABLE push_subscriptions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  endpoint text NOT NULL, p256dh text NOT NULL, auth text NOT NULL,
-  user_agent text, created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (user_id, endpoint)
-);
+@Entity({ tableName: 'push_subscriptions' })
+@Unique({ properties: ['user', 'endpoint'] })
+export class PushSubscription {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => Org, { deleteRule: 'cascade' }) org!: Org;
+  @ManyToOne(() => User, { deleteRule: 'cascade' }) user!: User;
+  @Property() endpoint!: string;
+  @Property() p256dh!: string;
+  @Property() auth!: string;
+  @Property({ nullable: true }) userAgent?: string;
+}
 ```
 
-`events` owned by Pillar 1; Q23 org_id backfill in Pillar 1. No new `events` columns from this pillar.
+`Event` owned by Pillar 1; Q23 org_id backfill in Pillar 1. No new `Event` properties from this pillar.
 
 ---
 
@@ -251,18 +274,18 @@ fulcrum audit export --format csv|json [same filters as query] [--output <file>]
 
 ```mermaid
 graph TD
-    EV[(events table)] -->|INSERT trigger| GW[graphile-worker notify-fan-out]
+    EV[(Event entity)] -->|write hook| GW[graphile-worker notify-fan-out]
     GW --> RE[rule-engine.ts per org user]
-    RE -->|match + not muted + not quiet| UN[(user_notifications)]
-    RE -->|channel=email + notify-email ON| EM[email channel nodemailer]
-    RE -->|channel=webhook + notify-webhook ON| WH[webhook channel HMAC POST]
-    RE -->|channel=slack + notify-slack ON| SL[Slack webhook fetch]
-    RE -->|channel=discord + notify-discord ON| DC[Discord webhook fetch]
-    RE -->|channel=push + notify-push ON| VP[VAPID web-push]
-    EM & WH & SL & DC & VP --> ND[(notification_deliveries)]
+    RE -->|match + not muted + not quiet| UN[(Notification)]
+    RE -->|channel=email + notify-email ON| EM[EmailDispatcherService]
+    RE -->|channel=webhook + notify-webhook ON| WH[WebhookDispatcherService]
+    RE -->|channel=slack + notify-slack ON| SL[SlackDispatcherService]
+    RE -->|channel=discord + notify-discord ON| DC[DiscordDispatcherService]
+    RE -->|channel=push + notify-push ON| VP[PushDispatcherService]
+    EM & WH & SL & DC & VP --> ND[(NotificationDelivery)]
 
     QH[quiet-hours.ts] -->|suppress in window| RE
-    MUTE[(notification_mutes)] --> RE
+    MUTE[(NotificationMute)] --> RE
     CRON[retention cron daily] --> PRUNE[audit retention pruner]
     PRUNE --> EV
 
@@ -277,16 +300,16 @@ graph TD
 ```mermaid
 sequenceDiagram
     participant P6 as Pillar 6 task.assigned
-    participant DB as PGlite events
+    participant DB as EventRepository
     participant GW as graphile-worker
     participant RE as rule-engine.ts
     participant MUT as notification_mutes
     participant QH as quiet-hours.ts
     participant ND as user_notifications
 
-    P6->>DB: INSERT events(verb=task.assigned, payload={assignee_id})
+    P6->>DB: eventRepo.createTaskAssigned({assigneeId})
     DB->>GW: notify-fan-out({eventId})
-    GW->>DB: SELECT notification_rules WHERE org_id AND enabled
+    GW->>DB: notificationRuleRepo.find({org, enabled: true})
     GW->>RE: evaluate(event, rules[])
     loop per user with matching rule
         RE->>MUT: SELECT WHERE user_id AND subject_id
@@ -297,7 +320,7 @@ sequenceDiagram
             alt in quiet hours
                 RE->>GW: enqueue retry-after-quiet
             else
-                RE->>ND: INSERT user_notifications
+                RE->>ND: notificationRepo.upsertFromMatch(match)
                 alt channel=email
                     RE->>GW: enqueue email-delivery
                 end
@@ -369,7 +392,7 @@ erDiagram
 
 | Code | Description | Propagated to | Recovery |
 |---|---|---|---|
-| `RULE_EVAL_SLOW` | Rule engine >5ms per event with 1000 rules | Doctor warn | Compile patterns to SQL WHERE |
+| `RULE_EVAL_SLOW` | Rule engine >5ms per event with 1000 rules | Doctor warn | Pre-index common patterns in repository filters |
 | `EMAIL_SEND_FAILED` | nodemailer SMTP error | `deliveries.status=failed` + `last_error` | Check SMTP creds; `nodemailer` fallback `emailjs` |
 | `WEBHOOK_MAX_RETRIES` | 5 retry attempts exhausted on 5xx | `deliveries.status=failed` | Manual resend; check target URL |
 | `VAPID_SUBSCRIPTION_EXPIRED` | 410 from push service | Delete `push_subscriptions` row | User re-subscribes in browser |
@@ -415,9 +438,9 @@ const DoctorNotificationsCheck = z.object({
 
 | Check ID | What it verifies | Failure recovery |
 |---|---|---|
-| `notifications.schema.rules` | `notification_rules` table with enabled partial index | Run migration T12-01 |
-| `notifications.schema.user_notifications` | `user_notifications` UNIQUE(user_id, event_id, rule_id) constraint | Run migration T12-01 |
-| `notifications.schema.audit_retention` | `audit_retention_policies` table present | Run migration T12-01 |
+| `notifications.schema.rules` | `NotificationRule` metadata with enabled composite index | Run migration T12-01 |
+| `notifications.schema.user_notifications` | `Notification` unique key `(user, event, rule)` | Run migration T12-01 |
+| `notifications.schema.audit_retention` | `EventRetentionPolicy` metadata registered | Run migration T12-01 |
 | `notifications.defaults.seeded` | 4 default rules exist per user on first user create | Re-run default seeder T12-03 |
 | `notifications.fanout.worker` | `notify-fan-out` graphile-worker task registered | Check graphile-worker setup (Pillar 1) |
 | `notifications.email.smtp` | If `notify-email` ON: SMTP connection test passes | Check `SMTP_HOST/PORT/USER/PASS` |
@@ -429,7 +452,7 @@ const DoctorNotificationsCheck = z.object({
 
 | Pillar | Need |
 |---|---|
-| 1 | `events` DDL + Q23 backfill; `graphile-worker` (fan-out, quiet-retry, retention cron); flag eval; Better-Auth `$me` resolution |
+| 1 | `Event` entity + Q23 backfill; `graphile-worker` (fan-out, quiet-retry, retention cron); flag eval; Better-Auth `$me` resolution |
 | 6 | Task events: `status_changed`, `assigned`, `mentioned`, `commented`, `sprint_changed` |
 | 7 | Doc events: `created`, `updated`, `mentioned` |
 | 9 | Repo events: `pushed`, `merged` |
@@ -441,7 +464,7 @@ const DoctorNotificationsCheck = z.object({
 ## Issues breakdown (TDD-numbered)
 
 **Foundation**
-- `T12-01` Migration: all 8 tables. Tests: schema, unique indexes, FK cascades.
+- `T12-01` Migration class `Migration<timestamp>`: all 8 notification entities. Tests: metadata, unique indexes, FK cascades.
 - `T12-02` Rule engine `src/notifications/rule-engine.ts`. Tests: all AST fields match; `$me` resolved; no-match empty; mute short-circuits; disabled rule skipped.
 - `T12-03` Default rules seeding (4 defaults on user create). Tests: correct rules present; idempotent.
 - `T12-04` `graphile-worker` `notify-fan-out`: event → evaluate rules → write `user_notifications`. Tests: dedup `(user_id, event_id, rule_id)`; muted suppressed; disabled skipped.
@@ -496,7 +519,7 @@ const DoctorNotificationsCheck = z.object({
 - **`graphile-worker` unavailable (Pillar 1 delay):** in-process sync listener + `at_least_once_deliveries` retry table.
 - **`nodemailer` TLS/auth issues:** `emailjs` (MIT) drop-in; transport factory in `src/notifications/channels/email.ts`.
 - **`web-push` VAPID rotation:** `VAPID_PUBLIC_KEY_OLD` + re-subscribe flow; old subs kept until TTL.
-- **Rule engine >5ms per event:** compile patterns to parameterised SQL WHERE; `json-rules-engine` (MIT, shared with Pillar 3 router) as fallback.
+- **Rule engine >5ms per event:** pre-index frequent patterns and batch repository filters; `json-rules-engine` (MIT, shared with Pillar 3 router) as fallback.
 - **OpenTUI too immature:** ratatui pane in Rust sidecar via same Unix socket/stdio RPC.
 
 ---

@@ -10,23 +10,23 @@ Vision: .scratch/agent-os-vision/EXTRA-GAPS.md (B7, B8, B9, B10)
 Docs: https://pglite.dev/docs
 ---
 
-# Schema migration — credentials, telemetry_events, error_logs, experiment_assignment + feature_flags addendum
+# Migration class — Credential, TelemetryEvent, ErrorLog, ExperimentAssignment, FeatureFlagRollout
 
 ## What to build
 
-Write and apply migration(s) for the five schema additions owned by Pillar 17. (1) `credentials` table with UNIQUE `(org_id, user_id, name)`, composite indexes `(org_id, user_id, last_used_at DESC)` and `(org_id, archived)`. (2) `telemetry_events` table with indexes `(org_id, occurred_at DESC)` and `(org_id, user_id, kind)`. (3) `error_logs` table with index `(org_id, occurred_at DESC)`. (4) `experiment_assignment` table with UNIQUE `(org_id, user_id, experiment_id)` and index `(org_id, experiment_id)`. (5) `feature_flags` addendum: `ADD COLUMN IF NOT EXISTS rollout_percent`, `cohort_rules`, `updated_by`, `updated_at` — idempotent. All tables: `org_id NOT NULL` + FK cascade + composite indexes mandatory per Q22.
+Write and apply migration class `Migration<timestamp>` for the five entity additions owned by Pillar 17. (1) `Credential` with UNIQUE `(org_id, user_id, name)`, composite indexes `(org_id, user_id, last_used_at DESC)` and `(org_id, archived)`. (2) `TelemetryEvent` with indexes `(org_id, occurred_at DESC)` and `(org_id, user_id, kind)`. (3) `ErrorLog` with index `(org_id, occurred_at DESC)`. (4) `ExperimentAssignment` with UNIQUE `(org_id, user_id, experiment_id)` and index `(org_id, experiment_id)`. (5) `FeatureFlagRollout` with UNIQUE `(org_id, flag_id)`, `rolloutPercent`, `cohortRules`, `updatedBy`, `updatedAt`. All entities: `org_id NOT NULL` + FK cascade + composite indexes mandatory per Q22.
 
-Cuts through: migration SQL → migration runner (PGlite + Postgres) → schema-shape unit test → idempotent re-run.
+Cuts through: entity decorators → MikroORM migration class → metadata-shape unit test → idempotent re-run.
 
 ## Acceptance criteria
 
-- [ ] All 4 new tables created with correct columns, types, NOT NULL flags, FK targets, UNIQUE constraints, CHECK constraints, composite indexes.
-- [ ] `feature_flags` addendum: `ADD COLUMN IF NOT EXISTS` runs clean on both fresh DB (no existing columns) and existing DB (columns already present).
-- [ ] Migration idempotent: running twice → no error, no duplicate rows/indexes.
+- [ ] All 5 entity mappings created with correct properties, types, required flags, FK targets, UNIQUE constraints, enum/range validators, composite indexes.
+- [ ] `FeatureFlagRollout` links to Pillar 1 `FeatureFlag` and keeps rollout/cohort data outside the base flag entity.
+- [ ] Migration idempotent: running twice → no error, no duplicate entities/indexes.
 - [ ] Runs clean on PGlite WASM in-process AND standard Postgres (pg driver).
-- [ ] Unit test: `tests/db/migrations/0017_platform.test.ts` — asserts every table/column/index via `information_schema`; RED → GREEN.
-- [ ] `org_id` NOT NULL on every table; FK to `orgs(id) ON DELETE CASCADE` verified.
+- [ ] Unit test: `tests/db/migrations/Migration<timestamp>.test.ts` — asserts every entity/property/index via MikroORM metadata + repository smoke checks; RED → GREEN.
+- [ ] `org_id` NOT NULL on every entity; FK to `Org` with cascade verified.
 
 ## Blocked by
 
-- Pillar 1 issue 01 (schema auth migration) — `orgs`, `users` tables must exist for FKs.
+- Pillar 1 issue 01 (auth entities migration) — `Org`, `User`, `FeatureFlag`, and `TenantSetting` entities must exist for FKs.
