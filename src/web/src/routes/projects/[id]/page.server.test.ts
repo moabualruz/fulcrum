@@ -117,6 +117,58 @@ describe("/projects/[id] +page.server.ts", () => {
     }
   });
 
+  test("load throws 404 when the project id does not exist", async () => {
+    // Seed an unrelated project so the DB exists + migrations have run; the
+    // bogus ID below is a syntactically-valid ULID that won't match any row.
+    await seedOneProject({ slug: "exists", name: "Exists" });
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 10}`);
+    let caught: unknown;
+    try {
+      await mod.load({
+        params: { id: "01JBOGUS000000000000000000" },
+      } as Parameters<typeof mod.load>[0]);
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeDefined();
+    expect(
+      typeof caught === "object" &&
+        caught !== null &&
+        "status" in caught &&
+        (caught as { status: number }).status === 404,
+    ).toBe(true);
+  });
+
+  test("rename action returns fail(400, {form}) when name is empty", async () => {
+    const { id } = await seedOneProject({
+      slug: "renamer-empty",
+      name: "Existing",
+      description: "before",
+    });
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 11}`);
+    const fd = new FormData();
+    fd.set("name", "");
+    fd.set("description", "anything");
+    const request = new Request("http://localhost/projects/x", {
+      method: "POST",
+      body: fd,
+    });
+    // SvelteKit's `fail(400, { form })` returns an ActionFailure object
+    // (not a thrown error). It carries `status === 400` and `data.form`
+    // (the SuperValidated envelope with `valid: false` + populated errors).
+    const result = (await mod.actions.rename({
+      params: { id },
+      request,
+    } as Parameters<typeof mod.actions.rename>[0])) as {
+      status?: number;
+      data?: { form?: { valid?: boolean; errors?: Record<string, unknown> } };
+    };
+    expect(result.status).toBe(400);
+    expect(result.data?.form).toBeDefined();
+    expect(result.data?.form?.valid).toBe(false);
+    expect(result.data?.form?.errors).toBeDefined();
+  });
+
   test("delete action deletes row, emits project.deleted, throws redirect 303 to /projects", async () => {
     const { id } = await seedOneProject({ slug: "doomed", name: "Doomed" });
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
