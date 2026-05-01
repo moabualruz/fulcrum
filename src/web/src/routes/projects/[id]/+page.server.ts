@@ -36,6 +36,11 @@ interface ProjectRow {
   updated_at: Date | string;
 }
 
+// Note: this loader is intentionally NOT wrapped in SvelteKit's `streamed`
+// pattern even though the rest of the detail routes are. The rename `<form>`
+// is built via `superValidate` *from* the loaded row's defaults, so the
+// initial form state is downstream of the DB read — there's no useful
+// header-paints-before-data window to gain by streaming this one row.
 export const load: PageServerLoad = async ({ params, parent }) => {
   // Inherit `activeProjectId` from the root layout-data so the
   // `<SetActiveButton />` next to the heading can render its toggle state
