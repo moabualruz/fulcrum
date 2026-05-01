@@ -39,12 +39,14 @@ export interface LicenseAuditOptions {
 
 const PASS_LICENSES = new Set([
   "MIT",
+  "MIT-0",
   "Apache-2.0",
   "BSD-2-Clause",
   "BSD-3-Clause",
   "ISC",
   "0BSD",
   "CC0",
+  "CC0-1.0",
   "Unlicense",
   "CC-BY-4.0",
   "Python-2.0",
@@ -53,6 +55,8 @@ const PASS_LICENSES = new Set([
 
 const FAIL_LICENSE_PATTERNS = [
   /\bAGPL\b/i,
+  /\bGPL\b/i,
+  /\bLGPL\b/i,
   /\bSSPL\b/i,
   /\bBSL\b/i,
   /\bBUSL\b/i,
