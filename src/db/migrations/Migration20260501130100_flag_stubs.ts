@@ -30,8 +30,10 @@ export class Migration20260501130100_flag_stubs extends Migration {
     );
 
     // ── webhook_subscriptions (Pillar 10: Webhooks) ───────────────────────
+    // C10: minimal stub — only index-axis columns (org_id, active).
+    // Domain fields (url, events, secret, created_at) added by Pillar 10 migration.
     this.addSql(
-      `create table "webhook_subscriptions" ("id" uuid not null default gen_random_uuid(), "org_id" uuid not null, "url" varchar(255) not null, "events" jsonb not null, "active" boolean not null default true, "secret" varchar(255) not null, "created_at" timestamptz not null default now(), primary key ("id"))`,
+      `create table "webhook_subscriptions" ("id" uuid not null default gen_random_uuid(), "org_id" uuid not null, "active" boolean not null default true, primary key ("id"))`,
     );
     this.addSql(
       `create index "idx_webhook_subscriptions_org_active" on "webhook_subscriptions" ("org_id", "active")`,
@@ -41,8 +43,10 @@ export class Migration20260501130100_flag_stubs extends Migration {
     );
 
     // ── notification_rules (Pillar 12: Notifications) ─────────────────────
+    // C10: minimal stub — only index-axis columns (org_id, subject_kind, active).
+    // Domain fields (verb, channel, target, created_at) added by Pillar 12 migration.
     this.addSql(
-      `create table "notification_rules" ("id" uuid not null default gen_random_uuid(), "org_id" uuid not null, "subject_kind" varchar(255) not null, "verb" varchar(255) not null, "channel" varchar(255) not null, "target" varchar(255) not null, "active" boolean not null default true, "created_at" timestamptz not null default now(), primary key ("id"))`,
+      `create table "notification_rules" ("id" uuid not null default gen_random_uuid(), "org_id" uuid not null, "subject_kind" varchar(255) not null, "active" boolean not null default true, primary key ("id"))`,
     );
     this.addSql(
       `create index "idx_notification_rules_org_active_subject" on "notification_rules" ("org_id", "active", "subject_kind")`,

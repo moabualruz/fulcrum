@@ -3,14 +3,20 @@
  *
  * Per-org notification rule. Rows are written only when one of
  * `notify-email`/`notify-webhook`/`notify-slack` feature flags is enabled.
- * Pillar 12 evaluates rules against incoming events and dispatches via the
- * channel/target pair.
  *
  * C2: Composite (org_id, active, subject_kind) index — Pillar 12 dispatch
  *     loop filters per-org active rules by subject kind.
  * C6: No plaintext SQL — schema via @Entity decorator class.
  * C7: MikroORM v7 ES Stage-3 decorator pattern (@mikro-orm/decorators/es).
  * C8: @Entity({ repository }) wires NotificationRuleRepository.
+ * C10: stub contains only the index-axis columns (id + org FK + subjectKind +
+ *      active). Domain-specific fields deferred to Pillar 12 own-migration in
+ *      its wave:
+ *        - verb: string     — event verb filter (e.g. "created", "*")
+ *        - channel: string  — dispatch channel: "email" | "webhook" | "slack"
+ *        - target: string   — channel-specific target (email, URL, slack ch)
+ *        - createdAt: Date  — audit timestamp
+ *      Non-id @Property count: 2 (subjectKind + active). Total non-id: 3 (org FK + 2).
  */
 
 import {
@@ -42,21 +48,6 @@ export class NotificationRule {
   @Property({ type: "string", fieldName: "subject_kind" })
   subjectKind!: string;
 
-  /** Verb (e.g. "created", "completed") this rule matches; "*" = any. */
-  @Property({ type: "string" })
-  verb!: string;
-
-  /** Channel: "email" | "webhook" | "slack". */
-  @Property({ type: "string" })
-  channel!: string;
-
-  /** Channel-specific target (email address, webhook URL, slack channel). */
-  @Property({ type: "string" })
-  target!: string;
-
   @Property({ type: "boolean" })
   active: boolean = true;
-
-  @Property({ type: "datetime", fieldName: "created_at", defaultRaw: "now()" })
-  createdAt!: Date;
 }

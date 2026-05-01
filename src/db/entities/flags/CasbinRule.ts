@@ -12,10 +12,10 @@
  * C7: MikroORM v7 ES Stage-3 decorator pattern (@mikro-orm/decorators/es).
  * C8: @Entity({ repository }) wires CasbinRuleRepository.
  *
- * Note: NOT tenant-scoped here — CasbinRule's `v0` slot is conventionally the
- * subject (user/role) and Pillar 5 will use the `v0` namespace to encode
- * org_id (e.g., "org:<uuid>:role:owner"). Adding org FK + composite index
- * here would conflict with the node-casbin adapter contract.
+ * C11 carve-out: not tenant-scoped at table level; org scoping encoded in v0
+ * per casbin namespace contract (e.g. "org:<uuid>:role:owner"). Adding an
+ * org FK + composite index here would conflict with the node-casbin adapter
+ * contract that owns the v0..v5 column layout.
  */
 
 import { Entity, PrimaryKey, Property } from "@mikro-orm/decorators/es";

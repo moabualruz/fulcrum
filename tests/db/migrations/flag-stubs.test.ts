@@ -125,15 +125,21 @@ describe("WebhookSubscription entity metadata", () => {
     expect(meta.tableName).toBe("webhook_subscriptions");
   });
 
-  it("has org ManyToOne, url, events, active, secret + id + timestamps", () => {
+  it("has C10-minimum columns: id + org ManyToOne + active (index axes only)", () => {
+    // C10 stub ceiling: id + org FK + columns-in-composite-index.
+    // Index: (org, active). Domain fields (url, events, secret, created_at)
+    // deferred to Pillar 10 own-migration. Trimmed per P1#03 follow-up.
     const meta = orm.getMetadata().get(WebhookSubscription);
     expect(meta.properties["id"]).toBeDefined();
     expect(meta.properties["org"]).toBeDefined();
     expect(meta.properties["org"]!.kind).toBe(ReferenceKind.MANY_TO_ONE);
-    expect(meta.properties["url"]).toBeDefined();
-    expect(meta.properties["events"]).toBeDefined();
     expect(meta.properties["active"]).toBeDefined();
-    expect(meta.properties["secret"]).toBeDefined();
+    // Ensure trimmed columns are NOT present at this stub stage.
+    // Cast to Record to allow indexing by removed property names (TS7053 guard).
+    const props = meta.properties as Record<string, unknown>;
+    expect(props["url"]).toBeUndefined();
+    expect(props["events"]).toBeUndefined();
+    expect(props["secret"]).toBeUndefined();
   });
 
   it("count() === 0 on fresh schema", async () => {
@@ -155,16 +161,22 @@ describe("NotificationRule entity metadata", () => {
     expect(meta.tableName).toBe("notification_rules");
   });
 
-  it("has org ManyToOne, subjectKind, verb, channel, target, active", () => {
+  it("has C10-minimum columns: id + org ManyToOne + subjectKind + active (index axes only)", () => {
+    // C10 stub ceiling: id + org FK + columns-in-composite-index.
+    // Index: (org, active, subjectKind). Domain fields (verb, channel, target,
+    // created_at) deferred to Pillar 12 own-migration. Trimmed per P1#03 follow-up.
     const meta = orm.getMetadata().get(NotificationRule);
     expect(meta.properties["id"]).toBeDefined();
     expect(meta.properties["org"]).toBeDefined();
     expect(meta.properties["org"]!.kind).toBe(ReferenceKind.MANY_TO_ONE);
     expect(meta.properties["subjectKind"]).toBeDefined();
-    expect(meta.properties["verb"]).toBeDefined();
-    expect(meta.properties["channel"]).toBeDefined();
-    expect(meta.properties["target"]).toBeDefined();
     expect(meta.properties["active"]).toBeDefined();
+    // Ensure trimmed columns are NOT present at this stub stage.
+    // Cast to Record to allow indexing by removed property names (TS7053 guard).
+    const props = meta.properties as Record<string, unknown>;
+    expect(props["verb"]).toBeUndefined();
+    expect(props["channel"]).toBeUndefined();
+    expect(props["target"]).toBeUndefined();
   });
 
   it("count() === 0 on fresh schema", async () => {

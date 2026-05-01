@@ -5,6 +5,7 @@ Pillar: 01-foundation-reset
 Blocked-by: 02-events-org-id-backfill
 Owner: claude-orchestrator
 ClaimedAt: 2026-05-01T04:30:00Z
+ReviewVerdict: PENDING — P1#03 follow-up applied: EXPLAIN Index Scan assertions (Finding 1), C11 citation (Finding 2), C10 column trim for WebhookSubscription + NotificationRule (Finding 3). Supersedes d24eb47.
 ---
 
 # Composite (org, …) index decorators + flag-stub entities (two migration classes)

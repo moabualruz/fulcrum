@@ -201,7 +201,7 @@ for (const spec of STUBS) {
       expect(props).toEqual(spec.indexProps);
     });
 
-    it("EXPLAIN on org-predicated query runs without error", async () => {
+    it("EXPLAIN on org-predicated query uses Index Scan (not Seq Scan)", async () => {
       const em = orm.em.fork();
       const repo = em.getRepository(spec.entity as never);
       // QB filter typed loosely — composite tests run across heterogeneous entities.
@@ -209,23 +209,36 @@ for (const spec of STUBS) {
         .createQueryBuilder("e")
         .select("*")
         .where({ org: WELL_KNOWN_ORG_ID } as never);
-      const sql = qb.getQuery();
-      // Run EXPLAIN. PGlite returns an array of rows — we assert it returns
-      // *something* (either array or .rows non-empty), proving the query is
-      // valid and the table + composite index exist in the schema.
-      const result = await em
+
+      // PGlite EXPLAIN returns an array of { "QUERY PLAN": string } rows.
+      // PGlite divergence: PGlite v0.x (WASM Postgres 16) uses "Bitmap Index
+      // Scan" rather than a plain "Index Scan" on small tables. The substring
+      // "Index Scan" is present in both plan types, so asserting its presence
+      // covers PGlite's Bitmap Index Scan and a standard Postgres Index Scan.
+      const result = (await em
         .getConnection()
-        .execute(`explain ${sql}`, qb.getParams() as unknown[]);
-      expect(result).toBeDefined();
-      // result is an array of rows (PGlite-via-Kysely shape); each row has
-      // a single column whose value is the plan line. Empty plan would mean
-      // a broken query.
-      const rowCount = Array.isArray(result)
-        ? result.length
-        : Array.isArray((result as { rows?: unknown[] }).rows)
-          ? (result as { rows: unknown[] }).rows.length
-          : 0;
-      expect(rowCount).toBeGreaterThan(0);
+        .execute(
+          `explain ${qb.getQuery()}`,
+          qb.getParams() as unknown[],
+        )) as Array<{ "QUERY PLAN": string }>;
+
+      // Flatten all QUERY PLAN lines into one string for easy assertion.
+      const planText = Array.isArray(result)
+        ? result.map((r) => r["QUERY PLAN"] ?? "").join("\n")
+        : "";
+
+      // Primary: plan must reference an Index Scan node (covers "Index Scan",
+      // "Bitmap Index Scan", "Index Only Scan").
+      expect(planText).toMatch(/Index Scan/i);
+
+      // Guard: sequential scan means the index was NOT used.
+      expect(planText).not.toMatch(/Seq Scan/i);
+
+      // Belt-and-suspenders fallback: the composite index name must appear in
+      // the plan. More stable than keyword-matching across PGlite versions.
+      // (PGlite limitation: WASM Postgres may alter plan node labels in future
+      // builds; index name in plan output is the most stable anchor.)
+      expect(planText).toContain(spec.indexName);
     });
   });
 }
