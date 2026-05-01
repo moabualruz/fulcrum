@@ -2,6 +2,9 @@
 // Local CI runner — single command exercises the full smoke-test gate.
 // Usage: bun run ci
 
+import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { join } from "node:path";
 import { spawn } from "node:child_process";
 
 interface Step { name: string; cmd: string[]; soft?: boolean; cwd?: string; }
@@ -22,11 +25,31 @@ const STEPS: Step[] = [
 
 interface Result { step: string; ok: boolean; soft?: boolean; skipped?: boolean; pending?: number; ms: number; }
 
+const BUN_INSTALL_CACHE_DIR =
+  process.env["BUN_INSTALL_CACHE_DIR"] ?? join(tmpdir(), "fulcrum-bun-install-cache");
+
+function seedBunRuntimeCache(cacheDir: string): void {
+  const sourceDir = join(homedir(), ".bun", "install", "cache");
+  if (sourceDir === cacheDir || !existsSync(sourceDir)) return;
+
+  for (const entry of readdirSync(sourceDir)) {
+    if (!/^bun-.+-v\d+\.\d+\.\d+/.test(entry)) continue;
+    const source = join(sourceDir, entry);
+    const target = join(cacheDir, entry);
+    if (!statSync(source).isFile() || existsSync(target)) continue;
+    copyFileSync(source, target);
+  }
+}
+
 function run(step: Step): Promise<{ ok: boolean; ms: number; stderr?: string }> {
   return new Promise((resolve) => {
     const t0 = Date.now();
     let stderr = "";
-    const proc = spawn(step.cmd[0]!, step.cmd.slice(1), { stdio: "pipe", cwd: step.cwd });
+    const proc = spawn(step.cmd[0]!, step.cmd.slice(1), {
+      stdio: "pipe",
+      cwd: step.cwd,
+      env: { ...process.env, BUN_INSTALL_CACHE_DIR },
+    });
 
     if (proc.stdout) proc.stdout.on("data", (d) => process.stdout.write(d));
     if (proc.stderr) proc.stderr.on("data", (d) => {
@@ -40,6 +63,9 @@ function run(step: Step): Promise<{ ok: boolean; ms: number; stderr?: string }> 
 
 const results: Array<Result> = [];
 let failed = false;
+
+mkdirSync(BUN_INSTALL_CACHE_DIR, { recursive: true });
+seedBunRuntimeCache(BUN_INSTALL_CACHE_DIR);
 
 for (const step of STEPS) {
   console.log(`\n━━━ ${step.name} ━━━ ${step.cmd.join(" ")}`);
