@@ -29,9 +29,13 @@ Acceptance criteria:
 
 ## Sub-tasks
 
-- [ ] **06.1 — Server actions cancel/retry.** Owns: `src/web/src/lib/server/runs.ts`, `.test.ts`. RED: cancel sets status `cancelled` + emits `agent_run.cancelled`; retry creates new `agent_runs` row + `jobs` row + emits `agent_run.retried`.
-- [ ] **06.2 — Filters reducer.** Owns: `src/web/src/lib/components/runs/runs-filters.ts`, `.test.ts`. RED: applying agent + status + range narrows the input list deterministically.
-- [ ] **06.3 — `formatDuration` helper.** Owns: `src/web/src/lib/util/duration.ts`, `.test.ts`. RED: `null` → "—"; `1h 5m`, `45s`, etc.
-- [ ] **06.4 — `RunStatusBadge`.** Owns: `src/web/src/lib/components/runs/RunStatusBadge.svelte`, `.svelte.test.ts`. RED: matrix asserts class for each status.
+- [x] **06.1 — Server actions cancel/retry.** Owns: `src/web/src/lib/server/runs.ts`, `.test.ts`. RED: cancel sets status `cancelled` + emits `agent_run.cancelled`; retry creates new `agent_runs` row + `jobs` row + emits `agent_run.retried`.
+  - Comment: `cancelRunAction` is idempotent — `UPDATE … WHERE status IN ('queued','running') RETURNING …`; only emits `agent_run.cancelled` when a row was actually transitioned. `retryRunAction` reads the original row, inserts a fresh `agent_runs` row (status `queued`, `parent_run_id` set), enqueues `{queue:'agent-runs', kind:'agent_run', payload:{run_id}}` via `enqueueJob`, and writes `agent_run.retried` on the **parent** subject with payload `{parent, retry}`. Throws when the parent run is missing.
+- [x] **06.2 — Filters reducer.** Owns: `src/web/src/lib/components/runs/runs-filters.ts`, `.test.ts`. RED: applying agent + status + range narrows the input list deterministically.
+  - Comment: pure `applyRunsFilters(rows, filter, now?)`. Range cutoffs computed off injectable `now` so tests are deterministic; `range:'all'` skips the time slice. `project:''` matches rows whose `project_id` is null (so the "no project" filter is expressible).
+- [x] **06.3 — `formatDuration` helper.** Owns: `src/web/src/lib/util/duration.ts`, `.test.ts`. RED: `null` → "—"; `1h 5m`, `45s`, etc.
+  - Comment: 7 cases — null end, 0s edge, 45s, 5m 9s, 1h 5m, 2h 13m, 2d 5h. Negative deltas clamp to 0.
+- [x] **06.4 — `RunStatusBadge`.** Owns: `src/web/src/lib/components/runs/RunStatusBadge.svelte`, `.svelte.test.ts`. RED: matrix asserts class for each status.
+  - Comment: SSR snapshot per status, asserts `data-status`, tailwind class string, and capitalised label. `badgeClass` / `label` live in `<script module>` so they're tree-shakeable for reuse.
 - [ ] **06.5 — `RunsTable` sortable.** Owns: `src/web/src/lib/components/runs/RunsTable.svelte`, `.svelte.test.ts`. RED: clicking column header toggles sort direction.
 - [ ] **06.6 — `/runs/[id]` detail + cancel/retry dialogs + 5s polling.** Owns: `src/web/src/routes/runs/[id]/+page.server.ts`, `+page.svelte`. RED: tabs swap; transcript empty state when `transcript_path` missing; polling clears on unmount.
