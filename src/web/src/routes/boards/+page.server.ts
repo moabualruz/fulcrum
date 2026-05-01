@@ -15,6 +15,7 @@ import {
   BoardMoveSchema,
   BoardUpdateSchema,
 } from "$lib/server/boards.schema";
+import { actionOk, actionFail } from "$lib/feedback/action-result";
 
 // Inherit `activeProjectId` from the root layout-data so the optional
 // project scoping is consistent with `/projects` and `/docs`. Tests for the
@@ -56,18 +57,19 @@ export const actions: Actions = {
     }
     if (priorityFromFd != null) candidate["priority"] = Number(priorityFromFd);
     const parsed = v.safeParse(BoardCreateSchema, candidate);
-    if (!parsed.success) return fail(400, { error: "invalid", issues: parsed.issues });
+    if (!parsed.success) return fail(400, actionFail("invalid input"));
     const db = await openProductDb();
     try {
       const orgId = await defaultOrgId(db);
-      if (!orgId) return fail(500, { error: "no-org" });
+      if (!orgId) return fail(500, actionFail("no-org"));
       const created = await createTaskAction(db, {
         orgId,
         projectId: parsed.output.projectId ?? null,
         title: parsed.output.title,
         status: parsed.output.status,
       });
-      return { ok: true, id: created.id };
+      void created;
+      return actionOk("Task created");
     } finally {
       await db.close();
     }
@@ -82,13 +84,13 @@ export const actions: Actions = {
     }
     if (candidate["description"] === "") candidate["description"] = null;
     const parsed = v.safeParse(BoardUpdateSchema, candidate);
-    if (!parsed.success) return fail(400, { error: "invalid", issues: parsed.issues });
+    if (!parsed.success) return fail(400, actionFail("invalid input"));
     const db = await openProductDb();
     try {
       await updateTaskAction(db, parsed.output);
-      return { ok: true };
+      return actionOk("Task updated");
     } catch (err) {
-      return fail(400, { error: (err as Error).message });
+      return fail(400, actionFail((err as Error).message));
     } finally {
       await db.close();
     }
@@ -97,11 +99,11 @@ export const actions: Actions = {
   delete: async ({ request }) => {
     const fd = await request.formData();
     const parsed = v.safeParse(BoardDeleteSchema, fdToRecord(fd));
-    if (!parsed.success) return fail(400, { error: "invalid", issues: parsed.issues });
+    if (!parsed.success) return fail(400, actionFail("invalid input"));
     const db = await openProductDb();
     try {
       await deleteTaskAction(db, parsed.output.id);
-      return { ok: true };
+      return actionOk("Task deleted");
     } finally {
       await db.close();
     }
@@ -110,15 +112,15 @@ export const actions: Actions = {
   move: async ({ request }) => {
     const fd = await request.formData();
     const parsed = v.safeParse(BoardMoveSchema, fdToRecord(fd));
-    if (!parsed.success) return fail(400, { error: "invalid", issues: parsed.issues });
+    if (!parsed.success) return fail(400, actionFail("invalid input"));
     const db = await openProductDb();
     try {
       await moveTaskStatusAction(db, parsed.output);
-      return { ok: true };
+      return actionOk("Task moved");
     } catch (err) {
       const msg = (err as Error).message;
-      if (msg.startsWith("status conflict")) return fail(409, { error: msg });
-      return fail(400, { error: msg });
+      if (msg.startsWith("status conflict")) return fail(409, actionFail(msg));
+      return fail(400, actionFail(msg));
     } finally {
       await db.close();
     }

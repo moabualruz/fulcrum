@@ -2,6 +2,7 @@ import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { openProductDb } from "$lib/server/db";
 import { cancelRunAction, retryRunAction, type RunStatus } from "$lib/server/runs";
+import { actionOk } from "$lib/feedback/action-result";
 
 interface AgentRunDetail {
   id: string;
@@ -90,7 +91,7 @@ export const actions: Actions = {
     } finally {
       await db.close();
     }
-    return { ok: true };
+    return actionOk("Run cancelled");
   },
   retry: async ({ params }) => {
     let newId: string;

@@ -28,7 +28,8 @@ Acceptance criteria:
 
 - [x] **08.1 — `ActionResult` + `dispatchToast` helpers.** Owns: `src/web/src/lib/feedback/action-result.ts`, `.test.ts`. RED: `{ ok, message }` round-trips through `dispatchToast`.
   Comment: feat(web): add ActionResult + dispatchToast feedback helpers (187e3a7). 4 tests pass; bun run ci 9/9, check 0/0/0.
-- [ ] **08.2 — `Toaster` mount in `+layout.svelte`.** Owns: `src/web/src/routes/+layout.svelte` (extend). RED: smoke test imports the layout, asserts `<Toaster />` present.
+- [x] **08.2 — `Toaster` mount in `+layout.svelte`.** Owns: `src/web/src/routes/+layout.svelte` (extend). RED: smoke test imports the layout, asserts `<Toaster />` present.
+  Comment: feat(web): wire form-action toasts via dispatchToast bridge. New `use-form-toast.ts` helper + test (5 cases); action servers (runs/[id], boards) return `actionOk`/`actionFail`; layout `$effect` bridges `page.form` to toaster. RED 8 fail → GREEN 13 pass; bun run check 0/0/0; bun run ci 9/9.
 - [x] **08.3 — `RouteSkeleton` variants.** Owns: `src/web/src/lib/components/feedback/RouteSkeleton.svelte`, `.svelte.test.ts`. RED: `kind="list"` renders `<table>` skeleton; `kind="board"` renders 5-column skeleton; `kind="detail"` renders title + 3 paragraphs.
   Comment: feat(web): add RouteSkeleton (list/detail/board variants) (2eaa1cd). 5 tests pass; bun run check 0/0/0, bun run ci 9/9.
 - [ ] **08.4 — Wire skeleton via SvelteKit `streamed`.** Owns: every list/detail route's `+page.server.ts`. RED: load test resolves with `streamed` and skeleton renders during pendency.

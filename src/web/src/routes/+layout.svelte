@@ -5,6 +5,7 @@
 
 	import { page } from "$app/state";
 	import favicon from "$lib/assets/favicon.svg";
+	import { toastFromForm } from "$lib/feedback/use-form-toast";
 	import AppSidebar from "$lib/components/app/AppSidebar.svelte";
 	import AppTopbar from "$lib/components/app/AppTopbar.svelte";
 	import * as Sheet from "$lib/components/ui/sheet";
@@ -39,6 +40,10 @@
 		};
 		mql.addEventListener("change", onChange);
 		return () => mql.removeEventListener("change", onChange);
+	});
+
+	$effect(() => {
+		toastFromForm(page.form as Parameters<typeof toastFromForm>[0]);
 	});
 </script>
 
