@@ -21,6 +21,8 @@ import { SchemaMigration } from "./entities/SchemaMigration.ts";
 import { Org } from "./entities/auth/Org.ts";
 import { User } from "./entities/auth/User.ts";
 import { Session } from "./entities/auth/Session.ts";
+import { Account } from "./entities/auth/Account.ts";
+import { Verification } from "./entities/auth/Verification.ts";
 import { Invitation } from "./entities/auth/Invitation.ts";
 import { OrgMember } from "./entities/auth/OrgMember.ts";
 import { FeatureFlag } from "./entities/auth/FeatureFlag.ts";
@@ -47,6 +49,8 @@ export {
   Org,
   User,
   Session,
+  Account,
+  Verification,
   Invitation,
   OrgMember,
   FeatureFlag,
@@ -97,6 +101,8 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     Org,
     User,
     Session,
+    Account,
+    Verification,
     Invitation,
     OrgMember,
     FeatureFlag,

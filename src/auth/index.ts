@@ -19,7 +19,7 @@
 import { injectable } from "@needle-di/core";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { betterAuth } from "better-auth";
-import { organization } from "better-auth/plugins";
+import { organization, magicLink, emailOTP } from "better-auth/plugins";
 import type { DBAdapter } from "@better-auth/core/db/adapter";
 
 import { MikroOrmBetterAuthAdapter } from "./adapter.ts";
@@ -75,18 +75,48 @@ function buildDbAdapterInstance(mikro: MikroOrmBetterAuthAdapter): unknown {
 /**
  * Construct the Better-Auth instance.
  *
- * This is called once at AuthService construction time and the resulting
- * `auth` object (with `.handler`) is stored for reuse.
+ * Called once at AuthService.init() time; the resulting `auth` object
+ * (with `.handler`) is stored for reuse.
+ *
+ * C1: saas-auth flag gates OAuth / magic-link / email-OTP plugins.
+ *     When flag is OFF only emailAndPassword + organization are active.
+ *     When flag is ON all four gated plugins are also included.
+ *     The WIRING ships now — just disabled by default.
  */
 // Auth instance type — the generic parameter is inferred from options; use any to avoid
 // the variance clash between Auth<{specific opts}> and Auth<BetterAuthOptions>.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyAuth = ReturnType<typeof betterAuth<any>>;
 
-function buildAuth(em: EntityManager): AnyAuth {
+async function buildAuth(em: EntityManager): Promise<AnyAuth> {
   const mikro = new MikroOrmBetterAuthAdapter(em);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = buildDbAdapterInstance(mikro) as any;
+
+  const saasEnabled = await isFlagEnabled(em, SAAS_AUTH_FLAG);
+
+  // Base plugins — always enabled (local-first mode)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const plugins: any[] = [organization()];
+
+  if (saasEnabled) {
+    // C1: SaaS-only plugins wired when "saas-auth" flag is ON.
+    // sendMagicLink / sendVerificationOTP are no-ops stubs — real SMTP config
+    // is provided by the SaaS deployment environment (not shipped here).
+    plugins.push(
+      magicLink({
+        sendMagicLink: async (_data) => {
+          // Stub: real implementation provided by SMTP transport in SaaS mode.
+          // Better-Auth requires this callback to be present when plugin is active.
+        },
+      }),
+      emailOTP({
+        sendVerificationOTP: async (_data) => {
+          // Stub: real implementation provided by SMTP transport in SaaS mode.
+        },
+      }),
+    );
+  }
 
   return betterAuth({
     database: db,
@@ -96,14 +126,22 @@ function buildAuth(em: EntityManager): AnyAuth {
       enabled: true,
     },
 
-    // Organisation plugin — enables org-scoped sessions
-    plugins: [
-      organization(),
-      // C1: SaaS-only plugins (magicLink, emailOTP, OAuth) are wired
-      // and will be added when "saas-auth" flag is ON at startup.
-      // They are NOT wired at init time to avoid requiring their peer deps
-      // (SMTP config, OAuth secrets) in local mode.
-    ],
+    // Social providers — gated by saas-auth flag.
+    // clientId/clientSecret are read from environment at runtime; absent in local mode.
+    ...(saasEnabled && {
+      socialProviders: {
+        google: {
+          clientId: process.env["GOOGLE_CLIENT_ID"] ?? "",
+          clientSecret: process.env["GOOGLE_CLIENT_SECRET"] ?? "",
+        },
+        github: {
+          clientId: process.env["GITHUB_CLIENT_ID"] ?? "",
+          clientSecret: process.env["GITHUB_CLIENT_SECRET"] ?? "",
+        },
+      },
+    }),
+
+    plugins,
 
     // Session config — expiry aligned with SeedService SESSION_TTL_MS
     session: {
@@ -119,8 +157,13 @@ function buildAuth(em: EntityManager): AnyAuth {
  * @injectable() AuthService — wraps Better-Auth and exposes `.handler`
  * for SvelteKit hooks.server.ts mounting.
  *
+ * Lifecycle: construct → await init() → use handler / instance.
+ * `init()` resolves the saas-auth flag and builds the Better-Auth instance.
+ * In tests, pass `em` directly to constructor and call `await authService.init()`.
+ *
  * @example
- *   const authService = container.get(AuthService);
+ *   const authService = new AuthService(em);
+ *   await authService.init();
  *   // In hooks.server.ts:
  *   if (url.pathname.startsWith('/api/auth')) {
  *     return authService.handler(request);
@@ -128,24 +171,39 @@ function buildAuth(em: EntityManager): AnyAuth {
  */
 @injectable()
 export class AuthService {
-  private readonly auth: AnyAuth;
+  private auth: AnyAuth | null = null;
 
-  constructor(private readonly em: EntityManager) {
-    this.auth = buildAuth(em);
+  constructor(private readonly em: EntityManager) {}
+
+  /**
+   * Async init — resolves feature flag + builds Better-Auth instance.
+   * Must be called once before using `handler` or `instance`.
+   * Safe to call multiple times — rebuilds on each call (flag may change).
+   */
+  async init(): Promise<void> {
+    this.auth = await buildAuth(this.em);
   }
 
   /**
    * HTTP handler — pass the incoming Request, get a Response back.
    * Mount on /api/auth/** in SvelteKit hooks.server.ts.
+   * Throws if `init()` has not been called.
    */
   get handler(): (request: Request) => Promise<Response> {
+    if (!this.auth) {
+      throw new Error("[AuthService] call init() before using handler");
+    }
     return this.auth.handler;
   }
 
   /**
    * Expose the raw auth instance for advanced usage (e.g., session validation).
+   * Throws if `init()` has not been called.
    */
   get instance(): AnyAuth {
+    if (!this.auth) {
+      throw new Error("[AuthService] call init() before using instance");
+    }
     return this.auth;
   }
 

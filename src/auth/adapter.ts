@@ -3,13 +3,15 @@
  * MikroORM EntityRepository calls. Zero raw SQL (C6).
  *
  * Better-Auth model names and how they map:
- *   "user"         → User entity   (users table)
- *   "session"      → Session entity (sessions table)
- *   "account"      → in-memory store (no Account entity; OAuth not yet wired)
- *   "verification" → in-memory store (no verification table; email OTP not yet wired)
- *   "member"       → OrgMember entity (org_members table)
- *   "invitation"   → Invitation entity (invitations table)
+ *   "user"         → User entity        (users table)
+ *   "session"      → Session entity     (sessions table)
+ *   "account"      → Account entity     (accounts table — always present; C1)
+ *   "verification" → Verification entity (verifications table — always present; C1)
+ *   "member"       → OrgMember entity   (org_members table)
+ *   "invitation"   → Invitation entity  (invitations table)
  *
+ * C1: account/verification tables exist always; saas-auth flag gates writes at
+ *     the auth-config layer, not here.
  * C2: User composite key (orgId, email) — adapter defaults to DEFAULT_ORG_ID for
  *     single-org local mode; multi-org SaaS handled by orgId in session context.
  * C6: All reads/writes via EntityManager + EntityRepository.
@@ -23,6 +25,8 @@ import type { CustomAdapter, CleanedWhere, JoinConfig } from "@better-auth/core/
 
 import { User } from "../db/entities/auth/User.ts";
 import { Session } from "../db/entities/auth/Session.ts";
+import { Account } from "../db/entities/auth/Account.ts";
+import { Verification } from "../db/entities/auth/Verification.ts";
 import { OrgMember } from "../db/entities/auth/OrgMember.ts";
 import { Invitation } from "../db/entities/auth/Invitation.ts";
 import { DEFAULT_ORG_ID } from "../db/seed.ts";
@@ -129,7 +133,32 @@ const INVITATION_FIELD_MAP: Record<string, string> = {
   status: "acceptedAt",
 };
 
-/** Simple in-memory store for models without a DB table (account, verification). */
+const ACCOUNT_FIELD_MAP: Record<string, string> = {
+  id: "id",
+  userId: "userId",
+  providerId: "providerId",
+  accountId: "accountId",
+  accessToken: "accessToken",
+  refreshToken: "refreshToken",
+  accessTokenExpiresAt: "accessTokenExpiresAt",
+  refreshTokenExpiresAt: "refreshTokenExpiresAt",
+  scope: "scope",
+  idToken: "idToken",
+  password: "password",
+  createdAt: "createdAt",
+  updatedAt: "updatedAt",
+};
+
+const VERIFICATION_FIELD_MAP: Record<string, string> = {
+  id: "id",
+  identifier: "identifier",
+  value: "value",
+  expiresAt: "expiresAt",
+  createdAt: "createdAt",
+  updatedAt: "updatedAt",
+};
+
+/** Simple in-memory store for rare/unknown model names Better-Auth might introduce. */
 class InMemoryStore {
   private readonly store = new Map<string, Record<string, unknown>>();
   private readonly modelIndex = new Map<string, string[]>();
@@ -233,10 +262,13 @@ class InMemoryStore {
  * MikroORM EntityRepository calls.
  *
  * Usage: pass `this.createAdapter()` as the `database` option to `betterAuth()`.
+ *
+ * DB-backed models: user, session, account, verification, member, invitation.
+ * In-memory fallback: any unrecognised model name Better-Auth may introduce.
  */
 @injectable()
 export class MikroOrmBetterAuthAdapter {
-  /** In-memory fallback for models without a DB table (account, verification). */
+  /** In-memory fallback for any unrecognised model names Better-Auth may introduce. */
   private readonly memStore = new InMemoryStore();
 
   constructor(private readonly em: EntityManager) {}
@@ -312,7 +344,27 @@ export class MikroOrmBetterAuthAdapter {
       return this.mapInvitationToBetterAuth(inv) as unknown as T;
     }
 
-    // Fallback: account / verification / rate-limit → in-memory
+    if (model === "account") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mapped = this.mapAccountFromBetterAuth(data as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const account = em.create(Account, mapped as any);
+      em.persist(account);
+      await em.flush();
+      return this.mapAccountToBetterAuth(account) as unknown as T;
+    }
+
+    if (model === "verification") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mapped = this.mapVerificationFromBetterAuth(data as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const verification = em.create(Verification, mapped as any);
+      em.persist(verification);
+      await em.flush();
+      return this.mapVerificationToBetterAuth(verification) as unknown as T;
+    }
+
+    // Fallback: rate-limit / any unrecognised model → in-memory
     return (await this.memStore.create(model, data as Record<string, unknown>)) as unknown as T;
   }
 
@@ -372,7 +424,23 @@ export class MikroOrmBetterAuthAdapter {
       return this.mapInvitationToBetterAuth(inv) as unknown as T;
     }
 
-    // account / verification / rate-limit → in-memory
+    if (model === "account") {
+      const query = buildWhere(where, ACCOUNT_FIELD_MAP);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const account = await em.findOne(Account, query as any);
+      if (!account) return null;
+      return this.mapAccountToBetterAuth(account) as unknown as T;
+    }
+
+    if (model === "verification") {
+      const query = buildWhere(where, VERIFICATION_FIELD_MAP);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const verification = await em.findOne(Verification, query as any);
+      if (!verification) return null;
+      return this.mapVerificationToBetterAuth(verification) as unknown as T;
+    }
+
+    // rate-limit / unrecognised model → in-memory
     return (await this.memStore.findOne(model, where)) as unknown as T;
   }
 
@@ -427,7 +495,21 @@ export class MikroOrmBetterAuthAdapter {
       return invitations.map((i) => this.mapInvitationToBetterAuth(i)) as unknown as T[];
     }
 
-    // account / verification / rate-limit → in-memory
+    if (model === "account") {
+      const query = where ? buildWhere(where, ACCOUNT_FIELD_MAP) : {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const accounts = await em.find(Account, query as any, { limit, offset, orderBy });
+      return accounts.map((a) => this.mapAccountToBetterAuth(a)) as unknown as T[];
+    }
+
+    if (model === "verification") {
+      const query = where ? buildWhere(where, VERIFICATION_FIELD_MAP) : {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const verifications = await em.find(Verification, query as any, { limit, offset, orderBy });
+      return verifications.map((v) => this.mapVerificationToBetterAuth(v)) as unknown as T[];
+    }
+
+    // rate-limit / unrecognised model → in-memory
     return (await this.memStore.findMany(model, where, limit)) as unknown as T[];
   }
 
@@ -471,7 +553,51 @@ export class MikroOrmBetterAuthAdapter {
       return this.mapSessionToBetterAuth(session) as unknown as T;
     }
 
-    // in-memory fallback
+    if (model === "member") {
+      const query = buildWhere(where, MEMBER_FIELD_MAP);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const member = await em.findOne(OrgMember, query as any);
+      if (!member) return null;
+      const mapped = this.mapMemberFromBetterAuth(upd);
+      Object.assign(member, mapped);
+      await em.flush();
+      return this.mapMemberToBetterAuth(member) as unknown as T;
+    }
+
+    if (model === "invitation") {
+      const query = buildWhere(where, INVITATION_FIELD_MAP);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const inv = await em.findOne(Invitation, query as any);
+      if (!inv) return null;
+      const mapped = this.mapInvitationFromBetterAuth(upd);
+      Object.assign(inv, mapped);
+      await em.flush();
+      return this.mapInvitationToBetterAuth(inv) as unknown as T;
+    }
+
+    if (model === "account") {
+      const query = buildWhere(where, ACCOUNT_FIELD_MAP);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const account = await em.findOne(Account, query as any);
+      if (!account) return null;
+      const mapped = this.mapAccountFromBetterAuth(upd);
+      Object.assign(account, mapped);
+      await em.flush();
+      return this.mapAccountToBetterAuth(account) as unknown as T;
+    }
+
+    if (model === "verification") {
+      const query = buildWhere(where, VERIFICATION_FIELD_MAP);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const verification = await em.findOne(Verification, query as any);
+      if (!verification) return null;
+      const mapped = this.mapVerificationFromBetterAuth(upd);
+      Object.assign(verification, mapped);
+      await em.flush();
+      return this.mapVerificationToBetterAuth(verification) as unknown as T;
+    }
+
+    // in-memory fallback for rate-limit / unrecognised models
     return (await this.memStore.update(model, where, upd)) as unknown as T;
   }
 
@@ -497,7 +623,35 @@ export class MikroOrmBetterAuthAdapter {
       return em.nativeUpdate(Session, query as any, mapped as any);
     }
 
-    // in-memory
+    if (model === "member") {
+      const query = buildWhere(where, MEMBER_FIELD_MAP);
+      const mapped = this.mapMemberFromBetterAuth(update);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return em.nativeUpdate(OrgMember, query as any, mapped as any);
+    }
+
+    if (model === "invitation") {
+      const query = buildWhere(where, INVITATION_FIELD_MAP);
+      const mapped = this.mapInvitationFromBetterAuth(update);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return em.nativeUpdate(Invitation, query as any, mapped as any);
+    }
+
+    if (model === "account") {
+      const query = buildWhere(where, ACCOUNT_FIELD_MAP);
+      const mapped = this.mapAccountFromBetterAuth(update);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return em.nativeUpdate(Account, query as any, mapped as any);
+    }
+
+    if (model === "verification") {
+      const query = buildWhere(where, VERIFICATION_FIELD_MAP);
+      const mapped = this.mapVerificationFromBetterAuth(update);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return em.nativeUpdate(Verification, query as any, mapped as any);
+    }
+
+    // in-memory fallback for rate-limit / unrecognised models
     let count = 0;
     const rows = await this.memStore.findMany(model, where);
     for (const row of rows) {
@@ -530,6 +684,34 @@ export class MikroOrmBetterAuthAdapter {
       return;
     }
 
+    if (model === "member") {
+      const query = buildWhere(where, MEMBER_FIELD_MAP);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await em.nativeDelete(OrgMember, query as any);
+      return;
+    }
+
+    if (model === "invitation") {
+      const query = buildWhere(where, INVITATION_FIELD_MAP);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await em.nativeDelete(Invitation, query as any);
+      return;
+    }
+
+    if (model === "account") {
+      const query = buildWhere(where, ACCOUNT_FIELD_MAP);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await em.nativeDelete(Account, query as any);
+      return;
+    }
+
+    if (model === "verification") {
+      const query = buildWhere(where, VERIFICATION_FIELD_MAP);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await em.nativeDelete(Verification, query as any);
+      return;
+    }
+
     await this.memStore.delete(model, where);
   }
 
@@ -550,6 +732,30 @@ export class MikroOrmBetterAuthAdapter {
       const query = buildWhere(where, USER_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return em.nativeDelete(User, query as any);
+    }
+
+    if (model === "member") {
+      const query = buildWhere(where, MEMBER_FIELD_MAP);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return em.nativeDelete(OrgMember, query as any);
+    }
+
+    if (model === "invitation") {
+      const query = buildWhere(where, INVITATION_FIELD_MAP);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return em.nativeDelete(Invitation, query as any);
+    }
+
+    if (model === "account") {
+      const query = buildWhere(where, ACCOUNT_FIELD_MAP);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return em.nativeDelete(Account, query as any);
+    }
+
+    if (model === "verification") {
+      const query = buildWhere(where, VERIFICATION_FIELD_MAP);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return em.nativeDelete(Verification, query as any);
     }
 
     const rows = await this.memStore.findMany(model, where);
@@ -574,6 +780,30 @@ export class MikroOrmBetterAuthAdapter {
       const query = where ? buildWhere(where, SESSION_FIELD_MAP) : {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return em.count(Session, query as any);
+    }
+
+    if (model === "member") {
+      const query = where ? buildWhere(where, MEMBER_FIELD_MAP) : {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return em.count(OrgMember, query as any);
+    }
+
+    if (model === "invitation") {
+      const query = where ? buildWhere(where, INVITATION_FIELD_MAP) : {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return em.count(Invitation, query as any);
+    }
+
+    if (model === "account") {
+      const query = where ? buildWhere(where, ACCOUNT_FIELD_MAP) : {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return em.count(Account, query as any);
+    }
+
+    if (model === "verification") {
+      const query = where ? buildWhere(where, VERIFICATION_FIELD_MAP) : {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return em.count(Verification, query as any);
     }
 
     return this.memStore.count(model, where);
@@ -682,6 +912,66 @@ export class MikroOrmBetterAuthAdapter {
       expiresAt: inv.expiresAt,
       status: inv.acceptedAt ? "accepted" : "pending",
       createdAt: inv.createdAt,
+    };
+  }
+
+  private mapAccountFromBetterAuth(data: Record<string, unknown>): Record<string, unknown> {
+    const now = new Date();
+    return {
+      ...(data["id"] !== undefined && { id: data["id"] }),
+      userId: data["userId"] as string,
+      providerId: data["providerId"] as string,
+      accountId: data["accountId"] as string,
+      accessToken: (data["accessToken"] ?? null) as string | undefined,
+      refreshToken: (data["refreshToken"] ?? null) as string | undefined,
+      accessTokenExpiresAt: (data["accessTokenExpiresAt"] ?? null) as Date | undefined,
+      refreshTokenExpiresAt: (data["refreshTokenExpiresAt"] ?? null) as Date | undefined,
+      scope: (data["scope"] ?? null) as string | undefined,
+      idToken: (data["idToken"] ?? null) as string | undefined,
+      password: (data["password"] ?? null) as string | undefined,
+      createdAt: (data["createdAt"] as Date | undefined) ?? now,
+      updatedAt: (data["updatedAt"] as Date | undefined) ?? now,
+    };
+  }
+
+  private mapAccountToBetterAuth(account: Account): Record<string, unknown> {
+    return {
+      id: account.id,
+      userId: account.userId,
+      providerId: account.providerId,
+      accountId: account.accountId,
+      accessToken: account.accessToken ?? null,
+      refreshToken: account.refreshToken ?? null,
+      accessTokenExpiresAt: account.accessTokenExpiresAt ?? null,
+      refreshTokenExpiresAt: account.refreshTokenExpiresAt ?? null,
+      scope: account.scope ?? null,
+      idToken: account.idToken ?? null,
+      password: account.password ?? null,
+      createdAt: account.createdAt,
+      updatedAt: account.updatedAt,
+    };
+  }
+
+  private mapVerificationFromBetterAuth(data: Record<string, unknown>): Record<string, unknown> {
+    const now = new Date();
+    return {
+      ...(data["id"] !== undefined && { id: data["id"] }),
+      identifier: data["identifier"] as string,
+      value: data["value"] as string,
+      expiresAt: data["expiresAt"] as Date,
+      createdAt: (data["createdAt"] as Date | undefined) ?? now,
+      updatedAt: (data["updatedAt"] as Date | undefined) ?? now,
+    };
+  }
+
+  private mapVerificationToBetterAuth(verification: Verification): Record<string, unknown> {
+    return {
+      id: verification.id,
+      identifier: verification.identifier,
+      value: verification.value,
+      expiresAt: verification.expiresAt,
+      createdAt: verification.createdAt,
+      updatedAt: verification.updatedAt,
     };
   }
 }

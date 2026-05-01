@@ -30,6 +30,8 @@ import { MigratorService } from "./migrator-service.ts";
 import { Org } from "./entities/auth/Org.ts";
 import { User } from "./entities/auth/User.ts";
 import { Session } from "./entities/auth/Session.ts";
+import { Account } from "./entities/auth/Account.ts";
+import { Verification } from "./entities/auth/Verification.ts";
 import { Invitation } from "./entities/auth/Invitation.ts";
 import { OrgMember } from "./entities/auth/OrgMember.ts";
 import { FeatureFlag } from "./entities/auth/FeatureFlag.ts";
@@ -54,6 +56,8 @@ import { NotificationRule } from "./entities/flags/NotificationRule.ts";
 import { OrgRepository } from "./repositories/auth/OrgRepository.ts";
 import { UserRepository } from "./repositories/auth/UserRepository.ts";
 import { SessionRepository } from "./repositories/auth/SessionRepository.ts";
+import { AccountRepository } from "./repositories/auth/AccountRepository.ts";
+import { VerificationRepository } from "./repositories/auth/VerificationRepository.ts";
 import { InvitationRepository } from "./repositories/auth/InvitationRepository.ts";
 import { OrgMemberRepository } from "./repositories/auth/OrgMemberRepository.ts";
 import { FeatureFlagRepository } from "./repositories/auth/FeatureFlagRepository.ts";
@@ -82,6 +86,8 @@ export {
   OrgRepository,
   UserRepository,
   SessionRepository,
+  AccountRepository,
+  VerificationRepository,
   InvitationRepository,
   OrgMemberRepository,
   FeatureFlagRepository,
@@ -136,6 +142,14 @@ export function registerDbBindings(container: Container, orm: MikroORM): void {
   container.bind({
     provide: SessionRepository,
     useFactory: () => em.getRepository(Session) as SessionRepository,
+  });
+  container.bind({
+    provide: AccountRepository,
+    useFactory: () => em.getRepository(Account) as AccountRepository,
+  });
+  container.bind({
+    provide: VerificationRepository,
+    useFactory: () => em.getRepository(Verification) as VerificationRepository,
   });
   container.bind({
     provide: InvitationRepository,

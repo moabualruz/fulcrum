@@ -4,8 +4,8 @@ Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 04-local-org-seed-and-init
 Owner: claude-orchestrator
-ClaimedAt: 2026-05-01T19:30:00Z
-CompletedAt: 2026-05-01T20:30:00Z
+ClaimedAt: 2026-05-01T21:00:00Z
+ReviewVerdict: Round-2 — all 4 issues resolved: saas-auth flag wired in buildAuth() (Issue 1); Account + Verification @Entity classes created with migration (Issue 2, option a); adapter member/invitation/account/verification CRUD complete (Issue 3); scope creep note acknowledged (Issue 4).
 ---
 
 # Better-Auth v1 integration — MikroORM-backed adapter, org plugin, passkey plugin, SvelteKit handler
