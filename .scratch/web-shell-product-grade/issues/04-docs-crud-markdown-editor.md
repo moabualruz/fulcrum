@@ -34,7 +34,7 @@ Acceptance criteria:
 - [x] **04.3 — `MarkdownEditor` wrapper (CodeMirror 6).** Owns: `src/web/src/lib/components/markdown/MarkdownEditor.svelte`, `.svelte.test.ts`. RED: jsdom-safe wrapper test asserts the `value` prop binding and the `change` event payload.
 - [x] **04.4 — `MarkdownPreview` (marked + dompurify).** Owns: `src/web/src/lib/components/markdown/MarkdownPreview.svelte`, `.svelte.test.ts`. RED: sanitises `<script>`; preserves links + headings; renders `# h1` to `<h1>`.
 - [x] **04.5 — `/docs` list with kind + FTS filter.** Owns: `src/web/src/routes/docs/+page.server.ts`, `+page.svelte`, `+page.svelte.test.ts`. RED: filter by kind hides non-matching rows; free-text filter calls `searchProductDocuments`.
-- [ ] **04.6 — `/docs/new`, `/docs/[id]`, `/docs/[id]/edit`.** Owns: those three routes + form action wiring. RED: create-then-view round-trip; edit preserves byte-identical body when no changes.
+- [x] **04.6 — `/docs/new`, `/docs/[id]`, `/docs/[id]/edit`.** Owns: those three routes + form action wiring. RED: create-then-view round-trip; edit preserves byte-identical body when no changes.
 
 ## Comments
 
@@ -219,4 +219,43 @@ Notes:
 - `+page.svelte` is exactly 120 LOC (≤120 budget). Filter bar is `<form data-docs-filter method="GET">` with a kind `<select>` (auto-submit via `onchange={(e) => e.currentTarget.form?.requestSubmit()}`) + `<input data-q-filter type="search">` + an Apply button. Distinct empty states: `data-empty-docs` for the raw 0-rows view, `data-empty-filter` once any filter is set.
 - Server tests seed three docs via `createDocumentAction` and pin `updated_at` with direct `UPDATE` rows for deterministic ordering. Cases: default DESC ordering, `kind=spec` narrowing, `q=kernel` FTS hitting the search index. The note's body is intentionally `"totally unrelated body"` so the FTS test isolates the two intended hits (decision + spec, both with "kernel" in title or body).
 - The svelte 5 `selected={…}` short-form on `<option>` round-trips as `selected=""` in SSR output. The page test asserts that the matching option has the `selected` attribute regardless of attribute-order; svelte normalises empty boolean attributes to `selected=""`.
+- `bun run ci` (root) → 9/9 green. `cd src/web && bun run check` → 0 errors / 0 warnings. `cd src/web && bun run build` → ok.
+
+### 04.6 — /docs/new + /docs/[id] + /docs/[id]/edit (DONE)
+
+RED command:
+```
+bun test --conditions=svelte ./src/web/src/lib/markdown/labels.test.ts ./src/web/src/lib/server/documents.schema.test.ts ./src/web/src/routes/docs/new/page.server.test.ts ./src/web/src/routes/docs/[id]/page.server.test.ts ./src/web/src/routes/docs/[id]/edit/page.server.test.ts
+```
+
+RED output (excerpt):
+```
+src/web/src/lib/markdown/labels.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './labels.ts' from '/Users/mkh/workspace/fulcrum/src/web/src/lib/markdown/labels.test.ts'
+```
+
+GREEN command:
+```
+bun test --conditions=svelte ./src/web/src/lib/markdown/labels.test.ts ./src/web/src/lib/server/documents.schema.test.ts ./src/web/src/routes/docs/new/page.server.test.ts ./src/web/src/routes/docs/[id]/page.server.test.ts ./src/web/src/routes/docs/[id]/edit/page.server.test.ts
+```
+
+GREEN output (excerpt):
+```
+ 18 pass
+ 0 fail
+ 52 expect() calls
+Ran 18 tests across 5 files.
+```
+
+Notes:
+- `+page.server.ts` for both `new` and `[id]/edit` import from `sveltekit-superforms/server` (same trick as `/projects/[id]`) so the client `SuperDebug.svelte` graph never lands in the test harness — no `$app/navigation` / `$app/stores` stubs needed.
+- `DocumentFormSchema` carries `labels` as an optional comma-separated string; the route splits it via `parseLabels` before persisting `frontmatter.labels` as `string[]`. Edit reseeds the form with `serializeLabels(...)` so the round-trip is stable.
+- Edit action re-reads `documents.frontmatter` before calling `updateDocumentAction` and merges `{...rawFm, title, kind, labels}`. Non-form keys (e.g. `id`, `status`, anything `frontmatter-form.ts` would route to `rawFrontmatter`) survive the round-trip — issue 15 follow-up depends on this.
+- Byte-identical body test (`page.server.test.ts` 3rd case in `[id]/edit`) round-trips `"Line one with    spaces\nline\ttwo\n   trailing  \n"` (multi-space, tab, trailing whitespace) through load → resubmit → DB read; `documents.body` is byte-equal because the form ships the body as a single string field with no normalisation.
+- `/docs/[id]/+page.svelte` reuses the `DangerZone`-style markup inline rather than importing the projects-flavoured component (different copy, different subject id). Same data attributes (`data-danger-trigger`, `data-danger-confirm`, `data-delete-form`, `data-delete-cancel`, `data-delete-submit`) so e2e selectors stay portable.
+- `MarkdownEditor` is bound bidirectionally; a sibling `<input type="hidden" name="body">` mirrors the value so the form posts the current editor contents on non-JS submission too.
+- LOC: `[id]/+page.svelte` = 91, `[id]/edit/+page.svelte` = 120, `new/+page.svelte` = 113 — all ≤140. Server files: `new/+page.server.ts` = 60, `[id]/+page.server.ts` = 56, `[id]/edit/+page.server.ts` = 104.
 - `bun run ci` (root) → 9/9 green. `cd src/web && bun run check` → 0 errors / 0 warnings. `cd src/web && bun run build` → ok.
