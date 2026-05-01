@@ -35,11 +35,11 @@ Items here fall strictly into carve-out (1): genuinely not in user's verbatim as
 | Tier 1: explicit `--agent` override | `src/router/auto-assign.ts` | CLI flag; also accepted via tRPC `routing.dispatch` |
 | Tier 2: `json-rules-engine` declarative rules | `src/router/auto-assign.ts` | Synchronous, deterministic; evaluates against task facts object |
 | No-match interactive prompt | `src/router/auto-assign.ts` | "No rule matched; pick an agent or write a rule" → answer stored as `learned` rule |
-| `routing_rules` CRUD + test | DB + tRPC + CLI + TUI + Web | Full rule lifecycle; rule test dry-runs against a real task |
 | Routing telemetry (`events` row per decision) | `src/router/telemetry.ts` | `verb='routed'`, payload: `{rule_id|'manual'|'learned', agent, confidence}` |
 | Per-agent skill folders | Install-time | `~/.claude/skills/`, `~/.codex/skills/`, etc. — N copies kept in sync |
 | `fulcrum component install/uninstall/upgrade` skills support | Existing package manager | Delete-and-recopy on upgrade; multi-target via `SKILL.md` `agents:` frontmatter |
-| `fulcrum_skills` registry table | DB | Canonical record of installed skills per org |
+| `RoutingRule` CRUD + test | MikroORM entity + tRPC + CLI + TUI + Web | Full rule lifecycle; rule test dry-runs against a real task |
+| `fulcrum_skills` registry entity | MikroORM | Canonical record of installed skills per org |
 | Skills attach to routing rules | `routing_rules.action_skill_set` | Skills injected into agent session context bundle when rule fires |
 | Skills CRUD + sync conflict viewer | tRPC + CLI + TUI + Web | Full lifecycle; conflict viewer shows diff of upstream vs local |
 
@@ -55,6 +55,12 @@ Items here fall strictly into carve-out (1): genuinely not in user's verbatim as
 ---
 
 ## Tech stack
+
+### Stack
+- C7: MikroORM v7 owns `RoutingRule`, `FulcrumSkill`, `SkillVersion`, marketplace, and `CasbinPolicy` entities; no hand-authored migration files.
+- C7: Casbin uses custom `FulcrumCasbinAdapter` (~200 LOC) over MikroORM repositories; Fulcrum owns `@Entity({ tableName: 'casbin_policies' })`, not node-casbin `casbin_rule`.
+- C8: `@Injectable()` router and skills services use needle-di Stage-3 constructor injection across tRPC, CLI, TUI, and SvelteKit.
+- C9: entities live under `src/db/entities/router/` and `src/db/entities/skills/`; repositories under matching `src/db/repositories/`; migrations are `src/db/migrations/Migration<timestamp>.ts`.
 
 ### Auto-Router
 
@@ -88,65 +94,57 @@ Items here fall strictly into carve-out (1): genuinely not in user's verbatim as
 
 ## Schema changes
 
-```sql
--- Composite (org_id, ...) indexes per Q22 mandate --
+Migration class `Migration<timestamp>` is generated from MikroORM entity decorator diffs. Hand-authored schema lives in classes, not schema snippets.
 
-CREATE TABLE routing_rules (
-  id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id        uuid        NOT NULL REFERENCES orgs(id),
-  project_id    uuid        NULL REFERENCES projects(id),
-  name          text        NOT NULL,
-  conditions_json jsonb     NOT NULL,
-  action_agent  text        NOT NULL,
-  action_skill_set text[]   NOT NULL DEFAULT '{}',
-  priority      int         NOT NULL DEFAULT 100,
-  enabled       boolean     NOT NULL DEFAULT true,
-  source        text        NOT NULL DEFAULT 'manual'
-                            CHECK (source IN ('manual','learned','imported')),
-  created_at    timestamptz NOT NULL DEFAULT now(),
-  updated_at    timestamptz NOT NULL DEFAULT now()
-);
+```typescript
+@Entity({ tableName: 'routing_rules' })
+@Index({ name: 'routing_rules_org_priority', properties: ['org', 'priority', 'enabled'] })
+@Index({ name: 'routing_rules_org_project', properties: ['org', 'project'] })
+class RoutingRule {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => Org) org!: Org;
+  @ManyToOne(() => Project, { nullable: true }) project?: Project;
+  @Property() name!: string;
+  @Property({ type: 'json' }) conditionsJson!: RoutingConditions;
+  @Property() actionAgent!: string;
+  @Property({ type: 'array' }) actionSkillSet: string[] = [];
+  @Property({ default: 100 }) priority = 100;
+  @Property({ default: true }) enabled = true;
+  @Enum(() => RoutingRuleSource) source = RoutingRuleSource.Manual;
+}
 
--- Primary lookup: org + priority sort for ordered rule evaluation
-CREATE INDEX routing_rules_org_priority
-  ON routing_rules(org_id, priority, enabled);
+@Entity({ tableName: 'fulcrum_skills' })
+@Unique({ name: 'fulcrum_skills_org_slug', properties: ['org', 'slug'] })
+class FulcrumSkill {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => Org) org!: Org;
+  @Property() name!: string;
+  @Property() slug!: string;
+  @Enum(() => SkillSource) source!: SkillSource;
+  @Property({ nullable: true }) upstreamRepo?: string;
+  @Property({ nullable: true }) upstreamRef?: string;
+  @Property({ type: 'json' }) enabledAgents: string[] = [];
+  @OneToMany(() => SkillVersion, version => version.skill) versions = new Collection<SkillVersion>(this);
+}
 
--- Project-scoped rule lookup (NULL = global rule)
-CREATE INDEX routing_rules_org_project
-  ON routing_rules(org_id, project_id);
+@Entity({ tableName: 'skill_versions' })
+class SkillVersion {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => FulcrumSkill) skill!: FulcrumSkill;
+  @Property() version!: string;
+  @Property({ nullable: true }) hashVerified?: string;
+}
 
--- -------------------------------------------------------
-
-CREATE TABLE fulcrum_skills (
-  id             uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id         uuid        NOT NULL REFERENCES orgs(id),
-  name           text        NOT NULL,
-  slug           text        NOT NULL,
-  source         text        NOT NULL
-                             CHECK (source IN ('upstream','local','package')),
-  upstream_repo  text,
-  upstream_ref   text,
-  version        text,
-  hash_verified  text,
-  enabled_agents jsonb       NOT NULL DEFAULT '[]',
-  created_at     timestamptz NOT NULL DEFAULT now(),
-  updated_at     timestamptz NOT NULL DEFAULT now(),
-
-  UNIQUE(org_id, slug)
-);
-
--- Composite (org_id, slug) per Q22 + unique constraint doubles as index
-CREATE INDEX fulcrum_skills_org_slug
-  ON fulcrum_skills(org_id, slug);
-
--- -------------------------------------------------------
--- events table already exists; Q23 migration adds org_id.
--- No new columns needed for routing telemetry beyond:
---   verb = 'routed'
---   payload jsonb includes: rule_id, source ('explicit'|'rule'|'learned'|'llm-fallback'|'manual'), agent, confidence
+@Entity({ tableName: 'casbin_policies' })
+class CasbinPolicy {
+  @PrimaryKey({ type: 'uuid' }) id = crypto.randomUUID();
+  @ManyToOne(() => Org) org!: Org;
+  @Property() ptype!: string;
+  @Property({ type: 'array' }) values: string[] = [];
+}
 ```
 
-Rule eval order: `WHERE org_id=$1 AND (project_id=$2 OR project_id IS NULL) AND enabled=true ORDER BY priority ASC`. First match wins.
+Routing uses `RoutingRuleRepository.findEnabledForDispatch(orgId, projectId)` ordered by priority. First match wins. Routing telemetry writes through `EventRepository.recordRouted(...)`; no new event columns are needed.
 
 ---
 
@@ -259,20 +257,20 @@ sequenceDiagram
     alt explicit override
         AA-->>SYM: RoutingDecision{source:explicit}
     else
-        AA->>DB: SELECT routing_rules WHERE org_id AND enabled ORDER BY priority
+        AA->>DB: RoutingRuleRepository.findEnabledForDispatch(orgId, projectId)
         AA->>JRE: engine.run(taskFacts, rules)
         alt rule matches
             JRE-->>AA: {agent, rule_id}
-            AA->>DB: INSERT events(verb=routed, source=rule)
+            AA->>DB: EventRepository.recordRouted(source=rule)
             AA-->>SYM: RoutingDecision{source:rule}
         else no match, router-llm ON
             AA->>SID: classify(taskDescription)
             SID-->>AA: {agent, confidence, reasoning}
-            AA->>DB: INSERT events(verb=routed, source=llm-fallback)
+            AA->>DB: EventRepository.recordRouted(source=llm-fallback)
             AA-->>SYM: RoutingDecision{source:llm-fallback}
         else no match, router-llm OFF
             AA->>AA: interactive prompt
-            AA->>DB: INSERT routing_rules(source=learned)
+            AA->>DB: RoutingRuleRepository.createLearnedRule(...)
             AA-->>SYM: RoutingDecision{source:learned}
         end
     end
@@ -329,8 +327,8 @@ const DoctorRouterCheck = z.object({
 
 | Check ID | What it verifies | Failure recovery |
 |---|---|---|
-| `router.routing-rules.table` | `routing_rules` table exists and is queryable | Run migration 0005; check DB file |
-| `router.skills.table` | `fulcrum_skills` table exists | Run migration 0005 |
+| `router.routing-rules.entity` | `RoutingRule` repository resolves and can read rules | Run migration class `Migration<timestamp>` covering router entities; check DB file |
+| `router.skills.entity` | `FulcrumSkill` repository resolves | Run migration class `Migration<timestamp>` covering skills entities |
 | `router.skills.conflicts.count` | Count of unresolved upstream conflicts | `fulcrum skills conflicts resolve` or accept upstream |
 | `router.llm-flag.sidecar` | If `router-llm` ON: sidecar Unix socket reachable | Start inference sidecar (Pillar 2) |
 | `router.default-rules.present` | At least one enabled `routing_rules` row per org | Create at least one rule via UI or CLI |
@@ -356,7 +354,7 @@ Red-green-refactor: failing test first, then implementation, then lint pass.
 
 ### Router subsystem
 
-**R-01** Schema migration: `routing_rules` + indexes + `events` payload `source`/`rule_id` fields. Verify idempotency + CHECK constraint.
+**R-01** Entity + migration class: `RoutingRule` + decorator indexes + `events` payload `source`/`rule_id` fields. Verify idempotency + enum constraint.
 
 **R-02** `src/router/rules-engine.ts` — `json-rules-engine` wrapper. Condition match returns agent; no match returns null; malformed `conditions_json` caught, returns null, marks rule disabled.
 
@@ -380,7 +378,7 @@ Red-green-refactor: failing test first, then implementation, then lint pass.
 
 ### Skills subsystem
 
-**S-01** Schema migration: `fulcrum_skills` + UNIQUE(org_id, slug) + composite index. Idempotent; duplicate slug rejected.
+**S-01** Entity + migration class: `FulcrumSkill` + `SkillVersion` + unique `(org_id, slug)` decorator. Idempotent; duplicate slug rejected.
 
 **S-02** `src/skills/loader.ts`. `agents: [claude, codex]` copies to 2 dirs; `agents: [*]` copies to all 5; missing agent dir emits warning, continues.
 
@@ -404,7 +402,7 @@ Red-green-refactor: failing test first, then implementation, then lint pass.
 
 ### Skill marketplace subsystem (`FULCRUM_FEATURES=skill-marketplace`)
 
-**M-01** Schema: `marketplace_listings(id, org_id, slug, name, version, manifest_json, signature, publisher_org_id, published_at, yanked)` + composite `(slug, version)` unique + `(publisher_org_id)` index. Idempotent migration.
+**M-01** Entities: `MarketplaceListing` + `OrgMarketplaceKey` with decorator unique `(slug, version)` and publisher index. Migration class generated from entity diff.
 
 **M-02** `src/skills/marketplace-client.ts` — fetch skill listing from shared registry endpoint; verify Ed25519 signature against publisher org's public key; reject on bad sig or missing key.
 

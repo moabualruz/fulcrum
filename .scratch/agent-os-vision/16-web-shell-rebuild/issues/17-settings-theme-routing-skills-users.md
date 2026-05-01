@@ -16,7 +16,7 @@ Docs: https://kit.svelte.dev/docs
 
 Four settings routes. `/settings/theme`: org + user CSS-var pickers (HSL accent wheel, radius slider, font-family select, font-size-scale, spacing, animation-speed, compact mode toggle, dark/light/auto selector), preset selector, live preview panel, "Reset to defaults". `/settings/routing`: routing rules CRUD table + rule tester form (enter task title + type → "simulate" button → shows matched agent or no-match). `/settings/skills`: skill list (name, version, source, lock status, conflict indicator), "Update" button per skill, conflict resolution UI (upstream vs local diff). `/settings/users`: member list (avatar + name + role badge), invite button (email + role → invitation link), role picker, remove member.
 
-Cuts through: `theme.update(key, value)` tRPC → CSS var updates in `:root` live preview → save persists to `tenant_settings`.
+Cuts through: `theme.update(key, value)` tRPC → handler resolves `ThemeService` from `ctx.container` → CSS var updates in `:root` live preview → save persists through `TenantSettingsRepository`.
 
 ## Acceptance criteria
 

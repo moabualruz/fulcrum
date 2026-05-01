@@ -5,26 +5,26 @@ Pillar: 05-router-and-skills
 Blocked-by: None
 ---
 
-# fulcrum_skills schema migration + skills.lock.json design
+# FulcrumSkill entity + migration class + skills.lock.json design
 
 ## Parent: PRD `prds/05-router-and-skills.md`
 
 ## What to build
 
-Write and test the idempotent Drizzle migration that creates `fulcrum_skills` table with all columns, `UNIQUE(org_id, slug)` constraint, and `fulcrum_skills_org_slug` composite index. Define the `skills.lock.json` schema (TypeScript type + Zod validator) that lives at `~/.fulcrum/skills.lock.json` and tracks installed skills, their hashes, and any `upstream_conflict` diffs.
+Write and test `FulcrumSkill` and `SkillVersion` as MikroORM v7 `@Entity` classes plus generated migration class `Migration<timestamp>`. `FulcrumSkill` owns table name `fulcrum_skills`, enum validation for `source` (`upstream|local|package`), and `@Unique({ name: 'fulcrum_skills_org_slug', properties: ['org', 'slug'] })`. Define the `skills.lock.json` schema (TypeScript type + Zod validator) that lives at `~/.fulcrum/skills.lock.json` and tracks installed skills, their hashes, and any `upstream_conflict` diffs.
 
 ## Acceptance criteria
 
-- [ ] Schema / module: migration creates `fulcrum_skills` idempotently
-- [ ] Schema / module: `source` CHECK constraint rejects values outside `('upstream','local','package')`
+- [ ] Schema / module: generated `Migration<timestamp>` creates/updates `fulcrum_skills` idempotently from entity metadata.
+- [ ] Schema / module: `SkillSource` enum rejects values outside `upstream|local|package`.
 - [ ] Schema / module: `UNIQUE(org_id, slug)` enforced at DB level — duplicate slug insert throws
-- [ ] Schema / module: `fulcrum_skills_org_slug` composite index present in `pg_indexes`
-- [ ] Schema / module: `FulcrumSkillRow` Drizzle schema + TS types exported from `src/db/schema.ts`
+- [ ] Schema / module: `fulcrum_skills_org_slug` unique decorator present in MikroORM metadata.
+- [ ] Schema / module: `FulcrumSkillRepository` exported from `src/db/repositories/skills/FulcrumSkillRepository.ts`.
 - [ ] Schema / module: `SkillsLockFile` Zod type exported from `src/skills/lock.ts`; shape: `{ [slug]: { version, hash, installedAt, upstream_conflict?: string, enabled_agents: string[] } }`
 - [ ] Logic: `skills.lock.json` round-trips (write → read → same object) via helper functions in `src/skills/lock.ts`
 - [ ] Tests: unique constraint violation test
 - [ ] Tests: lock file parse test (valid + invalid)
-- [ ] Tests: migration idempotency test
+- [ ] Tests: migration class idempotency test
 
 ## Blocked by
 

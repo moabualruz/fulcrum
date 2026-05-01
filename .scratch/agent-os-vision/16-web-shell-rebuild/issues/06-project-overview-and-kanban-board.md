@@ -14,15 +14,15 @@ Docs: https://github.com/isaacHagoel/svelte-dnd-action
 
 ## What to build
 
-`/projects/[id]`: project overview page with quick-nav tabs (Board / Backlog / Sprints / Reports / Repos / Docs) and summary metrics (open tasks, in-progress, done, sprint days remaining). `/projects/[id]/board`: full Kanban using `svelte-dnd-action`; columns are status values from `project.statuses`; swimlane toggle (assignee / label / none); sprint filter header chip; card mini-view (title, priority badge, assignee avatar, due date, estimate). Drag card to new column → `tasks.update(status)` tRPC → `events` INSERT verb=`status_changed`.
+`/projects/[id]`: project overview page with quick-nav tabs (Board / Backlog / Sprints / Reports / Repos / Docs) and summary metrics (open tasks, in-progress, done, sprint days remaining). `/projects/[id]/board`: full Kanban using `svelte-dnd-action`; columns are status values from `project.statuses`; swimlane toggle (assignee / label / none); sprint filter header chip; card mini-view (title, priority badge, assignee avatar, due date, estimate). Drag card to new column → `tasks.update(status)` tRPC → `TaskService.moveStatus(...)` → `EventService.recordStatusChanged(...)`.
 
-Cuts through: `tasks.list(projectId, statusFilter)` tRPC → Kanban rendered → `svelte-dnd-action` drag → `onfinalize` → server action `tasks.update` → DB `status` updated → event emitted → card re-renders in new column.
+Cuts through: `tasks.list(projectId, statusFilter)` tRPC → Kanban rendered → `svelte-dnd-action` drag → `onfinalize` → server action `tasks.update` → repository status update + event service call → card re-renders in new column.
 
 ## Acceptance criteria
 
 - [ ] `/projects/[id]` tabs render; each navigates correct sub-route; summary counts match `tasks.list` aggregate.
 - [ ] Kanban: 200 tasks × 7 columns cold load < 300ms (Playwright performance assertion).
-- [ ] Drag card: `onconsider` shows ghost; `onfinalize` calls `tasks.update`; DB row updated; event row inserted (`verb='status_changed'`).
+- [ ] Drag card: `onconsider` shows ghost; `onfinalize` calls `tasks.update`; `TaskRepository` state updated; event service records `verb='status_changed'`.
 - [ ] Swimlane toggle: assignee mode groups cards by assignee; label mode groups by first label; none = flat column.
 - [ ] Sprint filter chip: filters board to sprint_id; "All" clears filter.
 - [ ] Failure gate: if `svelte-dnd-action` Svelte 5 `onconsider`/`onfinalize` API breaks → `pragmatic-drag-and-drop` fallback; test verifies same board behavior.

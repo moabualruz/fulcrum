@@ -40,7 +40,7 @@ Ships unconditionally, all domain screens included.
 
 ### Launch + in-process tRPC bridge
 
-`fulcrum tui` (binary dispatcher → `src/tui/index.ts`). In-process tRPC caller via `createCaller(ctx)` — zero HTTP. Context bootstrapped from same Better-Auth session as CLI. tRPC subscriptions delivered via a local in-process event emitter bridge (no WebSocket server started; subscriptions are direct EventEmitter listeners). Graceful exit: `Ctrl+C` / `q` on root pane saves state to `~/.fulcrum/tui-state.json` (last focused pane, scroll positions).
+`fulcrum tui` (binary dispatcher → `src/tui/index.ts`). TUI startup receives the shared needle-di container and calls `container.resolve(...)` for services such as `TrpcCallerService`, `ThemeService`, and `KeybindingService`. In-process tRPC caller via `createCaller(ctx)` — zero HTTP. Context bootstrapped from same Better-Auth session as CLI. tRPC subscriptions delivered via a local in-process event emitter bridge (no WebSocket server started; subscriptions are direct EventEmitter listeners). Graceful exit: `Ctrl+C` / `q` on root pane saves state to `~/.fulcrum/tui-state.json` (last focused pane, scroll positions).
 
 ### Keyboard-first shortcut registry (shared)
 
@@ -152,6 +152,11 @@ All shipped + tested; OFF by default; flip individual flag to enable.
 
 ## Tech stack
 
+### Stack
+- C7: TUI owns no tables; it consumes MikroORM-backed domain services through tRPC and repositories.
+- C8: OpenTUI screens call services via `container.resolve(...)`; settings screens read repositories through injectable services, never direct query strings.
+- C9: persistent state such as keybindings/theme lives in existing entity/repository paths; no TUI-owned migration files.
+
 | Layer | Pick | License | Failure gate → action | 2nd | 3rd |
 |---|---|---|---|---|---|
 | TUI framework | OpenTUI (Bun-native TS, JSX components) | MIT | OpenTUI component library too immature OR missing required primitives (overlay, split-pane, virtual scroll) at pillar start time → switch to ratatui (Rust, MIT) sharing the `inference/` Cargo workspace; TUI logic ported to Rust; tRPC consumed via Unix socket same as sidecar | ratatui (Rust MIT) | ink (React/Node, MIT) |
@@ -167,15 +172,9 @@ All shipped + tested; OFF by default; flip individual flag to enable.
 
 ## Schema changes
 
-No new schema tables. TUI consumes existing tables exclusively via tRPC.
+No new entity classes or migration classes. TUI consumes existing data exclusively through tRPC and injectable services.
 
-One optional addition to `tenant_settings`:
-```sql
--- tui-state key (no new table; uses existing tenant_settings)
--- key='tui.last_pane', key='tui.theme_preset', key='tui.keybinding_overrides_json'
--- stored per (org_id, user_id) in tenant_settings
--- Pillar 1 owns tenant_settings DDL; no migration needed here.
-```
+TUI state uses `TenantSettingsRepository` keys such as `tui.last_pane`, `tui.theme_preset`, and `tui.keybinding_overrides_json`, stored per `(org_id, user_id)` in the existing Pillar 1 entity.
 
 ---
 
@@ -242,13 +241,13 @@ sequenceDiagram
     participant TUI as TUI Screen (TaskBoard)
     participant Router as TUI Router
     participant Caller as tRPC Caller
-    participant DB as PGlite
+    participant Services as Injectable services
 
     User->>TUI: Enter on card
     TUI->>Router: navigate('/tasks/:id')
     Router->>Caller: tasks.get({id})
-    Caller->>DB: SELECT tasks WHERE id=?
-    DB-->>Caller: TaskRow
+    Caller->>Services: TaskRepository.findOneOrFail(id)
+    Services-->>Caller: Task
     Caller-->>Router: Task
     Router->>TUI: render TaskDetail screen
     TUI-->>User: full-pane task detail
@@ -257,8 +256,8 @@ sequenceDiagram
     TUI->>TUI: open status picker overlay
     User->>TUI: select 'in_progress'
     TUI->>Caller: tasks.update({id, status:'in_progress'})
-    Caller->>DB: UPDATE tasks + INSERT events
-    DB-->>Caller: ok
+    Caller->>Services: TaskService.moveStatus(...) + EventService.recordStatusChanged(...)
+    Services-->>Caller: ok
     Caller-->>TUI: updated Task
     TUI-->>User: status badge updated
 ```

@@ -25,7 +25,7 @@ Per C5: only (1) genuinely-not-asked items or (2) cross-pillar-owned items appea
 ## Always-on features
 
 ### Codegen pipeline
-`bun run scripts/cli/codegen.ts` — reads `AppRouter` type from `src/server/trpc/router.ts`:
+`bun run scripts/cli/codegen.ts` — reads the `AppRouter` TypeScript type from `src/server/trpc/router.ts`; no DB schema introspection, migrations, or repository access in codegen:
 1. Introspects procedure metadata: name, type (query/mutation/subscription), Zod input schema, Zod output schema, docstring.
 2. Emits `src/cli/generated/<domain>.ts` per sub-router — one file per domain with: `commander` `Command` instances, flag definitions derived from Zod input schema (object keys → `--key` flags; optional fields → optional flags; defaults forwarded), `--json` flag on every command, `--watch` on subscription procedures, help text from Zod description strings.
 3. Emits `src/cli/generated/completions.sh` / `.zsh` / `.fish` for shell completion; all domain verbs + flags present.
@@ -144,6 +144,12 @@ No flags specific to Pillar 14 itself. `FULCRUM_FEATURES` env var flows through 
 
 ## Tech stack
 
+### Stack
+- C7: no CLI-owned entities or migrations; generated commands call tRPC and domain repositories stay behind services.
+- C8: hand-written CLI flows and doctor checks are `@Injectable()` services resolved from the shared needle-di container.
+- C9: DB access, when needed by doctor checks, goes through `src/db/repositories/...`; no hand-authored migration-file paths.
+- Bun compile size note: baseline ~60 MB + needle-di <0.01 MB + MikroORM core ~280 KB; comfortably under the 150 MB binary target.
+
 | Layer | Pick | License | Failure gate → action | 2nd | 3rd |
 |---|---|---|---|---|---|
 | CLI framework | `commander` v12 (MIT, 27k stars) | MIT | commander breaking change or Bun compat issue → minimal hand-rolled arg parser (~300 LOC) with same `--json` contract | `yargs` (MIT) | hand-rolled |
@@ -155,7 +161,7 @@ No flags specific to Pillar 14 itself. `FULCRUM_FEATURES` env var flows through 
 
 ## Schema changes
 
-No new tables. Pillar 14 reads existing tables via tRPC in-process. The keybindings user override reads from `tenant_settings` (Pillar 1 schema). No migration required.
+No new entity classes or migration classes. Pillar 14 reads the `AppRouter` TypeScript type for codegen and invokes tRPC in-process at runtime. Keybinding overrides are read through `TenantSettingsRepository` behind an injectable service when needed; no DB work happens in the generator.
 
 ## Surfaces
 
@@ -208,8 +214,8 @@ sequenceDiagram
     BIN->>CMD: parse argv
     CMD->>CMD: Zod parse { projectId: 'abc' }
     CMD->>TRPC: tasks.list({ projectId: 'abc', orgId: ctx.orgId })
-    TRPC->>PG: SELECT tasks WHERE org_id=? AND project_id=? ...
-    PG-->>TRPC: TaskRow[]
+    TRPC->>PG: TaskRepository.findByProject(orgId, projectId)
+    PG-->>TRPC: Task[]
     TRPC-->>CMD: Task[] (Zod-parsed output)
     CMD-->>Shell: stdout JSON.stringify(Task[]) + exit 0
 ```
@@ -299,7 +305,7 @@ CLI calls are in-process: they inherit the same OTel span from the tRPC middlewa
 
 ### Checks added to `fulcrum doctor`
 
-`src/doctor/checks/cli.ts` — CLI pillar's own checks:
+`src/doctor/checks/cli.ts` — CLI pillar's own checks. Checks that need persisted state resolve injectable services from the shared container and call repositories through those services:
 
 1. **Binary entrypoint** — `dist/fulcrum` (or `fulcrum` on PATH) runs `--version`; assert exit 0.
 2. **Codegen sync** — run codegen in dry-run mode; assert output matches committed `src/cli/generated/` snapshots.

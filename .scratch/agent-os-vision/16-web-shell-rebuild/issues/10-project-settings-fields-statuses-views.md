@@ -16,7 +16,7 @@ Docs: https://kit.svelte.dev/docs
 
 Four project settings sub-routes. `/settings/fields`: custom field CRUD UI — add field (name, type selector, required toggle, options for select/multi-select), edit, archive; field order drag-and-drop. `/settings/statuses`: status config — add status (name, color), reorder, mark as final state, delete. `/settings/views`: saved views management — list org/project/private scoped views, set default, share with user/team, delete. `/settings/connectors`: per-connector config cards (gated per connector flag); shows enabled/disabled toggle and config form for enabled connectors.
 
-Cuts through: `customFields.list(projectId)` tRPC → field list renders → "Add Field" → form → `customFields.create` → list updates. Same pattern for statuses, views.
+Cuts through: `customFields.list(projectId)` tRPC → handler resolves `CustomFieldService` from `ctx.container` → repository reads field list → "Add Field" → form → `customFields.create` → repository write → list updates. Same pattern for statuses, views.
 
 ## Acceptance criteria
 

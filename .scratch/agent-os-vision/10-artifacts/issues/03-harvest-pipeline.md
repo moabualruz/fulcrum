@@ -16,10 +16,10 @@ Docs: []
 PRD: `.scratch/agent-os-vision/prds/10-artifacts.md` (Always-on: Harvest pipeline; issues 10-04)
 
 ## What to build
-Implement `harvestArtifacts(runId, extractedDir)` in `src/artifacts/harvest.ts`. End-to-end vertical slice: reads handoff directory from Sandcastle `copyFileOut()`, computes SHA-256 via `node:crypto`, sniffs MIME via `mime-types`, resolves `retention_until` from `projects.artifact_retention_days`, copies file to `LocalFsBackend`, writes `artifacts` row, writes two `edges` rows (`artifact→generated_by→agent_run` + `agent_run→produced→artifact` per Q32 hybrid edge registry), upserts `search_documents` row (title=filename, body=first 2000 chars for text MIME), emits `events` row `verb='artifact.harvested'`. Returns `{ artifacts: ArtifactRow[] }`.
+Implement `harvestArtifacts(runId, extractedDir)` in `src/artifacts/harvest.ts`. End-to-end vertical slice: reads handoff directory from Sandcastle `copyFileOut()`, computes SHA-256 via `node:crypto`, sniffs MIME via `mime-types`, resolves `retentionUntil` through `ProjectRepository`, copies file to `LocalFsBackend`, calls `ArtifactRepository.create(...)`, calls `EdgeRepository.createMany(...)` for `artifact→generated_by→agent_run` + `agent_run→produced→artifact` per Q32 hybrid edge registry, calls `SearchDocumentRepository.upsertArtifactPreview(...)` (title=filename, body=first 2000 chars for text MIME), and calls `EventRepository.recordArtifactHarvested(...)`. Returns `{ artifacts: Artifact[] }`.
 
 ## Acceptance criteria
-- [ ] Schema migration: reads from `0010_artifacts` columns; writes `artifacts`, `edges`, `search_documents` rows.
+- [ ] Schema migration: reads `Artifact` entity properties from migration class `Migration<timestamp>`; writes through artifact, edge, and search repositories.
 - [ ] tRPC procedure / module: `src/artifacts/harvest.ts` exports `harvestArtifacts()`; `ArtifactRepository` CRUD wrappers emit events on every mutation.
 - [ ] Web surface: `/runs/<id>/artifacts` route shows harvested artifacts after run completes.
 - [ ] CLI command: `fulcrum artifacts list --run-id <id> --json` returns harvested artifacts with correct SHA + MIME.
@@ -30,12 +30,12 @@ Implement `harvestArtifacts(runId, extractedDir)` in `src/artifacts/harvest.ts`.
 - `01-schema-migration.md` — DB columns.
 - `02-storage-backend.md` — `LocalFsBackend` for file copy.
 - Pillar 4 (Sandcastle) — handoff path contract; can mock for unit tests.
-- Pillar 11 (Search) — `search_documents` table DDL must exist; Pillar 11 owns FTS, this slice only writes the row.
+- Pillar 11 (Search) — `SearchDocument` entity + repository must exist; Pillar 11 owns FTS, this slice only writes through the repository.
 
 ## Notes / Tech-stack hints
 - `mime-types` v3 (MIT) primary; add `file-type` v19 (MIT) as secondary magic-byte sniff for binary formats where extension is missing.
 - `node:crypto` `createHash('sha256')` streaming — do not buffer large files.
 - `edges` kind values: `'generated_by'` and `'produced'` — registered in Pillar 1 edge-kind registry per Q32.
-- `search_documents` upsert: `ON CONFLICT (org_id, kind, entity_id) DO UPDATE` — idempotent re-harvest.
+- `SearchDocumentRepository.upsertArtifactPreview(...)` owns idempotent re-harvest behavior.
 - Dedup check: if same `(run_id, filename, checksum_sha256)` already exists, skip copy and reuse existing row.
 - Failure gate: MIME misidentify → `file-type` secondary sniff; disk full → clean partial file, emit `artifact.harvest.failed`, no DB row.

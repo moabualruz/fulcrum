@@ -19,7 +19,7 @@ PRD: `.scratch/agent-os-vision/prds/10-artifacts.md` (Always-on: Harvest pipelin
 Register a graphile-worker task `artifact.harvest` (payload: `{ runId: string, extractedDir: string }`) that calls `harvestArtifacts()` and handles errors without crashing the worker. Implement the enqueue shim in `src/orchestration/symphony/after_run_hook.ts` that immediately enqueues `artifact.harvest` and returns — decoupling Symphony's `after_run` hook from the harvest latency. Wire doctor check: reports pending/failed harvest jobs count.
 
 ## Acceptance criteria
-- [ ] Schema migration: graphile-worker jobs table (already seeded by Pillar 1 bootstrap) holds `artifact.harvest` entries.
+- [ ] Schema migration: graphile-worker job entity/repository from Pillar 1 holds `artifact.harvest` entries.
 - [ ] tRPC procedure / module: `src/artifacts/worker.ts` exports `registerArtifactWorkerTasks(worker)` called from main worker bootstrap.
 - [ ] Web surface: `/runs/<id>/artifacts` populates after job completes (eventual — no polling needed in this slice; page refresh shows harvested artifacts).
 - [ ] CLI command: `fulcrum artifacts list --run-id <id> --json` returns harvested artifacts once job processes.
@@ -34,4 +34,4 @@ Register a graphile-worker task `artifact.harvest` (payload: `{ runId: string, e
 ## Notes / Tech-stack hints
 - graphile-worker retries on thrown errors; do NOT swallow errors — rethrow so graphile-worker can retry.
 - Enqueue via `addJob('artifact.harvest', { runId, extractedDir }, { queueName: 'artifacts', jobKey: `harvest:${runId}` })` — jobKey prevents duplicate enqueues for same run.
-- Doctor check: `SELECT count(*) FROM graphile_worker.jobs WHERE task_identifier='artifact.harvest' AND run_at IS NULL` (pending count).
+- Doctor check: `GraphileJobRepository.countPending('artifact.harvest')` reports pending count.

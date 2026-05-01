@@ -16,7 +16,7 @@ Docs: https://tiptap.dev/docs, https://kit.svelte.dev/docs
 
 Five doc routes. `/docs` + `/docs/global`: sidebar tree navigation (project tree + global tree) with expand/collapse, breadcrumbs, "New Doc" button with `doc_type` selector. `/docs/[id]` reader: TipTap read-only render (remark+unified+shiki+DOMPurify), frontmatter header (type badge, status, scope), backlinks sidebar from `doc_links`. `/docs/[id]/edit`: TipTap editable with all extensions from Pillar 7 (StarterKit, wikilinks, @agent mention, KaTeX, Mermaid, image, file); frontmatter form (Zod-validated TipTap block) + raw YAML toggle (round-trip stable); autosave 1000ms debounce. `/docs/[id]/history`: version timeline (version number, author, timestamp); click version → diff view (jsondiffpatch rendered); "Restore" button.
 
-Cuts through: `docs.list(projectId)` tRPC → tree rendered → click → `docs.get(id)` → TipTap JSON loaded → edit → autosave → `doc_versions` delta written → history shows new version.
+Cuts through: `docs.list(projectId)` tRPC → handler resolves `DocService` from `ctx.container` → tree rendered → click → `docs.get(id)` → TipTap JSON loaded → edit → autosave → `DocService.updateContent(...)` records version delta through `DocVersionRepository` → history shows new version.
 
 ## Acceptance criteria
 

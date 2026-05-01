@@ -16,7 +16,7 @@ Docs: []
 PRD: `.scratch/agent-os-vision/prds/10-artifacts.md` (Always-on: Manual upload + preview + CRUD; issues 10-07, 10-13)
 
 ## What to build
-End-to-end manual upload slice cutting all three surfaces. SvelteKit form action at `+server.ts` handles multipart POST: streams file to `LocalFsBackend`, calls `artifacts.upload` tRPC procedure with metadata, writes `edges` row `(artifact→attached_to→task|doc|run)`. Web: drag-drop widget component (`src/lib/components/ArtifactUpload.svelte`) embedded in task/run/doc detail pages with progress bar and file-type badge. CLI: `fulcrum artifacts upload <file> [--task-id|--run-id|--doc-id] [--project-id]` via tRPC codegen. TUI: `u` hotkey opens file-path input prompt → uploads via tRPC in-process.
+End-to-end manual upload slice cutting all three surfaces. SvelteKit form action at `+server.ts` handles multipart POST: streams file to `LocalFsBackend`, calls `artifacts.upload` tRPC procedure with metadata, and records `artifact→attached_to→task|doc|run` through `EdgeRepository`. Web: drag-drop widget component (`src/lib/components/ArtifactUpload.svelte`) embedded in task/run/doc detail pages with progress bar and file-type badge. CLI: `fulcrum artifacts upload <file> [--task-id|--run-id|--doc-id] [--project-id]` via tRPC codegen. TUI: `u` hotkey opens file-path input prompt → uploads via tRPC in-process.
 
 ## Acceptance criteria
 - [ ] Schema migration: `edges` row with `kind='attached_to'` written on upload; readable via `edges` query.
@@ -29,7 +29,7 @@ End-to-end manual upload slice cutting all three surfaces. SvelteKit form action
 ## Blocked by
 - `06-trpc-procedures.md` — `artifacts.upload` tRPC procedure.
 - `02-storage-backend.md` — `LocalFsBackend.put`.
-- Pillar 1 (Foundation) — `edges` table DDL + edge-kind registry.
+- Pillar 1 (Foundation) — `Edge` entity + edge-kind registry.
 
 ## Notes / Tech-stack hints
 - `FULCRUM_ARTIFACT_MAX_SIZE_MB` env var (default unlimited); server action enforces limit before streaming to disk.

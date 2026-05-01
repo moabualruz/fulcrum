@@ -46,6 +46,8 @@ Ships unconditionally on Web surface.
 
 SvelteKit 2 app with Svelte 5 runes. `src/web/src/` root. Better-Auth session in `event.locals.session` via `src/web/src/hooks.server.ts`. Auto-redirect unauthenticated requests to `/auth/login` (except `/auth/*` and `/api/*`). Local-mode: `fulcrum init` seeds `admin@local` — web app skips login screen; `event.locals.session` populated automatically.
 
+Per C8, `hooks.server.ts` creates the shared needle-di `Container` at app start and attaches it to `event.locals.container` for every request. `+server.ts` endpoints expose that same container through locals, `+page.server.ts` loads data with `event.locals.container.get(SomeService)`, and tRPC handlers attach `ctx.container = event.locals.container` before resolving domain services.
+
 Layout hierarchy:
 ```
 +layout.svelte         ← app shell (sidebar nav, topbar, cmd+K portal, toast provider, theme vars)
@@ -190,6 +192,12 @@ All shipped + tested; OFF by default; flip individual flag to enable.
 
 ## Tech stack
 
+### Stack
+- C7: Web owns no tables; SvelteKit routes consume MikroORM-backed services and repositories from domain pillars.
+- C8: `hooks.server.ts` attaches `event.locals.container`; `+page.server.ts` resolves services via `event.locals.container.get(SomeService)`.
+- C8: tRPC context sets `ctx.container = event.locals.container`; handlers resolve services lazily from needle-di.
+- C9: persisted web settings use existing entity/repository paths; no web-owned migration files or ad hoc query strings.
+
 | Layer | Pick | License | Failure gate → action | 2nd | 3rd |
 |---|---|---|---|---|---|
 | Web framework | SvelteKit 2 + Svelte 5 | MIT | Breaking rune change blocks compilation → pin Svelte minor; open bug upstream | — | committed |
@@ -216,9 +224,9 @@ All shipped + tested; OFF by default; flip individual flag to enable.
 
 ## Schema changes
 
-No new schema tables — this pillar consumes Pillars 1–15 schema. SvelteKit server actions and tRPC calls only.
+No new entity classes or migration classes — this pillar consumes Pillars 1–15 schema. SvelteKit server actions resolve services from `event.locals.container` and tRPC calls use `ctx.container`.
 
-Additions to `tenant_settings` (no DDL change; existing KV table from Pillar 1):
+Additional `TenantSettings` keys (existing Pillar 1 entity; repository calls only):
 - `key='web.theme.<var>'` — per CSS var override (org or user scope)
 - `key='web.keybindings.overrides'` — JSON of user keybinding overrides
 - `key='web.locale'` — chosen locale (when `i18n` flag ON)
@@ -253,7 +261,8 @@ graph TD
     end
 
     subgraph "SvelteKit server"
-        HOOKS[hooks.server.ts<br/>session + flags]
+        HOOKS[hooks.server.ts<br/>session + flags + container]
+        LOCALS[event.locals.container]
         SA[Server actions<br/>+page.server.ts]
         TRPC_LINK[tRPC HTTP link<br/>/api/trpc]
     end
@@ -274,8 +283,9 @@ graph TD
     SHELL --> THEME
     ROUTES --> TRPC_CLIENT
     ROUTES --> SA
-    SA --> HOOKS
-    HOOKS --> TRPC_ROUTER
+    HOOKS --> LOCALS
+    SA --> LOCALS
+    LOCALS --> TRPC_ROUTER
     TRPC_CLIENT --> TRPC_LINK
     TRPC_LINK --> TRPC_ROUTER
     TRPC_ROUTER --> DB
@@ -294,16 +304,16 @@ sequenceDiagram
     participant DnD as svelte-dnd-action
     participant SA as Server Action
     participant tRPC as tasks.update
-    participant DB as PGlite
+    participant SVC as TaskService
 
     User->>Board: drag card to 'in_review' column
     Board->>DnD: onfinalize event
     DnD->>Board: { item, targetColumnId }
     Board->>SA: form action update_task_status
     SA->>tRPC: tasks.update({ id, status: 'in_review' })
-    tRPC->>DB: UPDATE tasks SET status='in_review'
-    tRPC->>DB: INSERT INTO events (verb='status_changed')
-    DB-->>tRPC: ok
+    tRPC->>SVC: moveStatus(id, 'in_review')
+    SVC->>SVC: TaskRepository.updateStatus(...) + EventService.recordStatusChanged(...)
+    SVC-->>tRPC: Task
     tRPC-->>SA: Task
     SA-->>Board: invalidate() → re-render card
     Board-->>User: card in new column, badge updated
@@ -317,14 +327,14 @@ sequenceDiagram
     participant Editor as TipTap editor
     participant Autosave as Autosave hook
     participant tRPC as docs.update
-    participant DB as PGlite
+    participant SVC as DocService
 
     User->>Editor: types content
     Editor->>Autosave: onChange (debounce 1000ms)
     Autosave->>tRPC: docs.update({ id, tiptap_content })
-    tRPC->>DB: UPDATE documents SET tiptap_content=?
-    tRPC->>DB: INSERT doc_versions (delta)
-    DB-->>tRPC: ok
+    tRPC->>SVC: updateContent(id, tiptapContent)
+    SVC->>SVC: DocRepository.saveContent(...) + DocVersionRepository.recordDelta(...)
+    SVC-->>tRPC: ok
     tRPC-->>Autosave: { updated_at }
     Autosave-->>Editor: "Saved" indicator
     Editor-->>User: content visible, indicator shows saved

@@ -16,7 +16,7 @@ Docs: https://kit.svelte.dev/docs
 
 `/memory`: memory browser with filter sidebar (scope: project/global/task/user, importance: high/medium/low, source: heuristic/llm/manual, project selector). List shows memory cards (title snippet, scope badge, importance badge, tags, last used). Create memory button → inline create form. `/memory/[id]`: detail view — full body (markdown), importance selector, scope toggle (project ↔ global), tags combobox, linked docs/tasks (edges), "Delete" action. `/context/preview`: project + task selectors → 4-pane view (top-N memories / linked docs / recent transcripts / repo state) showing token budget bar and truncation markers per slice.
 
-Cuts through: `memory.list(projectId)` tRPC → memories listed → importance filter applied → click → `memory.get(id)` → detail renders → toggle global → `memory.update(scope='global')` → scope badge updates.
+Cuts through: `memory.list(projectId)` tRPC → handler resolves `MemoryService` from `ctx.container` → repository returns memories → importance filter applied → click → `memory.get(id)` → detail renders → toggle global → `memory.update(scope='global')` → repository write → scope badge updates.
 
 ## Acceptance criteria
 

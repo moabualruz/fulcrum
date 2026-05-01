@@ -14,9 +14,9 @@ Docs: https://kit.svelte.dev/docs, https://tailwindcss.com/docs
 
 ## What to build
 
-Wire the `useTheme()` composable (from Pillar 17) into the SvelteKit root layout — inject CSS custom properties on SSR and update reactively on client. Build the keybindings dispatcher reading `src/keybindings/schema.ts` + `default-web.ts` bindings + user overrides from `tenant_settings`. Build the `+error.svelte` error boundary. Build the `<FeatureGate flag="x">` wrapper component. Wire `window.onerror` to write to `local_telemetry` via `telemetry.recordError` tRPC call (Pillar 17 procedures).
+Wire the `useTheme()` composable (from Pillar 17) into the SvelteKit root layout — inject CSS custom properties on SSR and update reactively on client. Server loads theme/keybinding state by resolving `ThemeService` and `KeybindingService` from `event.locals.container.get(...)`. Build the keybindings dispatcher reading `src/keybindings/schema.ts` + `default-web.ts` bindings + user overrides from `tenant_settings`. Build the `+error.svelte` error boundary. Build the `<FeatureGate flag="x">` wrapper component. Wire `window.onerror` to write to `local_telemetry` via `telemetry.recordError` tRPC call (Pillar 17 procedures).
 
-Cuts through: `tenant_settings` DB row → `theme.get` tRPC → `useTheme()` composable → CSS vars on `:root` → Playwright assertion; keybindings schema → in-layout dispatcher → `⌘K` opens palette; `+error.svelte` catches tRPC FORBIDDEN; `<FeatureGate>` renders callout when flag OFF.
+Cuts through: `TenantSettingsRepository` read → `theme.get` tRPC → `useTheme()` composable → CSS vars on `:root` → Playwright assertion; keybindings schema → in-layout dispatcher → `⌘K` opens palette; `+error.svelte` catches tRPC FORBIDDEN; `<FeatureGate>` renders callout when flag OFF.
 
 ## Acceptance criteria
 
