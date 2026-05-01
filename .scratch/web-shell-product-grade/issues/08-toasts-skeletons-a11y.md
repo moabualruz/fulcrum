@@ -26,7 +26,8 @@ Acceptance criteria:
 
 ## Sub-tasks
 
-- [ ] **08.1 — `ActionResult` + `dispatchToast` helpers.** Owns: `src/web/src/lib/feedback/action-result.ts`, `.test.ts`. RED: `{ ok, message }` round-trips through `dispatchToast`.
+- [x] **08.1 — `ActionResult` + `dispatchToast` helpers.** Owns: `src/web/src/lib/feedback/action-result.ts`, `.test.ts`. RED: `{ ok, message }` round-trips through `dispatchToast`.
+  Comment: feat(web): add ActionResult + dispatchToast feedback helpers (187e3a7). 4 tests pass; bun run ci 9/9, check 0/0/0.
 - [ ] **08.2 — `Toaster` mount in `+layout.svelte`.** Owns: `src/web/src/routes/+layout.svelte` (extend). RED: smoke test imports the layout, asserts `<Toaster />` present.
 - [ ] **08.3 — `RouteSkeleton` variants.** Owns: `src/web/src/lib/components/feedback/RouteSkeleton.svelte`, `.svelte.test.ts`. RED: `kind="list"` renders `<table>` skeleton; `kind="board"` renders 5-column skeleton; `kind="detail"` renders title + 3 paragraphs.
 - [ ] **08.4 — Wire skeleton via SvelteKit `streamed`.** Owns: every list/detail route's `+page.server.ts`. RED: load test resolves with `streamed` and skeleton renders during pendency.
