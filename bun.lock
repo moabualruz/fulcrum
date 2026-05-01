@@ -7,6 +7,7 @@
       "dependencies": {
         "@electric-sql/pglite": "0.4.5",
         "@mikro-orm/core": "7.0.13",
+        "@mikro-orm/decorators": "7.0.13",
         "@mikro-orm/migrations": "7.0.13",
         "@mikro-orm/postgresql": "7.0.13",
         "@needle-di/core": "1.1.2",
@@ -29,6 +30,8 @@
     "@harryplusplus/knex-pglite": ["@harryplusplus/knex-pglite@0.13.13", "", { "peerDependencies": { "@electric-sql/pglite": "^0.3.10", "knex": "^3.1.0" } }, "sha512-+c1Bs2aXgkc2NY3/EvhfP5Yv/xXDPS9TBPvR9EVU2J2LkwgrZbOFFmoYRBl5o5q2iSzmaGbLi5xdbicHSceFTA=="],
 
     "@mikro-orm/core": ["@mikro-orm/core@7.0.13", "", { "peerDependencies": { "dataloader": "2.2.3" }, "optionalPeers": ["dataloader"] }, "sha512-TC1ize8Eo8fxnBdbIV3Af/oHkF8aD77PllieYqZv98geKGKRiXxGu99zC18KjdOjwf6FxdVp/DOvhGAQIhsPZw=="],
+
+    "@mikro-orm/decorators": ["@mikro-orm/decorators@7.0.13", "", { "peerDependencies": { "@mikro-orm/core": "7.0.13", "reflect-metadata": "^0.1.0 || ^0.2.0" }, "optionalPeers": ["reflect-metadata"] }, "sha512-AStwKw1cGTqjytl/jNGl09yPYh0iEqOWrEsRNbaQHwEw6Khc7LQtKVD7KjJITKT//2vA6UFqqn++3RFu8kML9w=="],
 
     "@mikro-orm/migrations": ["@mikro-orm/migrations@7.0.13", "", { "dependencies": { "@mikro-orm/sql": "7.0.13" }, "peerDependencies": { "@mikro-orm/core": "7.0.13" } }, "sha512-SMSz9lsUNdQYDl+h+jGmbcfpBZm5UKUmyaMOljWK7czm/rkqZyKh2la4hFwF8IMOZ71agZtgtxFy1Ag6IOhsNA=="],
 

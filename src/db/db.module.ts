@@ -9,54 +9,54 @@
  *   const orm = await initOrm();
  *   registerDbBindings(container, orm);
  *
- *   const em = container.get(ENTITY_MANAGER_TOKEN);
+ *   const userRepo = container.get(UserRepository);  // ← typed UserRepository subclass
  *
  * C6: No raw SQL.
- * C7: MikroORM v7 EntityManager.
- * C8: needle-di Container + Provider pattern (ValueProvider, FactoryProvider).
+ * C7: MikroORM v7 EntityManager + @Entity decorator-class entities.
+ * C8: needle-di Container binds each *Repository class (custom subclass) as the
+ *     injectable token — not the base EntityRepository — so inject(UserRepository)
+ *     returns the typed subclass with full type inference.
  */
 
 import { Container, InjectionToken } from "@needle-di/core";
 import type { MikroORM, EntityManager } from "@mikro-orm/postgresql";
-import {
-  UserSchema,
-  SessionSchema,
-  InvitationSchema,
-  OrgMemberSchema,
-  FeatureFlagSchema,
-} from "./entities/auth/index.ts";
-import type { InferEntity } from "@mikro-orm/postgresql";
-import type { EntityRepository } from "@mikro-orm/postgresql";
+
+// Entity classes (decorator pattern)
+import { User } from "./entities/auth/User.ts";
+import { Session } from "./entities/auth/Session.ts";
+import { Invitation } from "./entities/auth/Invitation.ts";
+import { OrgMember } from "./entities/auth/OrgMember.ts";
+import { FeatureFlag } from "./entities/auth/FeatureFlag.ts";
+
+// Custom repository subclasses (extended EntityRepository<T>)
+import { UserRepository } from "./repositories/auth/UserRepository.ts";
+import { SessionRepository } from "./repositories/auth/SessionRepository.ts";
+import { InvitationRepository } from "./repositories/auth/InvitationRepository.ts";
+import { OrgMemberRepository } from "./repositories/auth/OrgMemberRepository.ts";
+import { FeatureFlagRepository } from "./repositories/auth/FeatureFlagRepository.ts";
+
+// Re-export repository classes for convenience (callers can use class as injection token)
+export {
+  UserRepository,
+  SessionRepository,
+  InvitationRepository,
+  OrgMemberRepository,
+  FeatureFlagRepository,
+};
 
 /** InjectionToken for the MikroORM EntityManager (forked per request in SvelteKit). */
 export const ENTITY_MANAGER_TOKEN = new InjectionToken<EntityManager>(
   "EntityManager",
 );
 
-/** InjectionToken for each auth repository. */
-export const USER_REPOSITORY_TOKEN = new InjectionToken<
-  EntityRepository<InferEntity<typeof UserSchema>>
->("UserRepository");
-
-export const SESSION_REPOSITORY_TOKEN = new InjectionToken<
-  EntityRepository<InferEntity<typeof SessionSchema>>
->("SessionRepository");
-
-export const INVITATION_REPOSITORY_TOKEN = new InjectionToken<
-  EntityRepository<InferEntity<typeof InvitationSchema>>
->("InvitationRepository");
-
-export const ORG_MEMBER_REPOSITORY_TOKEN = new InjectionToken<
-  EntityRepository<InferEntity<typeof OrgMemberSchema>>
->("OrgMemberRepository");
-
-export const FEATURE_FLAG_REPOSITORY_TOKEN = new InjectionToken<
-  EntityRepository<InferEntity<typeof FeatureFlagSchema>>
->("FeatureFlagRepository");
-
 /**
  * Registers ORM-related bindings into the given needle-di Container.
  * Call once per process after `MikroORM.init()` completes.
+ *
+ * Each *Repository class is registered as its own injectable token.
+ * em.getRepository(EntityClass) returns the custom subclass because
+ * the entity's @Entity({ repository: () => XxxRepository }) metadata
+ * wires the correct constructor — this cast is safe.
  */
 export function registerDbBindings(container: Container, orm: MikroORM): void {
   const em = orm.em;
@@ -67,29 +67,27 @@ export function registerDbBindings(container: Container, orm: MikroORM): void {
     useValue: em,
   });
 
-  // Auth repositories — use em.getRepository() for proper type resolution
+  // Auth repositories — bind custom subclass as injectable token.
+  // em.getRepository(User) returns UserRepository because @Entity({ repository: () => UserRepository })
+  // is wired in the entity decorator. The cast is safe: MikroORM returns the registered subclass.
   container.bind({
-    provide: USER_REPOSITORY_TOKEN,
-    useFactory: () => em.getRepository<InferEntity<typeof UserSchema>>(UserSchema),
+    provide: UserRepository,
+    useFactory: () => em.getRepository(User) as UserRepository,
   });
   container.bind({
-    provide: SESSION_REPOSITORY_TOKEN,
-    useFactory: () =>
-      em.getRepository<InferEntity<typeof SessionSchema>>(SessionSchema),
+    provide: SessionRepository,
+    useFactory: () => em.getRepository(Session) as SessionRepository,
   });
   container.bind({
-    provide: INVITATION_REPOSITORY_TOKEN,
-    useFactory: () =>
-      em.getRepository<InferEntity<typeof InvitationSchema>>(InvitationSchema),
+    provide: InvitationRepository,
+    useFactory: () => em.getRepository(Invitation) as InvitationRepository,
   });
   container.bind({
-    provide: ORG_MEMBER_REPOSITORY_TOKEN,
-    useFactory: () =>
-      em.getRepository<InferEntity<typeof OrgMemberSchema>>(OrgMemberSchema),
+    provide: OrgMemberRepository,
+    useFactory: () => em.getRepository(OrgMember) as OrgMemberRepository,
   });
   container.bind({
-    provide: FEATURE_FLAG_REPOSITORY_TOKEN,
-    useFactory: () =>
-      em.getRepository<InferEntity<typeof FeatureFlagSchema>>(FeatureFlagSchema),
+    provide: FeatureFlagRepository,
+    useFactory: () => em.getRepository(FeatureFlag) as FeatureFlagRepository,
   });
 }

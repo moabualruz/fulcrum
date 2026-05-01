@@ -6,7 +6,7 @@
  *   - SAAS: @mikro-orm/postgresql (standard pg Pool) when DATABASE_URL points to a server.
  *
  * C6: No plaintext SQL in this file.
- * C7: MikroORM v7 + defineEntity entities.
+ * C7: MikroORM v7 + @Entity decorator-class entities.
  * C9: Config lives here; entities registered per domain.
  */
 
@@ -15,14 +15,21 @@ import { Migrator } from "@mikro-orm/migrations";
 import type { PGlite } from "@electric-sql/pglite";
 import { PGliteKyselyDialect } from "./PGliteKyselyDriver.ts";
 
-// Entity schemas — imported here so all consumers get a consistent list
+// Entity classes — imported here so all consumers get a consistent list.
+// Uses @Entity decorator classes (C7: ES Stage-3 decorators).
+import { User } from "./entities/auth/User.ts";
+import { Session } from "./entities/auth/Session.ts";
+import { Invitation } from "./entities/auth/Invitation.ts";
+import { OrgMember } from "./entities/auth/OrgMember.ts";
+import { FeatureFlag } from "./entities/auth/FeatureFlag.ts";
+
 export {
-  UserSchema,
-  SessionSchema,
-  InvitationSchema,
-  OrgMemberSchema,
-  FeatureFlagSchema,
-} from "./entities/auth/index.ts";
+  User,
+  Session,
+  Invitation,
+  OrgMember,
+  FeatureFlag,
+};
 
 /** Allowed options for createOrmConfig(). */
 export interface OrmConfigOptions {
@@ -49,16 +56,23 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
   const isSaas =
     dbUrl.startsWith("postgresql://") || dbUrl.startsWith("postgres://");
 
-  const baseEntities: Options["entities"] = [
-    ...entities,
+  // Built-in auth domain entities (decorator classes)
+  const builtinEntities: Options["entities"] = [
+    User,
+    Session,
+    Invitation,
+    OrgMember,
+    FeatureFlag,
   ];
+
+  const allEntities: Options["entities"] = [...builtinEntities, ...entities];
 
   if (isSaas) {
     // SaaS: standard PostgreSQL driver
     return {
       dbName: new URL(dbUrl).pathname.slice(1) || "fulcrum",
       clientUrl: dbUrl,
-      entities: baseEntities,
+      entities: allEntities,
       migrations: {
         path: new URL("./migrations", import.meta.url).pathname,
         pathTs: new URL("./migrations", import.meta.url).pathname,
@@ -83,7 +97,7 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     // PGlite does not support multiple statements in a single prepared query.
     // Setting false causes SqlSchemaGenerator to split DDL on ';\n' before executing.
     multipleStatements: false,
-    entities: baseEntities,
+    entities: allEntities,
     migrations: {
       path: new URL("./migrations", import.meta.url).pathname,
       pathTs: new URL("./migrations", import.meta.url).pathname,

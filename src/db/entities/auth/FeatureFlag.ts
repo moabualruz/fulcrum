@@ -6,38 +6,44 @@
  *
  * D5: Flag names: lowercase-with-hyphens, validated in FlagRegistry.
  * C2: Composite (org_id, flag) index.
- * C6/C7: defineEntity + p builder.
+ * C6: No plaintext SQL — schema via @Entity decorator class.
+ * C7: MikroORM v7 ES Stage-3 decorator pattern (@mikro-orm/decorators/es).
+ *     Stage-3 decorators do NOT emit reflect-metadata type info — explicit `type`
+ *     is required on every @Property/@PrimaryKey decorator.
+ * C8: Class IS the type; @Entity({ repository }) wires FeatureFlagRepository.
  */
 
-import { defineEntity, p, type InferEntity } from "@mikro-orm/postgresql";
+import {
+  Entity,
+  PrimaryKey,
+  Property,
+  Index,
+  Unique,
+} from "@mikro-orm/decorators/es";
+import { FeatureFlagRepository } from "../../repositories/auth/FeatureFlagRepository.ts";
 
-export const FeatureFlagSchema = defineEntity({
-  name: "FeatureFlag",
-  tableName: "feature_flags",
-  indexes: [
-    {
-      name: "idx_feature_flags_org_flag",
-      properties: ["orgId", "flag"],
-    },
-  ],
-  uniques: [
-    {
-      // One row per (org, user, flag) combination
-      name: "uq_feature_flags_org_user_flag",
-      properties: ["orgId", "userId", "flag"],
-    },
-  ],
-  properties: {
-    id: p.uuid().primary().defaultRaw("gen_random_uuid()"),
-    // Nullable: global flag rows have no org (apply to all orgs)
-    orgId: p.uuid().fieldName("org_id").nullable(),
-    // Nullable: org-level flags have no user (apply to all users in the org)
-    userId: p.uuid().fieldName("user_id").nullable(),
-    // Flag name — must match ^[a-z][a-z0-9-]*$ (D5 constraint, enforced in FlagRegistry)
-    flag: p.string(),
-    enabled: p.boolean().default(false),
-    createdAt: p.datetime().fieldName("created_at").defaultRaw("now()"),
-  },
-});
+@Entity({ tableName: "feature_flags", repository: () => FeatureFlagRepository })
+@Index({ name: "idx_feature_flags_org_flag", properties: ["orgId", "flag"] })
+@Unique({ name: "uq_feature_flags_org_user_flag", properties: ["orgId", "userId", "flag"] })
+export class FeatureFlag {
+  @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
+  id!: string;
 
-export type FeatureFlag = InferEntity<typeof FeatureFlagSchema>;
+  // Nullable: global flag rows have no org (apply to all orgs)
+  @Property({ type: "uuid", fieldName: "org_id", nullable: true })
+  orgId?: string;
+
+  // Nullable: org-level flags have no user (apply to all users in the org)
+  @Property({ type: "uuid", fieldName: "user_id", nullable: true })
+  userId?: string;
+
+  // Flag name — must match ^[a-z][a-z0-9-]*$ (D5 constraint, enforced in FlagRegistry)
+  @Property({ type: "string" })
+  flag!: string;
+
+  @Property({ type: "boolean" })
+  enabled: boolean = false;
+
+  @Property({ type: "datetime", fieldName: "created_at", defaultRaw: "now()" })
+  createdAt!: Date;
+}

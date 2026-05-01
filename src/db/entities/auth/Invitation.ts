@@ -1,39 +1,52 @@
 /**
  * Invitation entity — auth domain.
  *
- * C2: Composite (org_id, email) index.
- * C6/C7: defineEntity + p builder.
+ * C2: Composite (org_id, email) index for tenant-scoped queries.
+ * C6: No plaintext SQL — schema via @Entity decorator class.
+ * C7: MikroORM v7 ES Stage-3 decorator pattern (@mikro-orm/decorators/es).
+ *     Stage-3 decorators do NOT emit reflect-metadata type info — explicit `type`
+ *     is required on every @Property/@PrimaryKey decorator.
+ * C8: Class IS the type; @Entity({ repository }) wires InvitationRepository.
  */
 
-import { defineEntity, p, type InferEntity } from "@mikro-orm/postgresql";
+import {
+  Entity,
+  PrimaryKey,
+  Property,
+  Index,
+  Unique,
+} from "@mikro-orm/decorators/es";
+import { InvitationRepository } from "../../repositories/auth/InvitationRepository.ts";
 
-export const InvitationSchema = defineEntity({
-  name: "Invitation",
-  tableName: "invitations",
-  indexes: [
-    {
-      name: "idx_invitations_org_email",
-      properties: ["orgId", "email"],
-    },
-  ],
-  uniques: [
-    {
-      name: "uq_invitations_token",
-      properties: ["token"],
-    },
-  ],
-  properties: {
-    id: p.uuid().primary().defaultRaw("gen_random_uuid()"),
-    orgId: p.uuid().fieldName("org_id"),
-    email: p.string(),
-    role: p.string().default("member"),
-    token: p.string(),
-    // Who sent the invite (nullable — system-generated invites have no user)
-    invitedById: p.uuid().fieldName("invited_by").nullable(),
-    acceptedAt: p.datetime().fieldName("accepted_at").nullable(),
-    expiresAt: p.datetime().fieldName("expires_at"),
-    createdAt: p.datetime().fieldName("created_at").defaultRaw("now()"),
-  },
-});
+@Entity({ tableName: "invitations", repository: () => InvitationRepository })
+@Index({ name: "idx_invitations_org_email", properties: ["orgId", "email"] })
+@Unique({ name: "uq_invitations_token", properties: ["token"] })
+export class Invitation {
+  @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
+  id!: string;
 
-export type Invitation = InferEntity<typeof InvitationSchema>;
+  @Property({ type: "uuid", fieldName: "org_id" })
+  orgId!: string;
+
+  @Property({ type: "string" })
+  email!: string;
+
+  @Property({ type: "string" })
+  role: string = "member";
+
+  @Property({ type: "string" })
+  token!: string;
+
+  // Who sent the invite (nullable — system-generated invites have no user)
+  @Property({ type: "uuid", fieldName: "invited_by", nullable: true })
+  invitedById?: string;
+
+  @Property({ type: "datetime", fieldName: "accepted_at", nullable: true })
+  acceptedAt?: Date;
+
+  @Property({ type: "datetime", fieldName: "expires_at" })
+  expiresAt!: Date;
+
+  @Property({ type: "datetime", fieldName: "created_at", defaultRaw: "now()" })
+  createdAt!: Date;
+}

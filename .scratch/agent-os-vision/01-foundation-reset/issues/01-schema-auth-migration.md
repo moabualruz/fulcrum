@@ -4,7 +4,8 @@ Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: None
 Owner: claude-orchestrator
-ClaimedAt: 2026-05-01T02:30:00Z
+ClaimedAt: 2026-05-01T03:30:00Z
+ReviewVerdict: SPEC FAIL / QUALITY CHANGES_REQUIRED — Path B (decorator-class rewrite) per .scratch/agent-os-vision/research/p1-01-review.md
 ---
 
 # Auth migration class — User, Session, Invitation, OrgMember, FeatureFlag entities
