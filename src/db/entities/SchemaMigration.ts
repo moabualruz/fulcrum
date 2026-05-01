@@ -28,14 +28,21 @@ export type MigrationDirection = "up" | "down";
 @Entity({ tableName: "schema_migrations", repository: () => SchemaMigrationRepository })
 export class SchemaMigration {
   /**
-   * Migration ordinal — auto-incrementing integer PRIMARY KEY.
-   * Matches the numeric timestamp portion of the migration class name.
-   * Using a serial/auto-increment so queries can ORDER BY version easily.
+   * Migration version — bigint PRIMARY KEY, caller-supplied.
    *
-   * Optional on create — database assigns the serial value.
+   * Derived from the numeric timestamp portion of the migration class name,
+   * e.g. "Migration20260501104413_auth" → 20260501104413.
+   *
+   * Caller must pass this value explicitly when creating a SchemaMigration row.
+   * Using a timestamp-derived bigint (not serial/autoincrement) preserves version
+   * semantics: version ordering matches chronological migration order, and doctor
+   * checks can compare DB max-version against the compile-time constant in
+   * doctor-checks.ts without relying on serial offsets.
+   *
+   * NOT optional — the caller (MigratorService#recordResults) always supplies it.
    */
-  @PrimaryKey({ type: "integer", autoincrement: true })
-  version?: number;
+  @PrimaryKey({ type: "bigint", autoincrement: false })
+  version!: number;
 
   /**
    * Full migration class name, e.g. "Migration20260501104413_auth".

@@ -17,8 +17,11 @@ import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260501140000_schema_migration_ledger extends Migration {
   override async up(): Promise<void> {
+    // version: bigint PRIMARY KEY (caller-supplied timestamp, not serial).
+    // name, checksum: text (not varchar — avoids length limit surprises).
+    // direction: text check constraint — keeps DDL portable.
     this.addSql(
-      `create table "schema_migrations" ("version" serial not null, "name" varchar(255) not null, "applied_at" timestamptz not null default now(), "checksum" varchar(255) not null, "direction" varchar(4) not null check ("direction" in ('up','down')), primary key ("version"))`,
+      `create table "schema_migrations" ("version" bigint not null, "name" text not null, "applied_at" timestamptz not null default now(), "checksum" text not null, "direction" text not null check ("direction" in ('up','down')), primary key ("version"))`,
     );
     this.addSql(
       `alter table "schema_migrations" add constraint "uq_schema_migrations_name" unique ("name")`,

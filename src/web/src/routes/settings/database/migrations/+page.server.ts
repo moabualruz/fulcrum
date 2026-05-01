@@ -27,6 +27,7 @@
  * C4: Web surface at feature parity with CLI (deferred pending build fix above).
  */
 
+import { error } from "@sveltejs/kit";
 import type { PageServerLoad, Actions } from "./$types";
 
 /** Shape of a migration row for the client. */
@@ -44,43 +45,45 @@ export interface MigrationPageData {
 }
 
 /**
- * Stub load function — returns placeholder data until the cross-package
- * import issue is resolved (see FLAGs above).
+ * Error code surfaced to the client when the tRPC / API layer is not yet wired.
  *
- * In `bun run dev` mode, swap this stub for the real implementation:
+ * Thrown by both `load` and the `migrate` action so the page renders a
+ * clear "not wired" message rather than silently returning empty data.
  *
- *   import { initOrm } from "../../../../../../db/mikro-orm.config.ts";
- *   import { MigratorService } from "../../../../../../db/migrator-service.ts";
- *   import { SchemaMigration } from "../../../../../../db/entities/SchemaMigration.ts";
- *   import { SchemaMigrationRepository } from "../../../../../../db/repositories/SchemaMigrationRepository.ts";
- *   import { EventRepository } from "../../../../../../db/repositories/core/EventRepository.ts";
- *   import { Event } from "../../../../../../db/entities/core/Event.ts";
+ * TODO(P1#04 / P13): Remove this throw when Pillar 13 tRPC wiring lands.
+ * Replace with real consumption of `event.locals.container` (P1#04 owns wiring).
  */
+const INTERNAL_NOT_WIRED_YET = "INTERNAL_NOT_WIRED_YET";
+
 export const load: PageServerLoad = () => {
-  return {
-    streamed: {
-      migrations: Promise.resolve<MigrationPageData>({
-        history: [],
-        status: { current: null, pending: [], pastDue: 0 },
-      }),
-    },
-  };
+  // Use SvelteKit's error() helper — throws an HttpError routed to the error
+  // page, NOT this page component. This is louder than returning empty data
+  // (which would silently hide the "not wired" state) and avoids type errors
+  // from returning `never` directly (which confused the Svelte compiler).
+  //
+  // P1#04 (SvelteKit locals wiring) + Pillar 13 (tRPC) own the real implementation.
+  // TODO(P1#04 / P13): Remove this throw when Pillar 13 tRPC wiring lands.
+  error(501, {
+    message:
+      `db.migrations: load not yet implemented — requires Pillar 13 tRPC + P1#04 SvelteKit locals wiring. ` +
+      `Error code: ${INTERNAL_NOT_WIRED_YET}`,
+  });
 };
 
 export const actions: Actions = {
   /**
    * Form action: migrate to a target version or to latest.
    *
-   * Stub — deferred until cross-package build issue is resolved (see FLAGs above).
+   * Throws loudly until the cross-package build issue is resolved (see FLAGs above).
    * POST body: targetVersion (optional), force (checkbox).
+   *
+   * TODO(P1#04 / P13): Replace throw with real consumption of event.locals.container.
    */
   migrate: async () => {
-    return {
-      success: false,
-      error:
-        "Migration action not yet available in web build. " +
-        "Use `fulcrum db migrate` CLI command. " +
-        "(See FLAG in +page.server.ts — awaiting P1#04 / Pillar 13 integration.)",
-    };
+    error(501, {
+      message:
+        `db.migrations: migrate action not yet implemented — requires Pillar 13 tRPC + P1#04 SvelteKit locals wiring. ` +
+        `Error code: ${INTERNAL_NOT_WIRED_YET}`,
+    });
   },
 };

@@ -33,11 +33,34 @@ export interface DbMigrateInput {
 }
 
 /**
- * Stub assertPermission — no-op until Pillar 1 #06 (auth middleware) lands.
- * TODO(P1#06): Replace with real permission gate from Better-Auth / casbin.
+ * Thrown by `assertPermission` until P1#06 (Better-Auth + permission middleware) lands.
+ *
+ * Consumers MUST catch this error or stub it in tests.
+ * When P1#06 ships, replace `assertPermission` body with a real gate and remove
+ * the `throw` — callers that catch this class will automatically recover.
+ *
+ * code: 'PERMISSION_NOT_AVAILABLE'
  */
-function assertPermission(_container: Container | null, _action: string): void {
-  // No-op stub — permission gating deferred to P1#06.
+export class PermissionNotAvailableError extends Error {
+  readonly code = "PERMISSION_NOT_AVAILABLE" as const;
+  constructor() {
+    super("Permission middleware not yet wired (Pillar 1 #06 owns)");
+    this.name = "PermissionNotAvailableError";
+  }
+}
+
+/**
+ * assertPermission — THROWS until P1#06 (auth middleware) lands.
+ *
+ * Intentionally fail-closed: any call to a db.router procedure throws
+ * PermissionNotAvailableError so callers fail loudly, not silently allow.
+ * This prevents accidental unauthenticated access before the auth gate is wired.
+ *
+ * TODO(P1#06): Replace body with real permission gate from Better-Auth / casbin.
+ * When that lands, remove the throw and implement the real check.
+ */
+function assertPermission(..._args: unknown[]): never {
+  throw new PermissionNotAvailableError();
 }
 
 /**
@@ -50,12 +73,8 @@ export async function dbMigrate(
   input: DbMigrateInput = {},
 ): Promise<void> {
   assertPermission(container, "db.migrate");
-
-  const service = container?.get(MigratorService);
-  if (!service) {
-    throw new Error("db.router: MigratorService not registered in container.");
-  }
-
+  /* istanbul ignore next — assertPermission always throws until P1#06 lands */
+  const service = container!.get(MigratorService);
   await service.migrate(input.targetVersion, input.force ?? false);
 }
 
@@ -66,13 +85,8 @@ export async function dbStatus(
   container: Container | null,
 ): Promise<MigrationStatus> {
   assertPermission(container, "db.status");
-
-  const service = container?.get(MigratorService);
-  if (!service) {
-    throw new Error("db.router: MigratorService not registered in container.");
-  }
-
-  return service.status();
+  /* istanbul ignore next — assertPermission always throws until P1#06 lands */
+  return container!.get(MigratorService).status();
 }
 
 /**
@@ -82,13 +96,8 @@ export async function dbHistory(
   container: Container | null,
 ): Promise<SchemaMigration[]> {
   assertPermission(container, "db.history");
-
-  const service = container?.get(MigratorService);
-  if (!service) {
-    throw new Error("db.router: MigratorService not registered in container.");
-  }
-
-  return service.history();
+  /* istanbul ignore next — assertPermission always throws until P1#06 lands */
+  return container!.get(MigratorService).history();
 }
 
 /**

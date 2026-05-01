@@ -24,8 +24,14 @@ export interface DoctorCheckResult {
   check: string;
   /** "pass" | "fail" | "warn" */
   status: "pass" | "fail" | "warn";
-  /** Human-readable detail. */
-  message: string;
+  /**
+   * Human-readable detail.
+   *
+   * Field name: `detail` (aligned with Pillar 14 doctor contract spec).
+   * TODO(P14): When Pillar 14 doctor aggregator lands, confirm this field name
+   * matches the aggregator's DoctorCheckResult type and remove this TODO.
+   */
+  detail: string;
   /** Optional hint for recovery. */
   hint?: string;
 }
@@ -56,7 +62,7 @@ export async function dbMigrationVersion(
     return {
       check: "db.migrationVersion",
       status: "warn",
-      message: "No migrations applied yet.",
+      detail: "No migrations applied yet.",
       hint: "Run `fulcrum db migrate` to apply all pending migrations.",
     };
   }
@@ -65,7 +71,7 @@ export async function dbMigrationVersion(
   return {
     check: "db.migrationVersion",
     status: "pass",
-    message: `Current migration: v${latest.version} — ${latest.name} (direction: ${latest.direction})`,
+    detail: `Current migration: v${latest.version} — ${latest.name} (direction: ${latest.direction})`,
   };
 }
 
@@ -90,7 +96,7 @@ export async function dbCanRunOnCurrentBinary(
     return {
       check: "db.canRunOnCurrentBinary",
       status: "pass",
-      message: "No migrations applied; no version conflict.",
+      detail: "No migrations applied; no version conflict.",
     };
   }
 
@@ -100,7 +106,7 @@ export async function dbCanRunOnCurrentBinary(
     return {
       check: "db.canRunOnCurrentBinary",
       status: "fail",
-      message:
+      detail:
         `DB schema version (${dbMaxVersion}) exceeds binary's known max ` +
         `(${MAX_KNOWN_MIGRATION_VERSION}). The binary is out of date.`,
       hint:
@@ -112,7 +118,7 @@ export async function dbCanRunOnCurrentBinary(
   return {
     check: "db.canRunOnCurrentBinary",
     status: "pass",
-    message:
+    detail:
       `DB schema v${dbMaxVersion} ≤ binary max v${MAX_KNOWN_MIGRATION_VERSION}. OK.`,
   };
 }
