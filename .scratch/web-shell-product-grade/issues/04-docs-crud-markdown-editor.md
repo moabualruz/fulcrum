@@ -31,7 +31,7 @@ Acceptance criteria:
 
 - [x] **04.1 — Server actions for documents.** Owns: `src/web/src/lib/server/documents.ts`, `.test.ts`. RED: PGlite tests for create/update/delete + matching `events` row + `search_documents` upsert via `indexSearchDocument`.
 - [x] **04.2 — Frontmatter form mapper.** Owns: `src/web/src/lib/markdown/frontmatter-form.ts`, `.test.ts`. RED: round-trip `{ title, kind, labels[] }` ↔ `KernelMarkdown.frontmatter` via existing `parseKernelMarkdown` / `serializeKernelMarkdown`.
-- [ ] **04.3 — `MarkdownEditor` wrapper (CodeMirror 6).** Owns: `src/web/src/lib/components/markdown/MarkdownEditor.svelte`, `.svelte.test.ts`. RED: jsdom-safe wrapper test asserts the `value` prop binding and the `change` event payload.
+- [x] **04.3 — `MarkdownEditor` wrapper (CodeMirror 6).** Owns: `src/web/src/lib/components/markdown/MarkdownEditor.svelte`, `.svelte.test.ts`. RED: jsdom-safe wrapper test asserts the `value` prop binding and the `change` event payload.
 - [ ] **04.4 — `MarkdownPreview` (marked + dompurify).** Owns: `src/web/src/lib/components/markdown/MarkdownPreview.svelte`, `.svelte.test.ts`. RED: sanitises `<script>`; preserves links + headings; renders `# h1` to `<h1>`.
 - [ ] **04.5 — `/docs` list with kind + FTS filter.** Owns: `src/web/src/routes/docs/+page.server.ts`, `+page.svelte`, `+page.svelte.test.ts`. RED: filter by kind hides non-matching rows; free-text filter calls `searchProductDocuments`.
 - [ ] **04.6 — `/docs/new`, `/docs/[id]`, `/docs/[id]/edit`.** Owns: those three routes + form action wiring. RED: create-then-view round-trip; edit preserves byte-identical body when no changes.
@@ -105,3 +105,43 @@ Kernel surface notes (carried from 03):
 - `events.subject_id` has no FK back to `documents`, so `deleteDocumentAction` skips an "events strip" pre-delete — only `search_documents` (which has a unique key on `(source_kind, source_id)` and no FK either) is cleared first. `DELETE FROM documents ... RETURNING org_id, project_id` then drives the `document.deleted` event; on no-row-deleted we return `{ok:true}` and emit nothing.
 - `frontmatter` is stored as `jsonb` and round-trips as a `Record<string, unknown>`. `extractLabels` filters non-string entries so a malformed `labels` field never breaks the search index.
 - `documents.ts` is 110 LOC, under the ≤120 ceiling.
+
+### 04.3 — MarkdownEditor wrapper (DONE)
+
+RED command:
+```
+bun test --conditions=svelte ./src/web/src/lib/components/markdown/MarkdownEditor.svelte.test.ts ./src/web/src/lib/components/markdown/markdown-editor-helpers.test.ts
+```
+
+RED output (excerpt):
+```
+src/web/src/lib/components/markdown/MarkdownEditor.svelte.test.ts:
+error: Cannot find module './MarkdownEditor.svelte' from '/Users/mkh/workspace/fulcrum/src/web/src/lib/components/markdown/MarkdownEditor.svelte.test.ts'
+(fail) MarkdownEditor component (SSR) > (unnamed) [9.50ms]
+
+src/web/src/lib/components/markdown/markdown-editor-helpers.test.ts:
+
+# Unhandled error between tests
+```
+
+GREEN command:
+```
+bun test --conditions=svelte ./src/web/src/lib/components/markdown/MarkdownEditor.svelte.test.ts ./src/web/src/lib/components/markdown/markdown-editor-helpers.test.ts
+```
+
+GREEN output (excerpt):
+```
+ 9 pass
+ 0 fail
+ 11 expect() calls
+Ran 9 tests across 2 files.
+```
+
+Notes:
+- Added deps to `src/web/package.json`: `codemirror@6.0.2`, `@codemirror/state@6.6.0`, `@codemirror/view@6.41.1`, `@codemirror/lang-markdown@6.5.0`, `@codemirror/theme-one-dark@6.1.3`, `svelte-codemirror-editor@2.1.0`. Lockfile re-pinned with `frozenLockfile = true`.
+- `svelte-codemirror-editor` v2.1 is runes-mode: it exposes an `onchange?: (value: string) => void` callback rather than a Svelte 4 `on:change` event with `event.detail.value`. The wrapper bridges by funnelling the callback's plain string through `extractMarkdownChange({ detail: { value: next } })` — this keeps the Issue 09 (Playwright) browser-level test surface compatible with the legacy `event.detail.value` shape and lets the helper unit-test stand on its own.
+- `cm-ready` is derived directly from `$app/environment`'s `browser` constant. An earlier draft used a `$state(false)` toggled inside a `$effect`, but that died with `Svelte error: effect_orphan` whenever the test loader resolved to client-mode (smoke-test loader race). Pure conditional avoids the runtime entirely.
+- The `<textarea hidden data-markdown-editor-source ...>` mirror sits inside the wrapper for SSR-fallback / non-JS form submission. It's marked `readonly` because the live edit channel is CodeMirror; the textarea only reflects the bound value.
+- `MarkdownEditor.svelte` is 47 LOC, under the ≤90 ceiling.
+- `bun run ci` (root) → 9/9 green. `cd src/web && bun run check` → 0 errors / 0 warnings. `cd src/web && bun run build` → ok.
+- Pre-existing `.svelte.test.ts` files in this repo (`AppSidebar`, `AppTopbar`, `ProjectPicker`, `ProjectForm`, `DangerZone`, `SetActiveButton`) currently fail when the web suite is run as a single `bun test ./src/lib` invocation due to the SSR↔CSR loader race documented in `svelte-ssr-preload.ts`. The new MarkdownEditor SSR tests inherit the same isolation behaviour: green when targeted directly, racey under the full-suite run. The fix surface is in the test harness (out of 04.3 ownership).
