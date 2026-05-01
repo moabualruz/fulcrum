@@ -16,8 +16,9 @@ interface RunRow {
 
 interface PageProps {
   data: {
-    runs: RunRow[];
+    activeProjectId: string | null;
     filter: { agent: string; status: string; range: string; project: string };
+    streamed: { data: Promise<{ runs: RunRow[] }> };
   };
 }
 
@@ -45,7 +46,13 @@ describe("runs route a11y", () => {
 
   test("no axe-core serious/critical violations on /runs", async () => {
     const { body } = render(Page, {
-      props: { data: { runs, filter: { agent: "", status: "", range: "all", project: "__any__" } } },
+      props: {
+        data: {
+          activeProjectId: null,
+          filter: { agent: "", status: "", range: "all", project: "__any__" },
+          streamed: { data: Promise.resolve({ runs }) },
+        },
+      },
     });
     const result = await auditRoute(body);
     const severe = result.violations.filter((v) => v.impact === "serious" || v.impact === "critical");

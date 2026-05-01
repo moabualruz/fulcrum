@@ -9,6 +9,25 @@ import { createDocumentAction } from "$lib/server/documents";
 
 let scratch: string;
 
+interface DocPayload {
+  doc: {
+    id: string;
+    org_id: string;
+    project_id: string | null;
+    kind: string;
+    title: string;
+    body: string;
+    frontmatter: Record<string, unknown>;
+    updated_at: string;
+  };
+}
+
+function streamedData<T>(result: unknown): Promise<T> {
+  const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
+  expect(stream).toBeInstanceOf(Promise);
+  return stream as Promise<T>;
+}
+
 beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-docs-detail-"));
   process.env["FULCRUM_HOME"] = scratch;
@@ -65,10 +84,12 @@ describe("/docs/[id] +page.server.ts", () => {
     const result = await mod.load({ params: { id } } as Parameters<
       typeof mod.load
     >[0]);
-    expect(result.doc.id).toBe(id);
-    expect(result.doc.title).toBe("Doc Title");
-    expect(result.doc.kind).toBe("spec");
-    expect(result.doc.body).toBe("body content\n");
+    expect(result.activeProjectId).toBeNull();
+    const payload = await streamedData<DocPayload>(result);
+    expect(payload.doc.id).toBe(id);
+    expect(payload.doc.title).toBe("Doc Title");
+    expect(payload.doc.kind).toBe("spec");
+    expect(payload.doc.body).toBe("body content\n");
   });
 
   test("load throws 404 when the doc id does not exist", async () => {
@@ -76,9 +97,10 @@ describe("/docs/[id] +page.server.ts", () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     let caught: unknown;
     try {
-      await mod.load({
+      const result = await mod.load({
         params: { id: "01JBOGUS000000000000000000" },
       } as Parameters<typeof mod.load>[0]);
+      await streamedData<DocPayload>(result);
     } catch (e) {
       caught = e;
     }

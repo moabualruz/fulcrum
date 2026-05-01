@@ -12,6 +12,22 @@ import { createLocalOrg, createProject } from "../../../../product-kernel/store/
 
 let scratch: string;
 
+interface ProjectPayload {
+  projects: Array<{
+    id: string;
+    slug: string;
+    name: string;
+    description: string | null;
+    updated_at: string;
+  }>;
+}
+
+function streamedData<T>(result: unknown): Promise<T> {
+  const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
+  expect(stream).toBeInstanceOf(Promise);
+  return stream as Promise<T>;
+}
+
 beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-projects-list-"));
   process.env["FULCRUM_HOME"] = scratch;
@@ -61,13 +77,17 @@ describe("/projects +page.server.ts load()", () => {
   test("returns seeded projects in deterministic created_at-ASC order", async () => {
     const { first, second } = await seedTwoProjects();
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.load({} as Parameters<typeof mod.load>[0]);
-    expect(Array.isArray(result.projects)).toBe(true);
-    expect(result.projects).toHaveLength(2);
-    expect(result.projects[0]?.id).toBe(first);
-    expect(result.projects[1]?.id).toBe(second);
-    expect(result.projects[0]?.slug).toBe("first");
-    expect(result.projects[1]?.slug).toBe("second");
+    const result = await mod.load({
+      locals: { activeProjectId: "first" },
+    } as Parameters<typeof mod.load>[0]);
+    expect(result.activeProjectId).toBe("first");
+    const payload = await streamedData<ProjectPayload>(result);
+    expect(Array.isArray(payload.projects)).toBe(true);
+    expect(payload.projects).toHaveLength(2);
+    expect(payload.projects[0]?.id).toBe(first);
+    expect(payload.projects[1]?.id).toBe(second);
+    expect(payload.projects[0]?.slug).toBe("first");
+    expect(payload.projects[1]?.slug).toBe("second");
   });
 
   test("returns empty array when the product DB has no projects", async () => {
@@ -78,7 +98,11 @@ describe("/projects +page.server.ts load()", () => {
     await runMigrations(db);
     await db.close();
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    const result = await mod.load({} as Parameters<typeof mod.load>[0]);
-    expect(result.projects).toEqual([]);
+    const result = await mod.load({
+      locals: { activeProjectId: null },
+    } as Parameters<typeof mod.load>[0]);
+    expect(result.activeProjectId).toBeNull();
+    const payload = await streamedData<ProjectPayload>(result);
+    expect(payload.projects).toEqual([]);
   });
 });

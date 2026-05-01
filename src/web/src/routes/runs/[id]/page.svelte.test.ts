@@ -43,9 +43,20 @@ interface RunDetail {
 
 type PageProps = {
   data: {
-    run: RunDetail;
-    transcript: string | null;
-    events: Array<{ id: string; verb: string; created_at: string; payload: unknown }>;
+    activeProjectId: string | null;
+    streamed: {
+      data:
+        | Promise<{
+            run: RunDetail;
+            transcript: string | null;
+            events: Array<{ id: string; verb: string; created_at: string; payload: unknown }>;
+          }>
+        | {
+            run: RunDetail;
+            transcript: string | null;
+            events: Array<{ id: string; verb: string; created_at: string; payload: unknown }>;
+          };
+    };
   };
 };
 
@@ -63,6 +74,17 @@ const RUN: RunDetail = {
   parent_run_id: null,
 };
 
+function pageData(input: {
+  run: RunDetail;
+  transcript: string | null;
+  events: Array<{ id: string; verb: string; created_at: string; payload: unknown }>;
+}): PageProps["data"] {
+  return {
+    activeProjectId: null,
+    streamed: { data: input },
+  };
+}
+
 describe("/runs/[id] +page.svelte (SSR)", () => {
   let render: typeof import("svelte/server").render;
   let Page: Component<PageProps>;
@@ -75,9 +97,22 @@ describe("/runs/[id] +page.svelte (SSR)", () => {
     Page = mod.default;
   });
 
+  test("renders detail RouteSkeleton while streamed data is pending", () => {
+    const pending = new Promise<{
+      run: RunDetail;
+      transcript: string | null;
+      events: Array<{ id: string; verb: string; created_at: string; payload: unknown }>;
+    }>(() => {});
+    const { body } = render(Page, {
+      props: { data: { activeProjectId: null, streamed: { data: pending } } },
+    });
+    expect(body).toContain("data-route-skeleton");
+    expect(body).toContain('data-kind="detail"');
+  });
+
   test("renders three tab buttons (transcript, payload, events)", () => {
     const { body } = render(Page, {
-      props: { data: { run: RUN, transcript: null, events: [] } },
+      props: { data: pageData({ run: RUN, transcript: null, events: [] }) },
     });
     expect(body).toContain('data-tab="transcript"');
     expect(body).toContain('data-tab="payload"');
@@ -87,7 +122,7 @@ describe("/runs/[id] +page.svelte (SSR)", () => {
 
   test("shows transcript empty state when transcript is null", () => {
     const { body } = render(Page, {
-      props: { data: { run: RUN, transcript: null, events: [] } },
+      props: { data: pageData({ run: RUN, transcript: null, events: [] }) },
     });
     expect(body).toContain("data-runs-transcript-empty");
     expect(body).toContain("No transcript recorded");
@@ -95,7 +130,7 @@ describe("/runs/[id] +page.svelte (SSR)", () => {
 
   test("shows transcript content when transcript provided", () => {
     const { body } = render(Page, {
-      props: { data: { run: RUN, transcript: "hello world", events: [] } },
+      props: { data: pageData({ run: RUN, transcript: "hello world", events: [] }) },
     });
     expect(body).toContain("data-runs-transcript");
     expect(body).toContain("hello world");
@@ -104,7 +139,7 @@ describe("/runs/[id] +page.svelte (SSR)", () => {
 
   test("renders cancel and retry triggers", () => {
     const { body } = render(Page, {
-      props: { data: { run: RUN, transcript: null, events: [] } },
+      props: { data: pageData({ run: RUN, transcript: null, events: [] }) },
     });
     expect(body).toContain("data-runs-cancel-trigger");
     expect(body).toContain("data-runs-retry-trigger");
@@ -112,7 +147,7 @@ describe("/runs/[id] +page.svelte (SSR)", () => {
 
   test("payload tab renders the run JSON", () => {
     const { body } = render(Page, {
-      props: { data: { run: RUN, transcript: null, events: [] } },
+      props: { data: pageData({ run: RUN, transcript: null, events: [] }) },
     });
     expect(body).toContain("data-runs-payload");
     expect(body).toContain(RUN.id);
@@ -125,7 +160,7 @@ describe("/runs/[id] +page.svelte (SSR)", () => {
       { id: "e2", verb: "started", created_at: "2026-04-30T10:00:01Z", payload: {} },
     ];
     const { body } = render(Page, {
-      props: { data: { run: RUN, transcript: null, events } },
+      props: { data: pageData({ run: RUN, transcript: null, events }) },
     });
     expect(body).toContain("data-runs-events");
   });

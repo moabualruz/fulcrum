@@ -14,7 +14,11 @@ interface BoardTask {
 }
 
 interface PageProps {
-  data: { tasks: BoardTask[]; project: string };
+  data: {
+    project: string;
+    activeProjectId: string | null;
+    streamed: { data: Promise<{ tasks: BoardTask[] }> | { tasks: BoardTask[] } };
+  };
 }
 
 const tasks: BoardTask[] = [
@@ -48,7 +52,13 @@ describe("boards route a11y", () => {
 
   test("no axe-core serious/critical violations on /boards", async () => {
     const { body } = render(Page, {
-      props: { data: { tasks, project: "" } },
+      props: {
+        data: {
+          project: "",
+          activeProjectId: null,
+          streamed: { data: { tasks } },
+        },
+      },
     });
     const result = await auditRoute(body);
     const severe = result.violations.filter((v) => v.impact === "serious" || v.impact === "critical");

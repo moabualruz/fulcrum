@@ -14,17 +14,27 @@ interface DocRow {
   updated_at: Date | string;
 }
 
-export const load: PageServerLoad = async ({ params }) => {
-  const db = await openProductDb();
-  try {
-    const rows = await db.query<DocRow>(
-      `SELECT id, org_id, project_id, kind, title, body, frontmatter, updated_at
-         FROM documents WHERE id = $1`,
-      [params.id],
-    );
-    if (rows.length === 0) throw error(404, "Document not found");
-    const row = rows[0]!;
-    const doc = {
+type ProductDb = Awaited<ReturnType<typeof openProductDb>>;
+
+async function loadDoc(db: ProductDb, id: string): Promise<{ doc: {
+  id: string;
+  org_id: string;
+  project_id: string | null;
+  kind: string;
+  title: string;
+  body: string;
+  frontmatter: Record<string, unknown>;
+  updated_at: string;
+} }> {
+  const rows = await db.query<DocRow>(
+    `SELECT id, org_id, project_id, kind, title, body, frontmatter, updated_at
+       FROM documents WHERE id = $1`,
+    [id],
+  );
+  if (rows.length === 0) throw error(404, "Document not found");
+  const row = rows[0]!;
+  return {
+    doc: {
       id: row.id,
       org_id: row.org_id,
       project_id: row.project_id,
@@ -36,21 +46,32 @@ export const load: PageServerLoad = async ({ params }) => {
         row.updated_at instanceof Date
           ? row.updated_at.toISOString()
           : row.updated_at,
-    };
-    return { doc };
-  } finally {
-    await db.close();
-  }
-};
+    },
+  };
+}
+
+export const load: PageServerLoad = ({ params, locals }) => ({
+  activeProjectId: locals?.activeProjectId ?? null,
+  streamed: {
+    data: (async () => {
+      const db = await openProductDb();
+      try {
+        return await loadDoc(db, params.id);
+      } finally {
+        await db.close();
+      }
+    })(),
+  },
+});
 
 export const actions: Actions = {
   delete: async ({ params }) => {
-    const db = await openProductDb();
-    try {
-      await deleteDocumentAction(db, params.id!);
-    } finally {
-      await db.close();
-    }
-    throw redirect(303, "/docs");
+  const db = await openProductDb();
+  try {
+    await deleteDocumentAction(db, params.id!);
+  } finally {
+    await db.close();
+  }
+  throw redirect(303, "/docs");
   },
 };

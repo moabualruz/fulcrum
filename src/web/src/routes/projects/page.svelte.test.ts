@@ -37,7 +37,14 @@ interface ProjectListing {
 }
 
 type PageProps = {
-  data: { projects: ProjectListing[]; activeProjectId: string | null };
+  data: {
+    activeProjectId: string | null;
+    streamed: {
+      data:
+        | Promise<{ projects: ProjectListing[] }>
+        | { projects: ProjectListing[] };
+    };
+  };
 };
 
 const SAMPLE: ProjectListing[] = [
@@ -64,6 +71,16 @@ const SAMPLE: ProjectListing[] = [
   },
 ];
 
+function pageData(
+  projects: ProjectListing[],
+  activeProjectId: string | null = null,
+): PageProps["data"] {
+  return {
+    activeProjectId,
+    streamed: { data: { projects } },
+  };
+}
+
 describe("/projects +page.svelte", () => {
   let render: typeof import("svelte/server").render;
   let Page: Component<PageProps>;
@@ -76,15 +93,24 @@ describe("/projects +page.svelte", () => {
     Page = mod.default;
   });
 
+  test("renders list RouteSkeleton while streamed data is pending", () => {
+    const pending = new Promise<{ projects: ProjectListing[] }>(() => {});
+    const { body } = render(Page, {
+      props: { data: { activeProjectId: null, streamed: { data: pending } } },
+    });
+    expect(body).toContain("data-route-skeleton");
+    expect(body).toContain('data-kind="list"');
+  });
+
   test("renders the empty-state marker and zero table-row bodies when no projects", () => {
-    const { body } = render(Page, { props: { data: { projects: [], activeProjectId: null } } });
+    const { body } = render(Page, { props: { data: pageData([]) } });
     expect(body).toContain('data-empty-projects');
     const rows = body.match(/data-slot="table-row"[^>]*data-project-row/g) ?? [];
     expect(rows).toHaveLength(0);
   });
 
   test("renders three body rows for three seeded projects, each with name + slug", () => {
-    const { body } = render(Page, { props: { data: { projects: SAMPLE, activeProjectId: null } } });
+    const { body } = render(Page, { props: { data: pageData(SAMPLE) } });
     const rows = body.match(/data-slot="table-row"[^>]*data-project-row/g) ?? [];
     expect(rows).toHaveLength(3);
     for (const project of SAMPLE) {
@@ -94,7 +120,7 @@ describe("/projects +page.svelte", () => {
   });
 
   test("filter input is present (data-projects-filter, type=search)", () => {
-    const { body } = render(Page, { props: { data: { projects: SAMPLE, activeProjectId: null } } });
+    const { body } = render(Page, { props: { data: pageData(SAMPLE) } });
     const inputMatch = body.match(/<input\b[^>]*>/g) ?? [];
     const filterInput = inputMatch.find((m) => m.includes("data-projects-filter"));
     expect(filterInput).toBeDefined();
@@ -102,7 +128,7 @@ describe("/projects +page.svelte", () => {
   });
 
   test("new-project CTA points to /projects/new", () => {
-    const { body } = render(Page, { props: { data: { projects: SAMPLE, activeProjectId: null } } });
+    const { body } = render(Page, { props: { data: pageData(SAMPLE) } });
     const anchorMatch = body.match(/<a\b[^>]*>/g) ?? [];
     const cta = anchorMatch.find((a) => a.includes("data-new-project"));
     expect(cta).toBeDefined();
@@ -110,7 +136,7 @@ describe("/projects +page.svelte", () => {
   });
 
   test("each row links to /projects/<id>", () => {
-    const { body } = render(Page, { props: { data: { projects: SAMPLE, activeProjectId: null } } });
+    const { body } = render(Page, { props: { data: pageData(SAMPLE) } });
     for (const project of SAMPLE) {
       const re = new RegExp(`href="/projects/${project.id}"`);
       expect(body).toMatch(re);
@@ -119,7 +145,7 @@ describe("/projects +page.svelte", () => {
 
   test("each row renders a SetActiveButton with data-set-active-project + slug", () => {
     const { body } = render(Page, {
-      props: { data: { projects: SAMPLE, activeProjectId: "alpha" } },
+      props: { data: pageData(SAMPLE, "alpha") },
     });
     for (const project of SAMPLE) {
       expect(body).toContain(`data-slug="${project.slug}"`);
@@ -145,7 +171,7 @@ describe("/projects +page.svelte", () => {
   });
 
   test("header h1 reads 'Projects'", () => {
-    const { body } = render(Page, { props: { data: { projects: [], activeProjectId: null } } });
+    const { body } = render(Page, { props: { data: pageData([]) } });
     expect(body).toMatch(/<h1\b[^>]*>\s*Projects\s*<\/h1>/);
   });
 });

@@ -37,50 +37,57 @@ function isoStamp(value: string | Date | null): string | null {
   return value instanceof Date ? value.toISOString() : value;
 }
 
-export const load: PageServerLoad = async ({ params }) => {
-  const db = await openProductDb();
-  try {
-    const rows = await db.query<AgentRunDetail>(
-      `SELECT id, org_id, project_id, agent, model, prompt, status,
-              parent_run_id, started_at, ended_at, transcript_path
-         FROM agent_runs WHERE id = $1`,
-      [params.id],
-    );
-    if (rows.length === 0) throw error(404, "Run not found");
-    const raw = rows[0]!;
-    const run = {
-      ...raw,
-      started_at: isoStamp(raw.started_at),
-      ended_at: isoStamp(raw.ended_at),
-    };
+export const load: PageServerLoad = ({ params, locals }) => {
+  return {
+    activeProjectId: locals?.activeProjectId ?? null,
+    streamed: {
+      data: (async () => {
+        const db = await openProductDb();
+        try {
+          const rows = await db.query<AgentRunDetail>(
+            `SELECT id, org_id, project_id, agent, model, prompt, status,
+                    parent_run_id, started_at, ended_at, transcript_path
+               FROM agent_runs WHERE id = $1`,
+            [params.id],
+          );
+          if (rows.length === 0) throw error(404, "Run not found");
+          const raw = rows[0]!;
+          const run = {
+            ...raw,
+            started_at: isoStamp(raw.started_at),
+            ended_at: isoStamp(raw.ended_at),
+          };
 
-    let transcript: string | null = null;
-    if (run.transcript_path) {
-      const fs = await import("node:fs/promises");
-      try {
-        transcript = await fs.readFile(run.transcript_path, "utf8");
-      } catch (err) {
-        const code = (err as NodeJS.ErrnoException).code;
-        if (code !== "ENOENT" && code !== "ENOTDIR") throw err;
-        transcript = null;
-      }
-    }
+          let transcript: string | null = null;
+          if (run.transcript_path) {
+            const fs = await import("node:fs/promises");
+            try {
+              transcript = await fs.readFile(run.transcript_path, "utf8");
+            } catch (err) {
+              const code = (err as NodeJS.ErrnoException).code;
+              if (code !== "ENOENT" && code !== "ENOTDIR") throw err;
+              transcript = null;
+            }
+          }
 
-    const eventRows = await db.query<EventRow>(
-      `SELECT * FROM events
-        WHERE subject_kind = 'agent_run' AND subject_id = $1
-        ORDER BY created_at DESC, id DESC`,
-      [run.id],
-    );
-    const events = eventRows.map((e) => ({
-      ...e,
-      created_at: isoStamp(e.created_at),
-    }));
+          const eventRows = await db.query<EventRow>(
+            `SELECT * FROM events
+              WHERE subject_kind = 'agent_run' AND subject_id = $1
+              ORDER BY created_at DESC, id DESC`,
+            [run.id],
+          );
+          const events = eventRows.map((e) => ({
+            ...e,
+            created_at: isoStamp(e.created_at),
+          }));
 
-    return { run, transcript, events };
-  } finally {
-    await db.close();
-  }
+          return { run, transcript, events };
+        } finally {
+          await db.close();
+        }
+      })(),
+    },
+  };
 };
 
 export const actions: Actions = {

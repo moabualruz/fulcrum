@@ -14,7 +14,7 @@ async function getDefaultOrgId(db: ProductDb): Promise<string> {
 }
 
 export const load: PageServerLoad = ({ locals }) => {
-  const projectId = locals.activeProjectId ?? null;
+  const projectId = locals?.activeProjectId ?? null;
   return {
     activeProjectId: projectId,
     streamed: {

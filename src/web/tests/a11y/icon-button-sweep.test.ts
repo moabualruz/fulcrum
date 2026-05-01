@@ -80,8 +80,20 @@ describe("icon-button aria-label sweep", () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let render: typeof import("svelte/server").render;
   let DashPage: Component<{ data: { activeProjectId: string | null; streamed: { dashboard: Promise<typeof dashboard> } } }>;
-  let RunsPage: Component<{ data: { runs: typeof runs; filter: { agent: string; status: string; range: string; project: string } } }>;
-  let BoardsPage: Component<{ data: { tasks: typeof tasks; project: string } }>;
+  let RunsPage: Component<{
+    data: {
+      activeProjectId: string | null;
+      filter: { agent: string; status: string; range: string; project: string };
+      streamed: { data: Promise<{ runs: typeof runs }> };
+    };
+  }>;
+  let BoardsPage: Component<{
+    data: {
+      project: string;
+      activeProjectId: string | null;
+      streamed: { data: Promise<{ tasks: typeof tasks }> | { tasks: typeof tasks } };
+    };
+  }>;
 
   beforeAll(async () => {
     ({ render } = await import("svelte/server"));
@@ -99,13 +111,27 @@ describe("icon-button aria-label sweep", () => {
 
   test("runs list — no unlabelled icon-only buttons", () => {
     const { body } = render(RunsPage, {
-      props: { data: { runs, filter: { agent: "", status: "", range: "all", project: "__any__" } } },
+      props: {
+        data: {
+          activeProjectId: null,
+          filter: { agent: "", status: "", range: "all", project: "__any__" },
+          streamed: { data: Promise.resolve({ runs }) },
+        },
+      },
     });
     expect(sweep("/runs", body)).toEqual([]);
   });
 
   test("boards — no unlabelled icon-only buttons", () => {
-    const { body } = render(BoardsPage, { props: { data: { tasks, project: "" } } });
+    const { body } = render(BoardsPage, {
+      props: {
+        data: {
+          project: "",
+          activeProjectId: null,
+          streamed: { data: { tasks } },
+        },
+      },
+    });
     expect(sweep("/boards", body)).toEqual([]);
   });
 });

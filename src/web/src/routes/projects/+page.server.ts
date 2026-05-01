@@ -1,16 +1,31 @@
 import type { PageServerLoad } from "./$types";
-import { listProjects } from "$lib/product-queries";
+import { openProductDb } from "$lib/server/db";
 
-export const load: PageServerLoad = async ({ parent }) => {
-  // Inherit `activeProjectId` from the root layout-data (`+layout.server.ts`
-  // returns `{ activeProjectId }` from `locals.activeProjectId`). This lets
-  // each row's `<SetActiveButton />` toggle its `active` state without an
-  // extra round-trip. Tests for the route load do not always supply
-  // `parent`; guard so legacy callers keep working.
-  const parentData =
-    typeof parent === "function"
-      ? await parent()
-      : ({ activeProjectId: null } as { activeProjectId: string | null });
-  const projects = await listProjects();
-  return { projects, activeProjectId: parentData.activeProjectId };
+interface ProjectRow {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  updated_at: string;
+}
+
+export const load: PageServerLoad = ({ locals }) => {
+  const activeProjectId = locals?.activeProjectId ?? null;
+  return {
+    activeProjectId,
+    streamed: {
+      data: (async () => {
+        const db = await openProductDb();
+        try {
+          const projects = await db.query<ProjectRow>(
+            `SELECT id, slug, name, description, updated_at
+               FROM projects ORDER BY created_at ASC, id ASC`,
+          );
+          return { projects };
+        } finally {
+          await db.close();
+        }
+      })(),
+    },
+  };
 };

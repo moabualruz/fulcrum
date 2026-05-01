@@ -13,6 +13,23 @@ import { createDocumentAction } from "$lib/server/documents";
 
 let scratch: string;
 
+interface DocsPayload {
+  documents: Array<{
+    id: string;
+    title: string;
+    kind: string;
+    project_id: string | null;
+    updated_at: string;
+    body_excerpt: string;
+  }>;
+}
+
+function streamedData<T>(result: unknown): Promise<T> {
+  const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
+  expect(stream).toBeInstanceOf(Promise);
+  return stream as Promise<T>;
+}
+
 beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-docs-list-"));
   process.env["FULCRUM_HOME"] = scratch;
@@ -94,7 +111,7 @@ function fakeEvent(searchParams: Record<string, string>): Parameters<
   }
   return {
     url,
-    parent: async () => ({ activeProjectId: null }),
+    locals: { activeProjectId: null },
   } as unknown as Parameters<typeof import("./+page.server.ts").load>[0];
 }
 
@@ -105,11 +122,13 @@ describe("/docs +page.server.ts load()", () => {
     const result = await mod.load(fakeEvent({}));
     expect(result.kind).toBe("");
     expect(result.q).toBe("");
-    expect(result.documents).toHaveLength(3);
-    expect(result.documents[0]?.id).toBe(decisionId);
-    expect(result.documents[1]?.id).toBe(specId);
-    expect(result.documents[2]?.id).toBe(noteId);
-    expect(result.documents[0]?.kind).toBe("decision");
+    expect(result.activeProjectId).toBeNull();
+    const payload = await streamedData<DocsPayload>(result);
+    expect(payload.documents).toHaveLength(3);
+    expect(payload.documents[0]?.id).toBe(decisionId);
+    expect(payload.documents[1]?.id).toBe(specId);
+    expect(payload.documents[2]?.id).toBe(noteId);
+    expect(payload.documents[0]?.kind).toBe("decision");
   });
 
   test("kind filter narrows the rows to matching kinds", async () => {
@@ -117,9 +136,10 @@ describe("/docs +page.server.ts load()", () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const result = await mod.load(fakeEvent({ kind: "spec" }));
     expect(result.kind).toBe("spec");
-    expect(result.documents).toHaveLength(1);
-    expect(result.documents[0]?.id).toBe(specId);
-    expect(result.documents[0]?.kind).toBe("spec");
+    const payload = await streamedData<DocsPayload>(result);
+    expect(payload.documents).toHaveLength(1);
+    expect(payload.documents[0]?.id).toBe(specId);
+    expect(payload.documents[0]?.kind).toBe("spec");
   });
 
   test("free-text q hits searchProductDocuments scoped to sourceKinds=['document']", async () => {
@@ -129,7 +149,8 @@ describe("/docs +page.server.ts load()", () => {
     expect(result.q).toBe("kernel");
     // Both seeded docs whose body/title hit "kernel" come back; the unrelated
     // note is filtered out via FTS.
-    const ids = result.documents.map((d: { id: string }) => d.id).sort();
+    const payload = await streamedData<DocsPayload>(result);
+    const ids = payload.documents.map((d) => d.id).sort();
     expect(ids).toEqual([decisionId, specId].sort());
   });
 
@@ -141,6 +162,7 @@ describe("/docs +page.server.ts load()", () => {
     await db.close();
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
     const result = await mod.load(fakeEvent({}));
-    expect(result.documents).toEqual([]);
+    const payload = await streamedData<DocsPayload>(result);
+    expect(payload.documents).toEqual([]);
   });
 });

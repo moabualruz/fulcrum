@@ -34,10 +34,14 @@ interface DocRow {
 
 type PageProps = {
   data: {
-    documents: DocRow[];
     kind: string;
     q: string;
     activeProjectId: string | null;
+    streamed: {
+      data:
+        | Promise<{ documents: DocRow[] }>
+        | { documents: DocRow[] };
+    };
   };
 };
 
@@ -68,6 +72,20 @@ const SAMPLE: DocRow[] = [
   },
 ];
 
+function pageData(input: {
+  documents: DocRow[];
+  kind?: string;
+  q?: string;
+  activeProjectId?: string | null;
+}): PageProps["data"] {
+  return {
+    kind: input.kind ?? "",
+    q: input.q ?? "",
+    activeProjectId: input.activeProjectId ?? null,
+    streamed: { data: { documents: input.documents } },
+  };
+}
+
 describe("/docs +page.svelte", () => {
   let render: typeof import("svelte/server").render;
   let Page: Component<PageProps>;
@@ -80,11 +98,25 @@ describe("/docs +page.svelte", () => {
     Page = mod.default;
   });
 
-  test("renders three rows + new-doc CTA + filter bar for three documents", () => {
+  test("renders list RouteSkeleton while streamed data is pending", () => {
+    const pending = new Promise<{ documents: DocRow[] }>(() => {});
     const { body } = render(Page, {
       props: {
-        data: { documents: SAMPLE, kind: "", q: "", activeProjectId: null },
+        data: {
+          kind: "",
+          q: "",
+          activeProjectId: null,
+          streamed: { data: pending },
+        },
       },
+    });
+    expect(body).toContain("data-route-skeleton");
+    expect(body).toContain('data-kind="list"');
+  });
+
+  test("renders three rows + new-doc CTA + filter bar for three documents", () => {
+    const { body } = render(Page, {
+      props: { data: pageData({ documents: SAMPLE }) },
     });
     const rows = body.match(/data-slot="table-row"[^>]*data-doc-row/g) ?? [];
     expect(rows).toHaveLength(3);
@@ -105,9 +137,7 @@ describe("/docs +page.svelte", () => {
 
   test("empty default state shows data-empty-docs marker", () => {
     const { body } = render(Page, {
-      props: {
-        data: { documents: [], kind: "", q: "", activeProjectId: null },
-      },
+      props: { data: pageData({ documents: [] }) },
     });
     expect(body).toContain("data-empty-docs");
     expect(body).not.toContain("data-empty-filter");
@@ -115,9 +145,7 @@ describe("/docs +page.svelte", () => {
 
   test("empty filtered state shows data-empty-filter marker", () => {
     const { body } = render(Page, {
-      props: {
-        data: { documents: [], kind: "spec", q: "", activeProjectId: null },
-      },
+      props: { data: pageData({ documents: [], kind: "spec" }) },
     });
     expect(body).toContain("data-empty-filter");
     expect(body).not.toContain("data-empty-docs");
@@ -125,9 +153,7 @@ describe("/docs +page.svelte", () => {
 
   test("kind select reflects the current kind filter as selected", () => {
     const { body } = render(Page, {
-      props: {
-        data: { documents: SAMPLE, kind: "spec", q: "", activeProjectId: null },
-      },
+      props: { data: pageData({ documents: SAMPLE, kind: "spec" }) },
     });
     // The selected option for `spec` should carry the `selected` attribute.
     const optionRe = /<option[^>]*value="spec"[^>]*selected[^>]*>|<option[^>]*selected[^>]*value="spec"/;
@@ -136,14 +162,7 @@ describe("/docs +page.svelte", () => {
 
   test("q input value reflects the current data.q", () => {
     const { body } = render(Page, {
-      props: {
-        data: {
-          documents: SAMPLE,
-          kind: "",
-          q: "kernel",
-          activeProjectId: null,
-        },
-      },
+      props: { data: pageData({ documents: SAMPLE, q: "kernel" }) },
     });
     const inputs = body.match(/<input\b[^>]*>/g) ?? [];
     const qInput = inputs.find((i) => i.includes("data-q-filter"));
@@ -153,9 +172,7 @@ describe("/docs +page.svelte", () => {
 
   test("header h1 reads 'Documents'", () => {
     const { body } = render(Page, {
-      props: {
-        data: { documents: [], kind: "", q: "", activeProjectId: null },
-      },
+      props: { data: pageData({ documents: [] }) },
     });
     expect(body).toMatch(/<h1\b[^>]*>\s*Documents\s*<\/h1>/);
   });

@@ -9,6 +9,24 @@ import { newUlid } from "../../../../product-kernel/ids.ts";
 
 let scratch: string;
 
+interface RunsPayload {
+  runs: Array<{
+    id: string;
+    agent: string;
+    model: string | null;
+    status: string;
+    project_id: string | null;
+    started_at: string;
+    ended_at: string | null;
+  }>;
+}
+
+function streamedData<T>(result: unknown): Promise<T> {
+  const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
+  expect(stream).toBeInstanceOf(Promise);
+  return stream as Promise<T>;
+}
+
 beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-runs-list-"));
   process.env["FULCRUM_HOME"] = scratch;
@@ -56,9 +74,14 @@ describe("/runs +page.server.ts load()", () => {
     const { ids } = await seedRuns();
     const url = new URL("http://localhost/runs");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.load({ url } as Parameters<typeof mod.load>[0]);
-    expect(result.runs).toHaveLength(2);
-    const returnedIds = result.runs.map((r: { id: string }) => r.id);
+    const result = await mod.load({
+      url,
+      locals: { activeProjectId: null },
+    } as Parameters<typeof mod.load>[0]);
+    expect(result.activeProjectId).toBeNull();
+    const payload = await streamedData<RunsPayload>(result);
+    expect(payload.runs).toHaveLength(2);
+    const returnedIds = payload.runs.map((r) => r.id);
     expect(returnedIds).toContain(ids[0]);
     expect(returnedIds).toContain(ids[1]);
     expect(result.filter).toEqual({
@@ -76,8 +99,12 @@ describe("/runs +page.server.ts load()", () => {
     // non-existent project yields zero rows so we know the column is wired.
     const url = new URL("http://localhost/runs?project=missing");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 9}`);
-    const result = await mod.load({ url } as Parameters<typeof mod.load>[0]);
-    expect(result.runs).toEqual([]);
+    const result = await mod.load({
+      url,
+      locals: { activeProjectId: null },
+    } as Parameters<typeof mod.load>[0]);
+    const payload = await streamedData<RunsPayload>(result);
+    expect(payload.runs).toEqual([]);
     expect(result.filter.project).toBe("missing");
   });
 
@@ -85,9 +112,13 @@ describe("/runs +page.server.ts load()", () => {
     await seedRuns();
     const url = new URL("http://localhost/runs?agent=claude");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    const result = await mod.load({ url } as Parameters<typeof mod.load>[0]);
-    expect(result.runs).toHaveLength(1);
-    expect(result.runs[0].agent).toBe("claude");
+    const result = await mod.load({
+      url,
+      locals: { activeProjectId: null },
+    } as Parameters<typeof mod.load>[0]);
+    const payload = await streamedData<RunsPayload>(result);
+    expect(payload.runs).toHaveLength(1);
+    expect(payload.runs[0]?.agent).toBe("claude");
     expect(result.filter.agent).toBe("claude");
   });
 
@@ -95,9 +126,13 @@ describe("/runs +page.server.ts load()", () => {
     await seedRuns();
     const url = new URL("http://localhost/runs?status=running");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
-    const result = await mod.load({ url } as Parameters<typeof mod.load>[0]);
-    expect(result.runs).toHaveLength(1);
-    expect(result.runs[0].status).toBe("running");
+    const result = await mod.load({
+      url,
+      locals: { activeProjectId: null },
+    } as Parameters<typeof mod.load>[0]);
+    const payload = await streamedData<RunsPayload>(result);
+    expect(payload.runs).toHaveLength(1);
+    expect(payload.runs[0]?.status).toBe("running");
   });
 
   test("returns empty array when DB has no runs", async () => {
@@ -108,7 +143,11 @@ describe("/runs +page.server.ts load()", () => {
     await db.close();
     const url = new URL("http://localhost/runs");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
-    const result = await mod.load({ url } as Parameters<typeof mod.load>[0]);
-    expect(result.runs).toEqual([]);
+    const result = await mod.load({
+      url,
+      locals: { activeProjectId: null },
+    } as Parameters<typeof mod.load>[0]);
+    const payload = await streamedData<RunsPayload>(result);
+    expect(payload.runs).toEqual([]);
   });
 });

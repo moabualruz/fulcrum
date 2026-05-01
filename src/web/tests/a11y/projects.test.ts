@@ -13,7 +13,10 @@ interface ProjectListing {
 }
 
 interface PageProps {
-  data: { projects: ProjectListing[]; activeProjectId: string | null };
+  data: {
+    activeProjectId: string | null;
+    streamed: { data: Promise<{ projects: ProjectListing[] }> | { projects: ProjectListing[] } };
+  };
 }
 
 const projects: ProjectListing[] = [
@@ -32,13 +35,18 @@ describe("projects route a11y", () => {
 
   beforeAll(async () => {
     ({ render } = await import("svelte/server"));
-    const mod = (await import("../../src/routes/projects/+page.svelte")) as { default: Component<PageProps> };
+    const mod = (await import("../../src/routes/projects/+page.svelte")) as unknown as { default: Component<PageProps> };
     Page = mod.default;
   });
 
   test("no axe-core serious/critical violations on /projects", async () => {
     const { body } = render(Page, {
-      props: { data: { projects, activeProjectId: "alpha" } },
+      props: {
+        data: {
+          activeProjectId: "alpha",
+          streamed: { data: { projects } },
+        },
+      },
     });
     const result = await auditRoute(body);
     const severe = result.violations.filter((v) => v.impact === "serious" || v.impact === "critical");

@@ -3,6 +3,7 @@
 
 	import { buttonVariants } from "$lib/components/ui/button";
 	import SetActiveButton from "$lib/components/projects/SetActiveButton.svelte";
+	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 	import { cn } from "$lib/utils.js";
 
 	interface Props {
@@ -10,6 +11,7 @@
 	}
 
 	let { data }: Props = $props();
+	type ProjectsPayload = Awaited<PageData["streamed"]["data"]>;
 
 	let filter = $state("");
 
@@ -28,85 +30,91 @@
 		return isoTime ? `${isoDate} ${isoTime}` : isoDate;
 	}
 
-	let visible = $derived.by(() => {
+	function filterProjects(projects: ProjectsPayload["projects"]): ProjectsPayload["projects"] {
 		const needle = filter.trim().toLowerCase();
-		if (needle === "") return data.projects;
-		return data.projects.filter(
+		if (needle === "") return projects;
+		return projects.filter(
 			(p) =>
 				p.name.toLowerCase().includes(needle) ||
 				p.slug.toLowerCase().includes(needle),
 		);
-	});
+	}
 </script>
 
-<header
-	data-projects-header
-	class={cn("flex items-center justify-between gap-4 border-b border-border pb-4 mb-4")}
->
-	<h1 class={cn("text-2xl font-semibold tracking-tight")}>Projects</h1>
-	<a
-		href="/projects/new"
-		data-new-project
-		data-slot="button"
-		class={cn(buttonVariants({ variant: "default" }), "gap-2")}
-	>New project</a>
-</header>
+{#await data.streamed.data}
+	<RouteSkeleton kind="list" />
+{:then payload}
+	{@const visible = filterProjects(payload.projects)}
 
-<div class={cn("mb-3")}>
-	<input
-		type="search"
-		data-projects-filter
-		aria-label="Filter projects"
-		placeholder="Filter projects"
-		bind:value={filter}
-		class={cn(
-			"border-input bg-background placeholder:text-muted-foreground flex h-9 w-full max-w-sm rounded-md border px-3 py-1 text-sm shadow-xs",
-		)}
-	/>
-</div>
+	<header
+		data-projects-header
+		class={cn("flex items-center justify-between gap-4 border-b border-border pb-4 mb-4")}
+	>
+		<h1 class={cn("text-2xl font-semibold tracking-tight")}>Projects</h1>
+		<a
+			href="/projects/new"
+			data-new-project
+			data-slot="button"
+			class={cn(buttonVariants({ variant: "default" }), "gap-2")}
+		>New project</a>
+	</header>
 
-{#if data.projects.length === 0}
-	<div
-		data-empty-projects
-		class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
-	>No projects yet — create one.</div>
-{:else if visible.length === 0}
-	<div
-		data-empty-filter
-		class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
-	>No projects match "{filter}".</div>
-{:else}
-	<div data-slot="table-container" class={cn("relative w-full overflow-x-auto")}>
-		<table data-slot="table" class={cn("w-full caption-bottom text-sm")}>
-			<thead data-slot="table-header" class={cn("[&_tr]:border-b")}>
-				<tr data-slot="table-row" class={cn("border-b transition-colors")}>
-					<th data-slot="table-head" class={cn("h-10 px-2 text-left align-middle font-medium")}>Name</th>
-					<th data-slot="table-head" class={cn("h-10 px-2 text-left align-middle font-medium")}>Slug</th>
-					<th data-slot="table-head" class={cn("h-10 px-2 text-left align-middle font-medium")}>Description</th>
-					<th data-slot="table-head" class={cn("h-10 px-2 text-left align-middle font-medium")}>Updated</th>
-					<th data-slot="table-head" class={cn("h-10 px-2 text-left align-middle font-medium")}>Actions</th>
-				</tr>
-			</thead>
-			<tbody data-slot="table-body" class={cn("[&_tr:last-child]:border-0")}>
-				{#each visible as project (project.id)}
-					<tr
-						data-slot="table-row"
-						data-project-row
-						data-project-id={project.id}
-						class={cn("hover:bg-muted/50 border-b transition-colors")}
-					>
-						<td data-slot="table-cell" class={cn("p-2 align-middle font-medium")}>
-							<a href="/projects/{project.id}" class={cn("hover:underline")}>{project.name}</a>
-						</td>
-						<td data-slot="table-cell" class={cn("p-2 align-middle text-muted-foreground")}>{project.slug}</td>
-						<td data-slot="table-cell" class={cn("p-2 align-middle text-muted-foreground")}>{truncate(project.description)}</td>
-						<td data-slot="table-cell" class={cn("p-2 align-middle font-mono text-xs text-muted-foreground")}>{formatUpdated(project.updated_at)}</td>
-						<td data-slot="table-cell" class={cn("p-2 align-middle")}>
-							<SetActiveButton slug={project.slug} active={data.activeProjectId === project.slug} />
-						</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
+	<div class={cn("mb-3")}>
+		<input
+			type="search"
+			data-projects-filter
+			aria-label="Filter projects"
+			placeholder="Filter projects"
+			bind:value={filter}
+			class={cn(
+				"border-input bg-background placeholder:text-muted-foreground flex h-9 w-full max-w-sm rounded-md border px-3 py-1 text-sm shadow-xs",
+			)}
+		/>
 	</div>
-{/if}
+
+	{#if payload.projects.length === 0}
+		<div
+			data-empty-projects
+			class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
+		>No projects yet — create one.</div>
+	{:else if visible.length === 0}
+		<div
+			data-empty-filter
+			class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
+		>No projects match "{filter}".</div>
+	{:else}
+		<div data-slot="table-container" class={cn("relative w-full overflow-x-auto")}>
+			<table data-slot="table" class={cn("w-full caption-bottom text-sm")}>
+				<thead data-slot="table-header" class={cn("[&_tr]:border-b")}>
+					<tr data-slot="table-row" class={cn("border-b transition-colors")}>
+						<th data-slot="table-head" class={cn("h-10 px-2 text-left align-middle font-medium")}>Name</th>
+						<th data-slot="table-head" class={cn("h-10 px-2 text-left align-middle font-medium")}>Slug</th>
+						<th data-slot="table-head" class={cn("h-10 px-2 text-left align-middle font-medium")}>Description</th>
+						<th data-slot="table-head" class={cn("h-10 px-2 text-left align-middle font-medium")}>Updated</th>
+						<th data-slot="table-head" class={cn("h-10 px-2 text-left align-middle font-medium")}>Actions</th>
+					</tr>
+				</thead>
+				<tbody data-slot="table-body" class={cn("[&_tr:last-child]:border-0")}>
+					{#each visible as project (project.id)}
+						<tr
+							data-slot="table-row"
+							data-project-row
+							data-project-id={project.id}
+							class={cn("hover:bg-muted/50 border-b transition-colors")}
+						>
+							<td data-slot="table-cell" class={cn("p-2 align-middle font-medium")}>
+								<a href="/projects/{project.id}" class={cn("hover:underline")}>{project.name}</a>
+							</td>
+							<td data-slot="table-cell" class={cn("p-2 align-middle text-muted-foreground")}>{project.slug}</td>
+							<td data-slot="table-cell" class={cn("p-2 align-middle text-muted-foreground")}>{truncate(project.description)}</td>
+							<td data-slot="table-cell" class={cn("p-2 align-middle font-mono text-xs text-muted-foreground")}>{formatUpdated(project.updated_at)}</td>
+							<td data-slot="table-cell" class={cn("p-2 align-middle")}>
+								<SetActiveButton slug={project.slug} active={data.activeProjectId === project.slug} />
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	{/if}
+{/await}

@@ -10,22 +10,50 @@
   import BoardColumn from "$lib/components/board/BoardColumn.svelte";
   import BoardSheet from "$lib/components/board/BoardSheet.svelte";
   import KeyboardMoveAnnouncer from "$lib/components/board/KeyboardMoveAnnouncer.svelte";
+  import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import type { DndMovePayload } from "$lib/components/board/board-column-handlers";
 
-  interface Props { data: { tasks: BoardTask[]; project: string } }
+  interface Props {
+    data: {
+      project: string;
+      activeProjectId: string | null;
+      streamed: { data: Promise<{ tasks: BoardTask[] }> | { tasks: BoardTask[] } };
+    };
+  }
   const { data }: Props = $props();
+
+  let resolvedTasks = $state<BoardTask[]>([]);
+
+  // SSR-friendly synchronous unwrap: when the loader passes a resolved
+  // object (test fixtures + SSR'd payload), populate immediately. When it
+  // passes a Promise (real navigation), wait for resolution.
+  {
+    const d = data.streamed.data;
+    if (!(d instanceof Promise)) resolvedTasks = d.tasks;
+  }
+
+  $effect(() => {
+    const d = data.streamed.data;
+    if (d instanceof Promise) {
+      let cancelled = false;
+      void d.then((p) => { if (!cancelled) resolvedTasks = p.tasks; });
+      return () => { cancelled = true; };
+    } else {
+      resolvedTasks = d.tasks;
+    }
+  });
 
   let sheetOpen = $state(false);
   let selectedTask = $state<BoardTask | null>(null);
   let announcement = $state<string | null>(null);
 
-  const snapshot = $derived(buildBoardSnapshot(data.tasks));
+  const snapshot = $derived(buildBoardSnapshot(resolvedTasks));
   const distinctProjects = $derived(
-    Array.from(new Set(data.tasks.map((t) => t.project_id).filter((p): p is string => !!p))).sort(),
+    Array.from(new Set(resolvedTasks.map((t) => t.project_id).filter((p): p is string => !!p))).sort(),
   );
 
   function openSheet(taskId: string): void {
-    const task = data.tasks.find((t) => t.id === taskId) ?? null;
+    const task = resolvedTasks.find((t) => t.id === taskId) ?? null;
     selectedTask = task;
     sheetOpen = task !== null;
   }
@@ -80,34 +108,42 @@
 
 <header data-board-header class="mb-3 flex items-center justify-between">
   <h1 class="text-2xl font-semibold tracking-tight">Board</h1>
-  <form method="GET" class="flex items-center gap-2">
-    <select
-      data-board-project-filter
-      name="project"
-      onchange={(e) => (e.currentTarget as HTMLSelectElement).form?.requestSubmit()}
-      class="border-input bg-background h-9 rounded-md border px-3 py-1 text-sm shadow-xs"
-    >
-      <option value="" selected={data.project === ""}>All</option>
-      {#each distinctProjects as projectId (projectId)}
-        <option value={projectId} selected={data.project === projectId}>{projectId}</option>
-      {/each}
-    </select>
-  </form>
 </header>
 
-<div data-board-grid class="flex gap-3 overflow-x-auto pb-2" onkeydown={onCardKeydown} role="presentation">
-  {#each TASK_STATUSES as status (status)}
-    <BoardColumn
-      {status}
-      label={describeStatus(status)}
-      tasks={snapshot.groups[status]}
-      allTasks={data.tasks}
-      onCardEdit={openSheet}
-      onMove={onMove}
-      onCreate={(title) => onCreate(status, title)}
-    />
-  {/each}
-</div>
+{#await data.streamed.data}
+  <RouteSkeleton kind="board" />
+{:then _payload}
+  <header class="mb-3 flex items-center justify-end">
+    <form method="GET" class="flex items-center gap-2">
+      <select
+        data-board-project-filter
+        name="project"
+        aria-label="Filter board by project"
+        onchange={(e) => (e.currentTarget as HTMLSelectElement).form?.requestSubmit()}
+        class="border-input bg-background h-9 rounded-md border px-3 py-1 text-sm shadow-xs"
+      >
+        <option value="" selected={data.project === ""}>All</option>
+        {#each distinctProjects as projectId (projectId)}
+          <option value={projectId} selected={data.project === projectId}>{projectId}</option>
+        {/each}
+      </select>
+    </form>
+  </header>
 
-<BoardSheet open={sheetOpen} task={selectedTask} {onSave} {onDelete} onClose={closeSheet} />
-<KeyboardMoveAnnouncer message={announcement} />
+  <div data-board-grid class="flex gap-3 overflow-x-auto pb-2" onkeydown={onCardKeydown} role="presentation">
+    {#each TASK_STATUSES as status (status)}
+      <BoardColumn
+        {status}
+        label={describeStatus(status)}
+        tasks={snapshot.groups[status]}
+        allTasks={resolvedTasks}
+        onCardEdit={openSheet}
+        onMove={onMove}
+        onCreate={(title) => onCreate(status, title)}
+      />
+    {/each}
+  </div>
+
+  <BoardSheet open={sheetOpen} task={selectedTask} {onSave} {onDelete} onClose={closeSheet} />
+  <KeyboardMoveAnnouncer message={announcement} />
+{/await}

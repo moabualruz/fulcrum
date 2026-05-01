@@ -10,6 +10,30 @@ import type { ProductDb } from "../../../../../product-kernel/db/types.ts";
 
 let scratch: string;
 
+interface RunDetailPayload {
+  run: {
+    id: string;
+    org_id: string;
+    project_id: string | null;
+    agent: string;
+    model: string | null;
+    prompt: string | null;
+    status: string;
+    parent_run_id: string | null;
+    started_at: string;
+    ended_at: string | null;
+    transcript_path: string | null;
+  };
+  transcript: string | null;
+  events: Array<{ id: string; created_at: string }>;
+}
+
+function streamedData<T>(result: unknown): Promise<T> {
+  const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
+  expect(stream).toBeInstanceOf(Promise);
+  return stream as Promise<T>;
+}
+
 beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-runs-detail-"));
   process.env["FULCRUM_HOME"] = scratch;
@@ -77,10 +101,12 @@ describe("/runs/[id] +page.server.ts", () => {
     }
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({ params: { id } } as Parameters<typeof mod.load>[0]);
-    expect(result.run.id).toBe(id);
-    expect(result.run.status).toBe("succeeded");
-    expect(result.transcript).toBeNull();
-    expect(Array.isArray(result.events)).toBe(true);
+    expect(result.activeProjectId).toBeNull();
+    const payload = await streamedData<RunDetailPayload>(result);
+    expect(payload.run.id).toBe(id);
+    expect(payload.run.status).toBe("succeeded");
+    expect(payload.transcript).toBeNull();
+    expect(Array.isArray(payload.events)).toBe(true);
   });
 
   test("load reads transcript file content when transcript_path is set", async () => {
@@ -95,7 +121,8 @@ describe("/runs/[id] +page.server.ts", () => {
     }
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const result = await mod.load({ params: { id } } as Parameters<typeof mod.load>[0]);
-    expect(result.transcript).toBe("hello transcript");
+    const payload = await streamedData<RunDetailPayload>(result);
+    expect(payload.transcript).toBe("hello transcript");
   });
 
   test("load throws 404 when run does not exist", async () => {
@@ -104,7 +131,8 @@ describe("/runs/[id] +page.server.ts", () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
     let caught: unknown;
     try {
-      await mod.load({ params: { id: "01JBOGUS000000000000000000" } } as Parameters<typeof mod.load>[0]);
+      const result = await mod.load({ params: { id: "01JBOGUS000000000000000000" } } as Parameters<typeof mod.load>[0]);
+      await streamedData<RunDetailPayload>(result);
     } catch (e) {
       caught = e;
     }

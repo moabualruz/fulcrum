@@ -33,12 +33,15 @@ interface RunRow {
 
 type PageProps = {
   data: {
-    runs: RunRow[];
+    activeProjectId: string | null;
     filter: {
       agent: string;
       status: string;
       range: string;
       project: string;
+    };
+    streamed: {
+      data: Promise<{ runs: RunRow[] }> | { runs: RunRow[] };
     };
   };
 };
@@ -73,6 +76,17 @@ const SAMPLE: RunRow[] = [
   },
 ];
 
+function pageData(
+  runs: RunRow[],
+  filter = { agent: "", status: "", range: "all", project: "__any__" },
+): PageProps["data"] {
+  return {
+    activeProjectId: null,
+    filter,
+    streamed: { data: { runs } },
+  };
+}
+
 describe("/runs +page.svelte", () => {
   let render: typeof import("svelte/server").render;
   let Page: Component<PageProps>;
@@ -85,9 +99,24 @@ describe("/runs +page.svelte", () => {
     Page = mod.default;
   });
 
+  test("renders list RouteSkeleton while streamed data is pending", () => {
+    const pending = new Promise<{ runs: RunRow[] }>(() => {});
+    const { body } = render(Page, {
+      props: {
+        data: {
+          activeProjectId: null,
+          filter: { agent: "", status: "", range: "all", project: "__any__" },
+          streamed: { data: pending },
+        },
+      },
+    });
+    expect(body).toContain("data-route-skeleton");
+    expect(body).toContain('data-kind="list"');
+  });
+
   test("renders three run rows via RunsTable", () => {
     const { body } = render(Page, {
-      props: { data: { runs: SAMPLE, filter: { agent: "", status: "", range: "all", project: "__any__" } } },
+      props: { data: pageData(SAMPLE) },
     });
     const rowMatches = body.match(/data-runs-row[^>]*data-run-id="([^"]+)"/g) ?? [];
     expect(rowMatches).toHaveLength(3);
@@ -95,7 +124,7 @@ describe("/runs +page.svelte", () => {
 
   test("filter form has agent, status, and range selects", () => {
     const { body } = render(Page, {
-      props: { data: { runs: SAMPLE, filter: { agent: "", status: "", range: "all", project: "__any__" } } },
+      props: { data: pageData(SAMPLE) },
     });
     expect(body).toContain("data-runs-agent-filter");
     expect(body).toContain("data-runs-status-filter");
@@ -105,14 +134,14 @@ describe("/runs +page.svelte", () => {
 
   test("renders empty state when there are zero runs", () => {
     const { body } = render(Page, {
-      props: { data: { runs: [], filter: { agent: "", status: "", range: "all", project: "__any__" } } },
+      props: { data: pageData([]) },
     });
     expect(body).toContain("data-empty-runs");
   });
 
   test("header h1 reads 'Agent runs'", () => {
     const { body } = render(Page, {
-      props: { data: { runs: [], filter: { agent: "", status: "", range: "all", project: "__any__" } } },
+      props: { data: pageData([]) },
     });
     expect(body).toMatch(/<h1\b[^>]*>\s*Agent runs\s*<\/h1>/);
   });

@@ -26,8 +26,13 @@ export const load: PageServerLoad = async ({ url, parent }) => {
       ? await parent()
       : ({ activeProjectId: null } as { activeProjectId: string | null });
   const project = url.searchParams.get("project") ?? parentData.activeProjectId ?? "";
-  const tasks = await listBoardTasks(project || null);
-  return { tasks, project };
+  return {
+    project,
+    activeProjectId: parentData.activeProjectId ?? null,
+    streamed: {
+      data: (async () => ({ tasks: await listBoardTasks(project || null) }))(),
+    },
+  };
 };
 
 function fdToRecord(fd: FormData): Record<string, string | null> {

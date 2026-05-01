@@ -32,7 +32,13 @@ interface BoardTask {
 }
 
 type PageProps = {
-  data: { tasks: BoardTask[]; project: string };
+  data: {
+    activeProjectId: string | null;
+    project: string;
+    streamed: {
+      data: Promise<{ tasks: BoardTask[] }> | { tasks: BoardTask[] };
+    };
+  };
 };
 
 const SAMPLE: BoardTask[] = [
@@ -78,6 +84,14 @@ const SAMPLE: BoardTask[] = [
   },
 ];
 
+function pageData(tasks: BoardTask[], project = ""): PageProps["data"] {
+  return {
+    activeProjectId: null,
+    project,
+    streamed: { data: { tasks } },
+  };
+}
+
 describe("/boards +page.svelte", () => {
   let render: typeof import("svelte/server").render;
   let Page: Component<PageProps>;
@@ -90,9 +104,20 @@ describe("/boards +page.svelte", () => {
     Page = mod.default;
   });
 
+  test("renders board RouteSkeleton while streamed data is pending", () => {
+    const pending = new Promise<{ tasks: BoardTask[] }>(() => {});
+    const { body } = render(Page, {
+      props: {
+        data: { activeProjectId: null, project: "", streamed: { data: pending } },
+      },
+    });
+    expect(body).toContain("data-route-skeleton");
+    expect(body).toContain('data-kind="board"');
+  });
+
   test("renders five board columns regardless of seeded task distribution", () => {
     const { body } = render(Page, {
-      props: { data: { tasks: SAMPLE, project: "" } },
+      props: { data: pageData(SAMPLE) },
     });
     const cols = body.match(/data-board-column[^-]/g) ?? [];
     expect(cols.length).toBeGreaterThanOrEqual(5);
@@ -104,7 +129,7 @@ describe("/boards +page.svelte", () => {
 
   test("each column count badge matches the seeded distribution", () => {
     const { body } = render(Page, {
-      props: { data: { tasks: SAMPLE, project: "" } },
+      props: { data: pageData(SAMPLE) },
     });
     function countFor(status: string): number {
       const colStart = body.indexOf(`data-status="${status}"`);
@@ -122,7 +147,7 @@ describe("/boards +page.svelte", () => {
 
   test("project filter select renders distinct project ids plus an All option", () => {
     const { body } = render(Page, {
-      props: { data: { tasks: SAMPLE, project: "" } },
+      props: { data: pageData(SAMPLE) },
     });
     expect(body).toContain("data-board-project-filter");
     // Distinct non-null projects in SAMPLE: alpha, beta.
@@ -135,7 +160,7 @@ describe("/boards +page.svelte", () => {
 
   test("page header h1 reads 'Board'", () => {
     const { body } = render(Page, {
-      props: { data: { tasks: [], project: "" } },
+      props: { data: pageData([]) },
     });
     expect(body).toMatch(/<h1\b[^>]*>\s*Board\s*<\/h1>/);
   });

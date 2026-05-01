@@ -15,10 +15,10 @@ interface DocRow {
 
 interface PageProps {
   data: {
-    documents: DocRow[];
+    activeProjectId: string | null;
     kind: string;
     q: string;
-    activeProjectId: string | null;
+    streamed: { data: Promise<{ documents: DocRow[] }> | { documents: DocRow[] } };
   };
 }
 
@@ -39,13 +39,20 @@ describe("docs route a11y", () => {
 
   beforeAll(async () => {
     ({ render } = await import("svelte/server"));
-    const mod = (await import("../../src/routes/docs/+page.svelte")) as { default: Component<PageProps> };
+    const mod = (await import("../../src/routes/docs/+page.svelte")) as unknown as { default: Component<PageProps> };
     Page = mod.default;
   });
 
   test("no axe-core serious/critical violations on /docs", async () => {
     const { body } = render(Page, {
-      props: { data: { documents, kind: "", q: "", activeProjectId: null } },
+      props: {
+        data: {
+          activeProjectId: null,
+          kind: "",
+          q: "",
+          streamed: { data: { documents } },
+        },
+      },
     });
     const result = await auditRoute(body);
     const severe = result.violations.filter((v) => v.impact === "serious" || v.impact === "critical");

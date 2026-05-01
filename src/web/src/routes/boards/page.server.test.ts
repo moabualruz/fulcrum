@@ -17,6 +17,23 @@ import {
 
 let scratch: string;
 
+interface BoardPayload {
+  tasks: Array<{
+    id: string;
+    title: string;
+    status: string;
+    priority: number;
+    project_id: string | null;
+    updated_at: string;
+  }>;
+}
+
+function streamedData<T>(result: unknown): Promise<T> {
+  const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
+  expect(stream).toBeInstanceOf(Promise);
+  return stream as Promise<T>;
+}
+
 beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-boards-"));
   process.env["FULCRUM_HOME"] = scratch;
@@ -78,7 +95,7 @@ function fakeLoadEvent(searchParams: Record<string, string>): Parameters<
   for (const [k, v] of Object.entries(searchParams)) url.searchParams.set(k, v);
   return {
     url,
-    parent: async () => ({ activeProjectId: null }),
+    locals: { activeProjectId: null },
   } as unknown as Parameters<typeof import("./+page.server.ts").load>[0];
 }
 
@@ -93,9 +110,11 @@ describe("/boards +page.server.ts load()", () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load(fakeLoadEvent({}));
     expect(result.project).toBe("");
-    expect(Array.isArray(result.tasks)).toBe(true);
-    expect(result.tasks).toHaveLength(3);
-    const seen = new Set(result.tasks.map((t: { id: string }) => t.id));
+    expect(result.activeProjectId).toBeNull();
+    const payload = await streamedData<BoardPayload>(result);
+    expect(Array.isArray(payload.tasks)).toBe(true);
+    expect(payload.tasks).toHaveLength(3);
+    const seen = new Set(payload.tasks.map((t) => t.id));
     expect(seen.has(ids.taskAlphaPendingId)).toBe(true);
     expect(seen.has(ids.taskAlphaInProgressId)).toBe(true);
     expect(seen.has(ids.taskBetaPendingId)).toBe(true);
@@ -108,8 +127,9 @@ describe("/boards +page.server.ts load()", () => {
       fakeLoadEvent({ project: ids.alphaProjectId }),
     );
     expect(result.project).toBe(ids.alphaProjectId);
-    expect(result.tasks).toHaveLength(2);
-    for (const t of result.tasks as { project_id: string | null }[]) {
+    const payload = await streamedData<BoardPayload>(result);
+    expect(payload.tasks).toHaveLength(2);
+    for (const t of payload.tasks) {
       expect(t.project_id).toBe(ids.alphaProjectId);
     }
   });

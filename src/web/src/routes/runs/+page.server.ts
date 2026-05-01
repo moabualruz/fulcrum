@@ -32,7 +32,7 @@ function isoStamp(value: string | Date): string {
   return value instanceof Date ? value.toISOString() : value;
 }
 
-export const load: PageServerLoad = async ({ url }) => {
+export const load: PageServerLoad = ({ url, locals }) => {
   const agent = (url.searchParams.get("agent") ?? "").trim();
   const statusRaw = (url.searchParams.get("status") ?? "").trim();
   const rangeRaw = (url.searchParams.get("range") ?? "all").trim();
@@ -47,43 +47,46 @@ export const load: PageServerLoad = async ({ url }) => {
       ? (statusRaw as RunStatus)
       : undefined;
 
-  const db = await openProductDb();
-  let rows: RawRow[];
-  try {
-    rows = await db.query<RawRow>(
-      `SELECT id, agent, model, status, project_id, started_at, ended_at
-         FROM agent_runs
-        ORDER BY started_at DESC, id ASC`,
-    );
-  } finally {
-    await db.close();
-  }
-
-  const normalised: RunRow[] = rows.map((r) => ({
-    id: r.id,
-    agent: r.agent,
-    model: r.model,
-    status: r.status as RunStatus,
-    project_id: r.project_id,
-    started_at: isoStamp(r.started_at),
-    ended_at: r.ended_at === null ? null : isoStamp(r.ended_at),
-  }));
-
-  const filterState: RunsFilterState = {
+  const filter = {
+    agent,
+    status: statusRaw,
     range,
-    ...(agent ? { agent } : {}),
-    ...(status ? { status } : {}),
-    ...(projectRaw !== undefined ? { project: projectRaw } : {}),
+    project: projectRaw ?? "__any__",
   };
-  const runs = applyRunsFilters(normalised, filterState);
 
   return {
-    runs,
-    filter: {
-      agent,
-      status: statusRaw,
-      range,
-      project: projectRaw ?? "__any__",
+    activeProjectId: locals?.activeProjectId ?? null,
+    filter,
+    streamed: {
+      data: (async () => {
+        const db = await openProductDb();
+        let rows: RawRow[];
+        try {
+          rows = await db.query<RawRow>(
+            `SELECT id, agent, model, status, project_id, started_at, ended_at
+               FROM agent_runs
+              ORDER BY started_at DESC, id ASC`,
+          );
+        } finally {
+          await db.close();
+        }
+        const normalised: RunRow[] = rows.map((r) => ({
+          id: r.id,
+          agent: r.agent,
+          model: r.model,
+          status: r.status as RunStatus,
+          project_id: r.project_id,
+          started_at: isoStamp(r.started_at),
+          ended_at: r.ended_at === null ? null : isoStamp(r.ended_at),
+        }));
+        const filterState: RunsFilterState = {
+          range,
+          ...(agent ? { agent } : {}),
+          ...(status ? { status } : {}),
+          ...(projectRaw !== undefined ? { project: projectRaw } : {}),
+        };
+        return { runs: applyRunsFilters(normalised, filterState) };
+      })(),
     },
   };
 };
