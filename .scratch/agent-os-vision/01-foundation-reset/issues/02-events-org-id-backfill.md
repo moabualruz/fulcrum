@@ -1,12 +1,13 @@
 ---
-Status: needs-review
+Status: completed
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 01-schema-auth-migration
 Owner: claude-orchestrator
 ClaimedAt: 2026-05-01T08:00:00Z
-CompletedAt: 2026-05-01T15:00:00Z
-ReviewVerdict: ROUND-4 FIX APPLIED — IF NOT EXISTS reverted (strict CREATE TABLE in both 20537 + 20538); single-migration split into two production classes (20537: CREATE TABLE orgs+events nullable; 20538: backfill+NOT NULL+FK+indexes); test redesigned as option (d): Phase 1 runs auth+20537, Phase 2 raw INSERTs only (no DDL), Phase 3 runs 20538 for live backfill; per-call C6 citations on all 2 raw INSERTs + EXPLAIN; 6 C6 citations total; CI 116/116 migration tests pass (1 pre-existing flaky failure in uninstall.test.ts under full-suite concurrency, unrelated to this change); per .scratch/agent-os-vision/research/p1-02-round3-review.md
+CompletedAt: 2026-05-01T16:00:00Z
+Status_TRANSITION: needs-review → completed (2026-05-01T16:00:00Z)
+ReviewVerdict: APPROVED — round-4 fix (commit fb2ed83) meets real spec: production DDL strict, single-ORM Phase 1-4 round-trip exercises live backfill on a live null-org row, per-call C6 citations on raw INSERTs + EXPLAIN, two-migration split (20537 DDL nullable + 20538 backfill+NOT NULL+FK+indexes) is the correct architecture. Deferred nits to hygiene PR: (a) 2 comment-line "IF NOT EXISTS" hits in migration prose (not in DDL strings) — cosmetic; (b) pre-existing raw SQL in tests/db/PGliteKyselyDriver.test.ts + tests/db/auth/auth-entities.test.ts — pre-dates this issue, scope-deferred. Per .scratch/agent-os-vision/research/p1-02-round4-review.md.
 ---
 
 # Events org_id backfill migration class — NOT NULL + default-org backfill
