@@ -1,8 +1,11 @@
 ---
-Status: ready-for-agent
+Status: needs-review
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 04-local-org-seed-and-init
+Owner: claude-orchestrator
+ClaimedAt: 2026-05-01T19:30:00Z
+CompletedAt: 2026-05-01T20:30:00Z
 ---
 
 # Better-Auth v1 integration — MikroORM-backed adapter, org plugin, passkey plugin, SvelteKit handler
