@@ -30,9 +30,22 @@ Acceptance criteria:
 
 ## Sub-tasks
 
-- [ ] **05.1 — Server actions for tasks.** Owns: `src/web/src/lib/server/tasks.ts`, `.test.ts`. RED: PGlite tests for create/update/delete/moveStatus + matching `task.<verb>` event rows.
+- [x] **05.1 — Server actions for tasks.** Owns: `src/web/src/lib/server/tasks.ts`, `.test.ts`. RED: PGlite tests for create/update/delete/moveStatus + matching `task.<verb>` event rows.
 - [ ] **05.2 — Board helpers (`optimisticMove`, `keyboardMove`).** Owns: `src/web/src/lib/components/board/board-helpers.ts`, `.test.ts`. RED: optimistic move keeps order stable in same column; cross-column move appends to end of target.
 - [ ] **05.3 — `BoardCard` component.** Owns: `src/web/src/lib/components/board/BoardCard.svelte`, `.svelte.test.ts`. RED: click fires `onEdit` callback with task id.
 - [ ] **05.4 — `BoardColumn` with `svelte-dnd-action`.** Owns: `src/web/src/lib/components/board/BoardColumn.svelte`, `.svelte.test.ts`. RED: `finalize` handler emits server-action call with `{ taskId, fromStatus, toStatus }`.
 - [ ] **05.5 — `BoardSheet` editor + keyboard accessibility.** Owns: `src/web/src/lib/components/board/BoardSheet.svelte`, `KeyboardMoveAnnouncer.svelte`. RED: keyboard helper triggers `optimisticMove`; `aria-live` region updated with move description.
 - [ ] **05.6 — `/boards/+page` wiring + project filter.** Owns: `src/web/src/routes/boards/+page.server.ts`, `+page.svelte`. RED: page renders five columns with seeded counts; project filter narrows results.
+
+## Comments
+
+### 05.1 — landed
+
+Server actions module `src/web/src/lib/server/tasks.ts` (139 LOC) with 12 PGlite tests covering create/update/delete/moveStatus and matching `task.<verb>` event rows.
+
+- `createTaskAction` reuses `kernel.createTask`; `task.created` emitted by the kernel with `{title,status}`.
+- `updateTaskAction` builds a dynamic `UPDATE`, validates `status` against `TASK_STATUSES`, and emits `task.updated` with `payload.changed`.
+- `deleteTaskAction` uses `DELETE ... RETURNING org_id, project_id`; emits `task.deleted` only when a row is actually removed. No `events` strip required (events.subject_id has no FK to tasks).
+- `moveTaskStatusAction` guards the transition with `WHERE id=$2 AND status=$3` so a stale optimistic UI throws `status conflict: task <id> not in <from>` and the caller can revert. Emits `task.status_changed` with `{from,to,task}`.
+
+Gates: `bun run check` 0/0/0; `bun run build` ok; repo `bun run ci` 9/9.
