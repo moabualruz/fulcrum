@@ -208,9 +208,11 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "web":
       await runWeb(rest);
       return;
-    case "tui":
-      console.log("TUI not yet implemented");
+    case "tui": {
+      const { run: runTui } = await import("./commands/tui.ts");
+      await runTui(rest);
       return;
+    }
     case "inference":
       console.log("Inference sidecar not yet implemented");
       return;

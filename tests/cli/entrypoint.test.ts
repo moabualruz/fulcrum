@@ -62,12 +62,15 @@ describe("fulcrum binary entrypoint", () => {
     expect(result.stdout).toContain("Usage:");
   });
 
-  test("tui stub exits 0", async () => {
+  test("tui exits 0 (non-interactive mode graceful)", async () => {
+    // When run outside a TTY (e.g. in CI / subprocess), the TUI detects the
+    // missing terminal and exits cleanly with an informational message.
     const result = await runFulcrum(["tui"]);
 
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toBe("");
-    expect(result.stdout.trim()).toBe("TUI not yet implemented");
+    // Non-TTY environment: TUI prints a graceful no-TTY message and exits.
+    expect(result.stdout).toContain("no interactive terminal detected");
   });
 
   test("inference stub exits 0", async () => {
