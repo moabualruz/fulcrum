@@ -56,6 +56,7 @@
 	<input
 		type="search"
 		data-projects-filter
+		aria-label="Filter projects"
 		placeholder="Filter projects"
 		bind:value={filter}
 		class={cn(

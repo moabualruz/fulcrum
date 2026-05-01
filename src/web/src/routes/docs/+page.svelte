@@ -63,6 +63,7 @@
 		data-q-filter
 		type="search"
 		name="q"
+		aria-label="Filter documents by text"
 		placeholder="Filter by text"
 		value={data.q}
 		class={cn(
