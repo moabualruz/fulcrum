@@ -127,6 +127,21 @@ describe("/projects +page.svelte", () => {
     // The active-row's button reports aria-pressed="true" exactly once.
     const ariaTrue = body.match(/data-set-active-project[^>]*aria-pressed="true"/g) ?? [];
     expect(ariaTrue).toHaveLength(1);
+
+    // Bind pressed-state to the alpha row specifically; beta row should
+    // own an aria-pressed="false" button so the active marker is not
+    // accidentally shared across rows.
+    function rowSlice(haystack: string, slug: string): string {
+      const start = haystack.indexOf(`data-slug="${slug}"`);
+      if (start === -1) return "";
+      const end = haystack.indexOf(`data-slot="table-row"`, start + 1);
+      return end === -1 ? haystack.slice(start) : haystack.slice(start, end);
+    }
+
+    const alpha = rowSlice(body, "alpha");
+    expect(alpha.match(/aria-pressed="true"/g)?.length ?? 0).toBe(1);
+    const beta = rowSlice(body, "beta");
+    expect(beta.match(/aria-pressed="false"/g)?.length ?? 0).toBe(1);
   });
 
   test("header h1 reads 'Projects'", () => {
