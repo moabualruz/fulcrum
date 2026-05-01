@@ -6,7 +6,7 @@ Blocked-by: 01-schema-auth-migration
 Owner: claude-orchestrator
 ClaimedAt: 2026-05-01T05:00:00Z
 CompletedAt: 2026-05-01T13:00:00Z
-ReviewVerdict: CHANGES_REQUIRED resolved — 3 blockers fixed per follow-up commit (migrator round-trip test + nullable→backfill→NOT NULL ordering + @Index expression form with DESC)
+ReviewVerdict: ROUND-3 FIX APPLIED — Blocker 1 resolved via single-ORM Phase 1-4 architecture; migration uses CREATE TABLE IF NOT EXISTS to allow Phase 2 pre-seeding; ormB removed; C6 sweep clean; transactional:false scoped to test config only; explain-probe-test.test.ts confirmed not present (not orphan). CI 11/11 green.
 ---
 
 # Events org_id backfill migration class — NOT NULL + default-org backfill

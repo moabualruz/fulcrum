@@ -22,7 +22,7 @@ export class Migration20260501120537_events_org_id_backfill extends Migration {
   override async up(): Promise<void> {
     // ── 1. orgs table ────────────────────────────────────────────────────────
     this.addSql(
-      `create table "orgs" ("id" uuid not null default gen_random_uuid(), "name" varchar(255) not null, "slug" varchar(255) not null, "avatar_url" varchar(255) null, "created_at" timestamptz not null default now(), "updated_at" timestamptz not null default now(), primary key ("id"))`,
+      `create table if not exists "orgs" ("id" uuid not null default gen_random_uuid(), "name" varchar(255) not null, "slug" varchar(255) not null, "avatar_url" varchar(255) null, "created_at" timestamptz not null default now(), "updated_at" timestamptz not null default now(), primary key ("id"))`,
     );
     this.addSql(
       `alter table "orgs" add constraint "uq_orgs_slug" unique ("slug")`,
@@ -32,7 +32,7 @@ export class Migration20260501120537_events_org_id_backfill extends Migration {
     // Column starts nullable so any pre-existing rows don't violate NOT NULL
     // before the backfill step runs.
     this.addSql(
-      `create table "events" ("id" uuid not null default gen_random_uuid(), "org_id" uuid null, "user_id" uuid null, "verb" varchar(255) not null, "subject_kind" varchar(255) not null, "subject_id" varchar(255) null, "payload" jsonb null, "created_at" timestamptz not null default now(), primary key ("id"))`,
+      `create table if not exists "events" ("id" uuid not null default gen_random_uuid(), "org_id" uuid null, "user_id" uuid null, "verb" varchar(255) not null, "subject_kind" varchar(255) not null, "subject_id" varchar(255) null, "payload" jsonb null, "created_at" timestamptz not null default now(), primary key ("id"))`,
     );
 
     // ── 3. backfill (C6 carve-out: data DML inside migration class body) ─────

@@ -1,22 +1,34 @@
 /**
- * TDD — events backfill migration: migrator round-trip + backfill logic + EXPLAIN.
+ * TDD — events backfill migration: single-ORM Phase 1-4 round-trip + EXPLAIN.
  *
- * Three test phases:
+ * Single-ORM Phase 1–4 architecture (Blocker 1 fix — round-3):
  *
- *  PHASE A — Migrator round-trip (fresh PGlite):
- *    Init ORM with Migrator extension, call getMigrator().up({ to: backfill }),
- *    verify the migrations table records completion, assert no null-org events.
+ *  PHASE 1 — run auth migration only on a fresh PGlite (single ORM instance).
+ *    Apply Migration20260501104413_auth. Stop before events backfill.
+ *    The events table does not yet exist.
  *
- *  PHASE B — Backfill logic (separate PGlite pre-migration state):
- *    Manually construct the pre-backfill schema (events with org_id NULL),
- *    insert a row with org_id = NULL, run the migration's UPDATE backfill SQL,
- *    assert eventRepo.count({ org: null }) === 0.
+ *  PHASE 2 — pre-seed null-org state before events backfill runs (C6 carve-out).
+ *    Using sanctioned raw conn.execute() calls (the ONLY way to construct a
+ *    pre-migration schema state; no entity-class path exists at this point):
+ *      (a) create "orgs" table (same columns as migration; without the unique
+ *          constraint — the migration adds it via ALTER TABLE afterward)
+ *      (b) seed the well-known org row (D4: '00000000-0000-0000-0000-000000000001')
+ *          required for the FK the migration adds in step 5
+ *      (c) create "events" table with org_id NULL — the migration uses
+ *          CREATE TABLE IF NOT EXISTS so this pre-created table is preserved
+ *      (d) insert one event row with org_id = NULL (the pre-existing null-org row)
  *
- *  PHASE C — EXPLAIN on org-predicated query:
- *    Reuse the Phase-A ORM (migrated schema). Build QueryBuilder for
- *    eventRepo.find({ org }, { orderBy: { createdAt: 'desc' }, limit: 50 }),
- *    run EXPLAIN on the SQL, assert the plan is non-empty.
+ *  PHASE 3 — run the events backfill migration via the SAME ORM instance.
+ *    migrator.up({ to: 'Migration20260501120537_events_org_id_backfill' })
+ *    The migration's CREATE TABLE IF NOT EXISTS steps skip the pre-created tables.
+ *    The backfill UPDATE runs against the live null-org row seeded in Phase 2.
+ *    NOT NULL / FK / indexes complete the schema.
  *
+ *  PHASE 4 — assert backfill occurred on the pre-existing row.
+ *    eventRepo.count({ org: null }) === 0
+ *    events WHERE verb='test.event.preexisting' has org_id = WELL_KNOWN_ORG_ID
+ *
+ *  PHASE C — EXPLAIN on org-predicated query (reuses the same ORM).
  *    Note: PGlite's EXPLAIN output does not guarantee "Index Scan" phrasing
  *    (PGlite's small-table planner may choose Seq Scan on empty tables even
  *    when indexes exist). We therefore assert:
@@ -25,12 +37,16 @@
  *          confirming the ORM metadata reflects the correct index definitions.
  *    This is the documented fallback for PGlite EXPLAIN limitations.
  *
- * Per C6: raw SQL confined to migration class bodies; test uses em.create/persistAndFlush
- *         for fixture data, except in Phase B where we simulate pre-migration raw DDL
- *         to construct the backfill scenario (no other way to get a nullable-org row
- *         into the table before the migration's NOT NULL flip).
+ * Per C6: ONLY the Phase 2 setup calls use raw SQL (DDL + one INSERT).
+ *         All post-migration fixture data uses em.create/flush.
+ *         Raw SQL in Phase 2 is the sanctioned C6 carve-out for test setup.
  * Per C7: MikroORM v7 @Entity decorator-class pattern.
  * Per D4: well-known local org UUID = '00000000-0000-0000-0000-000000000001'.
+ *
+ * transactional: false / allOrNothing: false — test-only workaround for
+ * PGlite's lack of savepoint support. PGliteKyselyDialect does not support
+ * savepoints; migrations must run outside a wrapping transaction.
+ * This setting lives ONLY in makeOrmConfig() below — NOT in src/db/mikro-orm.config.ts.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
@@ -38,6 +54,7 @@ import { MikroORM, ReferenceKind } from "@mikro-orm/postgresql";
 import { Migrator } from "@mikro-orm/migrations";
 import { PGlite } from "@electric-sql/pglite";
 import { PGliteKyselyDialect } from "../../../src/db/PGliteKyselyDriver.ts";
+import { randomUUID } from "node:crypto";
 
 // Entity classes
 import { Org } from "../../../src/db/entities/auth/Org.ts";
@@ -60,7 +77,8 @@ const MIGRATION_PATH = new URL(
 ).pathname;
 
 // ──────────────────────────────────────────────
-// Helpers
+// Helper — builds test ORM config (PGlite, transactional:false).
+// transactional:false lives HERE only — not in production mikro-orm.config.ts.
 // ──────────────────────────────────────────────
 
 function makeOrmConfig(pglite: PGlite) {
@@ -73,8 +91,9 @@ function makeOrmConfig(pglite: PGlite) {
     migrations: {
       path: MIGRATION_PATH,
       pathTs: MIGRATION_PATH,
-      // Disable transaction wrapping for PGlite: the PGliteKyselyDialect does not
-      // support savepoints, so migrations must run outside a wrapping transaction.
+      // transactional:false / allOrNothing:false — test-only PGlite savepoint workaround.
+      // PGliteKyselyDialect does not support savepoints; migrations must run without a
+      // wrapping transaction. This setting MUST NOT appear in src/db/mikro-orm.config.ts.
       transactional: false,
       allOrNothing: false,
     },
@@ -84,39 +103,93 @@ function makeOrmConfig(pglite: PGlite) {
 }
 
 // ──────────────────────────────────────────────
-// PHASE A — Migrator round-trip
+// Single ORM instance shared across all phases.
 // ──────────────────────────────────────────────
 
-let ormA: MikroORM;
+let orm: MikroORM;
+
+// ID of the pre-existing null-org event seeded in Phase 2.
+let _preExistingEventId: string;
 
 beforeAll(async () => {
-  const pgliteA = new PGlite();
-  ormA = await MikroORM.init(makeOrmConfig(pgliteA));
+  const pglite = new PGlite();
+  orm = await MikroORM.init(makeOrmConfig(pglite));
 
-  // Run ALL migrations up to and including the backfill migration.
-  // This exercises the full MikroORM migration runner (getMigrator().up()).
-  await ormA.migrator.up({
+  // ── PHASE 1: run auth migration only (no events table yet) ─────────────────
+  await orm.migrator.up({
+    to: "Migration20260501104413_auth",
+  });
+
+  // ── PHASE 2: pre-seed null-org state before events backfill runs ────────────
+  // C6 carve-out: raw DDL + one INSERT to construct pre-migration schema state.
+  // The events backfill migration uses CREATE TABLE IF NOT EXISTS so these
+  // manually-created tables are preserved; the backfill UPDATE then runs against
+  // our null-org row. This is the only way to simulate pre-migration data.
+  const conn = orm.em.getConnection();
+
+  // (a) Create orgs table WITHOUT the unique constraint.
+  //     Migration step 1 runs CREATE TABLE IF NOT EXISTS (skips) then
+  //     ALTER TABLE ... ADD CONSTRAINT "uq_orgs_slug" (adds the constraint).
+  await conn.execute(
+    `create table "orgs" ("id" uuid not null default gen_random_uuid(), "name" varchar(255) not null, "slug" varchar(255) not null, "avatar_url" varchar(255) null, "created_at" timestamptz not null default now(), "updated_at" timestamptz not null default now(), primary key ("id"))`,
+  );
+
+  // (b) Seed well-known local org (D4). Required for the FK the migration adds.
+  await conn.execute(
+    `insert into "orgs" ("id", "name", "slug", "created_at", "updated_at") values ('${WELL_KNOWN_ORG_ID}', 'Local', 'local', now(), now())`,
+  );
+
+  // (c) Create events table with org_id NULL — pre-migration state.
+  //     The migration uses CREATE TABLE IF NOT EXISTS (preserved here).
+  await conn.execute(
+    `create table "events" ("id" uuid not null default gen_random_uuid(), "org_id" uuid null, "user_id" uuid null, "verb" varchar(255) not null, "subject_kind" varchar(255) not null, "subject_id" varchar(255) null, "payload" jsonb null, "created_at" timestamptz not null default now(), primary key ("id"))`,
+  );
+
+  // (d) Insert the pre-existing null-org event row (C6 sanctioned raw INSERT).
+  //     This is the row the migration's backfill UPDATE must fix.
+  //     Cannot use em.create here: Event entity requires non-nullable org post-migration.
+  _preExistingEventId = randomUUID();
+  await conn.execute(
+    `insert into "events" ("id", "verb", "subject_kind", "created_at") values ('${_preExistingEventId}', 'test.event.preexisting', 'system', now())`,
+  );
+
+  // Verify the null-org row exists before the migration runs.
+  const preCount = await orm.em
+    .fork()
+    .getRepository(Event)
+    .count({ org: null as unknown as Org });
+  if (preCount !== 1) {
+    throw new Error(
+      `PHASE 2 precondition failed: expected 1 null-org event, got ${preCount}`,
+    );
+  }
+
+  // ── PHASE 3: run the events backfill migration ──────────────────────────────
+  // CREATE TABLE IF NOT EXISTS skips orgs + events (pre-created above).
+  // The backfill UPDATE sets our null-org row to WELL_KNOWN_ORG_ID.
+  // NOT NULL / FK / index steps complete the schema.
+  await orm.migrator.up({
     to: "Migration20260501120537_events_org_id_backfill",
   });
 });
 
 afterAll(async () => {
-  if (ormA) await ormA.close(true);
+  if (orm) await orm.close(true);
 });
 
 // ──────────────────────────────────────────────
-// 1. Org entity metadata (unchanged — kept for regression coverage)
+// 1. Org entity metadata
 // ──────────────────────────────────────────────
 
 describe("MikroORM metadata — Org", () => {
   it("Org entity is registered with tableName=orgs", () => {
-    const meta = ormA.getMetadata().get(Org);
+    const meta = orm.getMetadata().get(Org);
     expect(meta).toBeDefined();
     expect(meta.tableName).toBe("orgs");
   });
 
   it("Org.id is a UUID primary key", () => {
-    const meta = ormA.getMetadata().get(Org);
+    const meta = orm.getMetadata().get(Org);
     const idProp = meta.properties["id"];
     expect(idProp).toBeDefined();
     expect(idProp!.primary).toBe(true);
@@ -124,12 +197,12 @@ describe("MikroORM metadata — Org", () => {
   });
 
   it("Org.name property exists", () => {
-    const meta = ormA.getMetadata().get(Org);
+    const meta = orm.getMetadata().get(Org);
     expect(meta.properties["name"]).toBeDefined();
   });
 
   it("Org.slug property exists", () => {
-    const meta = ormA.getMetadata().get(Org);
+    const meta = orm.getMetadata().get(Org);
     expect(meta.properties["slug"]).toBeDefined();
   });
 });
@@ -140,20 +213,20 @@ describe("MikroORM metadata — Org", () => {
 
 describe("MikroORM metadata — Event", () => {
   it("Event entity is registered with tableName=events", () => {
-    const meta = ormA.getMetadata().get(Event);
+    const meta = orm.getMetadata().get(Event);
     expect(meta).toBeDefined();
     expect(meta.tableName).toBe("events");
   });
 
   it("Event.id is a UUID primary key", () => {
-    const meta = ormA.getMetadata().get(Event);
+    const meta = orm.getMetadata().get(Event);
     const idProp = meta.properties["id"];
     expect(idProp).toBeDefined();
     expect(idProp!.primary).toBe(true);
   });
 
   it("Event.org is a ManyToOne (non-nullable)", () => {
-    const meta = ormA.getMetadata().get(Event);
+    const meta = orm.getMetadata().get(Event);
     const orgProp = meta.properties["org"];
     expect(orgProp).toBeDefined();
     expect(orgProp!.kind).toBe(ReferenceKind.MANY_TO_ONE);
@@ -161,7 +234,7 @@ describe("MikroORM metadata — Event", () => {
   });
 
   it("Event.user is a ManyToOne (nullable)", () => {
-    const meta = ormA.getMetadata().get(Event);
+    const meta = orm.getMetadata().get(Event);
     const userProp = meta.properties["user"];
     expect(userProp).toBeDefined();
     expect(userProp!.kind).toBe(ReferenceKind.MANY_TO_ONE);
@@ -169,7 +242,7 @@ describe("MikroORM metadata — Event", () => {
   });
 
   it("Event has composite index idx_events_org_created (expression form with DESC)", () => {
-    const meta = ormA.getMetadata().get(Event);
+    const meta = orm.getMetadata().get(Event);
     const idx = meta.indexes?.find((i) => i.name === "idx_events_org_created");
     expect(idx).toBeDefined();
     // expression form — no properties array, but expression string
@@ -177,7 +250,7 @@ describe("MikroORM metadata — Event", () => {
   });
 
   it("Event has composite index idx_events_subject (expression form with DESC)", () => {
-    const meta = ormA.getMetadata().get(Event);
+    const meta = orm.getMetadata().get(Event);
     const idx = meta.indexes?.find((i) => i.name === "idx_events_subject");
     expect(idx).toBeDefined();
     expect(idx!.expression).toMatch(/created_at.*DESC/i);
@@ -185,12 +258,14 @@ describe("MikroORM metadata — Event", () => {
 });
 
 // ──────────────────────────────────────────────
-// 3. Migrator round-trip: getMigrator().up() succeeds and records migration
+// 3. Migrator round-trip: getMigrator().up() records migration
 // ──────────────────────────────────────────────
 
 describe("Migrator round-trip — getMigrator().up() records migration", () => {
   it("backfill migration is recorded in mikro_orm_migrations table", async () => {
-    const storage = (ormA.migrator as import("@mikro-orm/migrations").Migrator).getStorage();
+    const storage = (
+      orm.migrator as import("@mikro-orm/migrations").Migrator
+    ).getStorage();
     const executed = await storage.executed();
     expect(executed).toContain(
       "Migration20260501120537_events_org_id_backfill",
@@ -198,9 +273,39 @@ describe("Migrator round-trip — getMigrator().up() records migration", () => {
   });
 
   it("auth migration is also recorded (full chain ran)", async () => {
-    const storage = (ormA.migrator as import("@mikro-orm/migrations").Migrator).getStorage();
+    const storage = (
+      orm.migrator as import("@mikro-orm/migrations").Migrator
+    ).getStorage();
     const executed = await storage.executed();
     expect(executed).toContain("Migration20260501104413_auth");
+  });
+});
+
+// ──────────────────────────────────────────────
+// PHASE 4 — Backfill assertions
+// ──────────────────────────────────────────────
+// The pre-existing null-org event inserted in Phase 2 must now have
+// org_id = WELL_KNOWN_ORG_ID after the migrator's backfill UPDATE ran.
+
+describe("PHASE 4 — Backfill: pre-existing null-org row now has default org", () => {
+  it("eventRepo.count({ org: null }) === 0 after migration ran", async () => {
+    const em = orm.em.fork();
+    const count = await em
+      .getRepository(Event)
+      .count({ org: null as unknown as Org });
+    expect(count).toBe(0);
+  });
+
+  it("pre-existing event now has org_id = WELL_KNOWN_ORG_ID", async () => {
+    const em = orm.em.fork();
+    const event = await em
+      .getRepository(Event)
+      .findOne(
+        { verb: "test.event.preexisting" },
+        { populate: ["org"] as never },
+      );
+    expect(event).toBeDefined();
+    expect(event!.org.id).toBe(WELL_KNOWN_ORG_ID);
   });
 });
 
@@ -210,19 +315,9 @@ describe("Migrator round-trip — getMigrator().up() records migration", () => {
 
 describe("CRUD round-trip — Event (post-migrator)", () => {
   it("creates and retrieves an Event with org FK", async () => {
-    const em = ormA.em.fork();
-    // Seed well-known org first (migrator does not seed data rows)
-    em.create(Org, {
-      id: WELL_KNOWN_ORG_ID,
-      name: "Local",
-      slug: "local",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    await em.flush();
-
-    const em2 = ormA.em.fork();
-    em2.create(User, {
+    const em = orm.em.fork();
+    // Seed a user (org was pre-seeded in Phase 2 and is already in the DB)
+    em.create(User, {
       id: TEST_USER_ID,
       email: "admin@local",
       role: "owner",
@@ -230,11 +325,11 @@ describe("CRUD round-trip — Event (post-migrator)", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-    await em2.flush();
+    await em.flush();
 
-    const em3 = ormA.em.fork();
-    const orgRef = em3.getReference(Org, WELL_KNOWN_ORG_ID);
-    em3.create(Event, {
+    const em2 = orm.em.fork();
+    const orgRef = em2.getReference(Org, WELL_KNOWN_ORG_ID);
+    em2.create(Event, {
       org: orgRef,
       verb: "task.created",
       subjectKind: "task",
@@ -242,10 +337,10 @@ describe("CRUD round-trip — Event (post-migrator)", () => {
       payload: { title: "First task" },
       createdAt: new Date(),
     });
-    await em3.flush();
+    await em2.flush();
 
-    const em4 = ormA.em.fork();
-    const found = await em4
+    const em3 = orm.em.fork();
+    const found = await em3
       .getRepository(Event)
       .findOne({ verb: "task.created" });
     expect(found).toBeDefined();
@@ -253,7 +348,7 @@ describe("CRUD round-trip — Event (post-migrator)", () => {
   });
 
   it("creates an Event without user (nullable FK)", async () => {
-    const em = ormA.em.fork();
+    const em = orm.em.fork();
     const orgRef = em.getReference(Org, WELL_KNOWN_ORG_ID);
     em.create(Event, {
       org: orgRef,
@@ -263,7 +358,7 @@ describe("CRUD round-trip — Event (post-migrator)", () => {
     });
     await em.flush();
 
-    const em2 = ormA.em.fork();
+    const em2 = orm.em.fork();
     const found = await em2
       .getRepository(Event)
       .findOne({ verb: "system.init" });
@@ -278,122 +373,11 @@ describe("CRUD round-trip — Event (post-migrator)", () => {
 
 describe("Post-migrator invariant — eventRepo.count({ org: null }) === 0", () => {
   it("no events with org = null after migration ran", async () => {
-    const em = ormA.em.fork();
+    const em = orm.em.fork();
     const count = await em
       .getRepository(Event)
       .count({ org: null as unknown as Org });
     expect(count).toBe(0);
-  });
-});
-
-// ──────────────────────────────────────────────
-// PHASE B — Backfill logic: pre-migration null-org row + UPDATE backfill
-// ──────────────────────────────────────────────
-// Uses a separate PGlite instance to simulate the pre-migration state:
-//   - events table created with org_id NULL (as migration step 2 does)
-//   - one event row inserted with org_id = NULL
-//   - migration's UPDATE backfill SQL runs
-//   - assert count({ org: null }) === 0
-//
-// Note: We use raw getConnection().execute() only for DDL setup (simulating
-// a pre-migration database state) and the backfill UPDATE. Fixture data
-// (the null-org event insert) uses em.persistAndFlush() after schema is set up.
-// ──────────────────────────────────────────────
-
-describe("PHASE B — Backfill logic: pre-migration null-org row gets backfilled", () => {
-  let ormB: MikroORM;
-
-  beforeAll(async () => {
-    const pgliteB = new PGlite();
-    // Init ORM without Migrator; we set up schema manually to simulate pre-migration state.
-    ormB = await MikroORM.init({
-      dbName: "postgres",
-      driverOptions: new PGliteKyselyDialect(() => pgliteB),
-      multipleStatements: false,
-      entities: [Org, User, Session, Invitation, OrgMember, FeatureFlag, Event],
-      debug: false,
-    });
-
-    const conn = ormB.em.getConnection();
-
-    // Create the minimum prerequisite tables (mirrors auth migration output).
-    // Raw DDL here is the only way to set up a pre-migration state in tests.
-    await conn.execute(
-      `create table "users" ("id" uuid not null default gen_random_uuid(), "org_id" uuid not null, "email" varchar(255) not null, "name" varchar(255) null, "avatar_url" varchar(255) null, "role" text not null default 'member', "created_at" timestamptz not null default now(), "updated_at" timestamptz not null default now(), primary key ("id"))`,
-    );
-
-    // Create orgs table (needed for FK after backfill).
-    await conn.execute(
-      `create table "orgs" ("id" uuid not null default gen_random_uuid(), "name" varchar(255) not null, "slug" varchar(255) not null, "avatar_url" varchar(255) null, "created_at" timestamptz not null default now(), "updated_at" timestamptz not null default now(), primary key ("id"))`,
-    );
-    await conn.execute(
-      `alter table "orgs" add constraint "uq_orgs_slug" unique ("slug")`,
-    );
-
-    // Seed well-known org row (required for FK after backfill).
-    await conn.execute(
-      `insert into "orgs" ("id", "name", "slug", "created_at", "updated_at") values ('00000000-0000-0000-0000-000000000001', 'Local', 'local', now(), now())`,
-    );
-
-    // Create events table with org_id NULLABLE — this is the pre-backfill state.
-    // This mirrors migration step 2 (table created nullable before backfill runs).
-    await conn.execute(
-      `create table "events" ("id" uuid not null default gen_random_uuid(), "org_id" uuid null, "user_id" uuid null, "verb" varchar(255) not null, "subject_kind" varchar(255) not null, "subject_id" varchar(255) null, "payload" jsonb null, "created_at" timestamptz not null default now(), primary key ("id"))`,
-    );
-
-    // Insert a row with org_id = NULL — the entire point of the backfill test.
-    // This proves the UPDATE backfill step is exercised on a real null row.
-    await conn.execute(
-      `insert into "events" ("verb", "subject_kind", "created_at") values ('legacy.event', 'legacy', now())`,
-    );
-
-    // Run the migration's backfill UPDATE (C6 carve-out: data DML in migration class body).
-    // This is the exact SQL from Migration20260501120537_events_org_id_backfill up() step 3.
-    await conn.execute(
-      `update "events" set "org_id" = '00000000-0000-0000-0000-000000000001' where "org_id" is null`,
-    );
-
-    // Flip org_id to NOT NULL (migration step 4).
-    await conn.execute(
-      `alter table "events" alter column "org_id" set not null`,
-    );
-
-    // Add FK + composite indexes (migration steps 5–6).
-    await conn.execute(
-      `alter table "events" add constraint "events_org_id_fkey" foreign key ("org_id") references "orgs" ("id") on update cascade`,
-    );
-    await conn.execute(
-      `create index "idx_events_org_created" on "events" ("org_id", "created_at" desc)`,
-    );
-    await conn.execute(
-      `create index "idx_events_subject" on "events" ("org_id", "subject_kind", "subject_id", "created_at" desc)`,
-    );
-  });
-
-  afterAll(async () => {
-    if (ormB) await ormB.close(true);
-  });
-
-  it("pre-backfill: events table accepts org_id NULL rows", async () => {
-    // Verified by the insert in beforeAll — if it throws the test would not reach here.
-    expect(true).toBe(true);
-  });
-
-  it("post-backfill: eventRepo.count({ org: null }) === 0", async () => {
-    const em = ormB.em.fork();
-    const count = await em
-      .getRepository(Event)
-      .count({ org: null as unknown as Org });
-    expect(count).toBe(0);
-  });
-
-  it("post-backfill: legacy event has org_id set to well-known UUID", async () => {
-    const conn = ormB.em.getConnection();
-    const rows = (await conn.execute(
-      `select "org_id" from "events" where "verb" = 'legacy.event'`,
-    )) as Array<{ org_id: string }>;
-    expect(rows.length).toBe(1);
-    expect(rows[0]!.org_id).toBe(WELL_KNOWN_ORG_ID);
   });
 });
 
@@ -413,12 +397,12 @@ describe("Repository class definitions — Org + Event", () => {
   });
 
   it("em.getRepository(Org) returns OrgRepository instance", () => {
-    const repo = ormA.em.getRepository(Org);
+    const repo = orm.em.getRepository(Org);
     expect(repo).toBeInstanceOf(OrgRepository);
   });
 
   it("em.getRepository(Event) returns EventRepository instance", () => {
-    const repo = ormA.em.getRepository(Event);
+    const repo = orm.em.getRepository(Event);
     expect(repo).toBeInstanceOf(EventRepository);
   });
 });
@@ -427,19 +411,18 @@ describe("Repository class definitions — Org + Event", () => {
 // PHASE C — EXPLAIN: org-predicated query uses composite index
 // ──────────────────────────────────────────────
 // Note on PGlite EXPLAIN limitations:
-//   PGlite's query planner for small/empty tables may choose Seq Scan even when
-//   composite indexes exist, because the cost estimator deems index use too expensive
-//   for tiny tables. The Postgres-identical "Index Scan" assertion is therefore
+//   PGlite's query planner for small tables may choose Seq Scan even when
+//   composite indexes exist. The Postgres-identical "Index Scan" assertion is
 //   brittle in PGlite. Fallback strategy:
 //     (a) Assert EXPLAIN runs and returns a non-empty plan (proves query compiles).
 //     (b) Assert composite index metadata exists in em.getMetadata().get(Event).indexes
 //         (proves ORM metadata reflects the correct index definitions).
-//     (c) Assert QueryBuilder SQL emits ORDER BY ... created_at DESC matching index direction.
+//     (c) Assert QueryBuilder SQL emits ORDER BY ... created_at DESC.
 // ──────────────────────────────────────────────
 
 describe("PHASE C — EXPLAIN: eventRepo.find({ org }, orderBy createdAt desc)", () => {
   it("EXPLAIN runs and returns a non-empty plan", async () => {
-    const em = ormA.em.fork();
+    const em = orm.em.fork();
     const repo = em.getRepository(Event);
     const qb = repo
       .createQueryBuilder("e")
@@ -463,7 +446,7 @@ describe("PHASE C — EXPLAIN: eventRepo.find({ org }, orderBy createdAt desc)",
   });
 
   it("QueryBuilder SQL emits ORDER BY ... created_at DESC (index direction match)", () => {
-    const em = ormA.em.fork();
+    const em = orm.em.fork();
     const repo = em.getRepository(Event);
     const qb = repo
       .createQueryBuilder("e")
@@ -477,7 +460,7 @@ describe("PHASE C — EXPLAIN: eventRepo.find({ org }, orderBy createdAt desc)",
   });
 
   it("ORM metadata has idx_events_org_created with DESC expression", () => {
-    const meta = ormA.getMetadata().get(Event);
+    const meta = orm.getMetadata().get(Event);
     const idx = meta.indexes?.find((i) => i.name === "idx_events_org_created");
     expect(idx).toBeDefined();
     // expression form preserves DESC ordering that properties[] cannot encode
@@ -485,7 +468,7 @@ describe("PHASE C — EXPLAIN: eventRepo.find({ org }, orderBy createdAt desc)",
   });
 
   it("ORM metadata has idx_events_subject with DESC expression", () => {
-    const meta = ormA.getMetadata().get(Event);
+    const meta = orm.getMetadata().get(Event);
     const idx = meta.indexes?.find((i) => i.name === "idx_events_subject");
     expect(idx).toBeDefined();
     expect(idx!.expression).toMatch(/created_at.*DESC/i);
