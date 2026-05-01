@@ -30,6 +30,21 @@ import { OrgMember } from "./entities/auth/OrgMember.ts";
 import { FeatureFlag } from "./entities/auth/FeatureFlag.ts";
 import { Event } from "./entities/core/Event.ts";
 
+// Stub entities (P1#03 — composite index decorators landed early)
+import { Task } from "./entities/tasks/Task.ts";
+import { Document } from "./entities/docs/Document.ts";
+import { Memory } from "./entities/memory/Memory.ts";
+import { AgentRun } from "./entities/orchestration/AgentRun.ts";
+import { Artifact } from "./entities/artifacts/Artifact.ts";
+import { Repo } from "./entities/repos/Repo.ts";
+import { Job } from "./entities/jobs/Job.ts";
+import { SearchDocument } from "./entities/search/SearchDocument.ts";
+
+// Flag-stub entities (P1#03 — gated by later pillars' feature flags)
+import { CasbinRule } from "./entities/flags/CasbinRule.ts";
+import { WebhookSubscription } from "./entities/flags/WebhookSubscription.ts";
+import { NotificationRule } from "./entities/flags/NotificationRule.ts";
+
 // Custom repository subclasses (extended EntityRepository<T>)
 import { OrgRepository } from "./repositories/auth/OrgRepository.ts";
 import { UserRepository } from "./repositories/auth/UserRepository.ts";
@@ -38,6 +53,21 @@ import { InvitationRepository } from "./repositories/auth/InvitationRepository.t
 import { OrgMemberRepository } from "./repositories/auth/OrgMemberRepository.ts";
 import { FeatureFlagRepository } from "./repositories/auth/FeatureFlagRepository.ts";
 import { EventRepository } from "./repositories/core/EventRepository.ts";
+
+// Stub repositories
+import { TaskRepository } from "./repositories/tasks/TaskRepository.ts";
+import { DocumentRepository } from "./repositories/docs/DocumentRepository.ts";
+import { MemoryRepository } from "./repositories/memory/MemoryRepository.ts";
+import { AgentRunRepository } from "./repositories/orchestration/AgentRunRepository.ts";
+import { ArtifactRepository } from "./repositories/artifacts/ArtifactRepository.ts";
+import { RepoRepository } from "./repositories/repos/RepoRepository.ts";
+import { JobRepository } from "./repositories/jobs/JobRepository.ts";
+import { SearchDocumentRepository } from "./repositories/search/SearchDocumentRepository.ts";
+
+// Flag-stub repositories
+import { CasbinRuleRepository } from "./repositories/flags/CasbinRuleRepository.ts";
+import { WebhookSubscriptionRepository } from "./repositories/flags/WebhookSubscriptionRepository.ts";
+import { NotificationRuleRepository } from "./repositories/flags/NotificationRuleRepository.ts";
 
 // Re-export repository classes for convenience (callers can use class as injection token)
 export {
@@ -48,6 +78,17 @@ export {
   OrgMemberRepository,
   FeatureFlagRepository,
   EventRepository,
+  TaskRepository,
+  DocumentRepository,
+  MemoryRepository,
+  AgentRunRepository,
+  ArtifactRepository,
+  RepoRepository,
+  JobRepository,
+  SearchDocumentRepository,
+  CasbinRuleRepository,
+  WebhookSubscriptionRepository,
+  NotificationRuleRepository,
 };
 
 /** InjectionToken for the MikroORM EntityManager (forked per request in SvelteKit). */
@@ -105,5 +146,57 @@ export function registerDbBindings(container: Container, orm: MikroORM): void {
   container.bind({
     provide: EventRepository,
     useFactory: () => em.getRepository(Event) as EventRepository,
+  });
+
+  // Stub-tenant repositories (P1#03 — Task, Document, Memory, AgentRun, Artifact,
+  // Repo, Job, SearchDocument). Later pillars consume the typed subclass.
+  container.bind({
+    provide: TaskRepository,
+    useFactory: () => em.getRepository(Task) as TaskRepository,
+  });
+  container.bind({
+    provide: DocumentRepository,
+    useFactory: () => em.getRepository(Document) as DocumentRepository,
+  });
+  container.bind({
+    provide: MemoryRepository,
+    useFactory: () => em.getRepository(Memory) as MemoryRepository,
+  });
+  container.bind({
+    provide: AgentRunRepository,
+    useFactory: () => em.getRepository(AgentRun) as AgentRunRepository,
+  });
+  container.bind({
+    provide: ArtifactRepository,
+    useFactory: () => em.getRepository(Artifact) as ArtifactRepository,
+  });
+  container.bind({
+    provide: RepoRepository,
+    useFactory: () => em.getRepository(Repo) as RepoRepository,
+  });
+  container.bind({
+    provide: JobRepository,
+    useFactory: () => em.getRepository(Job) as JobRepository,
+  });
+  container.bind({
+    provide: SearchDocumentRepository,
+    useFactory: () =>
+      em.getRepository(SearchDocument) as SearchDocumentRepository,
+  });
+
+  // Flag-stub repositories (P1#03 — CasbinRule, WebhookSubscription, NotificationRule).
+  container.bind({
+    provide: CasbinRuleRepository,
+    useFactory: () => em.getRepository(CasbinRule) as CasbinRuleRepository,
+  });
+  container.bind({
+    provide: WebhookSubscriptionRepository,
+    useFactory: () =>
+      em.getRepository(WebhookSubscription) as WebhookSubscriptionRepository,
+  });
+  container.bind({
+    provide: NotificationRuleRepository,
+    useFactory: () =>
+      em.getRepository(NotificationRule) as NotificationRuleRepository,
   });
 }

@@ -25,6 +25,22 @@ import { OrgMember } from "./entities/auth/OrgMember.ts";
 import { FeatureFlag } from "./entities/auth/FeatureFlag.ts";
 import { Event } from "./entities/core/Event.ts";
 
+// Tenant-scoped stub entities (P1#03 — composite index decorators land here so
+// later pillars never need a base-table migration).
+import { Task } from "./entities/tasks/Task.ts";
+import { Document } from "./entities/docs/Document.ts";
+import { Memory } from "./entities/memory/Memory.ts";
+import { AgentRun } from "./entities/orchestration/AgentRun.ts";
+import { Artifact } from "./entities/artifacts/Artifact.ts";
+import { Repo } from "./entities/repos/Repo.ts";
+import { Job } from "./entities/jobs/Job.ts";
+import { SearchDocument } from "./entities/search/SearchDocument.ts";
+
+// Flag-stub entities (P1#03 — gated behind feature flags by later pillars).
+import { CasbinRule } from "./entities/flags/CasbinRule.ts";
+import { WebhookSubscription } from "./entities/flags/WebhookSubscription.ts";
+import { NotificationRule } from "./entities/flags/NotificationRule.ts";
+
 export {
   Org,
   User,
@@ -33,6 +49,17 @@ export {
   OrgMember,
   FeatureFlag,
   Event,
+  Task,
+  Document,
+  Memory,
+  AgentRun,
+  Artifact,
+  Repo,
+  Job,
+  SearchDocument,
+  CasbinRule,
+  WebhookSubscription,
+  NotificationRule,
 };
 
 /** Allowed options for createOrmConfig(). */
@@ -60,7 +87,9 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
   const isSaas =
     dbUrl.startsWith("postgresql://") || dbUrl.startsWith("postgres://");
 
-  // Built-in entities (auth + core domains, decorator classes)
+  // Built-in entities (auth + core + stub domains, decorator classes).
+  // Stub entities (Task..SearchDocument, CasbinRule..NotificationRule) carry
+  // composite-index decorators from day 1 so later pillars only ALTER TABLE.
   const builtinEntities: Options["entities"] = [
     Org,
     User,
@@ -69,6 +98,17 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     OrgMember,
     FeatureFlag,
     Event,
+    Task,
+    Document,
+    Memory,
+    AgentRun,
+    Artifact,
+    Repo,
+    Job,
+    SearchDocument,
+    CasbinRule,
+    WebhookSubscription,
+    NotificationRule,
   ];
 
   const allEntities: Options["entities"] = [...builtinEntities, ...entities];

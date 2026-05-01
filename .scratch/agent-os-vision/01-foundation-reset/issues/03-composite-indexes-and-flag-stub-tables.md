@@ -1,8 +1,10 @@
 ---
-Status: ready-for-agent
+Status: needs-review
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 02-events-org-id-backfill
+Owner: claude-orchestrator
+ClaimedAt: 2026-05-01T04:30:00Z
 ---
 
 # Composite (org, …) index decorators + flag-stub entities (two migration classes)
