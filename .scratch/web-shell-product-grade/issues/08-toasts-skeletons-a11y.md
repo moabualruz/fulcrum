@@ -29,7 +29,8 @@ Acceptance criteria:
 - [x] **08.1 — `ActionResult` + `dispatchToast` helpers.** Owns: `src/web/src/lib/feedback/action-result.ts`, `.test.ts`. RED: `{ ok, message }` round-trips through `dispatchToast`.
   Comment: feat(web): add ActionResult + dispatchToast feedback helpers (187e3a7). 4 tests pass; bun run ci 9/9, check 0/0/0.
 - [ ] **08.2 — `Toaster` mount in `+layout.svelte`.** Owns: `src/web/src/routes/+layout.svelte` (extend). RED: smoke test imports the layout, asserts `<Toaster />` present.
-- [ ] **08.3 — `RouteSkeleton` variants.** Owns: `src/web/src/lib/components/feedback/RouteSkeleton.svelte`, `.svelte.test.ts`. RED: `kind="list"` renders `<table>` skeleton; `kind="board"` renders 5-column skeleton; `kind="detail"` renders title + 3 paragraphs.
+- [x] **08.3 — `RouteSkeleton` variants.** Owns: `src/web/src/lib/components/feedback/RouteSkeleton.svelte`, `.svelte.test.ts`. RED: `kind="list"` renders `<table>` skeleton; `kind="board"` renders 5-column skeleton; `kind="detail"` renders title + 3 paragraphs.
+  Comment: feat(web): add RouteSkeleton (list/detail/board variants) (2eaa1cd). 5 tests pass; bun run check 0/0/0, bun run ci 9/9.
 - [ ] **08.4 — Wire skeleton via SvelteKit `streamed`.** Owns: every list/detail route's `+page.server.ts`. RED: load test resolves with `streamed` and skeleton renders during pendency.
 - [ ] **08.5 — `axe-core` a11y assertions.** Owns: `src/web/tests/a11y/*.test.ts`. RED: per route, render and assert no `serious` or `critical` violations.
 - [ ] **08.6 — Aria + keyboard sweep.** Owns: existing icon buttons across routes. RED: snapshot test asserts every icon-only button has `aria-label`.
