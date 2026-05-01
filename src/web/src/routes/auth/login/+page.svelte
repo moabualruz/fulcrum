@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+  import { browserSupportsPasskeys, registerPasskey, signInWithPasskey } from "$lib/passkey";
   import type { ActionData } from "./$types";
 
   interface Props {
@@ -6,6 +8,44 @@
   }
 
   let { form }: Props = $props();
+  let passkeySupported = $state(false);
+  let passkeyBusy = $state(false);
+  let passkeyError = $state<string | null>(null);
+  let passkeyMessage = $state<string | null>(null);
+
+  onMount(() => {
+    passkeySupported = browserSupportsPasskeys();
+  });
+
+  async function handlePasskeyLogin() {
+    passkeyError = null;
+    passkeyMessage = null;
+    passkeyBusy = true;
+    const result = await signInWithPasskey();
+    passkeyBusy = false;
+
+    if (result.verified) {
+      window.location.assign("/");
+      return;
+    }
+
+    passkeyError = result.error ?? "Passkey login failed";
+  }
+
+  async function handlePasskeyRegistration() {
+    passkeyError = null;
+    passkeyMessage = null;
+    passkeyBusy = true;
+    const result = await registerPasskey();
+    passkeyBusy = false;
+
+    if (result.verified) {
+      passkeyMessage = "Passkey registered";
+      return;
+    }
+
+    passkeyError = result.error ?? "Passkey registration failed";
+  }
 </script>
 
 <svelte:head>
@@ -21,6 +61,37 @@
     <p data-auth-error class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
       {form.error}
     </p>
+  {/if}
+
+  {#if passkeyError}
+    <p data-passkey-error class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+      {passkeyError}
+    </p>
+  {/if}
+
+  {#if passkeyMessage}
+    <p data-passkey-message class="rounded-md border border-green-700/30 bg-green-950/20 px-3 py-2 text-sm text-green-700">
+      {passkeyMessage}
+    </p>
+  {/if}
+
+  {#if passkeySupported}
+    <div class="flex flex-col gap-2">
+      <button
+        type="button"
+        data-passkey-login
+        disabled={passkeyBusy}
+        onclick={handlePasskeyLogin}
+        class="h-9 rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs disabled:opacity-60"
+      >{passkeyBusy ? "Waiting for passkey" : "Sign in with passkey"}</button>
+      <button
+        type="button"
+        data-passkey-register
+        disabled={passkeyBusy}
+        onclick={handlePasskeyRegistration}
+        class="h-9 rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs disabled:opacity-60"
+      >Register passkey</button>
+    </div>
   {/if}
 
   <form method="POST" class="flex flex-col gap-4">
