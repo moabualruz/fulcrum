@@ -31,7 +31,7 @@ Acceptance criteria:
 ## Sub-tasks
 
 - [x] **05.1 — Server actions for tasks.** Owns: `src/web/src/lib/server/tasks.ts`, `.test.ts`. RED: PGlite tests for create/update/delete/moveStatus + matching `task.<verb>` event rows.
-- [ ] **05.2 — Board helpers (`optimisticMove`, `keyboardMove`).** Owns: `src/web/src/lib/components/board/board-helpers.ts`, `.test.ts`. RED: optimistic move keeps order stable in same column; cross-column move appends to end of target.
+- [x] **05.2 — Board helpers (`optimisticMove`, `keyboardMove`).** Owns: `src/web/src/lib/components/board/board-helpers.ts`, `.test.ts`. RED: optimistic move keeps order stable in same column; cross-column move appends to end of target.
 - [ ] **05.3 — `BoardCard` component.** Owns: `src/web/src/lib/components/board/BoardCard.svelte`, `.svelte.test.ts`. RED: click fires `onEdit` callback with task id.
 - [ ] **05.4 — `BoardColumn` with `svelte-dnd-action`.** Owns: `src/web/src/lib/components/board/BoardColumn.svelte`, `.svelte.test.ts`. RED: `finalize` handler emits server-action call with `{ taskId, fromStatus, toStatus }`.
 - [ ] **05.5 — `BoardSheet` editor + keyboard accessibility.** Owns: `src/web/src/lib/components/board/BoardSheet.svelte`, `KeyboardMoveAnnouncer.svelte`. RED: keyboard helper triggers `optimisticMove`; `aria-live` region updated with move description.
@@ -49,3 +49,14 @@ Server actions module `src/web/src/lib/server/tasks.ts` (139 LOC) with 12 PGlite
 - `moveTaskStatusAction` guards the transition with `WHERE id=$2 AND status=$3` so a stale optimistic UI throws `status conflict: task <id> not in <from>` and the caller can revert. Emits `task.status_changed` with `{from,to,task}`.
 
 Gates: `bun run check` 0/0/0; `bun run build` ok; repo `bun run ci` 9/9.
+
+### 05.2 — landed
+
+Pure board helpers in `src/web/src/lib/components/board/board-helpers.ts` (115 LOC) with 18 unit tests in `board-helpers.test.ts`.
+
+- `BoardSnapshot` keeps tasks grouped by `TaskStatus` across the five canonical columns; `buildBoardSnapshot` ignores rows with unknown statuses and sorts each column priority DESC, `updated_at` DESC, id ASC (matches `listBoardTasks` SQL order).
+- `optimisticMove(snapshot, taskId, toStatus)` returns a new snapshot with the moved card appended to the END of the target column. Same-column move and unknown-task lookups return identity (`next === snapshot`); same-column reports `from = currentStatus`, unknown returns `from = null`.
+- `keyboardMove`: `ArrowUp`/`ArrowDown` without modifier swap with the column neighbour; `Cmd/Ctrl+ArrowLeft`/`ArrowRight` walks `TASK_STATUSES` to the neighbour column. Bare arrows on left/right are no-ops. ARIA description is `"Moved '<title>' from <fromLabel> to <toLabel>."` for column moves; `null` for no-ops.
+- `describeStatus` exports human labels (`"In progress"`, `"Pending"`, …) reused by both intra-column reorder announcements and cross-column moves.
+
+Gates: `bun run check` 0/0/0; `bun run build` ok; repo `bun run ci` 9/9. (Pre-existing 31 component-test failures from earlier sub-tasks are unchanged — none introduced by 05.2.)
