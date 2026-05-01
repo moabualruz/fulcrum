@@ -30,7 +30,7 @@ Acceptance criteria:
 ## Sub-tasks
 
 - [x] **04.1 — Server actions for documents.** Owns: `src/web/src/lib/server/documents.ts`, `.test.ts`. RED: PGlite tests for create/update/delete + matching `events` row + `search_documents` upsert via `indexSearchDocument`.
-- [ ] **04.2 — Frontmatter form mapper.** Owns: `src/web/src/lib/markdown/frontmatter-form.ts`, `.test.ts`. RED: round-trip `{ title, kind, labels[] }` ↔ `KernelMarkdown.frontmatter` via existing `parseKernelMarkdown` / `serializeKernelMarkdown`.
+- [x] **04.2 — Frontmatter form mapper.** Owns: `src/web/src/lib/markdown/frontmatter-form.ts`, `.test.ts`. RED: round-trip `{ title, kind, labels[] }` ↔ `KernelMarkdown.frontmatter` via existing `parseKernelMarkdown` / `serializeKernelMarkdown`.
 - [ ] **04.3 — `MarkdownEditor` wrapper (CodeMirror 6).** Owns: `src/web/src/lib/components/markdown/MarkdownEditor.svelte`, `.svelte.test.ts`. RED: jsdom-safe wrapper test asserts the `value` prop binding and the `change` event payload.
 - [ ] **04.4 — `MarkdownPreview` (marked + dompurify).** Owns: `src/web/src/lib/components/markdown/MarkdownPreview.svelte`, `.svelte.test.ts`. RED: sanitises `<script>`; preserves links + headings; renders `# h1` to `<h1>`.
 - [ ] **04.5 — `/docs` list with kind + FTS filter.** Owns: `src/web/src/routes/docs/+page.server.ts`, `+page.svelte`, `+page.svelte.test.ts`. RED: filter by kind hides non-matching rows; free-text filter calls `searchProductDocuments`.
@@ -66,6 +66,40 @@ GREEN output (excerpt):
  33 expect() calls
 Ran 9 tests across 1 file.
 ```
+
+### 04.2 — Frontmatter form mapper (DONE)
+
+RED command:
+```
+cd src/web && bun test --conditions=svelte ./src/lib/markdown/frontmatter-form.test.ts
+```
+
+RED output (excerpt):
+```
+src/lib/markdown/frontmatter-form.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './frontmatter-form.ts' from '/Users/mkh/workspace/fulcrum/src/web/src/lib/markdown/frontmatter-form.test.ts'
+```
+
+GREEN command:
+```
+cd src/web && bun test --conditions=svelte ./src/lib/markdown/frontmatter-form.test.ts
+```
+
+GREEN output (excerpt):
+```
+ 9 pass
+ 0 fail
+ 22 expect() calls
+Ran 9 tests across 1 file.
+```
+
+Notes:
+- `frontmatter-form.ts` is 42 LOC, under the ≤80 ceiling.
+- The kernel's `serializeKernelMarkdown` injects a `\n` separator before bodies that don't start with `\n`; `parseKernelMarkdown`'s `^---\n…---\n?` regex only consumes one trailing newline. So a body like `"hello\n"` round-trips through the kernel as `"\nhello\n"`. The mapper inherits this — the round-trip test fixture uses a body already starting with `\n` to assert byte-equal recovery.
+- `labels` filter drops non-string entries (mirrors `extractLabels` in `documents.ts`); a non-array `labels` field is dropped from both `values` and `rawFrontmatter`.
 
 Kernel surface notes (carried from 03):
 - `events.subject_id` has no FK back to `documents`, so `deleteDocumentAction` skips an "events strip" pre-delete — only `search_documents` (which has a unique key on `(source_kind, source_id)` and no FK either) is cleared first. `DELETE FROM documents ... RETURNING org_id, project_id` then drives the `document.deleted` event; on no-row-deleted we return `{ok:true}` and emit nothing.
