@@ -15,19 +15,27 @@
 import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { Container } from "@needle-di/core";
 import { MikroORM } from "@mikro-orm/postgresql";
 import { Migrator } from "@mikro-orm/migrations";
 import { PGlite } from "@electric-sql/pglite";
 import { PGliteKyselyDialect } from "../db/PGliteKyselyDriver.ts";
 import { createOrmConfig } from "../db/mikro-orm.config.ts";
-import { registerDbBindings } from "../db/db.module.ts";
+import {
+  registerDbBindings,
+  SchemaMigrationRepository,
+} from "../db/db.module.ts";
+import { dbCanRunOnCurrentBinary } from "../db/doctor-checks.ts";
 
 const HELP = `fulcrum
 
 Usage:
   fulcrum init
   fulcrum db <migrate|status|history> [options]
+  fulcrum web
+  fulcrum tui
+  fulcrum inference
 `;
 
 function fulcrumHome(): string {
@@ -54,6 +62,7 @@ async function buildDbContainer(): Promise<{ container: Container; cleanup: () =
   });
 
   const container = new Container();
+  container.bind({ provide: MikroORM, useValue: orm });
   registerDbBindings(container, orm);
 
   return {
@@ -63,6 +72,104 @@ async function buildDbContainer(): Promise<{ container: Container; cleanup: () =
       await pglite.close();
     },
   };
+}
+
+type MigrationInfoLike = { name?: string };
+type MigratorCompat = {
+  getPendingMigrations?: () => Promise<MigrationInfoLike[]>;
+  getPending?: () => Promise<MigrationInfoLike[]>;
+};
+
+async function pendingMigrations(migrator: MigratorCompat): Promise<MigrationInfoLike[]> {
+  if (migrator.getPendingMigrations) return migrator.getPendingMigrations();
+  if (migrator.getPending) return migrator.getPending();
+  return [];
+}
+
+async function verifyMigrationCompatibility(
+  orm: MikroORM,
+  container: Container,
+): Promise<void> {
+  const pending = await pendingMigrations(orm.migrator as MigratorCompat);
+  if (pending.length > 0) {
+    const names = pending.map((migration) => migration.name ?? "(unknown)").join(", ");
+    throw new Error(`migrations pending: ${names}. Run \`fulcrum db migrate\` before \`fulcrum web\`.`);
+  }
+
+  const schemaMigrationRepo = container.get(SchemaMigrationRepository);
+  const binaryCheck = await dbCanRunOnCurrentBinary(schemaMigrationRepo);
+  if (binaryCheck.status === "fail") {
+    throw new Error(binaryCheck.detail);
+  }
+
+  console.log("Migrations up-to-date");
+}
+
+async function exists(path: string): Promise<boolean> {
+  return Bun.file(path).exists();
+}
+
+async function runWeb(_argv: readonly string[]): Promise<void> {
+  const { container, cleanup } = await buildDbContainer();
+  console.log("MikroORM initialized");
+  console.log("needle-di container ready");
+
+  const orm = container.get(MikroORM);
+  await verifyMigrationCompatibility(orm, container);
+
+  const outputRoot = join(process.cwd(), "src", "web", ".svelte-kit", "output");
+  const serverIndex = join(outputRoot, "server", "index.js");
+  const manifestPath = join(outputRoot, "server", "manifest.js");
+  const clientRoot = join(outputRoot, "client");
+
+  if (!(await exists(serverIndex)) || !(await exists(manifestPath))) {
+    await cleanup();
+    throw new Error("web build missing. Run `bun --cwd src/web run build` before `fulcrum web`.");
+  }
+
+  const [{ Server }, { manifest }] = await Promise.all([
+    import(pathToFileURL(serverIndex).href) as Promise<{
+      Server: new (manifest: unknown) => {
+        init(opts: {
+          env: Record<string, string | undefined>;
+          read: (file: string) => ReadableStream<Uint8Array>;
+        }): Promise<void>;
+        respond(request: Request, options: {
+          platform: Record<string, never>;
+          getClientAddress: () => string;
+        }): Promise<Response>;
+      };
+    }>,
+    import(pathToFileURL(manifestPath).href) as Promise<{ manifest: unknown }>,
+  ]);
+
+  const server = new Server(manifest);
+  await server.init({
+    env: process.env,
+    read: (file: string) => Bun.file(join(clientRoot, file)).stream(),
+  });
+
+  const port = Number(process.env["PORT"] ?? "3000");
+  const listener = Bun.serve({
+    port,
+    async fetch(request) {
+      const url = new URL(request.url);
+      const pathname = decodeURIComponent(url.pathname);
+      if (pathname !== "/" && !pathname.endsWith("/")) {
+        const assetPath = join(clientRoot, pathname);
+        const asset = Bun.file(assetPath);
+        if (await asset.exists()) return new Response(asset);
+      }
+
+      return server.respond(request, {
+        platform: {},
+        getClientAddress: () => "127.0.0.1",
+      });
+    },
+  });
+
+  console.log(`Web server listening on http://localhost:${listener.port}`);
+  await new Promise<void>(() => {});
 }
 
 export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<void> {
@@ -86,6 +193,15 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       }
       return;
     }
+    case "web":
+      await runWeb(rest);
+      return;
+    case "tui":
+      console.log("TUI not yet implemented");
+      return;
+    case "inference":
+      console.log("Inference sidecar not yet implemented");
+      return;
     case "help":
     case "--help":
     case "-h":

@@ -1,11 +1,11 @@
 ---
-Status: needs-review
+Status: completed
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 04-local-org-seed-and-init
 Owner: claude-orchestrator
-ClaimedAt: 2026-05-01T21:00:00Z
-ReviewVerdict: Round-2 — all 4 issues resolved: saas-auth flag wired in buildAuth() (Issue 1); Account + Verification @Entity classes created with migration (Issue 2, option a); adapter member/invitation/account/verification CRUD complete (Issue 3); scope creep note acknowledged (Issue 4).
+CompletedAt: 2026-05-01T22:00:00Z
+ReviewVerdict: APPROVED — Codex round-2 review confirms Fix 1/2/3 PASS; round-3 fix (commit d5f54c7) adds missing `await svc.init()` in hooks.server.ts (1-line trivial fix, obviously correct). LICENSE-DEPS.md noise accepted as auto-generated artifact.
 ---
 
 # Better-Auth v1 integration — MikroORM-backed adapter, org plugin, passkey plugin, SvelteKit handler

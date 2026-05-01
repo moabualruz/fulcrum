@@ -4,7 +4,12 @@
 const HELP = `fulcrum — multi-agent foundation CLI
 
 Usage:
-  fulcrum init [DIR]                 Bootstrap a project (AGENTS.md, .claude/CLAUDE.md, .gitignore).
+  fulcrum init                       Bootstrap local org + admin session.
+  fulcrum db <migrate|status|history>
+                                     Manage local schema migrations.
+  fulcrum web                        Start the SvelteKit web server.
+  fulcrum tui                        Start the TUI (stub).
+  fulcrum inference                  Start the inference sidecar (stub).
   fulcrum hook <name> [args...]      Run a hook recipe (reads JSON envelope on stdin).
                                      Recipes: format, lint-gate, pm-policy, test-on-edit,
                                               audit-log, index-check, index-rebuild, router
@@ -58,11 +63,19 @@ Environment:
 
 const VERSION = "0.1.0";
 
-async function main() {
-  const argv = Bun.argv.slice(2);
+export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<void> {
   const [cmd = "help", ...rest] = argv;
 
   switch (cmd) {
+    case "init":
+    case "db":
+    case "web":
+    case "tui":
+    case "inference": {
+      const { run: runCli } = await import("./cli/index.ts");
+      await runCli([cmd, ...rest]);
+      return;
+    }
     case "hook": {
       const [name, ...args] = rest;
       if (!name) {
@@ -80,11 +93,6 @@ async function main() {
     case "skills": {
       const { run: runSkills } = await import("./cli/skills.ts");
       await runSkills(rest);
-      return;
-    }
-    case "init": {
-      const { run: runInit } = await import("./cli/init.ts");
-      await runInit(rest);
       return;
     }
     case "install": {
@@ -191,7 +199,9 @@ async function runHook(name: string, _args: string[]) {
   }
 }
 
-main().catch((err) => {
-  console.error(`fulcrum: fatal: ${(err as Error).message}`);
-  process.exit(1);
-});
+if (import.meta.main) {
+  run().catch((err) => {
+    console.error(`fulcrum: fatal: ${(err as Error).message}`);
+    process.exit(1);
+  });
+}
