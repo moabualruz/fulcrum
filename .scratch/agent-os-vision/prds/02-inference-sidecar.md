@@ -26,14 +26,14 @@ Build the Rust inference sidecar — a single static binary under `inference/` �
 - **Rust workspace `inference/`** — Cargo workspace sibling to `src/`. Crates: `inference-core` (shared types + JSON-RPC protocol), `inference-server` (binary entrypoint + dispatcher), `inference-embed` (fastembed-rs), `inference-generate` (candle). Consumed by `fulcrum inference` CLI, `src/inference/lifecycle.ts`, and `src/inference/client.ts`.
 - **JSON-RPC 2.0 over Unix socket** — `$FULCRUM_HOME/inference.sock`; length-prefixed newline-delimited JSON. Protocol schema mirrored in `inference/inference-core/src/protocol.rs` (Rust) + `src/inference/protocol.ts` (TS). Fallback: stdio JSON-RPC when socket unavailable (Windows). All surfaces call via `src/inference/client.ts`.
 - **Auto-spawn-and-supervise** — `src/inference/lifecycle.ts`: checks socket liveness on first call; if dead, spawns via `Bun.spawn`, polls readiness max 10s, caches PID in `$FULCRUM_HOME/inference.pid`. Transparent to callers.
-- **`embed(texts: string[]): Promise<number[][]>`** — batch float32 vectors. Default: `bge-small-en-v1.5` (~67 MB ONNX). Cached per (model, text-hash) in `embed_cache` SQLite. Consumed by memory retrieval (Pillar 6) + search (Pillar 14) when `embeddings` flag on.
+- **`embed(texts: string[]): Promise<number[][]>`** — batch float32 vectors. Default: `bge-small-en-v1.5` (~67 MB ONNX). Cached per (model, text-hash) through `CacheStore` `EmbedCacheEntry`. Consumed by memory retrieval (Pillar 6) + search (Pillar 14) when `embeddings` flag on.
 - **`generate(prompt, options?): Promise<GenerateResult>`** — `GenerateOptions`: `schema?: JSONSchema` (constrained decoding), `model?`, `maxTokens?`, `temperature?`. Default: `Qwen2.5-0.5B-Instruct` Q4_K_M (~400 MB). Consumed by router LLM fallback (Pillar 3) + memory-llm-extract (Pillar 6).
 - **`classify(text, labels): Promise<{label, score}[]>`** — zero-shot via cosine similarity; reuses embed backend; no extra model.
 - **`tokenize(text, model?): Promise<{count, tokens}>`** — token budget for context assembler (Pillar 3).
 - **`health(): Promise<HealthResult>`** — `{ status, backends, models }`; consumed by `fulcrum doctor`, TUI status bar, web settings.
-- **`src/inference/client.ts`** — single import for all callers; reads `FULCRUM_INFERENCE_BACKEND` + feature flags to select backend; retries 3× with exponential backoff; typed `InferenceError { code, backend, message }`; all four backends implement `InferenceBackend` interface.
+- **`src/inference/client.ts`** — needle-di `@Injectable()` `InferenceClient`; single import/resolution for all callers; reads `FULCRUM_INFERENCE_BACKEND` + feature flags to select backend; retries 3× with exponential backoff; typed `InferenceError { code, backend, message }`; all four backends implement `InferenceBackend` interface.
 - **Model auto-download** — `ModelManager::ensure(model_id)` in Rust: checks `$FULCRUM_HOME/models/<model_id>.gguf`; downloads from HuggingFace Hub (HTTPS + SHA-256) if absent; streams progress as `{"type":"download_progress","pct":N}` to stdout; TS surfaces via tRPC subscription.
-- **`inference_cache`** — `$FULCRUM_HOME/inference-cache.db` SQLite; embed TTL 7 days, gen TTL 1 hour; cache-aside in `embed()` and `generate()`.
+- **Inference cache store** — `$FULCRUM_HOME/inference-cache.db` SQLite behind `CacheStore`; embed TTL 7 days, gen TTL 1 hour; cache-aside in `embed()` and `generate()`.
 
 ## Gated features (online or feature-flagged)
 
@@ -42,7 +42,7 @@ Build the Rust inference sidecar — a single static binary under `inference/` �
 | Ollama backend | `embeddings:ollama` or `router-llm:ollama` (per-feature backend qualifier) | `src/inference/backends/ollama.ts` sends requests to `http://localhost:11434/api/embed` and `/api/generate`; model name passed through |
 | LM Studio backend | `embeddings:lm-studio` or `router-llm:lm-studio` | `src/inference/backends/lm-studio.ts` hits `http://localhost:1234/v1` OpenAI-compat endpoint |
 | External LLM provider | `external-llm-provider` (from Pillar 1) | `src/inference/backends/openai-compatible.ts` reads `FULCRUM_INFERENCE_URL` + `FULCRUM_INFERENCE_API_KEY`; calls any OpenAI-compatible API (Anthropic, Groq, Together, DeepSeek, Vercel, OpenRouter) |
-| pgvector embeddings pipeline | `embeddings` (from Pillar 1) | Embedding vectors written to `memories.embedding` and `search_documents.embedding` columns on upsert; HNSW index queried in retriever |
+| pgvector embeddings pipeline | `embeddings` (from Pillar 1) | Embedding vectors written to `Memory.embedding` and `SearchDocument.embedding` `VectorType` properties on upsert; HNSW index queried in retriever |
 | Router LLM fallback | `router-llm` (from Pillar 1) | `generate()` called from `src/router/auto-assign.ts` when json-rules-engine returns no match |
 | Memory LLM extraction | `memory-llm-extract` (from Pillar 1) | `generate()` called from `src/memory/extractor-llm.ts` for richer fact extraction from transcripts |
 
@@ -59,6 +59,14 @@ Build the Rust inference sidecar — a single static binary under `inference/` �
 | Embedding cache | SQLite via `rusqlite` | Zero extra service; in-process; fast reads | If cache DB corrupts → delete and rebuild on next run; embeddings are deterministic | In-memory LRU (loses cache on restart) | N/A |
 | Build system | `cargo build --release` + `bun build --compile` wrapper | Standard | N/A | N/A | N/A |
 
+### Stack (C7-C9)
+
+- C7: Main Fulcrum DB schema uses MikroORM v7 ES decorators, `@mikro-orm/migrations`, and generated migration class `src/db/migrations/Migration<timestamp>.ts`.
+- C7: Embedding properties use `VectorType` from `pgvector/mikro-orm` with explicit `length: 384`; embeddings flag gates extension registration and writes.
+- C8: TS inference services use needle-di `@Injectable()` and constructor `inject(...)` defaults.
+- C9: Inference entities live under `src/db/entities/inference/`; repositories under `src/db/repositories/inference/`.
+- Rust sidecar cache remains local implementation detail behind `CacheStore`; no hand-written schema files or query snippets are part of Fulcrum docs/source.
+
 Default bundled models (downloaded on first use, not shipped in binary):
 - Embeddings: `BAAI/bge-small-en-v1.5` (ONNX, ~67 MB) via `fastembed-rs` default.
 - Generation: `Qwen/Qwen2.5-0.5B-Instruct-GGUF` Q4_K_M (~400 MB) via HuggingFace Hub.
@@ -66,64 +74,88 @@ Default bundled models (downloaded on first use, not shipped in binary):
 
 ## Schema changes
 
-Migration `0008_inference_cache` (this pillar — separate SQLite DB, not PGlite):
-```sql
--- $FULCRUM_HOME/inference-cache.db
-CREATE TABLE IF NOT EXISTS embed_cache (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  model       TEXT    NOT NULL,
-  input_hash  TEXT    NOT NULL,
-  output_blob BLOB    NOT NULL,
-  dimensions  INTEGER NOT NULL,
-  created_at  INTEGER NOT NULL DEFAULT (unixepoch()),
-  hit_count   INTEGER NOT NULL DEFAULT 0,
-  UNIQUE (model, input_hash)
-);
-CREATE INDEX idx_embed_cache_model ON embed_cache (model, input_hash);
-CREATE INDEX idx_embed_cache_age ON embed_cache (created_at);
+Migration class `Migration<timestamp>` covering inference model cache, provider credentials, and embedding properties is generated from MikroORM metadata; file path: `src/db/migrations/Migration<timestamp>.ts`.
 
-CREATE TABLE IF NOT EXISTS gen_cache (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  model       TEXT    NOT NULL,
-  input_hash  TEXT    NOT NULL,
-  output_text TEXT    NOT NULL,
-  created_at  INTEGER NOT NULL DEFAULT (unixepoch()),
-  ttl_seconds INTEGER NOT NULL DEFAULT 3600,
-  UNIQUE (model, input_hash)
-);
-CREATE INDEX idx_gen_cache_model ON gen_cache (model, input_hash);
+```typescript
+import { Entity, Index, PrimaryKey, Property } from '@mikro-orm/decorators/es';
+import { randomUUID } from 'node:crypto';
+import { VectorType } from 'pgvector/mikro-orm';
+
+@Entity({ tableName: 'model_cache' })
+@Index({ properties: ['kind', 'active'] })
+export class ModelCache {
+  @PrimaryKey({ type: 'uuid' })
+  id = randomUUID();
+
+  @Property({ unique: true })
+  modelId!: string;
+
+  @Property()
+  kind!: 'embed' | 'generate' | 'classify';
+
+  @Property()
+  source!: 'bundled' | 'huggingface' | 'local';
+
+  @Property({ nullable: true })
+  localPath?: string;
+
+  @Property({ type: 'bigint', nullable: true })
+  sizeBytes?: bigint;
+
+  @Property({ nullable: true })
+  sha256?: string;
+
+  @Property({ default: false })
+  downloaded = false;
+
+  @Property({ default: false })
+  active = false;
+
+  @Property({ onCreate: () => new Date() })
+  createdAt = new Date();
+}
+
+@Entity({ tableName: 'provider_credentials' })
+@Index({ properties: ['provider', 'active'] })
+export class ProviderCredential {
+  @PrimaryKey({ type: 'uuid' })
+  id = randomUUID();
+
+  @Property()
+  provider!: 'ollama' | 'lm-studio' | 'openai-compatible';
+
+  @Property()
+  baseUrl!: string;
+
+  @Property({ nullable: true })
+  secretRef?: string;
+
+  @Property({ default: false })
+  active = false;
+}
+
+@Entity({ tableName: 'memories' })
+@Index({ name: 'memories_embedding_hnsw', expression: 'USING hnsw (embedding vector_cosine_ops)' })
+export class MemoryEmbeddingColumn {
+  @Property({ type: VectorType, length: 384, nullable: true })
+  embedding?: number[];
+}
+
+@Entity({ tableName: 'search_documents' })
+@Index({ name: 'search_documents_embedding_hnsw', expression: 'USING hnsw (embedding vector_cosine_ops)' })
+export class SearchDocumentEmbeddingColumn {
+  @Property({ type: VectorType, length: 384, nullable: true })
+  embedding?: number[];
+}
+
+@Entity({ tableName: 'documents' })
+export class DocumentEmbeddingColumn {
+  @Property({ type: VectorType, length: 384, nullable: true })
+  embedding?: number[];
+}
 ```
 
-Main PGlite migration `0008_inference_columns` (embeddings activated by `pgvector` flag — already gated in Pillar 1; columns added now, written only when flag on):
-```sql
--- Add embedding columns; writes guarded by isEnabled('embeddings') in application layer
-ALTER TABLE memories       ADD COLUMN IF NOT EXISTS embedding vector(384);
-ALTER TABLE search_documents ADD COLUMN IF NOT EXISTS embedding vector(384);
-ALTER TABLE documents      ADD COLUMN IF NOT EXISTS embedding vector(384);
-
--- HNSW index (created when pgvector flag enabled at runtime, not at migration time)
--- Application layer calls: CREATE INDEX CONCURRENTLY IF NOT EXISTS ...
--- Stored here for reference:
--- CREATE INDEX idx_memories_embed    ON memories        USING hnsw (embedding vector_cosine_ops);
--- CREATE INDEX idx_search_embed      ON search_documents USING hnsw (embedding vector_cosine_ops);
-```
-
-Model registry table (PGlite main DB):
-```sql
-CREATE TABLE IF NOT EXISTS inference_models (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  model_id    text NOT NULL UNIQUE,
-  kind        text NOT NULL CHECK (kind IN ('embed','generate','classify')),
-  source      text NOT NULL,  -- 'bundled' | 'huggingface' | 'local'
-  local_path  text,
-  size_bytes  bigint,
-  sha256      text,
-  downloaded  boolean NOT NULL DEFAULT false,
-  active      boolean NOT NULL DEFAULT false,
-  created_at  timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX idx_inference_models_kind ON inference_models (kind, active);
-```
+Rust sidecar cache contract (separate `$FULCRUM_HOME/inference-cache.db`) is represented by typed `EmbedCacheEntry` and `GenerateCacheEntry` structs behind `CacheStore`; tests cover cache put/get/ttl/index behavior through API round-trips, not schema text.
 
 ## Surfaces
 
@@ -164,7 +196,7 @@ CREATE INDEX idx_inference_models_kind ON inference_models (kind, active);
 ```mermaid
 graph TD
     subgraph TS process (Bun)
-        CLIENT[src/inference/client.ts\nInferenceBackend interface]
+        CLIENT[src/inference/client.ts\n@Injectable InferenceClient]
         LIFE[src/inference/lifecycle.ts\nauto-spawn + PID file]
         EMB[backends/embedded.ts\nUnix socket JSON-RPC]
         OLL[backends/ollama.ts\nHTTP localhost:11434]
@@ -260,7 +292,7 @@ OTel spans (no-op when exporter unset):
 
 Log fields: `requestId`, `backend`, `model`, `inputCount`, `durationMs`, `cached`, `error?`.
 
-Events emitted (to `events` table): `inference.model.downloaded`, `inference.sidecar.started`, `inference.sidecar.stopped`.
+Events emitted through `EventsRepository`: `inference.model.downloaded`, `inference.sidecar.started`, `inference.sidecar.stopped`.
 
 ### Performance budgets
 
@@ -280,13 +312,13 @@ Events emitted (to `events` table): `inference.model.downloaded`, `inference.sid
 Registered in `src/doctor/checks/inference.ts`:
 
 1. **`inference.embedded.processHealthy`** — calls `health()` JSON-RPC; asserts `{status:'ok'}` within 3s. Spawns sidecar if not running.
-2. **`inference.embedded.modelsAvailable`** — `SELECT downloaded FROM inference_models WHERE kind='embed' AND active=true`; warn if no downloaded model.
+2. **`inference.embedded.modelsAvailable`** — `ModelCacheRepository.findActiveDownloaded('embed')`; warn if no downloaded model.
 3. **`inference.embedded.socketReachable`** — checks `FULCRUM_HOME/inference.sock` exists and accepts connection.
-4. **`inference.cache.readable`** — opens `inference-cache.db`; asserts `PRAGMA integrity_check` returns `ok`.
+4. **`inference.cache.readable`** — opens `inference-cache.db`; asserts `CacheStore.health()` returns `ok`.
 5. **`inference.ollama.reachable`** (checked when `embeddings:ollama` or `router-llm:ollama` in active flags) — `HEAD http://localhost:11434/`; asserts 200.
 6. **`inference.lm-studio.reachable`** (checked when `embeddings:lm-studio` or `router-llm:lm-studio`) — `HEAD http://localhost:1234/v1`; asserts 200.
 7. **`inference.external.configured`** (checked when `external-llm-provider` ON) — asserts `FULCRUM_INFERENCE_URL` and `FULCRUM_INFERENCE_API_KEY` set.
-8. **`inference.models.diskUsage`** — sums `size_bytes` from `inference_models WHERE downloaded=true`; warn if > 5GB.
+8. **`inference.models.diskUsage`** — `ModelCacheRepository.sumDownloadedBytes()`; warn if > 5GB.
 
 ### JSON output shape (Zod schema)
 
@@ -316,7 +348,7 @@ const DoctorInferenceCheck = z.object({
 - `inference.models.diskUsage warn` → `fulcrum inference models rm <model-id>` to free space; keep only active model tier.
 
 ## Dependencies
-Pillar 1 (Foundation Reset) must be complete: feature-flag registry (`isEnabled()`), tRPC core router + context, `fulcrum` binary entrypoint scaffold, `fulcrum inference` stub converted to real dispatcher, migration runner for `0008_*`.
+Pillar 1 (Foundation Reset) must be complete: feature-flag registry (`isEnabled()`), tRPC core router + context, `fulcrum` binary entrypoint scaffold, `fulcrum inference` stub converted to real dispatcher, MikroORM config, and generated migration class runner.
 
 ## Issues breakdown
 
@@ -343,7 +375,7 @@ Pillar 1 (Foundation Reset) must be complete: feature-flag registry (`isEnabled(
 **P2.5 — Embedding cache**
 - Owner: `inference/inference-embed/src/cache.rs`
 - RED: second call with same text → hit count increments; no model inference fired.
-- GREEN: `rusqlite` `embed_cache` table; 7-day TTL eviction; cache-aside in `embed()`.
+- GREEN: SQLite-backed `CacheStore` with typed `EmbedCacheEntry`; 7-day TTL eviction; cache-aside in `embed()`.
 
 **P2.6 — Generation crate (`candle`)**
 - Owner: `inference/inference-generate/src/`
@@ -358,12 +390,12 @@ Pillar 1 (Foundation Reset) must be complete: feature-flag registry (`isEnabled(
 **P2.8 — Model auto-download**
 - Owner: `inference/inference-server/src/models.rs`
 - RED: `models.pull("BAAI/bge-small-en-v1.5")` → progress stream 0%→100%; file present at `$FULCRUM_HOME/models/`; SHA-256 matches manifest.
-- GREEN: `reqwest` HTTPS + streaming SHA-256; progress JSON to stdout; `inference_models` row updated.
+- GREEN: `reqwest` HTTPS + streaming SHA-256; progress JSON to stdout; `ModelCacheRepository` row updated through MikroORM.
 
 **P2.9 — TS backend abstraction**
 - Owner: `src/inference/backends/`, `src/inference/client.ts`
 - RED: unit tests for `embedded` (socket), `ollama` (mocked HTTP), `lm-studio` (mocked HTTP), `openai-compatible` (mocked, gated). All satisfy `InferenceBackend` interface.
-- GREEN: four backend classes; `client.ts` selects via env + flag qualifier.
+- GREEN: four backend classes; `@Injectable()` `InferenceClient` selects via env + flag qualifier.
 
 **P2.10 — `fulcrum inference` CLI verbs**
 - Owner: `src/cli/inference.ts`
@@ -373,7 +405,7 @@ Pillar 1 (Foundation Reset) must be complete: feature-flag registry (`isEnabled(
 **P2.11 — tRPC inference procedures**
 - Owner: `src/server/trpc/routers/inference.ts`
 - RED: `inference.health()` typed; `inference.embed(["test"])` returns `number[][]`; `inference.models.pull` streams progress.
-- GREEN: procedures delegating to `client.ts`; subscription via `observable`.
+- GREEN: procedures resolving `InferenceClient` from needle-di; subscription via `observable`.
 
 **P2.12 — Web inference settings page**
 - Owner: `src/web/src/routes/settings/inference/`

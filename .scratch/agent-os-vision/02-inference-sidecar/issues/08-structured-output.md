@@ -26,4 +26,4 @@ Add grammar-constrained decoding to `generate()`: Rust `inference/inference-gene
 ## Notes
 - GBNF grammar subset needed: `object`, `array`, `string`, `number`, `boolean`, `null`, `required`, `additionalProperties: false`.
 - Failure gate: grammar generation fails for complex schemas (nested `$ref`, `oneOf`, `anyOf`) → post-hoc validation path: generate free text → `serde_json::from_str` → retry 3×; surface `GRAMMAR_FALLBACK` warning in response.
-- Do not cache schema-constrained responses (avoid false cache hits where same prompt + different schema returns stale output from gen_cache).
+- Do not cache schema-constrained responses (avoid false cache hits where same prompt + different schema returns stale output from `GenerateCacheEntry`).

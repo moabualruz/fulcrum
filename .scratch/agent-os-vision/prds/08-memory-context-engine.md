@@ -39,15 +39,22 @@ Ships unconditionally, all surfaces.
 
 ### Memory schema + lifecycle
 
-`memories` table — full DDL in Schema Changes section. CRUD: create, read, update, archive, restore, forget (hard delete, org-admin only). `source` column (`heuristic | llm | manual`) always set on write. `importance` column (`low | medium | high`) defaults `medium`. `global` boolean defaults `false`; flip to `true` to share cross-project. `archived` boolean soft-deletes from retrieval unless `--include-archived` explicitly passed.
+`Memory` entity — full MikroORM class in Schema Changes section. CRUD: create, read, update, archive, restore, forget (hard delete, org-admin only). `source` property (`heuristic | llm | manual`) always set on write. `importance` property (`low | medium | high`) defaults `medium`. `global` boolean defaults `false`; flip to `true` to share cross-project. `archived` boolean soft-deletes from retrieval unless `--include-archived` explicitly passed.
 
-`memory_links` — links a memory to a task, doc, agent_run, or artifact row by `(target_kind, target_id)`. One memory may link to many entities. Populated by heuristic extractor when it detects provenance; queryable to show "memories from this run" on the agent run detail page (Pillar 3 surface).
+`MemoryLink` entity — links a memory to a task, doc, agent_run, or artifact row by `(target_kind, target_id)`. One memory may link to many entities. Populated by heuristic extractor when it detects provenance; queryable to show "memories from this run" on the agent run detail page (Pillar 3 surface).
 
-`context_snapshots` — replay/debug store. Every assembled bundle is serialized and stored against its `run_id`. Enables deterministic re-run, diff between two runs, and the `fulcrum context preview` output being reproducible without re-running retrieval.
+`ContextSnapshot` entity — replay/debug store. Every assembled bundle is serialized and stored against its `run_id`. Enables deterministic re-run, diff between two runs, and the `fulcrum context preview` output being reproducible without re-running retrieval.
 
 ### Heuristic extractor (`src/memory/extractor-heuristic.ts`)
 
-Always-on. No inference call. Triggered by two hooks:
+Always-on `@Injectable()` service using needle-di constructor injection. No inference call. Triggered by two hooks:
+
+```typescript
+@Injectable()
+export class HeuristicExtractor {
+  constructor(private memoryRepo = inject(MemoryRepository)) {}
+}
+```
 
 **Agent run completion hook** (`after_run`): receives transcript blob from Symphony. Runs five regex/parser passes in sequence:
 1. **File-touched** — `[read|wrote|created|deleted] <path>` → `kind='file_ref'`, `source_ref.{run_id,span_start,span_end}`.
@@ -67,18 +74,18 @@ All rows: `source='heuristic'`.
 
 ### Retriever (`src/memory/retriever.ts`)
 
-~150 LOC, pure TS, no framework dependency. Single exported function `retrieve(query: string, opts: RetrieverOpts): Promise<Memory[]>`.
+`@Injectable()` service with a needle-di-injected `MemoryRepository`. Public method: `retrieve(query: string, opts: RetrieverOpts): Promise<Memory[]>`.
 
 **Always-on scoring formula:**
 ```
-score = bm25(query, memory.body)
-      + exp(-age_days / 30)
-      + (memory.importance === 'high' ? 1.0 : 0.0)
+score = memory.textRank
+      + memory.recencyBoost
+      + memory.importanceBoost
 ```
 
-BM25 via Postgres `ts_rank_cd(to_tsvector('english', body), plainto_tsquery('english', $query))`. Recency computed as `EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400`. Importance boost applied in SQL CASE expression.
+`MemoryRepository.searchProjectAndGlobal(opts)` owns text-rank, recency, and importance scoring behind typed MikroORM repository methods. Callers do not pass query strings or database expression text.
 
-**Scope:** single UNION query: `WHERE org_id=$1 AND project_id=$2 AND archived=false` UNION `WHERE org_id=$1 AND global=true AND archived=false`. Dedupe on `id` (UNION handles naturally). Sort by `score DESC`. Return top 20.
+**Scope:** repository criteria fetch project-scoped rows and global rows for the same org, dedupe by `id`, sort by computed `score` descending, then return top 20. `includeArchived=true` keeps archived rows; `kinds` applies a typed property filter.
 
 **RetrieverOpts:** `{ orgId, projectId, query, topK = 20, includeArchived = false, kinds?: string[] }`. All params typed; Zod schema generated from tRPC input schema.
 
@@ -86,11 +93,23 @@ BM25 via Postgres `ts_rank_cd(to_tsvector('english', body), plainto_tsquery('eng
 
 Called by Pillar 3 Symphony `before_run` hook. Assembles 5 slices into a single token-budgeted blob. Returns `ContextBundle` + writes a `context_snapshots` row.
 
+```typescript
+@Injectable()
+export class ContextAssembler {
+  constructor(
+    private memRepo = inject(MemoryRepository),
+    private docRepo = inject(DocRepository),
+    private runRepo = inject(AgentRunRepository),
+    private snapshotRepo = inject(ContextSnapshotRepository),
+  ) {}
+}
+```
+
 **5 slices (in priority order for proportional truncation):**
 1. **Memories** — top-N from retriever (project + global). Query derived from task description + task title.
 2. **Linked docs** — one-hop wikilinks extracted from task description. Each doc fetched and truncated to first paragraph (or first 200 tokens). Max 5 docs.
-3. **Recent agent runs** — last K (default 3) transcripts / status events for the same `task_id`, plus last 2 for sibling tasks in the same sprint. Source: `agent_runs` table, status + summary fields only (not full transcript, unless budget allows).
-4. **Repo state snapshot** — current branch name + last 5 commits (from `repos` table cached state, Pillar 1/Q24 data) + top-level file tree skim (directory names only, depth 2).
+3. **Recent agent runs** — last K (default 3) transcripts / status events for the same `task_id`, plus last 2 for sibling tasks in the same sprint. Source: `AgentRunRepository`, status + summary fields only (not full transcript, unless budget allows).
+4. **Repo state snapshot** — current branch name + last 5 commits (from `RepoRepository` cached state, Pillar 1/Q24 data) + top-level file tree skim (directory names only, depth 2).
 5. **Skill prompts** — SKILL.md content for the chosen agent + task type. Source: Pillar 5 skills registry. Truncated to skill description + triggers section.
 
 **Token budget:** configurable via `context.tokenBudget` project setting (default 8192). Proportional shrink: each slice allocated `budget * weight[i]`; weights `[0.35, 0.20, 0.20, 0.15, 0.10]`. Slices truncated independently by token count (naive `text.split(' ').length * 1.3` estimate; exact tiktoken used when embeddings flag on).
@@ -117,11 +136,11 @@ Triggered after `after_run` or `after_doc_save` (parallel to heuristic, graphile
 
 **Flag:** `FULCRUM_FEATURES=embeddings`
 
-On memory write: enqueue job `generate-memory-embedding` → sidecar `embed(body) → float32[]` → write to `memory_embeddings(memory_id, vector)` (384 dim for bge-small). On retrieval, hybrid score:
+On memory write: enqueue job `generate-memory-embedding` → sidecar `embed(body) → float32[]` → write `MemoryEmbedding.embedding` (384 dim for bge-small) through `MemoryEmbeddingRepository`. On retrieval, hybrid score:
 ```
 score = 0.6 * normalize(bm25) + 0.4 * cosine(embed(query), memory_embed)
 ```
-`normalize(bm25) = bm25 / max_bm25_in_result_set`. Recency + importance boosts unchanged (additive). Query embed cached in `context_snapshots.bundle_blob` for replay. `doc_embeddings` populated on doc save; ranks linked-doc slice when wikilinks > 5.
+`normalize(bm25) = bm25 / max_bm25_in_result_set`. Recency + importance boosts unchanged (additive). Query embed cached in `ContextSnapshot.bundleBlob` for replay. `DocEmbedding.embedding` populated on doc save; ranks linked-doc slice when wikilinks > 5.
 
 ### `report-llm-narration`
 
@@ -142,73 +161,139 @@ Summarize a memory cluster (project + date range) via sidecar `summarize(memorie
 | Dedup similarity | `pg_trgm` `similarity()` | PostgreSQL | 85% | Trigram not semantic enough | Cosine check via pgvector when embeddings on |
 | Token counting | Naive word-count * 1.3 (always-on) | N/A | 80% | Off by >15% for CJK text | `tiktoken-lite` WASM (gated with embeddings) |
 
+### Stack (C7-C9)
+
+- C7: MikroORM v7 ES decorators define entities and generated migration class `src/db/migrations/Migration<timestamp>.ts`.
+- C7: Embedding properties use `VectorType` from `pgvector/mikro-orm` with explicit `length: 384`; embeddings flag gates extension registration and writes.
+- C7/C6: HNSW index text appears only inside `@Index({ expression: 'USING hnsw (embedding vector_cosine_ops)' })`.
+- C8: `HeuristicExtractor`, `MemoryRetriever`, and `ContextAssembler` are needle-di `@Injectable()` services.
+- C9: Entities live under `src/db/entities/memory/`; repositories under `src/db/repositories/memory/`.
+
 Note: `ts_rank_cd` is not strict BM25 but equivalent here. TS BM25 re-ranker swappable if precision gate fails; no schema change.
 
 ---
 
 ## Schema changes
 
-```sql
-CREATE TABLE memories (
-  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id       uuid NOT NULL REFERENCES orgs(id),
-  project_id   uuid REFERENCES projects(id),
-  global       boolean NOT NULL DEFAULT false,
-  kind         text NOT NULL DEFAULT 'note',   -- note|decision|blocker|file_ref|section_anchor|link|fact
-  body         text NOT NULL,
-  tags         text[] NOT NULL DEFAULT '{}',
-  importance   text NOT NULL DEFAULT 'medium' CHECK (importance IN ('low','medium','high')),
-  source       text NOT NULL CHECK (source IN ('heuristic','llm','manual')),
-  source_ref   jsonb NOT NULL DEFAULT '{}',
-  created_at   timestamptz NOT NULL DEFAULT now(),
-  updated_at   timestamptz NOT NULL DEFAULT now(),
-  archived     boolean NOT NULL DEFAULT false,
-  body_tsv     tsvector GENERATED ALWAYS AS (to_tsvector('english', body)) STORED
-);
+Migration classes are generated from MikroORM entity metadata into `src/db/migrations/Migration<timestamp>.ts`. Representative entities:
 
--- Composite indexes per Q22
-CREATE INDEX memories_org_project_importance ON memories (org_id, project_id, importance);
-CREATE INDEX memories_org_kind    ON memories (org_id, kind);
-CREATE INDEX memories_org_archived ON memories (org_id, archived);
-CREATE INDEX memories_org_global  ON memories (org_id, global) WHERE global = true;
-CREATE INDEX memories_body_tsv    ON memories USING GIN (body_tsv);
+```typescript
+import { Entity, Index, ManyToOne, OneToOne, PrimaryKey, Property } from '@mikro-orm/decorators/es';
+import { randomUUID } from 'node:crypto';
+import { VectorType } from 'pgvector/mikro-orm';
 
-CREATE TABLE memory_links (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  memory_id   uuid NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
-  target_kind text NOT NULL,   -- task|doc|agent_run|artifact
-  target_id   uuid NOT NULL,
-  created_at  timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX memory_links_memory_id ON memory_links (memory_id);
-CREATE INDEX memory_links_target   ON memory_links (target_kind, target_id);
+@Entity({ tableName: 'memories' })
+@Index({ properties: ['orgId', 'projectId', 'importance'] })
+@Index({ properties: ['orgId', 'kind'] })
+@Index({ properties: ['orgId', 'archived'] })
+@Index({ properties: ['orgId', 'global'] })
+@Index({ name: 'memories_body_tsv', expression: "gin(to_tsvector('english', body))" })
+export class Memory {
+  @PrimaryKey({ type: 'uuid' })
+  id = randomUUID();
 
--- Gated (FULCRUM_FEATURES=embeddings); HNSW index added lazily on first write
-CREATE TABLE memory_embeddings (
-  memory_id  uuid PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE,
-  vector     vector(384),
-  model_id   text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE TABLE doc_embeddings (
-  doc_id     uuid PRIMARY KEY REFERENCES docs(id) ON DELETE CASCADE,
-  vector     vector(384),
-  model_id   text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
+  @Property({ type: 'uuid' })
+  orgId!: string;
 
--- Replay / debug; written on every context.assemble call
-CREATE TABLE context_snapshots (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  run_id      uuid REFERENCES agent_runs(id) ON DELETE SET NULL,
-  task_id     uuid REFERENCES tasks(id) ON DELETE SET NULL,
-  bundle_blob jsonb NOT NULL,
-  token_count int NOT NULL,
-  slice_sizes jsonb NOT NULL,
-  created_at  timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX context_snapshots_run_id  ON context_snapshots (run_id);
-CREATE INDEX context_snapshots_task_id ON context_snapshots (task_id);
+  @Property({ type: 'uuid', nullable: true })
+  projectId?: string;
+
+  @Property({ default: false })
+  global = false;
+
+  @Property({ default: 'note' })
+  kind!: 'note' | 'decision' | 'blocker' | 'file_ref' | 'section_anchor' | 'link' | 'fact';
+
+  @Property()
+  body!: string;
+
+  @Property({ type: 'array', default: [] })
+  tags: string[] = [];
+
+  @Property({ default: 'medium' })
+  importance!: 'low' | 'medium' | 'high';
+
+  @Property()
+  source!: 'heuristic' | 'llm' | 'manual';
+
+  @Property({ type: 'json', default: {} })
+  sourceRef: Record<string, unknown> = {};
+
+  @Property({ onCreate: () => new Date() })
+  createdAt = new Date();
+
+  @Property({ onUpdate: () => new Date() })
+  updatedAt = new Date();
+
+  @Property({ default: false })
+  archived = false;
+}
+
+@Entity({ tableName: 'memory_links' })
+@Index({ properties: ['memory'] })
+@Index({ properties: ['targetKind', 'targetId'] })
+export class MemoryLink {
+  @PrimaryKey({ type: 'uuid' })
+  id = randomUUID();
+
+  @ManyToOne(() => Memory, { deleteRule: 'cascade' })
+  memory!: Memory;
+
+  @Property()
+  targetKind!: 'task' | 'doc' | 'agent_run' | 'artifact';
+
+  @Property({ type: 'uuid' })
+  targetId!: string;
+}
+
+@Entity({ tableName: 'memory_embeddings' })
+@Index({ name: 'memory_embeddings_hnsw', expression: 'USING hnsw (embedding vector_cosine_ops)' })
+export class MemoryEmbedding {
+  @OneToOne(() => Memory, { primary: true, deleteRule: 'cascade' })
+  memory!: Memory;
+
+  @Property({ type: VectorType, length: 384, nullable: true })
+  embedding?: number[];
+
+  @Property()
+  modelId!: string;
+}
+
+@Entity({ tableName: 'doc_embeddings' })
+@Index({ name: 'doc_embeddings_hnsw', expression: 'USING hnsw (embedding vector_cosine_ops)' })
+export class DocEmbedding {
+  @PrimaryKey({ type: 'uuid' })
+  docId!: string;
+
+  @Property({ type: VectorType, length: 384, nullable: true })
+  embedding?: number[];
+
+  @Property()
+  modelId!: string;
+}
+
+@Entity({ tableName: 'context_snapshots' })
+@Index({ properties: ['runId'] })
+@Index({ properties: ['taskId'] })
+export class ContextSnapshot {
+  @PrimaryKey({ type: 'uuid' })
+  id = randomUUID();
+
+  @Property({ type: 'uuid', nullable: true })
+  runId?: string;
+
+  @Property({ type: 'uuid', nullable: true })
+  taskId?: string;
+
+  @Property({ type: 'json' })
+  bundleBlob!: ContextBundle;
+
+  @Property()
+  tokenCount!: number;
+
+  @Property({ type: 'json' })
+  sliceSizes!: Record<string, number>;
+}
 ```
 
 ---
@@ -287,7 +372,7 @@ graph TD
     subgraph "Embeddings (gated)"
         MROW --> GW2[generate-memory-embedding job]
         GW2 --> SID2[Inference sidecar embed]
-        SID2 --> ME[(memory_embeddings vector)]
+        SID2 --> ME[(MemoryEmbedding.embedding VectorType)]
         ME --> HYRET[Hybrid score 0.6*bm25 + 0.4*cosine]
     end
 ```
@@ -299,29 +384,29 @@ sequenceDiagram
     participant SYM as Symphony before_run
     participant ASSM as assemble.ts
     participant RET as retriever.ts
-    participant DB as PGlite
+    participant REPOS as MikroORM repositories
     participant SID as Inference sidecar
 
     SYM->>ASSM: assemble({orgId, projectId, taskId, agentName, budget:8192})
     ASSM->>RET: retrieve(taskDescription, {orgId, projectId, topK:20})
-    RET->>DB: SELECT memories WHERE (project_id OR global) ORDER BY bm25+recency+importance
-    DB-->>RET: top-20 memories
+    RET->>REPOS: MemoryRepository.searchProjectAndGlobal(...)
+    REPOS-->>RET: top-20 memories
     RET-->>ASSM: slice1 memories
 
-    ASSM->>DB: SELECT docs WHERE id IN (wikilinks from task description) LIMIT 5
-    DB-->>ASSM: slice2 linked docs (first paragraph)
+    ASSM->>REPOS: DocRepository.findLinkedDocs(...)
+    REPOS-->>ASSM: slice2 linked docs (first paragraph)
 
-    ASSM->>DB: SELECT agent_runs WHERE task_id ORDER BY created_at DESC LIMIT 3
-    DB-->>ASSM: slice3 recent runs
+    ASSM->>REPOS: AgentRunRepository.findRecentForTask(...)
+    REPOS-->>ASSM: slice3 recent runs
 
-    ASSM->>DB: SELECT repos.current_branch, last commits WHERE task.repo_id
-    DB-->>ASSM: slice4 repo snapshot
+    ASSM->>REPOS: RepoRepository.findSnapshotForTask(...)
+    REPOS-->>ASSM: slice4 repo snapshot
 
-    ASSM->>DB: SELECT fulcrum_skills WHERE name IN routing_rule.action_skill_set
-    DB-->>ASSM: slice5 skill prompts
+    ASSM->>REPOS: SkillRepository.findForRoutingRule(...)
+    REPOS-->>ASSM: slice5 skill prompts
 
     ASSM->>ASSM: proportional truncate [0.35,0.20,0.20,0.15,0.10] * budget
-    ASSM->>DB: INSERT context_snapshots(bundle_blob, token_count, slice_sizes)
+    ASSM->>REPOS: ContextSnapshotRepository.createSnapshot(...)
     ASSM-->>SYM: ContextBundle
 ```
 
@@ -375,11 +460,11 @@ const DoctorMemoryCheck = z.object({
 
 | Check ID | What it verifies | Failure recovery |
 |---|---|---|
-| `memory.schema.memories` | `memories` table with `body_tsv` GENERATED column | Run migration P8.1; check PGlite WASM supports generated cols |
-| `memory.schema.context_snapshots` | `context_snapshots` table exists | Run migration P8.1 |
-| `memory.schema.memory_links` | `memory_links` table exists | Run migration P8.1 |
-| `memory.fts.tsvector` | Simple FTS query returns in <100ms | Check GIN index on `body_tsv` |
-| `memory.embeddings.table` | If `embeddings` ON: `memory_embeddings` table present | Run migration P8.2 |
+| `memory.schema.memories` | `em.getMetadata().get(Memory)` exposes properties and indexes | Run migration P8.1; check MikroORM metadata snapshot |
+| `memory.schema.context_snapshots` | `em.getMetadata().get(ContextSnapshot)` round-trips create/read | Run migration P8.1 |
+| `memory.schema.memory_links` | `em.getMetadata().get(MemoryLink)` round-trips linked row | Run migration P8.1 |
+| `memory.fts.tsvector` | `MemoryRepository.searchProjectAndGlobal` returns in <100ms | Check `memories_body_tsv` metadata index |
+| `memory.embeddings.entity` | If `embeddings` ON: `em.getMetadata().get(MemoryEmbedding)` exposes `VectorType` length 384 | Run migration P8.2 |
 | `memory.embeddings.sidecar` | If `embeddings` ON: sidecar `embed()` reachable | Start inference sidecar (Pillar 2) |
 | `memory.llm-extract.sidecar` | If `memory-llm-extract` ON: sidecar `extract_facts` reachable | Start inference sidecar |
 | `memory.context.budget` | `context.tokenBudget` setting > 0 in project_settings | Configure via settings panel or CLI |
@@ -396,14 +481,14 @@ const DoctorMemoryCheck = z.object({
 | Pillar 7 (Docs) | consumes | doc save events for heuristic extraction; doc content for linked-doc slice 2 |
 | graphile-worker | runtime dep | job queue for async LLM extract + embedding generation jobs |
 | PGlite + pg_trgm | runtime dep | FTS, tsvector, trigram similarity for dedup |
-| PGlite + pgvector | runtime dep (gated) | vector column + HNSW index when `embeddings` on |
+| PGlite + `pgvector/mikro-orm` | runtime dep (gated) | `VectorType` property + HNSW `@Index({ expression })` when `embeddings` on |
 
 ---
 
 ## Issues breakdown
 
-**P8.1** Migration: `memories` + `memory_links` + `context_snapshots` + all indexes. TDD: idempotent; indexes present.
-**P8.2** Migration: `memory_embeddings` + `doc_embeddings` (no HNSW yet). TDD: tables exist; vector column typed.
+**P8.1** Migration class `Migration<timestamp>` covering `Memory` + `MemoryLink` + `ContextSnapshot` + all indexes. TDD: `em.getMetadata()` round-trips; indexes present in metadata.
+**P8.2** Migration class `Migration<timestamp>` covering `MemoryEmbedding` + `DocEmbedding` with `VectorType` length 384 (no HNSW writes yet). TDD: `em.getMetadata()` exposes vector properties.
 **P8.3** `extractor-heuristic.ts` — file-touched regex pass. TDD: fixture transcripts → expected rows.
 **P8.4** Heuristic — decision-line parser. TDD: 5 decision-pattern variants → `kind='decision'`.
 **P8.5** Heuristic — heading detection. TDD: H2/H3 headings → `kind='section_anchor'`.
@@ -413,7 +498,7 @@ const DoctorMemoryCheck = z.object({
 **P8.9** `retriever.ts` — BM25 via `ts_rank_cd`. TDD: fixed seed → deterministic top-20.
 **P8.10** Retriever — recency decay. TDD: newer memory beats identical 60-day-old body.
 **P8.11** Retriever — importance boost. TDD: `high` beats `medium` same body + age by +1.0.
-**P8.12** Retriever — project + global UNION. TDD: both scopes returned; no duplicates.
+**P8.12** Retriever — project + global repository merge. TDD: both scopes returned; no duplicates.
 **P8.13** Retriever — archived exclusion. TDD: excluded by default; visible with `includeArchived=true`.
 **P8.14** `assemble.ts` — slice 1 memories. TDD: retriever result in bundle.
 **P8.15** Assembler — slice 2 linked docs. TDD: wikilinks resolved; max 5 docs; first-paragraph truncation.
@@ -435,9 +520,9 @@ const DoctorMemoryCheck = z.object({
 **P8.31** TUI context preview screen. TDD: 5 slices render; expand/collapse; budget bar accurate.
 **P8.32** OpenAPI mount (gated `public-api`). TDD: spec validates; payloads match tRPC.
 **P8.33** Gated `memory-llm-extract`: job `extract-llm-memories`; sidecar `extract_facts`; `pg_trgm` dedup; `source='llm'`. TDD: job enqueued when flag on; dedup skips near-duplicate.
-**P8.34** Gated `embeddings`: job `generate-memory-embedding`; sidecar `embed()`; writes `memory_embeddings`. TDD: row written; dimension correct.
+**P8.34** Gated `embeddings`: job `generate-memory-embedding`; sidecar `embed()`; writes `MemoryEmbedding.embedding`. TDD: row written; dimension correct.
 **P8.35** Gated `embeddings`: hybrid scoring. TDD: re-ranks differently from FTS-only on same seed.
-**P8.36** Gated `embeddings`: HNSW index post-first-write. TDD: index present; EXPLAIN shows index scan.
+**P8.36** Gated `embeddings`: HNSW `@Index({ expression: 'USING hnsw (embedding vector_cosine_ops)' })` registered after first write path. TDD: metadata exposes index; hybrid repository path uses indexed property.
 **P8.37** Gated `report-llm-narration`: `fulcrum memory digest`; sidecar `summarize`; writes `doc_type='note'`. TDD: doc row created; body non-empty.
 
 ---
@@ -447,10 +532,10 @@ const DoctorMemoryCheck = z.object({
 | Component | Gate condition | Response |
 |---|---|---|
 | `ts_rank_cd` BM25 quality | Retriever precision@10 < 0.6 on test corpus | Replace with hand-rolled BM25 re-ranker in TS; no schema change |
-| pgvector HNSW recall | Recall@10 < 0.9 on embedding test set | Tune `ef_construction` / `m` HNSW params; fallback to exact `ORDER BY vector <=>` (no HNSW) |
+| pgvector HNSW recall | Recall@10 < 0.9 on embedding test set | Tune `ef_construction` / `m` HNSW params; fallback to exact cosine re-rank through repository helper (no HNSW) |
 | Inference sidecar unavailable | `embed()` or `extract_facts()` call fails or times out | Disable gated feature for run; log warning; heuristic path continues uninterrupted |
 | graphile-worker PGlite compatibility | Job queue drops or duplicates jobs in tests | Switch to pg-boss (same Postgres, simpler API) |
-| PGlite `tsvector` GENERATED ALWAYS | PGlite WASM version doesn't support generated columns | Compute `body_tsv` in application layer on write; add trigger |
+| PGlite tsvector metadata support | PGlite WASM version doesn't support generated tsvector property | Compute text-search field in `MemoryRepository` before `em.flush()` |
 | Token budget accuracy | Naive word-count estimate off > 15% for non-Latin text | Add `tiktoken-lite` WASM; gated with `embeddings` flag (both ship together) |
 | `memory-llm-extract` job timeout | Inference sidecar > 30s per transcript | Job fails silently; no retry beyond 2×; heuristic row still present |
 
@@ -476,6 +561,6 @@ All three surfaces must reach parity before pillar ships.
 
 8. **Archive lifecycle** — Archived rows excluded by default; visible with `--include-archived`; restorable. All three surfaces.
 
-9. **Gated off by default** — No `FULCRUM_FEATURES` → `memory_embeddings` empty, no sidecar calls, no `source='llm'` rows. (`feature-flags.test.ts`)
+9. **Gated off by default** — No `FULCRUM_FEATURES` → `MemoryEmbeddingRepository.count()` stays zero, no sidecar calls, no `source='llm'` rows. (`feature-flags.test.ts`)
 
 10. **OpenAPI parity** — `public-api` ON → spec passes `openapi-validator`; payload schemas match tRPC. (`openapi.memory.test.ts`)

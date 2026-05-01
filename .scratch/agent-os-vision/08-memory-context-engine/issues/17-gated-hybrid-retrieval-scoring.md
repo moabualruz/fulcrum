@@ -21,7 +21,7 @@ score = 0.6 * normalize(ts_rank_cd(...))
 
 `normalize(bm25) = bm25 / max_bm25_in_result_set`. Recency and importance boosts unchanged (additive). Query embed cached in `context_snapshots.bundle_blob` for replay.
 
-`doc_embeddings` used for linked-doc slice 2 in assembler re-ranking when wikilinks > 5 (adds cosine ranking on top of wikilink order).
+`DocEmbedding.embedding` used for linked-doc slice 2 in assembler re-ranking when wikilinks > 5 (adds cosine ranking on top of wikilink order).
 
 Falls back to FTS-only scoring if sidecar is unavailable (log warning, proceed).
 
@@ -30,12 +30,12 @@ Falls back to FTS-only scoring if sidecar is unavailable (log warning, proceed).
 - [ ] `FULCRUM_FEATURES=embeddings` ON → `retrieve()` calls sidecar `embed(query)`; scoring uses hybrid formula
 - [ ] `memory.search` re-ranks differently from FTS-only for ≥3/10 test queries (`retriever.hybrid.test.ts`)
 - [ ] `normalize(bm25)` computed correctly: `bm25 / max(bm25)` within result set; no divide-by-zero on empty set
-- [ ] Cosine similarity: `1 - (vector <=> query_vec)` using pgvector operator
+- [ ] Cosine similarity computed by `MemoryEmbeddingRepository.cosineSimilarity(queryEmbedding)` against the `VectorType` property
 - [ ] Query embed cached in `context_snapshots.bundle_blob` so replay hydration doesn't re-embed
 - [ ] Sidecar unavailable with flag on → fallback to FTS-only; warning logged; no error thrown
-- [ ] Doc embeddings: assembler slice 2 re-ranks linked docs by cosine similarity when wikilinks > 5
+- [ ] Doc embeddings: assembler slice 2 re-ranks linked docs by cosine similarity through `DocEmbeddingRepository` when wikilinks > 5
 - [ ] Flag OFF → retriever unchanged; no sidecar calls
-- [ ] HNSW index scan confirmed in EXPLAIN for hybrid path (from slice 16)
+- [ ] HNSW `@Index({ expression: 'USING hnsw (embedding vector_cosine_ops)' })` metadata confirmed for hybrid path (from slice 16)
 - [ ] All retriever tests from slice 06 still pass with flag off
 
 ## Blocked by

@@ -12,7 +12,7 @@ Docs: PRD §Heuristic extractor — five regex/parser passes
 
 ## What to build
 
-`src/memory/extractor-heuristic.ts` — pure TS module (~200 LOC) with a single exported function `extractMemories(text: string): HeuristicMemory[]`. Runs five regex/parser passes in sequence over an agent run transcript or doc body:
+`src/memory/extractor-heuristic.ts` — needle-di `@Injectable()` service (~200 LOC) with method `extractMemories(text: string): HeuristicMemory[]`. Constructor uses `inject(MemoryRepository)` default-param syntax for later write-path reuse, while this method remains deterministic and side-effect free. Runs five regex/parser passes in sequence over an agent run transcript or doc body:
 
 1. **file-touched** — `[read|wrote|created|deleted] <path>` → `kind='file_ref'`
 2. **decision lines** — `decided:` / `decision:` / `## Decision` headings → `kind='decision'`, `importance='high'`
@@ -24,7 +24,8 @@ All output rows carry `source='heuristic'`. No DB writes here — this is a pure
 
 ## Acceptance criteria
 
-- [ ] `extractMemories(text)` is a pure function with no DB or I/O dependencies
+- [ ] `HeuristicExtractor` is `@Injectable()` and resolved through needle-di
+- [ ] `HeuristicExtractor.extractMemories(text)` is deterministic with no DB writes or I/O
 - [ ] Pass 1: fixture transcript with `"[wrote] src/foo.ts"` → row `{ kind: 'file_ref', body: 'src/foo.ts', source: 'heuristic' }`
 - [ ] Pass 2: `"decided: use PGlite"` and `"## Decision\nuse PGlite"` each → `{ kind: 'decision', importance: 'high' }`; covers 5 decision-pattern variants
 - [ ] Pass 3: `"## Summary"` and `"### Details"` → `{ kind: 'section_anchor' }`

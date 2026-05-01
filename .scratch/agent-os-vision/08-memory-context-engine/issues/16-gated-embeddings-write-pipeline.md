@@ -7,29 +7,29 @@ PRD: .scratch/agent-os-vision/prds/08-memory-context-engine.md
 Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 8 section)
 Decisions: [Q17, C1]
 Vision: .scratch/agent-os-vision/VISION-GAPS.md (Memory + Context rows)
-Docs: PRD §Gated features — embeddings flag; graphile-worker job generate-memory-embedding; HNSW index lazy creation
+Docs: PRD §Gated features — embeddings flag; graphile-worker job generate-memory-embedding; HNSW `@Index({ expression })`
 ---
 
 ## What to build
 
-Gated embedding write pipeline (`FULCRUM_FEATURES=embeddings`). On any `memories` row write (create or update), enqueue graphile-worker job `generate-memory-embedding`. Job calls Pillar 2 sidecar `embed(body) → float32[384]` and writes to `memory_embeddings(memory_id, vector, model_id)`.
+Gated embedding write pipeline (`FULCRUM_FEATURES=embeddings`). On any `Memory` entity write (create or update), enqueue graphile-worker job `generate-memory-embedding`. Job calls Pillar 2 sidecar `embed(body) → float32[384]` and writes `MemoryEmbedding.embedding` through `MemoryEmbeddingRepository`.
 
-HNSW index: created lazily on first successful embedding write (`CREATE INDEX IF NOT EXISTS memories_embedding_hnsw ON memory_embeddings USING hnsw (vector vector_cosine_ops)`). After creation, `EXPLAIN` confirms index scan used for `ORDER BY vector <=> $query_embed`.
+HNSW index: declared with the C6 decorator carve-out on the entity, `@Index({ expression: 'USING hnsw (embedding vector_cosine_ops)' })`. After first successful embedding write, metadata and repository integration tests confirm the hybrid path uses the indexed `embedding` property.
 
-Also: doc-save path writes to `doc_embeddings` via job `generate-doc-embedding` (same pattern; used for linked-doc re-ranking in assembler slice 2 when wikilinks > 5).
+Also: doc-save path writes `DocEmbedding.embedding` via job `generate-doc-embedding` (same pattern; used for linked-doc re-ranking in assembler slice 2 when wikilinks > 5).
 
-Default OFF — no sidecar calls, `memory_embeddings` stays empty.
+Default OFF — no sidecar calls, `MemoryEmbeddingRepository.count()` stays zero.
 
 ## Acceptance criteria
 
-- [ ] `FULCRUM_FEATURES` unset → no embedding jobs enqueued; `memory_embeddings` empty (`feature-flags.test.ts`)
-- [ ] `FULCRUM_FEATURES=embeddings` → memory write → job enqueued → `memory_embeddings` row written with `vector` dimension 384
-- [ ] `model_id` column set to the sidecar's reported model name (e.g. `bge-small-en-v1.5`)
-- [ ] HNSW index created after first write; `EXPLAIN SELECT ... ORDER BY vector <=> $1` shows index scan
-- [ ] `doc_embeddings` populated on doc save when flag on
+- [ ] `FULCRUM_FEATURES` unset → no embedding jobs enqueued; `MemoryEmbeddingRepository.count()` stays zero (`feature-flags.test.ts`)
+- [ ] `FULCRUM_FEATURES=embeddings` → memory write → job enqueued → `MemoryEmbedding.embedding` written with dimension 384
+- [ ] `modelId` property set to the sidecar's reported model name (e.g. `bge-small-en-v1.5`)
+- [ ] HNSW metadata present after first write path; repository hybrid search uses indexed `embedding` property
+- [ ] `DocEmbedding.embedding` populated on doc save when flag on
 - [ ] Sidecar unavailable → job retries 2× then fails silently; memory row still present without embedding
 - [ ] Dimension mismatch (sidecar returns wrong size) → job fails with error log; no corrupt row written
-- [ ] Integration test: flag ON + mock sidecar → assert `memory_embeddings` row; assert vector dimension = 384
+- [ ] Integration test: flag ON + mock sidecar → assert `MemoryEmbedding` row; assert vector dimension = 384
 - [ ] `fulcrum doctor --json` `embeddings` subsystem: `disabled` when flag off; `ok`/`degraded` with row count when on
 
 ## Blocked by

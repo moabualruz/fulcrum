@@ -12,18 +12,18 @@ Docs: PRD §Out-of-scope — Pillar 3 owns before_run invocation; PRD §Context 
 
 ## What to build
 
-Wire `assemble()` into Symphony's `before_run` hook so the context bundle is injected into every agent run's workspace before the agent starts. This pillar implements the hook handler; Pillar 3 calls it.
+Wire `ContextAssembler.assemble()` into Symphony's `before_run` hook so the context bundle is injected into every agent run's workspace before the agent starts. This pillar implements the hook handler; Pillar 3 calls it.
 
-`src/memory/hooks/before-run-hook.ts` exports `beforeRunHook(runId, taskId, agentType, ctx): Promise<ContextBundle>`. Symphony's `workspace.ts` calls this hook via `onWorktreeReady` (Pillar 4 Sandcastle adapter). The returned bundle is serialized and written to the worktree as `.fulcrum/context.json` so the agent can read it.
+`src/memory/hooks/before-run-hook.ts` exports `@Injectable() BeforeRunContextHook` with `handle(runId, taskId, agentType, ctx): Promise<ContextBundle>`. Symphony's `workspace.ts` calls this hook via `onWorktreeReady` (Pillar 4 Sandcastle adapter). The returned bundle is serialized and written to the worktree as `.fulcrum/context.json` so the agent can read it.
 
 This is the integration slice — not new logic, just wiring assemble → hook → file write.
 
 ## Acceptance criteria
 
-- [ ] `beforeRunHook` exported from `src/memory/hooks/before-run-hook.ts`
-- [ ] Calls `assemble(taskId, { agentType })` and returns the `ContextBundle`
+- [ ] `BeforeRunContextHook` exported from `src/memory/hooks/before-run-hook.ts`
+- [ ] Resolves `ContextAssembler`, calls `assemble(taskId, { agentType })`, and returns the `ContextBundle`
 - [ ] Writes `ContextBundle` JSON to `<worktree>/.fulcrum/context.json` (path configurable via env)
-- [ ] `context_snapshots.run_id` set to `runId` after hook completes
+- [ ] `ContextSnapshot.runId` set to `runId` after hook completes
 - [ ] Integration test: mock Symphony `before_run` trigger → assert `.fulcrum/context.json` written with 5 slices
 - [ ] Hook failure (e.g. retriever DB error) is non-fatal: logs warning and writes a minimal bundle `{ slices: [], tokenCount: 0, error: '...' }` so the run still proceeds
 - [ ] `fulcrum doctor --json` `context_assembly` subsystem: `ok`

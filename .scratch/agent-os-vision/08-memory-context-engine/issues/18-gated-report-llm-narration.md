@@ -12,7 +12,7 @@ Docs: PRD §Gated features — report-llm-narration flag; fulcrum memory digest;
 
 ## What to build
 
-Gated memory-cluster digest (`FULCRUM_FEATURES=report-llm-narration`). Summarizes a project's memory cluster over a date range via Pillar 2 sidecar `summarize(memories[]) → string`. Output stored as a `doc_type='note'` doc (Pillar 7 docs table) with `source_ref = { kind: 'memory_digest', project_id, since }`.
+Gated memory-cluster digest (`FULCRUM_FEATURES=report-llm-narration`). Summarizes a project's memory cluster over a date range via Pillar 2 sidecar `summarize(memories[]) → string`. Output stored as a `Doc` entity with `docType='note'` (Pillar 7 docs) and `sourceRef = { kind: 'memory_digest', project_id, since }`.
 
 Triggered two ways:
 1. `fulcrum memory digest --project <id> [--since <date>]` CLI command

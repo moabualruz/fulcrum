@@ -32,4 +32,4 @@ Both operations get JSON-RPC methods, tRPC procedures, CLI commands, and web deb
 ## Notes
 - `classify` cosine similarity: `dot(v_text, v_label) / (|v_text| * |v_label|)`.
 - `tokenize` only needs the tokenizer, not the model weights — load tokenizer config from model download dir, no full GGUF load.
-- Both operations cacheable in `embed_cache` (classify: keyed on `(model, sha256(text + labels_sorted))`; tokenize: in-memory LRU only, no DB).
+- Both operations cacheable through `CacheStore` `EmbedCacheEntry` (classify: keyed on `(model, sha256(text + labels_sorted))`; tokenize: in-memory LRU only, no DB).
