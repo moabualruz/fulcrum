@@ -1,5 +1,17 @@
 import type { BoardTask } from "$lib/product-queries";
-import { TASK_STATUSES, type TaskStatus } from "$lib/server/tasks";
+// SvelteKit's `$lib/server/*` rule blocks runtime imports of `tasks.ts` from
+// any module that ends up in the browser bundle. We pull the type only and
+// re-declare the canonical status order locally — the type guarantees the
+// list matches the server's `TaskStatus` definition.
+import type { TaskStatus } from "$lib/server/tasks";
+
+export const TASK_STATUSES = [
+  "pending",
+  "in_progress",
+  "blocked",
+  "completed",
+  "cancelled",
+] as const satisfies readonly TaskStatus[];
 
 export interface BoardSnapshot {
   groups: Record<TaskStatus, BoardTask[]>;

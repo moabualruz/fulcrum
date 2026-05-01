@@ -2,8 +2,8 @@
   import type { BoardTask } from "$lib/product-queries";
   import { buttonVariants } from "$lib/components/ui/button/index.js";
   import { cn } from "$lib/utils.js";
-  import { TASK_STATUSES, type TaskStatus } from "$lib/server/tasks";
-  import { describeStatus } from "./board-helpers.ts";
+  import type { TaskStatus } from "$lib/server/tasks";
+  import { TASK_STATUSES, describeStatus } from "./board-helpers.ts";
 
   interface Props {
     open: boolean;

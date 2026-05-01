@@ -35,7 +35,7 @@ Acceptance criteria:
 - [x] **05.3 — `BoardCard` component.** Owns: `src/web/src/lib/components/board/BoardCard.svelte`, `.svelte.test.ts`. RED: click fires `onEdit` callback with task id.
 - [x] **05.4 — `BoardColumn` with `svelte-dnd-action`.** Owns: `src/web/src/lib/components/board/BoardColumn.svelte`, `.svelte.test.ts`. RED: `finalize` handler emits server-action call with `{ taskId, fromStatus, toStatus }`.
 - [x] **05.5 — `BoardSheet` editor + keyboard accessibility.** Owns: `src/web/src/lib/components/board/BoardSheet.svelte`, `KeyboardMoveAnnouncer.svelte`. RED: keyboard helper triggers `optimisticMove`; `aria-live` region updated with move description.
-- [ ] **05.6 — `/boards/+page` wiring + project filter.** Owns: `src/web/src/routes/boards/+page.server.ts`, `+page.svelte`. RED: page renders five columns with seeded counts; project filter narrows results.
+- [x] **05.6 — `/boards/+page` wiring + project filter.** Owns: `src/web/src/routes/boards/+page.server.ts`, `+page.svelte`. RED: page renders five columns with seeded counts; project filter narrows results.
 
 ## Comments
 
@@ -92,6 +92,27 @@ Tests:
 RED: `bun test --conditions=svelte ./src/web/src/lib/components/board/BoardSheet.svelte.test.ts ./src/web/src/lib/components/board/KeyboardMoveAnnouncer.svelte.test.ts` → `0 pass / 2 fail` (`Cannot find module './BoardSheet.svelte'` and `Cannot find module './KeyboardMoveAnnouncer.svelte'`).
 
 GREEN: same command → `7 pass / 0 fail`. Full board suite `./src/web/src/lib/components/board/` → `44 pass / 0 fail`.
+
+Gates: `cd src/web && bun run check` 0/0/0; `bun run build` ok; repo `bun run ci` 9/9 green.
+
+### 05.6 — landed
+
+`/boards` route rewritten end-to-end:
+
+- `src/web/src/routes/boards/+page.server.ts` (122 LOC) — `load()` reads `url.searchParams.get("project") ?? activeProjectId ?? ""` and calls `listBoardTasks(project || null)`; returns `{ tasks, project }`. Four named actions wire valibot-validated form data into `tasks.ts`: `?/create` (createTaskAction), `?/update` (updateTaskAction), `?/delete` (deleteTaskAction), `?/move` (moveTaskStatusAction). Stale-`from` race on `?/move` returns `fail(409, …)` per the design contract.
+- `src/web/src/lib/server/boards.schema.ts` (43 LOC) — small valibot schema module: `BoardCreateSchema`, `BoardUpdateSchema`, `BoardDeleteSchema`, `BoardMoveSchema`. Status fields are constrained by `v.picklist([...TASK_STATUSES])`; title trims and bounds 1..200.
+- `src/web/src/routes/boards/+page.svelte` (109 LOC) — Svelte 5 runes. `<header>` carries `<h1>Board</h1>` + `<form method="GET">` with `<select data-board-project-filter>` (auto-submits on change, listing distinct project IDs found in `data.tasks` + an `All` option). Body is a horizontal-scroll grid of five `<BoardColumn>` over `TASK_STATUSES` with `tasksFor(status)` from `buildBoardSnapshot(data.tasks)`. `<BoardSheet>` is controlled by `$state` `sheetOpen`/`selectedTask`; `onCardEdit` opens the sheet, `onSave` posts to `?/update`, `onDelete` posts to `?/delete`. `onMove` posts to `?/move`. Every form-post path calls `invalidateAll()` (lazy `$app/navigation` import keeps SSR clean) so optimistic UI reverts on 4xx without bespoke rollback logic. `onCardKeydown` consumes arrow-keys, calls `keyboardMove(buildBoardSnapshot(tasks), focusedTaskId, …)`, and pipes the resulting `description` into `<KeyboardMoveAnnouncer message={announcement} />`.
+
+Tests:
+
+- `src/web/src/routes/boards/page.server.test.ts` (5 cases): default load returns three seeded tasks across two projects with `project=""`; `project` search-param narrows to one project; `?/create` inserts the row + emits `task.created`; `?/move` updates status + emits `task.status_changed`; `?/move` with stale `from` returns `fail(409)`.
+- `src/web/src/routes/boards/page.svelte.test.ts` (4 SSR cases): all five `data-status="<status>"` columns render regardless of distribution; per-column count badges match seeded distribution (2/1/1/1/0); project-filter `<select>` carries `data-board-project-filter` plus an `All` option and one option per distinct non-null project ID; header `<h1>` reads `Board`.
+
+Build-graph fix: the prior board-helpers/`BoardSheet` modules pulled `TASK_STATUSES` out of `$lib/server/tasks`, which compiled fine while no SvelteKit route used those modules. Wiring them into `+page.svelte` made the chain reach the client bundle and the SvelteKit guard rejected `$lib/server/tasks` as server-only. Resolution: switch both to `import type { TaskStatus }` and re-declare `TASK_STATUSES` once in `board-helpers.ts` with `as const satisfies readonly TaskStatus[]` — type-system guarantees the literal stays in sync with the server enum. `BoardSheet.svelte` now reads the constant from `board-helpers.ts` instead. Net behaviour unchanged; tests + check + build all green.
+
+RED: `bun test --conditions=svelte ./src/web/src/routes/boards/page.server.test.ts ./src/web/src/routes/boards/page.svelte.test.ts` → `0 pass / 9 fail`. First failure: `expect(result.project).toBe("") — Expected: "" / Received: undefined`.
+
+GREEN: same command → `9 pass / 0 fail`. Full board+route+task suite (`./src/web/src/lib/components/board/ ./src/web/src/routes/boards/ ./src/web/src/lib/server/tasks.test.ts`) → `65 pass / 0 fail`.
 
 Gates: `cd src/web && bun run check` 0/0/0; `bun run build` ok; repo `bun run ci` 9/9 green.
 
