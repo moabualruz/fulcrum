@@ -9,6 +9,7 @@ export interface ProjectListing {
   slug: string;
   name: string;
   description: string | null;
+  updated_at: string;
 }
 
 export interface DocumentListing {
@@ -46,7 +47,7 @@ export async function listProjects(): Promise<ProjectListing[]> {
   const db = await open();
   try {
     return await db.query<ProjectListing>(
-      `SELECT id, slug, name, description FROM projects ORDER BY created_at ASC, id ASC`,
+      `SELECT id, slug, name, description, updated_at FROM projects ORDER BY created_at ASC, id ASC`,
     );
   } finally {
     await db.close();
