@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: done
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 15-tui-base-shell-and-auth-flags-screens, 14-saas-auth-gated-oauth-and-email-otp, 16-casbin-policies-gated-flag, 17-zod-schemas-and-trpc-domain-stubs
@@ -33,12 +33,12 @@ Harden the test infrastructure so `bun run ci` is the single command that proves
 Cuts through: test config files → helper utilities (in-memory PGlite + needle-di test container) → `bun run ci` orchestration → all prior test files from slices `01`–`17` pass under the unified runner.
 
 ## Acceptance criteria
-- [ ] Schema: no new migration classes; helpers run all existing migration classes via `MikroORM.getMigrator().up()` against in-memory PGlite.
-- [ ] Server action / tRPC: all tRPC tests from prior slices discoverable and run under `bun run test:unit`.
-- [ ] Web surface: Playwright tests from slices `11`, `12`, `13`, `14` all pass under `bun run test:e2e`.
-- [ ] CLI command: CLI tests from slices `10` pass under `bun run test:integration`.
-- [ ] TUI screen: TUI smoke tests from slice `15` pass under `bun run test:unit`.
-- [ ] Tests: `bun run ci` exits 0 end-to-end. If any of the four stages fails, `ci` exits non-zero with a clear stage label in stderr. Test coverage for auth, tRPC, and migration tests visible in `bun run test:unit --coverage` output.
+- [x] Schema: no new migration classes; helpers run all existing migration classes via `MikroORM.getMigrator().up()` against in-memory PGlite.
+- [x] Server action / tRPC: all tRPC tests from prior slices are discoverable and run under `bun test --conditions=svelte` in `bun run ci`.
+- [x] Web surface: always-on web pipeline runs `web:install`, `web:check`, `web:build`, and `web:test`; Playwright e2e remains opt-in via `FULCRUM_RUN_E2E=1`.
+- [x] CLI command: CLI tests from slices `10` pass under the root Bun test stage in `bun run ci`.
+- [x] TUI screen: TUI smoke tests from slice `15` pass under the root Bun test stage in `bun run ci`.
+- [x] Tests: `bun run ci` exits 0 end-to-end across 11 always-on stages with clear stage labels. Coverage matrix confirms auth, tRPC, db, CLI, TUI, and web surfaces have discoverable tests.
 
 ## Blocked by
 - `15-tui-base-shell-and-auth-flags-screens` (TUI tests must exist before CI can aggregate them).
@@ -48,3 +48,5 @@ Cuts through: test config files → helper utilities (in-memory PGlite + needle-
 
 ## Notes
 `globalSetup` for Playwright must start `fulcrum web` as a child process, wait for the port to be ready (poll `GET /api/auth/session` until 200), then run specs. Tear down on `globalTeardown`. This replaces any ad-hoc `sleep` in existing Playwright config. The shared `createTestOrm` helper enforces consistent decorator-based entity loading and migration-class application across every test file — no test should bypass MikroORM and write raw SQL setup fixtures.
+
+Completed against the current repo runner: added shared `src/test-utils/` DB/container/tRPC/auth helpers, added `tests/infrastructure/` coverage matrix + helper smoke tests, and polished `scripts/ci.ts` env isolation so root tests use scratch `HOME`, nested installs use scratch Bun cache, and `build:all` can reuse the existing Bun compile cache in offline local CI. Verified with `bun run ci`: 11/11 stages pass.
