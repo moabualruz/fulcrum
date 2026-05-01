@@ -19,3 +19,4 @@ eval-results/
 /repomix-output.md
 .claude/settings.local.json
 .claude/.cache/
+.codex/

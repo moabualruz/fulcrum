@@ -36,6 +36,7 @@ export async function loadDashboard(
   const params: SqlValue[] = [orgId];
   if (scope.param !== undefined) params.push(scope.param);
   const NOT_DONE = "status NOT IN ('completed','cancelled')";
+  const RECENT_LIMIT = 5;
 
   // counters.projects intentionally ignores projectId: org-wide stat.
   const [projectsR, openTasksR, docsR, runsR, recentRuns, recentDocs, topTasks] = await Promise.all([
@@ -55,18 +56,18 @@ export async function loadDashboard(
     ),
     db.query<DashboardData["recentRuns"][number]>(
       `SELECT id, agent, status, started_at, ended_at FROM agent_runs
-         WHERE org_id = $1${scope.sql} ORDER BY started_at DESC LIMIT 5`,
+         WHERE org_id = $1${scope.sql} ORDER BY started_at DESC LIMIT ${RECENT_LIMIT}`,
       params,
     ),
     db.query<DashboardData["recentDocs"][number]>(
       `SELECT id, title, kind, updated_at FROM documents
-         WHERE org_id = $1${scope.sql} ORDER BY updated_at DESC LIMIT 5`,
+         WHERE org_id = $1${scope.sql} ORDER BY updated_at DESC LIMIT ${RECENT_LIMIT}`,
       params,
     ),
     db.query<DashboardData["topTasks"][number]>(
       `SELECT id, title, status, priority, project_id FROM tasks
          WHERE org_id = $1 AND ${NOT_DONE}${scope.sql}
-         ORDER BY priority DESC, updated_at DESC LIMIT 5`,
+         ORDER BY priority DESC, updated_at DESC LIMIT ${RECENT_LIMIT}`,
       params,
     ),
   ]);
