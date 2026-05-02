@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "inference-core",
+    "inference-server",
+    "inference-embed",
+    "inference-generate",
+]
+resolver = "2"
