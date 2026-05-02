@@ -98,9 +98,9 @@ describe("Notification entity exports and metadata", () => {
     expect(EventRetentionPolicy).toBeDefined();
     expect(WebhookRuleConfig).toBeDefined();
     expect(PushSubscription).toBeDefined();
-    expect(DeliveryStatus.Pending).toBe("pending");
-    expect(DeliveryStatus.Sent).toBe("sent");
-    expect(DeliveryStatus.Failed).toBe("failed");
+    expect(String(DeliveryStatus.Pending)).toBe("pending");
+    expect(String(DeliveryStatus.Sent)).toBe("sent");
+    expect(String(DeliveryStatus.Failed)).toBe("failed");
   });
 
   it("has correct table names and org FK on all entities", async () => {
