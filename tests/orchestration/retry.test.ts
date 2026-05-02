@@ -13,7 +13,8 @@ describe("calcRetryDelay", () => {
     [2, 3_600_000, 20_000],
     [3, 3_600_000, 40_000],
     [4, 3_600_000, 80_000],
-    [10, 3_600_000, 3_600_000], // cap: uncapped would be 5_120_000
+    [10, 300_000, 300_000],     // compatibility default cap
+    [10, 3_600_000, 3_600_000], // explicit override cap
     [1, 5_000, 5_000],          // immediate cap when maxMs < first-attempt delay
   ])("attempt=%d maxMs=%d → %dms", (attempt, maxMs, expected) => {
     expect(calcRetryDelay(attempt, maxMs)).toBe(expected);
@@ -62,7 +63,7 @@ function makeFakeEm(updateCount = 1) {
 
 const DEFAULT_CONFIG: WorkflowConfig = {
   stallTimeoutMs: 300_000,
-  maxRetryBackoffMs: 3_600_000,
+  maxRetryBackoffMs: 300_000,
   keepOnFailure: false,
   maxAttempts: 3,
 };

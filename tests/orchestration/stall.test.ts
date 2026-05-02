@@ -15,7 +15,7 @@ import type { WorkflowConfig } from "../../src/orchestration/symphony/schemas.ts
 
 const DEFAULT_CONFIG: WorkflowConfig = {
   stallTimeoutMs: 300_000,
-  maxRetryBackoffMs: 3_600_000,
+  maxRetryBackoffMs: 300_000,
   keepOnFailure: false,
   maxAttempts: 3,
 };

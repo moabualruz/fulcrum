@@ -67,7 +67,7 @@ describe("parseWorkflowConfig", () => {
 
     expect(parseWorkflowConfig("")).toEqual({
       stallTimeoutMs: 300000,
-      maxRetryBackoffMs: 3600000,
+      maxRetryBackoffMs: 300000,
       keepOnFailure: false,
       maxAttempts: 3,
     });
@@ -147,7 +147,7 @@ describe("orchestration.renderPromptPreview", () => {
       prompt: "Ship prompt preview.",
       config: {
         stallTimeoutMs: 300000,
-        maxRetryBackoffMs: 3600000,
+        maxRetryBackoffMs: 300000,
         keepOnFailure: false,
         maxAttempts: 2,
       },

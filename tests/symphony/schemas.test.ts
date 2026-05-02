@@ -114,7 +114,7 @@ describe("Symphony shared schemas", () => {
   it("keeps workflow config defaults in the shared schema", () => {
     expect(WorkflowConfigSchema.parse({})).toEqual({
       stallTimeoutMs: 300000,
-      maxRetryBackoffMs: 3600000,
+      maxRetryBackoffMs: 300000,
       keepOnFailure: false,
       maxAttempts: 3,
     });
