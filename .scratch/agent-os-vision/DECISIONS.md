@@ -358,18 +358,23 @@ Replaces the original boolean. Future-proof. Default = `'project'` on insert whe
 - Env: `FULCRUM_FEATURES=router-llm,embeddings,real-time-collab-server` (case-insensitive parser; canonicalized to lowercase).
 - DB column `feature_flags.name text` UNIQUE per org. Zod regex `^[a-z][a-z0-9-]*$` enforced at registration.
 
-### D6. Execution mode → continuous dependency queue + mandatory cross-runtime review
+### D6. Execution mode → continuous dependency queue + milestone cross-runtime review
 Locked: 2026-05-02 by user. Verbatim: "stop stopping and defining waves and act as if it is 1 big continues work till the end line" and "if tasks done by codex claude is reviewing and if tasks done by claude codex is reviewing".
+Updated: 2026-05-02 by user. Verbatim summary: `@RESUME.md` means keep going until all tasks complete, user pauses, or feedback is required; review gates happen after milestones / integration bundles, not after each task.
+Updated: 2026-05-02 by user. Verbatim summary: parallelism allowance is 6 Codex CLI agents and 6 Claude Code agents; resume orchestration must drive toward both limits instead of treating 6 as the total pool.
 
 - Waves are planning history only. Execution is one continuous dependency queue from current state to final release.
-- Keep up to 6 implementation slots and up to 6 review slots active whenever dependencies allow. Refill slots immediately after an issue completes, blocks, or moves to review. Do not stop after artificial batches or wave boundaries.
-- The dependency DAG still controls safety: an issue is dispatchable only when its `Blocked-by:` issues are completed. "Wave" labels never block otherwise-ready work.
-- Mandatory cross-runtime loop:
-  - Claude implementer → Codex reviewer.
-  - Codex implementer → Claude reviewer.
-  - No self-review, no same-runtime final approval, no local-only implementation batch.
-- If the opposite reviewer is unavailable, the issue stays `Status: needs-review`; it cannot be marked `completed`.
-- On every resume, audit recent completed issues and `EXECUTION-LOG.md` for review provenance. Any issue without recorded opposite-runtime approval is review debt: move it back to `needs-review` or dispatch a retroactive opposite-runtime review before filling new implementation capacity.
+- A bare `@RESUME.md` invocation is never status-only. It is authorization to report a short digest and continue the execution loop without waiting for another user message.
+- Keep up to 12 implementation slots active whenever dependencies allow: 6 Claude Code implementers plus 6 Codex CLI implementers. Refill slots immediately after an issue completes, blocks, or moves to implemented. Do not stop after artificial batches, status digests, or wave boundaries.
+- Running below 12 active implementation workers is allowed only when dependencies, overlapping file ownership, HITL blockers, CI/firebreak isolation, or runtime unavailability make extra workers unsafe. Log the reason in `EXECUTION-LOG.md`.
+- The dependency DAG still controls safety: an issue is dispatchable when its `Blocked-by:` issues are implemented or completed. "Wave" labels never block otherwise-ready work.
+- Mandatory cross-runtime review happens at milestone / integration gates:
+  - Claude-implemented work in a gate → Codex reviewer.
+  - Codex-implemented work in a gate → Claude reviewer.
+  - Use up to 6 reviewers per runtime when the gate can be split safely.
+  - No self-review, no same-runtime gate approval, no local-only implementation bundle.
+- Individual issues move to `Status: implemented` after focused RED/GREEN verification. They are grouped into coherent milestone / integration review gates when surrounding work exists and acceptance can be verified meaningfully.
+- On every resume, audit implemented and completed issues plus `EXECUTION-LOG.md` for milestone gate provenance. Any completed issue without recorded opposite-runtime gate approval is review debt: move it back to `implemented` and include it in the next coherent gate while implementation slots keep moving.
 - CI failure pauses only the affected integration lane. Keep unrelated dispatchable issues moving while a debug slot fixes CI.
 
 ---
