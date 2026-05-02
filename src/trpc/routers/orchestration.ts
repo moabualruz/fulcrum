@@ -24,13 +24,13 @@ import {
 import { ClaimConflictError } from "../../orchestration/symphony/orchestrator.ts";
 
 const ClaimRunInputSchema = z.object({
-  orgId: z.string().uuid(),
-  taskId: z.string().uuid(),
+  orgId: z.string().min(1),
+  taskId: z.string().min(1),
   instanceId: z.string().min(1),
 });
 
 const ClaimRunOutputSchema = z.object({
-  runId: z.string().uuid(),
+  runId: z.string().min(1),
 });
 
 const PromptPreviewIssueSchema = z.object({
