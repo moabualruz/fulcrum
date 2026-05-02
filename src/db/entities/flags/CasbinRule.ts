@@ -12,8 +12,8 @@
  * C7: MikroORM v7 ES Stage-3 decorator pattern (@mikro-orm/decorators/es).
  * C8: @Entity({ repository }) wires CasbinRuleRepository.
  *
- * C11 carve-out: not tenant-scoped at table level; org scoping encoded in v0
- * per casbin namespace contract (e.g. "org:<uuid>:role:owner"). Adding an
+ * C11 carve-out: not tenant-scoped at table level; org scoping encoded in
+ * policy fields (p.v0 for permission rows, g.v2 for grouping rows). Adding an
  * org FK + composite index here would conflict with the node-casbin adapter
  * contract that owns the v0..v5 column layout.
  */

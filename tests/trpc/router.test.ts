@@ -24,6 +24,7 @@ import { CasbinRuleRepository } from "../../src/db/repositories/flags/CasbinRule
 import { protectedProcedure } from "../../src/trpc/middleware.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
+const LOCAL_ORG_ID = "00000000-0000-0000-0000-000000000001";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: build a mock session object that satisfies the TRPCContext shape
@@ -32,8 +33,8 @@ function mockSession(overrides?: Partial<{ id: string; userId: string; orgId: st
   return {
     id: overrides?.id ?? "sess-test-001",
     userId: overrides?.userId ?? "user-test-001",
-    orgId: overrides?.orgId ?? "00000000-0000-0000-0000-000000000001",
-    activeOrganizationId: overrides?.orgId ?? "00000000-0000-0000-0000-000000000001",
+    orgId: overrides?.orgId ?? LOCAL_ORG_ID,
+    activeOrganizationId: overrides?.orgId ?? LOCAL_ORG_ID,
     expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -57,7 +58,7 @@ function unauthenticatedCaller() {
 
 function authenticatedCaller(
   userId = "user-test-001",
-  orgId = "00000000-0000-0000-0000-000000000001",
+  orgId = LOCAL_ORG_ID,
 ) {
   const session = mockSession({ userId, orgId });
   return createCaller(
@@ -73,7 +74,7 @@ function authenticatedCaller(
 
 function authenticatedCallerWithContainer(container: Container) {
   const userId = "user-test-001";
-  const orgId = "00000000-0000-0000-0000-000000000001";
+  const orgId = LOCAL_ORG_ID;
   const session = mockSession({ userId, orgId });
   return createCaller(
     createContext({
@@ -87,7 +88,7 @@ function authenticatedCallerWithContainer(container: Container) {
 }
 
 function casbinContainer(
-  rows: Array<{ ptype: string; v0: string; v1: string; v2: string }>,
+  rows: Array<{ ptype: string; v0: string; v1: string; v2: string; v3?: string; v4?: string; v5?: string }>,
 ) {
   const container = new Container();
   container.bind({
@@ -111,7 +112,7 @@ function testCallerForRouter(
   return factory(
     createContext({
       session: mockSession({ userId: "user-test-001" }) as unknown as import("better-auth").Session,
-      orgId: "00000000-0000-0000-0000-000000000001",
+      orgId: LOCAL_ORG_ID,
       userId: "user-test-001",
       em: null,
       container,
@@ -209,7 +210,7 @@ describe("assertPermission middleware", () => {
   });
 
   it("derives casbin resource/action from procedure path when input omits them", async () => {
-    const rows = [{ ptype: "p", v0: "user-test-001", v1: "secure", v2: "list" }];
+    const rows = [{ ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "secure", v3: "list" }];
 
     const container = casbinContainer(rows);
 
@@ -225,8 +226,8 @@ describe("assertPermission middleware", () => {
 
   it("ignores spoofed casbin resource/action input and enforces server route identity", async () => {
     const rows = [
-      { ptype: "p", v0: "user-test-001", v1: "public", v2: "update" },
-      { ptype: "p", v0: "user-test-001", v1: "secure", v2: "get" },
+      { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "public", v3: "update" },
+      { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "secure", v3: "get" },
     ];
     const repo = {
       findAll: async () => rows,
@@ -270,8 +271,8 @@ describe("assertPermission middleware", () => {
     const caller = testCallerForRouter(
       router,
       casbinContainer([
-        { ptype: "p", v0: "user-test-001", v1: "notify.rules", v2: "list" },
-        { ptype: "p", v0: "user-test-001", v1: "notify", v2: "update" },
+        { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "notify.rules", v3: "list" },
+        { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "notify", v3: "update" },
       ]),
     );
 
@@ -289,7 +290,7 @@ describe("assertPermission middleware", () => {
     const caller = testCallerForRouter(
       router,
       casbinContainer([
-        { ptype: "p", v0: "user-test-001", v1: "repos", v2: "unregister" },
+        { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "repos", v3: "unregister" },
       ]),
     );
 
@@ -305,7 +306,7 @@ describe("assertPermission middleware", () => {
     const caller = testCallerForRouter(
       router,
       casbinContainer([
-        { ptype: "p", v0: "user-test-001", v1: "secure", v2: "write" },
+        { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "secure", v3: "write" },
       ]),
     );
 

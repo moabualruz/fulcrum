@@ -8,9 +8,9 @@
  *   resolves CasbinEnforcerService + FulcrumCasbinAdapter from ctx.container
  *   and calls checkCasbinGate for the current request context.
  *   - Flag OFF: Better-Auth path unchanged.
- *   - Flag ON + allow rule: pass through.
- *   - Flag ON + deny (rule exists, enforce returns false): TRPCError FORBIDDEN.
- *   - Flag ON + no rule for subject: fall through to Better-Auth.
+ *   - Flag ON + allow rule in ctx.orgId: pass through.
+ *   - Flag ON + deny in ctx.orgId (rule exists, enforce returns false): TRPCError FORBIDDEN.
+ *   - Flag ON + no rule for subject in ctx.orgId: fall through to Better-Auth.
  *
  * Lint rule: every mutation procedure MUST use protectedProcedure (= t.procedure + this).
  * Enforced via middleware chain membership, not convention — procedures without the
@@ -130,6 +130,7 @@ export const assertPermission = t.middleware(async ({ ctx, next, path }) => {
 
         await checkCasbinGate(
           enforcerSvc,
+          ctx.orgId,
           ctx.userId,
           resource,
           action,

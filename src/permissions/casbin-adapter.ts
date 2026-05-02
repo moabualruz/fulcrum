@@ -8,7 +8,7 @@
  *
  * CasbinRule columns: id (PK), ptype, v0..v5
  *   - ptype: "p" = permission policy, "g" = role grouping
- *   - v0..v5: policy fields (sub, obj, act, ... for "p"; user, role for "g")
+ *   - v0..v5: policy fields (org, sub, obj, act, ... for "p"; user, role, org for "g")
  *
  * C6: No raw SQL.
  * C8: injectable() for needle-di; constructor accepts CasbinRuleRepository.
@@ -67,7 +67,7 @@ export class FulcrumCasbinAdapter implements Adapter {
   /**
    * loadPolicy — fetch all rows from casbin_rule and push each into the model
    * via casbin's Helper.loadPolicyLine(). The model uses the CSV format:
-   * "p, alice, data1, read" or "g, alice, role:owner".
+   * "p, org-a, alice, data1, read" or "g, alice, role:owner, org-a".
    */
   async loadPolicy(model: Model): Promise<void> {
     const rows = await this._repo.findAll();

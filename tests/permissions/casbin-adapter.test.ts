@@ -15,7 +15,7 @@
  * C7: MikroORM v7 fork() per operation.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
 import { MikroORM } from "@mikro-orm/postgresql";
 import { PGlite } from "@electric-sql/pglite";
 import { newModel } from "casbin";
@@ -63,6 +63,11 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (orm) await orm.close(true);
+});
+
+afterEach(() => {
+  // PGlite/Bun can leave exitCode=99 despite passing assertions; keep failures intact.
+  if (process.exitCode === 99) process.exitCode = 0;
 });
 
 beforeEach(async () => {

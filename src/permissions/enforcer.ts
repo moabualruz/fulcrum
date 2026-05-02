@@ -1,19 +1,19 @@
 /**
  * CasbinEnforcerService — singleton enforcer, lazy-initialized on first use.
  *
- * Wraps node-casbin's Enforcer with a standard RBAC+resource+action model.
+ * Wraps node-casbin's Enforcer with an org-scoped RBAC+resource+action model.
  * Gated: only instantiated when `casbin-policies` flag is ON.
  *
- * RBAC model: sub (user/role), obj (resource), act (action).
- * Policies: "p" rows define (sub, obj, act) allow tuples.
- * Grouping: "g" rows define (user, role) assignments for role inheritance.
+ * RBAC model: org, sub (user/role), obj (resource), act (action).
+ * Policies: "p" rows define (org, sub, obj, act) allow tuples.
+ * Grouping: "g" rows define (user, role, org) assignments for role inheritance.
  *
  * C6: No raw SQL.
  * C8: injectable() for needle-di; constructor accepts FulcrumCasbinAdapter.
  *
- * checkCasbinGate(svc, userId, resource, action):
+ * checkCasbinGate(svc, orgId, userId, resource, action):
  *   - If enforce() → true: allow (return).
- *   - If enforce() → false AND hasRuleFor(userId, resource) → true: DENY → throws FORBIDDEN.
+ *   - If enforce() → false AND hasRuleFor(orgId, userId, resource) → true: DENY → throws FORBIDDEN.
  *   - If enforce() → false AND hasRuleFor() → false: fall through (return, let Better-Auth decide).
  */
 
@@ -25,24 +25,24 @@ import { TRPCError } from "@trpc/server";
 import type { FulcrumCasbinAdapter } from "./casbin-adapter.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RBAC model — standard sub/obj/act with role inheritance
+// RBAC model — org-scoped sub/obj/act with domain role inheritance
 // ─────────────────────────────────────────────────────────────────────────────
 
 const RBAC_MODEL_TEXT = `
 [request_definition]
-r = sub, obj, act
+r = org, sub, obj, act
 
 [policy_definition]
-p = sub, obj, act
+p = org, sub, obj, act
 
 [role_definition]
-g = _, _
+g = _, _, _
 
 [policy_effect]
 e = some(where (p.eft == allow))
 
 [matchers]
-m = g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act
+m = r.org == p.org && g(r.sub, p.sub, r.org) && (p.obj == "*" || r.obj == p.obj) && (p.act == "*" || r.act == p.act)
 `;
 
 @injectable()
@@ -52,25 +52,25 @@ export class CasbinEnforcerService {
   constructor(private readonly _adapter: FulcrumCasbinAdapter) {}
 
   /**
-   * enforce — evaluate (sub, obj, act) against loaded policies.
+   * enforce — evaluate (org, sub, obj, act) against loaded policies.
    * Lazy-initializes the enforcer on first call.
    */
-  async enforce(sub: string, obj: string, act: string): Promise<boolean> {
+  async enforce(orgId: string, sub: string, obj: string, act: string): Promise<boolean> {
     const enforcer = await this._getEnforcer();
-    return enforcer.enforce(sub, obj, act);
+    return enforcer.enforce(orgId, sub, obj, act);
   }
 
   /**
-   * hasRuleFor — returns true if ANY policy row exists for this sub + obj.
+   * hasRuleFor — returns true if ANY policy row exists for this org + sub + obj.
    * Used by checkCasbinGate to distinguish "deny" from "no opinion" (fall-through).
-   * Checks direct subject match only (not role inheritance at this level).
+   * Checks direct subject and roles inherited within the same org.
    */
-  async hasRuleFor(sub: string, obj: string): Promise<boolean> {
+  async hasRuleFor(orgId: string, sub: string, obj: string): Promise<boolean> {
     const enforcer = await this._getEnforcer();
-    // getAllPolicy() returns all "p" type policies
     const policies = await enforcer.getPolicy();
-    // Check if any policy has this exact subject and resource
-    return policies.some((rule) => rule[0] === sub && rule[1] === obj);
+    const roles = await enforcer.getImplicitRolesForUser(sub, orgId);
+    const subjects = new Set([sub, ...roles]);
+    return policies.some((rule) => rule[0] === orgId && subjects.has(rule[1] ?? "") && rule[2] === obj);
   }
 
   /**
@@ -100,11 +100,12 @@ export class CasbinEnforcerService {
  * checkCasbinGate — evaluates casbin enforcement for a tRPC request.
  *
  * Logic:
- *   1. enforce(sub, obj, act) → true → allow (return without throwing).
- *   2. enforce → false + hasRuleFor(sub, obj) → true → explicit deny → FORBIDDEN.
+ *   1. enforce(org, sub, obj, act) → true → allow (return without throwing).
+ *   2. enforce → false + hasRuleFor(org, sub, obj) → true → explicit deny → FORBIDDEN.
  *   3. enforce → false + hasRuleFor → false → no opinion → fall through (return).
  *
  * @param svc       - CasbinEnforcerService instance.
+ * @param orgId     - Organization namespace.
  * @param userId    - Subject (caller's userId).
  * @param resource  - Object (resource type, e.g. "task", "document").
  * @param action    - Action (e.g. "read", "write", "delete").
@@ -112,22 +113,23 @@ export class CasbinEnforcerService {
  */
 export async function checkCasbinGate(
   svc: CasbinEnforcerService,
+  orgId: string,
   userId: string,
   resource: string,
   action: string,
 ): Promise<void> {
-  const allowed = await svc.enforce(userId, resource, action);
+  const allowed = await svc.enforce(orgId, userId, resource, action);
   if (allowed) {
     // Casbin allows — pass through
     return;
   }
 
-  const hasRule = await svc.hasRuleFor(userId, resource);
+  const hasRule = await svc.hasRuleFor(orgId, userId, resource);
   if (hasRule) {
     // Casbin has a rule for this subject+resource but didn't allow → explicit deny
     throw new TRPCError({
       code: "FORBIDDEN",
-      message: `Access denied: user '${userId}' does not have permission to '${action}' on '${resource}'.`,
+      message: `Access denied: user '${userId}' does not have permission to '${action}' on '${resource}' in org '${orgId}'.`,
     });
   }
 
