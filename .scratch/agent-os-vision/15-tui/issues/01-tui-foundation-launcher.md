@@ -1,7 +1,8 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: tui
+Owner: codex-worker-tui-foundation
 Blocked-by: []
 PRD: .scratch/agent-os-vision/prds/15-tui.md
 Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 15 section)

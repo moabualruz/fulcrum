@@ -1,5 +1,5 @@
 ---
-Status: completed
+Status: integration-review
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 06-trpc-core-router-and-permission-middleware

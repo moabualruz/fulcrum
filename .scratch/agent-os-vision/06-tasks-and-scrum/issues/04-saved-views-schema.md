@@ -1,7 +1,8 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: 06-tasks-and-scrum
+Owner: claude-worker-saved-views
 Blocked-by: []
 PRD: .scratch/agent-os-vision/prds/06-tasks-and-scrum.md
 Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 6 section)

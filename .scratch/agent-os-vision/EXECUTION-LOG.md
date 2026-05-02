@@ -1081,6 +1081,41 @@ Decision flagged:
 ]
 Result: IMPLEMENTED.
 
+## 2026-05-02T15:22:22Z — codex-orchestrator
+
+Capacity: claude_impl=0/6 codex_impl=0/6 claude_review=0/6 codex_review=0/6
+
+State:
+[
+  branch: plan/agent-os-vision,
+  head: dbda9023,
+  worktree: clean before review-debt normalization,
+  markdown_artifacts: 392,
+  issue_buckets_before_normalization: { completed: 34, implemented: 20, ready_for_agent: 287, in_progress: 0, blocked: 0 },
+  dispatchable_ready: 8,
+  coverage_signoff: PASS,
+  full_ci: PASS (12/12 stages, 1751 pass, 2 skip, 0 fail)
+]
+
+Review debt normalized:
+[
+  .scratch/agent-os-vision/01-foundation-reset/issues/01-schema-auth-migration.md,
+  .scratch/agent-os-vision/01-foundation-reset/issues/02-events-org-id-backfill.md,
+  .scratch/agent-os-vision/01-foundation-reset/issues/03-composite-indexes-and-flag-stub-tables.md,
+  .scratch/agent-os-vision/01-foundation-reset/issues/04-local-org-seed-and-init.md,
+  .scratch/agent-os-vision/01-foundation-reset/issues/12-web-invitation-accept-and-user-management-ui.md,
+  .scratch/agent-os-vision/01-foundation-reset/issues/15-tui-base-shell-and-auth-flags-screens.md,
+  .scratch/agent-os-vision/01-foundation-reset/issues/17-zod-schemas-and-trpc-domain-stubs.md,
+  .scratch/agent-os-vision/01-foundation-reset/issues/19-migration-up-down-versioning.md
+]
+
+Result:
+[
+  moved completed -> implemented because explicit opposite-runtime integration gate provenance was missing in EXECUTION-LOG.md,
+  queued for next P1 integration gate,
+  continuing to queue claim + implementation dispatch
+]
+
 ## 2026-05-02T12:01:59Z — codex-orchestrator (next worker wave integrated)
 
 Batch:
@@ -1345,3 +1380,39 @@ Verification:
 ]
 
 Result: IMPLEMENTED.
+
+## 2026-05-02T15:26:12Z — codex-orchestrator (resume gate + next wave claimed)
+
+Capacity:
+[
+  claude_impl=1/6,
+  codex_impl=2/6,
+  claude_review=1/6,
+  codex_review=1/6
+]
+
+Review debt gate:
+[
+  P1 implemented issues moved to integration-review before completion promotion,
+  bundled issues: 01,02,03,04,05,07,10,11,12,14,15,16,17,18,19,
+  reviewers: claude-reviewer-p1 + codex-reviewer-p1,
+  precomputed verification: bun run ci PASS at 2026-05-02T15:13Z, 12/12 stages, 1751 pass, 2 skip, 0 fail
+]
+
+Implementation wave:
+[
+  06-tasks-and-scrum/issues/04-saved-views-schema.md => in-progress, owner claude-worker-saved-views, DB migration lane,
+  07-docs-editor-collab/issues/02-tiptap-svelte-binding-spike.md => in-progress, owner codex-worker-tiptap-spike, HITL spike lane,
+  15-tui/issues/01-tui-foundation-launcher.md => in-progress, owner codex-worker-tui-foundation, TUI lane
+]
+
+Held:
+[
+  09-repos-git-supervision/issues/01-schema-migration.md,
+  10-artifacts/issues/01-schema-migration.md,
+  12-notifications-activity-audit/issues/01-schema-migration.md,
+  06-tasks-and-scrum/issues/03-custom-field-defs-schema.md,
+  11-search-and-discovery/issues/01-schema-migration.md until SavedView exists
+]
+
+Result: CLAIMED.

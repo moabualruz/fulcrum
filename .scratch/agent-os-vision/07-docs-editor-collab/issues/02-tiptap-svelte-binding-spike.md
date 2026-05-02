@@ -1,7 +1,8 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: HITL
 Pillar: 07-docs-editor-collab
+Owner: codex-worker-tiptap-spike
 Blocked-by: []
 PRD: .scratch/agent-os-vision/prds/07-docs-editor-collab.md
 Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 7 section)
