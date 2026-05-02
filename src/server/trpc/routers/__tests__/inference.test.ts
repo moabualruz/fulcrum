@@ -22,6 +22,11 @@ import {
   actions as inferenceSettingsActions,
   load as loadInferenceSettings,
 } from "../../../../web/src/routes/settings/inference/+page.server.ts";
+import { FlagRegistry } from "../../../../flags/registry.ts";
+
+function stubFlagRegistry(enabled: string[] = ["embeddings"]): FlagRegistry {
+  return { isEnabled: async (flag: string) => enabled.includes(flag) } as unknown as FlagRegistry;
+}
 
 const health: HealthResult = {
   status: "degraded",
@@ -78,6 +83,7 @@ function makeContainer(): Container {
       ],
     } satisfies Partial<InferenceClient> as unknown as InferenceClient,
   });
+  container.bind({ provide: FlagRegistry, useValue: stubFlagRegistry() });
   return container;
 }
 
@@ -377,6 +383,7 @@ describe("inference tRPC router", () => {
         listBackends: async () => [],
       } satisfies Partial<InferenceClient> as unknown as InferenceClient,
     });
+    container.bind({ provide: FlagRegistry, useValue: stubFlagRegistry() });
     const caller = createCaller(container);
 
     await expect(caller.inference.health()).resolves.toEqual(health);
