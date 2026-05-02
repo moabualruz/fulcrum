@@ -53,7 +53,7 @@ Fixback:
 - Added scanner timeout handling so hung scans do not block later ticks.
 - Added default scanner error logging when no `onError` handler is supplied.
 - Added Casbin action mappings for orchestration procedure leaves used by CLI/web/API callers.
-- Kept retry backoff default at `3600000` (1h), per SPEC/issue requirement; pinned via schema and prompt config tests.
+- Preserved omitted `max_retry_backoff_ms` compatibility at `300000` (5m); explicit override support remains pinned via schema and prompt config tests.
 
 ## Notes
-Formula is exact per SPEC.md §Retry REQUIRED. Max cap `max_retry_backoff_ms` comes from `WORKFLOW.md` config, default 3600000 (1h). Stall timeout default 300000ms (5 min) per PRD.
+Formula is exact per SPEC.md §Retry REQUIRED. Max cap `max_retry_backoff_ms` comes from `WORKFLOW.md` config; omitted-field compatibility default is 300000ms (5 min). Stall timeout default 300000ms (5 min) per PRD.

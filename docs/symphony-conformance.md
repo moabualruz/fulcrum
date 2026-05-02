@@ -57,7 +57,7 @@ Prompt template: `src/orchestration/symphony/prompt.ts:renderPrompt` renders Liq
 
 Mapping: `src/orchestration/symphony/retry.ts:scheduleRetry`
 
-### Configurable retry backoff cap (`agent.max_retry_backoff_ms`, default 1h)
+### Configurable retry backoff cap (`agent.max_retry_backoff_ms`, default 5m)
 
 Mapping: `src/orchestration/symphony/retry.ts:calcRetryDelay`
 

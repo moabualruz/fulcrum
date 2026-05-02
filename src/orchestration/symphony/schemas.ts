@@ -97,7 +97,7 @@ export type WorkspacePath = z.infer<typeof WorkspacePathSchema>;
 
 export const WorkflowConfigSchema = z.object({
   stallTimeoutMs: z.number().int().positive().default(300_000),
-  maxRetryBackoffMs: z.number().int().positive().default(3_600_000),
+  maxRetryBackoffMs: z.number().int().positive().default(300_000),
   keepOnFailure: z.boolean().default(false),
   maxAttempts: z.number().int().positive().default(3),
 });
