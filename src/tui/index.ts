@@ -39,6 +39,7 @@ import { TuiRouter, type TuiRoute } from "./router.ts";
 import { JsonlCrashLog, type TuiCrashLog } from "./crashlog.ts";
 import { DbTelemetrySink, NullTelemetrySink, type TuiTelemetrySink } from "./telemetry.ts";
 import { ENTITY_MANAGER_TOKEN, registerDbBindings } from "../db/db.module.ts";
+import type { InferenceModel, ModelPullProgress } from "../inference/protocol.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -67,6 +68,10 @@ export interface TuiCaller {
   };
   inference?: {
     health: () => Promise<{ status: string }>;
+    models?: {
+      list: () => Promise<InferenceModel[]>;
+      pull: (input: { modelId: string; force?: boolean }) => AsyncIterable<ModelPullProgress> | Promise<AsyncIterable<ModelPullProgress>>;
+    };
   };
 }
 
@@ -146,6 +151,9 @@ export class TuiApp {
     status: "down",
     tone: "red",
   };
+  private inferenceModels: InferenceModel[] = [];
+  private inferencePullProgress: (ModelPullProgress & { modelId: string }) | null = null;
+  private inferenceLastDownload: (ModelPullProgress & { modelId: string }) | null = null;
   private inferencePoll: ReturnType<typeof setInterval> | null = null;
   private running = false;
 
@@ -261,6 +269,14 @@ export class TuiApp {
     }
   }
 
+  private async _loadInferenceModels(): Promise<void> {
+    try {
+      this.inferenceModels = await this.caller.inference?.models?.list() ?? [];
+    } catch {
+      this.inferenceModels = [];
+    }
+  }
+
   private _formatInferenceBadge(): string {
     const label = `Inference:${this.inferenceInfo.status}`;
     if (this.inferenceInfo.tone === "green") return c.green(label);
@@ -352,13 +368,35 @@ export class TuiApp {
   }
 
   private _renderInference(): void {
-    this.renderer.writeln();
-    this.renderer.writeln(c.bold("  Settings › Inference"));
-    this.renderer.separator();
-    this.renderer.writeln();
-    this.renderer.infoRow("Backend", this._formatInferenceBadge());
-    this.renderer.writeln();
-    this.renderer.writeln(c.dim("  Press [q] to go back"));
+    const r = this.renderer;
+    r.writeln();
+    r.writeln(c.bold("  Settings › Inference"));
+    r.separator();
+    r.writeln();
+    r.infoRow("Backend", this._formatInferenceBadge());
+    r.writeln();
+    r.writeln(c.bold("  Models"));
+    if (this.inferenceModels.length === 0) {
+      r.writeln(c.dim("  No inference models configured."));
+    } else {
+      for (const model of this.inferenceModels) {
+        const action = model.downloaded ? "downloaded" : "Download";
+        const size = model.sizeBytes ? ` ${model.sizeBytes} bytes` : "";
+        r.writeln(`  ${model.id}  ${model.kind}  ${action}${size}`);
+      }
+    }
+    if (this.inferencePullProgress) {
+      r.writeln();
+      r.writeln(
+        `  Downloading ${this.inferencePullProgress.modelId} ${this.inferencePullProgress.pct}% ` +
+          `${this.inferencePullProgress.downloaded}/${this.inferencePullProgress.total}`,
+      );
+    } else if (this.inferenceLastDownload) {
+      r.writeln();
+      r.writeln(`  Last download ${this.inferenceLastDownload.modelId} ${this.inferenceLastDownload.pct}%`);
+    }
+    r.writeln();
+    r.writeln(c.dim("  Press [q] to go back"));
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -484,6 +522,7 @@ export class TuiApp {
 
     if (screen === "inference") {
       await this._loadInferenceBadge();
+      await this._loadInferenceModels();
     }
 
     await this._renderCurrentScreen();
@@ -496,6 +535,25 @@ export class TuiApp {
   /** Navigate to a screen directly (for tests — bypasses keyboard). */
   async navigateTo(screen: Screen): Promise<void> {
     await this._navigate(screen);
+  }
+
+  async pullInferenceModel(modelId: string): Promise<void> {
+    const pull = this.caller.inference?.models?.pull;
+    if (!pull) return;
+    const events = await pull({ modelId, force: false });
+    for await (const event of events) {
+      this.inferencePullProgress = { ...event, modelId };
+      await this._renderCurrentScreen();
+    }
+    if (this.inferencePullProgress) {
+      this.inferenceLastDownload = this.inferencePullProgress;
+      this.inferencePullProgress = null;
+    }
+    await this._loadInferenceModels();
+    this.inferenceModels = this.inferenceModels.map((model) =>
+      model.id === modelId ? { ...model, downloaded: true } : model
+    );
+    await this._renderCurrentScreen();
   }
 
   /** Navigate to a router path directly (for tests and future route dispatcher). */

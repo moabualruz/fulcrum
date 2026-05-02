@@ -225,6 +225,54 @@ describe("inference tRPC router", () => {
     await expect(collectPullEvents(subscription)).resolves.toEqual(progressEvents);
   });
 
+  test("TUI inference screen renders models and pull progress overlay", async () => {
+    const tty = new FakeTTY();
+    const tui = new TuiApp({
+      output: tty,
+      caller: {
+        auth: {
+          whoami: async () => ({
+            userId: "user_1",
+            orgId: "00000000-0000-0000-0000-000000000001",
+            email: "admin@local",
+            role: "owner",
+          }),
+        },
+        flags: {
+          list: async () => [],
+          set: async () => ({ ok: true }),
+        },
+        inference: {
+          health: async () => ({ status: "ok" }),
+          models: {
+            list: async () => [{
+              id: "BAAI/bge-small-en-v1.5",
+              kind: "embed",
+              downloaded: false,
+              active: true,
+              sizeBytes: 133466304,
+            }],
+            pull: async function* () {
+              yield* progressEvents;
+            },
+          },
+        },
+      } as never,
+    });
+    try {
+      await tui.mount();
+      await tui.navigateTo("inference");
+      await tui.pullInferenceModel("BAAI/bge-small-en-v1.5");
+
+      const body = tty.plainText();
+      expect(body).toContain("BAAI/bge-small-en-v1.5");
+      expect(body).toContain("Download");
+      expect(body).toContain("100%");
+    } finally {
+      tui.stop();
+    }
+  });
+
   test("health status matches tRPC, CLI, web settings load, and TUI badge", async () => {
     const container = makeContainer();
     const caller = createCaller(container);

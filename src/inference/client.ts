@@ -148,8 +148,8 @@ export class InferenceClient {
     return InferenceModelSchema.array().parse(await this.call("models.list", {}));
   }
 
-  async *pullModel(modelId: string): AsyncIterable<ModelPullProgress> {
-    const result = await this.call("models.pull", { modelId });
+  async *pullModel(modelId: string, options: { force?: boolean } = {}): AsyncIterable<ModelPullProgress> {
+    const result = await this.call("models.pull", { modelId, force: options.force ?? false });
     const events = Array.isArray(result) ? result : [result];
     for (const event of events) {
       yield ModelPullProgressSchema.parse(event);

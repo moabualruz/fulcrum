@@ -1,8 +1,10 @@
 mod cache;
+mod models;
 
 use cache::CacheStore;
-use inference_embed::{EmbedRequest, EmbedResponse, DEFAULT_EMBED_DIMS, DEFAULT_EMBED_MODEL};
 use inference_core::protocol::{CacheStats, HealthResult, Request, Response};
+use inference_embed::{EmbedRequest, EmbedResponse, DEFAULT_EMBED_DIMS, DEFAULT_EMBED_MODEL};
+use models::ModelPullParams;
 use sha2::{Digest, Sha256};
 use std::env;
 use std::path::PathBuf;
@@ -23,7 +25,11 @@ async fn main() {
     let home = env::var("FULCRUM_HOME").ok();
     if let Some(path) = cache_path(home.as_deref()) {
         if let Err(error) = CacheStore::open(&path) {
-            eprintln!("warn: cache bootstrap failed ({}): {}", path.display(), error);
+            eprintln!(
+                "warn: cache bootstrap failed ({}): {}",
+                path.display(),
+                error
+            );
         }
     }
     match choose_transport(&args, stdin_is_stream(), home.as_deref()) {
@@ -213,7 +219,7 @@ fn dispatch(req: Request) -> Response {
             HealthResult {
                 status: "ok".to_string(),
                 backends: vec![],
-                models: vec![],
+                models: model_ids(),
                 cache: health_cache_stats(),
             },
         ),
@@ -221,12 +227,58 @@ fn dispatch(req: Request) -> Response {
             Ok(response) => Response::success(req.id, response),
             Err(message) => Response::error(req.id, -32602, &message),
         },
+        "models.list" => match handle_models_list() {
+            Ok(models) => Response::success(req.id, models),
+            Err(message) => Response::error(req.id, -32602, &message),
+        },
+        "models.pull" => match handle_models_pull(req.params) {
+            Ok(events) => Response::success(req.id, events),
+            Err(message) => Response::error(req.id, -32602, &message),
+        },
+        "models.rm" => match handle_models_rm(req.params) {
+            Ok(payload) => Response::success(req.id, payload),
+            Err(message) => Response::error(req.id, -32602, &message),
+        },
         _ => Response::method_not_found(req.id),
     }
 }
 
+fn model_ids() -> Vec<String> {
+    models::manager_from_env()
+        .map(|manager| manager.list().into_iter().map(|model| model.id).collect())
+        .unwrap_or_default()
+}
+
+fn handle_models_list() -> Result<Vec<models::InferenceModelInfo>, String> {
+    Ok(models::manager_from_env()
+        .map_err(|error| error.to_string())?
+        .list())
+}
+
+fn handle_models_pull(
+    params: serde_json::Value,
+) -> Result<Vec<models::ModelDownloadProgress>, String> {
+    let request: ModelPullParams =
+        serde_json::from_value(params).map_err(|error| error.to_string())?;
+    models::manager_from_env()
+        .map_err(|error| error.to_string())?
+        .ensure(&request.model_id, request.force)
+        .map_err(|error| error.to_string())
+}
+
+fn handle_models_rm(params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let request: ModelPullParams =
+        serde_json::from_value(params).map_err(|error| error.to_string())?;
+    let removed = models::manager_from_env()
+        .map_err(|error| error.to_string())?
+        .remove(&request.model_id)
+        .map_err(|error| error.to_string())?;
+    Ok(serde_json::json!({ "ok": true, "removed": removed }))
+}
+
 fn handle_embed(params: serde_json::Value) -> Result<EmbedResponse, String> {
-    let request: EmbedRequest = serde_json::from_value(params).map_err(|error| error.to_string())?;
+    let request: EmbedRequest =
+        serde_json::from_value(params).map_err(|error| error.to_string())?;
     if request.texts.is_empty() {
         return Err("embed requires at least one text".to_string());
     }
@@ -322,7 +374,8 @@ mod tests {
     #[test]
     fn dispatch_embed_returns_deterministic_vectors_without_model_download() {
         std::env::set_var("SKIP_MODEL_DOWNLOAD", "1");
-        let line = r#"{"jsonrpc":"2.0","id":7,"method":"embed","params":{"texts":["alpha","beta"]}}"#;
+        let line =
+            r#"{"jsonrpc":"2.0","id":7,"method":"embed","params":{"texts":["alpha","beta"]}}"#;
 
         let resp = dispatch_line(line);
 
@@ -342,7 +395,10 @@ mod tests {
         std::env::set_var("SKIP_MODEL_DOWNLOAD", "1");
         let home = std::env::temp_dir().join(format!(
             "fulcrum-embed-cache-{}",
-            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ));
         std::env::set_var("FULCRUM_HOME", &home);
         let line = r#"{"jsonrpc":"2.0","id":8,"method":"embed","params":{"texts":["same text"]}}"#;
@@ -433,8 +489,14 @@ mod tests {
             hit_count: 0,
         };
         store.put_embed(&embed).unwrap();
-        assert_eq!(store.get_embed("bge-small-en-v1.5", "embed-hash").unwrap(), Some(embed));
-        let hit = store.get_embed("bge-small-en-v1.5", "embed-hash").unwrap().unwrap();
+        assert_eq!(
+            store.get_embed("bge-small-en-v1.5", "embed-hash").unwrap(),
+            Some(embed)
+        );
+        let hit = store
+            .get_embed("bge-small-en-v1.5", "embed-hash")
+            .unwrap()
+            .unwrap();
         assert_eq!(hit.hit_count, 1);
 
         let expired_embed = EmbedCacheEntry {
@@ -446,7 +508,10 @@ mod tests {
             hit_count: 0,
         };
         store.put_embed(&expired_embed).unwrap();
-        assert_eq!(store.get_embed("bge-small-en-v1.5", "old-embed").unwrap(), None);
+        assert_eq!(
+            store.get_embed("bge-small-en-v1.5", "old-embed").unwrap(),
+            None
+        );
 
         let gen = GenerateCacheEntry {
             model: "qwen2.5-0.5b".to_string(),

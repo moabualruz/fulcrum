@@ -29,6 +29,40 @@ export function load({ locals }: { locals: InferenceLocals }) {
 }
 
 export const actions = {
+  pullModel: async ({ request, locals }: { request: Request; locals: InferenceLocals }) => {
+    const form = await request.formData();
+    const modelId = String(form.get("modelId") ?? "").trim();
+    if (!modelId) {
+      return {
+        success: false,
+        error: "Select a model to download.",
+      };
+    }
+    if (!locals.session) {
+      return {
+        success: false,
+        error: "Authentication required.",
+      };
+    }
+
+    try {
+      const client = resolveClient(locals.container ?? null);
+      let last = { modelId, pct: 0, downloaded: 0, total: 0 };
+      for await (const event of client.pullModel(modelId)) {
+        last = { modelId, pct: event.pct, downloaded: event.downloaded, total: event.total };
+      }
+      return {
+        success: true,
+        pullProgress: last,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Model download failed.",
+      };
+    }
+  },
+
   testEmbed: async ({ request, locals }: { request: Request; locals: InferenceLocals }) => {
     const form = await request.formData();
     const text = String(form.get("text") ?? "").trim();

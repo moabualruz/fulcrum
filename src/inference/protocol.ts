@@ -70,9 +70,11 @@ export const InferenceModelSchema = z.object({
   downloaded: z.boolean(),
   active: z.boolean(),
   sizeBytes: z.number().int().nonnegative().optional(),
+  sizeBytesActual: z.number().int().nonnegative().optional(),
 });
 
 export const ModelPullProgressSchema = z.object({
+  type: z.literal("download_progress").optional(),
   pct: z.number().min(0).max(100),
   downloaded: z.number().int().nonnegative(),
   total: z.number().int().nonnegative(),

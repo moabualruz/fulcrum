@@ -34,6 +34,98 @@ function capture() {
 }
 
 describe("fulcrum inference CLI", () => {
+  test("models list --json emits InferenceModel array with snake-case size", async () => {
+    const cap = capture();
+
+    await run(["models", "list", "--json"], {
+      ...cap.opts,
+      caller: {
+        inference: {
+          health: async () => health,
+          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false }),
+          generate: async () => ({ text: "Paris", model: "Qwen2.5-0.5B-Instruct", tokens: 8 }),
+          models: {
+            list: async () => [{
+              id: "BAAI/bge-small-en-v1.5",
+              kind: "embed",
+              downloaded: false,
+              active: true,
+              sizeBytes: 133466304,
+            }],
+            pull: async function* () {},
+            rm: async () => ({ ok: true }),
+          },
+        },
+      } as never,
+    });
+
+    expect(JSON.parse(cap.lines.join("\n"))).toEqual([{
+      id: "BAAI/bge-small-en-v1.5",
+      kind: "embed",
+      downloaded: false,
+      active: true,
+      size_bytes: 133466304,
+    }]);
+  });
+
+  test("models pull streams progress and forwards --force", async () => {
+    const cap = capture();
+    let observedInput: unknown;
+
+    await run(["models", "pull", "fixture-model", "--force"], {
+      ...cap.opts,
+      caller: {
+        inference: {
+          health: async () => health,
+          embed: async () => ({ vectors: [[0.1]], model: "fixture-model", cached: false }),
+          generate: async () => ({ text: "Paris", model: "Qwen2.5-0.5B-Instruct", tokens: 8 }),
+          models: {
+            list: async () => [],
+            pull: async function* (input: unknown) {
+              observedInput = input;
+              yield { type: "download_progress", pct: 0, downloaded: 0, total: 10 };
+              yield { type: "download_progress", pct: 100, downloaded: 10, total: 10 };
+            },
+            rm: async () => ({ ok: true }),
+          },
+        },
+      } as never,
+    });
+
+    expect(observedInput).toEqual({ modelId: "fixture-model", force: true });
+    expect(cap.lines).toEqual([
+      "download fixture-model 0% 0/10",
+      "download fixture-model 100% 10/10",
+    ]);
+  });
+
+  test("models rm deletes model via tRPC caller", async () => {
+    const cap = capture();
+    let observedInput: unknown;
+
+    await run(["models", "rm", "fixture-model", "--json"], {
+      ...cap.opts,
+      caller: {
+        inference: {
+          health: async () => health,
+          embed: async () => ({ vectors: [[0.1]], model: "fixture-model", cached: false }),
+          generate: async () => ({ text: "Paris", model: "Qwen2.5-0.5B-Instruct", tokens: 8 }),
+          models: {
+            list: async () => [],
+            pull: async function* () {},
+            rm: async (input: unknown) => {
+              observedInput = input;
+              return { ok: true };
+            },
+          },
+        },
+      } as never,
+    });
+
+    expect(observedInput).toEqual({ modelId: "fixture-model" });
+    expect(JSON.parse(cap.lines.join("\n"))).toEqual({ ok: true });
+  });
+
   test("start --json emits parseable JSON with PID, socket path, and health", async () => {
     const cap = capture();
 

@@ -48,7 +48,55 @@ const TokenizeInputSchema = z.object({
 
 const ModelInputSchema = z.object({
   modelId: z.string().min(1).max(MAX_MODEL_ID_CHARS),
+  force: z.boolean().optional(),
 });
+
+async function getOrgClass() {
+  const { Org } = await import("../../../db/entities/auth/Org.ts");
+  return Org;
+}
+
+async function getModelCacheClass() {
+  const { ModelCache } = await import("../../../db/entities/inference/ModelCache.ts");
+  return ModelCache;
+}
+
+async function syncModelDownloaded(ctx: TRPCContext, modelId: string): Promise<void> {
+  if (!ctx.em || !ctx.orgId) return;
+  const Org = await getOrgClass();
+  const org = await ctx.em.findOne(Org, { id: ctx.orgId } as never);
+  if (!org) return;
+  const client = await resolveClient(ctx);
+  const model = (await client.listModels()).find((item) => item.id === modelId);
+  if (!model) return;
+  const ModelCache = await getModelCacheClass();
+  const repo = ctx.em.getRepository(ModelCache) as unknown as {
+    markDownloaded(input: {
+      org: typeof org;
+      modelId: string;
+      kind: string;
+      sizeBytes?: number;
+    }): Promise<unknown>;
+  };
+  await repo.markDownloaded({
+    org,
+    modelId,
+    kind: model.kind,
+    sizeBytes: model.sizeBytesActual ?? model.sizeBytes,
+  });
+}
+
+async function syncModelMissing(ctx: TRPCContext, modelId: string): Promise<void> {
+  if (!ctx.em || !ctx.orgId) return;
+  const Org = await getOrgClass();
+  const org = await ctx.em.findOne(Org, { id: ctx.orgId } as never);
+  if (!org) return;
+  const ModelCache = await getModelCacheClass();
+  const repo = ctx.em.getRepository(ModelCache) as unknown as {
+    markMissing(input: { org: typeof org; modelId: string }): Promise<unknown>;
+  };
+  await repo.markMissing({ org, modelId });
+}
 
 async function findBoundClient(container: TRPCContext["container"]): Promise<InferenceClient | null> {
   if (!container) return null;
@@ -175,12 +223,13 @@ export const inferenceRouter = t.router({
           void (async () => {
             try {
               const client = await resolveClient(ctx);
-              iterator = client.pullModel(input.modelId)[Symbol.asyncIterator]();
+              iterator = client.pullModel(input.modelId, { force: input.force ?? false })[Symbol.asyncIterator]();
               while (!cancelled) {
                 const event = await iterator.next();
                 if (event.done) break;
                 if (!cancelled) emit.next(ModelPullProgressSchema.parse(event.value));
               }
+              if (!cancelled) await syncModelDownloaded(ctx, input.modelId);
               if (!cancelled) emit.complete();
             } catch (error) {
               if (cancelled) return;
@@ -198,7 +247,11 @@ export const inferenceRouter = t.router({
     rm: protectedProcedure
       .input(ModelInputSchema)
       .output(z.object({ ok: z.boolean() }))
-      .mutation(async ({ ctx, input }) => (await resolveClient(ctx)).rmModel(input.modelId)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await (await resolveClient(ctx)).rmModel(input.modelId);
+        await syncModelMissing(ctx, input.modelId);
+        return result;
+      }),
   }),
 
   backends: t.router({
