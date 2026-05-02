@@ -206,11 +206,12 @@ async function removeAbandonedStaleLockClaims(lockDir: string): Promise<void> {
     },
   );
 
-  await Promise.all(
-    entries
-      .filter((entry) => entry.isDirectory() && entry.name.startsWith(stalePrefix))
-      .map((entry) => rm(join(parent, entry.name), { recursive: true, force: true })),
-  );
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith(stalePrefix)) continue;
+    // Best-effort cleanup: active lock recovery owns the atomic rename; losing
+    // cleaners may see ENOENT, and force:true keeps that race harmless.
+    await rm(join(parent, entry.name), { recursive: true, force: true });
+  }
 }
 
 function isProcessAlive(pid: number): boolean {

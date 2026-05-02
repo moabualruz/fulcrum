@@ -315,8 +315,12 @@ describe("installSkill", () => {
 
   it("cleans orphaned stale lock claim directories before install", async () => {
     const lockDir = join(process.env["FULCRUM_HOME"]!, "skills.lock.json.lock");
-    const staleClaimDir = `${lockDir}.stale-orphan`;
-    await mkdir(staleClaimDir, { recursive: true });
+    const staleClaimDirs = [`${lockDir}.stale-orphan-1`, `${lockDir}.stale-orphan-2`];
+    const unrelatedDir = `${lockDir}.other`;
+    await Promise.all([
+      ...staleClaimDirs.map((staleClaimDir) => mkdir(staleClaimDir, { recursive: true })),
+      mkdir(unrelatedDir, { recursive: true }),
+    ]);
     const skillPath = await writeSkill("stale-claim", {
       name: "stale-claim",
       version: "1.0.0",
@@ -326,7 +330,10 @@ describe("installSkill", () => {
 
     await installSkill(skillPath, testDb.seed.orgId);
 
-    expect(await pathExists(staleClaimDir)).toBe(false);
+    for (const staleClaimDir of staleClaimDirs) {
+      expect(await pathExists(staleClaimDir)).toBe(false);
+    }
+    expect(await pathExists(unrelatedDir)).toBe(true);
     expect(await pathExists(await installedPath("codex", "stale-claim"))).toBe(true);
   });
 
