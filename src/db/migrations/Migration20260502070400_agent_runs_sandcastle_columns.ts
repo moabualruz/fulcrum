@@ -11,6 +11,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260502070400_agent_runs_sandcastle_columns extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     this.addSql(
       `alter table "agent_runs" add column "created_at" timestamptz not null default now()`,

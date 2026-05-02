@@ -25,6 +25,11 @@ import { VectorType } from "../../types/VectorType.ts";
   properties: ["org", "updatedAt"],
 })
 @Index({
+  name: "documents_id_org_unique",
+  expression:
+    'CREATE UNIQUE INDEX "documents_id_org_unique" ON "documents" ("id", "org_id")',
+})
+@Index({
   name: "docs_org_project_scope",
   properties: ["org", "projectId", "scope"],
 })

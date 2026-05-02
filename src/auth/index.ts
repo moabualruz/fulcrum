@@ -16,6 +16,7 @@
  * C8: @injectable() — needle-di Stage-3 pattern.
  */
 
+import { createHash } from "node:crypto";
 import { injectable } from "@needle-di/core";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { betterAuth } from "better-auth";
@@ -30,6 +31,8 @@ import { FeatureFlag } from "../db/entities/auth/FeatureFlag.ts";
  * D5: lowercase-with-hyphens flag name.
  */
 const SAAS_AUTH_FLAG = "saas-auth";
+const DEV_TEST_AUTH_SECRET = "fulcrum-dev-test-better-auth-secret-00000000";
+const DEV_TEST_TRUSTED_ORIGINS = ["http://localhost:5173", "http://localhost:3000"];
 
 /**
  * Check if a feature flag is enabled for the local (global) scope.
@@ -93,6 +96,40 @@ function nonEmptyEnv(name: string): string | null {
   return value ? value : null;
 }
 
+function isProductionRuntime(): boolean {
+  return process.env["NODE_ENV"] === "production";
+}
+
+function betterAuthSecret(): string {
+  const secret = nonEmptyEnv("BETTER_AUTH_SECRET");
+  if (secret) return secret;
+
+  if (isProductionRuntime()) {
+    throw new Error("BETTER_AUTH_SECRET is required in production.");
+  }
+
+  return DEV_TEST_AUTH_SECRET;
+}
+
+function parseCommaList(value: string | null): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+}
+
+function trustedOrigins(): string[] {
+  const configured = parseCommaList(nonEmptyEnv("FULCRUM_TRUSTED_ORIGINS"));
+  if (configured.length > 0) return configured;
+  return isProductionRuntime() ? [] : DEV_TEST_TRUSTED_ORIGINS;
+}
+
+function sha256Digest(value: string | null): string | null {
+  if (value === null) return null;
+  return createHash("sha256").update(value).digest("hex");
+}
+
 function oauthProviderConfig(): Record<string, { clientId: string; clientSecret: string }> | undefined {
   const providers: Record<string, { clientId: string; clientSecret: string }> = {};
 
@@ -115,8 +152,17 @@ async function authConfigSignature(em: EntityManager): Promise<string> {
   const saasEnabled = await isFlagEnabled(em, SAAS_AUTH_FLAG);
   return JSON.stringify({
     saasEnabled,
-    google: Boolean(nonEmptyEnv("GOOGLE_CLIENT_ID") && nonEmptyEnv("GOOGLE_CLIENT_SECRET")),
-    github: Boolean(nonEmptyEnv("GITHUB_CLIENT_ID") && nonEmptyEnv("GITHUB_CLIENT_SECRET")),
+    production: isProductionRuntime(),
+    secret: sha256Digest(nonEmptyEnv("BETTER_AUTH_SECRET")),
+    trustedOrigins: trustedOrigins(),
+    google: {
+      clientId: sha256Digest(nonEmptyEnv("GOOGLE_CLIENT_ID")),
+      clientSecret: sha256Digest(nonEmptyEnv("GOOGLE_CLIENT_SECRET")),
+    },
+    github: {
+      clientId: sha256Digest(nonEmptyEnv("GITHUB_CLIENT_ID")),
+      clientSecret: sha256Digest(nonEmptyEnv("GITHUB_CLIENT_SECRET")),
+    },
   });
 }
 
@@ -127,6 +173,7 @@ async function buildAuth(em: EntityManager): Promise<{ auth: AnyAuth; signature:
 
   const saasEnabled = await isFlagEnabled(em, SAAS_AUTH_FLAG);
   const socialProviders = saasEnabled ? oauthProviderConfig() : undefined;
+  const secret = betterAuthSecret();
 
   // Base plugins — always enabled (local-first mode)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -153,6 +200,7 @@ async function buildAuth(em: EntityManager): Promise<{ auth: AnyAuth; signature:
 
   const auth = betterAuth({
     database: db,
+    secret,
 
     // C1: email+password is always enabled (local-first mode)
     emailAndPassword: {
@@ -172,8 +220,7 @@ async function buildAuth(em: EntityManager): Promise<{ auth: AnyAuth; signature:
       expiresIn: 30 * 24 * 60 * 60,  // 30 days in seconds
     },
 
-    // Trusted origins — permissive for local dev; tighten in SaaS mode
-    trustedOrigins: ["http://localhost:5173", "http://localhost:3000"],
+    trustedOrigins: trustedOrigins(),
   });
 
   return { auth, signature: await authConfigSignature(em) };

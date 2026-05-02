@@ -226,13 +226,14 @@ export const handle: Handle = async ({ event, resolve }) => {
           endpoint: "/api/trpc",
           req: request,
           router: appRouter,
-          createContext: () =>
+          createContext: ({ resHeaders }) =>
             createContext({
               session: sessionState.session,
               orgId: sessionState.orgId,
               userId: sessionState.userId,
               em: requestRuntime?.em ?? null,
               container: requestRuntime?.container ?? null,
+              responseHeaders: resHeaders,
             }),
         });
       }

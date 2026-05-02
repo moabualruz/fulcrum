@@ -143,7 +143,7 @@
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "unique": false,
+          "unique": true,
           "length": null,
           "precision": null,
           "scale": null,
@@ -257,17 +257,6 @@
         },
         {
           "columnNames": [
-            "provider_id",
-            "account_id"
-          ],
-          "composite": true,
-          "constraint": false,
-          "keyName": "idx_accounts_provider",
-          "primary": false,
-          "unique": false
-        },
-        {
-          "columnNames": [
             "user_id"
           ],
           "composite": false,
@@ -275,6 +264,17 @@
           "keyName": "idx_accounts_user_id",
           "primary": false,
           "unique": false
+        },
+        {
+          "columnNames": [
+            "provider_id",
+            "account_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "uq_accounts_provider_account",
+          "primary": false,
+          "unique": true
         }
       ],
       "checks": [],
@@ -289,6 +289,18 @@
             "id"
           ],
           "referencedTableName": "public.orgs",
+          "deleteRule": "cascade"
+        },
+        "accounts_user_id_foreign": {
+          "columnNames": [
+            "user_id"
+          ],
+          "constraintName": "accounts_user_id_foreign",
+          "localTableName": "public.accounts",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.users",
           "deleteRule": "cascade"
         }
       },
@@ -750,16 +762,19 @@
           ],
           "referencedTableName": "public.search_documents"
         },
-        "agent_runs_task_id_foreign": {
+        "agent_runs_task_org_foreign": {
           "columnNames": [
-            "task_id"
+            "task_id",
+            "org_id"
           ],
-          "constraintName": "agent_runs_task_id_foreign",
+          "constraintName": "agent_runs_task_org_foreign",
           "localTableName": "public.agent_runs",
           "referencedColumnNames": [
-            "id"
+            "id",
+            "org_id"
           ],
-          "referencedTableName": "public.tasks"
+          "referencedTableName": "public.tasks",
+          "deleteRule": "set null (task_id)"
         }
       },
       "comment": null
@@ -1185,6 +1200,174 @@
       "comment": null
     },
     {
+      "name": "context_snapshots",
+      "schema": "public",
+      "columns": {
+        "bundle_blob": {
+          "name": "bundle_blob",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
+        },
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": true,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "gen_random_uuid()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "slice_sizes": {
+          "name": "slice_sizes",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
+        },
+        "task_id": {
+          "name": "task_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "token_count": {
+          "name": "token_count",
+          "type": "int",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
+        }
+      },
+      "indexes": [
+        {
+          "columnNames": [
+            "id"
+          ],
+          "composite": false,
+          "constraint": true,
+          "keyName": "context_snapshots_pkey",
+          "primary": true,
+          "unique": true
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "run_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "context_snapshots_run",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "task_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "context_snapshots_task",
+          "primary": false,
+          "unique": false
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "context_snapshots_org_id_foreign": {
+          "columnNames": [
+            "org_id"
+          ],
+          "constraintName": "context_snapshots_org_id_foreign",
+          "localTableName": "public.context_snapshots",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.orgs",
+          "deleteRule": "cascade"
+        }
+      },
+      "comment": null
+    },
+    {
       "name": "credentials",
       "schema": "public",
       "columns": {
@@ -1479,7 +1662,7 @@
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
-          "nullable": false,
+          "nullable": true,
           "unique": false,
           "length": null,
           "precision": null,
@@ -1544,7 +1727,7 @@
           "autoincrement": false,
           "primary": true,
           "nullable": false,
-          "unique": false,
+          "unique": true,
           "length": null,
           "precision": null,
           "scale": null,
@@ -1621,6 +1804,27 @@
       "indexes": [
         {
           "columnNames": [
+            "author_id"
+          ],
+          "composite": false,
+          "constraint": false,
+          "keyName": "doc_comments_author",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "id",
+            "org_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "doc_comments_id_org_unique",
+          "primary": false,
+          "unique": true
+        },
+        {
+          "columnNames": [
             "org_id",
             "doc_id"
           ],
@@ -1643,25 +1847,30 @@
       ],
       "checks": [],
       "foreignKeys": {
-        "doc_comments_author_id_foreign": {
+        "doc_comments_author_org_foreign": {
           "columnNames": [
-            "author_id"
+            "author_id",
+            "org_id"
           ],
-          "constraintName": "doc_comments_author_id_foreign",
+          "constraintName": "doc_comments_author_org_foreign",
           "localTableName": "public.doc_comments",
           "referencedColumnNames": [
-            "id"
+            "id",
+            "org_id"
           ],
-          "referencedTableName": "public.users"
+          "referencedTableName": "public.users",
+          "deleteRule": "set null (author_id)"
         },
-        "doc_comments_doc_id_foreign": {
+        "doc_comments_doc_org_foreign": {
           "columnNames": [
-            "doc_id"
+            "doc_id",
+            "org_id"
           ],
-          "constraintName": "doc_comments_doc_id_foreign",
+          "constraintName": "doc_comments_doc_org_foreign",
           "localTableName": "public.doc_comments",
           "referencedColumnNames": [
-            "id"
+            "id",
+            "org_id"
           ],
           "referencedTableName": "public.documents",
           "deleteRule": "cascade"
@@ -1678,14 +1887,16 @@
           "referencedTableName": "public.orgs",
           "deleteRule": "cascade"
         },
-        "doc_comments_parent_comment_id_foreign": {
+        "doc_comments_parent_org_foreign": {
           "columnNames": [
-            "parent_comment_id"
+            "parent_comment_id",
+            "org_id"
           ],
-          "constraintName": "doc_comments_parent_comment_id_foreign",
+          "constraintName": "doc_comments_parent_org_foreign",
           "localTableName": "public.doc_comments",
           "referencedColumnNames": [
-            "id"
+            "id",
+            "org_id"
           ],
           "referencedTableName": "public.doc_comments",
           "deleteRule": "cascade"
@@ -1874,14 +2085,16 @@
         }
       ],
       "foreignKeys": {
-        "doc_links_from_doc_id_foreign": {
+        "doc_links_from_doc_org_foreign": {
           "columnNames": [
-            "from_doc_id"
+            "from_doc_id",
+            "org_id"
           ],
-          "constraintName": "doc_links_from_doc_id_foreign",
+          "constraintName": "doc_links_from_doc_org_foreign",
           "localTableName": "public.doc_links",
           "referencedColumnNames": [
-            "id"
+            "id",
+            "org_id"
           ],
           "referencedTableName": "public.documents",
           "deleteRule": "cascade"
@@ -1898,17 +2111,19 @@
           "referencedTableName": "public.orgs",
           "deleteRule": "cascade"
         },
-        "doc_links_to_doc_id_foreign": {
+        "doc_links_to_doc_org_foreign": {
           "columnNames": [
-            "to_doc_id"
+            "to_doc_id",
+            "org_id"
           ],
-          "constraintName": "doc_links_to_doc_id_foreign",
+          "constraintName": "doc_links_to_doc_org_foreign",
           "localTableName": "public.doc_links",
           "referencedColumnNames": [
-            "id"
+            "id",
+            "org_id"
           ],
           "referencedTableName": "public.documents",
-          "deleteRule": "set null"
+          "deleteRule": "set null (to_doc_id)"
         }
       },
       "comment": null
@@ -2237,7 +2452,7 @@
           "autoincrement": false,
           "primary": true,
           "nullable": false,
-          "unique": false,
+          "unique": true,
           "length": null,
           "precision": null,
           "scale": null,
@@ -2314,12 +2529,33 @@
       "indexes": [
         {
           "columnNames": [
+            "author_id"
+          ],
+          "composite": false,
+          "constraint": false,
+          "keyName": "doc_versions_author",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
             "doc_id",
             "version_num"
           ],
           "composite": true,
           "constraint": false,
           "keyName": "doc_versions_doc_version_unique",
+          "primary": false,
+          "unique": true
+        },
+        {
+          "columnNames": [
+            "id",
+            "org_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "doc_versions_id_org_unique",
           "primary": false,
           "unique": true
         },
@@ -2348,26 +2584,30 @@
       ],
       "checks": [],
       "foreignKeys": {
-        "doc_versions_author_id_foreign": {
+        "doc_versions_author_org_foreign": {
           "columnNames": [
-            "author_id"
+            "author_id",
+            "org_id"
           ],
-          "constraintName": "doc_versions_author_id_foreign",
+          "constraintName": "doc_versions_author_org_foreign",
           "localTableName": "public.doc_versions",
           "referencedColumnNames": [
-            "id"
+            "id",
+            "org_id"
           ],
           "referencedTableName": "public.users",
-          "deleteRule": "set null"
+          "deleteRule": "set null (author_id)"
         },
-        "doc_versions_doc_id_foreign": {
+        "doc_versions_doc_org_foreign": {
           "columnNames": [
-            "doc_id"
+            "doc_id",
+            "org_id"
           ],
-          "constraintName": "doc_versions_doc_id_foreign",
+          "constraintName": "doc_versions_doc_org_foreign",
           "localTableName": "public.doc_versions",
           "referencedColumnNames": [
-            "id"
+            "id",
+            "org_id"
           ],
           "referencedTableName": "public.documents",
           "deleteRule": "cascade"
@@ -2384,17 +2624,19 @@
           "referencedTableName": "public.orgs",
           "deleteRule": "cascade"
         },
-        "doc_versions_restore_of_foreign": {
+        "doc_versions_restore_org_foreign": {
           "columnNames": [
-            "restore_of"
+            "restore_of",
+            "org_id"
           ],
-          "constraintName": "doc_versions_restore_of_foreign",
+          "constraintName": "doc_versions_restore_org_foreign",
           "localTableName": "public.doc_versions",
           "referencedColumnNames": [
-            "id"
+            "id",
+            "org_id"
           ],
           "referencedTableName": "public.doc_versions",
-          "deleteRule": "set null"
+          "deleteRule": "set null (restore_of)"
         }
       },
       "comment": null
@@ -2532,7 +2774,7 @@
           "autoincrement": false,
           "primary": true,
           "nullable": false,
-          "unique": false,
+          "unique": true,
           "length": null,
           "precision": null,
           "scale": null,
@@ -2690,6 +2932,17 @@
         },
         {
           "columnNames": [
+            "id",
+            "org_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "documents_id_org_unique",
+          "primary": false,
+          "unique": true
+        },
+        {
+          "columnNames": [
             "id"
           ],
           "composite": false,
@@ -2736,17 +2989,19 @@
           ],
           "referencedTableName": "public.orgs"
         },
-        "documents_parent_id_foreign": {
+        "documents_parent_org_foreign": {
           "columnNames": [
-            "parent_id"
+            "parent_id",
+            "org_id"
           ],
-          "constraintName": "documents_parent_id_foreign",
+          "constraintName": "documents_parent_org_foreign",
           "localTableName": "public.documents",
           "referencedColumnNames": [
-            "id"
+            "id",
+            "org_id"
           ],
           "referencedTableName": "public.documents",
-          "deleteRule": "set null"
+          "deleteRule": "set null (parent_id)"
         }
       },
       "comment": null
@@ -3928,6 +4183,18 @@
         {
           "columnNames": [
             "org_id",
+            "flag"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "uq_feature_flags_org_flag",
+          "primary": false,
+          "unique": true,
+          "expression": "CREATE UNIQUE INDEX uq_feature_flags_org_flag ON public.feature_flags USING btree (org_id, flag) WHERE ((org_id IS NOT NULL) AND (user_id IS NULL))"
+        },
+        {
+          "columnNames": [
+            "org_id",
             "user_id",
             "flag"
           ],
@@ -4425,6 +4692,54 @@
       "name": "memories",
       "schema": "public",
       "columns": {
+        "archived": {
+          "name": "archived",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "false",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "boolean"
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "''",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": "now()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
         "embedding": {
           "name": "embedding",
           "type": "text",
@@ -4440,6 +4755,22 @@
           "comment": null,
           "enumItems": [],
           "mappedType": "text"
+        },
+        "global": {
+          "name": "global",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "false",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "boolean"
         },
         "id": {
           "name": "id",
@@ -4457,6 +4788,26 @@
           "enumItems": [],
           "mappedType": "uuid"
         },
+        "importance": {
+          "name": "importance",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": "'medium'",
+          "comment": null,
+          "enumItems": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "mappedType": "enum"
+        },
         "kind": {
           "name": "kind",
           "type": "varchar(255)",
@@ -4468,10 +4819,18 @@
           "length": 255,
           "precision": null,
           "scale": null,
-          "default": null,
+          "default": "'note'",
           "comment": null,
-          "enumItems": [],
-          "mappedType": "string"
+          "enumItems": [
+            "note",
+            "decision",
+            "blocker",
+            "file_ref",
+            "section_anchor",
+            "link",
+            "fact"
+          ],
+          "mappedType": "enum"
         },
         "org_id": {
           "name": "org_id",
@@ -4488,9 +4847,127 @@
           "comment": null,
           "enumItems": [],
           "mappedType": "uuid"
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "source": {
+          "name": "source",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": "'manual'",
+          "comment": null,
+          "enumItems": [
+            "heuristic",
+            "llm",
+            "manual"
+          ],
+          "mappedType": "enum"
+        },
+        "source_ref": {
+          "name": "source_ref",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "'{}'",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
+        },
+        "tags": {
+          "name": "tags",
+          "type": "text[]",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "'{}'",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "array"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": "now()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
         }
       },
       "indexes": [
+        {
+          "columnNames": [
+            "to_tsvector(english::regconfig, body)"
+          ],
+          "composite": false,
+          "constraint": false,
+          "keyName": "memories_body_tsv",
+          "primary": false,
+          "unique": false,
+          "expression": "CREATE INDEX memories_body_tsv ON public.memories USING gin (to_tsvector('english'::regconfig, body))",
+          "type": "gin"
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "archived"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "memories_org_archived",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "global"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "memories_org_global",
+          "primary": false,
+          "unique": false
+        },
         {
           "columnNames": [
             "org_id",
@@ -4498,7 +4975,19 @@
           ],
           "composite": true,
           "constraint": false,
-          "keyName": "idx_memories_org_kind",
+          "keyName": "memories_org_kind",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "project_id",
+            "importance"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "memories_org_project_importance",
           "primary": false,
           "unique": false
         },
@@ -4513,7 +5002,26 @@
           "unique": true
         }
       ],
-      "checks": [],
+      "checks": [
+        {
+          "name": "memories_importance_check",
+          "expression": "\"importance\" in ('low', 'medium', 'high')",
+          "definition": "check (\"importance\" in ('low', 'medium', 'high'))",
+          "columnName": "importance"
+        },
+        {
+          "name": "memories_kind_check",
+          "expression": "\"kind\" in ('note', 'decision', 'blocker', 'file_ref', 'section_anchor', 'link', 'fact')",
+          "definition": "check (\"kind\" in ('note', 'decision', 'blocker', 'file_ref', 'section_anchor', 'link', 'fact'))",
+          "columnName": "kind"
+        },
+        {
+          "name": "memories_source_check",
+          "expression": "\"source\" in ('heuristic', 'llm', 'manual')",
+          "definition": "check (\"source\" in ('heuristic', 'llm', 'manual'))",
+          "columnName": "source"
+        }
+      ],
       "foreignKeys": {
         "memories_org_id_foreign": {
           "columnNames": [
@@ -4525,6 +5033,167 @@
             "id"
           ],
           "referencedTableName": "public.orgs"
+        }
+      },
+      "comment": null
+    },
+    {
+      "name": "memory_links",
+      "schema": "public",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": true,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "gen_random_uuid()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "memory_id": {
+          "name": "memory_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "target_kind": {
+          "name": "target_kind",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [
+            "task",
+            "doc",
+            "agent_run",
+            "artifact"
+          ],
+          "mappedType": "enum"
+        }
+      },
+      "indexes": [
+        {
+          "columnNames": [
+            "org_id",
+            "memory_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "memory_links_memory",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "id"
+          ],
+          "composite": false,
+          "constraint": true,
+          "keyName": "memory_links_pkey",
+          "primary": true,
+          "unique": true
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "target_kind",
+            "target_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "memory_links_target",
+          "primary": false,
+          "unique": false
+        }
+      ],
+      "checks": [
+        {
+          "name": "memory_links_target_kind_check",
+          "expression": "\"target_kind\" in ('task', 'doc', 'agent_run', 'artifact')",
+          "definition": "check (\"target_kind\" in ('task', 'doc', 'agent_run', 'artifact'))",
+          "columnName": "target_kind"
+        }
+      ],
+      "foreignKeys": {
+        "memory_links_memory_id_foreign": {
+          "columnNames": [
+            "memory_id"
+          ],
+          "constraintName": "memory_links_memory_id_foreign",
+          "localTableName": "public.memory_links",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.memories",
+          "deleteRule": "cascade"
+        },
+        "memory_links_org_id_foreign": {
+          "columnNames": [
+            "org_id"
+          ],
+          "constraintName": "memory_links_org_id_foreign",
+          "localTableName": "public.memory_links",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.orgs",
+          "deleteRule": "cascade"
         }
       },
       "comment": null
@@ -6456,7 +7125,7 @@
           "autoincrement": false,
           "primary": true,
           "nullable": false,
-          "unique": false,
+          "unique": true,
           "length": null,
           "precision": null,
           "scale": null,
@@ -6617,6 +7286,17 @@
         },
         {
           "columnNames": [
+            "id",
+            "org_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "tasks_id_org_unique",
+          "primary": false,
+          "unique": true
+        },
+        {
+          "columnNames": [
             "org_id",
             "external_id"
           ],
@@ -6674,17 +7354,19 @@
           ],
           "referencedTableName": "public.orgs"
         },
-        "tasks_parent_id_foreign": {
+        "tasks_parent_org_foreign": {
           "columnNames": [
-            "parent_id"
+            "parent_id",
+            "org_id"
           ],
-          "constraintName": "tasks_parent_id_foreign",
+          "constraintName": "tasks_parent_org_foreign",
           "localTableName": "public.tasks",
           "referencedColumnNames": [
-            "id"
+            "id",
+            "org_id"
           ],
           "referencedTableName": "public.tasks",
-          "deleteRule": "set null"
+          "deleteRule": "set null (parent_id)"
         }
       },
       "comment": null
@@ -6922,7 +7604,7 @@
           "autoincrement": false,
           "primary": true,
           "nullable": false,
-          "unique": false,
+          "unique": true,
           "length": null,
           "precision": null,
           "scale": null,
@@ -7021,6 +7703,17 @@
           "composite": true,
           "constraint": true,
           "keyName": "uq_users_org_email",
+          "primary": false,
+          "unique": true
+        },
+        {
+          "columnNames": [
+            "id",
+            "org_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "users_id_org_unique",
           "primary": false,
           "unique": true
         },

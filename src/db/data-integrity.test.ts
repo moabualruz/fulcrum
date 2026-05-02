@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { randomUUID } from "node:crypto";
 
 import { createTestOrm } from "../test-utils/db.ts";
 import { Account } from "./entities/auth/Account.ts";
@@ -154,6 +155,107 @@ describe("schema data integrity", () => {
       const savedVerification = await em.findOneOrFail(Verification, { value: "local-token" });
       expect(savedAccount.org).toBeNull();
       expect(savedVerification.org).toBeNull();
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("accounts reject duplicate provider identities", async () => {
+    const db = await createTestOrm();
+    try {
+      const em = db.em.fork();
+      const now = new Date();
+      em.persist([
+        em.create(Account, {
+          userId: db.seed.userId,
+          providerId: "github",
+          accountId: "provider-subject-1",
+          createdAt: now,
+          updatedAt: now,
+        }),
+        em.create(Account, {
+          userId: db.seed.userId,
+          providerId: "github",
+          accountId: "provider-subject-1",
+          createdAt: now,
+          updatedAt: now,
+        }),
+      ]);
+
+      await expect(em.flush()).rejects.toThrow("uq_accounts_provider_account");
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("accounts reject orphan users and cascade when the user is deleted", async () => {
+    const db = await createTestOrm();
+    try {
+      const em = db.em.fork();
+      const now = new Date();
+      em.persist(em.create(Account, {
+        userId: randomUUID(),
+        providerId: "github",
+        accountId: "orphan-subject",
+        createdAt: now,
+        updatedAt: now,
+      }));
+      await expect(em.flush()).rejects.toThrow("accounts_user_id_foreign");
+
+      em.clear();
+      const account = em.create(Account, {
+        userId: db.seed.userId,
+        providerId: "github",
+        accountId: "cascade-subject",
+        createdAt: now,
+        updatedAt: now,
+      });
+      em.persist(account);
+      await em.flush();
+
+      await db.pglite.query(`delete from "users" where "id" = $1`, [db.seed.userId]);
+      expect(await em.count(Account, { accountId: "cascade-subject" })).toBe(0);
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("account token fields are encrypted at rest and decrypted on entity load", async () => {
+    const db = await createTestOrm();
+    try {
+      const em = db.em.fork();
+      const now = new Date();
+      const account = em.create(Account, {
+        userId: db.seed.userId,
+        providerId: "github",
+        accountId: "encrypted-subject",
+        accessToken: "access-secret",
+        refreshToken: "refresh-secret",
+        idToken: "id-secret",
+        createdAt: now,
+        updatedAt: now,
+      });
+      em.persist(account);
+      await em.flush();
+      em.clear();
+
+      const raw = await db.pglite.query<{
+        access_token: string;
+        refresh_token: string;
+        id_token: string;
+      }>(
+        `select "access_token", "refresh_token", "id_token" from "accounts" where "account_id" = $1`,
+        ["encrypted-subject"],
+      );
+      expect(raw.rows[0]?.access_token).not.toBe("access-secret");
+      expect(raw.rows[0]?.refresh_token).not.toBe("refresh-secret");
+      expect(raw.rows[0]?.id_token).not.toBe("id-secret");
+      expect(raw.rows[0]?.access_token).toStartWith("fc1.");
+
+      const saved = await em.findOneOrFail(Account, { accountId: "encrypted-subject" });
+      expect(saved.accessToken).toBe("access-secret");
+      expect(saved.refreshToken).toBe("refresh-secret");
+      expect(saved.idToken).toBe("id-secret");
     } finally {
       await db.close();
     }

@@ -22,6 +22,11 @@ import { UserRepository } from "../../repositories/auth/UserRepository.ts";
 
 @Entity({ tableName: "users", repository: () => UserRepository })
 @Index({ name: "idx_users_org_email", properties: ["orgId", "email"] })
+@Index({
+  name: "users_id_org_unique",
+  expression:
+    'CREATE UNIQUE INDEX "users_id_org_unique" ON "users" ("id", "org_id")',
+})
 @Unique({ name: "uq_users_org_email", properties: ["orgId", "email"] })
 export class User {
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })

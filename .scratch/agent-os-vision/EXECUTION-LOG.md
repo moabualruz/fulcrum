@@ -1080,3 +1080,33 @@ Decision flagged:
   sprint_fk_conditional: P6#02 owns the sprints table/entity, so P6#01 adds tasks.sprint_id now and installs tasks_sprint_id_foreign only when public.sprints exists before this migration
 ]
 Result: IMPLEMENTED.
+
+## 2026-05-02T11:21:18Z — codex-orchestrator (integration gate review fixes verified)
+
+State:
+[
+  branch: plan/agent-os-vision,
+  review_fix_bundle: auth/flags/tenant-guard, DB integrity/migrations, router hot reload, Symphony claim lock, CLI auth, request-id propagation,
+  scratch_log_git_status: ignored by .scratch rule
+]
+
+Implemented fixes:
+[
+  flags: writable scope checks, target-user membership validation, org/global guardrails,
+  auth: production BETTER_AUTH_SECRET requirement, trusted origins env, OAuth credential hash includes credential value, invite hierarchy checks,
+  db: composite tenant FKs/indexes, provider uniqueness, cascade/delete behavior, encrypted token type, JSON nullability, lossy migration markers,
+  router: singleton event bus, listener exception isolation, cache invalidation, stale fallback on refresh failure, destroy/unsubscribe path,
+  symphony: same-process claim queue, transactional compare-and-set claim, event rollback coverage, duplicate-unclaimed regression,
+  cli_web: root auth dispatch, DB-backed CLI session handling, request-id response headers for hooks + tRPC endpoint
+]
+
+Verification:
+[
+  bun test --conditions=svelte src/db/data-integrity.test.ts src/db/tasks-schema-extension.test.ts tests/db/migrations/orchestration-agent-runs.test.ts tests/db/migrations/docs-schema-foundation.test.ts tests/db/migrator-service.test.ts tests/db/auth/auth-entities.test.ts => PASS, 111 pass,
+  bun test --conditions=svelte tests/symphony/workspace.test.ts tests/symphony/tracker-fetch-candidate-issues.test.ts tests/symphony/orchestrator-claim-lock.test.ts => PASS, 32 pass,
+  bun run lint => PASS,
+  semgrep --config auto --json --quiet -o /tmp/fulcrum-semgrep-auth.json src/auth src/server/trpc src/trpc src/cli src/web/src/hooks.server.ts src/web/src/routes/api/trpc => PASS, 6 existing unrelated non-literal RegExp findings outside changed auth/tRPC/request paths,
+  bun run ci => PASS, 1720 pass, 2 skip, 0 fail; web:check/web:build kept existing Svelte warnings in boards/login pages and existing Vite chunk-size warning
+]
+
+Result: review-fix bundle ready to commit.

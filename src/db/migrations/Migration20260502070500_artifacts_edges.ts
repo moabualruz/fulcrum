@@ -11,6 +11,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260502070500_artifacts_edges extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     this.addSql(
       `alter table "artifacts" drop constraint if exists "artifacts_org_id_foreign"`,

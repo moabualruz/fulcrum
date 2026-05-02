@@ -19,14 +19,97 @@ import {
   Property,
   Index,
   ManyToOne,
+  Unique,
 } from "@mikro-orm/decorators/es";
+import { Type, type EntityProperty, type Platform } from "@mikro-orm/core";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from "node:crypto";
 import { AccountRepository } from "../../repositories/auth/AccountRepository.ts";
 import { Org } from "./Org.ts";
+
+const ENCRYPTED_TOKEN_PREFIX = "fc1.";
+const DEV_TEST_ACCOUNT_TOKEN_SECRET = "fulcrum-dev-test-account-token-secret-00000000";
+
+class EncryptedAccountTokenType extends Type<string | null | undefined, string | null> {
+  override convertToDatabaseValue(value: string | null | undefined): string | null {
+    if (value == null) return null;
+    if (value.startsWith(ENCRYPTED_TOKEN_PREFIX)) return value;
+    return encryptAccountToken(value);
+  }
+
+  override convertToJSValue(value: string | null | undefined): string | null {
+    if (value == null) return null;
+    if (!value.startsWith(ENCRYPTED_TOKEN_PREFIX)) return value;
+    return decryptAccountToken(value);
+  }
+
+  override getColumnType(_prop: EntityProperty, _platform: Platform): string {
+    return "text";
+  }
+}
+
+function encryptAccountToken(value: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", accountTokenKey(), iv);
+  const ciphertext = Buffer.concat([
+    cipher.update(value, "utf8"),
+    cipher.final(),
+  ]);
+  const tag = cipher.getAuthTag();
+  return [
+    ENCRYPTED_TOKEN_PREFIX.slice(0, -1),
+    iv.toString("base64url"),
+    tag.toString("base64url"),
+    ciphertext.toString("base64url"),
+  ].join(".");
+}
+
+function decryptAccountToken(value: string): string {
+  const [, ivText, tagText, ciphertextText] = value.split(".");
+  if (!ivText || !tagText || !ciphertextText) {
+    throw new Error("Stored account token envelope is invalid.");
+  }
+  const decipher = createDecipheriv(
+    "aes-256-gcm",
+    accountTokenKey(),
+    Buffer.from(ivText, "base64url"),
+  );
+  decipher.setAuthTag(Buffer.from(tagText, "base64url"));
+  return Buffer.concat([
+    decipher.update(Buffer.from(ciphertextText, "base64url")),
+    decipher.final(),
+  ]).toString("utf8");
+}
+
+function accountTokenKey(): Buffer {
+  const secret = nonEmptyEnv("FULCRUM_ACCOUNT_TOKEN_KEY") ??
+    nonEmptyEnv("BETTER_AUTH_SECRET");
+  if (!secret && process.env["NODE_ENV"] === "production") {
+    throw new Error(
+      "FULCRUM_ACCOUNT_TOKEN_KEY or BETTER_AUTH_SECRET is required for account token encryption.",
+    );
+  }
+  return createHash("sha256")
+    .update(secret ?? DEV_TEST_ACCOUNT_TOKEN_SECRET)
+    .digest();
+}
+
+function nonEmptyEnv(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
+}
 
 @Entity({ tableName: "accounts", repository: () => AccountRepository })
 @Index({ name: "idx_accounts_org_user", properties: ["org", "userId"] })
 @Index({ name: "idx_accounts_user_id", properties: ["userId"] })
-@Index({ name: "idx_accounts_provider", properties: ["providerId", "accountId"] })
+@Unique({
+  name: "uq_accounts_provider_account",
+  properties: ["providerId", "accountId"],
+})
 export class Account {
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
@@ -38,10 +121,7 @@ export class Account {
   })
   org: Org | null = null;
 
-  /**
-   * References users.id — not a FK constraint to keep cascade behaviour
-   * simple across all Better-Auth models; Better-Auth manages the join itself.
-   */
+  /** References users.id with ON DELETE CASCADE at the migration boundary. */
   @Property({ type: "uuid", fieldName: "user_id" })
   userId!: string;
 
@@ -54,11 +134,19 @@ export class Account {
   accountId!: string;
 
   /** Short-lived access token (nullable — not always returned). */
-  @Property({ type: "text", fieldName: "access_token", nullable: true })
+  @Property({
+    type: EncryptedAccountTokenType,
+    fieldName: "access_token",
+    nullable: true,
+  })
   accessToken?: string;
 
   /** Refresh token for long-lived sessions. */
-  @Property({ type: "text", fieldName: "refresh_token", nullable: true })
+  @Property({
+    type: EncryptedAccountTokenType,
+    fieldName: "refresh_token",
+    nullable: true,
+  })
   refreshToken?: string;
 
   /** Expiry of the access token. */
@@ -74,7 +162,11 @@ export class Account {
   scope?: string;
 
   /** OIDC id_token, if returned by provider. */
-  @Property({ type: "text", fieldName: "id_token", nullable: true })
+  @Property({
+    type: EncryptedAccountTokenType,
+    fieldName: "id_token",
+    nullable: true,
+  })
   idToken?: string;
 
   /** Provider-specific password hash (for credential accounts, e.g., email/password stored via account). */

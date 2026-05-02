@@ -86,6 +86,39 @@ function authenticatedCallerWithContainer(container: Container) {
   );
 }
 
+function casbinContainer(
+  rows: Array<{ ptype: string; v0: string; v1: string; v2: string }>,
+) {
+  const container = new Container();
+  container.bind({
+    provide: FlagRegistry,
+    useValue: { isEnabled: async () => true } as unknown as FlagRegistry,
+  });
+  container.bind({
+    provide: CasbinRuleRepository,
+    useValue: {
+      findAll: async () => rows,
+    } as unknown as CasbinRuleRepository,
+  });
+  return container;
+}
+
+function testCallerForRouter(
+  router: ReturnType<typeof t.router>,
+  container: Container,
+): any {
+  const factory = t.createCallerFactory(router);
+  return factory(
+    createContext({
+      session: mockSession({ userId: "user-test-001" }) as unknown as import("better-auth").Session,
+      orgId: "00000000-0000-0000-0000-000000000001",
+      userId: "user-test-001",
+      em: null,
+      container,
+    }),
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. UNAUTHORIZED — protected procedure without session
 // ─────────────────────────────────────────────────────────────────────────────
@@ -160,7 +193,7 @@ describe("assertPermission middleware", () => {
     const caller = authenticatedCallerWithContainer(container);
     let error: TRPCError | null = null;
     try {
-      await caller.auth.whoami();
+      await caller.tasks.list();
     } catch (e) {
       if (e instanceof TRPCError) error = e;
     }
@@ -176,40 +209,24 @@ describe("assertPermission middleware", () => {
   });
 
   it("derives casbin resource/action from procedure path when input omits them", async () => {
-    const rows = [{ ptype: "p", v0: "user-test-001", v1: "secure", v2: "read" }];
+    const rows = [{ ptype: "p", v0: "user-test-001", v1: "secure", v2: "list" }];
 
-    const container = new Container();
-    container.bind({
-      provide: FlagRegistry,
-      useValue: { isEnabled: async () => true } as unknown as FlagRegistry,
-    });
-    container.bind({
-      provide: CasbinRuleRepository,
-      useValue: {
-        findAll: async () => rows,
-      } as unknown as CasbinRuleRepository,
-    });
+    const container = casbinContainer(rows);
 
     const router = t.router({
-      secure: protectedProcedure.query(() => "ok"),
-    });
-    const caller = t.createCallerFactory(router)(
-      createContext({
-        session: mockSession({ userId: "user-test-001" }) as unknown as import("better-auth").Session,
-        orgId: "00000000-0000-0000-0000-000000000001",
-        userId: "user-test-001",
-        em: null,
-        container,
+      secure: t.router({
+        list: protectedProcedure.query(() => "ok"),
       }),
-    );
+    });
+    const caller = testCallerForRouter(router, container);
 
-    expect(await caller.secure()).toBe("ok");
+    expect(await caller.secure.list()).toBe("ok");
   });
 
   it("ignores spoofed casbin resource/action input and enforces server route identity", async () => {
     const rows = [
-      { ptype: "p", v0: "user-test-001", v1: "public", v2: "read" },
-      { ptype: "p", v0: "user-test-001", v1: "secure", v2: "read" },
+      { ptype: "p", v0: "user-test-001", v1: "public", v2: "update" },
+      { ptype: "p", v0: "user-test-001", v1: "secure", v2: "get" },
     ];
     const repo = {
       findAll: async () => rows,
@@ -223,23 +240,78 @@ describe("assertPermission middleware", () => {
     container.bind({ provide: CasbinRuleRepository, useValue: repo });
 
     const router = t.router({
-      secure: protectedProcedure
-        .input(z.object({ resource: z.string(), action: z.string() }))
-        .mutation(() => "ok"),
-    });
-    const caller = t.createCallerFactory(router)(
-      createContext({
-        session: mockSession({ userId: "user-test-001" }) as unknown as import("better-auth").Session,
-        orgId: "00000000-0000-0000-0000-000000000001",
-        userId: "user-test-001",
-        em: null,
-        container,
+      secure: t.router({
+        update: protectedProcedure
+          .input(z.object({ resource: z.string(), action: z.string() }))
+          .mutation(() => "ok"),
       }),
+    });
+    const caller = testCallerForRouter(router, container);
+
+    let error: TRPCError | null = null;
+    try {
+      await caller.secure.update({ resource: "public", action: "update" });
+    } catch (e) {
+      if (e instanceof TRPCError) error = e;
+    }
+
+    expect(error).not.toBeNull();
+    expect(error?.code).toBe("FORBIDDEN");
+  });
+
+  it("derives casbin resource from nested parent path and action from list leaf", async () => {
+    const router = t.router({
+      notify: t.router({
+        rules: t.router({
+          list: protectedProcedure.query(() => "ok"),
+        }),
+      }),
+    });
+    const caller = testCallerForRouter(
+      router,
+      casbinContainer([
+        { ptype: "p", v0: "user-test-001", v1: "notify.rules", v2: "list" },
+        { ptype: "p", v0: "user-test-001", v1: "notify", v2: "update" },
+      ]),
+    );
+
+    expect(await caller.notify.rules.list()).toBe("ok");
+  });
+
+  it("derives casbin action from destructive unregister leaf", async () => {
+    const router = t.router({
+      repos: t.router({
+        unregister: protectedProcedure
+          .input(z.object({ id: z.string() }))
+          .mutation(() => "ok"),
+      }),
+    });
+    const caller = testCallerForRouter(
+      router,
+      casbinContainer([
+        { ptype: "p", v0: "user-test-001", v1: "repos", v2: "unregister" },
+      ]),
+    );
+
+    expect(await caller.repos.unregister({ id: "repo-1" })).toBe("ok");
+  });
+
+  it("fails closed when casbin is enabled for unmapped protected procedure leaf", async () => {
+    const router = t.router({
+      secure: t.router({
+        archive: protectedProcedure.mutation(() => "ok"),
+      }),
+    });
+    const caller = testCallerForRouter(
+      router,
+      casbinContainer([
+        { ptype: "p", v0: "user-test-001", v1: "secure", v2: "write" },
+      ]),
     );
 
     let error: TRPCError | null = null;
     try {
-      await caller.secure({ resource: "public", action: "read" });
+      await caller.secure.archive();
     } catch (e) {
       if (e instanceof TRPCError) error = e;
     }

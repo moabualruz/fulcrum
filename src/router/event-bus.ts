@@ -11,10 +11,22 @@ export class RoutingEventBus {
   }
 
   emitRulesChanged(): void {
-    this.emitter.emit(RULES_CHANGED);
+    for (const listener of this.emitter.listeners(RULES_CHANGED)) {
+      try {
+        (listener as () => void)();
+      } catch (error) {
+        console.error(
+          `Routing rules change listener failed: ${String(
+            (error as { message?: unknown }).message ?? error,
+          )}`,
+        );
+      }
+    }
   }
 
   listenerCount(): number {
     return this.emitter.listenerCount(RULES_CHANGED);
   }
 }
+
+export const routingEventBus = new RoutingEventBus();

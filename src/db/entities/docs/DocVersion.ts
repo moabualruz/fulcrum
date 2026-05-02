@@ -17,6 +17,11 @@ import { Document } from "./Document.ts";
 import { DocVersionRepository } from "../../repositories/docs/DocVersionRepository.ts";
 
 @Entity({ tableName: "doc_versions", repository: () => DocVersionRepository })
+@Index({
+  name: "doc_versions_id_org_unique",
+  expression:
+    'CREATE UNIQUE INDEX "doc_versions_id_org_unique" ON "doc_versions" ("id", "org_id")',
+})
 @Unique({
   name: "doc_versions_doc_version_unique",
   properties: ["doc", "versionNum"],
@@ -24,6 +29,10 @@ import { DocVersionRepository } from "../../repositories/docs/DocVersionReposito
 @Index({
   name: "doc_versions_org_doc_version",
   properties: ["org", "doc", "versionNum"],
+})
+@Index({
+  name: "doc_versions_author",
+  properties: ["author"],
 })
 export class DocVersion {
   [OptionalProps]?:

@@ -17,12 +17,22 @@ import { DocCommentRepository } from "../../repositories/docs/DocCommentReposito
 
 @Entity({ tableName: "doc_comments", repository: () => DocCommentRepository })
 @Index({
+  name: "doc_comments_id_org_unique",
+  expression:
+    'CREATE UNIQUE INDEX "doc_comments_id_org_unique" ON "doc_comments" ("id", "org_id")',
+})
+@Index({
   name: "doc_comments_org_doc",
   properties: ["org", "doc"],
+})
+@Index({
+  name: "doc_comments_author",
+  properties: ["author"],
 })
 export class DocComment {
   [OptionalProps]?:
     | "anchorRange"
+    | "author"
     | "parentComment"
     | "resolved"
     | "createdAt"
@@ -48,8 +58,12 @@ export class DocComment {
   @Property({ type: "json", fieldName: "anchor_range", nullable: true })
   anchorRange: Record<string, unknown> | null = null;
 
-  @ManyToOne(() => User, { fieldName: "author_id", nullable: false })
-  author!: User;
+  @ManyToOne(() => User, {
+    fieldName: "author_id",
+    nullable: true,
+    deleteRule: "set null",
+  })
+  author: User | null = null;
 
   @Property({ type: "text", fieldName: "body_md" })
   bodyMd!: string;

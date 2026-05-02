@@ -20,7 +20,8 @@
  * Closes (issue): .scratch/agent-os-vision/01-foundation-reset/issues/19-migration-up-down-versioning.md
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { readdir } from "node:fs/promises";
 import { MikroORM } from "@mikro-orm/postgresql";
 import { Migrator } from "@mikro-orm/migrations";
 import { PGlite } from "@electric-sql/pglite";
@@ -87,13 +88,16 @@ const ALL_ENTITIES = [
 ];
 
 const MIGRATIONS_PATH = new URL("../../src/db/migrations", import.meta.url).pathname;
+const DESTRUCTIVE_DOWN_SQL = /\b(drop\s+table|drop\s+column)\b/i;
+const LOSSY_FLAG = /static\s+(?:readonly\s+)?isLossy\s*=\s*true\b/;
+const pglitesByOrm = new WeakMap<MikroORM, PGlite>();
 
 /** Build a fresh in-memory PGlite ORM for each test suite. */
 async function buildOrm(): Promise<MikroORM> {
   const pglite = new PGlite();
   const dialect = new PGliteKyselyDialect(() => pglite);
 
-  return MikroORM.init({
+  const orm = await MikroORM.init({
     dbName: "postgres",
     driverOptions: dialect,
     multipleStatements: false,
@@ -108,6 +112,21 @@ async function buildOrm(): Promise<MikroORM> {
     extensions: [Migrator],
     debug: false,
   });
+  pglitesByOrm.set(orm, pglite);
+  return orm;
+}
+
+async function closeOrm(orm?: MikroORM): Promise<void> {
+  if (!orm) return;
+  const pglite = pglitesByOrm.get(orm);
+  try {
+    await orm.close(true);
+  } finally {
+    if (pglite) {
+      pglitesByOrm.delete(orm);
+      await pglite.close();
+    }
+  }
 }
 
 /** Build a MigratorService backed by the given ORM instance. */
@@ -137,7 +156,7 @@ describe("MigratorService.status() on empty DB", () => {
   });
 
   afterAll(async () => {
-    if (orm) await orm.close(true);
+    await closeOrm(orm);
   });
 
   it("returns current=null on a blank DB (getExecuted returns nothing)", async () => {
@@ -165,7 +184,7 @@ describe("MigratorService.migrate() — up to latest", () => {
   });
 
   afterAll(async () => {
-    if (orm) await orm.close(true);
+    await closeOrm(orm);
   });
 
   it("runs migrate() without throwing", async () => {
@@ -203,7 +222,7 @@ describe("MigratorService — lossy-down protection", () => {
   });
 
   afterAll(async () => {
-    if (orm) await orm.close(true);
+    await closeOrm(orm);
   });
 
   it("throws target-not-found when migrating to a non-existent version", async () => {
@@ -252,6 +271,27 @@ describe("migration-checksums", () => {
   });
 });
 
+describe("migration lossiness declarations", () => {
+  it("marks every destructive down() migration with static isLossy=true", async () => {
+    const files = (await readdir(MIGRATIONS_PATH))
+      .filter((name) => /^Migration.*\.ts$/.test(name))
+      .sort();
+
+    const unflagged: string[] = [];
+
+    for (const file of files) {
+      const contents = await Bun.file(`${MIGRATIONS_PATH}/${file}`).text();
+      const downBody = /override\s+async\s+down\(\):\s+Promise<void>\s*\{([\s\S]*?)^\s*\}/m.exec(contents)?.[1] ?? "";
+
+      if (DESTRUCTIVE_DOWN_SQL.test(downBody) && !LOSSY_FLAG.test(contents)) {
+        unflagged.push(file);
+      }
+    }
+
+    expect(unflagged).toEqual([]);
+  });
+});
+
 // ────────────────────────────────────────────────────────────────────────────
 // Suite 5: Doctor checks
 // ────────────────────────────────────────────────────────────────────────────
@@ -270,7 +310,7 @@ describe("doctor-checks", () => {
   });
 
   afterAll(async () => {
-    if (orm) await orm.close(true);
+    await closeOrm(orm);
   });
 
   /** Get a fresh forked-EM-backed repo for each check call. */
@@ -346,7 +386,7 @@ describe("SchemaMigration entity metadata", () => {
   });
 
   afterAll(async () => {
-    if (orm) await orm.close(true);
+    await closeOrm(orm);
   });
 
   it("is registered with tableName=schema_migrations", () => {
@@ -396,7 +436,7 @@ describe("MigratorService — forced-lossy-down protection (P1#19 round-2)", () 
   });
 
   afterAll(async () => {
-    if (orm) await orm.close(true);
+    await closeOrm(orm);
   });
 
   it("throws LossyDownProtectedError when isLossy=true and force=false", async () => {
@@ -483,7 +523,7 @@ describe("MigratorService — forced-lossy-down protection (P1#19 round-2)", () 
       expect(lossyEvent).not.toBeNull();
       expect(lossyEvent!.verb).toBe("migration.down-lossy-forced");
     } finally {
-      await freshOrm.close(true);
+      await closeOrm(freshOrm);
     }
   });
 });
@@ -514,7 +554,7 @@ describe("MigratorService — LossyCheckFailedError (fail-closed lossy import)",
       // Must propagate LossyCheckFailedError — fail-closed, not fail-open.
       await expect(service.migrate(target, false)).rejects.toThrow(LossyCheckFailedError);
     } finally {
-      await freshOrm.close(true);
+      await closeOrm(freshOrm);
     }
   });
 
@@ -556,7 +596,7 @@ describe("MigratorService — checksum mismatch (P1#19 round-2)", () => {
       // The pre-flight checksum validation in migrate() detects the mismatch.
       await expect(serviceSecondRun.migrate()).rejects.toThrow(MigrationChecksumMismatchError);
     } finally {
-      await freshOrm.close(true);
+      await closeOrm(freshOrm);
     }
   });
 
@@ -601,7 +641,7 @@ describe("MigratorService — unreadable applied-migration file (P1#19 round-3)"
       // Fail-closed: must throw MigrationFileMissingError, not silently skip.
       await expect(serviceSecondRun.migrate()).rejects.toThrow(MigrationFileMissingError);
     } finally {
-      await freshOrm.close(true);
+      await closeOrm(freshOrm);
     }
   });
 
@@ -681,7 +721,7 @@ describe("MigratorService — round-trip up/down on all migration classes (P1#19
         const finalStatus = await service.status();
         expect(finalStatus.pastDue).toBe(0);
       } finally {
-        await freshOrm.close(true);
+        await closeOrm(freshOrm);
       }
     });
   }

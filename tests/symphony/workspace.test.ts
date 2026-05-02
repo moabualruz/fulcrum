@@ -35,6 +35,7 @@ import { Migration20260502050200_skills_registry } from "../../src/db/migrations
 import { Migration20260502070100_docs_document_columns } from "../../src/db/migrations/Migration20260502070100_docs_document_columns.ts";
 import { Migration20260502070200_docs_related_tables } from "../../src/db/migrations/Migration20260502070200_docs_related_tables.ts";
 import { Migration20260502070400_agent_runs_sandcastle_columns } from "../../src/db/migrations/Migration20260502070400_agent_runs_sandcastle_columns.ts";
+import { Migration20260502090000_tasks_schema_extension } from "../../src/db/migrations/Migration20260502090000_tasks_schema_extension.ts";
 import {
   createWorkspace,
   destroyWorkspace,
@@ -116,6 +117,10 @@ async function buildMigratedOrm(): Promise<BlankOrm> {
       {
         name: "Migration20260502070400_agent_runs_sandcastle_columns",
         class: Migration20260502070400_agent_runs_sandcastle_columns,
+      },
+      {
+        name: "Migration20260502090000_tasks_schema_extension",
+        class: Migration20260502090000_tasks_schema_extension,
       },
     ] satisfies MigrationObject[],
   };

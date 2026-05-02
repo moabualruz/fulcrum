@@ -5,6 +5,8 @@ const HELP = `fulcrum — multi-agent foundation CLI
 
 Usage:
   fulcrum init                       Bootstrap local org + admin session.
+  fulcrum auth <whoami|invite|login|logout>
+                                     Manage local CLI authentication.
   fulcrum db <migrate|status|history>
                                      Manage local schema migrations.
   fulcrum web                        Start the SvelteKit web server.
@@ -71,6 +73,7 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
 
   switch (cmd) {
     case "init":
+    case "auth":
     case "db":
     case "web":
     case "tui":

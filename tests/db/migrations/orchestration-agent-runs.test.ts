@@ -341,18 +341,18 @@ describe("Migration20260502030300_agent_runs_symphony_columns", () => {
   it("allows only one claimed run per task through the partial unique index", async () => {
     const db = await buildMigratedOrm();
     try {
-      const setupEm = db.orm.em.fork();
-      const org = setupEm.getReference(Org, DEFAULT_ORG_ID);
-      const task = setupEm.create(Task, { org, createdAt: new Date(), blockedByIds: [] });
-      setupEm.persist(task);
-      await setupEm.flush();
+      const taskId = crypto.randomUUID();
+      await rows(db.orm, `insert into "tasks" ("id", "org_id") values (?, ?)`, [
+        taskId,
+        DEFAULT_ORG_ID,
+      ]);
 
       const insertClaimed = async () => {
         const em = db.orm.em.fork();
         const repo = em.getRepository(AgentRun) as AgentRunRepository;
         return repo.insert({
           org: em.getReference(Org, DEFAULT_ORG_ID),
-          task: em.getReference(Task, task.id),
+          task: em.getReference(Task, taskId),
           orchestrationState: "claimed",
         } as never);
       };
@@ -386,6 +386,65 @@ describe("Migration20260502030300_agent_runs_symphony_columns", () => {
       expect(String((caught as { message?: unknown }).message ?? caught)).toContain(
         "agent_runs_claimed_task_id_check",
       );
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("rejects cross-org task links on agent runs", async () => {
+    const db = await buildMigratedOrm();
+    try {
+      const setupEm = db.orm.em.fork();
+      const now = new Date();
+      const otherOrgId = crypto.randomUUID();
+      const otherOrg = setupEm.create(Org, {
+        id: otherOrgId,
+        name: "AgentRun Other Org",
+        slug: `agent-run-other-${crypto.randomUUID()}`,
+        createdAt: now,
+        updatedAt: now,
+      });
+      setupEm.persist(otherOrg);
+      await setupEm.flush();
+      const otherTaskId = crypto.randomUUID();
+      await rows(db.orm, `insert into "tasks" ("id", "org_id") values (?, ?)`, [
+        otherTaskId,
+        otherOrgId,
+      ]);
+
+      await expect(
+        rows(db.orm, `insert into "agent_runs" ("org_id", "task_id") values (?, ?)`, [
+          DEFAULT_ORG_ID,
+          otherTaskId,
+        ]),
+      ).rejects.toThrow("agent_runs_task_org_foreign");
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("sets agent_runs.task_id to null when the linked task is deleted", async () => {
+    const db = await buildMigratedOrm();
+    try {
+      const em = db.orm.em.fork();
+      const org = em.getReference(Org, DEFAULT_ORG_ID);
+      const taskId = crypto.randomUUID();
+      await rows(db.orm, `insert into "tasks" ("id", "org_id") values (?, ?)`, [
+        taskId,
+        DEFAULT_ORG_ID,
+      ]);
+      const run = em.create(AgentRun, { org, task: em.getReference(Task, taskId) });
+      em.persist(run);
+      await em.flush();
+
+      await rows(db.orm, `delete from "tasks" where "id" = ?`, [taskId]);
+      const [saved] = await rows<{ task_id: string | null }>(
+        db.orm,
+        `select "task_id" from "agent_runs" where "id" = ?`,
+        [run.id],
+      );
+
+      expect(saved?.task_id).toBeNull();
     } finally {
       await db.close();
     }

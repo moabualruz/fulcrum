@@ -34,6 +34,7 @@ import { t } from "../../src/trpc/trpc.ts";
 
 const TEST_ORG_ID = "00000000-0000-0000-0000-000000000001"; // nil-adjacent — DB seed only
 const TEST_OWNER_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
+const TEST_ADMIN_ID = "c3d4e5f6-a7b8-4c9d-90e1-f2a3b4c5d6e7";
 const TEST_MEMBER_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
 
 let orm: MikroORM;
@@ -169,6 +170,16 @@ beforeAll(async () => {
     updatedAt: now,
   });
 
+  const admin = seedEm.create(User, {
+    id: TEST_ADMIN_ID,
+    email: "admin@test.local",
+    name: "Admin",
+    orgId: TEST_ORG_ID,
+    role: "admin",
+    createdAt: now,
+    updatedAt: now,
+  });
+
   const ownerMembership = seedEm.create(OrgMember, {
     userId: TEST_OWNER_ID,
     orgId: TEST_ORG_ID,
@@ -183,7 +194,14 @@ beforeAll(async () => {
     joinedAt: now,
   });
 
-  seedEm.persist([org, owner, member, ownerMembership, memberMembership]);
+  const adminMembership = seedEm.create(OrgMember, {
+    userId: TEST_ADMIN_ID,
+    orgId: TEST_ORG_ID,
+    role: "admin",
+    joinedAt: now,
+  });
+
+  seedEm.persist([org, owner, admin, member, ownerMembership, adminMembership, memberMembership]);
   await seedEm.flush();
 });
 
@@ -236,6 +254,42 @@ describe("auth.invite", () => {
     expect(typeof result.invitationId).toBe("string");
     expect(typeof result.token).toBe("string");
     expect(result.token.length).toBeGreaterThan(0);
+  });
+
+  it("owner can invite admins", async () => {
+    const caller = makeCaller(TEST_OWNER_ID, TEST_ORG_ID);
+    const result = await caller.auth.invite({ email: "admin-invite@test.local", role: "admin" });
+    expect(typeof result.invitationId).toBe("string");
+  });
+
+  it("admin can invite guests", async () => {
+    const caller = makeCaller(TEST_ADMIN_ID, TEST_ORG_ID);
+    const result = await caller.auth.invite({ email: "guest-invite@test.local", role: "guest" });
+    expect(typeof result.invitationId).toBe("string");
+  });
+
+  it("admin inviting owner → FORBIDDEN", async () => {
+    const caller = makeCaller(TEST_ADMIN_ID, TEST_ORG_ID);
+    let error: TRPCError | null = null;
+    try {
+      await caller.auth.invite({ email: "owner-invite@test.local", role: "owner" });
+    } catch (e) {
+      if (e instanceof TRPCError) error = e;
+    }
+    expect(error).not.toBeNull();
+    expect(error?.code).toBe("FORBIDDEN");
+  });
+
+  it("admin inviting admin → FORBIDDEN", async () => {
+    const caller = makeCaller(TEST_ADMIN_ID, TEST_ORG_ID);
+    let error: TRPCError | null = null;
+    try {
+      await caller.auth.invite({ email: "admin-peer-invite@test.local", role: "admin" });
+    } catch (e) {
+      if (e instanceof TRPCError) error = e;
+    }
+    expect(error).not.toBeNull();
+    expect(error?.code).toBe("FORBIDDEN");
   });
 
   it("invite creates an Invitation row in DB", async () => {

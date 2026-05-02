@@ -71,7 +71,9 @@ const RELATED_TABLES = [
 const RELATED_INDEXES = [
   "doc_links_org_from",
   "doc_links_org_to",
+  "doc_versions_author",
   "doc_versions_org_doc_version",
+  "doc_comments_author",
   "doc_comments_org_doc",
   "doc_templates_org_project_type",
 ] as const;
@@ -344,6 +346,7 @@ describe("Docs related entity metadata", () => {
     const comment = db.orm.getMetadata().get(DocComment);
     expect(comment.tableName).toBe("doc_comments");
     expect(comment.properties["anchorRange"]?.nullable).toBe(true);
+    expect(comment.properties["author"]?.nullable).toBe(true);
     expect(comment.properties["parentComment"]?.nullable).toBe(true);
     expect(comment.properties["resolved"]?.type).toBe("boolean");
 
@@ -480,6 +483,181 @@ describe("Docs FK deletion behavior", () => {
       em.clear();
 
       expect(await em.count(DocComment, { id: reply.id })).toBe(0);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("preserves authored docs rows when user is deleted", async () => {
+    const db = await buildMigratedOrm();
+    try {
+      const author = await seedUser(db.orm);
+      const em = db.orm.em.fork();
+      const org = em.getReference(Org, DEFAULT_ORG_ID);
+      const doc = em.create(Document, { org, projectId: PROJECT_ID });
+      const version = em.create(DocVersion, {
+        org,
+        doc,
+        versionNum: 1,
+        author: em.getReference(User, author.id),
+      });
+      const comment = em.create(DocComment, {
+        org,
+        doc,
+        author: em.getReference(User, author.id),
+        bodyMd: "Comment",
+      });
+      em.persist([doc, version, comment]);
+      await em.flush();
+
+      await rows(db.orm, `delete from "users" where "id" = ?`, [author.id]);
+
+      const [savedVersion] = await rows<{ author_id: string | null }>(
+        db.orm,
+        `select author_id from "doc_versions" where "id" = ?`,
+        [version.id],
+      );
+      const [savedComment] = await rows<{ author_id: string | null }>(
+        db.orm,
+        `select author_id from "doc_comments" where "id" = ?`,
+        [comment.id],
+      );
+
+      expect(savedVersion?.author_id).toBeNull();
+      expect(savedComment?.author_id).toBeNull();
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("rejects cross-org Document.parent references", async () => {
+    const db = await buildMigratedOrm();
+    try {
+      const em = db.orm.em.fork();
+      const now = new Date();
+      const otherOrg = em.create(Org, {
+        name: "Docs Other Org",
+        slug: `docs-other-${crypto.randomUUID()}`,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const parent = em.create(Document, { org: otherOrg, projectId: PROJECT_ID });
+      em.persist([otherOrg, parent]);
+      await em.flush();
+
+      await expect(
+        rows(
+          db.orm,
+          `insert into "documents" ("org_id", "parent_id", "project_id") values (?, ?, ?)`,
+          [DEFAULT_ORG_ID, parent.id, PROJECT_ID],
+        ),
+      ).rejects.toThrow("documents_parent_org_foreign");
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("rejects cross-org DocLink, DocVersion, and DocComment document references", async () => {
+    const db = await buildMigratedOrm();
+    try {
+      const em = db.orm.em.fork();
+      const now = new Date();
+      const otherOrg = em.create(Org, {
+        name: "Docs Related Other Org",
+        slug: `docs-related-other-${crypto.randomUUID()}`,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const localDoc = em.create(Document, {
+        org: em.getReference(Org, DEFAULT_ORG_ID),
+        projectId: PROJECT_ID,
+      });
+      const otherDoc = em.create(Document, { org: otherOrg, projectId: PROJECT_ID });
+      em.persist([otherOrg, localDoc, otherDoc]);
+      await em.flush();
+
+      await expect(
+        rows(
+          db.orm,
+          `insert into "doc_links" ("org_id", "from_doc_id", "to_slug") values (?, ?, ?)`,
+          [DEFAULT_ORG_ID, otherDoc.id, "other"],
+        ),
+      ).rejects.toThrow("doc_links_from_doc_org_foreign");
+      await expect(
+        rows(
+          db.orm,
+          `insert into "doc_links" ("org_id", "from_doc_id", "to_doc_id", "to_slug") values (?, ?, ?, ?)`,
+          [DEFAULT_ORG_ID, localDoc.id, otherDoc.id, "other"],
+        ),
+      ).rejects.toThrow("doc_links_to_doc_org_foreign");
+      await expect(
+        rows(
+          db.orm,
+          `insert into "doc_versions" ("org_id", "doc_id", "version_num") values (?, ?, ?)`,
+          [DEFAULT_ORG_ID, otherDoc.id, 1],
+        ),
+      ).rejects.toThrow("doc_versions_doc_org_foreign");
+      await expect(
+        rows(
+          db.orm,
+          `insert into "doc_comments" ("org_id", "doc_id", "body_md") values (?, ?, ?)`,
+          [DEFAULT_ORG_ID, otherDoc.id, "wrong tenant"],
+        ),
+      ).rejects.toThrow("doc_comments_doc_org_foreign");
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("rejects cross-org doc author and comment-parent references", async () => {
+    const db = await buildMigratedOrm();
+    try {
+      const otherAuthor = await seedUser(db.orm);
+      const em = db.orm.em.fork();
+      const now = new Date();
+      const otherOrgId = crypto.randomUUID();
+      const otherOrg = em.create(Org, {
+        id: otherOrgId,
+        name: "Docs Author Other Org",
+        slug: `docs-author-other-${crypto.randomUUID()}`,
+        createdAt: now,
+        updatedAt: now,
+      });
+      em.assign(em.getReference(User, otherAuthor.id), { orgId: otherOrgId });
+      const localDoc = em.create(Document, {
+        org: em.getReference(Org, DEFAULT_ORG_ID),
+        projectId: PROJECT_ID,
+      });
+      const otherDoc = em.create(Document, { org: otherOrg, projectId: PROJECT_ID });
+      const otherComment = em.create(DocComment, {
+        org: otherOrg,
+        doc: otherDoc,
+        bodyMd: "Other org",
+      });
+      em.persist([otherOrg, localDoc, otherDoc, otherComment]);
+      await em.flush();
+
+      await expect(
+        rows(
+          db.orm,
+          `insert into "doc_versions" ("org_id", "doc_id", "version_num", "author_id") values (?, ?, ?, ?)`,
+          [DEFAULT_ORG_ID, localDoc.id, 1, otherAuthor.id],
+        ),
+      ).rejects.toThrow("doc_versions_author_org_foreign");
+      await expect(
+        rows(
+          db.orm,
+          `insert into "doc_comments" ("org_id", "doc_id", "author_id", "body_md") values (?, ?, ?, ?)`,
+          [DEFAULT_ORG_ID, localDoc.id, otherAuthor.id, "wrong author"],
+        ),
+      ).rejects.toThrow("doc_comments_author_org_foreign");
+      await expect(
+        rows(
+          db.orm,
+          `insert into "doc_comments" ("org_id", "doc_id", "parent_comment_id", "body_md") values (?, ?, ?, ?)`,
+          [DEFAULT_ORG_ID, localDoc.id, otherComment.id, "wrong parent"],
+        ),
+      ).rejects.toThrow("doc_comments_parent_org_foreign");
     } finally {
       await db.close();
     }

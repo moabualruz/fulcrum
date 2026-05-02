@@ -11,6 +11,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260502090000_tasks_schema_extension extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     this.addSql(`alter table "tasks" add column "sprint_id" uuid null`);
     this.addSql(
@@ -23,7 +25,7 @@ export class Migration20260502090000_tasks_schema_extension extends Migration {
     );
     this.addSql(`alter table "tasks" add column "external_id" varchar(255) null`);
     this.addSql(
-      `alter table "tasks" add constraint "tasks_parent_id_foreign" foreign key ("parent_id") references "tasks" ("id") on delete set null`,
+      `alter table "tasks" add constraint "tasks_parent_org_foreign" foreign key ("parent_id", "org_id") references "tasks" ("id", "org_id") on delete set null ("parent_id")`,
     );
     this.addSql(
       `do $$ begin if to_regclass('public.sprints') is not null then alter table "tasks" add constraint "tasks_sprint_id_foreign" foreign key ("sprint_id") references "sprints" ("id") on delete set null; end if; end $$`,
@@ -65,7 +67,7 @@ export class Migration20260502090000_tasks_schema_extension extends Migration {
       `alter table "tasks" drop constraint if exists "tasks_sprint_id_foreign"`,
     );
     this.addSql(
-      `alter table "tasks" drop constraint if exists "tasks_parent_id_foreign"`,
+      `alter table "tasks" drop constraint if exists "tasks_parent_org_foreign"`,
     );
     this.addSql(`alter table "tasks" drop column if exists "external_id"`);
     this.addSql(`alter table "tasks" drop column if exists "dependencies"`);

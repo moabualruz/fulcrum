@@ -22,6 +22,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260501104413_auth extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     // feature_flags
     this.addSql(
@@ -32,6 +34,9 @@ export class Migration20260501104413_auth extends Migration {
     );
     this.addSql(
       `alter table "feature_flags" add constraint "uq_feature_flags_org_user_flag" unique ("org_id", "user_id", "flag")`,
+    );
+    this.addSql(
+      `create unique index "uq_feature_flags_org_flag" on "feature_flags" ("org_id", "flag") where "org_id" is not null and "user_id" is null`,
     );
     this.addSql(
       `create unique index "uq_feature_flags_global_flag" on "feature_flags" ("flag") where "org_id" is null and "user_id" is null`,
@@ -77,6 +82,9 @@ export class Migration20260501104413_auth extends Migration {
     );
     this.addSql(
       `create index "idx_users_org_email" on "users" ("org_id", "email")`,
+    );
+    this.addSql(
+      `create unique index "users_id_org_unique" on "users" ("id", "org_id")`,
     );
     this.addSql(
       `alter table "users" add constraint "uq_users_org_email" unique ("org_id", "email")`,

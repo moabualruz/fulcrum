@@ -12,6 +12,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { raw } from "@mikro-orm/core";
 import { MikroORM } from "@mikro-orm/postgresql";
 import { PGlite } from "@electric-sql/pglite";
 import { PGliteKyselyDialect } from "../../../src/db/PGliteKyselyDriver.ts";
@@ -33,11 +34,12 @@ import {
 } from "../../../src/db/repositories/auth/index.ts";
 
 let orm: MikroORM;
+let pglite: PGlite;
 
 const TEST_ORG_ID = "00000000-0000-0000-0000-000000000001";
 
 beforeAll(async () => {
-  const pglite = new PGlite();
+  pglite = new PGlite();
   const dialect = new PGliteKyselyDialect(() => pglite);
 
   orm = await MikroORM.init({
@@ -55,6 +57,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (orm) await orm.close(true);
+  await pglite?.close();
 });
 
 // ──────────────────────────────────────────────
@@ -385,6 +388,45 @@ describe("CRUD round-trip — FeatureFlag", () => {
       .getRepository(FeatureFlag)
       .findOne({ flag: "router-llm" });
     expect(updated!.enabled).toBe(true);
+  });
+
+  it("rejects duplicate org-level FeatureFlag rows for the same flag", async () => {
+    const em = orm.em.fork();
+    const conflictTarget = raw(
+      '("org_id", "flag") where "org_id" is not null and "user_id" is null',
+    );
+
+    await em
+      .createQueryBuilder(FeatureFlag)
+      .insert({
+        orgId: TEST_ORG_ID,
+        userId: null,
+        flag: "org-duplicate-blocked",
+        enabled: true,
+        createdAt: new Date(),
+      })
+      .onConflict(conflictTarget)
+      .ignore()
+      .execute();
+    await em
+      .createQueryBuilder(FeatureFlag)
+      .insert({
+        orgId: TEST_ORG_ID,
+        userId: null,
+        flag: "org-duplicate-blocked",
+        enabled: false,
+        createdAt: new Date(),
+      })
+      .onConflict(conflictTarget)
+      .ignore()
+      .execute();
+
+    const count = await em.count(FeatureFlag, {
+      orgId: TEST_ORG_ID,
+      userId: null,
+      flag: "org-duplicate-blocked",
+    });
+    expect(count).toBe(1);
   });
 });
 

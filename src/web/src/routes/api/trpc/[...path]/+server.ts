@@ -23,7 +23,7 @@ async function handler(event: RequestEvent): Promise<Response> {
     endpoint: "/api/trpc",
     req: event.request,
     router: appRouter,
-    createContext: () =>
+    createContext: ({ resHeaders }) =>
       createContext({
         session: event.locals.session,
         orgId: event.locals.orgId,
@@ -32,6 +32,7 @@ async function handler(event: RequestEvent): Promise<Response> {
           : null,
         em: event.locals.em ?? null,
         container: event.locals.container ?? null,
+        responseHeaders: resHeaders,
       }),
   });
 }

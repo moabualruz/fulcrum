@@ -18,6 +18,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260501120537_events_org_id_backfill extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     // ── 1. orgs table ────────────────────────────────────────────────────────
     // Strict CREATE TABLE — fails loud if orgs already exists (schema drift).

@@ -186,7 +186,18 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     }
     case "auth": {
       const { run: runAuth } = await import("./commands/auth.ts");
-      await runAuth(rest);
+      const [sub = "help"] = rest;
+      if (sub === "help" || sub === "--help" || sub === "-h" || sub === "login" || sub === "logout") {
+        await runAuth(rest);
+        return;
+      }
+
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runAuth(rest, { container });
+      } finally {
+        await cleanup();
+      }
       return;
     }
     case "flags": {

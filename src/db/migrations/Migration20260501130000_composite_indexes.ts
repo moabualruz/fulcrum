@@ -24,6 +24,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260501130000_composite_indexes extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     // ── tasks (Pillar 6 stub) ──────────────────────────────────────────────
     this.addSql(
@@ -31,6 +33,9 @@ export class Migration20260501130000_composite_indexes extends Migration {
     );
     this.addSql(
       `create index "idx_tasks_org_created" on "tasks" ("org_id", "created_at")`,
+    );
+    this.addSql(
+      `create unique index "tasks_id_org_unique" on "tasks" ("id", "org_id")`,
     );
     this.addSql(
       `alter table "tasks" add constraint "tasks_org_id_foreign" foreign key ("org_id") references "orgs" ("id")`,
@@ -42,6 +47,9 @@ export class Migration20260501130000_composite_indexes extends Migration {
     );
     this.addSql(
       `create index "idx_documents_org_updated" on "documents" ("org_id", "updated_at")`,
+    );
+    this.addSql(
+      `create unique index "documents_id_org_unique" on "documents" ("id", "org_id")`,
     );
     this.addSql(
       `alter table "documents" add constraint "documents_org_id_foreign" foreign key ("org_id") references "orgs" ("id")`,

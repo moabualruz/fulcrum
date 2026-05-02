@@ -35,6 +35,7 @@ import { Migration20260502050200_skills_registry } from "../../src/db/migrations
 import { Migration20260502070100_docs_document_columns } from "../../src/db/migrations/Migration20260502070100_docs_document_columns.ts";
 import { Migration20260502070200_docs_related_tables } from "../../src/db/migrations/Migration20260502070200_docs_related_tables.ts";
 import { Migration20260502070400_agent_runs_sandcastle_columns } from "../../src/db/migrations/Migration20260502070400_agent_runs_sandcastle_columns.ts";
+import { Migration20260502090000_tasks_schema_extension } from "../../src/db/migrations/Migration20260502090000_tasks_schema_extension.ts";
 import { claimRun, ClaimConflictError } from "../../src/orchestration/symphony/orchestrator.ts";
 import { appRouter } from "../../src/trpc/router.ts";
 import { createContext } from "../../src/trpc/context.ts";
@@ -66,6 +67,7 @@ async function migrationsList(): Promise<MigrationObject[]> {
     { name: "Migration20260502070100_docs_document_columns", class: Migration20260502070100_docs_document_columns },
     { name: "Migration20260502070200_docs_related_tables", class: Migration20260502070200_docs_related_tables },
     { name: "Migration20260502070400_agent_runs_sandcastle_columns", class: Migration20260502070400_agent_runs_sandcastle_columns },
+    { name: "Migration20260502090000_tasks_schema_extension", class: Migration20260502090000_tasks_schema_extension },
   ];
 
   try {
@@ -161,6 +163,53 @@ async function seedUnclaimedRun(
   return { taskId: task.id, runId: run.id };
 }
 
+async function seedDuplicateUnclaimedRuns(
+  orm: MikroORM,
+): Promise<{ taskId: string; runIds: [string, string] }> {
+  const em = orm.em.fork();
+  const org = em.getReference(Org, DEFAULT_ORG_ID);
+
+  const task = em.create(Task, {
+    id: "30000000-0000-0000-0000-000000000010",
+    org,
+    createdAt: new Date("2026-05-01T00:00:00.000Z"),
+    blockedByIds: [],
+    status: "ready",
+    priority: 1,
+  });
+  em.persist(task);
+  await em.flush();
+
+  const runInputs = [
+    {
+      id: "40000000-0000-0000-0000-000000000010",
+      createdAt: new Date("2026-05-01T00:01:00.000Z"),
+    },
+    {
+      id: "40000000-0000-0000-0000-000000000011",
+      createdAt: new Date("2026-05-01T00:02:00.000Z"),
+    },
+  ] as const;
+
+  for (const input of runInputs) {
+    const run = em.create(AgentRun, {
+      id: input.id,
+      org,
+      task,
+      createdAt: input.createdAt,
+      startedAt: input.createdAt,
+      orchestrationState: "unclaimed",
+      attemptCount: 0,
+      sandboxMode: "host",
+      iterationCount: 0,
+    });
+    em.persist(run);
+  }
+  await em.flush();
+
+  return { taskId: task.id, runIds: [runInputs[0].id, runInputs[1].id] };
+}
+
 describe("claimRun — claim-lock state machine", () => {
   let lastDb: BlankOrm | undefined;
 
@@ -208,6 +257,64 @@ describe("claimRun — claim-lock state machine", () => {
       }
 
       expect(caught).toBeInstanceOf(ClaimConflictError);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("claims one duplicate unclaimed run instead of updating the whole task set", async () => {
+    const db = await buildMigratedOrm();
+    try {
+      const { taskId, runIds } = await seedDuplicateUnclaimedRuns(db.orm);
+
+      const result = await claimRun(db.orm.em, DEFAULT_ORG_ID, taskId, "instance-A");
+
+      expect(result.runId).toBe(runIds[0]);
+
+      const em = db.orm.em.fork();
+      const claimed = await em.find(AgentRun, {
+        task: taskId,
+        orchestrationState: "claimed",
+      } as never);
+      const unclaimed = await em.find(AgentRun, {
+        task: taskId,
+        orchestrationState: "unclaimed",
+      } as never);
+
+      expect(claimed.map((run) => run.id)).toEqual([runIds[0]]);
+      expect(unclaimed.map((run) => run.id)).toEqual([runIds[1]]);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("rolls back claimed state when state_changed event insert fails", async () => {
+    const db = await buildMigratedOrm();
+    try {
+      const { taskId, runId } = await seedUnclaimedRun(db.orm);
+      await db.orm.em.getConnection().execute(
+        `alter table "events" add constraint "events_reject_state_changed_test" check ("verb" <> 'state_changed')`,
+      );
+
+      let caught: unknown;
+      try {
+        await claimRun(db.orm.em, DEFAULT_ORG_ID, taskId, "instance-A");
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeDefined();
+
+      const em = db.orm.em.fork();
+      const run = await em.findOneOrFail(AgentRun, { id: runId });
+      const events = await em.find(Event, {
+        subjectKind: "agent_run",
+        subjectId: runId,
+        verb: "state_changed",
+      });
+
+      expect(run.orchestrationState).toBe("unclaimed");
+      expect(events).toHaveLength(0);
     } finally {
       await db.close();
     }

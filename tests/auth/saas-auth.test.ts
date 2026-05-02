@@ -27,6 +27,7 @@ import { createOrmConfig } from "../../src/db/mikro-orm.config.ts";
 import { AuthService } from "../../src/auth/index.ts";
 
 let orm: MikroORM;
+const TEST_BETTER_AUTH_SECRET = ["test", "secret", "123456789012345678901234"].join("-");
 
 // Shared fake DB adapter for standalone auth instances (no ORM required)
 function makeStubAdapter(): unknown {
@@ -77,6 +78,35 @@ function withSaasAuthFlag(enabled: boolean, cb: () => Promise<void>): () => Prom
       }
     }
   };
+}
+
+async function withEnv(
+  values: Record<string, string | undefined>,
+  cb: () => Promise<void>,
+): Promise<void> {
+  const originals: Record<string, string | undefined> = {};
+  for (const key of Object.keys(values)) {
+    originals[key] = process.env[key];
+    const value = values[key];
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+
+  try {
+    await cb();
+  } finally {
+    for (const [key, value] of Object.entries(originals)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
+function authOptions(svc: AuthService): {
+  secret?: string;
+  trustedOrigins?: string[];
+} {
+  return (svc.instance as unknown as { options: { secret?: string; trustedOrigins?: string[] } }).options;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -221,6 +251,98 @@ describe("saas-auth flag ON — OAuth enabled", () => {
     else delete process.env["GOOGLE_CLIENT_ID"];
     if (origSecret !== undefined) process.env["GOOGLE_CLIENT_SECRET"] = origSecret;
     else delete process.env["GOOGLE_CLIENT_SECRET"];
+  });
+
+  it("rebuilds the auth handler when OAuth credentials rotate at runtime", async () => {
+    await withEnv(
+      {
+        FULCRUM_FLAG_SAAS_AUTH: "true",
+        GOOGLE_CLIENT_ID: "old-google-client-id",
+        GOOGLE_CLIENT_SECRET: "old-google-client-secret",
+      },
+      async () => {
+        const svc = new AuthService(orm.em);
+        await svc.init();
+
+        process.env["GOOGLE_CLIENT_ID"] = "new-google-client-id";
+        process.env["GOOGLE_CLIENT_SECRET"] = "new-google-client-secret";
+
+        const req = new Request("http://localhost/api/auth/sign-in/social", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ provider: "google", callbackURL: "/dashboard" }),
+        });
+
+        const res = await svc.handler(req);
+        expect(res.status).toBe(200);
+        const body = await res.json() as { url?: string };
+        expect(body.url).toContain("client_id=new-google-client-id");
+        expect(body.url).not.toContain("old-google-client-id");
+      },
+    );
+  });
+});
+
+describe("BetterAuth runtime config", () => {
+  it("uses BETTER_AUTH_SECRET when provided", async () => {
+    await withEnv(
+      {
+        BETTER_AUTH_SECRET: TEST_BETTER_AUTH_SECRET,
+      },
+      async () => {
+        const svc = new AuthService(orm.em);
+        await svc.init();
+        expect(authOptions(svc).secret).toBe(TEST_BETTER_AUTH_SECRET);
+      },
+    );
+  });
+
+  it("throws in production when BETTER_AUTH_SECRET is missing", async () => {
+    await withEnv(
+      {
+        NODE_ENV: "production",
+        BETTER_AUTH_SECRET: undefined,
+      },
+      async () => {
+        const svc = new AuthService(orm.em);
+        await expect(svc.init()).rejects.toThrow("BETTER_AUTH_SECRET");
+      },
+    );
+  });
+
+  it("uses FULCRUM_TRUSTED_ORIGINS without localhost defaults in production", async () => {
+    await withEnv(
+      {
+        NODE_ENV: "production",
+        BETTER_AUTH_SECRET: TEST_BETTER_AUTH_SECRET,
+        FULCRUM_TRUSTED_ORIGINS: "https://app.example.com, https://admin.example.com ,,",
+      },
+      async () => {
+        const svc = new AuthService(orm.em);
+        await svc.init();
+        expect(authOptions(svc).trustedOrigins).toEqual([
+          "https://app.example.com",
+          "https://admin.example.com",
+        ]);
+      },
+    );
+  });
+
+  it("uses localhost trusted origin defaults in test when FULCRUM_TRUSTED_ORIGINS is empty", async () => {
+    await withEnv(
+      {
+        NODE_ENV: "test",
+        FULCRUM_TRUSTED_ORIGINS: undefined,
+      },
+      async () => {
+        const svc = new AuthService(orm.em);
+        await svc.init();
+        expect(authOptions(svc).trustedOrigins).toEqual([
+          "http://localhost:5173",
+          "http://localhost:3000",
+        ]);
+      },
+    );
   });
 });
 

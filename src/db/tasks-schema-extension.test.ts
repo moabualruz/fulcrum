@@ -105,9 +105,11 @@ describe("tasks schema extension", () => {
       const taskMeta = metadataFor(db.em, Task);
       expectField(taskMeta, "sprint", "sprint_id");
       expectField(taskMeta, "customFields", "custom_fields");
+      expect(taskMeta.properties["customFields"]?.nullable).not.toBe(true);
       expectField(taskMeta, "points", "points");
       expectField(taskMeta, "parent", "parent_id");
       expectField(taskMeta, "dependencies", "dependencies");
+      expect(taskMeta.properties["dependencies"]?.nullable).not.toBe(true);
       expectField(taskMeta, "externalId", "external_id");
 
       const statusMeta = metadataFor(db.em, taskEntities.TaskStatus);
@@ -187,6 +189,32 @@ describe("tasks schema extension", () => {
         externalId: "jira:FUL-1",
       }));
       await expect(em.flush()).rejects.toThrow();
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("database constraints reject cross-org task parents", async () => {
+    const db = await createTestOrm();
+    try {
+      const em = db.em.fork();
+      const now = new Date();
+      const otherOrg = em.create(Org, {
+        name: "Other Task Org",
+        slug: `other-task-org-${randomUUID()}`,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const parent = em.create(Task, { org: otherOrg });
+      em.persist([otherOrg, parent]);
+      await em.flush();
+
+      await expect(
+        db.pglite.query(
+          `insert into "tasks" ("id", "org_id", "parent_id") values ($1, $2, $3)`,
+          [randomUUID(), DEFAULT_ORG_ID, parent.id],
+        ),
+      ).rejects.toThrow("tasks_parent_org_foreign");
     } finally {
       await db.close();
     }

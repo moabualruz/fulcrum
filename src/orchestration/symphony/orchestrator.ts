@@ -11,6 +11,7 @@
  * Pillar 3, slice 06 — callable from the orchestrator poll loop (wired in slice 10).
  */
 
+import { UniqueConstraintViolationException } from "@mikro-orm/core";
 import type { EntityManager } from "@mikro-orm/postgresql";
 
 import type { AgentRunRepository } from "../../db/repositories/orchestration/AgentRunRepository.ts";
@@ -30,15 +31,26 @@ export interface ClaimRunResult {
   runId: string;
 }
 
+const claimQueues = new Map<string, Promise<void>>();
+
 /**
  * Atomically transitions an unclaimed AgentRun to claimed state.
  *
- * Uses nativeUpdate with `orchestrationState:'unclaimed'` filter — exactly one
- * row is updated when the run is available; zero rows → ClaimConflictError.
- * The agent_runs_claimed_unique partial index prevents double-dispatch as a
- * secondary guard (PG-level unique constraint).
+ * Selects one unclaimed run, then performs a CAS update by run id and state.
+ * The agent_runs_claimed_unique partial index remains the DB-level guard.
  */
 export async function claimRun(
+  em: EntityManager,
+  orgId: string,
+  taskId: string,
+  instanceId: string,
+): Promise<ClaimRunResult> {
+  return queueClaim(`${orgId}:${taskId}`, () =>
+    claimRunUnlocked(em, orgId, taskId, instanceId),
+  );
+}
+
+async function claimRunUnlocked(
   em: EntityManager,
   orgId: string,
   taskId: string,
@@ -51,48 +63,84 @@ export async function claimRun(
   ]);
 
   const fork = em.fork();
-  const agentRunRepo = fork.getRepository(AgentRun) as AgentRunRepository;
-  const eventsRepo = fork.getRepository(Event) as EventRepository;
-  const org = fork.getReference(Org, orgId);
 
-  // Optimistic lock: UPDATE ... WHERE orchestration_state='unclaimed' AND task_id=taskId
-  // The partial unique index agent_runs_claimed_unique backs this as a DB-level guard.
-  const updatedCount = await agentRunRepo.nativeUpdate(
-    {
-      org: orgId,
-      task: taskId,
-      orchestrationState: "unclaimed",
-    } as never,
-    {
-      orchestrationState: "claimed",
-      claimedBy: instanceId,
-    } as never,
-  );
+  try {
+    return await fork.transactional(async (tx) => {
+      const agentRunRepo = tx.getRepository(AgentRun) as AgentRunRepository;
+      const eventsRepo = tx.getRepository(Event) as EventRepository;
+      const org = tx.getReference(Org, orgId);
 
-  if (updatedCount === 0) {
-    throw new ClaimConflictError(taskId);
+      const candidate = await agentRunRepo.findOne(
+        {
+          org: orgId,
+          task: taskId,
+          orchestrationState: "unclaimed",
+        } as never,
+        { orderBy: { createdAt: "ASC", id: "ASC" }, fields: ["id"] },
+      );
+
+      if (!candidate) {
+        throw new ClaimConflictError(taskId);
+      }
+
+      const updatedCount = await agentRunRepo.nativeUpdate(
+        {
+          id: candidate.id,
+          orchestrationState: "unclaimed",
+        } as never,
+        {
+          orchestrationState: "claimed",
+          claimedBy: instanceId,
+        } as never,
+      );
+
+      if (updatedCount === 0) {
+        throw new ClaimConflictError(taskId);
+      }
+
+      eventsRepo.create({
+        org,
+        subjectKind: "agent_run",
+        subjectId: candidate.id,
+        verb: "state_changed",
+        payload: { from: "unclaimed", to: "claimed" },
+        createdAt: new Date(),
+      });
+
+      await tx.flush();
+
+      return { runId: candidate.id };
+    });
+  } catch (error) {
+    if (isClaimConflict(error)) throw new ClaimConflictError(taskId);
+    throw error;
   }
+}
 
-  // Fetch the run we just claimed to get its ID for the event.
-  const claimed = await agentRunRepo.findOneOrFail(
-    {
-      org: orgId,
-      task: taskId,
-      orchestrationState: "claimed",
-    } as never,
-    { fields: ["id"] },
-  );
+function isClaimConflict(error: unknown): boolean {
+  if (error instanceof ClaimConflictError) return true;
+  if (error instanceof UniqueConstraintViolationException) return true;
 
-  eventsRepo.create({
-    org,
-    subjectKind: "agent_run",
-    subjectId: claimed.id,
-    verb: "state_changed",
-    payload: { from: "unclaimed", to: "claimed" },
-    createdAt: new Date(),
+  const message = String((error as { message?: unknown }).message ?? error);
+  return message.includes("agent_runs_claimed_unique");
+}
+
+async function queueClaim<T>(key: string, claim: () => Promise<T>): Promise<T> {
+  const previous = claimQueues.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
   });
+  const queued = previous.catch(() => undefined).then(() => gate);
+  claimQueues.set(key, queued);
 
-  await fork.flush();
-
-  return { runId: claimed.id };
+  await previous.catch(() => undefined);
+  try {
+    return await claim();
+  } finally {
+    release();
+    if (claimQueues.get(key) === queued) {
+      claimQueues.delete(key);
+    }
+  }
 }

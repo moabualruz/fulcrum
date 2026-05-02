@@ -25,6 +25,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260502011859_cross_cutting_platform extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     // ── credentials ─────────────────────────────────────────────────────────
     this.addSql(

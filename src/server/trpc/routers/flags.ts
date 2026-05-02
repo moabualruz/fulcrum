@@ -125,6 +125,32 @@ async function resolveOrgMemberRepo(ctx: {
   return null;
 }
 
+async function findOrgMembership(
+  ctx: {
+    container: import("@needle-di/core").Container | null;
+    em: import("@mikro-orm/postgresql").EntityManager | null;
+  },
+  orgId: string,
+  userId: string,
+): Promise<{ role: string } | null> {
+  const orgMemberRepo = await resolveOrgMemberRepo(ctx);
+  if (orgMemberRepo) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return orgMemberRepo.findOne({ orgId, userId } as any);
+  }
+
+  if (ctx.em) {
+    const { OrgMember } = await import("../../../db/entities/auth/OrgMember.ts");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ctx.em.findOne(OrgMember, { orgId, userId } as any);
+  }
+
+  throw new TRPCError({
+    code: "INTERNAL_SERVER_ERROR",
+    message: "OrgMember repository could not be resolved.",
+  });
+}
+
 async function requireOwnerOrAdmin(ctx: {
   container: import("@needle-di/core").Container | null;
   em: import("@mikro-orm/postgresql").EntityManager | null;
@@ -138,21 +164,7 @@ async function requireOwnerOrAdmin(ctx: {
     });
   }
 
-  const orgMemberRepo = await resolveOrgMemberRepo(ctx);
-  let membership: { role: string } | null = null;
-  if (orgMemberRepo) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    membership = await orgMemberRepo.findOne({ orgId: ctx.orgId, userId: ctx.userId } as any);
-  } else if (ctx.em) {
-    const { OrgMember } = await import("../../../db/entities/auth/OrgMember.ts");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    membership = await ctx.em.findOne(OrgMember, { orgId: ctx.orgId, userId: ctx.userId } as any);
-  } else {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "OrgMember repository could not be resolved.",
-    });
-  }
+  const membership = await findOrgMembership(ctx, ctx.orgId, ctx.userId);
 
   if (!membership || (membership.role !== "owner" && membership.role !== "admin")) {
     throw new TRPCError({
@@ -160,6 +172,41 @@ async function requireOwnerOrAdmin(ctx: {
       message: "Only org owners and admins can modify feature flags.",
     });
   }
+}
+
+async function requireWritableFlagScope(
+  ctx: {
+    container: import("@needle-di/core").Container | null;
+    em: import("@mikro-orm/postgresql").EntityManager | null;
+    orgId: string | null;
+  },
+  input: { orgId?: string; userId?: string },
+): Promise<string> {
+  if (!ctx.orgId) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Session is missing orgId. Re-authenticate.",
+    });
+  }
+
+  if (input.orgId && input.orgId !== ctx.orgId) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Cannot modify feature flags outside the active org.",
+    });
+  }
+
+  if (input.userId) {
+    const targetMembership = await findOrgMembership(ctx, ctx.orgId, input.userId);
+    if (!targetMembership) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Cannot modify feature flags for users outside the active org.",
+      });
+    }
+  }
+
+  return ctx.orgId;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -206,11 +253,9 @@ export const flagsRouter = t.router({
       }),
     )
     .mutation(async ({ ctx, input }): Promise<{ ok: boolean }> => {
-      const { orgId: ctxOrgId, userId: ctxUserId } = ctx;
-      const targetOrgId = input.orgId ?? ctxOrgId ?? undefined;
-
       // ── Authorization: owner or admin only ───────────────────────────────
       await requireOwnerOrAdmin(ctx);
+      const targetOrgId = await requireWritableFlagScope(ctx, input);
 
       // ── Upsert FeatureFlag row ────────────────────────────────────────────
       if (!ctx.em) {
@@ -221,7 +266,7 @@ export const flagsRouter = t.router({
       }
 
       const FeatureFlag = await getFeatureFlagClass();
-      const scopedOrgId = targetOrgId ?? null;
+      const scopedOrgId = targetOrgId;
       const scopedUserId = input.userId ?? null;
 
       // Find existing row matching the unique key (orgId, userId, flag).

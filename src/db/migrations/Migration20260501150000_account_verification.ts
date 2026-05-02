@@ -15,6 +15,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260501150000_account_verification extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     // accounts — OAuth provider credential links (Better-Auth "account" model)
     this.addSql(
@@ -40,13 +42,16 @@ export class Migration20260501150000_account_verification extends Migration {
       `alter table "accounts" add constraint "accounts_org_id_foreign" foreign key ("org_id") references "orgs" ("id") on delete cascade`,
     );
     this.addSql(
+      `alter table "accounts" add constraint "accounts_user_id_foreign" foreign key ("user_id") references "users" ("id") on delete cascade`,
+    );
+    this.addSql(
       `create index "idx_accounts_org_user" on "accounts" ("org_id", "user_id")`,
     );
     this.addSql(
       `create index "idx_accounts_user_id" on "accounts" ("user_id")`,
     );
     this.addSql(
-      `create index "idx_accounts_provider" on "accounts" ("provider_id", "account_id")`,
+      `create unique index "uq_accounts_provider_account" on "accounts" ("provider_id", "account_id")`,
     );
 
     // verifications — short-lived tokens for email OTP / magic-link flows

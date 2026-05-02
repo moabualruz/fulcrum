@@ -99,7 +99,10 @@ async function resolveRepo<T>(ctx: CtxWithEm, RepoClass: new (...args: any[]) =>
   return null;
 }
 
-async function requireOwnerOrAdmin(ctx: CtxWithEm & { orgId: string | null; userId: string | null }): Promise<void> {
+async function requireInvitePermission(
+  ctx: CtxWithEm & { orgId: string | null; userId: string | null },
+  invitedRole: "owner" | "admin" | "member" | "guest",
+): Promise<void> {
   if (!ctx.orgId || !ctx.userId) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
@@ -128,6 +131,13 @@ async function requireOwnerOrAdmin(ctx: CtxWithEm & { orgId: string | null; user
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "Only org owners and admins can invite members.",
+    });
+  }
+
+  if (membership.role === "admin" && (invitedRole === "owner" || invitedRole === "admin")) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only org owners can invite owners and admins.",
     });
   }
 }
@@ -188,7 +198,7 @@ export const authRouter = t.router({
     .input(InviteInputSchema)
     .mutation(async ({ ctx, input }) => {
       // ── Authorization: owner or admin only ────────────────────────────────
-      await requireOwnerOrAdmin(ctx);
+      await requireInvitePermission(ctx, input.role);
 
       const em = await requireEm(ctx);
       const Invitation = await getInvitationClass();

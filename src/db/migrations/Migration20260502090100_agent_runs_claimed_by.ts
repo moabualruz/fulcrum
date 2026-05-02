@@ -14,6 +14,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260502090100_agent_runs_claimed_by extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     this.addSql(
       `alter table "agent_runs" add column "claimed_by" varchar(255) null`,

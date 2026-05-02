@@ -39,6 +39,11 @@ import type { TaskDependencies } from "./schemas.ts";
   properties: ["org", "createdAt"],
 })
 @Index({
+  name: "tasks_id_org_unique",
+  expression:
+    'CREATE UNIQUE INDEX "tasks_id_org_unique" ON "tasks" ("id", "org_id")',
+})
+@Index({
   name: "tasks_org_sprint_status",
   properties: ["org", "sprint", "status"],
 })
@@ -98,11 +103,11 @@ export class Task {
   @Property({
     type: "json",
     fieldName: "custom_fields",
-    nullable: true,
+    defaultRaw: "'{}'::jsonb",
     returning: false,
     lazy: true,
   })
-  customFields?: Record<string, unknown>;
+  customFields: Record<string, unknown> = {};
 
   @Property({ type: "integer", fieldName: "points", nullable: true, lazy: true })
   points?: number | null;
@@ -118,11 +123,11 @@ export class Task {
   @Property({
     type: "json",
     fieldName: "dependencies",
-    nullable: true,
+    defaultRaw: '\'{"blocks": [], "blocked_by": []}\'::jsonb',
     returning: false,
     lazy: true,
   })
-  dependencies?: TaskDependencies;
+  dependencies: TaskDependencies = { blocks: [], blocked_by: [] };
 
   @Property({ type: "string", fieldName: "external_id", nullable: true, lazy: true })
   externalId?: string | null;

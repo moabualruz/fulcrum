@@ -38,6 +38,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260502000001_orchestration_workflow_definitions extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     // ── workflow_definitions table ─────────────────────────────────────────
     this.addSql(

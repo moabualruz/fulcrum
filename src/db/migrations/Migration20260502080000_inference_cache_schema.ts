@@ -7,6 +7,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260502080000_inference_cache_schema extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     this.addSql(
       `create table "model_cache" ("id" uuid not null default gen_random_uuid(), "org_id" uuid not null, "model_id" varchar(255) not null, "kind" varchar(255) not null, "source" varchar(255) not null, "local_path" varchar(255) null, "size_bytes" bigint null, "sha256" varchar(255) null, "downloaded" boolean not null default false, "active" boolean not null default false, "created_at" timestamptz not null default now(), primary key ("id"))`,

@@ -14,6 +14,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260502050200_skills_registry extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     this.addSql(
       `create table "fulcrum_skills" (

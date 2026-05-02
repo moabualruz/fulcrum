@@ -7,6 +7,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260502070100_docs_document_columns extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     this.addSql(`alter table "documents" add column "parent_id" uuid null`);
     this.addSql(`alter table "documents" add column "project_id" uuid null`);
@@ -34,7 +36,7 @@ export class Migration20260502070100_docs_document_columns extends Migration {
     this.addSql(`alter table "documents" add column "external_id" varchar(255) null`);
 
     this.addSql(
-      `alter table "documents" add constraint "documents_parent_id_foreign" foreign key ("parent_id") references "documents" ("id") on delete set null`,
+      `alter table "documents" add constraint "documents_parent_org_foreign" foreign key ("parent_id", "org_id") references "documents" ("id", "org_id") on delete set null ("parent_id")`,
     );
     this.addSql(
       `alter table "documents" add constraint "documents_scope_check" check ("scope" in ('project', 'global'))`,
@@ -69,7 +71,7 @@ export class Migration20260502070100_docs_document_columns extends Migration {
       `alter table "documents" drop constraint if exists "documents_scope_check"`,
     );
     this.addSql(
-      `alter table "documents" drop constraint if exists "documents_parent_id_foreign"`,
+      `alter table "documents" drop constraint if exists "documents_parent_org_foreign"`,
     );
     this.addSql(`alter table "documents" drop column if exists "external_id"`);
     this.addSql(`alter table "documents" drop column if exists "archived"`);

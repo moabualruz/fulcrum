@@ -57,13 +57,29 @@ async function isCasbinPoliciesEnabled(ctx: TRPCContext): Promise<boolean> {
 }
 
 function resourceFromProcedurePath(path: string): string {
-  return path.split(".").filter(Boolean)[0] ?? path;
+  const segments = path.split(".").filter(Boolean);
+  if (segments.length <= 1) return segments[0] ?? path;
+  return segments.slice(0, -1).join(".");
 }
 
-function actionFromProcedureType(type: "query" | "mutation" | "subscription"): string {
-  if (type === "query") return "read";
-  if (type === "mutation") return "write";
-  return "subscribe";
+function actionFromProcedurePath(path: string): string {
+  const leaf = path.split(".").filter(Boolean).at(-1);
+  switch (leaf) {
+    case "list":
+    case "get":
+    case "create":
+    case "update":
+    case "delete":
+    case "revoke":
+    case "cancel":
+    case "unregister":
+      return leaf;
+    default:
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: `Protected procedure '${path}' is not mapped for Casbin enforcement.`,
+      });
+  }
 }
 
 /**
@@ -73,7 +89,7 @@ function actionFromProcedureType(type: "query" | "mutation" | "subscription"): s
  * Phase 2: when `casbin-policies` flag is ON, calls checkCasbinGate() before
  *   passing through to Better-Auth. When flag is OFF: existing session-only check.
  */
-export const assertPermission = t.middleware(async ({ ctx, next, path, type }) => {
+export const assertPermission = t.middleware(async ({ ctx, next, path }) => {
   if (!ctx.session) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
@@ -97,6 +113,9 @@ export const assertPermission = t.middleware(async ({ ctx, next, path, type }) =
 
     if (casbinOn) {
       try {
+        const resource = resourceFromProcedurePath(path);
+        const action = actionFromProcedurePath(path);
+
         // Dynamic imports — excluded from web SSR static bundle (decorator safety).
         const [{ FulcrumCasbinAdapter }, { CasbinEnforcerService, checkCasbinGate }, { CasbinRuleRepository }] =
           await Promise.all([
@@ -112,8 +131,8 @@ export const assertPermission = t.middleware(async ({ ctx, next, path, type }) =
         await checkCasbinGate(
           enforcerSvc,
           ctx.userId,
-          resourceFromProcedurePath(path),
-          actionFromProcedureType(type),
+          resource,
+          action,
         );
       } catch (e) {
         // Re-throw TRPCErrors (FORBIDDEN from checkCasbinGate)

@@ -10,6 +10,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260502090200_memory_context_core extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     this.addSql(`drop index if exists "idx_memories_org_kind"`);
 

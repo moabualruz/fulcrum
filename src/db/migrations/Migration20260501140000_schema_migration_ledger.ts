@@ -16,6 +16,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260501140000_schema_migration_ledger extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     // version: bigint PRIMARY KEY (caller-supplied timestamp, not serial).
     // name, checksum: text (not varchar — avoids length limit surprises).

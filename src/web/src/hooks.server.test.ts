@@ -7,6 +7,9 @@ import {
   __setWebRuntimeForTest,
   handle,
 } from "./hooks.server.ts";
+import { FULCRUM_REQUEST_ID_HEADER } from "../../../src/trpc/context.ts";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function createCookiesStub(initial?: string) {
   const store = new Map<string, string>();
@@ -153,6 +156,24 @@ describe("hooks.server handle", () => {
     expect(await response.text()).toBe("auth");
     expect(contextCalls).toBe(0);
     expect(resolveCalls).toBe(0);
+  });
+
+  test("hook-mounted tRPC responses include request id header", async () => {
+    __setWebRuntimeForTest({
+      authHandler: null,
+      orm: { close: async () => undefined } as never,
+      createRequestContext: () => ({
+        em: { clear: () => undefined } as never,
+        container: new Container(),
+      }),
+    });
+
+    const response = await handle({
+      event: createRequestEvent("/api/trpc/health.ping") as never,
+      resolve: (() => new Response("app")) as never,
+    });
+
+    expect(response.headers.get(FULCRUM_REQUEST_ID_HEADER)).toMatch(UUID_RE);
   });
 
   test("request EntityManager is cleared when resolve throws", async () => {

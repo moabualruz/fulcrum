@@ -22,6 +22,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260501130100_flag_stubs extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     // ── casbin_rule (Pillar 5: Permissions) ────────────────────────────────
     // node-casbin standard adapter schema.

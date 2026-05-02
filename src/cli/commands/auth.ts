@@ -18,7 +18,11 @@
  * C8: needle-di Container resolves services; tRPC caller is in-process (no HTTP).
  */
 
+import { MikroORM, type EntityManager } from "@mikro-orm/postgresql";
+import { Container } from "@needle-di/core";
 import { TRPCError } from "@trpc/server";
+import type { Session as BetterAuthSession } from "better-auth";
+import { ENTITY_MANAGER_TOKEN, registerDbBindings } from "../../db/db.module.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -40,7 +44,7 @@ export interface AuthRunOptions {
   };
 
   /** needle-di Container — used to build caller when `caller` not provided. */
-  container?: import("@needle-di/core").Container | null;
+  container?: Container | null;
 
   /** stdout writer (default: console.log). */
   print?: (line: string) => void;
@@ -67,6 +71,26 @@ Options:
   --non-interactive Skip interactive prompts (CI/scripting).
   -h, --help        Show this help.
 `;
+
+type CliSession = {
+  id: string;
+  userId: string;
+  orgId: string;
+  activeOrganizationId?: string;
+  expiresAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  token: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+};
+
+class MissingCliSessionError extends Error {
+  constructor() {
+    super("No active CLI session found. Run `fulcrum init` or `fulcrum auth login` before protected auth commands.");
+    this.name = "MissingCliSessionError";
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // run — entry-point for `fulcrum auth <subcommand> [args]`
@@ -128,14 +152,14 @@ async function runInvite(
     return;
   }
 
-  const caller = await resolveCaller(opts);
-  if (!caller.auth.invite) {
-    printErr("fulcrum auth invite: auth.invite procedure unavailable.");
-    exit(1);
-    return;
-  }
-
   try {
+    const caller = await resolveCaller(opts);
+    if (!caller.auth.invite) {
+      printErr("fulcrum auth invite: auth.invite procedure unavailable.");
+      exit(1);
+      return;
+    }
+
     const result = await caller.auth.invite({ email, role });
     if (jsonMode) {
       print(JSON.stringify(result));
@@ -167,9 +191,8 @@ async function runWhoami(
   const { print, printErr, exit } = opts;
   const jsonMode = argv.includes("--json");
 
-  const caller = await resolveCaller(opts);
-
   try {
+    const caller = await resolveCaller(opts);
     const result = await caller.auth.whoami();
 
     if (jsonMode) {
@@ -238,8 +261,68 @@ async function resolveCaller(opts: AuthRunOptions): Promise<{
   const { appRouter } = await import("../../trpc/router.ts");
   const { createContext } = await import("../../trpc/context.ts");
 
-  const container = opts.container ?? null;
-  const ctx = createContext({ session: null, orgId: null, userId: null, em: null, container });
+  const cliContext = buildCliContext(opts.container ?? null);
+  const { container, em } = cliContext;
+  const session = await resolveActiveCliSession(em);
+  if (!session) throw new MissingCliSessionError();
+
+  const orgId = session.activeOrganizationId ?? session.orgId;
+  const userId = session.userId;
+  if (!orgId || !userId) throw new MissingCliSessionError();
+
+  const ctx = createContext({
+    session: session as unknown as BetterAuthSession,
+    orgId,
+    userId,
+    em,
+    container,
+  });
   const factory = t.createCallerFactory(appRouter);
   return factory(ctx);
+}
+
+function buildCliContext(container: Container | null): { container: Container | null; em: EntityManager | null } {
+  if (!container) return { container: null, em: null };
+
+  try {
+    const orm = container.get(MikroORM);
+    const em = container.get(ENTITY_MANAGER_TOKEN).fork();
+    const requestContainer = new Container();
+    requestContainer.bind({ provide: MikroORM, useValue: orm });
+    registerDbBindings(requestContainer, orm, em);
+    return { container: requestContainer, em };
+  } catch {
+    return { container, em: null };
+  }
+}
+
+async function resolveActiveCliSession(em: EntityManager | null): Promise<CliSession | null> {
+  if (!em) return null;
+
+  const { Session } = await import("../../db/entities/auth/Session.ts");
+  const now = new Date();
+
+  try {
+    const session = await em.findOne(
+      Session,
+      { expiresAt: { $gt: now } },
+      { orderBy: { createdAt: "DESC" } },
+    );
+    if (!session) return null;
+
+    return {
+      id: session.id,
+      token: session.id,
+      userId: session.userId,
+      orgId: session.orgId,
+      activeOrganizationId: session.activeOrganizationId ?? session.orgId,
+      expiresAt: session.expiresAt,
+      createdAt: session.createdAt,
+      updatedAt: session.createdAt,
+      ipAddress: session.ipAddress ?? null,
+      userAgent: session.userAgent ?? "fulcrum-cli",
+    };
+  } catch {
+    return null;
+  }
 }

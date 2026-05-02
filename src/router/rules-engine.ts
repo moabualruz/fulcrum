@@ -9,10 +9,11 @@ import { createOrmConfig, RoutingRule } from "../db/mikro-orm.config.ts";
 import type { RoutingRule as RoutingRuleEntity } from "../db/entities/router/RoutingRule.ts";
 import type { RoutingRuleRepository } from "../db/repositories/router/RoutingRuleRepository.ts";
 import type { TaskFacts } from "./types.ts";
-import { RoutingEventBus } from "./event-bus.ts";
+import { RoutingEventBus, routingEventBus } from "./event-bus.ts";
 
 interface RulesEngineConfig {
   routingRuleRepository: RoutingRuleRepository | null;
+  eventBus?: RoutingEventBus;
 }
 
 export interface RuleMatch {
@@ -20,11 +21,26 @@ export interface RuleMatch {
   agent: string;
 }
 
-let configuredRepository: RoutingRuleRepository | null = null;
-let defaultRepositoryPromise: Promise<RoutingRuleRepository> | null = null;
+let configuredEngine: RulesEngine | null = null;
+let defaultEngine: RulesEngine | null = null;
+let defaultEnginePromise: Promise<RulesEngine> | null = null;
 
 export function configureRulesEngine(config: RulesEngineConfig): void {
-  configuredRepository = config.routingRuleRepository;
+  configuredEngine?.destroy();
+  defaultEngine?.destroy();
+  configuredEngine = null;
+  defaultEngine = null;
+  defaultEnginePromise = null;
+
+  if (!config.routingRuleRepository) {
+    configuredEngine = null;
+    return;
+  }
+
+  const bus = config.eventBus ?? routingEventBus;
+  config.routingRuleRepository.setEventBus?.(bus);
+  configuredEngine = new RulesEngine(config.routingRuleRepository, bus);
+  configuredEngine.initialize();
 }
 
 export async function evaluateRules(
@@ -41,24 +57,20 @@ export async function evaluateRuleMatch(
   orgId: string,
   projectId?: string,
 ): Promise<RuleMatch | null> {
-  const repository = await getRoutingRuleRepository();
-  const rules = await repository.findEnabledForDispatch(orgId, projectId ?? null);
-
-  for (const rule of sortRulesForDispatch(rules, projectId)) {
-    const agent = await evaluateRule(rule, facts, repository);
-    if (agent) return { ruleId: rule.id, agent };
-  }
-
-  return null;
+  const engine = await getRulesEngine();
+  return engine.evaluateRuleMatch(facts, orgId, projectId);
 }
 
 export type { TaskFacts } from "./types.ts";
 
 export class RulesEngine {
-  private stale = true;
-  private cachedRules: RoutingRuleEntity[] | null = null;
-  private cachedKey: string | null = null;
+  private readonly cache = new Map<
+    string,
+    { loadedVersion: number; rules: RoutingRuleEntity[] }
+  >();
+  private rulesVersion = 0;
   private subscribed = false;
+  private unsubscribe: (() => void) | null = null;
 
   constructor(
     private readonly repository: RoutingRuleRepository,
@@ -67,10 +79,14 @@ export class RulesEngine {
 
   initialize(): void {
     if (this.subscribed) return;
-    this.eventBus.onRulesChanged(() => {
-      this.stale = true;
-    });
+    this.unsubscribe = this.eventBus.onRulesChanged(() => this.markStale());
     this.subscribed = true;
+  }
+
+  destroy(): void {
+    this.unsubscribe?.();
+    this.unsubscribe = null;
+    this.subscribed = false;
   }
 
   async evaluateRules(facts: TaskFacts, orgId: string, projectId?: string): Promise<string | null> {
@@ -80,20 +96,53 @@ export class RulesEngine {
 
   async evaluateRuleMatch(facts: TaskFacts, orgId: string, projectId?: string): Promise<RuleMatch | null> {
     const cacheKey = `${orgId}:${projectId ?? ""}`;
-    if (this.stale || this.cachedRules === null || this.cachedKey !== cacheKey) {
-      this.cachedRules = await this.repository.findEnabledForDispatch(orgId, projectId ?? null);
-      this.cachedKey = cacheKey;
-      this.stale = false;
-    }
+    const rules = await this.rulesFor(cacheKey, orgId, projectId ?? null);
 
-    for (const rule of sortRulesForDispatch(this.cachedRules, projectId)) {
+    for (const rule of sortRulesForDispatch(rules, projectId)) {
       const agent = await evaluateRule(rule, facts, this.repository, () => {
-        this.stale = true;
+        this.markStale();
       });
       if (agent) return { ruleId: rule.id, agent };
     }
 
     return null;
+  }
+
+  private markStale(): void {
+    this.rulesVersion += 1;
+  }
+
+  private async rulesFor(
+    cacheKey: string,
+    orgId: string,
+    projectId: string | null,
+  ): Promise<RoutingRuleEntity[]> {
+    if (
+      this.cache.get(cacheKey)?.loadedVersion === this.rulesVersion
+    ) {
+      return this.cache.get(cacheKey)!.rules;
+    }
+
+    while (true) {
+      const refreshVersion = this.rulesVersion;
+      try {
+        const rules = await this.repository.findEnabledForDispatch(orgId, projectId);
+        if (refreshVersion !== this.rulesVersion) continue;
+        this.cache.set(cacheKey, { rules, loadedVersion: refreshVersion });
+        return rules;
+      } catch (error) {
+        const cached = this.cache.get(cacheKey);
+        if (cached) {
+          console.error(
+            `Routing rules refresh failed; serving stale cache: ${String(
+              (error as { message?: unknown }).message ?? error,
+            )}`,
+          );
+          return cached.rules;
+        }
+        throw error;
+      }
+    }
   }
 }
 
@@ -115,8 +164,17 @@ async function evaluateRule(
     const result = await engine.run(toRuleFacts(facts));
     return result.events.length > 0 ? rule.actionAgent : null;
   } catch (error) {
-    await disableMalformedRule(rule, repository, error);
-    onDisable?.();
+    try {
+      await disableMalformedRule(rule, repository, error);
+    } catch (disableError) {
+      console.error(
+        `Failed to disable malformed routing rule ${rule.id}: ${String(
+          (disableError as { message?: unknown }).message ?? disableError,
+        )}`,
+      );
+    } finally {
+      onDisable?.();
+    }
     return null;
   }
 }
@@ -162,10 +220,22 @@ async function disableMalformedRule(
   );
 }
 
-async function getRoutingRuleRepository(): Promise<RoutingRuleRepository> {
-  if (configuredRepository) return configuredRepository;
-  defaultRepositoryPromise ??= initDefaultRoutingRuleRepository();
-  return defaultRepositoryPromise;
+async function getRulesEngine(): Promise<RulesEngine> {
+  if (configuredEngine) return configuredEngine;
+  defaultEnginePromise ??= initDefaultRulesEngine().catch((error) => {
+    defaultEnginePromise = null;
+    throw error;
+  });
+  return defaultEnginePromise;
+}
+
+async function initDefaultRulesEngine(): Promise<RulesEngine> {
+  const repository = await initDefaultRoutingRuleRepository();
+  repository.setEventBus?.(routingEventBus);
+  const engine = new RulesEngine(repository, routingEventBus);
+  engine.initialize();
+  defaultEngine = engine;
+  return engine;
 }
 
 async function initDefaultRoutingRuleRepository(): Promise<RoutingRuleRepository> {

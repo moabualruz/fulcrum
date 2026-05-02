@@ -15,8 +15,14 @@
  * pre-built container/caller so no DB connection is needed.
  */
 
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it, expect } from "bun:test";
 import type { Container } from "@needle-di/core";
+
+const REPO_ROOT = join(import.meta.dir, "..", "..");
+const ROOT_ENTRYPOINT = join(REPO_ROOT, "src", "index.ts");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers — build a fake in-process tRPC caller
@@ -64,6 +70,36 @@ function fakeUnauthCaller(): { auth: { whoami: () => Promise<WhoamiResult> } } {
       },
     },
   };
+}
+
+async function withFulcrumHome<T>(fn: (home: string) => Promise<T>): Promise<T> {
+  const home = await mkdtemp(join(tmpdir(), "fulcrum-auth-cli-"));
+  try {
+    return await fn(home);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+}
+
+async function runFulcrum(args: readonly string[], fulcrumHome: string) {
+  const proc = Bun.spawn([process.execPath, "run", ROOT_ENTRYPOINT, ...args], {
+    cwd: REPO_ROOT,
+    env: {
+      ...process.env,
+      FULCRUM_HOME: fulcrumHome,
+      NO_COLOR: "1",
+    },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  const [exitCode, stdout, stderr] = await Promise.all([
+    proc.exited,
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+
+  return { exitCode, stdout, stderr };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -125,6 +161,69 @@ describe("auth.run — whoami --json", () => {
 
     expect(exitCode).toBe(1);
     expect(errLines.join("\n")).toMatch(/unauthorized|authentication/i);
+  });
+});
+
+describe("root entrypoint — auth", () => {
+  it("lists auth in root help", async () => {
+    await withFulcrumHome(async (home) => {
+      const result = await runFulcrum(["help"], home);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("fulcrum auth <whoami|invite|login|logout>");
+    });
+  });
+
+  it("runs whoami through src/index.ts without a fake caller", async () => {
+    await withFulcrumHome(async (home) => {
+      const init = await runFulcrum(["init"], home);
+      expect(init.exitCode).toBe(0);
+
+      const result = await runFulcrum(["auth", "whoami", "--json"], home);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      const parsed = JSON.parse(result.stdout);
+      expect(parsed.email).toBe("admin@local");
+      expect(parsed.orgId).toBe("00000000-0000-0000-0000-000000000001");
+      expect(parsed.role).toBe("owner");
+      expect(typeof parsed.userId).toBe("string");
+    });
+  });
+
+  it("fails clearly when no CLI session exists", async () => {
+    await withFulcrumHome(async (home) => {
+      const result = await runFulcrum(["auth", "whoami", "--json"], home);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("No active CLI session found");
+      expect(result.stderr).toContain("fulcrum init");
+    });
+  });
+
+  it("runs invite through src/index.ts without a fake caller", async () => {
+    await withFulcrumHome(async (home) => {
+      const init = await runFulcrum(["init"], home);
+      expect(init.exitCode).toBe(0);
+
+      const result = await runFulcrum([
+        "auth",
+        "invite",
+        "new@test.local",
+        "--role",
+        "member",
+        "--json",
+      ], home);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      const parsed = JSON.parse(result.stdout);
+      expect(typeof parsed.invitationId).toBe("string");
+      expect(parsed.invitationId.length).toBeGreaterThan(0);
+      expect(typeof parsed.token).toBe("string");
+      expect(parsed.token).toHaveLength(64);
+    });
   });
 });
 

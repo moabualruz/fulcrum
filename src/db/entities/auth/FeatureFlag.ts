@@ -30,6 +30,11 @@ import { FeatureFlagRepository } from "../../repositories/auth/FeatureFlagReposi
   expression:
     'CREATE UNIQUE INDEX "uq_feature_flags_global_flag" ON "feature_flags" ("flag") WHERE "org_id" IS NULL AND "user_id" IS NULL',
 })
+@Index({
+  name: "uq_feature_flags_org_flag",
+  expression:
+    'CREATE UNIQUE INDEX "uq_feature_flags_org_flag" ON "feature_flags" ("org_id", "flag") WHERE "org_id" IS NOT NULL AND "user_id" IS NULL',
+})
 export class FeatureFlag {
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;

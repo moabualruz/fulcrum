@@ -32,10 +32,13 @@ import { t } from "../../src/trpc/trpc.ts";
 import { FlagRegistry } from "../../src/flags/registry.ts";
 
 const TEST_ORG_ID = "00000000-0000-0000-0000-000000000001";
+const OTHER_ORG_ID = "11111111-1111-4111-8111-111111111111";
 const TEST_USER_ID = "00000000-0000-0000-0000-000000000010";
 const TEST_ADMIN_USER_ID = "00000000-0000-0000-0000-000000000011";
+const OTHER_USER_ID = "00000000-0000-0000-0000-000000000020";
 
 let orm: MikroORM;
+let pglite: PGlite;
 let flagRegistry: FlagRegistry;
 let container: Container;
 
@@ -110,7 +113,7 @@ function unauthCaller() {
 }
 
 beforeAll(async () => {
-  const pglite = new PGlite();
+  pglite = new PGlite();
   const dialect = new PGliteKyselyDialect(() => pglite);
 
   orm = await MikroORM.init({
@@ -135,6 +138,14 @@ beforeAll(async () => {
     updatedAt: now,
   });
 
+  const otherOrg = seedEm.create(Org, {
+    id: OTHER_ORG_ID,
+    name: "Other Org",
+    slug: "other-org",
+    createdAt: now,
+    updatedAt: now,
+  });
+
   const owner = seedEm.create(User, {
     id: TEST_ADMIN_USER_ID,
     email: "admin@test.local",
@@ -155,6 +166,16 @@ beforeAll(async () => {
     updatedAt: now,
   });
 
+  const otherMember = seedEm.create(User, {
+    id: OTHER_USER_ID,
+    email: "other-member@test.local",
+    name: "Other Member",
+    orgId: OTHER_ORG_ID,
+    role: "member",
+    createdAt: now,
+    updatedAt: now,
+  });
+
   const adminMembership = seedEm.create(OrgMember, {
     userId: TEST_ADMIN_USER_ID,
     orgId: TEST_ORG_ID,
@@ -169,12 +190,29 @@ beforeAll(async () => {
     joinedAt: now,
   });
 
-  seedEm.persist([org, owner, member, adminMembership, memberMembership]);
+  const otherMembership = seedEm.create(OrgMember, {
+    userId: OTHER_USER_ID,
+    orgId: OTHER_ORG_ID,
+    role: "member",
+    joinedAt: now,
+  });
+
+  seedEm.persist([
+    org,
+    otherOrg,
+    owner,
+    member,
+    otherMember,
+    adminMembership,
+    memberMembership,
+    otherMembership,
+  ]);
   await seedEm.flush();
 });
 
 afterAll(async () => {
   if (orm) await orm.close(true);
+  if (pglite) await pglite.close();
 });
 
 beforeEach(async () => {
@@ -247,6 +285,20 @@ describe("flags.set — owner/admin", () => {
     const caller = makeCaller(TEST_ADMIN_USER_ID, TEST_ORG_ID);
     const result = await caller.flags.set({ flag: "router-llm", enabled: true });
     expect(result.ok).toBe(true);
+
+    const em = orm.em.fork();
+    const orgFlag = await em.findOne(FeatureFlag, {
+      orgId: TEST_ORG_ID,
+      userId: null,
+      flag: "router-llm",
+    });
+    const globalFlag = await em.findOne(FeatureFlag, {
+      orgId: null,
+      userId: null,
+      flag: "router-llm",
+    });
+    expect(orgFlag?.enabled).toBe(true);
+    expect(globalFlag).toBeNull();
   });
 
   it("after flags.set(router-llm, true), flags.list returns enabled=true", async () => {
@@ -271,6 +323,58 @@ describe("flags.set — owner/admin", () => {
     const result = await caller3.flags.list();
     const embeddings = result.find((f) => f.name === "embeddings");
     expect(embeddings!.enabled).toBe(false);
+  });
+
+  it("owner cannot set a flag for another org", async () => {
+    const caller = makeCaller(TEST_ADMIN_USER_ID, TEST_ORG_ID);
+    let error: TRPCError | null = null;
+
+    try {
+      await caller.flags.set({
+        flag: "router-llm",
+        enabled: true,
+        orgId: OTHER_ORG_ID,
+      });
+    } catch (e) {
+      if (e instanceof TRPCError) error = e;
+    }
+
+    expect(error).not.toBeNull();
+    expect(error?.code).toBe("FORBIDDEN");
+
+    const em = orm.em.fork();
+    const foreignFlag = await em.findOne(FeatureFlag, {
+      orgId: OTHER_ORG_ID,
+      userId: null,
+      flag: "router-llm",
+    });
+    expect(foreignFlag).toBeNull();
+  });
+
+  it("owner cannot set a user-scoped flag for a user outside the caller org", async () => {
+    const caller = makeCaller(TEST_ADMIN_USER_ID, TEST_ORG_ID);
+    let error: TRPCError | null = null;
+
+    try {
+      await caller.flags.set({
+        flag: "embeddings",
+        enabled: true,
+        userId: OTHER_USER_ID,
+      });
+    } catch (e) {
+      if (e instanceof TRPCError) error = e;
+    }
+
+    expect(error).not.toBeNull();
+    expect(error?.code).toBe("FORBIDDEN");
+
+    const em = orm.em.fork();
+    const foreignUserFlag = await em.findOne(FeatureFlag, {
+      orgId: TEST_ORG_ID,
+      userId: OTHER_USER_ID,
+      flag: "embeddings",
+    });
+    expect(foreignUserFlag).toBeNull();
   });
 });
 
