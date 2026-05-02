@@ -1816,3 +1816,29 @@ Reviewer dispatch:
 ]
 
 Result: FIXBACKS_SENT_OR_HOLD.
+
+## 2026-05-02T19:12:40Z — codex-orchestrator (p8 retriever accepted)
+
+Accepted:
+[
+  p8-retriever => commits=906b533b,bf268055,
+  worker_commits=2332d00745f4,baf6d0d61e02,
+  main_verification=bun test src/memory/__tests__/retriever.test.ts PASS 13/13; bun run lint PASS
+]
+
+Parent review resolution:
+[
+  bounded FTS/ts_rank_cd candidate query before hydration implemented,
+  empty-query candidate path bounded,
+  Q17 importance constants corrected to high=1.0 medium=0 low=0,
+  B072 context bundle assembler dependency now satisfied
+]
+
+Still blocked:
+[
+  p17-secrets-vault => fix commit returned and parent verification passed; final security/API rereview pending; touches frozen auth/permission/codegen surfaces,
+  p7-doc-template-seeds => sent back for no-migration redesign, codegen/Casbin/web-template fixes,
+  p3-retry-stall => sent back for product-kernel forward migration, retry exhaustion, scanner lifecycle/error handling
+]
+
+Result: P8_ACCEPTED_B072_READY.
