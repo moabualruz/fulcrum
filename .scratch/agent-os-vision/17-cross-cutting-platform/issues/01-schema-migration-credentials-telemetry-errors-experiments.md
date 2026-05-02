@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: needs-review
 Triage: AFK
 Pillar: 17-cross-cutting-platform
 Blocked-by: [01-foundation-reset/issues/01-schema-auth-migration.md]
