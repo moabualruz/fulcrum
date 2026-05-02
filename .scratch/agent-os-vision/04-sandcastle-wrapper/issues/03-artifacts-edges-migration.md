@@ -1,5 +1,5 @@
 ---
-Status: integration-review
+Status: completed
 Owner: codex-orchestrator
 Triage: AFK
 Pillar: 04-sandcastle-wrapper

@@ -856,3 +856,24 @@ Review debt normalization:
 Capacity: claude_impl=0/6 codex_impl=0/6 claude_review=0/6 codex_review=0/6
 Underfilled reason: ledger commit/worktree setup before dispatch.
 Result: RESUME_AUDIT_PERSISTED.
+
+## 2026-05-02T10:02:00Z — codex-orchestrator (recovered review provenance)
+
+Recovered review results:
+[
+  02-inference-sidecar/issues/04-trpc-procedures-and-health-surface.md: impl=codex review=claude APPROVED via review-moo0x558-a0en02 after 39489fb8; no remaining inference findings,
+  05-router-and-skills/issues/04-auto-assign-tier1-tier2.md: impl=codex review=claude APPROVED via review-moo0n4g3-ka9vua after 1c0d0ab0; no remaining auto-assign findings,
+  04-sandcastle-wrapper/issues/03-artifacts-edges-migration.md: impl=codex review=claude APPROVED via review-moo1xhjd-9m5q3h after a0ac1dbf; no bugs or regressions,
+  03-symphony-orchestration/issues/07-workspace-management.md: impl=codex review=claude APPROVED via review-moo25wg7-34s0jf after ce0e7ca5; no bugs found,
+  03-symphony-orchestration/issues/08-prompt-template-renderer.md: impl=codex review=claude APPROVED via review-moo25wg7-34s0jf after ce0e7ca5; no bugs found,
+  05-router-and-skills/issues/13-skills-loader-per-agent-install.md: impl=codex review=claude APPROVED via review-moo1xhjd-1856cz after bb6a8dd0; non-blocking cold-path perf nit only
+]
+Status flips:
+[
+  integration-review -> completed for 6 issues
+]
+Verification:
+[
+  bun run ci PASS — 12/12 stages, 1641 pass, 2 skip; web:check has 2 pre-existing Svelte warnings
+]
+Result: INTEGRATION_REVIEW_RECOVERED_AND_COMPLETED.
