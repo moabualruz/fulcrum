@@ -47,3 +47,5 @@ Cuts through: `src/auth/index.ts` flag-conditional plugin init (FlagRegistry res
 
 ## Notes
 SMTP env vars for magic-link/OTP are consumed by this slice for plugin wiring; actual email delivery relies on `notify-email` flag being on too. Both flags must be on for email auth to work end-to-end — document this dependency in the `FLAG_DESCRIPTIONS` constant in `src/flags/registry.ts`.
+
+Review follow-up: OAuth providers are now registered only when `saas-auth` is enabled and both client ID and secret are non-empty. `AuthService.handler` checks a small auth-config signature per request and rebuilds Better-Auth when the flag/provider availability changes, so `saas-auth` no longer requires process restart for handler gating.

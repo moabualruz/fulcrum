@@ -3,6 +3,7 @@
  *
  * Commands:
  *   fulcrum auth whoami [--json]
+ *   fulcrum auth invite <email> [--role owner|admin|member|guest] [--json]
  *   fulcrum auth login [--passkey | --password] [--non-interactive]
  *   fulcrum auth logout
  *
@@ -23,13 +24,20 @@ import { TRPCError } from "@trpc/server";
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
+type InviteRole = "owner" | "admin" | "member" | "guest";
+
 export interface AuthRunOptions {
   /**
    * In-process tRPC caller. Accepts any object with an `auth` namespace
    * that exposes the required procedures (duck-typed for testability).
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  caller?: { auth: { whoami: () => Promise<any> } };
+  caller?: {
+    auth: {
+      whoami: () => Promise<any>;
+      invite?: (input: { email: string; role: InviteRole }) => Promise<any>;
+    };
+  };
 
   /** needle-di Container — used to build caller when `caller` not provided. */
   container?: import("@needle-di/core").Container | null;
@@ -50,6 +58,7 @@ Authentication commands.
 
 Usage:
   fulcrum auth whoami [--json]
+  fulcrum auth invite <email> [--role owner|admin|member|guest] [--json]
   fulcrum auth login [--passkey | --password] [--non-interactive]
   fulcrum auth logout
 
@@ -80,6 +89,9 @@ export async function run(
     case "logout":
       return runLogout(rest, { ...opts, print, printErr, exit });
 
+    case "invite":
+      return runInvite(rest, { ...opts, print, printErr, exit });
+
     case "help":
     case "--help":
     case "-h":
@@ -91,6 +103,57 @@ export async function run(
       printErr(HELP);
       exit(2);
   }
+}
+
+async function runInvite(
+  argv: readonly string[],
+  opts: Required<Pick<AuthRunOptions, "print" | "printErr" | "exit">> & AuthRunOptions,
+): Promise<void> {
+  const { print, printErr, exit } = opts;
+  const jsonMode = argv.includes("--json");
+  const email = argv.find((arg) => !arg.startsWith("--") && arg !== "invite");
+  const roleFlagIndex = argv.indexOf("--role");
+  const role = roleFlagIndex >= 0 ? argv[roleFlagIndex + 1] : "member";
+
+  if (!email) {
+    printErr("fulcrum auth invite: missing required argument <email>");
+    printErr("Usage: fulcrum auth invite <email> [--role owner|admin|member|guest] [--json]");
+    exit(2);
+    return;
+  }
+
+  if (!role || !isInviteRole(role)) {
+    printErr(`fulcrum auth invite: invalid role '${role ?? ""}'`);
+    exit(2);
+    return;
+  }
+
+  const caller = await resolveCaller(opts);
+  if (!caller.auth.invite) {
+    printErr("fulcrum auth invite: auth.invite procedure unavailable.");
+    exit(1);
+    return;
+  }
+
+  try {
+    const result = await caller.auth.invite({ email, role });
+    if (jsonMode) {
+      print(JSON.stringify(result));
+    } else {
+      print(`Invitation: ${result.invitationId}`);
+      print(`Token:      ${result.token}`);
+    }
+  } catch (err) {
+    const msg = err instanceof TRPCError
+      ? `${err.code}: ${err.message}`
+      : `Error: ${(err as Error).message}`;
+    printErr(`fulcrum auth invite: ${msg}`);
+    exit(1);
+  }
+}
+
+function isInviteRole(value: string): value is InviteRole {
+  return value === "owner" || value === "admin" || value === "member" || value === "guest";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -133,14 +196,15 @@ async function runLogin(
   argv: readonly string[],
   opts: Required<Pick<AuthRunOptions, "print" | "printErr" | "exit">> & AuthRunOptions,
 ): Promise<void> {
-  const { print } = opts;
+  const { printErr, exit } = opts;
   const nonInteractive = argv.includes("--non-interactive");
 
   if (nonInteractive) {
-    print("login: --non-interactive mode not yet implemented. Use session.json manually.");
+    printErr("login: --non-interactive mode not yet implemented.");
   } else {
-    print("login: interactive login not yet implemented.");
+    printErr("login: interactive login not yet implemented.");
   }
+  exit(1);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -151,8 +215,9 @@ async function runLogout(
   _argv: readonly string[],
   opts: Required<Pick<AuthRunOptions, "print" | "printErr" | "exit">> & AuthRunOptions,
 ): Promise<void> {
-  const { print } = opts;
-  print("logout: session invalidation not yet implemented.");
+  const { printErr, exit } = opts;
+  printErr("logout: session invalidation not yet implemented.");
+  exit(1);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -160,7 +225,12 @@ async function runLogout(
 // ─────────────────────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function resolveCaller(opts: AuthRunOptions): Promise<{ auth: { whoami: () => Promise<any> } }> {
+async function resolveCaller(opts: AuthRunOptions): Promise<{
+  auth: {
+    whoami: () => Promise<any>;
+    invite?: (input: { email: string; role: InviteRole }) => Promise<any>;
+  };
+}> {
   if (opts.caller) return opts.caller;
 
   // Production path: build caller from needle-di container + tRPC router

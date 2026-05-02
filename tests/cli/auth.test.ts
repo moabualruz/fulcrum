@@ -8,8 +8,8 @@
  *   1. `fulcrum auth whoami --json` returns { userId, orgId, email, role } JSON.
  *   2. `fulcrum auth whoami` (no --json) prints human-readable text.
  *   3. `fulcrum auth whoami` without session exits non-zero with error on stderr.
- *   4. `fulcrum auth login --non-interactive` exits 0 (stub: not yet implemented).
- *   5. `fulcrum auth logout` exits 0 (stub: not yet implemented).
+ *   4. `fulcrum auth invite <email> --role member --json` calls auth.invite.
+ *   5. Unimplemented login/logout exit non-zero.
  *
  * These tests call run() from src/cli/commands/auth.ts directly, passing a
  * pre-built container/caller so no DB connection is needed.
@@ -33,7 +33,12 @@ interface WhoamiResult {
  * Build a minimal fake caller that mimics the shape of a tRPC caller.
  * run() in auth.ts accepts a `caller` option (or builds one from container).
  */
-function fakeAuthenticatedCaller(): { auth: { whoami: () => Promise<WhoamiResult> } } {
+function fakeAuthenticatedCaller(): {
+  auth: {
+    whoami: () => Promise<WhoamiResult>;
+    invite: (input: { email: string; role: string }) => Promise<{ invitationId: string; token: string }>;
+  };
+} {
   return {
     auth: {
       whoami: async () => ({
@@ -41,6 +46,10 @@ function fakeAuthenticatedCaller(): { auth: { whoami: () => Promise<WhoamiResult
         orgId: "org-01",
         email: "admin@local",
         role: "owner",
+      }),
+      invite: async (input) => ({
+        invitationId: `inv-${input.role}`,
+        token: `token-for-${input.email}`,
       }),
     },
   };
@@ -119,31 +128,14 @@ describe("auth.run — whoami --json", () => {
   });
 });
 
-describe("auth.run — login / logout stubs", () => {
-  it("login --non-interactive exits 0", async () => {
+describe("auth.run — invite", () => {
+  it("invite creates an invitation and prints JSON", async () => {
     const { run } = await import("../../src/cli/commands/auth.ts");
 
     let exitCode: number | undefined;
     const lines: string[] = [];
 
-    await run(["login", "--non-interactive"], {
-      caller: fakeAuthenticatedCaller(),
-      print: (line: string) => { lines.push(line); },
-      printErr: (_line: string) => {},
-      exit: (code: number) => { exitCode = code; },
-    });
-
-    expect(exitCode).toBeUndefined(); // no error
-    expect(lines.join("")).toBeTruthy(); // at minimum prints something
-  });
-
-  it("logout exits 0", async () => {
-    const { run } = await import("../../src/cli/commands/auth.ts");
-
-    let exitCode: number | undefined;
-    const lines: string[] = [];
-
-    await run(["logout"], {
+    await run(["invite", "new@test.local", "--role", "member", "--json"], {
       caller: fakeAuthenticatedCaller(),
       print: (line: string) => { lines.push(line); },
       printErr: (_line: string) => {},
@@ -151,6 +143,44 @@ describe("auth.run — login / logout stubs", () => {
     });
 
     expect(exitCode).toBeUndefined();
-    expect(lines.join("")).toBeTruthy();
+    const parsed = JSON.parse(lines[0] as string);
+    expect(parsed.invitationId).toBe("inv-member");
+    expect(parsed.token).toBe("token-for-new@test.local");
+  });
+});
+
+describe("auth.run — login / logout not implemented", () => {
+  it("login --non-interactive exits 1", async () => {
+    const { run } = await import("../../src/cli/commands/auth.ts");
+
+    let exitCode: number | undefined;
+    const errLines: string[] = [];
+
+    await run(["login", "--non-interactive"], {
+      caller: fakeAuthenticatedCaller(),
+      print: (_line: string) => {},
+      printErr: (line: string) => { errLines.push(line); },
+      exit: (code: number) => { exitCode = code; },
+    });
+
+    expect(exitCode).toBe(1);
+    expect(errLines.join("\n")).toMatch(/not yet implemented/i);
+  });
+
+  it("logout exits 1", async () => {
+    const { run } = await import("../../src/cli/commands/auth.ts");
+
+    let exitCode: number | undefined;
+    const errLines: string[] = [];
+
+    await run(["logout"], {
+      caller: fakeAuthenticatedCaller(),
+      print: (_line: string) => {},
+      printErr: (line: string) => { errLines.push(line); },
+      exit: (code: number) => { exitCode = code; },
+    });
+
+    expect(exitCode).toBe(1);
+    expect(errLines.join("\n")).toMatch(/not yet implemented/i);
   });
 });

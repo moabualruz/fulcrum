@@ -88,12 +88,45 @@ function buildDbAdapterInstance(mikro: MikroOrmBetterAuthAdapter): unknown {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyAuth = ReturnType<typeof betterAuth<any>>;
 
-async function buildAuth(em: EntityManager): Promise<AnyAuth> {
+function nonEmptyEnv(name: string): string | null {
+  const value = process.env[name]?.trim();
+  return value ? value : null;
+}
+
+function oauthProviderConfig(): Record<string, { clientId: string; clientSecret: string }> | undefined {
+  const providers: Record<string, { clientId: string; clientSecret: string }> = {};
+
+  const googleId = nonEmptyEnv("GOOGLE_CLIENT_ID");
+  const googleSecret = nonEmptyEnv("GOOGLE_CLIENT_SECRET");
+  if (googleId && googleSecret) {
+    providers["google"] = { clientId: googleId, clientSecret: googleSecret };
+  }
+
+  const githubId = nonEmptyEnv("GITHUB_CLIENT_ID");
+  const githubSecret = nonEmptyEnv("GITHUB_CLIENT_SECRET");
+  if (githubId && githubSecret) {
+    providers["github"] = { clientId: githubId, clientSecret: githubSecret };
+  }
+
+  return Object.keys(providers).length > 0 ? providers : undefined;
+}
+
+async function authConfigSignature(em: EntityManager): Promise<string> {
+  const saasEnabled = await isFlagEnabled(em, SAAS_AUTH_FLAG);
+  return JSON.stringify({
+    saasEnabled,
+    google: Boolean(nonEmptyEnv("GOOGLE_CLIENT_ID") && nonEmptyEnv("GOOGLE_CLIENT_SECRET")),
+    github: Boolean(nonEmptyEnv("GITHUB_CLIENT_ID") && nonEmptyEnv("GITHUB_CLIENT_SECRET")),
+  });
+}
+
+async function buildAuth(em: EntityManager): Promise<{ auth: AnyAuth; signature: string }> {
   const mikro = new MikroOrmBetterAuthAdapter(em);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = buildDbAdapterInstance(mikro) as any;
 
   const saasEnabled = await isFlagEnabled(em, SAAS_AUTH_FLAG);
+  const socialProviders = saasEnabled ? oauthProviderConfig() : undefined;
 
   // Base plugins — always enabled (local-first mode)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -118,7 +151,7 @@ async function buildAuth(em: EntityManager): Promise<AnyAuth> {
     );
   }
 
-  return betterAuth({
+  const auth = betterAuth({
     database: db,
 
     // C1: email+password is always enabled (local-first mode)
@@ -128,17 +161,8 @@ async function buildAuth(em: EntityManager): Promise<AnyAuth> {
 
     // Social providers — gated by saas-auth flag.
     // clientId/clientSecret are read from environment at runtime; absent in local mode.
-    ...(saasEnabled && {
-      socialProviders: {
-        google: {
-          clientId: process.env["GOOGLE_CLIENT_ID"] ?? "",
-          clientSecret: process.env["GOOGLE_CLIENT_SECRET"] ?? "",
-        },
-        github: {
-          clientId: process.env["GITHUB_CLIENT_ID"] ?? "",
-          clientSecret: process.env["GITHUB_CLIENT_SECRET"] ?? "",
-        },
-      },
+    ...(socialProviders && {
+      socialProviders,
     }),
 
     plugins,
@@ -151,6 +175,8 @@ async function buildAuth(em: EntityManager): Promise<AnyAuth> {
     // Trusted origins — permissive for local dev; tighten in SaaS mode
     trustedOrigins: ["http://localhost:5173", "http://localhost:3000"],
   });
+
+  return { auth, signature: await authConfigSignature(em) };
 }
 
 /**
@@ -172,6 +198,7 @@ async function buildAuth(em: EntityManager): Promise<AnyAuth> {
 @injectable()
 export class AuthService {
   private auth: AnyAuth | null = null;
+  private authSignature: string | null = null;
 
   constructor(private readonly em: EntityManager) {}
 
@@ -181,7 +208,28 @@ export class AuthService {
    * Safe to call multiple times — rebuilds on each call (flag may change).
    */
   async init(): Promise<void> {
-    this.auth = await buildAuth(this.em);
+    const built = await buildAuth(this.em);
+    this.auth = built.auth;
+    this.authSignature = built.signature;
+  }
+
+  private async ensureFreshAuth(): Promise<AnyAuth> {
+    if (!this.auth) {
+      await this.init();
+      if (!this.auth) {
+        throw new Error("[AuthService] failed to initialise auth");
+      }
+      return this.auth;
+    }
+
+    const currentSignature = await authConfigSignature(this.em);
+    if (currentSignature !== this.authSignature) {
+      const built = await buildAuth(this.em);
+      this.auth = built.auth;
+      this.authSignature = built.signature;
+    }
+
+    return this.auth;
   }
 
   /**
@@ -193,7 +241,10 @@ export class AuthService {
     if (!this.auth) {
       throw new Error("[AuthService] call init() before using handler");
     }
-    return this.auth.handler;
+    return async (request: Request) => {
+      const auth = await this.ensureFreshAuth();
+      return auth.handler(request);
+    };
   }
 
   /**

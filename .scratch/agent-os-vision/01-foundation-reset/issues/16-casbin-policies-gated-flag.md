@@ -43,3 +43,5 @@ Cuts through: `CasbinRule` entity (from slice `03`) → `FulcrumCasbinAdapter` (
 
 ## Notes
 Full ABAC policy management UI + per-resource policy editor is Owned by Pillar 5 (Permissions). This slice only wires the enforcer + custom adapter into `assertPermission` and seeds the default owner policy. The `CasbinRule` entity is ready for Pillar 5 to populate without a schema change. The custom `FulcrumCasbinAdapter` keeps Casbin's table contract (`ptype`, `v0..v5`) without ceding ownership of the entity to a third-party adapter package.
+
+Review follow-up: `assertPermission` now derives Casbin resource/action from the server-owned tRPC procedure path/type (`query` => `read`, `mutation` => `write`) instead of trusting client input. Regression coverage proves omitted input still enforces and spoofed `resource`/`action` cannot bypass a denied mutation.
