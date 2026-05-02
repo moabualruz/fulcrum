@@ -1,5 +1,5 @@
 import type { MikroORM } from "@mikro-orm/postgresql";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createHash } from "node:crypto";
 import { z } from "zod";
@@ -38,12 +38,25 @@ const SkillFrontmatter = z.object({
 });
 
 let testOrm: MikroORM | undefined;
+let processKillForTest: typeof process.kill | undefined;
 const LOCK_TIMEOUT_MS = 5_000;
 const LOCK_POLL_MS = 25;
 const STALE_LOCK_MS = 60_000;
 
 export function __setSkillsLoaderOrmForTest(orm: MikroORM | undefined): void {
   testOrm = orm;
+}
+
+export function __setSkillsLoaderProcessKillForTest(
+  fn: typeof process.kill | undefined,
+): void {
+  processKillForTest = fn;
+}
+
+export async function __removeStaleSkillsLockForTest(
+  lockDir: string,
+): Promise<boolean> {
+  return removeStaleLock(lockDir, join(lockDir, "lock.json"));
 }
 
 function expandHome(path: string): string {
@@ -154,7 +167,11 @@ async function removeStaleLock(
       createdAt?: unknown;
     };
   } catch {
-    return false;
+    const dirStats = await stat(lockDir).catch(() => null);
+    if (!dirStats || Date.now() - dirStats.mtimeMs <= STALE_LOCK_MS) {
+      return false;
+    }
+    parsed = { pid: null, createdAt: new Date(dirStats.mtimeMs).toISOString() };
   }
 
   const pid = typeof parsed.pid === "number" ? parsed.pid : null;
@@ -165,16 +182,25 @@ async function removeStaleLock(
   const ownerDead = pid !== null && !isProcessAlive(pid);
   if (!ownerDead && !lockIsOld) return false;
 
-  await rm(lockDir, { recursive: true, force: true });
+  const claimedDir = `${lockDir}.stale-${process.pid}-${Date.now()}-${Math.random()
+    .toString(16)
+    .slice(2)}`;
+  try {
+    await rename(lockDir, claimedDir);
+  } catch (error) {
+    if ((error as { code?: string }).code === "ENOENT") return false;
+    throw error;
+  }
+  await rm(claimedDir, { recursive: true, force: true });
   return true;
 }
 
 function isProcessAlive(pid: number): boolean {
   try {
-    process.kill(pid, 0);
+    (processKillForTest ?? process.kill)(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "ESRCH";
   }
 }
 

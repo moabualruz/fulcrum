@@ -12,6 +12,7 @@ import {
   readFile,
   rm,
   stat,
+  utimes,
   writeFile,
 } from "node:fs/promises";
 import { join } from "node:path";
@@ -29,6 +30,8 @@ import {
 } from "../../src/db/entities/skills/index.ts";
 import {
   AGENT_DIRS,
+  __removeStaleSkillsLockForTest,
+  __setSkillsLoaderProcessKillForTest,
   __setSkillsLoaderOrmForTest,
   installSkill,
 } from "../../src/skills/loader.ts";
@@ -51,6 +54,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   __setSkillsLoaderOrmForTest(undefined);
+  __setSkillsLoaderProcessKillForTest(undefined);
   await testDb.close();
   if (originalHome === undefined) delete process.env["HOME"];
   else process.env["HOME"] = originalHome;
@@ -178,7 +182,16 @@ describe("installSkill", () => {
 
     await expect(installSkill(skillPath, testDb.seed.orgId)).rejects.toThrow();
 
-    expect((await latestVersion("copy-fail"))?.hashVerified).toBeNull();
+    const em = testDb.orm.em.fork();
+    const skill = await em.findOneOrFail(FulcrumSkill, {
+      org: testDb.seed.orgId,
+      slug: "copy-fail",
+    }, {
+      populate: ["versions"],
+    });
+    expect(skill.source).toBe(SkillSource.Local);
+    expect(skill.enabledAgents).toEqual(["codex"]);
+    expect(skill.versions.getItems()[0]?.hashVerified).toBeNull();
   });
 
   it("updates existing skill source to local on install", async () => {
@@ -241,6 +254,51 @@ describe("installSkill", () => {
     await installSkill(skillPath, testDb.seed.orgId);
 
     expect(await pathExists(await installedPath("codex", "stale-lock"))).toBe(true);
+    expect(await pathExists(lockDir)).toBe(false);
+  });
+
+  it("preserves a skills lock when process.kill reports EPERM", async () => {
+    const lockDir = join(process.env["FULCRUM_HOME"]!, "skills.lock.json.lock");
+    await mkdir(lockDir, { recursive: true });
+    await writeFile(
+      join(lockDir, "lock.json"),
+      JSON.stringify({ pid: 123, createdAt: new Date().toISOString() }),
+      "utf8",
+    );
+    __setSkillsLoaderProcessKillForTest(() => {
+      const error = new Error("operation not permitted") as NodeJS.ErrnoException;
+      error.code = "EPERM";
+      throw error;
+    });
+
+    expect(await __removeStaleSkillsLockForTest(lockDir)).toBe(false);
+    expect(await pathExists(lockDir)).toBe(true);
+  });
+
+  it("lets exactly one contender claim a stale skills lock", async () => {
+    const lockDir = join(process.env["FULCRUM_HOME"]!, "skills.lock.json.lock");
+    await mkdir(lockDir, { recursive: true });
+    await writeFile(
+      join(lockDir, "lock.json"),
+      JSON.stringify({ pid: 999_999_999, createdAt: new Date().toISOString() }),
+      "utf8",
+    );
+
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () => __removeStaleSkillsLockForTest(lockDir)),
+    );
+
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(await pathExists(lockDir)).toBe(false);
+  });
+
+  it("removes an old skills lock directory when lock.json is missing", async () => {
+    const lockDir = join(process.env["FULCRUM_HOME"]!, "skills.lock.json.lock");
+    await mkdir(lockDir, { recursive: true });
+    const old = new Date(Date.now() - 61_000);
+    await utimes(lockDir, old, old);
+
+    expect(await __removeStaleSkillsLockForTest(lockDir)).toBe(true);
     expect(await pathExists(lockDir)).toBe(false);
   });
 
