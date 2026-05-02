@@ -39,6 +39,9 @@ interface RunDetail {
   prompt: string | null;
   org_id: string;
   parent_run_id: string | null;
+  attempt_count: number;
+  next_retry_at: string | null;
+  last_error_kind: string | null;
 }
 
 type PageProps = {
@@ -72,6 +75,9 @@ const RUN: RunDetail = {
   prompt: "Do thing",
   org_id: "org-1",
   parent_run_id: null,
+  attempt_count: 0,
+  next_retry_at: null,
+  last_error_kind: null,
 };
 
 function pageData(input: {
@@ -152,6 +158,23 @@ describe("/runs/[id] +page.svelte (SSR)", () => {
     expect(body).toContain("data-runs-payload");
     expect(body).toContain(RUN.id);
     expect(body).toContain(RUN.agent);
+  });
+
+  test("renders retry schedule metadata", () => {
+    const run = {
+      ...RUN,
+      attempt_count: 3,
+      next_retry_at: "2026-05-02T10:01:20.000Z",
+      last_error_kind: "stall_timeout",
+    };
+    const { body } = render(Page, {
+      props: { data: pageData({ run, transcript: null, events: [] }) },
+    });
+    expect(body).toContain("data-runs-retry-schedule");
+    expect(body).toContain("Attempt");
+    expect(body).toContain("3");
+    expect(body).toContain("2026-05-02T10:01:20.000Z");
+    expect(body).toContain("stall_timeout");
   });
 
   test("events tab markers present", () => {

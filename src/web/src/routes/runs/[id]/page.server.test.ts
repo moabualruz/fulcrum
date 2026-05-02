@@ -23,6 +23,9 @@ interface RunDetailPayload {
     started_at: string;
     ended_at: string | null;
     transcript_path: string | null;
+    attempt_count: number;
+    next_retry_at: string | null;
+    last_error_kind: string | null;
   };
   transcript: string | null;
   events: Array<{ id: string; created_at: string }>;
@@ -123,6 +126,31 @@ describe("/runs/[id] +page.server.ts", () => {
     const result = await mod.load({ params: { id } } as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<RunDetailPayload>(result);
     expect(payload.transcript).toBe("hello transcript");
+  });
+
+  test("load returns retry schedule fields for run detail", async () => {
+    const { db, orgId, projectId } = await freshDb();
+    let id: string;
+    try {
+      id = await seedRun(db, orgId, projectId, "running", null);
+      await db.query(
+        `UPDATE agent_runs
+            SET attempt_count = 2,
+                next_retry_at = '2026-05-02T10:01:20.000Z',
+                last_error_kind = 'stall_timeout'
+          WHERE id = $1`,
+        [id],
+      );
+    } finally {
+      await db.close();
+    }
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 5}`);
+    const result = await mod.load({ params: { id } } as Parameters<typeof mod.load>[0]);
+    const payload = await streamedData<RunDetailPayload>(result);
+
+    expect(payload.run.attempt_count).toBe(2);
+    expect(payload.run.next_retry_at).toBe("2026-05-02T10:01:20.000Z");
+    expect(payload.run.last_error_kind).toBe("stall_timeout");
   });
 
   test("load throws 404 when run does not exist", async () => {

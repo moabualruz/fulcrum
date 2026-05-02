@@ -60,6 +60,9 @@ const RunDetailSchema = z.object({
   orchestrationState: z.string().nullable(),
   workspacePath: z.string().nullable(),
   renderedPrompt: z.string().nullable(),
+  attemptCount: z.number().int(),
+  nextRetryAt: z.date().nullable(),
+  lastErrorKind: z.string().nullable(),
 });
 
 export const orchestrationRouter = t.router({
@@ -148,7 +151,14 @@ export const orchestrationRouter = t.router({
         id: input.runId,
         org,
       }, {
-        fields: ["id", "orchestrationState", "workspacePath"],
+        fields: [
+          "id",
+          "orchestrationState",
+          "workspacePath",
+          "attemptCount",
+          "nextRetryAt",
+          "lastErrorKind",
+        ],
       });
       if (!run) return null;
 
@@ -158,6 +168,9 @@ export const orchestrationRouter = t.router({
         orchestrationState: run.orchestrationState ?? null,
         workspacePath: run.workspacePath ?? null,
         renderedPrompt: null,
+        attemptCount: run.attemptCount,
+        nextRetryAt: run.nextRetryAt ?? null,
+        lastErrorKind: run.lastErrorKind ?? null,
       };
     }),
 
