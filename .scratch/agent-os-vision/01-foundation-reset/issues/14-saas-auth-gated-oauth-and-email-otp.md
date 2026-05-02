@@ -1,9 +1,11 @@
 ---
-Status: integration-review
+Status: in-progress
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 13-passkey-enrollment-and-login-flow
-Owner: codex-orchestrator
+Owner: codex-worker-local-auth-flow
+ReopenedAt: 2026-05-02T16:02:54Z
+ReopenedBecause: P1 gate found local-mode signup still permits unauthenticated email signup into default org.
 ReviewGate: 2026-05-02T10:01:13Z — Claude adversarial review review-moo61q5y-llfvx1 SPEC FAIL / QUALITY CHANGES_REQUIRED: OAuth providers register empty credentials; saas-auth gating is boot-time only.
 ---
 

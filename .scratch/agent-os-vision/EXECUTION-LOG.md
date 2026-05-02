@@ -1461,3 +1461,29 @@ Underfilled reason:
 ]
 
 Result: CHECKPOINT_READY.
+
+## 2026-05-02T16:02:54Z — codex-orchestrator (P1 repair wave claimed)
+
+Capacity:
+[
+  codex_impl=5/6,
+  claude_impl=0/6,
+  review=0/6
+]
+
+Repair lanes:
+[
+  bootstrap-migrations: P1#04 + P1#19, owner codex-worker-bootstrap-migrations, target init/db/doctor migration ledger consistency,
+  local-auth-flow: P1#05 + P1#11 + P1#14, owner codex-worker-local-auth-flow, target seeded admin login + local-mode signup gate,
+  flags-settings-page: P1#07, owner codex-worker-flags-settings-page, target /settings/flags browser surface,
+  tui-runtime-auth: P1#15 + P15#01 co-owner, owner codex-worker-tui-runtime-auth, target production TUI DB/auth context and telemetry,
+  casbin-org-scope: P1#16, owner codex-worker-casbin-org-scope, target org-scoped Casbin enforcement
+]
+
+Held:
+[
+  P1#10 auth login/logout/invite until local-auth-flow stabilizes session semantics,
+  remaining pillar schema slices until P1 gate is green
+]
+
+Result: CLAIMED.

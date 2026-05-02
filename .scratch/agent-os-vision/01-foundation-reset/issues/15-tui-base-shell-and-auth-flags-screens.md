@@ -1,8 +1,11 @@
 ---
-Status: integration-review
+Status: in-progress
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 10-cli-auth-and-flags-verbs, 07-feature-flag-registry
+Owner: codex-worker-tui-runtime-auth
+ReopenedAt: 2026-05-02T16:02:54Z
+ReopenedBecause: P1 gate found production TUI starts without DB/auth container and uses null session/org/user context.
 Commit: feat(tui): base shell + auth + flags screens (P1#15)
 ReviewDebtResolved: 2026-05-02T10:01:13Z — Claude adversarial review review-moo61q5y-llfvx1 SPEC PASS for this issue; no blocking findings.
 ---

@@ -1,10 +1,12 @@
 ---
-Status: integration-review
+Status: in-progress
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 01-schema-auth-migration
-Owner: claude-orchestrator
+Owner: codex-worker-bootstrap-migrations
 CompletedAt: 2026-05-01T20:00:00Z
+ReopenedAt: 2026-05-02T16:02:54Z
+ReopenedBecause: P1 gate found init uses schema.update without migration ledger alignment and seeded local admin cannot complete browser login.
 ReviewVerdict: APPROVED — Codex round-2 review confirms Fix 1 PASS (TODO at +layout.server.ts citing P1#04/P13/P16/SSR SyntaxError/user-impact; test.skip present) + Fix 2 PASS (em.persistAndFlush). Scope-bundling nit flagged (orchestrator packaging, not P1#04 defect). Per .scratch/agent-os-vision/research/p1-04-review.md.
 ---
 

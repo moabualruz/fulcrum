@@ -3,6 +3,9 @@ Status: in-progress
 Triage: AFK
 Pillar: tui
 Owner: codex-worker-tui-foundation
+CoOwner: codex-worker-tui-runtime-auth
+ReopenedAt: 2026-05-02T16:02:54Z
+ReopenedBecause: Resume wave landed partial harness only; remaining work includes production auth container, local_telemetry DB insert, and renderer integration.
 Blocked-by: []
 PRD: .scratch/agent-os-vision/prds/15-tui.md
 Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 15 section)
