@@ -23,6 +23,16 @@ import {
 } from "../../orchestration/symphony/schemas.ts";
 import { ClaimConflictError } from "../../orchestration/symphony/orchestrator.ts";
 
+const OrgIdInputSchema = z.object({
+  orgId: z.string().min(1),
+});
+
+const OrchestratorStatusSchema = z.object({
+  running: z.number().int(),
+  queued: z.number().int(),
+  stalled: z.number().int(),
+});
+
 const ClaimRunInputSchema = z.object({
   orgId: z.string().min(1),
   taskId: z.string().min(1),
@@ -198,6 +208,27 @@ export const orchestrationRouter = t.router({
       );
 
       return { prompt, config };
+    }),
+
+  getOrchestratorStatus: protectedProcedure
+    .input(OrgIdInputSchema)
+    .output(OrchestratorStatusSchema)
+    .query(async ({ ctx, input }) => {
+      ensureOrg(ctx.orgId, input.orgId);
+      const em = ensureEntityManager(ctx.em);
+      const { fetchIssuesByStates } = await import(
+        "../../orchestration/symphony/tracker.ts"
+      );
+      const [running, queued, stalled] = await Promise.all([
+        fetchIssuesByStates(em, input.orgId, ["running"], 500),
+        fetchIssuesByStates(em, input.orgId, ["unclaimed", "claimed", "retry_queued"], 500),
+        fetchIssuesByStates(em, input.orgId, ["stalled"], 500),
+      ]);
+      return {
+        running: running.length,
+        queued: queued.length,
+        stalled: stalled.length,
+      };
     }),
 
   claimRun: protectedProcedure
