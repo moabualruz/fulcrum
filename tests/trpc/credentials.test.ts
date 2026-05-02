@@ -27,6 +27,7 @@ import { OrgMember } from "../../src/db/entities/auth/OrgMember.ts";
 import { Credential } from "../../src/db/entities/platform/Credential.ts";
 import { CredentialRepository } from "../../src/db/repositories/platform/CredentialRepository.ts";
 import { OrgMemberRepository } from "../../src/db/repositories/auth/OrgMemberRepository.ts";
+import { CasbinRuleRepository } from "../../src/db/repositories/flags/CasbinRuleRepository.ts";
 import { FlagRegistry } from "../../src/flags/registry.ts";
 import { appRouter } from "../../src/trpc/router.ts";
 import { createContext } from "../../src/trpc/context.ts";
@@ -39,6 +40,12 @@ const TEST_OWNER_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
 const TEST_ADMIN_ID = "c3d4e5f6-a7b8-4c9d-90e1-f2a3b4c5d6e7";
 const TEST_MEMBER_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
 const TEST_OTHER_ID = "d4e5f6a7-b8c9-4d0e-91f2-a3b4c5d6e7f8";
+const TEST_MEMBERS = [
+  [TEST_OWNER_ID, "owner"],
+  [TEST_ADMIN_ID, "admin"],
+  [TEST_MEMBER_ID, "member"],
+  [TEST_OTHER_ID, "member"],
+] as const;
 
 let orm: MikroORM;
 let pglite: PGlite;
@@ -74,7 +81,11 @@ function inMemoryNative(): NativeKeyringAdapter {
   };
 }
 
-function makeCaller(userId: string, orgId: string) {
+function makeCaller(
+  userId: string,
+  orgId: string,
+  options: { casbinActions?: string[] } = {},
+) {
   const em = orm.em.fork();
   const credentialRepo = em.getRepository(Credential) as CredentialRepository;
   const orgMemberRepo = em.getRepository(OrgMember) as OrgMemberRepository;
@@ -84,7 +95,23 @@ function makeCaller(userId: string, orgId: string) {
   c.bind({ provide: OrgMemberRepository, useValue: orgMemberRepo });
   c.bind({
     provide: FlagRegistry,
-    useValue: { isEnabled: async () => false } as unknown as FlagRegistry,
+    useValue: {
+      isEnabled: async (flag: string) =>
+        flag === "casbin-policies" && options.casbinActions !== undefined,
+    } as unknown as FlagRegistry,
+  });
+  c.bind({
+    provide: CasbinRuleRepository,
+    useValue: {
+      findAll: async () =>
+        (options.casbinActions ?? []).map((action) => ({
+          ptype: "p",
+          v0: orgId,
+          v1: userId,
+          v2: "credentials",
+          v3: action,
+        })),
+    } as unknown as CasbinRuleRepository,
   });
   c.bind({
     provide: SecretsKeyringToken,
@@ -138,12 +165,7 @@ beforeAll(async () => {
     createdAt: now,
     updatedAt: now,
   });
-  for (const [id, role] of [
-    [TEST_OWNER_ID, "owner"],
-    [TEST_ADMIN_ID, "admin"],
-    [TEST_MEMBER_ID, "member"],
-    [TEST_OTHER_ID, "member"],
-  ] as const) {
+  for (const [id, role] of TEST_MEMBERS) {
     seed.create(User, {
       id,
       email: `${role}-${id.slice(0, 4)}@test.local`,
@@ -173,6 +195,18 @@ afterAll(async () => {
 beforeEach(async () => {
   const em = orm.em.fork();
   await em.nativeDelete(Credential, {});
+  await em.nativeDelete(OrgMember, {});
+  const now = new Date();
+  for (const [id, role] of TEST_MEMBERS) {
+    const member = em.create(OrgMember, {
+      orgId: TEST_ORG_ID,
+      userId: id,
+      role,
+      joinedAt: now,
+    });
+    em.persist(member);
+  }
+  await em.flush();
 });
 
 describe("credentials.set", () => {
@@ -304,6 +338,59 @@ describe("credentials.archive / remove", () => {
     const em = orm.em.fork();
     const row = await em.findOne(Credential, { name: "rm", org: TEST_ORG_ID } as object);
     expect(row).toBeNull();
+  });
+});
+
+describe("credentials casbin-policies integration", () => {
+  it("maps credentials mutation verbs so Casbin-enabled set/rotate/archive/remove reach resolvers", async () => {
+    const caller = makeCaller(TEST_OWNER_ID, TEST_ORG_ID, {
+      casbinActions: ["set", "rotate", "archive", "remove"],
+    });
+
+    await caller.credentials.set({ name: "casbin", value: "v1" });
+    await caller.credentials.rotate({ name: "casbin", newValue: "v2" });
+    await caller.credentials.archive({ name: "casbin" });
+    await caller.credentials.remove({ name: "casbin" });
+
+    const em = orm.em.fork();
+    const row = await em.findOne(Credential, { name: "casbin", org: TEST_ORG_ID } as object);
+    expect(row).toBeNull();
+  });
+});
+
+describe("credentials active membership gate", () => {
+  it("blocks stale-session self get/list/set after OrgMember removal", async () => {
+    const activeCaller = makeCaller(TEST_MEMBER_ID, TEST_ORG_ID);
+    await activeCaller.credentials.set({ name: "stale", value: "plaintext-before-remove" });
+
+    const adminEm = orm.em.fork();
+    await adminEm.nativeDelete(OrgMember, {
+      orgId: TEST_ORG_ID,
+      userId: TEST_MEMBER_ID,
+    } as object);
+
+    const staleCaller = makeCaller(TEST_MEMBER_ID, TEST_ORG_ID);
+
+    for (const attempt of [
+      () => staleCaller.credentials.get({ name: "stale" }),
+      () => staleCaller.credentials.list(),
+      () => staleCaller.credentials.set({ name: "after-removal", value: "must-not-write" }),
+    ]) {
+      let err: TRPCError | null = null;
+      try {
+        await attempt();
+      } catch (e) {
+        if (e instanceof TRPCError) err = e;
+      }
+      expect(err?.code).toBe("FORBIDDEN");
+    }
+
+    const checkEm = orm.em.fork();
+    const blockedWrite = await checkEm.findOne(Credential, {
+      name: "after-removal",
+      org: TEST_ORG_ID,
+    } as object);
+    expect(blockedWrite).toBeNull();
   });
 });
 

@@ -183,8 +183,8 @@ async function extractRouterMetadata(routerPath: string): Promise<DomainMetadata
   });
   const entry = project.addSourceFileAtPath(routerPath);
   const source = await resolveAppRouterSource(entry, routerPath, project);
-  const context = createExtractorContext(source);
-  const appRouter = context.variables.get("appRouter");
+  const context = createExtractorContext(source, project);
+  const appRouter = lookupVariable("appRouter", source, context);
   const initializer = appRouter?.getInitializer();
   const record = unwrapRouterObject(initializer);
   if (record === null) throw new Error(`appRouter t.router({...}) not found in ${routerPath}`);
@@ -209,23 +209,93 @@ async function resolveAppRouterSource(entry: SourceFile, routerPath: string, pro
   return entry;
 }
 
-function createExtractorContext(source: SourceFile) {
+type ExtractorContext = {
+  source: SourceFile;
+  project: Project;
+  variables: Map<string, VariableDeclaration>;
+  schemas: Map<string, AstSchema>;
+  imports: Map<string, VariableDeclaration>;
+};
+
+function createExtractorContext(source: SourceFile, project: Project): ExtractorContext {
   const variables = new Map<string, VariableDeclaration>();
   const schemas = new Map<string, AstSchema>();
-  for (const declaration of source.getVariableDeclarations()) {
-    variables.set(declaration.getName(), declaration);
-    const initializer = declaration.getInitializer();
-    if (initializer !== undefined) {
-      const schema = parseZodExpression(initializer, { variables, schemas });
-      if (schema !== null) schemas.set(declaration.getName(), schema);
+  const imports = new Map<string, VariableDeclaration>();
+  const context: ExtractorContext = { source, project, variables, schemas, imports };
+  const seen = new Set<string>();
+
+  function collect(current: SourceFile): void {
+    const path = current.getFilePath();
+    if (seen.has(path)) return;
+    seen.add(path);
+
+    for (const declaration of current.getVariableDeclarations()) {
+      variables.set(bindingKey(current, declaration.getName()), declaration);
+    }
+
+    for (const declaration of current.getImportDeclarations()) {
+      const specifier = declaration.getModuleSpecifierValue();
+      if (!specifier.startsWith(".")) continue;
+      let imported: SourceFile;
+      try {
+        imported = project.addSourceFileAtPath(resolve(dirname(path), specifier));
+      } catch {
+        continue;
+      }
+      collect(imported);
+      for (const item of declaration.getNamedImports()) {
+        const importedName = item.getName();
+        const localName = item.getAliasNode()?.getText() ?? importedName;
+        const importedDeclaration = lookupVariable(importedName, imported, context);
+        if (importedDeclaration) {
+          imports.set(bindingKey(current, localName), importedDeclaration);
+        }
+      }
     }
   }
-  return { source, variables, schemas };
+
+  collect(source);
+
+  for (const [key, declaration] of variables.entries()) {
+    const initializer = declaration.getInitializer();
+    if (initializer !== undefined) {
+      const schema = parseZodExpression(initializer, context);
+      if (schema !== null) schemas.set(key, schema);
+    }
+  }
+  return context;
+}
+
+function bindingKey(source: SourceFile, name: string): string {
+  return `${source.getFilePath()}:${name}`;
+}
+
+function lookupVariable(
+  name: string,
+  source: SourceFile,
+  context: ExtractorContext,
+): VariableDeclaration | undefined {
+  return (
+    context.variables.get(bindingKey(source, name)) ??
+    context.imports.get(bindingKey(source, name))
+  );
+}
+
+function lookupSchema(
+  name: string,
+  source: SourceFile,
+  context: ExtractorContext,
+): AstSchema | null {
+  const local = context.schemas.get(bindingKey(source, name));
+  if (local) return local;
+  const imported = context.imports.get(bindingKey(source, name));
+  if (!imported) return null;
+  return context.schemas.get(bindingKey(imported.getSourceFile(), imported.getName())) ?? null;
 }
 
 function extractRouterProcedures(
   expression: Node,
-  context: ReturnType<typeof createExtractorContext>,
+  context: ExtractorContext,
   prefix: string[],
 ): ProcedureMetadata[] {
   const resolved = resolveExpression(expression, context);
@@ -289,7 +359,7 @@ function helperProcedure(
 
 function extractProcedure(
   expression: Node,
-  context: ReturnType<typeof createExtractorContext>,
+  context: ExtractorContext,
   path: string[],
 ): ProcedureMetadata | null {
   const resolved = resolveExpression(expression, context);
@@ -324,10 +394,10 @@ function procedureFromHelperCall(expression: CallExpression, path: string[]): Pr
 
 function parseZodExpression(
   expression: Node,
-  context: Pick<ReturnType<typeof createExtractorContext>, "variables" | "schemas">,
+  context: ExtractorContext,
 ): AstSchema | null {
   if (Node.isIdentifier(expression)) {
-    return context.schemas.get(expression.getText()) ?? schemaFromKnownIdentifier(expression.getText());
+    return lookupSchema(expression.getText(), expression.getSourceFile(), context) ?? schemaFromKnownIdentifier(expression.getText());
   }
   if (!Node.isCallExpression(expression)) return null;
 
@@ -413,9 +483,9 @@ function unwrapRouterObject(expression: Node | undefined): ObjectLiteralExpressi
   return Node.isObjectLiteralExpression(record) ? record : null;
 }
 
-function resolveExpression(expression: Node, context: ReturnType<typeof createExtractorContext>): Node {
+function resolveExpression(expression: Node, context: ExtractorContext): Node {
   if (!Node.isIdentifier(expression)) return expression;
-  const declaration = context.variables.get(expression.getText());
+  const declaration = lookupVariable(expression.getText(), expression.getSourceFile(), context);
   if (declaration !== undefined && Node.isVariableDeclaration(declaration)) {
     return declaration.getInitializer() ?? expression;
   }

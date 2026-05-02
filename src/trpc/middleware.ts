@@ -73,6 +73,10 @@ function actionFromProcedurePath(path: string): string {
     case "revoke":
     case "cancel":
     case "unregister":
+    case "set":
+    case "rotate":
+    case "archive":
+    case "remove":
       return leaf;
     default:
       throw new TRPCError({

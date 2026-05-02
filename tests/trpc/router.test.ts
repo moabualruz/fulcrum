@@ -300,7 +300,7 @@ describe("assertPermission middleware", () => {
   it("fails closed when casbin is enabled for unmapped protected procedure leaf", async () => {
     const router = t.router({
       secure: t.router({
-        archive: protectedProcedure.mutation(() => "ok"),
+        publish: protectedProcedure.mutation(() => "ok"),
       }),
     });
     const caller = testCallerForRouter(
@@ -312,7 +312,7 @@ describe("assertPermission middleware", () => {
 
     let error: TRPCError | null = null;
     try {
-      await caller.secure.archive();
+      await caller.secure.publish();
     } catch (e) {
       if (e instanceof TRPCError) error = e;
     }
