@@ -230,3 +230,41 @@ Batch:
   03-symphony-orchestration/issues/10-retry-backoff-stall-detection.md
 ]
 Result: IN_PROGRESS — statuses flipped to in-progress before dispatch.
+
+## 2026-05-02T03:03:19Z — codex-orchestrator (Wave 3 integrated + final verification)
+
+Adjusted batch:
+[
+  02-inference-sidecar/issues/03-inference-cache-schema.md — returned to ready; overlaps P2#02 inference ownership,
+  03-symphony-orchestration/issues/07-workspace-management.md — returned to ready; shared orchestration router/CLI surface,
+  03-symphony-orchestration/issues/08-prompt-template-renderer.md — returned to ready; shared orchestration router/CLI surface,
+  03-symphony-orchestration/issues/10-retry-backoff-stall-detection.md — returned to ready; shared orchestration router/CLI surface
+]
+Integrated:
+[
+  a038cae feat(inference): integrate sidecar lifecycle client,
+  0cad8b0 feat(symphony): integrate candidate issue tracker,
+  f053ec2 build(sandbox): integrate sandcastle dependency pins,
+  9238e72 feat(router): integrate routing rule schema,
+  fdef6c4 feat(skills): integrate skill registry schema,
+  55823cb feat(docs): integrate schema foundation,
+  c3103fa fix(db): refresh migration snapshot for router schema,
+  7b35088 fix(db): refresh migration snapshot for docs schema
+]
+Integration fixes:
+[
+  src/orchestration/symphony/tracker.ts: kept decorated Task/AgentRun classes out of the SvelteKit top-level SSR graph via runtime dynamic imports,
+  LICENSE-DEPS.md: refreshed license-audit report after Sandcastle/Effect dependency pins
+]
+Verification:
+[
+  bun test --conditions=svelte ./src/inference/protocol.test.ts ./src/inference/client.test.ts ./src/inference/lifecycle.test.ts ./src/inference/contract.test.ts ./src/cli/inference.test.ts ./tests/cli/entrypoint.test.ts PASS,
+  cargo test --manifest-path inference/Cargo.toml -p inference-server PASS,
+  bun test tests/db/migrations/docs-schema-foundation.test.ts tests/db/migrations/routing-rules.test.ts tests/db/migrations/skills-schema.test.ts tests/symphony/tracker-fetch-candidate-issues.test.ts tests/cli/symphony.test.ts tests/orchestration/sandcastle-deps.test.ts PASS,
+  bun run --bun tsc --noEmit PASS,
+  cargo test --manifest-path inference/Cargo.toml --workspace PASS,
+  cargo build --release --manifest-path inference/Cargo.toml PASS,
+  bash inference/scripts/smoke.sh inference/target/release/inference-server PASS,
+  bun run ci PASS — 12/12 stages, 1487 pass, 2 skip; web:check still reports 2 pre-existing Svelte warnings
+]
+Result: WAVE_3_FINAL_VERIFICATION_PASS.

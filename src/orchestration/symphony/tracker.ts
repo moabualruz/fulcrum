@@ -8,8 +8,7 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { z } from "zod";
 
-import { AgentRun } from "../../db/entities/orchestration/AgentRun.ts";
-import { Task } from "../../db/entities/tasks/Task.ts";
+import type { Task } from "../../db/entities/tasks/Task.ts";
 import type { AgentRunRepository } from "../../db/repositories/orchestration/AgentRunRepository.ts";
 import type { TaskRepository } from "../../db/repositories/tasks/TaskRepository.ts";
 
@@ -67,6 +66,10 @@ export async function fetchCandidateIssues(
   limit = 50,
 ): Promise<CandidateIssue[]> {
   const input = FetchCandidateIssuesInputSchema.parse({ orgId, limit });
+  const [{ AgentRun }, { Task }] = await Promise.all([
+    import("../../db/entities/orchestration/AgentRun.ts"),
+    import("../../db/entities/tasks/Task.ts"),
+  ]);
   const fork = em.fork();
   const taskRepo = fork.getRepository(Task) as TaskRepository;
   const agentRunRepo = fork.getRepository(AgentRun) as AgentRunRepository;
