@@ -30,6 +30,7 @@ import {
 } from "@mikro-orm/decorators/es";
 import { OptionalProps } from "@mikro-orm/core";
 import { Org } from "../auth/Org.ts";
+import { Repo } from "../repos/Repo.ts";
 import { TaskRepository } from "../../repositories/tasks/TaskRepository.ts";
 import type { TaskDependencies } from "./schemas.ts";
 
@@ -61,6 +62,11 @@ import type { TaskDependencies } from "./schemas.ts";
   expression:
     'CREATE UNIQUE INDEX "tasks_org_external_id" ON "tasks" ("org_id", "external_id") WHERE "external_id" IS NOT NULL',
 })
+@Index({
+  name: "tasks_org_repo",
+  expression:
+    'CREATE INDEX "tasks_org_repo" ON "tasks" ("org_id", "repo_id") WHERE "repo_id" IS NOT NULL',
+})
 export class Task {
   [OptionalProps]?:
     | "createdAt"
@@ -73,7 +79,8 @@ export class Task {
     | "points"
     | "parent"
     | "dependencies"
-    | "externalId";
+    | "externalId"
+    | "repo";
 
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
@@ -131,4 +138,13 @@ export class Task {
 
   @Property({ type: "string", fieldName: "external_id", nullable: true, lazy: true })
   externalId?: string | null;
+
+  // P9#01 — optional repo association.
+  @ManyToOne(() => Repo, {
+    fieldName: "repo_id",
+    nullable: true,
+    deleteRule: "set null",
+    lazy: true,
+  })
+  repo?: Repo | null;
 }

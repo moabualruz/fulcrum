@@ -44,7 +44,7 @@ import { AgentRun } from "./entities/orchestration/AgentRun.ts";
 import { WorkflowDefinition } from "./entities/orchestration/WorkflowDefinition.ts";
 import { RoutingRule } from "./entities/router/RoutingRule.ts";
 import { Artifact, Edge } from "./entities/sandbox/index.ts";
-import { Repo } from "./entities/repos/Repo.ts";
+import { Repo, RepoBranch, RepoCommit, RepoFilesIndex } from "./entities/repos/index.ts";
 import { Job } from "./entities/jobs/Job.ts";
 import { SearchDocument } from "./entities/search/SearchDocument.ts";
 import { ModelCache } from "./entities/inference/ModelCache.ts";
@@ -95,6 +95,9 @@ export {
   Artifact,
   Edge,
   Repo,
+  RepoBranch,
+  RepoCommit,
+  RepoFilesIndex,
   Job,
   SearchDocument,
   ModelCache,
@@ -176,6 +179,9 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     Artifact,
     Edge,
     Repo,
+    RepoBranch,
+    RepoCommit,
+    RepoFilesIndex,
     Job,
     SearchDocument,
     ModelCache,
