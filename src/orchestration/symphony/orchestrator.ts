@@ -23,6 +23,12 @@ import {
   type LifecycleHooks,
   type LifecycleHookTimeoutConfig,
 } from "./hooks.ts";
+import type { WorkflowConfig } from "./schemas.ts";
+import {
+  startStallScanner,
+  type StallScannerHandle,
+  type StartStallScannerOptions,
+} from "./stall.ts";
 
 export { scanForStalledRuns, startStallScanner } from "./stall.ts";
 
@@ -43,6 +49,38 @@ export interface ClaimRunResult {
 export type AgentDispatch<T> = (ctx: LifecycleHookContext) => Promise<T>;
 
 const claimQueues = new Map<string, Promise<void>>();
+
+export interface SymphonyOrchestratorHandle {
+  stop: () => void;
+}
+
+export interface StartSymphonyOrchestratorOptions extends StartStallScannerOptions {
+  startStallScanner?: (
+    em: EntityManager,
+    orgId: string,
+    config: WorkflowConfig,
+    opts?: StartStallScannerOptions,
+  ) => StallScannerHandle;
+}
+
+export function startSymphonyOrchestrator(
+  em: EntityManager,
+  orgId: string,
+  config: WorkflowConfig,
+  opts: StartSymphonyOrchestratorOptions = {},
+): SymphonyOrchestratorHandle {
+  const {
+    startStallScanner: startScanner = startStallScanner,
+    ...scannerOpts
+  } = opts;
+  const stallScanner = startScanner(em, orgId, config, scannerOpts);
+
+  return {
+    stop: () => {
+      stallScanner.stop();
+    },
+  };
+}
 
 /**
  * Atomically transitions an unclaimed AgentRun to claimed state.

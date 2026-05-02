@@ -73,6 +73,13 @@ function actionFromProcedurePath(path: string): string {
     case "revoke":
     case "cancel":
     case "unregister":
+    case "claimRun":
+    case "fetchCandidateIssues":
+    case "fetchIssuesByStates":
+    case "fetchIssueStatesByIds":
+    case "getRun":
+    case "getWorkspacePath":
+    case "renderPromptPreview":
       return leaf;
     default:
       throw new TRPCError({

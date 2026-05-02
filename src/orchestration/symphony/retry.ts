@@ -38,9 +38,13 @@ export async function scheduleRetry(
 
   const now = opts.now?.() ?? new Date();
   const nextAttempt = run.attemptCount + 1;
-  const nextRetryAt = new Date(
-    now.getTime() + calcRetryDelay(nextAttempt, config.maxRetryBackoffMs),
-  );
+  const exhausted = nextAttempt >= config.maxAttempts;
+  const nextState = exhausted ? "failed" : "retry_queued";
+  const nextRetryAt = exhausted
+    ? null
+    : new Date(
+        now.getTime() + calcRetryDelay(nextAttempt, config.maxRetryBackoffMs),
+      );
   const fork = em.fork();
 
   await fork.transactional(async (tx) => {
@@ -55,7 +59,8 @@ export async function scheduleRetry(
         orchestrationState: run.orchestrationState,
       } as never,
       {
-        orchestrationState: "retry_queued",
+        orchestrationState: nextState,
+        ...(exhausted ? { status: "failed" } : {}),
         attemptCount: nextAttempt,
         nextRetryAt,
         lastErrorKind: error.kind,
@@ -69,7 +74,7 @@ export async function scheduleRetry(
       subjectKind: "agent_run",
       subjectId: run.id,
       verb: "state_changed",
-      payload: { from: run.orchestrationState, to: "retry_queued" },
+      payload: { from: run.orchestrationState, to: nextState },
       createdAt: now,
     });
 

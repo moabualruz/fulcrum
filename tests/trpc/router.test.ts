@@ -297,6 +297,40 @@ describe("assertPermission middleware", () => {
     expect(await caller.repos.unregister({ id: "repo-1" })).toBe("ok");
   });
 
+  it("maps orchestration procedure leaves for casbin-enabled callers", async () => {
+    const router = t.router({
+      orchestration: t.router({
+        fetchCandidateIssues: protectedProcedure.query(() => "fetchCandidateIssues-ok"),
+        getRun: protectedProcedure.query(() => "getRun-ok"),
+        fetchIssuesByStates: protectedProcedure.query(() => "fetchIssuesByStates-ok"),
+        fetchIssueStatesByIds: protectedProcedure.query(() => "fetchIssueStatesByIds-ok"),
+        getWorkspacePath: protectedProcedure.query(() => "getWorkspacePath-ok"),
+        renderPromptPreview: protectedProcedure.query(() => "renderPromptPreview-ok"),
+        claimRun: protectedProcedure.mutation(() => "claimRun-ok"),
+      }),
+    });
+    const caller = testCallerForRouter(
+      router,
+      casbinContainer([
+        { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "orchestration", v3: "fetchCandidateIssues" },
+        { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "orchestration", v3: "getRun" },
+        { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "orchestration", v3: "fetchIssuesByStates" },
+        { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "orchestration", v3: "fetchIssueStatesByIds" },
+        { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "orchestration", v3: "getWorkspacePath" },
+        { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "orchestration", v3: "renderPromptPreview" },
+        { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "orchestration", v3: "claimRun" },
+      ]),
+    );
+
+    expect(await caller.orchestration.fetchCandidateIssues()).toBe("fetchCandidateIssues-ok");
+    expect(await caller.orchestration.getRun()).toBe("getRun-ok");
+    expect(await caller.orchestration.fetchIssuesByStates()).toBe("fetchIssuesByStates-ok");
+    expect(await caller.orchestration.fetchIssueStatesByIds()).toBe("fetchIssueStatesByIds-ok");
+    expect(await caller.orchestration.getWorkspacePath()).toBe("getWorkspacePath-ok");
+    expect(await caller.orchestration.renderPromptPreview()).toBe("renderPromptPreview-ok");
+    expect(await caller.orchestration.claimRun()).toBe("claimRun-ok");
+  });
+
   it("fails closed when casbin is enabled for unmapped protected procedure leaf", async () => {
     const router = t.router({
       secure: t.router({

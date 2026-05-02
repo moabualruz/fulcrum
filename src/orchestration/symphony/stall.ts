@@ -25,10 +25,20 @@ export interface StallScannerHandle {
 
 export interface StartStallScannerOptions extends StallScanOptions {
   intervalMs?: number;
+  scanTimeoutMs?: number;
   scan?: typeof scanForStalledRuns;
   setInterval?: (fn: () => void, ms: number) => unknown;
   clearInterval?: (timer: unknown) => void;
+  setTimeout?: (fn: () => void, ms: number) => unknown;
+  clearTimeout?: (timer: unknown) => void;
   onError?: (error: unknown) => void;
+}
+
+export class StallScanTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Symphony stall scanner timed out after ${timeoutMs}ms`);
+    this.name = "StallScanTimeoutError";
+  }
 }
 
 export async function scanForStalledRuns(
@@ -71,6 +81,7 @@ export function startStallScanner(
   opts: StartStallScannerOptions = {},
 ): StallScannerHandle {
   const intervalMs = opts.intervalMs ?? 30_000;
+  const scanTimeoutMs = opts.scanTimeoutMs ?? intervalMs;
   const scan = opts.scan ?? scanForStalledRuns;
   const setTimer = opts.setInterval ??
     ((fn: () => void, ms: number) => globalThis.setInterval(fn, ms));
@@ -79,16 +90,38 @@ export function startStallScanner(
       globalThis.clearInterval(
         timer as ReturnType<typeof globalThis.setInterval>,
       ));
-  let inFlight: Promise<unknown> | null = null;
+  const setScanTimeout = opts.setTimeout ??
+    ((fn: () => void, ms: number) => globalThis.setTimeout(fn, ms));
+  const clearScanTimeout = opts.clearTimeout ??
+    ((timer: unknown) =>
+      globalThis.clearTimeout(
+        timer as ReturnType<typeof globalThis.setTimeout>,
+      ));
+  const onError = opts.onError ?? defaultScannerErrorHandler;
+  let inFlightId: number | null = null;
+  let scanSeq = 0;
 
   const tick = () => {
-    if (inFlight) return;
-    inFlight = scan(em, orgId, config, scheduleRetry, { now: opts.now })
+    if (inFlightId !== null) return;
+
+    const scanId = ++scanSeq;
+    inFlightId = scanId;
+    const timeout = scanTimeoutMs > 0
+      ? setScanTimeout(() => {
+          if (inFlightId !== scanId) return;
+          inFlightId = null;
+          reportScannerError(onError, new StallScanTimeoutError(scanTimeoutMs));
+        }, scanTimeoutMs)
+      : null;
+
+    scan(em, orgId, config, scheduleRetry, { now: opts.now })
       .catch((error) => {
-        opts.onError?.(error);
+        reportScannerError(onError, error);
       })
       .finally(() => {
-        inFlight = null;
+        if (inFlightId !== scanId) return;
+        inFlightId = null;
+        if (timeout !== null) clearScanTimeout(timeout);
       });
   };
 
@@ -98,6 +131,21 @@ export function startStallScanner(
       clearTimer(timer);
     },
   };
+}
+
+function defaultScannerErrorHandler(error: unknown): void {
+  console.error("fulcrum symphony stall scanner failed", error);
+}
+
+function reportScannerError(
+  onError: (error: unknown) => void,
+  error: unknown,
+): void {
+  try {
+    onError(error);
+  } catch (handlerError) {
+    defaultScannerErrorHandler(handlerError);
+  }
 }
 
 function toRunRef(run: AgentRun, fallbackOrgId: string): RunRef {

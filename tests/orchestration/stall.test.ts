@@ -1,9 +1,11 @@
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, mock, spyOn, test } from "bun:test";
 
 import type { RunRef, RetryError } from "../../src/orchestration/symphony/retry.ts";
+import { startSymphonyOrchestrator } from "../../src/orchestration/symphony/orchestrator.ts";
 import {
   scanForStalledRuns,
   startStallScanner,
+  type StallScannerHandle,
 } from "../../src/orchestration/symphony/stall.ts";
 import type { WorkflowConfig } from "../../src/orchestration/symphony/schemas.ts";
 
@@ -213,5 +215,102 @@ describe("startStallScanner", () => {
 
     handle.stop();
     expect(cleared).toEqual(["timer-1"]);
+  });
+
+  test("times out a hung scan and allows a later tick to run", async () => {
+    const fakeEm = makeFakeEm([]);
+    const ticks: Array<() => void> = [];
+    const timeouts: Array<() => void> = [];
+    const errors: unknown[] = [];
+    let scanCount = 0;
+    const scan = mock(async () => {
+      scanCount += 1;
+      if (scanCount === 1) return await new Promise<number>(() => {});
+      return 0;
+    });
+
+    startStallScanner(fakeEm as never, "org-1", DEFAULT_CONFIG, {
+      scan,
+      scanTimeoutMs: 50,
+      onError: (error) => errors.push(error),
+      setInterval: (fn) => {
+        ticks.push(fn);
+        return "timer-1";
+      },
+      clearInterval: () => {},
+      setTimeout: (fn, ms) => {
+        expect(ms).toBe(50);
+        timeouts.push(fn);
+        return `timeout-${timeouts.length}`;
+      },
+      clearTimeout: () => {},
+    });
+
+    ticks[0]!();
+    await Promise.resolve();
+    ticks[0]!();
+    expect(scan).toHaveBeenCalledTimes(1);
+
+    timeouts[0]!();
+    await Promise.resolve();
+    expect(errors[0]).toBeInstanceOf(Error);
+
+    ticks[0]!();
+    await Promise.resolve();
+    expect(scan).toHaveBeenCalledTimes(2);
+  });
+
+  test("logs scanner errors when no onError handler is supplied", async () => {
+    const fakeEm = makeFakeEm([]);
+    const ticks: Array<() => void> = [];
+    const consoleError = spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      startStallScanner(fakeEm as never, "org-1", DEFAULT_CONFIG, {
+        scan: mock(async () => {
+          throw new Error("scan failed");
+        }),
+        setInterval: (fn) => {
+          ticks.push(fn);
+          return "timer-1";
+        },
+        clearInterval: () => {},
+      });
+
+      ticks[0]!();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(String(consoleError.mock.calls[0]?.[0])).toContain(
+        "fulcrum symphony stall scanner failed",
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+});
+
+describe("startSymphonyOrchestrator", () => {
+  test("starts the stall scanner and stops it on shutdown", () => {
+    const fakeEm = makeFakeEm([]);
+    const starts: unknown[] = [];
+    const stops: string[] = [];
+
+    const handle = startSymphonyOrchestrator(
+      fakeEm as never,
+      "org-1",
+      DEFAULT_CONFIG,
+      {
+        startStallScanner: (...args): StallScannerHandle => {
+          starts.push(args);
+          return { stop: () => stops.push("stopped") };
+        },
+      },
+    );
+
+    expect(starts).toHaveLength(1);
+    handle.stop();
+    expect(stops).toEqual(["stopped"]);
   });
 });

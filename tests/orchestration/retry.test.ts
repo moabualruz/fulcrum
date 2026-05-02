@@ -148,6 +148,30 @@ describe("scheduleRetry", () => {
     expect(event["payload"]).toEqual({ from: "running", to: "retry_queued" });
   });
 
+  test("transitions to terminal failed when next attempt reaches maxAttempts", async () => {
+    const { fakeEm, runUpdates, emittedEvents } = makeFakeEm();
+
+    await scheduleRetry(
+      fakeEm as never,
+      { id: "run-1", orgId: "org-1", attemptCount: 2, orchestrationState: "running" },
+      { kind: "agent_error" },
+      { ...DEFAULT_CONFIG, maxAttempts: 3 },
+    );
+
+    expect(runUpdates).toHaveLength(1);
+    expect(runUpdates[0]!.update).toMatchObject({
+      orchestrationState: "failed",
+      status: "failed",
+      attemptCount: 3,
+      nextRetryAt: null,
+      lastErrorKind: "agent_error",
+    });
+    expect((emittedEvents[0] as Record<string, unknown>)["payload"]).toEqual({
+      from: "running",
+      to: "failed",
+    });
+  });
+
   test("does not emit event when state transition loses the race", async () => {
     const { fakeEm, emittedEvents } = makeFakeEm(0);
 
