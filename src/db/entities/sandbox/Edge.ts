@@ -32,7 +32,11 @@ export class Edge {
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
 
-  @ManyToOne(() => Org, { fieldName: "org_id", nullable: false })
+  @ManyToOne(() => Org, {
+    fieldName: "org_id",
+    nullable: false,
+    deleteRule: "cascade",
+  })
   org!: Org;
 
   @Property({ type: "string", fieldName: "from_kind" })

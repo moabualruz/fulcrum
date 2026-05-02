@@ -18,14 +18,20 @@ import { Org } from "../../../src/db/entities/auth/Org.ts";
 import { Task } from "../../../src/db/entities/tasks/Task.ts";
 import { AgentRun } from "../../../src/db/entities/orchestration/AgentRun.ts";
 
+const MIGRATION_NAME = "Migration20260502070500_artifacts_edges";
+const PREVIOUS_MIGRATION_NAME = "Migration20260502070400_agent_runs_sandcastle_columns";
+
 async function loadSandboxEntities() {
-  const [artifactModule, edgeModule] = await Promise.all([
+  const [artifactModule, compatArtifactModule, edgeModule] = await Promise.all([
     import("../../../src/db/entities/sandbox/Artifact.ts").catch(() => undefined),
+    import("../../../src/db/entities/artifacts/Artifact.ts").catch(() => undefined),
     import("../../../src/db/entities/sandbox/Edge.ts").catch(() => undefined),
   ]);
 
   expect(artifactModule).toBeDefined();
+  expect(compatArtifactModule).toBeDefined();
   expect(edgeModule).toBeDefined();
+  expect(compatArtifactModule!.Artifact).toBe(artifactModule!.Artifact);
 
   return {
     Artifact: artifactModule!.Artifact,
@@ -48,6 +54,20 @@ async function indexRows(
   return rows.rows;
 }
 
+async function foreignKeyRows(
+  db: Awaited<ReturnType<typeof createTestOrm>>,
+  names: readonly string[],
+) {
+  const quoted = names.map((name) => `'${name.replaceAll("'", "''")}'`).join(", ");
+  const rows = await db.pglite.query<{ conname: string; confdeltype: string }>(`
+    select conname, confdeltype
+    from pg_constraint
+    where conname in (${quoted})
+    order by conname
+  `);
+  return rows.rows;
+}
+
 describe("Artifact + Edge sandbox schema", () => {
   it("declares artifact and edge properties with org-scoped indexes", async () => {
     const { Artifact, Edge } = await loadSandboxEntities();
@@ -58,11 +78,17 @@ describe("Artifact + Edge sandbox schema", () => {
 
       expect(artifactMeta.tableName).toBe("artifacts");
       expect(artifactMeta.properties["org"]?.fieldNames).toEqual(["org_id"]);
+      expect((artifactMeta.properties["org"] as { deleteRule?: string })?.deleteRule)
+        .toBe("cascade");
       expect(artifactMeta.properties["run"]?.kind).toBe(ReferenceKind.MANY_TO_ONE);
       expect(artifactMeta.properties["run"]?.fieldNames).toEqual(["run_id"]);
+      expect((artifactMeta.properties["run"] as { deleteRule?: string })?.deleteRule)
+        .toBe("cascade");
       expect(artifactMeta.properties["task"]?.kind).toBe(ReferenceKind.MANY_TO_ONE);
       expect(artifactMeta.properties["task"]?.nullable).toBe(true);
       expect(artifactMeta.properties["task"]?.fieldNames).toEqual(["task_id"]);
+      expect((artifactMeta.properties["task"] as { deleteRule?: string })?.deleteRule)
+        .toBe("set null");
       expect(artifactMeta.properties["filename"]?.fieldNames).toEqual(["filename"]);
       expect(artifactMeta.properties["mime"]?.nullable).toBe(true);
       expect(artifactMeta.properties["sizeBytes"]?.fieldNames).toEqual(["size_bytes"]);
@@ -75,6 +101,8 @@ describe("Artifact + Edge sandbox schema", () => {
 
       expect(edgeMeta.tableName).toBe("edges");
       const edgeProperties = edgeMeta.properties as Record<string, { fieldNames?: string[] }>;
+      expect((edgeMeta.properties["org"] as { deleteRule?: string })?.deleteRule)
+        .toBe("cascade");
       for (const [property, fieldName] of Object.entries({
         org: "org_id",
         fromKind: "from_kind",
@@ -101,17 +129,34 @@ describe("Artifact + Edge sandbox schema", () => {
       const rows = await indexRows(db, [
         "artifacts_org_run",
         "artifacts_org_task",
+        "artifacts_run_fk",
+        "artifacts_task_fk",
         "edges_from_to_kind",
         "edges_to_lookup",
       ]);
       expect(rows.map((row) => row.indexname)).toEqual([
         "artifacts_org_run",
         "artifacts_org_task",
+        "artifacts_run_fk",
+        "artifacts_task_fk",
         "edges_from_to_kind",
         "edges_to_lookup",
       ]);
       expect(rows.find((row) => row.indexname === "edges_from_to_kind")?.indexdef)
         .toContain("UNIQUE");
+
+      const fks = await foreignKeyRows(db, [
+        "artifacts_org_id_foreign",
+        "artifacts_run_id_foreign",
+        "artifacts_task_id_foreign",
+        "edges_org_id_foreign",
+      ]);
+      expect(fks).toEqual([
+        { conname: "artifacts_org_id_foreign", confdeltype: "c" },
+        { conname: "artifacts_run_id_foreign", confdeltype: "c" },
+        { conname: "artifacts_task_id_foreign", confdeltype: "n" },
+        { conname: "edges_org_id_foreign", confdeltype: "c" },
+      ]);
 
       const em = db.em.fork();
       const org = em.getReference(Org, DEFAULT_ORG_ID);
@@ -164,6 +209,41 @@ describe("Artifact + Edge sandbox schema", () => {
       expect(savedEdge?.fromKind).toBe("artifact");
       expect(savedEdge?.toKind).toBe("agent_run");
       expect(savedEdge?.kind).toBe("generated_by");
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("backfills existing stub artifact rows before enforcing required columns", async () => {
+    const db = await createTestOrm();
+    try {
+      await db.orm.migrator.down({ to: PREVIOUS_MIGRATION_NAME });
+      const id = randomUUID();
+      await db.pglite.query(
+        `insert into artifacts (id, org_id, path) values ($1, $2, $3)`,
+        [id, DEFAULT_ORG_ID, "legacy/output.txt"],
+      );
+
+      await db.orm.migrator.up({ to: MIGRATION_NAME });
+
+      const rows = await db.pglite.query<{
+        filename: string;
+        run_id: string | null;
+        agent_name: string | null;
+      }>(
+        `
+          select a.filename, a.run_id, r.agent_name
+          from artifacts a
+          join agent_runs r on r.id = a.run_id
+          where a.id = $1
+        `,
+        [id],
+      );
+
+      expect(rows.rows).toHaveLength(1);
+      expect(rows.rows[0]!.filename).toBe("legacy/output.txt");
+      expect(rows.rows[0]!.run_id).not.toBeNull();
+      expect(rows.rows[0]!.agent_name).toBe("artifact-migration");
     } finally {
       await db.close();
     }

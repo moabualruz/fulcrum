@@ -898,6 +898,26 @@
         },
         {
           "columnNames": [
+            "run_id"
+          ],
+          "composite": false,
+          "constraint": false,
+          "keyName": "artifacts_run_fk",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "task_id"
+          ],
+          "composite": false,
+          "constraint": false,
+          "keyName": "artifacts_task_fk",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
             "id"
           ],
           "composite": false,
@@ -929,7 +949,8 @@
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.orgs"
+          "referencedTableName": "public.orgs",
+          "deleteRule": "cascade"
         },
         "artifacts_run_id_foreign": {
           "columnNames": [
@@ -940,7 +961,8 @@
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.agent_runs"
+          "referencedTableName": "public.agent_runs",
+          "deleteRule": "cascade"
         },
         "artifacts_task_id_foreign": {
           "columnNames": [
@@ -951,7 +973,8 @@
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.tasks"
+          "referencedTableName": "public.tasks",
+          "deleteRule": "set null"
         }
       },
       "comment": null
@@ -2843,7 +2866,8 @@
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.orgs"
+          "referencedTableName": "public.orgs",
+          "deleteRule": "cascade"
         }
       },
       "comment": null

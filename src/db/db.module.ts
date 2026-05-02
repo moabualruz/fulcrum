@@ -82,7 +82,7 @@ import { DocTemplateRepository } from "./repositories/docs/DocTemplateRepository
 import { MemoryRepository } from "./repositories/memory/MemoryRepository.ts";
 import { AgentRunRepository } from "./repositories/orchestration/AgentRunRepository.ts";
 import { RoutingRuleRepository } from "./repositories/router/RoutingRuleRepository.ts";
-import { ArtifactRepository } from "./repositories/artifacts/ArtifactRepository.ts";
+import { ArtifactRepository } from "./repositories/sandbox/ArtifactRepository.ts";
 import { EdgeRepository } from "./repositories/sandbox/EdgeRepository.ts";
 import { RepoRepository } from "./repositories/repos/RepoRepository.ts";
 import { JobRepository } from "./repositories/jobs/JobRepository.ts";

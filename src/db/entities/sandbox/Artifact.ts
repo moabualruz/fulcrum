@@ -16,7 +16,7 @@ import { OptionalProps } from "@mikro-orm/core";
 import { Org } from "../auth/Org.ts";
 import { AgentRun } from "../orchestration/AgentRun.ts";
 import { Task } from "../tasks/Task.ts";
-import { ArtifactRepository } from "../../repositories/artifacts/ArtifactRepository.ts";
+import { ArtifactRepository } from "../../repositories/sandbox/ArtifactRepository.ts";
 
 @Entity({ tableName: "artifacts", repository: () => ArtifactRepository })
 @Index({
@@ -42,13 +42,25 @@ export class Artifact {
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
 
-  @ManyToOne(() => Org, { fieldName: "org_id", nullable: false })
+  @ManyToOne(() => Org, {
+    fieldName: "org_id",
+    nullable: false,
+    deleteRule: "cascade",
+  })
   org!: Org;
 
-  @ManyToOne(() => AgentRun, { fieldName: "run_id", nullable: false })
+  @ManyToOne(() => AgentRun, {
+    fieldName: "run_id",
+    nullable: false,
+    deleteRule: "cascade",
+  })
   run!: AgentRun;
 
-  @ManyToOne(() => Task, { fieldName: "task_id", nullable: true })
+  @ManyToOne(() => Task, {
+    fieldName: "task_id",
+    nullable: true,
+    deleteRule: "set null",
+  })
   task?: Task;
 
   @Property({ type: "string" })
