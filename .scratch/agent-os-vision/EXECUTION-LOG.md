@@ -358,3 +358,40 @@ Implementers:
   019de6ae-64c9-78b0-9664-4aff8aacb946: codex-medium P9#03 simple-git wrapper
 ]
 Result: IN_PROGRESS — statuses flipped to in-progress before dispatch.
+
+## 2026-05-02T06:02:49Z — codex-orchestrator (post-push status sync)
+
+Commit:
+[
+  1a57c597 feat(agent-os): harden auth runtime foundations,
+  pushed to origin/plan/agent-os-vision
+]
+Status flips:
+[
+  01-foundation-reset/issues/05-better-auth-integration.md: completed -> needs-review,
+  01-foundation-reset/issues/06-trpc-core-router-and-permission-middleware.md: completed -> needs-review,
+  01-foundation-reset/issues/07-feature-flag-registry.md: completed -> needs-review,
+  01-foundation-reset/issues/09-auth-trpc-procedures-and-org-management.md: completed -> needs-review,
+  01-foundation-reset/issues/13-passkey-enrollment-and-login-flow.md: completed -> needs-review,
+  03-symphony-orchestration/issues/04-tracker-fetch-candidate-issues.md: completed -> needs-review
+]
+Review debt:
+[
+  reason: final hardening commit changed these issue surfaces after prior approvals,
+  required next step: opposite-runtime review before returning them to completed
+]
+Verification:
+[
+  gitleaks staged-diff pipe scan PASS — no leaks found,
+  bun run ci PASS — 12/12 stages, 1567 pass, 2 skip, 0 fail
+]
+State digest:
+[
+  issues: 341 total,
+  completed: 31,
+  needs-review: 6,
+  ready-for-agent: 304,
+  in-progress: 0,
+  blocked: 0
+]
+Result: REVIEW_DEBT_RECORDED.
