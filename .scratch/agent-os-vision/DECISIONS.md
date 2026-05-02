@@ -358,10 +358,24 @@ Replaces the original boolean. Future-proof. Default = `'project'` on insert whe
 - Env: `FULCRUM_FEATURES=router-llm,embeddings,real-time-collab-server` (case-insensitive parser; canonicalized to lowercase).
 - DB column `feature_flags.name text` UNIQUE per org. Zod regex `^[a-z][a-z0-9-]*$` enforced at registration.
 
+### D6. Execution mode → continuous dependency queue + mandatory cross-runtime review
+Locked: 2026-05-02 by user. Verbatim: "stop stopping and defining waves and act as if it is 1 big continues work till the end line" and "if tasks done by codex claude is reviewing and if tasks done by claude codex is reviewing".
+
+- Waves are planning history only. Execution is one continuous dependency queue from current state to final release.
+- Keep up to 6 implementation slots and up to 6 review slots active whenever dependencies allow. Refill slots immediately after an issue completes, blocks, or moves to review. Do not stop after artificial batches or wave boundaries.
+- The dependency DAG still controls safety: an issue is dispatchable only when its `Blocked-by:` issues are completed. "Wave" labels never block otherwise-ready work.
+- Mandatory cross-runtime loop:
+  - Claude implementer → Codex reviewer.
+  - Codex implementer → Claude reviewer.
+  - No self-review, no same-runtime final approval, no local-only implementation batch.
+- If the opposite reviewer is unavailable, the issue stays `Status: needs-review`; it cannot be marked `completed`.
+- On every resume, audit recent completed issues and `EXECUTION-LOG.md` for review provenance. Any issue without recorded opposite-runtime approval is review debt: move it back to `needs-review` or dispatch a retroactive opposite-runtime review before filling new implementation capacity.
+- CI failure pauses only the affected integration lane. Keep unrelated dispatchable issues moving while a debug slot fixes CI.
+
 ---
 
 ## Status: All gray-area questions resolved
-2026-05-01: Q1–Q38 (incl. Q29, Q30, Q31, Q32, Q34, Q35, Q36, Q38, Q-cross-cut, Q-sidecar-path, Q-governance) + auto-locks A1/A2/A4/A6 + C1–C4 (auto) + D1/D3/D4/D5 (auto) + foundational constraints C1–C5 all locked.
+2026-05-02: Q1–Q38 (incl. Q29, Q30, Q31, Q32, Q34, Q35, Q36, Q38, Q-cross-cut, Q-sidecar-path, Q-governance) + auto-locks A1/A2/A4/A6 + C1–C4 (auto) + D1/D3/D4/D5/D6 (auto) + foundational constraints C1–C5 all locked.
 Ready: technical-design retrofit on PRDs 1–12 + write PRDs 13–16 + remaining /to-issues + MASTER-PLAN + coverage check.
 
 ## Pending grill batches (none — all resolved)

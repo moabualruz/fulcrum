@@ -1,13 +1,15 @@
-w# Fulcrum Agent-OS — Resume / Execute Prompt
+# Fulcrum Agent-OS — Resume / Execute Prompt
 
 You (Claude or Codex) are the orchestrator. The user invoked you by `@`-referencing
 this file with no other arguments. Your job is to detect current state, plan the
-remaining work, and drive every issue to completion under strict TDD with
-maximum local 6 parallel subagents and 6 cross-team subagents (Claude impl ↔ Codex review,
-Codex impl ↔ Claude review). Accept interruptions: every step must persist
-state to disk so resuming again is idempotent. Maximize paralelisations,
-and use cross team if you face blockers or want to ask a question, Do not stop unless the
-user interrupt and keep going until all is done fully the whole agent-os-vision.
+remaining work, and drive every issue to completion under strict TDD as one
+continuous dependency queue. Keep up to 6 implementation subagents and up to 6
+opposite-runtime review subagents active whenever dependencies allow. Claude
+implementation MUST be reviewed by Codex; Codex implementation MUST be reviewed
+by Claude. Accept interruptions: every step must persist state to disk so
+resuming again is idempotent. Maximize parallelization, use cross-team agents for
+implementation and review, and do not stop unless the user interrupts or the
+whole agent-os-vision is fully complete.
 Only before you begin you can always use grill-with-docs to resolve any gray areas so we start focused. Questions to me are always to utilize interactive wizards and recommendations not free text responses, and document and gray areas as open questions and answers as decisions so we prserve both so in the future we d not face similar ambegiouty 
 
 Read this entire file before you act. Do not skip sections.
@@ -33,8 +35,10 @@ VISION (.scratch/agent-os-vision/VISION-GAPS.md, user verbatim ask + clarificati
 Every issue's frontmatter declares `PRD:`, `Requirements:`, `Decisions:`,
 `Vision:`, `Docs:` exactly so subagents do not have to re-derive context.
 
-The execution plan that orders pillars/issues into 6 waves with critical
-path + risk register lives in `.scratch/agent-os-vision/MASTER-PLAN.md`.
+The execution plan is a continuous dependency-lane plan with critical path +
+risk register in `.scratch/agent-os-vision/MASTER-PLAN.md`. Old milestone
+labels are historical context only; they must never stop otherwise-dispatchable
+work.
 
 The proof that every clause of the user's ask traces to a specific PRD +
 issue lives in `.scratch/agent-os-vision/COVERAGE.md` (current sign-off:
@@ -61,8 +65,12 @@ From `DECISIONS.md`:
   mentioned in the user's ask, OPEN-QUESTIONS, research, or DECISIONS.
   Anything mentioned must be either in `## Always-on features` or
   `## Gated features` with a `FULCRUM_FEATURES=<flag>` name.
+- **D6.** Execution is one continuous dependency queue. Keep implementation and
+  review slots filled until the finish line. Claude-implemented work requires
+  Codex review; Codex-implemented work requires Claude review. No same-runtime
+  final approval.
 
-If a subagent's work output violates any C1–C5, reject it and re-dispatch.
+If a subagent's work output violates any C1–C5 or D6, reject it and re-dispatch.
 
 ---
 
@@ -80,34 +88,42 @@ Run these checks in parallel (one Bash call per check):
    read the `issues/` directory, parse each issue's frontmatter, and bucket by:
    - `Status: ready-for-agent` (not started)
    - `Status: in-progress` (already claimed by a prior dispatch)
+   - `Status: needs-review` (implementation done; opposite-runtime review pending)
    - `Status: completed` (done)
    - `Status: blocked-needs-info`, `Status: needs-human` (HITL or stuck)
+6. Audit `EXECUTION-LOG.md` and recent commits for review provenance. Any
+   completed issue without explicit opposite-runtime approval is review debt:
+   move it to `Status: needs-review` or dispatch the missing reviewer before
+   filling new implementation slots.
 
 Compute per-pillar completion percentage. Report a one-screen status digest
 to the user before any dispatch.
 
 If `bun run ci` from repo root passes, note that. If not, the highest
-priority becomes "fix CI before resuming pillar work".
+priority becomes "fix CI" in one debug slot while unrelated dispatchable issues
+continue in other slots when safe.
 
 ---
 
-## Step 1 — Compute the next 6 dispatchable issues
+## Step 1 — Maintain the continuous dispatch queue
 
 For every `Status: ready-for-agent` issue across all pillars:
 
 1. Resolve its `Blocked-by:` frontmatter to issue paths.
 2. An issue is "dispatchable" iff every blocker is `Status: completed`.
-3. Among dispatchable issues, prefer the order from `MASTER-PLAN.md`'s
-   wave layout: Wave 1 issues before Wave 2 etc. Within a wave, prefer
-   the pillar with the lowest current completion percentage so progress
-   is balanced.
-4. Pick at most **6** issues. The 6 chosen issues become the parallel
-   batch.
+3. Among dispatchable issues, prefer:
+   - Critical-path blockers first.
+   - Issues that unlock the most blocked downstream work.
+   - The pillar with the lowest completion percentage when priority ties.
+   - HITL spikes early enough that dependent work is not starved.
+4. Fill every open implementation slot up to 6. This is not a batch boundary:
+   when any slot frees, immediately refill from the next dispatchable issue.
 
 For each chosen issue, decide:
 
-- **Implementation surface:** Claude subagent vs. Codex subagent (alternate
-  to keep the cross-review loop balanced — see Step 2).
+- **Implementation runtime:** Claude subagent vs. Codex subagent. Maintain a
+  real cross-team split; never let one runtime implement a whole pool alone
+  unless the other runtime is unavailable and that unavailability is logged.
 - **Model + effort:** pick per task complexity. Heuristic:
   - Small mechanical (pure helper, schema migration, a single
     well-bounded test file) → `haiku` (Claude) or `gpt-5-codex` low
@@ -118,11 +134,12 @@ For each chosen issue, decide:
     Symphony state machine, retriever tuning, Yjs collab) → `opus`
     (Claude) or `gpt-5-codex` high effort.
   - Architecture or schema-shape decisions that change cross-pillar
-    contracts → STOP and `AskUserQuestion` first; do not dispatch yet.
+    contracts → use the interactive question path for that issue only; keep
+    other independent queue slots moving.
 
 ---
 
-## Step 2 — Dispatch model (max 6 parallel + cross-review loops)
+## Step 2 — Dispatch model (continuous 6 impl + 6 review slots)
 
 You follow `superpowers:subagent-driven-development` and
 `fulcrum:subagent-orchestration` skills strictly.
@@ -134,11 +151,13 @@ Per chosen issue:
    `codex-orchestrator`). Persist immediately so an interrupt + resume
    does not double-dispatch the same issue.
 2. Decide implementer:
-   - If the issue's even-indexed in the batch → Claude implementer
-     (general-purpose subagent).
-   - If odd-indexed → Codex implementer (codex:codex-rescue subagent).
-   - This 50/50 split keeps the review loop balanced.
-3. Dispatch the implementer in parallel (one tool block, all 6 calls).
+   - Alternate runtimes across the continuous queue, not within artificial
+     batches.
+   - If both runtimes are available and more than one implementation slot is
+     open, dispatch at least one Claude implementer and at least one Codex
+     implementer.
+   - Record runtime in `EXECUTION-LOG.md` as `runtime: claude|codex`.
+3. Dispatch open implementation slots in parallel.
    Each implementer prompt MUST include the linkage-chain block from
    the top of this file PLUS:
    - The full body of the issue file.
@@ -154,22 +173,24 @@ Per chosen issue:
 
 4. When an implementer reports DONE:
    - Mark the issue `Status: needs-review` + persist.
-   - Dispatch the **opposite** review subagent: Claude implementer →
-     Codex review; Codex implementer → Claude review.
+   - Dispatch the **opposite-runtime** review subagent immediately:
+     Claude implementer → Codex reviewer; Codex implementer → Claude reviewer.
+   - Same-runtime review is invalid. Orchestrator self-review is invalid.
    - The reviewer prompt MUST include: pre-computed verification
      outputs (`bun run check`, the relevant `bun test` command output)
      so the reviewer doesn't hit sandbox EPERM false-negatives.
    - The reviewer reports SPEC: PASS|FAIL + QUALITY: APPROVED|
      CHANGES_REQUIRED.
-5. If review = APPROVED: mark `Status: completed` + commit if not
-   already + move on.
+5. If review = APPROVED from the opposite runtime: mark `Status: completed` +
+   commit if not already + refill the freed implementation/review slot.
 6. If review = CHANGES_REQUIRED: dispatch the SAME implementer subagent
    with the reviewer's findings. Loop until approved. Don't accept
    "close enough".
 
-7. After every batch of 6 completions, run `bun run ci` from repo root.
-   If it fails, dispatch a debug subagent to find + fix; pause new batches
-   until CI is green.
+7. Run focused tests for each issue before review and `bun run ci` after each
+   logical integration group or whenever shared contracts/migrations change. If
+   CI fails, keep one debug slot on CI and continue unrelated safe work only
+   when the failing area is isolated.
 
 ---
 
@@ -208,20 +229,24 @@ Every action persists state so an interrupted run can resume. Specifically:
   `.scratch/agent-os-vision/EXECUTION-LOG.md` (append-only). Each entry:
   ```
   ## <timestamp> — <orchestrator>
-  Batch: [issue-path-1, issue-path-2, …]
+  Queue fill: [issue-path-1, issue-path-2, …]
   Implementers: [agent-id-1: claude-sonnet, agent-id-2: codex-medium, …]
-  Reviewers (when dispatched): [agent-id-3: codex-low, …]
-  Result: [issue-path: COMPLETED@<sha>, issue-path: BLOCKED reason: …]
+  Reviewers: [issue-path-1: codex-reviewer-for-claude-impl, issue-path-2: claude-reviewer-for-codex-impl, …]
+  Review provenance: [issue-path: impl=claude review=codex APPROVED@<sha>, …]
+  Result: [issue-path: COMPLETED@<sha>, issue-path: NEEDS_REVIEW, issue-path: BLOCKED reason: …]
   ```
-- On resume: read EXECUTION-LOG.md tail to detect any in-flight batches
-  before computing the next batch (Step 1).
+- On resume: read EXECUTION-LOG.md tail to detect in-flight implementation,
+  review debt, and blocked HITL items before filling queue slots (Step 1).
 
 ---
 
-## Step 5 — Loop until done
+## Step 5 — Continuous loop until done
 
 Continue Steps 1–4 until ALL 341 issues are `Status: completed` AND
 `bun run ci` is 9/9 green AND the COVERAGE.md sign-off remains PASS.
+Do not stop at old milestone boundaries, six-issue batch boundaries, or "good enough"
+milestones. Only stop for user interruption, unresolved HITL that blocks every
+remaining dispatchable path, or final completion.
 
 When done:
 
@@ -244,10 +269,14 @@ If interrupted at any point:
   same order.
 - Step 0 detects the in-flight in-progress issues from frontmatter +
   EXECUTION-LOG.md.
+- Step 0 audits completed issues for missing opposite-runtime review and
+  creates/re-dispatches review work before new implementation work.
 - Step 1 excludes any `Status: in-progress` issue whose `Owner:` is
   the SAME orchestrator and was claimed within the last 30 minutes
   (assumes it's still running). After 30 minutes of no commit/log
   update, the orchestrator re-dispatches with `--resume` to recover.
+- `Status: needs-review` issues never get skipped. They take review-slot
+  priority until opposite-runtime review is recorded.
 - No partial PR/commit must be left dangling. Implementer subagents
   always commit + log before reporting DONE.
 
@@ -288,7 +317,7 @@ TDD DISCIPLINE (implementer):
 4. Commit on the current branch with subject:
    `<type>(<scope>): <subject>` (Conventional Commits).
    Body cites RED + GREEN + Closes (issue): <ISSUE_PATH>.
-5. DO NOT push (orchestrator pushes after batch closes).
+5. DO NOT push (orchestrator pushes after final integration / explicit user ask).
 6. Mark `Status:` updates on the issue file via Edit BEFORE you
    commit. Update EXECUTION-LOG.md last.
 
@@ -312,7 +341,9 @@ DECISIONS FLAGGED (if any): <items where you propose a PRD addendum>
 For the **reviewer** subagent, the template flips to "validate the diff
 matches the issue's acceptance criteria; cite SPEC: PASS|FAIL + QUALITY:
 APPROVED|CHANGES_REQUIRED with line/file references; do not modify
-files".
+files". The reviewer runtime MUST be opposite the implementer runtime. If
+runtime provenance is missing, the reviewer rejects the process and asks the
+orchestrator to re-run the correct opposite-runtime review.
 
 ---
 
@@ -323,6 +354,9 @@ files".
   test` outputs in the orchestrator's shell and paste them into the
   reviewer's prompt as "PRE-COMPUTED VERIFICATION (use as ground truth
   — do NOT re-run)". Codex's sandbox can't write `.svelte-kit/` etc.
+- Claude reviewers must receive the same pre-computed verification plus
+  `git show <sha>` for Codex-implemented work. Do not rely on reviewer-local
+  sandbox commands as the only proof.
 - Use `AskUserQuestion` (Claude) only for items not already locked in
   DECISIONS.md. Do not ask the user about a decision they already
   resolved in OPEN-QUESTIONS.md.
@@ -335,6 +369,7 @@ files".
 ## Acceptance criteria for "done"
 
 - [ ] All 341 issues `Status: completed`.
+- [ ] Every completed issue has logged opposite-runtime review provenance.
 - [ ] `bun run ci` from repo root: 9/9 (or higher per Pillar 14 cli stage)
       green.
 - [ ] COVERAGE.md sign-off line still reads `Sign-off: PASS`.
@@ -346,12 +381,10 @@ files".
 
 ## Begin now
 
-Start with Step 0 (state detection). Report the digest to the user.
-Then move to Step 1 + Step 2 without waiting for further input — the
-user already authorized the full execution loop by referencing this
-file. Continue until done OR until you encounter a HITL gate (passkey
-UX in Pillar 1, TipTap Svelte 5 spike in Pillar 7, governance docs
-review in Pillar 17). When you hit a HITL gate, surface the question
-to the user via `AskUserQuestion`, persist state, and pause that
-specific issue until the user answers — but keep dispatching other
-non-blocked issues in parallel.
+Start with Step 0 (state detection + review-debt audit). Report the digest to
+the user. Then move to Step 1 + Step 2 without waiting for further input — the
+user already authorized the full continuous execution loop by referencing this
+file. Continue until done. When you hit a HITL gate (passkey UX in Pillar 1,
+TipTap Svelte 5 spike in Pillar 7, governance docs review in Pillar 17),
+surface the question via the interactive question path, persist state, and pause
+that specific issue only; keep all other non-blocked queue slots moving.
