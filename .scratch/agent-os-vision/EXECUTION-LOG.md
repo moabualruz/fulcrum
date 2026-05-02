@@ -157,3 +157,26 @@ Verification:
   inference/scripts/smoke.sh PASS — version, stdio, delayed stdio, socket health
 ]
 Result: WAVE_2_FINAL_VERIFICATION_PASS.
+
+## 2026-05-02T02:27:56Z — codex-orchestrator (Wave 3 batch claimed)
+
+Selection:
+[
+  issues: 341 total,
+  dispatchable: 35,
+  unresolved_stale_blocker_labels: 18
+]
+Skipped for this batch:
+[
+  03-symphony-orchestration/issues/05-tracker-fetch-by-states.md — likely tracker adapter ownership overlap with P3#04
+]
+Batch:
+[
+  02-inference-sidecar/issues/02-ts-client-and-lifecycle.md,
+  02-inference-sidecar/issues/03-inference-cache-schema.md,
+  03-symphony-orchestration/issues/04-tracker-fetch-candidate-issues.md,
+  03-symphony-orchestration/issues/07-workspace-management.md,
+  03-symphony-orchestration/issues/08-prompt-template-renderer.md,
+  03-symphony-orchestration/issues/10-retry-backoff-stall-detection.md
+]
+Result: IN_PROGRESS — statuses flipped to in-progress before dispatch.
