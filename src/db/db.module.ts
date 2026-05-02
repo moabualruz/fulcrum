@@ -42,6 +42,7 @@ import { Task } from "./entities/tasks/Task.ts";
 import { Document } from "./entities/docs/Document.ts";
 import { Memory } from "./entities/memory/Memory.ts";
 import { AgentRun } from "./entities/orchestration/AgentRun.ts";
+import { RoutingRule } from "./entities/router/RoutingRule.ts";
 import { Artifact } from "./entities/artifacts/Artifact.ts";
 import { Repo } from "./entities/repos/Repo.ts";
 import { Job } from "./entities/jobs/Job.ts";
@@ -68,6 +69,7 @@ import { TaskRepository } from "./repositories/tasks/TaskRepository.ts";
 import { DocumentRepository } from "./repositories/docs/DocumentRepository.ts";
 import { MemoryRepository } from "./repositories/memory/MemoryRepository.ts";
 import { AgentRunRepository } from "./repositories/orchestration/AgentRunRepository.ts";
+import { RoutingRuleRepository } from "./repositories/router/RoutingRuleRepository.ts";
 import { ArtifactRepository } from "./repositories/artifacts/ArtifactRepository.ts";
 import { RepoRepository } from "./repositories/repos/RepoRepository.ts";
 import { JobRepository } from "./repositories/jobs/JobRepository.ts";
@@ -96,6 +98,7 @@ export {
   DocumentRepository,
   MemoryRepository,
   AgentRunRepository,
+  RoutingRuleRepository,
   ArtifactRepository,
   RepoRepository,
   JobRepository,
@@ -187,6 +190,10 @@ export function registerDbBindings(container: Container, orm: MikroORM): void {
   container.bind({
     provide: AgentRunRepository,
     useFactory: () => em.getRepository(AgentRun) as AgentRunRepository,
+  });
+  container.bind({
+    provide: RoutingRuleRepository,
+    useFactory: () => em.getRepository(RoutingRule) as RoutingRuleRepository,
   });
   container.bind({
     provide: ArtifactRepository,
