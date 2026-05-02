@@ -16,10 +16,17 @@ export interface InferenceRunning {
   socketPath: string;
 }
 
+export interface InferenceCacheStats {
+  db_path: string;
+  embed_rows: number;
+  gen_rows: number;
+}
+
 export interface InferenceStatus {
   status: "ok" | "down";
   pid?: number;
   socketPath: string;
+  cache?: InferenceCacheStats;
 }
 
 export interface InferenceStopResult {
@@ -184,6 +191,7 @@ export class InferenceLifecycle {
       stdout: "ignore",
       stderr: "ignore",
     });
+    proc.unref();
     const pid = proc.pid;
     await writeFile(this.pidFilePath, `${pid}\n`, "utf8");
 

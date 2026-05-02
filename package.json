@@ -15,6 +15,7 @@
     "test": "bun test",
     "lint": "bun run --bun tsc --noEmit",
     "ci": "bun run scripts/ci.ts",
+    "migrate:test": "bun test src/db/inference-schema.test.ts",
     "changelog": "git-cliff -o CHANGELOG.md",
     "compress": "bun run src/index.ts compress",
     "release": "bun run scripts/release.ts",

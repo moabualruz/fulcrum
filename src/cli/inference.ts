@@ -105,6 +105,7 @@ async function runStatus(
     status: health?.status ?? state.status,
     pid: state.pid,
     socketPath: state.socketPath,
+    cache: state.cache ?? health?.cache,
     health,
   };
 

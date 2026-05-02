@@ -52,6 +52,8 @@ import { Repo } from "./entities/repos/Repo.ts";
 import { Job } from "./entities/jobs/Job.ts";
 import { SearchDocument } from "./entities/search/SearchDocument.ts";
 import { FulcrumSkill } from "./entities/skills/FulcrumSkill.ts";
+import { ModelCache } from "./entities/inference/ModelCache.ts";
+import { ProviderCredential } from "./entities/inference/ProviderCredential.ts";
 
 // Flag-stub entities (P1#03 — gated by later pillars' feature flags)
 import { CasbinRule } from "./entities/flags/CasbinRule.ts";
@@ -84,6 +86,8 @@ import { RepoRepository } from "./repositories/repos/RepoRepository.ts";
 import { JobRepository } from "./repositories/jobs/JobRepository.ts";
 import { SearchDocumentRepository } from "./repositories/search/SearchDocumentRepository.ts";
 import { FulcrumSkillRepository } from "./repositories/skills/FulcrumSkillRepository.ts";
+import { ModelCacheRepository } from "./repositories/inference/ModelCacheRepository.ts";
+import { ProviderCredentialRepository } from "./repositories/inference/ProviderCredentialRepository.ts";
 
 // Flag-stub repositories
 import { CasbinRuleRepository } from "./repositories/flags/CasbinRuleRepository.ts";
@@ -118,6 +122,8 @@ export {
   JobRepository,
   SearchDocumentRepository,
   FulcrumSkillRepository,
+  ModelCacheRepository,
+  ProviderCredentialRepository,
   CasbinRuleRepository,
   WebhookSubscriptionRepository,
   NotificationRuleRepository,
@@ -246,6 +252,15 @@ export function registerDbBindings(container: Container, orm: MikroORM): void {
   container.bind({
     provide: FulcrumSkillRepository,
     useFactory: () => em.getRepository(FulcrumSkill) as FulcrumSkillRepository,
+  });
+  container.bind({
+    provide: ModelCacheRepository,
+    useFactory: () => em.getRepository(ModelCache) as ModelCacheRepository,
+  });
+  container.bind({
+    provide: ProviderCredentialRepository,
+    useFactory: () =>
+      em.getRepository(ProviderCredential) as ProviderCredentialRepository,
   });
 
   // Flag-stub repositories (P1#03 — CasbinRule, WebhookSubscription, NotificationRule).

@@ -29,10 +29,19 @@ pub struct RpcError {
 }
 
 #[derive(Debug, Serialize)]
+pub struct CacheStats {
+    pub db_path: String,
+    pub embed_rows: i64,
+    pub gen_rows: i64,
+}
+
+#[derive(Debug, Serialize)]
 pub struct HealthResult {
     pub status: String,
     pub backends: Vec<String>,
     pub models: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache: Option<CacheStats>,
 }
 
 impl Response {
@@ -83,6 +92,7 @@ mod tests {
             status: "ok".to_string(),
             backends: vec![],
             models: vec![],
+            cache: None,
         };
         let val: Value = serde_json::to_value(&hr).unwrap();
         assert_eq!(val["status"], "ok");
@@ -96,6 +106,7 @@ mod tests {
             status: "ok".to_string(),
             backends: vec![],
             models: vec![],
+            cache: None,
         };
         let resp = Response::success(Some(json!(1)), hr);
         let val: Value = serde_json::to_value(&resp).unwrap();

@@ -18,8 +18,10 @@ import {
   ManyToOne,
   Index,
 } from "@mikro-orm/decorators/es";
+import { OptionalProps } from "@mikro-orm/core";
 import { Org } from "../auth/Org.ts";
 import { MemoryRepository } from "../../repositories/memory/MemoryRepository.ts";
+import { VectorType } from "../../types/VectorType.ts";
 
 @Entity({ tableName: "memories", repository: () => MemoryRepository })
 @Index({
@@ -27,6 +29,8 @@ import { MemoryRepository } from "../../repositories/memory/MemoryRepository.ts"
   properties: ["org", "kind"],
 })
 export class Memory {
+  [OptionalProps]?: "embedding";
+
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
 
@@ -36,4 +40,7 @@ export class Memory {
   /** Memory bucket: "doc", "task", "chat", "embedding", … (set by Pillar 8). */
   @Property({ type: "string" })
   kind!: string;
+
+  @Property({ type: VectorType, length: 384, nullable: true })
+  embedding?: number[];
 }

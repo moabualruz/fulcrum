@@ -1,5 +1,9 @@
-use inference_core::protocol::{HealthResult, Request, Response};
+mod cache;
+
+use cache::CacheStore;
+use inference_core::protocol::{CacheStats, HealthResult, Request, Response};
 use std::env;
+use std::path::PathBuf;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixListener;
 
@@ -15,6 +19,11 @@ async fn main() {
     }
 
     let home = env::var("FULCRUM_HOME").ok();
+    if let Some(path) = cache_path(home.as_deref()) {
+        if let Err(error) = CacheStore::open(&path) {
+            eprintln!("warn: cache bootstrap failed ({}): {}", path.display(), error);
+        }
+    }
     match choose_transport(&args, stdin_is_stream(), home.as_deref()) {
         Transport::Socket(path) => {
             // Remove stale socket from a previous run.
@@ -53,6 +62,12 @@ fn choose_transport(args: &[String], stdin_stream: bool, fulcrum_home: Option<&s
         Some(home) => Transport::Socket(format!("{}/inference.sock", home)),
         None => Transport::Stdio,
     }
+}
+
+fn cache_path(fulcrum_home: Option<&str>) -> Option<PathBuf> {
+    fulcrum_home
+        .filter(|h| !h.is_empty())
+        .map(|home| PathBuf::from(home).join("inference-cache.db"))
 }
 
 #[cfg(unix)]
@@ -197,16 +212,38 @@ fn dispatch(req: Request) -> Response {
                 status: "ok".to_string(),
                 backends: vec![],
                 models: vec![],
+                cache: health_cache_stats(),
             },
         ),
         _ => Response::method_not_found(req.id),
     }
 }
 
+fn health_cache_stats() -> Option<CacheStats> {
+    let path = cache_path(env::var("FULCRUM_HOME").ok().as_deref())?;
+    let store = CacheStore::open(&path).ok()?;
+    let stats = store.stats().ok()?;
+    Some(CacheStats {
+        db_path: stats.db_path,
+        embed_rows: stats.embed_rows,
+        gen_rows: stats.gen_rows,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cache::{CacheStore, EmbedCacheEntry, GenerateCacheEntry};
     use serde_json::json;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_cache_path(name: &str) -> std::path::PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("fulcrum-{name}-{unique}.db"))
+    }
 
     #[test]
     fn dispatch_health_returns_ok_shape() {
@@ -279,5 +316,55 @@ mod tests {
             choose_transport(&args, false, Some("/tmp/fulcrum")),
             Transport::Socket("/tmp/fulcrum/inference.sock".to_string())
         );
+    }
+
+    #[test]
+    fn cache_store_round_trips_embed_and_generate_entries_with_ttl() {
+        let path = temp_cache_path("cache-roundtrip");
+        let store = CacheStore::open(&path).unwrap();
+        let now = CacheStore::now_epoch_seconds();
+
+        let embed = EmbedCacheEntry {
+            model: "bge-small-en-v1.5".to_string(),
+            input_hash: "embed-hash".to_string(),
+            dims: 3,
+            vector: vec![0.1, 0.2, 0.3],
+            expires_at: now + 60,
+        };
+        store.put_embed(&embed).unwrap();
+        assert_eq!(store.get_embed("bge-small-en-v1.5", "embed-hash").unwrap(), Some(embed));
+
+        let expired_embed = EmbedCacheEntry {
+            model: "bge-small-en-v1.5".to_string(),
+            input_hash: "old-embed".to_string(),
+            dims: 3,
+            vector: vec![0.0, 0.0, 0.0],
+            expires_at: now - 1,
+        };
+        store.put_embed(&expired_embed).unwrap();
+        assert_eq!(store.get_embed("bge-small-en-v1.5", "old-embed").unwrap(), None);
+
+        let gen = GenerateCacheEntry {
+            model: "qwen2.5-0.5b".to_string(),
+            prompt_hash: "prompt-hash".to_string(),
+            options_hash: "options-hash".to_string(),
+            text: "Paris".to_string(),
+            tokens: 1,
+            expires_at: now + 60,
+        };
+        store.put_generate(&gen).unwrap();
+        assert_eq!(
+            store
+                .get_generate("qwen2.5-0.5b", "prompt-hash", "options-hash")
+                .unwrap(),
+            Some(gen)
+        );
+
+        let stats = store.stats().unwrap();
+        assert_eq!(stats.db_path, path.to_string_lossy());
+        assert_eq!(stats.embed_rows, 1);
+        assert_eq!(stats.gen_rows, 1);
+
+        let _ = std::fs::remove_file(path);
     }
 }

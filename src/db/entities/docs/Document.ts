@@ -17,6 +17,7 @@ import { OptionalProps } from "@mikro-orm/core";
 import { Org } from "../auth/Org.ts";
 import { DocumentRepository } from "../../repositories/docs/DocumentRepository.ts";
 import type { DocType, Scope } from "./enums.ts";
+import { VectorType } from "../../types/VectorType.ts";
 
 @Entity({ tableName: "documents", repository: () => DocumentRepository })
 @Index({
@@ -52,6 +53,7 @@ export class Document {
     | "sortPosition"
     | "archived"
     | "externalId"
+    | "embedding"
     | "updatedAt";
 
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
@@ -104,6 +106,9 @@ export class Document {
 
   @Property({ type: "string", fieldName: "external_id", nullable: true })
   externalId: string | null = null;
+
+  @Property({ type: VectorType, length: 384, nullable: true })
+  embedding?: number[];
 
   @Property({ type: "datetime", fieldName: "updated_at", defaultRaw: "now()" })
   updatedAt!: Date;

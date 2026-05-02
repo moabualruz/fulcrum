@@ -19,8 +19,10 @@ import {
   ManyToOne,
   Index,
 } from "@mikro-orm/decorators/es";
+import { OptionalProps } from "@mikro-orm/core";
 import { Org } from "../auth/Org.ts";
 import { SearchDocumentRepository } from "../../repositories/search/SearchDocumentRepository.ts";
+import { VectorType } from "../../types/VectorType.ts";
 
 @Entity({
   tableName: "search_documents",
@@ -31,6 +33,8 @@ import { SearchDocumentRepository } from "../../repositories/search/SearchDocume
   properties: ["org", "entityKind", "entityId"],
 })
 export class SearchDocument {
+  [OptionalProps]?: "embedding";
+
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
 
@@ -44,4 +48,7 @@ export class SearchDocument {
   /** Source entity ID (UUID of the row in its native table). */
   @Property({ type: "string", fieldName: "entity_id" })
   entityId!: string;
+
+  @Property({ type: VectorType, length: 384, nullable: true })
+  embedding?: number[];
 }

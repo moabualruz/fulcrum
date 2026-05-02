@@ -26,6 +26,11 @@ export const HealthResultSchema = z.object({
   status: z.string(),
   backends: z.array(z.string()),
   models: z.array(z.string()),
+  cache: z.object({
+    db_path: z.string(),
+    embed_rows: z.number().int().nonnegative(),
+    gen_rows: z.number().int().nonnegative(),
+  }).optional(),
 });
 
 export const InferenceErrorSchema = z.object({

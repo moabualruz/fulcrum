@@ -44,6 +44,8 @@ import { Artifact } from "./entities/artifacts/Artifact.ts";
 import { Repo } from "./entities/repos/Repo.ts";
 import { Job } from "./entities/jobs/Job.ts";
 import { SearchDocument } from "./entities/search/SearchDocument.ts";
+import { ModelCache } from "./entities/inference/ModelCache.ts";
+import { ProviderCredential } from "./entities/inference/ProviderCredential.ts";
 
 // Flag-stub entities (P1#03 — gated behind feature flags by later pillars).
 import { CasbinRule } from "./entities/flags/CasbinRule.ts";
@@ -86,6 +88,8 @@ export {
   Repo,
   Job,
   SearchDocument,
+  ModelCache,
+  ProviderCredential,
   CasbinRule,
   WebhookSubscription,
   NotificationRule,
@@ -151,6 +155,8 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     Repo,
     Job,
     SearchDocument,
+    ModelCache,
+    ProviderCredential,
     CasbinRule,
     WebhookSubscription,
     NotificationRule,

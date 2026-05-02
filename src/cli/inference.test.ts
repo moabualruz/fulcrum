@@ -4,6 +4,11 @@ import { run } from "./inference.ts";
 import type { HealthResult } from "../inference/protocol.ts";
 
 const health: HealthResult = { status: "ok", backends: ["embedded"], models: [] };
+const cache = {
+  db_path: "/tmp/fulcrum/inference-cache.db",
+  embed_rows: 2,
+  gen_rows: 1,
+};
 
 function capture() {
   const lines: string[] = [];
@@ -55,7 +60,12 @@ describe("fulcrum inference CLI", () => {
     await run(["status", "--json"], {
       ...cap.opts,
       lifecycle: {
-        status: async () => ({ status: "ok", pid: 42, socketPath: "/tmp/fulcrum/inference.sock" }),
+        status: async () => ({
+          status: "ok",
+          pid: 42,
+          socketPath: "/tmp/fulcrum/inference.sock",
+          cache,
+        }),
       },
       client: {
         call: async () => health,
@@ -65,6 +75,7 @@ describe("fulcrum inference CLI", () => {
     const payload = JSON.parse(cap.lines.join("\n"));
     expect(payload.status).toBe("ok");
     expect(payload.health.status).toBe("ok");
+    expect(payload.cache).toEqual(cache);
   });
 
   test("stop confirms socket removal", async () => {
