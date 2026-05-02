@@ -43,7 +43,7 @@ export interface DoctorCheckResult {
  * Convention: numeric timestamp portion of the migration filename.
  * Pillar 14's doctor aggregator compares this against schema_migrations.MAX(version).
  */
-export const MAX_KNOWN_MIGRATION_VERSION = 20260501140000;
+export const MAX_KNOWN_MIGRATION_VERSION = 20260502050000;
 
 /**
  * db.migrationVersion — returns the highest applied migration version + name.
