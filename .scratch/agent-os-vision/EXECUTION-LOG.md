@@ -1128,3 +1128,29 @@ Issue status normalization:
 ]
 
 Result: downstream blockers can treat these as implemented while next integration review gate retains approval debt.
+
+## 2026-05-02T11:30:46Z — codex-orchestrator (dispatch wave after clean CI)
+
+State:
+[
+  branch: plan/agent-os-vision,
+  head_before_dispatch: 63967b47,
+  full_ci: PASS on head ancestry after integration fixes,
+  issue_buckets: { completed: 34, implemented: 15, ready_for_agent: 292 }
+]
+
+Claimed for next worker wave:
+[
+  06-tasks-and-scrum/issues/02-sprints-schema.md — one migration lane only; owns Sprint entity/migration/tests,
+  05-router-and-skills/issues/05-routing-telemetry.md — router telemetry/event lane,
+  03-symphony-orchestration/issues/09-lifecycle-hooks.md — Symphony hooks lane,
+  14-cli-codegen/issues/12-keybindings-registry.md — keybindings schema/defaults lane,
+  02-inference-sidecar/issues/05-embed-operation.md — inference embed operation lane
+]
+
+Underfilled reason:
+[
+  keeping only one DB migration/snapshot lane active to avoid migration ordering conflicts,
+  skipping P7 TipTap HITL spike until current long-running code workers are launched because it can require dependency fallback/user verdict,
+  skipping P14 watch/json while P13 websocket subscriptions are still unimplemented to avoid cross-worker transport contract drift
+]

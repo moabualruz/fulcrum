@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: 02-inference-sidecar
 Blocked-by: 03-inference-cache-schema, 04-trpc-procedures-and-health-surface
