@@ -1808,6 +1808,51 @@ Claim:
 
 Result: READY_TO_DISPATCH.
 
+## 2026-05-02T19:30:41Z — codex-orchestrator (held lanes and fixbacks)
+
+Capacity: claude_impl=2/6 codex_impl=1/6 claude_review=0/6 codex_review=0/6
+
+Queue fill:
+[
+  p3-retry-stall-fixback,
+  p7-doc-template-seeds-fixback,
+  b072-context-assembler-fixback
+]
+
+Underfilled reason:
+[
+  active protected G0/P1 gate freezes schema/auth/permission/tRPC middleware/context surfaces,
+  P17/P3/P7 touch frozen surfaces and are verified-held or in fixback,
+  B068 overlaps active P7 docs route worktree,
+  B072 core service returned but context.preview tRPC remains deferred by router freeze
+]
+
+Implemented queue:
+[
+  p17-secrets-vault: impl=claude sha=3ccee6a9e5db,56ac397c32c0 gate=P17-cross-cutting held; verification=38 secrets/credentials pass, 41 router/casbin/codegen pass, lint pass, gitleaks pass; hold_reason=frozen auth/permission/codegen/router surfaces,
+  p3-retry-stall: impl=claude sha=9c09d4dec742,e6b426434b64 gate=P3-orchestration fixback; verification=80 pass, lint pass, compress check pass; blocker=API review found omitted max_retry_backoff_ms default changed 300000ms to 3600000ms,
+  p7-doc-template-seeds: impl=claude sha=94068be18c8e,e8ff7710 gate=P7-docs fixback; parent_verification=53 pass, 43 pass, web route 2 pass, lint pass, web check 0 errors/2 existing warnings; blocker=TUI new-doc placeholder traps q/Escape/Ctrl-C when caller.docs absent,
+  b072-context-assembler: impl=codex sha=a6a50331e5e93810d1c4f58245d28263d1b6610c gate=P8-context fixback; parent_verification=29 pass, lint pass; blocker=real Task lazy fields customFields/sprint/externalId not loaded by populate:[org], fake tests hid query/project/doc-link loss
+]
+
+Gate reviewers:
+[
+  p3-reliability=019dea22-f1a9-7850-9db9-586a02a5bb74 clean,
+  p3-data=019dea23-121d-7931-a401-5e4caa4a47d6 clean,
+  p3-contract-review=019dea23-2e01-7a03-bd99-43116b87fb03 changes_required default compatibility,
+  p7-contract-review=019dea26-0b56-7d00-8049-fd9dcebb1068 clean,
+  p7-data=019dea26-29c8-7140-93df-156ce5c6a68c clean,
+  p7-correctness=019dea25-ed5c-7de1-837f-20ddc4a416b9 changes_required TUI placeholder escape
+]
+
+Result:
+[
+  p3-retry-stall: FIXBACK_SENT to 019dea05-b250-7f62-9556-5db560d9135a,
+  p7-doc-template-seeds: FIXBACK_SENT to 019dea05-dae2-7500-ac31-b97656a49a83,
+  b072-context-assembler: FIXBACK_SENT to 019dea1c-775b-7410-9588-a981390df7fd,
+  completed reviewer threads closed to recover subagent capacity
+]
+
 ## 2026-05-02T19:14:10Z — codex-orchestrator (b072 context assembler dispatched)
 
 Implementer:
