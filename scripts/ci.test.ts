@@ -48,3 +48,17 @@ describe("ci STEPS — web:e2e opt-in", () => {
     expect(steps).toHaveLength(0);
   });
 });
+
+describe("ci STEPS — Symphony SPEC lock gate", () => {
+  it("includes focused symphony:lock step before the broad test suite", () => {
+    const names = STEPS.map((s) => s.name);
+    expect(names).toContain("symphony:lock");
+    expect(names.indexOf("symphony:lock")).toBeLessThan(names.indexOf("test"));
+  });
+
+  it("symphony:lock runs the focused SPEC lock test", () => {
+    const step = STEPS.find((s) => s.name === "symphony:lock");
+    expect(step).toBeDefined();
+    expect(step!.cmd).toEqual(["bun", "test", "tests/symphony/spec-lock.test.ts"]);
+  });
+});
