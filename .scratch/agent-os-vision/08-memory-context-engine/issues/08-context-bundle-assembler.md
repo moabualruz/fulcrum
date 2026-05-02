@@ -1,8 +1,9 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [06-retriever-bm25-recency-importance.md]
+Owner: codex-worker-p8-context-assembler
 PRD: .scratch/agent-os-vision/prds/08-memory-context-engine.md
 Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 8 section)
 Decisions: [Q18, Q17, C1, C4]
@@ -57,3 +58,7 @@ export class ContextAssembler {
 ## Blocked by
 
 - `06-retriever-bm25-recency-importance.md`
+
+## EXECUTION-LOG
+
+- 2026-05-02 codex-orchestrator: claimed for `codex-worker-p8-context-assembler` after retriever lane accepted on main (`906b533b`, `bf268055`).
