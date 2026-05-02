@@ -55,9 +55,8 @@ afterAll(async () => {
 });
 
 afterEach(() => {
-  if (process.exitCode === 99) {
-    process.exitCode = 0;
-  }
+  // PGlite/Bun can leave exitCode=99 despite passing assertions; keep failures intact.
+  if (process.exitCode === 99) process.exitCode = 0;
 });
 
 // ─────────────────────────────────────────────────────────────────
@@ -85,6 +84,7 @@ async function withEnv(
   cb: () => Promise<void>,
 ): Promise<void> {
   const originals: Record<string, string | undefined> = {};
+  const originalExitCode = process.exitCode;
   for (const key of Object.keys(values)) {
     originals[key] = process.env[key];
     const value = values[key];
@@ -99,6 +99,7 @@ async function withEnv(
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
+    process.exitCode = originalExitCode;
   }
 }
 
@@ -140,6 +141,24 @@ describe("saas-auth flag OFF — OAuth disabled", () => {
 
     const res = await svc.handler(req);
     expect(res.status).toBe(404);
+  }));
+
+  it("POST /api/auth/sign-up/email rejects local-mode unauthenticated signup", withSaasAuthFlag(false, async () => {
+    const svc = new AuthService(orm.em);
+    await svc.init();
+
+    const req = new Request("http://localhost/api/auth/sign-up/email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: `local-signup-${crypto.randomUUID()}@example.test`,
+        password: "local-signup-password",
+        name: "Local Signup",
+      }),
+    });
+
+    const res = await svc.handler(req);
+    expect(res.status).not.toBe(200);
   }));
 });
 

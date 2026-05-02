@@ -19,14 +19,14 @@
  * Per C8: needle-di @injectable() / inject() pattern.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "bun:test";
 import { MikroORM } from "@mikro-orm/postgresql";
 import { PGlite } from "@electric-sql/pglite";
 import { Container } from "@needle-di/core";
 
 import { createOrmConfig } from "../../src/db/mikro-orm.config.ts";
 import { registerDbBindings, SessionRepository } from "../../src/db/db.module.ts";
-import { SeedService } from "../../src/db/seed.ts";
+import { DEFAULT_ADMIN_PASSWORD, SeedService } from "../../src/db/seed.ts";
 import { AuthService } from "../../src/auth/index.ts";
 import { MikroOrmBetterAuthAdapter } from "../../src/auth/adapter.ts";
 
@@ -54,6 +54,11 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (orm) await orm.close(true);
+});
+
+afterEach(() => {
+  // PGlite/Bun can leave exitCode=99 despite passing assertions; keep failures intact.
+  if (process.exitCode === 99) process.exitCode = 0;
 });
 
 // ─────────────────────────────────────────────────────────────────
@@ -112,6 +117,42 @@ describe("auth.handler GET /api/auth/session", () => {
     expect(response).toBeInstanceOf(Response);
     // Unauthenticated get-session returns 200 with null session
     expect(response.status).toBe(200);
+  });
+
+  it("seeded local admin can sign in with admin@local and writes a session row", async () => {
+    const svc = container.get(AuthService);
+
+    // Local-only dev fallback password; seed must create the matching credential account.
+    const response = await svc.handler(new Request("http://localhost/api/auth/sign-in/email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "admin@local",
+        password: DEFAULT_ADMIN_PASSWORD,
+      }),
+    }));
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { token?: string; user?: { email?: string } };
+    expect(body.user?.email).toBe("admin@local");
+    expect(typeof body.token).toBe("string");
+
+    const em = orm.em.fork();
+    const { Session } = await import("../../src/db/entities/auth/index.ts");
+    const session = await em.findOne(Session, { id: body.token! });
+    expect(session).not.toBeNull();
+    expect(session!.expiresAt.getTime()).toBeGreaterThan(Date.now());
+
+    const setCookie = response.headers.get("set-cookie");
+    expect(setCookie).toContain(body.token!);
+
+    const sessionResponse = await svc.handler(new Request("http://localhost/api/auth/get-session", {
+      method: "GET",
+      headers: { cookie: setCookie ?? "" },
+    }));
+    expect(sessionResponse.status).toBe(200);
+    const sessionBody = await sessionResponse.json() as { user?: { email?: string } } | null;
+    expect(sessionBody?.user?.email).toBe("admin@local");
   });
 });
 

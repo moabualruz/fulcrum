@@ -29,7 +29,16 @@ import { Account } from "../db/entities/auth/Account.ts";
 import { Verification } from "../db/entities/auth/Verification.ts";
 import { OrgMember } from "../db/entities/auth/OrgMember.ts";
 import { Invitation } from "../db/entities/auth/Invitation.ts";
-import { DEFAULT_ORG_ID } from "../db/seed.ts";
+import { DEFAULT_ADMIN_EMAIL, DEFAULT_ORG_ID } from "../db/seed.ts";
+
+const BETTER_AUTH_LOCAL_ADMIN_EMAIL = "admin@local.fulcrum";
+
+function normalizeLocalAuthEmail(email: unknown): unknown {
+  if (typeof email !== "string") return email;
+  return email.toLowerCase() === BETTER_AUTH_LOCAL_ADMIN_EMAIL
+    ? DEFAULT_ADMIN_EMAIL
+    : email;
+}
 
 /**
  * Build a MikroORM FilterQuery from Better-Auth CleanedWhere clauses.
@@ -375,6 +384,7 @@ export class MikroOrmBetterAuthAdapter {
   private async findOne<T>({
     model,
     where,
+    join,
   }: {
     model: string;
     where: CleanedWhere[];
@@ -385,6 +395,9 @@ export class MikroOrmBetterAuthAdapter {
 
     if (model === "user") {
       const query = buildWhere(where, USER_FIELD_MAP);
+      if (query["email"]) {
+        query["email"] = normalizeLocalAuthEmail(query["email"]);
+      }
       // C2: composite key — if no orgId in query, default to local org
       if (!query["orgId"] && query["email"]) {
         query["orgId"] = DEFAULT_ORG_ID;
@@ -392,7 +405,12 @@ export class MikroOrmBetterAuthAdapter {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const user = await em.findOne(User, query as any);
       if (!user) return null;
-      return this.mapUserToBetterAuth(user) as unknown as T;
+      const output = this.mapUserToBetterAuth(user);
+      if (join?.account) {
+        const accounts = await em.find(Account, { userId: user.id });
+        output["account"] = accounts.map((account) => this.mapAccountToBetterAuth(account));
+      }
+      return output as unknown as T;
     }
 
     if (model === "session") {
@@ -405,7 +423,12 @@ export class MikroOrmBetterAuthAdapter {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const session = await em.findOne(Session, query as any);
       if (!session) return null;
-      return this.mapSessionToBetterAuth(session) as unknown as T;
+      const output = this.mapSessionToBetterAuth(session);
+      if (join?.user) {
+        const user = await em.findOne(User, { id: session.userId });
+        if (user) output["user"] = this.mapUserToBetterAuth(user);
+      }
+      return output as unknown as T;
     }
 
     if (model === "member") {

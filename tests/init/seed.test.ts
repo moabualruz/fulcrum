@@ -23,6 +23,7 @@ import { PGliteKyselyDialect } from ${JSON.stringify(moduleUrl("src/db/PGliteKys
 import { ENTITY_MANAGER_TOKEN } from ${JSON.stringify(moduleUrl("src/db/db.module.ts"))};
 import { Org } from ${JSON.stringify(moduleUrl("src/db/entities/auth/Org.ts"))};
 import {
+  Account,
   FeatureFlag,
   Invitation,
   OrgMember,
@@ -41,7 +42,7 @@ const dialect = new PGliteKyselyDialect(() => pglite);
 const orm = await MikroORM.init({
   dbName: "postgres",
   driverOptions: dialect,
-  entities: [Org, User, Session, Invitation, OrgMember, FeatureFlag],
+  entities: [Org, User, Session, Invitation, OrgMember, FeatureFlag, Account],
   debug: false,
 });
 
@@ -62,6 +63,7 @@ try {
     users: await afterFirstEm.count(User, {}),
     sessions: await afterFirstEm.count(Session, {}),
     orgMembers: await afterFirstEm.count(OrgMember, {}),
+    accounts: await afterFirstEm.count(Account, {}),
   };
 
   const second = await seed.run();
@@ -71,6 +73,7 @@ try {
     users: await afterSecondEm.count(User, {}),
     sessions: await afterSecondEm.count(Session, {}),
     orgMembers: await afterSecondEm.count(OrgMember, {}),
+    accounts: await afterSecondEm.count(Account, {}),
   };
 
   console.log(JSON.stringify({ first, second, afterFirst, afterSecond }));
@@ -124,8 +127,8 @@ describe("SeedService", () => {
     expect(result.second.orgId).toBe(result.first.orgId);
     expect(result.second.userId).toBe(result.first.userId);
     expect(result.second.sessionToken).toBe(result.first.sessionToken);
-    expect(result.afterFirst).toEqual({ orgs: 1, users: 1, sessions: 1, orgMembers: 1 });
-    expect(result.afterSecond).toEqual({ orgs: 1, users: 1, sessions: 1, orgMembers: 1 });
+    expect(result.afterFirst).toEqual({ orgs: 1, users: 1, sessions: 1, orgMembers: 1, accounts: 1 });
+    expect(result.afterSecond).toEqual({ orgs: 1, users: 1, sessions: 1, orgMembers: 1, accounts: 1 });
   });
 
   test("creates the session with MikroORM persistAndFlush", async () => {

@@ -40,6 +40,10 @@ function authErrorMessage(body: unknown): string {
 
 export const actions: Actions = {
   default: async ({ fetch, request }) => {
+    if (!isSaasAuthEnabled()) {
+      throw error(403, "Sign-up requires saas-auth to be enabled");
+    }
+
     const form = await request.formData();
     const email = String(form.get("email") ?? "");
     const password = String(form.get("password") ?? "");

@@ -25,6 +25,7 @@ import type { DBAdapter } from "@better-auth/core/db/adapter";
 
 import { MikroOrmBetterAuthAdapter } from "./adapter.ts";
 import { FeatureFlag } from "../db/entities/auth/FeatureFlag.ts";
+import { DEFAULT_ADMIN_EMAIL } from "../db/seed.ts";
 
 /**
  * Name of the feature flag that gates SaaS-only auth providers.
@@ -33,6 +34,7 @@ import { FeatureFlag } from "../db/entities/auth/FeatureFlag.ts";
 const SAAS_AUTH_FLAG = "saas-auth";
 const DEV_TEST_AUTH_SECRET = "fulcrum-dev-test-better-auth-secret-00000000";
 const DEV_TEST_TRUSTED_ORIGINS = ["http://localhost:5173", "http://localhost:3000"];
+const BETTER_AUTH_LOCAL_ADMIN_EMAIL = "admin@local.fulcrum";
 
 /**
  * Check if a feature flag is enabled for the local (global) scope.
@@ -148,6 +150,44 @@ function oauthProviderConfig(): Record<string, { clientId: string; clientSecret:
   return Object.keys(providers).length > 0 ? providers : undefined;
 }
 
+async function normalizeLocalSignInRequest(request: Request): Promise<Request> {
+  if (request.method !== "POST") return request;
+
+  const url = new URL(request.url);
+  if (!url.pathname.endsWith("/sign-in/email")) return request;
+
+  const headers = new Headers(request.headers);
+  const contentType = headers.get("content-type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    const body = await request.clone().json().catch(() => null);
+    if (!body || typeof body !== "object" || !("email" in body)) return request;
+    if (String((body as { email: unknown }).email).toLowerCase() !== DEFAULT_ADMIN_EMAIL) return request;
+
+    headers.delete("content-length");
+    return new Request(request.url, {
+      method: request.method,
+      headers,
+      body: JSON.stringify({ ...body, email: BETTER_AUTH_LOCAL_ADMIN_EMAIL }),
+    });
+  }
+
+  if (contentType.includes("application/x-www-form-urlencoded")) {
+    const form = new URLSearchParams(await request.clone().text());
+    if (form.get("email")?.toLowerCase() !== DEFAULT_ADMIN_EMAIL) return request;
+
+    form.set("email", BETTER_AUTH_LOCAL_ADMIN_EMAIL);
+    headers.delete("content-length");
+    return new Request(request.url, {
+      method: request.method,
+      headers,
+      body: form.toString(),
+    });
+  }
+
+  return request;
+}
+
 async function authConfigSignature(em: EntityManager): Promise<string> {
   const saasEnabled = await isFlagEnabled(em, SAAS_AUTH_FLAG);
   return JSON.stringify({
@@ -205,6 +245,7 @@ async function buildAuth(em: EntityManager): Promise<{ auth: AnyAuth; signature:
     // C1: email+password is always enabled (local-first mode)
     emailAndPassword: {
       enabled: true,
+      disableSignUp: !saasEnabled,
     },
 
     // Social providers — gated by saas-auth flag.
@@ -290,7 +331,7 @@ export class AuthService {
     }
     return async (request: Request) => {
       const auth = await this.ensureFreshAuth();
-      return auth.handler(request);
+      return auth.handler(await normalizeLocalSignInRequest(request));
     };
   }
 
