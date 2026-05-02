@@ -33,6 +33,7 @@ import { sprintsRouter } from "./routers/sprints.ts";
 import { searchRouter } from "./routers/search.ts";
 import { notificationsRouter } from "./routers/notifications.ts";
 import { webhooksRouter } from "./routers/webhooks.ts";
+import { orchestrationRouter } from "./routers/orchestration.ts";
 
 // authRouter imported above from src/server/trpc/routers/auth.ts (Pillar 9)
 
@@ -41,13 +42,6 @@ import { webhooksRouter } from "./routers/webhooks.ts";
 // ─────────────────────────────────────────────────────────────────────────────
 const dbRouter = t.router({
   ping: publicProcedure.query(() => ({ ok: true })),
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// orchestration sub-router stub — Pillar 5 (Symphony + agent dispatch)
-// ─────────────────────────────────────────────────────────────────────────────
-const orchestrationRouter = t.router({
-  list: protectedProcedure.query(() => []),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

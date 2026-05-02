@@ -17,6 +17,8 @@ Lock: `.symphony-spec.lock`
 
 ### Issue tracker client with candidate fetch + state refresh + terminal fetch
 
+Candidate fetch + SPEC ordering: `src/orchestration/symphony/tracker.ts:fetchCandidateIssues` uses Fulcrum PGlite `tasks` as the canonical tracker, filters `status="ready"`, excludes unresolved blockers and `agent_runs.orchestration_state="claimed"`, and orders by `priority ASC`, `created_at ASC`, then `id ASC` as Fulcrum's identifier tie-breaker.
+
 ### Workspace manager with sanitized per-issue workspaces
 
 ### Workspace lifecycle hooks (`after_create`, `before_run`, `after_run`, `before_remove`)
