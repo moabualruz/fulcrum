@@ -1416,3 +1416,48 @@ Held:
 ]
 
 Result: CLAIMED.
+
+## 2026-05-02T15:56:13Z — codex-orchestrator (resume wave verification + gate fallout)
+
+Capacity:
+[
+  claude_impl=0/6,
+  codex_impl=0/6,
+  claude_review=0/6,
+  codex_review=0/6
+]
+
+Implementation results:
+[
+  06-tasks-and-scrum/issues/04-saved-views-schema.md => IMPLEMENTED, runtime=claude-worker-saved-views plus codex fix for lossy migration marker,
+  07-docs-editor-collab/issues/02-tiptap-svelte-binding-spike.md => NEEDS-HUMAN, runtime=codex-worker-tiptap-spike, compat verdict PASS for svelte-tiptap@3.0.1 + @tiptap/*@3.22.5; no Tipex fallback/ADR needed,
+  15-tui/issues/01-tui-foundation-launcher.md => IN-PROGRESS, runtime=codex-worker-tui-foundation, partial foundation only; remaining blockers: DB-backed local_telemetry insert and OpenTUI renderer integration
+]
+
+Review gate fallout:
+[
+  P1 integration gate remains CHANGES_REQUIRED,
+  fixed immediately: CLI web static path traversal, root flags dispatch, DB-backed CLI flags caller,
+  remaining blockers: init/migration ledger, local admin login seed/password/email validity, production TUI auth container, /settings/flags route, saas-auth signup gate, Casbin org scoping, doctor raw SQL
+]
+
+Verification:
+[
+  bun test src/filters/ast.test.ts src/db/saved-views-schema.test.ts => PASS, 40 pass,
+  bun test tests/cli/web-static.test.ts tests/cli/entrypoint.test.ts tests/cli/flags.test.ts => PASS, 14 pass,
+  bun test tests/tui/foundation.test.ts src/filters/ast.test.ts src/db/saved-views-schema.test.ts => PASS, 46 pass,
+  cd src/web && bun run check => PASS, 0 errors, 2 existing warnings,
+  cd src/web && bun run web:test -- tests/vitest/editor-baseline.test.ts => PASS, 3 pass,
+  cd src/web && bun run build => PASS, existing Svelte warnings + existing chunk warning,
+  cd src/web && FULCRUM_E2E_PORT=5174 bun run web:e2e -- tests/e2e/tiptap-baseline.spec.ts => PASS, 1 pass,
+  bun test tests/db/migrator-service.test.ts src/db/saved-views-schema.test.ts => PASS, 50 pass,
+  bun run lint => PASS,
+  bun run ci => PASS, 12/12 stages, 1801 pass, 2 skip, 0 fail
+]
+
+Underfilled reason:
+[
+  checkpointing dirty multi-worker wave before next dispatch; P1 gate fixes require disjoint ownership claims after commits
+]
+
+Result: CHECKPOINT_READY.
