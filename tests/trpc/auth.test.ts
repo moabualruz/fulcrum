@@ -27,6 +27,7 @@ import { OrgMember } from "../../src/db/entities/auth/OrgMember.ts";
 import { Invitation } from "../../src/db/entities/auth/Invitation.ts";
 import { OrgMemberRepository } from "../../src/db/repositories/auth/OrgMemberRepository.ts";
 import { InvitationRepository } from "../../src/db/repositories/auth/InvitationRepository.ts";
+import { FlagRegistry } from "../../src/flags/registry.ts";
 import { appRouter } from "../../src/trpc/router.ts";
 import { createContext } from "../../src/trpc/context.ts";
 import { t } from "../../src/trpc/trpc.ts";
@@ -36,6 +37,7 @@ const TEST_OWNER_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
 const TEST_MEMBER_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
 
 let orm: MikroORM;
+let pglite: PGlite;
 
 const createCaller = t.createCallerFactory(appRouter);
 
@@ -69,11 +71,46 @@ function makeCaller(userId: string, orgId: string) {
       const c = new Container();
       c.bind({ provide: OrgMemberRepository, useValue: orgMemberRepo });
       c.bind({ provide: InvitationRepository, useValue: invitationRepo });
+      c.bind({
+        provide: FlagRegistry,
+        useValue: {
+          isEnabled: async () => false,
+        } as unknown as FlagRegistry,
+      });
       return c;
     })(),
   });
 
   return createCaller(ctx);
+}
+
+function makeCallerWithoutContainer(userId: string, orgId: string) {
+  const session = mockSession(userId, orgId);
+  const em = orm.em.fork();
+
+  return createCaller(
+    createContext({
+      session: session as unknown as import("better-auth").Session,
+      orgId,
+      userId,
+      em: em as unknown as import("@mikro-orm/postgresql").EntityManager,
+      container: null,
+    }),
+  );
+}
+
+function makeCallerWithoutPersistence(userId: string, orgId: string) {
+  const session = mockSession(userId, orgId);
+
+  return createCaller(
+    createContext({
+      session: session as unknown as import("better-auth").Session,
+      orgId,
+      userId,
+      em: null,
+      container: null,
+    }),
+  );
 }
 
 function unauthCaller() {
@@ -89,7 +126,7 @@ function unauthCaller() {
 }
 
 beforeAll(async () => {
-  const pglite = new PGlite();
+  pglite = new PGlite();
   const dialect = new PGliteKyselyDialect(() => pglite);
 
   orm = await MikroORM.init({
@@ -152,6 +189,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (orm) await orm.close(true);
+  if (pglite) await pglite.close();
 });
 
 beforeEach(async () => {
@@ -225,6 +263,31 @@ describe("auth.invite", () => {
     }
     expect(error).not.toBeNull();
     expect(error?.code).toBe("FORBIDDEN");
+  });
+
+  it("member with em but no container still gets FORBIDDEN", async () => {
+    const caller = makeCallerWithoutContainer(TEST_MEMBER_ID, TEST_ORG_ID);
+    let error: TRPCError | null = null;
+    try {
+      await caller.auth.invite({ email: "fail-no-container@test.local", role: "owner" });
+    } catch (e) {
+      if (e instanceof TRPCError) error = e;
+    }
+    expect(error).not.toBeNull();
+    expect(error?.code).toBe("FORBIDDEN");
+  });
+
+  it("fails closed when no membership repository or EntityManager is available", async () => {
+    const caller = makeCallerWithoutPersistence(TEST_OWNER_ID, TEST_ORG_ID);
+    let error: TRPCError | null = null;
+    try {
+      await caller.auth.invite({ email: "fail-no-persistence@test.local", role: "member" });
+    } catch (e) {
+      if (e instanceof TRPCError) error = e;
+    }
+    expect(error).not.toBeNull();
+    expect(error?.code).toBe("INTERNAL_SERVER_ERROR");
+    expect(error?.message).toBe("OrgMember repository could not be resolved.");
   });
 });
 

@@ -30,9 +30,8 @@ async function handler(event: RequestEvent): Promise<Response> {
         userId: event.locals.session
           ? (event.locals.session as unknown as { userId: string }).userId ?? null
           : null,
-        // em + container wired by Pillar 2+ after ORM is registered in Container
-        em: null,
-        container: null,
+        em: event.locals.em ?? null,
+        container: event.locals.container ?? null,
       }),
   });
 }

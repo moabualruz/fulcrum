@@ -20,6 +20,7 @@
 
 import { Container, InjectionToken } from "@needle-di/core";
 import type { MikroORM, EntityManager } from "@mikro-orm/postgresql";
+import { FlagRegistry } from "../flags/registry.ts";
 
 // P1#19 — MigratorService + SchemaMigration ledger
 import { SchemaMigration } from "./entities/SchemaMigration.ts";
@@ -143,9 +144,11 @@ export const ENTITY_MANAGER_TOKEN = new InjectionToken<EntityManager>(
  * the entity's @Entity({ repository: () => XxxRepository }) metadata
  * wires the correct constructor — this cast is safe.
  */
-export function registerDbBindings(container: Container, orm: MikroORM): void {
-  const em = orm.em;
-
+export function registerDbBindings(
+  container: Container,
+  orm: MikroORM,
+  em: EntityManager = orm.em,
+): void {
   // EntityManager — forked per request in web context, shared in CLI/TUI
   container.bind({
     provide: ENTITY_MANAGER_TOKEN,
@@ -186,6 +189,13 @@ export function registerDbBindings(container: Container, orm: MikroORM): void {
   container.bind({
     provide: FeatureFlagRepository,
     useFactory: () => em.getRepository(FeatureFlag) as FeatureFlagRepository,
+  });
+  container.bind({
+    provide: FlagRegistry,
+    useFactory: () =>
+      new FlagRegistry(
+        em.getRepository(FeatureFlag) as FeatureFlagRepository,
+      ),
   });
 
   // Core repositories

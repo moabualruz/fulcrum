@@ -112,6 +112,14 @@ export interface OrmConfigOptions {
   debug?: boolean;
 }
 
+let defaultOrmPromise: Promise<MikroORM> | null = null;
+
+function hasCustomOrmOptions(opts: OrmConfigOptions): boolean {
+  return opts.pglite !== undefined ||
+    opts.debug !== undefined ||
+    (opts.entities !== undefined && (!Array.isArray(opts.entities) || opts.entities.length > 0));
+}
+
 /**
  * Builds a MikroORM Options object.
  *
@@ -214,5 +222,20 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
 /** Convenience: initialise an ORM instance with the standard config. */
 export async function initOrm(opts: OrmConfigOptions = {}): Promise<MikroORM> {
   const { MikroORM } = await import("@mikro-orm/postgresql");
-  return MikroORM.init(createOrmConfig(opts));
+  if (hasCustomOrmOptions(opts)) {
+    return MikroORM.init(createOrmConfig(opts));
+  }
+
+  defaultOrmPromise ??= MikroORM.init(createOrmConfig()).catch((error) => {
+    defaultOrmPromise = null;
+    throw error;
+  });
+  return defaultOrmPromise;
+}
+
+export async function __resetDefaultOrmForTest(): Promise<MikroORM | null> {
+  const orm = await defaultOrmPromise?.catch(() => null) ?? null;
+  defaultOrmPromise = null;
+  if (orm) await orm.close(true);
+  return orm;
 }

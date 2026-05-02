@@ -26,6 +26,7 @@ import { Org } from "../../src/db/entities/auth/Org.ts";
 import { User } from "../../src/db/entities/auth/User.ts";
 import { OrgMember } from "../../src/db/entities/auth/OrgMember.ts";
 import { OrgMemberRepository } from "../../src/db/repositories/auth/OrgMemberRepository.ts";
+import { FlagRegistry } from "../../src/flags/registry.ts";
 import { appRouter } from "../../src/trpc/router.ts";
 import { createContext } from "../../src/trpc/context.ts";
 import { t } from "../../src/trpc/trpc.ts";
@@ -71,6 +72,12 @@ function makeCaller(userId: string, orgId: string = TEST_ORG_ID) {
     container: (() => {
       const c = new Container();
       c.bind({ provide: OrgMemberRepository, useValue: orgMemberRepo });
+      c.bind({
+        provide: FlagRegistry,
+        useValue: {
+          isEnabled: async () => false,
+        } as unknown as FlagRegistry,
+      });
       return c;
     })(),
   });

@@ -5,7 +5,7 @@
  *   1. Mount Better-Auth handler on /api/auth/** (AuthService.handler).
  *   2. Mount tRPC fetchRequestHandler on /api/trpc/** (appRouter + createContext).
  *   3. Inject event.locals.session on every request (null if unauthenticated).
- *   4. Derive event.locals.orgId via getOrgId(session).
+ *   4. Derive event.locals.orgId from the Better-Auth session payload.
  *   5. Set event.locals.activeProjectId from cookie.
  *
  * AuthService is lazily initialised on first request (avoids ORM init at
@@ -18,6 +18,8 @@
 
 import type { Handle } from "@sveltejs/kit";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
+import { Container } from "@needle-di/core";
+import type { EntityManager, MikroORM } from "@mikro-orm/postgresql";
 
 import { getActiveProject } from "$lib/state/active-project";
 import { appRouter } from "../../../src/trpc/router.ts";
@@ -25,127 +27,230 @@ import { createContext } from "../../../src/trpc/context.ts";
 
 // Lazy auth initialiser — only wired when ORM is available.
 // Imported dynamically to avoid circular dep issues at SSR preload time.
-let _authHandler: ((req: Request) => Promise<Response>) | null = null;
+interface WebRequestRuntime {
+  em: EntityManager;
+  container: Container;
+}
+
+interface WebRuntime {
+  authHandler: ((req: Request) => Promise<Response>) | null;
+  orm: MikroORM;
+  createRequestContext?: () => WebRequestRuntime;
+  em?: EntityManager;
+  container?: Container;
+}
+
+interface HydratedSession {
+  session: App.Locals["session"];
+  orgId: string | null;
+  userId: string | null;
+}
+
+let _runtimePromise: Promise<WebRuntime> | null = null;
+
+async function getWebRuntime(): Promise<WebRuntime> {
+  if (!_runtimePromise) {
+    _runtimePromise = (async () => {
+      const { AuthService } = await import("../../../src/auth/index.ts");
+      const { initOrm } = await import("../../../src/db/mikro-orm.config.ts");
+      const { registerDbBindings } = await import("../../../src/db/db.module.ts");
+
+      const orm = await initOrm();
+
+      let authHandler: ((req: Request) => Promise<Response>) | null = null;
+      try {
+        const svc = new AuthService(orm.em);
+        await svc.init();
+        authHandler = svc.handler;
+      } catch {
+        authHandler = null;
+      }
+
+      return {
+        authHandler,
+        orm,
+        createRequestContext: () => {
+          const em = orm.em.fork();
+          const container = new Container();
+          registerDbBindings(container, orm, em);
+          return { em, container };
+        },
+      };
+    })().catch((error) => {
+      _runtimePromise = null;
+      throw error;
+    });
+  }
+  return _runtimePromise;
+}
+
+function createWebRequestRuntime(runtime: WebRuntime): WebRequestRuntime {
+  if (runtime.createRequestContext) {
+    return runtime.createRequestContext();
+  }
+
+  if (!runtime.em || !runtime.container) {
+    throw new Error("Web runtime is missing request context bindings.");
+  }
+
+  const maybeFork = runtime.em as EntityManager & {
+    fork?: () => EntityManager;
+  };
+
+  if (typeof maybeFork.fork === "function") {
+    throw new Error("Forkable web runtime must provide createRequestContext.");
+  }
+
+  return {
+    em: runtime.em,
+    container: runtime.container,
+  };
+}
+
+function clearWebRequestRuntime(runtime: WebRequestRuntime | null): void {
+  const maybeClear = runtime?.em as (EntityManager & { clear?: () => void }) | null;
+  maybeClear?.clear?.();
+}
 
 async function getAuthHandler(): Promise<((req: Request) => Promise<Response>) | null> {
-  if (_authHandler) return _authHandler;
   try {
-    const { AuthService } = await import("../../../src/auth/index.ts");
-    const { initOrm } = await import("../../../src/db/mikro-orm.config.ts");
-    const orm = await initOrm();
-    const svc = new AuthService(orm.em);
-    await svc.init();
-    _authHandler = svc.handler;
-    return _authHandler;
+    return (await getWebRuntime()).authHandler;
   } catch {
     // ORM not available (e.g. running web-only tests without DB) — degrade gracefully
     return null;
   }
 }
 
-export const handle: Handle = async ({ event, resolve }) => {
-  // 1. Active project cookie (existing behaviour — must stay first for test compat)
-  event.locals.activeProjectId = getActiveProject(event.cookies);
+async function hydrateSession(
+  request: Request,
+  handler: ((req: Request) => Promise<Response>) | null,
+): Promise<HydratedSession> {
+  if (!handler) return emptySession();
 
-  // 2. Defaults for new locals
-  event.locals.session = null;
-  event.locals.orgId = null;
+  try {
+    const sessionResponse = await handler(
+      new Request(new URL("/api/auth/get-session", request.url).toString(), {
+        headers: request.headers,
+      }),
+    );
+    if (!sessionResponse.ok) return emptySession();
 
-  // 3. Mount Better-Auth on /api/auth/**
-  //    event.request is a real Request in production; may be absent in unit-test stubs.
-  const request = "request" in event ? (event as { request: Request }).request : null;
-
-  if (request) {
-    const url = new URL(request.url);
-
-    if (url.pathname.startsWith("/api/auth")) {
-      const handler = await getAuthHandler();
-      if (handler) {
-        return handler(request);
-      }
+    const body = await sessionResponse.json().catch(() => null);
+    if (!body || typeof body !== "object" || !("session" in body)) {
+      return emptySession();
     }
 
-    // 4. tRPC handler on /api/trpc/**
-    //    fetchRequestHandler passes the Request + context to appRouter.
-    if (url.pathname.startsWith("/api/trpc")) {
-      // Session hydration before tRPC so ctx.session is populated
-      const handler = await getAuthHandler();
-      let session: App.Locals["session"] = null;
-      let orgId: string | null = null;
-      if (handler) {
-        try {
-          const sessionResponse = await handler(
-            new Request(new URL("/api/auth/get-session", request.url).toString(), {
-              headers: request.headers,
-            }),
-          );
-          if (sessionResponse.ok) {
-            const body = await sessionResponse.json().catch(() => null);
-            if (body && typeof body === "object" && "session" in body) {
-              const sess = (body as { session: App.Locals["session"] }).session;
-              if (sess) {
-                session = sess;
-                orgId = (sess as unknown as { orgId: string }).orgId ?? null;
-              }
-            }
-          }
-        } catch {
-          // Non-fatal — tRPC will run with session=null (unauthenticated)
-        }
-      }
+    const session = (body as { session: App.Locals["session"] }).session;
+    if (!session) return emptySession();
 
-      return fetchRequestHandler({
-        endpoint: "/api/trpc",
-        req: request,
-        router: appRouter,
-        createContext: () =>
-          createContext({
-            session,
-            orgId,
-            userId: session ? (session as unknown as { userId: string }).userId ?? null : null,
-            em: null,     // Pillar 2+ wires the forked EM here via container
-            container: null, // Pillar 2+ wires container here
-          }),
-      });
-    }
-
-    // 5. Session hydration for non-auth/non-trpc routes
-    //    Better-Auth reads the session cookie and validates it against the DB.
-    const handler = await getAuthHandler();
-    if (handler) {
-      try {
-        const sessionResponse = await handler(
-          new Request(new URL("/api/auth/get-session", request.url).toString(), {
-            headers: request.headers,
-          }),
-        );
-        if (sessionResponse.ok) {
-          const body = await sessionResponse.json().catch(() => null);
-          if (body && typeof body === "object" && body !== null && "session" in body) {
-            const { getOrgId } = await import("../../../src/db/context.ts");
-            const sess = (body as { session: App.Locals["session"] }).session;
-            if (sess) {
-              event.locals.session = sess;
-              // getOrgId expects our MikroORM Session shape; cast safely
-              event.locals.orgId = (sess as unknown as { orgId: string }).orgId ?? null;
-            }
-          }
-        }
-      } catch {
-        // Session hydration failure is non-fatal — locals.session stays null
-      }
-    }
-
-    // Auth guard lives after hydration so valid sessions can reach app routes.
-    if (
-      !event.locals.session &&
-      !url.pathname.startsWith("/auth") &&
-      !url.pathname.startsWith("/api")
-    ) {
-      const { redirect } = await import("@sveltejs/kit");
-      throw redirect(302, "/auth/login");
-    }
+    return {
+      session,
+      orgId: (session as unknown as { orgId: string }).orgId ?? null,
+      userId: (session as unknown as { userId: string }).userId ?? null,
+    };
+  } catch {
+    return emptySession();
   }
+}
 
-  return resolve(event);
+function emptySession(): HydratedSession {
+  return { session: null, orgId: null, userId: null };
+}
+
+export async function __getWebRuntimeForTest(): Promise<{
+  em: EntityManager;
+  container: Container;
+}> {
+  const runtime = await getWebRuntime();
+  return createWebRequestRuntime(runtime);
+}
+
+export function __setWebRuntimeForTest(runtime: WebRuntime): void {
+  _runtimePromise = Promise.resolve(runtime);
+}
+
+export async function __closeWebRuntimeForTest(): Promise<void> {
+  const runtime = await _runtimePromise?.catch(() => null);
+  _runtimePromise = null;
+  const { __resetDefaultOrmForTest } = await import("../../../src/db/mikro-orm.config.ts");
+  const closedDefaultOrm = await __resetDefaultOrmForTest();
+  if (runtime?.orm && runtime.orm !== closedDefaultOrm) {
+    await runtime.orm.close(true);
+  }
+}
+
+export const handle: Handle = async ({ event, resolve }) => {
+  let requestRuntime: WebRequestRuntime | null = null;
+
+  try {
+    // 1. Active project cookie (existing behaviour — must stay first for test compat)
+    event.locals.activeProjectId = getActiveProject(event.cookies);
+
+    // 2. Defaults for new locals
+    event.locals.session = null;
+    event.locals.orgId = null;
+    event.locals.em = null;
+    event.locals.container = null;
+
+    // 3. Mount Better-Auth on /api/auth/**
+    //    event.request is a real Request in production; may be absent in unit-test stubs.
+    const request = "request" in event ? (event as { request: Request }).request : null;
+
+    if (request) {
+      const url = new URL(request.url);
+
+      if (url.pathname.startsWith("/api/auth")) {
+        const handler = await getAuthHandler();
+        if (handler) {
+          return await handler(request);
+        }
+        return await resolve(event);
+      }
+
+      const runtime = await getWebRuntime().catch(() => null);
+      if (runtime) {
+        requestRuntime = createWebRequestRuntime(runtime);
+        event.locals.em = requestRuntime.em;
+        event.locals.container = requestRuntime.container;
+      }
+      const sessionState = await hydrateSession(request, runtime?.authHandler ?? null);
+
+      // 4. tRPC handler on /api/trpc/**
+      //    fetchRequestHandler passes the Request + context to appRouter.
+      if (url.pathname.startsWith("/api/trpc")) {
+        return await fetchRequestHandler({
+          endpoint: "/api/trpc",
+          req: request,
+          router: appRouter,
+          createContext: () =>
+            createContext({
+              session: sessionState.session,
+              orgId: sessionState.orgId,
+              userId: sessionState.userId,
+              em: requestRuntime?.em ?? null,
+              container: requestRuntime?.container ?? null,
+            }),
+        });
+      }
+
+      // 5. Session hydration for non-auth/non-trpc routes
+      //    Better-Auth reads the session cookie and validates it against the DB.
+      event.locals.session = sessionState.session;
+      event.locals.orgId = sessionState.orgId;
+
+      // Auth guard lives after hydration so valid sessions can reach app routes.
+      if (
+        !event.locals.session &&
+        !url.pathname.startsWith("/auth") &&
+        !url.pathname.startsWith("/api")
+      ) {
+        const { redirect } = await import("@sveltejs/kit");
+        throw redirect(302, "/auth/login");
+      }
+    }
+
+    return await resolve(event);
+  } finally {
+    clearWebRequestRuntime(requestRuntime);
+  }
 };

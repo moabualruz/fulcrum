@@ -125,6 +125,43 @@ async function resolveOrgMemberRepo(ctx: {
   return null;
 }
 
+async function requireOwnerOrAdmin(ctx: {
+  container: import("@needle-di/core").Container | null;
+  em: import("@mikro-orm/postgresql").EntityManager | null;
+  orgId: string | null;
+  userId: string | null;
+}): Promise<void> {
+  if (!ctx.orgId || !ctx.userId) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Session is missing orgId or userId. Re-authenticate.",
+    });
+  }
+
+  const orgMemberRepo = await resolveOrgMemberRepo(ctx);
+  let membership: { role: string } | null = null;
+  if (orgMemberRepo) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    membership = await orgMemberRepo.findOne({ orgId: ctx.orgId, userId: ctx.userId } as any);
+  } else if (ctx.em) {
+    const { OrgMember } = await import("../../../db/entities/auth/OrgMember.ts");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    membership = await ctx.em.findOne(OrgMember, { orgId: ctx.orgId, userId: ctx.userId } as any);
+  } else {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "OrgMember repository could not be resolved.",
+    });
+  }
+
+  if (!membership || (membership.role !== "owner" && membership.role !== "admin")) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only org owners and admins can modify feature flags.",
+    });
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // flags router
 // ─────────────────────────────────────────────────────────────────────────────
@@ -173,19 +210,7 @@ export const flagsRouter = t.router({
       const targetOrgId = input.orgId ?? ctxOrgId ?? undefined;
 
       // ── Authorization: owner or admin only ───────────────────────────────
-      const orgMemberRepo = await resolveOrgMemberRepo(ctx);
-      if (orgMemberRepo && ctxOrgId && ctxUserId) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const membership = await orgMemberRepo.findOne({ orgId: ctxOrgId, userId: ctxUserId } as any);
-        if (!membership || (membership.role !== "owner" && membership.role !== "admin")) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Only org owners and admins can modify feature flags.",
-          });
-        }
-      }
-      // If orgMemberRepo is null: allow (dev/test contexts without a container).
-      // Production always has orgMemberRepo wired via registerDbBindings.
+      await requireOwnerOrAdmin(ctx);
 
       // ── Upsert FeatureFlag row ────────────────────────────────────────────
       if (!ctx.em) {

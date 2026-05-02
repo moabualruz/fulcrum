@@ -99,6 +99,39 @@ async function resolveRepo<T>(ctx: CtxWithEm, RepoClass: new (...args: any[]) =>
   return null;
 }
 
+async function requireOwnerOrAdmin(ctx: CtxWithEm & { orgId: string | null; userId: string | null }): Promise<void> {
+  if (!ctx.orgId || !ctx.userId) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Session is missing orgId or userId. Re-authenticate.",
+    });
+  }
+
+  const OrgMember = await getOrgMemberClass();
+  const OrgMemberRepository = await getOrgMemberRepository();
+  const orgMemberRepo = await resolveRepo(ctx, OrgMemberRepository);
+  let membership: { role: string } | null = null;
+  if (orgMemberRepo) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    membership = await (orgMemberRepo as any).findOne({ orgId: ctx.orgId, userId: ctx.userId });
+  } else if (ctx.em) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    membership = await ctx.em.findOne(OrgMember, { orgId: ctx.orgId, userId: ctx.userId } as any);
+  } else {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "OrgMember repository could not be resolved.",
+    });
+  }
+
+  if (!membership || (membership.role !== "owner" && membership.role !== "admin")) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only org owners and admins can invite members.",
+    });
+  }
+}
+
 async function requireEm(ctx: CtxWithEm) {
   if (!ctx.em) {
     throw new TRPCError({
@@ -154,25 +187,11 @@ export const authRouter = t.router({
   invite: protectedProcedure
     .input(InviteInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const em = await requireEm(ctx);
-      const OrgMemberRepository = await getOrgMemberRepository();
-      const Invitation = await getInvitationClass();
-
       // ── Authorization: owner or admin only ────────────────────────────────
-      const orgMemberRepo = await resolveRepo(ctx, OrgMemberRepository);
-      if (orgMemberRepo && ctx.orgId && ctx.userId) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const membership = await (orgMemberRepo as any).findOne({
-          orgId: ctx.orgId,
-          userId: ctx.userId,
-        });
-        if (!membership || (membership.role !== "owner" && membership.role !== "admin")) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Only org owners and admins can invite members.",
-          });
-        }
-      }
+      await requireOwnerOrAdmin(ctx);
+
+      const em = await requireEm(ctx);
+      const Invitation = await getInvitationClass();
 
       // ── Generate + hash token ─────────────────────────────────────────────
       const plaintext = randomBytes(32).toString("hex");

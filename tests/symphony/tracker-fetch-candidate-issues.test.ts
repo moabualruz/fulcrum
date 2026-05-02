@@ -50,6 +50,8 @@ const TASK_IDS = {
   candidateB: "00000000-0000-0000-0000-000000000001",
   highPriority: "00000000-0000-0000-0000-000000000004",
   claimed: "00000000-0000-0000-0000-000000000002",
+  running: "00000000-0000-0000-0000-000000000006",
+  retryQueued: "00000000-0000-0000-0000-000000000007",
   blocked: "00000000-0000-0000-0000-000000000005",
 } as const;
 
@@ -204,6 +206,22 @@ async function seedCandidateFixture(orm: MikroORM): Promise<void> {
     status: "ready",
     priority: 0,
   });
+  const running = em.create(Task, {
+    id: TASK_IDS.running,
+    org,
+    createdAt: new Date("2026-01-04T00:00:00.000Z"),
+    blockedByIds: [],
+    status: "ready",
+    priority: 0,
+  });
+  const retryQueued = em.create(Task, {
+    id: TASK_IDS.retryQueued,
+    org,
+    createdAt: new Date("2026-01-05T00:00:00.000Z"),
+    blockedByIds: [],
+    status: "ready",
+    priority: 0,
+  });
   const blocked = em.create(Task, {
     id: TASK_IDS.blocked,
     org,
@@ -213,19 +231,50 @@ async function seedCandidateFixture(orm: MikroORM): Promise<void> {
     priority: 0,
   });
 
-  em.persist([candidateA, candidateB, highPriority, claimed, blocked]);
+  em.persist([
+    candidateA,
+    candidateB,
+    highPriority,
+    claimed,
+    running,
+    retryQueued,
+    blocked,
+  ]);
   await em.flush();
 
-  em.create(AgentRun, {
-    org,
-    task: claimed,
-    createdAt: new Date("2026-01-02T00:00:00.000Z"),
-    startedAt: new Date("2026-01-02T00:00:00.000Z"),
-    orchestrationState: "claimed",
-    attemptCount: 0,
-    sandboxMode: "host",
-    iterationCount: 0,
-  });
+  em.persist([
+    em.create(AgentRun, {
+      org,
+      task: claimed,
+      createdAt: new Date("2026-01-02T00:00:00.000Z"),
+      startedAt: new Date("2026-01-02T00:00:00.000Z"),
+      orchestrationState: "claimed",
+      attemptCount: 0,
+      sandboxMode: "host",
+      iterationCount: 0,
+    }),
+    em.create(AgentRun, {
+      org,
+      task: running,
+      createdAt: new Date("2026-01-04T00:00:00.000Z"),
+      startedAt: new Date("2026-01-04T00:00:00.000Z"),
+      orchestrationState: "running",
+      attemptCount: 1,
+      sandboxMode: "host",
+      iterationCount: 0,
+    }),
+    em.create(AgentRun, {
+      org,
+      task: retryQueued,
+      createdAt: new Date("2026-01-05T00:00:00.000Z"),
+      startedAt: new Date("2026-01-05T00:00:00.000Z"),
+      orchestrationState: "retry_queued",
+      attemptCount: 2,
+      nextRetryAt: new Date("2026-01-06T00:00:00.000Z"),
+      sandboxMode: "host",
+      iterationCount: 0,
+    }),
+  ]);
   await em.flush();
 }
 
@@ -330,6 +379,8 @@ describe("fetchCandidateIssues", () => {
     expect(all.every((task) => task.status === "ready")).toBe(true);
     expect(all.map((task) => task.id)).not.toContain(TASK_IDS.blocked);
     expect(all.map((task) => task.id)).not.toContain(TASK_IDS.claimed);
+    expect(all.map((task) => task.id)).not.toContain(TASK_IDS.running);
+    expect(all.map((task) => task.id)).not.toContain(TASK_IDS.retryQueued);
 
     const limited = await fetchCandidateIssues(lastDb.orm.em, DEFAULT_ORG_ID, 2);
     expect(limited.map((task) => task.id)).toEqual([

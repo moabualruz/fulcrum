@@ -70,11 +70,16 @@ export const assertPermission = t.middleware(async ({ ctx, next }) => {
   // See web-bundle safety note in module JSDoc above.
   if (ctx.container) {
     try {
-      const flagRegistry = ctx.container.get(FlagRegistry);
-      const casbinOn = await flagRegistry.isEnabled("casbin-policies", {
-        orgId: ctx.orgId ?? undefined,
-        userId: ctx.userId ?? undefined,
-      });
+      // Partial containers do not opt into Casbin until the flag registry is bound.
+      const flagRegistry = ctx.container.has(FlagRegistry)
+        ? ctx.container.get(FlagRegistry)
+        : null;
+      const casbinOn = flagRegistry
+        ? await flagRegistry.isEnabled("casbin-policies", {
+            orgId: ctx.orgId ?? undefined,
+            userId: ctx.userId ?? undefined,
+          })
+        : false;
 
       if (casbinOn) {
         // Dynamic imports — excluded from web SSR static bundle (decorator safety).
@@ -112,7 +117,13 @@ export const assertPermission = t.middleware(async ({ ctx, next }) => {
     } catch (e) {
       // Re-throw TRPCErrors (FORBIDDEN from checkCasbinGate)
       if (e instanceof TRPCError) throw e;
-      // Other errors (container not bound, DB unavailable) — fail open (Better-Auth path).
+      // Permission infrastructure failures fail closed; adapter/container wiring
+      // issues must not silently downgrade protected routes.
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Permission check failed.",
+        cause: e,
+      });
     }
   }
 

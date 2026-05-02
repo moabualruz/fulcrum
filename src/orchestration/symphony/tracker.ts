@@ -30,6 +30,12 @@ const RESOLVED_BLOCKER_STATUSES = new Set([
   "resolved",
 ]);
 
+const OCCUPIED_TASK_ORCHESTRATION_STATES = [
+  "claimed",
+  "running",
+  "retry_queued",
+] satisfies (typeof AGENT_RUN_ORCHESTRATION_STATES)[number][];
+
 export const FetchCandidateIssuesInputSchema = z.object({
   orgId: FulcrumUuidSchema,
   limit: z.number().int().min(1).max(500).default(50),
@@ -245,7 +251,7 @@ async function fetchClaimedTaskIds(
   const claimedRuns = await agentRunRepo.find(
     {
       org: orgId,
-      orchestrationState: "claimed",
+      orchestrationState: { $in: OCCUPIED_TASK_ORCHESTRATION_STATES },
       task: { id: { $in: [...taskIds] } },
     } as never,
     { populate: ["task"] },

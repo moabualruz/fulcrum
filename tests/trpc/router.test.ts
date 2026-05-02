@@ -13,10 +13,12 @@
 
 import { describe, it, expect } from "bun:test";
 import { TRPCError } from "@trpc/server";
+import { Container } from "@needle-di/core";
 
 import { appRouter } from "../../src/trpc/router.ts";
 import { createContext } from "../../src/trpc/context.ts";
 import { t } from "../../src/trpc/trpc.ts";
+import { FlagRegistry } from "../../src/flags/registry.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 
@@ -66,6 +68,21 @@ function authenticatedCaller(
   );
 }
 
+function authenticatedCallerWithContainer(container: Container) {
+  const userId = "user-test-001";
+  const orgId = "00000000-0000-0000-0000-000000000001";
+  const session = mockSession({ userId, orgId });
+  return createCaller(
+    createContext({
+      session: session as unknown as import("better-auth").Session,
+      orgId,
+      userId,
+      em: null,
+      container,
+    }),
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. UNAUTHORIZED — protected procedure without session
 // ─────────────────────────────────────────────────────────────────────────────
@@ -105,6 +122,34 @@ describe("assertPermission middleware", () => {
     }
     expect(error).not.toBeNull();
     expect(error?.code).toBe("UNAUTHORIZED");
+  });
+
+  it("returns INTERNAL_SERVER_ERROR when casbin flag check throws unexpectedly", async () => {
+    const container = new Container();
+    container.bind({
+      provide: FlagRegistry,
+      useValue: {
+        isEnabled: async () => {
+          throw new Error("flag store unavailable");
+        },
+      } as unknown as FlagRegistry,
+    });
+    const caller = authenticatedCallerWithContainer(container);
+    let error: TRPCError | null = null;
+    try {
+      await caller.auth.whoami();
+    } catch (e) {
+      if (e instanceof TRPCError) error = e;
+    }
+    expect(error).not.toBeNull();
+    expect(error?.code).toBe("INTERNAL_SERVER_ERROR");
+  });
+
+  it("treats containers without FlagRegistry as casbin disabled", async () => {
+    const caller = authenticatedCallerWithContainer(new Container());
+    const result = await caller.auth.whoami();
+    expect(result.userId).toBe("user-test-001");
+    expect(result.orgId).toBe("00000000-0000-0000-0000-000000000001");
   });
 });
 

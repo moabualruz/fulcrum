@@ -21,6 +21,8 @@
  * clear error message rather than crashing at import time.
  */
 
+import type { EntityManager, MikroORM } from "@mikro-orm/postgresql";
+
 /** Result type for registration options generation. */
 export interface PasskeyRegistrationOptions {
   challenge: string;
@@ -126,6 +128,7 @@ export async function verifyPasskeyRegistration(params: {
   expectedChallenge: string;
   expectedOrigin: string;
   rpId?: string;
+  requireUserVerification?: boolean;
 }): Promise<{
   verified: boolean;
   credentialId?: string;
@@ -140,7 +143,7 @@ export async function verifyPasskeyRegistration(params: {
     expectedChallenge: params.expectedChallenge,
     expectedOrigin: params.expectedOrigin,
     expectedRPID: params.rpId ?? "localhost",
-    requireUserVerification: false,
+    requireUserVerification: params.requireUserVerification ?? true,
   }) as { verified: boolean; registrationInfo?: { credential: { id: Uint8Array; publicKey: Uint8Array; counter: number } } };
 
   if (!verification.verified || !verification.registrationInfo) {
@@ -201,6 +204,7 @@ export interface PasskeyCredentialRecord {
   transports?: string[];
   deviceType?: string;
   backedUp?: boolean;
+  userVerificationRequired?: boolean;
 }
 
 export interface PasskeyStore {
@@ -217,6 +221,7 @@ export interface PasskeyStore {
   getCredentialById(credentialId: string): Promise<PasskeyCredentialRecord | null>;
   saveCredential(credential: PasskeyCredentialRecord): Promise<void>;
   updateCredentialCounter(credentialId: string, counter: number): Promise<void>;
+  runInScope?<T>(callback: (store: PasskeyStore) => Promise<T>): Promise<T>;
 }
 
 export interface PasskeyUser {
@@ -265,7 +270,196 @@ class InMemoryPasskeyStore implements PasskeyStore {
   }
 }
 
-export const defaultPasskeyStore: PasskeyStore = new InMemoryPasskeyStore();
+export class MikroOrmPasskeyStore implements PasskeyStore {
+  constructor(private readonly em: EntityManager) {}
+
+  async saveChallenge(challenge: PasskeyChallengeRecord): Promise<void> {
+    const Verification = await getVerificationClass();
+    const identifier = challengeIdentifier(challenge.challengeId, challenge.purpose);
+    await this.em.transactional(async (em) => {
+      await em.nativeDelete(Verification, { identifier } as never);
+      const row = em.create(Verification, {
+        identifier,
+        value: JSON.stringify({
+          challenge: challenge.challenge,
+          userId: challenge.userId,
+          createdAt: challenge.createdAt.toISOString(),
+        }),
+        expiresAt: challenge.expiresAt,
+        createdAt: challenge.createdAt,
+        updatedAt: new Date(),
+      } as never);
+      em.persist(row);
+      await em.flush();
+    });
+  }
+
+  async getChallenge(params: {
+    challengeId: string;
+    purpose: PasskeyChallengePurpose;
+  }): Promise<PasskeyChallengeRecord | null> {
+    const Verification = await getVerificationClass();
+    const identifier = challengeIdentifier(params.challengeId, params.purpose);
+    const row = await this.em.findOne(Verification, { identifier } as never);
+    if (!row) return null;
+    const parsed = parseChallengeValue((row as { value: string }).value);
+    return {
+      challengeId: params.challengeId,
+      purpose: params.purpose,
+      challenge: parsed.challenge,
+      userId: parsed.userId,
+      createdAt: parsed.createdAt,
+      expiresAt: (row as { expiresAt: Date }).expiresAt,
+    };
+  }
+
+  async deleteChallenge(params: {
+    challengeId: string;
+    purpose: PasskeyChallengePurpose;
+  }): Promise<void> {
+    const Verification = await getVerificationClass();
+    await this.em.nativeDelete(Verification, {
+      identifier: challengeIdentifier(params.challengeId, params.purpose),
+    } as never);
+  }
+
+  async listCredentialsByUser(userId: string): Promise<PasskeyCredentialRecord[]> {
+    const Account = await getAccountClass();
+    const rows = await this.em.find(Account, {
+      providerId: "passkey",
+      userId,
+    } as never);
+    return rows.map(accountToCredential);
+  }
+
+  async getCredentialById(credentialId: string): Promise<PasskeyCredentialRecord | null> {
+    const Account = await getAccountClass();
+    const row = await this.em.findOne(Account, {
+      providerId: "passkey",
+      accountId: credentialId,
+    } as never);
+    return row ? accountToCredential(row) : null;
+  }
+
+  async saveCredential(credential: PasskeyCredentialRecord): Promise<void> {
+    const Account = await getAccountClass();
+    await this.em.transactional(async (em) => {
+      const existing = await em.findOne(Account, {
+        providerId: "passkey",
+        accountId: credential.id,
+      } as never);
+      const now = new Date();
+      const metadata = credentialMetadataToString(credential);
+      if (existing) {
+        Object.assign(existing, {
+          userId: credential.userId,
+          password: bytesToBase64Url(credential.publicKey),
+          accessToken: metadata,
+          updatedAt: now,
+        });
+      } else {
+        const row = em.create(Account, {
+          userId: credential.userId,
+          providerId: "passkey",
+          accountId: credential.id,
+          password: bytesToBase64Url(credential.publicKey),
+          accessToken: metadata,
+          createdAt: now,
+          updatedAt: now,
+        } as never);
+        em.persist(row);
+      }
+      await em.flush();
+    });
+  }
+
+  async updateCredentialCounter(credentialId: string, counter: number): Promise<void> {
+    const Account = await getAccountClass();
+    await this.em.transactional(async (em) => {
+      const row = await em.findOne(Account, {
+        providerId: "passkey",
+        accountId: credentialId,
+      } as never);
+      if (!row) return;
+      const credential = accountToCredential(row);
+      Object.assign(row, {
+        accessToken: credentialMetadataToString({ ...credential, counter }),
+        updatedAt: new Date(),
+      });
+      await em.flush();
+    });
+  }
+}
+
+class LazyMikroOrmPasskeyStore implements PasskeyStore {
+  private ormPromise: Promise<MikroORM> | null = null;
+
+  async saveChallenge(challenge: PasskeyChallengeRecord): Promise<void> {
+    await this.runInScope((store) => store.saveChallenge(challenge));
+  }
+
+  async getChallenge(params: {
+    challengeId: string;
+    purpose: PasskeyChallengePurpose;
+  }): Promise<PasskeyChallengeRecord | null> {
+    return this.runInScope((store) => store.getChallenge(params));
+  }
+
+  async deleteChallenge(params: {
+    challengeId: string;
+    purpose: PasskeyChallengePurpose;
+  }): Promise<void> {
+    await this.runInScope((store) => store.deleteChallenge(params));
+  }
+
+  async listCredentialsByUser(userId: string): Promise<PasskeyCredentialRecord[]> {
+    return this.runInScope((store) => store.listCredentialsByUser(userId));
+  }
+
+  async getCredentialById(credentialId: string): Promise<PasskeyCredentialRecord | null> {
+    return this.runInScope((store) => store.getCredentialById(credentialId));
+  }
+
+  async saveCredential(credential: PasskeyCredentialRecord): Promise<void> {
+    await this.runInScope((store) => store.saveCredential(credential));
+  }
+
+  async updateCredentialCounter(credentialId: string, counter: number): Promise<void> {
+    await this.runInScope((store) => store.updateCredentialCounter(credentialId, counter));
+  }
+
+  async runInScope<T>(callback: (store: PasskeyStore) => Promise<T>): Promise<T> {
+    const orm = await this.orm();
+    const em = orm.em.fork();
+    try {
+      return await callback(new MikroOrmPasskeyStore(em));
+    } finally {
+      em.clear();
+    }
+  }
+
+  private async orm(): Promise<MikroORM> {
+    this.ormPromise ??= import("../db/mikro-orm.config.ts")
+      .then(({ initOrm }) => initOrm())
+      .catch((error) => {
+        this.ormPromise = null;
+        throw error;
+      });
+    return this.ormPromise;
+  }
+}
+
+export const defaultPasskeyStore: PasskeyStore = new LazyMikroOrmPasskeyStore();
+
+async function withPasskeyStore<T>(
+  store: PasskeyStore | undefined,
+  callback: (scopedStore: PasskeyStore) => Promise<T>,
+): Promise<T> {
+  const resolvedStore = store ?? defaultPasskeyStore;
+  return resolvedStore.runInScope
+    ? resolvedStore.runInScope(callback)
+    : callback(resolvedStore);
+}
 
 export async function generateRegistrationOptions(params: {
   store?: PasskeyStore;
@@ -275,37 +469,38 @@ export async function generateRegistrationOptions(params: {
   timeoutMs?: number;
   challengeTtlMs?: number;
 }): Promise<Record<string, unknown>> {
-  const store = params.store ?? defaultPasskeyStore;
-  const { generateRegistrationOptions: generate } = await importSimpleWebAuthn();
-  const credentials = await store.listCredentialsByUser(params.user.id);
-  const options = await generate({
-    rpName: params.rpName ?? "Fulcrum",
-    rpID: params.rpId ?? "localhost",
-    userID: new TextEncoder().encode(params.user.id),
-    userName: params.user.email,
-    userDisplayName: params.user.name ?? params.user.email,
-    timeout: params.timeoutMs ?? 60_000,
-    attestationType: "none",
-    excludeCredentials: credentials.map((credential) => ({
-      id: credential.id,
-      ...(credential.transports ? { transports: credential.transports } : {}),
-    })),
-    authenticatorSelection: {
-      residentKey: "preferred",
-      userVerification: "preferred",
-    },
-    supportedAlgorithmIDs: [-7, -257],
-  }) as Record<string, unknown>;
+  return withPasskeyStore(params.store, async (store) => {
+    const { generateRegistrationOptions: generate } = await importSimpleWebAuthn();
+    const credentials = await store.listCredentialsByUser(params.user.id);
+    const options = await generate({
+      rpName: params.rpName ?? "Fulcrum",
+      rpID: params.rpId ?? "localhost",
+      userID: new TextEncoder().encode(params.user.id),
+      userName: params.user.email,
+      userDisplayName: params.user.name ?? params.user.email,
+      timeout: params.timeoutMs ?? 60_000,
+      attestationType: "none",
+      excludeCredentials: credentials.map((credential) => ({
+        id: credential.id,
+        ...(credential.transports ? { transports: credential.transports } : {}),
+      })),
+      authenticatorSelection: {
+        residentKey: "preferred",
+        userVerification: "required",
+      },
+      supportedAlgorithmIDs: [-7, -257],
+    }) as Record<string, unknown>;
 
-  await store.saveChallenge({
-    challengeId: params.user.id,
-    purpose: "registration",
-    userId: params.user.id,
-    challenge: readChallenge(options),
-    createdAt: new Date(),
-    expiresAt: new Date(Date.now() + (params.challengeTtlMs ?? 5 * 60_000)),
+    await store.saveChallenge({
+      challengeId: params.user.id,
+      purpose: "registration",
+      userId: params.user.id,
+      challenge: readChallenge(options),
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + (params.challengeTtlMs ?? 5 * 60_000)),
+    });
+    return options;
   });
-  return options;
 }
 
 export async function verifyRegistrationResponse(params: {
@@ -315,32 +510,34 @@ export async function verifyRegistrationResponse(params: {
   expectedOrigin: string;
   rpId?: string;
 }): Promise<{ verified: boolean; credentialId?: string }> {
-  const store = params.store ?? defaultPasskeyStore;
-  const challenge = await requireChallenge(store, params.userId, "registration");
-  const { verifyRegistrationResponse: verify } = await importSimpleWebAuthn();
-  const verification = await verify({
-    response: params.response,
-    expectedChallenge: challenge.challenge,
-    expectedOrigin: params.expectedOrigin,
-    expectedRPID: params.rpId ?? "localhost",
-    requireUserVerification: false,
-  });
+  return withPasskeyStore(params.store, async (store) => {
+    const challenge = await requireChallenge(store, params.userId, "registration");
+    const { verifyRegistrationResponse: verify } = await importSimpleWebAuthn();
+    const verification = await verify({
+      response: params.response,
+      expectedChallenge: challenge.challenge,
+      expectedOrigin: params.expectedOrigin,
+      expectedRPID: params.rpId ?? "localhost",
+      requireUserVerification: true,
+    });
 
-  if (!verification.verified || !verification.registrationInfo) return { verified: false };
+    if (!verification.verified || !verification.registrationInfo) return { verified: false };
 
-  const info = verification.registrationInfo as unknown as Record<string, unknown>;
-  const credential = readCredential(info);
-  await store.saveCredential({
-    id: credential.id,
-    userId: params.userId,
-    publicKey: credential.publicKey,
-    counter: credential.counter,
-    transports: credential.transports,
-    deviceType: readString(info, "credentialDeviceType"),
-    backedUp: readBoolean(info, "credentialBackedUp"),
+    const info = verification.registrationInfo as unknown as Record<string, unknown>;
+    const credential = readCredential(info);
+    await store.saveCredential({
+      id: credential.id,
+      userId: params.userId,
+      publicKey: credential.publicKey,
+      counter: credential.counter,
+      transports: credential.transports,
+      deviceType: readString(info, "credentialDeviceType"),
+      backedUp: readBoolean(info, "credentialBackedUp"),
+      userVerificationRequired: true,
+    });
+    await store.deleteChallenge({ challengeId: params.userId, purpose: "registration" });
+    return { verified: true, credentialId: credential.id };
   });
-  await store.deleteChallenge({ challengeId: params.userId, purpose: "registration" });
-  return { verified: true, credentialId: credential.id };
 }
 
 export async function generateAuthenticationOptions(params: {
@@ -351,31 +548,32 @@ export async function generateAuthenticationOptions(params: {
   timeoutMs?: number;
   challengeTtlMs?: number;
 }): Promise<Record<string, unknown>> {
-  const store = params.store ?? defaultPasskeyStore;
-  const { generateAuthenticationOptions: generate } = await importSimpleWebAuthn();
-  const credentials = params.userId ? await store.listCredentialsByUser(params.userId) : [];
-  const challengeId = params.challengeId ?? params.userId ?? "login";
-  const options = await generate({
-    rpID: params.rpId ?? "localhost",
-    timeout: params.timeoutMs ?? 60_000,
-    userVerification: "preferred",
-    ...(credentials.length > 0 && {
-      allowCredentials: credentials.map((credential) => ({
-        id: credential.id,
-        ...(credential.transports ? { transports: credential.transports } : {}),
-      })),
-    }),
-  }) as Record<string, unknown>;
+  return withPasskeyStore(params.store, async (store) => {
+    const { generateAuthenticationOptions: generate } = await importSimpleWebAuthn();
+    const credentials = params.userId ? await store.listCredentialsByUser(params.userId) : [];
+    const challengeId = params.challengeId ?? params.userId ?? "login";
+    const options = await generate({
+      rpID: params.rpId ?? "localhost",
+      timeout: params.timeoutMs ?? 60_000,
+      userVerification: authenticationUserVerificationPreference(credentials),
+      ...(credentials.length > 0 && {
+        allowCredentials: credentials.map((credential) => ({
+          id: credential.id,
+          ...(credential.transports ? { transports: credential.transports } : {}),
+        })),
+      }),
+    }) as Record<string, unknown>;
 
-  await store.saveChallenge({
-    challengeId,
-    purpose: "authentication",
-    userId: params.userId,
-    challenge: readChallenge(options),
-    createdAt: new Date(),
-    expiresAt: new Date(Date.now() + (params.challengeTtlMs ?? 5 * 60_000)),
+    await store.saveChallenge({
+      challengeId,
+      purpose: "authentication",
+      userId: params.userId,
+      challenge: readChallenge(options),
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + (params.challengeTtlMs ?? 5 * 60_000)),
+    });
+    return options;
   });
-  return options;
 }
 
 export async function verifyAuthenticationResponse(params: {
@@ -390,39 +588,40 @@ export async function verifyAuthenticationResponse(params: {
   userId?: string;
   newCounter?: number;
 }> {
-  const store = params.store ?? defaultPasskeyStore;
-  const credentialId = readResponseCredentialId(params.response);
-  const credential = await store.getCredentialById(credentialId);
-  if (!credential) return { verified: false };
+  return withPasskeyStore(params.store, async (store) => {
+    const credentialId = readResponseCredentialId(params.response);
+    const credential = await store.getCredentialById(credentialId);
+    if (!credential) return { verified: false };
 
-  const challengeId = params.challengeId ?? credential.userId;
-  const challenge = await requireChallenge(store, challengeId, "authentication");
-  const { verifyAuthenticationResponse: verify } = await importSimpleWebAuthn();
-  const verification = await verify({
-    response: params.response,
-    expectedChallenge: challenge.challenge,
-    expectedOrigin: params.expectedOrigin,
-    expectedRPID: params.rpId ?? "localhost",
-    credential: {
-      id: credential.id,
-      publicKey: credential.publicKey,
-      counter: credential.counter,
-      transports: credential.transports,
-    },
-    requireUserVerification: false,
+    const challengeId = params.challengeId ?? credential.userId;
+    const challenge = await requireChallenge(store, challengeId, "authentication");
+    const { verifyAuthenticationResponse: verify } = await importSimpleWebAuthn();
+    const verification = await verify({
+      response: params.response,
+      expectedChallenge: challenge.challenge,
+      expectedOrigin: params.expectedOrigin,
+      expectedRPID: params.rpId ?? "localhost",
+      credential: {
+        id: credential.id,
+        publicKey: credential.publicKey,
+        counter: credential.counter,
+        transports: credential.transports,
+      },
+      requireUserVerification: credential.userVerificationRequired === true,
+    });
+
+    if (!verification.verified) return { verified: false };
+
+    const newCounter = readNumber(verification.authenticationInfo, "newCounter", credential.counter);
+    await store.updateCredentialCounter(credential.id, newCounter);
+    await store.deleteChallenge({ challengeId, purpose: "authentication" });
+    return {
+      verified: true,
+      credentialId: credential.id,
+      userId: credential.userId,
+      newCounter,
+    };
   });
-
-  if (!verification.verified) return { verified: false };
-
-  const newCounter = readNumber(verification.authenticationInfo, "newCounter", credential.counter);
-  await store.updateCredentialCounter(credential.id, newCounter);
-  await store.deleteChallenge({ challengeId, purpose: "authentication" });
-  return {
-    verified: true,
-    credentialId: credential.id,
-    userId: credential.userId,
-    newCounter,
-  };
 }
 
 async function requireChallenge(
@@ -510,4 +709,111 @@ function readStringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const strings = value.filter((item): item is string => typeof item === "string");
   return strings.length > 0 ? strings : undefined;
+}
+
+async function getAccountClass() {
+  const { Account } = await import("../db/entities/auth/Account.ts");
+  return Account;
+}
+
+async function getVerificationClass() {
+  const { Verification } = await import("../db/entities/auth/Verification.ts");
+  return Verification;
+}
+
+function challengeIdentifier(challengeId: string, purpose: PasskeyChallengePurpose): string {
+  return `passkey:${purpose}:${challengeId}`;
+}
+
+function parseChallengeValue(value: string): {
+  challenge: string;
+  userId?: string;
+  createdAt: Date;
+} {
+  const parsed = JSON.parse(value) as {
+    challenge?: unknown;
+    userId?: unknown;
+    createdAt?: unknown;
+  };
+  if (typeof parsed.challenge !== "string") {
+    throw new Error("Stored passkey challenge is invalid");
+  }
+  return {
+    challenge: parsed.challenge,
+    userId: typeof parsed.userId === "string" ? parsed.userId : undefined,
+    createdAt: typeof parsed.createdAt === "string" ? new Date(parsed.createdAt) : new Date(0),
+  };
+}
+
+function accountToCredential(row: unknown): PasskeyCredentialRecord {
+  const account = row as {
+    userId: string;
+    accountId: string;
+    password?: string | null;
+    accessToken?: string | null;
+  };
+  if (!account.password) throw new Error("Stored passkey credential is missing public key");
+  const metadata = parseCredentialMetadata(account.accessToken);
+  return {
+    id: account.accountId,
+    userId: account.userId,
+    publicKey: base64UrlToBytes(account.password),
+    counter: metadata.counter,
+    transports: metadata.transports,
+    deviceType: metadata.deviceType,
+    backedUp: metadata.backedUp,
+    userVerificationRequired: metadata.userVerificationRequired,
+  };
+}
+
+function credentialMetadataToString(credential: Pick<
+  PasskeyCredentialRecord,
+  "counter" | "transports" | "deviceType" | "backedUp" | "userVerificationRequired"
+>): string {
+  return JSON.stringify({
+    counter: credential.counter,
+    transports: credential.transports,
+    deviceType: credential.deviceType,
+    backedUp: credential.backedUp,
+    userVerificationRequired: credential.userVerificationRequired,
+  });
+}
+
+function parseCredentialMetadata(value: string | null | undefined): Pick<
+  PasskeyCredentialRecord,
+  "counter" | "transports" | "deviceType" | "backedUp" | "userVerificationRequired"
+> {
+  if (!value) return { counter: 0 };
+  const parsed = JSON.parse(value) as {
+    counter?: unknown;
+    transports?: unknown;
+    deviceType?: unknown;
+    backedUp?: unknown;
+    userVerificationRequired?: unknown;
+  };
+  return {
+    counter: typeof parsed.counter === "number" ? parsed.counter : 0,
+    transports: readStringArray(parsed.transports),
+    deviceType: typeof parsed.deviceType === "string" ? parsed.deviceType : undefined,
+    backedUp: typeof parsed.backedUp === "boolean" ? parsed.backedUp : undefined,
+    userVerificationRequired: typeof parsed.userVerificationRequired === "boolean"
+      ? parsed.userVerificationRequired
+      : undefined,
+  };
+}
+
+function authenticationUserVerificationPreference(
+  credentials: PasskeyCredentialRecord[],
+): "preferred" | "required" {
+  return credentials.length > 0 && credentials.every((credential) => credential.userVerificationRequired === true)
+    ? "required"
+    : "preferred";
+}
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  return Buffer.from(bytes).toString("base64url");
+}
+
+function base64UrlToBytes(value: string): Uint8Array {
+  return new Uint8Array(Buffer.from(value, "base64url"));
 }

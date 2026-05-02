@@ -82,6 +82,21 @@ function makeCaller(userId: string, orgId: string) {
   return createCaller(ctx);
 }
 
+function makeCallerWithoutContainer(userId: string, orgId: string) {
+  const session = mockSession(userId, orgId);
+  const em = orm.em.fork();
+
+  return createCaller(
+    createContext({
+      session: session as unknown as import("better-auth").Session,
+      orgId,
+      userId,
+      em: em as unknown as import("@mikro-orm/postgresql").EntityManager,
+      container: null,
+    }),
+  );
+}
+
 function unauthCaller() {
   return createCaller(
     createContext({
@@ -266,6 +281,18 @@ describe("flags.set — owner/admin", () => {
 describe("flags.set — non-owner forbidden", () => {
   it("member (non-owner) calling flags.set gets FORBIDDEN", async () => {
     const caller = makeCaller(TEST_USER_ID, TEST_ORG_ID);
+    let error: TRPCError | null = null;
+    try {
+      await caller.flags.set({ flag: "router-llm", enabled: true });
+    } catch (e) {
+      if (e instanceof TRPCError) error = e;
+    }
+    expect(error).not.toBeNull();
+    expect(error?.code).toBe("FORBIDDEN");
+  });
+
+  it("member with em but no container still gets FORBIDDEN", async () => {
+    const caller = makeCallerWithoutContainer(TEST_USER_ID, TEST_ORG_ID);
     let error: TRPCError | null = null;
     try {
       await caller.flags.set({ flag: "router-llm", enabled: true });
