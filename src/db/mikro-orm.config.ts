@@ -52,6 +52,10 @@ import { ErrorLog } from "./entities/platform/ErrorLog.ts";
 import { ExperimentAssignment } from "./entities/platform/ExperimentAssignment.ts";
 import { FeatureFlagRollout } from "./entities/platform/FeatureFlagRollout.ts";
 
+// Skills registry entities (P5#02).
+import { FulcrumSkill } from "./entities/skills/FulcrumSkill.ts";
+import { SkillVersion } from "./entities/skills/SkillVersion.ts";
+
 export {
   SchemaMigration,
   Org,
@@ -80,6 +84,8 @@ export {
   ErrorLog,
   ExperimentAssignment,
   FeatureFlagRollout,
+  FulcrumSkill,
+  SkillVersion,
 };
 
 /** Allowed options for createOrmConfig(). */
@@ -138,6 +144,8 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     ErrorLog,
     ExperimentAssignment,
     FeatureFlagRollout,
+    FulcrumSkill,
+    SkillVersion,
   ];
 
   const allEntities: Options["entities"] = [...builtinEntities, ...entities];

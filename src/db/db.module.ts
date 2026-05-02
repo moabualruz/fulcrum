@@ -46,6 +46,7 @@ import { Artifact } from "./entities/artifacts/Artifact.ts";
 import { Repo } from "./entities/repos/Repo.ts";
 import { Job } from "./entities/jobs/Job.ts";
 import { SearchDocument } from "./entities/search/SearchDocument.ts";
+import { FulcrumSkill } from "./entities/skills/FulcrumSkill.ts";
 
 // Flag-stub entities (P1#03 — gated by later pillars' feature flags)
 import { CasbinRule } from "./entities/flags/CasbinRule.ts";
@@ -72,6 +73,7 @@ import { ArtifactRepository } from "./repositories/artifacts/ArtifactRepository.
 import { RepoRepository } from "./repositories/repos/RepoRepository.ts";
 import { JobRepository } from "./repositories/jobs/JobRepository.ts";
 import { SearchDocumentRepository } from "./repositories/search/SearchDocumentRepository.ts";
+import { FulcrumSkillRepository } from "./repositories/skills/FulcrumSkillRepository.ts";
 
 // Flag-stub repositories
 import { CasbinRuleRepository } from "./repositories/flags/CasbinRuleRepository.ts";
@@ -100,6 +102,7 @@ export {
   RepoRepository,
   JobRepository,
   SearchDocumentRepository,
+  FulcrumSkillRepository,
   CasbinRuleRepository,
   WebhookSubscriptionRepository,
   NotificationRuleRepository,
@@ -204,6 +207,10 @@ export function registerDbBindings(container: Container, orm: MikroORM): void {
     provide: SearchDocumentRepository,
     useFactory: () =>
       em.getRepository(SearchDocument) as SearchDocumentRepository,
+  });
+  container.bind({
+    provide: FulcrumSkillRepository,
+    useFactory: () => em.getRepository(FulcrumSkill) as FulcrumSkillRepository,
   });
 
   // Flag-stub repositories (P1#03 — CasbinRule, WebhookSubscription, NotificationRule).
