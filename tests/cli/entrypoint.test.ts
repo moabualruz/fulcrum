@@ -73,11 +73,13 @@ describe("fulcrum binary entrypoint", () => {
     expect(result.stdout).toContain("no interactive terminal detected");
   });
 
-  test("inference stub exits 0", async () => {
-    const result = await runFulcrum(["inference"]);
+  test("inference help exits 0 and lists lifecycle verbs", async () => {
+    const result = await runFulcrum(["inference", "--help"]);
 
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toBe("");
-    expect(result.stdout.trim()).toBe("Inference sidecar not yet implemented");
+    expect(result.stdout).toContain("start");
+    expect(result.stdout).toContain("status");
+    expect(result.stdout).toContain("stop");
   });
 });

@@ -9,7 +9,8 @@ Usage:
                                      Manage local schema migrations.
   fulcrum web                        Start the SvelteKit web server.
   fulcrum tui                        Start the TUI (stub).
-  fulcrum inference                  Start the inference sidecar (stub).
+  fulcrum inference start|status|stop [--json]
+                                     Manage the local inference sidecar.
   fulcrum hook <name> [args...]      Run a hook recipe (reads JSON envelope on stdin).
                                      Recipes: format, lint-gate, pm-policy, test-on-edit,
                                               audit-log, index-check, index-rebuild, router
