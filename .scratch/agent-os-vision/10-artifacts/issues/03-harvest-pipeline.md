@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: artifacts
 Blocked-by: [01-schema-migration.md, 02-storage-backend.md]
