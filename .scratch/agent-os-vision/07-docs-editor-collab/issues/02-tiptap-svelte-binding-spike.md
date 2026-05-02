@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: needs-human
 Triage: HITL
 Pillar: 07-docs-editor-collab
 Owner: codex-worker-tiptap-spike
