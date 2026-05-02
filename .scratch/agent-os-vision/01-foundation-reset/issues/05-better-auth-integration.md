@@ -39,3 +39,5 @@ Cuts through: `src/auth/index.ts` (`@Injectable() AuthService`) → SvelteKit ho
 
 ## Notes
 `saas-auth` flag gates OAuth (Google/GitHub) + magic-link + email OTP plugins. Those plugins are wired into the Better-Auth instance behind the flag check at startup; when flag is OFF the login screen shows only passkey + email/password. Do not defer the wiring — ship it disabled. The MikroORM-backed adapter is a thin wrapper over `EntityRepository` + `EntityManager` calls and is registered as `@Injectable()` in the needle-di container; Better-Auth never sees raw SQL.
+
+Review follow-up: `accounts` and `verifications` now carry nullable `org_id` relations plus org-scoped lookup indexes for SaaS tenancy. The current Better-Auth adapter does not receive a reliable active org context for account/verification creates, so local auth rows remain `org_id = NULL`; SaaS call sites must pass explicit org context before these rows can be treated as tenant-bound data.

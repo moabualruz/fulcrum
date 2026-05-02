@@ -46,7 +46,11 @@ export class RoutingRule {
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
 
-  @ManyToOne(() => Org, { fieldName: "org_id", nullable: false })
+  @ManyToOne(() => Org, {
+    fieldName: "org_id",
+    nullable: false,
+    deleteRule: "cascade",
+  })
   org!: Org;
 
   // Project entity is not in the MikroORM graph yet; keep scope as project_id.

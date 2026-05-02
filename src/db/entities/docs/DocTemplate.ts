@@ -21,6 +21,11 @@ import type { DocType } from "./enums.ts";
   properties: ["org", "projectId", "docType", "name"],
 })
 @Index({
+  name: "doc_templates_org_global_type_name_unique",
+  expression:
+    'CREATE UNIQUE INDEX "doc_templates_org_global_type_name_unique" ON "doc_templates" ("org_id", "doc_type", "name") WHERE "project_id" IS NULL',
+})
+@Index({
   name: "doc_templates_org_project_type",
   properties: ["org", "projectId", "docType"],
 })

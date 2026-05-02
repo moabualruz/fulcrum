@@ -18,15 +18,25 @@ import {
   PrimaryKey,
   Property,
   Index,
+  ManyToOne,
 } from "@mikro-orm/decorators/es";
 import { AccountRepository } from "../../repositories/auth/AccountRepository.ts";
+import { Org } from "./Org.ts";
 
 @Entity({ tableName: "accounts", repository: () => AccountRepository })
+@Index({ name: "idx_accounts_org_user", properties: ["org", "userId"] })
 @Index({ name: "idx_accounts_user_id", properties: ["userId"] })
 @Index({ name: "idx_accounts_provider", properties: ["providerId", "accountId"] })
 export class Account {
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
+
+  @ManyToOne(() => Org, {
+    fieldName: "org_id",
+    nullable: true,
+    deleteRule: "cascade",
+  })
+  org: Org | null = null;
 
   /**
    * References users.id — not a FK constraint to keep cascade behaviour

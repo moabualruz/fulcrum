@@ -20,16 +20,26 @@ import {
   Property,
   Index,
   Unique,
+  ManyToOne,
 } from "@mikro-orm/decorators/es";
 import { VerificationRepository } from "../../repositories/auth/VerificationRepository.ts";
+import { Org } from "./Org.ts";
 
 @Entity({ tableName: "verifications", repository: () => VerificationRepository })
 @Unique({ name: "uq_verifications_identifier_value", properties: ["identifier", "value"] })
+@Index({ name: "idx_verifications_org_identifier", properties: ["org", "identifier"] })
 @Index({ name: "idx_verifications_identifier", properties: ["identifier"] })
 @Index({ name: "idx_verifications_expires_at", properties: ["expiresAt"] })
 export class Verification {
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
+
+  @ManyToOne(() => Org, {
+    fieldName: "org_id",
+    nullable: true,
+    deleteRule: "cascade",
+  })
+  org: Org | null = null;
 
   /**
    * The identifier this token is scoped to (e.g. email address, user ID).
