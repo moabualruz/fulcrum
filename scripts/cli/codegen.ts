@@ -1,0 +1,568 @@
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, join, relative, resolve } from "node:path";
+import {
+  CallExpression,
+  Node,
+  ObjectLiteralExpression,
+  Project,
+  SourceFile,
+  VariableDeclaration,
+} from "ts-morph";
+import { z } from "zod";
+
+export type FlagType = "string" | "number" | "boolean" | "enum";
+
+export type FlagDefinition = {
+  name: string;
+  flag: string;
+  type: FlagType;
+  required: boolean;
+  choices: string[];
+  description: string | null;
+};
+
+type AstSchema =
+  | {
+      kind: "object";
+      description: string | null;
+      optional: boolean;
+      fields: Array<{ name: string; schema: AstSchema }>;
+    }
+  | {
+      kind: FlagType;
+      description: string | null;
+      optional: boolean;
+      choices: string[];
+    }
+  | {
+      kind: "unknown" | "void" | "array" | "record";
+      description: string | null;
+      optional: boolean;
+    };
+
+type ProcedureMetadata = {
+  path: string[];
+  type: "query" | "mutation" | "subscription";
+  input: AstSchema | null;
+  output: string | null;
+  description: string | null;
+};
+
+type DomainMetadata = {
+  name: string;
+  procedures: ProcedureMetadata[];
+};
+
+export type GenerateCliFilesOptions = {
+  routerPath: string;
+  outDir: string;
+  useAst?: boolean;
+};
+
+const EMPTY_SCHEMA: AstSchema = {
+  kind: "void",
+  description: null,
+  optional: true,
+};
+
+const ID_SCHEMA: AstSchema = {
+  kind: "object",
+  description: null,
+  optional: false,
+  fields: [
+    {
+      name: "id",
+      schema: { kind: "string", description: null, optional: false, choices: [] },
+    },
+  ],
+};
+
+const RECORD_SCHEMA: AstSchema = {
+  kind: "record",
+  description: null,
+  optional: true,
+};
+
+export function mapZodObjectToFlags(schema: z.ZodType): FlagDefinition[] {
+  return schemaToFlags(zodToAstSchema(schema), []);
+}
+
+export async function generateCliFiles(options: GenerateCliFilesOptions): Promise<void> {
+  const routerPath = resolve(options.routerPath);
+  const outDir = resolve(options.outDir);
+  const domains = await extractRouterMetadata(routerPath);
+
+  await rm(outDir, { recursive: true, force: true });
+  await mkdir(outDir, { recursive: true });
+
+  for (const domain of domains) {
+    if (domain.procedures.length === 0) continue;
+    await writeFile(join(outDir, `${domain.name}.ts`), emitDomain(domain));
+  }
+}
+
+function zodToAstSchema(schema: z.ZodType): AstSchema {
+  const zodDef = getZodDef(schema);
+  const kind = zodDef.type;
+  if (kind === "optional") {
+    const inner = zodToAstSchema(zodDef.innerType as z.ZodType);
+    return { ...inner, optional: true };
+  }
+  if (kind === "default") {
+    const inner = zodToAstSchema(zodDef.innerType as z.ZodType);
+    return { ...inner, optional: true };
+  }
+  if (kind === "object") {
+    const shape = getZodShape(zodDef.shape);
+    return {
+      kind: "object",
+      description: schema.description ?? null,
+      optional: false,
+      fields: Object.entries(shape).map(([name, child]) => ({
+        name,
+        schema: zodToAstSchema(child),
+      })),
+    };
+  }
+  if (kind === "string" || kind === "number" || kind === "boolean") {
+    return {
+      kind,
+      description: schema.description ?? null,
+      optional: false,
+      choices: [],
+    };
+  }
+  if (kind === "enum") {
+    return {
+      kind: "enum",
+      description: schema.description ?? null,
+      optional: false,
+      choices: Object.values(zodDef.entries ?? {}).map(String).sort(),
+    };
+  }
+  return {
+    kind: "unknown",
+    description: schema.description ?? null,
+    optional: false,
+  };
+}
+
+function schemaToFlags(schema: AstSchema | null, path: string[]): FlagDefinition[] {
+  if (schema === null) return [];
+  if (schema.kind === "object") {
+    return schema.fields
+      .flatMap((field) => schemaToFlags(field.schema, [...path, field.name]))
+      .sort(compareFlags);
+  }
+  if (schema.kind === "string" || schema.kind === "number" || schema.kind === "boolean" || schema.kind === "enum") {
+    const name = path.map(kebab).join("-");
+    const valueHint = schema.kind === "boolean" ? "" : ` <${schema.kind === "enum" ? "choice" : schema.kind}>`;
+    return [
+      {
+        name,
+        flag: `--${name}${valueHint}`,
+        type: schema.kind,
+        required: !schema.optional,
+        choices: "choices" in schema ? schema.choices : [],
+        description: schema.description,
+      },
+    ];
+  }
+  return [];
+}
+
+async function extractRouterMetadata(routerPath: string): Promise<DomainMetadata[]> {
+  const project = new Project({
+    compilerOptions: {
+      allowImportingTsExtensions: true,
+      moduleResolution: 100,
+      noEmit: true,
+      strict: true,
+    },
+    skipAddingFilesFromTsConfig: true,
+  });
+  const entry = project.addSourceFileAtPath(routerPath);
+  const source = await resolveAppRouterSource(entry, routerPath, project);
+  const context = createExtractorContext(source);
+  const appRouter = context.variables.get("appRouter");
+  const initializer = appRouter?.getInitializer();
+  const record = unwrapRouterObject(initializer);
+  if (record === null) throw new Error(`appRouter t.router({...}) not found in ${routerPath}`);
+
+  return objectProperties(record)
+    .map(({ name, expression }) => ({
+      name,
+      procedures: extractRouterProcedures(expression, context, []),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function resolveAppRouterSource(entry: SourceFile, routerPath: string, project: Project): Promise<SourceFile> {
+  for (const declaration of entry.getExportDeclarations()) {
+    const names = declaration.getNamedExports().map((item) => item.getName());
+    if (!names.includes("appRouter") && !names.includes("AppRouter")) continue;
+    const specifier = declaration.getModuleSpecifierValue();
+    if (specifier === undefined) continue;
+    const resolved = resolve(dirname(routerPath), specifier);
+    return project.addSourceFileAtPath(resolved);
+  }
+  return entry;
+}
+
+function createExtractorContext(source: SourceFile) {
+  const variables = new Map<string, VariableDeclaration>();
+  const schemas = new Map<string, AstSchema>();
+  for (const declaration of source.getVariableDeclarations()) {
+    variables.set(declaration.getName(), declaration);
+    const initializer = declaration.getInitializer();
+    if (initializer !== undefined) {
+      const schema = parseZodExpression(initializer, { variables, schemas });
+      if (schema !== null) schemas.set(declaration.getName(), schema);
+    }
+  }
+  return { source, variables, schemas };
+}
+
+function extractRouterProcedures(
+  expression: Node,
+  context: ReturnType<typeof createExtractorContext>,
+  prefix: string[],
+): ProcedureMetadata[] {
+  const resolved = resolveExpression(expression, context);
+  const routerObject = unwrapRouterObject(resolved);
+  if (routerObject === null) return proceduresFromHelperCall(resolved, prefix);
+
+  return objectProperties(routerObject)
+    .flatMap(({ name, expression: propertyExpression }) => {
+      if (Node.isSpreadAssignment(propertyExpression)) {
+        return proceduresFromHelperCall(propertyExpression.getExpression(), prefix);
+      }
+      const nestedRouter = unwrapRouterObject(resolveExpression(propertyExpression, context));
+      if (nestedRouter !== null) {
+        return extractRouterProcedures(propertyExpression, context, [...prefix, name]);
+      }
+      const procedure = extractProcedure(propertyExpression, context, [...prefix, name]);
+      return procedure === null ? [] : [procedure];
+    })
+    .sort((a, b) => a.path.join(".").localeCompare(b.path.join(".")));
+}
+
+function proceduresFromHelperCall(expression: Node, prefix: string[]): ProcedureMetadata[] {
+  if (!Node.isCallExpression(expression)) return [];
+  const helper = callName(expression);
+  const domain = stringArg(expression, 0) ?? prefix.at(0) ?? "unknown";
+  if (helper === "crudRouter" || helper === "crudProcedures") {
+    return [
+      helperProcedure(prefix, "list", "query", EMPTY_SCHEMA, null),
+      helperProcedure(prefix, "get", "query", ID_SCHEMA, null),
+      helperProcedure(prefix, "create", "mutation", RECORD_SCHEMA, `${domain} create`),
+      helperProcedure(prefix, "update", "mutation", RECORD_SCHEMA, `${domain} update`),
+      helperProcedure(prefix, "delete", "mutation", ID_SCHEMA, null),
+    ];
+  }
+  if (helper === "listProcedure") return [helperProcedure(prefix, "list", "query", EMPTY_SCHEMA, null)];
+  if (helper === "getProcedure") return [helperProcedure(prefix, "get", "query", ID_SCHEMA, null)];
+  if (helper === "mutationProcedure") {
+    return [helperProcedure(prefix, stringArg(expression, 1) ?? "run", "mutation", RECORD_SCHEMA, null)];
+  }
+  if (helper === "idMutationProcedure") {
+    return [helperProcedure(prefix, stringArg(expression, 1) ?? "run", "mutation", ID_SCHEMA, null)];
+  }
+  return [];
+}
+
+function helperProcedure(
+  prefix: string[],
+  name: string,
+  type: ProcedureMetadata["type"],
+  input: AstSchema,
+  description: string | null,
+): ProcedureMetadata {
+  return {
+    path: [...prefix, name],
+    type,
+    input,
+    output: null,
+    description,
+  };
+}
+
+function extractProcedure(
+  expression: Node,
+  context: ReturnType<typeof createExtractorContext>,
+  path: string[],
+): ProcedureMetadata | null {
+  const resolved = resolveExpression(expression, context);
+  if (!Node.isCallExpression(resolved)) return null;
+  const type = procedureType(resolved);
+  if (type === null) return procedureFromHelperCall(resolved, path);
+
+  const inputExpression = chainedCallArgument(resolved, "input");
+  const outputExpression = chainedCallArgument(resolved, "output");
+  const input = inputExpression === null ? null : parseZodExpression(inputExpression, context);
+  const output = outputExpression?.getText() ?? null;
+
+  return {
+    path,
+    type,
+    input,
+    output,
+    description: input?.description ?? null,
+  };
+}
+
+function procedureFromHelperCall(expression: CallExpression, path: string[]): ProcedureMetadata | null {
+  const helper = callName(expression);
+  const name = path.at(-1) ?? stringArg(expression, 1) ?? "run";
+  const prefix = path.slice(0, -1);
+  if (helper === "listProcedure") return helperProcedure(prefix, name, "query", EMPTY_SCHEMA, null);
+  if (helper === "getProcedure") return helperProcedure(prefix, name, "query", ID_SCHEMA, null);
+  if (helper === "mutationProcedure") return helperProcedure(prefix, stringArg(expression, 1) ?? name, "mutation", RECORD_SCHEMA, null);
+  if (helper === "idMutationProcedure") return helperProcedure(prefix, stringArg(expression, 1) ?? name, "mutation", ID_SCHEMA, null);
+  return null;
+}
+
+function parseZodExpression(
+  expression: Node,
+  context: Pick<ReturnType<typeof createExtractorContext>, "variables" | "schemas">,
+): AstSchema | null {
+  if (Node.isIdentifier(expression)) {
+    return context.schemas.get(expression.getText()) ?? schemaFromKnownIdentifier(expression.getText());
+  }
+  if (!Node.isCallExpression(expression)) return null;
+
+  const called = expression.getExpression();
+  if (!Node.isPropertyAccessExpression(called)) return null;
+  const method = called.getName();
+  const target = called.getExpression();
+
+  if (method === "describe") {
+    const base = parseZodExpression(target, context);
+    const description = stringArg(expression, 0);
+    return base === null ? null : { ...base, description: description ?? base.description };
+  }
+  if (method === "optional" || method === "default" || method === "nullable") {
+    const base = parseZodExpression(target, context);
+    return base === null ? null : { ...base, optional: true };
+  }
+  if (
+    method === "min" ||
+    method === "max" ||
+    method === "int" ||
+    method === "nonnegative" ||
+    method === "positive" ||
+    method === "uuid" ||
+    method === "email" ||
+    method === "url"
+  ) {
+    return parseZodExpression(target, context);
+  }
+  if (method === "array") {
+    return { kind: "array", description: null, optional: false };
+  }
+  if (target.getText() !== "z") return null;
+
+  if (method === "object") {
+    const shape = expression.getArguments()[0];
+    if (!Node.isObjectLiteralExpression(shape)) {
+      return { kind: "object", description: null, optional: false, fields: [] };
+    }
+    return {
+      kind: "object",
+      description: null,
+      optional: false,
+      fields: objectProperties(shape).map(({ name, expression: childExpression }) => ({
+        name,
+        schema: parseZodExpression(childExpression, context) ?? unknownSchema(),
+      })),
+    };
+  }
+  if (method === "string" || method === "number" || method === "boolean") {
+    return { kind: method, description: null, optional: false, choices: [] };
+  }
+  if (method === "enum") {
+    const arg = expression.getArguments()[0];
+    const choices = Node.isArrayLiteralExpression(arg)
+      ? arg.getElements().flatMap((item) => {
+          if (Node.isStringLiteral(item)) return [item.getLiteralText()];
+          return [];
+        })
+      : [];
+    return { kind: "enum", description: null, optional: false, choices };
+  }
+  if (method === "record") return { kind: "record", description: null, optional: false };
+  if (method === "void") return EMPTY_SCHEMA;
+  return unknownSchema();
+}
+
+function schemaFromKnownIdentifier(name: string): AstSchema | null {
+  if (name === "EmptyInputSchema") return EMPTY_SCHEMA;
+  if (name === "IdInputSchema") return ID_SCHEMA;
+  if (name === "OptionalRecordInputSchema") return RECORD_SCHEMA;
+  return null;
+}
+
+function unwrapRouterObject(expression: Node | undefined): ObjectLiteralExpression | null {
+  if (expression === undefined) return null;
+  if (!Node.isCallExpression(expression)) return null;
+  const called = expression.getExpression();
+  if (!Node.isPropertyAccessExpression(called)) return null;
+  if (called.getName() !== "router") return null;
+  const args = expression.getArguments();
+  const record = args[0];
+  return Node.isObjectLiteralExpression(record) ? record : null;
+}
+
+function resolveExpression(expression: Node, context: ReturnType<typeof createExtractorContext>): Node {
+  if (!Node.isIdentifier(expression)) return expression;
+  const declaration = context.variables.get(expression.getText());
+  if (declaration !== undefined && Node.isVariableDeclaration(declaration)) {
+    return declaration.getInitializer() ?? expression;
+  }
+  return expression;
+}
+
+function objectProperties(object: ObjectLiteralExpression): Array<{ name: string; expression: Node }> {
+  const properties: Array<{ name: string; expression: Node }> = [];
+  for (const property of object.getProperties()) {
+    if (Node.isSpreadAssignment(property)) {
+      properties.push({ name: "...", expression: property });
+      continue;
+    }
+    if (Node.isPropertyAssignment(property)) {
+      const nameNode = property.getNameNode();
+      const name = Node.isStringLiteral(nameNode) ? nameNode.getLiteralText() : property.getName();
+      properties.push({ name, expression: property.getInitializerOrThrow() });
+      continue;
+    }
+    if (Node.isShorthandPropertyAssignment(property)) {
+      properties.push({ name: property.getName(), expression: property.getNameNode() });
+    }
+  }
+  return properties;
+}
+
+function chainedCallArgument(expression: CallExpression, method: string): Node | null {
+  let current: Node = expression;
+  while (Node.isCallExpression(current)) {
+    const called = current.getExpression();
+    if (!Node.isPropertyAccessExpression(called)) return null;
+    if (called.getName() === method) return current.getArguments()[0] ?? null;
+    current = called.getExpression();
+  }
+  return null;
+}
+
+function procedureType(expression: CallExpression): ProcedureMetadata["type"] | null {
+  const called = expression.getExpression();
+  if (!Node.isPropertyAccessExpression(called)) return null;
+  const name = called.getName();
+  if (name === "query" || name === "mutation" || name === "subscription") return name;
+  return null;
+}
+
+function callName(expression: CallExpression): string {
+  const called = expression.getExpression();
+  if (Node.isIdentifier(called)) return called.getText();
+  if (Node.isPropertyAccessExpression(called)) return called.getName();
+  return "";
+}
+
+function stringArg(expression: CallExpression, index: number): string | null {
+  const arg = expression.getArguments()[index];
+  if (Node.isStringLiteral(arg)) return arg.getLiteralText();
+  if (Node.isNoSubstitutionTemplateLiteral(arg)) return arg.getLiteralText();
+  return null;
+}
+
+function emitDomain(domain: DomainMetadata): string {
+  const functionName = `create${pascal(domain.name)}Command`;
+  const lines = [
+    `import { Command, Option } from "commander";`,
+    "",
+    `export function ${functionName}(): Command {`,
+    `  const command = new Command(${JSON.stringify(domain.name)});`,
+    `  command.description(${JSON.stringify(`Generated ${domain.name} commands.`)});`,
+    "",
+  ];
+
+  for (const procedure of domain.procedures) {
+    const constName = `${camel(procedure.path.join("_"))}Command`;
+    const commandPath = procedure.path.map(kebab).join(" ");
+    lines.push(`  const ${constName} = command.command(${JSON.stringify(commandPath)});`);
+    lines.push(`  ${constName}.description(${JSON.stringify(procedure.description ?? `${domain.name} ${procedure.path.join(" ")}`)});`);
+    lines.push(`  ${constName}.option("--json", "Emit JSON output");`);
+    for (const flag of schemaToFlags(procedure.input, [])) {
+      const help = flag.description ?? flag.name;
+      if (flag.type === "enum") {
+        lines.push(`  ${constName}.addOption(new Option(${JSON.stringify(flag.flag)}, ${JSON.stringify(help)}).choices(${JSON.stringify(flag.choices)}));`);
+      } else if (flag.type === "number") {
+        lines.push(`  ${constName}.option(${JSON.stringify(flag.flag)}, ${JSON.stringify(help)}, Number.parseFloat);`);
+      } else {
+        lines.push(`  ${constName}.option(${JSON.stringify(flag.flag)}, ${JSON.stringify(help)});`);
+      }
+    }
+    lines.push(`  ${constName}.action(async () => {`);
+    lines.push(`    throw new Error(${JSON.stringify(`Generated tRPC invocation for ${domain.name}.${procedure.path.join(".")} is not wired yet.`)});`);
+    lines.push(`  });`);
+    lines.push("");
+  }
+
+  lines.push("  return command;");
+  lines.push("}");
+  lines.push("");
+  return lines.join("\n");
+}
+
+function getZodDef(schema: z.ZodType): {
+  type: string;
+  innerType?: unknown;
+  shape?: unknown;
+  entries?: Record<string, unknown>;
+} {
+  return (schema as unknown as { def: { type: string } }).def;
+}
+
+function getZodShape(shape: unknown): Record<string, z.ZodType> {
+  if (typeof shape === "function") return shape() as Record<string, z.ZodType>;
+  return shape as Record<string, z.ZodType>;
+}
+
+function compareFlags(a: FlagDefinition, b: FlagDefinition): number {
+  return a.name.localeCompare(b.name);
+}
+
+function unknownSchema(): AstSchema {
+  return { kind: "unknown", description: null, optional: false };
+}
+
+function kebab(value: string): string {
+  return value.replaceAll("_", "-").replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`).replace(/^-/, "");
+}
+
+function pascal(value: string): string {
+  return value
+    .split(/[_\-.]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+}
+
+function camel(value: string): string {
+  const name = pascal(value);
+  return name.charAt(0).toLowerCase() + name.slice(1);
+}
+
+if (import.meta.main) {
+  const args = new Set(Bun.argv.slice(2));
+  const root = resolve(import.meta.dir, "../..");
+  const routerPath = join(root, "src/server/trpc/router.ts");
+  const outDir = join(root, "src/cli/generated");
+  const start = performance.now();
+  await generateCliFiles({ routerPath, outDir, useAst: !args.has("--no-ast") });
+  const elapsed = performance.now() - start;
+  if (elapsed > 30_000) {
+    console.error("codegen exceeded 30s; rerun with --no-ast to force template emit fallback");
+    process.exitCode = 1;
+  }
+}
