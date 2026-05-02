@@ -126,7 +126,10 @@ export class ContextAssembler {
   ): Promise<{ bundle: ContextBundle; snapshotId: string }> {
     const task = await this.taskRepo.findOneOrFail(
       { id: taskId },
-      { populate: ["org"] },
+      {
+        populate: ["org"],
+        fields: ["id", "org", "customFields", "sprint", "externalId"],
+      },
     );
     const orgId = opts.orgId ?? relationId(fieldValue(task, "org")) ??
       fail("ContextAssembler requires task org or opts.orgId.");

@@ -5,8 +5,10 @@ import { createTestOrm, type TestOrm } from "../../test-utils/db.ts";
 import { registerDbBindings } from "../../db/db.module.ts";
 import { Org } from "../../db/entities/auth/Org.ts";
 import { Task } from "../../db/entities/tasks/Task.ts";
+import { Document } from "../../db/entities/docs/Document.ts";
 import { Memory } from "../../db/entities/memory/Memory.ts";
 import { ContextSnapshot } from "../../db/entities/memory/ContextSnapshot.ts";
+import { MemoryRetriever } from "../../memory/retriever.ts";
 import {
   CONTEXT_SLICE_WEIGHTS,
   ContextAssembler,
@@ -220,6 +222,30 @@ describe("ContextAssembler", () => {
       await db.close();
     }
   });
+
+  test("loads lazy task customFields in the real repository path before deriving query, project, and wikilinks", async () => {
+    const db = await createTestOrm();
+    try {
+      const retriever = new FakeMemoryRetriever([
+        { body: "Lazy custom fields memory.", kind: "note" },
+      ]);
+      await seedLazyTaskRows(db);
+      const container = new Container();
+      registerDbBindings(container, db.orm, db.orm.em.fork());
+      container.bind({ provide: MemoryRetriever, useValue: retriever as unknown as MemoryRetriever });
+      const assembler = container.get(ContextAssembler);
+
+      const { bundle } = await assembler.assemble(TASK_ID);
+
+      expect(retriever.calls[0]?.query).toBe(
+        "Lazy field title Read [[Lazy Linked Doc]] before dispatch.",
+      );
+      expect(bundle.projectId).toBe(PROJECT_ID);
+      expect(bundle.slices.linkedDocs.content).toContain("Lazy linked content.");
+    } finally {
+      await db.close();
+    }
+  });
 });
 
 class FakeMemoryRetriever {
@@ -412,6 +438,39 @@ async function seedIntegrationRows(db: TestOrm): Promise<void> {
     sourceRef: {},
     archived: false,
     createdAt: new Date("2026-05-02T00:00:00.000Z"),
+    updatedAt: new Date("2026-05-02T00:00:00.000Z"),
+  }));
+  await em.flush();
+  em.clear();
+}
+
+async function seedLazyTaskRows(db: TestOrm): Promise<void> {
+  const em = db.orm.em.fork();
+  const org = em.getReference(Org, ORG_ID);
+  em.persist(em.create(Task, {
+    id: TASK_ID,
+    org,
+    customFields: {
+      title: "Lazy field title",
+      description: "Read [[Lazy Linked Doc]] before dispatch.",
+      projectId: PROJECT_ID,
+    },
+  }));
+  em.persist(em.create(Document, {
+    id: "66666666-6666-6666-6666-666666666666",
+    org,
+    projectId: PROJECT_ID,
+    scope: "project",
+    docType: "note",
+    frontmatter: {
+      title: "Lazy Linked Doc",
+      slug: "lazy-linked-doc",
+    },
+    bodyMd: "Lazy linked content.\n\nSecond paragraph.",
+    contentJson: {},
+    sortPosition: 0,
+    archived: false,
+    externalId: null,
     updatedAt: new Date("2026-05-02T00:00:00.000Z"),
   }));
   await em.flush();
