@@ -21,6 +21,17 @@ import {
   WorkspacePathSchema,
   WorkflowConfigSchema,
 } from "../../orchestration/symphony/schemas.ts";
+import { ClaimConflictError } from "../../orchestration/symphony/orchestrator.ts";
+
+const ClaimRunInputSchema = z.object({
+  orgId: z.string().uuid(),
+  taskId: z.string().uuid(),
+  instanceId: z.string().min(1),
+});
+
+const ClaimRunOutputSchema = z.object({
+  runId: z.string().uuid(),
+});
 
 const PromptPreviewIssueSchema = z.object({
   id: z.string(),
@@ -174,6 +185,31 @@ export const orchestrationRouter = t.router({
       );
 
       return { prompt, config };
+    }),
+
+  claimRun: protectedProcedure
+    .input(ClaimRunInputSchema)
+    .output(ClaimRunOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      ensureOrg(ctx.orgId, input.orgId);
+      const em = ensureEntityManager(ctx.em);
+
+      const { claimRun } = await import(
+        "../../orchestration/symphony/orchestrator.ts"
+      );
+
+      try {
+        return await claimRun(em, input.orgId, input.taskId, input.instanceId);
+      } catch (error) {
+        if (error instanceof ClaimConflictError) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: error.message,
+            cause: error,
+          });
+        }
+        throw error;
+      }
     }),
 });
 
