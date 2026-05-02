@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [06-retriever-bm25-recency-importance.md]
@@ -42,18 +42,18 @@ export class ContextAssembler {
 
 ## Acceptance criteria
 
-- [ ] `ContextAssembler` is `@Injectable()` and exposes `assemble(taskId, opts): Promise<{ bundle: ContextBundle, snapshotId: string }>`
-- [ ] Returns exactly 5 slices; each slice non-null (empty slice = `{ content: '', tokenCount: 0 }`)
-- [ ] Total `tokenCount` ≤ configured budget (`assembler.unit.test.ts`)
-- [ ] `ContextSnapshot` entity written on every `assemble()` call; `bundleBlob` byte-identical to returned JSON
-- [ ] Re-hydrating from `ContextSnapshot.bundleBlob` (no repository calls) produces byte-identical JSON (`assembler.replay.test.ts`)
-- [ ] Slice 1 uses `retrieve()` with query = `"${task.title} ${task.description}"`
-- [ ] Slice 2 resolves max 5 wikilinks; each truncated at 200-token boundary
-- [ ] Slice 3 includes last 3 same-task runs + last 2 sibling runs; transcript dropped when budget is tight
-- [ ] Slice 4 present when repo data available; gracefully empty (`{ content: '', tokenCount: 0 }`) when no repo linked
-- [ ] Slice 5 present when skills registry has entry for agent type; gracefully empty otherwise
+- [x] `ContextAssembler` is `@Injectable()` and exposes `assemble(taskId, opts): Promise<{ bundle: ContextBundle, snapshotId: string }>`
+- [x] Returns exactly 5 slices; each slice non-null (empty slice = `{ content: '', tokenCount: 0 }`)
+- [x] Total `tokenCount` ≤ configured budget (`assembler.unit.test.ts`)
+- [x] `ContextSnapshot` entity written on every `assemble()` call; `bundleBlob` byte-identical to returned JSON
+- [x] Re-hydrating from `ContextSnapshot.bundleBlob` (no repository calls) produces byte-identical JSON (`assembler.replay.test.ts`)
+- [x] Slice 1 uses `retrieve()` with query = `"${task.title} ${task.description}"`
+- [x] Slice 2 resolves max 5 wikilinks; each truncated at 200-token boundary
+- [x] Slice 3 includes last 3 same-task runs + last 2 sibling runs; transcript dropped when budget is tight
+- [x] Slice 4 present when repo data available; gracefully empty (`{ content: '', tokenCount: 0 }`) when no repo linked
+- [x] Slice 5 present when skills registry has entry for agent type; gracefully empty otherwise
 - [ ] `context.preview` tRPC procedure returns bundle without writing `agent_runs` row
-- [ ] Proportional truncation: each slice allocated `budget * weight[i]`; slice text clipped at its allocation
+- [x] Proportional truncation: each slice allocated `budget * weight[i]`; slice text clipped at its allocation
 
 ## Blocked by
 
@@ -62,3 +62,7 @@ export class ContextAssembler {
 ## EXECUTION-LOG
 
 - 2026-05-02 codex-orchestrator: claimed for `codex-worker-p8-context-assembler` after retriever lane accepted on main (`906b533b`, `bf268055`).
+- 2026-05-02 codex-worker-p8-context-assembler: implemented service core in `src/context/assemble.ts` with `@Injectable()` `ContextAssembler`, `ContextSnapshotRepository` wrapper, 5-slice bundle assembly, default 8192 budget, weights `[0.35,0.20,0.20,0.15,0.10]`, proportional truncation, replay helper, and tests in `src/context/__tests__/assembler.test.ts`.
+- 2026-05-02 codex-worker-p8-context-assembler: deferred `context.preview` tRPC acceptance to API/router gate. Root/shared tRPC router is frozen by active P1 gate, and lane write set excludes router-wide surfaces.
+- 2026-05-02 codex-worker-p8-context-assembler: verification passed: `bun test src/context/__tests__/assembler.test.ts src/memory/__tests__/retriever.test.ts src/memory/__tests__/extractor-heuristic.test.ts`; `bun run lint`.
+- 2026-05-02 codex-worker-p8-context-assembler: fixback loaded lazy task fields (`customFields`, `sprint`, `externalId`) in real repository path before deriving query/project/doc links; added regression using `createTestOrm()` + DI container to verify seeded customFields title/description/projectId and wikilink resolution.
