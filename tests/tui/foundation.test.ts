@@ -4,16 +4,23 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { TRPCError } from "@trpc/server";
+import { Container } from "@needle-di/core";
+import { MikroORM } from "@mikro-orm/postgresql";
 
 import { t } from "../../src/trpc/trpc.ts";
 import { appRouter } from "../../src/trpc/router.ts";
 import { createContext } from "../../src/trpc/context.ts";
-import { TuiApp, type TuiCaller } from "../../src/tui/index.ts";
+import { buildCaller, TuiApp, type TuiCaller } from "../../src/tui/index.ts";
 import { TuiRouter } from "../../src/tui/router.ts";
 import { SubscriptionBridge } from "../../src/tui/subscriptions.ts";
 import { JsonlCrashLog } from "../../src/tui/crashlog.ts";
-import { MemoryTelemetrySink } from "../../src/tui/telemetry.ts";
+import { DbTelemetrySink, MemoryTelemetrySink } from "../../src/tui/telemetry.ts";
 import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
+import { registerDbBindings } from "../../src/db/db.module.ts";
+import { Org, User } from "../../src/db/entities/auth/index.ts";
+import { Account } from "../../src/db/entities/auth/Account.ts";
+import { TelemetryEvent } from "../../src/db/entities/platform/TelemetryEvent.ts";
+import { createTestOrm, type TestOrm } from "../../src/test-utils/db.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 
@@ -50,6 +57,13 @@ function fakeCaller(): TuiCaller {
       list: async () => [],
     },
   };
+}
+
+function testContainer(db: TestOrm): Container {
+  const container = new Container();
+  container.bind({ provide: MikroORM, useValue: db.orm });
+  registerDbBindings(container, db.orm, db.em);
+  return container;
 }
 
 describe("TuiRouter", () => {
@@ -139,6 +153,83 @@ describe("TuiApp foundation behavior", () => {
     expect(telemetry.rows.map((row) => row.screenKey)).toContain("auth");
     expect(telemetry.rows.every((row) => row.renderMs >= 0)).toBe(true);
     app.stop();
+  });
+
+  it("production caller resolves local seeded session, org name, passkeys, and flags from DB context", async () => {
+    const db = await createTestOrm();
+    try {
+      const em = db.em.fork();
+      const user = await em.findOneOrFail(User, { id: db.seed.userId });
+      em.persist(em.create(Account, {
+        userId: user.id,
+        providerId: "passkey",
+        accountId: "credential-a",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+      await em.flush();
+
+      const caller = await buildCaller(testContainer(db));
+      const whoami = await caller.auth.whoami();
+
+      expect(whoami.userId).toBe(db.seed.userId);
+      expect(whoami.orgId).toBe(db.seed.orgId);
+      expect(whoami.email).toBe("admin@local");
+      expect(whoami.orgName).toBe("Local");
+      expect(whoami.passkeyCount).toBe(1);
+      await expect(caller.flags.list()).resolves.toEqual(expect.any(Array));
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("status bar and auth screen render local org name from production caller", async () => {
+    const db = await createTestOrm();
+    try {
+      const tty = new FakeTTY();
+      const app = new TuiApp({
+        output: tty,
+        caller: await buildCaller(testContainer(db)),
+      });
+
+      await app.mount();
+      expect(tty.plainText()).toContain("Local");
+      expect(tty.plainText()).toContain("admin@local");
+
+      tty.clear();
+      await app.navigateTo("auth");
+      expect(tty.plainText()).toContain("Local");
+      expect(tty.plainText()).toContain("0 passkeys enrolled");
+      app.stop();
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("DB telemetry sink inserts a telemetry_events row per render", async () => {
+    const db = await createTestOrm();
+    try {
+      const em = db.em.fork();
+      const org = await em.findOneOrFail(Org, { id: db.seed.orgId });
+      const user = await em.findOneOrFail(User, { id: db.seed.userId });
+      const app = new TuiApp({
+        output: new FakeTTY(),
+        caller: await buildCaller(testContainer(db)),
+        telemetry: new DbTelemetrySink({ em, org, user }),
+      });
+
+      await app.mount();
+      await app.navigateTo("auth");
+
+      const rows = await em.find(TelemetryEvent, { org });
+      expect(rows).toHaveLength(2);
+      expect(rows.map((row) => row.kind)).toEqual(["local_telemetry", "local_telemetry"]);
+      expect(rows.map((row) => row.payload["screen_key"])).toContain("nav");
+      expect(rows.map((row) => row.payload["screen_key"])).toContain("auth");
+      app.stop();
+    } finally {
+      await db.close();
+    }
   });
 
   it("renders fallback screen and writes crashlog when screen render throws", async () => {

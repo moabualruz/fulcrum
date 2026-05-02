@@ -37,7 +37,7 @@ import { FlagsScreen } from "./screens/flags.ts";
 import type { FlagItem } from "./screens/flags.ts";
 import { TuiRouter, type TuiRoute } from "./router.ts";
 import { JsonlCrashLog, type TuiCrashLog } from "./crashlog.ts";
-import { NullTelemetrySink, type TuiTelemetrySink } from "./telemetry.ts";
+import { DbTelemetrySink, NullTelemetrySink, type TuiTelemetrySink } from "./telemetry.ts";
 import { ENTITY_MANAGER_TOKEN, registerDbBindings } from "../db/db.module.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -52,6 +52,10 @@ export interface TuiCaller {
       orgId: string;
       email: string | null;
       role: string | null;
+      orgName?: string | null;
+      passkeyCount?: number;
+      saasAuthEnabled?: boolean;
+      authProviders?: string[];
     }>;
   };
   flags: {
@@ -226,7 +230,7 @@ export class TuiApp {
       const whoami = await this.caller.auth.whoami();
       this.statusInfo = {
         email: whoami.email ?? whoami.userId,
-        orgId: whoami.orgId,
+        orgId: whoami.orgName ?? whoami.orgId,
       };
     } catch {
       this.statusInfo = { email: "(unauthenticated)", orgId: "local" };
@@ -446,10 +450,10 @@ export class TuiApp {
           orgId: whoami.orgId,
           email: whoami.email,
           role: whoami.role,
-          orgName: whoami.orgId,
-          passkeyCount: 0,
-          saasAuthEnabled: false,
-          authProviders: [],
+          orgName: whoami.orgName ?? whoami.orgId,
+          passkeyCount: whoami.passkeyCount ?? 0,
+          saasAuthEnabled: whoami.saasAuthEnabled ?? false,
+          authProviders: whoami.authProviders ?? [],
         };
       } catch {
         authInfo = {
@@ -543,9 +547,78 @@ export async function buildCaller(
     container: tuiContext.container,
   });
   const factory = t.createCallerFactory(appRouter);
-  // Cast: TuiCaller is a structural subset of the full AppRouter caller
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return factory(ctx) as any;
+  const caller = factory(ctx) as any;
+  return enrichTuiCaller(caller, tuiContext.em);
+}
+
+export async function buildTelemetrySink(
+  container: import("@needle-di/core").Container | null = null,
+): Promise<TuiTelemetrySink> {
+  const tuiContext = buildTuiContext(container);
+  const session = await resolveActiveTuiSession(tuiContext.em);
+  if (!tuiContext.em || !session) return new NullTelemetrySink();
+
+  try {
+    const { Org, User } = await import("../db/entities/auth/index.ts");
+    const orgId = session.activeOrganizationId ?? session.orgId;
+    const [org, user] = await Promise.all([
+      tuiContext.em.findOne(Org, { id: orgId } as never),
+      tuiContext.em.findOne(User, { id: session.userId } as never),
+    ]);
+    if (!org) return new NullTelemetrySink();
+    return new DbTelemetrySink({ em: tuiContext.em, org, user });
+  } catch {
+    return new NullTelemetrySink();
+  }
+}
+
+function authProvidersFromEnv(): string[] {
+  const providers: string[] = [];
+  if (process.env["GITHUB_CLIENT_ID"] && process.env["GITHUB_CLIENT_SECRET"]) providers.push("GitHub");
+  if (process.env["GOOGLE_CLIENT_ID"] && process.env["GOOGLE_CLIENT_SECRET"]) providers.push("Google");
+  return providers;
+}
+
+function enrichTuiCaller(caller: TuiCaller, em: EntityManager | null): TuiCaller {
+  return {
+    flags: caller.flags,
+    tasks: caller.tasks,
+    inference: caller.inference,
+    auth: {
+      whoami: async () => {
+        const whoami = await caller.auth.whoami();
+        if (!em) {
+          return {
+            ...whoami,
+            orgName: whoami.orgId,
+            passkeyCount: 0,
+            saasAuthEnabled: false,
+            authProviders: [],
+          };
+        }
+
+        const [{ Org, Account }, flags] = await Promise.all([
+          import("../db/mikro-orm.config.ts"),
+          caller.flags.list().catch(() => []),
+        ]);
+        const org = await em.findOne(Org, { id: whoami.orgId } as never);
+        const passkeyCount = await em.count(Account, {
+          providerId: "passkey",
+          userId: whoami.userId,
+        } as never);
+        const saasAuthEnabled = flags.some((flag) => flag.name === "saas-auth" && flag.enabled);
+
+        return {
+          ...whoami,
+          orgName: org?.name ?? whoami.orgId,
+          passkeyCount,
+          saasAuthEnabled,
+          authProviders: saasAuthEnabled ? authProvidersFromEnv() : [],
+        };
+      },
+    },
+  };
 }
 
 interface TuiCliSession {

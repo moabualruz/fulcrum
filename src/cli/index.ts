@@ -275,7 +275,19 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       return;
     case "tui": {
       const { run: runTui } = await import("./commands/tui.ts");
-      await runTui(rest);
+      const helpOnly = rest.includes("--help") || rest.includes("-h") || rest.includes("--no-tui");
+      const isTTY = process.stdout.isTTY && process.stdin.isTTY;
+      if (helpOnly || !isTTY) {
+        await runTui(rest);
+        return;
+      }
+
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runTui(rest, { container });
+      } finally {
+        await cleanup();
+      }
       return;
     }
     case "inference": {

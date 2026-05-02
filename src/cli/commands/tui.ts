@@ -64,7 +64,7 @@ export async function run(argv: readonly string[], opts: TuiRunOptions = {}): Pr
     return;
   }
 
-  const { TuiApp, buildCaller } = await import("../../tui/index.ts");
+  const { TuiApp, buildCaller, buildTelemetrySink } = await import("../../tui/index.ts");
 
   // Check if we have a real TTY — if not (e.g. piped in CI), bail gracefully
   const isTTY = process.stdout.isTTY && process.stdin.isTTY;
@@ -75,7 +75,11 @@ export async function run(argv: readonly string[], opts: TuiRunOptions = {}): Pr
     return;
   }
 
-  const caller = await buildCaller(opts.container ?? null);
+  const container = opts.container ?? null;
+  const [caller, telemetry] = await Promise.all([
+    buildCaller(container),
+    buildTelemetrySink(container),
+  ]);
 
   // Wire real stdin for keypress events
   // We implement a minimal raw-mode stdin adapter here
@@ -84,6 +88,7 @@ export async function run(argv: readonly string[], opts: TuiRunOptions = {}): Pr
 
   const app = new TuiApp({
     caller,
+    telemetry,
     input: stdinInput,
     onExit: () => {
       stdinInput.cleanup();
