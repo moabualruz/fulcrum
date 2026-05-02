@@ -8,6 +8,10 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { z } from "zod";
 
+import {
+  AGENT_RUN_ORCHESTRATION_STATES,
+  type AgentRun,
+} from "../../db/entities/orchestration/AgentRun.ts";
 import type { Task } from "../../db/entities/tasks/Task.ts";
 import type { AgentRunRepository } from "../../db/repositories/orchestration/AgentRunRepository.ts";
 import type { TaskRepository } from "../../db/repositories/tasks/TaskRepository.ts";
@@ -48,6 +52,54 @@ export const CandidateIssueSchema = z.object({
 export const CandidateIssueListSchema = z.array(CandidateIssueSchema);
 
 export type CandidateIssue = z.infer<typeof CandidateIssueSchema>;
+
+export const AgentRunOrchestrationStateSchema = z.enum(
+  AGENT_RUN_ORCHESTRATION_STATES,
+);
+
+export const FetchIssuesByStatesInputSchema = z.object({
+  orgId: FulcrumUuidSchema,
+  states: z.array(AgentRunOrchestrationStateSchema).max(50),
+  limit: z.number().int().min(1).max(500).default(50),
+});
+
+export const FetchIssueStatesByIdsInputSchema = z.object({
+  orgId: FulcrumUuidSchema,
+  runIds: z.array(FulcrumUuidSchema).max(500),
+});
+
+export const TrackerTaskSchema = z.object({
+  id: FulcrumUuidSchema,
+  status: z.string().nullable(),
+  priority: z.number().int().nullable(),
+  createdAt: z.date(),
+  blockedByIds: z.array(FulcrumUuidSchema),
+  workflowId: FulcrumUuidSchema.nullable(),
+});
+
+export const AgentRunIssueSchema = z.object({
+  id: FulcrumUuidSchema,
+  state: AgentRunOrchestrationStateSchema,
+  orchestrationState: AgentRunOrchestrationStateSchema,
+  task: TrackerTaskSchema.nullable(),
+  startedAt: z.date(),
+  attemptCount: z.number().int(),
+  nextRetryAt: z.date().nullable(),
+  workspacePath: z.string().nullable(),
+  lastErrorKind: z.string().nullable(),
+});
+
+export const AgentRunIssueListSchema = z.array(AgentRunIssueSchema);
+
+export const IssueStateSchema = z.object({
+  id: FulcrumUuidSchema,
+  state: AgentRunOrchestrationStateSchema,
+});
+
+export const IssueStateListSchema = z.array(IssueStateSchema);
+
+export type AgentRunIssue = z.infer<typeof AgentRunIssueSchema>;
+export type IssueState = z.infer<typeof IssueStateSchema>;
 
 export function buildCandidateIssuesBaseQuery(
   taskRepo: TaskRepository,
@@ -98,6 +150,91 @@ export async function fetchCandidateIssues(
     .map(toCandidateIssue);
 
   return CandidateIssueListSchema.parse(candidates);
+}
+
+export async function fetchIssuesByStates(
+  em: EntityManager,
+  orgId: string,
+  states: readonly z.infer<typeof AgentRunOrchestrationStateSchema>[],
+  limit = 50,
+): Promise<AgentRunIssue[]> {
+  const input = FetchIssuesByStatesInputSchema.parse({ orgId, states, limit });
+  if (input.states.length === 0) return [];
+
+  const { AgentRun } = await import(
+    "../../db/entities/orchestration/AgentRun.ts"
+  );
+  const fork = em.fork();
+  const agentRunRepo = fork.getRepository(AgentRun) as AgentRunRepository;
+
+  const runs = await agentRunRepo.find(
+    {
+      org: input.orgId,
+      orchestrationState: { $in: input.states },
+    } as never,
+    {
+      limit: input.limit,
+      populate: ["task"],
+      orderBy: issueStateOrderBy(input.states),
+    },
+  );
+
+  return AgentRunIssueListSchema.parse(runs.map(toAgentRunIssue));
+}
+
+function issueStateOrderBy(
+  states: readonly z.infer<typeof AgentRunOrchestrationStateSchema>[],
+) {
+  const stateSet = new Set(states);
+  if (
+    stateSet.size > 0 &&
+    [...stateSet].every((state) =>
+      state === "unclaimed" || state === "retry_queued"
+    )
+  ) {
+    return { nextRetryAt: "asc", id: "asc" } as const;
+  }
+
+  if (stateSet.size === 1 && stateSet.has("running")) {
+    return { startedAt: "asc", id: "asc" } as const;
+  }
+
+  return { id: "asc" } as const;
+}
+
+export async function fetchIssueStatesByIds(
+  em: EntityManager,
+  orgId: string,
+  runIds: readonly string[],
+): Promise<IssueState[]> {
+  const input = FetchIssueStatesByIdsInputSchema.parse({ orgId, runIds });
+  if (input.runIds.length === 0) return [];
+
+  const { AgentRun } = await import(
+    "../../db/entities/orchestration/AgentRun.ts"
+  );
+  const fork = em.fork();
+  const agentRunRepo = fork.getRepository(AgentRun) as AgentRunRepository;
+
+  const runs = await agentRunRepo.find(
+    {
+      id: { $in: input.runIds },
+      org: input.orgId,
+    } as never,
+    {
+      fields: ["id", "orchestrationState"],
+      orderBy: { id: "asc" },
+    },
+  );
+
+  const states = runs
+    .filter((run) => run.orchestrationState !== undefined)
+    .map((run) => ({
+      id: run.id,
+      state: run.orchestrationState,
+    }));
+
+  return IssueStateListSchema.parse(states);
 }
 
 async function fetchClaimedTaskIds(
@@ -165,6 +302,35 @@ function toCandidateIssue(task: Task): CandidateIssue {
     title: task.id,
     state: READY_TASK_STATUS,
     status: READY_TASK_STATUS,
+    priority: task.priority,
+    createdAt: task.createdAt,
+    blockedByIds: task.blockedByIds ?? [],
+    workflowId: task.workflowId,
+  };
+}
+
+function toAgentRunIssue(run: AgentRun): AgentRunIssue {
+  const state = AgentRunOrchestrationStateSchema.parse(
+    run.orchestrationState,
+  );
+
+  return {
+    id: run.id,
+    state,
+    orchestrationState: state,
+    task: run.task ? toTrackerTask(run.task) : null,
+    startedAt: run.startedAt,
+    attemptCount: run.attemptCount,
+    nextRetryAt: run.nextRetryAt ?? null,
+    workspacePath: run.workspacePath ?? null,
+    lastErrorKind: run.lastErrorKind ?? null,
+  };
+}
+
+function toTrackerTask(task: Task): z.infer<typeof TrackerTaskSchema> {
+  return {
+    id: task.id,
+    status: task.status,
     priority: task.priority,
     createdAt: task.createdAt,
     blockedByIds: task.blockedByIds ?? [],

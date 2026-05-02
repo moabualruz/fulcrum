@@ -8,7 +8,10 @@ import type { EntityManager } from "@mikro-orm/postgresql";
 
 import { DEFAULT_ORG_ID } from "../../db/seed.ts";
 import { ENTITY_MANAGER_TOKEN } from "../../db/db.module.ts";
-import type { CandidateIssue } from "../../orchestration/symphony/tracker.ts";
+import type {
+  AgentRunIssue,
+  CandidateIssue,
+} from "../../orchestration/symphony/tracker.ts";
 
 export interface SymphonyCaller {
   orchestration: {
@@ -16,6 +19,11 @@ export interface SymphonyCaller {
       orgId: string;
       limit: number;
     }) => Promise<CandidateIssue[]>;
+    fetchIssuesByStates?: (input: {
+      orgId: string;
+      states: string[];
+      limit: number;
+    }) => Promise<AgentRunIssue[]>;
   };
 }
 
@@ -34,10 +42,10 @@ const HELP = `fulcrum symphony
 Orchestration commands.
 
 Usage:
-  fulcrum symphony runs list --state ready [--limit N] [--json]
+  fulcrum symphony runs list --state <state> [--limit N] [--json]
 
 Options:
-  --state <state>  Run state filter. Only 'ready' is implemented in this slice.
+  --state <state>  State filter. 'ready' lists candidate tasks; run states list agent runs.
   --limit <N>      Max rows to return (default 50).
   --json           Output as machine-readable JSON.
   -h, --help       Show this help.
@@ -98,12 +106,6 @@ async function runRunsList(
   const state = readFlag(argv, "--state") ?? "ready";
   const limit = Number(readFlag(argv, "--limit") ?? "50");
 
-  if (state !== "ready") {
-    printErr("fulcrum symphony runs list: only --state ready is implemented");
-    exit(1);
-    return;
-  }
-
   if (!Number.isInteger(limit) || limit < 1) {
     printErr("fulcrum symphony runs list: --limit must be a positive integer");
     exit(1);
@@ -113,6 +115,30 @@ async function runRunsList(
   const caller = await resolveCaller(opts);
 
   try {
+    if (state !== "ready") {
+      if (!caller.orchestration.fetchIssuesByStates) {
+        throw new Error("orchestration.fetchIssuesByStates is unavailable");
+      }
+      const rows = await caller.orchestration.fetchIssuesByStates({
+        orgId: opts.orgId ?? DEFAULT_ORG_ID,
+        states: [state],
+        limit,
+      });
+
+      if (jsonMode) {
+        print(JSON.stringify(rows));
+        return;
+      }
+
+      print("ID                                    STATE         ATTEMPT  STARTED_AT");
+      for (const row of rows) {
+        print(
+          `${row.id}  ${row.state.padEnd(12)}  ${String(row.attemptCount).padEnd(7)}  ${row.startedAt.toISOString()}`,
+        );
+      }
+      return;
+    }
+
     const rows = await caller.orchestration.fetchCandidateIssues({
       orgId: opts.orgId ?? DEFAULT_ORG_ID,
       limit,

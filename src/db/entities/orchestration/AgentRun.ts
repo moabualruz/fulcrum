@@ -19,8 +19,10 @@ import {
   Index,
   Check,
 } from "@mikro-orm/decorators/es";
+import { OptionalProps } from "@mikro-orm/core";
 import { Org } from "../auth/Org.ts";
 import { Task } from "../tasks/Task.ts";
+import { SearchDocument } from "../search/SearchDocument.ts";
 import { AgentRunRepository } from "../../repositories/orchestration/AgentRunRepository.ts";
 
 export const AGENT_RUN_ORCHESTRATION_STATES = [
@@ -44,7 +46,30 @@ export type AgentRunOrchestrationState =
   name: "idx_agent_runs_org_started",
   properties: ["org", "startedAt"],
 })
+@Index({
+  name: "agent_runs_agent_org",
+  properties: ["org", "agentName", "status", "createdAt"],
+})
 export class AgentRun {
+  [OptionalProps]?:
+    | "task"
+    | "startedAt"
+    | "createdAt"
+    | "status"
+    | "orchestrationState"
+    | "attemptCount"
+    | "nextRetryAt"
+    | "workspacePath"
+    | "lastErrorKind"
+    | "sandboxMode"
+    | "iterationCount"
+    | "tokenUsed"
+    | "transcriptPath"
+    | "workspaceDiffPath"
+    | "agentName"
+    | "agentVersion"
+    | "searchDoc";
+
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
 
@@ -56,6 +81,12 @@ export class AgentRun {
 
   @Property({ type: "datetime", fieldName: "started_at", defaultRaw: "now()" })
   startedAt!: Date;
+
+  @Property({ type: "datetime", fieldName: "created_at", defaultRaw: "now()" })
+  createdAt!: Date;
+
+  @Property({ type: "string", fieldName: "status", nullable: true })
+  status?: string;
 
   @Property({
     type: "string",
@@ -81,4 +112,33 @@ export class AgentRun {
 
   @Property({ type: "string", fieldName: "last_error_kind", nullable: true })
   lastErrorKind?: string;
+
+  @Property({
+    type: "string",
+    fieldName: "sandbox_mode",
+    default: "host",
+    check: "sandbox_mode in ('host','docker','podman')",
+  })
+  sandboxMode: "host" | "docker" | "podman" = "host";
+
+  @Property({ type: "integer", fieldName: "iteration_count", default: 0 })
+  iterationCount: number = 0;
+
+  @Property({ type: "integer", fieldName: "token_used", nullable: true })
+  tokenUsed?: number;
+
+  @Property({ type: "string", fieldName: "transcript_path", nullable: true })
+  transcriptPath?: string;
+
+  @Property({ type: "string", fieldName: "workspace_diff_path", nullable: true })
+  workspaceDiffPath?: string;
+
+  @Property({ type: "string", fieldName: "agent_name", nullable: true })
+  agentName?: string;
+
+  @Property({ type: "string", fieldName: "agent_version", nullable: true })
+  agentVersion?: string;
+
+  @ManyToOne(() => SearchDocument, { fieldName: "search_doc_id", nullable: true })
+  searchDoc?: SearchDocument;
 }

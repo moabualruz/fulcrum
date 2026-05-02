@@ -28,9 +28,16 @@ import { Migration20260501140000_schema_migration_ledger } from "../../src/db/mi
 import { Migration20260501150000_account_verification } from "../../src/db/migrations/Migration20260501150000_account_verification.ts";
 import { Migration20260502000001_orchestration_workflow_definitions } from "../../src/db/migrations/Migration20260502000001_orchestration_workflow_definitions.ts";
 import { Migration20260502030300_agent_runs_symphony_columns } from "../../src/db/migrations/Migration20260502030300_agent_runs_symphony_columns.ts";
+import { Migration20260502050000_routing_rules } from "../../src/db/migrations/Migration20260502050000_routing_rules.ts";
+import { Migration20260502050200_skills_registry } from "../../src/db/migrations/Migration20260502050200_skills_registry.ts";
+import { Migration20260502070100_docs_document_columns } from "../../src/db/migrations/Migration20260502070100_docs_document_columns.ts";
+import { Migration20260502070200_docs_related_tables } from "../../src/db/migrations/Migration20260502070200_docs_related_tables.ts";
+import { Migration20260502070400_agent_runs_sandcastle_columns } from "../../src/db/migrations/Migration20260502070400_agent_runs_sandcastle_columns.ts";
 import {
   buildCandidateIssuesBaseQuery,
   fetchCandidateIssues,
+  fetchIssuesByStates,
+  fetchIssueStatesByIds,
 } from "../../src/orchestration/symphony/tracker.ts";
 import { appRouter } from "../../src/trpc/router.ts";
 import { createContext } from "../../src/trpc/context.ts";
@@ -44,6 +51,13 @@ const TASK_IDS = {
   highPriority: "00000000-0000-0000-0000-000000000004",
   claimed: "00000000-0000-0000-0000-000000000002",
   blocked: "00000000-0000-0000-0000-000000000005",
+} as const;
+
+const RUN_IDS = {
+  unclaimed: "10000000-0000-0000-0000-000000000001",
+  running: "10000000-0000-0000-0000-000000000002",
+  retryQueued: "10000000-0000-0000-0000-000000000003",
+  stalled: "10000000-0000-0000-0000-000000000004",
 } as const;
 
 interface BlankOrm {
@@ -94,6 +108,26 @@ async function buildBlankOrm(): Promise<BlankOrm> {
       {
         name: "Migration20260502030300_agent_runs_symphony_columns",
         class: Migration20260502030300_agent_runs_symphony_columns,
+      },
+      {
+        name: "Migration20260502050000_routing_rules",
+        class: Migration20260502050000_routing_rules,
+      },
+      {
+        name: "Migration20260502050200_skills_registry",
+        class: Migration20260502050200_skills_registry,
+      },
+      {
+        name: "Migration20260502070100_docs_document_columns",
+        class: Migration20260502070100_docs_document_columns,
+      },
+      {
+        name: "Migration20260502070200_docs_related_tables",
+        class: Migration20260502070200_docs_related_tables,
+      },
+      {
+        name: "Migration20260502070400_agent_runs_sandcastle_columns",
+        class: Migration20260502070400_agent_runs_sandcastle_columns,
       },
     ] satisfies MigrationObject[],
   };
@@ -185,10 +219,94 @@ async function seedCandidateFixture(orm: MikroORM): Promise<void> {
   em.create(AgentRun, {
     org,
     task: claimed,
+    createdAt: new Date("2026-01-02T00:00:00.000Z"),
     startedAt: new Date("2026-01-02T00:00:00.000Z"),
     orchestrationState: "claimed",
     attemptCount: 0,
+    sandboxMode: "host",
+    iterationCount: 0,
   });
+  await em.flush();
+}
+
+async function seedRunStateFixture(orm: MikroORM): Promise<void> {
+  const em = orm.em.fork();
+  const org = em.getReference(Org, DEFAULT_ORG_ID);
+
+  const taskA = em.create(Task, {
+    id: "20000000-0000-0000-0000-000000000001",
+    org,
+    createdAt: new Date("2026-02-01T00:00:00.000Z"),
+    blockedByIds: [],
+    status: "ready",
+    priority: 1,
+  });
+  const taskB = em.create(Task, {
+    id: "20000000-0000-0000-0000-000000000002",
+    org,
+    createdAt: new Date("2026-02-02T00:00:00.000Z"),
+    blockedByIds: [],
+    status: "ready",
+    priority: 2,
+  });
+  const taskC = em.create(Task, {
+    id: "20000000-0000-0000-0000-000000000003",
+    org,
+    createdAt: new Date("2026-02-03T00:00:00.000Z"),
+    blockedByIds: [],
+    status: "ready",
+    priority: 3,
+  });
+  em.persist([taskA, taskB, taskC]);
+  await em.flush();
+
+  em.persist([
+    em.create(AgentRun, {
+      id: RUN_IDS.unclaimed,
+      org,
+      task: taskA,
+      createdAt: new Date("2026-02-01T01:00:00.000Z"),
+      startedAt: new Date("2026-02-01T01:00:00.000Z"),
+      orchestrationState: "unclaimed",
+      attemptCount: 0,
+      sandboxMode: "host",
+      iterationCount: 0,
+    }),
+    em.create(AgentRun, {
+      id: RUN_IDS.running,
+      org,
+      task: taskB,
+      createdAt: new Date("2026-02-01T02:00:00.000Z"),
+      startedAt: new Date("2026-02-01T02:00:00.000Z"),
+      orchestrationState: "running",
+      attemptCount: 1,
+      sandboxMode: "host",
+      iterationCount: 0,
+    }),
+    em.create(AgentRun, {
+      id: RUN_IDS.retryQueued,
+      org,
+      task: taskC,
+      createdAt: new Date("2026-02-01T03:00:00.000Z"),
+      startedAt: new Date("2026-02-01T03:00:00.000Z"),
+      orchestrationState: "retry_queued",
+      attemptCount: 2,
+      nextRetryAt: new Date("2026-02-01T04:00:00.000Z"),
+      sandboxMode: "host",
+      iterationCount: 0,
+    }),
+    em.create(AgentRun, {
+      id: RUN_IDS.stalled,
+      org,
+      createdAt: new Date("2026-02-01T05:00:00.000Z"),
+      startedAt: new Date("2026-02-01T05:00:00.000Z"),
+      orchestrationState: "stalled",
+      attemptCount: 3,
+      lastErrorKind: "stall",
+      sandboxMode: "host",
+      iterationCount: 0,
+    }),
+  ]);
   await em.flush();
 }
 
@@ -307,6 +425,180 @@ describe("orchestration.fetchCandidateIssues tRPC procedure", () => {
         TASK_IDS.highPriority,
         TASK_IDS.candidateB,
         TASK_IDS.candidateA,
+      ]);
+    } finally {
+      await db.close();
+    }
+  });
+});
+
+describe("fetchIssuesByStates", () => {
+  it("returns full run rows with task data for matching orchestration states", async () => {
+    const db = await buildMigratedOrm();
+    try {
+      await seedRunStateFixture(db.orm);
+
+      const result = await fetchIssuesByStates(db.orm.em, DEFAULT_ORG_ID, [
+        "running",
+        "retry_queued",
+      ]);
+
+      expect(result.map((run) => run.id)).toEqual([
+        RUN_IDS.running,
+        RUN_IDS.retryQueued,
+      ]);
+      expect(result.map((run) => run.state)).toEqual([
+        "running",
+        "retry_queued",
+      ]);
+      expect(result.map((run) => run.task?.id)).toEqual([
+        "20000000-0000-0000-0000-000000000002",
+        "20000000-0000-0000-0000-000000000003",
+      ]);
+      expect(result[0]?.attemptCount).toBe(1);
+      expect(result[1]?.nextRetryAt?.toISOString()).toBe(
+        "2026-02-01T04:00:00.000Z",
+      );
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("applies limit and returns empty for an empty state list without error", async () => {
+    const db = await buildMigratedOrm();
+    try {
+      await seedRunStateFixture(db.orm);
+
+      await expect(fetchIssuesByStates(db.orm.em, DEFAULT_ORG_ID, [])).resolves
+        .toEqual([]);
+
+      const limited = await fetchIssuesByStates(db.orm.em, DEFAULT_ORG_ID, [
+        "unclaimed",
+        "running",
+        "retry_queued",
+      ], 2);
+
+      expect(limited.map((run) => run.id)).toEqual([
+        RUN_IDS.unclaimed,
+        RUN_IDS.running,
+      ]);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("state filter query is EXPLAIN-able and shaped for Symphony run indexes", async () => {
+    const db = await buildMigratedOrm();
+    try {
+      await seedRunStateFixture(db.orm);
+      const em = db.orm.em.fork();
+      const dispatchSql =
+        'select * from "agent_runs" where "org_id" = ? and "orchestration_state" in (?, ?) order by "next_retry_at" asc limit ?';
+
+      const dispatchPlanRows = (await em
+        .getConnection()
+        .execute(`explain ${dispatchSql}`, [
+          DEFAULT_ORG_ID,
+          "unclaimed",
+          "retry_queued",
+          10,
+        ])) as Array<{ "QUERY PLAN": string }>;
+      const dispatchPlanText = dispatchPlanRows
+        .map((row) => row["QUERY PLAN"])
+        .join("\n");
+      expect(dispatchPlanText.length).toBeGreaterThan(0);
+
+      if (/Index Scan/i.test(dispatchPlanText)) {
+        expect(dispatchPlanText).toContain("agent_runs_dispatch_poll");
+      }
+      expect(dispatchSql).toContain('"orchestration_state" in');
+
+      const runningSql =
+        'select * from "agent_runs" where "org_id" = ? and "orchestration_state" = ? order by "started_at" asc limit ?';
+      const runningPlanRows = (await em
+        .getConnection()
+        .execute(`explain ${runningSql}`, [
+          DEFAULT_ORG_ID,
+          "running",
+          10,
+        ])) as Array<{ "QUERY PLAN": string }>;
+      const runningPlanText = runningPlanRows
+        .map((row) => row["QUERY PLAN"])
+        .join("\n");
+
+      if (/Index Scan/i.test(runningPlanText)) {
+        expect(runningPlanText).toContain("agent_runs_stall_scan");
+      }
+      expect(runningSql).toContain('"orchestration_state" =');
+    } finally {
+      await db.close();
+    }
+  });
+});
+
+describe("fetchIssueStatesByIds", () => {
+  it("returns slim id/state rows and omits unknown ids", async () => {
+    const db = await buildMigratedOrm();
+    try {
+      await seedRunStateFixture(db.orm);
+
+      const result = await fetchIssueStatesByIds(db.orm.em, DEFAULT_ORG_ID, [
+        RUN_IDS.retryQueued,
+        "10000000-0000-0000-0000-999999999999",
+        RUN_IDS.running,
+      ]);
+
+      expect(result).toEqual([
+        { id: RUN_IDS.running, state: "running" },
+        { id: RUN_IDS.retryQueued, state: "retry_queued" },
+      ]);
+      expect(Object.keys(result[0] ?? {})).toEqual(["id", "state"]);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("returns empty for an empty id list without querying full rows", async () => {
+    const db = await buildMigratedOrm();
+    try {
+      await seedRunStateFixture(db.orm);
+      await expect(fetchIssueStatesByIds(db.orm.em, DEFAULT_ORG_ID, []))
+        .resolves.toEqual([]);
+    } finally {
+      await db.close();
+    }
+  });
+});
+
+describe("orchestration Symphony tracker tRPC procedures", () => {
+  it("exposes fetchIssuesByStates and fetchIssueStatesByIds", async () => {
+    const db = await buildMigratedOrm();
+    try {
+      await seedRunStateFixture(db.orm);
+      const caller = createCaller(
+        createContext({
+          session: mockSession() as unknown as import("better-auth").Session,
+          orgId: DEFAULT_ORG_ID,
+          userId: "user-symphony-test",
+          em: db.orm.em.fork(),
+          container: null,
+        }),
+      );
+
+      const full = await caller.orchestration.fetchIssuesByStates({
+        orgId: DEFAULT_ORG_ID,
+        states: ["running"],
+      });
+      const slim = await caller.orchestration.fetchIssueStatesByIds({
+        orgId: DEFAULT_ORG_ID,
+        runIds: [RUN_IDS.running, RUN_IDS.stalled],
+      });
+
+      expect(full.map((run) => run.id)).toEqual([RUN_IDS.running]);
+      expect(full[0]?.task?.id).toBe("20000000-0000-0000-0000-000000000002");
+      expect(slim).toEqual([
+        { id: RUN_IDS.running, state: "running" },
+        { id: RUN_IDS.stalled, state: "stalled" },
       ]);
     } finally {
       await db.close();

@@ -19,6 +19,10 @@ Lock: `.symphony-spec.lock`
 
 Candidate fetch + SPEC ordering: `src/orchestration/symphony/tracker.ts:fetchCandidateIssues` uses Fulcrum PGlite `tasks` as canonical tracker, filters `status="ready"`, excludes unresolved blockers + `agent_runs.orchestration_state="claimed"`, orders `priority ASC`, `created_at ASC`, then `id ASC` as Fulcrum identifier tie-breaker.
 
+State batch fetch: `src/orchestration/symphony/tracker.ts:fetchIssuesByStates` validates state input/output with Zod, reads `agent_runs` via MikroORM repository `find({ org, orchestrationState: { $in: states } }, { limit, populate: ["task"] })`, returns full run rows + task row summary, and short-circuits empty state lists.
+
+State refresh fetch: `src/orchestration/symphony/tracker.ts:fetchIssueStatesByIds` validates id input/output with Zod, short-circuits empty id lists, and uses lightweight repository `find({ id: { $in: runIds }, org }, { fields: ["id", "orchestrationState"] })` to return slim `{id,state}` rows for polling while omitting unknown ids.
+
 ### Workspace manager with sanitized per-issue workspaces
 
 ### Workspace lifecycle hooks (`after_create`, `before_run`, `after_run`, `before_remove`)
