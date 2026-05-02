@@ -89,6 +89,7 @@ export async function claimRun(
     subjectId: claimed.id,
     verb: "state_changed",
     payload: { from: "unclaimed", to: "claimed" },
+    createdAt: new Date(),
   });
 
   await fork.flush();
