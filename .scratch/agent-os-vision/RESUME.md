@@ -24,6 +24,17 @@ Only before you begin you can always use grill-with-docs to resolve any gray are
 
 Read this entire file before you act. Do not skip sections.
 
+Before dispatching any worker, also read:
+- `.scratch/agent-os-vision/TASK-DAG.md`
+- `.scratch/agent-os-vision/TASK-BUNDLES.md`
+- `.scratch/agent-os-vision/TASK-DAG-FULL.json`
+
+These files are additive to this resume prompt and are binding for dispatch
+safety. The 12-worker target below is an upper bound, not a requirement; never
+fill a slot that overlaps an active protected surface or bypasses a named
+convergence gate. Dispatch bundles from `TASK-BUNDLES.md` when related issues
+benefit from one owner carrying context across them.
+
 ---
 
 ## Linkage chain (memorize, cite in every subagent prompt you dispatch)
@@ -124,36 +135,45 @@ continue in other slots when safe.
 
 ## Step 1 — Maintain the continuous dispatch queue
 
-For every `Status: ready-for-agent` issue across all pillars:
+For every bundle in `TASK-BUNDLES.md`, and then for every `Status:
+ready-for-agent` issue inside that bundle:
 
-1. Resolve its `Blocked-by:` frontmatter to issue paths.
-2. An issue is "dispatchable" iff every blocker is `Status: implemented` or
+1. Resolve bundle dependencies from `TASK-DAG-FULL.json`, then issue
+   `Blocked-by:` frontmatter to issue paths.
+2. A bundle is "dispatchable" iff every external blocker is `Status:
+   implemented` or `Status: completed`, no active convergence gate freezes its
+   write set, and its issues are related enough for one owner or partitioned
+   into truly disjoint write sets.
+3. An issue is "dispatchable" iff every blocker is `Status: implemented` or
    `Status: completed`. If a blocker owns a frozen cross-pillar contract or a
    migration that downstream code depends on, prefer completing the current
    integration gate before dispatching high-risk downstream work.
-3. Among dispatchable issues, prefer:
+4. Among dispatchable bundles, prefer:
    - Critical-path blockers first.
-   - Issues that unlock the most blocked downstream work.
+   - Bundles that unlock the most blocked downstream work.
+   - Bundles where one agent can complete tightly related issues faster than
+     coordinating multiple agents.
    - The pillar with the lowest completion percentage when priority ties.
    - HITL spikes early enough that dependent work is not starved.
-4. Fill every open implementation slot up to 12 total: 6 Claude Code + 6 Codex
+5. Fill every open implementation slot up to 12 total: 6 Claude Code + 6 Codex
    CLI. This is not a batch boundary: when any slot frees, immediately refill
-   from the next dispatchable issue.
-5. Underutilization rule: if fewer than 12 implementation workers are active and
-   enough independent dispatchable issues exist, keep selecting and dispatching.
-   Running fewer than capacity is allowed only when dependencies, overlapping
-   file ownership, HITL blockers, CI/firebreak isolation, or runtime
-   unavailability make extra workers unsafe. Record the reason in
+   from the next dispatchable bundle or bundle partition.
+6. Underutilization rule: if fewer than 12 implementation workers are active and
+   enough independent dispatchable bundles exist, keep selecting and
+   dispatching. Running fewer than capacity is allowed only when dependencies,
+   overlapping file ownership, HITL blockers, active convergence gates,
+   CI/firebreak isolation, or runtime unavailability make extra workers unsafe.
+   Record the reason in
    `EXECUTION-LOG.md`.
-6. If fewer than 12 whole issues are independently dispatchable, split large
-   issues only when their acceptance criteria naturally divide into disjoint
+7. If fewer than 12 whole bundles are independently dispatchable, split large
+   bundles only when their acceptance criteria naturally divide into disjoint
    write sets. Do not split shared migrations, router contracts, or tightly
    coupled UI/API flows just to fill a slot.
-7. Parent session must not wait on subagents while capacity is open. It should
+8. Parent session must not wait on subagents while capacity is open. It should
    either dispatch another independent lane, prepare the next gate, run
    verification, or resolve blockers.
 
-For each chosen issue, decide:
+For each chosen bundle or issue, decide:
 
 - **Implementation runtime:** Claude subagent vs. Codex subagent. Maintain a
   real cross-team split; target 6 active workers per runtime. Never let one
@@ -179,12 +199,12 @@ For each chosen issue, decide:
 You follow `superpowers:subagent-driven-development` and
 `fulcrum:subagent-orchestration` skills strictly.
 
-Per chosen issue:
+Per chosen bundle or issue:
 
-1. Mark the issue `Status: in-progress` + add an `Owner:` frontmatter line
-   with your orchestrator name (`claude-orchestrator` or
-   `codex-orchestrator`). Persist immediately so an interrupt + resume
-   does not double-dispatch the same issue.
+1. Mark every issue included in the dispatched bundle partition
+   `Status: in-progress` + add an `Owner:` frontmatter line with your
+   orchestrator name (`claude-orchestrator` or `codex-orchestrator`). Persist
+   immediately so an interrupt + resume does not double-dispatch the same work.
 2. Decide implementer:
    - Fill Codex CLI and Claude Code lanes independently, up to 6 active
      implementers each.
@@ -202,6 +222,8 @@ Per chosen issue:
    explicit design.
    Each implementer prompt MUST include the linkage-chain block from
    the top of this file PLUS:
+   - The bundle id, bundle issue list, bundle write set, convergence gate, and
+     split/keep-together rationale from `TASK-BUNDLES.md`.
    - The full body of the issue file.
    - The frontmatter linkage refs (PRD path, Requirements section,
      Decisions Q-IDs, Vision rows, Docs).
