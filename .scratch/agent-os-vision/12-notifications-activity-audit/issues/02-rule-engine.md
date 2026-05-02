@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: notifications-activity-audit
 Blocked-by: [01-schema-migration.md]
