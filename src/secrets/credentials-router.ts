@@ -132,7 +132,7 @@ function resolveKeyringConfig(ctx: { container: Ctx["container"] }): KeyringConf
   return {};
 }
 
-async function isOrgAdmin(ctx: Ctx): Promise<boolean> {
+async function findCallerMembership(ctx: Ctx): Promise<{ role: string } | null> {
   const OrgMember = await getOrgMemberClass();
   const OrgMemberRepository = await getOrgMemberRepository();
 
@@ -155,12 +155,24 @@ async function isOrgAdmin(ctx: Ctx): Promise<boolean> {
       userId: ctx.userId,
     } as object)) as { role: string } | null;
   }
-  return row ? row.role === "owner" || row.role === "admin" : false;
+  return row;
+}
+
+async function requireActiveMembership(ctx: Ctx): Promise<{ role: string }> {
+  const membership = await findCallerMembership(ctx);
+  if (!membership) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Active org membership required for credential access.",
+    });
+  }
+  return membership;
 }
 
 async function assertCanAct(ctx: Ctx, targetUserId: string): Promise<void> {
+  const membership = await requireActiveMembership(ctx);
   if (targetUserId === ctx.userId) return;
-  if (await isOrgAdmin(ctx)) return;
+  if (membership.role === "owner" || membership.role === "admin") return;
   throw new TRPCError({
     code: "FORBIDDEN",
     message: "Only the credential owner or an org admin may operate on this credential.",
@@ -210,6 +222,7 @@ export const credentialsRouter = t.router({
     .input(ListInput)
     .output(z.array(RowOutput))
     .query(async ({ ctx, input }) => {
+      await requireActiveMembership(ctx as Ctx);
       const em = requireEm(ctx);
       const Credential = await getCredentialClass();
       const where: Record<string, unknown> = {
@@ -247,6 +260,7 @@ export const credentialsRouter = t.router({
     .input(SetInput)
     .output(SetOutput)
     .mutation(async ({ ctx, input }) => {
+      await requireActiveMembership(ctx as Ctx);
       const em = requireEm(ctx);
       const Credential = await getCredentialClass();
       const cfg = resolveKeyringConfig(ctx);

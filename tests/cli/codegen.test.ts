@@ -94,6 +94,28 @@ describe("CLI codegen", () => {
     }
   });
 
+  test("resolves imported routers when generating command files", async () => {
+    const outDir = await mkdtemp(join(tmpdir(), "fulcrum-codegen-imported-"));
+    try {
+      await generateCliFiles({
+        routerPath: join(root, "src/server/trpc/router.ts"),
+        outDir,
+        useAst: true,
+      });
+
+      const generated = await readFile(join(outDir, "credentials.ts"), "utf8");
+      expect(generated).toContain('new Command("credentials")');
+      expect(generated).toContain('command.command("set")');
+      expect(generated).toContain('command.command("rotate")');
+      expect(generated).toContain('command.command("archive")');
+      expect(generated).toContain('command.command("remove")');
+      expect(generated).toContain('.option("--name <string>", "name")');
+      expect(generated).toContain('.option("--value <string>", "value")');
+    } finally {
+      await rm(outDir, { recursive: true, force: true });
+    }
+  });
+
   test("extracts Zod description strings into generated command descriptions and flag help", async () => {
     const scratch = await mkdtemp(join(tmpdir(), "fulcrum-codegen-fixture-"));
     try {
