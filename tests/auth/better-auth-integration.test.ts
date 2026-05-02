@@ -26,7 +26,7 @@ import { Container } from "@needle-di/core";
 
 import { createOrmConfig } from "../../src/db/mikro-orm.config.ts";
 import { registerDbBindings, SessionRepository } from "../../src/db/db.module.ts";
-import { DEFAULT_ADMIN_PASSWORD, SeedService } from "../../src/db/seed.ts";
+import { DEFAULT_ADMIN_PASSWORD, DEFAULT_ORG_ID, SeedService } from "../../src/db/seed.ts";
 import { AuthService } from "../../src/auth/index.ts";
 import { MikroOrmBetterAuthAdapter } from "../../src/auth/adapter.ts";
 
@@ -165,6 +165,102 @@ describe("MikroOrmBetterAuthAdapter", () => {
     const adapter = new MikroOrmBetterAuthAdapter(orm.em);
     expect(adapter).toBeDefined();
     expect(typeof adapter.createAdapter).toBe("function");
+  });
+
+  it("uses a generated local admin password when env does not provide one", () => {
+    expect(DEFAULT_ADMIN_PASSWORD).not.toBe("fulcrum-local-admin");
+    expect(DEFAULT_ADMIN_PASSWORD.length).toBeGreaterThanOrEqual(16);
+  });
+
+  it("findOne user lookups without orgId do not return users from another org", async () => {
+    const { Org, User } = await import("../../src/db/entities/auth/index.ts");
+    const em = orm.em.fork();
+    const otherOrgId = crypto.randomUUID();
+    const otherUserId = crypto.randomUUID();
+    const now = new Date();
+
+    em.persist([
+      em.create(Org, {
+        id: otherOrgId,
+        name: "Foreign Org",
+        slug: `foreign-${otherOrgId}`,
+        createdAt: now,
+        updatedAt: now,
+      }),
+      em.create(User, {
+        id: otherUserId,
+        email: `foreign-${otherUserId}@example.com`,
+        orgId: otherOrgId,
+        role: "member",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    ]);
+    await em.flush();
+
+    const adapter = new MikroOrmBetterAuthAdapter(orm.em).createAdapter();
+    const found = await (adapter as any).findOne({
+      model: "user",
+      where: [{ field: "id", operator: "eq", value: otherUserId, connector: "AND", mode: "sensitive" }],
+    });
+
+    expect(found).toBeNull();
+  });
+
+  it("findMany user lookups without orgId are scoped to the default org", async () => {
+    const { Org, User } = await import("../../src/db/entities/auth/index.ts");
+    const em = orm.em.fork();
+    const otherOrgId = crypto.randomUUID();
+    const otherEmail = `foreign-many-${otherOrgId}@example.com`;
+    const now = new Date();
+
+    em.persist([
+      em.create(Org, {
+        id: otherOrgId,
+        name: "Foreign Many Org",
+        slug: `foreign-many-${otherOrgId}`,
+        createdAt: now,
+        updatedAt: now,
+      }),
+      em.create(User, {
+        id: crypto.randomUUID(),
+        email: otherEmail,
+        orgId: otherOrgId,
+        role: "member",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    ]);
+    await em.flush();
+
+    const adapter = new MikroOrmBetterAuthAdapter(orm.em).createAdapter();
+    const users = await (adapter as any).findMany({ model: "user", limit: 100 });
+
+    expect(users.every((user: { orgId: string }) => user.orgId === DEFAULT_ORG_ID)).toBe(true);
+    expect(users.map((user: { email: string }) => user.email)).not.toContain(otherEmail);
+  });
+
+  it("round-trips user emailVerified through Better-Auth mapping", async () => {
+    const adapter = new MikroOrmBetterAuthAdapter(orm.em).createAdapter();
+    const email = `verified-${crypto.randomUUID()}@example.com`;
+
+    const created = await (adapter as any).create({
+      model: "user",
+      data: {
+        email,
+        name: "Verified User",
+        emailVerified: true,
+      },
+    });
+
+    expect(created.emailVerified).toBe(true);
+
+    const found = await (adapter as any).findOne({
+      model: "user",
+      where: [{ field: "email", operator: "eq", value: email, connector: "AND", mode: "sensitive" }],
+    });
+
+    expect(found.emailVerified).toBe(true);
   });
 });
 
@@ -322,6 +418,52 @@ describe("MikroOrmBetterAuthAdapter — invitation model DB completeness", () =>
     const cnt = await (adapter as any).count({ model: "invitation" });
     expect(typeof cnt).toBe("number");
     expect(cnt).toBeGreaterThanOrEqual(0);
+  });
+
+  it("filters Better-Auth invitation status using acceptedAt null semantics", async () => {
+    const { Invitation } = await import("../../src/db/entities/auth/index.ts");
+    const mikro = new MikroOrmBetterAuthAdapter(orm.em);
+    const adapter = mikro.createAdapter();
+    const pendingEmail = `pending-${crypto.randomUUID()}@example.com`;
+    const acceptedEmail = `accepted-${crypto.randomUUID()}@example.com`;
+
+    const pending = await (adapter as any).create({
+      model: "invitation",
+      data: {
+        organizationId: DEFAULT_ORG_ID,
+        email: pendingEmail,
+        token: crypto.randomUUID(),
+      },
+    });
+    const accepted = await (adapter as any).create({
+      model: "invitation",
+      data: {
+        organizationId: DEFAULT_ORG_ID,
+        email: acceptedEmail,
+        token: crypto.randomUUID(),
+      },
+    });
+
+    const em = orm.em.fork();
+    const acceptedRow = await em.findOneOrFail(Invitation, { id: accepted.id });
+    acceptedRow.acceptedAt = new Date();
+    await em.flush();
+
+    const pendingRows = await (adapter as any).findMany({
+      model: "invitation",
+      where: [{ field: "status", operator: "eq", value: "pending", connector: "AND", mode: "sensitive" }],
+      limit: 20,
+    });
+    const acceptedRows = await (adapter as any).findMany({
+      model: "invitation",
+      where: [{ field: "status", operator: "eq", value: "accepted", connector: "AND", mode: "sensitive" }],
+      limit: 20,
+    });
+
+    expect(pendingRows.map((row: { id: string }) => row.id)).toContain(pending.id);
+    expect(pendingRows.map((row: { id: string }) => row.id)).not.toContain(accepted.id);
+    expect(acceptedRows.map((row: { id: string }) => row.id)).toContain(accepted.id);
+    expect(acceptedRows.map((row: { id: string }) => row.id)).not.toContain(pending.id);
   });
 });
 

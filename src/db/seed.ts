@@ -10,7 +10,18 @@ export const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
 export const DEFAULT_ORG_NAME = "Local";
 export const DEFAULT_ORG_SLUG = "local";
 export const DEFAULT_ADMIN_EMAIL = "admin@local";
-export const DEFAULT_ADMIN_PASSWORD = "fulcrum-local-admin";
+export const DEFAULT_ADMIN_PASSWORD_ENV = "FULCRUM_LOCAL_ADMIN_PASSWORD";
+let generatedAdminPassword: string | null = null;
+
+export function getDefaultAdminPassword(): string {
+  const configured = process.env[DEFAULT_ADMIN_PASSWORD_ENV]?.trim();
+  if (configured) return configured;
+
+  generatedAdminPassword ??= crypto.randomUUID();
+  return generatedAdminPassword;
+}
+
+export const DEFAULT_ADMIN_PASSWORD = getDefaultAdminPassword();
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface SeedResult {
@@ -80,7 +91,7 @@ export class SeedService {
         userId: adminUser.id,
         providerId: "credential",
         accountId: adminUser.id,
-        password: await hashPassword(DEFAULT_ADMIN_PASSWORD),
+        password: await hashPassword(getDefaultAdminPassword()),
         createdAt: now,
         updatedAt: now,
       });

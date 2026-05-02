@@ -354,7 +354,10 @@ export class MigratorService {
     try {
       const em = this.#orm.em.fork();
       const repo = em.getRepository(SchemaMigration) as SchemaMigrationRepository;
-      rows = await repo.findAll({ orderBy: { version: "ASC" } });
+      rows = await repo.findAll({
+        where: { direction: "up" },
+        orderBy: { version: "ASC" },
+      });
     } catch {
       // schema_migrations table may not exist yet (e.g. on first run before ledger migration).
       // Skip validation — no ledger rows means no checksums to validate.

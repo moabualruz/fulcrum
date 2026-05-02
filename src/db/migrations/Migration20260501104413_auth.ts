@@ -78,7 +78,7 @@ export class Migration20260501104413_auth extends Migration {
 
     // users
     this.addSql(
-      `create table "users" ("id" uuid not null default gen_random_uuid(), "org_id" uuid not null, "email" varchar(255) not null, "name" varchar(255) null, "avatar_url" varchar(255) null, "role" text not null default 'member', "created_at" timestamptz not null default now(), "updated_at" timestamptz not null default now(), primary key ("id"))`,
+      `create table "users" ("id" uuid not null default gen_random_uuid(), "org_id" uuid not null, "email" varchar(255) not null, "name" varchar(255) null, "avatar_url" varchar(255) null, "email_verified" boolean not null default false, "role" text not null default 'member', "created_at" timestamptz not null default now(), "updated_at" timestamptz not null default now(), primary key ("id"))`,
     );
     this.addSql(
       `create index "idx_users_org_email" on "users" ("org_id", "email")`,

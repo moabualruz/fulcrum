@@ -43,6 +43,23 @@ e = some(where (p.eft == allow))
 m = g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act
 `;
 
+const ORG_RBAC_MODEL_TEXT = `
+[request_definition]
+r = org, sub, obj, act
+
+[policy_definition]
+p = org, sub, obj, act
+
+[role_definition]
+g = _, _, _
+
+[policy_effect]
+e = some(where (p.eft == allow))
+
+[matchers]
+m = r.org == p.org && g(r.sub, p.sub, r.org) && r.obj == p.obj && r.act == p.act
+`;
+
 let orm: MikroORM;
 let adapter: FulcrumCasbinAdapter;
 let repo: CasbinRuleRepository;
@@ -117,6 +134,20 @@ describe("FulcrumCasbinAdapter — addPolicy + loadPolicy", () => {
 
     expect(model.getPolicy("p", "p")).toHaveLength(2);
     expect(model.getPolicy("g", "g")).toHaveLength(1);
+  });
+
+  it("org-scoped loadPolicy excludes policies and groupings from other orgs", async () => {
+    await adapter.addPolicy("p", "p", ["org-a", "alice", "task", "read"]);
+    await adapter.addPolicy("p", "p", ["org-b", "bob", "task", "read"]);
+    await adapter.addPolicy("g", "g", ["alice", "role:owner", "org-a"]);
+    await adapter.addPolicy("g", "g", ["bob", "role:owner", "org-b"]);
+
+    const scopedAdapter = new FulcrumCasbinAdapter(repo, "org-a");
+    const model = newModel(ORG_RBAC_MODEL_TEXT);
+    await scopedAdapter.loadPolicy(model);
+
+    expect(model.getPolicy("p", "p")).toEqual([["org-a", "alice", "task", "read"]]);
+    expect(model.getPolicy("g", "g")).toEqual([["alice", "role:owner", "org-a"]]);
   });
 });
 

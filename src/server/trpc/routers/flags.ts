@@ -101,7 +101,15 @@ async function resolveFlagRegistry(ctx: {
     const FeatureFlag = await getFeatureFlagClass();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const repo = ctx.em.getRepository(FeatureFlag) as any;
-    return new FlagRegistry(repo as InstanceType<typeof FeatureFlagRepository>);
+    const registry = new FlagRegistry(repo as InstanceType<typeof FeatureFlagRepository>);
+    if (ctx.container) {
+      try {
+        ctx.container.bind({ provide: FlagRegistry, useValue: registry });
+      } catch {
+        // Container may reject duplicate binds; the registry is still valid for this call.
+      }
+    }
+    return registry;
   }
   throw new TRPCError({
     code: "INTERNAL_SERVER_ERROR",

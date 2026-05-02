@@ -17,6 +17,7 @@
 import { injectable } from "@needle-di/core";
 import { Helper } from "casbin";
 import type { Adapter, Model } from "casbin";
+import type { FilterQuery } from "@mikro-orm/core";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import type { CasbinRuleRepository } from "../db/repositories/flags/CasbinRuleRepository.ts";
 import { CasbinRule } from "../db/entities/flags/CasbinRule.ts";
@@ -48,6 +49,10 @@ function rowToLine(row: CasbinRule): string {
   return parts.join(", ");
 }
 
+function rowMatchesOrgScope(row: CasbinRule, orgId: string): boolean {
+  return (row.ptype === "p" && row.v0 === orgId) || (row.ptype === "g" && row.v2 === orgId);
+}
+
 /** Build field assignment object from ptype + rule array. */
 function ruleToFieldMap(
   ptype: string,
@@ -62,7 +67,34 @@ function ruleToFieldMap(
 
 @injectable()
 export class FulcrumCasbinAdapter implements Adapter {
-  constructor(private readonly _repo: CasbinRuleRepository) {}
+  constructor(
+    private readonly _repo: CasbinRuleRepository,
+    private readonly _orgId?: string,
+  ) {}
+
+  private orgScopedPolicyFilter(): Record<string, unknown> {
+    if (!this._orgId) return {};
+    return {
+      $or: [
+        { ptype: "p", v0: this._orgId },
+        { ptype: "g", v2: this._orgId },
+      ],
+    };
+  }
+
+  private async findRowsForLoad(): Promise<CasbinRule[]> {
+    if (!this._orgId) return this._repo.findAll();
+
+    const repo = this._repo as CasbinRuleRepository & {
+      find?: (where: FilterQuery<CasbinRule>) => Promise<CasbinRule[]>;
+    };
+
+    if (typeof repo.find === "function") {
+      return repo.find(this.orgScopedPolicyFilter() as FilterQuery<CasbinRule>);
+    }
+
+    return (await this._repo.findAll()).filter((row) => rowMatchesOrgScope(row, this._orgId!));
+  }
 
   /**
    * loadPolicy — fetch all rows from casbin_rule and push each into the model
@@ -70,7 +102,7 @@ export class FulcrumCasbinAdapter implements Adapter {
    * "p, org-a, alice, data1, read" or "g, alice, role:owner, org-a".
    */
   async loadPolicy(model: Model): Promise<void> {
-    const rows = await this._repo.findAll();
+    const rows = await this.findRowsForLoad();
     for (const row of rows) {
       const line = rowToLine(row);
       if (line.length > 0) {
@@ -90,7 +122,8 @@ export class FulcrumCasbinAdapter implements Adapter {
 
     await em.transactional(async (txEm) => {
       // Clear existing policies via entity class reference (C6: no raw SQL)
-      await txEm.nativeDelete(CasbinRule, {});
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await txEm.nativeDelete(CasbinRule, this.orgScopedPolicyFilter() as any);
 
       // Re-insert from model
       const sections = ["p", "g"];

@@ -18,6 +18,7 @@ import {
   Index,
   Unique,
 } from "@mikro-orm/decorators/es";
+import { OptionalProps } from "@mikro-orm/core";
 import { UserRepository } from "../../repositories/auth/UserRepository.ts";
 
 @Entity({ tableName: "users", repository: () => UserRepository })
@@ -29,6 +30,8 @@ import { UserRepository } from "../../repositories/auth/UserRepository.ts";
 })
 @Unique({ name: "uq_users_org_email", properties: ["orgId", "email"] })
 export class User {
+  [OptionalProps]?: "emailVerified";
+
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
 
@@ -43,6 +46,9 @@ export class User {
 
   @Property({ type: "string", fieldName: "avatar_url", nullable: true })
   avatarUrl?: string;
+
+  @Property({ type: "boolean", fieldName: "email_verified", default: false })
+  emailVerified = false;
 
   @Enum({ items: () => ["owner", "admin", "member", "guest"] as const })
   role: "owner" | "admin" | "member" | "guest" = "member";

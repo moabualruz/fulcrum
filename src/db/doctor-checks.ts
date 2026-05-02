@@ -43,7 +43,7 @@ export interface DoctorCheckResult {
  * Convention: numeric timestamp portion of the migration filename.
  * Pillar 14's doctor aggregator compares this against schema_migrations.MAX(version).
  */
-export const MAX_KNOWN_MIGRATION_VERSION = 20260502095500;
+export const MAX_KNOWN_MIGRATION_VERSION = 20260502101000;
 
 /**
  * db.migrationVersion — returns the highest applied migration version + name.
@@ -54,6 +54,7 @@ export async function dbMigrationVersion(
   schemaMigrationRepo: SchemaMigrationRepository,
 ): Promise<DoctorCheckResult> {
   const rows = await schemaMigrationRepo.findAll({
+    where: { direction: "up" },
     orderBy: { version: "DESC" },
     limit: 1,
   });
@@ -87,6 +88,7 @@ export async function dbCanRunOnCurrentBinary(
   schemaMigrationRepo: SchemaMigrationRepository,
 ): Promise<DoctorCheckResult> {
   const rows = await schemaMigrationRepo.findAll({
+    where: { direction: "up" },
     orderBy: { version: "DESC" },
     limit: 1,
   });

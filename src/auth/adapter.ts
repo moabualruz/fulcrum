@@ -167,6 +167,47 @@ const VERIFICATION_FIELD_MAP: Record<string, string> = {
   updatedAt: "updatedAt",
 };
 
+function buildUserWhere(where?: CleanedWhere[]): Record<string, unknown> {
+  const query = where ? buildWhere(where, USER_FIELD_MAP) : {};
+  if (query["email"]) {
+    query["email"] = normalizeLocalAuthEmail(query["email"]);
+  }
+  if (query["orgId"] === undefined) {
+    query["orgId"] = DEFAULT_ORG_ID;
+  }
+  return query;
+}
+
+function buildInvitationWhere(where?: CleanedWhere[]): Record<string, unknown> {
+  if (!where) return {};
+
+  const statusClauses = where.filter((clause) => clause.field === "status");
+  const baseClauses = where.filter((clause) => clause.field !== "status");
+  const query = buildWhere(baseClauses, INVITATION_FIELD_MAP);
+
+  for (const clause of statusClauses) {
+    if (clause.operator === "eq") {
+      if (clause.value === "pending") {
+        query["acceptedAt"] = null;
+      } else if (clause.value === "accepted") {
+        query["acceptedAt"] = { $ne: null };
+      } else {
+        query["id"] = null;
+      }
+    }
+
+    if (clause.operator === "ne") {
+      if (clause.value === "pending") {
+        query["acceptedAt"] = { $ne: null };
+      } else if (clause.value === "accepted") {
+        query["acceptedAt"] = null;
+      }
+    }
+  }
+
+  return query;
+}
+
 /** Simple in-memory store for rare/unknown model names Better-Auth might introduce. */
 class InMemoryStore {
   private readonly store = new Map<string, Record<string, unknown>>();
@@ -394,14 +435,7 @@ export class MikroOrmBetterAuthAdapter {
     const em = this.em.fork();
 
     if (model === "user") {
-      const query = buildWhere(where, USER_FIELD_MAP);
-      if (query["email"]) {
-        query["email"] = normalizeLocalAuthEmail(query["email"]);
-      }
-      // C2: composite key — if no orgId in query, default to local org
-      if (!query["orgId"] && query["email"]) {
-        query["orgId"] = DEFAULT_ORG_ID;
-      }
+      const query = buildUserWhere(where);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const user = await em.findOne(User, query as any);
       if (!user) return null;
@@ -440,7 +474,7 @@ export class MikroOrmBetterAuthAdapter {
     }
 
     if (model === "invitation") {
-      const query = buildWhere(where, INVITATION_FIELD_MAP);
+      const query = buildInvitationWhere(where);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const inv = await em.findOne(Invitation, query as any);
       if (!inv) return null;
@@ -491,7 +525,7 @@ export class MikroOrmBetterAuthAdapter {
     const orderBy: any = sortBy ? { [sortBy.field]: sortBy.direction } : undefined;
 
     if (model === "user") {
-      const query = where ? buildWhere(where, USER_FIELD_MAP) : {};
+      const query = buildUserWhere(where);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const users = await em.find(User, query as any, { limit, offset, orderBy });
       return users.map((u) => this.mapUserToBetterAuth(u)) as unknown as T[];
@@ -512,7 +546,7 @@ export class MikroOrmBetterAuthAdapter {
     }
 
     if (model === "invitation") {
-      const query = where ? buildWhere(where, INVITATION_FIELD_MAP) : {};
+      const query = buildInvitationWhere(where);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const invitations = await em.find(Invitation, query as any, { limit, offset, orderBy });
       return invitations.map((i) => this.mapInvitationToBetterAuth(i)) as unknown as T[];
@@ -794,7 +828,7 @@ export class MikroOrmBetterAuthAdapter {
     const em = this.em.fork();
 
     if (model === "user") {
-      const query = where ? buildWhere(where, USER_FIELD_MAP) : {};
+      const query = buildUserWhere(where);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return em.count(User, query as any);
     }
@@ -812,7 +846,7 @@ export class MikroOrmBetterAuthAdapter {
     }
 
     if (model === "invitation") {
-      const query = where ? buildWhere(where, INVITATION_FIELD_MAP) : {};
+      const query = buildInvitationWhere(where);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return em.count(Invitation, query as any);
     }
@@ -843,6 +877,7 @@ export class MikroOrmBetterAuthAdapter {
       email: data["email"] as string,
       name: data["name"] as string | undefined,
       avatarUrl: (data["image"] ?? data["avatarUrl"]) as string | undefined,
+      emailVerified: (data["emailVerified"] ?? false) as boolean,
       orgId: (data["orgId"] ?? DEFAULT_ORG_ID) as string,
       role: (data["role"] ?? "member") as string,
       createdAt: (data["createdAt"] as Date | undefined) ?? now,
@@ -856,7 +891,7 @@ export class MikroOrmBetterAuthAdapter {
       email: user.email,
       name: user.name ?? null,
       image: user.avatarUrl ?? null,
-      emailVerified: false,  // Not in our schema; Better-Auth requires this field
+      emailVerified: user.emailVerified,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       orgId: user.orgId,

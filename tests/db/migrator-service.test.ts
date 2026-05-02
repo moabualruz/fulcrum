@@ -354,6 +354,30 @@ describe("doctor-checks", () => {
     expect(result.detail).toContain("Migration20260501104413_auth");
   });
 
+  it("dbMigrationVersion ignores higher down rows when reporting current migration", async () => {
+    const em = orm.em.fork();
+    em.create(SchemaMigration, {
+      version: 20260502099998,
+      name: "Migration20260502099998_reverted_marker",
+      checksum: "down-checksum",
+      direction: "down",
+      appliedAt: new Date(),
+    });
+    em.create(SchemaMigration, {
+      version: 20260502099997,
+      name: "Migration20260502099997_still_applied",
+      checksum: "up-checksum",
+      direction: "up",
+      appliedAt: new Date(),
+    });
+    await em.flush();
+
+    const result = await dbMigrationVersion(freshRepo());
+    expect(result.status).toBe("pass");
+    expect(result.detail).toContain("Migration20260502099997_still_applied");
+    expect(result.detail).not.toContain("Migration20260502099998_reverted_marker");
+  });
+
   it("dbCanRunOnCurrentBinary: timestamp version is compared to compile-time constant", async () => {
     // Insert another fake row to ensure there's at least one row.
     // version: caller-supplied bigint — use a value < MAX_KNOWN_MIGRATION_VERSION so check PASSes.
@@ -370,6 +394,21 @@ describe("doctor-checks", () => {
     const result = await dbCanRunOnCurrentBinary(freshRepo());
     // version 20260501120000 < MAX_KNOWN_MIGRATION_VERSION 20260501140000 → check must PASS.
     expect(result.check).toBe("db.canRunOnCurrentBinary");
+    expect(result.status).toBe("pass");
+  });
+
+  it("dbCanRunOnCurrentBinary ignores down rows newer than this binary", async () => {
+    const em = orm.em.fork();
+    em.create(SchemaMigration, {
+      version: MAX_KNOWN_MIGRATION_VERSION + 1000,
+      name: "Migration99999999999999_reverted_future",
+      checksum: "future-down",
+      direction: "down",
+      appliedAt: new Date(),
+    });
+    await em.flush();
+
+    const result = await dbCanRunOnCurrentBinary(freshRepo());
     expect(result.status).toBe("pass");
   });
 });
@@ -595,6 +634,34 @@ describe("MigratorService — checksum mismatch (P1#19 round-2)", () => {
 
       // The pre-flight checksum validation in migrate() detects the mismatch.
       await expect(serviceSecondRun.migrate()).rejects.toThrow(MigrationChecksumMismatchError);
+    } finally {
+      await closeOrm(freshOrm);
+    }
+  });
+
+  it("migrate() does not validate checksum rows for reverted down migrations", async () => {
+    const freshOrm = await buildOrm();
+    try {
+      const serviceFirstRun = buildService(freshOrm, {
+        checksumReader: async (_path: string) => "stable-up-checksum",
+        isLossyResolver: async (_path: string) => false,
+      });
+      await serviceFirstRun.migrate();
+
+      const em = freshOrm.em.fork();
+      const repo = em.getRepository(SchemaMigration) as SchemaMigrationRepository;
+      const rows = await repo.findAll({ orderBy: { version: "ASC" } });
+      const reverted = rows[0]!;
+      reverted.direction = "down";
+      reverted.checksum = "stale-reverted-checksum";
+      await em.flush();
+
+      const serviceSecondRun = buildService(freshOrm, {
+        checksumReader: async (_path: string) => "stable-up-checksum",
+        isLossyResolver: async (_path: string) => false,
+      });
+
+      await expect(serviceSecondRun.migrate()).resolves.toBeUndefined();
     } finally {
       await closeOrm(freshOrm);
     }

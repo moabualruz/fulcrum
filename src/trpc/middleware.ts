@@ -125,7 +125,7 @@ export const assertPermission = t.middleware(async ({ ctx, next, path }) => {
           ]);
 
         const casbinRepo = ctx.container.get(CasbinRuleRepository);
-        const adapter = new FulcrumCasbinAdapter(casbinRepo);
+        const adapter = new FulcrumCasbinAdapter(casbinRepo, ctx.orgId);
         const enforcerSvc = new CasbinEnforcerService(adapter);
 
         await checkCasbinGate(

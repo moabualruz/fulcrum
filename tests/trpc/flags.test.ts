@@ -100,6 +100,29 @@ function makeCallerWithoutContainer(userId: string, orgId: string) {
   );
 }
 
+function makeCallerWithFallbackContainer(userId: string, orgId: string) {
+  const session = mockSession(userId, orgId);
+  const em = orm.em.fork();
+  const flagRepo = em.getRepository(FeatureFlag) as FeatureFlagRepository;
+  const orgMemberRepo = em.getRepository(OrgMember) as OrgMemberRepository;
+  const fallbackContainer = new Container();
+  fallbackContainer.bind({ provide: FeatureFlagRepository, useValue: flagRepo });
+  fallbackContainer.bind({ provide: OrgMemberRepository, useValue: orgMemberRepo });
+
+  return {
+    container: fallbackContainer,
+    caller: createCaller(
+      createContext({
+        session: session as unknown as import("better-auth").Session,
+        orgId,
+        userId,
+        em: em as unknown as import("@mikro-orm/postgresql").EntityManager,
+        container: fallbackContainer,
+      }),
+    ),
+  };
+}
+
 function unauthCaller() {
   return createCaller(
     createContext({
@@ -323,6 +346,14 @@ describe("flags.set — owner/admin", () => {
     const result = await caller3.flags.list();
     const embeddings = result.find((f) => f.name === "embeddings");
     expect(embeddings!.enabled).toBe(false);
+  });
+
+  it("binds fallback FlagRegistry into the request container before cache invalidation", async () => {
+    const { caller, container: fallbackContainer } = makeCallerWithFallbackContainer(TEST_ADMIN_USER_ID, TEST_ORG_ID);
+
+    await caller.flags.list();
+
+    expect(fallbackContainer.get(FlagRegistry)).toBeInstanceOf(FlagRegistry);
   });
 
   it("owner cannot set a flag for another org", async () => {
