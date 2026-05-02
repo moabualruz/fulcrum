@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: completed
+Owner: codex-orchestrator
 Triage: AFK
 Pillar: 07-docs-editor-collab
 Blocked-by: [01-docs-schema-foundation.md]

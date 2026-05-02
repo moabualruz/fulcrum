@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: completed
+Owner: codex-orchestrator
 Triage: AFK
 Pillar: 04-sandcastle-wrapper
 Blocked-by: 01-sandcastle-dep-effect-singleton

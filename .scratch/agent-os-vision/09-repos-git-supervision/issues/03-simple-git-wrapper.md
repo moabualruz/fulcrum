@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: completed
+Owner: codex-orchestrator
 Triage: AFK
 Pillar: 09-repos-git-supervision
 Blocked-by: []

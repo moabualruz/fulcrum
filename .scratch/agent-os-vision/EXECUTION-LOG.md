@@ -58,6 +58,67 @@ Implementers: [pending dispatch]
 Reviewers: [17-cross-cutting-platform/issues/23-license-deps-audit.md pending review]
 Result: IN_PROGRESS — statuses flipped to in-progress before dispatch.
 
+Review dispatch:
+[
+  07-docs-editor-collab/issues/03-frontmatter-schemas.md: implementer DONE_WITH_CONCERNS @ c34bcef; focused test PASS 22/22; status moved to needs-review; reviewer 019de6b2-035f-7231-a3a8-efa63ce9d1b9
+]
+
+Worker update:
+[
+  03-symphony-orchestration/issues/05-tracker-fetch-by-states.md: implementer DONE_WITH_CONCERNS; no commit; targeted RED/GREEN captured; current tracker DB test blocked by concurrent AgentRun schema migration missing created_at in test DB; keep status in-progress pending integration verification
+]
+
+Review result:
+[
+  07-docs-editor-collab/issues/03-frontmatter-schemas.md: SPEC FAIL / CHANGES_REQUIRED — meeting ISO datetime must accept timezone offsets; status returned to in-progress for implementer fix
+]
+
+Review dispatch:
+[
+  05-router-and-skills/issues/03-rules-engine-wrapper.md: implementer DONE_WITH_CONCERNS @ 7af0201; focused test PASS 5/5; status moved to needs-review,
+  07-docs-editor-collab/issues/03-frontmatter-schemas.md: implementer DONE @ 1c6b955; focused test PASS 23/23; status moved to needs-review
+]
+
+Review dispatch:
+[
+  03-symphony-orchestration/issues/05-tracker-fetch-by-states.md: implementer DONE_WITH_CONCERNS; no commit; focused test PASS 12/12 after P4 migration landed; status moved to needs-review,
+  04-sandcastle-wrapper/issues/02-agent-runs-schema-migration.md: implementer DONE_WITH_CONCERNS; no commit; focused test PASS 20/20; status moved to needs-review,
+  09-repos-git-supervision/issues/03-simple-git-wrapper.md: implementer DONE_WITH_CONCERNS; no commit; focused test PASS 13/13; status moved to needs-review
+]
+
+Review result:
+[
+  07-docs-editor-collab/issues/03-frontmatter-schemas.md: SPEC PASS / QUALITY APPROVED; completed @ c34bcef + 1c6b955
+  05-router-and-skills/issues/03-rules-engine-wrapper.md: SPEC PASS / QUALITY APPROVED; completed @ 7af0201,
+  04-sandcastle-wrapper/issues/02-agent-runs-schema-migration.md: SPEC PASS / QUALITY APPROVED; completed @ df72fc5
+]
+
+Review result:
+[
+  09-repos-git-supervision/issues/03-simple-git-wrapper.md: SPEC FAIL / CHANGES_REQUIRED — untracked files classified as staged; remote branch file tree/content refs resolved incorrectly; status returned to in-progress
+]
+
+Review dispatch:
+[
+  02-inference-sidecar/issues/03-inference-cache-schema.md: implementer DONE_WITH_CONCERNS @ 66aa7e6; cargo cache PASS 1/1; inference/db/CLI focused tests PASS 11/11; status moved to needs-review; review must evaluate VectorType/pgvector PRD-addendum concern
+]
+
+Review result:
+[
+  03-symphony-orchestration/issues/05-tracker-fetch-by-states.md: SPEC PASS / QUALITY APPROVED; completed @ df72fc5; reviewer noted non-blocking EXPLAIN test gap
+]
+
+Review dispatch:
+[
+  09-repos-git-supervision/issues/03-simple-git-wrapper.md: implementer DONE_WITH_CONCERNS after review fix; focused test PASS 15/15; status moved to needs-review
+]
+
+Review result:
+[
+  02-inference-sidecar/issues/03-inference-cache-schema.md: SPEC PASS / QUALITY APPROVED; completed @ 66aa7e6; addendum NOT_REQUIRED; reviewer noted non-blocking rollback test gap
+  09-repos-git-supervision/issues/03-simple-git-wrapper.md: SPEC PASS / QUALITY APPROVED; completed @ d8c9ded
+]
+
 ## 2026-05-02T02:39:00Z — codex-orchestrator (Wave 3 batch adjusted for independence)
 
 Adjustment:
@@ -268,3 +329,32 @@ Verification:
   bun run ci PASS — 12/12 stages, 1487 pass, 2 skip; web:check still reports 2 pre-existing Svelte warnings
 ]
 Result: WAVE_3_FINAL_VERIFICATION_PASS.
+
+## 2026-05-02T03:11:17Z — codex-orchestrator (Wave 3 next batch claimed)
+
+State digest:
+[
+  branch: plan/agent-os-vision,
+  worktree: clean before claim,
+  issues: 341 total, 31 completed, 310 ready, 0 in-progress/review/blocked,
+  ci: bun run ci PASS — 12/12 stages
+]
+Batch:
+[
+  02-inference-sidecar/issues/03-inference-cache-schema.md,
+  03-symphony-orchestration/issues/05-tracker-fetch-by-states.md,
+  04-sandcastle-wrapper/issues/02-agent-runs-schema-migration.md,
+  05-router-and-skills/issues/03-rules-engine-wrapper.md,
+  07-docs-editor-collab/issues/03-frontmatter-schemas.md,
+  09-repos-git-supervision/issues/03-simple-git-wrapper.md
+]
+Implementers:
+[
+  019de6ae-43f6-7b51-a4c2-796e487ce384: codex-high P2#03 inference cache schema,
+  019de6ae-493f-7ef3-b064-6204a7bdfc2d: codex-medium P3#05 tracker fetch by states,
+  019de6ae-502a-7832-bcb3-0cc718795e19: codex-high P4#02 agent_runs Sandcastle migration,
+  019de6ae-595d-79b0-a61e-e08de4962ce1: codex-medium P5#03 rules engine wrapper,
+  019de6ae-6045-7793-9c9c-4d0bb422b930: codex-medium P7#03 frontmatter schemas,
+  019de6ae-64c9-78b0-9664-4aff8aacb946: codex-medium P9#03 simple-git wrapper
+]
+Result: IN_PROGRESS — statuses flipped to in-progress before dispatch.
