@@ -1853,6 +1853,42 @@ Result:
   completed reviewer threads closed to recover subagent capacity
 ]
 
+## 2026-05-02T19:33:47Z — codex-orchestrator (fixbacks verified)
+
+Capacity: claude_impl=0/6 codex_impl=0/6 claude_review=0/6 codex_review=0/6
+
+Queue fill:
+[
+  none-safe-after-fixbacks
+]
+
+Underfilled reason:
+[
+  active protected G0/P1 gate still freezes schema/auth/permission/tRPC middleware/context surfaces,
+  P3/P7/P17 verified work touches frozen shared surfaces and remains held outside main,
+  B072 context assembler core verified but context.preview acceptance remains blocked by router freeze,
+  next dispatch requires DAG scan for non-overlapping write set before claiming
+]
+
+Verified-held:
+[
+  p3-retry-stall: commits=9c09d4dec742,e6b426434b64,a251db6c96f9; parent_verification=81 pass, lint pass, compress check pass; API compatibility blocker fixed by restoring omitted max_retry_backoff_ms default to 300000ms while explicit override remains supported,
+  p7-doc-template-seeds: commits=94068be18c8e,e8ff7710,bbbd0ea9bb0; parent_verification=17 pass, 54 pass, web route 2 pass, lint pass, diff check pass; correctness blocker fixed by q/Escape/Ctrl-C handling for new-doc placeholder without docs caller; seed migration not reintroduced,
+  b072-context-assembler: commits=a6a50331e5e9,9c85c8d961c; parent_verification=30 pass, lint pass, diff check pass; lazy task customFields/sprint/externalId blocker fixed with real createTestOrm DI regression
+]
+
+Closed:
+[
+  workers=019dea05-b250-7f62-9556-5db560d9135a,019dea05-dae2-7500-ac31-b97656a49a83,019dea1c-775b-7410-9588-a981390df7fd,019dea08-0e5d-7400-a623-4e0ab148141d,019dea06-0c31-7913-8549-d8a32949310a
+]
+
+Result:
+[
+  P3_VERIFIED_HELD,
+  P7_VERIFIED_HELD,
+  B072_VERIFIED_HELD
+]
+
 ## 2026-05-02T19:14:10Z — codex-orchestrator (b072 context assembler dispatched)
 
 Implementer:
