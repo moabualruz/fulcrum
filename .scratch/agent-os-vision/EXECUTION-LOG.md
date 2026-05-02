@@ -68,6 +68,28 @@ Adjustment:
 ]
 Result: IN_PROGRESS batch remains six issues.
 
+## 2026-05-02T02:51:00Z — codex-orchestrator (Wave 3 batch dispatched)
+
+Batch:
+[
+  02-inference-sidecar/issues/02-ts-client-and-lifecycle.md,
+  03-symphony-orchestration/issues/04-tracker-fetch-candidate-issues.md,
+  04-sandcastle-wrapper/issues/01-sandcastle-dep-effect-singleton.md,
+  05-router-and-skills/issues/01-routing-rules-schema-migration.md,
+  05-router-and-skills/issues/02-fulcrum-skills-schema-migration.md,
+  07-docs-editor-collab/issues/01-docs-schema-foundation.md
+]
+Implementers:
+[
+  019de68a-ff33-7111-880e-e1a5b862b031: codex-worker @ /Users/mkh/.config/superpowers/worktrees/fulcrum/agent-os-p2-02,
+  019de68b-0466-7db3-b644-6b6a0d438297: codex-worker @ /Users/mkh/.config/superpowers/worktrees/fulcrum/agent-os-p3-04,
+  019de68b-0918-73e0-9fe9-705a87909f9b: codex-worker @ /Users/mkh/.config/superpowers/worktrees/fulcrum/agent-os-p4-01,
+  019de68b-0dbc-7f01-834b-f1487d5c5cf9: codex-worker @ /Users/mkh/.config/superpowers/worktrees/fulcrum/agent-os-p5-01,
+  019de68b-126b-7a61-83d3-d291d1c23357: codex-worker @ /Users/mkh/.config/superpowers/worktrees/fulcrum/agent-os-p5-02,
+  019de68b-171e-78d3-acca-64a3b211a1fc: codex-worker @ /Users/mkh/.config/superpowers/worktrees/fulcrum/agent-os-p7-01
+]
+Result: RUNNING.
+
 ## 2026-05-02T02:45:00Z — codex-orchestrator (Wave 3 batch widened across pillars)
 
 Adjustment:
