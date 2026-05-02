@@ -170,6 +170,43 @@ describe("symphony.run — runs show <runId> --json", () => {
       workspacePath: "/tmp/fulcrum-workspaces/org/key",
     });
   });
+
+  it("accepts --json before the run id", async () => {
+    const { run } = await import("../../src/cli/commands/symphony.ts");
+    const printed: string[] = [];
+    const calls: unknown[] = [];
+    const runId = "10000000-0000-0000-0000-000000000001";
+
+    await run(["runs", "show", "--json", runId], {
+      caller: {
+        orchestration: {
+          fetchCandidateIssues: async () => [],
+          getWorkspacePath: async (input: { orgId: string; runId: string }) => {
+            calls.push(input);
+            return {
+              runId: input.runId,
+              workspacePath: "/tmp/fulcrum-workspaces/org/key",
+            };
+          },
+        },
+      },
+      print: (line: string) => {
+        printed.push(line);
+      },
+      printErr: (line: string) => {
+        throw new Error(line);
+      },
+      exit: (code: number) => {
+        throw new Error(`unexpected exit ${code}`);
+      },
+    });
+
+    expect(calls).toEqual([{ orgId: DEFAULT_ORG_ID, runId }]);
+    expect(JSON.parse(printed[0] as string)).toEqual({
+      runId,
+      workspacePath: "/tmp/fulcrum-workspaces/org/key",
+    });
+  });
 });
 
 describe("symphony.run — runs show <runId> --verbose", () => {

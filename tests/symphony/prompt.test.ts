@@ -62,6 +62,17 @@ describe("renderPrompt", () => {
 });
 
 describe("parseWorkflowConfig", () => {
+  it("parses empty config as defaults", async () => {
+    const { parseWorkflowConfig } = await import("../../src/orchestration/symphony/prompt.ts");
+
+    expect(parseWorkflowConfig("")).toEqual({
+      stallTimeoutMs: 300000,
+      maxRetryBackoffMs: 300000,
+      keepOnFailure: false,
+      maxAttempts: 3,
+    });
+  });
+
   it("parses valid YAML workflow config", async () => {
     const { parseWorkflowConfig } = await import("../../src/orchestration/symphony/prompt.ts");
 
@@ -141,5 +152,18 @@ describe("orchestration.renderPromptPreview", () => {
         maxAttempts: 2,
       },
     });
+  });
+
+  it("propagates strict template errors through tRPC", async () => {
+    db = await createTestOrm();
+    const caller = await createTestCaller(createTestContainer(db));
+
+    await expect(caller.orchestration.renderPromptPreview({
+      orgId: DEFAULT_ORG_ID,
+      promptMd: "Ship {{ missing.title }}.",
+      configYaml: "",
+      issue: { id: "task-1", title: "prompt preview" },
+      attempt: null,
+    })).rejects.toThrow(/missing/);
   });
 });

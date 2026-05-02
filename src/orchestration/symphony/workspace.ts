@@ -10,6 +10,7 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { z } from "zod";
 
+import { Org } from "../../db/entities/auth/Org.ts";
 import type { AgentRun } from "../../db/entities/orchestration/AgentRun.ts";
 
 const MAX_WORKSPACE_KEY_LENGTH = 128;
@@ -62,10 +63,16 @@ export function sanitizeWorkspaceKey(
     MAX_WORKSPACE_KEY_LENGTH,
   );
 
-  if (!opts.existingKeys?.has(base)) return base;
+  const existingKeys = opts.existingKeys;
+  if (!existingKeys?.has(base)) return base;
 
-  const suffix = `_${fallback}`;
-  return `${base.slice(0, MAX_WORKSPACE_KEY_LENGTH - suffix.length)}${suffix}`;
+  let attempt = 1;
+  while (true) {
+    const suffix = attempt === 1 ? `_${fallback}` : `_${fallback}_${attempt}`;
+    const key = `${base.slice(0, MAX_WORKSPACE_KEY_LENGTH - suffix.length)}${suffix}`;
+    if (!existingKeys.has(key)) return key;
+    attempt += 1;
+  }
 }
 
 export async function createWorkspace(
@@ -154,10 +161,11 @@ export async function getWorkspacePath(
     "../../db/entities/orchestration/AgentRun.ts"
   );
   const fork = em.fork();
+  const org = fork.getReference(Org, input.orgId);
   const run = await fork.findOneOrFail(AgentRun, {
     id: input.runId,
-    org: input.orgId,
-  } as never, {
+    org,
+  }, {
     fields: ["id", "workspacePath"],
   });
 

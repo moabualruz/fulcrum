@@ -120,7 +120,7 @@ async function runRunsShow(
     SymphonyRunOptions,
 ): Promise<void> {
   const { print, printErr, exit } = opts;
-  const [runId] = argv;
+  const runId = argv.find((arg) => !arg.startsWith("-"));
   const jsonMode = argv.includes("--json");
   const verbose = argv.includes("--verbose");
 

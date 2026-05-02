@@ -10,6 +10,7 @@ import { Liquid, UndefinedVariableError } from "liquidjs";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 
+import { Org } from "../../db/entities/auth/Org.ts";
 import { WorkflowDefinition } from "../../db/entities/orchestration/WorkflowDefinition.ts";
 import type { WorkflowDefinitionRepository } from "../../db/repositories/orchestration/WorkflowDefinitionRepository.ts";
 
@@ -49,6 +50,11 @@ export interface RenderPromptContext {
   attempt: number | null;
 }
 
+const liquid = new Liquid({
+  strictVariables: true,
+  strictFilters: true,
+});
+
 export function parseWorkflowConfig(configYaml: string): WorkflowConfig {
   const parsed = parseYaml(configYaml.trim() === "" ? "{}" : configYaml);
   const yamlConfig = WorkflowConfigYamlSchema.parse(parsed ?? {});
@@ -65,11 +71,6 @@ export async function renderPrompt(
   workflowDef: PromptWorkflowDef,
   context: RenderPromptContext,
 ): Promise<string> {
-  const liquid = new Liquid({
-    strictVariables: true,
-    strictFilters: true,
-  });
-
   try {
     return await liquid.parseAndRender(workflowDef.promptMd, {
       issue: context.issue,
@@ -93,19 +94,20 @@ export async function loadWorkflowDef(
   const repo = fork.getRepository(
     WorkflowDefinition,
   ) as WorkflowDefinitionRepository;
+  const org = fork.getReference(Org, orgId);
 
   if (projectId !== null) {
     const projectWorkflow = await repo.findOne({
-      org: orgId,
+      org,
       projectId,
       name,
-    } as never);
+    });
     if (projectWorkflow) return projectWorkflow;
   }
 
   return repo.findOne({
-    org: orgId,
+    org,
     projectId: null,
     name,
-  } as never);
+  });
 }

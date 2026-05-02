@@ -7,7 +7,7 @@
  */
 
 import { afterAll, describe, expect, it } from "bun:test";
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { MigrationObject } from "@mikro-orm/core";
@@ -203,6 +203,14 @@ describe("sanitizeWorkspaceKey", () => {
     ).toBe("Duplicate_12345678");
   });
 
+  it("keeps suffixing when both the base and first collision key exist", () => {
+    expect(
+      sanitizeWorkspaceKey("Duplicate", TASK_ID, {
+        existingKeys: new Set(["Duplicate", "Duplicate_12345678"]),
+      }),
+    ).toBe("Duplicate_12345678_2");
+  });
+
   it("keeps collision-suffixed keys within 128 characters", () => {
     const title = "a".repeat(140);
     const key = sanitizeWorkspaceKey(title, TASK_ID, {
@@ -280,6 +288,23 @@ describe("Symphony workspace lifecycle", () => {
     }
   });
 
+  it("removes a workspace without an entity manager", async () => {
+    const db = await buildMigratedOrm();
+    const root = await mkdtemp(join(tmpdir(), "fulcrum-workspaces-"));
+    try {
+      const run = await seedRun(db.orm);
+      const workspacePath = await createWorkspace(run, { root });
+
+      await destroyWorkspace(run, { root });
+
+      expect(await exists(workspacePath)).toBe(false);
+      expect(run.workspacePath).toBeUndefined();
+    } finally {
+      await db.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("refuses to remove a workspace path outside the org root", async () => {
     const db = await buildMigratedOrm();
     const root = await mkdtemp(join(tmpdir(), "fulcrum-workspaces-"));
@@ -302,11 +327,12 @@ describe("Symphony workspace lifecycle", () => {
     try {
       const run = await seedRun(db.orm);
       run.workspacePath = join(root, DEFAULT_ORG_ID);
+      await mkdir(run.workspacePath, { recursive: true });
 
       await expect(
         destroyWorkspace(run, { em: db.orm.em, root }),
       ).rejects.toThrow(/outside org root/i);
-      expect(await exists(run.workspacePath)).toBe(false);
+      expect(await exists(run.workspacePath)).toBe(true);
     } finally {
       await db.close();
       await rm(root, { recursive: true, force: true });

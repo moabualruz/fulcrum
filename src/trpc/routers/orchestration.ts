@@ -125,11 +125,16 @@ export const orchestrationRouter = t.router({
         });
       }
 
-      const { AgentRun } = await import("../../db/entities/orchestration/AgentRun.ts");
-      const run = await em.fork().findOne(AgentRun, {
+      const [{ AgentRun }, { Org }] = await Promise.all([
+        import("../../db/entities/orchestration/AgentRun.ts"),
+        import("../../db/entities/auth/Org.ts"),
+      ]);
+      const fork = em.fork();
+      const org = fork.getReference(Org, orgId);
+      const run = await fork.findOne(AgentRun, {
         id: input.runId,
-        org: orgId,
-      } as never, {
+        org,
+      }, {
         fields: ["id", "orchestrationState", "workspacePath"],
       });
       if (!run) return null;
