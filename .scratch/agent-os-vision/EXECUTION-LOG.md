@@ -919,3 +919,31 @@ Adjustment:
   reason: P17#04 owns theme tRPC/router wiring and can collide with P13#01 AppRouter scaffold; P5#11 owns routing engine hot-reload path and is safer parallel work
 ]
 Result: IMPLEMENTATION_WAVE_ADJUSTED.
+
+## 2026-05-02T10:22:32Z — codex (implemented P6#01 tasks schema extension)
+
+Issue:
+[
+  path: 06-tasks-and-scrum/issues/01-tasks-schema-extension.md,
+  status: implemented,
+  branch: mo/agent-os-p6-01
+]
+Implementation:
+[
+  added: TaskStatus entity and task schema helper exports,
+  changed: Task entity additive sprint/custom_fields/points/parent/dependencies/external_id fields,
+  migration: Migration20260502090000_tasks_schema_extension,
+  indexes: tasks_org_sprint_status, tasks_org_parent, tasks_custom_fields_gin, tasks_org_external_id,
+  compatibility: new Task fields are lazy so older migration-slice tests that populate task relations do not select future columns
+]
+TDD:
+[
+  RED: bun test ./src/db/tasks-schema-extension.test.ts FAIL — missing DependenciesSchema/TaskStatus exports and task columns; 0 pass, 5 fail,
+  GREEN: bun test ./src/db/tasks-schema-extension.test.ts PASS — 5 pass, 0 fail, 42 expect() calls,
+  VERIFY: bun run ci PASS — 12/12 stages; 1646 pass, 2 skip, 0 fail, 5054 expect() calls; web:check has 2 existing Svelte warnings
+]
+Decision flagged:
+[
+  sprint_fk_conditional: P6#02 owns the sprints table/entity, so P6#01 adds tasks.sprint_id now and installs tasks_sprint_id_foreign only when public.sprints exists before this migration
+]
+Result: IMPLEMENTED.

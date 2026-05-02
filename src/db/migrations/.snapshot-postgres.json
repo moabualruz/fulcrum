@@ -898,6 +898,16 @@
         },
         {
           "columnNames": [
+            "id"
+          ],
+          "composite": false,
+          "constraint": true,
+          "keyName": "artifacts_pkey",
+          "primary": true,
+          "unique": true
+        },
+        {
+          "columnNames": [
             "run_id"
           ],
           "composite": false,
@@ -915,16 +925,6 @@
           "keyName": "artifacts_task_fk",
           "primary": false,
           "unique": false
-        },
-        {
-          "columnNames": [
-            "id"
-          ],
-          "composite": false,
-          "constraint": true,
-          "keyName": "artifacts_pkey",
-          "primary": true,
-          "unique": true
         },
         {
           "columnNames": [
@@ -6089,6 +6089,202 @@
       "comment": null
     },
     {
+      "name": "task_statuses",
+      "schema": "public",
+      "columns": {
+        "category": {
+          "name": "category",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [
+            "unstarted",
+            "started",
+            "completed",
+            "cancelled"
+          ],
+          "mappedType": "enum"
+        },
+        "color": {
+          "name": "color",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": "'#6B7280'",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": true,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "gen_random_uuid()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "is_default": {
+          "name": "is_default",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "false",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "boolean"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "position": {
+          "name": "position",
+          "type": "int",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "0",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": true,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        }
+      },
+      "indexes": [
+        {
+          "columnNames": [
+            "org_id",
+            "project_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "task_statuses_org_project",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "id"
+          ],
+          "composite": false,
+          "constraint": true,
+          "keyName": "task_statuses_pkey",
+          "primary": true,
+          "unique": true
+        },
+        {
+          "columnNames": [
+            "project_id",
+            "name"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "task_statuses_project_name_unique",
+          "primary": false,
+          "unique": true
+        }
+      ],
+      "checks": [
+        {
+          "name": "task_statuses_category_check",
+          "expression": "\"category\" in ('unstarted', 'started', 'completed', 'cancelled')",
+          "definition": "check (\"category\" in ('unstarted', 'started', 'completed', 'cancelled'))",
+          "columnName": "category"
+        }
+      ],
+      "foreignKeys": {
+        "task_statuses_org_id_foreign": {
+          "columnNames": [
+            "org_id"
+          ],
+          "constraintName": "task_statuses_org_id_foreign",
+          "localTableName": "public.task_statuses",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.orgs",
+          "deleteRule": "cascade"
+        }
+      },
+      "comment": null
+    },
+    {
       "name": "tasks",
       "schema": "public",
       "columns": {
@@ -6124,6 +6320,54 @@
           "enumItems": [],
           "mappedType": "datetime"
         },
+        "custom_fields": {
+          "name": "custom_fields",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "'{}'",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
+        },
+        "dependencies": {
+          "name": "dependencies",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "'{\"blocks\": [], \"blocked_by\": []}'",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
+        },
+        "external_id": {
+          "name": "external_id",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
         "id": {
           "name": "id",
           "type": "uuid",
@@ -6147,6 +6391,22 @@
           "autoincrement": false,
           "primary": false,
           "nullable": false,
+          "unique": true,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "parent_id": {
+          "name": "parent_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
           "unique": false,
           "length": null,
           "precision": null,
@@ -6155,6 +6415,22 @@
           "comment": null,
           "enumItems": [],
           "mappedType": "uuid"
+        },
+        "points": {
+          "name": "points",
+          "type": "int",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
         },
         "priority": {
           "name": "priority",
@@ -6171,6 +6447,22 @@
           "comment": null,
           "enumItems": [],
           "mappedType": "integer"
+        },
+        "sprint_id": {
+          "name": "sprint_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
         },
         "status": {
           "name": "status",
@@ -6219,6 +6511,17 @@
         },
         {
           "columnNames": [
+            "custom_fields"
+          ],
+          "composite": false,
+          "constraint": false,
+          "keyName": "tasks_custom_fields_gin",
+          "primary": false,
+          "unique": false,
+          "type": "gin"
+        },
+        {
+          "columnNames": [
             "org_id",
             "status",
             "priority",
@@ -6230,6 +6533,41 @@
           "primary": false,
           "unique": false,
           "expression": "CREATE INDEX tasks_dispatch_eligible ON public.tasks USING btree (org_id, status, priority, created_at) WHERE ((status)::text = 'ready'::text)"
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "external_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "tasks_org_external_id",
+          "primary": false,
+          "unique": true,
+          "expression": "CREATE UNIQUE INDEX tasks_org_external_id ON public.tasks USING btree (org_id, external_id) WHERE (external_id IS NOT NULL)"
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "parent_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "tasks_org_parent",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "sprint_id",
+            "status"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "tasks_org_sprint_status",
+          "primary": false,
+          "unique": false
         },
         {
           "columnNames": [
@@ -6254,6 +6592,18 @@
             "id"
           ],
           "referencedTableName": "public.orgs"
+        },
+        "tasks_parent_id_foreign": {
+          "columnNames": [
+            "parent_id"
+          ],
+          "constraintName": "tasks_parent_id_foreign",
+          "localTableName": "public.tasks",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.tasks",
+          "deleteRule": "set null"
         }
       },
       "comment": null
