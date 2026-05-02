@@ -40,6 +40,7 @@ const SkillFrontmatter = z.object({
 let testOrm: MikroORM | undefined;
 const LOCK_TIMEOUT_MS = 5_000;
 const LOCK_POLL_MS = 25;
+const STALE_LOCK_MS = 60_000;
 
 export function __setSkillsLoaderOrmForTest(orm: MikroORM | undefined): void {
   testOrm = orm;
@@ -112,15 +113,22 @@ function sleep(ms: number): Promise<void> {
 
 async function withSkillsLock<T>(fn: () => Promise<T>): Promise<T> {
   const lockDir = `${skillsLockPath()}.lock`;
+  const lockInfoPath = join(lockDir, "lock.json");
   await mkdir(dirname(lockDir), { recursive: true });
   const startedAt = Date.now();
 
   while (true) {
     try {
       await mkdir(lockDir);
+      await writeFile(
+        lockInfoPath,
+        `${JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() })}\n`,
+        "utf8",
+      );
       break;
     } catch (error) {
       if ((error as { code?: string }).code !== "EEXIST") throw error;
+      if (await removeStaleLock(lockDir, lockInfoPath)) continue;
       if (Date.now() - startedAt > LOCK_TIMEOUT_MS) {
         throw new Error(`Timed out acquiring skills lock at ${lockDir}`);
       }
@@ -135,15 +143,67 @@ async function withSkillsLock<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+async function removeStaleLock(
+  lockDir: string,
+  lockInfoPath: string,
+): Promise<boolean> {
+  let parsed: { pid?: unknown; createdAt?: unknown };
+  try {
+    parsed = JSON.parse(await readFile(lockInfoPath, "utf8")) as {
+      pid?: unknown;
+      createdAt?: unknown;
+    };
+  } catch {
+    return false;
+  }
+
+  const pid = typeof parsed.pid === "number" ? parsed.pid : null;
+  const createdAt = typeof parsed.createdAt === "string"
+    ? Date.parse(parsed.createdAt)
+    : NaN;
+  const lockIsOld = Number.isFinite(createdAt) && Date.now() - createdAt > STALE_LOCK_MS;
+  const ownerDead = pid !== null && !isProcessAlive(pid);
+  if (!ownerDead && !lockIsOld) return false;
+
+  await rm(lockDir, { recursive: true, force: true });
+  return true;
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function writeNullHash(
   orm: MikroORM,
   orgId: string,
+  name: string,
   slug: string,
   version: string,
+  agents: AgentName[],
 ): Promise<void> {
   const em = orm.em.fork();
-  const skill = await em.findOne(FulcrumSkill, { org: orgId, slug });
-  if (!skill) return;
+  let skill = await em.findOne(FulcrumSkill, { org: orgId, slug }) as
+    | FulcrumSkill
+    | null;
+
+  if (!skill) {
+    skill = em.create(FulcrumSkill, {
+      org: em.getReference(Org, orgId),
+      name,
+      slug,
+      source: SkillSource.Local,
+      enabledAgents: agents,
+    });
+  } else {
+    skill.name = name;
+    skill.source = SkillSource.Local;
+    skill.enabledAgents = agents;
+  }
 
   let skillVersion = await em.findOne(SkillVersion, { skill, version });
   if (!skillVersion) {
@@ -256,20 +316,18 @@ export async function installSkill(
   try {
     return await withSkillsLock(async () => {
       const lock = await readSkillsLockFile();
-      await upsertSkillRow(
-        installOrm.orm,
-        orgId,
-        parsed.name,
-        slug,
-        parsed.version,
-        agents,
-        null,
-      );
 
       try {
         await copyToAgents(slug, content, agents, lock[slug]?.hash);
       } catch (error) {
-        await writeNullHash(installOrm.orm, orgId, slug, parsed.version);
+        await writeNullHash(
+          installOrm.orm,
+          orgId,
+          parsed.name,
+          slug,
+          parsed.version,
+          agents,
+        );
         throw error;
       }
 

@@ -68,39 +68,6 @@ function resolveServices(opts: InferenceRunOptions): {
   return { lifecycle: fullLifecycle, client };
 }
 
-async function resolveCaller(opts: InferenceRunOptions): Promise<InferenceCliCaller> {
-  if (opts.caller) return opts.caller;
-
-  if (opts.client) {
-    return {
-      inference: {
-        health: () => opts.client!.call("health", {}),
-        embed: async () => {
-          throw new Error("embed requires a tRPC caller or inference client embed method");
-        },
-        generate: async () => {
-          throw new Error("generate requires a tRPC caller or inference client generate method");
-        },
-      },
-    };
-  }
-
-  const container = opts.container ?? new Container();
-  const [{ appRouter }, { createContext }, { t }] = await Promise.all([
-    import("../trpc/router.ts"),
-    import("../trpc/context.ts"),
-    import("../trpc/trpc.ts"),
-  ]);
-  const factory = t.createCallerFactory(appRouter);
-  return factory(createContext({
-    session: null,
-    orgId: null,
-    userId: null,
-    em: null,
-    container,
-  })) as unknown as InferenceCliCaller;
-}
-
 export async function run(argv: readonly string[], opts: InferenceRunOptions = {}): Promise<void> {
   const { print = console.log, printErr = console.error, exit = process.exit } = opts;
   const [verb = "help", ...rest] = argv;
@@ -145,8 +112,7 @@ async function runStart(
   const json = hasFlag(argv, "json");
   const { lifecycle, client } = resolveServices(opts);
   const running = await lifecycle.ensureRunning();
-  const caller = await resolveCaller(opts);
-  const health = opts.client ? await client.call("health", {}) : await caller.inference.health();
+  const health = await client.call("health", {});
   const payload = { status: health.status, pid: running.pid, socketPath: running.socketPath, health };
 
   if (json) {

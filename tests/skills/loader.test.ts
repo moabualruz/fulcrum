@@ -223,6 +223,27 @@ describe("installSkill", () => {
     expect(await em.count(FulcrumSkill, { org: testDb.seed.orgId })).toBe(0);
   });
 
+  it("removes a stale skills lock owned by a dead process", async () => {
+    const lockDir = join(process.env["FULCRUM_HOME"]!, "skills.lock.json.lock");
+    await mkdir(lockDir, { recursive: true });
+    await writeFile(
+      join(lockDir, "lock.json"),
+      JSON.stringify({ pid: 999_999_999, createdAt: new Date().toISOString() }),
+      "utf8",
+    );
+    const skillPath = await writeSkill("stale-lock", {
+      name: "stale-lock",
+      version: "1.0.0",
+      agents: ["codex"],
+      triggers: ["stale-lock"],
+    });
+
+    await installSkill(skillPath, testDb.seed.orgId);
+
+    expect(await pathExists(await installedPath("codex", "stale-lock"))).toBe(true);
+    expect(await pathExists(lockDir)).toBe(false);
+  });
+
   it("reinstalling the same content skips rewriting installed file", async () => {
     const skillPath = await writeSkill("stable", {
       name: "stable",

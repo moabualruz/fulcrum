@@ -113,6 +113,34 @@ describe("fulcrum inference CLI", () => {
     ]);
   });
 
+  test("embed and generate use the local inference client when no tRPC caller is supplied", async () => {
+    const embedCap = capture();
+    await run(["embed", "hello", "--json"], {
+      ...embedCap.opts,
+      client: {
+        call: async () => health,
+        embed: async () => ({ vectors: [[0.1, 0.2]], model: "local", cached: true }),
+        generate: async () => ({ text: "unused", model: "local", tokens: 1 }),
+      },
+    });
+    expect(JSON.parse(embedCap.lines.join("\n"))).toEqual({
+      vectors: [[0.1, 0.2]],
+      model: "local",
+      cached: true,
+    });
+
+    const generateCap = capture();
+    await run(["generate", "Hello"], {
+      ...generateCap.opts,
+      client: {
+        call: async () => health,
+        embed: async () => ({ vectors: [[0.1]], model: "local", cached: false }),
+        generate: async () => ({ text: "Hi", model: "local", tokens: 2 }),
+      },
+    });
+    expect(generateCap.lines).toEqual(["Hi"]);
+  });
+
   test("generate --json emits text, model, and token count from tRPC caller", async () => {
     const cap = capture();
 
