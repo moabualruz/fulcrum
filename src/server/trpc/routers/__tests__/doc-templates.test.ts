@@ -21,6 +21,11 @@ import { run as runDocsTemplateCli } from "../../../../cli/docs-templates.ts";
 import { TuiApp } from "../../../../tui/index.ts";
 import { FakeTTY } from "../../../../tui/testing/fake-tty.ts";
 import { TEMPLATE_BODY_MAP, TEMPLATE_SEEDS } from "../../../../docs/template-seeds.ts";
+import { createTestOrm } from "../../../../test-utils/db.ts";
+import { DEFAULT_ORG_ID as SEEDED_ORG_ID } from "../../../../db/seed.ts";
+import { EntityManagerDocTemplateService } from "../../../../docs/em-doc-template-service.ts";
+import { Org } from "../../../../db/entities/auth/Org.ts";
+import { DocTemplate } from "../../../../db/entities/docs/DocTemplate.ts";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -177,6 +182,54 @@ describe("docs.templates tRPC router", () => {
       projectId: null,
     });
     expect(result).toBeNull();
+  });
+});
+
+// ─── Production service tests ───────────────────────────────────────────────
+
+describe("EntityManagerDocTemplateService", () => {
+  test("list(projectId) returns project templates plus static org-default fallback", async () => {
+    const db = await createTestOrm();
+    try {
+      const em = db.em.fork();
+      const org = em.getReference(Org, SEEDED_ORG_ID);
+      em.persist(em.create(DocTemplate, {
+        org,
+        projectId: PROJECT_ID,
+        docType: "adr",
+        name: "Project ADR",
+        frontmatterTemplate: { status: "proposed", project: "my-svc" },
+        bodyTemplate: "## Project-only ADR",
+        isDefault: true,
+      }));
+      await em.flush();
+
+      const service = new EntityManagerDocTemplateService(em);
+      const rows = await service.list(SEEDED_ORG_ID, PROJECT_ID);
+
+      expect(rows).toHaveLength(10);
+      expect(rows.filter((row) => row.projectId === null)).toHaveLength(9);
+      expect(rows.some((row) => row.projectId === PROJECT_ID && row.docType === "adr")).toBe(true);
+      expect(rows.find((row) => row.projectId === null && row.docType === "spec")?.bodyTemplate)
+        .toContain("## Requirements");
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("resolve falls back to immutable built-in templates when no DB default exists", async () => {
+    const db = await createTestOrm();
+    try {
+      const service = new EntityManagerDocTemplateService(db.em.fork());
+      const template = await service.resolve(SEEDED_ORG_ID, null, "rfc");
+
+      expect(template).not.toBeNull();
+      expect(template?.id).toBe("builtin-doc-template-rfc");
+      expect(template?.projectId).toBeNull();
+      expect(template?.bodyTemplate).toContain("## Proposal");
+    } finally {
+      await db.close();
+    }
   });
 });
 
@@ -349,6 +402,52 @@ describe("TUI new-doc flow", () => {
       // Template body should appear (from the first/selected doc_type)
       const hasTemplate = DOC_TYPES.some((dt) => output.includes(`## ${dt} default body`));
       expect(hasTemplate).toBe(true);
+    } finally {
+      tui.stop();
+    }
+  });
+
+  test("template load failures render an error state instead of escaping key handling", async () => {
+    const tty = new FakeTTY();
+
+    const tui = new TuiApp({
+      output: tty,
+      input: tty,
+      caller: {
+        auth: {
+          whoami: async () => ({
+            userId: "user_1",
+            orgId: DEFAULT_ORG_ID,
+            email: "admin@local",
+            role: "owner",
+          }),
+        },
+        flags: {
+          list: async () => [],
+          set: async () => ({ ok: true }),
+        },
+        inference: {
+          health: async () => ({ status: "ok" }),
+        },
+        docs: {
+          templates: {
+            list: async () => {
+              throw new Error("template service unavailable");
+            },
+          },
+        },
+      },
+    });
+
+    try {
+      await tui.mount();
+      tty.inject("n");
+      await new Promise((r) => setTimeout(r, 50));
+
+      const output = tty.plainText();
+      expect(output).toContain("New Document");
+      expect(output).toContain("Template load failed");
+      expect(output).toContain("template service unavailable");
     } finally {
       tui.stop();
     }

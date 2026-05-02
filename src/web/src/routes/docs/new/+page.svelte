@@ -4,6 +4,13 @@
 	import type { ActionData, PageData } from "./$types";
 	import MarkdownEditor from "$lib/components/markdown/MarkdownEditor.svelte";
 	import { buttonVariants } from "$lib/components/ui/button";
+	import {
+		applyTemplateSelectionChange,
+		buildDocTypeOptions,
+		createInitialTemplateState,
+		markTemplateBodyEdited,
+		type TemplatePickerState,
+	} from "$lib/docs/template-picker";
 	import { cn } from "$lib/utils.js";
 
 	interface Props {
@@ -13,19 +20,54 @@
 
 	let { data, form }: Props = $props();
 
-	const KINDS = ["decision", "spec", "note", "runbook"] as const;
+	const templates = untrack(() => data.templates ?? {});
+	const KINDS = buildDocTypeOptions(templates);
+	const initialTemplateState = untrack(() => createInitialTemplateState({
+		formKind: data.form.data.kind,
+		formBody: data.form.data.body,
+		templates,
+	}));
 
 	// Local mirrors seeded once — keystrokes don't recompute against re-rendered
 	// `data.form.data` on every input event.
 	let titleValue = $state(untrack(() => data.form.data.title ?? ""));
-	let kindValue = $state(untrack(() => data.form.data.kind ?? "note"));
+	let kindValue = $state(initialTemplateState.kind);
 	let labelsValue = $state(untrack(() => data.form.data.labels ?? ""));
-	let bodyValue = $state(untrack(() => data.form.data.body ?? ""));
+	let bodyValue = $state(initialTemplateState.body);
+	let lastAppliedTemplate = $state(initialTemplateState.lastTemplate);
+	let bodyEdited = $state(initialTemplateState.bodyEdited);
 
 	const errors = $derived(form?.form?.errors ?? data.form.errors ?? {});
 	const titleError = $derived<string | undefined>(errors.title?.[0]);
 	const kindError = $derived<string | undefined>(errors.kind?.[0]);
 	const bodyError = $derived<string | undefined>(errors.body?.[0]);
+
+	function currentTemplateState(): TemplatePickerState {
+		return {
+			kind: kindValue,
+			body: bodyValue,
+			lastTemplate: lastAppliedTemplate,
+			bodyEdited,
+		};
+	}
+
+	function applyTemplateState(next: TemplatePickerState): void {
+		kindValue = next.kind;
+		bodyValue = next.body;
+		lastAppliedTemplate = next.lastTemplate;
+		bodyEdited = next.bodyEdited;
+	}
+
+	function handleKindChange(event: Event): void {
+		const nextKind = (event.currentTarget as HTMLSelectElement).value;
+		applyTemplateState(
+			applyTemplateSelectionChange(currentTemplateState(), nextKind, templates),
+		);
+	}
+
+	function handleBodyChange(nextBody: string): void {
+		applyTemplateState(markTemplateBodyEdited(currentTemplateState(), nextBody));
+	}
 </script>
 
 <header
@@ -69,6 +111,7 @@
 			name="kind"
 			data-doc-kind
 			bind:value={kindValue}
+			onchange={handleKindChange}
 			aria-invalid={kindError ? "true" : undefined}
 			class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
 		>
@@ -96,7 +139,7 @@
 
 	<div class={cn("flex flex-col gap-1.5")}>
 		<label for="doc-body" class={cn("text-sm font-medium")}>Body</label>
-		<MarkdownEditor bind:value={bodyValue} ariaLabel="Document body" />
+		<MarkdownEditor bind:value={bodyValue} onChange={handleBodyChange} ariaLabel="Document body" />
 		<input type="hidden" name="body" value={bodyValue} />
 		{#if bodyError}
 			<p data-error-body class={cn("text-destructive text-xs")}>{bodyError}</p>
