@@ -8,6 +8,7 @@ import {
   ManyToOne,
   PrimaryKey,
   Property,
+  Unique,
 } from "@mikro-orm/decorators/es";
 import { Org } from "../auth/Org.ts";
 import { Memory } from "./Memory.ts";
@@ -16,6 +17,10 @@ import type { MemoryLinkTargetKind } from "./enums.ts";
 @Entity({ tableName: "memory_links" })
 @Index({ name: "memory_links_memory", properties: ["org", "memory"] })
 @Index({ name: "memory_links_target", properties: ["org", "targetKind", "targetId"] })
+@Unique({
+  name: "memory_links_memory_target_dedup",
+  properties: ["memory", "targetKind", "targetId"],
+})
 export class MemoryLink {
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
