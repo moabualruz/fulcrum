@@ -127,3 +127,82 @@ describe("symphony.run — runs list --state <state> --json", () => {
     ]);
   });
 });
+
+describe("symphony.run — runs show <runId> --json", () => {
+  it("prints JSON with workspacePath from orchestration.getWorkspacePath", async () => {
+    const { run } = await import("../../src/cli/commands/symphony.ts");
+    const printed: string[] = [];
+    const calls: unknown[] = [];
+
+    await run([
+      "runs",
+      "show",
+      "10000000-0000-0000-0000-000000000001",
+      "--json",
+    ], {
+      caller: {
+        orchestration: {
+          fetchCandidateIssues: async () => [],
+          getWorkspacePath: async (input: { orgId: string; runId: string }) => {
+            calls.push(input);
+            return {
+              runId: input.runId,
+              workspacePath: "/tmp/fulcrum-workspaces/org/key",
+            };
+          },
+        },
+      },
+      print: (line: string) => {
+        printed.push(line);
+      },
+      printErr: () => {},
+      exit: (code: number) => {
+        throw new Error(`unexpected exit ${code}`);
+      },
+    });
+
+    expect(calls).toEqual([{
+      orgId: DEFAULT_ORG_ID,
+      runId: "10000000-0000-0000-0000-000000000001",
+    }]);
+    expect(JSON.parse(printed[0] as string)).toEqual({
+      runId: "10000000-0000-0000-0000-000000000001",
+      workspacePath: "/tmp/fulcrum-workspaces/org/key",
+    });
+  });
+});
+
+describe("symphony.run — runs show <runId> --verbose", () => {
+  it("prints a rendered prompt excerpt when verbose mode is enabled", async () => {
+    const { run } = await import("../../src/cli/commands/symphony.ts");
+    const printed: string[] = [];
+    const runId = "10000000-0000-0000-0000-000000000001";
+
+    await run(["runs", "show", runId, "--verbose"], {
+      caller: {
+        orchestration: {
+          fetchCandidateIssues: async () => [],
+          getRun: async (input: { runId: string }) => {
+            expect(input).toEqual({ runId });
+            return {
+              id: runId,
+              state: "running",
+              renderedPrompt:
+                "Fix login flow\n\nUse strict workflow context and include enough diagnostic detail for the assigned agent.",
+            };
+          },
+        },
+      },
+      print: (line: string) => {
+        printed.push(line);
+      },
+      printErr: () => {},
+      exit: (code: number) => {
+        throw new Error(`unexpected exit ${code}`);
+      },
+    });
+
+    expect(printed.join("\n")).toContain("RENDERED PROMPT");
+    expect(printed.join("\n")).toContain("Fix login flow");
+  });
+});

@@ -9,7 +9,11 @@ Lock: `.symphony-spec.lock`
 
 ### `WORKFLOW.md` loader with YAML front matter + prompt body split
 
+Workflow definition load: `src/orchestration/symphony/prompt.ts:loadWorkflowDef` reads `workflow_definitions` through MikroORM and resolves project-specific `WORKFLOW.md` first, then the org-wide default (`project_id = NULL`) when no project row exists.
+
 ### Typed config layer with defaults and `$` resolution
+
+Config validation: `src/orchestration/symphony/prompt.ts:parseWorkflowConfig` parses YAML front matter and Zod-validates `stall_timeout_ms`, `max_retry_backoff_ms`, `keepOnFailure`, and `maxAttempts`, returning defaults for omitted values.
 
 ### Dynamic `WORKFLOW.md` watch/reload/re-apply for config and prompt
 
@@ -25,6 +29,12 @@ State refresh fetch: `src/orchestration/symphony/tracker.ts:fetchIssueStatesById
 
 ### Workspace manager with sanitized per-issue workspaces
 
+Naming invariant: `src/orchestration/symphony/workspace.ts:sanitizeWorkspaceKey` strips every char outside `[A-Za-z0-9._-]`, appends `_<taskId[0..7]>` when an existing key collides, and truncates final keys to 128 chars.
+
+Create-on-claim: `src/orchestration/symphony/workspace.ts:createWorkspace` creates `$FULCRUM_WORKSPACE_ROOT/<orgId>/<sanitizedKey>` (default `~/.fulcrum/workspaces`) and persists `agent_runs.workspace_path`.
+
+Destroy-on-release: `src/orchestration/symphony/workspace.ts:destroyWorkspace` removes the workspace and clears `agent_runs.workspace_path`; `keepOnFailure=true` retains failed-run workspaces for inspection.
+
 ### Workspace lifecycle hooks (`after_create`, `before_run`, `after_run`, `before_remove`)
 
 ### Hook timeout config (`hooks.timeout_ms`, default `60000`)
@@ -34,6 +44,8 @@ State refresh fetch: `src/orchestration/symphony/tracker.ts:fetchIssueStatesById
 ### Codex launch command config (`codex.command`, default `codex app-server`)
 
 ### Strict prompt rendering with `issue` and `attempt` variables
+
+Prompt template: `src/orchestration/symphony/prompt.ts:renderPrompt` renders Liquid templates with `strictVariables: true` and `strictFilters: true`, exposing only `{ issue, attempt }`; unknown variables are rethrown as `UnknownVariableError`.
 
 ### Exponential retry queue with continuation retries after normal exit
 

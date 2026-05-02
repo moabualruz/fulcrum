@@ -24,6 +24,20 @@ export interface SymphonyCaller {
       states: string[];
       limit: number;
     }) => Promise<AgentRunIssue[]>;
+    getRun?: (input: { runId: string }) => Promise<{
+      id: string;
+      state?: string | null;
+      orchestrationState?: string | null;
+      workspacePath?: string | null;
+      renderedPrompt?: string | null;
+    } | null>;
+    getWorkspacePath?: (input: {
+      orgId: string;
+      runId: string;
+    }) => Promise<{
+      runId: string;
+      workspacePath: string | null;
+    }>;
   };
 }
 
@@ -43,10 +57,12 @@ Orchestration commands.
 
 Usage:
   fulcrum symphony runs list --state <state> [--limit N] [--json]
+  fulcrum symphony runs show <runId> [--verbose] [--json]
 
 Options:
   --state <state>  State filter. 'ready' lists candidate tasks; run states list agent runs.
   --limit <N>      Max rows to return (default 50).
+  --verbose        Include rendered prompt excerpt where available.
   --json           Output as machine-readable JSON.
   -h, --help       Show this help.
 `;
@@ -84,6 +100,8 @@ async function runRuns(
   switch (action) {
     case "list":
       return runRunsList(rest, opts);
+    case "show":
+      return runRunsShow(rest, opts);
     case "help":
     case "--help":
     case "-h":
@@ -93,6 +111,76 @@ async function runRuns(
       printErr(`fulcrum symphony runs: unknown command '${action}'`);
       printErr(HELP);
       exit(2);
+  }
+}
+
+async function runRunsShow(
+  argv: readonly string[],
+  opts: Required<Pick<SymphonyRunOptions, "print" | "printErr" | "exit">> &
+    SymphonyRunOptions,
+): Promise<void> {
+  const { print, printErr, exit } = opts;
+  const [runId] = argv;
+  const jsonMode = argv.includes("--json");
+  const verbose = argv.includes("--verbose");
+
+  if (!runId || runId.startsWith("-")) {
+    printErr("fulcrum symphony runs show: missing <runId>");
+    exit(2);
+    return;
+  }
+
+  const caller = await resolveCaller(opts);
+
+  try {
+    if (!caller.orchestration.getRun && caller.orchestration.getWorkspacePath) {
+      const row = await caller.orchestration.getWorkspacePath({
+        orgId: opts.orgId ?? DEFAULT_ORG_ID,
+        runId,
+      });
+      if (jsonMode) {
+        print(JSON.stringify(row));
+        return;
+      }
+
+      print(`ID         ${row.runId}`);
+      print(`WORKSPACE  ${row.workspacePath ?? ""}`);
+      return;
+    }
+
+    if (!caller.orchestration.getRun) {
+      throw new Error(
+        "orchestration.getRun or orchestration.getWorkspacePath is unavailable",
+      );
+    }
+
+    const row = await caller.orchestration.getRun({ runId });
+    if (!row) {
+      printErr(`fulcrum symphony runs show: run not found '${runId}'`);
+      exit(1);
+      return;
+    }
+
+    if (jsonMode) {
+      print(JSON.stringify(row));
+      return;
+    }
+
+    print(`ID     ${row.id}`);
+    print(`STATE  ${row.state ?? row.orchestrationState ?? ""}`);
+    if (row.workspacePath) print(`WORKSPACE  ${row.workspacePath}`);
+
+    if (verbose && row.renderedPrompt) {
+      print("");
+      print("RENDERED PROMPT");
+      print(excerpt(row.renderedPrompt));
+    }
+  } catch (err) {
+    const msg = err instanceof TRPCError
+      ? `${err.code}: ${err.message}`
+      : `Error: ${(err as Error).message}`;
+    printErr(`fulcrum symphony runs show: ${msg}`);
+    exit(1);
   }
 }
 
@@ -217,4 +305,9 @@ function readFlag(argv: readonly string[], flag: string): string | undefined {
   const index = argv.indexOf(flag);
   if (index === -1) return undefined;
   return argv[index + 1];
+}
+
+function excerpt(value: string, maxChars = 240): string {
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, maxChars - 3)}...`;
 }

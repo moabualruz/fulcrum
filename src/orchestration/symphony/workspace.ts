@@ -1,0 +1,201 @@
+/**
+ * Symphony workspace lifecycle.
+ *
+ * SPEC naming invariant: workspace keys contain only [A-Za-z0-9._-].
+ */
+
+import { mkdir, readdir, rm } from "node:fs/promises";
+import { homedir } from "node:os";
+import { isAbsolute, join, relative, resolve } from "node:path";
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { z } from "zod";
+
+import type { AgentRun } from "../../db/entities/orchestration/AgentRun.ts";
+
+const MAX_WORKSPACE_KEY_LENGTH = 128;
+const WORKSPACE_SAFE_CHARS = /[^A-Za-z0-9._-]/g;
+const FulcrumUuidSchema = z.string().regex(
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
+);
+const TERMINAL_FAILURE_STATES = new Set([
+  "failed",
+  "timed_out",
+  "stalled",
+  "cancelled",
+]);
+
+export interface SanitizeWorkspaceKeyOptions {
+  existingKeys?: ReadonlySet<string>;
+}
+
+export interface CreateWorkspaceOptions {
+  em?: EntityManager;
+  root?: string;
+}
+
+export interface DestroyWorkspaceOptions {
+  em?: EntityManager;
+  root?: string;
+  keepOnFailure?: boolean;
+}
+
+export const GetWorkspacePathInputSchema = z.object({
+  orgId: FulcrumUuidSchema,
+  runId: FulcrumUuidSchema,
+});
+
+export const WorkspacePathSchema = z.object({
+  runId: FulcrumUuidSchema,
+  workspacePath: z.string().nullable(),
+});
+
+export type WorkspacePath = z.infer<typeof WorkspacePathSchema>;
+
+export function sanitizeWorkspaceKey(
+  title: string,
+  taskId: string,
+  opts: SanitizeWorkspaceKeyOptions = {},
+): string {
+  const fallback = taskId.slice(0, 8) || "workspace";
+  const base = (title.replace(WORKSPACE_SAFE_CHARS, "") || fallback).slice(
+    0,
+    MAX_WORKSPACE_KEY_LENGTH,
+  );
+
+  if (!opts.existingKeys?.has(base)) return base;
+
+  const suffix = `_${fallback}`;
+  return `${base.slice(0, MAX_WORKSPACE_KEY_LENGTH - suffix.length)}${suffix}`;
+}
+
+export async function createWorkspace(
+  run: AgentRun,
+  opts: CreateWorkspaceOptions = {},
+): Promise<string> {
+  if (run.workspacePath) {
+    await mkdir(run.workspacePath, { recursive: true });
+    return run.workspacePath;
+  }
+
+  const orgId = run.org.id;
+  const taskId = run.task?.id ?? run.id;
+  const orgRoot = join(workspaceRoot(opts.root), orgId);
+  const existingKeys = await readExistingWorkspaceKeys(orgRoot);
+  const key = sanitizeWorkspaceKey(workspaceTitle(run), taskId, {
+    existingKeys,
+  });
+  const workspacePath = join(orgRoot, key);
+
+  await mkdir(workspacePath, { recursive: true });
+  run.workspacePath = workspacePath;
+
+  if (opts.em) {
+    const fork = opts.em.fork();
+    const managedRun = await findManagedRun(fork, run.id);
+    managedRun.workspacePath = workspacePath;
+    await fork.flush();
+  }
+
+  return workspacePath;
+}
+
+export async function destroyWorkspace(
+  run: AgentRun,
+  opts: DestroyWorkspaceOptions = {},
+): Promise<void> {
+  const workspacePath = run.workspacePath;
+  if (!workspacePath) return;
+  assertWorkspacePathInOrgRoot(workspacePath, run.org.id, opts.root);
+
+  if (opts.keepOnFailure === true && isFailedRun(run)) {
+    if (opts.em) {
+      const fork = opts.em.fork();
+      const managedRun = await findManagedRun(fork, run.id);
+      managedRun.workspacePath = workspacePath;
+      await fork.flush();
+    }
+    return;
+  }
+
+  await rm(workspacePath, { recursive: true, force: true });
+  run.workspacePath = undefined;
+
+  if (opts.em) {
+    const fork = opts.em.fork();
+    const managedRun = await findManagedRun(fork, run.id);
+    managedRun.workspacePath = undefined;
+    await fork.flush();
+  }
+}
+
+function assertWorkspacePathInOrgRoot(
+  workspacePath: string,
+  orgId: string,
+  root?: string,
+): void {
+  const orgRoot = resolve(workspaceRoot(root), orgId);
+  const target = resolve(workspacePath);
+  const relativeTarget = relative(orgRoot, target);
+
+  if (relativeTarget !== "" && !relativeTarget.startsWith("..") && !isAbsolute(relativeTarget)) {
+    return;
+  }
+
+  throw new Error(`Refusing to remove workspace outside org root: ${workspacePath}`);
+}
+
+export async function getWorkspacePath(
+  em: EntityManager,
+  orgId: string,
+  runId: string,
+): Promise<WorkspacePath> {
+  const input = GetWorkspacePathInputSchema.parse({ orgId, runId });
+  const { AgentRun } = await import(
+    "../../db/entities/orchestration/AgentRun.ts"
+  );
+  const fork = em.fork();
+  const run = await fork.findOneOrFail(AgentRun, {
+    id: input.runId,
+    org: input.orgId,
+  } as never, {
+    fields: ["id", "workspacePath"],
+  });
+
+  return WorkspacePathSchema.parse({
+    runId: run.id,
+    workspacePath: run.workspacePath ?? null,
+  });
+}
+
+export function workspaceRoot(root = process.env["FULCRUM_WORKSPACE_ROOT"]): string {
+  return root && root.length > 0 ? root : join(homedir(), ".fulcrum", "workspaces");
+}
+
+async function readExistingWorkspaceKeys(orgRoot: string): Promise<Set<string>> {
+  try {
+    const entries = await readdir(orgRoot, { withFileTypes: true });
+    return new Set(
+      entries
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name),
+    );
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return new Set();
+    throw error;
+  }
+}
+
+function workspaceTitle(run: AgentRun): string {
+  return run.task?.id ?? run.id;
+}
+
+function isFailedRun(run: AgentRun): boolean {
+  return TERMINAL_FAILURE_STATES.has(run.orchestrationState ?? "");
+}
+
+async function findManagedRun(em: EntityManager, runId: string): Promise<AgentRun> {
+  const { AgentRun } = await import(
+    "../../db/entities/orchestration/AgentRun.ts"
+  );
+  return em.findOneOrFail(AgentRun, runId);
+}
