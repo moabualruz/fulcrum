@@ -8,7 +8,7 @@
  *   - requireMasterKey() with no native + missing fallback → DecryptionKeyMissingError
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { mkdtempSync, rmSync, statSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -20,12 +20,24 @@ import {
   KeyringStatus,
   type NativeKeyringAdapter,
   KEY_BYTES,
+  KEYTAR_ACCOUNT,
+  KEYTAR_SERVICE,
 } from "../../src/secrets/keyring.ts";
 
 let stateDir: string;
+const dynamicKeytarStore = new Map<string, string>();
+
+mock.module("keytar", () => ({
+  getPassword: async (service: string, account: string) =>
+    dynamicKeytarStore.get(`${service}:${account}`) ?? null,
+  setPassword: async (service: string, account: string, password: string) => {
+    dynamicKeytarStore.set(`${service}:${account}`, password);
+  },
+}));
 
 beforeEach(() => {
   stateDir = mkdtempSync(join(tmpdir(), "fulcrum-keyring-"));
+  dynamicKeytarStore.clear();
 });
 
 afterEach(() => {
@@ -46,6 +58,27 @@ function inMemoryNative(): NativeKeyringAdapter & { store: Map<string, string> }
 }
 
 describe("keyring native adapter path", () => {
+  it("default config dynamically loads keytar on encrypt path", async () => {
+    const r = await loadOrCreateMasterKey({ stateDir });
+    expect(r.status).toBe(KeyringStatus.OS);
+    expect(r.key.length).toBe(KEY_BYTES);
+    expect(dynamicKeytarStore.size).toBe(1);
+    expect(existsSync(join(stateDir, "keyring-fallback.key"))).toBe(false);
+  });
+
+  it("default config dynamically loads keytar on decrypt path", async () => {
+    const expected = Buffer.alloc(KEY_BYTES, 42);
+    dynamicKeytarStore.set(
+      `${KEYTAR_SERVICE}:${KEYTAR_ACCOUNT}`,
+      expected.toString("base64"),
+    );
+
+    const r = await requireMasterKey({ stateDir });
+    expect(r.status).toBe(KeyringStatus.OS);
+    expect(Buffer.from(r.key).equals(expected)).toBe(true);
+    expect(existsSync(join(stateDir, "keyring-fallback.key"))).toBe(false);
+  });
+
   it("round-trips master key via mock keytar; status='os'", async () => {
     const native = inMemoryNative();
     const a = await loadOrCreateMasterKey({ stateDir, native });
