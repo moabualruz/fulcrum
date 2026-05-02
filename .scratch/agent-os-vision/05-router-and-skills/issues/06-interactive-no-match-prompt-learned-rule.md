@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: in-progress
+Owner: claude-orchestrator
 Triage: AFK
 Pillar: 05-router-and-skills
 Blocked-by: 04-auto-assign-tier1-tier2

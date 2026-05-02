@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: in-progress
+Owner: claude-orchestrator
 Triage: AFK
 Pillar: 04-sandcastle-wrapper
 Blocked-by: 03-artifacts-edges-migration

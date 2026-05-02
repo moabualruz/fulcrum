@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: in-progress
+Owner: claude-orchestrator
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [03-heuristic-extractor-core.md]

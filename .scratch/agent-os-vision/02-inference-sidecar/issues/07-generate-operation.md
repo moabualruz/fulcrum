@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: in-progress
+Owner: claude-orchestrator
 Triage: AFK
 Pillar: 02-inference-sidecar
 Blocked-by: 06-models-registry-pull-list-rm
