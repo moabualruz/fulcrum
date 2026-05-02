@@ -82,7 +82,9 @@ describe("inference cache schema", () => {
       const memory = em.create(Memory, {
         id: randomUUID(),
         org,
-        kind: "manual",
+        kind: "note",
+        body: "Embedding memory",
+        source: "manual",
         embedding: [0.1, 0.2, 0.3],
       });
       const documentId = randomUUID();

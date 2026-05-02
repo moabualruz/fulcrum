@@ -98,6 +98,10 @@ interface DoctorReport {
     latestEventAt: string | null;
     error?: string;
   };
+  memoriesSchema: {
+    subsystem: "memories_schema";
+    ok: boolean;
+  };
   worktrees: {
     projectLocalIgnoredRoots: Array<{
       path: string;
@@ -583,6 +587,8 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
     // instead of the previous silent "ok".
     errors += 1;
   }
+  const memoriesSchema = await buildMemoriesSchemaReport();
+  if (!memoriesSchema.ok) errors += 1;
 
   // Managed MCPs
   const mcpReport: DoctorReport["mcp"] = { servers: [] };
@@ -701,6 +707,7 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       packageParity,
     },
     productKernel,
+    memoriesSchema,
     worktrees,
     skillBudget,
     skillsCount,
@@ -730,6 +737,66 @@ async function buildPackageParityReport(home: string): Promise<PackageParityRepo
     }
   }
   return reports;
+}
+
+async function buildMemoriesSchemaReport(): Promise<DoctorReport["memoriesSchema"]> {
+  try {
+    const { MikroORM } = await import("@mikro-orm/postgresql");
+    const {
+      ContextSnapshot,
+      Memory,
+      MemoryLink,
+      createOrmConfig,
+    } = await import("../db/mikro-orm.config.ts");
+    const orm = await MikroORM.init(createOrmConfig());
+    try {
+      const memory = orm.getMetadata().get(Memory);
+      const memoryLink = orm.getMetadata().get(MemoryLink);
+      const contextSnapshot = orm.getMetadata().get(ContextSnapshot);
+      const memoryProps = [
+        "id",
+        "orgId",
+        "projectId",
+        "global",
+        "kind",
+        "body",
+        "tags",
+        "importance",
+        "source",
+        "sourceRef",
+        "createdAt",
+        "updatedAt",
+        "archived",
+      ];
+      const memoryProperties = memory.properties as Record<string, unknown>;
+      const hasMemoryProps = memoryProps.every((prop) => memoryProperties[prop]);
+      const memoryIndexes = [
+        "memories_org_project_importance",
+        "memories_org_kind",
+        "memories_org_archived",
+        "memories_org_global",
+        "memories_body_tsv",
+      ];
+      const linkIndexes = ["memory_links_memory", "memory_links_target"];
+      const snapshotIndexes = ["context_snapshots_run", "context_snapshots_task"];
+      const hasIndexes = (
+        meta: { indexes?: Array<{ name?: string }> },
+        names: string[],
+      ) => names.every((name) => meta.indexes?.some((index) => index.name === name));
+
+      return {
+        subsystem: "memories_schema",
+        ok: hasMemoryProps &&
+          hasIndexes(memory, memoryIndexes) &&
+          hasIndexes(memoryLink, linkIndexes) &&
+          hasIndexes(contextSnapshot, snapshotIndexes),
+      };
+    } finally {
+      await orm.close(true);
+    }
+  } catch {
+    return { subsystem: "memories_schema", ok: false };
+  }
 }
 
 async function buildProductKernelReport(): Promise<DoctorReport["productKernel"]> {
@@ -913,6 +980,11 @@ function printHumanFormat(report: DoctorReport, home: string): void {
   } else if (pk.error) {
     console.log(`  error: ${pk.error}`);
   }
+  console.log();
+
+  console.log(
+    `Memories schema: ${report.memoriesSchema.ok ? "ok" : "failed"} (${report.memoriesSchema.subsystem})`,
+  );
   console.log();
 
   // Managed MCPs

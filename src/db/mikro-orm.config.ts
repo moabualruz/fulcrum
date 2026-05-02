@@ -37,7 +37,7 @@ import { DocLink } from "./entities/docs/DocLink.ts";
 import { DocVersion } from "./entities/docs/DocVersion.ts";
 import { DocComment } from "./entities/docs/DocComment.ts";
 import { DocTemplate } from "./entities/docs/DocTemplate.ts";
-import { Memory } from "./entities/memory/Memory.ts";
+import { ContextSnapshot, Memory, MemoryLink } from "./entities/memory/index.ts";
 import { AgentRun } from "./entities/orchestration/AgentRun.ts";
 import { WorkflowDefinition } from "./entities/orchestration/WorkflowDefinition.ts";
 import { RoutingRule } from "./entities/router/RoutingRule.ts";
@@ -83,6 +83,8 @@ export {
   DocComment,
   DocTemplate,
   Memory,
+  MemoryLink,
+  ContextSnapshot,
   AgentRun,
   WorkflowDefinition,
   RoutingRule,
@@ -160,6 +162,8 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     DocComment,
     DocTemplate,
     Memory,
+    MemoryLink,
+    ContextSnapshot,
     AgentRun,
     WorkflowDefinition,
     RoutingRule,
