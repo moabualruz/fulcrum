@@ -48,7 +48,7 @@ import { DocTemplate } from "./entities/docs/DocTemplate.ts";
 import { Memory } from "./entities/memory/Memory.ts";
 import { AgentRun } from "./entities/orchestration/AgentRun.ts";
 import { RoutingRule } from "./entities/router/RoutingRule.ts";
-import { Artifact } from "./entities/artifacts/Artifact.ts";
+import { Artifact, Edge } from "./entities/sandbox/index.ts";
 import { Repo } from "./entities/repos/Repo.ts";
 import { Job } from "./entities/jobs/Job.ts";
 import { SearchDocument } from "./entities/search/SearchDocument.ts";
@@ -83,6 +83,7 @@ import { MemoryRepository } from "./repositories/memory/MemoryRepository.ts";
 import { AgentRunRepository } from "./repositories/orchestration/AgentRunRepository.ts";
 import { RoutingRuleRepository } from "./repositories/router/RoutingRuleRepository.ts";
 import { ArtifactRepository } from "./repositories/artifacts/ArtifactRepository.ts";
+import { EdgeRepository } from "./repositories/sandbox/EdgeRepository.ts";
 import { RepoRepository } from "./repositories/repos/RepoRepository.ts";
 import { JobRepository } from "./repositories/jobs/JobRepository.ts";
 import { SearchDocumentRepository } from "./repositories/search/SearchDocumentRepository.ts";
@@ -119,6 +120,7 @@ export {
   AgentRunRepository,
   RoutingRuleRepository,
   ArtifactRepository,
+  EdgeRepository,
   RepoRepository,
   JobRepository,
   SearchDocumentRepository,
@@ -257,6 +259,10 @@ export function registerDbBindings(
   container.bind({
     provide: ArtifactRepository,
     useFactory: () => em.getRepository(Artifact) as ArtifactRepository,
+  });
+  container.bind({
+    provide: EdgeRepository,
+    useFactory: () => em.getRepository(Edge) as EdgeRepository,
   });
   container.bind({
     provide: RepoRepository,

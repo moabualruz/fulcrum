@@ -40,7 +40,7 @@ import { Memory } from "./entities/memory/Memory.ts";
 import { AgentRun } from "./entities/orchestration/AgentRun.ts";
 import { WorkflowDefinition } from "./entities/orchestration/WorkflowDefinition.ts";
 import { RoutingRule } from "./entities/router/RoutingRule.ts";
-import { Artifact } from "./entities/artifacts/Artifact.ts";
+import { Artifact, Edge } from "./entities/sandbox/index.ts";
 import { Repo } from "./entities/repos/Repo.ts";
 import { Job } from "./entities/jobs/Job.ts";
 import { SearchDocument } from "./entities/search/SearchDocument.ts";
@@ -85,6 +85,7 @@ export {
   WorkflowDefinition,
   RoutingRule,
   Artifact,
+  Edge,
   Repo,
   Job,
   SearchDocument,
@@ -160,6 +161,7 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     WorkflowDefinition,
     RoutingRule,
     Artifact,
+    Edge,
     Repo,
     Job,
     SearchDocument,
