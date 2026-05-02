@@ -209,17 +209,31 @@ describe("Artifact + Edge sandbox schema", () => {
       expect(savedEdge?.fromKind).toBe("artifact");
       expect(savedEdge?.toKind).toBe("agent_run");
       expect(savedEdge?.kind).toBe("generated_by");
+    } finally {
+      await db.close();
+    }
+  });
 
-      const duplicate = em.create(Edge, {
-        org: em.getReference(Org, DEFAULT_ORG_ID),
-        fromKind: "artifact",
-        fromId: artifact.id,
-        toKind: "agent_run",
-        toId: run.id,
-        kind: "generated_by",
-      });
-      em.persist(duplicate);
-      await expect(em.flush()).rejects.toThrow(/duplicate|unique/i);
+  it("rejects duplicate edge rows at the database layer", async () => {
+    const db = await createTestOrm();
+    try {
+      const fromId = randomUUID();
+      const toId = randomUUID();
+      await db.pglite.query(
+        `
+          insert into edges (org_id, from_kind, from_id, to_kind, to_id, kind)
+          values ($1, 'artifact', $2, 'agent_run', $3, 'generated_by')
+        `,
+        [DEFAULT_ORG_ID, fromId, toId],
+      );
+
+      await expect(db.pglite.query(
+        `
+          insert into edges (org_id, from_kind, from_id, to_kind, to_id, kind)
+          values ($1, 'artifact', $2, 'agent_run', $3, 'generated_by')
+        `,
+        [DEFAULT_ORG_ID, fromId, toId],
+      )).rejects.toThrow(/duplicate|unique/i);
     } finally {
       await db.close();
     }
@@ -285,6 +299,12 @@ describe("Artifact + Edge sandbox schema", () => {
       );
       expect(artifactRows.rows).toEqual([]);
 
+      const intermediateEdgeRows = await db.pglite.query<{ id: string }>(
+        `select id from edges where id = $1`,
+        [edge.id],
+      );
+      expect(intermediateEdgeRows.rows).toEqual([{ id: edge.id }]);
+
       await db.pglite.query(`delete from orgs where id = $1`, [org.id]);
       const edgeRows = await db.pglite.query<{ id: string }>(
         `select id from edges where id = $1`,
@@ -336,18 +356,39 @@ describe("Artifact + Edge sandbox schema", () => {
     try {
       await db.orm.migrator.down({ to: PREVIOUS_MIGRATION_NAME });
       const id = randomUUID();
+      const realRunId = randomUUID();
+      const realArtifactId = randomUUID();
       await db.pglite.query(
         `insert into artifacts (id, org_id, path) values ($1, $2, $3)`,
         [id, DEFAULT_ORG_ID, "legacy/rollback.txt"],
       );
 
       await db.orm.migrator.up({ to: MIGRATION_NAME });
+      await db.pglite.query(
+        `
+          insert into agent_runs (id, org_id, status, agent_name)
+          values ($1, $2, 'succeeded', 'codex')
+        `,
+        [realRunId, DEFAULT_ORG_ID],
+      );
+      await db.pglite.query(
+        `
+          insert into artifacts (id, org_id, run_id, filename, path)
+          values ($1, $2, $3, 'real-run.txt', 'legacy/real-run.txt')
+        `,
+        [realArtifactId, DEFAULT_ORG_ID, realRunId],
+      );
       await db.orm.migrator.down({ to: PREVIOUS_MIGRATION_NAME });
 
       const sentinelRows = await db.pglite.query<{ count: string }>(
         `select count(*)::text as count from agent_runs where agent_name = 'artifact-migration'`,
       );
       expect(sentinelRows.rows).toEqual([{ count: "0" }]);
+      const realRunRows = await db.pglite.query<{ agent_name: string | null }>(
+        `select agent_name from agent_runs where id = $1`,
+        [realRunId],
+      );
+      expect(realRunRows.rows).toEqual([{ agent_name: "codex" }]);
 
       await db.orm.migrator.up({ to: MIGRATION_NAME });
       const migratedRows = await db.pglite.query<{
