@@ -36,7 +36,7 @@ export const RunbookFrontmatterSchema = z
 
 export const MeetingFrontmatterSchema = z
   .object({
-    date: z.iso.datetime(),
+    date: z.iso.datetime({ offset: true }),
     attendees: z.array(z.string()),
   })
   .passthrough();

@@ -100,6 +100,14 @@ describe("frontmatter schemas", () => {
     ).toThrow(ZodError);
   });
 
+  test("meeting date accepts ISO-8601 offset datetime without Date coercion", () => {
+    const offsetDate = "2026-05-02T10:30:00+02:00";
+
+    expect(MeetingFrontmatterSchema.parse({ date: offsetDate, attendees: ["ada"] }).date).toBe(
+      offsetDate,
+    );
+  });
+
   test("wiki, note, and scratch preserve unknown keys", () => {
     expect(WikiFrontmatterSchema.parse({ custom: "kept" })).toEqual({ custom: "kept" });
     expect(NoteFrontmatterSchema.parse({ labels: ["docs"], extra: 1 })).toEqual({
