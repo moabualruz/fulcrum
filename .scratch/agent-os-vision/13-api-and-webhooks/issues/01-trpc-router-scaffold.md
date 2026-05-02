@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Owner: codex-orchestrator
 Triage: AFK
 Pillar: api-and-webhooks
@@ -25,12 +25,12 @@ Scaffold the consolidated tRPC v11 `appRouter` in `src/server/trpc/router.ts` th
 
 ## Acceptance criteria
 
-- [ ] `appRouter` compiles; `bun run type-check` exits 0 with all 28 sub-router stubs merged.
-- [ ] OTel middleware emits span `fulcrum.trpc.<domain>.<procedure>` with `org.id`, `user.id`, `request.id` attributes; no-op when exporter unset.
-- [ ] Request-ID middleware injects UUID in context + `X-Fulcrum-Request-Id` response header; same ID appears in error payload.
-- [ ] Lint rule `assertPermission-required` fails CI when any mutation lacks `assertPermission()` call.
-- [ ] No `z.any()` in any public procedure input or output schema (CI enforced by `ci:codegen` stage).
-- [ ] Unit test: each of the 28 sub-router stubs has at minimum `list`, `get`, `create`, `update`, `delete` procedures (where domain-applicable) returning typed Zod output.
+- [x] `appRouter` compiles; `bun run type-check` exits 0 with all 28 sub-router stubs merged.
+- [x] OTel middleware emits span `fulcrum.trpc.<domain>.<procedure>` with `org.id`, `user.id`, `request.id` attributes; no-op when exporter unset.
+- [x] Request-ID middleware injects UUID in context + `X-Fulcrum-Request-Id` response header; same ID appears in error payload.
+- [x] Lint rule `assertPermission-required` fails CI when any mutation lacks `assertPermission()` call.
+- [x] No `z.any()` in any public procedure input or output schema (CI enforced by `ci:codegen` stage).
+- [x] Unit test: each of the 28 sub-router stubs has at minimum `list`, `get`, `create`, `update`, `delete` procedures (where domain-applicable) returning typed Zod output.
 
 ## Blocked by
 

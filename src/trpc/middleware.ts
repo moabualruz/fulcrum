@@ -28,7 +28,7 @@
 
 import { TRPCError } from "@trpc/server";
 
-import { t } from "./trpc.ts";
+import { publicProcedure, t } from "./trpc.ts";
 import type { TRPCContext } from "./context.ts";
 import { FlagRegistry } from "../flags/registry.ts";
 
@@ -144,4 +144,4 @@ export const assertPermission = t.middleware(async ({ ctx, next, path, type }) =
  * Also use for queries that require an authenticated caller.
  * Only use publicProcedure for genuinely unauthenticated endpoints.
  */
-export const protectedProcedure = t.procedure.use(assertPermission);
+export const protectedProcedure = publicProcedure.use(assertPermission);
