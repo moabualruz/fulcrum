@@ -452,4 +452,61 @@ describe("TUI new-doc flow", () => {
       tui.stop();
     }
   });
+
+  test("new-doc placeholder without docs caller can escape via q, Escape, and Ctrl-C", async () => {
+    for (const [key, mode] of [
+      ["q", "nav"],
+      ["\x1b", "nav"],
+      ["\x03", "exit"],
+    ] as const) {
+      const tty = new FakeTTY();
+      let exitCount = 0;
+      const tui = new TuiApp({
+        output: tty,
+        input: tty,
+        onExit: () => {
+          exitCount++;
+          tui.stop();
+        },
+        caller: {
+          auth: {
+            whoami: async () => ({
+              userId: "user_1",
+              orgId: DEFAULT_ORG_ID,
+              email: "admin@local",
+              role: "owner",
+            }),
+          },
+          flags: {
+            list: async () => [],
+            set: async () => ({ ok: true }),
+          },
+          inference: {
+            health: async () => ({ status: "ok" }),
+          },
+        },
+      });
+
+      try {
+        await tui.mount();
+        tty.inject("n");
+        await new Promise((r) => setTimeout(r, 50));
+        expect(tui.screen).toBe("new-doc");
+        expect(tty.plainText()).toContain("Docs service not available");
+
+        tty.inject(key);
+        await new Promise((r) => setTimeout(r, 50));
+
+        if (mode === "nav") {
+          expect(tui.screen).toBe("nav");
+          expect(exitCount).toBe(0);
+          expect(tty.plainText()).toContain("Auth");
+        } else {
+          expect(exitCount).toBe(1);
+        }
+      } finally {
+        tui.stop();
+      }
+    }
+  });
 });
