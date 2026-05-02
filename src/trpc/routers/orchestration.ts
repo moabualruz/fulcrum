@@ -13,24 +13,14 @@ import { t } from "../trpc.ts";
 import {
   AgentRunIssueListSchema,
   CandidateIssueListSchema,
-  fetchIssueStatesByIds,
-  fetchCandidateIssues,
-  fetchIssuesByStates,
-  FetchIssueStatesByIdsInputSchema,
   FetchCandidateIssuesInputSchema,
   FetchIssuesByStatesInputSchema,
-  IssueStateListSchema,
-} from "../../orchestration/symphony/tracker.ts";
-import {
-  getWorkspacePath,
+  FetchIssueStatesByIdsInputSchema,
   GetWorkspacePathInputSchema,
+  IssueStateListSchema,
   WorkspacePathSchema,
-} from "../../orchestration/symphony/workspace.ts";
-import {
-  parseWorkflowConfig,
-  renderPrompt,
   WorkflowConfigSchema,
-} from "../../orchestration/symphony/prompt.ts";
+} from "../../orchestration/symphony/schemas.ts";
 
 const PromptPreviewIssueSchema = z.object({
   id: z.string(),
@@ -82,6 +72,9 @@ export const orchestrationRouter = t.router({
         });
       }
 
+      const { fetchCandidateIssues } = await import(
+        "../../orchestration/symphony/tracker.ts"
+      );
       return fetchCandidateIssues(ctx.em, input.orgId, input.limit);
     }),
 
@@ -91,6 +84,9 @@ export const orchestrationRouter = t.router({
     .query(async ({ ctx, input }) => {
       ensureOrg(ctx.orgId, input.orgId);
       const em = ensureEntityManager(ctx.em);
+      const { fetchIssuesByStates } = await import(
+        "../../orchestration/symphony/tracker.ts"
+      );
       return fetchIssuesByStates(em, input.orgId, input.states, input.limit);
     }),
 
@@ -100,6 +96,9 @@ export const orchestrationRouter = t.router({
     .query(async ({ ctx, input }) => {
       ensureOrg(ctx.orgId, input.orgId);
       const em = ensureEntityManager(ctx.em);
+      const { fetchIssueStatesByIds } = await import(
+        "../../orchestration/symphony/tracker.ts"
+      );
       return fetchIssueStatesByIds(em, input.orgId, input.runIds);
     }),
 
@@ -109,6 +108,9 @@ export const orchestrationRouter = t.router({
     .query(async ({ ctx, input }) => {
       ensureOrg(ctx.orgId, input.orgId);
       const em = ensureEntityManager(ctx.em);
+      const { getWorkspacePath } = await import(
+        "../../orchestration/symphony/workspace.ts"
+      );
       return getWorkspacePath(em, input.orgId, input.runId);
     }),
 
@@ -153,6 +155,11 @@ export const orchestrationRouter = t.router({
     .output(RenderPromptPreviewOutputSchema)
     .query(async ({ ctx, input }) => {
       ensureOrg(ctx.orgId, input.orgId);
+      // Keep DB-entity decorators out of SvelteKit postbuild analysis; import
+      // prompt helpers only when this procedure actually runs.
+      const { parseWorkflowConfig, renderPrompt } = await import(
+        "../../orchestration/symphony/prompt.ts"
+      );
       const config = parseWorkflowConfig(input.configYaml);
       const prompt = await renderPrompt(
         {

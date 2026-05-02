@@ -1,6 +1,9 @@
 import { Container } from "@needle-di/core";
 import { describe, expect, test } from "bun:test";
 import type { Session } from "better-auth";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { InferenceClient } from "../../../../inference/client.ts";
 import type {
@@ -8,6 +11,7 @@ import type {
   HealthResult,
   ModelPullProgress,
 } from "../../../../inference/protocol.ts";
+import { INFERENCE_CLIENT_TOKEN } from "../../../../inference/tokens.ts";
 import { run as runInferenceCli } from "../../../../cli/inference.ts";
 import { createContext } from "../../../../trpc/context.ts";
 import { appRouter } from "../../../../trpc/router.ts";
@@ -36,7 +40,7 @@ const progressEvents: ModelPullProgress[] = [
 function makeContainer(): Container {
   const container = new Container();
   container.bind({
-    provide: InferenceClient,
+    provide: INFERENCE_CLIENT_TOKEN,
     useValue: {
       health: async () => health,
       embed: async (texts: string[]) => ({
@@ -86,7 +90,7 @@ function mockSession(): Session {
   } as Session;
 }
 
-function createCaller(container = makeContainer(), authenticated = true) {
+function createCaller(container: Container | null = makeContainer(), authenticated = true) {
   const factory = t.createCallerFactory(appRouter);
   return factory(createContext({
     session: authenticated ? mockSession() : null,
@@ -127,6 +131,33 @@ async function collectPullEvents(subscription: unknown): Promise<ModelPullProgre
       },
     });
   });
+}
+
+async function withMissingInferenceServer(
+  callback: (missingServer: string) => Promise<void>,
+): Promise<void> {
+  const previousHome = process.env["FULCRUM_HOME"];
+  const previousServer = process.env["FULCRUM_INFERENCE_SERVER"];
+  const homeDir = await mkdtemp(join(tmpdir(), "fulcrum-inference-test-"));
+  const missingServer = join(homeDir, "missing-inference-server");
+
+  process.env["FULCRUM_HOME"] = homeDir;
+  process.env["FULCRUM_INFERENCE_SERVER"] = missingServer;
+  try {
+    await callback(missingServer);
+  } finally {
+    if (previousHome === undefined) {
+      delete process.env["FULCRUM_HOME"];
+    } else {
+      process.env["FULCRUM_HOME"] = previousHome;
+    }
+    if (previousServer === undefined) {
+      delete process.env["FULCRUM_INFERENCE_SERVER"];
+    } else {
+      process.env["FULCRUM_INFERENCE_SERVER"] = previousServer;
+    }
+    await rm(homeDir, { recursive: true, force: true });
+  }
 }
 
 describe("inference tRPC router", () => {
@@ -243,5 +274,100 @@ describe("inference tRPC router", () => {
     } finally {
       tui.stop();
     }
+  });
+
+  test("class-token binding remains supported for existing callers", async () => {
+    const container = new Container();
+    container.bind({
+      provide: InferenceClient,
+      useValue: {
+        health: async () => health,
+        embed: async (texts: string[]) => ({
+          vectors: texts.map(() => [0.4, 0.5, 0.6]),
+          model: "class-token-model",
+          cached: true,
+        }),
+        generate: async () => generateResult,
+        classify: async () => ({
+          results: [{ label: "bug", score: 1 }],
+        }),
+        tokenize: async () => ({ count: 4 }),
+        listModels: async () => [
+          {
+            id: "class-token-model",
+            kind: "embed",
+            downloaded: true,
+            active: true,
+          },
+        ],
+        pullModel: async function* () {
+          yield* progressEvents;
+        },
+        rmModel: async () => ({ ok: true }),
+        listBackends: async () => [],
+      } satisfies Partial<InferenceClient> as unknown as InferenceClient,
+    });
+    const caller = createCaller(container);
+
+    await expect(caller.inference.health()).resolves.toEqual(health);
+    await expect(caller.inference.embed({ texts: ["test"] })).resolves.toEqual({
+      vectors: [[0.4, 0.5, 0.6]],
+      model: "class-token-model",
+      cached: true,
+    });
+    await expect(caller.inference.generate({ prompt: "The capital of France is" }))
+      .resolves.toEqual(generateResult);
+    await expect(caller.inference.classify({ text: "fix crash", labels: ["bug"] }))
+      .resolves.toEqual({ results: [{ label: "bug", score: 1 }] });
+    await expect(caller.inference.tokenize({ text: "one two three four" }))
+      .resolves.toEqual({ count: 4 });
+    await expect(caller.inference.models.list()).resolves.toEqual([
+      {
+        id: "class-token-model",
+        kind: "embed",
+        downloaded: true,
+        active: true,
+      },
+    ]);
+    await expect(caller.inference.models.rm({ modelId: "class-token-model" }))
+      .resolves.toEqual({ ok: true });
+    await expect(caller.inference.backends.list()).resolves.toEqual([]);
+  });
+
+  test("backend discovery falls back without a container", async () => {
+    const caller = createCaller(null, false);
+
+    await expect(caller.inference.backends.list()).resolves.toEqual([
+      { id: "embedded", available: true, active: true, reason: null },
+      { id: "ollama", available: false, active: false, reason: "flag disabled" },
+      { id: "lm-studio", available: false, active: false, reason: "flag disabled" },
+      { id: "openai-compatible", available: false, active: false, reason: "flag disabled" },
+    ]);
+  });
+
+  test("non-backend procedures without a container resolve the default client lazily", async () => {
+    const caller = createCaller(null, false);
+
+    await withMissingInferenceServer(async (missingServer) => {
+      await expect(caller.inference.health()).rejects.toThrow(
+        `inference-server binary not found: ${missingServer}`,
+      );
+    });
+  });
+
+  test("empty containers use backend defaults and default client fallback", async () => {
+    const caller = createCaller(new Container(), false);
+
+    await expect(caller.inference.backends.list()).resolves.toEqual([
+      { id: "embedded", available: true, active: true, reason: null },
+      { id: "ollama", available: false, active: false, reason: "flag disabled" },
+      { id: "lm-studio", available: false, active: false, reason: "flag disabled" },
+      { id: "openai-compatible", available: false, active: false, reason: "flag disabled" },
+    ]);
+    await withMissingInferenceServer(async (missingServer) => {
+      await expect(caller.inference.health()).rejects.toThrow(
+        `inference-server binary not found: ${missingServer}`,
+      );
+    });
   });
 });

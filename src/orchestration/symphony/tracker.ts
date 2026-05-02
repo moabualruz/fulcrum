@@ -6,19 +6,46 @@
  */
 
 import type { EntityManager } from "@mikro-orm/postgresql";
-import { z } from "zod";
 
 import type { AgentRun } from "../../db/entities/orchestration/AgentRun.ts";
-import { AGENT_RUN_ORCHESTRATION_STATES } from "../../db/entities/orchestration/states.ts";
 import type { Task } from "../../db/entities/tasks/Task.ts";
 import type { AgentRunRepository } from "../../db/repositories/orchestration/AgentRunRepository.ts";
 import type { TaskRepository } from "../../db/repositories/tasks/TaskRepository.ts";
+import {
+  AgentRunIssueListSchema,
+  AgentRunIssueSchema,
+  AgentRunOrchestrationStateSchema,
+  CandidateIssueSchema,
+  CandidateIssueListSchema,
+  FetchCandidateIssuesInputSchema,
+  FetchIssuesByStatesInputSchema,
+  FetchIssueStatesByIdsInputSchema,
+  IssueStateSchema,
+  IssueStateListSchema,
+  READY_TASK_STATUS,
+  TrackerTaskSchema,
+  type AgentRunIssue,
+  type AgentRunOrchestrationState,
+  type CandidateIssue,
+  type IssueState,
+  type TrackerTask,
+} from "./schemas.ts";
 
-export const READY_TASK_STATUS = "ready";
-
-const FulcrumUuidSchema = z.string().regex(
-  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
-);
+export {
+  AgentRunIssueListSchema,
+  AgentRunIssueSchema,
+  AgentRunOrchestrationStateSchema,
+  CandidateIssueSchema,
+  CandidateIssueListSchema,
+  FetchCandidateIssuesInputSchema,
+  FetchIssuesByStatesInputSchema,
+  FetchIssueStatesByIdsInputSchema,
+  IssueStateSchema,
+  IssueStateListSchema,
+  READY_TASK_STATUS,
+  TrackerTaskSchema,
+} from "./schemas.ts";
+export type { AgentRunIssue, CandidateIssue, IssueState, TrackerTask } from "./schemas.ts";
 
 const RESOLVED_BLOCKER_STATUSES = new Set([
   "closed",
@@ -34,76 +61,7 @@ const OCCUPIED_TASK_ORCHESTRATION_STATES = [
   "claimed",
   "running",
   "retry_queued",
-] satisfies (typeof AGENT_RUN_ORCHESTRATION_STATES)[number][];
-
-export const FetchCandidateIssuesInputSchema = z.object({
-  orgId: FulcrumUuidSchema,
-  limit: z.number().int().min(1).max(500).default(50),
-});
-
-export const CandidateIssueSchema = z.object({
-  id: FulcrumUuidSchema,
-  identifier: z.string(),
-  title: z.string(),
-  state: z.string(),
-  status: z.literal(READY_TASK_STATUS),
-  priority: z.number().int().nullable(),
-  createdAt: z.date(),
-  blockedByIds: z.array(FulcrumUuidSchema),
-  workflowId: FulcrumUuidSchema.nullable(),
-});
-
-export const CandidateIssueListSchema = z.array(CandidateIssueSchema);
-
-export type CandidateIssue = z.infer<typeof CandidateIssueSchema>;
-
-export const AgentRunOrchestrationStateSchema = z.enum(
-  AGENT_RUN_ORCHESTRATION_STATES,
-);
-
-export const FetchIssuesByStatesInputSchema = z.object({
-  orgId: FulcrumUuidSchema,
-  states: z.array(AgentRunOrchestrationStateSchema).max(50),
-  limit: z.number().int().min(1).max(500).default(50),
-});
-
-export const FetchIssueStatesByIdsInputSchema = z.object({
-  orgId: FulcrumUuidSchema,
-  runIds: z.array(FulcrumUuidSchema).max(500),
-});
-
-export const TrackerTaskSchema = z.object({
-  id: FulcrumUuidSchema,
-  status: z.string().nullable(),
-  priority: z.number().int().nullable(),
-  createdAt: z.date(),
-  blockedByIds: z.array(FulcrumUuidSchema),
-  workflowId: FulcrumUuidSchema.nullable(),
-});
-
-export const AgentRunIssueSchema = z.object({
-  id: FulcrumUuidSchema,
-  state: AgentRunOrchestrationStateSchema,
-  orchestrationState: AgentRunOrchestrationStateSchema,
-  task: TrackerTaskSchema.nullable(),
-  startedAt: z.date(),
-  attemptCount: z.number().int(),
-  nextRetryAt: z.date().nullable(),
-  workspacePath: z.string().nullable(),
-  lastErrorKind: z.string().nullable(),
-});
-
-export const AgentRunIssueListSchema = z.array(AgentRunIssueSchema);
-
-export const IssueStateSchema = z.object({
-  id: FulcrumUuidSchema,
-  state: AgentRunOrchestrationStateSchema,
-});
-
-export const IssueStateListSchema = z.array(IssueStateSchema);
-
-export type AgentRunIssue = z.infer<typeof AgentRunIssueSchema>;
-export type IssueState = z.infer<typeof IssueStateSchema>;
+] satisfies AgentRunOrchestrationState[];
 
 export function buildCandidateIssuesBaseQuery(
   taskRepo: TaskRepository,
@@ -159,7 +117,7 @@ export async function fetchCandidateIssues(
 export async function fetchIssuesByStates(
   em: EntityManager,
   orgId: string,
-  states: readonly z.infer<typeof AgentRunOrchestrationStateSchema>[],
+  states: readonly AgentRunOrchestrationState[],
   limit = 50,
 ): Promise<AgentRunIssue[]> {
   const input = FetchIssuesByStatesInputSchema.parse({ orgId, states, limit });
@@ -187,7 +145,7 @@ export async function fetchIssuesByStates(
 }
 
 function issueStateOrderBy(
-  states: readonly z.infer<typeof AgentRunOrchestrationStateSchema>[],
+  states: readonly AgentRunOrchestrationState[],
 ) {
   const stateSet = new Set(states);
   if (
@@ -302,6 +260,8 @@ function isResolvedBlockerStatus(status: string | null): boolean {
 function toCandidateIssue(task: Task): CandidateIssue {
   return {
     id: task.id,
+    // Task title/identifier are Pillar 6 columns; current orchestration stub uses
+    // the stable task id for both contract fields until that domain lands.
     identifier: task.id,
     title: task.id,
     state: READY_TASK_STATUS,
@@ -331,7 +291,7 @@ function toAgentRunIssue(run: AgentRun): AgentRunIssue {
   };
 }
 
-function toTrackerTask(task: Task): z.infer<typeof TrackerTaskSchema> {
+function toTrackerTask(task: Task): TrackerTask {
   return {
     id: task.id,
     status: task.status,

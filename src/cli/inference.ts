@@ -13,6 +13,7 @@ import {
   type GenerateResult,
   type HealthResult,
 } from "../inference/protocol.ts";
+import { INFERENCE_CLIENT_TOKEN } from "../inference/tokens.ts";
 
 const HELP = `fulcrum inference
 
@@ -57,6 +58,16 @@ function hasFlag(argv: readonly string[], flag: string): boolean {
   return argv.includes(`--${flag}`);
 }
 
+function resolveContainerClient(container: Container): InferenceCliClient {
+  if (container.has(INFERENCE_CLIENT_TOKEN)) {
+    return container.get(INFERENCE_CLIENT_TOKEN);
+  }
+  if (container.has(InferenceClient)) {
+    return container.get(InferenceClient);
+  }
+  return container.get(InferenceClient);
+}
+
 function resolveServices(opts: InferenceRunOptions): {
   lifecycle: Required<InferenceCliLifecycle>;
   client: InferenceCliClient;
@@ -64,7 +75,7 @@ function resolveServices(opts: InferenceRunOptions): {
   const container = opts.container ?? new Container();
   const lifecycle = opts.lifecycle ?? container.get(InferenceLifecycle);
   const fullLifecycle = lifecycle as Required<InferenceCliLifecycle>;
-  const client = opts.client ?? (opts.lifecycle ? new InferenceClient({ lifecycle: fullLifecycle }) : container.get(InferenceClient));
+  const client = opts.client ?? (opts.lifecycle ? new InferenceClient({ lifecycle: fullLifecycle }) : resolveContainerClient(container));
   return { lifecycle: fullLifecycle, client };
 }
 

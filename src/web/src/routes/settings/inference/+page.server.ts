@@ -1,5 +1,5 @@
 import { createContext } from "../../../../../trpc/context.ts";
-import { appRouter } from "../../../../../trpc/router.ts";
+import { inferenceRouter } from "../../../../../server/trpc/routers/inference.ts";
 import { t } from "../../../../../trpc/trpc.ts";
 import type { Session } from "better-auth";
 
@@ -11,7 +11,7 @@ interface InferenceLocals {
 }
 
 function createCaller(locals: InferenceLocals) {
-  const factory = t.createCallerFactory(appRouter);
+  const factory = t.createCallerFactory(inferenceRouter);
   return factory(createContext({
     session: locals.session ?? null,
     orgId: locals.orgId ?? null,
@@ -26,8 +26,8 @@ export function load({ locals }: { locals: InferenceLocals }) {
 
   return {
     streamed: {
-      health: caller.inference.health(),
-      models: caller.inference.models.list(),
+      health: caller.health(),
+      models: caller.models.list(),
     },
   };
 }

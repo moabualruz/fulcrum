@@ -13,6 +13,10 @@ import { z } from "zod";
 import { Org } from "../../db/entities/auth/Org.ts";
 import { WorkflowDefinition } from "../../db/entities/orchestration/WorkflowDefinition.ts";
 import type { WorkflowDefinitionRepository } from "../../db/repositories/orchestration/WorkflowDefinitionRepository.ts";
+import { WorkflowConfigSchema, type WorkflowConfig } from "./schemas.ts";
+
+export { WorkflowConfigSchema } from "./schemas.ts";
+export type { WorkflowConfig } from "./schemas.ts";
 
 export class UnknownVariableError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -20,15 +24,6 @@ export class UnknownVariableError extends Error {
     this.name = "UnknownVariableError";
   }
 }
-
-export const WorkflowConfigSchema = z.object({
-  stallTimeoutMs: z.number().int().positive().default(300_000),
-  maxRetryBackoffMs: z.number().int().positive().default(300_000),
-  keepOnFailure: z.boolean().default(false),
-  maxAttempts: z.number().int().positive().default(3),
-});
-
-export type WorkflowConfig = z.infer<typeof WorkflowConfigSchema>;
 
 const WorkflowConfigYamlSchema = z.object({
   stall_timeout_ms: z.number().int().positive().optional(),

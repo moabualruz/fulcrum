@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { Container } from "@needle-di/core";
 
 import { run } from "./inference.ts";
+import type { InferenceClient } from "../inference/client.ts";
 import type { HealthResult } from "../inference/protocol.ts";
+import { INFERENCE_CLIENT_TOKEN } from "../inference/tokens.ts";
 
 const health: HealthResult = { status: "ok", backends: ["embedded"], models: [] };
 const cache = {
@@ -139,6 +142,31 @@ describe("fulcrum inference CLI", () => {
       },
     });
     expect(generateCap.lines).toEqual(["Hi"]);
+  });
+
+  test("local inference client resolves token binding before class token", async () => {
+    const cap = capture();
+    const container = new Container();
+    container.bind({
+      provide: INFERENCE_CLIENT_TOKEN,
+      useValue: {
+        call: async () => health,
+        embed: async () => ({ vectors: [[0.3, 0.4]], model: "token-bound", cached: false }),
+        generate: async () => ({ text: "unused", model: "token-bound", tokens: 1 }),
+      } satisfies Partial<InferenceClient> as unknown as InferenceClient,
+    });
+
+    await run(["embed", "hello", "--json"], {
+      ...cap.opts,
+      container,
+    });
+
+    expect(cap.exitCode).toBeUndefined();
+    expect(JSON.parse(cap.lines.join("\n"))).toEqual({
+      vectors: [[0.3, 0.4]],
+      model: "token-bound",
+      cached: false,
+    });
   });
 
   test("generate --json emits text, model, and token count from tRPC caller", async () => {

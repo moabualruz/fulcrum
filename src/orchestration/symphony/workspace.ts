@@ -8,17 +8,21 @@ import { mkdir, readdir, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import type { EntityManager } from "@mikro-orm/postgresql";
-import { z } from "zod";
 
 import { Org } from "../../db/entities/auth/Org.ts";
 import type { AgentRun } from "../../db/entities/orchestration/AgentRun.ts";
+import {
+  GetWorkspacePathInputSchema,
+  WorkspacePathSchema,
+  type WorkspacePath,
+} from "./schemas.ts";
+
+export { GetWorkspacePathInputSchema, WorkspacePathSchema } from "./schemas.ts";
+export type { WorkspacePath } from "./schemas.ts";
 
 const MAX_WORKSPACE_KEY_LENGTH = 128;
 const MAX_WORKSPACE_KEY_COLLISION_ATTEMPTS = 1_000;
 const WORKSPACE_SAFE_CHARS = /[^A-Za-z0-9._-]/g;
-const FulcrumUuidSchema = z.string().regex(
-  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
-);
 const TERMINAL_FAILURE_STATES = new Set([
   "failed",
   "timed_out",
@@ -40,18 +44,6 @@ export interface DestroyWorkspaceOptions {
   root?: string;
   keepOnFailure?: boolean;
 }
-
-export const GetWorkspacePathInputSchema = z.object({
-  orgId: FulcrumUuidSchema,
-  runId: FulcrumUuidSchema,
-});
-
-export const WorkspacePathSchema = z.object({
-  runId: FulcrumUuidSchema,
-  workspacePath: z.string().nullable(),
-});
-
-export type WorkspacePath = z.infer<typeof WorkspacePathSchema>;
 
 export function sanitizeWorkspaceKey(
   title: string,

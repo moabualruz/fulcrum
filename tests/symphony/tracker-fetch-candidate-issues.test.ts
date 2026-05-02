@@ -376,6 +376,11 @@ describe("fetchCandidateIssues", () => {
       TASK_IDS.candidateB,
       TASK_IDS.candidateA,
     ]);
+    expect(all[0]).toMatchObject({
+      id: TASK_IDS.highPriority,
+      identifier: TASK_IDS.highPriority,
+      title: TASK_IDS.highPriority,
+    });
     expect(all.every((task) => task.status === "ready")).toBe(true);
     expect(all.map((task) => task.id)).not.toContain(TASK_IDS.blocked);
     expect(all.map((task) => task.id)).not.toContain(TASK_IDS.claimed);

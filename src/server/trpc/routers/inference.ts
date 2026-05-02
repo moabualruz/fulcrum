@@ -2,7 +2,7 @@ import { observable } from "@trpc/server/observable";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { InferenceClient } from "../../../inference/client.ts";
+import type { InferenceClient } from "../../../inference/client.ts";
 import {
   BackendSchema,
   ClassifyResultSchema,
@@ -15,6 +15,7 @@ import {
   TokenizeResultSchema,
   type ModelPullProgress,
 } from "../../../inference/protocol.ts";
+import { INFERENCE_CLIENT_TOKEN } from "../../../inference/tokens.ts";
 import { FlagRegistry } from "../../../flags/registry.ts";
 import { t, publicProcedure } from "../../../trpc/trpc.ts";
 import { protectedProcedure } from "../../../trpc/middleware.ts";
@@ -49,11 +50,32 @@ const ModelInputSchema = z.object({
   modelId: z.string().min(1).max(MAX_MODEL_ID_CHARS),
 });
 
-function resolveClient(ctx: TRPCContext): InferenceClient {
-  if (ctx.container?.has(InferenceClient)) {
-    return ctx.container.get(InferenceClient);
+async function findBoundClient(container: TRPCContext["container"]): Promise<InferenceClient | null> {
+  if (!container) return null;
+
+  if (container.has(INFERENCE_CLIENT_TOKEN)) {
+    return container.get(INFERENCE_CLIENT_TOKEN);
   }
+
+  const { InferenceClient } = await import("../../../inference/client.ts");
+  if (container.has(InferenceClient)) {
+    return container.get(InferenceClient);
+  }
+
+  return null;
+}
+
+async function createDefaultClient(): Promise<InferenceClient> {
+  const { InferenceClient } = await import("../../../inference/client.ts");
   return new InferenceClient();
+}
+
+async function resolveClient(ctx: TRPCContext): Promise<InferenceClient> {
+  return (await findBoundClient(ctx.container)) ?? await createDefaultClient();
+}
+
+async function resolveBoundClient(ctx: TRPCContext): Promise<InferenceClient | null> {
+  return findBoundClient(ctx.container);
 }
 
 async function isEnabled(ctx: TRPCContext, flag: "embeddings" | "router-llm" | "external-llm-provider"): Promise<boolean> {
@@ -116,43 +138,43 @@ function toTrpcError(error: unknown): TRPCError {
 export const inferenceRouter = t.router({
   health: publicProcedure
     .output(HealthResultSchema)
-    .query(async ({ ctx }) => resolveClient(ctx).health()),
+    .query(async ({ ctx }) => (await resolveClient(ctx)).health()),
 
   embed: protectedProcedure
     .input(EmbedInputSchema)
     .output(EmbedResultSchema)
-    .query(async ({ ctx, input }) => resolveClient(ctx).embed(input.texts, { model: input.model })),
+    .query(async ({ ctx, input }) => (await resolveClient(ctx)).embed(input.texts, { model: input.model })),
 
   generate: protectedProcedure
     .input(GenerateInputSchema)
     .output(GenerateResultSchema)
-    .query(async ({ ctx, input }) => resolveClient(ctx).generate(input.prompt, input.options)),
+    .query(async ({ ctx, input }) => (await resolveClient(ctx)).generate(input.prompt, input.options)),
 
   classify: protectedProcedure
     .input(ClassifyInputSchema)
     .output(ClassifyResultSchema)
-    .query(async ({ ctx, input }) => resolveClient(ctx).classify(input.text, input.labels)),
+    .query(async ({ ctx, input }) => (await resolveClient(ctx)).classify(input.text, input.labels)),
 
   tokenize: protectedProcedure
     .input(TokenizeInputSchema)
     .output(TokenizeResultSchema)
-    .query(async ({ ctx, input }) => resolveClient(ctx).tokenize(input.text, input.model)),
+    .query(async ({ ctx, input }) => (await resolveClient(ctx)).tokenize(input.text, input.model)),
 
   models: t.router({
     list: publicProcedure
       .output(InferenceModelSchema.array())
-      .query(async ({ ctx }) => resolveClient(ctx).listModels()),
+      .query(async ({ ctx }) => (await resolveClient(ctx)).listModels()),
 
     pull: protectedProcedure
       .input(ModelInputSchema)
       .subscription(({ ctx, input }) => {
         return observable<ModelPullProgress>((emit) => {
-          const client = resolveClient(ctx);
           let cancelled = false;
           let iterator: AsyncIterator<ModelPullProgress> | null = null;
 
           void (async () => {
             try {
+              const client = await resolveClient(ctx);
               iterator = client.pullModel(input.modelId)[Symbol.asyncIterator]();
               while (!cancelled) {
                 const event = await iterator.next();
@@ -176,16 +198,17 @@ export const inferenceRouter = t.router({
     rm: protectedProcedure
       .input(ModelInputSchema)
       .output(z.object({ ok: z.boolean() }))
-      .mutation(async ({ ctx, input }) => resolveClient(ctx).rmModel(input.modelId)),
+      .mutation(async ({ ctx, input }) => (await resolveClient(ctx)).rmModel(input.modelId)),
   }),
 
   backends: t.router({
     list: publicProcedure
       .output(BackendSchema.array())
       .query(async ({ ctx }) => {
-        if (ctx.container?.has(InferenceClient)) {
-          return ctx.container.get(InferenceClient).listBackends();
-        }
+        // Keep backend discovery bound-client only so SSR settings load can show
+        // feature-gated defaults without importing or starting the decorated client.
+        const client = await resolveBoundClient(ctx);
+        if (client) return client.listBackends();
         return defaultBackends(ctx);
       }),
   }),
