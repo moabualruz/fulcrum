@@ -28,15 +28,48 @@ import {
   ManyToOne,
   Index,
 } from "@mikro-orm/decorators/es";
+import { OptionalProps } from "@mikro-orm/core";
 import { Org } from "../auth/Org.ts";
 import { TaskRepository } from "../../repositories/tasks/TaskRepository.ts";
+import type { TaskDependencies } from "./schemas.ts";
 
 @Entity({ tableName: "tasks", repository: () => TaskRepository })
 @Index({
   name: "idx_tasks_org_created",
   properties: ["org", "createdAt"],
 })
+@Index({
+  name: "tasks_org_sprint_status",
+  properties: ["org", "sprint", "status"],
+})
+@Index({
+  name: "tasks_org_parent",
+  properties: ["org", "parent"],
+})
+@Index({
+  name: "tasks_custom_fields_gin",
+  expression:
+    'CREATE INDEX "tasks_custom_fields_gin" ON "tasks" USING GIN ("custom_fields")',
+})
+@Index({
+  name: "tasks_org_external_id",
+  expression:
+    'CREATE UNIQUE INDEX "tasks_org_external_id" ON "tasks" ("org_id", "external_id") WHERE "external_id" IS NOT NULL',
+})
 export class Task {
+  [OptionalProps]?:
+    | "createdAt"
+    | "blockedByIds"
+    | "workflowId"
+    | "status"
+    | "priority"
+    | "sprint"
+    | "customFields"
+    | "points"
+    | "parent"
+    | "dependencies"
+    | "externalId";
+
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
 
@@ -58,4 +91,39 @@ export class Task {
 
   @Property({ type: "integer", fieldName: "priority", nullable: true })
   priority: number | null = null;
+
+  @Property({ type: "uuid", fieldName: "sprint_id", nullable: true, lazy: true })
+  sprint?: string | null;
+
+  @Property({
+    type: "json",
+    fieldName: "custom_fields",
+    nullable: true,
+    returning: false,
+    lazy: true,
+  })
+  customFields?: Record<string, unknown>;
+
+  @Property({ type: "integer", fieldName: "points", nullable: true, lazy: true })
+  points?: number | null;
+
+  @ManyToOne(() => Task, {
+    fieldName: "parent_id",
+    nullable: true,
+    deleteRule: "set null",
+    lazy: true,
+  })
+  parent?: Task | null;
+
+  @Property({
+    type: "json",
+    fieldName: "dependencies",
+    nullable: true,
+    returning: false,
+    lazy: true,
+  })
+  dependencies?: TaskDependencies;
+
+  @Property({ type: "string", fieldName: "external_id", nullable: true, lazy: true })
+  externalId?: string | null;
 }

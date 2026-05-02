@@ -31,6 +31,7 @@ import { Event } from "./entities/core/Event.ts";
 // Tenant-scoped stub entities (P1#03 — composite index decorators land here so
 // later pillars never need a base-table migration).
 import { Task } from "./entities/tasks/Task.ts";
+import { TaskStatus } from "./entities/tasks/TaskStatus.ts";
 import { Document } from "./entities/docs/Document.ts";
 import { DocLink } from "./entities/docs/DocLink.ts";
 import { DocVersion } from "./entities/docs/DocVersion.ts";
@@ -75,6 +76,7 @@ export {
   FeatureFlag,
   Event,
   Task,
+  TaskStatus,
   Document,
   DocLink,
   DocVersion,
@@ -151,6 +153,7 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     FeatureFlag,
     Event,
     Task,
+    TaskStatus,
     Document,
     DocLink,
     DocVersion,
