@@ -42,6 +42,7 @@
     "better-auth": "1.6.9",
     "casbin": "5.50.0",
     "effect": "3.20.0",
+    "json-rules-engine": "^7",
     "liquidjs": "10.25.7",
     "mikro-orm-pglite": "0.5.1",
     "pg": "8.20.0",
