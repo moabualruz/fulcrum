@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: needs-review
+Owner: codex-orchestrator
 Triage: AFK
 Pillar: 02-inference-sidecar
 Blocked-by: 02-ts-client-and-lifecycle

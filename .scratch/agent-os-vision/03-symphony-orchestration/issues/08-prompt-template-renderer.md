@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: completed
+Owner: codex-orchestrator
 Triage: AFK
 Pillar: 03-symphony-orchestration
 Blocked-by: 02-schema-workflow-definitions

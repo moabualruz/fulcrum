@@ -470,3 +470,354 @@ Verification:
   stages: install, typecheck, symphony:lock, test, license-audit, build:all, web:install, web:check, web:build, web:test, skills:lint, compress:check
 ]
 Result: REVIEW_DEBT_CLOSED_AND_VERIFIED.
+
+## 2026-05-02T06:57:50Z — codex-orchestrator (continuous queue claimed)
+
+State digest:
+[
+  branch: plan/agent-os-vision,
+  worktree: clean before claim,
+  artifacts: 391 markdown files under .scratch/agent-os-vision,
+  issues: 341 total,
+  completed: 37,
+  ready-for-agent: 304,
+  needs-review: 0,
+  in-progress: 0,
+  blocked: 0,
+  coverage: COVERAGE.md Sign-off PASS,
+  ci: bun run ci PASS — 12/12 stages, 1570 pass, 2 skip; web:check has 2 pre-existing Svelte warnings
+]
+Queue fill:
+[
+  05-router-and-skills/issues/04-auto-assign-tier1-tier2.md,
+  02-inference-sidecar/issues/04-trpc-procedures-and-health-surface.md,
+  05-router-and-skills/issues/13-skills-loader-per-agent-install.md,
+  03-symphony-orchestration/issues/07-workspace-management.md,
+  03-symphony-orchestration/issues/08-prompt-template-renderer.md,
+  04-sandcastle-wrapper/issues/03-artifacts-edges-migration.md
+]
+Implementers:
+[
+  019de77b-ca10-71e1-959d-9796ecddf036: codex-high P5#04 auto-assign tier1/tier2,
+  019de77c-320b-78a2-ac99-f01c1c6e4781: codex-high P2#04 inference tRPC health parity,
+  019de77c-9fb7-7161-abf1-27dec61bb11f: codex-medium P5#13 skills loader install/hash verification,
+  019de77c-ff01-7a32-9fc3-febc2ade54f2: codex-medium P3#07 workspace management,
+  019de77d-6013-7c41-9137-e4ddc0c88ac6: codex-medium P3#08 prompt template renderer,
+  019de77d-d4af-7513-aca4-7c3d37e5d5cc: codex-high P4#03 artifacts + edges migration
+]
+Reviewers:
+[
+  pending opposite-runtime review after implementation; Claude runtime required for Codex-implemented work
+]
+Result: IN_PROGRESS — statuses flipped to in-progress before implementation.
+
+## 2026-05-02T07:03:22Z — codex-orchestrator (P5#04 implementation complete)
+
+Implementation result:
+[
+  issue: 05-router-and-skills/issues/04-auto-assign-tier1-tier2.md,
+  implementer: 019de77b-ca10-71e1-959d-9796ecddf036 codex-high,
+  commit: 7d084b3b66c1b99fa5f9ee6c431e506a9f319b4a feat(router): add auto-assign tier 1 and 2,
+  red: bun test src/router/auto-assign.test.ts failed on missing ./auto-assign.ts,
+  green: bun test src/router/auto-assign.test.ts src/router/rules-engine.test.ts PASS — 9 pass, 0 fail, 12 expects,
+  status: needs-review
+]
+Reviewers:
+[
+  pending: Claude opposite-runtime review for P5#04 over 7d084b3b
+]
+Result: NEEDS_REVIEW.
+
+## 2026-05-02T07:17:04Z — codex-orchestrator (P4#03 Claude review queued)
+
+Reviewers:
+[
+  04-sandcastle-wrapper/issues/03-artifacts-edges-migration.md: review-moo0dsxj-0dsegd Claude review over 382c84a7^..382c84a7
+]
+Result: REVIEW_IN_PROGRESS.
+
+## 2026-05-02T08:07:14Z — codex-orchestrator (P3 follow-up review fix committed)
+
+Implementation result:
+[
+  issues: [
+    03-symphony-orchestration/issues/07-workspace-management.md,
+    03-symphony-orchestration/issues/08-prompt-template-renderer.md
+  ],
+  commit: ce0e7ca5 fix(symphony): bound workspace key collisions,
+  review_source: review-moo1xhjd-m56w86,
+  green: bun test tests/symphony/workspace.test.ts tests/symphony/prompt.test.ts tests/cli/symphony.test.ts tests/symphony/tracker-fetch-candidate-issues.test.ts PASS — 37 pass, 0 fail, 76 expects,
+  lint: bun run lint PASS
+]
+Reviewers:
+[
+  03-symphony-orchestration/issues/07-workspace-management.md + 08-prompt-template-renderer.md: review-moo25wg7-34s0jf Claude review over ce0e7ca5^..ce0e7ca5 in /tmp/fulcrum-review-ce0e7ca5
+]
+Review result:
+[
+  reviewer: review-moo25wg7-34s0jf Claude,
+  verdict: SPEC PASS / QUALITY APPROVED,
+  findings: no bugs found; bounded collision loop and dead runId guard fix accepted,
+  note: pre-existing TOCTOU in createWorkspace noted as low risk and outside this diff
+]
+Result: REVIEW_CLEAN.
+
+## 2026-05-02T08:00:20Z — codex-orchestrator (follow-up review fixes committed)
+
+Implementation result:
+[
+  issue: 04-sandcastle-wrapper/issues/03-artifacts-edges-migration.md,
+  commit: a0ac1dbf test(db): cover artifact edge rollback boundaries,
+  review_source: review-moo1f33f-475m2d,
+  green: bun test tests/db/migrations/sandbox-artifacts-edges.test.ts tests/db/migrations/sandcastle-agent-runs.test.ts src/db/inference-schema.test.ts PASS — 14 pass, 0 fail, 137 expects,
+  lint: bun run lint PASS
+]
+Implementation result:
+[
+  issues: [
+    03-symphony-orchestration/issues/07-workspace-management.md,
+    03-symphony-orchestration/issues/08-prompt-template-renderer.md
+  ],
+  commit: df753859 fix(symphony): avoid workspace retry collisions,
+  review_source: review-moo1hdyj-prcdcz,
+  red: scoped P3 suite failed on duplicate workspace key reuse and --json before run id,
+  green: bun test tests/symphony/workspace.test.ts tests/symphony/prompt.test.ts tests/cli/symphony.test.ts tests/symphony/tracker-fetch-candidate-issues.test.ts PASS — 34 pass, 0 fail, 73 expects,
+  lint: bun run lint PASS
+]
+Implementation result:
+[
+  issue: 05-router-and-skills/issues/13-skills-loader-per-agent-install.md,
+  commit: bb6a8dd0 fix(skills): document stale-claim cleanup race,
+  review_source: review-moo1mufv-mzyg26,
+  green: bun test tests/skills/loader.test.ts src/cli/inference.test.ts src/server/trpc/routers/__tests__/inference.test.ts PASS — 28 pass, 0 fail, 77 expects,
+  lint: bun run lint PASS
+]
+Reviewers:
+[
+  04-sandcastle-wrapper/issues/03-artifacts-edges-migration.md: review-moo1xhjd-9m5q3h Claude review over a0ac1dbf^..a0ac1dbf in /tmp/fulcrum-review-a0ac1dbf,
+  03-symphony-orchestration/issues/07-workspace-management.md + 08-prompt-template-renderer.md: review-moo1xhjd-m56w86 Claude review over df753859^..df753859 in /tmp/fulcrum-review-df753859,
+  05-router-and-skills/issues/13-skills-loader-per-agent-install.md: review-moo1xhjd-1856cz Claude review over bb6a8dd0^..bb6a8dd0 in /tmp/fulcrum-review-bb6a8dd0
+]
+Result: REVIEW_IN_PROGRESS.
+
+## 2026-05-02T07:52:09Z — codex-orchestrator (P5#13 follow-up review fix committed)
+
+Implementation result:
+[
+  issue: 05-router-and-skills/issues/13-skills-loader-per-agent-install.md,
+  commit: a9fd731a fix(skills): clean stale lock claims,
+  red: bun test tests/skills/loader.test.ts failed because orphan .stale-* lock claim directories survived install,
+  green: bun test tests/skills/loader.test.ts src/cli/inference.test.ts src/server/trpc/routers/__tests__/inference.test.ts PASS — 28 pass, 0 fail, 75 expects,
+  lint: bun run lint PASS
+]
+Reviewers:
+[
+  05-router-and-skills/issues/13-skills-loader-per-agent-install.md: review-moo1mufv-mzyg26 Claude review over a9fd731a^..a9fd731a in /tmp/fulcrum-review-a9fd731a
+]
+Result: REVIEW_IN_PROGRESS.
+
+## 2026-05-02T07:32:10Z — codex-orchestrator (P2/P5 follow-up review fixes committed)
+
+Review result:
+[
+  issues: [
+    02-inference-sidecar/issues/04-trpc-procedures-and-health-surface.md,
+    05-router-and-skills/issues/13-skills-loader-per-agent-install.md
+  ],
+  reviewer: review-moo0n4g3-ka9vua Claude,
+  verdict: CHANGES_REQUIRED,
+  blockers: stale unauthenticated CLI fallback remained in code; skills lock lacked stale-lock recovery
+]
+Implementation result:
+[
+  commit: 39489fb8 fix(agent-os): close review follow-ups,
+  red: Claude review findings from review-moo0n4g3-ka9vua,
+  green: bun test src/cli/inference.test.ts tests/skills/loader.test.ts src/server/trpc/routers/__tests__/inference.test.ts PASS — 23 pass, 0 fail, 63 expects,
+  lint: bun run lint PASS,
+  security: semgrep --config auto src/cli/inference.ts src/skills/loader.ts src/server/trpc/routers/inference.ts PASS — 0 findings
+]
+Reviewers:
+[
+  follow-up review-fix pass: review-moo0x558-a0en02 Claude review over 39489fb8^..39489fb8
+]
+Result: REVIEW_IN_PROGRESS.
+
+## 2026-05-02T07:29:24Z — codex-orchestrator (P4#03 review fixes committed)
+
+Review result:
+[
+  issue: 04-sandcastle-wrapper/issues/03-artifacts-edges-migration.md,
+  reviewer: review-moo0dsxj-0dsegd Claude,
+  verdict: CHANGES_REQUIRED,
+  blockers: existing artifact rows could fail NOT NULL migration; new FK delete rules missing; migration SQL missing ON DELETE
+]
+Implementation result:
+[
+  commit: 97859ae9 fix(db): harden artifact edge migration,
+  red: Claude review findings from review-moo0dsxj-0dsegd,
+  green: bun test tests/db/migrations/sandbox-artifacts-edges.test.ts tests/db/migrations/sandcastle-agent-runs.test.ts src/db/inference-schema.test.ts PASS — 11 pass, 0 fail, 124 expects,
+  lint: bun run lint PASS
+]
+Reviewers:
+[
+  04-sandcastle-wrapper/issues/03-artifacts-edges-migration.md: review-moo0tgp3-420wsz Claude review over 97859ae9^..97859ae9
+]
+Result: REVIEW_IN_PROGRESS.
+
+## 2026-05-02T07:29:18Z — codex-orchestrator (review fixes committed)
+
+Implementation result:
+[
+  issues: [
+    05-router-and-skills/issues/04-auto-assign-tier1-tier2.md,
+    05-router-and-skills/issues/13-skills-loader-per-agent-install.md,
+    02-inference-sidecar/issues/04-trpc-procedures-and-health-surface.md
+  ],
+  implementer: codex-orchestrator,
+  commit: 1c0d0ab0 fix(agent-os): address review feedback,
+  red: targeted regression tests failed before fixes for blank override, skills install audit/source/slug, inference auth/CLI output,
+  green: bun test src/router/auto-assign.test.ts src/router/rules-engine.test.ts tests/skills src/server/trpc/routers/__tests__/inference.test.ts src/cli/inference.test.ts src/inference/client.test.ts src/inference/protocol.test.ts PASS — 43 pass, 0 fail, 91 expects,
+  lint: bun run lint PASS,
+  security: semgrep --config auto src/server/trpc/routers/inference.ts src/cli/inference.ts src/skills/loader.ts PASS — 0 findings
+]
+Reviewers:
+[
+  combined review-fix pass: review-moo0n4g3-ka9vua Claude review over 1c0d0ab0^..1c0d0ab0
+]
+Result: REVIEW_IN_PROGRESS.
+
+## 2026-05-02T07:16:42Z — codex-orchestrator (P4#03 implementation complete)
+
+Implementation result:
+[
+  issue: 04-sandcastle-wrapper/issues/03-artifacts-edges-migration.md,
+  implementer: 019de77d-d4af-7513-aca4-7c3d37e5d5cc codex-medium,
+  commit: 382c84a7693274c0a8aa13b9e708e9df1f2c7d32 feat(db): add artifact and edge schema,
+  red: bun test tests/db/migrations/sandbox-artifacts-edges.test.ts failed before entity/migration existed,
+  green: bun test tests/db/migrations/sandbox-artifacts-edges.test.ts tests/db/migrations/sandcastle-agent-runs.test.ts src/db/inference-schema.test.ts PASS — 10 pass, 0 fail, 111 expects,
+  status: needs-review
+]
+Reviewers:
+[
+  pending: Claude opposite-runtime review for P4#03 over 382c84a7
+]
+Result: NEEDS_REVIEW.
+
+## 2026-05-02T07:10:55Z — codex-orchestrator (P2#04 Claude review queued)
+
+Reviewers:
+[
+  02-inference-sidecar/issues/04-trpc-procedures-and-health-surface.md: review-moo03k8b-7ptcd3 Claude review over ea05612e^..ea05612e
+]
+Result: REVIEW_IN_PROGRESS.
+
+## 2026-05-02T07:06:41Z — codex-orchestrator (P5#13 implementation complete)
+
+Implementation result:
+[
+  issue: 05-router-and-skills/issues/13-skills-loader-per-agent-install.md,
+  implementer: 019de77c-9fb7-7161-abf1-27dec61bb11f codex-medium,
+  commit: ed394f60 feat(skills): install skills per agent directory,
+  red: bun test tests/skills/loader.test.ts failed on missing ../../src/skills/loader.ts,
+  green: bun test tests/skills PASS — 10 pass, 0 fail, 26 expects,
+  status: needs-review
+]
+Reviewers:
+[
+  pending: Claude opposite-runtime review for P5#13 over ed394f60
+]
+Result: NEEDS_REVIEW.
+
+## 2026-05-02T07:08:13Z — codex-orchestrator (Claude reviews queued)
+
+Reviewers:
+[
+  05-router-and-skills/issues/04-auto-assign-tier1-tier2.md: review-monzzpm3-eabnuu Claude review over 7d084b3b^..7d084b3b,
+  05-router-and-skills/issues/13-skills-loader-per-agent-install.md: review-monzzpmp-s296gz Claude review over ed394f60^..ed394f60
+]
+Result: REVIEW_IN_PROGRESS.
+
+## 2026-05-02T07:08:41Z — codex-orchestrator (P3#08 implementation returned)
+
+Implementation result:
+[
+  issue: 03-symphony-orchestration/issues/08-prompt-template-renderer.md,
+  implementer: 019de77d-6013-7c41-9137-e4ddc0c88ac6 codex-medium,
+  commit: n/a — shared files overlap with P3#07 and current inference/sandbox WIP,
+  red: bun test tests/symphony/prompt.test.ts tests/cli/symphony.test.ts failed on missing prompt.ts,
+  green: bun test tests/symphony/prompt.test.ts tests/cli/symphony.test.ts tests/symphony/workspace.test.ts PASS — 17 pass, 0 fail, 31 expects,
+  ci: bun run ci typecheck failed due unrelated in-flight P2/P4 work,
+  status: in-progress pending integration commit
+]
+Result: P3_08_DONE_UNCOMMITTED.
+
+## 2026-05-02T07:09:26Z — codex-orchestrator (P3#07 implementation blocked)
+
+Implementation result:
+[
+  issue: 03-symphony-orchestration/issues/07-workspace-management.md,
+  implementer: 019de77c-ff01-7a32-9fc3-febc2ade54f2 codex-medium,
+  commit: n/a,
+  red: bun test tests/symphony/workspace.test.ts failed on missing workspace.ts,
+  second_red: bun test tests/symphony/workspace.test.ts tests/cli/symphony.test.ts failed getWorkspacePath and runs show --json paths,
+  green: bun test tests/symphony/workspace.test.ts tests/cli/symphony.test.ts tests/symphony/tracker-fetch-candidate-issues.test.ts PASS — 21 pass, 0 fail, 54 expects,
+  ci: bun run ci typecheck failed due unrelated in-flight P2/P4 work,
+  blocker: workspace_path schema and claim/release dispatch-loop integration are not safely ownable in this slice as currently scoped,
+  status: in-progress pending orchestrator reconciliation
+]
+Result: P3_07_BLOCKED_NEEDS_RECONCILIATION.
+
+## 2026-05-02T07:10:12Z — codex-orchestrator (P2#04 implementation complete)
+
+Implementation result:
+[
+  issue: 02-inference-sidecar/issues/04-trpc-procedures-and-health-surface.md,
+  implementer: 019de77c-320b-78a2-ac99-f01c1c6e4781 codex-high,
+  commit: ea05612e8d1512cd4c599fc96f5066dbe9b5aebb feat(inference): wire trpc surface parity,
+  red: bun test src/server/trpc/routers/__tests__/inference.test.ts failed because settings/inference page server module was missing,
+  green: bun test src/server/trpc/routers/__tests__/inference.test.ts src/cli/inference.test.ts src/inference/client.test.ts src/inference/protocol.test.ts PASS — 16 pass, 0 fail, 36 expects,
+  ci: bun run ci typecheck failed due unrelated in-flight P4 work,
+  status: needs-review
+]
+Reviewers:
+[
+  pending: Claude opposite-runtime review for P2#04 over ea05612e
+]
+Result: NEEDS_REVIEW.
+
+## 2026-05-02T07:48:13Z — codex-orchestrator (review fixes + P3 integration committed)
+
+Implementation result:
+[
+  issue: 04-sandcastle-wrapper/issues/03-artifacts-edges-migration.md,
+  commit: 7aa23ed3 fix(db): clean artifact edge rollback,
+  red: bun test tests/db/migrations/sandbox-artifacts-edges.test.ts failed because rollback left one artifact-migration sentinel agent_run,
+  green: bun test tests/db/migrations/sandbox-artifacts-edges.test.ts tests/db/migrations/sandcastle-agent-runs.test.ts src/db/inference-schema.test.ts PASS — 13 pass, 0 fail, 135 expects,
+  lint: bun run lint PASS
+]
+Implementation result:
+[
+  issue: 05-router-and-skills/issues/13-skills-loader-per-agent-install.md,
+  commit: 33cbdd58 fix(skills): harden install lock recovery,
+  red: bun test tests/skills/loader.test.ts failed on missing stale-lock test hooks before implementation,
+  green: bun test tests/skills/loader.test.ts src/cli/inference.test.ts src/server/trpc/routers/__tests__/inference.test.ts PASS — 26 pass, 0 fail, 71 expects,
+  lint: bun run lint PASS
+]
+Implementation result:
+[
+  issues: [
+    03-symphony-orchestration/issues/07-workspace-management.md,
+    03-symphony-orchestration/issues/08-prompt-template-renderer.md
+  ],
+  commit: 389f2b9e feat(symphony): add workspace and prompt surfaces,
+  red: tests/symphony/workspace.test.ts failed before workspace.ts existed; tests/symphony/prompt.test.ts failed before prompt.ts existed; org-root deletion regression failed before destroyWorkspace guard tightened,
+  green: bun test tests/symphony/workspace.test.ts tests/symphony/prompt.test.ts tests/cli/symphony.test.ts tests/symphony/tracker-fetch-candidate-issues.test.ts PASS — 29 pass, 0 fail, 66 expects,
+  lint: bun run lint PASS
+]
+Reviewers:
+[
+  04-sandcastle-wrapper/issues/03-artifacts-edges-migration.md: review-moo1f33f-475m2d Claude review over 7aa23ed3^..7aa23ed3 in /tmp/fulcrum-review-7aa23ed3,
+  05-router-and-skills/issues/13-skills-loader-per-agent-install.md: review-moo1f32x-cnr2jo Claude review over 33cbdd58^..33cbdd58 in /tmp/fulcrum-review-33cbdd58,
+  03-symphony-orchestration/issues/07-workspace-management.md + 08-prompt-template-renderer.md: review-moo1hdyj-prcdcz Claude review over 389f2b9e^..389f2b9e in /tmp/fulcrum-review-389f2b9e
+]
+Result: REVIEW_IN_PROGRESS.
