@@ -197,8 +197,28 @@ async function runWeb(_argv: readonly string[]): Promise<void> {
     },
   });
 
+  const [{ DEFAULT_ORG_ID }, { WorkflowConfigSchema }, { startSymphonyOrchestrator }] =
+    await Promise.all([
+      import("../db/seed.ts"),
+      import("../orchestration/symphony/schemas.ts"),
+      import("../orchestration/symphony/orchestrator.ts"),
+    ]);
+  const symphony = startSymphonyOrchestrator(
+    orm.em,
+    DEFAULT_ORG_ID,
+    WorkflowConfigSchema.parse({}),
+  );
+
   console.log(`Web server listening on http://localhost:${listener.port}`);
-  await new Promise<void>(() => {});
+  await new Promise<void>((resolve) => {
+    const stop = () => resolve();
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+  }).finally(async () => {
+    symphony.stop();
+    listener.stop(true);
+    await cleanup();
+  });
 }
 
 export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<void> {

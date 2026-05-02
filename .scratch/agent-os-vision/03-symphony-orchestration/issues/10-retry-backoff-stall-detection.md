@@ -44,5 +44,16 @@ Verification:
 - PASS `bun run compress --check`.
 - BROAD SUITE CAVEAT `bun test` attempted — 1817 pass, 2 skip, 6 fail, 2 errors. Failures are pre-existing/unrelated wide-suite environment/spec-lock issues: Rust inference sidecar health timeout, missing `vendor/openai-symphony/SPEC.md`, missing web optional packages `mode-watcher`, `formsnap`, and `runed`.
 
+2026-05-02 fixback — Product-kernel/API/reliability review blockers resolved. Linkage chain preserved: `MASTER-PLAN.md -> COVERAGE.md -> TASK-DAG.md -> TASK-BUNDLES.md -> this issue`.
+
+Fixback:
+- Restored `0001_product_kernel.sql` baseline compatibility and added forward migration `0004_agent_runs_retry_stall.sql` for old baseline-applied DBs.
+- Started stall scanner through the Symphony orchestrator lifecycle and wired `fulcrum web` shutdown to stop it.
+- Enforced `maxAttempts`: exhausted retries move to terminal `failed`, clear `nextRetryAt`, persist `lastErrorKind`, and emit `state_changed`.
+- Added scanner timeout handling so hung scans do not block later ticks.
+- Added default scanner error logging when no `onError` handler is supplied.
+- Added Casbin action mappings for orchestration procedure leaves used by CLI/web/API callers.
+- Kept retry backoff default at `3600000` (1h), per SPEC/issue requirement; pinned via schema and prompt config tests.
+
 ## Notes
 Formula is exact per SPEC.md §Retry REQUIRED. Max cap `max_retry_backoff_ms` comes from `WORKFLOW.md` config, default 3600000 (1h). Stall timeout default 300000ms (5 min) per PRD.
