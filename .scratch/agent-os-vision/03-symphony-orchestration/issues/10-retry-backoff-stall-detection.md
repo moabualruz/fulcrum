@@ -1,8 +1,8 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: 03-symphony-orchestration
-Blocked-by: 03-schema-agent-runs-symphony-columns
+Blocked-by: none
 Owner: claude-worker-p3-retry-stall
 ---
 
@@ -18,15 +18,31 @@ Implement `src/orchestration/symphony/retry.ts`:
 - Stall detection in `src/orchestration/symphony/stall.ts`: `scanForStalledRuns(orgId)` queries `agent_runs_stall_scan` index for runs where `started_at < NOW() - stall_timeout_ms`; calls `scheduleRetry` for each; runs on a 30s in-memory setInterval inside the orchestrator.
 
 ## Acceptance criteria
-- [ ] Schema / state machine: `next_retry_at`, `attempt_count`, `last_error_kind` updated correctly; stalled run transitions to `retry_queued`
-- [ ] Tracker adapter: N/A
-- [ ] Dispatch loop / hooks: stall scanner wired to orchestrator's secondary timer loop (slice 13)
-- [ ] Surfaces (web/cli/tui parity): retry schedule visible in Web run detail; `fulcrum symphony runs show --json` includes `nextRetryAt`, `attemptCount`
-- [ ] Tests: parameterized table test — attempt 1 → 10000ms, attempt 4 → 80000ms, attempt 10 → capped at `maxMs`; stall detection fires within 100ms of crossing `stall_timeout_ms` with mocked clock; `events` table has `state_changed running→retry_queued` row
-- [ ] SPEC conformance traced in `docs/symphony-conformance.md`: §Retry §Backoff formula mapped to `retry.ts:calcRetryDelay`
+- [x] Schema / state machine: `next_retry_at`, `attempt_count`, `last_error_kind` updated correctly; stalled run transitions to `retry_queued`
+- [x] Tracker adapter: N/A
+- [x] Dispatch loop / hooks: stall scanner wired to orchestrator's secondary timer loop (slice 13)
+- [x] Surfaces (web/cli/tui parity): retry schedule visible in Web run detail; `fulcrum symphony runs show --json` includes `nextRetryAt`, `attemptCount`
+- [x] Tests: parameterized table test — attempt 1 → 10000ms, attempt 4 → 80000ms, attempt 10 → capped at `maxMs`; stall detection fires within 100ms of crossing `stall_timeout_ms` with mocked clock; `events` table has `state_changed running→retry_queued` row
+- [x] SPEC conformance traced in `docs/symphony-conformance.md`: §Retry §Backoff formula mapped to `retry.ts:calcRetryDelay`
 
 ## Blocked by
-03-schema-agent-runs-symphony-columns
+None. `03-schema-agent-runs-symphony-columns` exists in runtime migrations; product-kernel base schema also now exposes retry fields for web run detail rows.
+
+## Implementation log
+2026-05-02 — Implemented. Linkage chain preserved: `MASTER-PLAN.md -> COVERAGE.md -> TASK-DAG.md -> TASK-BUNDLES.md -> this issue`.
+
+Built:
+- `src/orchestration/symphony/retry.ts` with exact capped exponential delay, CAS retry scheduling, retry metadata update, and `state_changed` event emission only when update wins.
+- `src/orchestration/symphony/stall.ts` with org-scoped stalled-run scan and non-overlapping 30s scanner handle.
+- CLI/web run detail retry metadata plumbing.
+- Product-kernel base schema retry columns for fresh and existing local DBs.
+- SPEC conformance mapping for retry queue + backoff formula.
+
+Verification:
+- PASS `bun test tests/orchestration/retry.test.ts tests/orchestration/stall.test.ts tests/cli/symphony.test.ts 'src/web/src/routes/runs/[id]/page.server.test.ts' 'src/web/src/routes/runs/[id]/page.svelte.test.ts' tests/symphony/prompt.test.ts tests/symphony/schemas.test.ts src/product-kernel/db/migrate.test.ts` — 55 pass, 0 fail.
+- PASS `bun run lint`.
+- PASS `bun run compress --check`.
+- BROAD SUITE CAVEAT `bun test` attempted — 1817 pass, 2 skip, 6 fail, 2 errors. Failures are pre-existing/unrelated wide-suite environment/spec-lock issues: Rust inference sidecar health timeout, missing `vendor/openai-symphony/SPEC.md`, missing web optional packages `mode-watcher`, `formsnap`, and `runed`.
 
 ## Notes
 Formula is exact per SPEC.md §Retry REQUIRED. Max cap `max_retry_backoff_ms` comes from `WORKFLOW.md` config, default 3600000 (1h). Stall timeout default 300000ms (5 min) per PRD.

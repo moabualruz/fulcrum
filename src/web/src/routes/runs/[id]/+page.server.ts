@@ -16,6 +16,9 @@ interface AgentRunDetail {
   started_at: string | Date;
   ended_at: string | Date | null;
   transcript_path: string | null;
+  attempt_count: number;
+  next_retry_at: string | Date | null;
+  last_error_kind: string | null;
 }
 
 interface EventRow {
@@ -47,7 +50,8 @@ export const load: PageServerLoad = ({ params, locals }) => {
           const orgId = await getDefaultOrgId(db);
           const rows = await db.query<AgentRunDetail>(
             `SELECT id, org_id, project_id, agent, model, prompt, status,
-                    parent_run_id, started_at, ended_at, transcript_path
+                    parent_run_id, started_at, ended_at, transcript_path,
+                    attempt_count, next_retry_at, last_error_kind
                FROM agent_runs WHERE id = $1 AND org_id = $2`,
             [params.id, orgId],
           );
@@ -57,6 +61,7 @@ export const load: PageServerLoad = ({ params, locals }) => {
             ...raw,
             started_at: isoStamp(raw.started_at),
             ended_at: isoStamp(raw.ended_at),
+            next_retry_at: isoStamp(raw.next_retry_at),
           };
 
           let transcript: string | null = null;

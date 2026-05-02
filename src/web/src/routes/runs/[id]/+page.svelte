@@ -71,6 +71,19 @@
     >Retry run</button>
   </section>
 
+  <section
+    data-runs-retry-schedule
+    class={cn("mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border pb-3 text-xs text-muted-foreground")}
+  >
+    <span>Attempt <span class={cn("font-mono text-foreground")}>{run.attempt_count}</span></span>
+    {#if run.next_retry_at}
+      <span>Next retry <span class={cn("font-mono text-foreground")}>{run.next_retry_at}</span></span>
+    {/if}
+    {#if run.last_error_kind}
+      <span>Last error <span class={cn("font-mono text-foreground")}>{run.last_error_kind}</span></span>
+    {/if}
+  </section>
+
   {#if showCancel}
     <div data-runs-cancel-confirm class={cn("mb-3 flex items-center gap-2 rounded-md border border-destructive/40 bg-background p-3 text-xs")}>
       <span class={cn("text-muted-foreground")}>Cancel this run? This cannot be undone.</span>

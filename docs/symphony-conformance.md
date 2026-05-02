@@ -55,7 +55,11 @@ Prompt template: `src/orchestration/symphony/prompt.ts:renderPrompt` renders Liq
 
 ### Exponential retry queue with continuation retries after normal exit
 
-### Configurable retry backoff cap (`agent.max_retry_backoff_ms`, default 5m)
+Mapping: `src/orchestration/symphony/retry.ts:scheduleRetry`
+
+### Configurable retry backoff cap (`agent.max_retry_backoff_ms`, default 1h)
+
+Mapping: `src/orchestration/symphony/retry.ts:calcRetryDelay`
 
 ### Reconciliation that stops runs on terminal/non-active tracker states
 

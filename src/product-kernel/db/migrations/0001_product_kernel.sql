@@ -84,6 +84,10 @@ CREATE TABLE IF NOT EXISTS agent_runs (
   model text,
   prompt text,
   status text NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')),
+  orchestration_state text CHECK (orchestration_state IN ('unclaimed', 'claimed', 'running', 'retry_queued', 'released', 'succeeded', 'failed', 'timed_out', 'stalled', 'cancelled')),
+  attempt_count integer NOT NULL DEFAULT 0,
+  next_retry_at timestamptz,
+  last_error_kind text,
   exit_code integer,
   transcript_path text,
   total_tokens integer,
@@ -94,6 +98,11 @@ CREATE TABLE IF NOT EXISTS agent_runs (
 );
 
 CREATE INDEX IF NOT EXISTS agent_runs_scope_idx ON agent_runs (org_id, project_id, status);
+
+ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS orchestration_state text CHECK (orchestration_state IN ('unclaimed', 'claimed', 'running', 'retry_queued', 'released', 'succeeded', 'failed', 'timed_out', 'stalled', 'cancelled'));
+ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS attempt_count integer NOT NULL DEFAULT 0;
+ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS next_retry_at timestamptz;
+ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS last_error_kind text;
 
 CREATE TABLE IF NOT EXISTS artifacts (
   id text PRIMARY KEY,

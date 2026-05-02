@@ -30,6 +30,9 @@ export interface SymphonyCaller {
       orchestrationState?: string | null;
       workspacePath?: string | null;
       renderedPrompt?: string | null;
+      attemptCount?: number | null;
+      nextRetryAt?: Date | string | null;
+      lastErrorKind?: string | null;
     } | null>;
     getWorkspacePath?: (input: {
       orgId: string;
@@ -168,6 +171,16 @@ async function runRunsShow(
 
     print(`ID     ${row.id}`);
     print(`STATE  ${row.state ?? row.orchestrationState ?? ""}`);
+    if (row.attemptCount !== undefined && row.attemptCount !== null) {
+      print(`ATTEMPT  ${row.attemptCount}`);
+    }
+    if (row.nextRetryAt) {
+      const nextRetryAt = row.nextRetryAt instanceof Date
+        ? row.nextRetryAt.toISOString()
+        : row.nextRetryAt;
+      print(`NEXT_RETRY_AT  ${nextRetryAt}`);
+    }
+    if (row.lastErrorKind) print(`LAST_ERROR_KIND  ${row.lastErrorKind}`);
     if (row.workspacePath) print(`WORKSPACE  ${row.workspacePath}`);
 
     if (verbose && row.renderedPrompt) {

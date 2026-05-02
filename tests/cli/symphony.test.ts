@@ -207,6 +207,51 @@ describe("symphony.run — runs show <runId> --json", () => {
       workspacePath: "/tmp/fulcrum-workspaces/org/key",
     });
   });
+
+  it("prints retry schedule fields from orchestration.getRun", async () => {
+    const { run } = await import("../../src/cli/commands/symphony.ts");
+    const printed: string[] = [];
+    const runId = "10000000-0000-0000-0000-000000000001";
+
+    await run(["runs", "show", runId, "--json"], {
+      caller: {
+        orchestration: {
+          fetchCandidateIssues: async () => [],
+          getRun: async (input: { runId: string }) => {
+            expect(input).toEqual({ runId });
+            return {
+              id: runId,
+              state: "retry_queued",
+              orchestrationState: "retry_queued",
+              workspacePath: "/tmp/fulcrum-workspaces/org/key",
+              renderedPrompt: null,
+              attemptCount: 3,
+              nextRetryAt: new Date("2026-05-02T10:01:20.000Z"),
+              lastErrorKind: "stall_timeout",
+            };
+          },
+        },
+      },
+      print: (line: string) => {
+        printed.push(line);
+      },
+      printErr: () => {},
+      exit: (code: number) => {
+        throw new Error(`unexpected exit ${code}`);
+      },
+    });
+
+    expect(JSON.parse(printed[0] as string)).toEqual({
+      id: runId,
+      state: "retry_queued",
+      orchestrationState: "retry_queued",
+      workspacePath: "/tmp/fulcrum-workspaces/org/key",
+      renderedPrompt: null,
+      attemptCount: 3,
+      nextRetryAt: "2026-05-02T10:01:20.000Z",
+      lastErrorKind: "stall_timeout",
+    });
+  });
 });
 
 describe("symphony.run — runs show <runId> --verbose", () => {

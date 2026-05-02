@@ -24,6 +24,8 @@ import {
   type LifecycleHookTimeoutConfig,
 } from "./hooks.ts";
 
+export { scanForStalledRuns, startStallScanner } from "./stall.ts";
+
 export class ClaimConflictError extends Error {
   readonly taskId: string;
 
