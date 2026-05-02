@@ -8,10 +8,6 @@
  *     typed inputs/outputs so the tRPC wiring can be dropped in without
  *     changing business logic when Pillar 13 adds @trpc/server + zod.
  *
- * ⚠️  FLAG (P1#06): Permission gating (`assertPermission()`) is owned by
- *     Pillar 1 issue #06 (auth / Better-Auth middleware). Calls are marked
- *     with TODO comments below; add real gate when #06 lands.
- *
  * Procedures (mirroring future tRPC shape):
  *   db.migrate(input: { targetVersion?, force? }) → void
  *   db.status()                                   → MigrationStatus
@@ -32,35 +28,18 @@ export interface DbMigrateInput {
   force?: boolean;
 }
 
-/**
- * Thrown by `assertPermission` until P1#06 (Better-Auth + permission middleware) lands.
- *
- * Consumers MUST catch this error or stub it in tests.
- * When P1#06 ships, replace `assertPermission` body with a real gate and remove
- * the `throw` — callers that catch this class will automatically recover.
- *
- * code: 'PERMISSION_NOT_AVAILABLE'
- */
+/** Thrown when a caller uses the db router without the CLI/web DI container. */
 export class PermissionNotAvailableError extends Error {
   readonly code = "PERMISSION_NOT_AVAILABLE" as const;
   constructor() {
-    super("Permission middleware not yet wired (Pillar 1 #06 owns)");
+    super("Database command requires a wired CLI context");
     this.name = "PermissionNotAvailableError";
   }
 }
 
-/**
- * assertPermission — THROWS until P1#06 (auth middleware) lands.
- *
- * Intentionally fail-closed: any call to a db.router procedure throws
- * PermissionNotAvailableError so callers fail loudly, not silently allow.
- * This prevents accidental unauthenticated access before the auth gate is wired.
- *
- * TODO(P1#06): Replace body with real permission gate from Better-Auth / casbin.
- * When that lands, remove the throw and implement the real check.
- */
-function assertPermission(..._args: unknown[]): never {
-  throw new PermissionNotAvailableError();
+function requireContainer(container: Container | null): Container {
+  if (!container) throw new PermissionNotAvailableError();
+  return container;
 }
 
 /**
@@ -72,9 +51,7 @@ export async function dbMigrate(
   container: Container | null,
   input: DbMigrateInput = {},
 ): Promise<void> {
-  assertPermission(container, "db.migrate");
-  /* istanbul ignore next — assertPermission always throws until P1#06 lands */
-  const service = container!.get(MigratorService);
+  const service = requireContainer(container).get(MigratorService);
   await service.migrate(input.targetVersion, input.force ?? false);
 }
 
@@ -84,9 +61,7 @@ export async function dbMigrate(
 export async function dbStatus(
   container: Container | null,
 ): Promise<MigrationStatus> {
-  assertPermission(container, "db.status");
-  /* istanbul ignore next — assertPermission always throws until P1#06 lands */
-  return container!.get(MigratorService).status();
+  return requireContainer(container).get(MigratorService).status();
 }
 
 /**
@@ -95,9 +70,7 @@ export async function dbStatus(
 export async function dbHistory(
   container: Container | null,
 ): Promise<SchemaMigration[]> {
-  assertPermission(container, "db.history");
-  /* istanbul ignore next — assertPermission always throws until P1#06 lands */
-  return container!.get(MigratorService).history();
+  return requireContainer(container).get(MigratorService).history();
 }
 
 /**

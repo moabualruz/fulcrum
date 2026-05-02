@@ -3,6 +3,7 @@
 // policy file location + size, skill count, managed MCPs.
 
 import { stat, readdir } from "node:fs/promises";
+import { join } from "node:path";
 import { which, exists } from "../utils/proc.ts";
 import { AGENTS } from "../agents/registry.ts";
 import { ALL_COMPONENTS } from "../components/catalog.ts";
@@ -96,6 +97,17 @@ interface DoctorReport {
       agentRuns: number;
     };
     latestEventAt: string | null;
+    error?: string;
+  };
+  db: {
+    engine: "pglite" | "postgres" | "absent";
+    dbPath: string;
+    checks: Array<{
+      check: string;
+      status: "pass" | "fail" | "warn";
+      detail: string;
+      hint?: string;
+    }>;
     error?: string;
   };
   memoriesSchema: {
@@ -214,6 +226,10 @@ async function cavemanActivationHookPresent(agent: AgentDir, home: string): Prom
 
 function repoRoot(): string {
   return process.env["FULCRUM_REPO_DIR"] ?? process.cwd();
+}
+
+function fulcrumHome(): string {
+  return process.env["FULCRUM_HOME"] ?? join(process.env["HOME"] ?? "", ".fulcrum");
 }
 
 function pad(s: string, n: number): string {
@@ -580,6 +596,12 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
     }
   }
   const packageParity = await buildPackageParityReport(home);
+  const db = await buildDbMigrationReport();
+  for (const check of db.checks) {
+    if (check.status === "fail") errors += 1;
+    else if (check.status === "warn") warnings += 1;
+  }
+  if (db.error) errors += 1;
   const productKernel = await buildProductKernelReport();
   if (productKernel.error) {
     // A PGlite/Postgres failure means a key product surface is offline.
@@ -706,6 +728,7 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       database: componentDatabase,
       packageParity,
     },
+    db,
     productKernel,
     memoriesSchema,
     worktrees,
@@ -737,6 +760,67 @@ async function buildPackageParityReport(home: string): Promise<PackageParityRepo
     }
   }
   return reports;
+}
+
+async function buildDbMigrationReport(): Promise<DoctorReport["db"]> {
+  const dbPath = join(fulcrumHome(), "db", "main");
+  if (!(await exists(join(dbPath, "PG_VERSION")))) {
+    return {
+      engine: "absent",
+      dbPath,
+      checks: [
+        {
+          check: "db.migrationVersion",
+          status: "warn",
+          detail: "Local database is not initialized.",
+          hint: "Run `fulcrum init`.",
+        },
+      ],
+    };
+  }
+
+  try {
+    const { PGlite } = await import("@electric-sql/pglite");
+    const { MikroORM } = await import("@mikro-orm/postgresql");
+    const { Migrator } = await import("@mikro-orm/migrations");
+    const { PGliteKyselyDialect } = await import("../db/PGliteKyselyDriver.ts");
+    const { createOrmConfig } = await import("../db/mikro-orm.config.ts");
+    const { registerDbBindings, SchemaMigrationRepository } = await import("../db/db.module.ts");
+    const { dbMigrationVersion, dbCanRunOnCurrentBinary } = await import("../db/doctor-checks.ts");
+    const { Container } = await import("@needle-di/core");
+
+    const pglite = new PGlite(dbPath);
+    await pglite.waitReady;
+    const dialect = new PGliteKyselyDialect(() => pglite);
+    const orm = await MikroORM.init({
+      ...createOrmConfig({ pglite, debug: false }),
+      driverOptions: dialect,
+      extensions: [Migrator],
+    });
+    try {
+      const container = new Container();
+      registerDbBindings(container, orm, orm.em.fork());
+      const repo = container.get(SchemaMigrationRepository);
+      return {
+        engine: "pglite",
+        dbPath,
+        checks: [
+          await dbMigrationVersion(repo),
+          await dbCanRunOnCurrentBinary(repo),
+        ],
+      };
+    } finally {
+      await orm.close(true);
+      await pglite.close();
+    }
+  } catch (err) {
+    return {
+      engine: "absent",
+      dbPath,
+      checks: [],
+      error: (err as Error).message,
+    };
+  }
 }
 
 async function buildMemoriesSchemaReport(): Promise<DoctorReport["memoriesSchema"]> {
@@ -817,10 +901,37 @@ async function buildProductKernelReport(): Promise<DoctorReport["productKernel"]
     const { openPglite } = await import("../product-kernel/db/pglite.ts");
     const db = await openPglite(dbPath);
     try {
-      const schemaRows = await db.query<{ count: number }>(
-        `SELECT COUNT(*)::int AS count FROM pg_class WHERE relname = 'schema_migrations' AND relkind = 'r'`,
-      );
-      if ((schemaRows[0]?.count ?? 0) === 0) {
+      const schemaApplied = await countProductKernelMigrationFiles();
+      let counts: Array<{
+        orgs: number;
+        projects: number;
+        documents: number;
+        tasks: number;
+        agent_runs: number;
+      }>;
+      let latest: Array<{ created_at: string | null }>;
+
+      try {
+        counts = await db.query<{
+          orgs: number;
+          projects: number;
+          documents: number;
+          tasks: number;
+          agent_runs: number;
+        }>(
+          `SELECT (SELECT COUNT(*)::int FROM orgs) AS orgs,
+                  (SELECT COUNT(*)::int FROM projects) AS projects,
+                  (SELECT COUNT(*)::int FROM documents) AS documents,
+                  (SELECT COUNT(*)::int FROM tasks) AS tasks,
+                  (SELECT COUNT(*)::int FROM agent_runs) AS agent_runs`,
+        );
+        latest = await db.query<{ created_at: string | null }>(
+          `SELECT created_at FROM events ORDER BY created_at DESC, id DESC LIMIT 1`,
+        );
+      } catch (err) {
+        if (!String((err as Error).message).includes("does not exist")) {
+          throw err;
+        }
         return {
           engine: "pglite",
           dbPath,
@@ -829,29 +940,11 @@ async function buildProductKernelReport(): Promise<DoctorReport["productKernel"]
           latestEventAt: null,
         };
       }
-      const applied = await db.query<{ count: number }>(
-        `SELECT COUNT(*)::int AS count FROM schema_migrations`,
-      );
-      const counts = await db.query<{
-        orgs: number;
-        projects: number;
-        documents: number;
-        tasks: number;
-        agent_runs: number;
-      }>(
-        `SELECT (SELECT COUNT(*)::int FROM orgs) AS orgs,
-                (SELECT COUNT(*)::int FROM projects) AS projects,
-                (SELECT COUNT(*)::int FROM documents) AS documents,
-                (SELECT COUNT(*)::int FROM tasks) AS tasks,
-                (SELECT COUNT(*)::int FROM agent_runs) AS agent_runs`,
-      );
-      const latest = await db.query<{ created_at: string | null }>(
-        `SELECT created_at FROM events ORDER BY created_at DESC, id DESC LIMIT 1`,
-      );
+
       return {
         engine: "pglite",
         dbPath,
-        schemaApplied: applied[0]?.count ?? 0,
+        schemaApplied,
         rows: {
           orgs: counts[0]?.orgs ?? 0,
           projects: counts[0]?.projects ?? 0,
@@ -874,6 +967,11 @@ async function buildProductKernelReport(): Promise<DoctorReport["productKernel"]
       error: (err as Error).message,
     };
   }
+}
+
+async function countProductKernelMigrationFiles(): Promise<number> {
+  const migrationsDir = new URL("../product-kernel/db/migrations", import.meta.url).pathname;
+  return (await readdir(migrationsDir)).filter((name) => name.endsWith(".sql")).length;
 }
 
 function printHumanFormat(report: DoctorReport, home: string): void {

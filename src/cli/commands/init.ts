@@ -5,11 +5,13 @@ import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { Container } from "@needle-di/core";
 import { MikroORM, type Options } from "@mikro-orm/postgresql";
+import { Migrator } from "@mikro-orm/migrations";
 
 import { PGliteKyselyDialect } from "../../db/PGliteKyselyDriver.ts";
 import { registerDbBindings } from "../../db/db.module.ts";
 import { Org } from "../../db/entities/auth/Org.ts";
 import { createOrmConfig } from "../../db/mikro-orm.config.ts";
+import { MigratorService } from "../../db/migrator-service.ts";
 import { SeedService } from "../../db/seed.ts";
 import { registerSeedBindings } from "../../db/seed.module.ts";
 
@@ -35,8 +37,13 @@ async function openLocalOrm(): Promise<{ orm: MikroORM; pglite: PGlite }> {
   const orm = await MikroORM.init({
     ...config,
     driverOptions: dialect,
+    extensions: [Migrator],
+    migrations: {
+      ...config.migrations,
+      transactional: false,
+      allOrNothing: false,
+    },
   });
-  await orm.schema.update();
   return { orm, pglite };
 }
 
@@ -46,6 +53,8 @@ export async function run(_argv: readonly string[] = []): Promise<void> {
     const container = new Container();
     registerDbBindings(container, orm);
     registerSeedBindings(container);
+
+    await container.get(MigratorService).migrate();
 
     const orgRepo = orm.em.fork().getRepository(Org);
     if (await orgRepo.count() === 0) {

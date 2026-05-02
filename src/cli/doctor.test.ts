@@ -678,6 +678,33 @@ describe("doctor --json product kernel section", () => {
   });
 });
 
+describe("doctor --json db migration checks", () => {
+  test("reports migration checks through repository state after fulcrum init", async () => {
+    const home = join(TMP, "db-migration-checks-after-init");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    const initProc = Bun.spawn(["bun", "src/index.ts", "init"], {
+      cwd: process.cwd(),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, HOME: home, FULCRUM_HOME: fulcrumHome },
+    });
+    await new Response(initProc.stdout).text();
+    const initStderr = await new Response(initProc.stderr).text();
+    expect(await initProc.exited).toBe(0);
+    expect(initStderr).toBe("");
+
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const db = report["db"] as Record<string, unknown>;
+    expect(db).toBeDefined();
+    expect(db["engine"]).toBe("pglite");
+    const checks = db["checks"] as Array<Record<string, unknown>>;
+    expect(checks.map((check) => check["check"])).toContain("db.migrationVersion");
+    expect(checks.map((check) => check["check"])).toContain("db.canRunOnCurrentBinary");
+    expect(checks.every((check) => check["status"] === "pass")).toBe(true);
+  });
+});
+
 describe("doctor product-kernel verdict (issue 19)", () => {
   test("forces verdict=error when product DB cannot open", async () => {
     const home = join(TMP, "product-kernel-broken");
