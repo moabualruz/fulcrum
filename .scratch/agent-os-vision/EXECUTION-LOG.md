@@ -973,8 +973,8 @@ RED failure (lines 1-5):
   error: 'RulesEngine' is not exported from 'src/router/rules-engine.ts'
   (import errors before any test runs; all 3 tests fail)
 
-GREEN command: pending orchestrator rerun after branch integration
-GREEN pass count: pending
+GREEN command: bun test --conditions=svelte src/router/rules-engine-hot-reload.test.ts
+GREEN pass count: 3 pass, 0 fail, 5 expect() calls
 
 Files touched:
   - src/router/event-bus.ts (new) — RoutingEventBus with onRulesChanged/emitRulesChanged/listenerCount
@@ -1017,14 +1017,13 @@ RED:
 GREEN:
 [
   command: bun test tests/symphony/orchestrator-claim-lock.test.ts,
-  expected: 7 tests pass across 2 describe blocks — claim-lock state machine + tRPC procedure,
-  note: pending user approval to run; tsc type check pending same
+  integrated result: 6 pass, 0 fail, 13 expect() calls after schema fix 86e30355
 ]
 Decisions flagged:
 [
   claimedBy column: issue spec says { claimedBy: instanceId } in nativeUpdate; added claimed_by varchar(255) nullable to agent_runs via new migration; this is an unambiguous implementation of the spec requirement and does not conflict with any owned file
 ]
-Status: implemented (tests pending user approval to execute)
+Status: implemented; integrated focused test passed
 
 ## 2026-05-02T11:02:00Z — codex (implemented P6#01 tasks schema extension)
 
@@ -1046,7 +1045,7 @@ TDD:
 [
   RED: bun test ./src/db/tasks-schema-extension.test.ts FAIL — missing DependenciesSchema/TaskStatus exports and task columns; 0 pass, 5 fail,
   GREEN: bun test ./src/db/tasks-schema-extension.test.ts PASS — 5 pass, 0 fail, 42 expect() calls,
-  VERIFY: bun run ci PASS — 12/12 stages; 1646 pass, 2 skip, 0 fail, 5054 expect() calls; web:check has 2 existing Svelte warnings
+  VERIFY: bun test --conditions=svelte src/db/tasks-schema-extension.test.ts PASS — 5 pass, 0 fail, 42 expect() calls; full integrated CI pending
 ]
 Decision flagged:
 [
