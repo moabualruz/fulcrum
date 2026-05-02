@@ -415,8 +415,12 @@ describe("Docs FK deletion behavior", () => {
       await em.flush();
       em.clear();
 
-      const found = await em.findOneOrFail(Document, child.id, { populate: ["parent"] });
-      expect(found.parent).toBeNull();
+      const [found] = await rows<{ parent_id: string | null }>(
+        db.orm,
+        `select parent_id from "documents" where "id" = ?`,
+        [child.id],
+      );
+      expect(found?.parent_id).toBeNull();
     } finally {
       await db.close();
     }
