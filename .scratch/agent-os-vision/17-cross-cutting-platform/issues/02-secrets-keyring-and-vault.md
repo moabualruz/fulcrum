@@ -1,8 +1,9 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: 17-cross-cutting-platform
 Blocked-by: [17-cross-cutting-platform/issues/01-schema-migration-credentials-telemetry-errors-experiments.md]
+Owner: claude-worker-p17-secrets-vault
 PRD: .scratch/agent-os-vision/prds/17-cross-cutting-platform.md
 Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Cross-Cutting Requirements section)
 Decisions: [Q-cross-cut, B9]

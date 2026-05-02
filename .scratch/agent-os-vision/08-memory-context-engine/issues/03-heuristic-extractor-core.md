@@ -1,8 +1,9 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [01-schema-migration-core.md]
+Owner: codex-worker-p8-heuristic-extractor
 PRD: .scratch/agent-os-vision/prds/08-memory-context-engine.md
 Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 8 section)
 Decisions: [Q16, C1]

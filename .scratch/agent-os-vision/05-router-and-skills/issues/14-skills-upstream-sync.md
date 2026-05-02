@@ -1,8 +1,9 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: 05-router-and-skills
 Blocked-by: 13-skills-loader-per-agent-install
+Owner: codex-worker-p5-upstream-sync
 ---
 
 # Skills upstream sync — fetch, auto-merge clean, conflict to lock file

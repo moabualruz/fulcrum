@@ -1,8 +1,9 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: 02-inference-sidecar
 Blocked-by: 03-inference-cache-schema, 04-trpc-procedures-and-health-surface
+Owner: codex-worker-p2-models-registry
 ---
 
 # Models registry — `fulcrum inference models pull|list|rm` + auto-download on first use

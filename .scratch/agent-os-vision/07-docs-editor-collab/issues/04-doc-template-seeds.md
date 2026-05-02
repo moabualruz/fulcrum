@@ -1,8 +1,9 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: 07-docs-editor-collab
 Blocked-by: [01-docs-schema-foundation.md]
+Owner: claude-worker-p7-template-seeds
 PRD: .scratch/agent-os-vision/prds/07-docs-editor-collab.md
 Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 7 section)
 Decisions: [C1, Q11]

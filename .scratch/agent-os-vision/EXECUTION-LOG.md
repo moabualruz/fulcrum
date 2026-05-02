@@ -1441,6 +1441,64 @@ Precomputed verification:
 
 Result: GATE_DISPATCH_READY.
 
+## 2026-05-02T17:35:00Z — codex-orchestrator (current tail checkpoint)
+
+Capacity:
+[
+  claude_impl=3/6,
+  codex_impl=3/6,
+  claude_review=1/6,
+  codex_review=0/6
+]
+
+Tracker:
+[
+  implementation wave claimed at 2026-05-02T17:34:00Z entry,
+  claimed issues: P2#06, P3#10, P5#14, P7#04, P8#03, P17#02,
+  all six issue files now in-progress with worker owners
+]
+
+Result: IMPLEMENTATION_DISPATCH_READY.
+
+## 2026-05-02T17:34:00Z — codex-orchestrator (implementation wave claimed)
+
+Capacity:
+[
+  claude_impl=3/6,
+  codex_impl=3/6,
+  claude_review=1/6,
+  codex_review=0/6
+]
+
+Queue fill:
+[
+  02-inference-sidecar/issues/06-models-registry-pull-list-rm.md,
+  03-symphony-orchestration/issues/10-retry-backoff-stall-detection.md,
+  05-router-and-skills/issues/14-skills-upstream-sync.md,
+  07-docs-editor-collab/issues/04-doc-template-seeds.md,
+  08-memory-context-engine/issues/03-heuristic-extractor-core.md,
+  17-cross-cutting-platform/issues/02-secrets-keyring-and-vault.md
+]
+
+Implementers:
+[
+  codex-worker-p2-models-registry: codex-high,
+  claude-worker-p3-retry-stall: claude-sonnet-medium,
+  codex-worker-p5-upstream-sync: codex-medium,
+  claude-worker-p7-template-seeds: claude-sonnet-medium,
+  codex-worker-p8-heuristic-extractor: codex-medium,
+  claude-worker-p17-secrets-vault: claude-opus-high
+]
+
+Underfilled reason:
+[
+  P1 foundation gate still running,
+  remaining dispatchable schema lanes likely collide on migration/entity ordering,
+  P15#01 recovery waits for P1/P15 overlap review to avoid TUI auth churn
+]
+
+Result: CLAIMED.
+
 ## 2026-05-02T17:30:00Z — codex-orchestrator (P1 integration gate queued)
 
 Capacity:

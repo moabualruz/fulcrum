@@ -1,8 +1,9 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: 03-symphony-orchestration
 Blocked-by: 03-schema-agent-runs-symphony-columns
+Owner: claude-worker-p3-retry-stall
 ---
 
 # Retry/backoff formula + stall detection engine
