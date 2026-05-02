@@ -11,6 +11,7 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 import type { DocType } from "../db/entities/docs/enums.ts";
 import type { DocTemplateRow, DocTemplateService } from "./doc-template-service.ts";
+import { builtinTemplateRow, builtinTemplateRows } from "./template-seeds.ts";
 
 export class EntityManagerDocTemplateService implements DocTemplateService {
   constructor(private readonly em: EntityManager) {}
@@ -19,14 +20,13 @@ export class EntityManagerDocTemplateService implements DocTemplateService {
     const { DocTemplate } = await import("../db/entities/docs/DocTemplate.ts");
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: Record<string, unknown> = { org: orgId } as any;
-    if (projectId !== undefined) {
-      where["projectId"] = projectId;
-    }
+    const where: Record<string, unknown> = projectId
+      ? { org: orgId, $or: [{ projectId }, { projectId: null }] } as any
+      : { org: orgId, projectId: null } as any;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows = await this.em.find(DocTemplate, where as any, { orderBy: { docType: "ASC" } });
-    return rows.map(toRow);
+    return withBuiltInDefaults(orgId, rows.map(toRow));
   }
 
   async resolve(
@@ -49,8 +49,30 @@ export class EntityManagerDocTemplateService implements DocTemplateService {
       org: orgId, projectId: null, docType, isDefault: true,
     } as any);
 
-    return fallback ? toRow(fallback) : null;
+    return fallback ? toRow(fallback) : builtinTemplateRow(orgId, docType);
   }
+}
+
+function withBuiltInDefaults(
+  orgId: string,
+  rows: DocTemplateRow[],
+): DocTemplateRow[] {
+  const dbDefaultDocTypes = new Set(
+    rows
+      .filter((row) => row.projectId === null && row.isDefault)
+      .map((row) => row.docType),
+  );
+  const builtIns = builtinTemplateRows(orgId).filter(
+    (row) => !dbDefaultDocTypes.has(row.docType),
+  );
+
+  return [...rows, ...builtIns].sort((a, b) => {
+    const projectRank = Number(a.projectId !== null) - Number(b.projectId !== null);
+    if (projectRank !== 0) return projectRank;
+    const docTypeRank = a.docType.localeCompare(b.docType);
+    if (docTypeRank !== 0) return docTypeRank;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 function toRow(

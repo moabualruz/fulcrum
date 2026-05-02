@@ -520,7 +520,11 @@ export class TuiApp {
           void this._renderCurrentScreen();
         },
       });
-      await this.newDocScreen.load();
+      try {
+        await this.newDocScreen.load();
+      } catch (error) {
+        this.newDocScreen.setLoadError(error);
+      }
     } else {
       // docs caller not available — render placeholder
       this.newDocScreen = null;

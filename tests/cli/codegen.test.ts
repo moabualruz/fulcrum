@@ -77,6 +77,23 @@ describe("CLI codegen", () => {
     }
   });
 
+  test("committed generated docs command matches fresh codegen output", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "fulcrum-codegen-docs-"));
+    try {
+      await generateCliFiles({
+        routerPath: join(root, "src/server/trpc/router.ts"),
+        outDir: scratch,
+        useAst: true,
+      });
+
+      const generated = await readFile(join(scratch, "docs.ts"), "utf8");
+      const committed = await readFile(join(root, "src/cli/generated/docs.ts"), "utf8");
+      expect(committed).toBe(generated);
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
   test("extracts Zod description strings into generated command descriptions and flag help", async () => {
     const scratch = await mkdtemp(join(tmpdir(), "fulcrum-codegen-fixture-"));
     try {

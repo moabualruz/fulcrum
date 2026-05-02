@@ -32,14 +32,14 @@ export interface DocTemplateService {
   /**
    * List all templates for an org.
    * If projectId is supplied, returns project-specific + org-default templates.
-   * If omitted, returns all templates for the org.
+   * If omitted, returns org-default templates.
    */
   list(orgId: string, projectId?: string | null): Promise<DocTemplateRow[]>;
 
   /**
    * Resolve the best template for a given org + project + docType.
    * Project-specific template (if any) takes precedence over org default.
-   * Returns null if no template exists.
+   * Implementations may return immutable built-in defaults when no DB row exists.
    */
   resolve(
     orgId: string,

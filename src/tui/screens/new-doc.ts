@@ -39,6 +39,7 @@ export class NewDocScreen {
   private typeCursor = 0;
   private selectedType: string = DOC_TYPES[0];
   private bodyBuffer = "";
+  private loadError: string | null = null;
 
   constructor(
     private readonly renderer: Renderer,
@@ -46,6 +47,7 @@ export class NewDocScreen {
   ) {}
 
   async load(): Promise<void> {
+    this.loadError = null;
     const rows = await this.opts.caller.templates.list({} as Record<string, never>);
     for (const row of rows) {
       this.templates.set(row.docType, row);
@@ -55,6 +57,16 @@ export class NewDocScreen {
     this.typeCursor = 0;
   }
 
+  setLoadError(error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    this.loadError = message || "Unknown template load error";
+    this.templates.clear();
+    this.phase = "pick-type";
+    this.typeCursor = 0;
+    this.selectedType = DOC_TYPES[0];
+    this.bodyBuffer = "";
+  }
+
   render(): void {
     const r = this.renderer;
     r.writeln();
@@ -62,7 +74,13 @@ export class NewDocScreen {
     r.separator();
     r.writeln();
 
-    if (this.phase === "pick-type") {
+    if (this.loadError) {
+      r.writeln(c.yellow("  Template load failed"));
+      r.writeln();
+      r.writeln(`  ${this.loadError}`);
+      r.writeln();
+      r.writeln(c.dim("  q back"));
+    } else if (this.phase === "pick-type") {
       r.writeln(c.dim("  Select doc type:"));
       r.writeln();
       for (let i = 0; i < DOC_TYPES.length; i++) {
@@ -97,6 +115,8 @@ export class NewDocScreen {
       this.opts.onExit?.();
       return true;
     }
+
+    if (this.loadError) return false;
 
     if (this.phase === "pick-type") {
       if (key === "j" || key === "\x1b[B") {

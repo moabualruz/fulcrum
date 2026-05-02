@@ -3,14 +3,15 @@
  *
  * These are the canonical bodies/frontmatter for the 9 built-in doc_types.
  * Used by:
- *   - Migration20260502100000_doc_templates_seed (seed migration)
- *   - Web docs/new load() (pre-populate the new-doc wizard without a DB round-trip)
+ *   - EntityManagerDocTemplateService fallback rows while P1 migration gate is active.
+ *   - Web docs/new load() pre-population without requiring DB seed rows.
  *
  * Frontmatter keys match the required fields in the Zod schemas in frontmatter-schemas.ts.
  * Body templates are plain markdown strings (not TipTap JSON).
  */
 
 import type { DocType } from "../db/entities/docs/enums.ts";
+import type { DocTemplateRow } from "./doc-template-service.ts";
 
 export interface TemplateSeed {
   docType: DocType;
@@ -99,3 +100,26 @@ export const TEMPLATE_SEEDS: TemplateSeed[] = [
 export const TEMPLATE_BODY_MAP: Record<DocType, string> = Object.fromEntries(
   TEMPLATE_SEEDS.map((s) => [s.docType, s.bodyTemplate]),
 ) as Record<DocType, string>;
+
+const BUILTIN_TEMPLATE_CREATED_AT = "2026-05-02T00:00:00.000Z";
+
+export function builtinTemplateRows(orgId: string): DocTemplateRow[] {
+  return TEMPLATE_SEEDS.map((seed) => ({
+    id: `builtin-doc-template-${seed.docType}`,
+    orgId,
+    projectId: null,
+    docType: seed.docType,
+    name: seed.name,
+    frontmatterTemplate: structuredClone(seed.frontmatterTemplate),
+    bodyTemplate: seed.bodyTemplate,
+    isDefault: true,
+    createdAt: new Date(BUILTIN_TEMPLATE_CREATED_AT),
+  }));
+}
+
+export function builtinTemplateRow(
+  orgId: string,
+  docType: DocType,
+): DocTemplateRow | null {
+  return builtinTemplateRows(orgId).find((row) => row.docType === docType) ?? null;
+}

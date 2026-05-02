@@ -22,6 +22,10 @@ import { t } from "../../src/trpc/trpc.ts";
 import { FlagRegistry } from "../../src/flags/registry.ts";
 import { CasbinRuleRepository } from "../../src/db/repositories/flags/CasbinRuleRepository.ts";
 import { protectedProcedure } from "../../src/trpc/middleware.ts";
+import {
+  DOC_TEMPLATE_SERVICE_TOKEN,
+  type DocTemplateService,
+} from "../../src/docs/doc-template-service.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 const LOCAL_ORG_ID = "00000000-0000-0000-0000-000000000001";
@@ -329,6 +333,48 @@ describe("assertPermission middleware", () => {
     expect(await caller.orchestration.getWorkspacePath()).toBe("getWorkspacePath-ok");
     expect(await caller.orchestration.renderPromptPreview()).toBe("renderPromptPreview-ok");
     expect(await caller.orchestration.claimRun()).toBe("claimRun-ok");
+  });
+
+  it("maps docs.templates list and resolve leaves when casbin policies are enabled", async () => {
+    const templateService: DocTemplateService = {
+      list: async () => [
+        {
+          id: "tmpl-adr",
+          orgId: LOCAL_ORG_ID,
+          projectId: null,
+          docType: "adr",
+          name: "Default adr",
+          frontmatterTemplate: {},
+          bodyTemplate: "## Context",
+          isDefault: true,
+          createdAt: new Date("2026-01-01T00:00:00Z"),
+        },
+      ],
+      resolve: async () => ({
+        id: "tmpl-adr",
+        orgId: LOCAL_ORG_ID,
+        projectId: null,
+        docType: "adr",
+        name: "Default adr",
+        frontmatterTemplate: {},
+        bodyTemplate: "## Context",
+        isDefault: true,
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+      }),
+    };
+    const container = casbinContainer([
+      { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "docs.templates", v3: "list" },
+      { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "docs.templates", v3: "resolve" },
+    ]);
+    container.bind({
+      provide: DOC_TEMPLATE_SERVICE_TOKEN,
+      useValue: templateService,
+    });
+    const caller = authenticatedCallerWithContainer(container);
+
+    await expect(caller.docs.templates.list({})).resolves.toHaveLength(1);
+    await expect(caller.docs.templates.resolve({ docType: "adr", projectId: null }))
+      .resolves.toMatchObject({ id: "tmpl-adr" });
   });
 
   it("fails closed when casbin is enabled for unmapped protected procedure leaf", async () => {
