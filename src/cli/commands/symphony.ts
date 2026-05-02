@@ -124,7 +124,7 @@ async function runRunsShow(
   const jsonMode = argv.includes("--json");
   const verbose = argv.includes("--verbose");
 
-  if (!runId || runId.startsWith("-")) {
+  if (!runId) {
     printErr("fulcrum symphony runs show: missing <runId>");
     exit(2);
     return;

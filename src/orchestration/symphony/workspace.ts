@@ -14,6 +14,7 @@ import { Org } from "../../db/entities/auth/Org.ts";
 import type { AgentRun } from "../../db/entities/orchestration/AgentRun.ts";
 
 const MAX_WORKSPACE_KEY_LENGTH = 128;
+const MAX_WORKSPACE_KEY_COLLISION_ATTEMPTS = 1_000;
 const WORKSPACE_SAFE_CHARS = /[^A-Za-z0-9._-]/g;
 const FulcrumUuidSchema = z.string().regex(
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
@@ -66,13 +67,15 @@ export function sanitizeWorkspaceKey(
   const existingKeys = opts.existingKeys;
   if (!existingKeys?.has(base)) return base;
 
-  let attempt = 1;
-  while (true) {
+  for (let attempt = 1; attempt <= MAX_WORKSPACE_KEY_COLLISION_ATTEMPTS; attempt += 1) {
     const suffix = attempt === 1 ? `_${fallback}` : `_${fallback}_${attempt}`;
     const key = `${base.slice(0, MAX_WORKSPACE_KEY_LENGTH - suffix.length)}${suffix}`;
     if (!existingKeys.has(key)) return key;
-    attempt += 1;
   }
+
+  throw new Error(
+    `Unable to allocate unique workspace key after ${MAX_WORKSPACE_KEY_COLLISION_ATTEMPTS} attempts`,
+  );
 }
 
 export async function createWorkspace(

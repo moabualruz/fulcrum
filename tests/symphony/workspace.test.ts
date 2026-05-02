@@ -195,6 +195,10 @@ describe("sanitizeWorkspaceKey", () => {
     );
   });
 
+  it("uses the task id fallback when a title sanitizes to empty", () => {
+    expect(sanitizeWorkspaceKey("🚀 #!!", TASK_ID)).toBe("12345678");
+  });
+
   it("appends the task id suffix when a sanitized key collides", () => {
     expect(
       sanitizeWorkspaceKey("Duplicate", TASK_ID, {
@@ -209,6 +213,32 @@ describe("sanitizeWorkspaceKey", () => {
         existingKeys: new Set(["Duplicate", "Duplicate_12345678"]),
       }),
     ).toBe("Duplicate_12345678_2");
+  });
+
+  it("keeps suffixing past the second collision", () => {
+    expect(
+      sanitizeWorkspaceKey("Duplicate", TASK_ID, {
+        existingKeys: new Set([
+          "Duplicate",
+          "Duplicate_12345678",
+          "Duplicate_12345678_2",
+        ]),
+      }),
+    ).toBe("Duplicate_12345678_3");
+  });
+
+  it("throws instead of looping forever when every collision candidate is taken", () => {
+    const existingKeys = new Set(["Duplicate"]);
+    for (let attempt = 1; attempt <= 1_000; attempt += 1) {
+      existingKeys.add(
+        attempt === 1
+          ? "Duplicate_12345678"
+          : `Duplicate_12345678_${attempt}`,
+      );
+    }
+
+    expect(() => sanitizeWorkspaceKey("Duplicate", TASK_ID, { existingKeys }))
+      .toThrow(/Unable to allocate unique workspace key/);
   });
 
   it("keeps collision-suffixed keys within 128 characters", () => {
