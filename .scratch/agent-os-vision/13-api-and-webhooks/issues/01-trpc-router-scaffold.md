@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: in-progress
+Owner: codex-orchestrator
 Triage: AFK
 Pillar: api-and-webhooks
 Blocked-by: []
