@@ -1453,6 +1453,21 @@ Warnings:
 
 Result: IMPLEMENTED_AND_VERIFIED.
 
+## 2026-05-02T17:20:25Z — human (P7 TipTap HITL approved)
+
+Decision:
+[
+  approved `svelte-tiptap@3.0.1` + `@tiptap/*@3.22.5` as the Pillar 7 editor binding path,
+  no Tipex fallback and no ADR required
+]
+
+Tracker:
+[
+  07-docs-editor-collab/issues/02-tiptap-svelte-binding-spike.md -> completed
+]
+
+Result: HITL_APPROVED.
+
 ## 2026-05-02T15:56:13Z — codex-orchestrator (resume wave verification + gate fallout)
 
 Capacity:

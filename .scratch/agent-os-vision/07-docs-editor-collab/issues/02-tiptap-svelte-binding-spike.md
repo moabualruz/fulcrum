@@ -1,8 +1,10 @@
 ---
-Status: needs-human
+Status: completed
 Triage: HITL
 Pillar: 07-docs-editor-collab
 Owner: codex-worker-tiptap-spike
+HumanApprovedAt: 2026-05-02T17:20:25Z
+HumanApproval: Approved svelte-tiptap@3.0.1 + @tiptap/*@3.22.5 compat verdict; no Tipex fallback or ADR required.
 Blocked-by: []
 PRD: .scratch/agent-os-vision/prds/07-docs-editor-collab.md
 Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 7 section)
