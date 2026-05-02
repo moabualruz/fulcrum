@@ -72,6 +72,27 @@ describe("autoAssign", () => {
     });
   });
 
+  it("ignores a blank explicit override and falls through to matching rules", async () => {
+    const rule = createRule({
+      name: "bugs",
+      actionAgent: "codex",
+      conditionsJson: BUG_CONDITIONS,
+    });
+
+    await expect(
+      autoAssign({
+        agentOverride: "",
+        taskFacts: TASK_FACTS,
+        orgId: DEFAULT_ORG_ID,
+      }),
+    ).resolves.toEqual({
+      ruleId: rule.id,
+      source: "rule",
+      agent: "codex",
+      confidence: 1.0,
+    });
+  });
+
   it("returns a rule decision with the matched rule id", async () => {
     const rule = createRule({
       name: "bugs",
@@ -101,6 +122,14 @@ describe("autoAssign", () => {
     await autoAssign({ taskFacts: TASK_FACTS, orgId: DEFAULT_ORG_ID, dryRun: true });
 
     expect(recordCalls).toBe(0);
+  });
+
+  it("records routing decisions outside dry runs", async () => {
+    createRule({ name: "bugs", actionAgent: "codex", conditionsJson: BUG_CONDITIONS });
+
+    await autoAssign({ taskFacts: TASK_FACTS, orgId: DEFAULT_ORG_ID });
+
+    expect(recordCalls).toBe(1);
   });
 
   function repository(): RoutingRuleRepository {

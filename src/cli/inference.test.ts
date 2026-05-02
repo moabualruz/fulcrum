@@ -94,6 +94,25 @@ describe("fulcrum inference CLI", () => {
     });
   });
 
+  test("embed without --json emits a concise human summary", async () => {
+    const cap = capture();
+
+    await run(["embed", "hello"], {
+      ...cap.opts,
+      caller: {
+        inference: {
+          health: async () => health,
+          embed: async () => ({ vectors: [[0.1, 0.2]], model: "BAAI/bge-small-en-v1.5", cached: false }),
+          generate: async () => ({ text: "Paris", model: "Qwen2.5-0.5B-Instruct", tokens: 8 }),
+        },
+      },
+    });
+
+    expect(cap.lines).toEqual([
+      "embedding model=BAAI/bge-small-en-v1.5 vectors=1 dims=2 cached=false",
+    ]);
+  });
+
   test("generate --json emits text, model, and token count from tRPC caller", async () => {
     const cap = capture();
 
@@ -113,6 +132,25 @@ describe("fulcrum inference CLI", () => {
       model: "Qwen2.5-0.5B-Instruct",
       tokens: 8,
     });
+  });
+
+  test("generate rejects malformed caller results instead of printing undefined", async () => {
+    const cap = capture();
+
+    await run(["generate", "The capital of France is"], {
+      ...cap.opts,
+      caller: {
+        inference: {
+          health: async () => health,
+          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false }),
+          generate: async () => ({ model: "broken" }),
+        },
+      },
+    });
+
+    expect(cap.exitCode).toBe(1);
+    expect(cap.lines).toEqual([]);
+    expect(cap.errors.join("\n")).toContain("fulcrum inference generate:");
   });
 
   test("stop confirms socket removal", async () => {

@@ -29,5 +29,5 @@ export class SkillVersion {
   version!: string;
 
   @Property({ type: "string", fieldName: "hash_verified", nullable: true })
-  hashVerified?: string;
+  hashVerified: string | null = null;
 }

@@ -17,30 +17,36 @@ import {
 } from "../../../inference/protocol.ts";
 import { FlagRegistry } from "../../../flags/registry.ts";
 import { t, publicProcedure } from "../../../trpc/trpc.ts";
+import { protectedProcedure } from "../../../trpc/middleware.ts";
 import type { TRPCContext } from "../../../trpc/context.ts";
 
+const MAX_TEXT_ITEMS = 64;
+const MAX_TEXT_CHARS = 20_000;
+const MAX_LABELS = 100;
+const MAX_MODEL_ID_CHARS = 200;
+
 const EmbedInputSchema = z.object({
-  texts: z.array(z.string().min(1)).min(1),
-  model: z.string().optional(),
+  texts: z.array(z.string().min(1).max(MAX_TEXT_CHARS)).min(1).max(MAX_TEXT_ITEMS),
+  model: z.string().max(MAX_MODEL_ID_CHARS).optional(),
 });
 
 const GenerateInputSchema = z.object({
-  prompt: z.string().min(1),
+  prompt: z.string().min(1).max(MAX_TEXT_CHARS),
   options: GenerateOptionsSchema,
 });
 
 const ClassifyInputSchema = z.object({
-  text: z.string().min(1),
-  labels: z.array(z.string().min(1)).min(1),
+  text: z.string().min(1).max(MAX_TEXT_CHARS),
+  labels: z.array(z.string().min(1).max(200)).min(1).max(MAX_LABELS),
 });
 
 const TokenizeInputSchema = z.object({
-  text: z.string(),
-  model: z.string().optional(),
+  text: z.string().max(MAX_TEXT_CHARS),
+  model: z.string().max(MAX_MODEL_ID_CHARS).optional(),
 });
 
 const ModelInputSchema = z.object({
-  modelId: z.string().min(1),
+  modelId: z.string().min(1).max(MAX_MODEL_ID_CHARS),
 });
 
 function resolveClient(ctx: TRPCContext): InferenceClient {
@@ -112,22 +118,22 @@ export const inferenceRouter = t.router({
     .output(HealthResultSchema)
     .query(async ({ ctx }) => resolveClient(ctx).health()),
 
-  embed: publicProcedure
+  embed: protectedProcedure
     .input(EmbedInputSchema)
     .output(EmbedResultSchema)
     .query(async ({ ctx, input }) => resolveClient(ctx).embed(input.texts, { model: input.model })),
 
-  generate: publicProcedure
+  generate: protectedProcedure
     .input(GenerateInputSchema)
     .output(GenerateResultSchema)
     .query(async ({ ctx, input }) => resolveClient(ctx).generate(input.prompt, input.options)),
 
-  classify: publicProcedure
+  classify: protectedProcedure
     .input(ClassifyInputSchema)
     .output(ClassifyResultSchema)
     .query(async ({ ctx, input }) => resolveClient(ctx).classify(input.text, input.labels)),
 
-  tokenize: publicProcedure
+  tokenize: protectedProcedure
     .input(TokenizeInputSchema)
     .output(TokenizeResultSchema)
     .query(async ({ ctx, input }) => resolveClient(ctx).tokenize(input.text, input.model)),
@@ -137,32 +143,37 @@ export const inferenceRouter = t.router({
       .output(InferenceModelSchema.array())
       .query(async ({ ctx }) => resolveClient(ctx).listModels()),
 
-    pull: publicProcedure
+    pull: protectedProcedure
       .input(ModelInputSchema)
       .subscription(({ ctx, input }) => {
         return observable<ModelPullProgress>((emit) => {
           const client = resolveClient(ctx);
           let cancelled = false;
+          let iterator: AsyncIterator<ModelPullProgress> | null = null;
 
           void (async () => {
             try {
-              for await (const event of client.pullModel(input.modelId)) {
-                if (cancelled) return;
-                emit.next(ModelPullProgressSchema.parse(event));
+              iterator = client.pullModel(input.modelId)[Symbol.asyncIterator]();
+              while (!cancelled) {
+                const event = await iterator.next();
+                if (event.done) break;
+                if (!cancelled) emit.next(ModelPullProgressSchema.parse(event.value));
               }
-              emit.complete();
+              if (!cancelled) emit.complete();
             } catch (error) {
+              if (cancelled) return;
               emit.error(toTrpcError(error));
             }
           })();
 
           return () => {
             cancelled = true;
+            void iterator?.return?.();
           };
         });
       }),
 
-    rm: publicProcedure
+    rm: protectedProcedure
       .input(ModelInputSchema)
       .output(z.object({ ok: z.boolean() }))
       .mutation(async ({ ctx, input }) => resolveClient(ctx).rmModel(input.modelId)),
@@ -172,9 +183,8 @@ export const inferenceRouter = t.router({
     list: publicProcedure
       .output(BackendSchema.array())
       .query(async ({ ctx }) => {
-        const client = resolveClient(ctx);
-        if (client.listBackends !== InferenceClient.prototype.listBackends) {
-          return client.listBackends();
+        if (ctx.container?.has(InferenceClient)) {
+          return ctx.container.get(InferenceClient).listBackends();
         }
         return defaultBackends(ctx);
       }),

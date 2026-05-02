@@ -1,5 +1,6 @@
 import { Container } from "@needle-di/core";
 import { describe, expect, test } from "bun:test";
+import type { Session } from "better-auth";
 
 import { InferenceClient } from "../../../../inference/client.ts";
 import type {
@@ -72,12 +73,25 @@ function makeContainer(): Container {
   return container;
 }
 
-function createCaller(container = makeContainer()) {
+function mockSession(): Session {
+  return {
+    id: "session_1",
+    userId: "user_1",
+    token: "token_1",
+    expiresAt: new Date(Date.now() + 60_000),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ipAddress: null,
+    userAgent: null,
+  } as Session;
+}
+
+function createCaller(container = makeContainer(), authenticated = true) {
   const factory = t.createCallerFactory(appRouter);
   return factory(createContext({
-    session: null,
-    orgId: "00000000-0000-0000-0000-000000000001",
-    userId: "user_1",
+    session: authenticated ? mockSession() : null,
+    orgId: authenticated ? "00000000-0000-0000-0000-000000000001" : null,
+    userId: authenticated ? "user_1" : null,
     em: null,
     container,
   }));
@@ -116,6 +130,22 @@ async function collectPullEvents(subscription: unknown): Promise<ModelPullProgre
 }
 
 describe("inference tRPC router", () => {
+  test("public health/model discovery remains unauthenticated while inference operations require auth", async () => {
+    const caller = createCaller(makeContainer(), false);
+
+    await expect(caller.inference.health()).resolves.toEqual(health);
+    await expect(caller.inference.models.list()).resolves.toHaveLength(1);
+    await expect(caller.inference.backends.list()).resolves.toHaveLength(2);
+    await expect(caller.inference.embed({ texts: ["test"] })).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    });
+    await expect(caller.inference.generate({ prompt: "Hello" })).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    });
+    await expect(caller.inference.models.rm({ modelId: "BAAI/bge-small-en-v1.5" }))
+      .rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
   test("health returns typed HealthResult and embed returns number vectors", async () => {
     const caller = createCaller();
 

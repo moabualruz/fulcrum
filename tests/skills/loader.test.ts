@@ -21,8 +21,10 @@ import {
   createTestOrm,
   type TestOrm,
 } from "../../src/test-utils/index.ts";
+import { Org } from "../../src/db/entities/auth/Org.ts";
 import {
   FulcrumSkill,
+  SkillSource,
   SkillVersion,
 } from "../../src/db/entities/skills/index.ts";
 import {
@@ -161,6 +163,64 @@ describe("installSkill", () => {
     );
 
     expect((await latestVersion("tamper"))?.hashVerified).toBeNull();
+  });
+
+  it("records a null DB hash when a first install fails during agent copy", async () => {
+    const blockedHome = join(scratch, "blocked-home");
+    await writeFile(blockedHome, "not a directory", "utf8");
+    process.env["HOME"] = blockedHome;
+    const skillPath = await writeSkill("copy-fail", {
+      name: "copy-fail",
+      version: "1.0.0",
+      agents: ["codex"],
+      triggers: ["copy-fail"],
+    });
+
+    await expect(installSkill(skillPath, testDb.seed.orgId)).rejects.toThrow();
+
+    expect((await latestVersion("copy-fail"))?.hashVerified).toBeNull();
+  });
+
+  it("updates existing skill source to local on install", async () => {
+    const em = testDb.orm.em.fork();
+    em.create(FulcrumSkill, {
+      org: em.getReference(Org, testDb.seed.orgId),
+      name: "source",
+      slug: "source",
+      source: SkillSource.Upstream,
+      enabledAgents: ["codex"],
+    });
+    await em.flush();
+    const skillPath = await writeSkill("source", {
+      name: "source",
+      version: "1.0.0",
+      agents: ["codex"],
+      triggers: ["source"],
+    });
+
+    await installSkill(skillPath, testDb.seed.orgId);
+
+    const reloaded = await testDb.orm.em.fork().findOneOrFail(FulcrumSkill, {
+      org: testDb.seed.orgId,
+      slug: "source",
+    });
+    expect(reloaded.source).toBe(SkillSource.Local);
+  });
+
+  it("rejects skill names that do not produce a filesystem-safe slug", async () => {
+    const skillPath = await writeSkill("punctuation", [
+      'name: "!!!"',
+      "version: 1.0.0",
+      'agents: ["codex"]',
+      'triggers: ["punctuation"]',
+    ].join("\n"));
+
+    await expect(installSkill(skillPath, testDb.seed.orgId)).rejects.toThrow(
+      /valid skill slug/i,
+    );
+
+    const em = testDb.orm.em.fork();
+    expect(await em.count(FulcrumSkill, { org: testDb.seed.orgId })).toBe(0);
   });
 
   it("reinstalling the same content skips rewriting installed file", async () => {

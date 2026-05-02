@@ -19,11 +19,12 @@ export function configureAutoAssign(config: AutoAssignConfig): void {
 export async function autoAssign(
   input: AutoAssignInput,
 ): Promise<RoutingDecision | null> {
-  if (input.agentOverride !== undefined) {
+  const agentOverride = input.agentOverride?.trim();
+  if (agentOverride) {
     return recordIfNeeded(input, {
       ruleId: null,
       source: "explicit",
-      agent: input.agentOverride,
+      agent: agentOverride,
       confidence: 1.0,
     });
   }

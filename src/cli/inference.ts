@@ -5,7 +5,14 @@ import {
   type InferenceStatus,
   type InferenceStopResult,
 } from "../inference/lifecycle.ts";
-import type { HealthResult } from "../inference/protocol.ts";
+import {
+  EmbedResultSchema,
+  GenerateResultSchema,
+  type EmbedResult,
+  type GenerateOptions,
+  type GenerateResult,
+  type HealthResult,
+} from "../inference/protocol.ts";
 
 const HELP = `fulcrum inference
 
@@ -24,13 +31,15 @@ interface InferenceCliLifecycle extends Partial<InferenceLifecycleLike> {
 
 interface InferenceCliClient {
   call(method: "health", params: Record<string, never>): Promise<HealthResult>;
+  embed?: (texts: string[], options?: { model?: string }) => Promise<EmbedResult>;
+  generate?: (prompt: string, options?: GenerateOptions) => Promise<GenerateResult>;
 }
 
 interface InferenceCliCaller {
   inference: {
     health(): Promise<HealthResult>;
     embed(input: { texts: string[]; model?: string }): Promise<unknown>;
-    generate(input: { prompt: string; options?: unknown }): Promise<unknown>;
+    generate(input: { prompt: string; options?: GenerateOptions }): Promise<unknown>;
   };
 }
 
@@ -66,8 +75,12 @@ async function resolveCaller(opts: InferenceRunOptions): Promise<InferenceCliCal
     return {
       inference: {
         health: () => opts.client!.call("health", {}),
-        embed: async ({ texts }) => ({ vectors: texts.map(() => []), model: "embedded", cached: false }),
-        generate: async () => ({ text: "", model: "embedded", tokens: 0 }),
+        embed: async () => {
+          throw new Error("embed requires a tRPC caller or inference client embed method");
+        },
+        generate: async () => {
+          throw new Error("generate requires a tRPC caller or inference client generate method");
+        },
       },
     };
   }
@@ -95,15 +108,20 @@ export async function run(argv: readonly string[], opts: InferenceRunOptions = {
   try {
     switch (verb) {
       case "start":
-        return runStart(rest, { ...opts, print });
+        await runStart(rest, { ...opts, print });
+        return;
       case "status":
-        return runStatus(rest, { ...opts, print });
+        await runStatus(rest, { ...opts, print });
+        return;
       case "embed":
-        return runEmbed(rest, { ...opts, print });
+        await runEmbed(rest, { ...opts, print });
+        return;
       case "generate":
-        return runGenerate(rest, { ...opts, print });
+        await runGenerate(rest, { ...opts, print });
+        return;
       case "stop":
-        return runStop(rest, { ...opts, print });
+        await runStop(rest, { ...opts, print });
+        return;
       case "help":
       case "--help":
       case "-h":
@@ -143,8 +161,9 @@ async function runStatus(
   opts: InferenceRunOptions & { print: (line: string) => void },
 ): Promise<void> {
   const json = hasFlag(argv, "json");
-  const caller = await resolveCaller(opts);
-  const health = await caller.inference.health();
+  const health = opts.caller
+    ? await opts.caller.inference.health()
+    : await resolveServices(opts).client.call("health", {});
 
   if (json) {
     opts.print(JSON.stringify(health));
@@ -160,9 +179,16 @@ async function runEmbed(
   const json = hasFlag(argv, "json");
   const text = argv.filter((arg) => arg !== "--json").join(" ").trim();
   if (!text) throw new Error("embed requires text");
-  const caller = await resolveCaller(opts);
-  const payload = await caller.inference.embed({ texts: [text] });
-  opts.print(json ? JSON.stringify(payload) : JSON.stringify(payload));
+  const payload = EmbedResultSchema.parse(opts.caller
+    ? await opts.caller.inference.embed({ texts: [text] })
+    : await embedWithClient(resolveServices(opts).client, text));
+
+  if (json) {
+    opts.print(JSON.stringify(payload));
+  } else {
+    const dims = payload.vectors[0]?.length ?? 0;
+    opts.print(`embedding model=${payload.model} vectors=${payload.vectors.length} dims=${dims} cached=${payload.cached}`);
+  }
 }
 
 async function runGenerate(
@@ -172,16 +198,34 @@ async function runGenerate(
   const json = hasFlag(argv, "json");
   const prompt = argv.filter((arg) => arg !== "--json").join(" ").trim();
   if (!prompt) throw new Error("generate requires prompt");
-  const caller = await resolveCaller(opts);
-  const payload = await caller.inference.generate({ prompt });
+  const payload = GenerateResultSchema.parse(opts.caller
+    ? await opts.caller.inference.generate({ prompt })
+    : await generateWithClient(resolveServices(opts).client, prompt));
   if (json) {
     opts.print(JSON.stringify(payload));
   } else {
-    const text = typeof payload === "object" && payload && "text" in payload
-      ? String((payload as { text: unknown }).text)
-      : JSON.stringify(payload);
-    opts.print(text);
+    opts.print(payload.text);
   }
+}
+
+async function embedWithClient(
+  client: InferenceCliClient,
+  text: string,
+): Promise<EmbedResult> {
+  if (!client.embed) {
+    throw new Error("embed requires a tRPC caller or inference client embed method");
+  }
+  return client.embed([text]);
+}
+
+async function generateWithClient(
+  client: InferenceCliClient,
+  prompt: string,
+): Promise<GenerateResult> {
+  if (!client.generate) {
+    throw new Error("generate requires a tRPC caller or inference client generate method");
+  }
+  return client.generate(prompt);
 }
 
 async function runStop(

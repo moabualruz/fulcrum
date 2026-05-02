@@ -1,5 +1,5 @@
 import type { MikroORM } from "@mikro-orm/postgresql";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createHash } from "node:crypto";
 import { z } from "zod";
@@ -14,6 +14,7 @@ import { initOrm } from "../db/mikro-orm.config.ts";
 import { parseKernelMarkdown } from "../product-kernel/markdown.ts";
 import {
   readSkillsLockFile,
+  skillsLockPath,
   writeSkillsLockFile,
 } from "./lock.ts";
 
@@ -37,6 +38,8 @@ const SkillFrontmatter = z.object({
 });
 
 let testOrm: MikroORM | undefined;
+const LOCK_TIMEOUT_MS = 5_000;
+const LOCK_POLL_MS = 25;
 
 export function __setSkillsLoaderOrmForTest(orm: MikroORM | undefined): void {
   testOrm = orm;
@@ -57,6 +60,12 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+function assertSlug(slug: string, name: string): void {
+  if (!slug) {
+    throw new Error(`Skill name '${name}' must produce a valid skill slug.`);
+  }
+}
+
 function sha256(content: string): string {
   return createHash("sha256").update(content).digest("hex");
 }
@@ -75,8 +84,55 @@ async function readInstalledHash(path: string): Promise<string | null> {
   }
 }
 
-async function ormForInstall(): Promise<MikroORM> {
-  return testOrm ?? initOrm();
+interface InstallOrmHandle {
+  orm: MikroORM;
+  close(): Promise<void>;
+}
+
+async function ormForInstall(): Promise<InstallOrmHandle> {
+  if (testOrm) {
+    return {
+      orm: testOrm,
+      close: async () => undefined,
+    };
+  }
+
+  const orm = await initOrm();
+  return {
+    orm,
+    close: async () => {
+      await orm.close(true);
+    },
+  };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withSkillsLock<T>(fn: () => Promise<T>): Promise<T> {
+  const lockDir = `${skillsLockPath()}.lock`;
+  await mkdir(dirname(lockDir), { recursive: true });
+  const startedAt = Date.now();
+
+  while (true) {
+    try {
+      await mkdir(lockDir);
+      break;
+    } catch (error) {
+      if ((error as { code?: string }).code !== "EEXIST") throw error;
+      if (Date.now() - startedAt > LOCK_TIMEOUT_MS) {
+        throw new Error(`Timed out acquiring skills lock at ${lockDir}`);
+      }
+      await sleep(LOCK_POLL_MS);
+    }
+  }
+
+  try {
+    return await fn();
+  } finally {
+    await rm(lockDir, { recursive: true, force: true });
+  }
 }
 
 async function writeNullHash(
@@ -94,10 +150,10 @@ async function writeNullHash(
     skillVersion = em.create(SkillVersion, {
       skill,
       version,
-      hashVerified: null as unknown as string | undefined,
+      hashVerified: null,
     });
   } else {
-    skillVersion.hashVerified = null as unknown as string | undefined;
+    skillVersion.hashVerified = null;
   }
   await em.flush();
 }
@@ -109,7 +165,7 @@ async function upsertSkillRow(
   slug: string,
   version: string,
   agents: AgentName[],
-  hash: string,
+  hash: string | null,
 ): Promise<FulcrumSkill> {
   const em = orm.em.fork();
   let skill = await em.findOne(FulcrumSkill, { org: orgId, slug }) as
@@ -126,6 +182,7 @@ async function upsertSkillRow(
     });
   } else {
     skill.name = name;
+    skill.source = SkillSource.Local;
     skill.enabledAgents = agents;
   }
 
@@ -186,40 +243,57 @@ export async function installSkill(
   try {
     parsed = SkillFrontmatter.parse(parseKernelMarkdown(content).frontmatter);
   } catch (error) {
-    console.error(`Skipping invalid skill frontmatter in ${skillPath}`, error);
+    console.error("Skipping invalid skill frontmatter in %s", skillPath, error);
     throw error;
   }
 
   const slug = slugify(parsed.name);
+  assertSlug(slug, parsed.name);
   const agents = targetAgents(parsed.agents);
   const hash = sha256(content);
-  const orm = await ormForInstall();
-  const lock = await readSkillsLockFile();
+  const installOrm = await ormForInstall();
 
   try {
-    await copyToAgents(slug, content, agents, lock[slug]?.hash);
-  } catch (error) {
-    await writeNullHash(orm, orgId, slug, parsed.version);
-    throw error;
+    return await withSkillsLock(async () => {
+      const lock = await readSkillsLockFile();
+      await upsertSkillRow(
+        installOrm.orm,
+        orgId,
+        parsed.name,
+        slug,
+        parsed.version,
+        agents,
+        null,
+      );
+
+      try {
+        await copyToAgents(slug, content, agents, lock[slug]?.hash);
+      } catch (error) {
+        await writeNullHash(installOrm.orm, orgId, slug, parsed.version);
+        throw error;
+      }
+
+      const skill = await upsertSkillRow(
+        installOrm.orm,
+        orgId,
+        parsed.name,
+        slug,
+        parsed.version,
+        agents,
+        hash,
+      );
+
+      lock[slug] = {
+        version: parsed.version,
+        hash,
+        installedAt: new Date().toISOString(),
+        enabled_agents: agents,
+      };
+      await writeSkillsLockFile(lock);
+
+      return skill;
+    });
+  } finally {
+    await installOrm.close();
   }
-
-  const skill = await upsertSkillRow(
-    orm,
-    orgId,
-    parsed.name,
-    slug,
-    parsed.version,
-    agents,
-    hash,
-  );
-
-  lock[slug] = {
-    version: parsed.version,
-    hash,
-    installedAt: new Date().toISOString(),
-    enabled_agents: agents,
-  };
-  await writeSkillsLockFile(lock);
-
-  return skill;
 }
