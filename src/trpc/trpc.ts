@@ -8,7 +8,9 @@
 import { initTRPC } from "@trpc/server";
 import SuperJSON from "superjson";
 
-import type { TRPCContext } from "./context.ts";
+import { applyRequestId } from "../server/trpc/middleware/requestId.ts";
+import { runWithTRPCSpan } from "../server/trpc/middleware/otel.ts";
+import { ensureRequestId, type TRPCContext } from "./context.ts";
 
 export const t = initTRPC.context<TRPCContext>().create({
   /**
@@ -21,11 +23,14 @@ export const t = initTRPC.context<TRPCContext>().create({
    * Error formatter — strip internal stack traces in production.
    * Always exposes TRPCError code and message; hides cause in prod.
    */
-  errorFormatter({ shape, error }) {
+  errorFormatter({ shape, error, ctx }) {
+    const requestId = ctx ? ensureRequestId(ctx) : undefined;
+
     return {
       ...shape,
       data: {
         ...shape.data,
+        requestId,
         // Only surface stack in non-production environments
         stack: process.env["NODE_ENV"] !== "production" ? error.message : undefined,
       },
@@ -33,8 +38,29 @@ export const t = initTRPC.context<TRPCContext>().create({
   },
 });
 
+const requestIdMiddleware = t.middleware(({ ctx, next }) => {
+  const requestId = applyRequestId(ctx);
+  return next({
+    ctx: {
+      ...ctx,
+      requestId,
+    },
+  });
+});
+
+const otelMiddleware = t.middleware(({ ctx, next, path, type }) => {
+  return runWithTRPCSpan({
+    ctx,
+    path,
+    type,
+    run: () => next(),
+  });
+});
+
 /**
  * Public procedure builder — no auth required.
  * Use only for genuinely unauthenticated endpoints (e.g. invite-accept token validation).
  */
-export const publicProcedure = t.procedure;
+export const publicProcedure = t.procedure
+  .use(requestIdMiddleware)
+  .use(otelMiddleware);
