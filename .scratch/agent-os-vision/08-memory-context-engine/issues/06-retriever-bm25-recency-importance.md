@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [01-schema-migration-core.md]
@@ -28,16 +28,16 @@ Zod schema `RetrieverOptsSchema` generated and exported for tRPC reuse.
 
 ## Acceptance criteria
 
-- [ ] `MemoryRetriever` is `@Injectable()` and exposes `retrieve(query, opts)`
-- [ ] Fixed seed: 50 rows (2 projects + 5 globals), fixed query → identical top-20 list across 100 sequential calls (`retriever.determinism.test.ts`)
-- [ ] Recency: newer memory beats 60-day-old memory with identical body on same query
-- [ ] Importance boost: `high` memory beats `medium` memory with same body + same age by +1.0
-- [ ] Scope merge: both project-scoped and global rows returned; no duplicates after repository dedupe by `id`
-- [ ] Archived exclusion: archived rows absent by default; visible with `includeArchived: true`
-- [ ] Org isolation: org A memories never appear in org B query results (`retriever.isolation.test.ts`)
-- [ ] `kinds` filter: `retrieve(q, { kinds: ['decision'] })` returns only `kind='decision'` rows
-- [ ] `RetrieverOptsSchema` is a valid Zod schema; round-trips through `tRPC` input validation
-- [ ] All retriever tests in `src/memory/__tests__/retriever.test.ts` green
+- [x] `MemoryRetriever` is `@Injectable()` and exposes `retrieve(query, opts)`
+- [x] Fixed seed: 50 rows (2 projects + 5 globals), fixed query → identical top-20 list across 100 sequential calls (`retriever.determinism.test.ts`)
+- [x] Recency: newer memory beats 60-day-old memory with identical body on same query
+- [x] Importance boost: `high` memory beats `medium` memory with same body + same age by +1.0
+- [x] Scope merge: both project-scoped and global rows returned; no duplicates after repository dedupe by `id`
+- [x] Archived exclusion: archived rows absent by default; visible with `includeArchived: true`
+- [x] Org isolation: org A memories never appear in org B query results (`retriever.isolation.test.ts`)
+- [x] `kinds` filter: `retrieve(q, { kinds: ['decision'] })` returns only `kind='decision'` rows
+- [x] `RetrieverOptsSchema` is a valid Zod schema; round-trips through `tRPC` input validation
+- [x] All retriever tests in `src/memory/__tests__/retriever.test.ts` green
 
 ## Blocked by
 
@@ -46,3 +46,4 @@ Zod schema `RetrieverOptsSchema` generated and exported for tRPC reuse.
 ## EXECUTION-LOG
 
 - 2026-05-02 codex-orchestrator: claimed for `codex-worker-p8-retriever`; prerequisite for B072 context bundle assembler because `src/memory/retriever.ts` is absent while B071 bundle status is stale/incomplete.
+- 2026-05-02 codex-worker-p8-retriever: implemented retriever slice only. Preserved linkage chain `MASTER-PLAN.md -> COVERAGE.md -> TASK-DAG.md -> TASK-BUNDLES.md -> 08-memory-context-engine/issues/06-retriever-bm25-recency-importance.md`. Verification: `bun test src/memory/__tests__/retriever.test.ts` (9 pass); `bun run lint` (pass).
