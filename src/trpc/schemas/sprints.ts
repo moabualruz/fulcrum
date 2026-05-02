@@ -13,16 +13,16 @@ export const SprintStatusSchema = z.enum(["planning", "active", "completed", "ca
 
 /** Minimal Sprint output schema — Pillar 3 extends with full field set. */
 export const SprintSchema = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  name: z.string(),
-  status: SprintStatusSchema,
-  createdAt: z.date(),
+  id: z.string().uuid().describe("Unique sprint identifier."),
+  orgId: z.string().uuid().describe("Organisation the sprint belongs to."),
+  name: z.string().describe("Human-readable sprint name."),
+  status: SprintStatusSchema.describe("Current lifecycle status of the sprint."),
+  createdAt: z.date().describe("Timestamp when the sprint was created."),
 });
 
 /** Input for listing sprints — Pillar 3 adds filters/pagination. */
 export const ListSprintsInputSchema = z.object({
-  orgId: z.string().uuid().optional(),
+  orgId: z.string().uuid().optional().describe("Filter by organisation."),
 });
 
 export type Sprint = z.infer<typeof SprintSchema>;

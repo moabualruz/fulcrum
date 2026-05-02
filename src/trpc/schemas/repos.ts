@@ -13,16 +13,16 @@ export const RepoProviderSchema = z.enum(["github", "gitlab", "bitbucket", "loca
 
 /** Minimal Repo output schema — Pillar 8 extends with supervision + worktree fields. */
 export const RepoSchema = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  name: z.string(),
-  provider: RepoProviderSchema,
-  createdAt: z.date(),
+  id: z.string().uuid().describe("Unique repository identifier."),
+  orgId: z.string().uuid().describe("Organisation that owns the repository."),
+  name: z.string().describe("Repository name, typically matching the remote name."),
+  provider: RepoProviderSchema.describe("Version control provider hosting the repository."),
+  createdAt: z.date().describe("Timestamp when the repository was registered."),
 });
 
 /** Input for listing repos — Pillar 8 adds filters/pagination. */
 export const ListReposInputSchema = z.object({
-  orgId: z.string().uuid().optional(),
+  orgId: z.string().uuid().optional().describe("Filter by organisation."),
 });
 
 export type Repo = z.infer<typeof RepoSchema>;

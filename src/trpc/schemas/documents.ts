@@ -13,16 +13,16 @@ export const DocumentTypeSchema = z.enum(["page", "wiki", "note", "template"]);
 
 /** Minimal Document output schema — Pillar 7 extends with full field set. */
 export const DocumentSchema = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  title: z.string(),
-  type: DocumentTypeSchema,
-  createdAt: z.date(),
+  id: z.string().uuid().describe("Unique document identifier."),
+  orgId: z.string().uuid().describe("Organisation that owns the document."),
+  title: z.string().describe("Human-readable document title."),
+  type: DocumentTypeSchema.describe("Content type category for the document."),
+  createdAt: z.date().describe("Timestamp when the document was created."),
 });
 
 /** Input for listing documents — Pillar 7 adds filters/pagination. */
 export const ListDocumentsInputSchema = z.object({
-  orgId: z.string().uuid().optional(),
+  orgId: z.string().uuid().optional().describe("Filter by organisation. Omit for all accessible documents."),
 });
 
 export type Document = z.infer<typeof DocumentSchema>;

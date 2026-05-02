@@ -13,16 +13,16 @@ export const NotificationChannelSchema = z.enum(["in_app", "email", "slack", "we
 
 /** Minimal Notification output schema — Pillar 13 extends with delivery state. */
 export const NotificationSchema = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  title: z.string(),
-  channel: NotificationChannelSchema,
-  createdAt: z.date(),
+  id: z.string().uuid().describe("Unique notification identifier."),
+  orgId: z.string().uuid().describe("Organisation the notification belongs to."),
+  title: z.string().describe("Short human-readable notification title."),
+  channel: NotificationChannelSchema.describe("Delivery channel for the notification."),
+  createdAt: z.date().describe("Timestamp when the notification was created."),
 });
 
 /** Input for listing notifications — Pillar 13 adds filters/pagination. */
 export const ListNotificationsInputSchema = z.object({
-  orgId: z.string().uuid().optional(),
+  orgId: z.string().uuid().optional().describe("Filter by organisation."),
 });
 
 export type Notification = z.infer<typeof NotificationSchema>;

@@ -53,6 +53,7 @@ export const STEPS: Step[] = [
   { name: "web:build",   cmd: ["bun", "run", "build"], cwd: "src/web" },
   // Vitest unit tests for the SvelteKit subpackage — always-on.
   { name: "web:test",    cmd: ["bun", "run", "web:test"], cwd: "src/web" },
+  { name: "ci:schemas",  cmd: ["bun", "run", "scripts/ci-schemas.ts"] },
   { name: "skills:lint", cmd: ["bun", "run", "src/index.ts", "skills", "lint", "skills/"] },
   { name: "compress:check", cmd: ["bash", "scripts/compress-with-caveman.sh", "--check"] },
   // Playwright e2e — opt-in via FULCRUM_RUN_E2E=1.

@@ -20,19 +20,19 @@ export const SearchResultKindSchema = z.enum([
 
 /** Search query input. */
 export const SearchQueryInputSchema = z.object({
-  q: z.string().min(1),
-  orgId: z.string().uuid().optional(),
-  kinds: z.array(SearchResultKindSchema).optional(),
-  limit: z.number().int().positive().max(100).optional(),
+  q: z.string().min(1).describe("Search query string."),
+  orgId: z.string().uuid().optional().describe("Restrict search to a specific organisation."),
+  kinds: z.array(SearchResultKindSchema).optional().describe("Restrict results to specific resource kinds."),
+  limit: z.number().int().positive().max(100).optional().describe("Maximum number of results to return; default 20, max 100."),
 });
 
 /** Minimal SearchResult output schema — Pillar 12 extends with scoring + snippets. */
 export const SearchResultSchema = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  kind: SearchResultKindSchema,
-  title: z.string(),
-  createdAt: z.date(),
+  id: z.string().uuid().describe("Unique identifier of the matched resource."),
+  orgId: z.string().uuid().describe("Organisation that owns the matched resource."),
+  kind: SearchResultKindSchema.describe("Resource type of the matched result."),
+  title: z.string().describe("Human-readable title of the matched resource."),
+  createdAt: z.date().describe("Timestamp when the matched resource was created."),
 });
 
 export type SearchQueryInput = z.infer<typeof SearchQueryInputSchema>;

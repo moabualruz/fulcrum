@@ -19,16 +19,16 @@ export const ArtifactTypeSchema = z.enum([
 
 /** Minimal Artifact output schema — Pillar 9 extends with storage + lifecycle fields. */
 export const ArtifactSchema = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  name: z.string(),
-  type: ArtifactTypeSchema,
-  createdAt: z.date(),
+  id: z.string().uuid().describe("Unique artifact identifier."),
+  orgId: z.string().uuid().describe("Organisation that owns the artifact."),
+  name: z.string().describe("Human-readable artifact name."),
+  type: ArtifactTypeSchema.describe("Media type category for the artifact."),
+  createdAt: z.date().describe("Timestamp when the artifact was created."),
 });
 
 /** Input for listing artifacts — Pillar 9 adds filters/pagination. */
 export const ListArtifactsInputSchema = z.object({
-  orgId: z.string().uuid().optional(),
+  orgId: z.string().uuid().optional().describe("Filter by organisation. Omit for all accessible artifacts."),
 });
 
 export type Artifact = z.infer<typeof ArtifactSchema>;
