@@ -55,6 +55,22 @@ describe("/docs/new +page.server.ts", () => {
     expect(result.form?.data?.labels).toBe("");
   });
 
+  test("load returns templates map with all 9 doc_types pre-populated", async () => {
+    await seedDb();
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 10}`);
+    const result = await mod.load();
+    expect(result.templates).toBeDefined();
+    const docTypes = ["spec","adr","wiki","runbook","meeting","postmortem","rfc","note","scratch"];
+    for (const dt of docTypes) {
+      expect(result.templates).toHaveProperty(dt);
+      expect(typeof result.templates[dt]).toBe("string");
+    }
+    // ADR body has the required sections
+    expect(result.templates["adr"]).toContain("## Context");
+    expect(result.templates["adr"]).toContain("## Decision");
+    expect(result.templates["adr"]).toContain("## Consequences");
+  });
+
   test("default action with valid input creates a document and throws redirect 303", async () => {
     const { orgId } = await seedDb();
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);

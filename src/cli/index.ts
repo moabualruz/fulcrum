@@ -34,6 +34,7 @@ Usage:
   fulcrum init
   fulcrum auth <whoami|invite|login|logout> [options]
   fulcrum flags <list|set> [options]
+  fulcrum docs template list [--json]
   fulcrum symphony runs list --state ready [--json]
   fulcrum db <migrate|status|history> [options]
   fulcrum web
@@ -257,6 +258,22 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       const { container, cleanup } = await buildDbContainer();
       try {
         await runFlags(rest, { container });
+      } finally {
+        await cleanup();
+      }
+      return;
+    }
+    case "docs": {
+      const { runDocsCommand } = await import("./docs-templates.ts");
+      const [sub = "help"] = rest;
+      if (sub === "help" || sub === "--help" || sub === "-h") {
+        await runDocsCommand(rest);
+        return;
+      }
+
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runDocsCommand(rest, { container });
       } finally {
         await cleanup();
       }

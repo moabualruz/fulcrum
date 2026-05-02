@@ -57,8 +57,9 @@ export async function run(_argv: readonly string[] = []): Promise<void> {
     await container.get(MigratorService).migrate();
 
     const orgRepo = orm.em.fork().getRepository(Org);
-    if (await orgRepo.count() === 0) {
-      await container.get(SeedService).run();
+    const hadOrg = (await orgRepo.count()) > 0;
+    await container.get(SeedService).run();
+    if (!hadOrg) {
       console.log("✓ Local org bootstrapped");
       return;
     }
