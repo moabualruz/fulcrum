@@ -1,6 +1,7 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
+Owner: codex-orchestrator
 Pillar: 07-docs-editor-collab
 Blocked-by: []
 PRD: .scratch/agent-os-vision/prds/07-docs-editor-collab.md

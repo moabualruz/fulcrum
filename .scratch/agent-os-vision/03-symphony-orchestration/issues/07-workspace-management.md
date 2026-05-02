@@ -1,7 +1,6 @@
 ---
-Status: in-progress
+Status: ready-for-agent
 Triage: AFK
-Owner: codex-orchestrator
 Pillar: 03-symphony-orchestration
 Blocked-by: 03-schema-agent-runs-symphony-columns
 ---

@@ -68,6 +68,24 @@ Adjustment:
 ]
 Result: IN_PROGRESS batch remains six issues.
 
+## 2026-05-02T02:45:00Z — codex-orchestrator (Wave 3 batch widened across pillars)
+
+Adjustment:
+[
+  returned_to_ready: [
+    03-symphony-orchestration/issues/07-workspace-management.md,
+    03-symphony-orchestration/issues/08-prompt-template-renderer.md,
+    03-symphony-orchestration/issues/10-retry-backoff-stall-detection.md
+  ],
+  added: [
+    05-router-and-skills/issues/01-routing-rules-schema-migration.md,
+    05-router-and-skills/issues/02-fulcrum-skills-schema-migration.md,
+    07-docs-editor-collab/issues/01-docs-schema-foundation.md
+  ],
+  reason: multiple P3 slices share router/CLI/conformance files; widened batch reduces parallel edit overlap
+]
+Result: IN_PROGRESS batch remains six issues.
+
 ## 2026-05-02T01:16:30Z — codex-orchestrator (Wave 2 batch dispatched)
 
 Batch: [
