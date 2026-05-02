@@ -1794,3 +1794,25 @@ Scope:
 ]
 
 Result: DISPATCHED.
+
+## 2026-05-02T19:05:14Z — codex-orchestrator (parent review checkpoint)
+
+Returned lanes:
+[
+  p17-secrets-vault => commit=3ccee6a9e5db; parent_status=blocked; blockers=native-keyring default bypass, stale-session org membership gap, casbin action mapping, CLI codegen imported-router coverage,
+  p8-retriever => commit=2332d00745f4; parent_status=blocked; blocker=repository hydrates full memory scope before topK; PRD requires FTS/ts_rank_cd bounded retrieval for 50k-row budget,
+  p7-doc-template-seeds => commit=94068be18c8e; parent_status=verified-held; verification=focused tests/lint/web-check pass; hold_reason=touches migration surface while G0/P1 protected gate freezes migrations
+]
+
+Reviewer dispatch:
+[
+  p17-security=019dea0d-60c1-7831-aa67-0abf8cb4081b,
+  p17-api=019dea0d-7fa1-7d02-9f83-6a7af8185b78,
+  p8-correctness=019dea10-dda8-7f61-9cd9-9091075545b5,
+  p8-performance=019dea10-f8e4-7a91-9e24-79b6c9c55fa2,
+  p7-api=019dea12-5c52-73c1-837b-5cdb74ad5d26,
+  p7-data=019dea12-8890-7fb2-b437-7e0a66b8acb7,
+  p7-correctness=019dea12-a175-7da0-a252-01f9da12c7f1
+]
+
+Result: FIXBACKS_SENT_OR_HOLD.
