@@ -43,6 +43,7 @@
     "picocolors": "1.1.1",
     "smol-toml": "^1.4.2",
     "superjson": "2.2.6",
+    "tinyglobby": "0.2.16",
     "yaml": "2.8.3",
     "zustand": "5.0.12"
   }
