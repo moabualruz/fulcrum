@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: 03-symphony-orchestration
 Blocked-by: 04-tracker-fetch-candidate-issues, 05-tracker-fetch-by-states, 06-state-machine-claim-lock, 07-workspace-management, 08-prompt-template-renderer, 09-lifecycle-hooks, 10-retry-backoff-stall-detection
