@@ -38,7 +38,7 @@ Usage:
   fulcrum db <migrate|status|history> [options]
   fulcrum web
   fulcrum tui
-  fulcrum inference <start|status|stop> [--json]
+  fulcrum inference <start|status|embed|generate|stop> [--json]
 `;
 
 function fulcrumHome(): string {

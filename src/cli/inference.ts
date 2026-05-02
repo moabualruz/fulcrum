@@ -12,6 +12,8 @@ const HELP = `fulcrum inference
 Usage:
   fulcrum inference start [--json]
   fulcrum inference status [--json]
+  fulcrum inference embed <text> [--json]
+  fulcrum inference generate <prompt> [--json]
   fulcrum inference stop [--json]
 `;
 
@@ -24,9 +26,18 @@ interface InferenceCliClient {
   call(method: "health", params: Record<string, never>): Promise<HealthResult>;
 }
 
+interface InferenceCliCaller {
+  inference: {
+    health(): Promise<HealthResult>;
+    embed(input: { texts: string[]; model?: string }): Promise<unknown>;
+    generate(input: { prompt: string; options?: unknown }): Promise<unknown>;
+  };
+}
+
 export interface InferenceRunOptions {
   lifecycle?: InferenceCliLifecycle;
   client?: InferenceCliClient;
+  caller?: InferenceCliCaller;
   container?: Container;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
@@ -48,6 +59,35 @@ function resolveServices(opts: InferenceRunOptions): {
   return { lifecycle: fullLifecycle, client };
 }
 
+async function resolveCaller(opts: InferenceRunOptions): Promise<InferenceCliCaller> {
+  if (opts.caller) return opts.caller;
+
+  if (opts.client) {
+    return {
+      inference: {
+        health: () => opts.client!.call("health", {}),
+        embed: async ({ texts }) => ({ vectors: texts.map(() => []), model: "embedded", cached: false }),
+        generate: async () => ({ text: "", model: "embedded", tokens: 0 }),
+      },
+    };
+  }
+
+  const container = opts.container ?? new Container();
+  const [{ appRouter }, { createContext }, { t }] = await Promise.all([
+    import("../trpc/router.ts"),
+    import("../trpc/context.ts"),
+    import("../trpc/trpc.ts"),
+  ]);
+  const factory = t.createCallerFactory(appRouter);
+  return factory(createContext({
+    session: null,
+    orgId: null,
+    userId: null,
+    em: null,
+    container,
+  })) as unknown as InferenceCliCaller;
+}
+
 export async function run(argv: readonly string[], opts: InferenceRunOptions = {}): Promise<void> {
   const { print = console.log, printErr = console.error, exit = process.exit } = opts;
   const [verb = "help", ...rest] = argv;
@@ -58,6 +98,10 @@ export async function run(argv: readonly string[], opts: InferenceRunOptions = {
         return runStart(rest, { ...opts, print });
       case "status":
         return runStatus(rest, { ...opts, print });
+      case "embed":
+        return runEmbed(rest, { ...opts, print });
+      case "generate":
+        return runGenerate(rest, { ...opts, print });
       case "stop":
         return runStop(rest, { ...opts, print });
       case "help":
@@ -83,7 +127,8 @@ async function runStart(
   const json = hasFlag(argv, "json");
   const { lifecycle, client } = resolveServices(opts);
   const running = await lifecycle.ensureRunning();
-  const health = await client.call("health", {});
+  const caller = await resolveCaller(opts);
+  const health = opts.client ? await client.call("health", {}) : await caller.inference.health();
   const payload = { status: health.status, pid: running.pid, socketPath: running.socketPath, health };
 
   if (json) {
@@ -98,23 +143,44 @@ async function runStatus(
   opts: InferenceRunOptions & { print: (line: string) => void },
 ): Promise<void> {
   const json = hasFlag(argv, "json");
-  const { lifecycle, client } = resolveServices(opts);
-  const state = await lifecycle.status();
-  const health = state.status === "ok" ? await client.call("health", {}) : undefined;
-  const payload = {
-    status: health?.status ?? state.status,
-    pid: state.pid,
-    socketPath: state.socketPath,
-    cache: state.cache ?? health?.cache,
-    health,
-  };
+  const caller = await resolveCaller(opts);
+  const health = await caller.inference.health();
 
   if (json) {
-    opts.print(JSON.stringify(payload));
-  } else if (health) {
-    opts.print(`inference ${health.status} pid=${state.pid ?? "unknown"} socket=${state.socketPath}`);
+    opts.print(JSON.stringify(health));
   } else {
-    opts.print(`inference down socket=${state.socketPath}`);
+    opts.print(`inference ${health.status} backends=${health.backends.join(",")}`);
+  }
+}
+
+async function runEmbed(
+  argv: readonly string[],
+  opts: InferenceRunOptions & { print: (line: string) => void },
+): Promise<void> {
+  const json = hasFlag(argv, "json");
+  const text = argv.filter((arg) => arg !== "--json").join(" ").trim();
+  if (!text) throw new Error("embed requires text");
+  const caller = await resolveCaller(opts);
+  const payload = await caller.inference.embed({ texts: [text] });
+  opts.print(json ? JSON.stringify(payload) : JSON.stringify(payload));
+}
+
+async function runGenerate(
+  argv: readonly string[],
+  opts: InferenceRunOptions & { print: (line: string) => void },
+): Promise<void> {
+  const json = hasFlag(argv, "json");
+  const prompt = argv.filter((arg) => arg !== "--json").join(" ").trim();
+  if (!prompt) throw new Error("generate requires prompt");
+  const caller = await resolveCaller(opts);
+  const payload = await caller.inference.generate({ prompt });
+  if (json) {
+    opts.print(JSON.stringify(payload));
+  } else {
+    const text = typeof payload === "object" && payload && "text" in payload
+      ? String((payload as { text: unknown }).text)
+      : JSON.stringify(payload);
+    opts.print(text);
   }
 }
 

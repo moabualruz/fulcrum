@@ -33,6 +33,58 @@ export const HealthResultSchema = z.object({
   }).optional(),
 });
 
+export const EmbedResultSchema = z.object({
+  vectors: z.array(z.array(z.number())),
+  model: z.string(),
+  cached: z.boolean(),
+});
+
+export const GenerateOptionsSchema = z.object({
+  model: z.string().optional(),
+  maxTokens: z.number().int().positive().optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  schema: z.record(z.string(), z.unknown()).optional(),
+}).optional();
+
+export const GenerateResultSchema = z.object({
+  text: z.string(),
+  model: z.string(),
+  tokens: z.number().int().nonnegative(),
+});
+
+export const ClassifyResultSchema = z.object({
+  results: z.array(z.object({
+    label: z.string(),
+    score: z.number(),
+  })),
+});
+
+export const TokenizeResultSchema = z.object({
+  count: z.number().int().nonnegative(),
+  tokens: z.array(z.string()).optional(),
+});
+
+export const InferenceModelSchema = z.object({
+  id: z.string(),
+  kind: z.enum(["embed", "generate", "classify"]),
+  downloaded: z.boolean(),
+  active: z.boolean(),
+  sizeBytes: z.number().int().nonnegative().optional(),
+});
+
+export const ModelPullProgressSchema = z.object({
+  pct: z.number().min(0).max(100),
+  downloaded: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+});
+
+export const BackendSchema = z.object({
+  id: z.enum(["embedded", "ollama", "lm-studio", "openai-compatible"]),
+  available: z.boolean(),
+  active: z.boolean(),
+  reason: z.string().nullable(),
+});
+
 export const InferenceErrorSchema = z.object({
   code: z.number(),
   backend: z.string(),
@@ -43,6 +95,14 @@ export type InferenceRequest = z.infer<typeof InferenceRequestSchema>;
 export type InferenceResponse = z.infer<typeof InferenceResponseSchema>;
 export type RpcError = z.infer<typeof RpcErrorSchema>;
 export type HealthResult = z.infer<typeof HealthResultSchema>;
+export type EmbedResult = z.infer<typeof EmbedResultSchema>;
+export type GenerateOptions = z.infer<typeof GenerateOptionsSchema>;
+export type GenerateResult = z.infer<typeof GenerateResultSchema>;
+export type ClassifyResult = z.infer<typeof ClassifyResultSchema>;
+export type TokenizeResult = z.infer<typeof TokenizeResultSchema>;
+export type InferenceModel = z.infer<typeof InferenceModelSchema>;
+export type ModelPullProgress = z.infer<typeof ModelPullProgressSchema>;
+export type InferenceBackendInfo = z.infer<typeof BackendSchema>;
 export type InferenceErrorPayload = z.infer<typeof InferenceErrorSchema>;
 
 export class InferenceError extends Error {

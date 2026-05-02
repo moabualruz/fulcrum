@@ -59,23 +59,60 @@ describe("fulcrum inference CLI", () => {
 
     await run(["status", "--json"], {
       ...cap.opts,
-      lifecycle: {
-        status: async () => ({
-          status: "ok",
-          pid: 42,
-          socketPath: "/tmp/fulcrum/inference.sock",
-          cache,
-        }),
-      },
-      client: {
-        call: async () => health,
+      caller: {
+        inference: {
+          health: async () => ({ ...health, cache }),
+          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false }),
+          generate: async () => ({ text: "Paris", model: "Qwen2.5-0.5B-Instruct", tokens: 8 }),
+        },
       },
     });
 
     const payload = JSON.parse(cap.lines.join("\n"));
     expect(payload.status).toBe("ok");
-    expect(payload.health.status).toBe("ok");
     expect(payload.cache).toEqual(cache);
+  });
+
+  test("embed --json emits vectors, model, and cached from tRPC caller", async () => {
+    const cap = capture();
+
+    await run(["embed", "hello", "--json"], {
+      ...cap.opts,
+      caller: {
+        inference: {
+          health: async () => health,
+          embed: async () => ({ vectors: [[0.1, 0.2]], model: "BAAI/bge-small-en-v1.5", cached: false }),
+          generate: async () => ({ text: "Paris", model: "Qwen2.5-0.5B-Instruct", tokens: 8 }),
+        },
+      },
+    });
+
+    expect(JSON.parse(cap.lines.join("\n"))).toEqual({
+      vectors: [[0.1, 0.2]],
+      model: "BAAI/bge-small-en-v1.5",
+      cached: false,
+    });
+  });
+
+  test("generate --json emits text, model, and token count from tRPC caller", async () => {
+    const cap = capture();
+
+    await run(["generate", "The capital of France is", "--json"], {
+      ...cap.opts,
+      caller: {
+        inference: {
+          health: async () => health,
+          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false }),
+          generate: async () => ({ text: "Paris", model: "Qwen2.5-0.5B-Instruct", tokens: 8 }),
+        },
+      },
+    });
+
+    expect(JSON.parse(cap.lines.join("\n"))).toEqual({
+      text: "Paris",
+      model: "Qwen2.5-0.5B-Instruct",
+      tokens: 8,
+    });
   });
 
   test("stop confirms socket removal", async () => {

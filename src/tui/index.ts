@@ -50,6 +50,9 @@ export interface TuiCaller {
     list: () => Promise<FlagItem[]>;
     set: (input: { flag: string; enabled: boolean }) => Promise<{ ok: boolean }>;
   };
+  inference?: {
+    health: () => Promise<{ status: string }>;
+  };
 }
 
 export interface TuiAppOptions {
@@ -70,7 +73,7 @@ export interface TuiAppOptions {
 // Screen enum
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Screen = "nav" | "auth" | "flags";
+type Screen = "nav" | "auth" | "flags" | "inference";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Navigation entries
@@ -84,6 +87,7 @@ interface NavEntry {
 const NAV_ENTRIES: NavEntry[] = [
   { label: "Auth", screen: "auth" },
   { label: "Feature Flags", screen: "flags" },
+  { label: "Inference", screen: "inference" },
   { label: "Dashboard (Pillar 3)", screen: "nav" },
   { label: "Tasks (Pillar 4)", screen: "nav" },
   { label: "Docs (Pillar 7)", screen: "nav" },
@@ -103,6 +107,11 @@ export class TuiApp {
   private currentScreen: Screen = "nav";
   private navCursor = 0;
   private statusInfo: { email: string; orgId: string } | null = null;
+  private inferenceInfo: { status: string; tone: "green" | "yellow" | "red" } = {
+    status: "down",
+    tone: "red",
+  };
+  private inferencePoll: ReturnType<typeof setInterval> | null = null;
   private running = false;
 
   // Active screen instances
@@ -128,6 +137,12 @@ export class TuiApp {
 
     // Load status bar data
     await this._loadStatusBar();
+    await this._loadInferenceBadge();
+    this.inferencePoll = setInterval(() => {
+      void this._loadInferenceBadge().then(() => {
+        if (this.running) this._renderCurrentScreen();
+      });
+    }, 30_000);
 
     // Initial render
     this._renderCurrentScreen();
@@ -144,6 +159,10 @@ export class TuiApp {
   /** Stop the TUI cleanly. */
   stop(): void {
     this.running = false;
+    if (this.inferencePoll) {
+      clearInterval(this.inferencePoll);
+      this.inferencePoll = null;
+    }
     this.renderer.showCursor();
   }
 
@@ -170,13 +189,33 @@ export class TuiApp {
 
   private _renderStatusBar(): void {
     const info = this.statusInfo;
+    const badge = this._formatInferenceBadge();
     if (!info) {
-      this.renderer.statusBar("Fulcrum TUI", "");
+      this.renderer.statusBar("Fulcrum TUI", badge);
       return;
     }
     const left = `${info.orgId}  ${info.email}`;
-    const right = "q:quit  ?:help";
+    const right = `${badge}  q:quit  ?:help`;
     this.renderer.statusBar(left, right);
+  }
+
+  private async _loadInferenceBadge(): Promise<void> {
+    try {
+      const status = (await this.caller.inference?.health())?.status ?? "down";
+      this.inferenceInfo = {
+        status,
+        tone: status === "ok" ? "green" : status === "degraded" ? "yellow" : "red",
+      };
+    } catch {
+      this.inferenceInfo = { status: "down", tone: "red" };
+    }
+  }
+
+  private _formatInferenceBadge(): string {
+    const label = `Inference:${this.inferenceInfo.status}`;
+    if (this.inferenceInfo.tone === "green") return c.green(label);
+    if (this.inferenceInfo.tone === "yellow") return c.yellow(label);
+    return c.red(label);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -198,6 +237,9 @@ export class TuiApp {
         break;
       case "flags":
         this._renderFlags();
+        break;
+      case "inference":
+        this._renderInference();
         break;
     }
   }
@@ -233,6 +275,16 @@ export class TuiApp {
     }
   }
 
+  private _renderInference(): void {
+    this.renderer.writeln();
+    this.renderer.writeln(c.bold("  Settings › Inference"));
+    this.renderer.separator();
+    this.renderer.writeln();
+    this.renderer.infoRow("Backend", this._formatInferenceBadge());
+    this.renderer.writeln();
+    this.renderer.writeln(c.dim("  Press [q] to go back"));
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Keyboard handling
   // ─────────────────────────────────────────────────────────────────────────
@@ -258,6 +310,14 @@ export class TuiApp {
       const consumed = await this.flagsScreen.handleKey(key);
       if (!consumed) return;
       this._renderCurrentScreen();
+      return;
+    }
+
+    if (this.currentScreen === "inference") {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        this._renderCurrentScreen();
+      }
       return;
     }
 
@@ -341,6 +401,10 @@ export class TuiApp {
       await this.flagsScreen.load();
     }
 
+    if (screen === "inference") {
+      await this._loadInferenceBadge();
+    }
+
     this._renderCurrentScreen();
   }
 
@@ -361,6 +425,10 @@ export class TuiApp {
   /** Status bar info resolved from auth.whoami (for tests). */
   get statusBarInfo(): { email: string; orgId: string } | null {
     return this.statusInfo;
+  }
+
+  get inferenceBadge(): { status: string; tone: "green" | "yellow" | "red" } {
+    return this.inferenceInfo;
   }
 }
 

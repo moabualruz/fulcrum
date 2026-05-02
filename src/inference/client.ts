@@ -1,16 +1,32 @@
 import { inject, injectable as Injectable } from "@needle-di/core";
 import net from "node:net";
+import { z } from "zod";
 
 import { InferenceLifecycle, type InferenceRunning } from "./lifecycle.ts";
 import {
   HealthResultSchema,
   InferenceError,
   InferenceResponseSchema,
+  EmbedResultSchema,
+  GenerateResultSchema,
+  ClassifyResultSchema,
+  TokenizeResultSchema,
+  InferenceModelSchema,
+  ModelPullProgressSchema,
+  BackendSchema,
   encodeJsonRpcFrame,
   normalizeRpcError,
+  type ClassifyResult,
+  type EmbedResult,
+  type GenerateOptions,
+  type GenerateResult,
   type HealthResult,
+  type InferenceBackendInfo,
+  type InferenceModel,
   type InferenceRequest,
   type InferenceResponse,
+  type ModelPullProgress,
+  type TokenizeResult,
 } from "./protocol.ts";
 
 export interface InferenceLifecycleLike {
@@ -26,6 +42,7 @@ export interface InferenceClientOptions {
 
 const DEFAULT_TIMEOUT_MS = 5_000;
 const DEFAULT_RETRY_DELAYS_MS = [100, 200, 400];
+const zOk = z.object({ ok: z.boolean() });
 
 let nextRequestId = 1;
 
@@ -106,6 +123,46 @@ export class InferenceClient {
       backend: "embedded",
       message: lastError instanceof Error ? lastError.message : "Inference request failed",
     }, { cause: lastError });
+  }
+
+  async health(): Promise<HealthResult> {
+    return this.call("health", {});
+  }
+
+  async embed(texts: string[], options: { model?: string } = {}): Promise<EmbedResult> {
+    return EmbedResultSchema.parse(await this.call("embed", { texts, ...options }));
+  }
+
+  async generate(prompt: string, options: GenerateOptions = {}): Promise<GenerateResult> {
+    return GenerateResultSchema.parse(await this.call("generate", { prompt, options }));
+  }
+
+  async classify(text: string, labels: string[]): Promise<ClassifyResult> {
+    return ClassifyResultSchema.parse(await this.call("classify", { text, labels }));
+  }
+
+  async tokenize(text: string, model?: string): Promise<TokenizeResult> {
+    return TokenizeResultSchema.parse(await this.call("tokenize", { text, model }));
+  }
+
+  async listModels(): Promise<InferenceModel[]> {
+    return InferenceModelSchema.array().parse(await this.call("models.list", {}));
+  }
+
+  async *pullModel(modelId: string): AsyncIterable<ModelPullProgress> {
+    const result = await this.call("models.pull", { modelId });
+    const events = Array.isArray(result) ? result : [result];
+    for (const event of events) {
+      yield ModelPullProgressSchema.parse(event);
+    }
+  }
+
+  async rmModel(modelId: string): Promise<{ ok: boolean }> {
+    return zOk.parse(await this.call("models.rm", { modelId }));
+  }
+
+  async listBackends(): Promise<InferenceBackendInfo[]> {
+    return BackendSchema.array().parse(await this.call("backends.list", {}));
   }
 
   private send(socketPath: string, request: InferenceRequest): Promise<InferenceResponse> {

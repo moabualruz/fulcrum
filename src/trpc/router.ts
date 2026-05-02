@@ -20,6 +20,7 @@ import { protectedProcedure } from "./middleware.ts";
 import { flagsRouter } from "../server/trpc/routers/flags.ts";
 import { authRouter } from "../server/trpc/routers/auth.ts";
 import { orgsRouter } from "../server/trpc/routers/orgs.ts";
+import { inferenceRouter } from "../server/trpc/routers/inference.ts";
 
 // Domain stub routers — src/trpc/routers/<domain>.ts
 // Each exports list() → [] until the owning pillar replaces the body.
@@ -71,6 +72,7 @@ export const appRouter = t.router({
   // Real implementations
   flags: flagsRouter,
   orgs: orgsRouter,
+  inference: inferenceRouter,
   orchestration: orchestrationRouter,
   health: healthRouter,
 });
