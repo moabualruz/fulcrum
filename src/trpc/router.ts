@@ -15,6 +15,7 @@ import { flagsRouter } from "../server/trpc/routers/flags.ts";
 import { inferenceRouter } from "../server/trpc/routers/inference.ts";
 import { orgsRouter } from "../server/trpc/routers/orgs.ts";
 import { orchestrationRouter } from "./routers/orchestration.ts";
+import { credentialsRouter } from "../secrets/credentials-router.ts";
 
 const EmptyInputSchema = z.void();
 const IdInputSchema = z.object({ id: z.string().min(1) });
@@ -353,6 +354,7 @@ export const appRouter = t.router({
   connectors: connectorsRouter,
   doctor: doctorRouter,
   invitations: invitationsRouter,
+  credentials: credentialsRouter,
 
   db: dbRouter,
   health: healthRouter,
