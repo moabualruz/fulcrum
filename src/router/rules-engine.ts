@@ -9,6 +9,7 @@ import { createOrmConfig, RoutingRule } from "../db/mikro-orm.config.ts";
 import type { RoutingRule as RoutingRuleEntity } from "../db/entities/router/RoutingRule.ts";
 import type { RoutingRuleRepository } from "../db/repositories/router/RoutingRuleRepository.ts";
 import type { TaskFacts } from "./types.ts";
+import { RoutingEventBus } from "./event-bus.ts";
 
 interface RulesEngineConfig {
   routingRuleRepository: RoutingRuleRepository | null;
@@ -53,10 +54,54 @@ export async function evaluateRuleMatch(
 
 export type { TaskFacts } from "./types.ts";
 
+export class RulesEngine {
+  private stale = true;
+  private cachedRules: RoutingRuleEntity[] | null = null;
+  private cachedKey: string | null = null;
+  private subscribed = false;
+
+  constructor(
+    private readonly repository: RoutingRuleRepository,
+    private readonly eventBus: RoutingEventBus,
+  ) {}
+
+  initialize(): void {
+    if (this.subscribed) return;
+    this.eventBus.onRulesChanged(() => {
+      this.stale = true;
+    });
+    this.subscribed = true;
+  }
+
+  async evaluateRules(facts: TaskFacts, orgId: string, projectId?: string): Promise<string | null> {
+    const match = await this.evaluateRuleMatch(facts, orgId, projectId);
+    return match?.agent ?? null;
+  }
+
+  async evaluateRuleMatch(facts: TaskFacts, orgId: string, projectId?: string): Promise<RuleMatch | null> {
+    const cacheKey = `${orgId}:${projectId ?? ""}`;
+    if (this.stale || this.cachedRules === null || this.cachedKey !== cacheKey) {
+      this.cachedRules = await this.repository.findEnabledForDispatch(orgId, projectId ?? null);
+      this.cachedKey = cacheKey;
+      this.stale = false;
+    }
+
+    for (const rule of sortRulesForDispatch(this.cachedRules, projectId)) {
+      const agent = await evaluateRule(rule, facts, this.repository, () => {
+        this.stale = true;
+      });
+      if (agent) return { ruleId: rule.id, agent };
+    }
+
+    return null;
+  }
+}
+
 async function evaluateRule(
   rule: RoutingRuleEntity,
   facts: TaskFacts,
   repository: RoutingRuleRepository,
+  onDisable?: () => void,
 ): Promise<string | null> {
   try {
     const engine = new Engine([], { allowUndefinedFacts: true });
@@ -71,6 +116,7 @@ async function evaluateRule(
     return result.events.length > 0 ? rule.actionAgent : null;
   } catch (error) {
     await disableMalformedRule(rule, repository, error);
+    onDisable?.();
     return null;
   }
 }

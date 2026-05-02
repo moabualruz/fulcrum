@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Owner: codex-orchestrator
 Triage: AFK
 Pillar: 05-router-and-skills
@@ -16,13 +16,13 @@ Implement a repository-backed hot-reload hook in `src/router/rules-engine.ts` so
 
 ## Acceptance criteria
 
-- [ ] Schema / module: no new schema object required; `RoutingRuleRepository` emits `RoutingRulesChanged` after successful `em.flush()`.
-- [ ] Logic: `RulesEngine` class subscribes to `RoutingRulesChanged` via injectable event bus at startup.
-- [ ] Logic: handler sets a stale flag; next `evaluateRules` call reloads rules via `RoutingRuleRepository.findEnabledForDispatch(...)`.
-- [ ] Logic: rule inserted via `trpc.routing.create` is picked up by the next `evaluateRules` call in the same process within 100ms
-- [ ] Logic: process restart not required for new rules to take effect
-- [ ] Tests: integration test — create rule via repository → assert next `evaluateRules` call returns the new rule's agent (no restart)
-- [ ] Tests: assert no duplicate event-bus subscriptions on repeated `initialize()` calls
+- [x] Schema / module: no new schema object required; `RoutingRuleRepository` emits `RoutingRulesChanged` after successful `em.flush()`.
+- [x] Logic: `RulesEngine` class subscribes to `RoutingRulesChanged` via injectable event bus at startup.
+- [x] Logic: handler sets a stale flag; next `evaluateRules` call reloads rules via `RoutingRuleRepository.findEnabledForDispatch(...)`.
+- [x] Logic: rule inserted via `trpc.routing.create` is picked up by the next `evaluateRules` call in the same process within 100ms
+- [x] Logic: process restart not required for new rules to take effect
+- [x] Tests: integration test — create rule via repository → assert next `evaluateRules` call returns the new rule's agent (no restart)
+- [x] Tests: assert no duplicate event-bus subscriptions on repeated `initialize()` calls
 
 ## Blocked by
 
