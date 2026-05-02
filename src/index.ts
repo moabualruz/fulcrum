@@ -51,6 +51,8 @@ Usage:
                                      Run an FTS query over the product kernel search index.
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
                                      Render the assembled Markdown context for a task.
+  fulcrum symphony runs list --state ready [--json]
+                                     List Symphony candidate tasks ready for dispatch.
   fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
   fulcrum version                    Print version.
   fulcrum help                       This message.
@@ -71,7 +73,8 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "db":
     case "web":
     case "tui":
-    case "inference": {
+    case "inference":
+    case "symphony": {
       const { run: runCli } = await import("./cli/index.ts");
       await runCli([cmd, ...rest]);
       return;

@@ -34,6 +34,7 @@ Usage:
   fulcrum init
   fulcrum auth <whoami|login|logout> [options]
   fulcrum flags <list|set> [options]
+  fulcrum symphony runs list --state ready [--json]
   fulcrum db <migrate|status|history> [options]
   fulcrum web
   fulcrum tui
@@ -200,6 +201,22 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       const { container, cleanup } = await buildDbContainer();
       try {
         await runDb(rest, container);
+      } finally {
+        await cleanup();
+      }
+      return;
+    }
+    case "symphony": {
+      const { run: runSymphony } = await import("./commands/symphony.ts");
+      const [sub = "help"] = rest;
+      if (sub === "help" || sub === "--help" || sub === "-h") {
+        await runSymphony(rest);
+        return;
+      }
+
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runSymphony(rest, { container });
       } finally {
         await cleanup();
       }
