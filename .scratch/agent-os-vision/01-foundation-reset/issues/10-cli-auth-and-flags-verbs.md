@@ -43,3 +43,5 @@ Cuts through: CLI entry (`src/index.ts`) → `src/cli/auth.ts` / `src/cli/flags.
 
 ## Notes
 Per Q-cli-shape: auto-codegen from tRPC schema is the long-term goal but for this pillar hand-roll the CLI wrappers — codegen tooling lives in a later pillar. `--non-interactive` on `auth login` is required for CI/scripting scenarios.
+
+Review follow-up: `fulcrum auth invite <email> [--role ...] [--json]` now calls `auth.invite` through the in-process caller. `auth login` and `auth logout` still defer full session persistence/invalidation, but now report "not yet implemented" on stderr and exit non-zero so scripts cannot treat stubs as success.

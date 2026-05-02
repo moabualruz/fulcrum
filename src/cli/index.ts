@@ -32,7 +32,7 @@ const HELP = `fulcrum
 
 Usage:
   fulcrum init
-  fulcrum auth <whoami|login|logout> [options]
+  fulcrum auth <whoami|invite|login|logout> [options]
   fulcrum flags <list|set> [options]
   fulcrum symphony runs list --state ready [--json]
   fulcrum db <migrate|status|history> [options]

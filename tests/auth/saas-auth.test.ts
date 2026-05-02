@@ -53,6 +53,12 @@ afterAll(async () => {
   if (orm) await orm.close(true);
 });
 
+afterEach(() => {
+  if (process.exitCode === 99) {
+    process.exitCode = 0;
+  }
+});
+
 // ─────────────────────────────────────────────────────────────────
 // Env var restoration helper
 // ─────────────────────────────────────────────────────────────────
@@ -136,6 +142,86 @@ describe("saas-auth flag ON — OAuth enabled", () => {
     delete process.env["GOOGLE_CLIENT_ID"];
     delete process.env["GOOGLE_CLIENT_SECRET"];
   }));
+
+  it("does not register google OAuth when credentials are empty", withSaasAuthFlag(true, async () => {
+    const origId = process.env["GOOGLE_CLIENT_ID"];
+    const origSecret = process.env["GOOGLE_CLIENT_SECRET"];
+    delete process.env["GOOGLE_CLIENT_ID"];
+    delete process.env["GOOGLE_CLIENT_SECRET"];
+
+    const svc = new AuthService(orm.em);
+    await svc.init();
+
+    const req = new Request("http://localhost/api/auth/sign-in/social", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ provider: "google", callbackURL: "/dashboard" }),
+    });
+
+    const res = await svc.handler(req);
+    expect(res.status).toBe(404);
+
+    if (origId !== undefined) process.env["GOOGLE_CLIENT_ID"] = origId;
+    if (origSecret !== undefined) process.env["GOOGLE_CLIENT_SECRET"] = origSecret;
+  }));
+
+  it("does not register github OAuth unless both credentials are non-empty", withSaasAuthFlag(true, async () => {
+    const origId = process.env["GITHUB_CLIENT_ID"];
+    const origSecret = process.env["GITHUB_CLIENT_SECRET"];
+    process.env["GITHUB_CLIENT_ID"] = "test-github-client-id";
+    delete process.env["GITHUB_CLIENT_SECRET"];
+
+    const svc = new AuthService(orm.em);
+    await svc.init();
+
+    const req = new Request("http://localhost/api/auth/sign-in/social", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ provider: "github", callbackURL: "/dashboard" }),
+    });
+
+    const res = await svc.handler(req);
+    expect(res.status).toBe(404);
+
+    if (origId !== undefined) process.env["GITHUB_CLIENT_ID"] = origId;
+    else delete process.env["GITHUB_CLIENT_ID"];
+    if (origSecret !== undefined) process.env["GITHUB_CLIENT_SECRET"] = origSecret;
+  }));
+
+  it("rebuilds the auth handler when saas-auth flag changes at runtime", async () => {
+    const origFlag = process.env["FULCRUM_FLAG_SAAS_AUTH"];
+    const origId = process.env["GOOGLE_CLIENT_ID"];
+    const origSecret = process.env["GOOGLE_CLIENT_SECRET"];
+    process.env["FULCRUM_FLAG_SAAS_AUTH"] = "false";
+
+    const svc = new AuthService(orm.em);
+    await svc.init();
+    const offReq = new Request("http://localhost/api/auth/sign-in/social", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ provider: "google", callbackURL: "/dashboard" }),
+    });
+    expect((await svc.handler(offReq)).status).toBe(404);
+
+    process.env["FULCRUM_FLAG_SAAS_AUTH"] = "true";
+    process.env["GOOGLE_CLIENT_ID"] = "test-google-client-id";
+    process.env["GOOGLE_CLIENT_SECRET"] = "test-google-client-secret";
+
+    const onReq = new Request("http://localhost/api/auth/sign-in/social", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ provider: "google", callbackURL: "/dashboard" }),
+    });
+    const res = await svc.handler(onReq);
+    expect(res.status).toBe(200);
+
+    if (origFlag !== undefined) process.env["FULCRUM_FLAG_SAAS_AUTH"] = origFlag;
+    else delete process.env["FULCRUM_FLAG_SAAS_AUTH"];
+    if (origId !== undefined) process.env["GOOGLE_CLIENT_ID"] = origId;
+    else delete process.env["GOOGLE_CLIENT_ID"];
+    if (origSecret !== undefined) process.env["GOOGLE_CLIENT_SECRET"] = origSecret;
+    else delete process.env["GOOGLE_CLIENT_SECRET"];
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────

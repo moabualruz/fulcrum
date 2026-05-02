@@ -50,6 +50,12 @@ describe("P1 test coverage matrix", () => {
       expect(matches.length).toBeGreaterThan(0);
     });
   }
+
+  it("keeps Playwright coverage for auth login/logout routes", async () => {
+    const files = await collectFiles("src/web/tests/e2e");
+    const authSpecs = files.filter((file) => /auth.*\.spec\.ts$/.test(file));
+    expect(authSpecs.length).toBeGreaterThan(0);
+  });
 });
 
 describe("scripts/ci.ts baseline gate", () => {

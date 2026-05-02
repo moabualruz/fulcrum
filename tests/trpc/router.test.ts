@@ -14,12 +14,14 @@
 import { describe, it, expect } from "bun:test";
 import { TRPCError } from "@trpc/server";
 import { Container } from "@needle-di/core";
+import { z } from "zod";
 
 import { appRouter } from "../../src/trpc/router.ts";
 import { createContext } from "../../src/trpc/context.ts";
 import { t } from "../../src/trpc/trpc.ts";
 import { FlagRegistry } from "../../src/flags/registry.ts";
 import { CasbinRuleRepository } from "../../src/db/repositories/flags/CasbinRuleRepository.ts";
+import { protectedProcedure } from "../../src/trpc/middleware.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 
@@ -171,6 +173,79 @@ describe("assertPermission middleware", () => {
     const result = await caller.auth.whoami();
     expect(result.userId).toBe("user-test-001");
     expect(result.orgId).toBe("00000000-0000-0000-0000-000000000001");
+  });
+
+  it("derives casbin resource/action from procedure path when input omits them", async () => {
+    const rows = [{ ptype: "p", v0: "user-test-001", v1: "secure", v2: "read" }];
+
+    const container = new Container();
+    container.bind({
+      provide: FlagRegistry,
+      useValue: { isEnabled: async () => true } as unknown as FlagRegistry,
+    });
+    container.bind({
+      provide: CasbinRuleRepository,
+      useValue: {
+        findAll: async () => rows,
+      } as unknown as CasbinRuleRepository,
+    });
+
+    const router = t.router({
+      secure: protectedProcedure.query(() => "ok"),
+    });
+    const caller = t.createCallerFactory(router)(
+      createContext({
+        session: mockSession({ userId: "user-test-001" }) as unknown as import("better-auth").Session,
+        orgId: "00000000-0000-0000-0000-000000000001",
+        userId: "user-test-001",
+        em: null,
+        container,
+      }),
+    );
+
+    expect(await caller.secure()).toBe("ok");
+  });
+
+  it("ignores spoofed casbin resource/action input and enforces server route identity", async () => {
+    const rows = [
+      { ptype: "p", v0: "user-test-001", v1: "public", v2: "read" },
+      { ptype: "p", v0: "user-test-001", v1: "secure", v2: "read" },
+    ];
+    const repo = {
+      findAll: async () => rows,
+    } as unknown as CasbinRuleRepository;
+
+    const container = new Container();
+    container.bind({
+      provide: FlagRegistry,
+      useValue: { isEnabled: async () => true } as unknown as FlagRegistry,
+    });
+    container.bind({ provide: CasbinRuleRepository, useValue: repo });
+
+    const router = t.router({
+      secure: protectedProcedure
+        .input(z.object({ resource: z.string(), action: z.string() }))
+        .mutation(() => "ok"),
+    });
+    const caller = t.createCallerFactory(router)(
+      createContext({
+        session: mockSession({ userId: "user-test-001" }) as unknown as import("better-auth").Session,
+        orgId: "00000000-0000-0000-0000-000000000001",
+        userId: "user-test-001",
+        em: null,
+        container,
+      }),
+    );
+
+    let error: TRPCError | null = null;
+    try {
+      await caller.secure({ resource: "public", action: "read" });
+    } catch (e) {
+      if (e instanceof TRPCError) error = e;
+    }
+
+    expect(error).not.toBeNull();
+    expect(error?.code).toBe("FORBIDDEN");
   });
 });
 

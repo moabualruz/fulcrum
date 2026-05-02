@@ -35,3 +35,5 @@ Cuts through: SvelteKit page/server routes → Better-Auth client/server (with M
 
 ## Notes
 Local mode: `/auth/signup` returns 403 when `saas-auth` flag is OFF (local-mode users never need to sign up manually). Signup page is shipped, gated — not deferred.
+
+Review follow-up: added Playwright auth coverage at `src/web/tests/e2e/auth-login.spec.ts` for login page local-auth controls, SaaS OAuth absence, and logout redirect. Full seeded `admin@local` login/session-row round trip remains dependent on the e2e global setup seeding path.

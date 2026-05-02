@@ -56,6 +56,16 @@ async function isCasbinPoliciesEnabled(ctx: TRPCContext): Promise<boolean> {
   }
 }
 
+function resourceFromProcedurePath(path: string): string {
+  return path.split(".").filter(Boolean)[0] ?? path;
+}
+
+function actionFromProcedureType(type: "query" | "mutation" | "subscription"): string {
+  if (type === "query") return "read";
+  if (type === "mutation") return "write";
+  return "subscribe";
+}
+
 /**
  * assertPermission middleware.
  *
@@ -63,7 +73,7 @@ async function isCasbinPoliciesEnabled(ctx: TRPCContext): Promise<boolean> {
  * Phase 2: when `casbin-policies` flag is ON, calls checkCasbinGate() before
  *   passing through to Better-Auth. When flag is OFF: existing session-only check.
  */
-export const assertPermission = t.middleware(async ({ ctx, next }) => {
+export const assertPermission = t.middleware(async ({ ctx, next, path, type }) => {
   if (!ctx.session) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
@@ -99,25 +109,12 @@ export const assertPermission = t.middleware(async ({ ctx, next }) => {
         const adapter = new FulcrumCasbinAdapter(casbinRepo);
         const enforcerSvc = new CasbinEnforcerService(adapter);
 
-        // Extract resource + action from raw input if provided.
-        // Procedures pass { resource, action } to opt-in to casbin enforcement.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rawInput = (ctx as any).rawInput as unknown;
-        if (
-          rawInput !== null &&
-          rawInput !== undefined &&
-          typeof rawInput === "object"
-        ) {
-          const inp = rawInput as Record<string, unknown>;
-          if (typeof inp["resource"] === "string" && typeof inp["action"] === "string") {
-            await checkCasbinGate(
-              enforcerSvc,
-              ctx.userId,
-              inp["resource"],
-              inp["action"],
-            );
-          }
-        }
+        await checkCasbinGate(
+          enforcerSvc,
+          ctx.userId,
+          resourceFromProcedurePath(path),
+          actionFromProcedureType(type),
+        );
       } catch (e) {
         // Re-throw TRPCErrors (FORBIDDEN from checkCasbinGate)
         if (e instanceof TRPCError) throw e;
