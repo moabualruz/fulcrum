@@ -38,7 +38,7 @@ Usage:
   fulcrum db <migrate|status|history> [options]
   fulcrum web
   fulcrum tui
-  fulcrum inference
+  fulcrum inference <start|status|stop> [--json]
 `;
 
 function fulcrumHome(): string {
@@ -230,9 +230,11 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       await runTui(rest);
       return;
     }
-    case "inference":
-      console.log("Inference sidecar not yet implemented");
+    case "inference": {
+      const { run: runInference } = await import("./inference.ts");
+      await runInference(rest);
       return;
+    }
     case "help":
     case "--help":
     case "-h":
