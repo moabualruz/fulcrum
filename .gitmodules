@@ -1,0 +1,4 @@
+[submodule "vendor/openai-symphony"]
+	path = vendor/openai-symphony
+	url = https://github.com/openai/symphony
+	branch = main

@@ -42,6 +42,7 @@ export const BUN_CACHE_ISOLATED_CI_ENV: NodeJS.ProcessEnv = {
 export const STEPS: Step[] = [
   { name: "install",     cmd: ["bun", "install", "--frozen-lockfile"], env: "bun-cache-isolated" },
   { name: "typecheck",   cmd: ["bun", "run", "--bun", "tsc", "--noEmit"] },
+  { name: "symphony:lock", cmd: ["bun", "test", "tests/symphony/spec-lock.test.ts"] },
   { name: "test",        cmd: ["bun", "test", "--conditions=svelte"], env: "home-isolated" },
   { name: "license-audit", cmd: ["bun", "run", "scripts/license-audit.ts"] },
   { name: "build:all",   cmd: ["bun", "run", "scripts/build-all.ts"] },
