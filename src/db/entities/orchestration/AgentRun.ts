@@ -56,6 +56,7 @@ export class AgentRun {
     | "workspaceDiffPath"
     | "agentName"
     | "agentVersion"
+    | "claimedBy"
     | "searchDoc";
 
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
@@ -126,6 +127,9 @@ export class AgentRun {
 
   @Property({ type: "string", fieldName: "agent_version", nullable: true })
   agentVersion?: string;
+
+  @Property({ type: "string", fieldName: "claimed_by", nullable: true })
+  claimedBy?: string;
 
   @ManyToOne(() => SearchDocument, { fieldName: "search_doc_id", nullable: true })
   searchDoc?: SearchDocument;

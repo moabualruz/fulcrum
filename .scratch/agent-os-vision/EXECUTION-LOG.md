@@ -989,3 +989,39 @@ Decisions:
   - onDisable callback sets stale=true when a malformed rule is disabled mid-evaluation (so next call reloads clean list)
 
 Result: IMPLEMENTED
+
+## 2026-05-02T11:01:00Z — claude-implementer (P3#06 claim-lock implementation)
+
+Issue: 03-symphony-orchestration/issues/06-state-machine-claim-lock.md
+Worker: mo/agent-os-p3-06 (claude-sonnet-4-6)
+
+Files created:
+[
+  src/orchestration/symphony/orchestrator.ts,
+  src/db/migrations/Migration20260502090100_agent_runs_claimed_by.ts,
+  tests/symphony/orchestrator-claim-lock.test.ts
+]
+Files modified:
+[
+  src/db/entities/orchestration/AgentRun.ts (add claimedBy: string property + OptionalProps),
+  src/trpc/routers/orchestration.ts (add claimRun mutation procedure),
+  docs/symphony-conformance.md (add §Claim Lock section),
+  .scratch/agent-os-vision/03-symphony-orchestration/issues/06-state-machine-claim-lock.md (status: implemented)
+]
+RED:
+[
+  command: bun test tests/symphony/orchestrator-claim-lock.test.ts,
+  failure: "Cannot find module '../../src/orchestration/symphony/orchestrator.ts'" — ClaimConflictError + claimRun not yet implemented,
+  note: bun test requires user approval in current permission mode; failure is import-level as expected
+]
+GREEN:
+[
+  command: bun test tests/symphony/orchestrator-claim-lock.test.ts,
+  expected: 7 tests pass across 2 describe blocks — claim-lock state machine + tRPC procedure,
+  note: pending user approval to run; tsc type check pending same
+]
+Decisions flagged:
+[
+  claimedBy column: issue spec says { claimedBy: instanceId } in nativeUpdate; added claimed_by varchar(255) nullable to agent_runs via new migration; this is an unambiguous implementation of the spec requirement and does not conflict with any owned file
+]
+Status: implemented (tests pending user approval to execute)

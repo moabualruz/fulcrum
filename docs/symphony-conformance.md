@@ -59,6 +59,18 @@ Prompt template: `src/orchestration/symphony/prompt.ts:renderPrompt` renders Liq
 
 ### Operator-visible observability (structured logs; OPTIONAL snapshot/status surface)
 
+## §Claim Lock — Unclaimed → Claimed Transition
+
+Mapping: `src/orchestration/symphony/orchestrator.ts:claimRun`
+
+| Requirement | Implementation |
+|---|---|
+| Atomic state transition `unclaimed → claimed` | `agentRunRepo.nativeUpdate({ org, task: taskId, orchestrationState: 'unclaimed' }, { orchestrationState: 'claimed', claimedBy: instanceId })` — single UPDATE WHERE clause; if 0 rows affected → `ClaimConflictError` |
+| No double-dispatch | `agent_runs_claimed_unique` partial unique index on `(task_id) WHERE orchestration_state='claimed'` acts as DB-level guard; nativeUpdate WHERE filter is the primary synchronization primitive |
+| Events row on success | `eventsRepo.create({ org, subjectKind: 'agent_run', subjectId: claimed.id, verb: 'state_changed', payload: { from: 'unclaimed', to: 'claimed' } })` + `fork.flush()` |
+| Internal tRPC surface | `orchestration.claimRun` mutation in `src/trpc/routers/orchestration.ts`; maps `ClaimConflictError → TRPCError(CONFLICT)` |
+| Poll-loop callable | `claimRun(em, orgId, taskId, instanceId)` signature ready for Pillar 3 slice 10 orchestrator poll loop |
+
 ## AgentRun Orchestration State Trace
 
 Source: `vendor/openai-symphony/SPEC.md` section 7.1 Issue Orchestration States and section 7.2 Run Attempt Lifecycle.
