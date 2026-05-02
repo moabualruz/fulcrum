@@ -6,6 +6,14 @@ export { Task } from "./Task.ts";
 export { TaskStatus } from "./TaskStatus.ts";
 export { Sprint, SprintStatus } from "./Sprint.ts";
 export {
+  CustomFieldDef,
+  CUSTOM_FIELD_TYPES,
+  CustomFieldConfigSchema,
+  seedDefaultFields,
+  type CustomFieldType,
+  type CustomFieldConfig,
+} from "./CustomFieldDef.ts";
+export {
   SavedView,
   SAVED_VIEW_SCOPES,
   SAVED_VIEW_TYPES,
