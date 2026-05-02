@@ -1,6 +1,6 @@
 import type { MikroORM } from "@mikro-orm/postgresql";
-import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 
@@ -128,6 +128,7 @@ async function withSkillsLock<T>(fn: () => Promise<T>): Promise<T> {
   const lockDir = `${skillsLockPath()}.lock`;
   const lockInfoPath = join(lockDir, "lock.json");
   await mkdir(dirname(lockDir), { recursive: true });
+  await removeAbandonedStaleLockClaims(lockDir);
   const startedAt = Date.now();
 
   while (true) {
@@ -193,6 +194,23 @@ async function removeStaleLock(
   }
   await rm(claimedDir, { recursive: true, force: true });
   return true;
+}
+
+async function removeAbandonedStaleLockClaims(lockDir: string): Promise<void> {
+  const parent = dirname(lockDir);
+  const stalePrefix = `${basename(lockDir)}.stale-`;
+  const entries = await readdir(parent, { withFileTypes: true }).catch(
+    (error) => {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+      throw error;
+    },
+  );
+
+  await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory() && entry.name.startsWith(stalePrefix))
+      .map((entry) => rm(join(parent, entry.name), { recursive: true, force: true })),
+  );
 }
 
 function isProcessAlive(pid: number): boolean {

@@ -302,6 +302,34 @@ describe("installSkill", () => {
     expect(await pathExists(lockDir)).toBe(false);
   });
 
+  it("removes an old skills lock directory when lock.json is corrupt", async () => {
+    const lockDir = join(process.env["FULCRUM_HOME"]!, "skills.lock.json.lock");
+    await mkdir(lockDir, { recursive: true });
+    await writeFile(join(lockDir, "lock.json"), "not json", "utf8");
+    const old = new Date(Date.now() - 61_000);
+    await utimes(lockDir, old, old);
+
+    expect(await __removeStaleSkillsLockForTest(lockDir)).toBe(true);
+    expect(await pathExists(lockDir)).toBe(false);
+  });
+
+  it("cleans orphaned stale lock claim directories before install", async () => {
+    const lockDir = join(process.env["FULCRUM_HOME"]!, "skills.lock.json.lock");
+    const staleClaimDir = `${lockDir}.stale-orphan`;
+    await mkdir(staleClaimDir, { recursive: true });
+    const skillPath = await writeSkill("stale-claim", {
+      name: "stale-claim",
+      version: "1.0.0",
+      agents: ["codex"],
+      triggers: ["stale-claim"],
+    });
+
+    await installSkill(skillPath, testDb.seed.orgId);
+
+    expect(await pathExists(staleClaimDir)).toBe(false);
+    expect(await pathExists(await installedPath("codex", "stale-claim"))).toBe(true);
+  });
+
   it("reinstalling the same content skips rewriting installed file", async () => {
     const skillPath = await writeSkill("stable", {
       name: "stable",
