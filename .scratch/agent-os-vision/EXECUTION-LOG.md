@@ -1025,6 +1025,34 @@ Decisions flagged:
 ]
 Status: implemented; integrated focused test passed
 
+## 2026-05-02T10:37:54Z — codex-orchestrator (next safe dispatch while review gate runs)
+
+State:
+[
+  full_ci: PASS (`bun run ci`, 12/12 stages green),
+  integration_branch: plan/agent-os-vision clean at 40e8550c,
+  active_reviews: [
+    Claude Code branch review over origin/plan/agent-os-vision..HEAD,
+    Codex correctness review for P3/P5,
+    Codex security review for auth/API/P13,
+    Codex data-integrity review for schema/snapshot/P6
+  ]
+]
+
+Dispatched:
+[
+  08-memory-context-engine/issues/01-schema-migration-core.md -> Codex worker, owner: codex-orchestrator, write scope: src/db/entities/memory/*, src/db/repositories/memory/*, src/db/migrations/*memory*, src/db/mikro-orm.config.ts, focused tests for memory schema + doctor check only,
+  14-cli-codegen/issues/01-codegen-scaffold.md -> Codex worker, owner: codex-orchestrator, write scope: scripts/cli/codegen.ts, src/cli/generated/*, CLI codegen tests/snapshots/package scripts only
+]
+
+Underfilled reason:
+[
+  active integration review gate still covers auth/API/router/Symphony/schema files,
+  only one schema migration lane dispatched to avoid migration snapshot conflicts,
+  governance issue 17#12 is HITL for contact email/tone before merge,
+  no additional same-file tRPC/auth/router/Symphony lanes dispatched until review findings resolve
+]
+
 ## 2026-05-02T11:02:00Z — codex (implemented P6#01 tasks schema extension)
 
 Issue:

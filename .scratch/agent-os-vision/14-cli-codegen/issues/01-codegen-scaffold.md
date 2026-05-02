@@ -1,6 +1,7 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
+Owner: codex-orchestrator
 Pillar: cli-codegen
 Blocked-by: []
 PRD: .scratch/agent-os-vision/prds/14-cli-codegen.md
