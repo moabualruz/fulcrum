@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [01-schema-migration-core.md]
@@ -25,18 +25,26 @@ All output rows carry `source='heuristic'`. No DB writes here — this is a pure
 
 ## Acceptance criteria
 
-- [ ] `HeuristicExtractor` is `@Injectable()` and resolved through needle-di
-- [ ] `HeuristicExtractor.extractMemories(text)` is deterministic with no DB writes or I/O
-- [ ] Pass 1: fixture transcript with `"[wrote] src/foo.ts"` → row `{ kind: 'file_ref', body: 'src/foo.ts', source: 'heuristic' }`
-- [ ] Pass 2: `"decided: use PGlite"` and `"## Decision\nuse PGlite"` each → `{ kind: 'decision', importance: 'high' }`; covers 5 decision-pattern variants
-- [ ] Pass 3: `"## Summary"` and `"### Details"` → `{ kind: 'section_anchor' }`
-- [ ] Pass 4: `"blocked by issue #12"` and `"waiting on review"` → `{ kind: 'blocker', importance: 'high' }`
-- [ ] Pass 5: `"[[Foo Bar]]"` → `{ kind: 'link', body: 'Foo Bar' }`; bare URL `https://example.com` → `{ kind: 'link' }`
-- [ ] Fixture transcript with all patterns → ≥1 row of each `kind`
-- [ ] Empty string input returns `[]`
-- [ ] No cross-pass duplicates for same span (span-tracking prevents double-extraction)
-- [ ] Unit tests in `src/memory/__tests__/extractor-heuristic.test.ts` all green
+- [x] `HeuristicExtractor` is `@Injectable()` and resolved through needle-di
+- [x] `HeuristicExtractor.extractMemories(text)` is deterministic with no DB writes or I/O
+- [x] Pass 1: fixture transcript with `"[wrote] src/foo.ts"` → row `{ kind: 'file_ref', body: 'src/foo.ts', source: 'heuristic' }`
+- [x] Pass 2: `"decided: use PGlite"` and `"## Decision\nuse PGlite"` each → `{ kind: 'decision', importance: 'high' }`; covers 5 decision-pattern variants
+- [x] Pass 3: `"## Summary"` and `"### Details"` → `{ kind: 'section_anchor' }`
+- [x] Pass 4: `"blocked by issue #12"` and `"waiting on review"` → `{ kind: 'blocker', importance: 'high' }`
+- [x] Pass 5: `"[[Foo Bar]]"` → `{ kind: 'link', body: 'Foo Bar' }`; bare URL `https://example.com` → `{ kind: 'link' }`
+- [x] Fixture transcript with all patterns → ≥1 row of each `kind`
+- [x] Empty string input returns `[]`
+- [x] No cross-pass duplicates for same span (span-tracking prevents double-extraction)
+- [x] Unit tests in `src/memory/__tests__/extractor-heuristic.test.ts` all green
 
 ## Blocked by
 
 - `01-schema-migration-core.md`
+
+## EXECUTION-LOG
+
+- 2026-05-02 codex-worker-p8-heuristic-extractor: RED `bun test src/memory/__tests__/extractor-heuristic.test.ts` → missing `../extractor-heuristic.ts`, 0 pass / 1 fail / 1 error.
+- 2026-05-02 codex-worker-p8-heuristic-extractor: implemented `src/memory/extractor-heuristic.ts` as pure needle-di service with ordered file_ref, decision, section_anchor, blocker, link passes and overlap span guard.
+- 2026-05-02 codex-worker-p8-heuristic-extractor: GREEN `bun test src/memory/__tests__/extractor-heuristic.test.ts` → 10 pass / 0 fail / 16 expect.
+- 2026-05-02 codex-worker-p8-heuristic-extractor: `bun run lint` blocked by unrelated untracked `tests/skills/upstream-sync.test.ts` importing missing `../../src/skills/upstream-sync.ts`.
+- 2026-05-02 codex-worker-p8-heuristic-extractor: `bun run ci` later passed install/typecheck/symphony-lock and failed in unrelated inference UI/TUI tests: `tui.pullInferenceModel is not a function`; settings inference page missing expected `Download`.
