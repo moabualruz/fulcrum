@@ -286,6 +286,8 @@ describe("inference tRPC router", () => {
         },
         inference: {
           health: async () => ({ status: "ok" }),
+          classify: async () => [{ label: "task", score: 0.91 }],
+          tokenize: async () => ({ count: 2, tokens: ["hello", "world"] }),
           models: {
             list: async () => [{
               id: "BAAI/bge-small-en-v1.5",
@@ -305,11 +307,17 @@ describe("inference tRPC router", () => {
       await tui.mount();
       await tui.navigateTo("inference");
       await tui.pullInferenceModel("BAAI/bge-small-en-v1.5");
+      await tui.testInferenceClassify("buy groceries", ["task", "question"]);
+      await tui.testInferenceTokenize("hello world");
 
       const body = tty.plainText();
       expect(body).toContain("BAAI/bge-small-en-v1.5");
       expect(body).toContain("Download");
       expect(body).toContain("100%");
+      expect(body).toContain("Classify");
+      expect(body).toContain("task  0.9100");
+      expect(body).toContain("Tokenize");
+      expect(body).toContain("2 tokens");
     } finally {
       tui.stop();
     }

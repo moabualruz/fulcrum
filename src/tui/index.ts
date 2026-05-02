@@ -39,7 +39,7 @@ import { TuiRouter, type TuiRoute } from "./router.ts";
 import { JsonlCrashLog, type TuiCrashLog } from "./crashlog.ts";
 import { DbTelemetrySink, NullTelemetrySink, type TuiTelemetrySink } from "./telemetry.ts";
 import { ENTITY_MANAGER_TOKEN, registerDbBindings } from "../db/db.module.ts";
-import type { InferenceModel, ModelPullProgress } from "../inference/protocol.ts";
+import type { ClassifyResult, InferenceModel, ModelPullProgress, TokenizeResult } from "../inference/protocol.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -68,6 +68,8 @@ export interface TuiCaller {
   };
   inference?: {
     health: () => Promise<{ status: string }>;
+    classify?: (input: { text: string; labels: string[] }) => Promise<ClassifyResult>;
+    tokenize?: (input: { text: string; model?: string }) => Promise<TokenizeResult>;
     models?: {
       list: () => Promise<InferenceModel[]>;
       pull: (input: { modelId: string; force?: boolean }) => AsyncIterable<ModelPullProgress> | Promise<AsyncIterable<ModelPullProgress>>;
@@ -154,6 +156,8 @@ export class TuiApp {
   private inferenceModels: InferenceModel[] = [];
   private inferencePullProgress: (ModelPullProgress & { modelId: string }) | null = null;
   private inferenceLastDownload: (ModelPullProgress & { modelId: string }) | null = null;
+  private inferenceClassifyResult: ClassifyResult | null = null;
+  private inferenceTokenizeResult: TokenizeResult | null = null;
   private inferencePoll: ReturnType<typeof setInterval> | null = null;
   private running = false;
 
@@ -395,6 +399,19 @@ export class TuiApp {
       r.writeln();
       r.writeln(`  Last download ${this.inferenceLastDownload.modelId} ${this.inferenceLastDownload.pct}%`);
     }
+    if (this.inferenceClassifyResult) {
+      r.writeln();
+      r.writeln(c.bold("  Classify"));
+      for (const result of this.inferenceClassifyResult) {
+        r.writeln(`  ${result.label}  ${result.score.toFixed(4)}`);
+      }
+    }
+    if (this.inferenceTokenizeResult) {
+      r.writeln();
+      r.writeln(c.bold("  Tokenize"));
+      r.writeln(`  ${this.inferenceTokenizeResult.count} tokens`);
+      r.writeln(`  ${this.inferenceTokenizeResult.tokens.join(" ")}`);
+    }
     r.writeln();
     r.writeln(c.dim("  Press [q] to go back"));
   }
@@ -553,6 +570,20 @@ export class TuiApp {
     this.inferenceModels = this.inferenceModels.map((model) =>
       model.id === modelId ? { ...model, downloaded: true } : model
     );
+    await this._renderCurrentScreen();
+  }
+
+  async testInferenceClassify(text: string, labels: string[]): Promise<void> {
+    const classify = this.caller.inference?.classify;
+    if (!classify) return;
+    this.inferenceClassifyResult = await classify({ text, labels });
+    await this._renderCurrentScreen();
+  }
+
+  async testInferenceTokenize(text: string, model?: string): Promise<void> {
+    const tokenize = this.caller.inference?.tokenize;
+    if (!tokenize) return;
+    this.inferenceTokenizeResult = await tokenize({ text, model });
     await this._renderCurrentScreen();
   }
 
