@@ -15,11 +15,13 @@ import {
   ManyToOne,
   PrimaryKey,
   Property,
+  Unique,
 } from "@mikro-orm/decorators/es";
 import { OptionalProps } from "@mikro-orm/core";
 import { Org } from "../auth/Org.ts";
 
 @Entity({ tableName: "notification_rules" })
+@Unique({ name: "uq_notification_rules_user_name", properties: ["userId", "name"] })
 @Index({ name: "notification_rules_org_user", properties: ["org", "userId"] })
 @Index({ name: "notification_rules_org_enabled", properties: ["org", "enabled"] })
 export class NotificationRule {

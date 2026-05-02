@@ -32,6 +32,7 @@ import {
 } from ${JSON.stringify(moduleUrl("src/db/entities/auth/index.ts"))};
 import { SeedService } from ${JSON.stringify(moduleUrl("src/db/seed.ts"))};
 import { registerSeedBindings } from ${JSON.stringify(moduleUrl("src/db/seed.module.ts"))};
+import { NotificationRule } from ${JSON.stringify(moduleUrl("src/db/entities/notifications/NotificationRule.ts"))};
 
 const dbDir = process.argv[2];
 if (!dbDir) throw new Error("missing db dir");
@@ -42,7 +43,7 @@ const dialect = new PGliteKyselyDialect(() => pglite);
 const orm = await MikroORM.init({
   dbName: "postgres",
   driverOptions: dialect,
-  entities: [Org, User, Session, Invitation, OrgMember, FeatureFlag, Account],
+  entities: [Org, User, Session, Invitation, OrgMember, FeatureFlag, Account, NotificationRule],
   debug: false,
 });
 
@@ -64,6 +65,7 @@ try {
     sessions: await afterFirstEm.count(Session, {}),
     orgMembers: await afterFirstEm.count(OrgMember, {}),
     accounts: await afterFirstEm.count(Account, {}),
+    notificationRules: await afterFirstEm.count(NotificationRule, {}),
   };
 
   const second = await seed.run();
@@ -74,9 +76,16 @@ try {
     sessions: await afterSecondEm.count(Session, {}),
     orgMembers: await afterSecondEm.count(OrgMember, {}),
     accounts: await afterSecondEm.count(Account, {}),
+    notificationRules: await afterSecondEm.count(NotificationRule, {}),
   };
 
-  console.log(JSON.stringify({ first, second, afterFirst, afterSecond }));
+  const rules = await afterSecondEm.find(
+    NotificationRule,
+    { userId: first.userId },
+    { orderBy: { name: "asc" } },
+  );
+
+  console.log(JSON.stringify({ first, second, afterFirst, afterSecond, rules }));
 } finally {
   await orm.close(true);
   await pglite.close();
@@ -91,6 +100,14 @@ async function runSeedTwice(scratch: string): Promise<{
   second: { orgId: string; userId: string; sessionToken: string };
   afterFirst: Record<string, number>;
   afterSecond: Record<string, number>;
+  rules: Array<{
+    name: string;
+    userId: string;
+    enabled: boolean;
+    active: boolean;
+    channels: string[];
+    eventPattern: Record<string, unknown>;
+  }>;
 }> {
   const runner = await writeRunner(scratch);
   const dbDir = join(scratch, "db");
@@ -127,8 +144,43 @@ describe("SeedService", () => {
     expect(result.second.orgId).toBe(result.first.orgId);
     expect(result.second.userId).toBe(result.first.userId);
     expect(result.second.sessionToken).toBe(result.first.sessionToken);
-    expect(result.afterFirst).toEqual({ orgs: 1, users: 1, sessions: 1, orgMembers: 1, accounts: 1 });
-    expect(result.afterSecond).toEqual({ orgs: 1, users: 1, sessions: 1, orgMembers: 1, accounts: 1 });
+    expect(result.afterFirst).toEqual({ orgs: 1, users: 1, sessions: 1, orgMembers: 1, accounts: 1, notificationRules: 4 });
+    expect(result.afterSecond).toEqual({ orgs: 1, users: 1, sessions: 1, orgMembers: 1, accounts: 1, notificationRules: 4 });
+  });
+
+  test("seeds default notification rules with matchable patterns", async () => {
+    const result = await runSeedTwice(scratch);
+
+    expect(result.rules.map((rule) => rule.name)).toEqual([
+      "assignment-to-me",
+      "mention-of-me",
+      "run-completed-on-my-task",
+      "sprint-changes-affecting-my-tasks",
+    ]);
+    expect(result.rules.every((rule) => rule.userId === result.first.userId)).toBe(true);
+    expect(result.rules.every((rule) => rule.enabled === true && rule.active === true)).toBe(true);
+    expect(result.rules.every((rule) => JSON.stringify(rule.channels) === JSON.stringify(["in-app"]))).toBe(true);
+    expect(result.rules.map((rule) => rule.eventPattern)).toEqual([
+      {
+        subject_kind: "task",
+        verb: "assigned",
+        payload_path_eq: [{ path: "assignee_id", value: "$current_user_id" }],
+      },
+      {
+        verb: "mentioned",
+        payload_path_eq: [{ path: "mentioned_user_id", value: "$current_user_id" }],
+      },
+      {
+        subject_kind: "agent_run",
+        verb: "completed",
+        payload_path_eq: [{ path: "task_id", value: "$tasks_assigned_to_current_user" }],
+      },
+      {
+        subject_kind: "sprint",
+        verb: "changed",
+        payload_path_eq: [{ path: "sprint_id", value: "$sprint_of_my_tasks" }],
+      },
+    ]);
   });
 
   test("creates the session with MikroORM persistAndFlush", async () => {

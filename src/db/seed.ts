@@ -5,6 +5,7 @@ import { hashPassword } from "@better-auth/utils/password";
 import { ENTITY_MANAGER_TOKEN } from "./db.module.ts";
 import { Org } from "./entities/auth/Org.ts";
 import { Account, OrgMember, Session, User } from "./entities/auth/index.ts";
+import { seedDefaultRules } from "../notifications/defaults.ts";
 
 export const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
 export const DEFAULT_ORG_NAME = "Local";
@@ -69,6 +70,8 @@ export class SeedService {
       },
       { onConflictFields: ["orgId", "userId"] },
     );
+
+    await seedDefaultRules(adminUser.id, defaultOrg.id, em);
 
     const credentialAccount = await em.findOne(Account, {
       userId: adminUser.id,

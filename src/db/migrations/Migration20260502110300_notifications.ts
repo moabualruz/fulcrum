@@ -59,6 +59,9 @@ export class Migration20260502110300_notifications extends Migration {
     this.addSql(
       `create index if not exists "notification_rules_org_enabled" on "notification_rules" ("org_id", "enabled")`,
     );
+    this.addSql(
+      `create unique index if not exists "uq_notification_rules_user_name" on "notification_rules" ("user_id", "name")`,
+    );
 
     // ── user_notifications ─────────────────────────────────────────────────────
 
