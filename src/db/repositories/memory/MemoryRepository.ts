@@ -6,35 +6,97 @@
  */
 
 import { injectable } from "@needle-di/core";
-import { EntityRepository } from "@mikro-orm/postgresql";
+import { EntityRepository, raw } from "@mikro-orm/postgresql";
 import type { Memory } from "../../entities/memory/Memory.ts";
 import type { MemoryImportance } from "../../entities/memory/enums.ts";
 import type { NormalizedRetrieverOpts } from "../../../memory/retriever.ts";
 
+const MIN_CANDIDATES = 50;
+const MAX_CANDIDATES = 500;
+const CANDIDATE_MULTIPLIER = 10;
+
+export const MEMORY_IMPORTANCE_BOOSTS = {
+  high: 1,
+  medium: 0,
+  low: 0,
+} as const satisfies Record<MemoryImportance, number>;
+
 @injectable()
 export class MemoryRepository extends EntityRepository<Memory> {
   async searchProjectAndGlobal(opts: NormalizedRetrieverOpts): Promise<Memory[]> {
-    const projectRows = opts.projectId
-      ? await this.find(scopeCriteria(opts, "project") as never, {
-        orderBy: { id: "asc" },
-      })
-      : [];
-    const globalRows = await this.find(scopeCriteria(opts, "global") as never, {
-      orderBy: { id: "asc" },
-    });
+    const candidates = opts.query.trim() === ""
+      ? await this.emptyQueryCandidates(opts)
+      : await this.ftsCandidates(opts);
 
-    const byId = new Map<string, Memory>();
-    for (const row of [...projectRows, ...globalRows]) {
-      if (!byId.has(row.id)) byId.set(row.id, row);
+    const textRankById = new Map<string, number>();
+    for (const candidate of candidates) {
+      const current = textRankById.get(candidate.id);
+      if (current === undefined || candidate.textRank > current) {
+        textRankById.set(candidate.id, candidate.textRank);
+      }
     }
+    const ids = [...textRankById.keys()];
+    if (ids.length === 0) return [];
 
-    return rankMemories([...byId.values()], opts.query)
+    const memories = await this.find({
+      org: opts.orgId,
+      id: { $in: ids },
+    } as never);
+
+    return rankMemories(memories, textRankById)
       .slice(0, opts.topK)
       .map((row) => row.memory);
   }
-}
 
-type ScopeKind = "project" | "global";
+  private async ftsCandidates(
+    opts: NormalizedRetrieverOpts,
+  ): Promise<ScoredMemoryCandidate[]> {
+    const query = opts.query.trim();
+    const rankSql =
+      "ts_rank_cd(to_tsvector('english', m.body), plainto_tsquery('english', ?))";
+    const rank = raw(rankSql, [query]);
+    const qb = this.createQueryBuilder("m")
+      .select(["m.id", raw(`${rankSql} as text_rank`, [query])] as never)
+      .where({ org: opts.orgId } as never)
+      .andWhere(
+        "to_tsvector('english', m.body) @@ plainto_tsquery('english', ?)",
+        [query],
+      )
+      .orderBy([
+        { [rank]: "DESC" },
+        { createdAt: "DESC" },
+        { id: "ASC" },
+      ] as never)
+      .limit(candidateLimit(opts));
+
+    applyTypedFilters(qb, opts);
+
+    const rows = await qb.execute<CandidateRow[]>("all", false);
+    return rows.map(toCandidate);
+  }
+
+  private async emptyQueryCandidates(
+    opts: NormalizedRetrieverOpts,
+  ): Promise<ScoredMemoryCandidate[]> {
+    const importanceRank = raw(
+      "case when m.importance = 'high' then 1 else 0 end",
+    );
+    const qb = this.createQueryBuilder("m")
+      .select(["m.id", raw("0 as text_rank")] as never)
+      .where({ org: opts.orgId } as never)
+      .orderBy([
+        { [importanceRank]: "DESC" },
+        { createdAt: "DESC" },
+        { id: "ASC" },
+      ] as never)
+      .limit(candidateLimit(opts));
+
+    applyTypedFilters(qb, opts);
+
+    const rows = await qb.execute<CandidateRow[]>("all", false);
+    return rows.map(toCandidate);
+  }
+}
 
 interface RankedMemory {
   memory: Memory;
@@ -44,102 +106,45 @@ interface RankedMemory {
   score: number;
 }
 
-interface TokenizedMemory {
-  memory: Memory;
-  tokens: string[];
+interface ScoredMemoryCandidate {
+  id: string;
+  textRank: number;
 }
 
-function scopeCriteria(
+interface CandidateRow {
+  id: string;
+  text_rank: number | string;
+}
+
+function applyTypedFilters(
+  qb: ReturnType<MemoryRepository["createQueryBuilder"]>,
   opts: NormalizedRetrieverOpts,
-  scope: ScopeKind,
-): Record<string, unknown> {
-  const criteria: Record<string, unknown> = { org: opts.orgId };
-  if (!opts.includeArchived) criteria["archived"] = false;
-  if (opts.kinds) criteria["kind"] = { $in: opts.kinds };
-  if (scope === "project") {
-    criteria["projectId"] = opts.projectId;
+): void {
+  if (!opts.includeArchived) qb.andWhere({ archived: false } as never);
+  if (opts.kinds) qb.andWhere({ kind: { $in: opts.kinds } } as never);
+  if (opts.projectId) {
+    qb.andWhere({
+      $or: [{ projectId: opts.projectId }, { global: true }],
+    } as never);
   } else {
-    criteria["global"] = true;
+    qb.andWhere({ global: true } as never);
   }
-  return criteria;
 }
 
-function rankMemories(memories: Memory[], query: string): RankedMemory[] {
-  const queryTerms = uniqueTerms(tokenize(query));
-  const textRanks = textRankById(memories, queryTerms);
+function rankMemories(
+  memories: Memory[],
+  textRankById: ReadonlyMap<string, number>,
+): RankedMemory[] {
   const now = new Date();
 
-  return memories
-    .map((memory) => {
-      const textRank = textRanks.get(memory.id) ?? 0;
-      const recencyBoost = recencyBoostFor(memory, now);
-      const importanceBoost = importanceBoostFor(memory.importance);
-      const score = textRank + recencyBoost + importanceBoost;
+  return memories.map((memory) => {
+    const textRank = textRankById.get(memory.id) ?? 0;
+    const recencyBoost = recencyBoostFor(memory, now);
+    const importanceBoost = importanceBoostFor(memory.importance);
+    const score = textRank + recencyBoost + importanceBoost;
 
-      return { memory, textRank, recencyBoost, importanceBoost, score };
-    })
-    .filter((row) => queryTerms.length === 0 || row.textRank > 0)
-    .sort(compareRankedMemories);
-}
-
-function textRankById(
-  memories: Memory[],
-  queryTerms: readonly string[],
-): Map<string, number> {
-  const ranks = new Map<string, number>();
-  if (memories.length === 0 || queryTerms.length === 0) return ranks;
-
-  const docs = memories.map((memory) => ({
-    memory,
-    tokens: tokenize(`${memory.body} ${memory.tags.join(" ")}`),
-  })) satisfies TokenizedMemory[];
-  const avgLength = docs.reduce((sum, doc) => sum + doc.tokens.length, 0) /
-    docs.length || 1;
-  const documentFrequency = documentFrequencyByTerm(docs, queryTerms);
-  const documentCount = docs.length;
-  const k1 = 1.2;
-  const b = 0.75;
-
-  for (const doc of docs) {
-    const termFrequency = termFrequencyByTerm(doc.tokens);
-    let score = 0;
-    for (const term of queryTerms) {
-      const frequency = termFrequency.get(term) ?? 0;
-      if (frequency === 0) continue;
-
-      const df = documentFrequency.get(term) ?? 0;
-      const idf = Math.log(1 + (documentCount - df + 0.5) / (df + 0.5));
-      const denominator = frequency +
-        k1 * (1 - b + b * (doc.tokens.length / avgLength));
-      score += idf * ((frequency * (k1 + 1)) / denominator);
-    }
-    ranks.set(doc.memory.id, score);
-  }
-
-  return ranks;
-}
-
-function documentFrequencyByTerm(
-  docs: readonly TokenizedMemory[],
-  queryTerms: readonly string[],
-): Map<string, number> {
-  const frequency = new Map<string, number>();
-  for (const term of queryTerms) {
-    let count = 0;
-    for (const doc of docs) {
-      if (doc.tokens.includes(term)) count += 1;
-    }
-    frequency.set(term, count);
-  }
-  return frequency;
-}
-
-function termFrequencyByTerm(tokens: readonly string[]): Map<string, number> {
-  const frequency = new Map<string, number>();
-  for (const token of tokens) {
-    frequency.set(token, (frequency.get(token) ?? 0) + 1);
-  }
-  return frequency;
+    return { memory, textRank, recencyBoost, importanceBoost, score };
+  }).sort(compareRankedMemories);
 }
 
 function recencyBoostFor(memory: Memory, now: Date): number {
@@ -149,9 +154,7 @@ function recencyBoostFor(memory: Memory, now: Date): number {
 }
 
 function importanceBoostFor(importance: MemoryImportance): number {
-  if (importance === "high") return 1.5;
-  if (importance === "medium") return 0.5;
-  return 0;
+  return MEMORY_IMPORTANCE_BOOSTS[importance];
 }
 
 function compareRankedMemories(left: RankedMemory, right: RankedMemory): number {
@@ -173,10 +176,16 @@ function compareStringAsc(left: string, right: string): number {
   return left < right ? -1 : 1;
 }
 
-function uniqueTerms(tokens: readonly string[]): string[] {
-  return [...new Set(tokens)];
+function candidateLimit(opts: NormalizedRetrieverOpts): number {
+  return Math.min(
+    MAX_CANDIDATES,
+    Math.max(MIN_CANDIDATES, opts.topK * CANDIDATE_MULTIPLIER),
+  );
 }
 
-function tokenize(text: string): string[] {
-  return text.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+function toCandidate(row: CandidateRow): ScoredMemoryCandidate {
+  return {
+    id: row.id,
+    textRank: Number(row.text_rank),
+  };
 }
