@@ -1,11 +1,12 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 06-trpc-core-router-and-permission-middleware
 Owner: codex-worker-flags-settings-page
 ReopenedAt: 2026-05-02T16:02:54Z
 ReopenedBecause: P1 gate requires missing /settings/flags route and browser toggle surface.
+RepairVerifiedAt: 2026-05-02T16:24:24Z
 ReviewDebtResolved: 2026-05-02T06:44:06Z — Claude adversarial review review-monyckiz-hm38tr SPEC PASS, follow-up review-monz2qeb-brwjnb SPEC PASS / QUALITY APPROVED after F1/F2 fixes.
 ReviewGate: 2026-05-02T10:01:13Z — Claude adversarial review review-moo61q5y-llfvx1 QUALITY CHANGES_REQUIRED: global FeatureFlag uniqueness broken by SQL NULL semantics.
 ---

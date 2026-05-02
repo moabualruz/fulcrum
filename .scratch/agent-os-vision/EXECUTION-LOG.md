@@ -1417,6 +1417,42 @@ Held:
 
 Result: CLAIMED.
 
+## 2026-05-02T16:24:24Z — codex-orchestrator (P1 repair wave integrated)
+
+Repair lanes:
+[
+  bootstrap-migrations: P1#04 + P1#19 implemented; `fulcrum init` now runs MikroORM migrations before seed and doctor/db routes read schema migration state through repositories/service paths,
+  local-auth-flow: P1#05 + P1#11 + P1#14 implemented; seeded `admin@local` has credential account, local admin sign-in is normalized at Better Auth boundary, local signup is rejected when `saas-auth` is OFF,
+  flags-settings-page: P1#07 implemented; `/settings/flags` owner/admin route lists/toggles flags via tRPC and re-reads state,
+  tui-runtime-auth: P1#15 implemented; production `fulcrum tui` gets DB-backed auth context and writes local_telemetry rows,
+  casbin-org-scope: P1#16 implemented; Casbin policy model/enforcement now includes org namespace and middleware passes server-owned org context
+]
+
+Tracker:
+[
+  P1#04, P1#05, P1#07, P1#11, P1#14, P1#15, P1#16, P1#19 -> implemented,
+  P15#01 remains in-progress: production auth container + local_telemetry repaired; renderer/foundation parity still pending
+]
+
+Verification:
+[
+  bun test tests/trpc/router.test.ts tests/auth/better-auth-integration.test.ts tests/auth/saas-auth.test.ts tests/init/seed.test.ts tests/permissions/casbin-enforcer.test.ts tests/permissions/casbin-adapter.test.ts => PASS, 77 pass, 1 skip,
+  cd src/web && bun run web:test -- tests/vitest/settings-flags-route.test.ts => PASS, 2 pass,
+  bun test tests/cli/init.test.ts src/cli/doctor.test.ts tests/db/migrator-service.test.ts tests/tui/foundation.test.ts tests/tui/smoke.test.ts => PASS, 112 pass,
+  bun run lint => PASS,
+  git diff | gitleaks detect --pipe --redact --no-banner => PASS,
+  semgrep --config auto --json --quiet -o /tmp/fulcrum-semgrep-repair.json ... => PASS, 0 findings,
+  bun run ci => PASS, 12/12 stages, 1812 pass, 2 skip, 0 fail
+]
+
+Warnings:
+[
+  web:check/build retain existing Svelte warnings in `src/web/src/routes/boards/+page.svelte` and `src/web/src/routes/auth/login/+page.svelte`,
+  web:build retains existing large chunk warning
+]
+
+Result: IMPLEMENTED_AND_VERIFIED.
+
 ## 2026-05-02T15:56:13Z — codex-orchestrator (resume wave verification + gate fallout)
 
 Capacity:

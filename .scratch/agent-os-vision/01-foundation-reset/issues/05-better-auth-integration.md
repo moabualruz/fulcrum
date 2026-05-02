@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 04-local-org-seed-and-init
@@ -7,6 +7,7 @@ Owner: codex-worker-local-auth-flow
 CompletedAt: 2026-05-01T22:00:00Z
 ReopenedAt: 2026-05-02T16:02:54Z
 ReopenedBecause: P1 gate found local seeded admin has no password-backed account and invalid local email breaks Better Auth login.
+RepairVerifiedAt: 2026-05-02T16:24:24Z
 ReviewVerdict: APPROVED — Codex round-2 review confirms Fix 1/2/3 PASS; round-3 fix (commit d5f54c7) adds missing `await svc.init()` in hooks.server.ts (1-line trivial fix, obviously correct). LICENSE-DEPS.md noise accepted as auto-generated artifact.
 ReviewDebtResolved: 2026-05-02T06:44:06Z — Claude adversarial review review-monyckiz-hm38tr SPEC PASS, follow-up review-monz2qeb-brwjnb SPEC PASS / QUALITY APPROVED after F1/F2 fixes.
 ReviewGate: 2026-05-02T10:01:13Z — Claude adversarial review review-moo61q5y-llfvx1 QUALITY CHANGES_REQUIRED: Account and Verification need org_id/index contract review.

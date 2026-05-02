@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 03-composite-indexes-and-flag-stub-tables
@@ -7,6 +7,7 @@ Owner: codex-worker-bootstrap-migrations
 CompletedAt: 2026-05-01T19:00:00Z
 ReopenedAt: 2026-05-02T16:02:54Z
 ReopenedBecause: P1 gate found init/db/doctor migration paths inconsistent with schema_migrations and raw SQL still present in doctor migration checks.
+RepairVerifiedAt: 2026-05-02T16:24:24Z
 ReviewVerdict: APPROVED — Codex round-3 review (commit 4be84a1) SPEC PASS / QUALITY APPROVED post-JSDoc-fix. All round-2 findings resolved: Suite 10 covers all 6 migration classes; MigrationFileMissingError throws on unreadable source files (Suite 9b regression test); +page.server.ts comment fixed; dead callCount removed. JSDoc nit at migrator-service.ts:345-347 hygiene-fixed inline by orchestrator. Per .scratch/agent-os-vision/research/p1-19-round2-review.md + p1-19-round3-review.md.
 PRD: .scratch/agent-os-vision/prds/01-foundation-reset.md
 Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 1 section)
