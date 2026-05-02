@@ -1,12 +1,12 @@
 ---
-Status: needs-review
+Status: completed
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 04-local-org-seed-and-init
 Owner: claude-orchestrator
 CompletedAt: 2026-05-01T22:00:00Z
 ReviewVerdict: APPROVED — Codex round-2 review confirms Fix 1/2/3 PASS; round-3 fix (commit d5f54c7) adds missing `await svc.init()` in hooks.server.ts (1-line trivial fix, obviously correct). LICENSE-DEPS.md noise accepted as auto-generated artifact.
-ReviewDebt: 2026-05-02T06:02:49Z — commit 1a57c597 changed hooks.server request-scoped runtime/session hydration after prior approval; requires opposite-runtime review.
+ReviewDebtResolved: 2026-05-02T06:44:06Z — Claude adversarial review review-monyckiz-hm38tr SPEC PASS, follow-up review-monz2qeb-brwjnb SPEC PASS / QUALITY APPROVED after F1/F2 fixes.
 ---
 
 # Better-Auth v1 integration — MikroORM-backed adapter, org plugin, passkey plugin, SvelteKit handler

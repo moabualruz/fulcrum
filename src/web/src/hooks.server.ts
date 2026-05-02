@@ -24,6 +24,7 @@ import type { EntityManager, MikroORM } from "@mikro-orm/postgresql";
 import { getActiveProject } from "$lib/state/active-project";
 import { appRouter } from "../../../src/trpc/router.ts";
 import { createContext } from "../../../src/trpc/context.ts";
+import type { FlagRegistry } from "../../../src/flags/registry.ts";
 
 // Lazy auth initialiser — only wired when ORM is available.
 // Imported dynamically to avoid circular dep issues at SSR preload time.
@@ -35,6 +36,7 @@ interface WebRequestRuntime {
 interface WebRuntime {
   authHandler: ((req: Request) => Promise<Response>) | null;
   orm: MikroORM;
+  flagRegistry?: FlagRegistry;
   createRequestContext?: () => WebRequestRuntime;
   em?: EntityManager;
   container?: Container;
@@ -53,9 +55,10 @@ async function getWebRuntime(): Promise<WebRuntime> {
     _runtimePromise = (async () => {
       const { AuthService } = await import("../../../src/auth/index.ts");
       const { initOrm } = await import("../../../src/db/mikro-orm.config.ts");
-      const { registerDbBindings } = await import("../../../src/db/db.module.ts");
+      const { createFlagRegistry, registerDbBindings } = await import("../../../src/db/db.module.ts");
 
       const orm = await initOrm();
+      const flagRegistry = createFlagRegistry(orm);
 
       let authHandler: ((req: Request) => Promise<Response>) | null = null;
       try {
@@ -69,10 +72,11 @@ async function getWebRuntime(): Promise<WebRuntime> {
       return {
         authHandler,
         orm,
+        flagRegistry,
         createRequestContext: () => {
           const em = orm.em.fork();
           const container = new Container();
-          registerDbBindings(container, orm, em);
+          registerDbBindings(container, orm, em, { flagRegistry });
           return { em, container };
         },
       };

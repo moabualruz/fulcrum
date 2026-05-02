@@ -1,10 +1,10 @@
 ---
-Status: needs-review
+Status: completed
 Triage: AFK
 Owner: codex-orchestrator
 Pillar: 03-symphony-orchestration
 Blocked-by: 02-schema-workflow-definitions, 03-schema-agent-runs-symphony-columns
-ReviewDebt: 2026-05-02T06:02:49Z — commit 1a57c597 changed candidate exclusion for claimed/running/retry_queued runs after prior integration; requires opposite-runtime review.
+ReviewDebtResolved: 2026-05-02T06:44:06Z — Claude adversarial review review-monyckiz-hm38tr SPEC PASS / QUALITY APPROVED for this surface.
 ---
 
 # Tracker adapter: fetchCandidateIssues

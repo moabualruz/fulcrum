@@ -92,7 +92,7 @@ const TTL_MS = 60_000;
  * Note: No @injectable() decorator — FlagRegistry uses Stage-3 decorator-free
  * class syntax so it can be safely imported into the SvelteKit web bundle
  * (which uses Node.js for SSR rendering; Stage-3 decorators break Node's SSR).
- * Registration in needle-di is done via container.bind({ provide: FlagRegistry, useFactory })
+ * Registration in needle-di is done via container.bind({ provide: FlagRegistry, useValue })
  * in db.module.ts, which is the production wiring path.
  */
 export class FlagRegistry {
@@ -189,19 +189,25 @@ export class FlagRegistry {
       // Per-user scope (org + user + flag)
       if (orgId && userId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        row = await this._flagRepo.findOne({ flag, orgId, userId } as any);
+        row = await this._flagRepo.findOne({ flag, orgId, userId } as any, {
+          refresh: true,
+        });
       }
 
       // Per-org scope (org + flag, no user)
       if (!row && orgId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        row = await this._flagRepo.findOne({ flag, orgId, userId: null } as any);
+        row = await this._flagRepo.findOne({ flag, orgId, userId: null } as any, {
+          refresh: true,
+        });
       }
 
       // Global scope (no org, no user)
       if (!row) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        row = await this._flagRepo.findOne({ flag, orgId: null, userId: null } as any);
+        row = await this._flagRepo.findOne({ flag, orgId: null, userId: null } as any, {
+          refresh: true,
+        });
       }
 
       // DB row found — return its value (repo wins over env var)

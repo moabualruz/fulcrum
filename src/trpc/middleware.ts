@@ -42,6 +42,20 @@ export interface AuthenticatedContext extends TRPCContext {
   userId: string;
 }
 
+async function isCasbinPoliciesEnabled(ctx: TRPCContext): Promise<boolean> {
+  if (!ctx.container?.has(FlagRegistry)) return false;
+
+  try {
+    const flagRegistry = ctx.container.get(FlagRegistry);
+    return await flagRegistry.isEnabled("casbin-policies", {
+      orgId: ctx.orgId ?? undefined,
+      userId: ctx.userId ?? undefined,
+    });
+  } catch {
+    return false;
+  }
+}
+
 /**
  * assertPermission middleware.
  *
@@ -69,19 +83,10 @@ export const assertPermission = t.middleware(async ({ ctx, next }) => {
   // web SSR bundle (Stage-3 decorators break Node.js ESM loader in web:build).
   // See web-bundle safety note in module JSDoc above.
   if (ctx.container) {
-    try {
-      // Partial containers do not opt into Casbin until the flag registry is bound.
-      const flagRegistry = ctx.container.has(FlagRegistry)
-        ? ctx.container.get(FlagRegistry)
-        : null;
-      const casbinOn = flagRegistry
-        ? await flagRegistry.isEnabled("casbin-policies", {
-            orgId: ctx.orgId ?? undefined,
-            userId: ctx.userId ?? undefined,
-          })
-        : false;
+    const casbinOn = await isCasbinPoliciesEnabled(ctx);
 
-      if (casbinOn) {
+    if (casbinOn) {
+      try {
         // Dynamic imports — excluded from web SSR static bundle (decorator safety).
         const [{ FulcrumCasbinAdapter }, { CasbinEnforcerService, checkCasbinGate }, { CasbinRuleRepository }] =
           await Promise.all([
@@ -113,17 +118,17 @@ export const assertPermission = t.middleware(async ({ ctx, next }) => {
             );
           }
         }
+      } catch (e) {
+        // Re-throw TRPCErrors (FORBIDDEN from checkCasbinGate)
+        if (e instanceof TRPCError) throw e;
+        // Once Casbin is confirmed enabled, enforcement infrastructure failures
+        // fail closed; adapter/container wiring must not silently downgrade routes.
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Permission check failed.",
+          cause: e,
+        });
       }
-    } catch (e) {
-      // Re-throw TRPCErrors (FORBIDDEN from checkCasbinGate)
-      if (e instanceof TRPCError) throw e;
-      // Permission infrastructure failures fail closed; adapter/container wiring
-      // issues must not silently downgrade protected routes.
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Permission check failed.",
-        cause: e,
-      });
     }
   }
 

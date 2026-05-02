@@ -30,9 +30,10 @@ import {
 
 let orm: MikroORM;
 let registry: FlagRegistry;
+let pglite: PGlite;
 
 beforeAll(async () => {
-  const pglite = new PGlite();
+  pglite = new PGlite();
   const dialect = new PGliteKyselyDialect(() => pglite);
 
   orm = await MikroORM.init({
@@ -51,6 +52,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (orm) await orm.close(true);
+  if (pglite) await pglite.close();
 });
 
 beforeEach(async () => {
@@ -328,5 +330,30 @@ describe("FlagRegistry — cache", () => {
 
     const result = await registry.isEnabled("memory-llm-extract");
     expect(result).toBe(false); // fresh lookup → no row → false
+  });
+
+  it("bustFlag() refreshes rows changed by another EntityManager", async () => {
+    const seedEm = orm.em.fork();
+    const flagRow = seedEm.create(FeatureFlag, {
+      flag: "casbin-policies",
+      enabled: false,
+      createdAt: new Date(),
+    });
+    seedEm.persist(flagRow);
+    await seedEm.flush();
+
+    registry.clearCache();
+    expect(await registry.isEnabled("casbin-policies")).toBe(false);
+
+    const updateEm = orm.em.fork();
+    const row = await updateEm.findOneOrFail(FeatureFlag, {
+      flag: "casbin-policies",
+    });
+    row.enabled = true;
+    await updateEm.flush();
+
+    registry.bustFlag("casbin-policies");
+
+    expect(await registry.isEnabled("casbin-policies")).toBe(true);
   });
 });

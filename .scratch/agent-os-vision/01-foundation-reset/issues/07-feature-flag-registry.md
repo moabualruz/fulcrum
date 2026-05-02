@@ -1,9 +1,9 @@
 ---
-Status: needs-review
+Status: completed
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 06-trpc-core-router-and-permission-middleware
-ReviewDebt: 2026-05-02T06:02:49Z — commit 1a57c597 changed FlagRegistry container binding and flags router fail-closed behavior; requires opposite-runtime review.
+ReviewDebtResolved: 2026-05-02T06:44:06Z — Claude adversarial review review-monyckiz-hm38tr SPEC PASS, follow-up review-monz2qeb-brwjnb SPEC PASS / QUALITY APPROVED after F1/F2 fixes.
 ---
 
 # Feature-flag registry — env-var + entity-backed override + tRPC procedures

@@ -1,10 +1,10 @@
 ---
-Status: needs-review
+Status: completed
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 07-feature-flag-registry
 Owner: codex-orchestrator
-ReviewDebt: 2026-05-02T06:02:49Z — commit 1a57c597 changed auth invite persistence fallback/fail-closed behavior and tests; requires opposite-runtime review.
+ReviewDebtResolved: 2026-05-02T06:44:06Z — Claude adversarial review review-monyckiz-hm38tr SPEC PASS / QUALITY APPROVED for this surface.
 ---
 
 # Auth + org tRPC procedures — whoami, invite, acceptInvite, org member management

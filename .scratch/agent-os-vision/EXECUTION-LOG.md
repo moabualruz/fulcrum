@@ -395,3 +395,78 @@ State digest:
   blocked: 0
 ]
 Result: REVIEW_DEBT_RECORDED.
+
+## 2026-05-02T06:19:39Z — codex-orchestrator (opposite-runtime review dispatch)
+
+State digest:
+[
+  branch: plan/agent-os-vision,
+  worktree: clean before review dispatch,
+  issues: 341 total,
+  completed: 31,
+  needs-review: 6,
+  ready-for-agent: 304,
+  in-progress: 0,
+  blocked: 0,
+  ci: bun run ci PASS — 12/12 stages, 1567 pass, 2 skip; web:check has 2 pre-existing Svelte warnings
+]
+Review queue:
+[
+  01-foundation-reset/issues/05-better-auth-integration.md,
+  01-foundation-reset/issues/06-trpc-core-router-and-permission-middleware.md,
+  01-foundation-reset/issues/07-feature-flag-registry.md,
+  01-foundation-reset/issues/09-auth-trpc-procedures-and-org-management.md,
+  01-foundation-reset/issues/13-passkey-enrollment-and-login-flow.md,
+  03-symphony-orchestration/issues/04-tracker-fetch-candidate-issues.md
+]
+Reviewers:
+[
+  review-monyckiz-hm38tr: claude-adversarial-review over 1a57c597^..HEAD, focused on six Codex hardening review-debt surfaces
+]
+Result: REVIEW_IN_PROGRESS — waiting for opposite-runtime SPEC/QUALITY result before status flips.
+
+## 2026-05-02T06:46:03Z — codex-orchestrator (review debt resolved)
+
+Review provenance:
+[
+  01-foundation-reset/issues/05-better-auth-integration.md: impl=codex review=claude APPROVED@review-monz2qeb-brwjnb,
+  01-foundation-reset/issues/06-trpc-core-router-and-permission-middleware.md: impl=codex review=claude APPROVED@review-monz2qeb-brwjnb,
+  01-foundation-reset/issues/07-feature-flag-registry.md: impl=codex review=claude APPROVED@review-monz2qeb-brwjnb,
+  01-foundation-reset/issues/09-auth-trpc-procedures-and-org-management.md: impl=codex review=claude APPROVED@review-monyckiz-hm38tr,
+  01-foundation-reset/issues/13-passkey-enrollment-and-login-flow.md: impl=codex review=claude APPROVED@review-monyckiz-hm38tr,
+  03-symphony-orchestration/issues/04-tracker-fetch-candidate-issues.md: impl=codex review=claude APPROVED@review-monyckiz-hm38tr
+]
+Fixes:
+[
+  src/trpc/middleware.ts: split casbin flag lookup errors from fail-closed enforcement errors,
+  src/db/db.module.ts + src/web/src/hooks.server.ts: share one process FlagRegistry across web request containers,
+  src/flags/registry.ts: use refresh reads so shared FlagRegistry cache busts cannot return stale MikroORM identity-map entities,
+  tests/trpc/router.test.ts + tests/flags/registry.test.ts + tests/db/db-module.test.ts: regression coverage for F1/F2
+]
+Verification:
+[
+  bun test --conditions=svelte tests/trpc/router.test.ts: 14 pass,
+  bun test --conditions=svelte tests/flags/registry.test.ts: 17 pass,
+  bun test --conditions=svelte tests/db/db-module.test.ts: 1 pass,
+  bun test --conditions=svelte tests/flags/registry.test.ts tests/trpc/router.test.ts tests/db/db-module.test.ts: 32 pass,
+  bun test --conditions=svelte tests/flags/registry.test.ts src/web/src/hooks.server.test.ts: 25 pass,
+  bun run --bun tsc --noEmit: PASS
+]
+Result: REVIEW_DEBT_COMPLETED — six issues marked completed; full bun run ci pending.
+
+## 2026-05-02T06:50:04Z — codex-orchestrator (ci verification)
+
+State digest:
+[
+  completed: 37,
+  ready-for-agent: 304,
+  needs-review: 0,
+  in-progress: 0,
+  blocked: 0
+]
+Verification:
+[
+  bun run ci: PASS — 12/12 stages,
+  stages: install, typecheck, symphony:lock, test, license-audit, build:all, web:install, web:check, web:build, web:test, skills:lint, compress:check
+]
+Result: REVIEW_DEBT_CLOSED_AND_VERIFIED.

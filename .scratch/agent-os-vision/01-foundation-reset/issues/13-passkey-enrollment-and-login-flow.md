@@ -1,10 +1,10 @@
 ---
-Status: needs-review
+Status: completed
 Triage: HITL
 Pillar: 01-foundation-reset
 Blocked-by: 11-web-login-signup-logout-pages
 Owner: codex-orchestrator
-ReviewDebt: 2026-05-02T06:02:49Z — commit 1a57c597 changed DB-backed passkey challenge/credential persistence and UV compatibility behavior; requires opposite-runtime review.
+ReviewDebtResolved: 2026-05-02T06:44:06Z — Claude adversarial review review-monyckiz-hm38tr SPEC PASS / QUALITY APPROVED for this surface.
 ---
 
 # Passkey enrollment + passkey login flow (WebAuthn via Better-Auth passkey plugin)

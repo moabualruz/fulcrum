@@ -135,6 +135,17 @@ export const ENTITY_MANAGER_TOKEN = new InjectionToken<EntityManager>(
   "EntityManager",
 );
 
+export interface DbBindingOptions {
+  flagRegistry?: FlagRegistry;
+}
+
+export function createFlagRegistry(orm: MikroORM): FlagRegistry {
+  const flagEm = orm.em.fork();
+  return new FlagRegistry(
+    flagEm.getRepository(FeatureFlag) as FeatureFlagRepository,
+  );
+}
+
 /**
  * Registers ORM-related bindings into the given needle-di Container.
  * Call once per process after `MikroORM.init()` completes.
@@ -148,6 +159,7 @@ export function registerDbBindings(
   container: Container,
   orm: MikroORM,
   em: EntityManager = orm.em,
+  options: DbBindingOptions = {},
 ): void {
   // EntityManager — forked per request in web context, shared in CLI/TUI
   container.bind({
@@ -192,7 +204,7 @@ export function registerDbBindings(
   });
   container.bind({
     provide: FlagRegistry,
-    useFactory: () =>
+    useValue: options.flagRegistry ??
       new FlagRegistry(
         em.getRepository(FeatureFlag) as FeatureFlagRepository,
       ),

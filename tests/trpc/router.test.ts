@@ -19,6 +19,7 @@ import { appRouter } from "../../src/trpc/router.ts";
 import { createContext } from "../../src/trpc/context.ts";
 import { t } from "../../src/trpc/trpc.ts";
 import { FlagRegistry } from "../../src/flags/registry.ts";
+import { CasbinRuleRepository } from "../../src/db/repositories/flags/CasbinRuleRepository.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 
@@ -124,7 +125,7 @@ describe("assertPermission middleware", () => {
     expect(error?.code).toBe("UNAUTHORIZED");
   });
 
-  it("returns INTERNAL_SERVER_ERROR when casbin flag check throws unexpectedly", async () => {
+  it("treats FlagRegistry lookup errors as casbin disabled", async () => {
     const container = new Container();
     container.bind({
       provide: FlagRegistry,
@@ -133,6 +134,26 @@ describe("assertPermission middleware", () => {
           throw new Error("flag store unavailable");
         },
       } as unknown as FlagRegistry,
+    });
+    const caller = authenticatedCallerWithContainer(container);
+    const result = await caller.auth.whoami();
+    expect(result.userId).toBe("user-test-001");
+    expect(result.orgId).toBe("00000000-0000-0000-0000-000000000001");
+  });
+
+  it("fails closed when casbin is enabled but enforcement wiring throws", async () => {
+    const container = new Container();
+    container.bind({
+      provide: FlagRegistry,
+      useValue: {
+        isEnabled: async () => true,
+      } as unknown as FlagRegistry,
+    });
+    container.bind({
+      provide: CasbinRuleRepository,
+      useFactory: () => {
+        throw new Error("casbin repo unavailable");
+      },
     });
     const caller = authenticatedCallerWithContainer(container);
     let error: TRPCError | null = null;
