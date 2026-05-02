@@ -1,8 +1,9 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [01-schema-migration-core.md]
+Owner: codex-worker-p8-retriever
 PRD: .scratch/agent-os-vision/prds/08-memory-context-engine.md
 Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 8 section)
 Decisions: [Q17, Q15, C1]
@@ -41,3 +42,7 @@ Zod schema `RetrieverOptsSchema` generated and exported for tRPC reuse.
 ## Blocked by
 
 - `01-schema-migration-core.md`
+
+## EXECUTION-LOG
+
+- 2026-05-02 codex-orchestrator: claimed for `codex-worker-p8-retriever`; prerequisite for B072 context bundle assembler because `src/memory/retriever.ts` is absent while B071 bundle status is stale/incomplete.

@@ -1728,3 +1728,52 @@ Verification:
 ]
 
 Result: DISPATCHED.
+
+## 2026-05-02T18:48:27Z — codex-orchestrator (resume checkpoint)
+
+State:
+[
+  branch=plan/agent-os-vision,
+  main_worktree=clean,
+  issues={total:341, completed:27, implemented:17, integration-review:15, in-progress:4, ready-for-agent:278},
+  active_protected_gate=G0/P1-foundation-review
+]
+
+Verification:
+[
+  bun run ci => PASS, 12/12 stages
+]
+
+Decision:
+[
+  rescue/classify dirty claimed worktrees before fresh implementation dispatch,
+  reason=three claimed lanes have uncommitted output and P7/P17 both touch shared src/trpc/router.ts surface under protected-gate constraints,
+  underfill=claude runtime unavailable in current Codex session; Codex capacity held until rescue classification completes
+]
+
+Dirty claimed lanes:
+[
+  claude-worker-p3-retry-stall => /Users/mkh/.config/superpowers/worktrees/fulcrum/agent-os-p3-10-retry-stall,
+  claude-worker-p7-template-seeds => /Users/mkh/.config/superpowers/worktrees/fulcrum/agent-os-p7-04-template-seeds,
+  claude-worker-p17-secrets-vault => /Users/mkh/.config/superpowers/worktrees/fulcrum/agent-os-p17-02-secrets-vault
+]
+
+Result: RESCUE_QUEUE_READY.
+
+## 2026-05-02T18:49:49Z — codex-orchestrator (fresh lane claim)
+
+Candidate scan:
+[
+  B068 => hold; overlaps dirty P7 docs route worktree,
+  B072 => rejected for now; depends on retriever slice that is absent in source despite stale B071 bundle status,
+  B071/06-retriever => selected; write_set=src/memory/**,src/db/repositories/memory/**,tests/memory/**; frozen_by_active_gate=false
+]
+
+Claim:
+[
+  issue=.scratch/agent-os-vision/08-memory-context-engine/issues/06-retriever-bm25-recency-importance.md,
+  owner=codex-worker-p8-retriever,
+  status=in-progress
+]
+
+Result: READY_TO_DISPATCH.
