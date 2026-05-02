@@ -26,9 +26,10 @@ import { Migration20260501130000_composite_indexes } from "../../../src/db/migra
 import { Migration20260501130100_flag_stubs } from "../../../src/db/migrations/Migration20260501130100_flag_stubs.ts";
 import { Migration20260501140000_schema_migration_ledger } from "../../../src/db/migrations/Migration20260501140000_schema_migration_ledger.ts";
 import { Migration20260501150000_account_verification } from "../../../src/db/migrations/Migration20260501150000_account_verification.ts";
+import { Migration20260502000001_orchestration_workflow_definitions } from "../../../src/db/migrations/Migration20260502000001_orchestration_workflow_definitions.ts";
 
 const MIGRATION_NAME = "Migration20260502030300_agent_runs_symphony_columns";
-const PREVIOUS_MIGRATION_NAME = "Migration20260501150000_account_verification";
+const PREVIOUS_MIGRATION_NAME = "Migration20260502000001_orchestration_workflow_definitions";
 
 const ORCHESTRATION_COLUMNS = [
   "orchestration_state",
@@ -89,6 +90,10 @@ async function migrationsList(): Promise<MigrationObject[]> {
     {
       name: "Migration20260501150000_account_verification",
       class: Migration20260501150000_account_verification,
+    },
+    {
+      name: "Migration20260502000001_orchestration_workflow_definitions",
+      class: Migration20260502000001_orchestration_workflow_definitions,
     },
   ];
 
@@ -310,7 +315,7 @@ describe("Migration20260502030300_agent_runs_symphony_columns", () => {
     try {
       const setupEm = db.orm.em.fork();
       const org = setupEm.getReference(Org, DEFAULT_ORG_ID);
-      const task = setupEm.create(Task, { org, createdAt: new Date() });
+      const task = setupEm.create(Task, { org, createdAt: new Date(), blockedByIds: [] });
       setupEm.persist(task);
       await setupEm.flush();
 

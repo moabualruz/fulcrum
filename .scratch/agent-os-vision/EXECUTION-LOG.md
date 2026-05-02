@@ -140,3 +140,20 @@ Integrated on plan/agent-os-vision:
   4c8ad9d feat(platform): add cross-cutting data entities
 ]
 Result: WAVE_2_READY_FOR_FINAL_VERIFICATION — issue ledgers normalized to completed.
+
+## 2026-05-02T02:20:02Z — codex-orchestrator (Wave 2 final verification)
+
+Integration fixes:
+[
+  tests/db/migrations/orchestration-agent-runs.test.ts: include P3#02 workflow migration before P3#03 agent-run migration fixture,
+  tests/infrastructure/p1-coverage-matrix.test.ts: baseline CI gate updated for symphony:lock,
+  docs/symphony-conformance.md: caveman-compressed with .original.md backup for CI compress gate
+]
+Verification:
+[
+  bun run ci PASS — 12/12 stages,
+  cargo test --workspace --manifest-path inference/Cargo.toml PASS — 11 Rust tests,
+  cargo build --release --manifest-path inference/Cargo.toml PASS,
+  inference/scripts/smoke.sh PASS — version, stdio, delayed stdio, socket health
+]
+Result: WAVE_2_FINAL_VERIFICATION_PASS.
