@@ -32,6 +32,7 @@ import { Event } from "./entities/core/Event.ts";
 // later pillars never need a base-table migration).
 import { Task } from "./entities/tasks/Task.ts";
 import { TaskStatus } from "./entities/tasks/TaskStatus.ts";
+import { Sprint } from "./entities/tasks/Sprint.ts";
 import { Document } from "./entities/docs/Document.ts";
 import { DocLink } from "./entities/docs/DocLink.ts";
 import { DocVersion } from "./entities/docs/DocVersion.ts";
@@ -77,6 +78,7 @@ export {
   Event,
   Task,
   TaskStatus,
+  Sprint,
   Document,
   DocLink,
   DocVersion,
@@ -156,6 +158,7 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     Event,
     Task,
     TaskStatus,
+    Sprint,
     Document,
     DocLink,
     DocVersion,

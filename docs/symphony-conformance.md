@@ -35,9 +35,15 @@ Create-on-claim: `src/orchestration/symphony/workspace.ts:createWorkspace` creat
 
 Destroy-on-release: `src/orchestration/symphony/workspace.ts:destroyWorkspace` removes the workspace and clears `agent_runs.workspace_path`; `keepOnFailure=true` retains failed-run workspaces for inspection.
 
-### Workspace lifecycle hooks (`after_create`, `before_run`, `after_run`, `before_remove`)
+### Workspace lifecycle hooks (`before_run`, `after_run`, `on_failure`, `on_cancel`)
 
-### Hook timeout config (`hooks.timeout_ms`, default `60000`)
+Hook dispatch: `src/orchestration/symphony/hooks.ts:dispatchLifecycleHook` invokes typed TS lifecycle hooks with `{ run, task, workspacePath, attempt }`, emits `events` rows with `verb='hook_dispatched'` and payload `{hookName,durationMs}`, and calls the Pillar 8 context assembler boundary for `before_run` through an injected `ContextAssembler` interface.
+
+Orchestrator integration: `src/orchestration/symphony/orchestrator.ts:dispatchRunWithHooks` runs `before_run → agent dispatch → after_run` on success, dispatches `on_failure` when agent dispatch throws, and dispatches `on_cancel` for abort-style cancellation errors.
+
+### Hook timeout config (`before_run_timeout_ms`, `after_run_timeout_ms`, `on_failure_timeout_ms`, `on_cancel_timeout_ms`; default `60000`)
+
+Timeout enforcement: `src/orchestration/symphony/hooks.ts:dispatchLifecycleHook` resolves per-hook timeout overrides, uses `AbortSignal.timeout(timeoutMs)` inside `Promise.race`, and rejects breaches as `HookTimeoutError`.
 
 ### Coding-agent app-server subprocess client with JSON line protocol
 

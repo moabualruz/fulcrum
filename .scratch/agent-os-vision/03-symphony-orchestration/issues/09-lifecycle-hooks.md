@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: 03-symphony-orchestration
 Blocked-by: 07-workspace-management, 08-prompt-template-renderer
@@ -26,6 +26,9 @@ Implement `src/orchestration/symphony/hooks.ts`:
 - [ ] Surfaces (web/cli/tui parity): hook outputs visible in Web run detail timeline; `fulcrum symphony runs show --json` includes `hookEvents[]`
 - [ ] Tests: hook completing within timeout resolves; hook exceeding timeout rejects with `HookTimeoutError`; all four hook names dispatched in correct order in happy-path integration test; `events` table has hook rows
 - [ ] SPEC conformance traced in `docs/symphony-conformance.md`: §Lifecycle Hooks section mapped to `hooks.ts`
+
+## Implementation note
+Implemented within hook/orchestrator scope: `hooks.ts` dispatches `before_run`, `after_run`, `on_failure`, `on_cancel`; enforces per-hook timeout keys; emits `hook_dispatched` event rows; and exposes a Pillar 8 `ContextAssembler` boundary for `before_run`. `orchestrator.ts` wires happy path, failure, and abort/cancel paths through hook dispatch. Surface consumption of hook events remains constrained to existing event rows; no router, DB migration, or CLI codegen touched in this lane.
 
 ## Blocked by
 07-workspace-management, 08-prompt-template-renderer

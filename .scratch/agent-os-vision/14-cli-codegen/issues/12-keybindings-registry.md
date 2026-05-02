@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: cli-codegen
 Blocked-by: [14/issues/01-codegen-scaffold.md]
@@ -24,12 +24,12 @@ Keyboard shortcuts registry as single source of truth. `src/keybindings/schema.t
 
 ## Acceptance criteria
 
-- [ ] `src/keybindings/schema.ts` exported `KeybindingAction` enum has all 40+ actions from PRD.
-- [ ] `src/keybindings/defaults.ts` provides bindings for all actions; platform-aware (`process.platform`).
-- [ ] `KeybindingAction` enum importable from `src/web`, `src/cli`, `src/tui` without error (CI type-check).
-- [ ] Conflict detector: test file with duplicate binding → `detectConflicts()` returns non-empty array; CI step asserts empty array on defaults.
-- [ ] `TenantSettingsRepository.set('keybinding.palette.open', 'Ctrl+P')` → web reads override; TUI reads override; `fulcrum --help` reflects override.
-- [ ] Zod parse of default bindings validates cleanly (no unknown action names).
+- [x] `src/keybindings/schema.ts` exported `KeybindingAction` enum has all 40+ actions from PRD.
+- [x] `src/keybindings/defaults.ts` provides bindings for all actions; platform-aware (`process.platform`).
+- [x] `KeybindingAction` enum importable from `src/web`, `src/cli`, `src/tui` without error (CI type-check).
+- [x] Conflict detector: test file with duplicate binding → `detectConflicts()` returns non-empty array; CI step asserts empty array on defaults.
+- [x] `TenantSettingsRepository.set('keybinding.palette.open', 'Ctrl+P')` → web reads override; TUI reads override; `fulcrum --help` reflects override.
+- [x] Zod parse of default bindings validates cleanly (no unknown action names).
 
 ## Blocked by
 

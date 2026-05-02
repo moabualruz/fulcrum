@@ -1081,6 +1081,100 @@ Decision flagged:
 ]
 Result: IMPLEMENTED.
 
+## 2026-05-02T12:01:59Z — codex-orchestrator (next worker wave integrated)
+
+Batch:
+[
+  06-tasks-and-scrum/issues/02-sprints-schema.md,
+  05-router-and-skills/issues/05-routing-telemetry.md,
+  03-symphony-orchestration/issues/09-lifecycle-hooks.md,
+  14-cli-codegen/issues/12-keybindings-registry.md,
+  02-inference-sidecar/issues/05-embed-operation.md
+]
+
+Integration:
+[
+  added sprints schema + Sprint entity/migration invariant,
+  added routing telemetry event recorder and auto-assign wiring,
+  added Symphony lifecycle hook dispatch with lazy DB imports for SSR safety,
+  added shared keybindings registry surfaces for CLI/TUI/web,
+  added inference embed operation across Rust sidecar, TS client, CLI, tRPC, and web settings smoke
+]
+
+Verification:
+[
+  cargo test --manifest-path inference/Cargo.toml -p inference-embed -p inference-server => PASS, inference-embed 2 pass, inference-server 11 pass,
+  bun test src/server/trpc/routers/__tests__/inference.test.ts tests/symphony/hooks.test.ts src/inference/client.test.ts src/inference/contract.test.ts => PASS, 25 pass, 0 fail,
+  bun run lint => PASS,
+  bun run build (cwd src/web) => PASS,
+  mise exec -- bun run ci => PASS, 1751 pass, 2 skip, 0 fail; web:check 0 errors/2 existing warnings; web:build PASS
+]
+
+Result: INTEGRATED.
+
+## 2026-05-02T11:37:38Z — codex-worker (P6#02 sprints schema)
+
+Linkage:
+[
+  ISSUES: .scratch/agent-os-vision/06-tasks-and-scrum/issues/02-sprints-schema.md,
+  PRDs: .scratch/agent-os-vision/prds/06-tasks-and-scrum.md,
+  REQUIREMENTS: .scratch/agent-os-vision/REQUIREMENTS.md Pillar 6,
+  DECISIONS: C1, C2, C4, C5, Q7, Q22,
+  VISION: .scratch/agent-os-vision/VISION-GAPS.md row "Sprint / scrum / dev cycles interactive monitoring"
+]
+
+RED:
+[
+  bun test tests/db/migrations/sprints-schema.test.ts => FAIL, missing CreateSprintInput/Sprint exports
+]
+
+GREEN:
+[
+  added Sprint entity + SprintStatus enum + CreateSprintInput startDate/endDate validator,
+  added Migration20260502090300_sprints_schema with sprints table, status CHECK, org FK, conditional projects cascade FK, sprints_org_project_status, sprints_one_active_per_project,
+  regenerated MikroORM postgres snapshot with sprints metadata
+]
+
+Verification:
+[
+  bun test tests/db/migrations/sprints-schema.test.ts => PASS, 5 pass, 0 fail,
+  bun test tests/db/migrations/sprints-schema.test.ts src/db/tasks-schema-extension.test.ts => PASS, 11 pass, 0 fail,
+  bun run lint => FAIL, unrelated existing src/cli/inference.ts type error
+]
+
+Result: IMPLEMENTED.
+
+## 2026-05-02T11:42:18Z — codex-worker (P14#12 keybindings registry)
+
+Linkage:
+[
+  ISSUES: .scratch/agent-os-vision/14-cli-codegen/issues/12-keybindings-registry.md,
+  PRDs: .scratch/agent-os-vision/prds/14-cli-codegen.md,
+  REQUIREMENTS: .scratch/agent-os-vision/REQUIREMENTS.md Pillar 14,
+  DECISIONS: C1, C2, C4, C5, Q-cross-cut,
+  VISION: .scratch/agent-os-vision/VISION-GAPS.md rows "Jira-grade task management", "Accessibility beyond aria-label sweep"
+]
+
+RED:
+[
+  bun test tests/keybindings/registry.test.ts tests/keybindings/surfaces.test.ts => FAIL, missing src/keybindings/schema.ts and src/cli/keybindings.ts
+]
+
+GREEN:
+[
+  added shared KeybindingAction Zod enum with 54 actions, schema validation, platform-aware defaults, conflict detector, TenantSettingsRepository-compatible `keybinding.<action>` override seam,
+  added web/CLI/TUI import adapters; CLI help renderer reflects resolved overrides,
+  TenantSettingsRepository implementation absent in current tree, so no broad settings subsystem was invented
+]
+
+Verification:
+[
+  bun test tests/keybindings/registry.test.ts tests/keybindings/surfaces.test.ts => PASS, 7 pass, 0 fail,
+  bun run lint => FAIL, unrelated active-lane errors in src/cli/inference.ts and tests/db/migrations/sprints-schema.test.ts
+]
+
+Result: IMPLEMENTED.
+
 ## 2026-05-02T11:21:18Z — codex-orchestrator (integration gate review fixes verified)
 
 State:
@@ -1154,3 +1248,100 @@ Underfilled reason:
   skipping P7 TipTap HITL spike until current long-running code workers are launched because it can require dependency fallback/user verdict,
   skipping P14 watch/json while P13 websocket subscriptions are still unimplemented to avoid cross-worker transport contract drift
 ]
+
+## 2026-05-02T11:35:36Z — codex-worker (P3#09 lifecycle hooks)
+
+Linkage:
+[
+  ISSUES: .scratch/agent-os-vision/03-symphony-orchestration/issues/09-lifecycle-hooks.md,
+  PRDs: .scratch/agent-os-vision/prds/03-symphony-orchestration.md,
+  REQUIREMENTS: .scratch/agent-os-vision/REQUIREMENTS.md Pillar 3,
+  DECISIONS: Q1, Q3, Q6, D1, C1, C2, C4, C5, A2,
+  VISION: .scratch/agent-os-vision/VISION-GAPS.md rows "Agent orchestration + manual assign", "Auto-orchestration (auto-assign by task type/criteria)"
+]
+
+RED:
+[
+  bun test tests/symphony/hooks.test.ts => FAIL, missing src/orchestration/symphony/hooks.ts
+]
+
+GREEN:
+[
+  added hooks.ts with before_run/after_run/on_failure/on_cancel dispatch, HookTimeoutError, per-hook timeout keys, hook_dispatched event rows,
+  wired orchestrator dispatchRunWithHooks for happy path, failure, and abort/cancel paths,
+  kept Pillar 8 context assembly as injected ContextAssembler interface/mock boundary
+]
+
+Verification:
+[
+  bun test tests/symphony/hooks.test.ts => PASS, 8 pass, 0 fail,
+  bun test tests/symphony/*.test.ts => PASS, 53 pass, 0 fail,
+  bun run lint => FAIL, unrelated active-lane errors in src/keybindings/index.ts duplicate exports, inference settings page-server actions export, tests/db/migrations/sprints-schema.test.ts SprintStatus expectation
+]
+
+Result: IMPLEMENTED.
+
+## 2026-05-02T12:08:00Z — codex-worker (P5#05 routing telemetry)
+
+Linkage:
+[
+  ISSUES: .scratch/agent-os-vision/05-router-and-skills/issues/05-routing-telemetry.md,
+  PRDs: .scratch/agent-os-vision/prds/05-router-and-skills.md R-05,
+  REQUIREMENTS: .scratch/agent-os-vision/REQUIREMENTS.md Pillar 5,
+  DECISIONS: C1, C2, C4, C5, Q4,
+  VISION: .scratch/agent-os-vision/VISION-GAPS.md row "Auto-orchestration (auto-assign by task type/criteria)"
+]
+
+RED:
+[
+  bun test src/router/auto-assign.test.ts => FAIL, missing src/router/telemetry.ts
+]
+
+GREEN:
+[
+  added src/router/telemetry.ts recordRoutingEvent using existing events table,
+  wired autoAssign default recorder to routing telemetry,
+  widened RoutingEventPayloadSchema to routing decision sources with nullable rule_id/confidence,
+  added migrated-DB tests for non-dryRun row count 1, dryRun row count 0, explicit null rule_id, rule matched rule_id, learned/llm-fallback source payloads
+]
+
+Verification:
+[
+  bun test src/router/*.test.ts tests/db/migrations/routing-rules.test.ts => PASS, 30 pass, 0 fail,
+  bun run lint => FAIL, unrelated pre-existing TypeScript errors: src/server/trpc/routers/__tests__/inference.test.ts missing actions export; tests/db/migrations/sprints-schema.test.ts SprintStatus active mismatch; tests/keybindings/surfaces.test.ts missing keybinding modules
+]
+
+Result: IMPLEMENTED.
+
+## 2026-05-02T11:38:57Z — codex-worker (P2#05 embed operation)
+
+Linkage:
+[
+  ISSUES: .scratch/agent-os-vision/02-inference-sidecar/issues/05-embed-operation.md,
+  PRDs: .scratch/agent-os-vision/prds/02-inference-sidecar.md,
+  REQUIREMENTS: .scratch/agent-os-vision/REQUIREMENTS.md Pillar 2,
+  DECISIONS: C1, C2, C4, C5, Q5, Q-inference-lang, Q-sidecar-path, C1 inference model defaults,
+  VISION: .scratch/agent-os-vision/VISION-GAPS.md online-gated inference-dependent rows
+]
+
+RED:
+[
+  cargo test --manifest-path inference/Cargo.toml -p inference-server dispatch_embed -- --nocapture => FAIL, missing EmbedCacheEntry.vectors + embed dispatch,
+  bun test src/inference/client.test.ts src/cli/inference.test.ts src/server/trpc/routers/__tests__/inference.test.ts src/web/src/routes/settings/inference/page.svelte.test.ts => FAIL, CLI --model ignored + settings page action/form missing
+]
+
+GREEN:
+[
+  added inference-embed fastembed v4 wrapper with Arc<Mutex<TextEmbedding>> default model and SKIP_MODEL_DOWNLOAD=1 deterministic 384-dim path,
+  added JSON-RPC embed dispatch with cache-aside, 7-day TTL, SHA-256 batch hash, little-endian Vec<Vec<f32>> cache blob, cache hit flag/count,
+  wired CLI --model, contract embed round-trip, tRPC/web settings smoke embed action and render state/error
+]
+
+Verification:
+[
+  cargo test --manifest-path inference/Cargo.toml -p inference-embed -p inference-server => PASS, inference-embed 2 pass, inference-server 11 pass,
+  bun test src/inference/contract.test.ts src/inference/client.test.ts src/cli/inference.test.ts src/server/trpc/routers/__tests__/inference.test.ts src/web/src/routes/settings/inference/page.svelte.test.ts => PASS, 29 pass, 0 fail,
+  bun run lint => PASS
+]
+
+Result: IMPLEMENTED.

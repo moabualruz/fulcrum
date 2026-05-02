@@ -74,6 +74,42 @@ describe("InferenceClient", () => {
     }
   });
 
+  test("embed sends texts and model over Unix socket and returns typed vectors", async () => {
+    const socketPath = join(scratch, "embed.sock");
+    let observedParams: unknown;
+    const server = await withServer(socketPath, (request) => {
+      observedParams = request.params;
+      return {
+        jsonrpc: "2.0",
+        id: request.id,
+        result: {
+          vectors: [[0.1, 0.2, 0.3]],
+          model: "custom-embed-model",
+          cached: true,
+        },
+      };
+    });
+
+    try {
+      const client = new InferenceClient({
+        lifecycle: { ensureRunning: async () => ({ pid: 1234, socketPath }) },
+        timeoutMs: 500,
+        retryDelaysMs: [1],
+      });
+
+      const result = await client.embed(["hello"], { model: "custom-embed-model" });
+
+      expect(observedParams).toEqual({ texts: ["hello"], model: "custom-embed-model" });
+      expect(result).toEqual({
+        vectors: [[0.1, 0.2, 0.3]],
+        model: "custom-embed-model",
+        cached: true,
+      });
+    } finally {
+      await closeServer(server);
+    }
+  });
+
   test("retries refused sockets with exponential backoff before succeeding", async () => {
     const socketPath = join(scratch, "retry.sock");
     let attempts = 0;

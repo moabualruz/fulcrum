@@ -4,12 +4,18 @@
 
 export { Task } from "./Task.ts";
 export { TaskStatus } from "./TaskStatus.ts";
+export { Sprint, SprintStatus } from "./Sprint.ts";
 export {
   TASK_STATUS_CATEGORIES,
+  SPRINT_STATUSES,
   TaskStatusCategorySchema,
+  SprintStatusSchema,
+  CreateSprintInput,
   DependenciesSchema,
   ExternalTaskIdSchema,
   type TaskStatusCategory,
+  type SprintStatusValue,
+  type CreateSprintInput as CreateSprintInputType,
   type TaskDependencies,
   type ExternalTaskId,
 } from "./schemas.ts";

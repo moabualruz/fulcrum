@@ -233,13 +233,27 @@ describe("RoutingEventPayloadSchema", () => {
     expect(
       modules.RoutingEventPayloadSchema.parse({
         rule_id: "11111111-1111-4111-8111-111111111111",
-        source: "manual",
+        source: "rule",
         agent: "codex",
         confidence: 1,
       }),
     ).toEqual({
       rule_id: "11111111-1111-4111-8111-111111111111",
-      source: "manual",
+      source: "rule",
+      agent: "codex",
+      confidence: 1,
+    });
+
+    expect(
+      modules.RoutingEventPayloadSchema.parse({
+        rule_id: null,
+        source: "explicit",
+        agent: "codex",
+        confidence: 1,
+      }),
+    ).toEqual({
+      rule_id: null,
+      source: "explicit",
       agent: "codex",
       confidence: 1,
     });
@@ -256,7 +270,7 @@ describe("RoutingEventPayloadSchema", () => {
     expect(
       modules.RoutingEventPayloadSchema.safeParse({
         rule_id: "11111111-1111-4111-8111-111111111111",
-        source: "manual",
+        source: "rule",
         agent: "codex",
         confidence: 1.2,
       }).success,

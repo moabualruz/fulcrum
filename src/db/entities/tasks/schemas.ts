@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+const UuidLikeSchema = z.string().regex(
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
+);
+
 export const TASK_STATUS_CATEGORIES = [
   "unstarted",
   "started",
@@ -20,3 +24,22 @@ export const ExternalTaskIdSchema = z.string().regex(
   /^(jira:[A-Za-z0-9][A-Za-z0-9._-]*|linear:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|github:\d+)$/,
 );
 export type ExternalTaskId = z.infer<typeof ExternalTaskIdSchema>;
+
+export const SPRINT_STATUSES = ["planned", "active", "completed"] as const;
+export const SprintStatusSchema = z.enum(SPRINT_STATUSES);
+export type SprintStatusValue = z.infer<typeof SprintStatusSchema>;
+
+export const CreateSprintInput = z.object({
+  orgId: UuidLikeSchema,
+  projectId: UuidLikeSchema,
+  name: z.string().trim().min(1),
+  goal: z.string().trim().min(1).optional(),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
+  status: SprintStatusSchema.default("planned"),
+  capacityPoints: z.number().int().nonnegative().optional(),
+}).strict().refine((input) => input.startDate < input.endDate, {
+  message: "startDate must be before endDate",
+  path: ["endDate"],
+});
+export type CreateSprintInput = z.infer<typeof CreateSprintInput>;

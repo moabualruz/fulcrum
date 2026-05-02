@@ -20,7 +20,7 @@ const HELP = `fulcrum inference
 Usage:
   fulcrum inference start [--json]
   fulcrum inference status [--json]
-  fulcrum inference embed <text> [--json]
+  fulcrum inference embed <text> [--model <id>] [--json]
   fulcrum inference generate <prompt> [--json]
   fulcrum inference stop [--json]
 `;
@@ -154,11 +154,12 @@ async function runEmbed(
   opts: InferenceRunOptions & { print: (line: string) => void },
 ): Promise<void> {
   const json = hasFlag(argv, "json");
-  const text = argv.filter((arg) => arg !== "--json").join(" ").trim();
+  const { values, model } = parseModelArgs(argv.filter((arg) => arg !== "--json"));
+  const text = values.join(" ").trim();
   if (!text) throw new Error("embed requires text");
   const payload = EmbedResultSchema.parse(opts.caller
-    ? await opts.caller.inference.embed({ texts: [text] })
-    : await embedWithClient(resolveServices(opts).client, text));
+    ? await opts.caller.inference.embed({ texts: [text], model })
+    : await embedWithClient(resolveServices(opts).client, text, model));
 
   if (json) {
     opts.print(JSON.stringify(payload));
@@ -188,11 +189,29 @@ async function runGenerate(
 async function embedWithClient(
   client: InferenceCliClient,
   text: string,
+  model?: string,
 ): Promise<EmbedResult> {
   if (!client.embed) {
     throw new Error("embed requires a tRPC caller or inference client embed method");
   }
-  return client.embed([text]);
+  return client.embed([text], { model });
+}
+
+function parseModelArgs(argv: readonly string[]): { values: string[]; model?: string } {
+  const values: string[] = [];
+  let model: string | undefined;
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--model") {
+      model = argv[index + 1];
+      if (!model) throw new Error("--model requires a value");
+      index += 1;
+      continue;
+    }
+    if (arg === undefined) continue;
+    values.push(arg);
+  }
+  return { values, model };
 }
 
 async function generateWithClient(

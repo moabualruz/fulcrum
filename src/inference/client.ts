@@ -71,7 +71,6 @@ function injectedLifecycle(): InferenceLifecycleLike | undefined {
   }
 }
 
-@Injectable()
 export class InferenceClient {
   private readonly lifecycle: InferenceLifecycleLike;
   private readonly timeoutMs: number;
@@ -206,3 +205,5 @@ export class InferenceClient {
     });
   }
 }
+
+Injectable()(InferenceClient);

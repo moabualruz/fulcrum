@@ -140,7 +140,6 @@ async function probeHealth(socketPath: string, timeoutMs: number): Promise<boole
   });
 }
 
-@Injectable()
 export class InferenceLifecycle {
   private readonly homeDir: string;
   private readonly pidFilePath: string;
@@ -261,6 +260,8 @@ export class InferenceLifecycle {
     return running;
   }
 }
+
+Injectable()(InferenceLifecycle);
 
 const defaultLifecycle = new InferenceLifecycle();
 

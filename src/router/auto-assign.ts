@@ -1,4 +1,5 @@
 import { evaluateRuleMatch } from "./rules-engine.ts";
+import { recordRoutingEvent } from "./telemetry.ts";
 import type { AutoAssignInput, RoutingDecision } from "./types.ts";
 
 type RecordRoutingDecision = (event: {
@@ -12,8 +13,20 @@ interface AutoAssignConfig {
 
 let recordDecision: RecordRoutingDecision | null = null;
 
+async function defaultRecordDecision({
+  input,
+  decision,
+}: {
+  input: AutoAssignInput;
+  decision: RoutingDecision;
+}): Promise<void> {
+  await recordRoutingEvent(decision, input.taskId, input.orgId, Boolean(input.dryRun));
+}
+
+recordDecision = defaultRecordDecision;
+
 export function configureAutoAssign(config: AutoAssignConfig): void {
-  recordDecision = config.recordDecision ?? null;
+  recordDecision = config.recordDecision ?? defaultRecordDecision;
 }
 
 export async function autoAssign(

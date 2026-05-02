@@ -22,6 +22,7 @@ export interface RoutingDecision {
 }
 
 export interface AutoAssignInput {
+  taskId: string;
   agentOverride?: string;
   taskFacts: TaskFacts;
   orgId: string;

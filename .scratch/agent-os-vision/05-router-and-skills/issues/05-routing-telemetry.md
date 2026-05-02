@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: 05-router-and-skills
 Blocked-by: 04-auto-assign-tier1-tier2
@@ -15,16 +15,16 @@ Implement `src/router/telemetry.ts` that writes exactly one `events` row per non
 
 ## Acceptance criteria
 
-- [ ] Schema / module: `src/router/telemetry.ts` exports `recordRoutingEvent(decision: RoutingDecision, taskId: string, orgId: string, dryRun: boolean): Promise<void>`
-- [ ] Logic: non-dryRun call → inserts one `events` row with `verb='routed'` and correct payload fields
-- [ ] Logic: `dryRun: true` → zero rows inserted
-- [ ] Logic: `source='explicit'` → `rule_id` is `null` in payload
-- [ ] Logic: `source='rule'` → `rule_id` is the matched rule's UUID
-- [ ] Logic: `source='llm-fallback'` → `confidence` non-null (stubbed for now; exercised fully in issue 10)
-- [ ] Surfaces parity: telemetry module is surface-agnostic; called by `auto-assign.ts`
-- [ ] Tests: assert exact `events` row count (1) after dispatch
-- [ ] Tests: assert `events` row count (0) after dryRun dispatch
-- [ ] Tests: payload shape validated against `RoutingEventPayload` Zod type in test assertions
+- [x] Schema / module: `src/router/telemetry.ts` exports `recordRoutingEvent(decision: RoutingDecision, taskId: string, orgId: string, dryRun: boolean): Promise<void>`
+- [x] Logic: non-dryRun call → inserts one `events` row with `verb='routed'` and correct payload fields
+- [x] Logic: `dryRun: true` → zero rows inserted
+- [x] Logic: `source='explicit'` → `rule_id` is `null` in payload
+- [x] Logic: `source='rule'` → `rule_id` is the matched rule's UUID
+- [x] Logic: `source='llm-fallback'` → `confidence` non-null (stubbed for now; exercised fully in issue 10)
+- [x] Surfaces parity: telemetry module is surface-agnostic; called by `auto-assign.ts`
+- [x] Tests: assert exact `events` row count (1) after dispatch
+- [x] Tests: assert `events` row count (0) after dryRun dispatch
+- [x] Tests: payload shape validated against `RoutingEventPayload` Zod type in test assertions
 
 ## Blocked by
 

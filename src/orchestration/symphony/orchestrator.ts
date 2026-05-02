@@ -16,6 +16,13 @@ import type { EntityManager } from "@mikro-orm/postgresql";
 
 import type { AgentRunRepository } from "../../db/repositories/orchestration/AgentRunRepository.ts";
 import type { EventRepository } from "../../db/repositories/core/EventRepository.ts";
+import {
+  dispatchLifecycleHook,
+  type DispatchLifecycleHookOptions,
+  type LifecycleHookContext,
+  type LifecycleHooks,
+  type LifecycleHookTimeoutConfig,
+} from "./hooks.ts";
 
 export class ClaimConflictError extends Error {
   readonly taskId: string;
@@ -30,6 +37,8 @@ export class ClaimConflictError extends Error {
 export interface ClaimRunResult {
   runId: string;
 }
+
+export type AgentDispatch<T> = (ctx: LifecycleHookContext) => Promise<T>;
 
 const claimQueues = new Map<string, Promise<void>>();
 
@@ -117,12 +126,50 @@ async function claimRunUnlocked(
   }
 }
 
+export async function dispatchRunWithHooks<T>(
+  em: EntityManager,
+  ctx: LifecycleHookContext,
+  dispatch: AgentDispatch<T>,
+  hooks: LifecycleHooks = {},
+  timeoutConfig: LifecycleHookTimeoutConfig = {},
+  hookOptions: DispatchLifecycleHookOptions = {},
+): Promise<T> {
+  await dispatchLifecycleHook(
+    em,
+    "before_run",
+    ctx,
+    hooks,
+    timeoutConfig,
+    hookOptions,
+  );
+
+  try {
+    const result = await dispatch(ctx);
+    await dispatchLifecycleHook(em, "after_run", ctx, hooks, timeoutConfig);
+    return result;
+  } catch (error) {
+    await dispatchLifecycleHook(
+      em,
+      isCancelError(error) ? "on_cancel" : "on_failure",
+      ctx,
+      hooks,
+      timeoutConfig,
+    );
+    throw error;
+  }
+}
+
 function isClaimConflict(error: unknown): boolean {
   if (error instanceof ClaimConflictError) return true;
   if (error instanceof UniqueConstraintViolationException) return true;
 
   const message = String((error as { message?: unknown }).message ?? error);
   return message.includes("agent_runs_claimed_unique");
+}
+
+function isCancelError(error: unknown): boolean {
+  const maybeError = error as { name?: unknown; code?: unknown };
+  return maybeError.name === "AbortError" || maybeError.code === "ABORT_ERR";
 }
 
 async function queueClaim<T>(key: string, claim: () => Promise<T>): Promise<T> {

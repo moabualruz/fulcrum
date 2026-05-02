@@ -9,6 +9,11 @@ export {
   configureAutoAssign,
 } from "./auto-assign.ts";
 
+export {
+  configureRoutingTelemetry,
+  recordRoutingEvent,
+} from "./telemetry.ts";
+
 export type {
   AutoAssignInput,
   RoutingDecision,

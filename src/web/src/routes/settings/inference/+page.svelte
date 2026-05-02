@@ -1,5 +1,5 @@
 <script lang="ts">
-  let { data } = $props();
+  let { data, form } = $props();
 </script>
 
 <section class="inference-settings">
@@ -30,6 +30,25 @@
   {:catch}
     <p>Model list unavailable.</p>
   {/await}
+
+  <h2>Test embed</h2>
+  <form method="POST" action="?/testEmbed" class="embed-form">
+    <label for="embed-text">Text</label>
+    <div class="embed-row">
+      <input id="embed-text" name="text" type="text" value="hello world" />
+      <button type="submit">Test embed</button>
+    </div>
+  </form>
+
+  {#if form?.success}
+    <div class="embed-result" data-embed-dimensions={form.dimensions}>
+      <p>Dimensions: {form.dimensions}</p>
+      <p>Model: {form.model} · cached={form.cached}</p>
+      <p>Preview: {form.preview?.join(", ")}</p>
+    </div>
+  {:else if form?.error}
+    <p class="embed-error" data-embed-error>{form.error}</p>
+  {/if}
 </section>
 
 <style>
@@ -40,5 +59,26 @@
 
   .status {
     font-weight: 600;
+  }
+
+  .embed-form {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+
+  .embed-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  input {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .embed-result,
+  .embed-error {
+    margin-top: 0.75rem;
   }
 </style>

@@ -1,33 +1,66 @@
-import { createContext } from "../../../../../trpc/context.ts";
-import { inferenceRouter } from "../../../../../server/trpc/routers/inference.ts";
-import { t } from "../../../../../trpc/trpc.ts";
+import { InferenceClient } from "../../../../../inference/client.ts";
+import { INFERENCE_CLIENT_TOKEN } from "../../../../../inference/tokens.ts";
 import type { Session } from "better-auth";
 
 interface InferenceLocals {
   session?: Session | null;
-  orgId?: string | null;
-  em?: import("@mikro-orm/postgresql").EntityManager | null;
   container?: import("@needle-di/core").Container | null;
 }
 
-function createCaller(locals: InferenceLocals) {
-  const factory = t.createCallerFactory(inferenceRouter);
-  return factory(createContext({
-    session: locals.session ?? null,
-    orgId: locals.orgId ?? null,
-    userId: (locals.session as { userId?: string } | null)?.userId ?? null,
-    em: locals.em ?? null,
-    container: locals.container ?? null,
-  }));
+function resolveClient(container: InferenceLocals["container"]): InferenceClient {
+  if (container?.has(INFERENCE_CLIENT_TOKEN)) {
+    return container.get(INFERENCE_CLIENT_TOKEN);
+  }
+  if (container?.has(InferenceClient)) {
+    return container.get(InferenceClient);
+  }
+  return new InferenceClient();
 }
 
 export function load({ locals }: { locals: InferenceLocals }) {
-  const caller = createCaller(locals);
+  const client = resolveClient(locals.container ?? null);
 
   return {
     streamed: {
-      health: caller.health(),
-      models: caller.models.list(),
+      health: client.health(),
+      models: client.listModels(),
     },
   };
 }
+
+export const actions = {
+  testEmbed: async ({ request, locals }: { request: Request; locals: InferenceLocals }) => {
+    const form = await request.formData();
+    const text = String(form.get("text") ?? "").trim();
+    if (!text) {
+      return {
+        success: false,
+        error: "Enter text to embed.",
+      };
+    }
+    if (!locals.session) {
+      return {
+        success: false,
+        error: "Authentication required.",
+      };
+    }
+
+    try {
+      const client = resolveClient(locals.container ?? null);
+      const result = await client.embed([text]);
+      const vector = result.vectors[0] ?? [];
+      return {
+        success: true,
+        dimensions: vector.length,
+        preview: vector.slice(0, 5),
+        model: result.model,
+        cached: result.cached,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Smoke embed failed.",
+      };
+    }
+  },
+};

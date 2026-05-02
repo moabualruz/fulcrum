@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: 02-inference-sidecar
 Blocked-by: 03-inference-cache-schema, 04-trpc-procedures-and-health-surface

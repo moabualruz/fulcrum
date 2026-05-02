@@ -18,7 +18,10 @@ import { appRouter } from "../../../../trpc/router.ts";
 import { t } from "../../../../trpc/trpc.ts";
 import { TuiApp } from "../../../../tui/index.ts";
 import { FakeTTY } from "../../../../tui/testing/fake-tty.ts";
-import { load as loadInferenceSettings } from "../../../../web/src/routes/settings/inference/+page.server.ts";
+import {
+  actions as inferenceSettingsActions,
+  load as loadInferenceSettings,
+} from "../../../../web/src/routes/settings/inference/+page.server.ts";
 
 const health: HealthResult = {
   status: "degraded",
@@ -274,6 +277,28 @@ describe("inference tRPC router", () => {
     } finally {
       tui.stop();
     }
+  });
+
+  test("web settings testEmbed action calls inference.embed and reports dimensions", async () => {
+    const container = makeContainer();
+    const request = new Request("http://localhost/settings/inference", {
+      method: "POST",
+      body: new URLSearchParams({ text: "smoke embed" }),
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+    });
+
+    const result = await inferenceSettingsActions.testEmbed({
+      request,
+      locals: { container, session: mockSession(), orgId: "00000000-0000-0000-0000-000000000001" },
+    } as Parameters<typeof inferenceSettingsActions.testEmbed>[0]);
+
+    expect(result).toEqual({
+      success: true,
+      dimensions: 3,
+      preview: [0.1, 0.2, 0.3],
+      model: "BAAI/bge-small-en-v1.5",
+      cached: false,
+    });
   });
 
   test("class-token binding remains supported for existing callers", async () => {

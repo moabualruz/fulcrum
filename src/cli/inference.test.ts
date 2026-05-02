@@ -97,6 +97,28 @@ describe("fulcrum inference CLI", () => {
     });
   });
 
+  test("embed --model forwards model id to tRPC caller", async () => {
+    const cap = capture();
+    let observedInput: unknown;
+
+    await run(["embed", "hello", "--model", "custom-embed-model", "--json"], {
+      ...cap.opts,
+      caller: {
+        inference: {
+          health: async () => health,
+          embed: async (input) => {
+            observedInput = input;
+            return { vectors: [[0.1, 0.2]], model: "custom-embed-model", cached: false };
+          },
+          generate: async () => ({ text: "Paris", model: "Qwen2.5-0.5B-Instruct", tokens: 8 }),
+        },
+      },
+    });
+
+    expect(observedInput).toEqual({ texts: ["hello"], model: "custom-embed-model" });
+    expect(JSON.parse(cap.lines.join("\n")).model).toBe("custom-embed-model");
+  });
+
   test("embed without --json emits a concise human summary", async () => {
     const cap = capture();
 

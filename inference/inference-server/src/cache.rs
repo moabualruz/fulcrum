@@ -9,8 +9,9 @@ pub struct EmbedCacheEntry {
     pub model: String,
     pub input_hash: String,
     pub dims: i64,
-    pub vector: Vec<f32>,
+    pub vectors: Vec<Vec<f32>>,
     pub expires_at: i64,
+    pub hit_count: i64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -55,23 +56,25 @@ impl CacheStore {
     }
 
     pub fn put_embed(&self, entry: &EmbedCacheEntry) -> Result<()> {
-        let vector_json = serde_json::to_string(&entry.vector).map_err(json_error)?;
+        let vector_blob = encode_vectors(&entry.vectors);
         self.conn.execute(
             r#"
-            insert into embed_cache (model, input_hash, dims, vector_json, expires_at, created_at)
-            values (?1, ?2, ?3, ?4, ?5, ?6)
+            insert into embed_cache (model, input_hash, dims, vector_blob, expires_at, hit_count, created_at)
+            values (?1, ?2, ?3, ?4, ?5, ?6, ?7)
             on conflict(model, input_hash) do update set
               dims = excluded.dims,
-              vector_json = excluded.vector_json,
+              vector_blob = excluded.vector_blob,
               expires_at = excluded.expires_at,
+              hit_count = 0,
               created_at = excluded.created_at
             "#,
             params![
                 entry.model,
                 entry.input_hash,
                 entry.dims,
-                vector_json,
+                vector_blob,
                 entry.expires_at,
+                entry.hit_count,
                 Self::now_epoch_seconds(),
             ],
         )?;
@@ -84,25 +87,31 @@ impl CacheStore {
             .conn
             .query_row(
                 r#"
-                select model, input_hash, dims, vector_json, expires_at
+                select model, input_hash, dims, vector_blob, expires_at, hit_count
                 from embed_cache
                 where model = ?1 and input_hash = ?2 and expires_at > ?3
                 "#,
                 params![model, input_hash, now],
                 |row| {
-                    let vector_json: String = row.get(3)?;
-                    let vector = serde_json::from_str(&vector_json).map_err(json_error)?;
+                    let vector_blob: Vec<u8> = row.get(3)?;
+                    let vectors = decode_vectors(&vector_blob).map_err(blob_error)?;
                     Ok(EmbedCacheEntry {
                         model: row.get(0)?,
                         input_hash: row.get(1)?,
                         dims: row.get(2)?,
-                        vector,
+                        vectors,
                         expires_at: row.get(4)?,
+                        hit_count: row.get(5)?,
                     })
                 },
             )
             .optional()?;
-        if row.is_none() {
+        if row.is_some() {
+            self.conn.execute(
+                "update embed_cache set hit_count = hit_count + 1 where model = ?1 and input_hash = ?2",
+                params![model, input_hash],
+            )?;
+        } else {
             self.conn.execute(
                 "delete from embed_cache where model = ?1 and input_hash = ?2 and expires_at <= ?3",
                 params![model, input_hash, now],
@@ -202,8 +211,9 @@ impl CacheStore {
               model text not null,
               input_hash text not null,
               dims integer not null,
-              vector_json text not null,
+              vector_blob blob not null,
               expires_at integer not null,
+              hit_count integer not null default 0,
               created_at integer not null,
               primary key (model, input_hash)
             );
@@ -230,4 +240,51 @@ impl CacheStore {
 
 fn json_error(error: serde_json::Error) -> rusqlite::Error {
     rusqlite::Error::ToSqlConversionFailure(Box::new(error))
+}
+
+fn blob_error(error: String) -> rusqlite::Error {
+    rusqlite::Error::FromSqlConversionFailure(
+        3,
+        rusqlite::types::Type::Blob,
+        Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, error)),
+    )
+}
+
+fn encode_vectors(vectors: &[Vec<f32>]) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(&(vectors.len() as u32).to_le_bytes());
+    for vector in vectors {
+        bytes.extend_from_slice(&(vector.len() as u32).to_le_bytes());
+        for value in vector {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+    }
+    bytes
+}
+
+fn decode_vectors(bytes: &[u8]) -> Result<Vec<Vec<f32>>, String> {
+    let mut offset = 0;
+    let rows = read_u32(bytes, &mut offset)? as usize;
+    let mut vectors = Vec::with_capacity(rows);
+    for _ in 0..rows {
+        let dims = read_u32(bytes, &mut offset)? as usize;
+        let mut vector = Vec::with_capacity(dims);
+        for _ in 0..dims {
+            let chunk = bytes
+                .get(offset..offset + 4)
+                .ok_or_else(|| "truncated f32 in vector blob".to_string())?;
+            vector.push(f32::from_le_bytes(chunk.try_into().unwrap()));
+            offset += 4;
+        }
+        vectors.push(vector);
+    }
+    Ok(vectors)
+}
+
+fn read_u32(bytes: &[u8], offset: &mut usize) -> Result<u32, String> {
+    let chunk = bytes
+        .get(*offset..*offset + 4)
+        .ok_or_else(|| "truncated u32 in vector blob".to_string())?;
+    *offset += 4;
+    Ok(u32::from_le_bytes(chunk.try_into().unwrap()))
 }

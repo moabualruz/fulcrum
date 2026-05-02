@@ -1,7 +1,9 @@
 mod cache;
 
 use cache::CacheStore;
+use inference_embed::{EmbedRequest, EmbedResponse, DEFAULT_EMBED_DIMS, DEFAULT_EMBED_MODEL};
 use inference_core::protocol::{CacheStats, HealthResult, Request, Response};
+use sha2::{Digest, Sha256};
 use std::env;
 use std::path::PathBuf;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader};
@@ -215,8 +217,67 @@ fn dispatch(req: Request) -> Response {
                 cache: health_cache_stats(),
             },
         ),
+        "embed" => match handle_embed(req.params) {
+            Ok(response) => Response::success(req.id, response),
+            Err(message) => Response::error(req.id, -32602, &message),
+        },
         _ => Response::method_not_found(req.id),
     }
+}
+
+fn handle_embed(params: serde_json::Value) -> Result<EmbedResponse, String> {
+    let request: EmbedRequest = serde_json::from_value(params).map_err(|error| error.to_string())?;
+    if request.texts.is_empty() {
+        return Err("embed requires at least one text".to_string());
+    }
+    let model = request
+        .model
+        .clone()
+        .unwrap_or_else(|| DEFAULT_EMBED_MODEL.to_string());
+    let input_hash = embed_input_hash(&request.texts);
+
+    if let Some(store) = open_cache_store() {
+        if let Ok(Some(entry)) = store.get_embed(&model, &input_hash) {
+            return Ok(EmbedResponse {
+                vectors: entry.vectors,
+                model,
+                cached: true,
+            });
+        }
+
+        let response = inference_embed::embed(request)?;
+        let dims = response
+            .vectors
+            .first()
+            .map(|vector| vector.len())
+            .unwrap_or(DEFAULT_EMBED_DIMS) as i64;
+        let entry = cache::EmbedCacheEntry {
+            model: response.model.clone(),
+            input_hash,
+            dims,
+            vectors: response.vectors.clone(),
+            expires_at: CacheStore::now_epoch_seconds() + 7 * 24 * 60 * 60,
+            hit_count: 0,
+        };
+        let _ = store.put_embed(&entry);
+        return Ok(response);
+    }
+
+    inference_embed::embed(request)
+}
+
+fn embed_input_hash(texts: &[String]) -> String {
+    let mut hasher = Sha256::new();
+    for text in texts {
+        hasher.update((text.len() as u64).to_be_bytes());
+        hasher.update(text.as_bytes());
+    }
+    format!("{:x}", hasher.finalize())
+}
+
+fn open_cache_store() -> Option<CacheStore> {
+    let path = cache_path(env::var("FULCRUM_HOME").ok().as_deref())?;
+    CacheStore::open(&path).ok()
 }
 
 fn health_cache_stats() -> Option<CacheStats> {
@@ -256,6 +317,45 @@ mod tests {
         assert_eq!(val["result"]["backends"], json!([]));
         assert_eq!(val["result"]["models"], json!([]));
         assert!(val.get("error").is_none() || val["error"].is_null());
+    }
+
+    #[test]
+    fn dispatch_embed_returns_deterministic_vectors_without_model_download() {
+        std::env::set_var("SKIP_MODEL_DOWNLOAD", "1");
+        let line = r#"{"jsonrpc":"2.0","id":7,"method":"embed","params":{"texts":["alpha","beta"]}}"#;
+
+        let resp = dispatch_line(line);
+
+        std::env::remove_var("SKIP_MODEL_DOWNLOAD");
+        let val: serde_json::Value = serde_json::to_value(&resp).unwrap();
+        assert_eq!(val["jsonrpc"], "2.0");
+        assert_eq!(val["id"], 7);
+        assert_eq!(val["result"]["model"], "BAAI/bge-small-en-v1.5");
+        assert_eq!(val["result"]["cached"], false);
+        assert_eq!(val["result"]["vectors"].as_array().unwrap().len(), 2);
+        assert_eq!(val["result"]["vectors"][0].as_array().unwrap().len(), 384);
+        assert_ne!(val["result"]["vectors"][0], val["result"]["vectors"][1]);
+    }
+
+    #[test]
+    fn dispatch_embed_uses_cache_for_identical_batch() {
+        std::env::set_var("SKIP_MODEL_DOWNLOAD", "1");
+        let home = std::env::temp_dir().join(format!(
+            "fulcrum-embed-cache-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        std::env::set_var("FULCRUM_HOME", &home);
+        let line = r#"{"jsonrpc":"2.0","id":8,"method":"embed","params":{"texts":["same text"]}}"#;
+
+        let first = serde_json::to_value(dispatch_line(line)).unwrap();
+        let second = serde_json::to_value(dispatch_line(line)).unwrap();
+
+        std::env::remove_var("SKIP_MODEL_DOWNLOAD");
+        std::env::remove_var("FULCRUM_HOME");
+        let _ = std::fs::remove_dir_all(home);
+        assert_eq!(first["result"]["cached"], false);
+        assert_eq!(second["result"]["cached"], true);
+        assert_eq!(first["result"]["vectors"], second["result"]["vectors"]);
     }
 
     #[test]
@@ -328,18 +428,22 @@ mod tests {
             model: "bge-small-en-v1.5".to_string(),
             input_hash: "embed-hash".to_string(),
             dims: 3,
-            vector: vec![0.1, 0.2, 0.3],
+            vectors: vec![vec![0.1, 0.2, 0.3]],
             expires_at: now + 60,
+            hit_count: 0,
         };
         store.put_embed(&embed).unwrap();
         assert_eq!(store.get_embed("bge-small-en-v1.5", "embed-hash").unwrap(), Some(embed));
+        let hit = store.get_embed("bge-small-en-v1.5", "embed-hash").unwrap().unwrap();
+        assert_eq!(hit.hit_count, 1);
 
         let expired_embed = EmbedCacheEntry {
             model: "bge-small-en-v1.5".to_string(),
             input_hash: "old-embed".to_string(),
             dims: 3,
-            vector: vec![0.0, 0.0, 0.0],
+            vectors: vec![vec![0.0, 0.0, 0.0]],
             expires_at: now - 1,
+            hit_count: 0,
         };
         store.put_embed(&expired_embed).unwrap();
         assert_eq!(store.get_embed("bge-small-en-v1.5", "old-embed").unwrap(), None);
