@@ -24,22 +24,10 @@ import { Org } from "../auth/Org.ts";
 import { Task } from "../tasks/Task.ts";
 import { SearchDocument } from "../search/SearchDocument.ts";
 import { AgentRunRepository } from "../../repositories/orchestration/AgentRunRepository.ts";
+import type { AgentRunOrchestrationState } from "./states.ts";
 
-export const AGENT_RUN_ORCHESTRATION_STATES = [
-  "unclaimed",
-  "claimed",
-  "running",
-  "retry_queued",
-  "released",
-  "succeeded",
-  "failed",
-  "timed_out",
-  "stalled",
-  "cancelled",
-] as const;
-
-export type AgentRunOrchestrationState =
-  (typeof AGENT_RUN_ORCHESTRATION_STATES)[number];
+export { AGENT_RUN_ORCHESTRATION_STATES } from "./states.ts";
+export type { AgentRunOrchestrationState } from "./states.ts";
 
 @Entity({ tableName: "agent_runs", repository: () => AgentRunRepository })
 @Index({

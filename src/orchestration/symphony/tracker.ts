@@ -8,10 +8,8 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { z } from "zod";
 
-import {
-  AGENT_RUN_ORCHESTRATION_STATES,
-  type AgentRun,
-} from "../../db/entities/orchestration/AgentRun.ts";
+import type { AgentRun } from "../../db/entities/orchestration/AgentRun.ts";
+import { AGENT_RUN_ORCHESTRATION_STATES } from "../../db/entities/orchestration/states.ts";
 import type { Task } from "../../db/entities/tasks/Task.ts";
 import type { AgentRunRepository } from "../../db/repositories/orchestration/AgentRunRepository.ts";
 import type { TaskRepository } from "../../db/repositories/tasks/TaskRepository.ts";
