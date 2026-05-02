@@ -1,5 +1,5 @@
 ---
-Status: integration-review
+Status: completed
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 10-cli-auth-and-flags-verbs, 07-feature-flag-registry

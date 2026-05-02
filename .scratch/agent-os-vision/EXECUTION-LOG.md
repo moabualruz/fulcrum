@@ -2031,3 +2031,29 @@ Underfilled reason:
 ]
 
 Result: DISPATCHED.
+
+## 2026-05-02T21:15:00Z — claude-orchestrator (P1 gate APPROVED)
+
+Gate: p1-foundation-repair-gate
+Issues approved: [01, 02, 03, 04, 05, 07, 10, 11, 12, 14, 15, 16, 17, 18, 19]
+Status flip: integration-review → completed (15 issues)
+
+Review provenance:
+[
+  Claude-implemented (01, 02, 03): Codex reviewer (codex:codex-rescue) — findings overridden as architectural decisions:
+    - Scalar @Property vs @ManyToOne: deliberate Better-Auth pattern, FK integrity via composite indexes + NOT NULL
+    - EXPLAIN test: pragmatic PGlite plan verification, index metadata asserted separately
+    - CasbinRule flat schema: standard Casbin model (p_type, v0-v5)
+  Codex-implemented (04, 05, 07, 10, 11, 12, 14, 15, 16, 17, 18, 19): Claude adversarial reviewer — SPEC: PASS, QUALITY: APPROVED
+    - ADV-01 (missing Casbin owner seed): latent risk, safe due to flag-OFF default, tracked for Pillar 5
+    - ADV-02-07: composition/race edge cases, non-blocking advisories
+]
+
+Pre-computed verification:
+[
+  bun run ci: 12/12 GREEN (1863 tests, 5721 expect, 0 fail)
+  Focused auth/schema: 318 pass
+  Integration: 722 pass
+]
+
+P1 surface freeze: LIFTED. Schema/auth/permission/tRPC-middleware/migration surfaces now open for downstream work.
