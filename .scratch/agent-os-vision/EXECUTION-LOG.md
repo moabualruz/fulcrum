@@ -1417,6 +1417,81 @@ Held:
 
 Result: CLAIMED.
 
+## 2026-05-02T17:31:00Z — codex-orchestrator (current tail checkpoint)
+
+Capacity:
+[
+  claude_impl=0/6,
+  codex_impl=0/6,
+  claude_review=1/6,
+  codex_review=0/6
+]
+
+Tracker:
+[
+  P1 gate queued at 2026-05-02T17:30:00Z entry,
+  P1#04, P1#05, P1#07, P1#11, P1#14, P1#15, P1#16, P1#19 now integration-review,
+  existing P1#01, P1#02, P1#03, P1#10, P1#12, P1#17, P1#18 already integration-review
+]
+
+Precomputed verification:
+[
+  bun run ci => PASS, 12/12 stages, 1812 pass, 2 skip, 0 fail
+]
+
+Result: GATE_DISPATCH_READY.
+
+## 2026-05-02T17:30:00Z — codex-orchestrator (P1 integration gate queued)
+
+Capacity:
+[
+  claude_impl=0/6,
+  codex_impl=0/6,
+  claude_review=1/6,
+  codex_review=0/6
+]
+
+Queue fill:
+[
+  gate=p1-foundation-repair-gate,
+  issues=[
+    01-foundation-reset/issues/01-schema-auth-migration.md,
+    01-foundation-reset/issues/02-events-org-id-backfill.md,
+    01-foundation-reset/issues/03-composite-indexes-and-flag-stub-tables.md,
+    01-foundation-reset/issues/04-local-org-seed-and-init.md,
+    01-foundation-reset/issues/05-better-auth-integration.md,
+    01-foundation-reset/issues/07-feature-flag-registry.md,
+    01-foundation-reset/issues/10-cli-auth-and-flags-verbs.md,
+    01-foundation-reset/issues/11-web-login-signup-logout-pages.md,
+    01-foundation-reset/issues/12-web-invitation-accept-and-user-management-ui.md,
+    01-foundation-reset/issues/14-saas-auth-gated-oauth-and-email-otp.md,
+    01-foundation-reset/issues/15-tui-base-shell-and-auth-flags-screens.md,
+    01-foundation-reset/issues/16-casbin-policies-gated-flag.md,
+    01-foundation-reset/issues/17-zod-schemas-and-trpc-domain-stubs.md,
+    01-foundation-reset/issues/18-test-infrastructure-baseline-and-ci.md,
+    01-foundation-reset/issues/19-migration-up-down-versioning.md
+  ]
+]
+
+Precomputed verification:
+[
+  bun run ci => PASS, 12/12 stages, 1812 pass, 2 skip, 0 fail,
+  web:check => PASS with existing warnings in src/web/src/routes/boards/+page.svelte and src/web/src/routes/auth/login/+page.svelte,
+  web:build => PASS with existing Svelte warnings and large chunk warning
+]
+
+Tracker:
+[
+  P1 implemented issues 04,05,07,11,14,15,16,19 -> integration-review before gate dispatch
+]
+
+Underfilled reason:
+[
+  implementation lanes held until P1 foundation gate verdict; stale P15#01 lane will be recovered after gate dispatch unless reviewer finds blocking foundation defects
+]
+
+Result: GATE_QUEUED.
+
 ## 2026-05-02T16:24:24Z — codex-orchestrator (P1 repair wave integrated)
 
 Repair lanes:
@@ -1538,3 +1613,27 @@ Held:
 ]
 
 Result: CLAIMED.
+
+## 2026-05-02T17:31:00Z — codex-orchestrator (current tail checkpoint)
+
+Capacity:
+[
+  claude_impl=0/6,
+  codex_impl=0/6,
+  claude_review=1/6,
+  codex_review=0/6
+]
+
+Tracker:
+[
+  P1 gate queued at 2026-05-02T17:30:00Z entry,
+  P1#04, P1#05, P1#07, P1#11, P1#14, P1#15, P1#16, P1#19 now integration-review,
+  existing P1#01, P1#02, P1#03, P1#10, P1#12, P1#17, P1#18 already integration-review
+]
+
+Precomputed verification:
+[
+  bun run ci => PASS, 12/12 stages, 1812 pass, 2 skip, 0 fail
+]
+
+Result: GATE_DISPATCH_READY.

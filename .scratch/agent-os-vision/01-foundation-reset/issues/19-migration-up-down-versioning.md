@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: integration-review
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 03-composite-indexes-and-flag-stub-tables
