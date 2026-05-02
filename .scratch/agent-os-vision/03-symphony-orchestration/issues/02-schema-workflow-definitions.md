@@ -1,8 +1,11 @@
 ---
-Status: needs-review
+Status: completed
 Triage: AFK
 Pillar: 03-symphony-orchestration
 Blocked-by: None
+Owner: codex-orchestrator
+ClaimedAt: 2026-05-02T01:12:17Z
+ReviewVerdict: SPEC PASS / QUALITY APPROVED — re-review 2026-05-02 after b5b177f fixed numeric priority + tasks_dispatch_eligible index
 ---
 
 # Schema migration: workflow_definitions table + tasks eligibility columns
@@ -15,11 +18,11 @@ MikroORM v7 migration covering `WorkflowDefinition` entity (new) and additive pr
 
 ## Acceptance criteria
 - [x] Schema / state machine: `workflow_definitions` table exists with columns `id, org_id, project_id, name, config_yaml, prompt_md, created_at, updated_at`; unique + list indexes present; `tasks.blocked_by_ids` and `tasks.workflow_id` columns added
-- [ ] Tracker adapter: N/A
-- [ ] Dispatch loop / hooks: N/A
-- [ ] Surfaces (web/cli/tui parity): N/A (schema-only slice)
+- [x] Tracker adapter: N/A
+- [x] Dispatch loop / hooks: N/A
+- [x] Surfaces (web/cli/tui parity): N/A (schema-only slice)
 - [x] Tests: migration class rolls forward and backward cleanly (MikroORM `migration:up` / `migration:down`); index names present in `pg_indexes` after up
-- [ ] SPEC conformance traced in `docs/symphony-conformance.md`: N/A
+- [x] SPEC conformance traced in `docs/symphony-conformance.md`: N/A
 
 ## Blocked by
 None

@@ -1,8 +1,11 @@
 ---
-Status: needs-review
+Status: completed
 Triage: AFK
 Pillar: 03-symphony-orchestration
 Blocked-by: None
+Owner: codex-orchestrator
+ClaimedAt: 2026-05-02T01:12:17Z
+ReviewVerdict: SPEC PASS / QUALITY APPROVED — re-review 2026-05-02 after 57ad027 fixed conformance trace, workspace_path text, claimed task_id check
 ---
 
 # Schema migration: agent_runs Symphony state columns + partial indexes
@@ -15,9 +18,9 @@ MikroORM v7 additive migration adding five properties to the `AgentRun` entity: 
 
 ## Acceptance criteria
 - [x] Schema / state machine: all five properties present on `AgentRun` entity; CHECK constraint rejects invalid state strings; all three partial indexes created by name and visible in `pg_indexes`
-- [ ] Tracker adapter: N/A
-- [ ] Dispatch loop / hooks: N/A
-- [ ] Surfaces (web/cli/tui parity): N/A
+- [x] Tracker adapter: N/A
+- [x] Dispatch loop / hooks: N/A
+- [x] Surfaces (web/cli/tui parity): N/A
 - [x] Tests: migration class forward + backward (`migration:up` / `migration:down`); unit test inserts a row with invalid `orchestration_state` and expects DB error; unique partial index tested with two concurrent repository inserts on same `task_id` with state `claimed` — second must fail
 - [x] SPEC conformance traced in `docs/symphony-conformance.md`: state enum values documented as implementing SPEC.md §State Machine
 

@@ -1,8 +1,11 @@
 ---
-Status: needs-review
+Status: completed
 Triage: AFK
 Pillar: 17-cross-cutting-platform
 Blocked-by: [01-foundation-reset/issues/01-schema-auth-migration.md]
+Owner: codex-orchestrator
+ClaimedAt: 2026-05-02T01:12:17Z
+ReviewVerdict: SPEC PASS / QUALITY APPROVED — re-review 2026-05-02 after e1dfca7 fixed rollout CHECK + text drift
 PRD: .scratch/agent-os-vision/prds/17-cross-cutting-platform.md
 Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Cross-Cutting Requirements section)
 Decisions: [Q-cross-cut, Q22, D5]
@@ -20,12 +23,12 @@ Cuts through: entity decorators → MikroORM migration class → metadata-shape 
 
 ## Acceptance criteria
 
-- [ ] All 5 entity mappings created with correct properties, types, required flags, FK targets, UNIQUE constraints, enum/range validators, composite indexes.
-- [ ] `FeatureFlagRollout` links to Pillar 1 `FeatureFlag` and keeps rollout/cohort data outside the base flag entity.
-- [ ] Migration idempotent: running twice → no error, no duplicate entities/indexes.
-- [ ] Runs clean on PGlite WASM in-process AND standard Postgres (pg driver).
-- [ ] Unit test: `tests/db/migrations/Migration<timestamp>.test.ts` — asserts every entity/property/index via MikroORM metadata + repository smoke checks; RED → GREEN.
-- [ ] `org_id` NOT NULL on every entity; FK to `Org` with cascade verified.
+- [x] All 5 entity mappings created with correct properties, types, required flags, FK targets, UNIQUE constraints, enum/range validators, composite indexes.
+- [x] `FeatureFlagRollout` links to Pillar 1 `FeatureFlag` and keeps rollout/cohort data outside the base flag entity.
+- [x] Migration idempotent: running twice → no error, no duplicate entities/indexes.
+- [x] Runs clean on PGlite WASM in-process AND standard Postgres (pg driver).
+- [x] Unit test: `tests/db/migrations/Migration<timestamp>.test.ts` — asserts every entity/property/index via MikroORM metadata + repository smoke checks; RED → GREEN.
+- [x] `org_id` NOT NULL on every entity; FK to `Org` with cascade verified.
 
 ## Blocked by
 
