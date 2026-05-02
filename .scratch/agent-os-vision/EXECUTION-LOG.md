@@ -932,3 +932,20 @@ Implementers:
 Capacity: claude_impl=2/6 codex_impl=2/6 claude_review=2/6 codex_review=0/6
 Underfilled reason: remaining dispatchable issues overlap migration snapshot, AppRouter, orchestration, or cross-surface contracts; will reassess after first worker/review result.
 Result: IMPLEMENTATION_WAVE_RUNNING.
+
+## 2026-05-02T10:22:00Z — codex-orchestrator (resume audit gates resolved)
+
+Review result:
+[
+  review-moo61qcn-s8r5vi: SPEC PASS / QUALITY CHANGES_REQUIRED for cross-pillar foundation schemas.
+  Completed immediately: 02-inference-sidecar/issues/02-ts-client-and-lifecycle.md, 04-sandcastle-wrapper/issues/01-sandcastle-dep-effect-singleton.md, 05-router-and-skills/issues/02-fulcrum-skills-schema-migration.md.
+  Reopened for fixes: 05-router-and-skills/issues/01-routing-rules-schema-migration.md (routing_rules org FK cascade), 07-docs-editor-collab/issues/01-docs-schema-foundation.md (doc_templates NULL uniqueness).
+]
+
+Review result:
+[
+  review-moo61q5y-llfvx1: SPEC FAIL / QUALITY CHANGES_REQUIRED for P1 foundation surfaces.
+  Completed immediately: 01-foundation-reset/issues/08-binary-entrypoint-scaffold.md, 12-web-invitation-accept-and-user-management-ui.md, 15-tui-base-shell-and-auth-flags-screens.md, 17-zod-schemas-and-trpc-domain-stubs.md.
+  Reopened for fixes: 01-foundation-reset/issues/10-cli-auth-and-flags-verbs.md, 11-web-login-signup-logout-pages.md, 14-saas-auth-gated-oauth-and-email-otp.md, 16-casbin-policies-gated-flag.md, 18-test-infrastructure-baseline-and-ci.md.
+  Additional reopened quality follow-ups: 01-foundation-reset/issues/05-better-auth-integration.md (Account/Verification org_id contract), 07-feature-flag-registry.md (global flag uniqueness).
+]

@@ -1,8 +1,9 @@
 ---
-Status: integration-review
+Status: completed
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 11-web-login-signup-logout-pages
+ReviewDebtResolved: 2026-05-02T10:01:13Z — Claude adversarial review review-moo61q5y-llfvx1 SPEC PASS for this issue; no blocking findings.
 ---
 
 # Web invitation-accept page + admin user-management UI

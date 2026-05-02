@@ -1,8 +1,10 @@
 ---
-Status: integration-review
+Status: in-progress
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 09-auth-trpc-procedures-and-org-management, 08-binary-entrypoint-scaffold
+Owner: codex-orchestrator
+ReviewGate: 2026-05-02T10:01:13Z — Claude adversarial review review-moo61q5y-llfvx1 SPEC FAIL / QUALITY CHANGES_REQUIRED: auth invite missing; login/logout stubs exit 0 with weak assertions.
 ---
 
 # CLI auth + flags verbs — `fulcrum auth *` and `fulcrum flags *`

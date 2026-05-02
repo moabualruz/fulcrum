@@ -1,8 +1,10 @@
 ---
-Status: integration-review
+Status: in-progress
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 13-passkey-enrollment-and-login-flow
+Owner: codex-orchestrator
+ReviewGate: 2026-05-02T10:01:13Z — Claude adversarial review review-moo61q5y-llfvx1 SPEC FAIL / QUALITY CHANGES_REQUIRED: OAuth providers register empty credentials; saas-auth gating is boot-time only.
 ---
 
 # `saas-auth` flag — OAuth providers, magic-link, email OTP (shipped + gated)

@@ -1,5 +1,5 @@
 ---
-Status: integration-review
+Status: in-progress
 Triage: AFK
 Owner: codex-orchestrator
 Pillar: 07-docs-editor-collab
@@ -9,6 +9,7 @@ Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 7 section)
 Decisions: [C2, Q11, Q22]
 Vision: .scratch/agent-os-vision/VISION-GAPS.md (Confluence-grade docs row)
 Docs: []
+ReviewGate: 2026-05-02T09:59:24Z — Claude adversarial review review-moo61qcn-s8r5vi SPEC PASS / QUALITY CHANGES_REQUIRED: doc_templates nullable project_id unique index allows duplicate global templates.
 ---
 
 # Docs schema foundation — ALTER TABLE docs + doc_links + doc_versions + doc_comments + doc_templates

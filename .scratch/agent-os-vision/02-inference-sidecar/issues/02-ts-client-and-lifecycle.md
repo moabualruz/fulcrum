@@ -1,9 +1,10 @@
 ---
-Status: integration-review
+Status: completed
 Triage: AFK
 Owner: codex-orchestrator
 Pillar: 02-inference-sidecar
 Blocked-by: 01-cargo-workspace-scaffold
+ReviewDebtResolved: 2026-05-02T09:59:24Z — Claude adversarial review review-moo61qcn-s8r5vi SPEC PASS / no blocking findings.
 ---
 
 # TS client + auto-spawn lifecycle + `fulcrum inference start|status|stop`

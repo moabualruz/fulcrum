@@ -1,8 +1,10 @@
 ---
-Status: integration-review
+Status: in-progress
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 09-auth-trpc-procedures-and-org-management
+Owner: codex-orchestrator
+ReviewGate: 2026-05-02T10:01:13Z — Claude adversarial review review-moo61q5y-llfvx1 SPEC FAIL / QUALITY CHANGES_REQUIRED: Playwright login/logout coverage missing.
 ---
 
 # Web login, signup, and logout pages

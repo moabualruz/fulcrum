@@ -1,8 +1,10 @@
 ---
-Status: integration-review
+Status: in-progress
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 15-tui-base-shell-and-auth-flags-screens, 14-saas-auth-gated-oauth-and-email-otp, 16-casbin-policies-gated-flag, 17-zod-schemas-and-trpc-domain-stubs
+Owner: codex-orchestrator
+ReviewGate: 2026-05-02T10:01:13Z — Claude adversarial review review-moo61q5y-llfvx1 SPEC FAIL / QUALITY CHANGES_REQUIRED: coverage matrix did not catch missing auth e2e tests.
 ---
 
 # Test infrastructure baseline — Vitest + Bun test + Playwright + `bun run ci` gate

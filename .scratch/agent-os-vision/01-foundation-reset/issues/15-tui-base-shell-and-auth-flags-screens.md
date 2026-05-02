@@ -1,9 +1,10 @@
 ---
-Status: integration-review
+Status: completed
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 10-cli-auth-and-flags-verbs, 07-feature-flag-registry
 Commit: feat(tui): base shell + auth + flags screens (P1#15)
+ReviewDebtResolved: 2026-05-02T10:01:13Z — Claude adversarial review review-moo61q5y-llfvx1 SPEC PASS for this issue; no blocking findings.
 ---
 
 # OpenTUI base shell + auth screen + feature-flags screen

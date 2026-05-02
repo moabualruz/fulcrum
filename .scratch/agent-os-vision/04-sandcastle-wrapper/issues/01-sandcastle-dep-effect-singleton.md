@@ -1,9 +1,10 @@
 ---
-Status: integration-review
+Status: completed
 Triage: AFK
 Owner: codex-orchestrator
 Pillar: 04-sandcastle-wrapper
 Blocked-by: None
+ReviewDebtResolved: 2026-05-02T09:59:24Z — Claude adversarial review review-moo61qcn-s8r5vi SPEC PASS / no blocking findings.
 ---
 
 # Sandcastle dep install + Effect singleton enforcement

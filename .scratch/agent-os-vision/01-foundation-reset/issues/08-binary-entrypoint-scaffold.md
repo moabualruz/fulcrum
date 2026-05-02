@@ -1,8 +1,9 @@
 ---
-Status: integration-review
+Status: completed
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 06-trpc-core-router-and-permission-middleware
+ReviewDebtResolved: 2026-05-02T10:01:13Z — Claude adversarial review review-moo61q5y-llfvx1 SPEC PASS for this issue; no blocking findings.
 ---
 
 # `fulcrum` single-binary entrypoint scaffold with subcommand dispatcher

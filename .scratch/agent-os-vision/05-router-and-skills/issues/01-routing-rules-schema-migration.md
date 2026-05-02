@@ -1,9 +1,10 @@
 ---
-Status: integration-review
+Status: in-progress
 Triage: AFK
 Owner: codex-orchestrator
 Pillar: 05-router-and-skills
 Blocked-by: None
+ReviewGate: 2026-05-02T09:59:24Z — Claude adversarial review review-moo61qcn-s8r5vi SPEC PASS / QUALITY CHANGES_REQUIRED: routing_rules org FK missing ON DELETE CASCADE.
 ---
 
 # Routing rules entity + migration class + composite indexes

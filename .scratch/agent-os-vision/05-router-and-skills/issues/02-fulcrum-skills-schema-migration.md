@@ -1,9 +1,10 @@
 ---
-Status: integration-review
+Status: completed
 Triage: AFK
 Owner: codex-orchestrator
 Pillar: 05-router-and-skills
 Blocked-by: None
+ReviewDebtResolved: 2026-05-02T09:59:24Z — Claude adversarial review review-moo61qcn-s8r5vi SPEC PASS / no blocking findings.
 ---
 
 # FulcrumSkill entity + migration class + skills.lock.json design
