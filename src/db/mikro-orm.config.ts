@@ -34,6 +34,7 @@ import { Task } from "./entities/tasks/Task.ts";
 import { Document } from "./entities/docs/Document.ts";
 import { Memory } from "./entities/memory/Memory.ts";
 import { AgentRun } from "./entities/orchestration/AgentRun.ts";
+import { WorkflowDefinition } from "./entities/orchestration/WorkflowDefinition.ts";
 import { Artifact } from "./entities/artifacts/Artifact.ts";
 import { Repo } from "./entities/repos/Repo.ts";
 import { Job } from "./entities/jobs/Job.ts";
@@ -59,6 +60,7 @@ export {
   Document,
   Memory,
   AgentRun,
+  WorkflowDefinition,
   Artifact,
   Repo,
   Job,
@@ -111,6 +113,7 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     Document,
     Memory,
     AgentRun,
+    WorkflowDefinition,
     Artifact,
     Repo,
     Job,

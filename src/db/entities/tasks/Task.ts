@@ -1,12 +1,19 @@
 /**
- * Task entity — tasks domain (Pillar 6 stub).
+ * Task entity — tasks domain (Pillar 6 stub + P3#02 eligibility columns).
  *
- * Stub: only the columns required for the FK + composite index land here.
- * Pillar 6 (Task management) will ADD additional columns (title, status,
- * assignee, priority, …) via its own migration class — the org FK and
- * composite index never need to be re-declared.
+ * Stub: base columns (id, org, createdAt) + composite index land in Pillar 1
+ * migration. Pillar 6 (Task management) adds domain columns (title, status,
+ * assignee, priority, …) via its own migration.
  *
- * C2: Composite (org_id, created_at desc) index from day 1.
+ * P3#02 additive columns (eligibility for Symphony dispatch):
+ *   - blockedByIds: list of task IDs that block this task from dispatch.
+ *   - workflowId:   FK-by-value to workflow_definitions.id (nullable).
+ *   - status:       dispatch-eligibility filter ("ready" = eligible).
+ *   - priority:     dispatch ordering (lower = higher priority).
+ * P3#02 partial index: tasks_dispatch_eligible (org, status, priority,
+ *   created_at) WHERE status = 'ready' — added by P3#02 migration via addSql().
+ *
+ * C2: Composite (org_id, created_at) index from day 1.
  * C6: No plaintext SQL — schema via @Entity decorator class.
  * C7: MikroORM v7 ES Stage-3 decorator pattern (@mikro-orm/decorators/es).
  *     Stage-3 decorators do NOT emit reflect-metadata type info — explicit
@@ -38,4 +45,17 @@ export class Task {
 
   @Property({ type: "datetime", fieldName: "created_at", defaultRaw: "now()" })
   createdAt!: Date;
+
+  // P3#02 eligibility columns — added by Migration20260502000001.
+  @Property({ type: "array", fieldName: "blocked_by_ids", default: [] })
+  blockedByIds: string[] = [];
+
+  @Property({ type: "string", fieldName: "workflow_id", nullable: true })
+  workflowId: string | null = null;
+
+  @Property({ type: "string", fieldName: "status", nullable: true })
+  status: string | null = null;
+
+  @Property({ type: "integer", fieldName: "priority", nullable: true })
+  priority: number | null = null;
 }
