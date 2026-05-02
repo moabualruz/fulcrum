@@ -479,7 +479,7 @@
           "name": "agent_runs_claimed_task_id_check",
           "expression": "(orchestration_state <> 'claimed'::text) OR (task_id IS NOT NULL)",
           "definition": "CHECK ((((orchestration_state)::text <> 'claimed'::text) OR (task_id IS NOT NULL)))",
-          "columnName": "orchestration_state"
+          "columnName": "task_id"
         },
         {
           "name": "agent_runs_orchestration_state_check",
@@ -1025,9 +1025,89 @@
       "comment": null
     },
     {
-      "name": "documents",
+      "name": "doc_comments",
       "schema": "public",
       "columns": {
+        "anchor_range": {
+          "name": "anchor_range",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "body_md": {
+          "name": "body_md",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": "now()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
+        "doc_id": {
+          "name": "doc_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
         "id": {
           "name": "id",
           "type": "uuid",
@@ -1060,6 +1140,38 @@
           "enumItems": [],
           "mappedType": "uuid"
         },
+        "parent_comment_id": {
+          "name": "parent_comment_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "resolved": {
+          "name": "resolved",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "false",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "boolean"
+        },
         "updated_at": {
           "name": "updated_at",
           "type": "timestamptz(6)",
@@ -1078,6 +1190,1046 @@
         }
       },
       "indexes": [
+        {
+          "columnNames": [
+            "org_id",
+            "doc_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "doc_comments_org_doc",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "id"
+          ],
+          "composite": false,
+          "constraint": true,
+          "keyName": "doc_comments_pkey",
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "doc_comments_author_id_foreign": {
+          "columnNames": [
+            "author_id"
+          ],
+          "constraintName": "doc_comments_author_id_foreign",
+          "localTableName": "public.doc_comments",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.users"
+        },
+        "doc_comments_doc_id_foreign": {
+          "columnNames": [
+            "doc_id"
+          ],
+          "constraintName": "doc_comments_doc_id_foreign",
+          "localTableName": "public.doc_comments",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.documents",
+          "deleteRule": "cascade"
+        },
+        "doc_comments_org_id_foreign": {
+          "columnNames": [
+            "org_id"
+          ],
+          "constraintName": "doc_comments_org_id_foreign",
+          "localTableName": "public.doc_comments",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.orgs",
+          "deleteRule": "cascade"
+        },
+        "doc_comments_parent_comment_id_foreign": {
+          "columnNames": [
+            "parent_comment_id"
+          ],
+          "constraintName": "doc_comments_parent_comment_id_foreign",
+          "localTableName": "public.doc_comments",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.doc_comments",
+          "deleteRule": "cascade"
+        }
+      },
+      "comment": null
+    },
+    {
+      "name": "doc_links",
+      "schema": "public",
+      "columns": {
+        "anchor": {
+          "name": "anchor",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": "now()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
+        "from_doc_id": {
+          "name": "from_doc_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": true,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "gen_random_uuid()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "link_kind": {
+          "name": "link_kind",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": "'wikilink'",
+          "comment": null,
+          "enumItems": [
+            "wikilink",
+            "task_ref",
+            "run_ref",
+            "mention"
+          ],
+          "mappedType": "enum"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "to_doc_id": {
+          "name": "to_doc_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "to_slug": {
+          "name": "to_slug",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        }
+      },
+      "indexes": [
+        {
+          "columnNames": [
+            "org_id",
+            "from_doc_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "doc_links_org_from",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "to_doc_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "doc_links_org_to",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "id"
+          ],
+          "composite": false,
+          "constraint": true,
+          "keyName": "doc_links_pkey",
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [
+        {
+          "name": "doc_links_link_kind_check",
+          "expression": "\"link_kind\" in ('wikilink', 'task_ref', 'run_ref', 'mention')",
+          "definition": "check (\"link_kind\" in ('wikilink', 'task_ref', 'run_ref', 'mention'))",
+          "columnName": "link_kind"
+        }
+      ],
+      "foreignKeys": {
+        "doc_links_from_doc_id_foreign": {
+          "columnNames": [
+            "from_doc_id"
+          ],
+          "constraintName": "doc_links_from_doc_id_foreign",
+          "localTableName": "public.doc_links",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.documents",
+          "deleteRule": "cascade"
+        },
+        "doc_links_org_id_foreign": {
+          "columnNames": [
+            "org_id"
+          ],
+          "constraintName": "doc_links_org_id_foreign",
+          "localTableName": "public.doc_links",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.orgs",
+          "deleteRule": "cascade"
+        },
+        "doc_links_to_doc_id_foreign": {
+          "columnNames": [
+            "to_doc_id"
+          ],
+          "constraintName": "doc_links_to_doc_id_foreign",
+          "localTableName": "public.doc_links",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.documents",
+          "deleteRule": "set null"
+        }
+      },
+      "comment": null
+    },
+    {
+      "name": "doc_templates",
+      "schema": "public",
+      "columns": {
+        "body_template": {
+          "name": "body_template",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "''",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": "now()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
+        "doc_type": {
+          "name": "doc_type",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [
+            "spec",
+            "adr",
+            "wiki",
+            "runbook",
+            "meeting",
+            "postmortem",
+            "rfc",
+            "note",
+            "scratch"
+          ],
+          "mappedType": "enum"
+        },
+        "frontmatter_template": {
+          "name": "frontmatter_template",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "'{}'",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
+        },
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": true,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "gen_random_uuid()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "is_default": {
+          "name": "is_default",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "false",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "boolean"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": true,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        }
+      },
+      "indexes": [
+        {
+          "columnNames": [
+            "org_id",
+            "project_id",
+            "doc_type"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "doc_templates_org_project_type",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "project_id",
+            "doc_type",
+            "name"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "doc_templates_org_project_type_name_unique",
+          "primary": false,
+          "unique": true
+        },
+        {
+          "columnNames": [
+            "id"
+          ],
+          "composite": false,
+          "constraint": true,
+          "keyName": "doc_templates_pkey",
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [
+        {
+          "name": "doc_templates_doc_type_check",
+          "expression": "\"doc_type\" in ('spec', 'adr', 'wiki', 'runbook', 'meeting', 'postmortem', 'rfc', 'note', 'scratch')",
+          "definition": "check (\"doc_type\" in ('spec', 'adr', 'wiki', 'runbook', 'meeting', 'postmortem', 'rfc', 'note', 'scratch'))",
+          "columnName": "doc_type"
+        }
+      ],
+      "foreignKeys": {
+        "doc_templates_org_id_foreign": {
+          "columnNames": [
+            "org_id"
+          ],
+          "constraintName": "doc_templates_org_id_foreign",
+          "localTableName": "public.doc_templates",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.orgs",
+          "deleteRule": "cascade"
+        }
+      },
+      "comment": null
+    },
+    {
+      "name": "doc_versions",
+      "schema": "public",
+      "columns": {
+        "author_id": {
+          "name": "author_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "body_md_snapshot": {
+          "name": "body_md_snapshot",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": "now()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
+        "delta": {
+          "name": "delta",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
+        },
+        "doc_id": {
+          "name": "doc_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": true,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": true,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "gen_random_uuid()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "restore_of": {
+          "name": "restore_of",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "snapshot": {
+          "name": "snapshot",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
+        },
+        "version_num": {
+          "name": "version_num",
+          "type": "int",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
+        }
+      },
+      "indexes": [
+        {
+          "columnNames": [
+            "doc_id",
+            "version_num"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "doc_versions_doc_version_unique",
+          "primary": false,
+          "unique": true
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "doc_id",
+            "version_num"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "doc_versions_org_doc_version",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "id"
+          ],
+          "composite": false,
+          "constraint": true,
+          "keyName": "doc_versions_pkey",
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "doc_versions_author_id_foreign": {
+          "columnNames": [
+            "author_id"
+          ],
+          "constraintName": "doc_versions_author_id_foreign",
+          "localTableName": "public.doc_versions",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.users",
+          "deleteRule": "set null"
+        },
+        "doc_versions_doc_id_foreign": {
+          "columnNames": [
+            "doc_id"
+          ],
+          "constraintName": "doc_versions_doc_id_foreign",
+          "localTableName": "public.doc_versions",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.documents",
+          "deleteRule": "cascade"
+        },
+        "doc_versions_org_id_foreign": {
+          "columnNames": [
+            "org_id"
+          ],
+          "constraintName": "doc_versions_org_id_foreign",
+          "localTableName": "public.doc_versions",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.orgs",
+          "deleteRule": "cascade"
+        },
+        "doc_versions_restore_of_foreign": {
+          "columnNames": [
+            "restore_of"
+          ],
+          "constraintName": "doc_versions_restore_of_foreign",
+          "localTableName": "public.doc_versions",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.doc_versions",
+          "deleteRule": "set null"
+        }
+      },
+      "comment": null
+    },
+    {
+      "name": "documents",
+      "schema": "public",
+      "columns": {
+        "archived": {
+          "name": "archived",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "false",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "boolean"
+        },
+        "body_md": {
+          "name": "body_md",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "''",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
+        "content_json": {
+          "name": "content_json",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "'{}'",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
+        },
+        "doc_type": {
+          "name": "doc_type",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": "'note'",
+          "comment": null,
+          "enumItems": [
+            "spec",
+            "adr",
+            "wiki",
+            "runbook",
+            "meeting",
+            "postmortem",
+            "rfc",
+            "note",
+            "scratch"
+          ],
+          "mappedType": "enum"
+        },
+        "external_id": {
+          "name": "external_id",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "frontmatter": {
+          "name": "frontmatter",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "'{}'",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
+        },
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": true,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "gen_random_uuid()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": true,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "parent_id": {
+          "name": "parent_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "scope": {
+          "name": "scope",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": "'project'",
+          "comment": null,
+          "enumItems": [
+            "project",
+            "global"
+          ],
+          "mappedType": "enum"
+        },
+        "sort_position": {
+          "name": "sort_position",
+          "type": "double precision",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "0",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "double"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": "now()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        }
+      },
+      "indexes": [
+        {
+          "columnNames": [
+            "org_id",
+            "doc_type"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "docs_org_doc_type",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "external_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "docs_org_external_id",
+          "primary": false,
+          "unique": true,
+          "expression": "CREATE UNIQUE INDEX docs_org_external_id ON public.documents USING btree (org_id, external_id) WHERE (external_id IS NOT NULL)"
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "parent_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "docs_org_parent",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "project_id",
+            "scope"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "docs_org_project_scope",
+          "primary": false,
+          "unique": false
+        },
         {
           "columnNames": [
             "id"
@@ -1100,7 +2252,20 @@
           "unique": false
         }
       ],
-      "checks": [],
+      "checks": [
+        {
+          "name": "documents_doc_type_check",
+          "expression": "\"doc_type\" in ('spec', 'adr', 'wiki', 'runbook', 'meeting', 'postmortem', 'rfc', 'note', 'scratch')",
+          "definition": "check (\"doc_type\" in ('spec', 'adr', 'wiki', 'runbook', 'meeting', 'postmortem', 'rfc', 'note', 'scratch'))",
+          "columnName": "doc_type"
+        },
+        {
+          "name": "documents_scope_check",
+          "expression": "\"scope\" in ('project', 'global')",
+          "definition": "check (\"scope\" in ('project', 'global'))",
+          "columnName": "scope"
+        }
+      ],
       "foreignKeys": {
         "documents_org_id_foreign": {
           "columnNames": [
@@ -1112,6 +2277,18 @@
             "id"
           ],
           "referencedTableName": "public.orgs"
+        },
+        "documents_parent_id_foreign": {
+          "columnNames": [
+            "parent_id"
+          ],
+          "constraintName": "documents_parent_id_foreign",
+          "localTableName": "public.documents",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.documents",
+          "deleteRule": "set null"
         }
       },
       "comment": null
