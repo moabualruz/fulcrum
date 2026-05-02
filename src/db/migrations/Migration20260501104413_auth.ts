@@ -33,6 +33,9 @@ export class Migration20260501104413_auth extends Migration {
     this.addSql(
       `alter table "feature_flags" add constraint "uq_feature_flags_org_user_flag" unique ("org_id", "user_id", "flag")`,
     );
+    this.addSql(
+      `create unique index "uq_feature_flags_global_flag" on "feature_flags" ("flag") where "org_id" is null and "user_id" is null`,
+    );
 
     // invitations
     this.addSql(

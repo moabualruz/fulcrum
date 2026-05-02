@@ -18,7 +18,7 @@ export class Migration20260502050000_routing_rules extends Migration {
       `create table "routing_rules" ("id" uuid not null default gen_random_uuid(), "org_id" uuid not null, "project_id" uuid null, "name" varchar(255) not null, "conditions_json" jsonb not null, "action_agent" varchar(255) not null, "action_skill_set" text[] not null default '{}', "priority" integer not null default 100, "enabled" boolean not null default true, "source" text not null default 'manual', "created_at" timestamptz not null default now(), "updated_at" timestamptz not null default now(), primary key ("id"))`,
     );
     this.addSql(
-      `alter table "routing_rules" add constraint "routing_rules_org_id_foreign" foreign key ("org_id") references "orgs" ("id")`,
+      `alter table "routing_rules" add constraint "routing_rules_org_id_foreign" foreign key ("org_id") references "orgs" ("id") on delete cascade`,
     );
     this.addSql(
       `alter table "routing_rules" add constraint "routing_rules_source_check" check ("source" in ('manual', 'learned', 'imported'))`,

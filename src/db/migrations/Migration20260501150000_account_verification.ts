@@ -20,6 +20,7 @@ export class Migration20260501150000_account_verification extends Migration {
     this.addSql(
       `create table "accounts" (
         "id" uuid not null default gen_random_uuid(),
+        "org_id" uuid null,
         "user_id" uuid not null,
         "provider_id" text not null,
         "account_id" text not null,
@@ -36,6 +37,12 @@ export class Migration20260501150000_account_verification extends Migration {
       )`,
     );
     this.addSql(
+      `alter table "accounts" add constraint "accounts_org_id_foreign" foreign key ("org_id") references "orgs" ("id") on delete cascade`,
+    );
+    this.addSql(
+      `create index "idx_accounts_org_user" on "accounts" ("org_id", "user_id")`,
+    );
+    this.addSql(
       `create index "idx_accounts_user_id" on "accounts" ("user_id")`,
     );
     this.addSql(
@@ -46,6 +53,7 @@ export class Migration20260501150000_account_verification extends Migration {
     this.addSql(
       `create table "verifications" (
         "id" uuid not null default gen_random_uuid(),
+        "org_id" uuid null,
         "identifier" text not null,
         "value" text not null,
         "expires_at" timestamptz not null,
@@ -55,7 +63,13 @@ export class Migration20260501150000_account_verification extends Migration {
       )`,
     );
     this.addSql(
+      `alter table "verifications" add constraint "verifications_org_id_foreign" foreign key ("org_id") references "orgs" ("id") on delete cascade`,
+    );
+    this.addSql(
       `create unique index "uq_verifications_identifier_value" on "verifications" ("identifier", "value")`,
+    );
+    this.addSql(
+      `create index "idx_verifications_org_identifier" on "verifications" ("org_id", "identifier")`,
     );
     this.addSql(
       `create index "idx_verifications_identifier" on "verifications" ("identifier")`,

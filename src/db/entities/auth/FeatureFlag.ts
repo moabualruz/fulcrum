@@ -25,17 +25,22 @@ import { FeatureFlagRepository } from "../../repositories/auth/FeatureFlagReposi
 @Entity({ tableName: "feature_flags", repository: () => FeatureFlagRepository })
 @Index({ name: "idx_feature_flags_org_flag", properties: ["orgId", "flag"] })
 @Unique({ name: "uq_feature_flags_org_user_flag", properties: ["orgId", "userId", "flag"] })
+@Index({
+  name: "uq_feature_flags_global_flag",
+  expression:
+    'CREATE UNIQUE INDEX "uq_feature_flags_global_flag" ON "feature_flags" ("flag") WHERE "org_id" IS NULL AND "user_id" IS NULL',
+})
 export class FeatureFlag {
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
 
   // Nullable: global flag rows have no org (apply to all orgs)
   @Property({ type: "uuid", fieldName: "org_id", nullable: true })
-  orgId?: string;
+  orgId: string | null = null;
 
   // Nullable: org-level flags have no user (apply to all users in the org)
   @Property({ type: "uuid", fieldName: "user_id", nullable: true })
-  userId?: string;
+  userId: string | null = null;
 
   // Flag name — must match ^[a-z][a-z0-9-]*$ (D5 constraint, enforced in FlagRegistry)
   @Property({ type: "string" })

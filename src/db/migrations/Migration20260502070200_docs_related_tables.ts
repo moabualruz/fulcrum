@@ -82,6 +82,9 @@ export class Migration20260502070200_docs_related_tables extends Migration {
       `create unique index "doc_templates_org_project_type_name_unique" on "doc_templates" ("org_id", "project_id", "doc_type", "name")`,
     );
     this.addSql(
+      `create unique index "doc_templates_org_global_type_name_unique" on "doc_templates" ("org_id", "doc_type", "name") where "project_id" is null`,
+    );
+    this.addSql(
       `create index "doc_templates_org_project_type" on "doc_templates" ("org_id", "project_id", "doc_type")`,
     );
     this.addSql(
