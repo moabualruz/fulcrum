@@ -8,18 +8,15 @@ import { PGlite } from "@electric-sql/pglite";
 import { createOrmConfig, RoutingRule } from "../db/mikro-orm.config.ts";
 import type { RoutingRule as RoutingRuleEntity } from "../db/entities/router/RoutingRule.ts";
 import type { RoutingRuleRepository } from "../db/repositories/router/RoutingRuleRepository.ts";
-
-export interface TaskFacts {
-  task: {
-    kind: string;
-    priority: string;
-    tags: string[];
-    title: string;
-  };
-}
+import type { TaskFacts } from "./types.ts";
 
 interface RulesEngineConfig {
   routingRuleRepository: RoutingRuleRepository | null;
+}
+
+export interface RuleMatch {
+  ruleId: string;
+  agent: string;
 }
 
 let configuredRepository: RoutingRuleRepository | null = null;
@@ -34,16 +31,27 @@ export async function evaluateRules(
   orgId: string,
   projectId?: string,
 ): Promise<string | null> {
+  const match = await evaluateRuleMatch(facts, orgId, projectId);
+  return match?.agent ?? null;
+}
+
+export async function evaluateRuleMatch(
+  facts: TaskFacts,
+  orgId: string,
+  projectId?: string,
+): Promise<RuleMatch | null> {
   const repository = await getRoutingRuleRepository();
   const rules = await repository.findEnabledForDispatch(orgId, projectId ?? null);
 
   for (const rule of sortRulesForDispatch(rules, projectId)) {
     const agent = await evaluateRule(rule, facts, repository);
-    if (agent) return agent;
+    if (agent) return { ruleId: rule.id, agent };
   }
 
   return null;
 }
+
+export type { TaskFacts } from "./types.ts";
 
 async function evaluateRule(
   rule: RoutingRuleEntity,
