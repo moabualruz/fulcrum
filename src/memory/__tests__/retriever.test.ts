@@ -10,6 +10,10 @@ import type {
   MemoryImportance,
   MemoryKind,
 } from "../../db/entities/memory/enums.ts";
+import {
+  MEMORY_IMPORTANCE_BOOSTS,
+  MemoryRepository,
+} from "../../db/repositories/memory/MemoryRepository.ts";
 import { MemoryRetriever, RetrieverOptsSchema } from "../retriever.ts";
 
 const ORG_A = "00000000-0000-0000-0000-000000000001";
@@ -109,6 +113,99 @@ describe("MemoryRetriever", () => {
     );
 
     expect(rows.map((row) => row.id)).toEqual([highId, mediumId]);
+  });
+
+  test("does not boost medium above low when body and age tie", async () => {
+    const lowId = "bbbbbbbb-0000-0000-0000-000000000003";
+    const mediumId = "bbbbbbbb-0000-0000-0000-000000000004";
+    await seedMemories([
+      {
+        id: mediumId,
+        body: "medium low tie marker",
+        importance: "medium",
+        createdAt: daysAgo(5),
+      },
+      {
+        id: lowId,
+        body: "medium low tie marker",
+        importance: "low",
+        createdAt: daysAgo(5),
+      },
+    ]);
+
+    const rows = await createRetriever().retrieve(
+      "medium low tie marker",
+      { orgId: ORG_A, projectId: PROJECT_A, topK: 2 },
+    );
+
+    expect(rows.map((row) => row.id)).toEqual([lowId, mediumId]);
+  });
+
+  test("uses Q17 importance constants: high +1, medium and low +0", () => {
+    expect(MEMORY_IMPORTANCE_BOOSTS).toEqual({
+      high: 1,
+      medium: 0,
+      low: 0,
+    });
+  });
+
+  test("uses a bounded FTS candidate query before hydrating non-empty searches", async () => {
+    await seedMemories(Array.from({ length: 30 }, (_, index) => ({
+      id: idFor(4, index),
+      body: `bounded candidate marker ${index}`,
+      createdAt: daysAgo(index),
+    })));
+    const em = db.orm.em.fork();
+    const repo = em.getRepository(Memory) as MemoryRepository;
+    const queries: Array<{ getQuery: () => string }> = [];
+    const originalCreateQueryBuilder = repo.createQueryBuilder.bind(repo);
+
+    repo.createQueryBuilder = ((alias: string) => {
+      const qb = originalCreateQueryBuilder(alias);
+      queries.push(qb);
+      return qb;
+    }) as typeof repo.createQueryBuilder;
+
+    await repo.searchProjectAndGlobal(RetrieverOptsSchema.parse({
+      orgId: ORG_A,
+      projectId: PROJECT_A,
+      query: "bounded candidate marker",
+      topK: 3,
+    }));
+
+    const sql = queries.map((query) => query.getQuery().toLowerCase()).join("\n");
+    expect(sql).toContain("to_tsvector");
+    expect(sql).toContain("plainto_tsquery");
+    expect(sql).toContain("ts_rank_cd");
+    expect(sql).toContain("limit");
+  });
+
+  test("uses a bounded candidate query for empty searches", async () => {
+    await seedMemories(Array.from({ length: 30 }, (_, index) => ({
+      id: idFor(5, index),
+      body: `empty candidate marker ${index}`,
+      createdAt: daysAgo(index),
+    })));
+    const em = db.orm.em.fork();
+    const repo = em.getRepository(Memory) as MemoryRepository;
+    const queries: Array<{ getQuery: () => string }> = [];
+    const originalCreateQueryBuilder = repo.createQueryBuilder.bind(repo);
+
+    repo.createQueryBuilder = ((alias: string) => {
+      const qb = originalCreateQueryBuilder(alias);
+      queries.push(qb);
+      return qb;
+    }) as typeof repo.createQueryBuilder;
+
+    await repo.searchProjectAndGlobal(RetrieverOptsSchema.parse({
+      orgId: ORG_A,
+      projectId: PROJECT_A,
+      query: "",
+      topK: 3,
+    }));
+
+    const sql = queries.map((query) => query.getQuery().toLowerCase()).join("\n");
+    expect(sql).toContain("limit");
   });
 
   test("merges project and global scopes and dedupes rows matching both", async () => {
