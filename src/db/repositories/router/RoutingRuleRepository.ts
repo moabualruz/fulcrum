@@ -8,9 +8,16 @@
 import { injectable } from "@needle-di/core";
 import { EntityRepository } from "@mikro-orm/postgresql";
 import type { RoutingRule } from "../../entities/router/RoutingRule.ts";
+import type { RoutingEventBus } from "../../../router/event-bus.ts";
 
 @injectable()
 export class RoutingRuleRepository extends EntityRepository<RoutingRule> {
+  private eventBus: RoutingEventBus | null = null;
+
+  setEventBus(bus: RoutingEventBus): void {
+    this.eventBus = bus;
+  }
+
   async findEnabledForDispatch(
     orgId: string,
     projectId?: string | null,
@@ -28,5 +35,17 @@ export class RoutingRuleRepository extends EntityRepository<RoutingRule> {
     }
 
     return qb.getResultList();
+  }
+
+  async save(rule: RoutingRule): Promise<void> {
+    this.getEntityManager().persist(rule);
+    await this.getEntityManager().flush();
+    this.eventBus?.emitRulesChanged();
+  }
+
+  async remove(rule: RoutingRule): Promise<void> {
+    this.getEntityManager().remove(rule);
+    await this.getEntityManager().flush();
+    this.eventBus?.emitRulesChanged();
   }
 }

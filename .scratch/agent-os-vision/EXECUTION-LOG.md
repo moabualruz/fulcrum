@@ -960,3 +960,32 @@ Implementers:
 Capacity: claude_impl=2/6 codex_impl=4/6 claude_review=0/6 codex_review=0/6
 Underfilled reason: six active implementation lanes total when including existing P13/P6 Codex workers and P3/P5 Claude workers.
 Result: REVIEW_FIX_WORKERS_RUNNING.
+
+## 2026-05-02T11:00:00Z — claude-code (P5#11 implementation)
+
+Issue: 05-router-and-skills/issues/11-pglite-listen-hot-reload.md
+Branch: mo/agent-os-p5-11
+Runtime: Claude Code (claude-sonnet-4-6)
+
+RED command: bun test src/router/rules-engine-hot-reload.test.ts
+RED failure (lines 1-5):
+  error: Cannot find module './event-bus.ts' from 'src/router/rules-engine-hot-reload.test.ts'
+  error: 'RulesEngine' is not exported from 'src/router/rules-engine.ts'
+  (import errors before any test runs; all 3 tests fail)
+
+GREEN command: pending orchestrator rerun after branch integration
+GREEN pass count: pending
+
+Files touched:
+  - src/router/event-bus.ts (new) — RoutingEventBus with onRulesChanged/emitRulesChanged/listenerCount
+  - src/router/rules-engine.ts (modified) — added RulesEngine class with stale flag + initialize() dedup; evaluateRule onDisable callback
+  - src/db/repositories/router/RoutingRuleRepository.ts (modified) — setEventBus, save(), remove() methods emitting RoutingRulesChanged post-flush
+  - src/router/rules-engine-hot-reload.test.ts (new) — 3 integration tests covering hot-reload and subscription dedup
+
+Decisions:
+  - Used Node EventEmitter as the event bus (no external dep; synchronous emit is safe since handler only sets stale=true)
+  - stale flag initialized true so first evaluateRules always loads from repo
+  - Cache keyed by orgId:projectId so changing scope triggers reload
+  - onDisable callback sets stale=true when a malformed rule is disabled mid-evaluation (so next call reloads clean list)
+
+Result: IMPLEMENTED
