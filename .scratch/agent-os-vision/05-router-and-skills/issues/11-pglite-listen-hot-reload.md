@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: in-progress
+Owner: codex-orchestrator
 Triage: AFK
 Pillar: 05-router-and-skills
 Blocked-by: 03-rules-engine-wrapper

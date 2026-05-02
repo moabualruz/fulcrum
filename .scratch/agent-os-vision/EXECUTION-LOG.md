@@ -909,3 +909,13 @@ Queue fill:
 Capacity: claude_impl=0/6 codex_impl=0/6 claude_review=2/6 codex_review=0/6
 Underfilled reason: status claims/worktree setup before dispatch; migration lanes limited to one DB snapshot writer.
 Result: IMPLEMENTATION_WAVE_CLAIMED.
+
+## 2026-05-02T10:17:00Z — codex-orchestrator (implementation wave adjusted)
+
+Adjustment:
+[
+  returned_to_ready: 17-cross-cutting-platform/issues/04-theme-trpc-and-composable.md,
+  added: 05-router-and-skills/issues/11-pglite-listen-hot-reload.md,
+  reason: P17#04 owns theme tRPC/router wiring and can collide with P13#01 AppRouter scaffold; P5#11 owns routing engine hot-reload path and is safer parallel work
+]
+Result: IMPLEMENTATION_WAVE_ADJUSTED.

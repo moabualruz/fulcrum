@@ -1,6 +1,5 @@
 ---
-Status: in-progress
-Owner: codex-orchestrator
+Status: ready-for-agent
 Triage: AFK
 Pillar: 17-cross-cutting-platform
 Blocked-by: [17-cross-cutting-platform/issues/01-schema-migration-credentials-telemetry-errors-experiments.md, 01-foundation-reset/issues/03-composite-indexes-and-flag-stub-tables.md]
