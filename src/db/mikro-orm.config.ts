@@ -45,6 +45,13 @@ import { CasbinRule } from "./entities/flags/CasbinRule.ts";
 import { WebhookSubscription } from "./entities/flags/WebhookSubscription.ts";
 import { NotificationRule } from "./entities/flags/NotificationRule.ts";
 
+// Platform / cross-cutting entities (P17#01 — Pillar 17 always-on).
+import { Credential } from "./entities/platform/Credential.ts";
+import { TelemetryEvent } from "./entities/platform/TelemetryEvent.ts";
+import { ErrorLog } from "./entities/platform/ErrorLog.ts";
+import { ExperimentAssignment } from "./entities/platform/ExperimentAssignment.ts";
+import { FeatureFlagRollout } from "./entities/platform/FeatureFlagRollout.ts";
+
 export {
   SchemaMigration,
   Org,
@@ -68,6 +75,11 @@ export {
   CasbinRule,
   WebhookSubscription,
   NotificationRule,
+  Credential,
+  TelemetryEvent,
+  ErrorLog,
+  ExperimentAssignment,
+  FeatureFlagRollout,
 };
 
 /** Allowed options for createOrmConfig(). */
@@ -121,6 +133,11 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     CasbinRule,
     WebhookSubscription,
     NotificationRule,
+    Credential,
+    TelemetryEvent,
+    ErrorLog,
+    ExperimentAssignment,
+    FeatureFlagRollout,
   ];
 
   const allEntities: Options["entities"] = [...builtinEntities, ...entities];
