@@ -35,6 +35,7 @@ import { AuthScreen } from "./screens/auth.ts";
 import type { AuthInfo } from "./screens/auth.ts";
 import { FlagsScreen } from "./screens/flags.ts";
 import type { FlagItem } from "./screens/flags.ts";
+import { NewDocScreen } from "./screens/new-doc.ts";
 import { TuiRouter, type TuiRoute } from "./router.ts";
 import { JsonlCrashLog, type TuiCrashLog } from "./crashlog.ts";
 import { DbTelemetrySink, NullTelemetrySink, type TuiTelemetrySink } from "./telemetry.ts";
@@ -67,6 +68,21 @@ export interface TuiCaller {
   };
   inference?: {
     health: () => Promise<{ status: string }>;
+  };
+  docs?: {
+    templates: {
+      list: (input: Record<string, never>) => Promise<Array<{
+        id: string;
+        orgId: string;
+        projectId: string | null;
+        docType: string;
+        name: string;
+        frontmatterTemplate: Record<string, unknown>;
+        bodyTemplate: string;
+        isDefault: boolean;
+        createdAt: Date;
+      }>>;
+    };
   };
 }
 
@@ -102,7 +118,7 @@ export interface TuiAppOptions {
 // Screen enum
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Screen = "nav" | "auth" | "flags" | "inference";
+type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Navigation entries
@@ -152,6 +168,7 @@ export class TuiApp {
   // Active screen instances
   private authScreen: AuthScreen | null = null;
   private flagsScreen: FlagsScreen | null = null;
+  private newDocScreen: NewDocScreen | null = null;
 
   constructor(opts: TuiAppOptions) {
     const out = opts.output ?? new StdoutOutput();
@@ -303,6 +320,9 @@ export class TuiApp {
         case "inference":
           this._renderInference();
           break;
+        case "new-doc":
+          this._renderNewDoc();
+          break;
       }
     } catch (error) {
       this.renderer.clearScreen();
@@ -361,6 +381,20 @@ export class TuiApp {
     this.renderer.writeln(c.dim("  Press [q] to go back"));
   }
 
+  private _renderNewDoc(): void {
+    if (this.newDocScreen) {
+      this.newDocScreen.render();
+    } else {
+      this.renderer.writeln();
+      this.renderer.writeln(c.bold("  New Document"));
+      this.renderer.separator();
+      this.renderer.writeln();
+      this.renderer.writeln(c.dim("  Docs service not available. Run fulcrum init first."));
+      this.renderer.writeln();
+      this.renderer.writeln(c.dim("  Press [q] to go back"));
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Keyboard handling
   // ─────────────────────────────────────────────────────────────────────────
@@ -397,6 +431,13 @@ export class TuiApp {
       return;
     }
 
+    if (this.currentScreen === "new-doc" && this.newDocScreen) {
+      const consumed = await this.newDocScreen.handleKey(key);
+      if (!consumed) return;
+      await this._renderCurrentScreen();
+      return;
+    }
+
     // Nav screen
     if (this.currentScreen === "nav") {
       await this._handleNavKey(key);
@@ -414,6 +455,10 @@ export class TuiApp {
       await this._renderCurrentScreen();
       return;
     }
+    if (key === "n") {
+      await this._openNewDoc();
+      return;
+    }
     if (key === "c") {
       await this.actions.CreateItem?.();
       return;
@@ -422,6 +467,28 @@ export class TuiApp {
       await this._openSelected();
       return;
     }
+  }
+
+  private async _openNewDoc(): Promise<void> {
+    this.currentPath = null;
+    this.currentScreen = "new-doc";
+
+    const docsCaller = this.caller.docs;
+    if (docsCaller) {
+      this.newDocScreen = new NewDocScreen(this.renderer, {
+        caller: docsCaller,
+        onExit: () => {
+          this.currentScreen = "nav";
+          void this._renderCurrentScreen();
+        },
+      });
+      await this.newDocScreen.load();
+    } else {
+      // docs caller not available — render placeholder
+      this.newDocScreen = null;
+    }
+
+    await this._renderCurrentScreen();
   }
 
   private async _openSelected(): Promise<void> {
@@ -585,6 +652,7 @@ function enrichTuiCaller(caller: TuiCaller, em: EntityManager | null): TuiCaller
     flags: caller.flags,
     tasks: caller.tasks,
     inference: caller.inference,
+    docs: caller.docs,
     auth: {
       whoami: async () => {
         const whoami = await caller.auth.whoami();

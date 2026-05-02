@@ -15,6 +15,7 @@ import { flagsRouter } from "../server/trpc/routers/flags.ts";
 import { inferenceRouter } from "../server/trpc/routers/inference.ts";
 import { orgsRouter } from "../server/trpc/routers/orgs.ts";
 import { orchestrationRouter } from "./routers/orchestration.ts";
+import { docTemplatesRouter } from "../server/trpc/routers/doc-templates.ts";
 
 const EmptyInputSchema = z.void();
 const IdInputSchema = z.object({ id: z.string().min(1) });
@@ -128,6 +129,7 @@ const docsRouter = t.router({
   ...crudProcedures("docs"),
   move: mutationProcedure("docs", "move"),
   reorder: mutationProcedure("docs", "reorder"),
+  templates: docTemplatesRouter,
 });
 
 const docVersionsRouter = t.router({

@@ -8,6 +8,9 @@ import { Org } from "./entities/auth/Org.ts";
 import { Verification } from "./entities/auth/Verification.ts";
 import { DocTemplate } from "./entities/docs/DocTemplate.ts";
 import { RoutingRule, RoutingRuleSource } from "./entities/router/RoutingRule.ts";
+import { TEMPLATE_SEEDS } from "../docs/template-seeds.ts";
+import { DEFAULT_ORG_ID } from "./seed.ts";
+import { Migration20260502100000_doc_templates_seed } from "./migrations/Migration20260502100000_doc_templates_seed.ts";
 
 function metadataFor(db: Awaited<ReturnType<typeof createTestOrm>>, entity: unknown) {
   return db.em.getMetadata().get(entity as never) as unknown as {
@@ -85,6 +88,45 @@ describe("schema data integrity", () => {
       ]);
 
       await expect(em.flush()).rejects.toThrow();
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("doc template seed migration inserts exactly 9 idempotent org-default rows", async () => {
+    const db = await createTestOrm();
+    try {
+      const seeded = await db.pglite.query<{
+        count: string;
+        doc_types: string[];
+      }>(
+        `select count(*)::text as count, array_agg(doc_type order by doc_type) as doc_types
+         from "doc_templates"
+         where "org_id" = $1 and "project_id" is null and "is_default" = true`,
+        [DEFAULT_ORG_ID],
+      );
+
+      expect(Number(seeded.rows[0]?.count)).toBe(9);
+      expect(seeded.rows[0]?.doc_types).toEqual(
+        TEMPLATE_SEEDS.map((seed) => seed.docType).sort(),
+      );
+
+      const replay = new Migration20260502100000_doc_templates_seed(
+        db.em.getDriver(),
+        db.orm.config,
+      );
+      await replay.up();
+      for (const query of replay.getQueries()) {
+        await db.em.getDriver().execute(query);
+      }
+
+      const afterReplay = await db.pglite.query<{ count: string }>(
+        `select count(*)::text as count
+         from "doc_templates"
+         where "org_id" = $1 and "project_id" is null and "is_default" = true`,
+        [DEFAULT_ORG_ID],
+      );
+      expect(Number(afterReplay.rows[0]?.count)).toBe(9);
     } finally {
       await db.close();
     }

@@ -55,5 +55,25 @@ export function createDocsCommand(): Command {
     throw new Error("Generated tRPC invocation for docs.update is not wired yet.");
   });
 
+  // docs template sub-commands (P7-04)
+  const templateCommand = command.command("template");
+  templateCommand.description("Doc template management commands.");
+
+  const templateListCommand = templateCommand.command("list");
+  templateListCommand.description("List all org-default doc templates.");
+  templateListCommand.option("--json", "Emit JSON output");
+  templateListCommand.action(async () => {
+    throw new Error("Generated tRPC invocation for docs.templates.list is not wired yet.");
+  });
+
+  const templateResolveCommand = templateCommand.command("resolve");
+  templateResolveCommand.description("Resolve the best template for a doc_type.");
+  templateResolveCommand.option("--json", "Emit JSON output");
+  templateResolveCommand.option("--doc-type <string>", "Doc type (adr, rfc, etc.)");
+  templateResolveCommand.option("--project-id <string>", "Optional project ID");
+  templateResolveCommand.action(async () => {
+    throw new Error("Generated tRPC invocation for docs.templates.resolve is not wired yet.");
+  });
+
   return command;
 }
