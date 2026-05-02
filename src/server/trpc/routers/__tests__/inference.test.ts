@@ -52,13 +52,14 @@ function makeContainer(): Container {
         cached: false,
       }),
       generate: async () => generateResult,
-      classify: async () => ({
-        results: [
-          { label: "bug", score: 0.91 },
-          { label: "docs", score: 0.09 },
-        ],
+      classify: async () => [
+        { label: "bug", score: 0.91 },
+        { label: "docs", score: 0.09 },
+      ],
+      tokenize: async (text: string) => ({
+        count: text.split(/\s+/).filter(Boolean).length,
+        tokens: text.split(/\s+/).filter(Boolean),
       }),
-      tokenize: async (text: string) => ({ count: text.split(/\s+/).filter(Boolean).length }),
       listModels: async () => [
         {
           id: "BAAI/bge-small-en-v1.5",
@@ -198,14 +199,12 @@ describe("inference tRPC router", () => {
     await expect(caller.inference.generate({ prompt: "The capital of France is" }))
       .resolves.toEqual(generateResult);
     await expect(caller.inference.classify({ text: "fix crash", labels: ["bug", "docs"] }))
-      .resolves.toEqual({
-        results: [
-          { label: "bug", score: 0.91 },
-          { label: "docs", score: 0.09 },
-        ],
-      });
+      .resolves.toEqual([
+        { label: "bug", score: 0.91 },
+        { label: "docs", score: 0.09 },
+      ]);
     await expect(caller.inference.tokenize({ text: "one two three" }))
-      .resolves.toEqual({ count: 3 });
+      .resolves.toEqual({ count: 3, tokens: ["one", "two", "three"] });
     await expect(caller.inference.models.list()).resolves.toHaveLength(1);
     await expect(caller.inference.models.rm({ modelId: "BAAI/bge-small-en-v1.5" }))
       .resolves.toEqual({ ok: true });
@@ -361,10 +360,8 @@ describe("inference tRPC router", () => {
           cached: true,
         }),
         generate: async () => generateResult,
-        classify: async () => ({
-          results: [{ label: "bug", score: 1 }],
-        }),
-        tokenize: async () => ({ count: 4 }),
+        classify: async () => [{ label: "bug", score: 1 }],
+        tokenize: async () => ({ count: 4, tokens: ["one", "two", "three", "four"] }),
         listModels: async () => [
           {
             id: "class-token-model",
@@ -391,9 +388,9 @@ describe("inference tRPC router", () => {
     await expect(caller.inference.generate({ prompt: "The capital of France is" }))
       .resolves.toEqual(generateResult);
     await expect(caller.inference.classify({ text: "fix crash", labels: ["bug"] }))
-      .resolves.toEqual({ results: [{ label: "bug", score: 1 }] });
+      .resolves.toEqual([{ label: "bug", score: 1 }]);
     await expect(caller.inference.tokenize({ text: "one two three four" }))
-      .resolves.toEqual({ count: 4 });
+      .resolves.toEqual({ count: 4, tokens: ["one", "two", "three", "four"] });
     await expect(caller.inference.models.list()).resolves.toEqual([
       {
         id: "class-token-model",
