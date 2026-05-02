@@ -58,6 +58,16 @@ Implementers: [pending dispatch]
 Reviewers: [17-cross-cutting-platform/issues/23-license-deps-audit.md pending review]
 Result: IN_PROGRESS — statuses flipped to in-progress before dispatch.
 
+## 2026-05-02T02:39:00Z — codex-orchestrator (Wave 3 batch adjusted for independence)
+
+Adjustment:
+[
+  returned_to_ready: 02-inference-sidecar/issues/03-inference-cache-schema.md,
+  added: 04-sandcastle-wrapper/issues/01-sandcastle-dep-effect-singleton.md,
+  reason: P2#03 overlaps P2#02 around inference status/protocol; P4#01 has independent package/sandbox-runner ownership
+]
+Result: IN_PROGRESS batch remains six issues.
+
 ## 2026-05-02T01:16:30Z — codex-orchestrator (Wave 2 batch dispatched)
 
 Batch: [

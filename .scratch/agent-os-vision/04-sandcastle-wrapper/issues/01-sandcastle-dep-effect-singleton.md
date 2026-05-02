@@ -1,6 +1,7 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
+Owner: codex-orchestrator
 Pillar: 04-sandcastle-wrapper
 Blocked-by: None
 ---

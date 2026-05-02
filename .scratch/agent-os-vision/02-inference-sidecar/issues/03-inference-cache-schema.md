@@ -1,7 +1,6 @@
 ---
-Status: in-progress
+Status: ready-for-agent
 Triage: AFK
-Owner: codex-orchestrator
 Pillar: 02-inference-sidecar
 Blocked-by: 01-cargo-workspace-scaffold
 ---
