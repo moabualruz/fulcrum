@@ -1,5 +1,5 @@
 ---
-Status: completed
+Status: integration-review
 Owner: codex-orchestrator
 Triage: AFK
 Pillar: 05-router-and-skills

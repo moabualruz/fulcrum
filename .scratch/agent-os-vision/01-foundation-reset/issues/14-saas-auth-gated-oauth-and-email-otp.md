@@ -1,5 +1,5 @@
 ---
-Status: completed
+Status: implemented
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 13-passkey-enrollment-and-login-flow

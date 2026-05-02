@@ -1,5 +1,5 @@
 ---
-Status: needs-review
+Status: integration-review
 Owner: codex-orchestrator
 Triage: AFK
 Pillar: 02-inference-sidecar

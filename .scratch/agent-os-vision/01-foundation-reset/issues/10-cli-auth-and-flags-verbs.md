@@ -1,5 +1,5 @@
 ---
-Status: completed
+Status: implemented
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 09-auth-trpc-procedures-and-org-management, 08-binary-entrypoint-scaffold

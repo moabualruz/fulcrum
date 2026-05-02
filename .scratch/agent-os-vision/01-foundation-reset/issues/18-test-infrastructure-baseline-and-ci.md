@@ -1,5 +1,5 @@
 ---
-Status: completed
+Status: implemented
 Triage: AFK
 Pillar: 01-foundation-reset
 Blocked-by: 15-tui-base-shell-and-auth-flags-screens, 14-saas-auth-gated-oauth-and-email-otp, 16-casbin-policies-gated-flag, 17-zod-schemas-and-trpc-domain-stubs
