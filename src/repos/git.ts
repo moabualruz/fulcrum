@@ -42,7 +42,7 @@ export interface GitBlameLine {
 
 export interface GitFileTreeEntry {
   path: string;
-  kind: "file" | "directory";
+  kind: "file" | "dir";
   sizeBytes: number;
 }
 
@@ -255,7 +255,7 @@ export async function getFileTree(
 
       return {
         path: match[4] ?? "",
-        kind: match[2] === "tree" ? "directory" : "file",
+        kind: match[2] === "tree" ? "dir" : "file",
         sizeBytes: match[3] === "-" ? 0 : Number(match[3]),
       };
     });

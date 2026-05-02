@@ -215,6 +215,12 @@ describe("repos git wrapper", () => {
     ]);
   });
 
+  test("getFileTree labels directories as dir", async () => {
+    const tree = await getFileTree(fixture.repoPath, { branch: "main" });
+
+    expect(tree).toContainEqual({ path: "docs", kind: "dir", sizeBytes: 0 });
+  });
+
   test("getFileContent returns text content and extension MIME type", async () => {
     const content = await getFileContent(fixture.repoPath, "docs/guide.txt", "main");
 
