@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: integration-review
 Triage: AFK
 Owner: codex-orchestrator
 Pillar: 07-docs-editor-collab
