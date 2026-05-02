@@ -258,6 +258,38 @@
       "name": "agent_runs",
       "schema": "public",
       "columns": {
+        "agent_name": {
+          "name": "agent_name",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "agent_version": {
+          "name": "agent_version",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
         "attempt_count": {
           "name": "attempt_count",
           "type": "int",
@@ -274,6 +306,22 @@
           "enumItems": [],
           "mappedType": "integer"
         },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": "now()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
         "id": {
           "name": "id",
           "type": "uuid",
@@ -289,6 +337,22 @@
           "comment": null,
           "enumItems": [],
           "mappedType": "uuid"
+        },
+        "iteration_count": {
+          "name": "iteration_count",
+          "type": "int",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "0",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
         },
         "last_error_kind": {
           "name": "last_error_kind",
@@ -365,6 +429,42 @@
           "enumItems": [],
           "mappedType": "uuid"
         },
+        "sandbox_mode": {
+          "name": "sandbox_mode",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": "'host'",
+          "comment": null,
+          "enumItems": [
+            "host",
+            "docker",
+            "podman"
+          ],
+          "mappedType": "enum"
+        },
+        "search_doc_id": {
+          "name": "search_doc_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
         "started_at": {
           "name": "started_at",
           "type": "timestamptz(6)",
@@ -381,6 +481,22 @@
           "enumItems": [],
           "mappedType": "datetime"
         },
+        "status": {
+          "name": "status",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
         "task_id": {
           "name": "task_id",
           "type": "uuid",
@@ -396,6 +512,54 @@
           "comment": null,
           "enumItems": [],
           "mappedType": "uuid"
+        },
+        "token_used": {
+          "name": "token_used",
+          "type": "int",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
+        },
+        "transcript_path": {
+          "name": "transcript_path",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "workspace_diff_path": {
+          "name": "workspace_diff_path",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
         },
         "workspace_path": {
           "name": "workspace_path",
@@ -415,6 +579,19 @@
         }
       },
       "indexes": [
+        {
+          "columnNames": [
+            "org_id",
+            "agent_name",
+            "status",
+            "created_at"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "agent_runs_agent_org",
+          "primary": false,
+          "unique": false
+        },
         {
           "columnNames": [
             "task_id"
@@ -479,13 +656,19 @@
           "name": "agent_runs_claimed_task_id_check",
           "expression": "(orchestration_state <> 'claimed'::text) OR (task_id IS NOT NULL)",
           "definition": "CHECK ((((orchestration_state)::text <> 'claimed'::text) OR (task_id IS NOT NULL)))",
-          "columnName": "task_id"
+          "columnName": "orchestration_state"
         },
         {
           "name": "agent_runs_orchestration_state_check",
           "expression": "\"orchestration_state\" in ('unclaimed', 'claimed', 'running', 'retry_queued', 'released', 'succeeded', 'failed', 'timed_out', 'stalled', 'cancelled')",
           "definition": "check (\"orchestration_state\" in ('unclaimed', 'claimed', 'running', 'retry_queued', 'released', 'succeeded', 'failed', 'timed_out', 'stalled', 'cancelled'))",
           "columnName": "orchestration_state"
+        },
+        {
+          "name": "agent_runs_sandbox_mode_check",
+          "expression": "\"sandbox_mode\" in ('host', 'docker', 'podman')",
+          "definition": "check (\"sandbox_mode\" in ('host', 'docker', 'podman'))",
+          "columnName": "sandbox_mode"
         }
       ],
       "foreignKeys": {
@@ -499,6 +682,17 @@
             "id"
           ],
           "referencedTableName": "public.orgs"
+        },
+        "agent_runs_search_doc_id_foreign": {
+          "columnNames": [
+            "search_doc_id"
+          ],
+          "constraintName": "agent_runs_search_doc_id_foreign",
+          "localTableName": "public.agent_runs",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.search_documents"
         },
         "agent_runs_task_id_foreign": {
           "columnNames": [
@@ -2034,6 +2228,22 @@
             "scratch"
           ],
           "mappedType": "enum"
+        },
+        "embedding": {
+          "name": "embedding",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
         },
         "external_id": {
           "name": "external_id",
@@ -3766,6 +3976,22 @@
       "name": "memories",
       "schema": "public",
       "columns": {
+        "embedding": {
+          "name": "embedding",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
         "id": {
           "name": "id",
           "type": "uuid",
@@ -3846,6 +4072,259 @@
           ],
           "constraintName": "memories_org_id_foreign",
           "localTableName": "public.memories",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.orgs"
+        }
+      },
+      "comment": null
+    },
+    {
+      "name": "model_cache",
+      "schema": "public",
+      "columns": {
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "false",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "boolean"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": "now()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
+        "downloaded": {
+          "name": "downloaded",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "false",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "boolean"
+        },
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": true,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "gen_random_uuid()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "kind": {
+          "name": "kind",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [
+            "embed",
+            "generate",
+            "classify"
+          ],
+          "mappedType": "enum"
+        },
+        "local_path": {
+          "name": "local_path",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "model_id": {
+          "name": "model_id",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": true,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "sha256": {
+          "name": "sha256",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "size_bytes": {
+          "name": "size_bytes",
+          "type": "bigint",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "bigint"
+        },
+        "source": {
+          "name": "source",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [
+            "bundled",
+            "huggingface",
+            "local"
+          ],
+          "mappedType": "enum"
+        }
+      },
+      "indexes": [
+        {
+          "columnNames": [
+            "org_id",
+            "kind",
+            "active"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "model_cache_org_kind_active",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "model_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "model_cache_org_model_id",
+          "primary": false,
+          "unique": true
+        },
+        {
+          "columnNames": [
+            "id"
+          ],
+          "composite": false,
+          "constraint": true,
+          "keyName": "model_cache_pkey",
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [
+        {
+          "name": "model_cache_kind_check",
+          "expression": "\"kind\" in ('embed', 'generate', 'classify')",
+          "definition": "check (\"kind\" in ('embed', 'generate', 'classify'))",
+          "columnName": "kind"
+        },
+        {
+          "name": "model_cache_source_check",
+          "expression": "\"source\" in ('bundled', 'huggingface', 'local')",
+          "definition": "check (\"source\" in ('bundled', 'huggingface', 'local'))",
+          "columnName": "source"
+        }
+      ],
+      "foreignKeys": {
+        "model_cache_org_id_foreign": {
+          "columnNames": [
+            "org_id"
+          ],
+          "constraintName": "model_cache_org_id_foreign",
+          "localTableName": "public.model_cache",
           "referencedColumnNames": [
             "id"
           ],
@@ -4221,6 +4700,158 @@
       ],
       "checks": [],
       "foreignKeys": {},
+      "comment": null
+    },
+    {
+      "name": "provider_credentials",
+      "schema": "public",
+      "columns": {
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "false",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "boolean"
+        },
+        "base_url": {
+          "name": "base_url",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": true,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "gen_random_uuid()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "provider": {
+          "name": "provider",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [
+            "ollama",
+            "lm-studio",
+            "openai-compatible"
+          ],
+          "mappedType": "enum"
+        },
+        "secret_ref": {
+          "name": "secret_ref",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        }
+      },
+      "indexes": [
+        {
+          "columnNames": [
+            "org_id",
+            "provider",
+            "active"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "provider_credentials_org_provider_active",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "id"
+          ],
+          "composite": false,
+          "constraint": true,
+          "keyName": "provider_credentials_pkey",
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [
+        {
+          "name": "provider_credentials_provider_check",
+          "expression": "\"provider\" in ('ollama', 'lm-studio', 'openai-compatible')",
+          "definition": "check (\"provider\" in ('ollama', 'lm-studio', 'openai-compatible'))",
+          "columnName": "provider"
+        }
+      ],
+      "foreignKeys": {
+        "provider_credentials_org_id_foreign": {
+          "columnNames": [
+            "org_id"
+          ],
+          "constraintName": "provider_credentials_org_id_foreign",
+          "localTableName": "public.provider_credentials",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.orgs"
+        }
+      },
       "comment": null
     },
     {
@@ -4699,6 +5330,22 @@
       "name": "search_documents",
       "schema": "public",
       "columns": {
+        "embedding": {
+          "name": "embedding",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
         "entity_id": {
           "name": "entity_id",
           "type": "varchar(255)",
