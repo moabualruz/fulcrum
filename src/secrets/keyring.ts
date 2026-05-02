@@ -124,6 +124,12 @@ function writeFallbackKey(path: string, key: Uint8Array): void {
   chmodSync(path, 0o600);
 }
 
+async function resolveNativeAdapter(
+  cfg: KeyringConfig,
+): Promise<NativeKeyringAdapter | null> {
+  return cfg.native === undefined ? loadDefaultNativeAdapter() : cfg.native;
+}
+
 /**
  * loadOrCreateMasterKey — encrypt-path entry point.
  *
@@ -133,13 +139,14 @@ function writeFallbackKey(path: string, key: Uint8Array): void {
 export async function loadOrCreateMasterKey(
   cfg: KeyringConfig = {},
 ): Promise<MasterKey> {
-  const nativeKey = await tryNativeGet(cfg.native);
+  const native = await resolveNativeAdapter(cfg);
+  const nativeKey = await tryNativeGet(native);
   if (nativeKey) return { key: nativeKey, status: KeyringStatus.OS };
 
   // Native present but empty: try to seed it before falling back to file.
-  if (cfg.native) {
+  if (native) {
     const fresh = new Uint8Array(randomBytes(KEY_BYTES));
-    if (await tryNativeSet(cfg.native, fresh)) {
+    if (await tryNativeSet(native, fresh)) {
       return { key: fresh, status: KeyringStatus.OS };
     }
   }
@@ -162,7 +169,8 @@ export async function loadOrCreateMasterKey(
 export async function requireMasterKey(
   cfg: KeyringConfig = {},
 ): Promise<MasterKey> {
-  const nativeKey = await tryNativeGet(cfg.native);
+  const native = await resolveNativeAdapter(cfg);
+  const nativeKey = await tryNativeGet(native);
   if (nativeKey) return { key: nativeKey, status: KeyringStatus.OS };
 
   const path = fallbackKeyPath(cfg);
