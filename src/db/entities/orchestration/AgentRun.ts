@@ -17,9 +17,27 @@ import {
   Property,
   ManyToOne,
   Index,
+  Check,
 } from "@mikro-orm/decorators/es";
 import { Org } from "../auth/Org.ts";
+import { Task } from "../tasks/Task.ts";
 import { AgentRunRepository } from "../../repositories/orchestration/AgentRunRepository.ts";
+
+export const AGENT_RUN_ORCHESTRATION_STATES = [
+  "unclaimed",
+  "claimed",
+  "running",
+  "retry_queued",
+  "released",
+  "succeeded",
+  "failed",
+  "timed_out",
+  "stalled",
+  "cancelled",
+] as const;
+
+export type AgentRunOrchestrationState =
+  (typeof AGENT_RUN_ORCHESTRATION_STATES)[number];
 
 @Entity({ tableName: "agent_runs", repository: () => AgentRunRepository })
 @Index({
@@ -33,6 +51,34 @@ export class AgentRun {
   @ManyToOne(() => Org, { fieldName: "org_id", nullable: false })
   org!: Org;
 
+  @ManyToOne(() => Task, { fieldName: "task_id", nullable: true })
+  task?: Task;
+
   @Property({ type: "datetime", fieldName: "started_at", defaultRaw: "now()" })
   startedAt!: Date;
+
+  @Property({
+    type: "string",
+    fieldName: "orchestration_state",
+    nullable: true,
+    check:
+      "orchestration_state in ('unclaimed','claimed','running','retry_queued','released','succeeded','failed','timed_out','stalled','cancelled')",
+  })
+  @Check({
+    name: "agent_runs_claimed_task_id_check",
+    expression: `"orchestration_state" <> 'claimed' or "task_id" is not null`,
+  })
+  orchestrationState?: AgentRunOrchestrationState;
+
+  @Property({ type: "integer", fieldName: "attempt_count", default: 0 })
+  attemptCount: number = 0;
+
+  @Property({ type: "datetime", fieldName: "next_retry_at", nullable: true })
+  nextRetryAt?: Date;
+
+  @Property({ type: "text", fieldName: "workspace_path", nullable: true })
+  workspacePath?: string;
+
+  @Property({ type: "string", fieldName: "last_error_kind", nullable: true })
+  lastErrorKind?: string;
 }

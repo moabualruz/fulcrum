@@ -55,6 +55,23 @@ export function renderTrace(items: string[]): string {
     "## 18.1 REQUIRED for Conformance",
     "",
     ...items.flatMap((item) => [`### ${item}`, ""]),
+    "## AgentRun Orchestration State Trace",
+    "",
+    "Source: `vendor/openai-symphony/SPEC.md` section 7.1 Issue Orchestration States and section 7.2 Run Attempt Lifecycle.",
+    "",
+    "| Fulcrum `agent_runs.orchestration_state` | Symphony source | Notes |",
+    "|---|---|---|",
+    "| `unclaimed` | section 7.1 `Unclaimed` | Issue is not running and no retry is scheduled. |",
+    "| `claimed` | section 7.1 `Claimed` | Orchestrator reserved the task; `agent_runs_claimed_task_id_check` requires `task_id` to avoid duplicate claimed rows with `NULL` task IDs. |",
+    "| `running` | section 7.1 `Running` | Worker task exists and the run is tracked as active. |",
+    "| `retry_queued` | section 7.1 `RetryQueued` | Worker is idle while a retry timer exists. |",
+    "| `released` | section 7.1 `Released` | Claim removed because the tracker state is terminal, inactive, missing, or retry path completed without redispatch. |",
+    "| `succeeded` | section 7.2 `Succeeded` | Terminal run-attempt reason after worker success. |",
+    "| `failed` | section 7.2 `Failed` | Terminal run-attempt reason after worker failure. |",
+    "| `timed_out` | section 7.2 `TimedOut` | Terminal run-attempt reason after timeout handling. |",
+    "| `stalled` | section 7.2 `Stalled` | Terminal run-attempt reason after stall reconciliation. |",
+    "| `cancelled` | section 7.2 `CanceledByReconciliation` | Fulcrum spelling uses D1 lowercase snake-case; maps to Symphony's reconciliation cancellation terminal reason. |",
+    "",
   ].join("\n");
 }
 
