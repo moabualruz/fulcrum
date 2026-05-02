@@ -1729,6 +1729,36 @@ Verification:
 
 Result: DISPATCHED.
 
+## 2026-05-02T19:16:22Z — codex-orchestrator (p17 verified-held, p3/p7 fixbacks active)
+
+P17 secrets vault:
+[
+  worker_commits=3ccee6a9e5db,56ac397c32c0,
+  parent_verification=secrets/credentials tests PASS 38/38; router/casbin/codegen tests PASS 41/41; bun run lint PASS; gitleaks HEAD~2..HEAD PASS,
+  security_rereview=PASS no findings,
+  api_rereview=PASS no findings,
+  status=verified-held,
+  hold_reason=touches src/trpc/middleware.ts/codegen/API surfaces while G0/P1 protected gate still freezes permissions/tRPC middleware/shared generated surfaces
+]
+
+P3 retry/stall:
+[
+  worker_commit=9c09d4dec742,
+  parent_verification=focused tests PASS 52/52; bun run lint PASS; compress check PASS,
+  status=fixback-active,
+  blockers=product-kernel forward migration required; stall scanner lifecycle missing; retry maxAttempts ignored; scanner timeout/error handling; orchestration Casbin mapping/default-backoff compatibility
+]
+
+P7 doc template seeds:
+[
+  worker_commit=94068be18c8e,
+  parent_verification=focused tests PASS 26/26; bun run lint PASS; web check PASS with existing warnings,
+  status=fixback-active,
+  blockers=remove/replace migration under G0; codegen reproducibility; project default fallback; Casbin resolve mapping; web template application; TUI load error handling
+]
+
+Result: HOLD_AND_FIXBACK.
+
 ## 2026-05-02T18:48:27Z — codex-orchestrator (resume checkpoint)
 
 State:
