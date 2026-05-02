@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Owner: codex-orchestrator
 Pillar: 08-memory-context-engine

@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Owner: codex-orchestrator
 Pillar: cli-codegen

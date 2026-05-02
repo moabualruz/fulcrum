@@ -1110,3 +1110,21 @@ Verification:
 ]
 
 Result: review-fix bundle ready to commit.
+
+## 2026-05-02T11:29:46Z — codex-orchestrator (ledger normalization after review-fix commit)
+
+State:
+[
+  commit: 14a06d38 fix(review): close agent-os integration gates,
+  full_ci: PASS after commit (`bun run ci`, 1720 pass, 2 skip, 0 fail),
+  worktree_before_ledger_update: clean
+]
+
+Issue status normalization:
+[
+  moved stale in-progress issues to implemented, not completed,
+  reason: code is implemented and verified, but post-fix opposite-runtime gate approval is not recorded yet,
+  affected: P1#05, P1#07, P1#10, P1#11, P1#14, P1#16, P1#18, P5#01, P7#01, P8#01, P14#01
+]
+
+Result: downstream blockers can treat these as implemented while next integration review gate retains approval debt.
