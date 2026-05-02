@@ -476,6 +476,18 @@ export class TuiApp {
       return;
     }
 
+    if (this.currentScreen === "new-doc" && !this.newDocScreen) {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      if (key === "\x03") {
+        this.onExit();
+      }
+      return;
+    }
+
     // Nav screen
     if (this.currentScreen === "nav") {
       await this._handleNavKey(key);
