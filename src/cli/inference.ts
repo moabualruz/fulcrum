@@ -6,14 +6,18 @@ import {
   type InferenceStopResult,
 } from "../inference/lifecycle.ts";
 import {
+  ClassifyResultSchema,
   EmbedResultSchema,
   GenerateResultSchema,
+  TokenizeResultSchema,
+  type ClassifyResult,
   type EmbedResult,
   type GenerateOptions,
   type GenerateResult,
   type HealthResult,
   type InferenceModel,
   type ModelPullProgress,
+  type TokenizeResult,
 } from "../inference/protocol.ts";
 import { INFERENCE_CLIENT_TOKEN } from "../inference/tokens.ts";
 
@@ -27,6 +31,8 @@ Usage:
   fulcrum inference models rm <model-id> [--json]
   fulcrum inference embed <text> [--model <id>] [--json]
   fulcrum inference generate <prompt> [--json]
+  fulcrum inference classify <text> --labels <csv> [--json]
+  fulcrum inference tokenize <text> [--model <id>] [--json]
   fulcrum inference stop [--json]
 `;
 
@@ -39,6 +45,8 @@ interface InferenceCliClient {
   call(method: "health", params: Record<string, never>): Promise<HealthResult>;
   embed?: (texts: string[], options?: { model?: string }) => Promise<EmbedResult>;
   generate?: (prompt: string, options?: GenerateOptions) => Promise<GenerateResult>;
+  classify?: (text: string, labels: string[]) => Promise<ClassifyResult>;
+  tokenize?: (text: string, model?: string) => Promise<TokenizeResult>;
   listModels?: () => Promise<InferenceModel[]>;
   pullModel?: (modelId: string, options?: { force?: boolean }) => AsyncIterable<ModelPullProgress>;
   rmModel?: (modelId: string) => Promise<{ ok: boolean }>;
@@ -49,6 +57,8 @@ interface InferenceCliCaller {
     health(): Promise<HealthResult>;
     embed(input: { texts: string[]; model?: string }): Promise<unknown>;
     generate(input: { prompt: string; options?: GenerateOptions }): Promise<unknown>;
+    classify?: (input: { text: string; labels: string[] }) => Promise<unknown>;
+    tokenize?: (input: { text: string; model?: string }) => Promise<unknown>;
     models?: {
       list(): Promise<unknown>;
       pull(input: { modelId: string; force?: boolean }): ProgressSource | Promise<ProgressSource>;
@@ -124,6 +134,12 @@ export async function run(argv: readonly string[], opts: InferenceRunOptions = {
         return;
       case "generate":
         await runGenerate(rest, { ...opts, print });
+        return;
+      case "classify":
+        await runClassify(rest, { ...opts, print });
+        return;
+      case "tokenize":
+        await runTokenize(rest, { ...opts, print });
         return;
       case "stop":
         await runStop(rest, { ...opts, print });
@@ -349,6 +365,52 @@ async function runGenerate(
   }
 }
 
+async function runClassify(
+  argv: readonly string[],
+  opts: InferenceRunOptions & { print: (line: string) => void },
+): Promise<void> {
+  assertEmbeddingsFeatureEnabled();
+  const json = hasFlag(argv, "json");
+  const { values, labels } = parseClassifyArgs(argv.filter((arg) => arg !== "--json"));
+  const text = values.join(" ").trim();
+  if (!text) throw new Error("classify requires text");
+  if (labels.length === 0) throw new Error("classify requires --labels");
+
+  const payload = ClassifyResultSchema.parse(opts.caller
+    ? await classifyWithCaller(opts.caller, text, labels)
+    : await classifyWithClient(resolveServices(opts).client, text, labels));
+
+  if (json) {
+    opts.print(JSON.stringify(payload));
+  } else {
+    for (const result of payload) {
+      opts.print(`${result.label}\t${result.score}`);
+    }
+  }
+}
+
+async function runTokenize(
+  argv: readonly string[],
+  opts: InferenceRunOptions & { print: (line: string) => void },
+): Promise<void> {
+  assertEmbeddingsFeatureEnabled();
+  const json = hasFlag(argv, "json");
+  const { values, model } = parseModelArgs(argv.filter((arg) => arg !== "--json"));
+  const text = values.join(" ").trim();
+  if (!text) throw new Error("tokenize requires text");
+
+  const payload = TokenizeResultSchema.parse(opts.caller
+    ? await tokenizeWithCaller(opts.caller, text, model)
+    : await tokenizeWithClient(resolveServices(opts).client, text, model));
+
+  if (json) {
+    opts.print(JSON.stringify(payload));
+  } else {
+    opts.print(`tokens=${payload.count}`);
+    opts.print(payload.tokens.join(" "));
+  }
+}
+
 async function embedWithClient(
   client: InferenceCliClient,
   text: string,
@@ -358,6 +420,33 @@ async function embedWithClient(
     throw new Error("embed requires a tRPC caller or inference client embed method");
   }
   return client.embed([text], { model });
+}
+
+function assertEmbeddingsFeatureEnabled(): void {
+  const features = (process.env["FULCRUM_FEATURES"] ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase());
+  if (!features.includes("embeddings")) {
+    throw new Error("classify/tokenize require FULCRUM_FEATURES=embeddings");
+  }
+}
+
+function parseClassifyArgs(argv: readonly string[]): { values: string[]; labels: string[] } {
+  const values: string[] = [];
+  let labels: string[] = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--labels") {
+      const csv = argv[index + 1];
+      if (!csv) throw new Error("--labels requires a value");
+      labels = csv.split(",").map((label) => label.trim()).filter(Boolean);
+      index += 1;
+      continue;
+    }
+    if (arg === undefined) continue;
+    values.push(arg);
+  }
+  return { values, labels };
 }
 
 function parseModelArgs(argv: readonly string[]): { values: string[]; model?: string } {
@@ -375,6 +464,50 @@ function parseModelArgs(argv: readonly string[]): { values: string[]; model?: st
     values.push(arg);
   }
   return { values, model };
+}
+
+async function classifyWithCaller(
+  caller: InferenceCliCaller,
+  text: string,
+  labels: string[],
+): Promise<unknown> {
+  if (!caller.inference.classify) {
+    throw new Error("classify requires inference.classify tRPC caller");
+  }
+  return caller.inference.classify({ text, labels });
+}
+
+async function tokenizeWithCaller(
+  caller: InferenceCliCaller,
+  text: string,
+  model?: string,
+): Promise<unknown> {
+  if (!caller.inference.tokenize) {
+    throw new Error("tokenize requires inference.tokenize tRPC caller");
+  }
+  return caller.inference.tokenize({ text, model });
+}
+
+async function classifyWithClient(
+  client: InferenceCliClient,
+  text: string,
+  labels: string[],
+): Promise<ClassifyResult> {
+  if (!client.classify) {
+    throw new Error("classify requires a tRPC caller or inference client classify method");
+  }
+  return client.classify(text, labels);
+}
+
+async function tokenizeWithClient(
+  client: InferenceCliClient,
+  text: string,
+  model?: string,
+): Promise<TokenizeResult> {
+  if (!client.tokenize) {
+    throw new Error("tokenize requires a tRPC caller or inference client tokenize method");
+  }
+  return client.tokenize(text, model);
 }
 
 async function generateWithClient(

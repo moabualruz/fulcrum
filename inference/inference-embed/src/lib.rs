@@ -3,6 +3,8 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
+pub mod classify;
+
 pub const DEFAULT_EMBED_MODEL: &str = "BAAI/bge-small-en-v1.5";
 pub const DEFAULT_EMBED_DIMS: usize = 384;
 

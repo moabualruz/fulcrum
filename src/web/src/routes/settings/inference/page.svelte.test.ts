@@ -15,6 +15,8 @@ type PageProps = {
     preview?: number[];
     model?: string;
     cached?: boolean;
+    classifyResults?: Array<{ label: string; score: number }>;
+    tokenizeResult?: { count: number; tokens: string[] };
     error?: string;
     pullProgress?: { modelId: string; pct: number; downloaded: number; total: number };
   };
@@ -62,6 +64,32 @@ describe("/settings/inference +page.svelte", () => {
     expect(body).toContain('data-embed-dimensions="384"');
     expect(body).toContain("0.11");
     expect(body).toContain("0.55");
+  });
+
+  test("renders test classify and tokenize panels with results", () => {
+    const { body } = render(Page, {
+      props: {
+        data,
+        form: {
+          success: true,
+          classifyResults: [
+            { label: "task", score: 0.91 },
+            { label: "question", score: 0.2 },
+          ],
+          tokenizeResult: { count: 2, tokens: ["hello", "world"] },
+        },
+      },
+    });
+
+    expect(body).toContain("Test classify");
+    expect(body).toContain('name="labels"');
+    expect(body).toContain('data-classify-results="2"');
+    expect(body).toContain("task");
+    expect(body).toContain("0.91");
+    expect(body).toContain("Test tokenize");
+    expect(body).toContain('data-tokenize-count="2"');
+    expect(body).toContain("hello");
+    expect(body).toContain("world");
   });
 
   test("renders download control for missing models and progress overlay state", () => {

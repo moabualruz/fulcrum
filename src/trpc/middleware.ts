@@ -64,22 +64,30 @@ function resourceFromProcedurePath(path: string): string {
 
 function actionFromProcedurePath(path: string): string {
   const leaf = path.split(".").filter(Boolean).at(-1);
-  switch (leaf) {
-    case "list":
-    case "get":
-    case "create":
-    case "update":
-    case "delete":
-    case "revoke":
-    case "cancel":
-    case "unregister":
-      return leaf;
-    default:
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: `Protected procedure '${path}' is not mapped for Casbin enforcement.`,
-      });
+  if (!leaf) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `Protected procedure '${path}' has no action leaf.`,
+    });
   }
+  return leaf;
+}
+
+// Process-level cached enforcer service (60s TTL).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _cachedEnforcer: { svc: any; createdAt: number } | null = null;
+const ENFORCER_TTL_MS = 60_000;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getCachedEnforcerService(AdapterCtor: any, EnforcerCtor: any, casbinRepo: any): any {
+  const now = Date.now();
+  if (_cachedEnforcer && now - _cachedEnforcer.createdAt < ENFORCER_TTL_MS) {
+    return _cachedEnforcer.svc;
+  }
+  const adapter = new AdapterCtor(casbinRepo);
+  const svc = new EnforcerCtor(adapter);
+  _cachedEnforcer = { svc, createdAt: now };
+  return svc;
 }
 
 /**
@@ -125,8 +133,11 @@ export const assertPermission = t.middleware(async ({ ctx, next, path }) => {
           ]);
 
         const casbinRepo = ctx.container.get(CasbinRuleRepository);
-        const adapter = new FulcrumCasbinAdapter(casbinRepo);
-        const enforcerSvc = new CasbinEnforcerService(adapter);
+        const enforcerSvc = getCachedEnforcerService(
+          FulcrumCasbinAdapter,
+          CasbinEnforcerService,
+          casbinRepo,
+        );
 
         await checkCasbinGate(
           enforcerSvc,

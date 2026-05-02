@@ -4,6 +4,7 @@ import type { Session } from "better-auth";
 
 interface InferenceLocals {
   session?: Session | null;
+  orgId?: string | null;
   container?: import("@needle-di/core").Container | null;
 }
 
@@ -15,6 +16,26 @@ function resolveClient(container: InferenceLocals["container"]): InferenceClient
     return container.get(InferenceClient);
   }
   return new InferenceClient();
+}
+
+function embeddingsFeatureEnabled(): boolean {
+  return (process.env["FULCRUM_FEATURES"] ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .includes("embeddings");
+}
+
+function operationGate(locals: InferenceLocals): { ok: true } | { ok: false; error: string } {
+  if (!locals.session) {
+    return { ok: false, error: "Authentication required." };
+  }
+  if (!locals.orgId) {
+    return { ok: false, error: "Organization required." };
+  }
+  if (!embeddingsFeatureEnabled()) {
+    return { ok: false, error: "Enable the embeddings feature flag to test classify or tokenize." };
+  }
+  return { ok: true };
 }
 
 export function load({ locals }: { locals: InferenceLocals }) {
@@ -94,6 +115,90 @@ export const actions = {
       return {
         success: false,
         error: error instanceof Error ? error.message : "Smoke embed failed.",
+      };
+    }
+  },
+
+  testGenerate: async ({ request, locals }: { request: Request; locals: InferenceLocals }) => {
+    const form = await request.formData();
+    const prompt = String(form.get("prompt") ?? "").trim();
+    const maxTokens = parseInt(String(form.get("maxTokens") ?? "64"), 10) || 64;
+    if (!prompt) {
+      return { success: false, error: "Enter a prompt." };
+    }
+    if (!locals.session) {
+      return { success: false, error: "Authentication required." };
+    }
+
+    try {
+      const client = resolveClient(locals.container ?? null);
+      const result = await client.generate(prompt, { maxTokens });
+      return {
+        success: true,
+        generateText: result.text,
+        generateTokens: result.tokens,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        generateError: error instanceof Error ? error.message : "Generate test failed.",
+      };
+    }
+  },
+
+  testClassify: async ({ request, locals }: { request: Request; locals: InferenceLocals }) => {
+    const form = await request.formData();
+    const text = String(form.get("text") ?? "").trim();
+    const labels = String(form.get("labels") ?? "")
+      .split(",")
+      .map((label) => label.trim())
+      .filter(Boolean);
+    if (!text) {
+      return { success: false, error: "Enter text to classify." };
+    }
+    if (labels.length === 0) {
+      return { success: false, error: "Enter at least one label." };
+    }
+    const gate = operationGate(locals);
+    if (!gate.ok) {
+      return { success: false, error: gate.error };
+    }
+
+    try {
+      const client = resolveClient(locals.container ?? null);
+      return {
+        success: true,
+        classifyResults: await client.classify(text, labels),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Classify test failed.",
+      };
+    }
+  },
+
+  testTokenize: async ({ request, locals }: { request: Request; locals: InferenceLocals }) => {
+    const form = await request.formData();
+    const text = String(form.get("text") ?? "").trim();
+    if (!text) {
+      return { success: false, error: "Enter text to tokenize." };
+    }
+    const gate = operationGate(locals);
+    if (!gate.ok) {
+      return { success: false, error: gate.error };
+    }
+
+    try {
+      const client = resolveClient(locals.container ?? null);
+      return {
+        success: true,
+        tokenizeResult: await client.tokenize(text),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Tokenize test failed.",
       };
     }
   },

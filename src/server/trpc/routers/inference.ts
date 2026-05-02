@@ -140,6 +140,21 @@ async function isEnabled(ctx: TRPCContext, flag: "embeddings" | "router-llm" | "
     .includes(flag);
 }
 
+async function assertEmbeddingsEnabled(ctx: TRPCContext): Promise<void> {
+  if (!ctx.orgId) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Session is missing orgId. Re-authenticate.",
+    });
+  }
+  if (!(await isEnabled(ctx, "embeddings"))) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Inference classify/tokenize require the embeddings feature flag.",
+    });
+  }
+}
+
 async function defaultBackends(ctx: TRPCContext) {
   const configured = process.env["FULCRUM_INFERENCE_BACKEND"] ?? "embedded";
   const embeddings = await isEnabled(ctx, "embeddings");
@@ -201,12 +216,18 @@ export const inferenceRouter = t.router({
   classify: protectedProcedure
     .input(ClassifyInputSchema)
     .output(ClassifyResultSchema)
-    .query(async ({ ctx, input }) => (await resolveClient(ctx)).classify(input.text, input.labels)),
+    .query(async ({ ctx, input }) => {
+      await assertEmbeddingsEnabled(ctx);
+      return (await resolveClient(ctx)).classify(input.text, input.labels);
+    }),
 
   tokenize: protectedProcedure
     .input(TokenizeInputSchema)
     .output(TokenizeResultSchema)
-    .query(async ({ ctx, input }) => (await resolveClient(ctx)).tokenize(input.text, input.model)),
+    .query(async ({ ctx, input }) => {
+      await assertEmbeddingsEnabled(ctx);
+      return (await resolveClient(ctx)).tokenize(input.text, input.model);
+    }),
 
   models: t.router({
     list: publicProcedure

@@ -35,6 +35,7 @@ export interface InferenceLifecycleLike {
 
 export interface InferenceClientOptions {
   lifecycle?: InferenceLifecycleLike;
+  transport?: (request: InferenceRequest) => Promise<InferenceResponse>;
   timeoutMs?: number;
   retryDelaysMs?: number[];
   onRetry?: (attempt: number, error: unknown) => void | Promise<void>;
@@ -73,12 +74,14 @@ function injectedLifecycle(): InferenceLifecycleLike | undefined {
 
 export class InferenceClient {
   private readonly lifecycle: InferenceLifecycleLike;
+  private readonly transport?: (request: InferenceRequest) => Promise<InferenceResponse>;
   private readonly timeoutMs: number;
   private readonly retryDelaysMs: number[];
   private readonly onRetry?: (attempt: number, error: unknown) => void | Promise<void>;
 
   constructor(options: InferenceClientOptions = {}) {
     this.lifecycle = options.lifecycle ?? injectedLifecycle() ?? new InferenceLifecycle();
+    this.transport = options.transport;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.retryDelaysMs = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
     this.onRetry = options.onRetry;
@@ -87,18 +90,20 @@ export class InferenceClient {
   async call(method: "health", params: Record<string, never>): Promise<HealthResult>;
   async call(method: string, params: unknown): Promise<unknown>;
   async call(method: string, params: unknown): Promise<unknown> {
-    const running = await this.lifecycle.ensureRunning();
     const request: InferenceRequest = {
       jsonrpc: "2.0",
       id: nextRequestId++,
       method,
       params,
     };
+    const running = this.transport ? undefined : await this.lifecycle.ensureRunning();
 
     let lastError: unknown;
     for (let attempt = 0; attempt <= this.retryDelaysMs.length; attempt++) {
       try {
-        const response = await this.send(running.socketPath, request);
+        const response = this.transport
+          ? await this.transport(request)
+          : await this.send(running!.socketPath, request);
         if (response.error) throw normalizeRpcError(response.error);
         if (method === "health") return HealthResultSchema.parse(response.result);
         return response.result;

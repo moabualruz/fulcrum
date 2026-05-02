@@ -1,83 +1,35 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import net from "node:net";
+import { describe, expect, test } from "bun:test";
 
 import { InferenceClient } from "./client.ts";
-import { encodeJsonRpcFrame, type InferenceRequest, type InferenceResponse } from "./protocol.ts";
+import type { InferenceRequest, InferenceResponse } from "./protocol.ts";
 
-let scratch = "";
-
-beforeEach(async () => {
-  scratch = await mkdtemp(join(tmpdir(), "fulcrum-inference-client-"));
-});
-
-afterEach(async () => {
-  await rm(scratch, { recursive: true, force: true });
-});
-
-function readFrame(socket: net.Socket, onRequest: (request: InferenceRequest) => InferenceResponse): void {
-  let buffer = Buffer.alloc(0);
-  socket.on("data", (chunk) => {
-    const bytes = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
-    buffer = Buffer.concat([buffer, bytes]);
-    while (buffer.byteLength >= 4) {
-      const len = buffer.readUInt32BE(0);
-      if (buffer.byteLength < len + 4) return;
-      const body = buffer.subarray(4, 4 + len).toString("utf8");
-      buffer = buffer.subarray(4 + len);
-      const response = onRequest(JSON.parse(body) as InferenceRequest);
-      socket.write(Buffer.from(encodeJsonRpcFrame(response)));
-    }
+function clientWithTransport(
+  onRequest: (request: InferenceRequest) => InferenceResponse | Promise<InferenceResponse>,
+): InferenceClient {
+  return new InferenceClient({
+    transport: async (request) => onRequest(request),
+    timeoutMs: 500,
+    retryDelaysMs: [1],
   });
-}
-
-async function withServer(
-  socketPath: string,
-  onRequest: (request: InferenceRequest) => InferenceResponse,
-): Promise<net.Server> {
-  const server = net.createServer((socket) => readFrame(socket, onRequest));
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(socketPath, resolve);
-  });
-  return server;
-}
-
-function closeServer(server: net.Server): Promise<void> {
-  return new Promise((resolve) => server.close(() => resolve()));
 }
 
 describe("InferenceClient", () => {
-  test("call('health', {}) returns typed HealthResult over Unix socket", async () => {
-    const socketPath = join(scratch, "inference.sock");
-    const server = await withServer(socketPath, (request) => ({
+  test("call('health', {}) returns typed HealthResult", async () => {
+    const client = clientWithTransport((request) => ({
       jsonrpc: "2.0",
       id: request.id,
       result: { status: "ok", backends: ["embedded"], models: [] },
     }));
 
-    try {
-      const client = new InferenceClient({
-        lifecycle: { ensureRunning: async () => ({ pid: 1234, socketPath }) },
-        timeoutMs: 500,
-        retryDelaysMs: [1],
-      });
+    const result = await client.call("health", {});
 
-      const result = await client.call("health", {});
-
-      expect(result.status).toBe("ok");
-      expect(result.backends).toEqual(["embedded"]);
-    } finally {
-      await closeServer(server);
-    }
+    expect(result.status).toBe("ok");
+    expect(result.backends).toEqual(["embedded"]);
   });
 
-  test("embed sends texts and model over Unix socket and returns typed vectors", async () => {
-    const socketPath = join(scratch, "embed.sock");
+  test("embed sends texts and model and returns typed vectors", async () => {
     let observedParams: unknown;
-    const server = await withServer(socketPath, (request) => {
+    const client = clientWithTransport((request) => {
       observedParams = request.params;
       return {
         jsonrpc: "2.0",
@@ -90,60 +42,84 @@ describe("InferenceClient", () => {
       };
     });
 
-    try {
-      const client = new InferenceClient({
-        lifecycle: { ensureRunning: async () => ({ pid: 1234, socketPath }) },
-        timeoutMs: 500,
-        retryDelaysMs: [1],
-      });
+    const result = await client.embed(["hello"], { model: "custom-embed-model" });
 
-      const result = await client.embed(["hello"], { model: "custom-embed-model" });
-
-      expect(observedParams).toEqual({ texts: ["hello"], model: "custom-embed-model" });
-      expect(result).toEqual({
-        vectors: [[0.1, 0.2, 0.3]],
-        model: "custom-embed-model",
-        cached: true,
-      });
-    } finally {
-      await closeServer(server);
-    }
+    expect(observedParams).toEqual({ texts: ["hello"], model: "custom-embed-model" });
+    expect(result).toEqual({
+      vectors: [[0.1, 0.2, 0.3]],
+      model: "custom-embed-model",
+      cached: true,
+    });
   });
 
-  test("retries refused sockets with exponential backoff before succeeding", async () => {
-    const socketPath = join(scratch, "retry.sock");
-    let attempts = 0;
-    let server: net.Server | undefined;
-
-    const client = new InferenceClient({
-      lifecycle: { ensureRunning: async () => ({ pid: 1234, socketPath }) },
-      timeoutMs: 500,
-      retryDelaysMs: [10, 20, 40],
-      onRetry: async () => {
-        attempts += 1;
-        if (attempts === 1) {
-          server = await withServer(socketPath, (request) => ({
-            jsonrpc: "2.0",
-            id: request.id,
-            result: { status: "ok", backends: [], models: [] },
-          }));
-        }
-      },
+  test("classify sends text and labels and returns sorted label scores", async () => {
+    let observedParams: unknown;
+    const client = clientWithTransport((request) => {
+      observedParams = request.params;
+      return {
+        jsonrpc: "2.0",
+        id: request.id,
+        result: [
+          { label: "task", score: 0.83 },
+          { label: "question", score: 0.12 },
+        ],
+      };
     });
 
-    try {
-      const result = await client.call("health", {});
+    const result = await client.classify("buy groceries", ["task", "question"]);
 
-      expect(result.status).toBe("ok");
-      expect(attempts).toBeGreaterThanOrEqual(1);
-    } finally {
-      if (server) await closeServer(server);
-    }
+    expect(observedParams).toEqual({ text: "buy groceries", labels: ["task", "question"] });
+    expect(result).toEqual([
+      { label: "task", score: 0.83 },
+      { label: "question", score: 0.12 },
+    ]);
+  });
+
+  test("tokenize sends text and optional model and returns count plus tokens", async () => {
+    let observedParams: unknown;
+    const client = clientWithTransport((request) => {
+      observedParams = request.params;
+      return {
+        jsonrpc: "2.0",
+        id: request.id,
+        result: { count: 2, tokens: ["hello", "world"] },
+      };
+    });
+
+    const result = await client.tokenize("hello world", "fixture-tokenizer");
+
+    expect(observedParams).toEqual({ text: "hello world", model: "fixture-tokenizer" });
+    expect(result).toEqual({ count: 2, tokens: ["hello", "world"] });
+  });
+
+  test("retries retryable transport failures before succeeding", async () => {
+    let attempts = 0;
+    const client = new InferenceClient({
+      transport: async (request) => {
+        attempts += 1;
+        if (attempts === 1) {
+          const error = new Error("reset");
+          (error as Error & { code?: string }).code = "ECONNRESET";
+          throw error;
+        }
+        return {
+          jsonrpc: "2.0",
+          id: request.id,
+          result: { status: "ok", backends: [], models: [] },
+        };
+      },
+      timeoutMs: 500,
+      retryDelaysMs: [1, 1],
+    });
+
+    const result = await client.call("health", {});
+
+    expect(result.status).toBe("ok");
+    expect(attempts).toBe(2);
   });
 
   test("throws typed InferenceError after JSON-RPC error response", async () => {
-    const socketPath = join(scratch, "error.sock");
-    const server = await withServer(socketPath, (request) => ({
+    const client = clientWithTransport((request) => ({
       jsonrpc: "2.0",
       id: request.id,
       error: {
@@ -153,28 +129,17 @@ describe("InferenceClient", () => {
       },
     }));
 
-    try {
-      const client = new InferenceClient({
-        lifecycle: { ensureRunning: async () => ({ pid: 1234, socketPath }) },
-        timeoutMs: 500,
-        retryDelaysMs: [1],
-      });
-
-      await expect(client.call("missing", {})).rejects.toMatchObject({
-        name: "InferenceError",
-        code: -32601,
-        backend: "embedded",
-        message: "Method not found",
-      });
-    } finally {
-      await closeServer(server);
-    }
+    await expect(client.call("missing", {})).rejects.toMatchObject({
+      name: "InferenceError",
+      code: -32601,
+      backend: "embedded",
+      message: "Method not found",
+    });
   });
 
   test("throws typed InferenceError after exhausting socket retries", async () => {
-    const socketPath = join(scratch, "missing.sock");
     const client = new InferenceClient({
-      lifecycle: { ensureRunning: async () => ({ pid: 1234, socketPath }) },
+      lifecycle: { ensureRunning: async () => ({ pid: 1234, socketPath: "/missing.sock" }) },
       timeoutMs: 100,
       retryDelaysMs: [1, 1],
     });

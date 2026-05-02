@@ -52,16 +52,16 @@ export const GenerateResultSchema = z.object({
   tokens: z.number().int().nonnegative(),
 });
 
-export const ClassifyResultSchema = z.object({
-  results: z.array(z.object({
-    label: z.string(),
-    score: z.number(),
-  })),
+export const ClassifyScoreSchema = z.object({
+  label: z.string(),
+  score: z.number(),
 });
+
+export const ClassifyResultSchema = z.array(ClassifyScoreSchema);
 
 export const TokenizeResultSchema = z.object({
   count: z.number().int().nonnegative(),
-  tokens: z.array(z.string()).optional(),
+  tokens: z.array(z.string()),
 });
 
 export const InferenceModelSchema = z.object({

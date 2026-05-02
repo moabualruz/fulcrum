@@ -3,7 +3,10 @@ mod models;
 
 use cache::CacheStore;
 use inference_core::protocol::{CacheStats, HealthResult, Request, Response};
+use inference_embed::classify::{ClassificationScore, ClassifyRequest};
 use inference_embed::{EmbedRequest, EmbedResponse, DEFAULT_EMBED_DIMS, DEFAULT_EMBED_MODEL};
+use inference_generate::tokenize::{TokenizeRequest, TokenizeResponse};
+use inference_generate::{generate as generate_text, GenerateRequest, GenerateResponse};
 use models::ModelPullParams;
 use sha2::{Digest, Sha256};
 use std::env;
@@ -227,6 +230,14 @@ fn dispatch(req: Request) -> Response {
             Ok(response) => Response::success(req.id, response),
             Err(message) => Response::error(req.id, -32602, &message),
         },
+        "classify" => match handle_classify(req.params) {
+            Ok(response) => Response::success(req.id, response),
+            Err(message) => Response::error(req.id, -32602, &message),
+        },
+        "tokenize" => match handle_tokenize(req.params) {
+            Ok(response) => Response::success(req.id, response),
+            Err(message) => Response::error(req.id, -32602, &message),
+        },
         "models.list" => match handle_models_list() {
             Ok(models) => Response::success(req.id, models),
             Err(message) => Response::error(req.id, -32602, &message),
@@ -237,6 +248,10 @@ fn dispatch(req: Request) -> Response {
         },
         "models.rm" => match handle_models_rm(req.params) {
             Ok(payload) => Response::success(req.id, payload),
+            Err(message) => Response::error(req.id, -32602, &message),
+        },
+        "generate" => match handle_generate(req.params) {
+            Ok(response) => Response::success(req.id, response),
             Err(message) => Response::error(req.id, -32602, &message),
         },
         _ => Response::method_not_found(req.id),
@@ -318,6 +333,85 @@ fn handle_embed(params: serde_json::Value) -> Result<EmbedResponse, String> {
     inference_embed::embed(request)
 }
 
+fn handle_classify(params: serde_json::Value) -> Result<Vec<ClassificationScore>, String> {
+    let request: ClassifyRequest =
+        serde_json::from_value(params).map_err(|error| error.to_string())?;
+    inference_embed::classify::classify_request(request)
+}
+
+fn handle_tokenize(params: serde_json::Value) -> Result<TokenizeResponse, String> {
+    let request: TokenizeRequest =
+        serde_json::from_value(params).map_err(|error| error.to_string())?;
+    inference_generate::tokenize::tokenize(request)
+}
+
+fn handle_generate(params: serde_json::Value) -> Result<GenerateResponse, String> {
+    let request: GenerateRequest =
+        serde_json::from_value(params).map_err(|error| error.to_string())?;
+
+    // Only cache schema-less requests.  Structured-output requests are NOT
+    // cached to avoid returning cached text that no longer matches a changed
+    // schema.
+    let has_schema = request.schema.is_some();
+    if !has_schema {
+        if let Some(store) = open_cache_store() {
+            let prompt_hash = generate_prompt_hash(&request.prompt);
+            let options_hash = generate_options_hash(&request);
+            let model = request
+                .model
+                .clone()
+                .unwrap_or_else(|| inference_generate::DEFAULT_GENERATE_MODEL.to_string());
+            if let Ok(Some(entry)) = store.get_generate(&model, &prompt_hash, &options_hash) {
+                return Ok(GenerateResponse {
+                    text: entry.text,
+                    model: entry.model,
+                    tokens_used: entry.tokens as usize,
+                });
+            }
+
+            let response = generate_text(request)?;
+            let cache_entry = cache::GenerateCacheEntry {
+                model: response.model.clone(),
+                prompt_hash,
+                options_hash,
+                text: response.text.clone(),
+                tokens: response.tokens_used as i64,
+                // 1-hour TTL
+                expires_at: CacheStore::now_epoch_seconds() + 60 * 60,
+            };
+            let _ = store.put_generate(&cache_entry);
+            return Ok(response);
+        }
+    }
+
+    generate_text(request)
+}
+
+fn generate_prompt_hash(prompt: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update((prompt.len() as u64).to_be_bytes());
+    hasher.update(prompt.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+fn generate_options_hash(request: &GenerateRequest) -> String {
+    let mut hasher = Sha256::new();
+    if let Some(model) = &request.model {
+        hasher.update(model.as_bytes());
+    }
+    if let Some(max_tokens) = request.max_tokens {
+        hasher.update(max_tokens.to_le_bytes());
+    }
+    // Encode temperature as bits so minor float differences don't collide
+    let temp_bits = request
+        .temperature
+        .unwrap_or(0.7)
+        .to_bits()
+        .to_le_bytes();
+    hasher.update(temp_bits);
+    format!("{:x}", hasher.finalize())
+}
+
 fn embed_input_hash(texts: &[String]) -> String {
     let mut hasher = Sha256::new();
     for text in texts {
@@ -348,6 +442,11 @@ mod tests {
     use super::*;
     use crate::cache::{CacheStore, EmbedCacheEntry, GenerateCacheEntry};
     use serde_json::json;
+    use std::sync::Mutex;
+
+    // Serialize tests that mutate process-global env vars (SKIP_MODEL_DOWNLOAD,
+    // FULCRUM_HOME) to prevent data races in the multi-threaded test runner.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temp_cache_path(name: &str) -> std::path::PathBuf {
@@ -367,12 +466,14 @@ mod tests {
         assert_eq!(val["id"], 1);
         assert_eq!(val["result"]["status"], "ok");
         assert_eq!(val["result"]["backends"], json!([]));
-        assert_eq!(val["result"]["models"], json!([]));
+        // models list now reflects models.toml; assert it's an array (length may vary)
+        assert!(val["result"]["models"].is_array());
         assert!(val.get("error").is_none() || val["error"].is_null());
     }
 
     #[test]
     fn dispatch_embed_returns_deterministic_vectors_without_model_download() {
+        let _guard = ENV_LOCK.lock().unwrap();
         std::env::set_var("SKIP_MODEL_DOWNLOAD", "1");
         let line =
             r#"{"jsonrpc":"2.0","id":7,"method":"embed","params":{"texts":["alpha","beta"]}}"#;
@@ -392,6 +493,7 @@ mod tests {
 
     #[test]
     fn dispatch_embed_uses_cache_for_identical_batch() {
+        let _guard = ENV_LOCK.lock().unwrap();
         std::env::set_var("SKIP_MODEL_DOWNLOAD", "1");
         let home = std::env::temp_dir().join(format!(
             "fulcrum-embed-cache-{}",
@@ -412,6 +514,89 @@ mod tests {
         assert_eq!(first["result"]["cached"], false);
         assert_eq!(second["result"]["cached"], true);
         assert_eq!(first["result"]["vectors"], second["result"]["vectors"]);
+    }
+
+    #[test]
+    fn dispatch_classify_returns_sorted_label_scores() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var("SKIP_MODEL_DOWNLOAD", "1");
+        let line = r#"{"jsonrpc":"2.0","id":9,"method":"classify","params":{"text":"buy groceries","labels":["task","question","reminder"]}}"#;
+
+        let resp = dispatch_line(line);
+
+        std::env::remove_var("SKIP_MODEL_DOWNLOAD");
+        let val: serde_json::Value = serde_json::to_value(&resp).unwrap();
+        assert_eq!(val["jsonrpc"], "2.0");
+        assert_eq!(val["id"], 9);
+        let results = val["result"].as_array().unwrap();
+        assert_eq!(results.len(), 3);
+        assert!(results.windows(2).all(|pair| {
+            pair[0]["score"].as_f64().unwrap() >= pair[1]["score"].as_f64().unwrap()
+        }));
+        assert!(results.iter().any(|result| result["label"] == "task"));
+    }
+
+    #[test]
+    fn dispatch_tokenize_returns_count_and_tokens() {
+        let line =
+            r#"{"jsonrpc":"2.0","id":10,"method":"tokenize","params":{"text":"hello world"}}"#;
+
+        let resp = dispatch_line(line);
+
+        let val: serde_json::Value = serde_json::to_value(&resp).unwrap();
+        assert_eq!(val["jsonrpc"], "2.0");
+        assert_eq!(val["id"], 10);
+        assert_eq!(val["result"]["count"], val["result"]["tokens"].as_array().unwrap().len());
+        assert!(val["result"]["count"].as_u64().unwrap() >= 2);
+        assert!(val["result"]["tokens"].as_array().unwrap().iter().any(|token| token == "hello"));
+    }
+
+    #[test]
+    fn dispatch_generate_returns_non_empty_text_without_model_download() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var("SKIP_MODEL_DOWNLOAD", "1");
+        let line = r#"{"jsonrpc":"2.0","id":11,"method":"generate","params":{"prompt":"The capital of France is","model":null,"max_tokens":null,"temperature":null,"schema":null}}"#;
+
+        let resp = dispatch_line(line);
+
+        std::env::remove_var("SKIP_MODEL_DOWNLOAD");
+        let val: serde_json::Value = serde_json::to_value(&resp).unwrap();
+        assert_eq!(val["jsonrpc"], "2.0");
+        assert_eq!(val["id"], 11);
+        assert!(val.get("error").is_none() || val["error"].is_null(), "unexpected error: {}", val["error"]);
+        let text = val["result"]["text"].as_str().unwrap_or("");
+        assert!(!text.is_empty(), "text should not be empty");
+        assert!(
+            text.to_lowercase().contains("paris"),
+            "expected 'Paris' in text, got: {text}"
+        );
+        assert!(val["result"]["tokens_used"].as_u64().unwrap_or(0) > 0);
+    }
+
+    #[test]
+    fn dispatch_generate_uses_cache_for_identical_prompt() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var("SKIP_MODEL_DOWNLOAD", "1");
+        let home = std::env::temp_dir().join(format!(
+            "fulcrum-gen-cache-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::env::set_var("FULCRUM_HOME", &home);
+        let line = r#"{"jsonrpc":"2.0","id":12,"method":"generate","params":{"prompt":"cached prompt"}}"#;
+
+        // First call — cache miss; second call — same prompt → cache hit
+        let first = serde_json::to_value(dispatch_line(line)).unwrap();
+        let second = serde_json::to_value(dispatch_line(line)).unwrap();
+
+        std::env::remove_var("SKIP_MODEL_DOWNLOAD");
+        std::env::remove_var("FULCRUM_HOME");
+        let _ = std::fs::remove_dir_all(home);
+
+        // Both calls should return the same text
+        assert_eq!(first["result"]["text"], second["result"]["text"]);
     }
 
     #[test]
