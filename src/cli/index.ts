@@ -14,7 +14,7 @@
 
 import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Container } from "@needle-di/core";
 import { MikroORM } from "@mikro-orm/postgresql";
@@ -43,6 +43,27 @@ Usage:
 
 function fulcrumHome(): string {
   return process.env["FULCRUM_HOME"] ?? join(homedir(), ".fulcrum");
+}
+
+export function resolveClientAssetPath(clientRoot: string, requestPath: string): string | null {
+  let pathname: string;
+  try {
+    pathname = decodeURIComponent(requestPath);
+  } catch {
+    return null;
+  }
+
+  if (pathname.includes("\0")) return null;
+
+  const baseRoot = resolve(clientRoot);
+  const rootedPath = pathname.startsWith("/") ? `.${pathname}` : `./${pathname}`;
+  const assetPath = resolve(baseRoot, rootedPath);
+
+  if (assetPath === baseRoot || assetPath.startsWith(`${baseRoot}${sep}`)) {
+    return assetPath;
+  }
+
+  return null;
 }
 
 /**
@@ -149,7 +170,11 @@ async function runWeb(_argv: readonly string[]): Promise<void> {
   const server = new Server(manifest);
   await server.init({
     env: process.env,
-    read: (file: string) => Bun.file(join(clientRoot, file)).stream(),
+    read: (file: string) => {
+      const assetPath = resolveClientAssetPath(clientRoot, file);
+      if (!assetPath) throw new Error(`invalid client asset path: ${file}`);
+      return Bun.file(assetPath).stream();
+    },
   });
 
   const port = Number(process.env["PORT"] ?? "3000");
@@ -157,9 +182,10 @@ async function runWeb(_argv: readonly string[]): Promise<void> {
     port,
     async fetch(request) {
       const url = new URL(request.url);
-      const pathname = decodeURIComponent(url.pathname);
+      const pathname = url.pathname;
       if (pathname !== "/" && !pathname.endsWith("/")) {
-        const assetPath = join(clientRoot, pathname);
+        const assetPath = resolveClientAssetPath(clientRoot, pathname);
+        if (!assetPath) return new Response("Not found", { status: 404 });
         const asset = Bun.file(assetPath);
         if (await asset.exists()) return new Response(asset);
       }
@@ -202,7 +228,18 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     }
     case "flags": {
       const { run: runFlags } = await import("./commands/flags.ts");
-      await runFlags(rest);
+      const [sub = "help"] = rest;
+      if (sub === "help" || sub === "--help" || sub === "-h") {
+        await runFlags(rest);
+        return;
+      }
+
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runFlags(rest, { container });
+      } finally {
+        await cleanup();
+      }
       return;
     }
     case "db": {

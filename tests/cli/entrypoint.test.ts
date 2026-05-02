@@ -82,4 +82,14 @@ describe("fulcrum binary entrypoint", () => {
     expect(result.stdout).toContain("status");
     expect(result.stdout).toContain("stop");
   });
+
+  test("flags help is dispatched by the top-level binary", async () => {
+    const result = await runFulcrum(["flags", "--help"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("fulcrum flags");
+    expect(result.stdout).toContain("list");
+    expect(result.stdout).toContain("set");
+  });
 });
