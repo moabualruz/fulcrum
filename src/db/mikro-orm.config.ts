@@ -32,6 +32,10 @@ import { Event } from "./entities/core/Event.ts";
 // later pillars never need a base-table migration).
 import { Task } from "./entities/tasks/Task.ts";
 import { Document } from "./entities/docs/Document.ts";
+import { DocLink } from "./entities/docs/DocLink.ts";
+import { DocVersion } from "./entities/docs/DocVersion.ts";
+import { DocComment } from "./entities/docs/DocComment.ts";
+import { DocTemplate } from "./entities/docs/DocTemplate.ts";
 import { Memory } from "./entities/memory/Memory.ts";
 import { AgentRun } from "./entities/orchestration/AgentRun.ts";
 import { WorkflowDefinition } from "./entities/orchestration/WorkflowDefinition.ts";
@@ -70,6 +74,10 @@ export {
   Event,
   Task,
   Document,
+  DocLink,
+  DocVersion,
+  DocComment,
+  DocTemplate,
   Memory,
   AgentRun,
   WorkflowDefinition,
@@ -131,6 +139,10 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     Event,
     Task,
     Document,
+    DocLink,
+    DocVersion,
+    DocComment,
+    DocTemplate,
     Memory,
     AgentRun,
     WorkflowDefinition,

@@ -40,6 +40,10 @@ import { Event } from "./entities/core/Event.ts";
 // Stub entities (P1#03 — composite index decorators landed early)
 import { Task } from "./entities/tasks/Task.ts";
 import { Document } from "./entities/docs/Document.ts";
+import { DocLink } from "./entities/docs/DocLink.ts";
+import { DocVersion } from "./entities/docs/DocVersion.ts";
+import { DocComment } from "./entities/docs/DocComment.ts";
+import { DocTemplate } from "./entities/docs/DocTemplate.ts";
 import { Memory } from "./entities/memory/Memory.ts";
 import { AgentRun } from "./entities/orchestration/AgentRun.ts";
 import { RoutingRule } from "./entities/router/RoutingRule.ts";
@@ -68,6 +72,10 @@ import { EventRepository } from "./repositories/core/EventRepository.ts";
 // Stub repositories
 import { TaskRepository } from "./repositories/tasks/TaskRepository.ts";
 import { DocumentRepository } from "./repositories/docs/DocumentRepository.ts";
+import { DocLinkRepository } from "./repositories/docs/DocLinkRepository.ts";
+import { DocVersionRepository } from "./repositories/docs/DocVersionRepository.ts";
+import { DocCommentRepository } from "./repositories/docs/DocCommentRepository.ts";
+import { DocTemplateRepository } from "./repositories/docs/DocTemplateRepository.ts";
 import { MemoryRepository } from "./repositories/memory/MemoryRepository.ts";
 import { AgentRunRepository } from "./repositories/orchestration/AgentRunRepository.ts";
 import { RoutingRuleRepository } from "./repositories/router/RoutingRuleRepository.ts";
@@ -98,6 +106,10 @@ export {
   EventRepository,
   TaskRepository,
   DocumentRepository,
+  DocLinkRepository,
+  DocVersionRepository,
+  DocCommentRepository,
+  DocTemplateRepository,
   MemoryRepository,
   AgentRunRepository,
   RoutingRuleRepository,
@@ -185,6 +197,22 @@ export function registerDbBindings(container: Container, orm: MikroORM): void {
   container.bind({
     provide: DocumentRepository,
     useFactory: () => em.getRepository(Document) as DocumentRepository,
+  });
+  container.bind({
+    provide: DocLinkRepository,
+    useFactory: () => em.getRepository(DocLink) as DocLinkRepository,
+  });
+  container.bind({
+    provide: DocVersionRepository,
+    useFactory: () => em.getRepository(DocVersion) as DocVersionRepository,
+  });
+  container.bind({
+    provide: DocCommentRepository,
+    useFactory: () => em.getRepository(DocComment) as DocCommentRepository,
+  });
+  container.bind({
+    provide: DocTemplateRepository,
+    useFactory: () => em.getRepository(DocTemplate) as DocTemplateRepository,
   });
   container.bind({
     provide: MemoryRepository,
