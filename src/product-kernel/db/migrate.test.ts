@@ -117,6 +117,13 @@ describe("product kernel migrations", () => {
           applied_at timestamptz NOT NULL DEFAULT now()
         );
 
+        CREATE TABLE projects (
+          id text PRIMARY KEY,
+          org_id text NOT NULL,
+          name text NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT now()
+        );
+
         CREATE TABLE agent_runs (
           id text PRIMARY KEY,
           org_id text NOT NULL,
@@ -135,7 +142,32 @@ describe("product kernel migrations", () => {
           ended_at timestamptz
         );
 
-        INSERT INTO schema_migrations (name) VALUES ('0001_product_kernel.sql');
+        CREATE TABLE artifacts (
+          id text PRIMARY KEY,
+          org_id text NOT NULL,
+          project_id text,
+          run_id text,
+          task_id text,
+          kind text NOT NULL DEFAULT 'file',
+          created_at timestamptz NOT NULL DEFAULT now()
+        );
+
+        CREATE TABLE search_documents (
+          id text PRIMARY KEY,
+          org_id text NOT NULL,
+          source_kind text NOT NULL,
+          source_id text NOT NULL,
+          title text,
+          body text,
+          indexed_at timestamptz NOT NULL DEFAULT now()
+        );
+
+        INSERT INTO schema_migrations (name) VALUES
+          ('0001_product_kernel.sql'),
+          ('0002_search.sql'),
+          ('0003_jobs.sql'),
+          ('0005_artifacts.sql'),
+          ('0006_search_extended.sql');
       `);
 
       const applied = await runMigrations(db);
