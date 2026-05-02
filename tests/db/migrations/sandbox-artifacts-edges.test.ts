@@ -209,6 +209,88 @@ describe("Artifact + Edge sandbox schema", () => {
       expect(savedEdge?.fromKind).toBe("artifact");
       expect(savedEdge?.toKind).toBe("agent_run");
       expect(savedEdge?.kind).toBe("generated_by");
+
+      const duplicate = em.create(Edge, {
+        org: em.getReference(Org, DEFAULT_ORG_ID),
+        fromKind: "artifact",
+        fromId: artifact.id,
+        toKind: "agent_run",
+        toId: run.id,
+        kind: "generated_by",
+      });
+      em.persist(duplicate);
+      await expect(em.flush()).rejects.toThrow(/duplicate|unique/i);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("enforces artifact and edge delete rules at the database layer", async () => {
+    const { Artifact, Edge } = await loadSandboxEntities();
+    const db = await createTestOrm();
+    try {
+      const em = db.em.fork();
+      const org = em.create(Org, {
+        id: randomUUID(),
+        name: "Delete Rule Org",
+        slug: `delete-rule-${randomUUID()}`,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      const task = em.create(Task, {
+        id: randomUUID(),
+        org,
+        createdAt: new Date(),
+        blockedByIds: [],
+        status: "ready",
+        priority: 1,
+      });
+      const run = em.create(AgentRun, {
+        id: randomUUID(),
+        org,
+        status: "succeeded",
+        agentName: "codex",
+      });
+      const artifact = em.create(Artifact, {
+        id: randomUUID(),
+        org,
+        run,
+        task,
+        filename: "delete-rule.txt",
+        path: "artifacts/delete-rule.txt",
+      });
+      const edge = em.create(Edge, {
+        org,
+        fromKind: "artifact",
+        fromId: artifact.id,
+        toKind: "agent_run",
+        toId: run.id,
+        kind: "generated_by",
+      });
+
+      em.persist([org, task, run, artifact, edge]);
+      await em.flush();
+
+      await db.pglite.query(`delete from tasks where id = $1`, [task.id]);
+      const taskRows = await db.pglite.query<{ task_id: string | null }>(
+        `select task_id from artifacts where id = $1`,
+        [artifact.id],
+      );
+      expect(taskRows.rows).toEqual([{ task_id: null }]);
+
+      await db.pglite.query(`delete from agent_runs where id = $1`, [run.id]);
+      const artifactRows = await db.pglite.query<{ id: string }>(
+        `select id from artifacts where id = $1`,
+        [artifact.id],
+      );
+      expect(artifactRows.rows).toEqual([]);
+
+      await db.pglite.query(`delete from orgs where id = $1`, [org.id]);
+      const edgeRows = await db.pglite.query<{ id: string }>(
+        `select id from edges where id = $1`,
+        [edge.id],
+      );
+      expect(edgeRows.rows).toEqual([]);
     } finally {
       await db.close();
     }
@@ -244,6 +326,39 @@ describe("Artifact + Edge sandbox schema", () => {
       expect(rows.rows[0]!.filename).toBe("legacy/output.txt");
       expect(rows.rows[0]!.run_id).not.toBeNull();
       expect(rows.rows[0]!.agent_name).toBe("artifact-migration");
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("rolls back cleanly and removes migration sentinel agent runs", async () => {
+    const db = await createTestOrm();
+    try {
+      await db.orm.migrator.down({ to: PREVIOUS_MIGRATION_NAME });
+      const id = randomUUID();
+      await db.pglite.query(
+        `insert into artifacts (id, org_id, path) values ($1, $2, $3)`,
+        [id, DEFAULT_ORG_ID, "legacy/rollback.txt"],
+      );
+
+      await db.orm.migrator.up({ to: MIGRATION_NAME });
+      await db.orm.migrator.down({ to: PREVIOUS_MIGRATION_NAME });
+
+      const sentinelRows = await db.pglite.query<{ count: string }>(
+        `select count(*)::text as count from agent_runs where agent_name = 'artifact-migration'`,
+      );
+      expect(sentinelRows.rows).toEqual([{ count: "0" }]);
+
+      await db.orm.migrator.up({ to: MIGRATION_NAME });
+      const migratedRows = await db.pglite.query<{
+        filename: string;
+        run_id: string | null;
+      }>(
+        `select filename, run_id from artifacts where id = $1`,
+        [id],
+      );
+      expect(migratedRows.rows[0]?.filename).toBe("legacy/rollback.txt");
+      expect(migratedRows.rows[0]?.run_id).not.toBeNull();
     } finally {
       await db.close();
     }

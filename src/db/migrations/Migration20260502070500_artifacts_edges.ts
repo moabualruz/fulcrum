@@ -81,6 +81,9 @@ export class Migration20260502070500_artifacts_edges extends Migration {
     this.addSql(
       `alter table "artifacts" drop constraint if exists "artifacts_run_id_foreign"`,
     );
+    this.addSql(
+      `delete from "agent_runs" where "agent_name" = 'artifact-migration' and "id" in (select "run_id" from "artifacts" where "run_id" is not null)`,
+    );
     this.addSql(`alter table "artifacts" drop column if exists "created_at"`);
     this.addSql(`alter table "artifacts" drop column if exists "metadata_json"`);
     this.addSql(`alter table "artifacts" drop column if exists "size_bytes"`);
