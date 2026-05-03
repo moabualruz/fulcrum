@@ -1,7 +1,7 @@
 ---
 Status: implemented
 ImplRuntime: claude
-ImplCommit: c0931dae
+ImplCommit: pending
 Triage: AFK
 Pillar: 07-docs-editor-collab
 Blocked-by: [02-tiptap-svelte-binding-spike.md, 06-slash-menu-core-marks-blocks.md]
