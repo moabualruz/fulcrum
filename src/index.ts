@@ -46,8 +46,10 @@ Usage:
                                      Run an FTS query over the product kernel search index.
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
                                      Render the assembled Markdown context for a task.
-  fulcrum symphony sync [--daily] [--json]
-                                     Submodule update + SPEC drift detection + conformance run.
+  fulcrum sprints add-task --sprint-id <id> --task-id <id> [--json]
+                                     Assign a task to a sprint.
+  fulcrum sprints remove-task --sprint-id <id> --task-id <id> [--json]
+                                     Remove a task from a sprint.
   fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
   fulcrum version                    Print version.
   fulcrum help                       This message.
@@ -124,15 +126,9 @@ async function main() {
       await runProduct(rest);
       return;
     }
-    case "symphony": {
-      const [sub, ...subRest] = rest;
-      if (sub === "sync") {
-        const { run: runSync } = await import("./cli/symphony/sync.ts");
-        await runSync(subRest);
-      } else {
-        console.error(`fulcrum symphony: unknown subcommand '${sub ?? ""}'`);
-        process.exit(2);
-      }
+    case "sprints": {
+      const { run: runSprints } = await import("./cli/sprints.ts");
+      await runSprints(rest);
       return;
     }
     case "version":

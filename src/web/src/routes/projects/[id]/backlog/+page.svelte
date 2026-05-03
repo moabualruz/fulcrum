@@ -1,206 +1,270 @@
 <script lang="ts">
-  import type { BacklogTask, SprintListing } from "$lib/product-queries";
-  import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { cn } from "$lib/utils.js";
+  interface BacklogTaskItem {
+    id: string;
+    title: string;
+    status: string;
+    priority: number;
+    estimate_points: number | null;
+    sprint_id: string | null;
+  }
+
+  interface SprintItem {
+    id: string;
+    name: string;
+    status: string;
+    capacity_points: number | null;
+  }
 
   interface Props {
     data: {
-      projectId: string;
-      streamed: {
-        data: Promise<{ tasks: BacklogTask[]; sprints: SprintListing[] }> | { tasks: BacklogTask[]; sprints: SprintListing[] };
-      };
+      project: { id: string; name: string };
+      sprints: SprintItem[];
+      backlogTasks: BacklogTaskItem[];
     };
   }
   const { data }: Props = $props();
 
-  let resolvedTasks = $state<BacklogTask[]>([]);
-  let resolvedSprints = $state<SprintListing[]>([]);
-  let sortField = $state<"priority" | "title" | "status">("priority");
-  let sortDir = $state<"asc" | "desc">("desc");
+  let selectedSprintId = $state<string | null>(
+    data.sprints[0]?.id ?? null,
+  );
 
-  {
-    const d = data.streamed.data;
-    if (!(d instanceof Promise)) {
-      resolvedTasks = d.tasks;
-      resolvedSprints = d.sprints;
-    }
-  }
+  // Sprint tasks loaded via form action response; start empty
+  let sprintTasks = $state<BacklogTaskItem[]>([]);
+  let backlogItems = $state<BacklogTaskItem[]>(data.backlogTasks.slice());
 
+  // Sync from data prop changes
   $effect(() => {
-    const d = data.streamed.data;
-    if (d instanceof Promise) {
-      let cancelled = false;
-      void d.then((p) => {
-        if (!cancelled) {
-          resolvedTasks = p.tasks;
-          resolvedSprints = p.sprints;
-        }
-      });
-      return () => { cancelled = true; };
-    } else {
-      resolvedTasks = d.tasks;
-      resolvedSprints = d.sprints;
-    }
+    backlogItems = data.backlogTasks.slice();
   });
 
-  const sortedTasks = $derived(() => {
-    const tasks = [...resolvedTasks];
-    tasks.sort((a, b) => {
-      let cmp = 0;
-      if (sortField === "priority") cmp = a.priority - b.priority;
-      else if (sortField === "title") cmp = a.title.localeCompare(b.title);
-      else if (sortField === "status") cmp = a.status.localeCompare(b.status);
-      return sortDir === "desc" ? -cmp : cmp;
+  const selectedSprint = $derived(
+    data.sprints.find((s) => s.id === selectedSprintId) ?? null,
+  );
+
+  const capacityUsed = $derived(
+    sprintTasks.reduce((sum, t) => sum + (t.estimate_points ?? 0), 0),
+  );
+  const capacityTotal = $derived(selectedSprint?.capacity_points ?? null);
+  const capacityPercent = $derived(
+    capacityTotal != null && capacityTotal > 0
+      ? Math.round((capacityUsed / capacityTotal) * 100)
+      : null,
+  );
+  const overCapacity = $derived(
+    capacityTotal != null && capacityUsed > capacityTotal,
+  );
+  const nearCapacity = $derived(
+    capacityTotal != null && !overCapacity && capacityPercent != null && capacityPercent > 80,
+  );
+
+  // Filter state for backlog
+  let filterPriority = $state<string>("");
+
+  const filteredBacklog = $derived(
+    filterPriority
+      ? backlogItems.filter((t) => String(t.priority) === filterPriority)
+      : backlogItems,
+  );
+
+  // DnD: lazy-load svelte-dnd-action
+  type DndAction = (
+    node: HTMLElement,
+    options: { items: BacklogTaskItem[]; type: string; flipDurationMs?: number },
+  ) => { update?: (o: unknown) => void; destroy?: () => void };
+  let dndzone = $state<DndAction | null>(null);
+  if (typeof window !== "undefined") {
+    void import("svelte-dnd-action").then((m) => {
+      dndzone = m.dndzone as DndAction;
     });
-    return tasks;
-  });
-
-  function toggleSort(field: typeof sortField) {
-    if (sortField === field) {
-      sortDir = sortDir === "asc" ? "desc" : "asc";
-    } else {
-      sortField = field;
-      sortDir = field === "priority" ? "desc" : "asc";
-    }
   }
 
-  // Sprint planning panel: capacity bar
-  let selectedSprintId = $state<string | null>(null);
-  const selectedSprint = $derived(resolvedSprints.find((s) => s.id === selectedSprintId) ?? null);
-
-  async function postForm(action: string, fields: Record<string, string>): Promise<Response> {
+  async function postAction(action: string, fields: Record<string, string>): Promise<void> {
     const fd = new FormData();
     for (const [k, val] of Object.entries(fields)) fd.set(k, val);
-    const res = await fetch(`?/${action}`, { method: "POST", body: fd });
+    await fetch(`?/${action}`, { method: "POST", body: fd });
     if (typeof window !== "undefined") {
       const nav = await import("$app/navigation");
       await nav.invalidateAll();
     }
-    return res;
   }
 
-  async function assignToSprint(taskId: string, sprintId: string): Promise<void> {
-    await postForm("assign", { taskId, sprintId });
+  async function moveToSprint(taskId: string): Promise<void> {
+    if (!selectedSprintId) return;
+    // Optimistic: move from backlog to sprint pane
+    const idx = backlogItems.findIndex((t) => t.id === taskId);
+    if (idx === -1) return;
+    const [task] = backlogItems.splice(idx, 1);
+    sprintTasks = [...sprintTasks, { ...task!, sprint_id: selectedSprintId }];
+    backlogItems = backlogItems.slice();
+    await postAction("addTask", { sprintId: selectedSprintId, taskId });
+  }
+
+  async function moveToBacklog(taskId: string): Promise<void> {
+    if (!selectedSprintId) return;
+    const idx = sprintTasks.findIndex((t) => t.id === taskId);
+    if (idx === -1) return;
+    const [task] = sprintTasks.splice(idx, 1);
+    backlogItems = [...backlogItems, { ...task!, sprint_id: null }];
+    sprintTasks = sprintTasks.slice();
+    await postAction("removeTask", { sprintId: selectedSprintId, taskId });
+  }
+
+  function onBacklogConsider(event: { detail: { items: BacklogTaskItem[] } }) {
+    backlogItems = event.detail.items;
+  }
+  function onBacklogFinalize(event: { detail: { items: BacklogTaskItem[] } }) {
+    // Check if a sprint task landed here
+    const prev = new Set(data.backlogTasks.map((t) => t.id));
+    for (const item of event.detail.items) {
+      if (!prev.has(item.id) && item.sprint_id) {
+        void moveToBacklog(item.id);
+        return;
+      }
+    }
+    backlogItems = event.detail.items;
+  }
+  function onSprintConsider(event: { detail: { items: BacklogTaskItem[] } }) {
+    sprintTasks = event.detail.items;
+  }
+  function onSprintFinalize(event: { detail: { items: BacklogTaskItem[] } }) {
+    // Check if a backlog task landed here
+    const prev = new Set(sprintTasks.map((t) => t.id));
+    for (const item of event.detail.items) {
+      if (!prev.has(item.id) && !item.sprint_id) {
+        void moveToSprint(item.id);
+        return;
+      }
+    }
+    sprintTasks = event.detail.items;
   }
 </script>
 
-<header data-backlog-header class={cn("flex items-center justify-between border-b border-border pb-3 mb-4")}>
-  <div class={cn("flex items-baseline gap-3")}>
-    <a href="/projects/{data.projectId}" class={cn("text-sm text-muted-foreground hover:underline")}>← Project</a>
-    <h1 class={cn("text-2xl font-semibold tracking-tight")}>Backlog</h1>
-  </div>
+<header class="mb-4 flex items-center justify-between">
+  <h1 class="text-2xl font-semibold tracking-tight">
+    {data.project.name} — Sprint Planning
+  </h1>
+  {#if data.sprints.length > 0}
+    <select
+      data-sprint-selector
+      bind:value={selectedSprintId}
+      aria-label="Select sprint"
+      class="border-input bg-background h-9 rounded-md border px-3 py-1 text-sm shadow-xs"
+    >
+      {#each data.sprints as sprint (sprint.id)}
+        <option value={sprint.id}>{sprint.name}</option>
+      {/each}
+    </select>
+  {/if}
 </header>
 
-{#await data.streamed.data}
-  <RouteSkeleton kind="table" />
-{:then _payload}
-  <div class={cn("flex gap-6")}>
-    <!-- Backlog table -->
-    <div class={cn("flex-1 overflow-auto")} data-backlog-table>
-      <div class={cn("mb-3")}>
-        <form method="POST" action="?/create" class={cn("flex gap-2")}>
-          <input
-            name="title"
-            type="text"
-            placeholder="Quick-add task…"
-            required
-            data-backlog-quick-add
-            class={cn("border-input bg-background h-9 flex-1 rounded-md border px-3 py-1 text-sm shadow-xs")}
-          />
-          <button
-            type="submit"
-            class={cn("bg-primary text-primary-foreground hover:bg-primary/90 h-9 rounded-md px-4 text-sm font-medium shadow-xs")}
-          >Add</button>
-        </form>
-      </div>
-
-      <table class={cn("w-full text-sm")} role="table" aria-label="Backlog tasks">
-        <thead>
-          <tr class={cn("border-b border-border text-left")}>
-            <th class={cn("pb-2 pr-4 font-medium")}>
-              <button onclick={() => toggleSort("title")} class={cn("hover:underline")} type="button">
-                Title {sortField === "title" ? (sortDir === "asc" ? "↑" : "↓") : ""}
-              </button>
-            </th>
-            <th class={cn("pb-2 pr-4 font-medium")}>
-              <button onclick={() => toggleSort("status")} class={cn("hover:underline")} type="button">
-                Status {sortField === "status" ? (sortDir === "asc" ? "↑" : "↓") : ""}
-              </button>
-            </th>
-            <th class={cn("pb-2 pr-4 font-medium")}>
-              <button onclick={() => toggleSort("priority")} class={cn("hover:underline")} type="button">
-                Priority {sortField === "priority" ? (sortDir === "asc" ? "↑" : "↓") : ""}
-              </button>
-            </th>
-            <th class={cn("pb-2 pr-4 font-medium")}>Est.</th>
-            <th class={cn("pb-2 font-medium")}>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each sortedTasks() as task (task.id)}
-            <tr data-backlog-row data-task-id={task.id} class={cn("border-b border-border/50 hover:bg-muted/30")}>
-              <td class={cn("py-2 pr-4")}>{task.title}</td>
-              <td class={cn("py-2 pr-4")}>
-                <span class={cn("rounded-full border px-2 py-0.5 text-xs")}>{task.status}</span>
-              </td>
-              <td class={cn("py-2 pr-4 tabular-nums")}>{task.priority}</td>
-              <td class={cn("py-2 pr-4 tabular-nums")}>{task.estimate}</td>
-              <td class={cn("py-2")}>
-                {#if selectedSprintId}
-                  <button
-                    type="button"
-                    data-assign-btn
-                    onclick={() => assignToSprint(task.id, selectedSprintId!)}
-                    class={cn("text-xs text-primary hover:underline")}
-                  >→ Sprint</button>
-                {/if}
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-
-      {#if resolvedTasks.length === 0}
-        <p class={cn("py-8 text-center text-muted-foreground")}>No backlog tasks. Add one above.</p>
-      {/if}
-    </div>
-
-    <!-- Sprint planning side panel -->
-    <aside data-sprint-panel class={cn("w-72 shrink-0 rounded-lg border border-border bg-muted/20 p-4")}>
-      <h2 class={cn("mb-3 text-lg font-semibold")}>Sprint Planning</h2>
-
-      {#if resolvedSprints.length === 0}
-        <p class={cn("text-sm text-muted-foreground")}>No sprints yet. <a href="/projects/{data.projectId}/sprints" class={cn("text-primary hover:underline")}>Create one</a>.</p>
-      {:else}
-        <label for="sprint-select" class={cn("mb-1 block text-sm font-medium")}>Target Sprint</label>
-        <select
-          id="sprint-select"
-          data-sprint-select
-          class={cn("border-input bg-background mb-3 h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs")}
-          onchange={(e) => { selectedSprintId = (e.currentTarget as HTMLSelectElement).value || null; }}
+<div data-backlog-grid class="grid grid-cols-2 gap-4" style="min-height: 400px;">
+  <!-- Left: Backlog pane -->
+  <section data-backlog-pane aria-label="Backlog">
+    <header class="mb-2 flex items-center justify-between">
+      <h2 class="text-lg font-medium">Backlog</h2>
+      <select
+        data-priority-filter
+        bind:value={filterPriority}
+        aria-label="Filter by priority"
+        class="border-input bg-background h-8 rounded border px-2 text-xs"
+      >
+        <option value="">All priorities</option>
+        <option value="10">High (10)</option>
+        <option value="5">Medium (5)</option>
+        <option value="0">Low (0)</option>
+      </select>
+    </header>
+    <div
+      data-backlog-list
+      class="min-h-[200px] rounded-md border p-2"
+      role="list"
+      aria-label="Backlog tasks"
+      use:dndzone={{ items: filteredBacklog, type: "planning", flipDurationMs: 150 }}
+      onconsider={onBacklogConsider}
+      onfinalize={onBacklogFinalize}
+    >
+      {#each filteredBacklog as task (task.id)}
+        <div
+          data-task-id={task.id}
+          data-backlog-card
+          class="mb-1 cursor-grab rounded border bg-white p-2 text-sm shadow-xs"
+          role="listitem"
         >
-          <option value="">Select sprint…</option>
-          {#each resolvedSprints.filter((s) => s.status !== "completed") as sprint (sprint.id)}
-            <option value={sprint.id}>{sprint.name} ({sprint.status})</option>
-          {/each}
-        </select>
-
-        {#if selectedSprint}
-          <div data-capacity-bar class={cn("mb-2")}>
-            <div class={cn("flex justify-between text-xs text-muted-foreground mb-1")}>
-              <span>{selectedSprint.total_estimate} / {selectedSprint.capacity} pts</span>
-              <span>{selectedSprint.task_count} tasks</span>
-            </div>
-            <div class={cn("h-2 w-full rounded-full bg-muted")}>
-              {@const pct = selectedSprint.capacity > 0 ? Math.min(100, (selectedSprint.total_estimate / selectedSprint.capacity) * 100) : 0}
-              <div
-                class={cn("h-2 rounded-full", pct > 90 ? "bg-destructive" : "bg-primary")}
-                style="width: {pct}%"
-              ></div>
-            </div>
+          <div class="flex items-center justify-between">
+            <span>{task.title}</span>
+            <span class="text-muted-foreground text-xs">P{task.priority}</span>
           </div>
-        {/if}
+          {#if task.estimate_points != null}
+            <span class="text-muted-foreground text-xs">{task.estimate_points}pt</span>
+          {/if}
+          {#if selectedSprintId}
+            <button
+              data-move-to-sprint
+              onclick={() => moveToSprint(task.id)}
+              class="ml-2 text-xs text-blue-600 hover:underline"
+              aria-label="Move to sprint"
+            >→ Sprint</button>
+          {/if}
+        </div>
+      {/each}
+    </div>
+  </section>
+
+  <!-- Right: Sprint pane -->
+  <section data-sprint-pane aria-label="Sprint">
+    <header class="mb-2">
+      <h2 class="text-lg font-medium">
+        {selectedSprint?.name ?? "No sprint selected"}
+      </h2>
+      {#if selectedSprint && capacityTotal != null}
+        <div data-capacity-bar class="mt-1" aria-label="Sprint capacity">
+          <div class="flex items-center gap-2 text-xs">
+            <span>{capacityUsed} / {capacityTotal} points</span>
+            {#if overCapacity}
+              <span data-over-capacity class="rounded bg-red-100 px-1.5 py-0.5 text-red-700 font-medium">Over capacity</span>
+            {/if}
+          </div>
+          <div class="mt-1 h-2 w-full overflow-hidden rounded-full bg-gray-200">
+            <div
+              data-capacity-fill
+              class="h-full rounded-full transition-all {overCapacity ? 'bg-red-500' : nearCapacity ? 'bg-amber-400' : 'bg-green-500'}"
+              style="width: {Math.min(capacityPercent ?? 0, 100)}%"
+            ></div>
+          </div>
+        </div>
       {/if}
-    </aside>
-  </div>
-{/await}
+    </header>
+    <div
+      data-sprint-list
+      class="min-h-[200px] rounded-md border p-2"
+      role="list"
+      aria-label="Sprint tasks"
+      use:dndzone={{ items: sprintTasks, type: "planning", flipDurationMs: 150 }}
+      onconsider={onSprintConsider}
+      onfinalize={onSprintFinalize}
+    >
+      {#each sprintTasks as task (task.id)}
+        <div
+          data-task-id={task.id}
+          data-sprint-card
+          class="mb-1 cursor-grab rounded border bg-white p-2 text-sm shadow-xs"
+          role="listitem"
+        >
+          <div class="flex items-center justify-between">
+            <span>{task.title}</span>
+            <span class="text-muted-foreground text-xs">P{task.priority}</span>
+          </div>
+          {#if task.estimate_points != null}
+            <span class="text-muted-foreground text-xs">{task.estimate_points}pt</span>
+          {/if}
+          <button
+            data-move-to-backlog
+            onclick={() => moveToBacklog(task.id)}
+            class="ml-2 text-xs text-blue-600 hover:underline"
+            aria-label="Move to backlog"
+          >← Backlog</button>
+        </div>
+      {/each}
+    </div>
+  </section>
+</div>

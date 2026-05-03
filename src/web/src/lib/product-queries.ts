@@ -26,10 +26,6 @@ export interface BoardTask {
   priority: number;
   project_id: string | null;
   updated_at: string;
-  assignee?: string | null;
-  due_date?: string | null;
-  estimate?: number | null;
-  labels?: string[];
 }
 
 export interface RunListing {
@@ -149,63 +145,56 @@ export async function listRuns(projectId?: string | null): Promise<RunListing[]>
 export interface SprintListing {
   id: string;
   name: string;
-  goal: string | null;
   status: string;
-  capacity: number;
+  capacity_points: number | null;
   start_date: string | null;
   end_date: string | null;
-  total_estimate: number;
-  task_count: number;
+  updated_at: string;
 }
 
-export interface BacklogTask extends BoardTask {
-  estimate: number;
+export interface BacklogTask {
+  id: string;
+  title: string;
+  status: string;
+  priority: number;
+  estimate_points: number | null;
   sprint_id: string | null;
+  project_id: string | null;
+  updated_at: string;
 }
 
-interface RawSprint {
-  id: string; name: string; goal: string | null; status: string;
-  capacity: number; start_date: string | Date | null; end_date: string | Date | null;
-  total_estimate: number; task_count: number;
-}
+interface RawSprint { id: string; name: string; status: string; capacity_points: number | null; start_date: string | Date | null; end_date: string | Date | null; updated_at: string | Date }
+interface RawBacklogTask { id: string; title: string; status: string; priority: number; estimate_points: number | null; sprint_id: string | null; project_id: string | null; updated_at: string | Date }
 
-interface RawBacklogTask extends RawTask {
-  estimate: number;
-  sprint_id: string | null;
-}
-
-export async function listSprints(projectId: string): Promise<SprintListing[]> {
+export async function listSprintsForProject(projectId: string): Promise<SprintListing[]> {
   const db = await open();
   try {
     const rows = await db.query<RawSprint>(
-      `SELECT s.id, s.name, s.goal, s.status, s.capacity, s.start_date, s.end_date,
-              COALESCE(SUM(t.estimate), 0)::int AS total_estimate,
-              COUNT(t.id)::int AS task_count
-         FROM sprints s
-         LEFT JOIN tasks t ON t.sprint_id = s.id
-        WHERE s.project_id = $1
-        GROUP BY s.id
-        ORDER BY s.created_at ASC, s.id ASC`,
+      `SELECT id, name, status, capacity_points, start_date, end_date, updated_at
+         FROM sprints WHERE project_id = $1 ORDER BY created_at DESC, id ASC`,
       [projectId],
     );
     return rows.map((r) => ({
       ...r,
-      start_date: isoStampOrNull(r.start_date),
-      end_date: isoStampOrNull(r.end_date),
+      start_date: r.start_date ? isoStampOrNull(r.start_date as string) : null,
+      end_date: r.end_date ? isoStampOrNull(r.end_date as string) : null,
+      updated_at: isoStamp(r.updated_at),
     }));
   } finally {
     await db.close();
   }
 }
 
-export async function listBacklogTasks(projectId: string): Promise<BacklogTask[]> {
+export async function listBacklog(projectId: string): Promise<BacklogTask[]> {
   const db = await open();
   try {
     const rows = await db.query<RawBacklogTask>(
-      `SELECT id, title, status, priority, project_id, updated_at, estimate, sprint_id
+      `SELECT id, title, status, priority, estimate_points, sprint_id, project_id, updated_at
          FROM tasks
-        WHERE project_id = $1 AND sprint_id IS NULL
-        ORDER BY priority DESC, updated_at DESC, id ASC`,
+         WHERE project_id = $1
+           AND sprint_id IS NULL
+           AND status NOT IN ('completed', 'cancelled')
+         ORDER BY priority DESC, updated_at DESC, id ASC`,
       [projectId],
     );
     return rows.map((r) => ({ ...r, updated_at: isoStamp(r.updated_at) }));
@@ -214,36 +203,17 @@ export async function listBacklogTasks(projectId: string): Promise<BacklogTask[]
   }
 }
 
-export async function listSprintTasks(sprintId: string): Promise<BacklogTask[]> {
+export async function listSprintTasksForBacklog(sprintId: string): Promise<BacklogTask[]> {
   const db = await open();
   try {
     const rows = await db.query<RawBacklogTask>(
-      `SELECT id, title, status, priority, project_id, updated_at, estimate, sprint_id
+      `SELECT id, title, status, priority, estimate_points, sprint_id, project_id, updated_at
          FROM tasks
-        WHERE sprint_id = $1
-        ORDER BY priority DESC, updated_at DESC, id ASC`,
+         WHERE sprint_id = $1
+         ORDER BY priority DESC, updated_at DESC, id ASC`,
       [sprintId],
     );
     return rows.map((r) => ({ ...r, updated_at: isoStamp(r.updated_at) }));
-  } finally {
-    await db.close();
-  }
-}
-
-export async function getSprintVelocity(projectId: string): Promise<{ sprintName: string; points: number }[]> {
-  const db = await open();
-  try {
-    const rows = await db.query<{ name: string; points: number }>(
-      `SELECT s.name, COALESCE(SUM(t.estimate), 0)::int AS points
-         FROM sprints s
-         LEFT JOIN tasks t ON t.sprint_id = s.id AND t.status = 'completed'
-        WHERE s.project_id = $1 AND s.status = 'completed'
-        GROUP BY s.id, s.name, s.created_at
-        ORDER BY s.created_at DESC
-        LIMIT 5`,
-      [projectId],
-    );
-    return rows.map((r) => ({ sprintName: r.name, points: r.points }));
   } finally {
     await db.close();
   }
