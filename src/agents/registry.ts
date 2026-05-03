@@ -2,6 +2,7 @@
 // skills sync. Adding a new agent or changing a path only requires editing here.
 
 import { AgentProfileSchema, type AgentProfile } from "./types.ts";
+import { claudeCodeProfile } from "./profiles/claude-code.ts";
 
 export interface Agent {
   id: "claude-code" | "codex" | "gemini" | "opencode" | "pi";
@@ -98,16 +99,7 @@ export const AGENTS: readonly Agent[] = [
 ] as const;
 
 const PROFILE_DEFINITIONS: readonly AgentProfile[] = [
-  {
-    name: "claude-code",
-    cliPath: "claude",
-    defaultFlags: [],
-    skillFolder: "claude-code",
-    authEnvVars: ["ANTHROPIC_API_KEY"],
-    sandcastleProvider: "docker",
-    maxIterations: 8,
-    defaultTimeout: 300_000,
-  },
+  claudeCodeProfile,
   {
     name: "codex",
     cliPath: "codex",
