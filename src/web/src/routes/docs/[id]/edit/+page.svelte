@@ -2,7 +2,8 @@
 	import { untrack } from "svelte";
 	import { enhance } from "$app/forms";
 	import type { ActionData, PageData } from "./$types";
-	import MarkdownEditor from "$lib/components/markdown/MarkdownEditor.svelte";
+	import type { JSONContent } from "@tiptap/core";
+	import DocEditor from "$lib/components/editor/DocEditor.svelte";
 	import { buttonVariants } from "$lib/components/ui/button";
 	import { cn } from "$lib/utils.js";
 
@@ -19,11 +20,30 @@
 	let kindValue = $state(untrack(() => data.form.data.kind ?? "note"));
 	let labelsValue = $state(untrack(() => data.form.data.labels ?? ""));
 	let bodyValue = $state(untrack(() => data.form.data.body ?? ""));
+	/* svelte-ignore state_referenced_locally */
+	let contentJson = $state<JSONContent>(markdownToDoc(bodyValue));
 
 	const errors = $derived(form?.form?.errors ?? data.form.errors ?? {});
 	const titleError = $derived<string | undefined>(errors.title?.[0]);
 	const kindError = $derived<string | undefined>(errors.kind?.[0]);
 	const bodyError = $derived<string | undefined>(errors.body?.[0]);
+
+	function handleDocChange(event: CustomEvent<{ contentJson: JSONContent; bodyMd: string }>): void {
+		contentJson = event.detail.contentJson;
+		bodyValue = event.detail.bodyMd;
+	}
+
+	function markdownToDoc(body: string): JSONContent {
+		const paragraphs = body.split(/\n{2,}/).map((text) => ({
+			type: "paragraph",
+			content: text ? [{ type: "text", text }] : undefined,
+		}));
+
+		return {
+			type: "doc",
+			content: paragraphs.length ? paragraphs : [{ type: "paragraph" }],
+		};
+	}
 </script>
 
 <header
@@ -98,8 +118,7 @@
 
 	<div class={cn("flex flex-col gap-1.5")}>
 		<label for="doc-body" class={cn("text-sm font-medium")}>Body</label>
-		<MarkdownEditor bind:value={bodyValue} ariaLabel="Document body" />
-		<input type="hidden" name="body" value={bodyValue} />
+		<DocEditor content={contentJson} onchange={handleDocChange} ariaLabel="Document body" />
 		{#if bodyError}
 			<p data-error-body class={cn("text-destructive text-xs")}>{bodyError}</p>
 		{/if}

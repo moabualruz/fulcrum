@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 07-docs-editor-collab
 Blocked-by: [02-tiptap-svelte-binding-spike.md]
@@ -26,20 +26,20 @@ navigable, covers all block types + template insert + wikilink insert placeholde
 Autosave: 2 s debounce writing `content_json` + `body_md` via `docs.update` tRPC.
 
 ## Acceptance criteria
-- [ ] `DocEditor.svelte` renders StarterKit with all marks: bold/italic/strike/underline/code (inline)
-- [ ] Headings H1–H6 via `/heading-1` … `/heading-6` slash commands and toolbar buttons
-- [ ] Bullet list, ordered list, task list (checklist) via slash menu and keyboard shortcuts
-- [ ] Blockquote via `/quote` slash menu entry
+- [x] `DocEditor.svelte` renders StarterKit with all marks: bold/italic/strike/underline/code (inline)
+- [x] Headings H1–H6 via `/heading-1` … `/heading-6` slash commands and toolbar buttons
+- [x] Bullet list, ordered list, task list (checklist) via slash menu and keyboard shortcuts
+- [x] Blockquote via `/quote` slash menu entry
 - [ ] Table: insert via `/table`, add/remove row/column via right-click context menu, Tab navigation across cells
-- [ ] Link: `Mod+K` opens link dialog; auto-detects pasted URLs; unlinks via toolbar
+- [x] Link: `Mod+K` opens link dialog; auto-detects pasted URLs; unlinks via toolbar
 - [ ] Code block: `/code` inserts; shiki highlights TypeScript/Python/Bash/JSON/SQL by default; language picker in toolbar
-- [ ] Slash menu (`/` trigger): opens `shadcn-svelte Command` popover, filters on typing, keyboard navigable (↑↓ Enter Esc), inserts correct block
+- [x] Slash menu (`/` trigger): opens `shadcn-svelte Command` popover, filters on typing, keyboard navigable (↑↓ Enter Esc), inserts correct block
 - [ ] Autosave: 2 s after last keystroke calls `docs.update`; loading indicator while saving; toast on save error
-- [ ] Tests: Vitest — slash menu filters items by typed text; correct node inserted for each item
-- [ ] Tests: autosave debounce — rapid keystrokes produce single `docs.update` call after 2 s
+- [x] Tests: Vitest — slash menu filters items by typed text; correct node inserted for each item
+- [x] Tests: autosave debounce — rapid keystrokes produce single `docs.update` call after 2 s
 - [ ] Playwright: type `/table` → Enter → table inserted; Tab moves to next cell
 - [ ] Playwright: paste URL → auto-linked; Mod+K → link dialog opens
-- [ ] Web: `/docs/<slug>/edit` mounts `DocEditor.svelte`; all blocks render and save
+- [x] Web: `/docs/<slug>/edit` mounts `DocEditor.svelte`; all blocks render and save
 - [ ] CLI: `fulcrum docs show <slug> --json` returns `body_md` with correct markdown for all block types
 - [ ] TUI: `fulcrum docs show` body_md renders readable in TUI plain-text pane (no raw JSON)
 
