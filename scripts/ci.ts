@@ -63,6 +63,8 @@ export const STEPS: Step[] = [
   { name: "ci:schemas",  cmd: ["bun", "run", "scripts/ci-schemas.ts"] },
   { name: "skills:lint", cmd: ["bun", "run", "src/index.ts", "skills", "lint", "skills/"] },
   { name: "compress:check", cmd: ["bash", "scripts/compress-with-caveman.sh", "--check"] },
+  // Search performance benchmark — soft gate (warn, not fail on slow envs).
+  { name: "search:bench", cmd: ["bun", "test", "--conditions=svelte", "--timeout", "120000", "src/product-kernel/search.test.ts"], soft: true },
   // Playwright e2e — opt-in via FULCRUM_RUN_E2E=1.
   ...(process.env["FULCRUM_RUN_E2E"] === "1"
     ? [{ name: "web:e2e", cmd: ["bun", "run", "web:e2e"], cwd: "src/web" } satisfies Step]

@@ -16,7 +16,7 @@ const HELP = `fulcrum product — local product kernel
 Usage:
   fulcrum product init [--json]
   fulcrum product projects list [--json]
-  fulcrum product search <query> [--org-slug <slug>] [--limit <N>] [--json]
+  fulcrum product search <query> [--org-slug <slug>] [--kind <kind>] [--limit <N>] [--json]
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
 `;
 
@@ -177,6 +177,7 @@ async function runSearch(argv: readonly string[]): Promise<void> {
   }
   const json = hasFlag(argv, "json");
   const orgSlug = parseFlag(argv, "org-slug") ?? DEFAULT_ORG_SLUG;
+  const kind = parseFlag(argv, "kind");
   const limit = Number(parseFlag(argv, "limit") ?? "25");
   const db = await openProductDb();
   try {
@@ -191,7 +192,8 @@ async function runSearch(argv: readonly string[]): Promise<void> {
       else console.log(`no org with slug=${orgSlug}`);
       return;
     }
-    const hits = await searchProductDocuments(db, query, { orgId, limit });
+    const sourceKinds = kind ? [kind] : undefined;
+    const hits = await searchProductDocuments(db, query, { orgId, limit, sourceKinds });
     if (json) {
       console.log(JSON.stringify(hits, null, 2));
     } else if (hits.length === 0) {

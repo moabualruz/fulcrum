@@ -141,6 +141,41 @@ describe("fulcrum product CLI", () => {
     expect(positionalFirst).toEqual(flagFirst);
   });
 
+  test("product search --kind filters by source kind", async () => {
+    const dbPath = join(productDbDir(), "main");
+    await Bun.write(join(productDbDir(), ".keep"), "");
+    const db = await openPglite(dbPath);
+    try {
+      await runMigrations(db);
+      const org = await createLocalOrg(db, { slug: "default", name: "Local" });
+      await indexSearchDocument(db, {
+        orgId: org.id,
+        sourceKind: "task",
+        sourceId: "t1",
+        title: "kernel task item",
+        body: "kernel task body",
+      });
+      await indexSearchDocument(db, {
+        orgId: org.id,
+        sourceKind: "doc",
+        sourceId: "d1",
+        title: "kernel doc item",
+        body: "kernel doc body",
+      });
+    } finally {
+      await db.close();
+    }
+    const cap = captureStdout();
+    try {
+      await runProduct(["search", "kernel", "--kind", "task", "--json"]);
+    } finally {
+      cap.restore();
+    }
+    const payload = JSON.parse(cap.lines.join("\n"));
+    expect(payload).toHaveLength(1);
+    expect(payload[0].source_kind).toBe("task");
+  });
+
   test("product context assemble --task <id> renders ordered Markdown", async () => {
     const dbPath = join(productDbDir(), "main");
     await Bun.write(join(productDbDir(), ".keep"), "");
