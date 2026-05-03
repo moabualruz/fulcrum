@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy, onMount } from "svelte";
 	import type { Snippet } from "svelte";
 	import { ModeWatcher, toggleMode } from "mode-watcher";
 	import { Toaster } from "svelte-sonner";
@@ -18,6 +19,7 @@
 		isMobileViewport,
 	} from "$lib/util/media-query";
 	import { cn } from "$lib/utils.js";
+	import { BellCounterPoll, type BellCounterItem } from "../../../notifications/bell-counter-poll";
 
 	import "../app.css";
 	import type { LayoutData } from "./$types";
@@ -32,6 +34,9 @@
 	let mobile = $state(isMobileViewport(browserDriver()));
 	let sheetOpen = $state(false);
 	let paletteOpen = $state(false);
+	let bellCount = $state(0);
+	let bellItems = $state<BellCounterItem[]>([]);
+	let bellPoll: BellCounterPoll<ReturnType<typeof setInterval>> | null = null;
 
 	const paletteItems = [
 		{ id: "home",     label: "Dashboard",  href: "/" },
@@ -57,6 +62,45 @@
 	$effect(() => {
 		toastFromForm(page.form as Parameters<typeof toastFromForm>[0]);
 	});
+
+	async function trpc<T>(procedure: string, input: unknown, method: "GET" | "POST" = "POST"): Promise<T> {
+		const response = await fetch(`/api/trpc/${procedure}`, {
+			method,
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ json: input }),
+		});
+		if (!response.ok) throw new Error(await response.text());
+		const payload = await response.json();
+		return (payload.result?.data?.json ?? payload.result?.data ?? payload.json ?? payload) as T;
+	}
+
+	onMount(() => {
+		bellPoll = new BellCounterPoll<ReturnType<typeof setInterval>>({
+			realtimeEnabled: false,
+			unreadCount: () => trpc("notify.unreadCount", {}),
+			listUnread: (input) => trpc("notify.list", input),
+			markAllRead: () => trpc("notify.markAllRead", {}),
+			onCount: (count) => {
+				bellCount = count;
+			},
+		});
+		void bellPoll.start();
+	});
+
+	onDestroy(() => {
+		bellPoll?.stop();
+	});
+
+	$effect(() => {
+		if (page.url.pathname === "/inbox" && bellCount > 0) {
+			void bellPoll?.clearForInboxVisit();
+		}
+	});
+
+	async function openBell(): Promise<void> {
+		const unread = await bellPoll?.openDropdown();
+		bellItems = unread?.items ?? [];
+	}
 </script>
 
 <svelte:head>
@@ -97,6 +141,9 @@
 						<AppTopbar
 							pathname={page.url.pathname}
 							activeProjectId={data.activeProjectId}
+							bellCount={bellCount}
+							bellItems={bellItems}
+							onBellOpen={() => void openBell()}
 							onThemeToggle={toggleMode}
 						/>
 					</div>
@@ -116,6 +163,9 @@
 					<AppTopbar
 						pathname={page.url.pathname}
 						activeProjectId={data.activeProjectId}
+						bellCount={bellCount}
+						bellItems={bellItems}
+						onBellOpen={() => void openBell()}
 						onThemeToggle={toggleMode}
 					/>
 				</div>

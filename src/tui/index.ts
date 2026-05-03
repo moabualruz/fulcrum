@@ -89,6 +89,9 @@ export interface TuiCaller {
       }>>;
     };
   };
+  notify?: {
+    unreadCount: () => Promise<{ count: number }>;
+  };
 }
 
 export type TuiAction = "CreateItem";
@@ -171,6 +174,8 @@ export class TuiApp {
   private inferencePullProgress: (ModelPullProgress & { modelId: string }) | null = null;
   private inferenceLastDownload: (ModelPullProgress & { modelId: string }) | null = null;
   private inferencePoll: ReturnType<typeof setInterval> | null = null;
+  private bellPoll: ReturnType<typeof setInterval> | null = null;
+  private bellCount = 0;
   private running = false;
 
   // Active screen instances
@@ -209,11 +214,15 @@ export class TuiApp {
     // Load status bar data
     await this._loadStatusBar();
     await this._loadInferenceBadge();
-    this.inferencePoll = setInterval(() => {
-      void this._loadInferenceBadge().then(() => {
-        if (this.running) void this._renderCurrentScreen();
-      });
-    }, 30_000);
+    await this._loadBellCount();
+    this.inferencePoll = setInterval(() =>
+      this._loadInferenceBadge().then(() => {
+        if (this.running) return this._renderCurrentScreen();
+      }), 30_000);
+    this.bellPoll = setInterval(() =>
+      this._loadBellCount().then(() => {
+        if (this.running) return this._renderCurrentScreen();
+      }), 60_000);
 
     // Initial render
     await this._renderCurrentScreen();
@@ -233,6 +242,10 @@ export class TuiApp {
     if (this.inferencePoll) {
       clearInterval(this.inferencePoll);
       this.inferencePoll = null;
+    }
+    if (this.bellPoll) {
+      clearInterval(this.bellPoll);
+      this.bellPoll = null;
     }
     if (this.input && this.keyHandler) {
       this.input.off("keypress", this.keyHandler);
@@ -270,8 +283,16 @@ export class TuiApp {
       return;
     }
     const left = `${info.orgId}  ${info.email}`;
-    const right = `${badge}  q:quit  ?:help`;
+    const right = `Bell:${this.bellCount}  ${badge}  q:quit  ?:help`;
     this.renderer.statusBar(left, right);
+  }
+
+  private async _loadBellCount(): Promise<void> {
+    try {
+      this.bellCount = (await this.caller.notify?.unreadCount())?.count ?? 0;
+    } catch {
+      this.bellCount = 0;
+    }
   }
 
   private async _loadInferenceBadge(): Promise<void> {

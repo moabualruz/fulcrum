@@ -8,10 +8,10 @@ describe("TuiApp bell counter poll", () => {
     const intervals: Array<{ ms: number; callback: () => void | Promise<void> }> = [];
     const originalSetInterval = globalThis.setInterval;
     const originalClearInterval = globalThis.clearInterval;
-    globalThis.setInterval = ((callback: () => void | Promise<void>, ms?: number) => {
-      intervals.push({ ms: ms ?? 0, callback });
+    globalThis.setInterval = ((callback: unknown, ms?: number) => {
+      intervals.push({ ms: ms ?? 0, callback: callback as () => void | Promise<void> });
       return intervals.length as never;
-    }) as typeof setInterval;
+    }) as unknown as typeof setInterval;
     globalThis.clearInterval = (() => undefined) as typeof clearInterval;
 
     const output = new FakeTTY({ columns: 100, rows: 20 });

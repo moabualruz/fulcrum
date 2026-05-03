@@ -1,18 +1,31 @@
 <script lang="ts">
+	import Bell from "@lucide/svelte/icons/bell";
 	import Sun from "@lucide/svelte/icons/sun";
 
 	import { buttonVariants } from "$lib/components/ui/button";
 	import { cn } from "$lib/utils.js";
 
+	interface BellItem {
+		id: string;
+		kind: string;
+		title: string;
+	}
+
 	interface Props {
 		pathname: string;
 		activeProjectId: string | null;
+		bellCount?: number;
+		bellItems?: BellItem[];
+		onBellOpen?: () => void;
 		onThemeToggle?: () => void;
 	}
 
 	let {
 		pathname,
 		activeProjectId,
+		bellCount = 0,
+		bellItems = [],
+		onBellOpen = () => {},
 		onThemeToggle = () => {},
 	}: Props = $props();
 
@@ -96,6 +109,40 @@
 		>
 			<Sun aria-hidden="true" />
 		</button>
+		<div class={cn("relative")}>
+			<button
+				type="button"
+				data-slot="button"
+				data-notification-bell
+				aria-label="open notifications"
+				onclick={onBellOpen}
+				class={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
+			>
+				<Bell aria-hidden="true" />
+				{#if bellCount > 0}
+					<span
+						data-notification-badge
+						class={cn(
+							"absolute -right-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium leading-4 text-destructive-foreground",
+						)}
+					>{bellCount}</span>
+				{/if}
+			</button>
+			{#if bellItems.length > 0}
+				<div
+					data-notification-dropdown
+					class={cn("absolute right-0 z-20 mt-2 w-72 rounded-md border border-border bg-popover p-2 text-sm shadow-md")}
+				>
+					{#each bellItems.slice(0, 5) as item (item.id)}
+						<div class={cn("flex gap-2 py-1.5")}>
+							<span class={cn("text-muted-foreground")}>{item.kind}</span>
+							<span>{item.title}</span>
+						</div>
+					{/each}
+					<a href="/inbox" class={cn("block border-t border-border pt-2 text-xs text-muted-foreground hover:text-foreground")}>See all</a>
+				</div>
+			{/if}
+		</div>
 		<span
 			class={cn("text-xs text-muted-foreground")}
 			data-active-project>{activeProjectId ?? "—"}</span

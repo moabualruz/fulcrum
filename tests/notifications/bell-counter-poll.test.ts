@@ -46,7 +46,7 @@ describe("BellCounterPoll", () => {
   test("uses realtime unread-count updates instead of interval polling when realtime is on", async () => {
     const { intervals, scheduler } = createScheduler();
     const updates: number[] = [];
-    let realtimeHandler: ((payload: { userId: string; unreadCount: number }) => void) | null = null;
+    let realtimeHandler: (payload: { userId: string; unreadCount: number }) => void = () => undefined;
     const poll = new BellCounterPoll({
       realtimeEnabled: true,
       userId: "user-1",
@@ -62,8 +62,8 @@ describe("BellCounterPoll", () => {
     });
 
     await poll.start();
-    realtimeHandler?.({ userId: "user-1", unreadCount: 4 });
-    realtimeHandler?.({ userId: "other", unreadCount: 99 });
+    realtimeHandler({ userId: "user-1", unreadCount: 4 });
+    realtimeHandler({ userId: "other", unreadCount: 99 });
 
     expect(intervals).toHaveLength(0);
     expect(updates).toEqual([1, 4]);
