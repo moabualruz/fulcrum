@@ -1,33 +1,55 @@
 import { describe, expect, test } from "bun:test";
-import { isFeatureEnabled, parseFeatureFlags } from "./features.ts";
+import {
+  getFeatureBackend,
+  isFeatureEnabled,
+  parseFeatures,
+} from "./features.ts";
 
-describe("feature flags", () => {
-  test("empty env returns empty set", () => {
-    expect(parseFeatureFlags("")).toEqual(new Set());
-    expect(parseFeatureFlags(undefined)).toEqual(new Set());
+describe("features", () => {
+  test("parseFeatures returns empty for undefined/empty", () => {
+    expect(parseFeatures()).toEqual([]);
+    expect(parseFeatures("")).toEqual([]);
+    expect(parseFeatures("  ")).toEqual([]);
   });
 
-  test("parses comma-separated known flags", () => {
-    const flags = parseFeatureFlags("real-time-collab-server,symphony-ssh-worker");
-    expect(flags.has("real-time-collab-server")).toBe(true);
-    expect(flags.has("symphony-ssh-worker")).toBe(true);
-    expect(flags.has("symphony-http-api")).toBe(false);
+  test("parseFeatures parses comma-separated flags", () => {
+    const flags = parseFeatures("embeddings,report-llm-narration");
+    expect(flags).toEqual([
+      { name: "embeddings", backend: null },
+      { name: "report-llm-narration", backend: null },
+    ]);
   });
 
-  test("ignores unknown flags", () => {
-    const flags = parseFeatureFlags("real-time-collab-server,bogus-flag");
-    expect(flags.size).toBe(1);
+  test("parseFeatures extracts backend hint after colon", () => {
+    const flags = parseFeatures("report-llm-narration:ollama");
+    expect(flags).toEqual([
+      { name: "report-llm-narration", backend: "ollama" },
+    ]);
   });
 
-  test("trims whitespace", () => {
-    const flags = parseFeatureFlags(" symphony-http-api , real-time-collab-server ");
-    expect(flags.has("symphony-http-api")).toBe(true);
-    expect(flags.has("real-time-collab-server")).toBe(true);
+  test("parseFeatures handles mixed flags with and without backends", () => {
+    const flags = parseFeatures(
+      "embeddings, report-llm-narration:openai-compatible",
+    );
+    expect(flags).toHaveLength(2);
+    expect(flags[0]).toEqual({ name: "embeddings", backend: null });
+    expect(flags[1]).toEqual({
+      name: "report-llm-narration",
+      backend: "openai-compatible",
+    });
   });
 
-  test("isFeatureEnabled checks against provided set", () => {
-    const flags = parseFeatureFlags("symphony-http-api");
-    expect(isFeatureEnabled("symphony-http-api", flags)).toBe(true);
-    expect(isFeatureEnabled("symphony-ssh-worker", flags)).toBe(false);
+  test("isFeatureEnabled returns true/false", () => {
+    const flags = parseFeatures("embeddings,report-llm-narration:ollama");
+    expect(isFeatureEnabled(flags, "embeddings")).toBe(true);
+    expect(isFeatureEnabled(flags, "report-llm-narration")).toBe(true);
+    expect(isFeatureEnabled(flags, "other")).toBe(false);
+  });
+
+  test("getFeatureBackend returns backend or null", () => {
+    const flags = parseFeatures("embeddings,report-llm-narration:ollama");
+    expect(getFeatureBackend(flags, "embeddings")).toBeNull();
+    expect(getFeatureBackend(flags, "report-llm-narration")).toBe("ollama");
+    expect(getFeatureBackend(flags, "missing")).toBeNull();
   });
 });

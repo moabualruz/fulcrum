@@ -1,216 +1,202 @@
 /**
- * Gated embedding write pipeline.
+ * Gated embeddings — task embedding on create/update + hybrid search.
  *
- * When FULCRUM_FEATURES=embeddings:
- *   - Memory writes enqueue `generate-memory-embedding` job
- *   - Doc saves enqueue `generate-doc-embedding` job
- *   - Job handler calls sidecar embed(body) → float32[384]
- *   - Result written to memory_embeddings / doc_embeddings
+ * When `FULCRUM_FEATURES=embeddings` is ON, task create/update enqueues an
+ * `embed-task` job. The job handler calls the inference sidecar, writes the
+ * embedding to `tasks.embedding`.
  *
- * Default OFF — no sidecar calls, no embedding rows.
+ * Search uses hybrid scoring: 0.6 * normalized_BM25 + 0.4 * cosine when
+ * embeddings are available; falls back to ILIKE when OFF.
  */
 
 import type { ProductDb } from "./db/types.ts";
-import { embeddingsEnabled } from "./feature-flags.ts";
+import type { InferenceSidecar } from "./inference.ts";
 import { enqueueJob } from "./jobs.ts";
-import { newUlid } from "./ids.ts";
 
-const EXPECTED_DIMENSION = 384;
-const EMBEDDING_QUEUE = "embeddings";
-const MAX_RETRY_ATTEMPTS = 3; // 1 initial + 2 retries
+// ── Embed job enqueue ──────────────────────────────────────────────
 
-// --- Enqueueing ---
-
-export async function enqueueMemoryEmbedding(
+export async function enqueueEmbedTask(
   db: ProductDb,
-  opts: { orgId: string; memoryId: string; body: string },
-): Promise<boolean> {
-  if (!embeddingsEnabled()) return false;
+  opts: { orgId: string; projectId: string | null; taskId: string },
+): Promise<void> {
   await enqueueJob(db, {
     orgId: opts.orgId,
-    queue: EMBEDDING_QUEUE,
-    kind: "generate-memory-embedding",
-    payload: { memoryId: opts.memoryId, body: opts.body },
-    maxAttempts: MAX_RETRY_ATTEMPTS,
+    projectId: opts.projectId,
+    queue: "inference",
+    kind: "embed-task",
+    payload: { taskId: opts.taskId },
   });
-  return true;
 }
 
-export async function enqueueDocEmbedding(
+// ── Embed job handler ──────────────────────────────────────────────
+
+export async function handleEmbedTaskJob(
   db: ProductDb,
-  opts: { orgId: string; docId: string; body: string },
-): Promise<boolean> {
-  if (!embeddingsEnabled()) return false;
-  await enqueueJob(db, {
-    orgId: opts.orgId,
-    queue: EMBEDDING_QUEUE,
-    kind: "generate-doc-embedding",
-    payload: { docId: opts.docId, body: opts.body },
-    maxAttempts: MAX_RETRY_ATTEMPTS,
-  });
-  return true;
+  sidecar: InferenceSidecar,
+  taskId: string,
+): Promise<void> {
+  const rows = await db.query<{ title: string; description: string | null }>(
+    `SELECT title, description FROM tasks WHERE id = $1`,
+    [taskId],
+  );
+  const task = rows[0];
+  if (!task) return; // task deleted between enqueue and run
+  const text = [task.title, task.description].filter(Boolean).join(" ");
+  const embedding = await sidecar.embed(text);
+  await db.query(`UPDATE tasks SET embedding = $1::jsonb WHERE id = $2`, [
+    JSON.stringify(embedding),
+    taskId,
+  ]);
 }
 
-// --- Sidecar client ---
+// ── Hybrid search ──────────────────────────────────────────────────
 
-export interface EmbedResult {
-  embedding: number[];
-  modelId: string;
-}
-
-export interface EmbedSidecar {
-  embed(text: string): Promise<EmbedResult>;
+export interface TaskSearchHit {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  score: number;
 }
 
 /**
- * Default HTTP sidecar client.
- * Expects POST to FULCRUM_EMBED_URL with { text } body,
- * returns { embedding: number[], model_id: string }.
+ * Hybrid search: 0.6 * normalized BM25 + 0.4 * cosine similarity.
+ * Falls back to ILIKE when embeddings flag is OFF.
  */
-export function httpSidecar(url?: string): EmbedSidecar {
-  const baseUrl = url ?? process.env["FULCRUM_EMBED_URL"] ?? "http://localhost:11434/embed";
-  return {
-    async embed(text: string): Promise<EmbedResult> {
-      const res = await fetch(baseUrl, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text }),
-        signal: AbortSignal.timeout(10_000),
+export async function searchTasks(
+  db: ProductDb,
+  opts: {
+    projectId: string;
+    text: string;
+    embeddingsEnabled: boolean;
+    sidecar?: InferenceSidecar;
+    limit?: number;
+  },
+): Promise<TaskSearchHit[]> {
+  const limit = opts.limit ?? 25;
+
+  if (!opts.embeddingsEnabled || !opts.sidecar) {
+    // Fallback: ILIKE text search
+    return searchTasksIlike(db, opts.projectId, opts.text, limit);
+  }
+
+  // Get query embedding
+  const queryEmbed = await opts.sidecar.embed(opts.text);
+
+  // Get BM25 hits from search_documents for tasks in this project
+  const bm25Rows = await db.query<{
+    source_id: string;
+    bm25_score: number;
+  }>(
+    `SELECT source_id,
+            ts_rank(search_vector, plainto_tsquery('english', $1)) AS bm25_score
+       FROM search_documents
+      WHERE project_id = $2 AND source_kind = 'task'
+        AND search_vector @@ plainto_tsquery('english', $1)
+      ORDER BY bm25_score DESC
+      LIMIT $3`,
+    [opts.text, opts.projectId, limit * 2],
+  );
+
+  // Get tasks with embeddings in this project
+  const taskRows = await db.query<{
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+    embedding: number[] | null;
+  }>(
+    `SELECT id, title, description, status, embedding
+       FROM tasks
+      WHERE project_id = $1
+        AND embedding IS NOT NULL
+      LIMIT $2`,
+    [opts.projectId, limit * 3],
+  );
+
+  // Build scoring map
+  const maxBm25 = Math.max(...bm25Rows.map((r) => r.bm25_score), 0.001);
+  const bm25Map = new Map(
+    bm25Rows.map((r) => [r.source_id, r.bm25_score / maxBm25]),
+  );
+
+  const scored: TaskSearchHit[] = [];
+  for (const task of taskRows) {
+    const normBm25 = bm25Map.get(task.id) ?? 0;
+    const embedding = typeof task.embedding === "string"
+      ? JSON.parse(task.embedding) as number[]
+      : task.embedding;
+    const cos = embedding ? cosineSimilarity(queryEmbed, embedding) : 0;
+    const score = 0.6 * normBm25 + 0.4 * Math.max(0, cos);
+    if (score > 0) {
+      scored.push({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        score,
       });
-      if (!res.ok) throw new Error(`Sidecar error: HTTP ${res.status}`);
-      const data = (await res.json()) as { embedding: number[]; model_id: string };
-      return { embedding: data.embedding, modelId: data.model_id };
-    },
-  };
-}
-
-// --- Job handlers ---
-
-export async function handleMemoryEmbeddingJob(
-  db: ProductDb,
-  payload: { memoryId: string; body: string },
-  sidecar: EmbedSidecar,
-): Promise<void> {
-  const result = await sidecar.embed(payload.body);
-  if (result.embedding.length !== EXPECTED_DIMENSION) {
-    throw new Error(
-      `Dimension mismatch: expected ${EXPECTED_DIMENSION}, got ${result.embedding.length}`,
-    );
-  }
-  const id = newUlid();
-  const arrayLiteral = `{${result.embedding.join(",")}}`;
-  await db.query(
-    `INSERT INTO memory_embeddings (id, memory_id, embedding, model_id)
-     VALUES ($1, $2, $3::real[], $4)
-     ON CONFLICT (memory_id) DO UPDATE
-       SET embedding = EXCLUDED.embedding,
-           model_id = EXCLUDED.model_id,
-           created_at = now()`,
-    [id, payload.memoryId, arrayLiteral, result.modelId],
-  );
-}
-
-export async function handleDocEmbeddingJob(
-  db: ProductDb,
-  payload: { docId: string; body: string },
-  sidecar: EmbedSidecar,
-): Promise<void> {
-  const result = await sidecar.embed(payload.body);
-  if (result.embedding.length !== EXPECTED_DIMENSION) {
-    throw new Error(
-      `Dimension mismatch: expected ${EXPECTED_DIMENSION}, got ${result.embedding.length}`,
-    );
-  }
-  const id = newUlid();
-  const arrayLiteral = `{${result.embedding.join(",")}}`;
-  await db.query(
-    `INSERT INTO doc_embeddings (id, doc_id, embedding, model_id)
-     VALUES ($1, $2, $3::real[], $4)
-     ON CONFLICT (doc_id) DO UPDATE
-       SET embedding = EXCLUDED.embedding,
-           model_id = EXCLUDED.model_id,
-           created_at = now()`,
-    [id, payload.docId, arrayLiteral, result.modelId],
-  );
-}
-
-// --- Repository helpers ---
-
-export async function countMemoryEmbeddings(db: ProductDb): Promise<number> {
-  const rows = await db.query<{ count: number }>(
-    `SELECT COUNT(*)::int AS count FROM memory_embeddings`,
-  );
-  return rows[0]?.count ?? 0;
-}
-
-export async function countDocEmbeddings(db: ProductDb): Promise<number> {
-  const rows = await db.query<{ count: number }>(
-    `SELECT COUNT(*)::int AS count FROM doc_embeddings`,
-  );
-  return rows[0]?.count ?? 0;
-}
-
-export async function getMemoryEmbedding(
-  db: ProductDb,
-  memoryId: string,
-): Promise<{ id: string; memory_id: string; model_id: string; created_at: string } | null> {
-  const rows = await db.query<{ id: string; memory_id: string; model_id: string; created_at: string }>(
-    `SELECT id, memory_id, model_id, created_at FROM memory_embeddings WHERE memory_id = $1`,
-    [memoryId],
-  );
-  return rows[0] ?? null;
-}
-
-export async function getDocEmbedding(
-  db: ProductDb,
-  docId: string,
-): Promise<{ id: string; doc_id: string; model_id: string; created_at: string } | null> {
-  const rows = await db.query<{ id: string; doc_id: string; model_id: string; created_at: string }>(
-    `SELECT id, doc_id, model_id, created_at FROM doc_embeddings WHERE doc_id = $1`,
-    [docId],
-  );
-  return rows[0] ?? null;
-}
-
-// --- Doctor subsystem ---
-
-export interface EmbeddingsDoctorReport {
-  flag: "on" | "off";
-  status: "disabled" | "ok" | "degraded";
-  memoryEmbeddingCount: number;
-  docEmbeddingCount: number;
-  hnswMetadata: boolean;
-}
-
-export async function checkEmbeddingsSubsystem(
-  db: ProductDb,
-): Promise<EmbeddingsDoctorReport> {
-  const flag = embeddingsEnabled() ? "on" : "off";
-
-  // Check HNSW metadata via table comments
-  const commentRows = await db.query<{ obj_description: string | null }>(
-    `SELECT obj_description('memory_embeddings'::regclass) AS obj_description`,
-  );
-  const hnswMetadata = (commentRows[0]?.obj_description ?? "").includes("HNSW");
-
-  if (!embeddingsEnabled()) {
-    return {
-      flag: "off",
-      status: "disabled",
-      memoryEmbeddingCount: 0,
-      docEmbeddingCount: 0,
-      hnswMetadata,
-    };
+    }
   }
 
-  const memCount = await countMemoryEmbeddings(db);
-  const docCount = await countDocEmbeddings(db);
+  // Also include BM25-only hits that have no embedding
+  for (const bm25 of bm25Rows) {
+    if (scored.some((s) => s.id === bm25.source_id)) continue;
+    const taskRow = await db.query<{
+      id: string;
+      title: string;
+      description: string | null;
+      status: string;
+    }>(`SELECT id, title, description, status FROM tasks WHERE id = $1`, [
+      bm25.source_id,
+    ]);
+    const t = taskRow[0];
+    if (t) {
+      scored.push({
+        ...t,
+        score: 0.6 * (bm25.bm25_score / maxBm25),
+      });
+    }
+  }
 
-  return {
-    flag,
-    status: memCount > 0 || docCount > 0 ? "ok" : "degraded",
-    memoryEmbeddingCount: memCount,
-    docEmbeddingCount: docCount,
-    hnswMetadata,
-  };
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit);
+}
+
+async function searchTasksIlike(
+  db: ProductDb,
+  projectId: string,
+  text: string,
+  limit: number,
+): Promise<TaskSearchHit[]> {
+  const pattern = `%${text}%`;
+  const rows = await db.query<{
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+  }>(
+    `SELECT id, title, description, status
+       FROM tasks
+      WHERE project_id = $1
+        AND (title ILIKE $2 OR description ILIKE $2)
+      ORDER BY updated_at DESC
+      LIMIT $3`,
+    [projectId, pattern, limit],
+  );
+  return rows.map((r, i) => ({ ...r, score: 1 - i * 0.01 }));
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length || a.length === 0) return 0;
+  let dot = 0;
+  let magA = 0;
+  let magB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i]! * b[i]!;
+    magA += a[i]! * a[i]!;
+    magB += b[i]! * b[i]!;
+  }
+  const denom = Math.sqrt(magA) * Math.sqrt(magB);
+  return denom === 0 ? 0 : dot / denom;
 }

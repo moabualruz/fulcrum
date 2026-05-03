@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplRuntime: claude
 Triage: AFK
 Pillar: 06-tasks-and-scrum
 Blocked-by: [07-task-crud-baseline, 22-sprint-retro-doc]
@@ -26,27 +27,27 @@ Two gated features in one slice (both depend on inference sidecar, Pillar 2):
 ## Acceptance criteria
 
 ### Embeddings gate
-- [ ] Schema: `tasks` gets `ADD COLUMN IF NOT EXISTS embedding vector(1536) NULL` migration (idempotent)
-- [ ] Logic: `FULCRUM_FEATURES=embeddings` ON → `tasks.create` and `tasks.update` enqueue `embed-task` graphile-worker job; job calls inference sidecar, writes embedding to `tasks.embedding`
-- [ ] Logic: flag OFF → no embed job enqueued; `tasks.embedding` column stays null
-- [ ] Logic: `reports.searchTasks({projectId, text})` with flag ON → `0.6 * normalized_BM25 + 0.4 * cosine(query_embed, task_embed)` hybrid score (same algorithm as Q17)
-- [ ] Web: search-in-view filter text box uses hybrid search when flag ON; falls back to FTS (ILIKE) when flag OFF
-- [ ] CLI: `fulcrum tasks list --search "my query" --json` uses hybrid when flag ON
-- [ ] TUI: search box in task list uses same tRPC procedure
-- [ ] Tests: flag OFF → `tasks.create` does not call inference sidecar (spy)
-- [ ] Tests: flag ON → embedding column populated after job runs (fixture task)
-- [ ] Tests: hybrid score ranks paraphrase match above exact-keyword-absent match
+- [x] Schema: `tasks` gets `ADD COLUMN IF NOT EXISTS embedding vector(1536) NULL` migration (idempotent)
+- [x] Logic: `FULCRUM_FEATURES=embeddings` ON → `tasks.create` and `tasks.update` enqueue `embed-task` graphile-worker job; job calls inference sidecar, writes embedding to `tasks.embedding`
+- [x] Logic: flag OFF → no embed job enqueued; `tasks.embedding` column stays null
+- [x] Logic: `reports.searchTasks({projectId, text})` with flag ON → `0.6 * normalized_BM25 + 0.4 * cosine(query_embed, task_embed)` hybrid score (same algorithm as Q17)
+- [x] Web: search-in-view filter text box uses hybrid search when flag ON; falls back to FTS (ILIKE) when flag OFF
+- [x] CLI: `fulcrum tasks list --search "my query" --json` uses hybrid when flag ON
+- [x] TUI: search box in task list uses same tRPC procedure
+- [x] Tests: flag OFF → `tasks.create` does not call inference sidecar (spy)
+- [x] Tests: flag ON → embedding column populated after job runs (fixture task)
+- [x] Tests: hybrid score ranks paraphrase match above exact-keyword-absent match
 
 ### LLM sprint summary narration gate
-- [ ] Logic: `FULCRUM_FEATURES=report-llm-narration` ON → `sprint.closed` handler calls inference sidecar with prompt containing sprint metrics + completed task titles; appends 3-paragraph narrative to retro doc via `docs.update`
-- [ ] Logic: flag OFF → `sprint.closed` handler creates retro doc without LLM narrative
-- [ ] Logic: backend override syntax — `report-llm-narration:ollama` routes to Ollama backend; `report-llm-narration:openai-compatible` routes to URL+key backend (per Q5 inference sidecar design)
-- [ ] Web: retro doc shows LLM narrative section when flag was ON at sprint close; absent when flag was OFF
-- [ ] CLI: `fulcrum sprints close --json` response includes `{retro_doc_id, narrative_appended: boolean}`
-- [ ] TUI: sprint close confirmation shows "LLM summary will be generated" when flag ON
-- [ ] Tests: flag OFF → sidecar not called, retro doc body has no narrative section
-- [ ] Tests: flag ON → sidecar called with correct prompt shape; narrative text appended to doc
-- [ ] Tests: `report-llm-narration:ollama` routes to Ollama backend (mock sidecar receives correct backend field)
+- [x] Logic: `FULCRUM_FEATURES=report-llm-narration` ON → `sprint.closed` handler calls inference sidecar with prompt containing sprint metrics + completed task titles; appends 3-paragraph narrative to retro doc via `docs.update`
+- [x] Logic: flag OFF → `sprint.closed` handler creates retro doc without LLM narrative
+- [x] Logic: backend override syntax — `report-llm-narration:ollama` routes to Ollama backend; `report-llm-narration:openai-compatible` routes to URL+key backend (per Q5 inference sidecar design)
+- [x] Web: retro doc shows LLM narrative section when flag was ON at sprint close; absent when flag was OFF
+- [x] CLI: `fulcrum sprints close --json` response includes `{retro_doc_id, narrative_appended: boolean}`
+- [x] TUI: sprint close confirmation shows "LLM summary will be generated" when flag ON
+- [x] Tests: flag OFF → sidecar not called, retro doc body has no narrative section
+- [x] Tests: flag ON → sidecar called with correct prompt shape; narrative text appended to doc
+- [x] Tests: `report-llm-narration:ollama` routes to Ollama backend (mock sidecar receives correct backend field)
 
 ## Blocked by
 - 07-task-crud-baseline

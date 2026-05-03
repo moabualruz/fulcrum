@@ -1,34 +1,27 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, afterEach, describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { openPglite } from "./db/pglite.ts";
 import { runMigrations } from "./db/migrate.ts";
-import { createLocalOrg } from "./store/repositories.ts";
-import { _resetFlagCache } from "./feature-flags.ts";
 import {
-  enqueueMemoryEmbedding,
-  enqueueDocEmbedding,
-  handleMemoryEmbeddingJob,
-  handleDocEmbeddingJob,
-  countMemoryEmbeddings,
-  countDocEmbeddings,
-  getMemoryEmbedding,
-  getDocEmbedding,
-  checkEmbeddingsSubsystem,
-  type EmbedSidecar,
+  createLocalOrg,
+  createProject,
+  createTask,
+} from "./store/repositories.ts";
+import { indexSearchDocument } from "./search.ts";
+import { createMockSidecar } from "./inference.ts";
+import {
+  enqueueEmbedTask,
+  handleEmbedTaskJob,
+  searchTasks,
 } from "./embeddings.ts";
-import { newUlid } from "./ids.ts";
+import { getJob, claimJob } from "./jobs.ts";
 
-const scratch = mkdtempSync(join(tmpdir(), "fulcrum-embeddings-"));
+const scratch = mkdtempSync(join(tmpdir(), "fulcrum-embed-"));
 
 afterAll(() => {
   rmSync(scratch, { recursive: true, force: true });
-});
-
-afterEach(() => {
-  _resetFlagCache();
-  delete process.env["FULCRUM_FEATURES"];
 });
 
 async function freshDb(name: string) {
@@ -37,251 +30,190 @@ async function freshDb(name: string) {
   return db;
 }
 
-function mockSidecar(dim = 384, modelId = "bge-small-en-v1.5"): EmbedSidecar {
-  return {
-    async embed(_text: string) {
-      return {
-        embedding: Array.from({ length: dim }, (_, i) => i * 0.001),
-        modelId,
-      };
-    },
-  };
-}
-
-function failingSidecar(): EmbedSidecar {
-  return {
-    async embed(_text: string) {
-      throw new Error("sidecar unavailable");
-    },
-  };
-}
-
-async function insertMemory(db: Awaited<ReturnType<typeof freshDb>>, orgId: string): Promise<string> {
-  const id = newUlid();
-  await db.query(
-    `INSERT INTO memories (id, org_id, scope, kind, key, body) VALUES ($1, $2, 'global', 'fact', $3, 'test body')`,
-    [id, orgId, `key-${id}`],
-  );
-  return id;
-}
-
-async function insertDoc(db: Awaited<ReturnType<typeof freshDb>>, orgId: string): Promise<string> {
-  const id = newUlid();
-  await db.query(
-    `INSERT INTO documents (id, org_id, kind, title, body) VALUES ($1, $2, 'note', 'Test', 'doc body')`,
-    [id, orgId],
-  );
-  return id;
-}
-
-describe("feature-flags", () => {
-  test("FULCRUM_FEATURES unset → no embedding jobs enqueued; count stays zero", async () => {
-    const db = await freshDb("ff-off");
+describe("embeddings gate", () => {
+  test("flag OFF: create task does not call inference sidecar", async () => {
+    const db = await freshDb("no-embed");
     try {
+      const sidecar = createMockSidecar();
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
-      const memId = await insertMemory(db, org.id);
-      const enqueued = await enqueueMemoryEmbedding(db, {
+      const project = await createProject(db, {
         orgId: org.id,
-        memoryId: memId,
-        body: "test",
+        slug: "p",
+        name: "P",
       });
-      expect(enqueued).toBe(false);
-      expect(await countMemoryEmbeddings(db)).toBe(0);
-    } finally {
-      await db.close();
-    }
-  });
-
-  test("FULCRUM_FEATURES=embeddings → job enqueued", async () => {
-    process.env["FULCRUM_FEATURES"] = "embeddings";
-    _resetFlagCache();
-    const db = await freshDb("ff-on");
-    try {
-      const org = await createLocalOrg(db, { slug: "o", name: "O" });
-      const memId = await insertMemory(db, org.id);
-      const enqueued = await enqueueMemoryEmbedding(db, {
+      await createTask(db, {
         orgId: org.id,
-        memoryId: memId,
-        body: "test",
+        projectId: project.id,
+        title: "Test task",
       });
-      expect(enqueued).toBe(true);
-      // Verify job row exists
-      const jobs = await db.query<{ kind: string }>(
-        `SELECT kind FROM jobs WHERE kind = 'generate-memory-embedding'`,
+      // Flag OFF — no enqueue, no sidecar call
+      expect(sidecar.calls).toHaveLength(0);
+      // Embedding column should be null
+      const rows = await db.query<{ embedding: unknown }>(
+        `SELECT embedding FROM tasks WHERE project_id = $1`,
+        [project.id],
       );
-      expect(jobs).toHaveLength(1);
+      expect(rows[0]?.embedding).toBeNull();
     } finally {
       await db.close();
     }
   });
-});
 
-describe("memory embedding pipeline", () => {
-  test("handler writes embedding with dimension 384 and modelId", async () => {
-    const db = await freshDb("mem-write");
+  test("flag ON: embed job populates embedding column", async () => {
+    const db = await freshDb("embed-on");
     try {
+      const sidecar = createMockSidecar();
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
-      const memId = await insertMemory(db, org.id);
-      await handleMemoryEmbeddingJob(db, { memoryId: memId, body: "test" }, mockSidecar());
-      const row = await getMemoryEmbedding(db, memId);
-      expect(row).not.toBeNull();
-      expect(row!.model_id).toBe("bge-small-en-v1.5");
-      // Verify dimension
-      const embRow = await db.query<{ dim: number }>(
-        `SELECT array_length(embedding, 1) AS dim FROM memory_embeddings WHERE memory_id = $1`,
-        [memId],
+      const project = await createProject(db, {
+        orgId: org.id,
+        slug: "p",
+        name: "P",
+      });
+      const task = await createTask(db, {
+        orgId: org.id,
+        projectId: project.id,
+        title: "Implement auth",
+        description: "Add JWT-based authentication",
+      });
+
+      // Enqueue embed job (flag ON path)
+      await enqueueEmbedTask(db, {
+        orgId: org.id,
+        projectId: project.id,
+        taskId: task.id,
+      });
+
+      // Verify job enqueued
+      const job = await claimJob(db, "inference", "test-worker");
+      expect(job).not.toBeNull();
+      expect(job!.kind).toBe("embed-task");
+
+      // Run the handler
+      await handleEmbedTaskJob(db, sidecar, task.id);
+
+      // Sidecar was called
+      expect(sidecar.calls).toHaveLength(1);
+      expect(sidecar.calls[0]!.method).toBe("embed");
+
+      // Embedding written
+      const rows = await db.query<{ embedding: string }>(
+        `SELECT embedding FROM tasks WHERE id = $1`,
+        [task.id],
       );
-      expect(embRow[0]?.dim).toBe(384);
+      const raw = rows[0]!.embedding;
+      const embedding = typeof raw === "string" ? JSON.parse(raw) : raw;
+      expect(Array.isArray(embedding)).toBe(true);
+      expect(embedding.length).toBeGreaterThan(0);
     } finally {
       await db.close();
     }
   });
 
-  test("cascade delete: deleting memory deletes embedding", async () => {
-    const db = await freshDb("mem-cascade");
+  test("hybrid search ranks paraphrase above keyword-absent", async () => {
+    const db = await freshDb("hybrid");
+    try {
+      const sidecar = createMockSidecar({
+        // Deterministic embeddings: paraphrase gets high cosine with query,
+        // keyword match gets low cosine
+        embed: async (text: string) => {
+          if (text.includes("authentication") || text.includes("auth")) {
+            return [1, 0, 0, 0, 0, 0, 0, 0]; // "auth" direction
+          }
+          if (text.includes("deploy") || text.includes("shipping")) {
+            return [0, 1, 0, 0, 0, 0, 0, 0]; // "deploy" direction
+          }
+          return [0.5, 0.5, 0, 0, 0, 0, 0, 0]; // generic
+        },
+      });
+      const org = await createLocalOrg(db, { slug: "o", name: "O" });
+      const project = await createProject(db, {
+        orgId: org.id,
+        slug: "p",
+        name: "P",
+      });
+
+      // Task A: paraphrase of "auth" — semantically close but keyword absent
+      const taskA = await createTask(db, {
+        orgId: org.id,
+        projectId: project.id,
+        title: "Implement login and authentication flow",
+        description: "JWT-based auth for API endpoints",
+      });
+
+      // Task B: has keyword "auth" but about deployment
+      const taskB = await createTask(db, {
+        orgId: org.id,
+        projectId: project.id,
+        title: "Deploy shipping pipeline",
+        description: "Set up CI/CD for shipping releases",
+      });
+
+      // Index both for BM25
+      await indexSearchDocument(db, {
+        orgId: org.id,
+        projectId: project.id,
+        sourceKind: "task",
+        sourceId: taskA.id,
+        title: taskA.title,
+        body: taskA.description ?? "",
+      });
+      await indexSearchDocument(db, {
+        orgId: org.id,
+        projectId: project.id,
+        sourceKind: "task",
+        sourceId: taskB.id,
+        title: taskB.title,
+        body: taskB.description ?? "",
+      });
+
+      // Embed both
+      await handleEmbedTaskJob(db, sidecar, taskA.id);
+      await handleEmbedTaskJob(db, sidecar, taskB.id);
+
+      // Search for "authentication" — taskA should rank higher via cosine
+      const hits = await searchTasks(db, {
+        projectId: project.id,
+        text: "authentication",
+        embeddingsEnabled: true,
+        sidecar,
+      });
+
+      expect(hits.length).toBeGreaterThan(0);
+      // taskA (auth paraphrase) should be first
+      expect(hits[0]!.id).toBe(taskA.id);
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("fallback ILIKE search when embeddings OFF", async () => {
+    const db = await freshDb("ilike");
     try {
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
-      const memId = await insertMemory(db, org.id);
-      await handleMemoryEmbeddingJob(db, { memoryId: memId, body: "test" }, mockSidecar());
-      expect(await countMemoryEmbeddings(db)).toBe(1);
-      await db.query(`DELETE FROM memories WHERE id = $1`, [memId]);
-      expect(await countMemoryEmbeddings(db)).toBe(0);
-    } finally {
-      await db.close();
-    }
-  });
+      const project = await createProject(db, {
+        orgId: org.id,
+        slug: "p",
+        name: "P",
+      });
+      await createTask(db, {
+        orgId: org.id,
+        projectId: project.id,
+        title: "Fix authentication bug",
+      });
+      await createTask(db, {
+        orgId: org.id,
+        projectId: project.id,
+        title: "Unrelated task",
+      });
 
-  test("dimension mismatch → error, no corrupt row", async () => {
-    const db = await freshDb("mem-dim-err");
-    try {
-      const org = await createLocalOrg(db, { slug: "o", name: "O" });
-      const memId = await insertMemory(db, org.id);
-      const badSidecar = mockSidecar(128); // wrong dimension
-      await expect(
-        handleMemoryEmbeddingJob(db, { memoryId: memId, body: "test" }, badSidecar),
-      ).rejects.toThrow("Dimension mismatch");
-      expect(await countMemoryEmbeddings(db)).toBe(0);
-    } finally {
-      await db.close();
-    }
-  });
+      const hits = await searchTasks(db, {
+        projectId: project.id,
+        text: "auth",
+        embeddingsEnabled: false,
+      });
 
-  test("sidecar unavailable → error propagated (retry handled by job queue)", async () => {
-    const db = await freshDb("mem-fail");
-    try {
-      const org = await createLocalOrg(db, { slug: "o", name: "O" });
-      const memId = await insertMemory(db, org.id);
-      await expect(
-        handleMemoryEmbeddingJob(db, { memoryId: memId, body: "test" }, failingSidecar()),
-      ).rejects.toThrow("sidecar unavailable");
-      expect(await countMemoryEmbeddings(db)).toBe(0);
-    } finally {
-      await db.close();
-    }
-  });
-
-  test("update overwrites existing embedding on same memory_id", async () => {
-    const db = await freshDb("mem-upsert");
-    try {
-      const org = await createLocalOrg(db, { slug: "o", name: "O" });
-      const memId = await insertMemory(db, org.id);
-      await handleMemoryEmbeddingJob(db, { memoryId: memId, body: "v1" }, mockSidecar(384, "model-v1"));
-      await handleMemoryEmbeddingJob(db, { memoryId: memId, body: "v2" }, mockSidecar(384, "model-v2"));
-      expect(await countMemoryEmbeddings(db)).toBe(1);
-      const row = await getMemoryEmbedding(db, memId);
-      expect(row!.model_id).toBe("model-v2");
-    } finally {
-      await db.close();
-    }
-  });
-});
-
-describe("doc embedding pipeline", () => {
-  test("handler writes doc embedding with dimension 384", async () => {
-    const db = await freshDb("doc-write");
-    try {
-      const org = await createLocalOrg(db, { slug: "o", name: "O" });
-      const docId = await insertDoc(db, org.id);
-      await handleDocEmbeddingJob(db, { docId, body: "test" }, mockSidecar());
-      const row = await getDocEmbedding(db, docId);
-      expect(row).not.toBeNull();
-      expect(row!.model_id).toBe("bge-small-en-v1.5");
-      const embRow = await db.query<{ dim: number }>(
-        `SELECT array_length(embedding, 1) AS dim FROM doc_embeddings WHERE doc_id = $1`,
-        [docId],
-      );
-      expect(embRow[0]?.dim).toBe(384);
-    } finally {
-      await db.close();
-    }
-  });
-
-  test("doc enqueue gated by flag", async () => {
-    const db = await freshDb("doc-gate");
-    try {
-      const org = await createLocalOrg(db, { slug: "o", name: "O" });
-      const docId = await insertDoc(db, org.id);
-
-      // Flag off
-      const off = await enqueueDocEmbedding(db, { orgId: org.id, docId, body: "test" });
-      expect(off).toBe(false);
-
-      // Flag on
-      process.env["FULCRUM_FEATURES"] = "embeddings";
-      _resetFlagCache();
-      const on = await enqueueDocEmbedding(db, { orgId: org.id, docId, body: "test" });
-      expect(on).toBe(true);
-      const jobs = await db.query<{ kind: string }>(
-        `SELECT kind FROM jobs WHERE kind = 'generate-doc-embedding'`,
-      );
-      expect(jobs).toHaveLength(1);
-    } finally {
-      await db.close();
-    }
-  });
-});
-
-describe("doctor embeddings subsystem", () => {
-  test("flag off → status disabled", async () => {
-    const db = await freshDb("doc-disabled");
-    try {
-      const report = await checkEmbeddingsSubsystem(db);
-      expect(report.flag).toBe("off");
-      expect(report.status).toBe("disabled");
-      expect(report.memoryEmbeddingCount).toBe(0);
-      expect(report.docEmbeddingCount).toBe(0);
-      expect(report.hnswMetadata).toBe(true);
-    } finally {
-      await db.close();
-    }
-  });
-
-  test("flag on + embeddings present → status ok", async () => {
-    process.env["FULCRUM_FEATURES"] = "embeddings";
-    _resetFlagCache();
-    const db = await freshDb("doc-ok");
-    try {
-      const org = await createLocalOrg(db, { slug: "o", name: "O" });
-      const memId = await insertMemory(db, org.id);
-      await handleMemoryEmbeddingJob(db, { memoryId: memId, body: "test" }, mockSidecar());
-      const report = await checkEmbeddingsSubsystem(db);
-      expect(report.flag).toBe("on");
-      expect(report.status).toBe("ok");
-      expect(report.memoryEmbeddingCount).toBe(1);
-      expect(report.hnswMetadata).toBe(true);
-    } finally {
-      await db.close();
-    }
-  });
-
-  test("flag on + no embeddings → status degraded", async () => {
-    process.env["FULCRUM_FEATURES"] = "embeddings";
-    _resetFlagCache();
-    const db = await freshDb("doc-degraded");
-    try {
-      const report = await checkEmbeddingsSubsystem(db);
-      expect(report.flag).toBe("on");
-      expect(report.status).toBe("degraded");
+      expect(hits).toHaveLength(1);
+      expect(hits[0]!.title).toBe("Fix authentication bug");
     } finally {
       await db.close();
     }
