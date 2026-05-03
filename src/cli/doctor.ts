@@ -1009,17 +1009,43 @@ function printHumanFormat(report: DoctorReport, home: string): void {
 export async function run(args: string[]): Promise<void> {
   const isJsonOutput = args.includes("--json");
   const probe = args.includes("--probe");
+  const subsystemIdx = args.indexOf("--subsystem");
+  const subsystem = subsystemIdx >= 0 ? args[subsystemIdx + 1] : undefined;
+
+  // When --subsystem is given, delegate entirely to the modular orchestrator.
+  if (subsystem) {
+    const { runOrchestrator } = await import("../doctor/index.ts");
+    await runOrchestrator(args);
+    return;
+  }
 
   const { report, errors } = await buildReport({ probe });
+
+  // Run modular orchestrator checks when --checks flag present.
+  const runOrchestratorChecks = args.includes("--checks");
+  let orchestratorReport: import("../doctor/index.ts").DoctorReport | undefined;
+  if (runOrchestratorChecks) {
+    const { buildDoctorReport } = await import("../doctor/index.ts");
+    orchestratorReport = await buildDoctorReport();
+    (report as unknown as Record<string, unknown>)["orchestrator"] = orchestratorReport;
+  }
 
   if (isJsonOutput) {
     console.log(JSON.stringify(report, null, 2));
   } else {
     const home = process.env["HOME"] ?? "";
     printHumanFormat(report, home);
+
+    // Print orchestrator checks in interactive mode.
+    if (orchestratorReport && orchestratorReport.checks.length > 0) {
+      const { printInteractiveReport } = await import("../doctor/output.ts");
+      console.log();
+      printInteractiveReport(orchestratorReport);
+    }
   }
 
-  if (errors > 0) {
+  // Exit 1 if legacy errors OR orchestrator failures.
+  if (errors > 0 || (orchestratorReport && orchestratorReport.summary.fail > 0)) {
     process.exit(1);
   }
 }

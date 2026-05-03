@@ -16,16 +16,6 @@ Usage:
                                      computes and writes subpath_sha256 for unpinned entries.
   fulcrum skills lint <path>         Validate a SKILL.md (frontmatter + required body sections).
   fulcrum skills list [--installed]  Enumerate authored skills, or installed skill budgets.
-  fulcrum skills marketplace browse [--query Q] [--tags t1,t2] [--json]
-                                     Browse marketplace listings.
-  fulcrum skills marketplace fetch --slug <s> [--version <v>] [--json]
-                                     Fetch a single marketplace listing.
-  fulcrum skills marketplace publish --slug <s> --version <v> --content <c> [--json]
-                                     Publish a skill to the marketplace.
-  fulcrum skills marketplace verify --slug <s> [--json]
-                                     Verify listing signature (CLI only).
-  fulcrum skills marketplace install --slug <s> [--version <v>] [--json]
-                                     Install a marketplace skill (verifies sig first).
   fulcrum install [--profile minimal|rules-only|full] [--with-project DIR]
                   [--no-skills] [--no-upstream-skills]
                   [--no-default-mcps] [--enable-all-mcps]
@@ -52,39 +42,18 @@ Usage:
   fulcrum product init [--json]      Initialise the local product kernel (PGlite + migrations).
   fulcrum product projects list [--json]
                                      List product-kernel projects.
-  fulcrum product tasks create --title <T> --project <P> [--json]
-                                     Create a new task in a project.
-  fulcrum product tasks list [--status <S>] [--assignee <A>] [--project <P>] [--json]
-                                     List tasks with optional filters.
-  fulcrum product tasks update <id> --status <S> [--json]
-                                     Update a task's status.
-  fulcrum product tasks bulk <ids> --status <S> [--json]
-                                     Bulk-update tasks (comma-separated IDs).
-  fulcrum product tasks move <id> --sprint <S> [--json]
-                                     Move a task to a sprint.
-  fulcrum product sprints list --project <P> [--json]
-                                     List sprints in a project.
-  fulcrum product sprints activate <id> [--json]
-                                     Activate a sprint.
-  fulcrum product sprints complete <id> [--json]
-                                     Complete a sprint (with velocity rollup).
-  fulcrum product custom-fields list --project <P> [--json]
-                                     List custom fields for a project.
-  fulcrum product saved-views list --project <P> [--json]
-                                     List saved views for a project.
   fulcrum product search <query> [--org-slug <slug>] [--limit <N>] [--json]
                                      Run an FTS query over the product kernel search index.
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
                                      Render the assembled Markdown context for a task.
-  fulcrum flags set <flag> on|off     Toggle a feature flag.
-  fulcrum flags get <flag>           Show flag state.
-  fulcrum flags list [--json]        List all feature flags.
-  fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
+  fulcrum doctor [--json] [--subsystem <name>] [--checks] [--probe]
+                                     Report bun, agent dirs, tool presence, policy health.
+                                     --subsystem runs only named subsystem checks via orchestrator.
+                                     --checks includes modular orchestrator checks in legacy report.
   fulcrum version                    Print version.
   fulcrum help                       This message.
 
 Environment:
-  FULCRUM_FEATURES       comma-separated feature flags (desktop-app,experiments,casbin-policies,scheduled-backups)
   FULCRUM_HOME           override ~/.fulcrum
   FULCRUM_POLICY         override ~/.fulcrum/tool-output-policy.toml
   FULCRUM_HEAD_LINES     head lines for summary tiers (default 20)
@@ -166,11 +135,6 @@ async function main() {
     case "-h":
       console.log(HELP);
       return;
-    case "flags": {
-      const { run: runFlags } = await import("./cli/flags.ts");
-      await runFlags(rest);
-      return;
-    }
     default:
       console.error(`fulcrum: unknown command '${cmd}'`);
       console.error(HELP);

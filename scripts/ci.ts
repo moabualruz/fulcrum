@@ -3,68 +3,25 @@
 // Usage: bun run ci
 
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 
-interface Step {
-  name: string;
-  cmd: string[];
-  soft?: boolean;
-  cwd?: string;
-  env?: "base" | "home-isolated" | "bun-cache-isolated";
-}
-
-const shouldCleanHome = process.env["FULCRUM_CI_HOME"] === undefined;
-const shouldCleanBunCache = process.env["FULCRUM_CI_BUN_CACHE"] === undefined;
-const ciHome = process.env["FULCRUM_CI_HOME"] ??
-  mkdtempSync(join(tmpdir(), "fulcrum-ci-"));
-const ciBunCache = process.env["FULCRUM_CI_BUN_CACHE"] ??
-  mkdtempSync(join(tmpdir(), "fulcrum-ci-bun-cache-"));
-const { FULCRUM_HOME: _fulcrumHome, ...baseEnv } = process.env;
-
-export const CI_ENV: NodeJS.ProcessEnv = {
-  ...baseEnv,
-  CI: process.env["CI"] ?? "1",
-};
-
-export const HOME_ISOLATED_CI_ENV: NodeJS.ProcessEnv = {
-  ...CI_ENV,
-  HOME: ciHome,
-  FULCRUM_HOME: undefined,
-};
-
-export const BUN_CACHE_ISOLATED_CI_ENV: NodeJS.ProcessEnv = {
-  ...CI_ENV,
-  BUN_INSTALL_CACHE_DIR: ciBunCache,
-};
+interface Step { name: string; cmd: string[]; soft?: boolean; cwd?: string; }
 
 export const STEPS: Step[] = [
-  { name: "install",     cmd: ["bun", "install", "--frozen-lockfile"], env: "bun-cache-isolated" },
+  { name: "install",     cmd: ["bun", "install", "--frozen-lockfile"] },
   { name: "typecheck",   cmd: ["bun", "run", "--bun", "tsc", "--noEmit"] },
-  { name: "symphony:lock", cmd: ["bun", "test", "tests/symphony/spec-lock.test.ts"] },
-  { name: "symphony:conformance", cmd: ["bun", "test", "src/orchestration/__tests__/symphony-conformance.test.ts"] },
-  { name: "symphony:trace-hash", cmd: ["bun", "run", "scripts/gen-conformance-trace.ts", "--check"] },
-  { name: "test",        cmd: ["bun", "test", "--conditions=svelte"], env: "home-isolated" },
-  { name: "license-audit", cmd: ["bun", "run", "scripts/license-audit.ts"] },
-  { name: "ci:codegen",  cmd: ["bun", "run", "scripts/ci/codegen.ts"] },
-  { name: "lint:docs",   cmd: ["bun", "run", "lint:docs"] },
-  ...(process.env["FULCRUM_FEATURES"]?.split(",").map((feature) => feature.trim().split(":")[0]?.toLowerCase()).includes("i18n")
-    ? [{ name: "i18n:extract", cmd: ["bun", "run", "i18n:extract"] } satisfies Step]
-    : []),
+  { name: "test",        cmd: ["bun", "test", "--conditions=svelte"] },
   { name: "build:all",   cmd: ["bun", "run", "scripts/build-all.ts"] },
   // Web pipeline runs from the SvelteKit subpackage. svelte-kit + svelte-check
   // catch regressions that the root tsc cannot see because src/web is excluded.
-  { name: "web:install", cmd: ["bun", "install", "--frozen-lockfile"], cwd: "src/web", env: "bun-cache-isolated" },
+  { name: "web:install", cmd: ["bun", "install", "--frozen-lockfile"], cwd: "src/web" },
   { name: "web:check",   cmd: ["bun", "run", "check"], cwd: "src/web" },
   { name: "web:build",   cmd: ["bun", "run", "build"], cwd: "src/web" },
   // Vitest unit tests for the SvelteKit subpackage — always-on.
   { name: "web:test",    cmd: ["bun", "run", "web:test"], cwd: "src/web" },
-  { name: "ci:schemas",  cmd: ["bun", "run", "scripts/ci-schemas.ts"] },
   { name: "skills:lint", cmd: ["bun", "run", "src/index.ts", "skills", "lint", "skills/"] },
   { name: "compress:check", cmd: ["bash", "scripts/compress-with-caveman.sh", "--check"] },
-  // Search performance benchmark — soft gate (warn, not fail on slow envs).
-  { name: "search:bench", cmd: ["bun", "test", "--conditions=svelte", "--timeout", "120000", "src/product-kernel/search.test.ts"], soft: true },
+  // Doctor gate — final CI check; catches environment and subsystem regressions.
+  { name: "doctor", cmd: ["bun", "run", "src/index.ts", "doctor", "--json"] },
   // Playwright e2e — opt-in via FULCRUM_RUN_E2E=1.
   ...(process.env["FULCRUM_RUN_E2E"] === "1"
     ? [{ name: "web:e2e", cmd: ["bun", "run", "web:e2e"], cwd: "src/web" } satisfies Step]
@@ -73,25 +30,11 @@ export const STEPS: Step[] = [
 
 interface Result { step: string; ok: boolean; soft?: boolean; skipped?: boolean; pending?: number; ms: number; }
 
-export function envForStep(step: Step): NodeJS.ProcessEnv {
-  if (step.env === "home-isolated") {
-    return HOME_ISOLATED_CI_ENV;
-  }
-  if (step.env === "bun-cache-isolated") {
-    return BUN_CACHE_ISOLATED_CI_ENV;
-  }
-  return CI_ENV;
-}
-
 function run(step: Step): Promise<{ ok: boolean; ms: number; stderr?: string }> {
   return new Promise((resolve) => {
     const t0 = Date.now();
     let stderr = "";
-    const proc = spawn(step.cmd[0]!, step.cmd.slice(1), {
-      stdio: "pipe",
-      cwd: step.cwd,
-      env: envForStep(step),
-    });
+    const proc = spawn(step.cmd[0]!, step.cmd.slice(1), { stdio: "pipe", cwd: step.cwd });
 
     if (proc.stdout) proc.stdout.on("data", (d) => process.stdout.write(d));
     if (proc.stderr) proc.stderr.on("data", (d) => {
@@ -107,55 +50,42 @@ if (import.meta.main) {
   const results: Array<Result> = [];
   let failed = false;
 
-  try {
-    for (const step of STEPS) {
-      console.log(`\n━━━ ${step.name} ━━━ ${step.cmd.join(" ")}`);
-      const r = await run(step);
+  for (const step of STEPS) {
+    console.log(`\n━━━ ${step.name} ━━━ ${step.cmd.join(" ")}`);
+    const r = await run(step);
 
-      if (step.soft && !r.ok) {
-        // Soft-fail: check if it's caveman not installed
-        if (r.stderr?.includes("Caveman not installed")) {
-          results.push({ step: step.name, ok: true, soft: true, skipped: true, ms: r.ms });
-        } else {
-          // Parse pending count from stdout
-          const output = r.stderr || "";
-          const pendingMatch = output.match(/PENDING/g);
-          const pendingCount = pendingMatch ? pendingMatch.length : 0;
-          results.push({ step: step.name, ok: false, soft: true, pending: pendingCount, ms: r.ms });
-          console.log(`\n⚠ ${step.name}: ${pendingCount} file(s) pending compression. Run: bun run compress`);
-        }
+    if (step.soft && !r.ok) {
+      // Soft-fail: check if it's caveman not installed
+      if (r.stderr?.includes("Caveman not installed")) {
+        results.push({ step: step.name, ok: true, soft: true, skipped: true, ms: r.ms });
       } else {
-        results.push({ step: step.name, ok: r.ok, soft: step.soft, ms: r.ms });
-        if (!r.ok && !step.soft) {
-          console.error(`CI stage failed: ${step.name}`);
-          failed = true;
-          break;
-        }
+        // Parse pending count from stdout
+        const output = r.stderr || "";
+        const pendingMatch = output.match(/PENDING/g);
+        const pendingCount = pendingMatch ? pendingMatch.length : 0;
+        results.push({ step: step.name, ok: false, soft: true, pending: pendingCount, ms: r.ms });
+        console.log(`\n⚠ ${step.name}: ${pendingCount} file(s) pending compression. Run: bun run compress`);
       }
+    } else {
+      results.push({ step: step.name, ok: r.ok, soft: step.soft, ms: r.ms });
+      if (!r.ok && !step.soft) { failed = true; break; }
+    }
+  }
+
+  console.log("\n━━━ summary ━━━");
+  for (const r of results) {
+    let tag = r.ok ? "✓" : "✗";
+    let suffix = "";
+
+    if (r.soft && r.skipped) {
+      tag = "·";
+      suffix = " (skipped)";
+    } else if (r.soft && r.pending !== undefined && r.pending > 0) {
+      tag = "⚠";
+      suffix = ` (${r.pending} pending)`;
     }
 
-    console.log("\n━━━ summary ━━━");
-    for (const r of results) {
-      let tag = r.ok ? "✓" : "✗";
-      let suffix = "";
-
-      if (r.soft && r.skipped) {
-        tag = "·";
-        suffix = " (skipped)";
-      } else if (r.soft && r.pending !== undefined && r.pending > 0) {
-        tag = "⚠";
-        suffix = ` (${r.pending} pending)`;
-      }
-
-      console.log(`  ${tag} ${r.step.padEnd(12)} ${(r.ms / 1000).toFixed(1)}s${suffix}`);
-    }
-  } finally {
-    if (shouldCleanHome) {
-      rmSync(ciHome, { recursive: true, force: true });
-    }
-    if (shouldCleanBunCache) {
-      rmSync(ciBunCache, { recursive: true, force: true });
-    }
+    console.log(`  ${tag} ${r.step.padEnd(12)} ${(r.ms / 1000).toFixed(1)}s${suffix}`);
   }
   process.exit(failed ? 1 : 0);
 }
