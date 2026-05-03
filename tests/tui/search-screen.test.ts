@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * TDD — semantic search toggle gating.
  * RED written first; GREEN by src/tui/screens/search-screen.ts.

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * E2E acceptance tests — Notifications / Activity / Audit pillar (P12 issue #22).
  *

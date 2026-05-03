@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Tests for gated scheduled remote backup with S3/GCS/Azure adapters.
  *

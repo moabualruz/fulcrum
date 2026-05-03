@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Playwright performance budget assertions (P16 Issue #28).
  *

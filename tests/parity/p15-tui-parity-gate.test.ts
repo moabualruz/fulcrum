@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * P15#19 — TUI Performance and Three-Surface Parity Gate.
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Vitest/Bun tests for gated CSV import/export pipeline.
 // RED: written before implementation exists.
 

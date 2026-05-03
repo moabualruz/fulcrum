@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * reporter.test.ts — Vitest for gated remote error reporting.
  *

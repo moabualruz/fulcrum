@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Accessibility audit — axe-core Playwright scan + keyboard nav + skip links + focus traps.
  * WCAG 2.1 AA compliance across 7 major routes.

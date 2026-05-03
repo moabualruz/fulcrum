@@ -58,3 +58,24 @@ export type OverlayState =
   | { kind: "blame"; file: string; entries: BlameEntry[] }
   | { kind: "prompt"; action: "new-branch" | "delete-branch" | "commit"; input: string }
   | { kind: "gated"; feature: string };
+
+export type SearchMode = "fts" | "hybrid";
+
+export interface SearchOptions {
+  query: string;
+  mode: SearchMode;
+  env?: Record<string, string | undefined>;
+}
+
+export interface SearchResult {
+  id: string;
+  title: string;
+  kind: string;
+  score: number;
+  snippet?: string;
+}
+
+export interface SettingsService {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string): Promise<void>;
+}

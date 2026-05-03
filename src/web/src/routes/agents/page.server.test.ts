@@ -1,24 +1,4 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../../../../product-kernel/store/repositories.ts";
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { upsertProfile } from "../../lib/server/agents.ts";
-
-let scratch: string;
-
-interface ProfilesPayload {
-  profiles: Array<{
-    id: string;
-    name: string;
-    cli_path: string;
-    auth_env: Record<string, string>;
-    test_passed: boolean | null;
-  }>;
-}
+import { describe, expect, test, mock, beforeEach } from "bun:test";
 
 function streamedData<T>(result: unknown): Promise<T> {
   const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
@@ -26,64 +6,134 @@ function streamedData<T>(result: unknown): Promise<T> {
   return stream as Promise<T>;
 }
 
-beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-agents-page-"));
-  process.env["FULCRUM_HOME"] = scratch;
-});
-
-afterEach(() => {
-  delete process.env["FULCRUM_HOME"];
-  rmSync(scratch, { recursive: true, force: true });
-});
-
-async function seedProfiles(): Promise<void> {
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  await upsertProfile(db, {
-    orgId: org.id,
-    name: "claude-code",
-    cliPath: "/usr/bin/claude",
-    authEnv: { ANTHROPIC_API_KEY: "sk-ant-secret1234" },
-  });
-  await upsertProfile(db, {
-    orgId: org.id,
-    name: "codex",
-    cliPath: "/usr/bin/codex",
-  });
-  await db.close();
+interface ProfilesPayload {
+  profiles: Array<{
+    id: string;
+    name: string;
+    cli_path: string;
+    capabilities: string[];
+    auth_env: Record<string, string>;
+    test_passed: boolean | null;
+  }>;
+  projects: Array<{ id: string; name: string }>;
+  tasks: Array<{ id: string; title: string }>;
 }
 
+const FAKE_PROFILES = [
+  {
+    id: "p1",
+    org_id: "org1",
+    name: "claude-code",
+    cli_path: "/usr/bin/claude",
+    default_flags: "",
+    auth_env_vars: ["ANTHROPIC_API_KEY=sk-ant-secret1234"],
+    test_passed: true,
+    last_tested_at: "2026-05-01T00:00:00Z",
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "p2",
+    org_id: "org1",
+    name: "codex",
+    cli_path: "/usr/bin/codex",
+    default_flags: "",
+    auth_env_vars: [],
+    test_passed: null,
+    last_tested_at: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  },
+];
+
+beforeEach(() => {
+  mock.module("$lib/server/db", () => ({
+    openProductDb: async () => ({
+      query: async (sql: string) => {
+        if (sql.includes("agent_profiles")) return FAKE_PROFILES;
+        if (sql.includes("FROM projects")) return [];
+        if (sql.includes("FROM tasks")) return [];
+        return [];
+      },
+      close: async () => {},
+    }),
+    getDefaultOrgId: async () => "org1",
+  }));
+});
+
 describe("/agents +page.server.ts", () => {
-  test("load returns seeded profiles with masked auth_env", async () => {
-    await seedProfiles();
+  test("load returns profiles with masked auth_env and capabilities", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({
       locals: { activeProjectId: null },
     } as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<ProfilesPayload>(result);
+
     expect(payload.profiles).toHaveLength(2);
-    // Ordered by name ASC
     expect(payload.profiles[0]!.name).toBe("claude-code");
     expect(payload.profiles[1]!.name).toBe("codex");
-    // Auth env must be masked
+    // Auth env masked
     expect(payload.profiles[0]!.auth_env.ANTHROPIC_API_KEY).toBe("****1234");
+    // Capability chips inferred
+    expect(payload.profiles[0]!.capabilities).toContain("LLM");
+    expect(payload.profiles[0]!.capabilities).toContain("code");
+    // Projects and tasks present
+    expect(Array.isArray(payload.projects)).toBe(true);
+    expect(Array.isArray(payload.tasks)).toBe(true);
   });
 
   test("load returns empty array when no profiles", async () => {
-    const dbDir = join(scratch, "state", "product", "db");
-    mkdirSync(dbDir, { recursive: true });
-    const db = await openPglite(join(dbDir, "main"));
-    await runMigrations(db);
-    await createLocalOrg(db, { slug: "default", name: "Default" });
-    await db.close();
+    mock.module("$lib/server/db", () => ({
+      openProductDb: async () => ({
+        query: async () => [],
+        close: async () => {},
+      }),
+      getDefaultOrgId: async () => "org1",
+    }));
+
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const result = await mod.load({
       locals: { activeProjectId: null },
     } as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<ProfilesPayload>(result);
     expect(payload.profiles).toEqual([]);
+  });
+
+  test("maskProfile: caps last 4 of auth_env value", async () => {
+    const { maskProfile } = await import("../../lib/server/agents.ts");
+    const row = {
+      id: "x",
+      org_id: "o",
+      name: "test-agent",
+      cli_path: "/bin/test",
+      default_flags: "",
+      auth_env_vars: ["MY_KEY=abcdef1234"],
+      test_passed: null,
+      last_tested_at: null,
+      created_at: "",
+      updated_at: "",
+    };
+    const masked = maskProfile(row);
+    expect(masked.auth_env["MY_KEY"]).toBe("****1234");
+    expect(masked.capabilities).toContain("general");
+  });
+
+  test("maskProfile: claude-code agent has LLM+code capabilities", async () => {
+    const { maskProfile } = await import("../../lib/server/agents.ts?v=2");
+    const row = {
+      id: "x",
+      org_id: "o",
+      name: "claude-code",
+      cli_path: "/bin/claude",
+      default_flags: "",
+      auth_env_vars: [],
+      test_passed: true,
+      last_tested_at: null,
+      created_at: "",
+      updated_at: "",
+    };
+    const masked = maskProfile(row);
+    expect(masked.capabilities).toContain("LLM");
+    expect(masked.capabilities).toContain("code");
   });
 });

@@ -34,6 +34,8 @@ export interface DispatchRow {
   agent: string;
   status: string;
   symphony_state: string | null;
+  orchestration_state: string | null;
+  claimed_by: string | null;
   started_at: string;
   ended_at: string | null;
   project_id: string | null;
@@ -80,6 +82,7 @@ export interface OrchestrationConfigRow {
 export async function loadOrchestrationDashboard(
   db: ProductDb,
   orgId: string,
+  projectId?: string,
 ): Promise<OrchestrationDashboardData> {
   // Config for concurrency gauge
   const configRows = await db.query<OrchestrationConfigRow>(
@@ -110,12 +113,20 @@ export async function loadOrchestrationDashboard(
         : lastTickRows[0].ended_at)
     : null;
 
-  // Recent dispatches
+  // Recent dispatches (optionally filtered by project)
+  const dispatchParams: unknown[] = projectId
+    ? [orgId, projectId]
+    : [orgId];
+  const dispatchWhere = projectId
+    ? `WHERE org_id = $1 AND project_id = $2`
+    : `WHERE org_id = $1`;
   const dispatches = await db.query<DispatchRow>(
-    `SELECT id, agent, status, symphony_state, started_at, ended_at, project_id
-       FROM agent_runs WHERE org_id = $1
-       ORDER BY started_at DESC LIMIT 20`,
-    [orgId],
+    `SELECT id, agent, status, symphony_state, orchestration_state,
+            NULL::text AS claimed_by,
+            started_at, ended_at, project_id
+       FROM agent_runs ${dispatchWhere}
+       ORDER BY started_at DESC LIMIT 50`,
+    dispatchParams,
   );
 
   // Retry queue: failed runs eligible for retry

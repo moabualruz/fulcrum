@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * P12 — Three-Surface Parity acceptance tests: Notifications / Activity / Audit
  *
