@@ -32,34 +32,15 @@
 	let mobile = $state(isMobileViewport(browserDriver()));
 	let sheetOpen = $state(false);
 	let paletteOpen = $state(false);
-	let bellCount = $state(0);
-	const i18n = $derived(data.i18n ?? { enabled: false, locale: "en", dir: null });
-
-	// Poll /api/bell every 60s for unread notification count
-	$effect(() => {
-		if (typeof window === "undefined") return;
-		async function fetchBell() {
-			try {
-				const res = await fetch("/api/bell");
-				if (res.ok) {
-					const json = await res.json();
-					bellCount = json.count ?? 0;
-				}
-			} catch { /* swallow — badge stays at last known value */ }
-		}
-		void fetchBell();
-		const id = setInterval(fetchBell, 60_000);
-		return () => clearInterval(id);
-	});
 
 	const paletteItems = [
 		{ id: "home",     label: "Dashboard",  href: "/" },
-		{ id: "inbox",    label: "Inbox",      href: "/inbox" },
 		{ id: "projects", label: "Projects",   href: "/projects" },
 		{ id: "docs",     label: "Documents",  href: "/docs" },
 		{ id: "boards",   label: "Boards",     href: "/boards" },
 		{ id: "runs",     label: "Agent runs", href: "/runs" },
-		{ id: "artifacts", label: "Artifacts", href: "/artifacts" },
+		{ id: "memory",   label: "Memory",     href: "/memory" },
+		{ id: "context",  label: "Context",    href: "/context/preview" },
 		{ id: "search",   label: "Search",     href: "/search" },
 	];
 
@@ -119,8 +100,6 @@
 							pathname={page.url.pathname}
 							activeProjectId={data.activeProjectId}
 							onThemeToggle={toggleMode}
-							{bellCount}
-							{i18n}
 						/>
 					</div>
 				</div>
@@ -140,7 +119,6 @@
 						pathname={page.url.pathname}
 						activeProjectId={data.activeProjectId}
 						onThemeToggle={toggleMode}
-						{i18n}
 					/>
 				</div>
 			</div>
