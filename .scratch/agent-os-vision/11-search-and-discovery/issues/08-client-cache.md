@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: search-and-discovery
 Blocked-by: [05-fts-query-ranking.md]
