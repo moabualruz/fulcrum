@@ -9,6 +9,11 @@
  */
 
 import type { CandidateIssue, WorkflowConfig } from "./schemas.ts";
+import {
+  initTracer,
+  traceTransition,
+  type TracerLike,
+} from "./telemetry.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,6 +47,7 @@ export interface TickDeps {
   transitionState: (runId: string, from: string, to: string) => Promise<void>;
   dispatchHook: (hookName: string, ctx: unknown) => Promise<void>;
   emitSpan: (name: string, attributes: Record<string, unknown>) => void;
+  tracer?: TracerLike;
   countRunningRuns: (orgId: string) => Promise<number>;
 }
 
@@ -80,17 +86,30 @@ async function processCandidate(
   candidate: CandidateIssue,
   result: TickResult,
 ): Promise<void> {
+  const tracer = deps.tracer ?? initTracer("fulcrum");
+
   // Claim
   const { runId } = await deps.claimRun(deps.orgId, candidate.id, deps.instanceId);
+  const run = await deps.getRunEntity(runId);
+  const attemptCount = attemptCountOf(run);
   await deps.transitionState(runId, "unclaimed", "claimed");
+  traceTransition(tracer, "unclaimed", "claimed", {
+    org_id: deps.orgId,
+    run_id: runId,
+    attempt_count: attemptCount,
+  });
   deps.emitSpan("symphony.claim", { org_id: deps.orgId, run_id: runId, from_state: "unclaimed", to_state: "claimed" });
   result.claimed += 1;
 
   // Transition to running
   await deps.transitionState(runId, "claimed", "running");
+  traceTransition(tracer, "claimed", "running", {
+    org_id: deps.orgId,
+    run_id: runId,
+    attempt_count: attemptCount,
+  });
   deps.emitSpan("symphony.run", { org_id: deps.orgId, run_id: runId, from_state: "claimed", to_state: "running" });
 
-  const run = await deps.getRunEntity(runId);
   const workspacePath = await deps.createWorkspace(run);
   const prompt = await deps.renderPrompt(run);
 
@@ -105,6 +124,11 @@ async function processCandidate(
     // Transition to succeeded/released
     const finalState = runnerResult.success ? "succeeded" : "failed";
     await deps.transitionState(runId, "running", finalState);
+    traceTransition(tracer, "running", finalState, {
+      org_id: deps.orgId,
+      run_id: runId,
+      attempt_count: attemptCount,
+    });
     deps.emitSpan("symphony.release", { org_id: deps.orgId, run_id: runId, from_state: "running", to_state: finalState });
 
     if (runnerResult.success) {
@@ -120,6 +144,11 @@ async function processCandidate(
     await deps.dispatchHook("on_failure", { run, workspacePath, error });
 
     await deps.transitionState(runId, "running", "failed");
+    traceTransition(tracer, "running", "failed", {
+      org_id: deps.orgId,
+      run_id: runId,
+      attempt_count: attemptCount,
+    });
     deps.emitSpan("symphony.release", { org_id: deps.orgId, run_id: runId, from_state: "running", to_state: "failed" });
 
     if (!deps.config.keepOnFailure) {
@@ -128,4 +157,9 @@ async function processCandidate(
 
     throw error;
   }
+}
+
+function attemptCountOf(run: unknown): number {
+  const attemptCount = (run as { attemptCount?: unknown }).attemptCount;
+  return typeof attemptCount === "number" ? attemptCount : 0;
 }

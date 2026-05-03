@@ -14,6 +14,7 @@ import { scanSkillBudgets, type SkillBudgetReport } from "./skill-budget.ts";
 import { auditPackageParity, type PackageParityReport } from "./package-parity.ts";
 import { planPackageMirrorTargets } from "./package-mirror.ts";
 import { getPackageSurfaceManifest, MANAGED_PACKAGE_IDS, packageCacheSourceRoot } from "./package-surfaces.ts";
+import { runPlatformDoctorChecks, type PlatformDoctorCheck } from "../platform/doctor-checks.ts";
 
 interface ToolCheck {
   cmd: string;
@@ -114,6 +115,7 @@ interface DoctorReport {
     subsystem: "memories_schema";
     ok: boolean;
   };
+  platformChecks: PlatformDoctorCheck[];
   worktrees: {
     projectLocalIgnoredRoots: Array<{
       path: string;
@@ -611,6 +613,11 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
   }
   const memoriesSchema = await buildMemoriesSchemaReport();
   if (!memoriesSchema.ok) errors += 1;
+  const platformChecks = await runPlatformDoctorChecks();
+  for (const platformCheck of platformChecks) {
+    if (platformCheck.status === "fail") errors += 1;
+    else if (platformCheck.status === "warn") warnings += 1;
+  }
 
   // Managed MCPs
   const mcpReport: DoctorReport["mcp"] = { servers: [] };
@@ -731,6 +738,7 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
     db,
     productKernel,
     memoriesSchema,
+    platformChecks,
     worktrees,
     skillBudget,
     skillsCount,
@@ -1083,6 +1091,17 @@ function printHumanFormat(report: DoctorReport, home: string): void {
   console.log(
     `Memories schema: ${report.memoriesSchema.ok ? "ok" : "failed"} (${report.memoriesSchema.subsystem})`,
   );
+  console.log();
+
+  console.log("Platform checks:");
+  for (const platformCheck of report.platformChecks) {
+    const mark =
+      platformCheck.status === "pass" ? "✓" :
+      platformCheck.status === "warn" ? "⚠" :
+      platformCheck.status === "skip" ? "·" :
+      "✗";
+    console.log(`  ${pad(platformCheck.name, 28)} ${mark}  ${platformCheck.message}`);
+  }
   console.log();
 
   // Managed MCPs

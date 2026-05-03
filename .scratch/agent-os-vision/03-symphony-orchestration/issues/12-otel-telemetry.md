@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: 03-symphony-orchestration
 Blocked-by: 11-dispatch-loop-happy-path

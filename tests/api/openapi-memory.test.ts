@@ -39,6 +39,17 @@ describe("P8#14 memory REST OpenAPI routes", () => {
     expect(res.status).toBe(404);
   });
 
+  it("returns the static OpenAPI spec at /api/openapi.json when public-api flag is off", async () => {
+    delete process.env["FULCRUM_FEATURES"];
+    const app = createPublicApiRouter();
+
+    const res = await app.fetch(new Request("http://localhost/api/openapi.json"));
+
+    expect(res.status).toBe(200);
+    const spec = await res.json() as { paths: Record<string, unknown> };
+    expect(Object.keys(spec.paths)).toContain("/memory");
+  });
+
   it("requires Bearer auth for memory routes", async () => {
     const app = createPublicApiRouter();
 

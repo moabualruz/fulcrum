@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: notifications-activity-audit
 Blocked-by: [05-trpc-notify-procedures.md]

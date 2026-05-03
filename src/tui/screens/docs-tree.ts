@@ -5,6 +5,7 @@ import { c } from "../renderer.ts";
 export interface DocsTreeItem {
   id: string;
   title: string;
+  slug?: string;
   scope: Scope | string;
   projectId?: string | null;
   parentId?: string | null;
@@ -17,7 +18,9 @@ export interface DocsTreeScreenOptions {
   caller: {
     docs: {
       list: (input?: Record<string, unknown>) => Promise<DocsTreeItem[]>;
+      tree?: (input: { scope: Scope; projectId?: string }) => Promise<DocsTreeItem[]>;
       create: (input: { title: string; docType: DocType; scope: Scope; projectId?: string }) => Promise<DocsTreeItem>;
+      delete?: (input: { id: string; hard: false }) => Promise<unknown>;
     };
   };
   onOpenDoc?: (id: string) => void;
@@ -31,11 +34,12 @@ export class DocsTreeScreen {
   private mode: Mode = "tree";
   private typeCursor = 0;
   private readonly expanded = new Set<string>();
+  private scope: Scope = "project";
 
   constructor(private readonly opts: DocsTreeScreenOptions) {}
 
   async load(): Promise<void> {
-    this.docs = await this.opts.caller.docs.list(this.opts.projectId ? { projectId: this.opts.projectId } : {});
+    this.docs = await this.fetchDocs();
     this.cursor = Math.min(this.cursor, Math.max(0, this.visibleRows.length - 1));
   }
 
@@ -66,13 +70,18 @@ export class DocsTreeScreen {
       return;
     }
 
-    renderer.writeln(c.bold("  Project Docs"));
-    this.renderTree(renderer, "project");
+    if (this.opts.caller.docs.tree) {
+      renderer.writeln(c.bold(`  ${this.scope === "project" ? "Project" : "Global"} Docs`));
+      this.renderTree(renderer, this.scope);
+    } else {
+      renderer.writeln(c.bold("  Project Docs"));
+      this.renderTree(renderer, "project");
+      renderer.writeln();
+      renderer.writeln(c.bold("  Global Docs"));
+      this.renderTree(renderer, "global");
+    }
     renderer.writeln();
-    renderer.writeln(c.bold("  Global Docs"));
-    this.renderTree(renderer, "global");
-    renderer.writeln();
-    renderer.writeln(c.dim("  j/k move  Enter open  -> expand  <- collapse  n new doc"));
+    renderer.writeln(c.dim("  j/k move  Enter open  -> expand  <- collapse  n new doc  d archive  g scope"));
   }
 
   async handleKey(key: string): Promise<boolean> {
@@ -110,6 +119,12 @@ export class DocsTreeScreen {
       return true;
     }
 
+    if (key === "g") {
+      this.scope = this.scope === "project" ? "global" : "project";
+      await this.load();
+      return true;
+    }
+
     if (key === "j" || key === "\x1b[B") {
       this.cursor = Math.min(this.cursor + 1, Math.max(0, this.visibleRows.length - 1));
       return true;
@@ -138,6 +153,13 @@ export class DocsTreeScreen {
       return true;
     }
 
+    if (key === "d" && this.opts.caller.docs.delete) {
+      await this.opts.caller.docs.delete({ id: row.doc.id, hard: false });
+      this.docs = this.docs.filter((doc) => doc.id !== row.doc.id);
+      this.cursor = Math.min(this.cursor, Math.max(0, this.visibleRows.length - 1));
+      return true;
+    }
+
     return false;
   }
 
@@ -146,8 +168,8 @@ export class DocsTreeScreen {
     const input = {
       title,
       docType,
-      scope: "project" as const,
-      ...(this.opts.projectId ? { projectId: this.opts.projectId } : {}),
+      scope: this.scope,
+      ...(this.scope === "project" && this.opts.projectId ? { projectId: this.opts.projectId } : {}),
     };
     const created = await this.opts.caller.docs.create(input);
     this.docs = [created, ...this.docs];
@@ -193,6 +215,16 @@ export class DocsTreeScreen {
 
   private childrenOf(parentId: string): DocsTreeItem[] {
     return this.docs.filter((doc) => doc.parentId === parentId);
+  }
+
+  private async fetchDocs(): Promise<DocsTreeItem[]> {
+    if (this.opts.caller.docs.tree) {
+      return this.opts.caller.docs.tree({
+        scope: this.scope,
+        ...(this.scope === "project" && this.opts.projectId ? { projectId: this.opts.projectId } : {}),
+      });
+    }
+    return this.opts.caller.docs.list(this.opts.projectId ? { projectId: this.opts.projectId } : {});
   }
 }
 

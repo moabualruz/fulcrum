@@ -15,6 +15,7 @@ import { flagsRouter } from "../server/trpc/routers/flags.ts";
 import { inferenceRouter } from "../server/trpc/routers/inference.ts";
 import { orgsRouter } from "../server/trpc/routers/orgs.ts";
 import { tasksRouter } from "../server/trpc/routers/tasks.ts";
+import { sprintsRouter } from "../server/trpc/routers/sprints.ts";
 import { memoryRouter } from "../server/trpc/routers/memory.ts";
 import { docsRouter } from "../server/trpc/routers/docs.ts";
 import { customFieldDefsRouter, taskCustomFieldsRouter } from "../server/trpc/routers/custom-fields.ts";
@@ -127,12 +128,6 @@ const projectsRouter = t.router({
     .input(IdInputSchema)
     .output(z.record(z.string(), z.number()))
     .query(() => ({})),
-});
-
-const sprintsRouter = t.router({
-  ...crudProcedures("sprints"),
-  activate: idMutationProcedure("sprints", "activate"),
-  complete: idMutationProcedure("sprints", "complete"),
 });
 
 const customFieldsRouter = t.router({
