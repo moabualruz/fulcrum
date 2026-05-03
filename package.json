@@ -16,6 +16,7 @@
     "lint": "bun run --bun tsc --noEmit",
     "lint:docs": "bun run scripts/lint-docs.ts",
     "ci": "bun run scripts/ci.ts",
+    "i18n:extract": "bun run scripts/i18n-extract.ts",
     "migrate:test": "bun test src/db/inference-schema.test.ts",
     "changelog": "git-cliff -o CHANGELOG.md",
     "compress": "bun run src/index.ts compress",

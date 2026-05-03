@@ -33,6 +33,7 @@
 	let sheetOpen = $state(false);
 	let paletteOpen = $state(false);
 	let bellCount = $state(0);
+	const i18n = $derived(data.i18n ?? { enabled: false, locale: "en", dir: null });
 
 	// Poll /api/bell every 60s for unread notification count
 	$effect(() => {
@@ -118,6 +119,7 @@
 							activeProjectId={data.activeProjectId}
 							onThemeToggle={toggleMode}
 							{bellCount}
+							{i18n}
 						/>
 					</div>
 				</div>
@@ -137,6 +139,7 @@
 						pathname={page.url.pathname}
 						activeProjectId={data.activeProjectId}
 						onThemeToggle={toggleMode}
+						{i18n}
 					/>
 				</div>
 			</div>

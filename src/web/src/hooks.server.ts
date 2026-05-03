@@ -21,10 +21,11 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { Container } from "@needle-di/core";
 import type { EntityManager, MikroORM } from "@mikro-orm/postgresql";
 
-import { getActiveProject } from "$lib/state/active-project";
+import { getActiveProject } from "./lib/state/active-project.ts";
 import { appRouter } from "../../../src/trpc/router.ts";
 import { createContext } from "../../../src/trpc/context.ts";
 import type { FlagRegistry } from "../../../src/flags/registry.ts";
+import { dirForLocale, isI18nEnabled, normalizeLocale } from "../../../src/i18n/index.ts";
 
 // Lazy auth initialiser — only wired when ORM is available.
 // Imported dynamically to avoid circular dep issues at SSR preload time.
@@ -185,6 +186,8 @@ export async function __closeWebRuntimeForTest(): Promise<void> {
 
 export const handle: Handle = async ({ event, resolve }) => {
   let requestRuntime: WebRequestRuntime | null = null;
+  let locale = "en";
+  let i18nEnabled = isI18nEnabled();
 
   try {
     // 1. Active project cookie (existing behaviour — must stay first for test compat)
@@ -216,6 +219,7 @@ export const handle: Handle = async ({ event, resolve }) => {
         requestRuntime = createWebRequestRuntime(runtime);
         event.locals.em = requestRuntime.em;
         event.locals.container = requestRuntime.container;
+        locale = await readPersistedLocale(requestRuntime.container);
       }
       const sessionState = await hydrateSession(request, runtime?.authHandler ?? null);
 
@@ -254,8 +258,34 @@ export const handle: Handle = async ({ event, resolve }) => {
       }
     }
 
-    return await resolve(event);
+    return await resolve(event, {
+      transformPageChunk: ({ html }) => transformHtmlLocale(html, locale, i18nEnabled),
+    });
   } finally {
     clearWebRequestRuntime(requestRuntime);
   }
 };
+
+async function readPersistedLocale(container: Container): Promise<string> {
+  try {
+    const repo = container.get("TenantSettingRepository") as
+      | { getValue?: (key: string) => Promise<string | null | undefined> }
+      | undefined;
+    const value = await repo?.getValue?.("web.locale");
+    return normalizeLocale(value);
+  } catch {
+    return "en";
+  }
+}
+
+function transformHtmlLocale(html: string, locale: string, enabled: boolean): string {
+  if (!enabled) return html.replace(/\sdir="(?:ltr|rtl)"/, "");
+  const normalized = normalizeLocale(locale);
+  const dir = dirForLocale(normalized, true);
+  return html.replace(/<html\b([^>]*)>/, (_match, attrs: string) => {
+    const clean = String(attrs)
+      .replace(/\slang="[^"]*"/, "")
+      .replace(/\sdir="[^"]*"/, "");
+    return `<html${clean} lang="${normalized}" dir="${dir}">`;
+  });
+}

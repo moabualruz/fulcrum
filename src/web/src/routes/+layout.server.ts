@@ -1,4 +1,5 @@
 import type { LayoutServerLoad } from "./$types";
+import { dirForLocale, isI18nEnabled, normalizeLocale } from "../../../src/i18n/index.ts";
 import { getThemeCookieValue, normalizeMode, type ThemeSettings } from "../lib/theme";
 import type { KeybindingOverrides } from "../lib/keybindings";
 
@@ -8,12 +9,19 @@ export const load: LayoutServerLoad = async ({ locals, request }) => {
   const theme = await readTheme(locals.container, request.headers.get("cookie"));
   const keybindingOverrides = await readKeybindingOverrides(locals.container);
   const featureFlags = await readFeatureFlags(locals.container);
+  const locale = await readLocale(locals.container);
+  const enabled = featureFlags["i18n"] ?? isI18nEnabled();
 
   return {
     activeProjectId: locals.activeProjectId,
     theme,
     keybindingOverrides,
     featureFlags,
+    i18n: {
+      enabled,
+      locale,
+      dir: dirForLocale(locale, enabled),
+    },
   };
 };
 
@@ -40,6 +48,13 @@ async function readFeatureFlags(container: App.Locals["container"]): Promise<Rec
   return result ?? {};
 }
 
+async function readLocale(container: App.Locals["container"]): Promise<string> {
+  const repo = resolveService(container, "TenantSettingRepository");
+  const value = await callOptional<string | null>(repo, "getValueWithKey", "web.locale")
+    ?? await callOptional<string | null>(repo, "getValue", "web.locale");
+  return normalizeLocale(value);
+}
+
 function resolveService(container: App.Locals["container"], token: string): unknown {
   try {
     return container?.get(token);
@@ -48,8 +63,8 @@ function resolveService(container: App.Locals["container"], token: string): unkn
   }
 }
 
-async function callOptional<T>(service: unknown, method: string): Promise<T | undefined> {
+async function callOptional<T>(service: unknown, method: string, ...args: unknown[]): Promise<T | undefined> {
   const fn = (service as Record<string, unknown> | undefined)?.[method];
   if (typeof fn !== "function") return undefined;
-  return (await fn.call(service)) as T;
+  return (await fn.call(service, ...args)) as T;
 }

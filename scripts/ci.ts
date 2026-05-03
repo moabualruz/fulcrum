@@ -48,6 +48,9 @@ export const STEPS: Step[] = [
   { name: "license-audit", cmd: ["bun", "run", "scripts/license-audit.ts"] },
   { name: "ci:codegen",  cmd: ["bun", "run", "scripts/ci/codegen.ts"] },
   { name: "lint:docs",   cmd: ["bun", "run", "lint:docs"] },
+  ...(process.env["FULCRUM_FEATURES"]?.split(",").map((feature) => feature.trim().split(":")[0]?.toLowerCase()).includes("i18n")
+    ? [{ name: "i18n:extract", cmd: ["bun", "run", "i18n:extract"] } satisfies Step]
+    : []),
   { name: "build:all",   cmd: ["bun", "run", "scripts/build-all.ts"] },
   // Web pipeline runs from the SvelteKit subpackage. svelte-kit + svelte-check
   // catch regressions that the root tsc cannot see because src/web is excluded.

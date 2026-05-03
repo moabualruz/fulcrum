@@ -7,6 +7,7 @@ export const DEFAULT_TASK_COLUMNS: readonly TaskColumn[] = [
   { key: "priority", label: "Priority" },
   { key: "sprint", label: "Sprint" },
   { key: "labels", label: "Labels" },
+  { key: "due_date", label: "Due date" },
   { key: "created_at", label: "Created" },
 ] as const;
 
@@ -42,6 +43,7 @@ export interface BulkMutationRequest {
 function taskValue(task: TaskViewRow, column: string): string | number {
   if (column === "sprint") return task.sprint_name ?? task.sprint_id ?? "";
   if (column === "labels") return (task.labels ?? []).join(", ");
+  if (column === "due_date") return task.due_date ?? "";
   if (column === "created_at") return task.created_at ?? task.updated_at;
   const value = (task as unknown as Record<string, unknown>)[column] ?? task.customFields?.[column];
   if (typeof value === "number") return value;

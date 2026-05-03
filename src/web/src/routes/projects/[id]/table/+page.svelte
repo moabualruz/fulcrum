@@ -20,5 +20,5 @@
   </header>
 
   <ProjectViewSwitcher projectId={data.project.id} active="table" />
-  <TaskTable tasks={data.tasks} sort={{ column: "created_at", direction: "asc" }} />
+  <TaskTable tasks={data.tasks} sort={{ column: "created_at", direction: "asc" }} locale={data.i18n?.locale ?? "en"} />
 </div>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
+  import { formatDate } from "../../../../../i18n/index.ts";
   import type { TaskColumn, TaskSortDirection, TaskViewRow } from "./task-view-types";
   import {
     buildBulkMutationRequest,
@@ -17,9 +18,10 @@
     sort?: { column: string; direction: TaskSortDirection };
     groupBy?: string | null;
     visibleColumns?: string[];
+    locale?: string;
   }
 
-  const { tasks, sort, groupBy = null, visibleColumns }: Props = $props();
+  const { tasks, sort, groupBy = null, visibleColumns, locale = "en" }: Props = $props();
 
   const columns = $derived(visibleTaskColumns(visibleColumns));
   const rows = $derived(sort ? sortTaskRows(tasks, sort.column, sort.direction) : tasks);
@@ -39,6 +41,7 @@
     if (column.key === "priority") return String(task.priority);
     if (column.key === "sprint") return task.sprint_name ?? task.sprint_id ?? "Backlog";
     if (column.key === "labels") return (task.labels ?? []).join(", ");
+    if (column.key === "due_date") return formatDate(task.due_date, locale);
     if (column.key === "created_at") return (task.created_at ?? task.updated_at).slice(0, 10);
     return "";
   }

@@ -201,4 +201,37 @@ describe("hooks.server handle", () => {
 
     expect(clearCalls).toBe(1);
   });
+
+  test("adds html dir for persisted RTL locale when i18n flag is on", async () => {
+    const previous = process.env["FULCRUM_FEATURES"];
+    process.env["FULCRUM_FEATURES"] = "i18n";
+    __setWebRuntimeForTest({
+      authHandler: null,
+      orm: { close: async () => undefined } as never,
+      createRequestContext: () => ({
+        em: { clear: () => undefined } as never,
+        container: {
+          get: (token: string) => {
+            if (token !== "TenantSettingRepository") throw new Error("unknown token");
+            return { getValue: async (key: string) => key === "web.locale" ? "ar" : null };
+          },
+        } as never,
+      }),
+    });
+
+    try {
+      const response = await handle({
+        event: createRequestEvent("/api/probe") as never,
+        resolve: ((event, options) => {
+          const html = options?.transformPageChunk?.({ html: '<html lang="en"><body>ok</body></html>', done: true }) ?? "";
+          return new Response(html);
+        }) as never,
+      });
+
+      expect(await response.text()).toContain('<html lang="ar" dir="rtl">');
+    } finally {
+      if (previous === undefined) delete process.env["FULCRUM_FEATURES"];
+      else process.env["FULCRUM_FEATURES"] = previous;
+    }
+  });
 });

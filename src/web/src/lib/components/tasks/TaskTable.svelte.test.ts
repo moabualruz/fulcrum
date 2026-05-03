@@ -13,6 +13,7 @@ type TaskTableProps = {
   sort?: { column: string; direction: "asc" | "desc" };
   groupBy?: string | null;
   visibleColumns?: string[];
+  locale?: string;
 };
 
 const TASKS: TaskViewRow[] = [
@@ -27,6 +28,7 @@ const TASKS: TaskViewRow[] = [
     assignee: "Maya",
     sprint_name: "Sprint 2",
     labels: ["api"],
+    due_date: "2026-05-03",
   },
   {
     id: "task-early",
@@ -39,6 +41,7 @@ const TASKS: TaskViewRow[] = [
     assignee: "Noah",
     sprint_name: "Sprint 1",
     labels: ["web"],
+    due_date: "2026-05-04",
   },
   {
     id: "task-middle",
@@ -51,6 +54,7 @@ const TASKS: TaskViewRow[] = [
     assignee: null,
     sprint_name: null,
     labels: ["ops"],
+    due_date: null,
   },
 ];
 
@@ -144,6 +148,16 @@ describe("TaskTable component (SSR)", () => {
     expect(body).toContain('data-task-column="status"');
     expect(body).not.toContain('data-task-column="assignee"');
     expect(body).not.toContain('data-task-column="priority"');
+  });
+
+  test("formats due dates with active locale", () => {
+    const { body } = render(TaskTable, {
+      props: { tasks: TASKS, visibleColumns: ["title", "due_date"], locale: "ar" },
+    });
+
+    expect(body).toContain('data-task-column="due_date"');
+    expect(body).toContain("مايو");
+    expect(body).not.toContain("2026-05-03");
   });
 });
 

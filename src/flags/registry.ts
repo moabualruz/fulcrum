@@ -39,6 +39,7 @@ export const FEATURE_FLAGS = [
   "connector-linear",
   "symphony-ssh-worker",
   "symphony-http-api",
+  "i18n",
 ] as const;
 
 /** Union type of all registered feature flag names. */
@@ -65,6 +66,7 @@ export const FLAG_DESCRIPTIONS: Record<FeatureFlagName, string> = {
   "connector-linear": "Enable Linear issue tracker sync via Linear API connector.",
   "symphony-ssh-worker": "Enable Symphony SSH worker for remote command execution.",
   "symphony-http-api": "Enable Symphony HTTP API for webhook-triggered agent runs.",
+  "i18n": "Enable locale catalogs, locale picker, and RTL rendering.",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

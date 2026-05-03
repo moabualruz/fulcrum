@@ -13,6 +13,7 @@ export type TaskColumnKey =
   | "priority"
   | "sprint"
   | "labels"
+  | "due_date"
   | "created_at"
   | string;
 

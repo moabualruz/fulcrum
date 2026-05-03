@@ -31,9 +31,32 @@ mock.module("$app/environment", () => ({
 }));
 
 mock.module("$lib/assets/favicon.svg", () => ({ default: "/favicon.svg" }));
+mock.module("mode-watcher", () => ({
+  ModeWatcher: () => "",
+  toggleMode: () => undefined,
+}));
+mock.module("$lib/feedback/use-form-toast", () => ({ toastFromForm: () => undefined }));
+mock.module("$lib/components/app/AppSidebar.svelte", () => ({ default: () => "<aside aria-label=\"primary navigation\"></aside>" }));
+mock.module("$lib/components/command-palette/CommandPalette.svelte", () => ({ default: () => "" }));
+mock.module("$lib/components/ui/sheet", () => ({
+  Root: () => "",
+  Content: () => "",
+  Trigger: () => "",
+}));
+mock.module("$lib/components/ui/button", () => ({ buttonVariants: () => "" }));
+mock.module("$lib/util/media-query", () => ({
+  MOBILE_QUERY: "(max-width: 767px)",
+  browserDriver: () => ({}),
+  isMobileViewport: () => false,
+}));
+mock.module("$lib/utils.js", () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(" ") }));
+mock.module("$lib/components/app/BellBadge.svelte", () => ({ default: () => "" }));
+mock.module("@lucide/svelte/icons/bell", () => ({ default: () => "" }));
+mock.module("@lucide/svelte/icons/sun", () => ({ default: () => "" }));
 
 interface LayoutData {
   activeProjectId: string | null;
+  i18n?: { enabled: boolean; locale: string; dir: "ltr" | "rtl" | null };
 }
 
 interface LayoutProps {
@@ -133,5 +156,19 @@ describe("+layout.svelte SSR shell", () => {
     expect(() =>
       render(Layout, { props: { data: { activeProjectId: null } } }),
     ).not.toThrow();
+  });
+
+  test("renders locale picker only when i18n flag is enabled", () => {
+    const off = render(Layout, {
+      props: { data: { activeProjectId: null, i18n: { enabled: false, locale: "en", dir: null } } },
+    }).body;
+    expect(off).not.toContain("data-locale-picker");
+
+    const on = render(Layout, {
+      props: { data: { activeProjectId: null, i18n: { enabled: true, locale: "ar", dir: "rtl" } } },
+    }).body;
+    expect(on).toContain("data-locale-picker");
+    expect(on).toContain('name="locale"');
+    expect(on).toContain('value="ar"');
   });
 });

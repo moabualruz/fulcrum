@@ -5,6 +5,7 @@
 	import { buttonVariants } from "$lib/components/ui/button";
 	import BellBadge from "$lib/components/app/BellBadge.svelte";
 	import { cn } from "$lib/utils.js";
+	import { t } from "../../../../../i18n/index.ts";
 
 	interface BellItem {
 		id: string;
@@ -19,7 +20,7 @@
 		bellItems?: BellItem[];
 		onBellOpen?: () => void;
 		onThemeToggle?: () => void;
-		bellCount?: number;
+		i18n?: { enabled: boolean; locale: string };
 	}
 
 	let {
@@ -29,7 +30,7 @@
 		bellItems = [],
 		onBellOpen = () => {},
 		onThemeToggle = () => {},
-		bellCount = 0,
+		i18n = { enabled: false, locale: "en" },
 	}: Props = $props();
 
 	interface Crumb {
@@ -97,6 +98,24 @@
 
 	<div class={cn("ml-auto flex items-center gap-2")}>
 		<BellBadge count={bellCount} />
+		{#if i18n.enabled}
+			<form data-locale-picker method="POST" action="/api/locale" class={cn("flex items-center")}>
+				<label class={cn("sr-only")} for="locale-picker">Locale</label>
+				<select
+					id="locale-picker"
+					name="locale"
+					value={i18n.locale}
+					aria-label="Locale"
+					class={cn("h-8 rounded-md border border-input bg-background px-2 text-xs")}
+					onchange={(event) => event.currentTarget.form?.requestSubmit()}
+				>
+					<option value="en">English</option>
+					<option value="ar">Arabic</option>
+					<option value="fr">French</option>
+				</select>
+				<button type="submit" class={cn("sr-only")}>{t("common.save", i18n.locale)}</button>
+			</form>
+		{/if}
 		<kbd
 			class={cn(
 				"hidden h-6 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-xs sm:inline-flex",
