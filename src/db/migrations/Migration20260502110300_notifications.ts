@@ -28,29 +28,23 @@ import { Migration } from "@mikro-orm/migrations";
 const LOCAL_ORG_ID = "00000000-0000-0000-0000-000000000001";
 
 export class Migration20260502110300_notifications extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     // ── Expand notification_rules ──────────────────────────────────────────────
 
-    // Add per-user + declarative-rule columns (idempotent via DO block).
-    this.addSql(`
-      do $$ begin
-        if not exists (
-          select 1 from information_schema.columns
-          where table_schema = 'public'
-            and table_name   = 'notification_rules'
-            and column_name  = 'user_id'
-        ) then
-          alter table "notification_rules"
-            add column "user_id"       uuid          null,
-            add column "name"          varchar(255)  null,
-            add column "event_pattern" jsonb         null,
-            add column "channels"      text[]        null,
-            add column "enabled"       boolean       not null default true,
-            add column "created_at"    timestamptz   null,
-            add column "updated_at"    timestamptz   null;
-        end if;
-      end $$
-    `);
+    // P1 stub created subject_kind NOT NULL; new schema replaces it with event_pattern jsonb.
+    // Drop NOT NULL constraint so default-rules seeding can insert without subject_kind.
+    this.addSql(`alter table "notification_rules" alter column "subject_kind" drop not null`);
+
+    // Add per-user + declarative-rule columns (idempotent ADD COLUMN IF NOT EXISTS).
+    this.addSql(`alter table "notification_rules" add column if not exists "user_id" uuid null`);
+    this.addSql(`alter table "notification_rules" add column if not exists "name" varchar(255) null`);
+    this.addSql(`alter table "notification_rules" add column if not exists "event_pattern" jsonb null`);
+    this.addSql(`alter table "notification_rules" add column if not exists "channels" text[] null`);
+    this.addSql(`alter table "notification_rules" add column if not exists "enabled" boolean not null default true`);
+    this.addSql(`alter table "notification_rules" add column if not exists "created_at" timestamptz null`);
+    this.addSql(`alter table "notification_rules" add column if not exists "updated_at" timestamptz null`);
 
     // Composite indexes on notification_rules (idempotent).
     this.addSql(

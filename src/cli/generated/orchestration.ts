@@ -37,6 +37,14 @@ export function createOrchestrationCommand(): Command {
     throw new Error("Generated tRPC invocation for orchestration.fetchIssueStatesByIds is not wired yet.");
   });
 
+  const getOrchestratorStatusCommand = command.command("get-orchestrator-status");
+  getOrchestratorStatusCommand.description("orchestration getOrchestratorStatus");
+  getOrchestratorStatusCommand.option("--json", "Emit JSON output");
+  getOrchestratorStatusCommand.option("--org-id <string>", "org-id");
+  getOrchestratorStatusCommand.action(async () => {
+    throw new Error("Generated tRPC invocation for orchestration.getOrchestratorStatus is not wired yet.");
+  });
+
   const getRunCommand = command.command("get-run");
   getRunCommand.description("orchestration getRun");
   getRunCommand.option("--json", "Emit JSON output");

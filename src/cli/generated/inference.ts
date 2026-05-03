@@ -52,6 +52,7 @@ export function createInferenceCommand(): Command {
   const modelsPullCommand = command.command("models pull");
   modelsPullCommand.description("inference models pull");
   modelsPullCommand.option("--json", "Emit JSON output");
+  modelsPullCommand.option("--force", "force");
   modelsPullCommand.option("--model-id <string>", "model-id");
   modelsPullCommand.action(async () => {
     throw new Error("Generated tRPC invocation for inference.models.pull is not wired yet.");
@@ -60,6 +61,7 @@ export function createInferenceCommand(): Command {
   const modelsRmCommand = command.command("models rm");
   modelsRmCommand.description("inference models rm");
   modelsRmCommand.option("--json", "Emit JSON output");
+  modelsRmCommand.option("--force", "force");
   modelsRmCommand.option("--model-id <string>", "model-id");
   modelsRmCommand.action(async () => {
     throw new Error("Generated tRPC invocation for inference.models.rm is not wired yet.");

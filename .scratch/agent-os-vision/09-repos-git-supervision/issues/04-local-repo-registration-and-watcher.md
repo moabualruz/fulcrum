@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: 09-repos-git-supervision
 Blocked-by: [01-schema-migration, 02-repo-repository-crud, 03-simple-git-wrapper]

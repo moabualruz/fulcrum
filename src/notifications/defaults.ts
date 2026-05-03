@@ -46,6 +46,13 @@ export async function seedDefaultRules(
   orgId: string,
   em: EntityManager,
 ): Promise<void> {
+  // Defensive: skip if notifications migration has not yet expanded notification_rules.
+  // SeedService runs in test setups before all migrations have been applied.
+  const cols = await em.getConnection().execute<Array<{ column_name: string }>>(
+    `select column_name from information_schema.columns where table_name = 'notification_rules' and column_name = 'user_id'`,
+  );
+  if (!cols.length) return;
+
   const now = new Date();
 
   for (const rule of DEFAULT_NOTIFICATION_RULES) {

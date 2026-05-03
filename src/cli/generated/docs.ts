@@ -48,6 +48,23 @@ export function createDocsCommand(): Command {
     throw new Error("Generated tRPC invocation for docs.reorder is not wired yet.");
   });
 
+  const templatesListCommand = command.command("templates list");
+  templatesListCommand.description("docs templates list");
+  templatesListCommand.option("--json", "Emit JSON output");
+  templatesListCommand.option("--project-id <string>", "project-id");
+  templatesListCommand.action(async () => {
+    throw new Error("Generated tRPC invocation for docs.templates.list is not wired yet.");
+  });
+
+  const templatesResolveCommand = command.command("templates resolve");
+  templatesResolveCommand.description("docs templates resolve");
+  templatesResolveCommand.option("--json", "Emit JSON output");
+  templatesResolveCommand.addOption(new Option("--doc-type <choice>", "doc-type").choices([]));
+  templatesResolveCommand.option("--project-id <string>", "project-id");
+  templatesResolveCommand.action(async () => {
+    throw new Error("Generated tRPC invocation for docs.templates.resolve is not wired yet.");
+  });
+
   const updateCommand = command.command("update");
   updateCommand.description("docs update");
   updateCommand.option("--json", "Emit JSON output");
