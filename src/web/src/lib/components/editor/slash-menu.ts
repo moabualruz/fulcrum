@@ -3,6 +3,7 @@ import { Node } from "@tiptap/core";
 import { TaskItem } from "@tiptap/extension-list/task-item";
 import { TaskList } from "@tiptap/extension-list/task-list";
 import { StarterKit } from "@tiptap/starter-kit";
+import { ExcalidrawNode, MathBlockNode, MathNode, MermaidNode } from "./embeds";
 import { MentionNode } from "./mention";
 import { WikilinkNode } from "./wikilink";
 
@@ -31,6 +32,10 @@ export const SLASH_MENU_ITEMS: SlashMenuItem[] = [
   { id: "horizontal-rule", label: "Divider", aliases: ["hr", "rule", "line"] },
   { id: "template", label: "Template section", aliases: ["template", "section"] },
   { id: "wikilink", label: "Wiki link", aliases: ["wiki", "link", "[["] },
+  { id: "math", label: "Math", aliases: ["latex", "katex", "$"] },
+  { id: "math-block", label: "Math block", aliases: ["latex-block", "katex-block", "$$"] },
+  { id: "mermaid", label: "Mermaid diagram", aliases: ["diagram", "flowchart"] },
+  { id: "sketch", label: "Sketch", aliases: ["excalidraw", "drawing"] },
 ];
 
 export const TableCell = Node.create({
@@ -85,6 +90,10 @@ export function createDocEditorExtensions(): Extension[] {
     TaskItem.configure({ nested: true }),
     MentionNode,
     WikilinkNode,
+    MathNode,
+    MathBlockNode,
+    MermaidNode,
+    ExcalidrawNode,
     Table,
     TableRow,
     TableCell,
@@ -125,6 +134,17 @@ export function insertSlashMenuItem(editor: Editor, itemId: string): boolean {
       }).run();
     case "wikilink":
       return chain.insertContent({ type: "wikilink", attrs: { slug: "doc-title", resolved: false } }).run();
+    case "math":
+      return chain.insertContent({ type: "math", attrs: { expression: "E=mc^2", displayMode: false } }).run();
+    case "math-block":
+      return chain.insertContent({ type: "mathBlock", attrs: { expression: "E=mc^2", displayMode: true } }).run();
+    case "mermaid":
+      return chain.insertContent({
+        type: "mermaid",
+        attrs: { diagram: "graph TD;\n  A[Start] --> B[Next]" },
+      }).run();
+    case "sketch":
+      return chain.insertContent({ type: "excalidraw" }).run();
     default:
       return false;
   }
