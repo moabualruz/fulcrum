@@ -50,6 +50,31 @@
     </div>
   {/if}
 
+  {#if data.externalProviderEnabled}
+    <h2>External LLM Provider</h2>
+    <div class="external-provider" data-external-provider>
+      <form method="POST" action="?/setProvider" class="embed-form">
+        <label for="provider-url">URL</label>
+        <input id="provider-url" name="providerUrl" type="url" placeholder="https://api.openai.com/v1" />
+        <label for="provider-key">API Key</label>
+        <input id="provider-key" name="providerKey" type="password" placeholder="sk-..." />
+        <div class="embed-row">
+          <button type="submit">Save</button>
+          <button type="submit" formaction="?/testProvider">Test Connection</button>
+        </div>
+      </form>
+      {#if form?.providerResult}
+        <p class="provider-status" data-provider-ok>Connected (latency: {form.providerResult.latency_ms}ms)</p>
+      {/if}
+      {#if form?.providerSaved}
+        <p class="provider-status" data-provider-saved>Provider saved.</p>
+      {/if}
+      {#if form?.providerError}
+        <p class="provider-status provider-error" data-provider-error>{form.providerError}</p>
+      {/if}
+    </div>
+  {/if}
+
   <h2>Test embed</h2>
   <form method="POST" action="?/testEmbed" class="embed-form">
     <label for="embed-text">Text</label>

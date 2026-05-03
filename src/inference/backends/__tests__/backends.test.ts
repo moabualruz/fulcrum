@@ -306,4 +306,64 @@ describe("OpenAICompatibleBackend", () => {
     expect(h.backend).toBe("openai-compatible");
     expect(h.status).toBe("ok");
   });
+
+  it("health() returns down with reason when flag disabled", async () => {
+    const b = new OpenAICompatibleBackend({
+      url: "http://example.com",
+      apiKey: "sk-test",
+      flagEnabled: false,
+    });
+    const h = await b.health();
+    expect(h.backend).toBe("openai-compatible");
+    expect(h.status).toBe("down");
+    expect(h.error).toBe("flag external-llm-provider disabled");
+  });
+
+  it("testConnection() returns ok with latency when flag enabled", async () => {
+    stubFetch({ "/v1/models": { data: [{ id: "gpt-4" }] } });
+    const b = new OpenAICompatibleBackend({
+      url: "http://example.com",
+      apiKey: "sk-test",
+      flagEnabled: true,
+    });
+    const result = await b.testConnection();
+    expect(result.ok).toBe(true);
+    expect(typeof result.latency_ms).toBe("number");
+  });
+
+  it("testConnection() returns error when flag disabled", async () => {
+    const b = new OpenAICompatibleBackend({
+      url: "http://example.com",
+      apiKey: "sk-test",
+      flagEnabled: false,
+    });
+    const result = await b.testConnection();
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("flag external-llm-provider disabled");
+  });
+
+  it("testConnection() returns error when URL not configured", async () => {
+    const b = new OpenAICompatibleBackend({
+      url: "",
+      apiKey: "sk-test",
+      flagEnabled: true,
+    });
+    const result = await b.testConnection();
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("FULCRUM_INFERENCE_URL not configured");
+  });
+
+  it("testConnection() returns HTTP error on non-200", async () => {
+    globalThis.fetch = (() =>
+      Promise.resolve(new Response("Unauthorized", { status: 401 }))) as unknown as typeof fetch;
+    const b = new OpenAICompatibleBackend({
+      url: "http://example.com",
+      apiKey: "bad-key",
+      flagEnabled: true,
+    });
+    const result = await b.testConnection();
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("HTTP 401");
+    expect(typeof result.latency_ms).toBe("number");
+  });
 });

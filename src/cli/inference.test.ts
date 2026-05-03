@@ -370,6 +370,49 @@ describe("fulcrum inference CLI", () => {
     expect(cap.errors.join("\n")).toContain("--schema value must be valid JSON");
   });
 
+  test("config set-provider sets env vars", async () => {
+    const cap = capture();
+    const origUrl = process.env["FULCRUM_INFERENCE_URL"];
+    const origKey = process.env["FULCRUM_INFERENCE_API_KEY"];
+
+    try {
+      await run(["config", "set-provider", "--url", "https://api.openai.com/v1", "--key", "sk-test123"], cap.opts);
+      expect(cap.exitCode).toBeUndefined();
+      expect(cap.lines.join("\n")).toContain("provider configured");
+      expect(process.env["FULCRUM_INFERENCE_URL"]).toBe("https://api.openai.com/v1");
+      expect(process.env["FULCRUM_INFERENCE_API_KEY"]).toBe("sk-test123");
+    } finally {
+      if (origUrl === undefined) delete process.env["FULCRUM_INFERENCE_URL"];
+      else process.env["FULCRUM_INFERENCE_URL"] = origUrl;
+      if (origKey === undefined) delete process.env["FULCRUM_INFERENCE_API_KEY"];
+      else process.env["FULCRUM_INFERENCE_API_KEY"] = origKey;
+    }
+  });
+
+  test("config set-provider errors without --url", async () => {
+    const cap = capture();
+    await run(["config", "set-provider", "--key", "sk-test"], cap.opts);
+    expect(cap.exitCode).toBe(1);
+    expect(cap.errors.join("\n")).toContain("--url");
+  });
+
+  test("config test-provider --json returns flag disabled when flag off", async () => {
+    const cap = capture();
+    const origFeatures = process.env["FULCRUM_FEATURES"];
+    delete process.env["FULCRUM_FEATURES"];
+
+    try {
+      await run(["config", "test-provider", "--json"], cap.opts);
+      expect(cap.exitCode).toBeUndefined();
+      const result = JSON.parse(cap.lines.join("\n"));
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain("flag external-llm-provider disabled");
+    } finally {
+      if (origFeatures === undefined) delete process.env["FULCRUM_FEATURES"];
+      else process.env["FULCRUM_FEATURES"] = origFeatures;
+    }
+  });
+
   test("stop confirms socket removal", async () => {
     const cap = capture();
 

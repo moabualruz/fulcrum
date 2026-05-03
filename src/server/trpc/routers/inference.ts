@@ -198,6 +198,17 @@ function toTrpcError(error: unknown): TRPCError {
   });
 }
 
+const ProviderTestResultSchema = z.object({
+  ok: z.boolean(),
+  latency_ms: z.number().optional(),
+  error: z.string().optional(),
+});
+
+const SetProviderInputSchema = z.object({
+  url: z.string().url().min(1),
+  key: z.string().min(1),
+});
+
 export const inferenceRouter = t.router({
   health: publicProcedure
     .output(HealthResultSchema)
@@ -284,6 +295,27 @@ export const inferenceRouter = t.router({
         const client = await resolveBoundClient(ctx);
         if (client) return client.listBackends();
         return defaultBackends(ctx);
+      }),
+  }),
+
+  provider: t.router({
+    test: protectedProcedure
+      .output(ProviderTestResultSchema)
+      .query(async ({ ctx }) => {
+        const flagOn = await isEnabled(ctx, "external-llm-provider");
+        const { OpenAICompatibleBackend } = await import("../../../inference/backends/openai-compatible.ts");
+        const backend = new OpenAICompatibleBackend({ flagEnabled: flagOn });
+        return backend.testConnection();
+      }),
+
+    set: protectedProcedure
+      .input(SetProviderInputSchema)
+      .output(z.object({ ok: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        // Persist URL + key to config store (env var override path documented in issue)
+        process.env["FULCRUM_INFERENCE_URL"] = input.url;
+        process.env["FULCRUM_INFERENCE_API_KEY"] = input.key;
+        return { ok: true };
       }),
   }),
 });

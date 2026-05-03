@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, test } from "bun:test";
 
 type PageProps = {
   data: {
+    externalProviderEnabled?: boolean;
     streamed: {
       health: Promise<{ status: string; backends: string[]; models: string[] }> | { status: string; backends: string[]; models: string[] };
       models: Promise<Array<{ id: string; kind: string; downloaded: boolean; active: boolean; sizeBytes?: number }>>
@@ -23,6 +24,9 @@ type PageProps = {
     schemaValid?: boolean;
     error?: string;
     pullProgress?: { modelId: string; pct: number; downloaded: number; total: number };
+    providerResult?: { ok: boolean; latency_ms?: number };
+    providerError?: string;
+    providerSaved?: boolean;
   } | null;
 };
 
@@ -137,6 +141,57 @@ describe("/settings/inference +page.svelte", () => {
     expect(body).toContain('data-schema-valid="true"');
     expect(body).toContain('data-schema-output');
     expect(body).toContain('{"agent": "router"}');
+  });
+
+  test("renders External LLM Provider section when flag enabled", () => {
+    const { body } = render(Page, {
+      props: {
+        data: { ...data, externalProviderEnabled: true },
+        form: null,
+      },
+    });
+
+    expect(body).toContain("External LLM Provider");
+    expect(body).toContain('name="providerUrl"');
+    expect(body).toContain('name="providerKey"');
+    expect(body).toContain("Test Connection");
+    expect(body).toContain("data-external-provider");
+  });
+
+  test("hides External LLM Provider section when flag disabled", () => {
+    const { body } = render(Page, {
+      props: {
+        data: { ...data, externalProviderEnabled: false },
+        form: null,
+      },
+    });
+
+    expect(body).not.toContain("External LLM Provider");
+    expect(body).not.toContain("data-external-provider");
+  });
+
+  test("renders provider test success result", () => {
+    const { body } = render(Page, {
+      props: {
+        data: { ...data, externalProviderEnabled: true },
+        form: { providerResult: { ok: true, latency_ms: 42 } },
+      },
+    });
+
+    expect(body).toContain("data-provider-ok");
+    expect(body).toContain("42ms");
+  });
+
+  test("renders provider error state", () => {
+    const { body } = render(Page, {
+      props: {
+        data: { ...data, externalProviderEnabled: true },
+        form: { providerError: "HTTP 401" },
+      },
+    });
+
+    expect(body).toContain("data-provider-error");
+    expect(body).toContain("HTTP 401");
   });
 
   test("renders smoke embed error state without throwing", () => {

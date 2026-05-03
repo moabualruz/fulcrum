@@ -18,11 +18,19 @@ function resolveClient(container: InferenceLocals["container"]): InferenceClient
   return new InferenceClient();
 }
 
-function embeddingsFeatureEnabled(): boolean {
+function featureEnabled(flag: string): boolean {
   return (process.env["FULCRUM_FEATURES"] ?? "")
     .split(",")
     .map((value) => value.trim().toLowerCase())
-    .includes("embeddings");
+    .includes(flag);
+}
+
+function embeddingsFeatureEnabled(): boolean {
+  return featureEnabled("embeddings");
+}
+
+function externalLlmProviderEnabled(): boolean {
+  return featureEnabled("external-llm-provider");
 }
 
 function operationGate(locals: InferenceLocals): { ok: true } | { ok: false; error: string } {
@@ -42,6 +50,7 @@ export function load({ locals }: { locals: InferenceLocals }) {
   const client = resolveClient(locals.container ?? null);
 
   return {
+    externalProviderEnabled: externalLlmProviderEnabled(),
     streamed: {
       health: client.health(),
       models: client.listModels(),
@@ -199,6 +208,49 @@ export const actions = {
         error: error instanceof Error ? error.message : "Classify test failed.",
       };
     }
+  },
+
+  testProvider: async ({ locals }: { request: Request; locals: InferenceLocals }) => {
+    if (!locals.session) {
+      return { success: false, providerError: "Authentication required." };
+    }
+    if (!externalLlmProviderEnabled()) {
+      return { success: false, providerError: "Enable the external-llm-provider feature flag first." };
+    }
+
+    try {
+      const { OpenAICompatibleBackend } = await import("../../../../../inference/backends/openai-compatible.ts");
+      const backend = new OpenAICompatibleBackend({ flagEnabled: true });
+      const result = await backend.testConnection();
+      if (result.ok) {
+        return { success: true, providerResult: { ok: true, latency_ms: result.latency_ms } };
+      }
+      return { success: false, providerError: result.error ?? "Connection failed" };
+    } catch (error) {
+      return {
+        success: false,
+        providerError: error instanceof Error ? error.message : "Provider test failed.",
+      };
+    }
+  },
+
+  setProvider: async ({ request, locals }: { request: Request; locals: InferenceLocals }) => {
+    if (!locals.session) {
+      return { success: false, providerError: "Authentication required." };
+    }
+    if (!externalLlmProviderEnabled()) {
+      return { success: false, providerError: "Enable the external-llm-provider feature flag first." };
+    }
+
+    const form = await request.formData();
+    const url = String(form.get("providerUrl") ?? "").trim();
+    const key = String(form.get("providerKey") ?? "").trim();
+    if (!url) return { success: false, providerError: "URL is required." };
+    if (!key) return { success: false, providerError: "API key is required." };
+
+    process.env["FULCRUM_INFERENCE_URL"] = url;
+    process.env["FULCRUM_INFERENCE_API_KEY"] = key;
+    return { success: true, providerSaved: true };
   },
 
   testTokenize: async ({ request, locals }: { request: Request; locals: InferenceLocals }) => {

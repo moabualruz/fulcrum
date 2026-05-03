@@ -18,17 +18,21 @@ import type {
 export interface OpenAICompatibleOpts {
   url?: string;
   apiKey?: string;
+  /** When false, health() returns down with reason instead of probing. */
+  flagEnabled?: boolean;
 }
 
 export class OpenAICompatibleBackend implements InferenceBackend {
   readonly id = "openai-compatible" as const;
   private readonly base: string;
   private readonly apiKey: string;
+  private readonly flagEnabled: boolean;
 
   constructor(opts?: OpenAICompatibleOpts) {
     this.base = opts?.url ?? process.env["FULCRUM_INFERENCE_URL"] ?? "";
     this.apiKey =
       opts?.apiKey ?? process.env["FULCRUM_INFERENCE_API_KEY"] ?? "";
+    this.flagEnabled = opts?.flagEnabled ?? true;
   }
 
   async embed(req: EmbedRequest): Promise<EmbedResponse> {
@@ -76,6 +80,13 @@ export class OpenAICompatibleBackend implements InferenceBackend {
   }
 
   async health(): Promise<HealthResult> {
+    if (!this.flagEnabled) {
+      return {
+        backend: "openai-compatible",
+        status: "down",
+        error: "flag external-llm-provider disabled",
+      };
+    }
     try {
       const res = await fetch(`${this.base}/v1/models`, {
         headers: this.headers(),
@@ -87,6 +98,37 @@ export class OpenAICompatibleBackend implements InferenceBackend {
       return {
         backend: "openai-compatible",
         status: "down",
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  /**
+   * testConnection — probe /v1/models with timing.
+   * Returns `{ ok, latency_ms }` or `{ ok: false, error }`.
+   */
+  async testConnection(): Promise<{ ok: boolean; latency_ms?: number; error?: string }> {
+    if (!this.flagEnabled) {
+      return { ok: false, error: "flag external-llm-provider disabled" };
+    }
+    if (!this.base) {
+      return { ok: false, error: "FULCRUM_INFERENCE_URL not configured" };
+    }
+    const start = performance.now();
+    try {
+      const res = await fetch(`${this.base}/v1/models`, {
+        headers: this.headers(),
+      });
+      const latency_ms = Math.round(performance.now() - start);
+      if (!res.ok) {
+        return { ok: false, latency_ms, error: `HTTP ${res.status}` };
+      }
+      return { ok: true, latency_ms };
+    } catch (err) {
+      const latency_ms = Math.round(performance.now() - start);
+      return {
+        ok: false,
+        latency_ms,
         error: err instanceof Error ? err.message : String(err),
       };
     }

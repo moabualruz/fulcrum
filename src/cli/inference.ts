@@ -33,6 +33,8 @@ Usage:
   fulcrum inference generate <prompt> [--schema <json>] [--json]
   fulcrum inference classify <text> --labels <csv> [--json]
   fulcrum inference tokenize <text> [--model <id>] [--json]
+  fulcrum inference config set-provider --url <url> --key <key>
+  fulcrum inference config test-provider [--json]
   fulcrum inference stop [--json]
 `;
 
@@ -140,6 +142,9 @@ export async function run(argv: readonly string[], opts: InferenceRunOptions = {
         return;
       case "tokenize":
         await runTokenize(rest, { ...opts, print });
+        return;
+      case "config":
+        await runConfig(rest, { ...opts, print });
         return;
       case "stop":
         await runStop(rest, { ...opts, print });
@@ -571,6 +576,64 @@ async function rmModelWithClient(
     throw new Error("models rm requires a tRPC caller or inference client rmModel method");
   }
   return client.rmModel(modelId);
+}
+
+async function runConfig(
+  argv: readonly string[],
+  opts: InferenceRunOptions & { print: (line: string) => void },
+): Promise<void> {
+  const [verb = "help", ...rest] = argv;
+  switch (verb) {
+    case "set-provider":
+      await runConfigSetProvider(rest, opts);
+      return;
+    case "test-provider":
+      await runConfigTestProvider(rest, opts);
+      return;
+    default:
+      throw new Error(`unknown config verb '${verb}'`);
+  }
+}
+
+async function runConfigSetProvider(
+  argv: readonly string[],
+  opts: InferenceRunOptions & { print: (line: string) => void },
+): Promise<void> {
+  let url: string | undefined;
+  let key: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--url") { url = argv[++i]; continue; }
+    if (argv[i] === "--key") { key = argv[++i]; continue; }
+  }
+  if (!url) throw new Error("config set-provider requires --url");
+  if (!key) throw new Error("config set-provider requires --key");
+
+  // Persist to env (config store override path per issue notes)
+  process.env["FULCRUM_INFERENCE_URL"] = url;
+  process.env["FULCRUM_INFERENCE_API_KEY"] = key;
+  opts.print(`provider configured url=${url}`);
+}
+
+async function runConfigTestProvider(
+  argv: readonly string[],
+  opts: InferenceRunOptions & { print: (line: string) => void },
+): Promise<void> {
+  const json = hasFlag(argv, "json");
+  const features = (process.env["FULCRUM_FEATURES"] ?? "")
+    .split(",").map((s) => s.trim()).filter(Boolean);
+  const flagEnabled = features.includes("external-llm-provider");
+
+  const { OpenAICompatibleBackend } = await import("../inference/backends/openai-compatible.ts");
+  const backend = new OpenAICompatibleBackend({ flagEnabled });
+  const result = await backend.testConnection();
+
+  if (json) {
+    opts.print(JSON.stringify(result));
+  } else if (result.ok) {
+    opts.print(`provider ok latency=${result.latency_ms}ms`);
+  } else {
+    opts.print(`provider error: ${result.error}`);
+  }
 }
 
 async function runStop(

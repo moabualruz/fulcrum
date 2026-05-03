@@ -3,7 +3,6 @@
 // policy file location + size, skill count, managed MCPs.
 
 import { stat, readdir } from "node:fs/promises";
-import { join } from "node:path";
 import { which, exists } from "../utils/proc.ts";
 import { AGENTS } from "../agents/registry.ts";
 import { ALL_COMPONENTS } from "../components/catalog.ts";
@@ -14,8 +13,6 @@ import { scanSkillBudgets, type SkillBudgetReport } from "./skill-budget.ts";
 import { auditPackageParity, type PackageParityReport } from "./package-parity.ts";
 import { planPackageMirrorTargets } from "./package-mirror.ts";
 import { getPackageSurfaceManifest, MANAGED_PACKAGE_IDS, packageCacheSourceRoot } from "./package-surfaces.ts";
-import { runPlatformDoctorChecks, type PlatformDoctorCheck } from "../platform/doctor-checks.ts";
-import { sandboxProviderDoctorChecks, type SandboxProviderDoctorCheck } from "../orchestration/sandbox-runner.ts";
 
 interface ToolCheck {
   cmd: string;
@@ -101,23 +98,14 @@ interface DoctorReport {
     latestEventAt: string | null;
     error?: string;
   };
-  db: {
-    engine: "pglite" | "postgres" | "absent";
-    dbPath: string;
-    checks: Array<{
-      check: string;
-      status: "pass" | "fail" | "warn";
-      detail: string;
-      hint?: string;
-    }>;
+  embeddingsSchema: {
+    status: "ok" | "absent" | "error";
+    tables: { memory_embeddings: boolean; doc_embeddings: boolean };
+    indexes: { memory_embeddings_hnsw: boolean; doc_embeddings_hnsw: boolean };
+    vectorDim: number | null;
+    flag: "on" | "off";
     error?: string;
   };
-  memoriesSchema: {
-    subsystem: "memories_schema";
-    ok: boolean;
-  };
-  platformChecks: PlatformDoctorCheck[];
-  sandboxProviders: SandboxProviderDoctorCheck[];
   worktrees: {
     projectLocalIgnoredRoots: Array<{
       path: string;
@@ -230,10 +218,6 @@ async function cavemanActivationHookPresent(agent: AgentDir, home: string): Prom
 
 function repoRoot(): string {
   return process.env["FULCRUM_REPO_DIR"] ?? process.cwd();
-}
-
-function fulcrumHome(): string {
-  return process.env["FULCRUM_HOME"] ?? join(process.env["HOME"] ?? "", ".fulcrum");
 }
 
 function pad(s: string, n: number): string {
@@ -600,30 +584,13 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
     }
   }
   const packageParity = await buildPackageParityReport(home);
-  const db = await buildDbMigrationReport();
-  for (const check of db.checks) {
-    if (check.status === "fail") errors += 1;
-    else if (check.status === "warn") warnings += 1;
-  }
-  if (db.error) errors += 1;
   const productKernel = await buildProductKernelReport();
+  const embeddingsSchema = await buildEmbeddingsSchemaReport();
   if (productKernel.error) {
     // A PGlite/Postgres failure means a key product surface is offline.
     // Surface it through the doctor verdict so users see "verdict: error"
     // instead of the previous silent "ok".
     errors += 1;
-  }
-  const memoriesSchema = await buildMemoriesSchemaReport();
-  if (!memoriesSchema.ok) errors += 1;
-  const platformChecks = await runPlatformDoctorChecks();
-  for (const platformCheck of platformChecks) {
-    if (platformCheck.status === "fail") errors += 1;
-    else if (platformCheck.status === "warn") warnings += 1;
-  }
-  const sandboxProviders = await sandboxProviderDoctorChecks();
-  for (const check of sandboxProviders) {
-    if (check.status === "error") errors += 1;
-    else if (check.status === "warn") warnings += 1;
   }
 
   // Managed MCPs
@@ -742,11 +709,8 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       database: componentDatabase,
       packageParity,
     },
-    db,
     productKernel,
-    memoriesSchema,
-    platformChecks,
-    sandboxProviders,
+    embeddingsSchema,
     worktrees,
     skillBudget,
     skillsCount,
@@ -778,127 +742,6 @@ async function buildPackageParityReport(home: string): Promise<PackageParityRepo
   return reports;
 }
 
-async function buildDbMigrationReport(): Promise<DoctorReport["db"]> {
-  const dbPath = join(fulcrumHome(), "db", "main");
-  if (!(await exists(join(dbPath, "PG_VERSION")))) {
-    return {
-      engine: "absent",
-      dbPath,
-      checks: [
-        {
-          check: "db.migrationVersion",
-          status: "warn",
-          detail: "Local database is not initialized.",
-          hint: "Run `fulcrum init`.",
-        },
-      ],
-    };
-  }
-
-  try {
-    const { PGlite } = await import("@electric-sql/pglite");
-    const { MikroORM } = await import("@mikro-orm/postgresql");
-    const { Migrator } = await import("@mikro-orm/migrations");
-    const { PGliteKyselyDialect } = await import("../db/PGliteKyselyDriver.ts");
-    const { createOrmConfig } = await import("../db/mikro-orm.config.ts");
-    const { registerDbBindings, SchemaMigrationRepository } = await import("../db/db.module.ts");
-    const { dbMigrationVersion, dbCanRunOnCurrentBinary } = await import("../db/doctor-checks.ts");
-    const { Container } = await import("@needle-di/core");
-
-    const pglite = new PGlite(dbPath);
-    await pglite.waitReady;
-    const dialect = new PGliteKyselyDialect(() => pglite);
-    const orm = await MikroORM.init({
-      ...createOrmConfig({ pglite, debug: false }),
-      driverOptions: dialect,
-      extensions: [Migrator],
-    });
-    try {
-      const container = new Container();
-      registerDbBindings(container, orm, orm.em.fork());
-      const repo = container.get(SchemaMigrationRepository);
-      return {
-        engine: "pglite",
-        dbPath,
-        checks: [
-          await dbMigrationVersion(repo),
-          await dbCanRunOnCurrentBinary(repo),
-        ],
-      };
-    } finally {
-      await orm.close(true);
-      await pglite.close();
-    }
-  } catch (err) {
-    return {
-      engine: "absent",
-      dbPath,
-      checks: [],
-      error: (err as Error).message,
-    };
-  }
-}
-
-async function buildMemoriesSchemaReport(): Promise<DoctorReport["memoriesSchema"]> {
-  try {
-    const { MikroORM } = await import("@mikro-orm/postgresql");
-    const {
-      ContextSnapshot,
-      Memory,
-      MemoryLink,
-      createOrmConfig,
-    } = await import("../db/mikro-orm.config.ts");
-    const orm = await MikroORM.init(createOrmConfig());
-    try {
-      const memory = orm.getMetadata().get(Memory);
-      const memoryLink = orm.getMetadata().get(MemoryLink);
-      const contextSnapshot = orm.getMetadata().get(ContextSnapshot);
-      const memoryProps = [
-        "id",
-        "orgId",
-        "projectId",
-        "global",
-        "kind",
-        "body",
-        "tags",
-        "importance",
-        "source",
-        "sourceRef",
-        "createdAt",
-        "updatedAt",
-        "archived",
-      ];
-      const memoryProperties = memory.properties as Record<string, unknown>;
-      const hasMemoryProps = memoryProps.every((prop) => memoryProperties[prop]);
-      const memoryIndexes = [
-        "memories_org_project_importance",
-        "memories_org_kind",
-        "memories_org_archived",
-        "memories_org_global",
-        "memories_body_tsv",
-      ];
-      const linkIndexes = ["memory_links_memory", "memory_links_target"];
-      const snapshotIndexes = ["context_snapshots_run", "context_snapshots_task"];
-      const hasIndexes = (
-        meta: { indexes?: Array<{ name?: string }> },
-        names: string[],
-      ) => names.every((name) => meta.indexes?.some((index) => index.name === name));
-
-      return {
-        subsystem: "memories_schema",
-        ok: hasMemoryProps &&
-          hasIndexes(memory, memoryIndexes) &&
-          hasIndexes(memoryLink, linkIndexes) &&
-          hasIndexes(contextSnapshot, snapshotIndexes),
-      };
-    } finally {
-      await orm.close(true);
-    }
-  } catch {
-    return { subsystem: "memories_schema", ok: false };
-  }
-}
-
 async function buildProductKernelReport(): Promise<DoctorReport["productKernel"]> {
   const { productDbDir } = await import("../product-kernel/paths.ts");
   const dir = productDbDir();
@@ -917,37 +760,10 @@ async function buildProductKernelReport(): Promise<DoctorReport["productKernel"]
     const { openPglite } = await import("../product-kernel/db/pglite.ts");
     const db = await openPglite(dbPath);
     try {
-      const schemaApplied = await countProductKernelMigrationFiles();
-      let counts: Array<{
-        orgs: number;
-        projects: number;
-        documents: number;
-        tasks: number;
-        agent_runs: number;
-      }>;
-      let latest: Array<{ created_at: string | null }>;
-
-      try {
-        counts = await db.query<{
-          orgs: number;
-          projects: number;
-          documents: number;
-          tasks: number;
-          agent_runs: number;
-        }>(
-          `SELECT (SELECT COUNT(*)::int FROM orgs) AS orgs,
-                  (SELECT COUNT(*)::int FROM projects) AS projects,
-                  (SELECT COUNT(*)::int FROM documents) AS documents,
-                  (SELECT COUNT(*)::int FROM tasks) AS tasks,
-                  (SELECT COUNT(*)::int FROM agent_runs) AS agent_runs`,
-        );
-        latest = await db.query<{ created_at: string | null }>(
-          `SELECT created_at FROM events ORDER BY created_at DESC, id DESC LIMIT 1`,
-        );
-      } catch (err) {
-        if (!String((err as Error).message).includes("does not exist")) {
-          throw err;
-        }
+      const schemaRows = await db.query<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM pg_class WHERE relname = 'schema_migrations' AND relkind = 'r'`,
+      );
+      if ((schemaRows[0]?.count ?? 0) === 0) {
         return {
           engine: "pglite",
           dbPath,
@@ -956,11 +772,29 @@ async function buildProductKernelReport(): Promise<DoctorReport["productKernel"]
           latestEventAt: null,
         };
       }
-
+      const applied = await db.query<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM schema_migrations`,
+      );
+      const counts = await db.query<{
+        orgs: number;
+        projects: number;
+        documents: number;
+        tasks: number;
+        agent_runs: number;
+      }>(
+        `SELECT (SELECT COUNT(*)::int FROM orgs) AS orgs,
+                (SELECT COUNT(*)::int FROM projects) AS projects,
+                (SELECT COUNT(*)::int FROM documents) AS documents,
+                (SELECT COUNT(*)::int FROM tasks) AS tasks,
+                (SELECT COUNT(*)::int FROM agent_runs) AS agent_runs`,
+      );
+      const latest = await db.query<{ created_at: string | null }>(
+        `SELECT created_at FROM events ORDER BY created_at DESC, id DESC LIMIT 1`,
+      );
       return {
         engine: "pglite",
         dbPath,
-        schemaApplied,
+        schemaApplied: applied[0]?.count ?? 0,
         rows: {
           orgs: counts[0]?.orgs ?? 0,
           projects: counts[0]?.projects ?? 0,
@@ -985,9 +819,65 @@ async function buildProductKernelReport(): Promise<DoctorReport["productKernel"]
   }
 }
 
-async function countProductKernelMigrationFiles(): Promise<number> {
-  const migrationsDir = new URL("../product-kernel/db/migrations", import.meta.url).pathname;
-  return (await readdir(migrationsDir)).filter((name) => name.endsWith(".sql")).length;
+async function buildEmbeddingsSchemaReport(): Promise<DoctorReport["embeddingsSchema"]> {
+  const flag = (process.env.FULCRUM_FEATURES ?? "").split(",").map(s => s.trim()).includes("embeddings")
+    ? "on" as const
+    : "off" as const;
+  const absent: DoctorReport["embeddingsSchema"] = {
+    status: "absent",
+    tables: { memory_embeddings: false, doc_embeddings: false },
+    indexes: { memory_embeddings_hnsw: false, doc_embeddings_hnsw: false },
+    vectorDim: null,
+    flag,
+  };
+  try {
+    const { productDbDir } = await import("../product-kernel/paths.ts");
+    const dir = productDbDir();
+    const dbPath = `${dir}/main`;
+    const pgExists = await Bun.file(`${dbPath}/PG_VERSION`).exists();
+    if (!pgExists) return absent;
+
+    const { openPglite } = await import("../product-kernel/db/pglite.ts");
+    const db = await openPglite(dbPath);
+    try {
+      const tblRows = await db.query<{ relname: string }>(
+        `SELECT relname FROM pg_class WHERE relname IN ('memory_embeddings', 'doc_embeddings') AND relkind = 'r'`,
+      );
+      const tables = {
+        memory_embeddings: tblRows.some(r => r.relname === "memory_embeddings"),
+        doc_embeddings: tblRows.some(r => r.relname === "doc_embeddings"),
+      };
+      const idxRows = await db.query<{ relname: string }>(
+        `SELECT relname FROM pg_class WHERE relname IN ('memory_embeddings_hnsw', 'doc_embeddings_hnsw') AND relkind = 'i'`,
+      );
+      const indexes = {
+        memory_embeddings_hnsw: idxRows.some(r => r.relname === "memory_embeddings_hnsw"),
+        doc_embeddings_hnsw: idxRows.some(r => r.relname === "doc_embeddings_hnsw"),
+      };
+      let vectorDim: number | null = null;
+      if (tables.memory_embeddings) {
+        const dimRows = await db.query<{ atttypmod: number }>(
+          `SELECT a.atttypmod FROM pg_attribute a
+           JOIN pg_class c ON c.oid = a.attrelid
+           WHERE c.relname = 'memory_embeddings' AND a.attname = 'embedding'`,
+        );
+        if (dimRows.length > 0) vectorDim = dimRows[0]!.atttypmod;
+      }
+      const allPresent = tables.memory_embeddings && tables.doc_embeddings
+        && indexes.memory_embeddings_hnsw && indexes.doc_embeddings_hnsw;
+      return {
+        status: allPresent ? "ok" : "absent",
+        tables,
+        indexes,
+        vectorDim,
+        flag,
+      };
+    } finally {
+      await db.close();
+    }
+  } catch (err) {
+    return { ...absent, status: "error", error: (err as Error).message };
+  }
 }
 
 function printHumanFormat(report: DoctorReport, home: string): void {
@@ -1030,15 +920,6 @@ function printHumanFormat(report: DoctorReport, home: string): void {
         );
       }
     }
-  }
-  console.log();
-
-  // Sandcastle provider gates
-  console.log("Sandcastle providers:");
-  for (const check of report.sandboxProviders) {
-    const mark = check.status === "ok" ? "✓" : check.status === "warn" ? "⚠" : "✗";
-    console.log(`  ${pad(check.flag, 22)} ${mark}  ${check.detail}`);
-    if (check.hint) console.log(`    ${check.hint}`);
   }
   console.log();
 
@@ -1105,19 +986,13 @@ function printHumanFormat(report: DoctorReport, home: string): void {
   }
   console.log();
 
-  console.log(
-    `Memories schema: ${report.memoriesSchema.ok ? "ok" : "failed"} (${report.memoriesSchema.subsystem})`,
-  );
-  console.log();
-
-  console.log("Platform checks:");
-  for (const platformCheck of report.platformChecks) {
-    const mark =
-      platformCheck.status === "pass" ? "✓" :
-      platformCheck.status === "warn" ? "⚠" :
-      platformCheck.status === "skip" ? "·" :
-      "✗";
-    console.log(`  ${pad(platformCheck.name, 28)} ${mark}  ${platformCheck.message}`);
+  // Embeddings schema
+  const es = report.embeddingsSchema;
+  console.log(`Embeddings schema: ${es.status}  flag: ${es.flag}`);
+  if (es.status === "ok") {
+    console.log(`  vector dim: ${es.vectorDim ?? "unknown"}`);
+  } else if (es.error) {
+    console.log(`  error: ${es.error}`);
   }
   console.log();
 
