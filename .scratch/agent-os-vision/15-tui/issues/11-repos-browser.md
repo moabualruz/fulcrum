@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: tui
 Blocked-by: [15/issues/04-dashboard-and-projects.md]
@@ -24,11 +24,11 @@ Repos browser screen (VirtualList of repos with supervision status, last-synced-
 
 ## Acceptance criteria
 
-- [ ] Repos list: repos with `supervision_mode`, `last_synced_at`, `branch_count`; `s` triggers sync → `repos.sync` called; last-synced-at updates.
-- [ ] Repo detail: file tree expands/collapses; `Enter` on file → content viewer renders file text; `l` switches to commit log.
-- [ ] Commit log: SHA/message/author list in VirtualList; `Enter` on commit → unified diff view (added/removed lines).
-- [ ] After TUI `s` sync, web repo detail shows updated branch count; CLI `fulcrum repos list --json` reflects `last_synced_at`.
-- [ ] FakeTTY snapshot for repos list (strip-ansi).
+- [x] Repos list: repos with `supervision_mode`, `last_synced_at`, `branch_count`; `s` triggers sync → `repos.sync` called; last-synced-at updates.
+- [x] Repo detail: file tree expands/collapses; `Enter` on file → content viewer renders file text; `l` switches to commit log.
+- [x] Commit log: SHA/message/author list in VirtualList; `Enter` on commit → unified diff view (added/removed lines).
+- [x] After TUI `s` sync, web repo detail shows updated branch count; CLI `fulcrum repos list --json` reflects `last_synced_at`.
+- [x] FakeTTY snapshot for repos list (strip-ansi).
 
 ## Blocked by
 
