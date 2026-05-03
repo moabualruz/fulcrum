@@ -1,6 +1,8 @@
 ---
-Status: in-progress
+Status: implemented
 Owner: claude-orchestrator
+ImplCommit: 3bc64d98
+ImplRuntime: claude
 Triage: AFK
 Pillar: 02-inference-sidecar
 Blocked-by: 06-models-registry-pull-list-rm

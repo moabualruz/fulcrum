@@ -1,6 +1,8 @@
 ---
-Status: in-progress
+Status: implemented
 Owner: claude-orchestrator
+ImplCommit: 31333891
+ImplRuntime: claude
 Triage: AFK
 Pillar: 02-inference-sidecar
 Blocked-by: 05-embed-operation

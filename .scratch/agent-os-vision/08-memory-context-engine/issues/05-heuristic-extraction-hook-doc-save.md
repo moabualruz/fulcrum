@@ -1,6 +1,8 @@
 ---
-Status: in-progress
+Status: implemented
 Owner: claude-orchestrator
+ImplCommit: 8f177398
+ImplRuntime: claude
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [03-heuristic-extractor-core.md]
