@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 04-sandcastle-wrapper
 Blocked-by: 12-artifact-harvest
