@@ -31,3 +31,20 @@ export {
   type AssignmentCounts,
   type MetricsResult,
 } from "./experiments.ts";
+
+/**
+ * Env-var feature gate: checks FULCRUM_FEATURES for a token.
+ * Used by TUI screens and other lightweight callers that don't need the full
+ * FlagRegistry (which requires DB context).
+ */
+export function isEnabled(
+  name: string,
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  const raw = env["FULCRUM_FEATURES"] ?? "";
+  return raw.split(",").map((s) => s.trim()).filter(Boolean).includes(name);
+}
+
+export function resetFeaturesCache(): void {
+  // No-op — env is re-read each call. Kept for test compat.
+}
