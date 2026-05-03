@@ -138,7 +138,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     flags)
-      local -a values=('evaluate:fulcrum flags evaluate' 'list:fulcrum flags list' 'set:fulcrum flags set' 'set-override:fulcrum flags set-override' 'set-rollout:fulcrum flags set-rollout' '--json:option')
+      local -a values=('evaluate:fulcrum flags evaluate' 'experiments assignments:fulcrum flags experiments assignments' 'experiments create:fulcrum flags experiments create' 'experiments list:fulcrum flags experiments list' 'experiments metrics:fulcrum flags experiments metrics' 'list:fulcrum flags list' 'set:fulcrum flags set' 'set-override:fulcrum flags set-override' 'set-rollout:fulcrum flags set-rollout' '--json:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
         _values 'ids' $(_fulcrum_dynamic_ids 'flags')
         return

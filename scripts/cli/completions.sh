@@ -241,7 +241,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     flags)
-      local verbs='evaluate list set set-override set-rollout'
+      local verbs='evaluate experiments assignments experiments create experiments list experiments metrics list set set-override set-rollout'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )

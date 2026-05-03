@@ -140,6 +140,10 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'errorLogs'" -l json -d opti
 complete -c fulcrum -n "__fish_seen_subcommand_from 'errorLogs'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'errorLogs')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'flags' -d 'fulcrum flags'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'flags'" -a 'evaluate' -d 'flags evaluate'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'flags'" -a 'experiments assignments' -d 'flags experiments assignments'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'flags'" -a 'experiments create' -d 'flags experiments create'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'flags'" -a 'experiments list' -d 'flags experiments list'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'flags'" -a 'experiments metrics' -d 'flags experiments metrics'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'flags'" -a 'list' -d 'flags list'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'flags'" -a 'set' -d 'flags set'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'flags'" -a 'set-override' -d 'flags set-override'

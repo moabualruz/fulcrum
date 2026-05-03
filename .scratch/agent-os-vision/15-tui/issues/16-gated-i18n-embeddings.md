@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: tui
 Blocked-by: [15/issues/14-settings-navigator-and-core-screens.md, 15/issues/12-search-and-notifications.md]

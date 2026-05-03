@@ -24,6 +24,80 @@ export function createFlagsCommand(): Command {
     }
   });
 
+  const experimentsAssignmentsCommand = command.command("experiments assignments");
+  experimentsAssignmentsCommand.description("flags experiments assignments");
+  experimentsAssignmentsCommand.option("--json", "Emit JSON output");
+  experimentsAssignmentsCommand.option("--experiment-id <string>", "experiment-id");
+  experimentsAssignmentsCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for flags.experiments.assignments is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const experimentsCreateCommand = command.command("experiments create");
+  experimentsCreateCommand.description("flags experiments create");
+  experimentsCreateCommand.option("--json", "Emit JSON output");
+  experimentsCreateCommand.option("--description <string>", "description");
+  experimentsCreateCommand.option("--name <string>", "name");
+  experimentsCreateCommand.option("--rollout-percent <number>", "rollout-percent", Number.parseFloat);
+  experimentsCreateCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for flags.experiments.create is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const experimentsListCommand = command.command("experiments list");
+  experimentsListCommand.description("flags experiments list");
+  experimentsListCommand.option("--json", "Emit JSON output");
+  experimentsListCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for flags.experiments.list is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const experimentsMetricsCommand = command.command("experiments metrics");
+  experimentsMetricsCommand.description("flags experiments metrics");
+  experimentsMetricsCommand.option("--json", "Emit JSON output");
+  experimentsMetricsCommand.option("--conversion-kind <string>", "conversion-kind");
+  experimentsMetricsCommand.option("--experiment-id <string>", "experiment-id");
+  experimentsMetricsCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for flags.experiments.metrics is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   const listCommand = command.command("list");
   listCommand.description("flags list");
   listCommand.option("--json", "Emit JSON output");
