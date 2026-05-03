@@ -8,6 +8,10 @@ import {
   listDocuments,
   listProjects,
   listRuns,
+  listSprints,
+  listBacklogTasks,
+  listSprintTasks,
+  getSprintVelocity,
   type BoardTask,
 } from "./product-queries.ts";
 import { openPglite } from "../../../product-kernel/db/pglite.ts";
@@ -17,6 +21,7 @@ import {
   createLocalOrg,
   createProject,
   createTask,
+  createSprint,
 } from "../../../product-kernel/store/repositories.ts";
 import { newUlid } from "../../../product-kernel/ids.ts";
 
@@ -92,6 +97,91 @@ describe("web product-queries", () => {
     expect(runs).toHaveLength(1);
     expect(runs[0]?.agent).toBe("codex");
     expect(runs[0]?.status).toBe("succeeded");
+  });
+
+  test("listSprints returns sprints with aggregated estimates", async () => {
+    const { project } = await seed();
+    // seed a sprint with tasks
+    const db2 = await openPglite(join(productDbDir(), "main"));
+    await runMigrations(db2);
+    const org = (await db2.query<{ id: string }>(`SELECT id FROM orgs WHERE slug = 'default'`))[0]!;
+    const sprint = await createSprint(db2, {
+      orgId: org.id,
+      projectId: project.id,
+      name: "Sprint 1",
+      capacity: 20,
+    });
+    const task = await createTask(db2, {
+      orgId: org.id,
+      projectId: project.id,
+      title: "Sprint task",
+    });
+    await db2.query(`UPDATE tasks SET sprint_id = $1, estimate = 5 WHERE id = $2`, [sprint.id, task.id]);
+    await db2.close();
+
+    const sprints = await listSprints(project.id);
+    expect(sprints).toHaveLength(1);
+    expect(sprints[0]?.name).toBe("Sprint 1");
+    expect(sprints[0]?.total_estimate).toBe(5);
+    expect(sprints[0]?.task_count).toBe(1);
+  });
+
+  test("listBacklogTasks returns only unassigned tasks", async () => {
+    const { project } = await seed();
+    // seed has 2 tasks with no sprint_id — both should appear
+    const backlog = await listBacklogTasks(project.id);
+    expect(backlog.length).toBeGreaterThanOrEqual(2);
+    for (const t of backlog) {
+      expect(t.sprint_id).toBeNull();
+    }
+  });
+
+  test("listSprintTasks returns only tasks assigned to sprint", async () => {
+    const { project } = await seed();
+    const db2 = await openPglite(join(productDbDir(), "main"));
+    await runMigrations(db2);
+    const org = (await db2.query<{ id: string }>(`SELECT id FROM orgs WHERE slug = 'default'`))[0]!;
+    const sprint = await createSprint(db2, {
+      orgId: org.id,
+      projectId: project.id,
+      name: "Sprint 2",
+    });
+    const task = await createTask(db2, {
+      orgId: org.id,
+      projectId: project.id,
+      title: "In sprint",
+    });
+    await db2.query(`UPDATE tasks SET sprint_id = $1 WHERE id = $2`, [sprint.id, task.id]);
+    await db2.close();
+
+    const tasks = await listSprintTasks(sprint.id);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]?.title).toBe("In sprint");
+  });
+
+  test("getSprintVelocity returns completed sprint points", async () => {
+    const { project } = await seed();
+    const db2 = await openPglite(join(productDbDir(), "main"));
+    await runMigrations(db2);
+    const org = (await db2.query<{ id: string }>(`SELECT id FROM orgs WHERE slug = 'default'`))[0]!;
+    const sprint = await createSprint(db2, {
+      orgId: org.id,
+      projectId: project.id,
+      name: "Done Sprint",
+    });
+    await db2.query(`UPDATE sprints SET status = 'completed' WHERE id = $1`, [sprint.id]);
+    const task = await createTask(db2, {
+      orgId: org.id,
+      projectId: project.id,
+      title: "Done task",
+      status: "completed",
+    });
+    await db2.query(`UPDATE tasks SET sprint_id = $1, estimate = 8 WHERE id = $2`, [sprint.id, task.id]);
+    await db2.close();
+
+    const velocity = await getSprintVelocity(project.id);
+    expect(velocity).toHaveLength(1);
+    expect(velocity[0]?.points).toBe(8);
   });
 
   test("groupTasksByStatus is pure and stable", () => {

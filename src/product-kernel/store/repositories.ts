@@ -157,99 +157,58 @@ export async function appendEvent(
   return rows[0] as EventRow;
 }
 
-// ── Repos ──────────────────────────────────────────────────────
-
-export interface RepoRow {
+export interface SprintRow {
   id: string;
   org_id: string;
-  project_id: string | null;
-  slug: string;
-  root_path: string;
-  default_branch: string | null;
-  remote_url: string | null;
+  project_id: string;
   name: string;
-  kind: string;
-  local_path: string | null;
-  current_branch: string | null;
-  last_sync_at: string | Date | null;
-  sync_status: string;
-  last_touched_at: string | Date | null;
-  archived: boolean;
-  registered_at: string;
-  last_seen_at: string;
+  goal: string | null;
+  status: string;
+  capacity: number;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface CreateRepoInput {
-  orgId: string;
-  projectId?: string | null;
-  slug: string;
-  rootPath: string;
-  defaultBranch?: string | null;
-  remoteUrl?: string | null;
-  name: string;
-  kind: "local" | "remote";
-  localPath?: string | null;
-  currentBranch?: string | null;
-}
-
-export async function createRepo(
+export async function createSprint(
   db: ProductDb,
-  input: CreateRepoInput,
-): Promise<RepoRow> {
+  input: {
+    orgId: string;
+    projectId: string;
+    name: string;
+    goal?: string | null;
+    capacity?: number;
+    startDate?: string | null;
+    endDate?: string | null;
+  },
+): Promise<SprintRow> {
   const id = newUlid();
   await db.query(
-    `INSERT INTO repos (id, org_id, project_id, slug, root_path, default_branch, remote_url, name, kind, local_path, current_branch, sync_status, last_touched_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'idle', now())`,
+    `INSERT INTO sprints (id, org_id, project_id, name, goal, capacity, start_date, end_date)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [
       id,
       input.orgId,
-      input.projectId ?? null,
-      input.slug,
-      input.rootPath,
-      input.defaultBranch ?? "main",
-      input.remoteUrl ?? null,
+      input.projectId,
       input.name,
-      input.kind,
-      input.localPath ?? null,
-      input.currentBranch ?? "main",
+      input.goal ?? null,
+      input.capacity ?? 0,
+      input.startDate ?? null,
+      input.endDate ?? null,
     ],
   );
   await appendEvent(db, {
     orgId: input.orgId,
-    projectId: input.projectId ?? null,
+    projectId: input.projectId,
     actor: "system",
-    subjectKind: "repo",
+    subjectKind: "sprint",
     subjectId: id,
     verb: "created",
-    payload: { name: input.name, kind: input.kind },
   });
-  const rows = await db.query<RepoRow>(`SELECT * FROM repos WHERE id = $1`, [id]);
-  if (rows.length === 0) throw new Error(`repo insert lost: ${id}`);
-  return rows[0] as RepoRow;
-}
-
-export async function listReposForProject(
-  db: ProductDb,
-  projectId: string,
-  orgId: string,
-): Promise<RepoRow[]> {
-  return db.query<RepoRow>(
-    `SELECT * FROM repos
-     WHERE project_id = $1 AND org_id = $2 AND COALESCE(archived, false) = false
-     ORDER BY COALESCE(last_touched_at, last_sync_at) DESC NULLS LAST, slug ASC`,
-    [projectId, orgId],
-  );
-}
-
-export async function linkRepoToProject(
-  db: ProductDb,
-  repoId: string,
-  projectId: string,
-): Promise<void> {
-  await db.query(
-    `UPDATE repos SET project_id = $1 WHERE id = $2`,
-    [projectId, repoId],
-  );
+  const rows = await db.query<SprintRow>(`SELECT * FROM sprints WHERE id = $1`, [id]);
+  if (rows.length === 0) throw new Error(`sprint insert lost: ${id}`);
+  return rows[0] as SprintRow;
 }
 
 export async function listEventsForProject(
@@ -259,266 +218,5 @@ export async function listEventsForProject(
   return db.query<EventRow>(
     `SELECT * FROM events WHERE project_id = $1 ORDER BY created_at ASC, id ASC`,
     [projectId],
-  );
-}
-
-// ── Notifications ──────────────────────────────────────────────
-
-export interface NotificationRow {
-  id: string;
-  org_id: string;
-  user_id: string;
-  event_id: string;
-  rule_id: string | null;
-  entity_kind: string;
-  entity_id: string;
-  title: string;
-  verb: string;
-  actor: string;
-  read_at: string | null;
-  created_at: string;
-}
-
-export interface CreateNotificationInput {
-  orgId: string;
-  userId: string;
-  eventId: string;
-  ruleId?: string | null;
-  entityKind: string;
-  entityId: string;
-  title: string;
-  verb: string;
-  actor: string;
-}
-
-export async function createNotification(
-  db: ProductDb,
-  input: CreateNotificationInput,
-): Promise<NotificationRow> {
-  const id = newUlid();
-  await db.query(
-    `INSERT INTO user_notifications (id, org_id, user_id, event_id, rule_id, entity_kind, entity_id, title, verb, actor)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [
-      id, input.orgId, input.userId, input.eventId, input.ruleId ?? null,
-      input.entityKind, input.entityId, input.title, input.verb, input.actor,
-    ],
-  );
-  const rows = await db.query<NotificationRow>(
-    `SELECT * FROM user_notifications WHERE id = $1`, [id],
-  );
-  if (rows.length === 0) throw new Error(`notification insert lost: ${id}`);
-  return rows[0] as NotificationRow;
-}
-
-export async function listNotifications(
-  db: ProductDb,
-  userId: string,
-  opts?: { limit?: number; offset?: number },
-): Promise<NotificationRow[]> {
-  const limit = opts?.limit ?? 20;
-  const offset = opts?.offset ?? 0;
-  return db.query<NotificationRow>(
-    `SELECT * FROM user_notifications
-     WHERE user_id = $1
-     ORDER BY created_at DESC, id DESC
-     LIMIT $2 OFFSET $3`,
-    [userId, limit, offset],
-  );
-}
-
-export async function countUnreadNotifications(
-  db: ProductDb,
-  userId: string,
-): Promise<number> {
-  const rows = await db.query<{ count: string | number }>(
-    `SELECT count(*) AS count FROM user_notifications WHERE user_id = $1 AND read_at IS NULL`,
-    [userId],
-  );
-  return Number((rows[0] as { count: string | number }).count);
-}
-
-export async function markNotificationRead(
-  db: ProductDb,
-  notificationId: string,
-): Promise<void> {
-  await db.query(
-    `UPDATE user_notifications SET read_at = now() WHERE id = $1 AND read_at IS NULL`,
-    [notificationId],
-  );
-}
-
-export async function listEventsForEntity(
-  db: ProductDb,
-  entityKind: string,
-  entityId: string,
-  opts?: { limit?: number },
-): Promise<EventRow[]> {
-  const limit = opts?.limit ?? 20;
-  return db.query<EventRow>(
-    `SELECT * FROM events
-     WHERE subject_kind = $1 AND subject_id = $2
-     ORDER BY created_at DESC, id DESC
-     LIMIT $3`,
-    [entityKind, entityId, limit],
-  );
-}
-
-export interface EventFilterInput {
-  orgId: string;
-  projectId?: string | null;
-  actorId?: string | null;
-  subjectKind?: string | null;
-  verb?: string | null;
-  limit?: number;
-  offset?: number;
-}
-
-export async function listEventsFiltered(
-  db: ProductDb,
-  filter: EventFilterInput,
-): Promise<EventRow[]> {
-  const conditions: string[] = ["org_id = $1"];
-  const params: unknown[] = [filter.orgId];
-  let idx = 2;
-
-  if (filter.projectId) {
-    conditions.push(`project_id = $${idx++}`);
-    params.push(filter.projectId);
-  }
-  if (filter.actorId) {
-    conditions.push(`actor = $${idx++}`);
-    params.push(filter.actorId);
-  }
-  if (filter.subjectKind) {
-    conditions.push(`subject_kind = $${idx++}`);
-    params.push(filter.subjectKind);
-  }
-  if (filter.verb) {
-    conditions.push(`verb = $${idx++}`);
-    params.push(filter.verb);
-  }
-
-  const limit = filter.limit ?? 20;
-  const offset = filter.offset ?? 0;
-  params.push(limit, offset);
-
-  return db.query<EventRow>(
-    `SELECT * FROM events
-     WHERE ${conditions.join(" AND ")}
-     ORDER BY created_at DESC, id DESC
-     LIMIT $${idx++} OFFSET $${idx}`,
-    params,
-  );
-}
-
-// ── Repos ──────────────────────────────────────────────────────
-
-export interface RepoRow {
-  id: string;
-  org_id: string;
-  project_id: string | null;
-  slug: string;
-  root_path: string;
-  default_branch: string | null;
-  remote_url: string | null;
-  name: string;
-  kind: string;
-  local_path: string | null;
-  current_branch: string | null;
-  last_sync_at: string | Date | null;
-  sync_status: string;
-  last_touched_at: string | Date | null;
-  archived: boolean;
-  registered_at: string;
-  last_seen_at: string;
-}
-
-export interface CreateRepoInput {
-  orgId: string;
-  projectId?: string | null;
-  slug: string;
-  rootPath: string;
-  defaultBranch?: string | null;
-  remoteUrl?: string | null;
-  name: string;
-  kind: "local" | "remote";
-  localPath?: string | null;
-  currentBranch?: string | null;
-}
-
-export async function createRepo(
-  db: ProductDb,
-  input: CreateRepoInput,
-): Promise<RepoRow> {
-  const id = newUlid();
-  await db.query(
-    `INSERT INTO repos (id, org_id, project_id, slug, root_path, default_branch, remote_url, name, kind, local_path, current_branch, sync_status, last_touched_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'idle', now())`,
-    [
-      id,
-      input.orgId,
-      input.projectId ?? null,
-      input.slug,
-      input.rootPath,
-      input.defaultBranch ?? "main",
-      input.remoteUrl ?? null,
-      input.name,
-      input.kind,
-      input.localPath ?? null,
-      input.currentBranch ?? "main",
-    ],
-  );
-  await appendEvent(db, {
-    orgId: input.orgId,
-    projectId: input.projectId ?? null,
-    actor: "system",
-    subjectKind: "repo",
-    subjectId: id,
-    verb: "created",
-    payload: { name: input.name, kind: input.kind },
-  });
-  const rows = await db.query<RepoRow>(`SELECT * FROM repos WHERE id = $1`, [id]);
-  if (rows.length === 0) throw new Error(`repo insert lost: ${id}`);
-  return rows[0] as RepoRow;
-}
-
-export async function listReposForProject(
-  db: ProductDb,
-  projectId: string,
-  orgId: string,
-): Promise<RepoRow[]> {
-  return db.query<RepoRow>(
-    `SELECT * FROM repos
-     WHERE project_id = $1 AND org_id = $2 AND COALESCE(archived, false) = false
-     ORDER BY COALESCE(last_touched_at, last_sync_at) DESC NULLS LAST, slug ASC`,
-    [projectId, orgId],
-  );
-}
-
-export async function linkRepoToProject(
-  db: ProductDb,
-  repoId: string,
-  projectId: string,
-): Promise<void> {
-  await db.query(
-    `UPDATE repos SET project_id = $1 WHERE id = $2`,
-    [projectId, repoId],
-  );
-}
-
-export async function listEventsByActor(
-  db: ProductDb,
-  actor: string,
-  opts?: { limit?: number; offset?: number },
-): Promise<EventRow[]> {
-  const limit = opts?.limit ?? 20;
-  const offset = opts?.offset ?? 0;
-  return db.query<EventRow>(
-    `SELECT * FROM events
-     WHERE actor = $1
-     ORDER BY created_at DESC, id DESC
-     LIMIT $2 OFFSET $3`,
-    [actor, limit, offset],
   );
 }

@@ -146,6 +146,109 @@ export async function listRuns(projectId?: string | null): Promise<RunListing[]>
   }
 }
 
+export interface SprintListing {
+  id: string;
+  name: string;
+  goal: string | null;
+  status: string;
+  capacity: number;
+  start_date: string | null;
+  end_date: string | null;
+  total_estimate: number;
+  task_count: number;
+}
+
+export interface BacklogTask extends BoardTask {
+  estimate: number;
+  sprint_id: string | null;
+}
+
+interface RawSprint {
+  id: string; name: string; goal: string | null; status: string;
+  capacity: number; start_date: string | Date | null; end_date: string | Date | null;
+  total_estimate: number; task_count: number;
+}
+
+interface RawBacklogTask extends RawTask {
+  estimate: number;
+  sprint_id: string | null;
+}
+
+export async function listSprints(projectId: string): Promise<SprintListing[]> {
+  const db = await open();
+  try {
+    const rows = await db.query<RawSprint>(
+      `SELECT s.id, s.name, s.goal, s.status, s.capacity, s.start_date, s.end_date,
+              COALESCE(SUM(t.estimate), 0)::int AS total_estimate,
+              COUNT(t.id)::int AS task_count
+         FROM sprints s
+         LEFT JOIN tasks t ON t.sprint_id = s.id
+        WHERE s.project_id = $1
+        GROUP BY s.id
+        ORDER BY s.created_at ASC, s.id ASC`,
+      [projectId],
+    );
+    return rows.map((r) => ({
+      ...r,
+      start_date: isoStampOrNull(r.start_date),
+      end_date: isoStampOrNull(r.end_date),
+    }));
+  } finally {
+    await db.close();
+  }
+}
+
+export async function listBacklogTasks(projectId: string): Promise<BacklogTask[]> {
+  const db = await open();
+  try {
+    const rows = await db.query<RawBacklogTask>(
+      `SELECT id, title, status, priority, project_id, updated_at, estimate, sprint_id
+         FROM tasks
+        WHERE project_id = $1 AND sprint_id IS NULL
+        ORDER BY priority DESC, updated_at DESC, id ASC`,
+      [projectId],
+    );
+    return rows.map((r) => ({ ...r, updated_at: isoStamp(r.updated_at) }));
+  } finally {
+    await db.close();
+  }
+}
+
+export async function listSprintTasks(sprintId: string): Promise<BacklogTask[]> {
+  const db = await open();
+  try {
+    const rows = await db.query<RawBacklogTask>(
+      `SELECT id, title, status, priority, project_id, updated_at, estimate, sprint_id
+         FROM tasks
+        WHERE sprint_id = $1
+        ORDER BY priority DESC, updated_at DESC, id ASC`,
+      [sprintId],
+    );
+    return rows.map((r) => ({ ...r, updated_at: isoStamp(r.updated_at) }));
+  } finally {
+    await db.close();
+  }
+}
+
+export async function getSprintVelocity(projectId: string): Promise<{ sprintName: string; points: number }[]> {
+  const db = await open();
+  try {
+    const rows = await db.query<{ name: string; points: number }>(
+      `SELECT s.name, COALESCE(SUM(t.estimate), 0)::int AS points
+         FROM sprints s
+         LEFT JOIN tasks t ON t.sprint_id = s.id AND t.status = 'completed'
+        WHERE s.project_id = $1 AND s.status = 'completed'
+        GROUP BY s.id, s.name, s.created_at
+        ORDER BY s.created_at DESC
+        LIMIT 5`,
+      [projectId],
+    );
+    return rows.map((r) => ({ sprintName: r.name, points: r.points }));
+  } finally {
+    await db.close();
+  }
+}
+
 export function groupTasksByStatus(tasks: readonly BoardTask[]): Record<string, BoardTask[]> {
   const groups: Record<string, BoardTask[]> = {
     pending: [],

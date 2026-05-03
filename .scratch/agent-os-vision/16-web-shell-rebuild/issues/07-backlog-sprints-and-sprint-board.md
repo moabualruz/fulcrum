@@ -1,5 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplCommit: f91bef62
+ImplRuntime: claude
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/06-project-overview-and-kanban-board.md, 06-tasks-and-scrum/issues/04-sprints-and-velocity.md]
