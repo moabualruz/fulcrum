@@ -2248,3 +2248,21 @@ Status: 172 implemented, 39 completed, 130 ready = 211/341 (61.9%)
 CI: typecheck GREEN, 83 pre-existing test failures from wave impl
 
 Next: dispatch 6 more impl + begin fixing pre-existing test failures to unblock milestone gates
+
+## 2026-05-03 — P2#08 structured output (claude)
+
+Landed: grammar-constrained generation via JSON Schema
+
+**Rust:**
+- `inference/inference-generate/src/grammar.rs` — schema_to_gbnf (object/array/string/number/boolean/null), validate_against_schema, generate_with_schema with 3x retry, needs_fallback for complex constructs ($ref/oneOf/anyOf/allOf)
+- `inference/inference-generate/src/lib.rs` — wired schema field into generate(), returns grammar_fallback flag
+- `inference/inference-server/src/main.rs` — schema requests bypass cache; 3 new server tests
+
+**TypeScript:**
+- `src/cli/inference.ts` — `--schema <json>` flag on generate command
+- `src/web/src/routes/settings/inference/+page.svelte` — JSON Schema textarea + validity indicator
+- `src/web/src/routes/settings/inference/+page.server.ts` — schema passthrough + JSON validity check
+
+**Tests:** 14 Rust grammar unit tests, 3 Rust server integration tests, 2 CLI tests, 2 web SSR tests, 2 tRPC integration tests — all green.
+
+Commit: e5396071
