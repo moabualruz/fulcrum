@@ -26,6 +26,32 @@ const tasks = Array.from({ length: 50 }, (_, index) => ({
 }));
 
 describe("TaskListScreen", () => {
+  test("filters the panel list with an in-panel search bar and restores on Escape", async () => {
+    const screen = new TaskListScreen({
+      caller: {
+        tasks: {
+          list: async () => tasks.slice(0, 4),
+          bulk: async () => ({ ok: true }),
+        },
+      },
+    });
+
+    await screen.load();
+    await screen.handleKey("/");
+    await screen.handleKey("3");
+
+    const filtered = renderPlain((renderer) => screen.render(renderer));
+    expect(filtered).toContain("Search: 3");
+    expect(filtered).toContain("Task 3");
+    expect(filtered).not.toContain("Task 1");
+
+    await screen.handleKey("\x1b");
+    const restored = renderPlain((renderer) => screen.render(renderer));
+    expect(restored).not.toContain("Search: 3");
+    expect(restored).toContain("Task 1");
+    expect(restored).toContain("Task 4");
+  });
+
   test("renders fifty tasks, applies filter chips, multi-selects with Space, and bulk-updates selected rows", async () => {
     const bulkUpdates: Array<{ ids: string[]; status?: string }> = [];
     const screen = new TaskListScreen({

@@ -23,6 +23,8 @@ type Overlay = "none" | "bulk";
 export class TaskListScreen {
   private tasks: TuiTask[] = [];
   private filters: TaskListFilters = {};
+  private searchQuery = "";
+  private searchActive = false;
   private selected = new Set<string>();
   private cursor = 0;
   private scrollTop = 0;
@@ -41,6 +43,7 @@ export class TaskListScreen {
     renderer.separator();
     renderer.writeln();
     renderer.writeln(`  Filters: ${this.filterChips.join(" ") || c.dim("none")}`);
+    if (this.searchActive) renderer.writeln(`  Search: ${this.searchQuery}`);
     renderer.writeln();
 
     if (this.visibleTasks.length === 0) {
@@ -56,7 +59,7 @@ export class TaskListScreen {
     }
 
     renderer.writeln();
-    renderer.writeln(c.dim("  j/k navigate  Space select  B bulk  q back"));
+    renderer.writeln(c.dim("  / search  Esc clear  j/k navigate  Space select  B bulk  q back"));
 
     if (this.overlay === "bulk") {
       renderer.writeln();
@@ -66,6 +69,40 @@ export class TaskListScreen {
   }
 
   async handleKey(key: string): Promise<boolean> {
+    if (this.searchActive) {
+      if (key === "\x1b") {
+        this.searchActive = false;
+        this.searchQuery = "";
+        this.cursor = 0;
+        this.scrollTop = 0;
+        return true;
+      }
+
+      if (key === "\b" || key === "\x7f") {
+        this.searchQuery = this.searchQuery.slice(0, -1);
+        this.cursor = 0;
+        this.scrollTop = 0;
+        this.clampCursor();
+        return true;
+      }
+
+      if (key.length === 1 && key >= " ") {
+        this.searchQuery += key;
+        this.cursor = 0;
+        this.scrollTop = 0;
+        this.clampCursor();
+        return true;
+      }
+    }
+
+    if (key === "/") {
+      this.searchActive = true;
+      this.searchQuery = "";
+      this.cursor = 0;
+      this.scrollTop = 0;
+      return true;
+    }
+
     if (key === "j" || key === "\x1b[B") {
       this.cursor = Math.min(this.cursor + 1, Math.max(0, this.filteredTasks.length - 1));
       this.keepCursorVisible();
@@ -124,6 +161,15 @@ export class TaskListScreen {
       if (this.filters.status && task.status !== this.filters.status) return false;
       if (this.filters.assignee && task.assignee !== this.filters.assignee) return false;
       if (this.filters.label && !task.labels?.includes(this.filters.label)) return false;
+      if (this.searchActive && this.searchQuery) {
+        const haystack = [
+          task.title,
+          task.status,
+          task.assignee,
+          ...(task.labels ?? []),
+        ].filter(Boolean).join(" ").toLowerCase();
+        if (!haystack.includes(this.searchQuery.toLowerCase())) return false;
+      }
       return true;
     });
   }
@@ -147,4 +193,3 @@ export class TaskListScreen {
     if (this.cursor >= this.scrollTop + rows) this.scrollTop = this.cursor - rows + 1;
   }
 }
-

@@ -5,6 +5,7 @@ import { Renderer } from "../../src/tui/renderer.ts";
 import { AuditLogScreen } from "../../src/tui/screens/audit.ts";
 import { NotificationsScreen } from "../../src/tui/screens/notifications.ts";
 import { SearchScreen } from "../../src/tui/screens/search.ts";
+import type { TuiSearchResult } from "../../src/tui/screens/search.ts";
 import { SubscriptionBridge } from "../../src/tui/subscriptions.ts";
 import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
 
@@ -15,6 +16,36 @@ function renderPlain(render: (renderer: Renderer) => void): string {
 }
 
 describe("SearchScreen", () => {
+  test("opens Cmd+K palette, closes with Escape, navigates results, and opens the selected entity", async () => {
+    const opened: unknown[] = [];
+    const screen = new SearchScreen({
+      caller: {
+        search: {
+          query: async () => [
+            { id: "task-1", kind: "tasks", title: "Fix search" },
+            { id: "doc-1", kind: "docs", title: "Search docs" },
+          ],
+        },
+      },
+      onOpenEntity: (entity) => opened.push(entity),
+    });
+
+    expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("Command palette");
+
+    await screen.handleKey("\x0b");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Command palette");
+
+    await screen.submitPaletteQuery("search");
+    await screen.handleKey("\x1b[B");
+    await screen.handleKey("\r");
+    expect(opened).toEqual([{ kind: "docs", id: "doc-1" }]);
+    expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("Command palette");
+
+    await screen.handleKey("\x0b");
+    await screen.handleKey("\x1b");
+    expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("Command palette");
+  });
+
   test("groups query results by kind, cycles facets, and opens the selected entity", async () => {
     const opened: unknown[] = [];
     const searches: unknown[] = [];
@@ -50,6 +81,31 @@ describe("SearchScreen", () => {
 
     await screen.handleKey("\r");
     expect(opened).toEqual([{ kind: "tasks", id: "task-1" }]);
+  });
+
+  test("refreshes full-screen result count when facets are toggled", async () => {
+    const screen = new SearchScreen({
+      caller: {
+        search: {
+          query: async (input) => {
+            const results = [
+              { id: "task-1", kind: "tasks", title: "Task search" },
+              { id: "doc-1", kind: "docs", title: "Doc search" },
+            ] satisfies TuiSearchResult[];
+            return results.filter((result) => input.facets.includes(result.kind));
+          },
+        },
+      },
+    });
+
+    await screen.handleKey("S");
+    await screen.submitQuery("search");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Results (2)");
+
+    await screen.handleKey(" ");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Results (1)");
+    expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("Task search");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Doc search");
   });
 });
 

@@ -16,6 +16,7 @@ export interface SearchScreenOptions {
   caller: {
     search: {
       query: (input: { query: string; facets: TuiSearchKind[] }) => Promise<TuiSearchResult[]>;
+      suggest?: (input: { query: string }) => Promise<string[]>;
     };
   };
   onOpenEntity?: (entity: { kind: TuiSearchKind; id: string }) => void;
@@ -24,19 +25,26 @@ export interface SearchScreenOptions {
 export class SearchScreen {
   private query = "";
   private results: TuiSearchResult[] = [];
+  private paletteQuery = "";
+  private paletteResults: TuiSearchResult[] = [];
   private enabledFacets = new Set<TuiSearchKind>(SEARCH_KINDS);
   private focusedFacet = 0;
   private cursor = 0;
+  private paletteCursor = 0;
+  private paletteOpen = false;
+  private fullScreen = false;
 
   constructor(private readonly opts: SearchScreenOptions) {}
 
   render(renderer: Renderer): void {
     renderer.writeln();
-    renderer.writeln(c.bold("  Search"));
+    renderer.writeln(c.bold(this.fullScreen ? "  Full-screen search" : "  Search"));
     renderer.separator();
     renderer.writeln(`  Query: ${this.query || c.dim("(empty)")}`);
     renderer.writeln();
     renderer.writeln(`  Facets: ${SEARCH_KINDS.map((kind, index) => this.renderFacet(kind, index)).join(" ")}`);
+    renderer.writeln();
+    renderer.writeln(c.bold(`  Results (${this.results.length})`));
     renderer.writeln();
 
     for (const kind of SEARCH_KINDS) {
@@ -55,7 +63,9 @@ export class SearchScreen {
     if (this.results.length === 0) renderer.writeln(c.dim("  No results."));
 
     renderer.writeln();
-    renderer.writeln(c.dim("  Tab facet  Space toggle  Enter open  q back"));
+    renderer.writeln(c.dim("  Cmd+K palette  S full search  Tab facet  Space toggle  Enter open  q back"));
+
+    if (this.paletteOpen) this.renderPalette(renderer);
   }
 
   async submitQuery(query: string): Promise<void> {
@@ -64,7 +74,26 @@ export class SearchScreen {
     this.cursor = 0;
   }
 
+  async submitPaletteQuery(query: string): Promise<void> {
+    this.paletteQuery = query;
+    this.paletteResults = await this.opts.caller.search.query({ query, facets: [...SEARCH_KINDS] });
+    this.paletteCursor = 0;
+  }
+
   async handleKey(key: string): Promise<boolean> {
+    if (key === "\x0b") {
+      this.paletteOpen = true;
+      this.paletteCursor = 0;
+      return true;
+    }
+
+    if (this.paletteOpen) return this.handlePaletteKey(key);
+
+    if (key === "S") {
+      this.fullScreen = true;
+      return true;
+    }
+
     if (key === "\t") {
       this.focusedFacet = (this.focusedFacet + 1) % SEARCH_KINDS.length;
       return true;
@@ -72,8 +101,10 @@ export class SearchScreen {
 
     if (key === " ") {
       const kind = SEARCH_KINDS[this.focusedFacet];
+      if (!kind) return false;
       if (this.enabledFacets.has(kind)) this.enabledFacets.delete(kind);
       else this.enabledFacets.add(kind);
+      if (this.query) await this.submitQuery(this.query);
       return true;
     }
 
@@ -105,5 +136,52 @@ export class SearchScreen {
     const checked = this.enabledFacets.has(kind) ? "x" : " ";
     const label = `[${checked}] ${kind}`;
     return index === this.focusedFacet ? c.bold(label) : label;
+  }
+
+  private renderPalette(renderer: Renderer): void {
+    renderer.writeln();
+    renderer.writeln(c.bold("  Command palette"));
+    renderer.writeln(`  ${this.paletteQuery.startsWith(">") ? "Command" : "Search"}: ${this.paletteQuery || c.dim("(empty)")}`);
+
+    if (this.paletteResults.length === 0) {
+      renderer.writeln(c.dim("  No results."));
+      return;
+    }
+
+    for (const [index, result] of this.paletteResults.entries()) {
+      const pointer = index === this.paletteCursor ? c.bold(">") : " ";
+      const subtitle = result.subtitle ? `  ${c.dim(result.subtitle)}` : "";
+      renderer.writeln(`${pointer} ${result.title}  ${c.dim(result.kind)}${subtitle}`);
+    }
+  }
+
+  private handlePaletteKey(key: string): boolean {
+    if (key === "\x1b") {
+      this.paletteOpen = false;
+      this.paletteQuery = "";
+      this.paletteResults = [];
+      this.paletteCursor = 0;
+      return true;
+    }
+
+    if (key === "j" || key === "\x1b[B") {
+      this.paletteCursor = Math.min(this.paletteCursor + 1, Math.max(0, this.paletteResults.length - 1));
+      return true;
+    }
+
+    if (key === "k" || key === "\x1b[A") {
+      this.paletteCursor = Math.max(0, this.paletteCursor - 1);
+      return true;
+    }
+
+    if (key === "\r") {
+      const result = this.paletteResults[this.paletteCursor];
+      if (!result) return false;
+      this.opts.onOpenEntity?.({ kind: result.kind, id: result.id });
+      this.paletteOpen = false;
+      return true;
+    }
+
+    return false;
   }
 }
