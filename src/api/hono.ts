@@ -15,6 +15,10 @@
 
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Hono } from "hono";
+import { registerTaskRoutes } from "./routes/tasks.ts";
+import { registerDocRoutes } from "./routes/docs.ts";
+import { registerSprintRoutes } from "./routes/sprints.ts";
+import { registerSavedViewRoutes } from "./routes/saved-views.ts";
 
 /** Check the `public-api` feature flag from FULCRUM_FEATURES env var (per-request). */
 function isPublicApiEnabled(): boolean {
@@ -38,6 +42,12 @@ export function createPublicApi(): OpenAPIHono {
   // OpenAPI 3.1 spec endpoint — auto-generated from registered routes.
   // @hono/zod-openapi collects all createRoute() registrations and generates
   // the spec on-demand. Zero extra work needed for new routes added later.
+  // Register domain routes (P13#05).
+  registerTaskRoutes(api);
+  registerDocRoutes(api);
+  registerSprintRoutes(api);
+  registerSavedViewRoutes(api);
+
   api.doc("/openapi.json", {
     openapi: "3.1.0",
     info: {
