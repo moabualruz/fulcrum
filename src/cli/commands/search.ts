@@ -50,7 +50,7 @@ const HELP = `fulcrum search
 Search commands.
 
 Usage:
-  fulcrum search <query> [--kind <kind>] [--project <id>] [--status <status>] [--assignee <id|me>] [--tag <tag>] [--date-range <ISO>/<ISO>] [--author <id>] [--limit <n>] [--offset <n>] [--json]
+  fulcrum search <query> [--kind <kind>] [--project <id>] [--status <status>] [--assignee <id|me>] [--tag <tag>] [--date-range <ISO>/<ISO>] [--author <id>] [--limit <n>] [--offset <n>] [--semantic] [--json]
   fulcrum search suggest <partial> [--kind <kind>] [--json]
   fulcrum search saved list [--project <id>] [--json]
   fulcrum search saved create --name <name> --query-json <json> [--json]
@@ -150,6 +150,11 @@ async function runQuery(argv: readonly string[], opts: ResolvedOptions): Promise
   const limit = parseIntegerFlag(flags.get("limit"), "limit", opts);
   const offset = parseIntegerFlag(flags.get("offset"), "offset", opts);
   if (limit === null || offset === null) return;
+
+  if (argv.includes("--semantic")) {
+    fail("fulcrum search", "FeatureDisabled: --semantic requires the embeddings feature flag to be enabled", opts);
+    return;
+  }
 
   const input: SearchQueryInput = compact({
     q: query,

@@ -128,6 +128,57 @@ describe("docs CLI commands", () => {
     }
   });
 
+  test("create with --type note --project P passes projectId and docType", async () => {
+    const caller = fakeCaller();
+    const result = await runDocs([
+      "create",
+      "--title",
+      "Design Note",
+      "--type",
+      "note",
+      "--project",
+      "00000000-0000-4000-8000-000000000099",
+      "--json",
+    ], caller);
+
+    expect(result.exitCode).toBeUndefined();
+    expect(caller.calls).toEqual([
+      ["create", { title: "Design Note", docType: "note", projectId: "00000000-0000-4000-8000-000000000099" }],
+    ]);
+    expect(JSON.parse(result.lines[0] as string).docType).toBe("adr"); // from fake, but call shape is what matters
+  });
+
+  test("list with --project P passes projectId filter", async () => {
+    const caller = fakeCaller();
+    const result = await runDocs([
+      "list",
+      "--project",
+      "00000000-0000-4000-8000-000000000099",
+      "--json",
+    ], caller);
+
+    expect(result.exitCode).toBeUndefined();
+    expect(caller.calls).toEqual([
+      ["list", { projectId: "00000000-0000-4000-8000-000000000099" }],
+    ]);
+  });
+
+  test("doc-versions list calls docs.versionsList and prints JSON", async () => {
+    const caller = fakeCaller();
+    (caller.docs as Record<string, unknown>).versionsList = async (input: unknown) => {
+      caller.calls.push(["versionsList", input]);
+      return [
+        { id: "v1", docId: DOC.id, version: 1, bodyMd: "v1 body", createdAt: "2026-05-01T00:00:00Z" },
+        { id: "v2", docId: DOC.id, version: 2, bodyMd: "v2 body", createdAt: "2026-05-02T00:00:00Z" },
+      ];
+    };
+    const result = await runDocs(["versions", "list", DOC.id, "--json"], caller);
+
+    expect(result.exitCode).toBeUndefined();
+    expect(caller.calls).toEqual([["versionsList", { docId: DOC.id }]]);
+    expect(JSON.parse(result.lines[0] as string)).toHaveLength(2);
+  });
+
   test("delete hard requires explicit confirmation", async () => {
     const caller = fakeCaller();
     const result = await runDocs(["delete", DOC.id, "--hard", "--json"], caller);

@@ -21,6 +21,7 @@ type DocsCaller = {
     update: (input: Record<string, unknown>) => Promise<DocRow | null>;
     delete: (input: Record<string, unknown>) => Promise<DocRow | { deleted: true } | null>;
     search?: (input: Record<string, unknown>) => Promise<unknown>;
+    versionsList?: (input: Record<string, unknown>) => Promise<DocRow[]>;
     templates?: {
       list: (input: Record<string, unknown>) => Promise<DocRow[]>;
     };
@@ -59,6 +60,7 @@ Usage:
   fulcrum docs edit <slug|id> [--editor <cmd>] [--json]
   fulcrum docs delete <id> [--hard --yes] [--json]
   fulcrum docs search <query> [--type <type>] [--scope <scope>] [--limit <n>] [--json]
+  fulcrum docs versions list <doc-id> [--json]
   fulcrum docs template list [--json]
 `;
 
@@ -108,6 +110,8 @@ export async function run(
       return withErrors("search", resolved, async () => {
         await runSearch(rest, resolved);
       });
+    case "versions":
+      return runVersions(rest, resolved);
     case "template":
       return runTemplate(rest, resolved);
     case "help":
@@ -139,6 +143,30 @@ async function runTemplate(argv: readonly string[], opts: ResolvedOptions): Prom
       return;
     default:
       opts.printErr(`fulcrum docs template: unknown command '${sub}'`);
+      opts.printErr(HELP);
+      opts.exit(2);
+  }
+}
+
+async function runVersions(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
+  const [sub = "help", ...rest] = argv;
+  switch (sub) {
+    case "list": {
+      const docId = requireArg(rest, 0, "versions list", "<doc-id>");
+      return withErrors("versions list", opts, async () => {
+        const caller = await resolveCaller(opts);
+        if (!caller.docs.versionsList) throw new Error("docs.versionsList procedure is not available");
+        const result = await caller.docs.versionsList({ docId });
+        printOutput(result, rest, opts.print, formatRows);
+      });
+    }
+    case "help":
+    case "--help":
+    case "-h":
+      opts.print(HELP);
+      return;
+    default:
+      opts.printErr(`fulcrum docs versions: unknown command '${sub}'`);
       opts.printErr(HELP);
       opts.exit(2);
   }
@@ -204,6 +232,7 @@ async function runSearch(argv: readonly string[], opts: ResolvedOptions): Promis
 
 function parseListInput(argv: readonly string[]): Record<string, unknown> {
   return compact({
+    projectId: flagValue(argv, "--project"),
     docType: flagValue(argv, "--type"),
     scope: flagValue(argv, "--scope"),
     archived: argv.includes("--archived") ? true : undefined,

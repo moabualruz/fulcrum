@@ -187,6 +187,21 @@ describe("search CLI commands", () => {
     expect(unknown.errors.join("\n")).toContain("unknown cmdk command");
   });
 
+  it("--semantic with embeddings disabled returns FeatureDisabledError", async () => {
+    const caller = fakeCaller();
+    const result = await runSearch([
+      "foo",
+      "--semantic",
+      "--kind",
+      "task",
+      "--json",
+    ], caller);
+
+    expect(result.exitCode).toBe(1);
+    expect(caller.calls).toEqual([]);
+    expect(result.errors.join("\n")).toContain("FeatureDisabled");
+  });
+
   it("prints help for search and cmdk", async () => {
     const search = await runSearch(["--help"]);
     const cmdk = await runCmdk(["--help"]);
