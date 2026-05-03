@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplRuntime: claude
 Triage: AFK
 Pillar: 02-inference-sidecar
 Blocked-by: 04-trpc-procedures-and-health-surface
