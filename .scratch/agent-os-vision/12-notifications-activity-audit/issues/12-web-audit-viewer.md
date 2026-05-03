@@ -1,6 +1,8 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
+ImplRuntime: claude
+ImplCommit: 039b93e3
 Pillar: notifications-activity-audit
 Blocked-by: [06-trpc-audit-procedures.md, 08-audit-retention-cron.md]
 PRD: .scratch/agent-os-vision/prds/12-notifications-activity-audit.md
