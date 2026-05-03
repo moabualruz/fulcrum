@@ -3,7 +3,7 @@ Status: implemented
 Triage: AFK
 Pillar: 02-inference-sidecar
 Blocked-by: 07-generate-operation
-ImplCommit: pending
+ImplCommit: e5396071
 ImplRuntime: claude
 ---
 
