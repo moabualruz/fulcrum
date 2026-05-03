@@ -50,6 +50,7 @@ import { Job } from "./entities/jobs/Job.ts";
 import { SearchDocument } from "./entities/search/SearchDocument.ts";
 import { ModelCache } from "./entities/inference/ModelCache.ts";
 import { ProviderCredential } from "./entities/inference/ProviderCredential.ts";
+import { ConnectorSyncLog } from "./entities/connectors/ConnectorSyncLog.ts";
 
 // Flag-stub entities (P1#03 — gated behind feature flags by later pillars).
 import { CasbinRule } from "./entities/flags/CasbinRule.ts";
@@ -104,6 +105,7 @@ export {
   SearchDocument,
   ModelCache,
   ProviderCredential,
+  ConnectorSyncLog,
   CasbinRule,
   WebhookSubscription,
   NotificationRule,
@@ -189,6 +191,7 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     SearchDocument,
     ModelCache,
     ProviderCredential,
+    ConnectorSyncLog,
     CasbinRule,
     WebhookSubscription,
     NotificationRule,
