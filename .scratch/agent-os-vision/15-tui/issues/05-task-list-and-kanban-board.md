@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: tui
 Blocked-by: [15/issues/04-dashboard-and-projects.md]
@@ -24,12 +24,12 @@ Tasks list pane (VirtualList of tasks, FilterChips for status/assignee/labels, `
 
 ## Acceptance criteria
 
-- [ ] Tasks list: 50 tasks in VirtualList; FilterChips filter applied; `Space` multi-selects; `B` opens bulk menu; bulk status update → all rows updated in DB.
-- [ ] Kanban board: status columns render; `h`/`l` moves card → `tasks.update` tRPC called; status badge updated; `c` inline create → new task row.
-- [ ] Calendar view: tasks with `due_date` appear on correct day cell; `←`/`→` switches weeks.
-- [ ] Timeline: ASCII Gantt bars proportional to task duration; horizontal scroll.
-- [ ] After TUI `h`/`l` move, web board shows updated column; CLI `fulcrum tasks list --json` reflects.
-- [ ] FakeTTY snapshot for Kanban board (strip-ansi).
+- [x] Tasks list: 50 tasks in VirtualList; FilterChips filter applied; `Space` multi-selects; `B` opens bulk menu; bulk status update → all rows updated in DB.
+- [x] Kanban board: status columns render; `h`/`l` moves card → `tasks.update` tRPC called; status badge updated; `c` inline create → new task row.
+- [x] Calendar view: tasks with `due_date` appear on correct day cell; `←`/`→` switches weeks.
+- [x] Timeline: ASCII Gantt bars proportional to task duration; horizontal scroll.
+- [x] After TUI `h`/`l` move, web board shows updated column; CLI `fulcrum tasks list --json` reflects.
+- [x] FakeTTY snapshot for Kanban board (strip-ansi).
 
 ## Blocked by
 

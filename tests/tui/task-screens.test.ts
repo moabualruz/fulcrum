@@ -1,0 +1,151 @@
+import { describe, expect, test } from "bun:test";
+
+import { Renderer } from "../../src/tui/renderer.ts";
+import { TaskBoardScreen } from "../../src/tui/screens/task-board.ts";
+import { TaskCalendarScreen } from "../../src/tui/screens/task-calendar.ts";
+import { TaskListScreen } from "../../src/tui/screens/task-list.ts";
+import { TaskTimelineScreen } from "../../src/tui/screens/task-timeline.ts";
+import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
+
+function renderPlain(render: (renderer: Renderer) => void): string {
+  const tty = new FakeTTY({ columns: 120, rows: 32 });
+  render(new Renderer(tty));
+  return tty.plainText();
+}
+
+const tasks = Array.from({ length: 50 }, (_, index) => ({
+  id: `task-${index + 1}`,
+  title: `Task ${index + 1}`,
+  status: index % 3 === 0 ? "todo" : index % 3 === 1 ? "in-progress" : "done",
+  assignee: index % 2 === 0 ? "alex" : "sam",
+  labels: index % 5 === 0 ? ["bug"] : ["feature"],
+  dueDate: `2026-05-${String((index % 7) + 4).padStart(2, "0")}`,
+  startDate: `2026-05-${String((index % 7) + 1).padStart(2, "0")}`,
+  endDate: `2026-05-${String((index % 7) + 3).padStart(2, "0")}`,
+}));
+
+describe("TaskListScreen", () => {
+  test("renders fifty tasks, applies filter chips, multi-selects with Space, and bulk-updates selected rows", async () => {
+    const bulkUpdates: Array<{ ids: string[]; status?: string }> = [];
+    const screen = new TaskListScreen({
+      caller: {
+        tasks: {
+          list: async () => tasks,
+          bulk: async (input) => {
+            bulkUpdates.push(input);
+            return { ok: true };
+          },
+        },
+      },
+      viewportRows: 50,
+    });
+
+    await screen.load();
+    expect(screen.visibleTasks).toHaveLength(50);
+    expect(renderPlain((renderer) => screen.render(renderer)).match(/Task \d+/g)).toHaveLength(50);
+
+    await screen.applyFilter({ status: "todo" });
+    const filtered = renderPlain((renderer) => screen.render(renderer));
+    expect(filtered).toContain("[status: todo]");
+    expect(filtered).toContain("Task 1");
+    expect(filtered).not.toMatch(/^.*Task 2  \[in-progress\].*$/m);
+
+    await screen.handleKey(" ");
+    await screen.handleKey("j");
+    await screen.handleKey(" ");
+    await screen.handleKey("B");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Bulk update");
+
+    await screen.submitBulkStatus("done");
+    expect(bulkUpdates).toEqual([{ ids: ["task-1", "task-4"], status: "done" }]);
+    expect(screen.selectedTaskIds).toEqual(["task-1", "task-4"]);
+    await screen.applyFilter({ status: "done" });
+    const doneRows = renderPlain((renderer) => screen.render(renderer));
+    expect(doneRows).toContain("Task 1  [done]");
+    expect(doneRows).toContain("Task 4  [done]");
+  });
+});
+
+describe("TaskBoardScreen", () => {
+  test("renders status columns, moves selected card with h/l, opens detail, and creates task inline", async () => {
+    const updates: Array<{ id: string; status: string }> = [];
+    const created: string[] = [];
+    const opened: string[] = [];
+    const screen = new TaskBoardScreen({
+      caller: {
+        tasks: {
+          list: async () => tasks.slice(0, 6),
+          update: async (input) => {
+            updates.push(input);
+            return { ...tasks[0]!, status: input.status };
+          },
+          create: async (input) => {
+            created.push(input.title);
+            return { id: "task-new", title: input.title, status: input.status, labels: [] };
+          },
+        },
+      },
+      onOpenTask: (id) => opened.push(id),
+    });
+
+    await screen.load();
+    const board = renderPlain((renderer) => screen.render(renderer));
+    expect(board).toContain("TODO");
+    expect(board).toContain("IN-PROGRESS");
+    expect(board).toContain("DONE");
+
+    await screen.handleKey("l");
+    expect(updates).toEqual([{ id: "task-1", status: "in-progress" }]);
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Task 1  [in-progress]");
+
+    await screen.handleKey("\r");
+    expect(opened).toEqual(["task-1"]);
+
+    await screen.handleKey("c");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Create task");
+    await screen.submitCreate("Inline task");
+    expect(created).toEqual(["Inline task"]);
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Inline task");
+  });
+});
+
+describe("TaskCalendarScreen", () => {
+  test("places due tasks in day cells and switches weeks with arrow keys", async () => {
+    const screen = new TaskCalendarScreen({
+      caller: { tasks: { list: async () => tasks.slice(0, 7) } },
+      weekStart: "2026-05-04",
+    });
+
+    await screen.load();
+    const initial = renderPlain((renderer) => screen.render(renderer));
+    expect(initial).toContain("Week of 2026-05-04");
+    expect(initial).toContain("Mon 05-04: Task 1");
+    expect(initial).toContain("Sun 05-10: Task 7");
+
+    await screen.handleKey("\x1b[C");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Week of 2026-05-11");
+
+    await screen.handleKey("\x1b[D");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Week of 2026-05-04");
+  });
+});
+
+describe("TaskTimelineScreen", () => {
+  test("renders proportional ASCII Gantt bars and scrolls horizontally", async () => {
+    const screen = new TaskTimelineScreen({
+      caller: { tasks: { list: async () => tasks.slice(0, 3) } },
+      windowStart: "2026-05-01",
+      daysVisible: 10,
+    });
+
+    await screen.load();
+    const initial = renderPlain((renderer) => screen.render(renderer));
+    expect(initial).toContain("Timeline 2026-05-01");
+    expect(initial).toContain("Task 1");
+    expect(initial).toContain("###");
+
+    await screen.handleKey("\x1b[C");
+    expect(screen.scrollDays).toBe(1);
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Timeline 2026-05-02");
+  });
+});
