@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Renderer } from "../../src/tui/renderer.ts";
 import { TaskBoardScreen } from "../../src/tui/screens/task-board.ts";
+import { TaskDetailScreen } from "../../src/tui/screens/task-detail.ts";
 import { TaskCalendarScreen } from "../../src/tui/screens/task-calendar.ts";
 import { TaskListScreen } from "../../src/tui/screens/task-list.ts";
 import { TaskTimelineScreen } from "../../src/tui/screens/task-timeline.ts";
@@ -106,6 +107,141 @@ describe("TaskBoardScreen", () => {
     await screen.submitCreate("Inline task");
     expect(created).toEqual(["Inline task"]);
     expect(renderPlain((renderer) => screen.render(renderer))).toContain("Inline task");
+  });
+});
+
+describe("TaskDetailScreen", () => {
+  test("renders detail sections, edits title/status/assignee, dependencies, child tasks, and comments", async () => {
+    const updates: unknown[] = [];
+    const comments: string[] = [];
+    const children: unknown[] = [];
+    const screen = new TaskDetailScreen({
+      taskId: "task-1",
+      caller: {
+        tasks: {
+          get: async () => ({
+            id: "task-1",
+            title: "Ship TUI",
+            description: "Supports **bold**, _italic_, and `code`.",
+            status: "todo",
+            assignee: null,
+            dueDate: "2026-05-10",
+            priority: "high",
+            labels: ["tui", "p15"],
+            project: "Fulcrum",
+            customFields: { size: "L", risk: "medium" },
+            comments: [{ id: "comment-1", author: "alex", body: "**Looks** `safe`." }],
+            activity: ["created task"],
+            watchers: ["sam"],
+            subtasks: [{ id: "task-2", title: "Wire forms", status: "todo" }],
+            blockedBy: [{ id: "task-9", title: "Task list" }],
+            breadcrumb: [
+              { id: "task-root", title: "Epic" },
+              { id: "task-1", title: "Ship TUI" },
+            ],
+          }),
+          update: async (input) => {
+            updates.push(input);
+            return { id: input.id, title: "Ship TUI updated", status: "in-progress" };
+          },
+          create: async (input) => {
+            children.push(input);
+            return { id: "task-child", title: String(input.title), status: "todo" };
+          },
+        },
+        custom_fields: {
+          list: async () => [
+            { slug: "risk", name: "Risk", position: 1 },
+            { slug: "size", name: "Size", position: 2 },
+          ],
+        },
+        comments: {
+          create: async (input) => {
+            comments.push(input.body);
+            return { id: "comment-2", author: "sam", body: input.body };
+          },
+        },
+      },
+      onNavigateTask: () => {},
+    });
+
+    await screen.load();
+    const detail = renderPlain((renderer) => screen.render(renderer));
+    for (const section of [
+      "Description",
+      "Status",
+      "Assignee",
+      "Due date",
+      "Priority",
+      "Labels",
+      "Custom fields",
+      "Comments (1)",
+      "Activity",
+      "Watchers",
+      "Subtasks",
+      "Blocking",
+    ]) {
+      expect(detail).toContain(section);
+    }
+    expect(detail).toContain("Risk: medium");
+    expect(detail.indexOf("Risk: medium")).toBeLessThan(detail.indexOf("Size: L"));
+    expect(detail).toContain("Looks safe");
+
+    await screen.handleKey("e");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Edit title");
+    await screen.submitTitle("Ship TUI updated");
+    expect(updates).toContainEqual({ id: "task-1", title: "Ship TUI updated" });
+
+    await screen.handleKey("s");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Status picker");
+    await screen.submitStatus("in-progress");
+    expect(updates).toContainEqual({ id: "task-1", status: "in-progress" });
+
+    await screen.handleKey("a");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("User picker");
+    await screen.submitAssignee("sam");
+    expect(updates).toContainEqual({ id: "task-1", assignee: "sam" });
+
+    await screen.handleKey("c");
+    await screen.submitChild("Child task");
+    expect(children).toEqual([{ title: "Child task", parent_id: "task-1", project: "Fulcrum" }]);
+
+    await screen.openDependencySearch();
+    await screen.submitBlockedBy("task-10");
+    expect(updates).toContainEqual({ id: "task-1", blocked_by: ["task-9", "task-10"] });
+
+    await screen.submitComment("**Done** with `forms`.");
+    expect(comments).toEqual(["**Done** with `forms`."]);
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Comments (2)");
+  });
+
+  test("validates create form title, cancels with Escape, submits tasks.create, and navigates to detail", async () => {
+    const creates: unknown[] = [];
+    const opened: string[] = [];
+    const screen = new TaskDetailScreen({
+      mode: "create",
+      caller: {
+        tasks: {
+          create: async (input) => {
+            creates.push(input);
+            return { id: "task-new", title: String(input.title), status: "todo" };
+          },
+        },
+      },
+      onNavigateTask: (id) => opened.push(id),
+    });
+
+    await screen.submitCreate({ title: "   ", project: "Fulcrum" });
+    expect(screen.validationError).toBe("Title required");
+    expect(creates).toEqual([]);
+
+    await screen.handleKey("\x1b");
+    expect(screen.cancelled).toBe(true);
+    expect(creates).toEqual([]);
+
+    await screen.submitCreate({ title: "New task", project: "Fulcrum" });
+    expect(creates).toEqual([{ title: "New task", project: "Fulcrum" }]);
+    expect(opened).toEqual(["task-new"]);
   });
 });
 

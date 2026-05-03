@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: implemented
+Implemented: 2026-05-03
 Triage: AFK
 Pillar: tui
 Blocked-by: [15/issues/05-task-list-and-kanban-board.md]
