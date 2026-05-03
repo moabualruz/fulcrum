@@ -1,66 +1,7 @@
-/**
- * tRPC v11 instance — superjson transformer + error formatter.
- *
- * C8: Context carries needle-di container so procedures resolve services lazily.
- * C4: Single shared core — all three surfaces (web, CLI, TUI) consume these builders.
- */
-
 import { initTRPC } from "@trpc/server";
-import SuperJSON from "superjson";
+import type { TrpcContext } from "./context.ts";
 
-import { applyRequestId } from "../server/trpc/middleware/requestId.ts";
-import { runWithTRPCSpan } from "../server/trpc/middleware/otel.ts";
-import { ensureRequestId, type TRPCContext } from "./context.ts";
+const t = initTRPC.context<TrpcContext>().create();
 
-export const t = initTRPC.context<TRPCContext>().create({
-  /**
-   * superjson transformer — transparently handles Date, Map, Set, Infinity, etc.
-   * Required for Date columns from MikroORM to round-trip correctly over tRPC.
-   */
-  transformer: SuperJSON,
-
-  /**
-   * Error formatter — strip internal stack traces in production.
-   * Always exposes TRPCError code and message; hides cause in prod.
-   */
-  errorFormatter({ shape, error, ctx }) {
-    const requestId = ctx ? ensureRequestId(ctx) : undefined;
-
-    return {
-      ...shape,
-      data: {
-        ...shape.data,
-        requestId,
-        // Only surface stack in non-production environments
-        stack: process.env["NODE_ENV"] !== "production" ? error.message : undefined,
-      },
-    };
-  },
-});
-
-const requestIdMiddleware = t.middleware(({ ctx, next }) => {
-  const requestId = applyRequestId(ctx);
-  return next({
-    ctx: {
-      ...ctx,
-      requestId,
-    },
-  });
-});
-
-const otelMiddleware = t.middleware(({ ctx, next, path, type }) => {
-  return runWithTRPCSpan({
-    ctx,
-    path,
-    type,
-    run: () => next(),
-  });
-});
-
-/**
- * Public procedure builder — no auth required.
- * Use only for genuinely unauthenticated endpoints (e.g. invite-accept token validation).
- */
-export const publicProcedure = t.procedure
-  .use(requestIdMiddleware)
-  .use(otelMiddleware);
+export const router = t.router;
+export const publicProcedure = t.procedure;

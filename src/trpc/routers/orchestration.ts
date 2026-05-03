@@ -1,280 +1,179 @@
-/**
- * Orchestration tRPC router.
- *
- * Internal surface consumed by Web, CLI, and TUI callers. Business logic stays
- * in src/orchestration/symphony/tracker.ts.
- */
-
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
-
-import { protectedProcedure } from "../middleware.ts";
-import { t } from "../trpc.ts";
+import { z } from "zod/v4";
+import { router, publicProcedure } from "../trpc.ts";
 import {
-  AgentRunIssueListSchema,
-  CandidateIssueListSchema,
-  FetchCandidateIssuesInputSchema,
-  FetchIssuesByStatesInputSchema,
-  FetchIssueStatesByIdsInputSchema,
-  GetWorkspacePathInputSchema,
-  IssueStateListSchema,
-  WorkspacePathSchema,
-  WorkflowConfigSchema,
-} from "../../orchestration/symphony/schemas.ts";
-import { ClaimConflictError } from "../../orchestration/symphony/orchestrator.ts";
+  cancelRun,
+  createRun,
+  getOrchestratorStatus,
+  getRun,
+  getSymphonyDriftReport,
+  listRuns,
+  listWorkflowDefs,
+  renderPromptPreview,
+  retryRun,
+  upsertWorkflowDef,
+} from "../../product-kernel/symphony.ts";
 
-const OrgIdInputSchema = z.object({
-  orgId: z.string().min(1),
-});
+// ---------------------------------------------------------------------------
+// Helpers — PGlite returns Date objects for timestamptz; coerce to ISO string
+// ---------------------------------------------------------------------------
+const dateToString = z.union([z.string(), z.date().transform((d) => d.toISOString())]);
+const nullableDateToString = z.union([
+  z.string(),
+  z.date().transform((d) => d.toISOString()),
+  z.null(),
+]);
 
-const OrchestratorStatusSchema = z.object({
-  running: z.number().int(),
-  queued: z.number().int(),
-  stalled: z.number().int(),
-});
+// ---------------------------------------------------------------------------
+// Zod schemas — shared with REST layer and clients
+// ---------------------------------------------------------------------------
+const SymphonyStateSchema = z.enum([
+  "pending",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+  "retry_queued",
+]);
 
-const ClaimRunInputSchema = z.object({
-  orgId: z.string().min(1),
-  taskId: z.string().min(1),
-  instanceId: z.string().min(1),
-});
-
-const ClaimRunOutputSchema = z.object({
-  runId: z.string().min(1),
-});
-
-const PromptPreviewIssueSchema = z.object({
+export const SymphonyRunSchema = z.object({
   id: z.string(),
-}).passthrough();
-
-const RenderPromptPreviewInputSchema = z.object({
-  orgId: z.string(),
-  promptMd: z.string(),
-  configYaml: z.string().default(""),
-  issue: PromptPreviewIssueSchema,
-  attempt: z.number().int().nullable().default(null),
+  org_id: z.string(),
+  project_id: z.string().nullable(),
+  workflow_def_id: z.string().nullable(),
+  identifier: z.string(),
+  symphony_state: SymphonyStateSchema,
+  payload: z.record(z.string(), z.unknown()),
+  result: z.record(z.string(), z.unknown()).nullable(),
+  next_retry_at: nullableDateToString,
+  attempts: z.number(),
+  max_attempts: z.number(),
+  last_error: z.string().nullable(),
+  created_at: dateToString,
+  updated_at: dateToString,
 });
 
-const RenderPromptPreviewOutputSchema = z.object({
-  prompt: z.string(),
-  config: WorkflowConfigSchema,
-});
-
-const GetRunInputSchema = z.object({
-  runId: z.string(),
-});
-
-const RunDetailSchema = z.object({
+export const WorkflowDefSchema = z.object({
   id: z.string(),
-  state: z.string().nullable(),
-  orchestrationState: z.string().nullable(),
-  workspacePath: z.string().nullable(),
-  renderedPrompt: z.string().nullable(),
-  attemptCount: z.number().int(),
-  nextRetryAt: z.date().nullable(),
-  lastErrorKind: z.string().nullable(),
+  org_id: z.string(),
+  project_id: z.string().nullable(),
+  slug: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  prompt_template: z.string().nullable(),
+  hooks: z.record(z.string(), z.unknown()),
+  config: z.record(z.string(), z.unknown()),
+  created_at: dateToString,
+  updated_at: dateToString,
 });
 
-export const orchestrationRouter = t.router({
-  list: protectedProcedure.query(() => []),
+export const OrchestratorStatusSchema = z.object({
+  pending: z.number(),
+  running: z.number(),
+  retry_queued: z.number(),
+  succeeded: z.number(),
+  failed: z.number(),
+  cancelled: z.number(),
+});
 
-  fetchCandidateIssues: protectedProcedure
-    .input(FetchCandidateIssuesInputSchema)
-    .output(CandidateIssueListSchema)
-    .query(async ({ ctx, input }) => {
-      if (input.orgId !== ctx.orgId) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Cannot fetch candidate issues for another org.",
-        });
-      }
+export const DriftEntrySchema = z.object({
+  id: z.string(),
+  identifier: z.string(),
+  symphony_state: SymphonyStateSchema,
+  updated_at: dateToString,
+});
 
-      if (!ctx.em) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "MikroORM EntityManager is required.",
-        });
-      }
-
-      const { fetchCandidateIssues } = await import(
-        "../../orchestration/symphony/tracker.ts"
-      );
-      return fetchCandidateIssues(ctx.em, input.orgId, input.limit);
-    }),
-
-  fetchIssuesByStates: protectedProcedure
-    .input(FetchIssuesByStatesInputSchema)
-    .output(AgentRunIssueListSchema)
-    .query(async ({ ctx, input }) => {
-      ensureOrg(ctx.orgId, input.orgId);
-      const em = ensureEntityManager(ctx.em);
-      const { fetchIssuesByStates } = await import(
-        "../../orchestration/symphony/tracker.ts"
-      );
-      return fetchIssuesByStates(em, input.orgId, input.states, input.limit);
-    }),
-
-  fetchIssueStatesByIds: protectedProcedure
-    .input(FetchIssueStatesByIdsInputSchema)
-    .output(IssueStateListSchema)
-    .query(async ({ ctx, input }) => {
-      ensureOrg(ctx.orgId, input.orgId);
-      const em = ensureEntityManager(ctx.em);
-      const { fetchIssueStatesByIds } = await import(
-        "../../orchestration/symphony/tracker.ts"
-      );
-      return fetchIssueStatesByIds(em, input.orgId, input.runIds);
-    }),
-
-  getWorkspacePath: protectedProcedure
-    .input(GetWorkspacePathInputSchema)
-    .output(WorkspacePathSchema)
-    .query(async ({ ctx, input }) => {
-      ensureOrg(ctx.orgId, input.orgId);
-      const em = ensureEntityManager(ctx.em);
-      const { getWorkspacePath } = await import(
-        "../../orchestration/symphony/workspace.ts"
-      );
-      return getWorkspacePath(em, input.orgId, input.runId);
-    }),
-
-  getRun: protectedProcedure
-    .input(GetRunInputSchema)
-    .output(RunDetailSchema.nullable())
-    .query(async ({ ctx, input }) => {
-      const em = ensureEntityManager(ctx.em);
-      const orgId = ctx.orgId;
-      if (!orgId) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Authenticated org context required",
-        });
-      }
-
-      const [{ AgentRun }, { Org }] = await Promise.all([
-        import("../../db/entities/orchestration/AgentRun.ts"),
-        import("../../db/entities/auth/Org.ts"),
-      ]);
-      const fork = em.fork();
-      const org = fork.getReference(Org, orgId);
-      const run = await fork.findOne(AgentRun, {
-        id: input.runId,
-        org,
-      }, {
-        fields: [
-          "id",
-          "orchestrationState",
-          "workspacePath",
-          "attemptCount",
-          "nextRetryAt",
-          "lastErrorKind",
-        ],
+// ---------------------------------------------------------------------------
+// Router
+// ---------------------------------------------------------------------------
+export const orchestrationRouter = router({
+  listRuns: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().int().min(1).max(200).optional(),
+        offset: z.number().int().min(0).optional(),
+      }),
+    )
+    .output(z.array(SymphonyRunSchema))
+    .query(async ({ input, ctx }) => {
+      return listRuns(ctx.db, ctx.orgId, {
+        limit: input.limit,
+        offset: input.offset,
       });
-      if (!run) return null;
-
-      return {
-        id: run.id,
-        state: run.orchestrationState ?? null,
-        orchestrationState: run.orchestrationState ?? null,
-        workspacePath: run.workspacePath ?? null,
-        renderedPrompt: null,
-        attemptCount: run.attemptCount,
-        nextRetryAt: run.nextRetryAt ?? null,
-        lastErrorKind: run.lastErrorKind ?? null,
-      };
     }),
 
-  renderPromptPreview: protectedProcedure
-    .input(RenderPromptPreviewInputSchema)
-    .output(RenderPromptPreviewOutputSchema)
-    .query(async ({ ctx, input }) => {
-      ensureOrg(ctx.orgId, input.orgId);
-      // Keep DB-entity decorators out of SvelteKit postbuild analysis; import
-      // prompt helpers only when this procedure actually runs.
-      const { parseWorkflowConfig, renderPrompt } = await import(
-        "../../orchestration/symphony/prompt.ts"
-      );
-      const config = parseWorkflowConfig(input.configYaml);
-      const prompt = await renderPrompt(
-        {
-          id: "preview",
-          promptMd: input.promptMd,
-          configYaml: input.configYaml,
-        },
-        {
-          issue: input.issue,
-          attempt: input.attempt,
-        },
-      );
-
-      return { prompt, config };
+  getRun: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .output(SymphonyRunSchema.nullable())
+    .query(async ({ input, ctx }) => {
+      return getRun(ctx.db, input.id);
     }),
 
-  getOrchestratorStatus: protectedProcedure
-    .input(OrgIdInputSchema)
+  cancelRun: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .output(SymphonyRunSchema.nullable())
+    .mutation(async ({ input, ctx }) => {
+      return cancelRun(ctx.db, input.id);
+    }),
+
+  retryRun: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .output(SymphonyRunSchema.nullable())
+    .mutation(async ({ input, ctx }) => {
+      return retryRun(ctx.db, input.id);
+    }),
+
+  getOrchestratorStatus: publicProcedure
+    .input(z.object({}))
     .output(OrchestratorStatusSchema)
-    .query(async ({ ctx, input }) => {
-      ensureOrg(ctx.orgId, input.orgId);
-      const em = ensureEntityManager(ctx.em);
-      const { fetchIssuesByStates } = await import(
-        "../../orchestration/symphony/tracker.ts"
-      );
-      const [running, queued, stalled] = await Promise.all([
-        fetchIssuesByStates(em, input.orgId, ["running"], 500),
-        fetchIssuesByStates(em, input.orgId, ["unclaimed", "claimed", "retry_queued"], 500),
-        fetchIssuesByStates(em, input.orgId, ["stalled"], 500),
-      ]);
-      return {
-        running: running.length,
-        queued: queued.length,
-        stalled: stalled.length,
-      };
+    .query(async ({ ctx }) => {
+      return getOrchestratorStatus(ctx.db, ctx.orgId);
     }),
 
-  claimRun: protectedProcedure
-    .input(ClaimRunInputSchema)
-    .output(ClaimRunOutputSchema)
-    .mutation(async ({ ctx, input }) => {
-      ensureOrg(ctx.orgId, input.orgId);
-      const em = ensureEntityManager(ctx.em);
+  listWorkflowDefs: publicProcedure
+    .input(z.object({}))
+    .output(z.array(WorkflowDefSchema))
+    .query(async ({ ctx }) => {
+      return listWorkflowDefs(ctx.db, ctx.orgId);
+    }),
 
-      const { claimRun } = await import(
-        "../../orchestration/symphony/orchestrator.ts"
-      );
+  upsertWorkflowDef: publicProcedure
+    .input(
+      z.object({
+        projectId: z.string().nullable().optional(),
+        slug: z.string(),
+        name: z.string(),
+        description: z.string().nullable().optional(),
+        promptTemplate: z.string().nullable().optional(),
+        hooks: z.record(z.string(), z.unknown()).optional(),
+        config: z.record(z.string(), z.unknown()).optional(),
+      }),
+    )
+    .output(WorkflowDefSchema)
+    .mutation(async ({ input, ctx }) => {
+      return upsertWorkflowDef(ctx.db, {
+        orgId: ctx.orgId,
+        ...input,
+      });
+    }),
 
-      try {
-        return await claimRun(em, input.orgId, input.taskId, input.instanceId);
-      } catch (error) {
-        if (error instanceof ClaimConflictError) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: error.message,
-            cause: error,
-          });
-        }
-        throw error;
-      }
+  renderPromptPreview: publicProcedure
+    .input(
+      z.object({
+        template: z.string(),
+        variables: z.record(z.string(), z.string()),
+      }),
+    )
+    .output(z.object({ rendered: z.string() }))
+    .query(({ input }) => {
+      return { rendered: renderPromptPreview(input.template, input.variables) };
+    }),
+
+  getSymphonyDriftReport: publicProcedure
+    .input(z.object({ staleMinutes: z.number().int().min(1).optional() }))
+    .output(z.array(DriftEntrySchema))
+    .query(async ({ input, ctx }) => {
+      return getSymphonyDriftReport(ctx.db, ctx.orgId, input.staleMinutes);
     }),
 });
 
 export type OrchestrationRouter = typeof orchestrationRouter;
-
-function ensureOrg(contextOrgId: string | null, inputOrgId: string): void {
-  if (inputOrgId !== contextOrgId) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Cannot fetch orchestration records for another org.",
-    });
-  }
-}
-
-function ensureEntityManager<T>(em: T | null): T {
-  if (!em) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "MikroORM EntityManager is required.",
-    });
-  }
-
-  return em;
-}
