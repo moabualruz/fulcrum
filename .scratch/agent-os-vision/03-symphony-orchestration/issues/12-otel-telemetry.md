@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: 03-symphony-orchestration
 Blocked-by: 11-dispatch-loop-happy-path
