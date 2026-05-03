@@ -75,10 +75,21 @@ export interface TuiCaller {
     list: () => Promise<Array<{ id: string; orgId: string | null }>>;
   };
   inference?: {
-    health: () => Promise<{ status: string }>;
+    health: () => Promise<{
+      status: string;
+      active_requests?: number;
+      ops_last_10s?: number;
+      embed_hit_rate?: number;
+      gen_hit_rate?: number;
+      cache_db_size?: number;
+    }>;
     models?: {
       list: () => Promise<InferenceModel[]>;
       pull: (input: { modelId: string; force?: boolean }) => AsyncIterable<ModelPullProgress> | Promise<AsyncIterable<ModelPullProgress>>;
+    };
+    config?: {
+      get: () => Promise<Record<string, string>>;
+      set: (input: { feature: string; backend: string }) => Promise<{ ok: boolean }>;
     };
   };
   docs?: {
@@ -228,6 +239,14 @@ export class TuiApp {
   private inferenceModels: InferenceModel[] = [];
   private inferencePullProgress: (ModelPullProgress & { modelId: string }) | null = null;
   private inferenceLastDownload: (ModelPullProgress & { modelId: string }) | null = null;
+  private inferenceHealthExtras: {
+    active_requests: number;
+    ops_last_10s: number;
+    embed_hit_rate: number;
+    gen_hit_rate: number;
+    cache_db_size: number;
+  } = { active_requests: 0, ops_last_10s: 0, embed_hit_rate: 0, gen_hit_rate: 0, cache_db_size: 0 };
+  private inferenceRoutingConfig: Record<string, string> = {};
   private inferencePoll: ReturnType<typeof setInterval> | null = null;
   private bellPoll: ReturnType<typeof setInterval> | null = null;
   private bellCount = 0;
@@ -364,13 +383,22 @@ export class TuiApp {
 
   private async _loadInferenceBadge(): Promise<void> {
     try {
-      const status = (await this.caller.inference?.health())?.status ?? "down";
+      const health = await this.caller.inference?.health();
+      const status = health?.status ?? "down";
       this.inferenceInfo = {
         status,
         tone: status === "ok" ? "green" : status === "degraded" ? "yellow" : "red",
       };
+      this.inferenceHealthExtras = {
+        active_requests: health?.active_requests ?? 0,
+        ops_last_10s: health?.ops_last_10s ?? 0,
+        embed_hit_rate: health?.embed_hit_rate ?? 0,
+        gen_hit_rate: health?.gen_hit_rate ?? 0,
+        cache_db_size: health?.cache_db_size ?? 0,
+      };
     } catch {
       this.inferenceInfo = { status: "down", tone: "red" };
+      this.inferenceHealthExtras = { active_requests: 0, ops_last_10s: 0, embed_hit_rate: 0, gen_hit_rate: 0, cache_db_size: 0 };
     }
   }
 
@@ -379,6 +407,14 @@ export class TuiApp {
       this.inferenceModels = await this.caller.inference?.models?.list() ?? [];
     } catch {
       this.inferenceModels = [];
+    }
+  }
+
+  private async _loadInferenceRoutingConfig(): Promise<void> {
+    try {
+      this.inferenceRoutingConfig = await this.caller.inference?.config?.get() ?? {};
+    } catch {
+      this.inferenceRoutingConfig = {};
     }
   }
 
@@ -497,7 +533,21 @@ export class TuiApp {
     r.separator();
     r.writeln();
     r.infoRow("Backend", this._formatInferenceBadge());
+    r.infoRow("In-flight", `${this.inferenceHealthExtras.active_requests}`);
+    r.infoRow("Throughput", `${this.inferenceHealthExtras.ops_last_10s} ops/s`);
     r.writeln();
+
+    // Cache stats
+    r.writeln(c.bold("  Cache"));
+    r.infoRow("Embed hit rate", `${this.inferenceHealthExtras.embed_hit_rate}%`);
+    r.infoRow("Gen hit rate", `${this.inferenceHealthExtras.gen_hit_rate}%`);
+    if (this.inferenceHealthExtras.cache_db_size > 0) {
+      const sizeKiB = Math.round(this.inferenceHealthExtras.cache_db_size / 1024);
+      r.infoRow("DB size", `${sizeKiB} KiB`);
+    }
+    r.writeln();
+
+    // Models
     r.writeln(c.bold("  Models"));
     if (this.inferenceModels.length === 0) {
       r.writeln(c.dim("  No inference models configured."));
@@ -508,15 +558,33 @@ export class TuiApp {
         r.writeln(`  ${model.id}  ${model.kind}  ${action}${size}`);
       }
     }
+
+    // Download progress bar overlay
     if (this.inferencePullProgress) {
       r.writeln();
+      const pct = this.inferencePullProgress.pct;
+      const barWidth = 30;
+      const filled = Math.round((pct / 100) * barWidth);
+      const bar = "█".repeat(filled) + "░".repeat(barWidth - filled);
       r.writeln(
-        `  Downloading ${this.inferencePullProgress.modelId} ${this.inferencePullProgress.pct}% ` +
+        `  Downloading ${this.inferencePullProgress.modelId}  [${bar}] ${pct}% ` +
           `${this.inferencePullProgress.downloaded}/${this.inferencePullProgress.total}`,
       );
     } else if (this.inferenceLastDownload) {
       r.writeln();
       r.writeln(`  Last download ${this.inferenceLastDownload.modelId} ${this.inferenceLastDownload.pct}%`);
+    }
+    r.writeln();
+
+    // Per-feature backend routing
+    r.writeln(c.bold("  Routing"));
+    const routingEntries = Object.entries(this.inferenceRoutingConfig);
+    if (routingEntries.length === 0) {
+      r.writeln(c.dim("  No per-feature routing configured."));
+    } else {
+      for (const [feature, backend] of routingEntries) {
+        r.writeln(`  ${feature}: ${backend}`);
+      }
     }
 
     // External LLM Provider — shown only when flag enabled
@@ -809,8 +877,11 @@ export class TuiApp {
     }
 
     if (screen === "inference") {
-      await this._loadInferenceBadge();
-      await this._loadInferenceModels();
+      await Promise.all([
+        this._loadInferenceBadge(),
+        this._loadInferenceModels(),
+        this._loadInferenceRoutingConfig(),
+      ]);
     }
 
     if (screen === "inbox") {

@@ -1,6 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
+ImplRuntime: claude
 Pillar: 02-inference-sidecar
 Blocked-by: 13-web-inference-settings-page
 ---
