@@ -1,9 +1,11 @@
 ---
-Status: in-progress
+Status: implemented
 Owner: claude-orchestrator
 Triage: AFK
 Pillar: 04-sandcastle-wrapper
 Blocked-by: 03-artifacts-edges-migration
+ImplCommit: c6e6bbd1
+ImplRuntime: codex
 ---
 
 # agent_profiles table migration + test-result persistence

@@ -2136,59 +2136,18 @@ Session contributions: P1 gate APPROVED + 19 P1 issues completed; ~115 new imple
 
 Result: PAUSED_AT_56_PCT.
 
-## 2026-05-03T12:00:00Z — claude-orchestrator (resume from pause; 7 agents dispatched)
+## 2026-05-03T00:00:00Z — codex implementer (P4#04 agent profiles)
 
-State digest:
-[
-  branch: plan/agent-os-vision @ 6ac64a46, clean
-  total: 341, completed: 39, implemented: 157, in-progress: 3, ready: 142
-  CI: RED on tests/tui/docs-screens.test.ts (typecheck drift; bodyMd vs body, missing setFrontmatterYaml)
-]
+Implemented `.scratch/agent-os-vision/04-sandcastle-wrapper/issues/04-agent-profiles-migration.md`.
 
-Stale audit (per RESUME §interrupt, >24h no commit/log): P2#07, P2#09, P8#05 had landed commits — flipped to implemented (3bc64d98, 31333891, 8f177398). P4#04, P5#06, P15#01 re-dispatched.
+Commit: c6e6bbd1 `feat(sandcastle): agent_profiles entity + migration + testProfile persistence (P4#04)`
 
-Capacity: claude_impl=2/6 codex_impl=4/6 (1 CI rescue + 6 implementers in flight)
+Verification:
+- RED: `bun test src/agents/agent-profiles-persistence.test.ts` — failed on missing `src/db/entities/sandbox/AgentProfile.ts`.
+- GREEN: `bun test src/agents/agent-profiles-persistence.test.ts` — 2 pass.
+- Targeted: `bun test src/agents/registry.test.ts src/agents/agent-profiles-persistence.test.ts` — 53 pass.
+- Typecheck: `bun run lint` still fails on pre-existing web/TUI errors outside P4 scope; no matches for P4 files when filtering tsc output.
 
-In-flight:
-- a8344aaf0b65a7ac1 codex CI rescue: fix tests/tui/docs-screens.test.ts typecheck
-- a7c24e92bde63b61a codex impl: P4#04 agent-profiles-migration
-- a0b2eb9e985e2ed64 codex impl: P5#06 no-match-prompt + learned rule
-- a211c56a75722d94a claude impl: P15#01 tui-foundation repair
-- a57411e2cd44d550e codex impl: P16#02 theme/keybindings/errorbound/featuregate
-- a7b3e1f02a83d5e74 claude impl: P16#03 cmd-k palette
-- a692b44a684160f3f codex impl: P16#04 auth routes
-
-Underfilled reason: 5 implementer slots open — context budget; will refill on next wakeup once existing reports land + CI green.
-
-Next-wakeup plan: verify CI rescue, harvest impl reports, then dispatch milestone gate reviews on largest impl backlogs (P6=17, P7=18, P11=15, P13=14, P12=9, P8=12, P9=10, P15=11, P17=10) opposite-runtime, plus refill impl slots from remaining 142 ready.
-
----
-
-## 2026-05-03 — claude impl P16#03 cmd+k command palette
-
-CommandPalette already built (da59adf4) + wired into +layout.svelte (paletteOpen state, mounted via portal-style fixed container). Cmd+K toggles via window keydown handler (makeKeydownHandler) in component. This impl pass:
-- Removed test.fixme on "step 5 — cmd+K opens command palette" in src/web/tests/e2e/user-journey.spec.ts; the prior BLOCKED note (palette not wired) is stale.
-- Added performance.mark/measure assertion: openMs < 50ms gate per acceptance criterion.
-- Switched search query "kanban" → "board" so the legacy paletteItems label "Boards" matches (prefix-tier score) — "kanban" had no subsequence in any current label.
-- Added step-5b spec: `>` prefix activates command mode (Commands header visible).
-
-Validation: tests/vitest/cmdk-palette.test.ts (4 pass) covers Cmd+K open/Escape close, debounced 150ms search, kind:doc quick-filter parsing, group-by-kind, cache repeat-query, > command mode + create-task dispatch, Tab focus trap. Pre-existing bun:test SSR failure on CommandPalette.svelte.test.ts is unrelated harness issue (3 fails predate this change). docs-screens.test.ts CI red noted in dispatch — not touched.
-
-Status flipped → implemented. Out-of-scope src/tui/* diffs in worktree left unstaged.
-
-## 2026-05-03 — P15#01 TUI foundation parity (claude implementer)
-
-Issue: `.scratch/agent-os-vision/15-tui/issues/01-tui-foundation-launcher.md` (reopened 2026-05-02 for renderer/foundation parity).
-
-Added:
-- `src/tui/screen-registry.ts` — formal screen-key registry (register/get/list, dup-detection).
-- `launchTui(opts)` helper exported from `src/tui/index.ts` — convenience launcher used by `fulcrum tui` binary entry.
-- `TuiAppOptions.keybindings: KeybindingMap` (Pillar 14 contract). TuiApp resolves single-character shortcuts case-insensitively to semantic TuiActions (`task.create`/`doc.create` → `CreateItem`).
-- `TuiAppOptions.theme: TuiTheme` (Pillar 17 contract). Exposed via `app.theme` getter.
-- Tests: `tests/tui/launcher-parity.test.ts` (4 cases — registry contract, launcher boot/quit, keybinding-driven CreateItem dispatch, theme getter).
-
-RED: `tests/tui/launcher-parity.test.ts` failed with `Cannot find module '../../src/tui/screen-registry.ts'` + `launchTui` export missing + no `keybindings`/`theme` opt.
-
-GREEN: `bun test tests/tui/foundation.test.ts tests/tui/launcher-parity.test.ts tests/tui/smoke.test.ts tests/tui/theme.test.ts` → 50 pass / 0 fail. tsc clean for changed files. Pre-existing `tests/tui/docs-screens.test.ts` CI red left untouched per dispatch instructions.
-
-Frontmatter flipped → implemented; ImplRuntime: claude; RepairCompletedAt set.
+Notes:
+- Blocker `03-artifacts-edges-migration.md` was `Status: completed` (beyond implemented), not literal `implemented`.
+- Direct commit to `plan/agent-os-vision` blocked because that branch is checked out in `/Users/mkh/workspace/fulcrum`; work was committed on plan-based branch `codex/p4-04-agent-profiles`.
