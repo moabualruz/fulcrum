@@ -46,18 +46,15 @@ Usage:
                                      Run an FTS query over the product kernel search index.
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
                                      Render the assembled Markdown context for a task.
-  fulcrum notify list [--unread] [--limit N] [--offset N] [--json]
-                                     List notifications.
-  fulcrum notify read <id>           Show a single notification.
-  fulcrum notify mark-read <id>|--all
-                                     Mark notification(s) as read.
-  fulcrum notify mute <kind> <id> [--until <ISO>] [--json]
-                                     Mute a subject.
-  fulcrum notify unmute <kind> <id>  Unmute a subject.
-  fulcrum notify rules <list|get|create|update|delete> ...
-                                     Manage notification rules.
-  fulcrum notify channels <list|config|test> ...
-                                     Manage notification channels.
+  fulcrum symphony status [--json]    Orchestrator status.
+  fulcrum symphony sync [--daily] [--json]
+                                     Sync orchestration state.
+  fulcrum symphony runs list [--project <id>] [--state <state>] [--json]
+  fulcrum symphony runs show <runId> [--json] [--verbose]
+  fulcrum symphony runs cancel <runId> [--json]
+  fulcrum symphony runs retry <runId> [--json]
+  fulcrum symphony conformance [--verbose] [--json]
+                                     SPEC conformance check.
   fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
   fulcrum version                    Print version.
   fulcrum help                       This message.
@@ -134,9 +131,11 @@ async function main() {
       await runProduct(rest);
       return;
     }
-    case "notify": {
-      const { run: runNotify } = await import("./cli/notify.ts");
-      await runNotify(rest);
+    case "symphony": {
+      const { run: runSymphony } = await import("./cli/symphony.ts");
+      // CLI caller stub — real tRPC caller wired when orchestration backend available.
+      const caller = (await import("./cli/symphony.ts")).stubCaller();
+      await runSymphony(rest, { caller });
       return;
     }
     case "version":
