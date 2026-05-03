@@ -1,6 +1,8 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
+ImplCommit: af52213d4c6bdc181527960ad89f7a64bc5d697e
+ImplRuntime: codex
 Pillar: 05-router-and-skills
 Blocked-by: 14-skills-upstream-sync
 ---
