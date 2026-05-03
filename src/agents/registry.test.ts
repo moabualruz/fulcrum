@@ -2,7 +2,17 @@
 // getter returns a non-empty string for a fake $HOME.
 
 import { describe, expect, test } from "bun:test";
-import { AGENTS } from "./registry.ts";
+import {
+  AGENTS,
+  UnknownAgentError,
+  createProfileRegistry,
+  getProfile,
+  listProfiles,
+} from "./registry.ts";
+import { AgentProfileSchema, type AgentProfile } from "./types.ts";
+import { appRouter } from "../trpc/router.ts";
+import { createContext } from "../trpc/context.ts";
+import { t } from "../trpc/trpc.ts";
 
 const FAKE_HOME = "/home/testuser";
 
@@ -161,5 +171,89 @@ describe("AGENTS registry — specific path expectations", () => {
   test("Gemini: does not have settingsPath", () => {
     const gemini = AGENTS.find((a) => a.id === "gemini")!;
     expect(gemini.settingsPath).toBeUndefined();
+  });
+});
+
+const VALID_PROFILE: AgentProfile = {
+  name: "codex",
+  cliPath: "codex",
+  defaultFlags: ["--sandbox", "workspace-write"],
+  skillFolder: "codex",
+  authEnvVars: ["OPENAI_API_KEY"],
+  sandcastleProvider: "docker",
+  maxIterations: 8,
+  defaultTimeout: 300_000,
+};
+
+describe("agent profile registry", () => {
+  test("schema accepts a complete profile", () => {
+    expect(AgentProfileSchema.parse(VALID_PROFILE)).toEqual(VALID_PROFILE);
+  });
+
+  test("getProfile returns a profile for a valid name", () => {
+    const profile = getProfile("codex");
+
+    expect(profile.name).toBe("codex");
+    expect(profile.sandcastleProvider).toBe("docker");
+  });
+
+  test("listProfiles returns validated profiles", () => {
+    const profiles = listProfiles();
+
+    expect(profiles.length).toBeGreaterThan(0);
+    expect(profiles.map((profile) => profile.name)).toContain("codex");
+  });
+
+  test("getProfile throws UnknownAgentError with unknown and known names", () => {
+    expect(() => getProfile("nonexistent")).toThrow(UnknownAgentError);
+
+    try {
+      getProfile("nonexistent");
+    } catch (error) {
+      expect(error).toBeInstanceOf(UnknownAgentError);
+      expect((error as Error).message).toContain("nonexistent");
+      expect((error as Error).message).toContain("codex");
+    }
+  });
+
+  test("registry validation rejects a profile missing a required field", () => {
+    const invalidProfile = {
+      ...VALID_PROFILE,
+      cliPath: undefined,
+    };
+
+    expect(() => createProfileRegistry([invalidProfile])).toThrow(/cliPath/);
+  });
+});
+
+describe("agents tRPC router", () => {
+  const createCaller = t.createCallerFactory(appRouter);
+
+  test("agents.listProfiles returns registered profiles", async () => {
+    const caller = createCaller(createContext({
+      session: null,
+      orgId: null,
+      userId: null,
+      em: null,
+      container: null,
+    }));
+
+    const profiles = await caller.agents.listProfiles();
+
+    expect(profiles.map((profile) => profile.name)).toContain("codex");
+  });
+
+  test("agents.getProfile returns a named profile", async () => {
+    const caller = createCaller(createContext({
+      session: null,
+      orgId: null,
+      userId: null,
+      em: null,
+      container: null,
+    }));
+
+    const profile = await caller.agents.getProfile({ name: "codex" });
+
+    expect(profile.name).toBe("codex");
   });
 });

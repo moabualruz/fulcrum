@@ -19,6 +19,7 @@ import { docsRouter } from "../server/trpc/routers/docs.ts";
 import { customFieldDefsRouter, taskCustomFieldsRouter } from "../server/trpc/routers/custom-fields.ts";
 import { auditRouter } from "../server/trpc/routers/audit.ts";
 import { backupRouter } from "../server/trpc/routers/backup.ts";
+import { dataExportRouter, dataImportRouter } from "../server/trpc/routers/json-import-export.ts";
 import { errorLogsRouter } from "../server/trpc/routers/error-logs.ts";
 import { telemetryRouter } from "../server/trpc/routers/telemetry.ts";
 import { themeRouter } from "../server/trpc/routers/theme.ts";
@@ -28,6 +29,8 @@ import { artifactsRouter } from "./routers/artifacts.ts";
 import { reposRouter } from "./routers/repos.ts";
 import { credentialsRouter } from "../secrets/credentials-router.ts";
 import { webhooksRouter } from "./routers/webhooks.ts";
+import { getProfile, listProfiles } from "../agents/registry.ts";
+import { AgentProfileSchema } from "../agents/types.ts";
 import {
   createSavedSearch,
   deleteSavedSearch,
@@ -183,6 +186,16 @@ const agentRunsRouter = t.router({
   retry: idMutationProcedure("agent_runs", "retry"),
 });
 
+const agentsRouter = t.router({
+  listProfiles: publicProcedure
+    .output(z.array(AgentProfileSchema))
+    .query(() => listProfiles()),
+  getProfile: publicProcedure
+    .input(z.object({ name: z.string().min(1) }))
+    .output(AgentProfileSchema)
+    .query(({ input }) => getProfile(input.name)),
+});
+
 const repoBranchesRouter = t.router({
   list: listProcedure(),
   get: getProcedure(),
@@ -295,6 +308,7 @@ export const appRouter = t.router({
   doc_links: docLinksRouter,
   memories: memoriesRouter,
   context: contextRouter,
+  agents: agentsRouter,
   agent_runs: agentRunsRouter,
   artifacts: artifactsRouter,
   repos: reposRouter,
@@ -304,6 +318,8 @@ export const appRouter = t.router({
   notify: notificationsRouter,
   audit: auditRouter,
   backup: backupRouter,
+  dataExport: dataExportRouter,
+  dataImport: dataImportRouter,
   errorLogs: errorLogsRouter,
   telemetry: telemetryRouter,
   theme: themeRouter,

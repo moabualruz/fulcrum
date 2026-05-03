@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 04-sandcastle-wrapper
 Blocked-by: 04-agent-profiles-migration
@@ -15,11 +15,11 @@ Define the `AgentProfile` TypeScript type and the profile registry in `src/agent
 
 ## Acceptance criteria
 
-- [ ] Adapter / profile: `src/agents/types.ts` exports `AgentProfile` type with fields: `name`, `cliPath`, `defaultFlags`, `skillFolder`, `authEnvVars`, `sandcastleProvider`, `maxIterations`, `defaultTimeout`; Zod schema in same file or sibling `schema.ts`.
-- [ ] Adapter / profile: `src/agents/registry.ts` exports `getProfile(name: string): AgentProfile` (throws `UnknownAgentError`) and `listProfiles(): AgentProfile[]`; validates all registered profiles against Zod schema at startup (throws if invalid).
-- [ ] Lifecycle integration: `UnknownAgentError` class exported from `src/agents/registry.ts`; message includes the unknown name and a list of known names.
-- [ ] Surfaces parity: tRPC procedures `agents.listProfiles` and `agents.getProfile` created (stubs OK if profiles not yet loaded — returns empty list until profile files exist).
-- [ ] Tests: unit test — `getProfile('nonexistent')` throws `UnknownAgentError`; `getProfile` with valid name returns profile; registry startup validation rejects a profile missing a required field.
+- [x] Adapter / profile: `src/agents/types.ts` exports `AgentProfile` type with fields: `name`, `cliPath`, `defaultFlags`, `skillFolder`, `authEnvVars`, `sandcastleProvider`, `maxIterations`, `defaultTimeout`; Zod schema in same file or sibling `schema.ts`.
+- [x] Adapter / profile: `src/agents/registry.ts` exports `getProfile(name: string): AgentProfile` (throws `UnknownAgentError`) and `listProfiles(): AgentProfile[]`; validates all registered profiles against Zod schema at startup (throws if invalid).
+- [x] Lifecycle integration: `UnknownAgentError` class exported from `src/agents/registry.ts`; message includes the unknown name and a list of known names.
+- [x] Surfaces parity: tRPC procedures `agents.listProfiles` and `agents.getProfile` created (stubs OK if profiles not yet loaded — returns empty list until profile files exist).
+- [x] Tests: unit test — `getProfile('nonexistent')` throws `UnknownAgentError`; `getProfile` with valid name returns profile; registry startup validation rejects a profile missing a required field.
 
 ## Blocked by
 
