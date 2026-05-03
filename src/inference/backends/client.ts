@@ -1,6 +1,7 @@
 /**
- * InferenceClient — selects backend via FULCRUM_INFERENCE_BACKEND env
- * + per-feature qualifier from FULCRUM_FEATURES (e.g. "embeddings:ollama").
+ * InferenceClient — selects backend via per-feature routing config
+ * (read at call time, not startup) with qualifier chain:
+ * explicit map entry -> FULCRUM_INFERENCE_BACKEND env -> "embedded".
  */
 import type {
   BackendId,
@@ -12,6 +13,10 @@ import { EmbeddedBackend } from "./embedded.ts";
 import { OllamaBackend } from "./ollama.ts";
 import { LmStudioBackend } from "./lm-studio.ts";
 import { OpenAICompatibleBackend } from "./openai-compatible.ts";
+import {
+  selectBackend,
+  getRoutingConfig,
+} from "../routing-config.ts";
 
 export interface BackendInfo {
   readonly id: BackendId;
@@ -20,45 +25,12 @@ export interface BackendInfo {
 }
 
 export class InferenceClient {
-  private readonly globalDefault: BackendId;
-  private readonly featureMap: ReadonlyMap<string, BackendId>;
-  private readonly enabledFlags: ReadonlySet<string>;
-
-  constructor() {
-    const envBackend = process.env["FULCRUM_INFERENCE_BACKEND"];
-    this.globalDefault = isValidBackendId(envBackend) ? envBackend : "embedded";
-
-    const features = process.env["FULCRUM_FEATURES"] ?? "";
-    const fMap = new Map<string, BackendId>();
-    const flags = new Set<string>();
-
-    for (const token of features.split(",").map((s) => s.trim()).filter(Boolean)) {
-      // "embeddings:ollama" → feature=embeddings, backend=ollama
-      const colonIdx = token.indexOf(":");
-      if (colonIdx > 0) {
-        const feature = token.slice(0, colonIdx);
-        const backend = token.slice(colonIdx + 1);
-        if (isValidBackendId(backend)) {
-          fMap.set(feature, backend);
-          flags.add(token);
-          flags.add(feature);
-        }
-      } else {
-        // bare flag like "external-llm-provider"
-        flags.add(token);
-      }
-    }
-
-    this.featureMap = fMap;
-    this.enabledFlags = flags;
-  }
-
-  /** Resolve which backend ID to use, optionally for a specific feature. */
+  /**
+   * Resolve which backend ID to use for a feature.
+   * Reads routing config at call time so config changes take effect without restart.
+   */
   resolveBackendId(feature?: InferenceFeature | string): BackendId {
-    if (feature && this.featureMap.has(feature)) {
-      return this.featureMap.get(feature)!;
-    }
-    return this.globalDefault;
+    return selectBackend(feature);
   }
 
   /** Resolve and instantiate the backend for a given feature (or global default). */
@@ -66,23 +38,25 @@ export class InferenceClient {
     return createBackend(this.resolveBackendId(feature));
   }
 
-  /** Check if a backend is enabled (by env or feature flags). */
+  /** Check if a backend is enabled (routing map references it, or env/flag enables it). */
   isEnabled(id: BackendId): boolean {
-    // embedded always available
     if (id === "embedded") return true;
 
-    // if global default matches, it's enabled
-    if (this.globalDefault === id) return true;
+    // Check if global env default matches
+    const envBackend = process.env["FULCRUM_INFERENCE_BACKEND"];
+    if (envBackend === id) return true;
 
     // openai-compatible requires explicit external-llm-provider flag
     if (id === "openai-compatible") {
-      return this.enabledFlags.has("external-llm-provider");
+      return enabledFlags().has("external-llm-provider");
     }
 
-    // ollama / lm-studio enabled if any feature qualifier references them
-    for (const backend of this.featureMap.values()) {
+    // Check if any feature in the routing map references this backend
+    const map = getRoutingConfig();
+    for (const backend of Object.values(map)) {
       if (backend === id) return true;
     }
+
     return false;
   }
 
@@ -94,6 +68,21 @@ export class InferenceClient {
       requiredFlag: requiredFlag(id),
     }));
   }
+}
+
+function enabledFlags(): ReadonlySet<string> {
+  const features = process.env["FULCRUM_FEATURES"] ?? "";
+  const flags = new Set<string>();
+  for (const token of features.split(",").map((s) => s.trim()).filter(Boolean)) {
+    const colonIdx = token.indexOf(":");
+    if (colonIdx > 0) {
+      flags.add(token);
+      flags.add(token.slice(0, colonIdx));
+    } else {
+      flags.add(token);
+    }
+  }
+  return flags;
 }
 
 function createBackend(id: BackendId): InferenceBackend {

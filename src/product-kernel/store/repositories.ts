@@ -34,20 +34,6 @@ export interface TaskRow {
   updated_at: string;
 }
 
-export interface SprintRow {
-  id: string;
-  org_id: string;
-  project_id: string;
-  name: string;
-  goal: string | null;
-  status: string;
-  capacity_points: number | null;
-  start_date: string | null;
-  end_date: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface EventRow {
   id: string;
   org_id: string;
@@ -173,60 +159,6 @@ export async function appendEvent(
   return rows[0] as EventRow;
 }
 
-export interface SprintRow {
-  id: string;
-  org_id: string;
-  project_id: string;
-  name: string;
-  goal: string | null;
-  status: string;
-  capacity: number;
-  start_date: string | null;
-  end_date: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export async function createSprint(
-  db: ProductDb,
-  input: {
-    orgId: string;
-    projectId: string;
-    name: string;
-    goal?: string | null;
-    capacity?: number;
-    startDate?: string | null;
-    endDate?: string | null;
-  },
-): Promise<SprintRow> {
-  const id = newUlid();
-  await db.query(
-    `INSERT INTO sprints (id, org_id, project_id, name, goal, capacity, start_date, end_date)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [
-      id,
-      input.orgId,
-      input.projectId,
-      input.name,
-      input.goal ?? null,
-      input.capacity ?? 0,
-      input.startDate ?? null,
-      input.endDate ?? null,
-    ],
-  );
-  await appendEvent(db, {
-    orgId: input.orgId,
-    projectId: input.projectId,
-    actor: "system",
-    subjectKind: "sprint",
-    subjectId: id,
-    verb: "created",
-  });
-  const rows = await db.query<SprintRow>(`SELECT * FROM sprints WHERE id = $1`, [id]);
-  if (rows.length === 0) throw new Error(`sprint insert lost: ${id}`);
-  return rows[0] as SprintRow;
-}
-
 export async function listEventsForProject(
   db: ProductDb,
   projectId: string,
@@ -238,6 +170,31 @@ export async function listEventsForProject(
 }
 
 // ── Sprint CRUD ──────────────────────────────────────────────────────
+
+export interface SprintRow {
+  id: string;
+  org_id: string;
+  project_id: string;
+  name: string;
+  goal: string | null;
+  status: string;
+  capacity_points: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  closed_at: string | null;
+  metrics_snapshot: Record<string, unknown> | null;
+  retro_doc_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MetricsSnapshot {
+  capacity_points: number | null;
+  completed_points: number;
+  total_tasks: number;
+  completed_tasks: number;
+  velocity: number;
+}
 
 export async function createSprint(
   db: ProductDb,
@@ -387,4 +344,108 @@ export async function sprintCapacityUsed(
     [sprintId],
   );
   return Number(rows[0]?.total ?? 0);
+}
+
+// ── Sprint close ────────────────────────────────────────────────────
+
+export interface CloseSprintResult {
+  sprint: SprintRow;
+  event: EventRow;
+  metrics: MetricsSnapshot;
+}
+
+export async function closeSprint(
+  db: ProductDb,
+  sprintId: string,
+): Promise<CloseSprintResult> {
+  const sprintRows = await db.query<SprintRow>(
+    `SELECT * FROM sprints WHERE id = $1`,
+    [sprintId],
+  );
+  const sprint = sprintRows[0];
+  if (!sprint) throw new Error(`sprint not found: ${sprintId}`);
+  if (sprint.status === "completed") throw new Error(`sprint already closed: ${sprintId}`);
+
+  // Compute metrics snapshot
+  const tasks = await listSprintTasks(db, sprintId);
+  const completedTasks = tasks.filter((t) => t.status === "completed");
+  const completedPoints = completedTasks.reduce(
+    (sum, t) => sum + (t.estimate_points ?? 0),
+    0,
+  );
+  const metrics: MetricsSnapshot = {
+    capacity_points: sprint.capacity_points,
+    completed_points: completedPoints,
+    total_tasks: tasks.length,
+    completed_tasks: completedTasks.length,
+    velocity: completedPoints,
+  };
+
+  await db.query(
+    `UPDATE sprints SET status = 'completed', closed_at = now(),
+       metrics_snapshot = $2::jsonb, updated_at = now()
+     WHERE id = $1`,
+    [sprintId, JSON.stringify(metrics)],
+  );
+
+  const event = await appendEvent(db, {
+    orgId: sprint.org_id,
+    projectId: sprint.project_id,
+    actor: "system",
+    subjectKind: "sprint",
+    subjectId: sprintId,
+    verb: "closed",
+    payload: {
+      name: sprint.name,
+      goal: sprint.goal,
+      start_date: sprint.start_date,
+      end_date: sprint.end_date,
+      metrics_snapshot: metrics,
+    },
+  });
+
+  const updatedRows = await db.query<SprintRow>(
+    `SELECT * FROM sprints WHERE id = $1`,
+    [sprintId],
+  );
+
+  return { sprint: updatedRows[0] as SprintRow, event, metrics };
+}
+
+// ── Event handler dedup ─────────────────────────────────────────────
+
+export async function checkEventHandled(
+  db: ProductDb,
+  eventId: string,
+  handler: string,
+): Promise<boolean> {
+  const rows = await db.query<{ event_id: string }>(
+    `SELECT event_id FROM event_handler_log WHERE event_id = $1 AND handler = $2`,
+    [eventId, handler],
+  );
+  return rows.length > 0;
+}
+
+export async function markEventHandled(
+  db: ProductDb,
+  eventId: string,
+  handler: string,
+): Promise<void> {
+  await db.query(
+    `INSERT INTO event_handler_log (event_id, handler) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+    [eventId, handler],
+  );
+}
+
+// ── Sprint retro doc link ───────────────────────────────────────────
+
+export async function setSprintRetroDocId(
+  db: ProductDb,
+  sprintId: string,
+  docId: string,
+): Promise<void> {
+  await db.query(
+    `UPDATE sprints SET retro_doc_id = $2, updated_at = now() WHERE id = $1`,
+    [sprintId, docId],
+  );
 }

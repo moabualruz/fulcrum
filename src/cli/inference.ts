@@ -33,6 +33,8 @@ Usage:
   fulcrum inference generate <prompt> [--schema <json>] [--json]
   fulcrum inference classify <text> --labels <csv> [--json]
   fulcrum inference tokenize <text> [--model <id>] [--json]
+  fulcrum inference config list [--json]
+  fulcrum inference config set <feature> <backend>
   fulcrum inference config set-provider --url <url> --key <key>
   fulcrum inference config test-provider [--json]
   fulcrum inference stop [--json]
@@ -65,6 +67,10 @@ interface InferenceCliCaller {
       list(): Promise<unknown>;
       pull(input: { modelId: string; force?: boolean }): ProgressSource | Promise<ProgressSource>;
       rm(input: { modelId: string }): Promise<unknown>;
+    };
+    config?: {
+      get(): Promise<unknown>;
+      set(input: { feature: string; backend: string }): Promise<unknown>;
     };
   };
 }
@@ -584,6 +590,12 @@ async function runConfig(
 ): Promise<void> {
   const [verb = "help", ...rest] = argv;
   switch (verb) {
+    case "list":
+      await runConfigList(rest, opts);
+      return;
+    case "set":
+      await runConfigSet(rest, opts);
+      return;
     case "set-provider":
       await runConfigSetProvider(rest, opts);
       return;
@@ -593,6 +605,60 @@ async function runConfig(
     default:
       throw new Error(`unknown config verb '${verb}'`);
   }
+}
+
+async function runConfigList(
+  argv: readonly string[],
+  opts: InferenceRunOptions & { print: (line: string) => void },
+): Promise<void> {
+  const json = hasFlag(argv, "json");
+
+  if (opts.caller?.inference.config) {
+    const map = await opts.caller.inference.config.get();
+    if (json) {
+      opts.print(JSON.stringify(map));
+    } else {
+      for (const [feature, backend] of Object.entries(map as Record<string, string>)) {
+        opts.print(`${feature}: ${backend}`);
+      }
+    }
+    return;
+  }
+
+  // Fallback: read from routing-config module directly
+  const { getRoutingConfig } = await import("../inference/routing-config.ts");
+  const map = getRoutingConfig();
+  if (json) {
+    opts.print(JSON.stringify(map));
+  } else {
+    for (const [feature, backend] of Object.entries(map)) {
+      opts.print(`${feature}: ${backend}`);
+    }
+  }
+}
+
+async function runConfigSet(
+  argv: readonly string[],
+  opts: InferenceRunOptions & { print: (line: string) => void },
+): Promise<void> {
+  const [feature, backend] = argv;
+  if (!feature) throw new Error("config set requires <feature>");
+  if (!backend) throw new Error("config set requires <backend>");
+
+  if (opts.caller?.inference.config) {
+    await opts.caller.inference.config.set({ feature, backend });
+    opts.print(`${feature}: ${backend}`);
+    return;
+  }
+
+  // Fallback: write to routing-config module directly
+  const { setRoutingConfig } = await import("../inference/routing-config.ts");
+  const { BACKEND_IDS } = await import("../inference/backends/types.ts");
+  if (!BACKEND_IDS.includes(backend as never)) {
+    throw new Error(`invalid backend '${backend}'; valid: ${BACKEND_IDS.join(", ")}`);
+  }
+  setRoutingConfig(feature as never, backend as never);
+  opts.print(`${feature}: ${backend}`);
 }
 
 async function runConfigSetProvider(

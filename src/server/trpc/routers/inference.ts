@@ -7,6 +7,8 @@ import {
   BackendSchema,
   ClassifyResultSchema,
   EmbedResultSchema,
+  FeatureBackendMapSchema,
+  FeatureBackendSetInputSchema,
   GenerateOptionsSchema,
   GenerateResultSchema,
   HealthResultSchema,
@@ -15,6 +17,10 @@ import {
   TokenizeResultSchema,
   type ModelPullProgress,
 } from "../../../inference/protocol.ts";
+import {
+  getRoutingConfig,
+  setRoutingConfig,
+} from "../../../inference/routing-config.ts";
 import { INFERENCE_CLIENT_TOKEN } from "../../../inference/tokens.ts";
 import { FlagRegistry } from "../../../flags/registry.ts";
 import { t, publicProcedure } from "../../../trpc/trpc.ts";
@@ -295,6 +301,20 @@ export const inferenceRouter = t.router({
         const client = await resolveBoundClient(ctx);
         if (client) return client.listBackends();
         return defaultBackends(ctx);
+      }),
+  }),
+
+  config: t.router({
+    get: publicProcedure
+      .output(FeatureBackendMapSchema)
+      .query(() => ({ ...getRoutingConfig() })),
+
+    set: protectedProcedure
+      .input(FeatureBackendSetInputSchema)
+      .output(z.object({ ok: z.boolean() }))
+      .mutation(({ input }) => {
+        setRoutingConfig(input.feature, input.backend);
+        return { ok: true };
       }),
   }),
 

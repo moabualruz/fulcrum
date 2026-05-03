@@ -115,6 +115,37 @@ export type ModelPullProgress = z.infer<typeof ModelPullProgressSchema>;
 export type InferenceBackendInfo = z.infer<typeof BackendSchema>;
 export type InferenceErrorPayload = z.infer<typeof InferenceErrorSchema>;
 
+// ── Per-feature backend routing map ──────────────────────────────────
+
+export const InferenceFeatureSchema = z.enum([
+  "embeddings",
+  "router-llm",
+  "memory-llm-extract",
+  "classify",
+  "tokenize",
+]);
+
+export type InferenceFeatureKey = z.infer<typeof InferenceFeatureSchema>;
+
+export const FeatureBackendMapSchema = z.record(
+  InferenceFeatureSchema,
+  BackendSchema.shape.id,
+);
+
+/** Per-feature backend routing map — e.g. { embeddings: "ollama", "router-llm": "embedded" } */
+export type FeatureBackendMap = z.infer<typeof FeatureBackendMapSchema>;
+
+export const DEFAULT_FEATURE_BACKEND_MAP: Readonly<FeatureBackendMap> = {
+  embeddings: "embedded",
+  "router-llm": "embedded",
+  "memory-llm-extract": "embedded",
+};
+
+export const FeatureBackendSetInputSchema = z.object({
+  feature: InferenceFeatureSchema,
+  backend: BackendSchema.shape.id,
+});
+
 export class InferenceError extends Error {
   readonly code: number;
   readonly backend: string;
