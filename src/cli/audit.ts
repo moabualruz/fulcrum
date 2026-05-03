@@ -39,11 +39,25 @@ interface RunOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
-const HELP = `fulcrum audit
+const HELP = `fulcrum audit — compliance audit-log query and export
 
 Usage:
-  fulcrum audit query [--project <id>] [--user <id>] [--kind <kind>] [--verb <verb>] [--since <ISO>] [--until <ISO>] [--limit <n>] [--json]
+  fulcrum audit query [--project <id>] [--user <id>] [--kind <kind>]
+                      [--verb <verb>] [--since <ISO>] [--until <ISO>]
+                      [--limit <n>] [--json]
+    Query audit events. Returns filtered event array from audit.query.
+    --since and --until accept ISO-8601 date strings (e.g. 2026-01-01).
+
   fulcrum audit export --format csv|json [same filters] [--output <file>]
+    Export audit events via audit.export. Streams to --output file or stdout.
+    For large exports (>100k events), the server returns a jobId; the CLI
+    polls audit.exportStatus until the job completes, then writes the result.
+    Output includes all event payload fields (compliance export per A4).
+
+Examples:
+  fulcrum audit query --kind task --since 2026-01-01 --json
+  fulcrum audit export --format csv --output ./audit.csv
+  fulcrum audit export --format json
 `;
 
 const BOOLEAN_FLAGS = new Set(["--json"]);

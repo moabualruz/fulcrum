@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplRuntime: claude
 Triage: AFK
 Pillar: notifications-activity-audit
 Blocked-by: [06-trpc-audit-procedures.md]
@@ -19,12 +20,12 @@ PRD: `.scratch/agent-os-vision/prds/12-notifications-activity-audit.md` (Issues 
 `fulcrum audit query [--project <id>] [--user <id>] [--kind <kind>] [--verb <verb>] [--since <ISO>] [--until <ISO>] [--limit <n>] [--json]` — calls `audit.query` tRPC; outputs event array. `fulcrum audit export --format csv|json [same filters] [--output <file>]` — calls `audit.export`; streams to file or stdout; handles large-export `{jobId}` response by polling `audit.exportStatus` until complete. Both with `--help`. Per A4: these commands are the compliance export mechanism.
 
 ## Acceptance criteria
-- [ ] Schema migration: N/A.
-- [ ] tRPC procedure / module: codegen or thin wrappers around `audit.query` + `audit.export`.
-- [ ] Web surface: N/A.
-- [ ] CLI command: `fulcrum audit query --kind task --since 2026-01-01 --json` returns filtered events as JSON array; `fulcrum audit export --format csv --output ./audit.csv` writes CSV file; `fulcrum audit export --format json` streams to stdout; large export (>100k) → polls `exportStatus` and waits; `--until` + `--since` parse ISO dates.
-- [ ] TUI screen: N/A (TUI audit in separate slice).
-- [ ] Tests: `audit query` filter combos tested; CSV output has correct headers + rows; JSON output is valid array; `--output` writes to file path; large export polling: mock job returns `completed` → file downloaded; RED→GREEN.
+- [x] Schema migration: N/A.
+- [x] tRPC procedure / module: codegen or thin wrappers around `audit.query` + `audit.export`.
+- [x] Web surface: N/A.
+- [x] CLI command: `fulcrum audit query --kind task --since 2026-01-01 --json` returns filtered events as JSON array; `fulcrum audit export --format csv --output ./audit.csv` writes CSV file; `fulcrum audit export --format json` streams to stdout; large export (>100k) → polls `exportStatus` and waits; `--until` + `--since` parse ISO dates.
+- [x] TUI screen: N/A (TUI audit in separate slice).
+- [x] Tests: `audit query` filter combos tested; CSV output has correct headers + rows; JSON output is valid array; `--output` writes to file path; large export polling: mock job returns `completed` → file downloaded; RED→GREEN.
 
 ## Blocked by
 - `06-trpc-audit-procedures.md` — `audit.query` + `audit.export` + `audit.exportStatus`.
