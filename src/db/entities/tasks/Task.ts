@@ -78,6 +78,7 @@ export class Task {
     | "updatedAt"
     | "title"
     | "description"
+    | "tiptapContent"
     | "blockedByIds"
     | "workflowId"
     | "status"
@@ -108,6 +109,17 @@ export class Task {
 
   @Property({ type: "text", nullable: true })
   description: string | null = null;
+
+  @Property({
+    type: "json",
+    fieldName: "tiptap_content",
+    defaultRaw: '\'{"type":"doc","content":[{"type":"paragraph"}]}\'::jsonb',
+    returning: false,
+  })
+  tiptapContent: Record<string, unknown> = {
+    type: "doc",
+    content: [{ type: "paragraph" }],
+  };
 
   // P3#02 eligibility columns — added by Migration20260502000001.
   @Property({ type: "array", fieldName: "blocked_by_ids", default: [] })

@@ -26,6 +26,8 @@ export interface BoardTask {
   priority: number;
   project_id: string | null;
   updated_at: string;
+  description_text?: string | null;
+  tiptap_content?: unknown;
 }
 
 export interface RunListing {

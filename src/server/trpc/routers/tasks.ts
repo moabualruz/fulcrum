@@ -6,14 +6,25 @@ import { Org } from "../../../db/entities/auth/Org.ts";
 import { Task } from "../../../db/entities/tasks/Task.ts";
 import { DependenciesSchema, type TaskDependencies } from "../../../db/entities/tasks/schemas.ts";
 import { TaskRepository } from "../../../db/repositories/tasks/TaskRepository.ts";
+import { tipTapDocToText, type TipTapJson } from "../../../db/tasks-rich-text.ts";
 import { protectedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
+
+const TipTapContentSchema: z.ZodType<TipTapJson> = z.lazy(() =>
+  z.object({
+    type: z.string().optional(),
+    text: z.string().optional(),
+    content: z.array(TipTapContentSchema).optional(),
+  }).catchall(z.unknown()),
+);
 
 const TaskOutputSchema = z.object({
   id: z.uuid(),
   orgId: z.string().regex(/^[0-9a-fA-F-]{36}$/),
   title: z.string(),
   description: z.string().nullable(),
+  descriptionText: z.string(),
+  tiptapContent: TipTapContentSchema,
   status: z.string().nullable(),
   priority: z.number().int().nullable(),
   points: z.number().int().nullable(),
@@ -47,6 +58,8 @@ const SetDependenciesInputSchema = TaskRelationIdInputSchema.extend({
 const CreateTaskInputSchema = z.object({
   title: z.string().trim().min(1),
   description: z.string().nullable().optional(),
+  descriptionText: z.string().optional(),
+  tiptapContent: TipTapContentSchema.optional(),
   status: z.string().trim().min(1).nullable().optional(),
   priority: z.number().int().nullable().optional(),
   points: z.number().int().nonnegative().nullable().optional(),
@@ -55,6 +68,8 @@ const CreateTaskInputSchema = z.object({
 const UpdateTaskInputSchema = TaskIdInputSchema.extend({
   title: z.string().trim().min(1).optional(),
   description: z.string().nullable().optional(),
+  descriptionText: z.string().optional(),
+  tiptapContent: TipTapContentSchema.optional(),
   status: z.string().trim().min(1).nullable().optional(),
   priority: z.number().int().nullable().optional(),
   points: z.number().int().nonnegative().nullable().optional(),
@@ -68,6 +83,8 @@ function serializeTask(task: Task): TaskOutput {
     orgId: task.org.id,
     title: task.title,
     description: task.description,
+    descriptionText: tipTapDocToText(task.tiptapContent as TipTapJson),
+    tiptapContent: task.tiptapContent as TipTapJson,
     status: task.status,
     priority: task.priority,
     points: task.points ?? null,

@@ -13,11 +13,14 @@ import type { EntityData } from "@mikro-orm/core";
 import { randomUUID } from "node:crypto";
 import { Org } from "../../entities/auth/Org.ts";
 import { Task } from "../../entities/tasks/Task.ts";
+import { textToTipTapDoc, type TipTapJson } from "../../tasks-rich-text.ts";
 
 export interface TaskCreateInput {
   orgId: string;
   title: string;
   description?: string | null;
+  descriptionText?: string;
+  tiptapContent?: TipTapJson;
   status?: string | null;
   priority?: number | null;
   points?: number | null;
@@ -36,6 +39,8 @@ export interface TaskGetInput {
 export interface TaskUpdateInput extends TaskGetInput {
   title?: string;
   description?: string | null;
+  descriptionText?: string;
+  tiptapContent?: TipTapJson;
   status?: string | null;
   priority?: number | null;
   points?: number | null;
@@ -55,6 +60,7 @@ export class TaskRepository extends EntityRepository<Task> {
       org: em.getReference(Org, input.orgId),
       title: input.title,
       description: input.description ?? null,
+      tiptapContent: input.tiptapContent ?? textToTipTapDoc(input.descriptionText ?? input.description ?? ""),
       status: input.status ?? "todo",
       priority: input.priority ?? null,
       points: input.points ?? null,
@@ -95,6 +101,8 @@ export class TaskRepository extends EntityRepository<Task> {
 
     if (input.title !== undefined) task.title = input.title;
     if (input.description !== undefined) task.description = input.description;
+    if (input.descriptionText !== undefined) task.tiptapContent = textToTipTapDoc(input.descriptionText);
+    if (input.tiptapContent !== undefined) task.tiptapContent = input.tiptapContent;
     if (input.status !== undefined) task.status = input.status;
     if (input.priority !== undefined) task.priority = input.priority;
     if (input.points !== undefined) task.points = input.points;

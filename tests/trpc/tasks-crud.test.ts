@@ -55,6 +55,10 @@ describe("tasks CRUD tRPC baseline", () => {
       const created = await caller.tasks.create({
         title: "Write CRUD tests",
         description: "Baseline coverage",
+        tiptapContent: {
+          type: "doc",
+          content: [{ type: "paragraph", content: [{ type: "text", text: "Baseline coverage" }] }],
+        },
         status: "todo",
         priority: 2,
         points: 3,
@@ -64,6 +68,11 @@ describe("tasks CRUD tRPC baseline", () => {
         orgId: ORG_ID,
         title: "Write CRUD tests",
         description: "Baseline coverage",
+        descriptionText: "Baseline coverage",
+        tiptapContent: {
+          type: "doc",
+          content: [{ type: "paragraph", content: [{ type: "text", text: "Baseline coverage" }] }],
+        },
         status: "todo",
         priority: 2,
         points: 3,
@@ -83,6 +92,7 @@ describe("tasks CRUD tRPC baseline", () => {
         id: created.id,
         title: "Ship CRUD baseline",
         description: null,
+        descriptionText: "Plain CLI edit",
         status: "in_progress",
         priority: 1,
         points: null,
@@ -92,6 +102,11 @@ describe("tasks CRUD tRPC baseline", () => {
         id: created.id,
         title: "Ship CRUD baseline",
         description: null,
+        descriptionText: "Plain CLI edit",
+        tiptapContent: {
+          type: "doc",
+          content: [{ type: "paragraph", content: [{ type: "text", text: "Plain CLI edit" }] }],
+        },
         status: "in_progress",
         priority: 1,
         points: null,
