@@ -9,6 +9,7 @@ export const DEFAULT_HOOK_TIMEOUT_MS = 60_000;
 export type LifecycleHookName =
   | "before_run"
   | "after_run"
+  | "before_remove"
   | "on_failure"
   | "on_cancel";
 
@@ -33,8 +34,10 @@ export type LifecycleHook = (
 export type LifecycleHooks = Partial<Record<LifecycleHookName, LifecycleHook>>;
 
 export interface LifecycleHookTimeoutConfig {
+  hooks_timeout_ms?: number;
   before_run_timeout_ms?: number;
   after_run_timeout_ms?: number;
+  before_remove_timeout_ms?: number;
   on_failure_timeout_ms?: number;
   on_cancel_timeout_ms?: number;
 }
@@ -113,7 +116,7 @@ export function resolveHookTimeoutMs(
   timeoutConfig: LifecycleHookTimeoutConfig,
 ): number {
   const timeoutMs = timeoutConfig[`${hookName}_timeout_ms`];
-  return timeoutMs ?? DEFAULT_HOOK_TIMEOUT_MS;
+  return timeoutMs ?? timeoutConfig.hooks_timeout_ms ?? DEFAULT_HOOK_TIMEOUT_MS;
 }
 
 async function runHookWithTimeout(

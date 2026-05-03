@@ -51,7 +51,7 @@ export function sanitizeWorkspaceKey(
   opts: SanitizeWorkspaceKeyOptions = {},
 ): string {
   const fallback = taskId.slice(0, 8) || "workspace";
-  const base = (title.replace(WORKSPACE_SAFE_CHARS, "") || fallback).slice(
+  const base = (title.replace(WORKSPACE_SAFE_CHARS, "_") || fallback).slice(
     0,
     MAX_WORKSPACE_KEY_LENGTH,
   );
