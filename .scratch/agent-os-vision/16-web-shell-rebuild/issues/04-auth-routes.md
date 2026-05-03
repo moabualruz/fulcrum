@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [01-foundation-reset/issues/11-web-login-signup-logout-pages.md, 01-foundation-reset/issues/13-passkey-enrollment-and-login-flow.md]
@@ -8,6 +8,8 @@ Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 16 section)
 Decisions: [Q21, Q30, Q-permissions]
 Vision: .scratch/agent-os-vision/VISION-GAPS.md (row: "Multi-user / accounts / collaboration / SaaS")
 Docs: https://www.better-auth.com/docs
+ImplCommit: d44a2eb764e075c2c2110baa08f04bdd541e1d14
+ImplRuntime: codex
 ---
 
 # Auth routes — /auth/login, /auth/signup, /auth/invite/[token], /auth/logout
