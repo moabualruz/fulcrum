@@ -9,8 +9,10 @@ import { DocLink } from "../../../db/entities/docs/DocLink.ts";
 import { Document } from "../../../db/entities/docs/Document.ts";
 import { DocVersion } from "../../../db/entities/docs/DocVersion.ts";
 import { DocTypeEnum, ScopeEnum } from "../../../db/entities/docs/enums.ts";
-import { syncDocWikilinks } from "../../../docs/wikilink-extractor.ts";
 import { SearchDocument } from "../../../db/entities/search/SearchDocument.ts";
+import { diffDocVersionsHtml, reconstructDocVersion } from "../../../docs/version-reconstructor.ts";
+import { writeDocVersion } from "../../../docs/version-writer.ts";
+import { syncDocWikilinks } from "../../../docs/wikilink-extractor.ts";
 import { protectedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 import { docTemplatesRouter } from "./doc-templates.ts";
@@ -144,6 +146,24 @@ const ResolveCommentInputSchema = z.object({
   resolved: z.boolean().default(true),
 });
 const DeleteCommentOutputSchema = z.object({ deleted: z.literal(true) });
+const VersionDocInputSchema = z.object({ docId: z.uuid() });
+const VersionGetInputSchema = VersionDocInputSchema.extend({ versionNum: z.number().int().positive() });
+const VersionDiffInputSchema = VersionDocInputSchema.extend({
+  fromVersionNum: z.number().int().positive(),
+  toVersionNum: z.number().int().positive(),
+});
+const VersionListOutputSchema = z.object({
+  id: z.uuid(),
+  versionNum: z.number().int().positive(),
+  isSnapshot: z.boolean(),
+  authorId: z.uuid().nullable(),
+  createdAt: z.date(),
+});
+const VersionOutputSchema = VersionListOutputSchema.extend({
+  bodyMdSnapshot: z.string().nullable(),
+  restoreOfId: z.uuid().nullable(),
+});
+const VersionDiffOutputSchema = z.object({ html: z.string() });
 
 type DocOutput = z.infer<typeof DocOutputSchema>;
 type CommentOutput = z.infer<typeof CommentOutputSchema>;
@@ -235,24 +255,6 @@ async function findDocByInput(
   } as never);
 }
 
-async function writeVersion(
-  em: import("@mikro-orm/postgresql").EntityManager,
-  orgId: string,
-  doc: Document,
-): Promise<void> {
-  const count = await em.count(DocVersion, { doc: doc.id } as never);
-  em.persist(em.create(DocVersion, {
-    id: randomUUID(),
-    org: em.getReference(Org, orgId),
-    doc,
-    versionNum: count + 1,
-    snapshot: doc.contentJson,
-    bodyMdSnapshot: doc.bodyMd,
-    author: null,
-    createdAt: new Date(),
-  } as never));
-}
-
 async function upsertSearchDocument(
   em: import("@mikro-orm/postgresql").EntityManager,
   orgId: string,
@@ -305,6 +307,30 @@ function serializeComment(comment: DocComment, replies: CommentOutput["replies"]
     updatedAt: comment.updatedAt,
     replies,
   };
+}
+
+function serializeVersion(version: DocVersion): z.infer<typeof VersionOutputSchema> {
+  return {
+    id: version.id,
+    versionNum: version.versionNum,
+    isSnapshot: version.snapshot !== null,
+    authorId: version.author?.id ?? null,
+    createdAt: version.createdAt,
+    bodyMdSnapshot: version.bodyMdSnapshot,
+    restoreOfId: version.restoreOf?.id ?? null,
+  };
+}
+
+async function requireDoc(
+  em: import("@mikro-orm/postgresql").EntityManager,
+  orgId: string,
+  docId: string,
+): Promise<Document> {
+  const doc = await em.findOne(Document, { org: orgId, id: docId, archived: false } as never);
+  if (!doc) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Document not found." });
+  }
+  return doc;
 }
 
 async function findComment(
@@ -395,7 +421,7 @@ export const docsRouter = t.router({
         updatedAt: new Date(),
       });
       em.persist(doc);
-      await writeVersion(em, ctx.orgId, doc);
+      await writeDocVersion(em, { orgId: ctx.orgId, doc, authorId: ctx.userId });
       await upsertSearchDocument(em, ctx.orgId, doc.id);
       await em.flush();
       return serializeDoc(doc);
@@ -426,7 +452,7 @@ export const docsRouter = t.router({
 
       em.persist(doc);
       await syncDocWikilinks(em, ctx.orgId, doc, doc.contentJson);
-      await writeVersion(em, ctx.orgId, doc);
+      await writeDocVersion(em, { orgId: ctx.orgId, doc, authorId: ctx.userId });
       await upsertSearchDocument(em, ctx.orgId, doc.id);
       await em.flush();
       return serializeDoc(doc);
@@ -585,6 +611,93 @@ export const docsRouter = t.router({
         em.persist(comment);
         await em.flush();
         return serializeComment(comment);
+      }),
+  }),
+
+  versions: t.router({
+    list: protectedProcedure
+      .input(VersionDocInputSchema)
+      .output(z.array(VersionListOutputSchema))
+      .query(async ({ ctx, input }) => {
+        const em = requireEntityManager(ctx);
+        await requireDoc(em, ctx.orgId, input.docId);
+        const versions = await em.find(DocVersion, {
+          org: ctx.orgId,
+          doc: input.docId,
+        } as never, {
+          populate: ["author"],
+          orderBy: { versionNum: "DESC" },
+        });
+        return versions.map((version) => ({
+          id: version.id,
+          versionNum: version.versionNum,
+          isSnapshot: version.snapshot !== null,
+          authorId: version.author?.id ?? null,
+          createdAt: version.createdAt,
+        }));
+      }),
+
+    get: protectedProcedure
+      .input(VersionGetInputSchema)
+      .output(VersionOutputSchema.nullable())
+      .query(async ({ ctx, input }) => {
+        const em = requireEntityManager(ctx);
+        await requireDoc(em, ctx.orgId, input.docId);
+        const version = await em.findOne(DocVersion, {
+          org: ctx.orgId,
+          doc: input.docId,
+          versionNum: input.versionNum,
+        } as never, {
+          populate: ["author", "restoreOf"],
+        });
+        return version ? serializeVersion(version) : null;
+      }),
+
+    diff: protectedProcedure
+      .input(VersionDiffInputSchema)
+      .output(VersionDiffOutputSchema)
+      .query(async ({ ctx, input }) => {
+        const em = requireEntityManager(ctx);
+        await requireDoc(em, ctx.orgId, input.docId);
+        const from = await reconstructDocVersion(em, {
+          orgId: ctx.orgId,
+          docId: input.docId,
+          versionNum: input.fromVersionNum,
+        });
+        const to = await reconstructDocVersion(em, {
+          orgId: ctx.orgId,
+          docId: input.docId,
+          versionNum: input.toVersionNum,
+        });
+        return { html: diffDocVersionsHtml(from.contentJson, to.contentJson) };
+      }),
+
+    restore: protectedProcedure
+      .input(VersionGetInputSchema)
+      .output(DocOutputSchema)
+      .mutation(async ({ ctx, input }) => {
+        const em = requireEntityManager(ctx);
+        const doc = await requireDoc(em, ctx.orgId, input.docId);
+        const reconstructed = await reconstructDocVersion(em, {
+          orgId: ctx.orgId,
+          docId: input.docId,
+          versionNum: input.versionNum,
+        });
+
+        doc.bodyMd = reconstructed.bodyMd;
+        doc.contentJson = reconstructed.contentJson;
+        doc.updatedAt = new Date();
+        em.persist(doc);
+        await syncDocWikilinks(em, ctx.orgId, doc, doc.contentJson);
+        await writeDocVersion(em, {
+          orgId: ctx.orgId,
+          doc,
+          authorId: ctx.userId,
+          restoreOf: reconstructed.version,
+        });
+        await upsertSearchDocument(em, ctx.orgId, doc.id);
+        await em.flush();
+        return serializeDoc(doc);
       }),
   }),
 
