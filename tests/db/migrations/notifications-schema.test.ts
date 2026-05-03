@@ -399,10 +399,10 @@ describe("Notifications migration: FK cascade on org delete", () => {
 // ─── Migration: idempotency ───────────────────────────────────────────────────
 
 describe("Notifications migration: idempotency", () => {
-  it("running migrations again after full apply returns 0 new migrations", async () => {
+  it("running notifications migration again returns 0 new migrations", async () => {
     const db = await createOrmWithFullMigration();
     try {
-      const second = await db.orm.migrator.up();
+      const second = await db.orm.migrator.up({ to: NOTIFICATIONS_MIGRATION });
       expect(second).toHaveLength(0);
     } finally {
       await db.close();

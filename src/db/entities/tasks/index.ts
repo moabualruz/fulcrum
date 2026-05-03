@@ -5,6 +5,7 @@
 export { Task } from "./Task.ts";
 export { TaskStatus } from "./TaskStatus.ts";
 export { Sprint, SprintStatus } from "./Sprint.ts";
+export { MetricsCache } from "./MetricsCache.ts";
 export {
   CustomFieldDef,
   CUSTOM_FIELD_TYPES,
