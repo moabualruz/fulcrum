@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: search-and-discovery
 Blocked-by: [03-indexers-task-doc-memory.md, 04-indexers-run-artifact-repo-sprint.md]
