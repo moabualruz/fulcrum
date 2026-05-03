@@ -1,8 +1,9 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 03-symphony-orchestration
 Blocked-by: 17-api-trpc-procedures
+ImplRuntime: claude
 ---
 
 # Web: /orchestration dashboard + /projects/[id]/runs board + workflow editor
@@ -20,12 +21,12 @@ SvelteKit pages consuming `orchestration.*` tRPC procedures:
 - Polling fallback: 5s interval refetch when `FULCRUM_FEATURES=real-time-collab-server` is OFF. SSE subscription when ON.
 
 ## Acceptance criteria
-- [ ] Schema / state machine: N/A (reads via tRPC)
-- [ ] Tracker adapter: N/A
-- [ ] Dispatch loop / hooks: cancel + retry actions on run detail page call `cancelRun` / `retryRun` tRPC mutations; state badge updates within 5s (polling) or immediately (SSE)
-- [ ] Surfaces (web/cli/tui parity): all pages render correctly; cancel/retry from Web updates state visible in CLI `runs list` and TUI pane
-- [ ] Tests: E2E test (Playwright): create task → orchestrator tick → `/projects/:id/runs` shows run with state badge → cancel from UI → state updates to `cancelled`; workflow editor saves `upsertWorkflowDef` and preview renders
-- [ ] SPEC conformance traced in `docs/symphony-conformance.md`: N/A (surface layer)
+- [x] Schema / state machine: N/A (reads via tRPC)
+- [x] Tracker adapter: N/A
+- [x] Dispatch loop / hooks: cancel + retry actions on run detail page call `cancelRun` / `retryRun` tRPC mutations; state badge updates within 5s (polling) or immediately (SSE)
+- [x] Surfaces (web/cli/tui parity): all pages render correctly; cancel/retry from Web updates state visible in CLI `runs list` and TUI pane
+- [x] Tests: E2E test (Playwright): create task → orchestrator tick → `/projects/:id/runs` shows run with state badge → cancel from UI → state updates to `cancelled`; workflow editor saves `upsertWorkflowDef` and preview renders
+- [x] SPEC conformance traced in `docs/symphony-conformance.md`: N/A (surface layer)
 
 ## Blocked by
 17-api-trpc-procedures

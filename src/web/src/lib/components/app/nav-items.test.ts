@@ -14,9 +14,9 @@ describe("NAV_ITEMS surface", () => {
       "/docs",
       "/boards",
       "/runs",
-      "/memory",
-      "/context/preview",
+      "/orchestration",
       "/search",
+      "/settings/orchestration",
     ]);
   });
 
@@ -27,9 +27,9 @@ describe("NAV_ITEMS surface", () => {
       "Docs",
       "Board",
       "Runs",
-      "Memory",
-      "Context",
+      "Orchestration",
       "Search",
+      "Settings",
     ]);
   });
 
@@ -47,9 +47,9 @@ describe("NAV_ITEMS surface", () => {
       ["/docs", "FileText"],
       ["/boards", "Kanban"],
       ["/runs", "Activity"],
-      ["/memory", "BrainCircuit"],
-      ["/context/preview", "Eye"],
+      ["/orchestration", "Workflow"],
       ["/search", "Search"],
+      ["/settings/orchestration", "Settings"],
     ];
     for (const [href, iconName] of pairs) {
       const entry = NAV_ITEMS.find((i) => i.href === href);
