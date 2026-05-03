@@ -133,6 +133,16 @@ async function main() {
       await runProduct(rest);
       return;
     }
+    case "export": {
+      const { run: runExport } = await import("./cli/export.ts");
+      await runExport(rest);
+      return;
+    }
+    case "import": {
+      const { run: runImport } = await import("./cli/import.ts");
+      await runImport(rest);
+      return;
+    }
     case "auth":
     case "flags":
     case "routing":
