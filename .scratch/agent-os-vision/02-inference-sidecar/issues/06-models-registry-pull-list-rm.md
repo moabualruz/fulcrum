@@ -47,3 +47,14 @@ Build `ModelManager::ensure(model_id)` in Rust: checks `$FULCRUM_HOME/models/<mo
 - GREEN: `bun run ci` — pass: 1830 pass, 2 skip, 0 fail; all CI stages green.
 - Decision flagged: model IDs are sanitized to filesystem-safe `<model-id>.gguf` filenames to avoid path traversal from slash-bearing HuggingFace IDs.
 - Decision flagged: `BAAI/bge-small-en-v1.5` manifest uses upstream `model.safetensors` because that HF repo does not publish a GGUF artifact; local cache target still follows Fulcrum `.gguf` contract.
+
+### 2026-05-03 — codex-worker-p2-models-registry-js-client
+
+- Status remains implemented.
+- RED: `bun test src/inference/client.test.ts`
+  - First failure: `listModels calls models.list and normalizes registry metadata` dropped `size_bytes` and `size_bytes_actual` from Rust JSON-RPC model payloads.
+- Implemented scoped JS client/protocol fix: `InferenceModelSchema` accepts Rust snake_case model size fields and normalizes them to TypeScript camelCase.
+- Added `src/inference` tests for `models.list`, `models.pull`, and `models.rm` JSON-RPC client operations.
+- GREEN: `bun test src/inference/client.test.ts` — 10 pass, 0 fail.
+- Broader inference run: `bun test src/inference/client.test.ts src/inference/protocol.test.ts src/inference/lifecycle.test.ts src/inference/contract.test.ts tests/inference/embed-operation.test.ts` — 18 pass, 2 fail; failures are lifecycle sidecar startup errors (`inference-server exited before readiness (code 1)`), with sandbox Unix socket skips in contract tests.
+- Project gate: `bun run ci` blocked in typecheck by existing out-of-scope errors under docs routes, notifications tests, and TUI docs tests before test stage.

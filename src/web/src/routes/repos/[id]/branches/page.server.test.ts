@@ -35,6 +35,7 @@ async function seedBranches(writeOps = false): Promise<string> {
   await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS kind text not null default 'local'`);
   await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS current_branch text null`);
   await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS default_branch text null`);
+  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS last_touched_at timestamptz null`);
   await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS archived boolean not null default false`);
   await db.query(`CREATE TABLE IF NOT EXISTS repo_branches (id uuid primary key, org_id text not null, repo_id text not null, name text not null, sha text null, is_default boolean not null default false)`);
   await db.query(`CREATE TABLE IF NOT EXISTS feature_flags (id uuid primary key, org_id text null, user_id text null, flag text not null, enabled boolean not null default false)`);

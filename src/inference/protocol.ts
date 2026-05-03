@@ -64,14 +64,22 @@ export const TokenizeResultSchema = z.object({
   tokens: z.array(z.string()),
 });
 
-export const InferenceModelSchema = z.object({
+export const InferenceModelSchema = z.preprocess((value) => {
+  if (typeof value !== "object" || value === null) return value;
+  const model = value as Record<string, unknown>;
+  return {
+    ...model,
+    sizeBytes: model.sizeBytes ?? model.size_bytes,
+    sizeBytesActual: model.sizeBytesActual ?? model.size_bytes_actual,
+  };
+}, z.object({
   id: z.string(),
   kind: z.enum(["embed", "generate", "classify"]),
   downloaded: z.boolean(),
   active: z.boolean(),
   sizeBytes: z.number().int().nonnegative().optional(),
   sizeBytesActual: z.number().int().nonnegative().optional(),
-});
+}));
 
 export const ModelPullProgressSchema = z.object({
   type: z.literal("download_progress").optional(),

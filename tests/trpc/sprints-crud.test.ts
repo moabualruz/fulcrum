@@ -132,11 +132,13 @@ describe("sprints tRPC CRUD", () => {
         `select sprint_id from tasks where id = ?`,
         [task.id],
       );
-      expect(rows[0].sprint_id).toBe(sprint.id);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.sprint_id).toBe(sprint.id);
 
       await expect(caller.sprints.removeTask({ sprintId: sprint.id, taskId: task.id })).resolves.toEqual({ moved: true });
       rows = await repo.getEntityManager().getConnection().execute(`select sprint_id from tasks where id = ?`, [task.id]);
-      expect(rows[0].sprint_id).toBeNull();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.sprint_id).toBeNull();
     } finally {
       await db.close();
     }

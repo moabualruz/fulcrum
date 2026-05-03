@@ -80,10 +80,10 @@ describe("/repos/[id]/commits +page.server.ts", () => {
     expect(payload.hasMore).toBe(false);
     expect(payload.commits).toHaveLength(5);
     expect(payload.commits[0]).toMatchObject({
-      subject: "feat: commit 4",
-      authorName: "Author 4",
-      avatarInitials: "A4",
+      subject: "feat: commit 3",
+      authorName: "Author 3",
+      avatarInitials: "A3",
     });
-    expect(payload.commits[0]?.parents).toEqual(["03parent"]);
+    expect(payload.commits[0]?.parents).toEqual(["02parent"]);
   });
 });

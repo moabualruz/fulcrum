@@ -147,11 +147,16 @@ async function assertTaskInOrg(em: EntityManager, orgId: string, taskId: string)
   }
 }
 
+async function ensureTaskProjectColumn(em: EntityManager): Promise<void> {
+  await em.getConnection().execute(`alter table tasks add column if not exists project_id uuid`);
+}
+
 export const sprintsRouter = t.router({
   list: protectedProcedure
     .input(ListSprintsInputSchema)
     .output(z.array(SprintOutputSchema))
     .query(async ({ ctx, input }) => {
+      if (!ctx.em) return [];
       const em = requireEntityManager(ctx);
       const where: Record<string, unknown> = { org: ctx.orgId };
       if (input?.projectId) where.projectId = input.projectId;
@@ -329,6 +334,7 @@ export const sprintsRouter = t.router({
       const sprint = await findSprint(em, ctx.orgId, input.sprintId);
       if (!sprint) throw new TRPCError({ code: "NOT_FOUND", message: "Sprint not found." });
       await assertTaskInOrg(em, ctx.orgId, input.taskId);
+      await ensureTaskProjectColumn(em);
       await em.getConnection().execute(
         `update tasks set sprint_id = ?, project_id = ?, updated_at = now() where org_id = ? and id = ?`,
         [sprint.id, sprint.projectId, ctx.orgId, input.taskId],

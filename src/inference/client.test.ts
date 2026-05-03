@@ -92,6 +92,83 @@ describe("InferenceClient", () => {
     expect(result).toEqual({ count: 2, tokens: ["hello", "world"] });
   });
 
+  test("listModels calls models.list and normalizes registry metadata", async () => {
+    let observedMethod: string | undefined;
+    let observedParams: unknown;
+    const client = clientWithTransport((request) => {
+      observedMethod = request.method;
+      observedParams = request.params;
+      return {
+        jsonrpc: "2.0",
+        id: request.id,
+        result: [{
+          id: "BAAI/bge-small-en-v1.5",
+          kind: "embed",
+          downloaded: true,
+          active: true,
+          size_bytes: 133466304,
+          size_bytes_actual: 133466304,
+        }],
+      };
+    });
+
+    const result = await client.listModels();
+
+    expect(observedMethod).toBe("models.list");
+    expect(observedParams).toEqual({});
+    expect(result).toEqual([{
+      id: "BAAI/bge-small-en-v1.5",
+      kind: "embed",
+      downloaded: true,
+      active: true,
+      sizeBytes: 133466304,
+      sizeBytesActual: 133466304,
+    }]);
+  });
+
+  test("pullModel calls models.pull with force flag and yields progress events", async () => {
+    let observedParams: unknown;
+    const client = clientWithTransport((request) => {
+      observedParams = request.params;
+      return {
+        jsonrpc: "2.0",
+        id: request.id,
+        result: [
+          { type: "download_progress", pct: 0, downloaded: 0, total: 10 },
+          { type: "download_progress", pct: 100, downloaded: 10, total: 10 },
+        ],
+      };
+    });
+
+    const events = [];
+    for await (const event of client.pullModel("BAAI/bge-small-en-v1.5", { force: true })) {
+      events.push(event);
+    }
+
+    expect(observedParams).toEqual({ modelId: "BAAI/bge-small-en-v1.5", force: true });
+    expect(events).toEqual([
+      { type: "download_progress", pct: 0, downloaded: 0, total: 10 },
+      { type: "download_progress", pct: 100, downloaded: 10, total: 10 },
+    ]);
+  });
+
+  test("rmModel calls models.rm and returns ok status", async () => {
+    let observedParams: unknown;
+    const client = clientWithTransport((request) => {
+      observedParams = request.params;
+      return {
+        jsonrpc: "2.0",
+        id: request.id,
+        result: { ok: true },
+      };
+    });
+
+    const result = await client.rmModel("BAAI/bge-small-en-v1.5");
+
+    expect(observedParams).toEqual({ modelId: "BAAI/bge-small-en-v1.5" });
+    expect(result).toEqual({ ok: true });
+  });
+
   test("retries retryable transport failures before succeeding", async () => {
     let attempts = 0;
     const client = new InferenceClient({
