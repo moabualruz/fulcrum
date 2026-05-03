@@ -1,6 +1,6 @@
 ---
-Status: ready-for-agent
-Triage: AFK
+Status: implemented
+ImplRuntime: claude
 Pillar: 08-memory-context-engine
 Blocked-by: [10-cli-memory-verbs.md, 11-web-memory-browser.md, 12-web-context-preview.md, 13-tui-memory-browser.md, 09-symphony-before-run-hook-integration.md]
 PRD: .scratch/agent-os-vision/prds/08-memory-context-engine.md
