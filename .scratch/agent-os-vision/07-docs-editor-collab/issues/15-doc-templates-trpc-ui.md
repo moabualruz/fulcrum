@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 07-docs-editor-collab
 Blocked-by: [01-docs-schema-foundation.md, 04-doc-template-seeds.md, 05-doc-crud-trpc.md]
