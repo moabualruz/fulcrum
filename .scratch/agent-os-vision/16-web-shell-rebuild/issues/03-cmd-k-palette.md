@@ -1,7 +1,7 @@
 ---
 Status: implemented
 Owner: claude-orchestrator
-ImplCommit: pending
+ImplCommit: 5aae24cc3df55c795
 ImplRuntime: claude
 Triage: AFK
 Pillar: 16-web-shell-rebuild
