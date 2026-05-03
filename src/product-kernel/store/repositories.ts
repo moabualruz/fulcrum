@@ -28,6 +28,8 @@ export interface TaskRow {
   description: string | null;
   status: string;
   priority: number;
+  sprint_id: string | null;
+  assignee_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -292,6 +294,7 @@ export async function listTasks(
   if (filters.projectId) push("project_id = ?", filters.projectId);
   if (filters.status) push("status = ?", filters.status);
   if (filters.sprintId) push("sprint_id = ?", filters.sprintId);
+  if (filters.assigneeId) push("assignee_id = ?", filters.assigneeId);
   if (filters.cursor) push("id > ?", filters.cursor);
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
   const limit = filters.limit ?? 50;
@@ -304,6 +307,172 @@ export async function listTasks(
   const data = hasMore ? rows.slice(0, limit) : rows;
   const cursor = hasMore ? data[data.length - 1]!.id : null;
   return { data, cursor };
+}
+
+// ── Task mutations ──────────────────────────────────────────────────
+
+export async function updateTask(
+  db: ProductDb,
+  input: {
+    id: string;
+    title?: string;
+    description?: string | null;
+    status?: string;
+    priority?: number;
+    sprintId?: string | null;
+    assigneeId?: string | null;
+  },
+): Promise<TaskRow> {
+  const sets: string[] = [];
+  const params: (string | number | null)[] = [];
+  const push = (col: string, val: string | number | null) => {
+    params.push(val);
+    sets.push(`${col} = $${params.length}`);
+  };
+  if (input.title !== undefined) push("title", input.title);
+  if (input.description !== undefined) push("description", input.description);
+  if (input.status !== undefined) push("status", input.status);
+  if (input.priority !== undefined) push("priority", input.priority);
+  if (input.sprintId !== undefined) push("sprint_id", input.sprintId);
+  if (input.assigneeId !== undefined) push("assignee_id", input.assigneeId);
+  if (sets.length === 0) throw new Error("updateTask: no fields to update");
+  sets.push("updated_at = now()");
+  params.push(input.id);
+  const rows = await db.query<TaskRow>(
+    `UPDATE tasks SET ${sets.join(", ")} WHERE id = $${params.length} RETURNING *`,
+    params,
+  );
+  if (rows.length === 0) throw new Error(`task not found: ${input.id}`);
+  const task = rows[0] as TaskRow;
+  await appendEvent(db, {
+    orgId: task.org_id,
+    projectId: task.project_id,
+    actor: "system",
+    subjectKind: "task",
+    subjectId: task.id,
+    verb: "updated",
+    payload: { ...input, id: undefined },
+  });
+  return task;
+}
+
+export async function moveTaskToSprint(
+  db: ProductDb,
+  taskId: string,
+  sprintId: string | null,
+): Promise<TaskRow> {
+  return updateTask(db, { id: taskId, sprintId });
+}
+
+// ── Custom fields CRUD ──────────────────────────────────────────────
+
+export interface CustomFieldRow {
+  id: string;
+  org_id: string;
+  project_id: string;
+  name: string;
+  field_type: string;
+  options: unknown;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function listCustomFields(
+  db: ProductDb,
+  projectId: string,
+): Promise<CustomFieldRow[]> {
+  return db.query<CustomFieldRow>(
+    `SELECT * FROM custom_fields WHERE project_id = $1 ORDER BY position ASC, id ASC`,
+    [projectId],
+  );
+}
+
+export async function createCustomField(
+  db: ProductDb,
+  input: {
+    orgId: string;
+    projectId: string;
+    name: string;
+    fieldType: string;
+    options?: unknown[];
+    position?: number;
+  },
+): Promise<CustomFieldRow> {
+  const id = newUlid();
+  await db.query(
+    `INSERT INTO custom_fields (id, org_id, project_id, name, field_type, options, position)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)`,
+    [
+      id,
+      input.orgId,
+      input.projectId,
+      input.name,
+      input.fieldType,
+      JSON.stringify(input.options ?? []),
+      input.position ?? 0,
+    ],
+  );
+  const rows = await db.query<CustomFieldRow>(`SELECT * FROM custom_fields WHERE id = $1`, [id]);
+  if (rows.length === 0) throw new Error(`custom_field insert lost: ${id}`);
+  return rows[0] as CustomFieldRow;
+}
+
+// ── Saved views CRUD ────────────────────────────────────────────────
+
+export interface SavedViewRow {
+  id: string;
+  org_id: string;
+  project_id: string;
+  name: string;
+  filters: unknown;
+  sort_by: string | null;
+  columns: unknown;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function listSavedViews(
+  db: ProductDb,
+  projectId: string,
+): Promise<SavedViewRow[]> {
+  return db.query<SavedViewRow>(
+    `SELECT * FROM saved_views WHERE project_id = $1 ORDER BY name ASC, id ASC`,
+    [projectId],
+  );
+}
+
+export async function createSavedView(
+  db: ProductDb,
+  input: {
+    orgId: string;
+    projectId: string;
+    name: string;
+    filters?: Record<string, unknown>;
+    sortBy?: string | null;
+    columns?: string[];
+    isDefault?: boolean;
+  },
+): Promise<SavedViewRow> {
+  const id = newUlid();
+  await db.query(
+    `INSERT INTO saved_views (id, org_id, project_id, name, filters, sort_by, columns, is_default)
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7::jsonb, $8)`,
+    [
+      id,
+      input.orgId,
+      input.projectId,
+      input.name,
+      JSON.stringify(input.filters ?? {}),
+      input.sortBy ?? null,
+      JSON.stringify(input.columns ?? []),
+      input.isDefault ?? false,
+    ],
+  );
+  const rows = await db.query<SavedViewRow>(`SELECT * FROM saved_views WHERE id = $1`, [id]);
+  if (rows.length === 0) throw new Error(`saved_view insert lost: ${id}`);
+  return rows[0] as SavedViewRow;
 }
 
 // ── API Key helpers ──────────────────────────────────────────────────

@@ -17,6 +17,13 @@ CREATE TABLE IF NOT EXISTS sprints (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Idempotent: add columns missing if a prior migration created a minimal sprints table.
+ALTER TABLE sprints ADD COLUMN IF NOT EXISTS name text;
+ALTER TABLE sprints ADD COLUMN IF NOT EXISTS goal text;
+ALTER TABLE sprints ADD COLUMN IF NOT EXISTS status text DEFAULT 'planning';
+ALTER TABLE sprints ADD COLUMN IF NOT EXISTS started_at timestamptz;
+ALTER TABLE sprints ADD COLUMN IF NOT EXISTS closed_at timestamptz;
+
 CREATE INDEX IF NOT EXISTS sprints_scope_idx ON sprints (org_id, project_id, status);
 
 -- Link tasks to sprints (many-to-one for simplicity).

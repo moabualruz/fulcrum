@@ -42,6 +42,26 @@ Usage:
   fulcrum product init [--json]      Initialise the local product kernel (PGlite + migrations).
   fulcrum product projects list [--json]
                                      List product-kernel projects.
+  fulcrum product tasks create --title <T> --project <P> [--json]
+                                     Create a new task in a project.
+  fulcrum product tasks list [--status <S>] [--assignee <A>] [--project <P>] [--json]
+                                     List tasks with optional filters.
+  fulcrum product tasks update <id> --status <S> [--json]
+                                     Update a task's status.
+  fulcrum product tasks bulk <ids> --status <S> [--json]
+                                     Bulk-update tasks (comma-separated IDs).
+  fulcrum product tasks move <id> --sprint <S> [--json]
+                                     Move a task to a sprint.
+  fulcrum product sprints list --project <P> [--json]
+                                     List sprints in a project.
+  fulcrum product sprints activate <id> [--json]
+                                     Activate a sprint.
+  fulcrum product sprints complete <id> [--json]
+                                     Complete a sprint (with velocity rollup).
+  fulcrum product custom-fields list --project <P> [--json]
+                                     List custom fields for a project.
+  fulcrum product saved-views list --project <P> [--json]
+                                     List saved views for a project.
   fulcrum product search <query> [--org-slug <slug>] [--limit <N>] [--json]
                                      Run an FTS query over the product kernel search index.
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]

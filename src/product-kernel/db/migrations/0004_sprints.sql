@@ -14,6 +14,15 @@ CREATE TABLE IF NOT EXISTS sprints (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Idempotent: add columns that may be missing if a prior migration created
+-- a minimal sprints table (e.g. 0004_connectors.sql).
+ALTER TABLE sprints ADD COLUMN IF NOT EXISTS name text;
+ALTER TABLE sprints ADD COLUMN IF NOT EXISTS goal text;
+ALTER TABLE sprints ADD COLUMN IF NOT EXISTS status text DEFAULT 'planning';
+ALTER TABLE sprints ADD COLUMN IF NOT EXISTS capacity_points integer;
+ALTER TABLE sprints ADD COLUMN IF NOT EXISTS start_date date;
+ALTER TABLE sprints ADD COLUMN IF NOT EXISTS end_date date;
+
 CREATE INDEX IF NOT EXISTS sprints_project_idx ON sprints (project_id, status);
 
 -- Nullable FK: tasks not yet assigned to a sprint have sprint_id = NULL.
