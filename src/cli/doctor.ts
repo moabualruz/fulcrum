@@ -13,6 +13,7 @@ import { scanSkillBudgets, type SkillBudgetReport } from "./skill-budget.ts";
 import { auditPackageParity, type PackageParityReport } from "./package-parity.ts";
 import { planPackageMirrorTargets } from "./package-mirror.ts";
 import { getPackageSurfaceManifest, MANAGED_PACKAGE_IDS, packageCacheSourceRoot } from "./package-surfaces.ts";
+import { runMemoryDoctorChecks, type MemoryDoctorReport, type SubsystemCheck } from "../product-kernel/memory-doctor.ts";
 
 interface ToolCheck {
   cmd: string;
@@ -98,25 +99,11 @@ interface DoctorReport {
     latestEventAt: string | null;
     error?: string;
   };
-  embeddingsSchema: {
-    status: "ok" | "absent" | "error";
-    tables: { memory_embeddings: boolean; doc_embeddings: boolean };
-    indexes: { memory_embeddings_hnsw: boolean; doc_embeddings_hnsw: boolean };
-    vectorDim: number | null;
-    flag: "on" | "off";
-    error?: string;
-  };
+  memoryEngine: MemoryDoctorReport;
   worktrees: {
     projectLocalIgnoredRoots: Array<{
       path: string;
       entries: string[];
-    }>;
-  };
-  orchestration: {
-    checks: Array<{
-      name: string;
-      level: "ok" | "warning" | "error";
-      message: string;
     }>;
   };
   skillBudget: SkillBudgetReport;
@@ -592,12 +579,28 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
   }
   const packageParity = await buildPackageParityReport(home);
   const productKernel = await buildProductKernelReport();
-  const embeddingsSchema = await buildEmbeddingsSchemaReport();
   if (productKernel.error) {
     // A PGlite/Postgres failure means a key product surface is offline.
     // Surface it through the doctor verdict so users see "verdict: error"
     // instead of the previous silent "ok".
     errors += 1;
+  }
+
+  // Memory engine subsystem checks (Pillar 8)
+  let memoryEngineDb: import("../product-kernel/db/types.ts").ProductDb | null = null;
+  if (productKernel.engine === "pglite" && !productKernel.error) {
+    try {
+      const { openPglite } = await import("../product-kernel/db/pglite.ts");
+      memoryEngineDb = await openPglite(productKernel.dbPath);
+    } catch { /* use null db */ }
+  }
+  const memoryEngine = await runMemoryDoctorChecks(memoryEngineDb);
+  if (memoryEngineDb) {
+    try { await memoryEngineDb.close(); } catch { /* ignore */ }
+  }
+  for (const check of memoryEngine.checks) {
+    if (check.status === "error") errors += 1;
+    else if (check.status === "warning") warnings += 1;
   }
 
   // Managed MCPs
@@ -689,13 +692,6 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
     // Registry not yet initialised — no entries to report
   }
 
-  // Orchestration checks (P4#15)
-  const orchestration = await buildOrchestrationChecks();
-  for (const check of orchestration.checks) {
-    if (check.level === "error") errors++;
-    else if (check.level === "warning") warnings++;
-  }
-
   // Verdict
   const verdict: "ok" | "warning" | "error" =
     errors > 0 ? "error" : warnings > 0 ? "warning" : "ok";
@@ -724,8 +720,7 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       packageParity,
     },
     productKernel,
-    embeddingsSchema,
-    orchestration,
+    memoryEngine,
     worktrees,
     skillBudget,
     skillsCount,
@@ -735,119 +730,6 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
   };
 
   return { report, errors };
-}
-
-/**
- * Orchestration health checks (P4#15): agent binaries, auth vars,
- * docker/podman daemon, workspace writable, Effect singleton.
- */
-async function buildOrchestrationChecks(): Promise<DoctorReport["orchestration"]> {
-  const checks: DoctorReport["orchestration"]["checks"] = [];
-
-  // 1. Agent binaries on PATH
-  const { listProfiles: lp } = await import("../agents/registry.ts");
-  const profiles = lp();
-  for (const profile of profiles) {
-    const binPath = await which(profile.cliPath);
-    if (binPath) {
-      checks.push({ name: `agent-binary:${profile.name}`, level: "ok", message: `${profile.cliPath} found at ${binPath}` });
-    } else {
-      checks.push({ name: `agent-binary:${profile.name}`, level: "warning", message: `${profile.cliPath} not on PATH` });
-    }
-  }
-
-  // 2. Auth env vars set (per profile)
-  for (const profile of profiles) {
-    const missing = profile.authEnvVars.filter((v) => !process.env[v]);
-    if (missing.length === 0) {
-      checks.push({ name: `auth-vars:${profile.name}`, level: "ok", message: "all auth env vars set" });
-    } else {
-      checks.push({ name: `auth-vars:${profile.name}`, level: "warning", message: `missing: ${missing.join(", ")}` });
-    }
-  }
-
-  // 3. Docker / Podman daemon reachable (only when sandcastleProvider requires it)
-  const needsDocker = profiles.some((p) => p.sandcastleProvider === "docker");
-  const needsPodman = profiles.some((p) => p.sandcastleProvider === "podman");
-  if (needsDocker) {
-    const dockerPath = await which("docker");
-    if (dockerPath) {
-      try {
-        const proc = Bun.spawn(["docker", "info"], { stdout: "ignore", stderr: "ignore" });
-        const code = await proc.exited;
-        checks.push({
-          name: "docker-daemon",
-          level: code === 0 ? "ok" : "error",
-          message: code === 0 ? "docker daemon reachable" : "docker daemon not reachable (exit " + code + ")",
-        });
-      } catch {
-        checks.push({ name: "docker-daemon", level: "error", message: "docker info failed" });
-      }
-    } else {
-      checks.push({ name: "docker-daemon", level: "error", message: "docker not on PATH but profile requires it" });
-    }
-  }
-  if (needsPodman) {
-    const podmanPath = await which("podman");
-    if (podmanPath) {
-      try {
-        const proc = Bun.spawn(["podman", "info"], { stdout: "ignore", stderr: "ignore" });
-        const code = await proc.exited;
-        checks.push({
-          name: "podman-daemon",
-          level: code === 0 ? "ok" : "error",
-          message: code === 0 ? "podman daemon reachable" : "podman daemon not reachable (exit " + code + ")",
-        });
-      } catch {
-        checks.push({ name: "podman-daemon", level: "error", message: "podman info failed" });
-      }
-    } else {
-      checks.push({ name: "podman-daemon", level: "error", message: "podman not on PATH but profile requires it" });
-    }
-  }
-
-  // 4. Workspace root writable
-  const home = process.env["HOME"] ?? "";
-  const workspaceRoot = process.env["FULCRUM_HOME"] ?? `${home}/.fulcrum`;
-  try {
-    const testFile = `${workspaceRoot}/.doctor-write-test-${Date.now()}`;
-    await Bun.write(testFile, "test");
-    const { unlink } = await import("node:fs/promises");
-    await unlink(testFile);
-    checks.push({ name: "workspace-writable", level: "ok", message: `${workspaceRoot} is writable` });
-  } catch {
-    checks.push({ name: "workspace-writable", level: "error", message: `${workspaceRoot} not writable` });
-  }
-
-  // 5. Effect singleton — check for multiple effect versions
-  try {
-    const effectPath = `${repoRoot()}/node_modules/effect`;
-    if (await exists(effectPath)) {
-      const nested = `${repoRoot()}/node_modules/.pnpm`;
-      let effectVersions = 0;
-      if (await exists(nested)) {
-        try {
-          const dirs = await readdir(nested);
-          effectVersions = dirs.filter((d) => d.startsWith("effect@")).length;
-        } catch {
-          effectVersions = 1;
-        }
-      } else {
-        effectVersions = 1;
-      }
-      if (effectVersions > 1) {
-        checks.push({ name: "effect-singleton", level: "error", message: `${effectVersions} effect versions — singleton violation` });
-      } else {
-        checks.push({ name: "effect-singleton", level: "ok", message: "effect singleton ok" });
-      }
-    } else {
-      checks.push({ name: "effect-singleton", level: "ok", message: "effect not installed (n/a)" });
-    }
-  } catch {
-    checks.push({ name: "effect-singleton", level: "ok", message: "effect check skipped" });
-  }
-
-  return { checks };
 }
 
 async function buildPackageParityReport(home: string): Promise<PackageParityReport[]> {
@@ -944,67 +826,6 @@ async function buildProductKernelReport(): Promise<DoctorReport["productKernel"]
       latestEventAt: null,
       error: (err as Error).message,
     };
-  }
-}
-
-async function buildEmbeddingsSchemaReport(): Promise<DoctorReport["embeddingsSchema"]> {
-  const flag = (process.env.FULCRUM_FEATURES ?? "").split(",").map(s => s.trim()).includes("embeddings")
-    ? "on" as const
-    : "off" as const;
-  const absent: DoctorReport["embeddingsSchema"] = {
-    status: "absent",
-    tables: { memory_embeddings: false, doc_embeddings: false },
-    indexes: { memory_embeddings_hnsw: false, doc_embeddings_hnsw: false },
-    vectorDim: null,
-    flag,
-  };
-  try {
-    const { productDbDir } = await import("../product-kernel/paths.ts");
-    const dir = productDbDir();
-    const dbPath = `${dir}/main`;
-    const pgExists = await Bun.file(`${dbPath}/PG_VERSION`).exists();
-    if (!pgExists) return absent;
-
-    const { openPglite } = await import("../product-kernel/db/pglite.ts");
-    const db = await openPglite(dbPath);
-    try {
-      const tblRows = await db.query<{ relname: string }>(
-        `SELECT relname FROM pg_class WHERE relname IN ('memory_embeddings', 'doc_embeddings') AND relkind = 'r'`,
-      );
-      const tables = {
-        memory_embeddings: tblRows.some(r => r.relname === "memory_embeddings"),
-        doc_embeddings: tblRows.some(r => r.relname === "doc_embeddings"),
-      };
-      const idxRows = await db.query<{ relname: string }>(
-        `SELECT relname FROM pg_class WHERE relname IN ('memory_embeddings_hnsw', 'doc_embeddings_hnsw') AND relkind = 'i'`,
-      );
-      const indexes = {
-        memory_embeddings_hnsw: idxRows.some(r => r.relname === "memory_embeddings_hnsw"),
-        doc_embeddings_hnsw: idxRows.some(r => r.relname === "doc_embeddings_hnsw"),
-      };
-      let vectorDim: number | null = null;
-      if (tables.memory_embeddings) {
-        const dimRows = await db.query<{ atttypmod: number }>(
-          `SELECT a.atttypmod FROM pg_attribute a
-           JOIN pg_class c ON c.oid = a.attrelid
-           WHERE c.relname = 'memory_embeddings' AND a.attname = 'embedding'`,
-        );
-        if (dimRows.length > 0) vectorDim = dimRows[0]!.atttypmod;
-      }
-      const allPresent = tables.memory_embeddings && tables.doc_embeddings
-        && indexes.memory_embeddings_hnsw && indexes.doc_embeddings_hnsw;
-      return {
-        status: allPresent ? "ok" : "absent",
-        tables,
-        indexes,
-        vectorDim,
-        flag,
-      };
-    } finally {
-      await db.close();
-    }
-  } catch (err) {
-    return { ...absent, status: "error", error: (err as Error).message };
   }
 }
 
@@ -1114,15 +935,18 @@ function printHumanFormat(report: DoctorReport, home: string): void {
   }
   console.log();
 
-  // Embeddings schema
-  const es = report.embeddingsSchema;
-  console.log(`Embeddings schema: ${es.status}  flag: ${es.flag}`);
-  if (es.status === "ok") {
-    console.log(`  vector dim: ${es.vectorDim ?? "unknown"}`);
-  } else if (es.error) {
-    console.log(`  error: ${es.error}`);
+  // Memory engine (Pillar 8)
+  if (report.memoryEngine.checks.length > 0) {
+    console.log("Memory engine subsystem checks:");
+    for (const check of report.memoryEngine.checks) {
+      const mark =
+        check.status === "ok" ? "✓" :
+        check.status === "disabled" ? "·" :
+        check.status === "warning" ? "⚠" : "✗";
+      console.log(`  ${pad(check.name, 22)} ${mark}  ${check.message}`);
+    }
+    console.log();
   }
-  console.log();
 
   // Managed MCPs
   if (report.mcp.servers.length > 0) {
@@ -1172,16 +996,6 @@ function printHumanFormat(report: DoctorReport, home: string): void {
     console.log();
   }
 
-  // Orchestration
-  if (report.orchestration.checks.length > 0) {
-    console.log("Orchestration:");
-    for (const check of report.orchestration.checks) {
-      const mark = check.level === "ok" ? "✓" : check.level === "warning" ? "⚠" : "✗";
-      console.log(`  ${mark} ${pad(check.name, 28)} ${check.message}`);
-    }
-    console.log();
-  }
-
   // Verdict
   if (report.errors > 0) {
     console.log(`✗ ${report.errors} error(s), ${report.warnings} warning(s)`);
@@ -1195,32 +1009,6 @@ function printHumanFormat(report: DoctorReport, home: string): void {
 export async function run(args: string[]): Promise<void> {
   const isJsonOutput = args.includes("--json");
   const probe = args.includes("--probe");
-
-  // --subsystem <name>: run only that subsystem's checks and exit.
-  const subsystemIdx = args.indexOf("--subsystem");
-  if (subsystemIdx !== -1) {
-    const subsystem = args[subsystemIdx + 1];
-    if (subsystem === "api") {
-      const { runApiDoctorChecks, buildDefaultApiDoctorConfig } = await import("../doctor/checks/api.ts");
-      const result = await runApiDoctorChecks(buildDefaultApiDoctorConfig());
-      if (isJsonOutput) {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        console.log("fulcrum doctor — api subsystem\n");
-        for (const c of result.checks) {
-          const mark = c.status === "pass" ? "✓" : c.status === "warn" ? "⚠" : c.status === "skip" ? "·" : "✗";
-          console.log(`  ${mark}  ${pad(c.name, 30)} ${c.status}  ${c.message}`);
-          if (c.recovery) console.log(`     recovery: ${c.recovery}`);
-        }
-        console.log();
-        console.log(`  pass=${result.summary.pass} warn=${result.summary.warn} fail=${result.summary.fail} skip=${result.summary.skip}`);
-      }
-      if (result.summary.fail > 0) process.exit(1);
-      return;
-    }
-    console.error(`fulcrum doctor: unknown subsystem '${subsystem}'`);
-    process.exit(2);
-  }
 
   const { report, errors } = await buildReport({ probe });
 

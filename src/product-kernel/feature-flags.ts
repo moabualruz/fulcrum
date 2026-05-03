@@ -1,31 +1,31 @@
-/**
- * Feature flags gated by FULCRUM_FEATURES environment variable.
- * Comma-separated list: FULCRUM_FEATURES=embeddings,other-flag
- */
+// Feature flags for gated Pillar 8 subsystems.
+// Parse FULCRUM_FEATURES env var: comma-separated list of enabled features.
+// No flag active when env unset — deterministic default.
 
-let _cache: Set<string> | null = null;
+export const PILLAR8_FLAGS = [
+  "embeddings",
+  "llm-extraction",
+  "report-narration",
+] as const;
 
-function activeFlags(): Set<string> {
-  if (_cache) return _cache;
-  const raw = process.env["FULCRUM_FEATURES"] ?? "";
-  _cache = new Set(
-    raw
-      .split(",")
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean),
-  );
-  return _cache;
+export type Pillar8Flag = (typeof PILLAR8_FLAGS)[number];
+
+export function parseFeatureFlags(env?: string): Set<Pillar8Flag> {
+  if (!env) return new Set();
+  const result = new Set<Pillar8Flag>();
+  for (const raw of env.split(",")) {
+    const trimmed = raw.trim() as Pillar8Flag;
+    if ((PILLAR8_FLAGS as readonly string[]).includes(trimmed)) {
+      result.add(trimmed);
+    }
+  }
+  return result;
 }
 
-export function isFeatureEnabled(flag: string): boolean {
-  return activeFlags().has(flag.toLowerCase());
+export function isFeatureEnabled(flag: Pillar8Flag, env?: string): boolean {
+  return parseFeatureFlags(env ?? process.env["FULCRUM_FEATURES"]).has(flag);
 }
 
-export function embeddingsEnabled(): boolean {
-  return isFeatureEnabled("embeddings");
-}
-
-/** Reset cache — for testing only. */
-export function _resetFlagCache(): void {
-  _cache = null;
+export function activeFlags(): Set<Pillar8Flag> {
+  return parseFeatureFlags(process.env["FULCRUM_FEATURES"]);
 }
