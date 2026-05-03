@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/03-cmd-k-palette.md, 11-search-and-discovery/issues/01-search-documents-and-fts.md, 12-notifications-activity-audit/issues/01-notification-rules-and-feed.md]

@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: notifications-activity-audit
 Blocked-by: [10-web-inbox-and-activity.md, 11-web-notification-settings.md, 12-web-audit-viewer.md, 13-cli-notify-commands.md, 14-cli-audit-commands.md, 15-tui-inbox-and-audit.md]
