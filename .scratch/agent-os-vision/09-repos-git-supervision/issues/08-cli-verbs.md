@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 09-repos-git-supervision
 Blocked-by: [07-trpc-procedures]
