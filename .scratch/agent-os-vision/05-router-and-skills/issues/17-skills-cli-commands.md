@@ -3,6 +3,7 @@ Status: implemented
 Triage: AFK
 Pillar: 05-router-and-skills
 Blocked-by: 16-skills-trpc-procedures
+ImplRuntime: claude
 ---
 
 # CLI fulcrum skills * commands + daily cron install (gated)
