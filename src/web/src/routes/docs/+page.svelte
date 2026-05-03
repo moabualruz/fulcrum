@@ -3,6 +3,7 @@
 
 	import { buttonVariants } from "$lib/components/ui/button";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
+	import DocTree from "$lib/components/docs/DocTree.svelte";
 	import InContextSearchBar from "$lib/components/search/InContextSearchBar.svelte";
 	import { cn } from "$lib/utils.js";
 
@@ -48,6 +49,18 @@
 
 	<div class={cn("mb-3")}>
 		<InContextSearchBar kind="doc" projectId={data.activeProjectId} placeholder="Search documents" />
+	</div>
+
+	<div
+		data-docs-hub
+		class={cn("mb-4 grid gap-3 lg:grid-cols-2")}
+	>
+		<div data-project-doc-tree>
+			<DocTree title="Project docs" scope="project" nodes={payload.projectTree ?? []} />
+		</div>
+		<div data-global-doc-tree>
+			<DocTree title="Global docs" scope="global" nodes={payload.globalTree ?? []} />
+		</div>
 	</div>
 
 	<form
