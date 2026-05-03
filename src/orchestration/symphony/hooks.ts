@@ -43,8 +43,18 @@ export interface ContextAssembler {
   assemble(ctx: LifecycleHookContext, signal: AbortSignal): Promise<unknown>;
 }
 
+export interface BeforeRunContextHook {
+  handle(
+    runId: string,
+    taskId: string,
+    agentType: string,
+    ctx: { workspacePath: string },
+  ): Promise<unknown>;
+}
+
 export interface DispatchLifecycleHookOptions {
   contextAssembler?: ContextAssembler;
+  beforeRunContextHook?: BeforeRunContextHook;
 }
 
 export class HookTimeoutError extends Error {
@@ -77,6 +87,12 @@ export async function dispatchLifecycleHook(
       async (signal) => {
         if (hookName === "before_run") {
           await options.contextAssembler?.assemble(ctx, signal);
+          await options.beforeRunContextHook?.handle(
+            ctx.run.id,
+            ctx.task.id,
+            ctx.run.agentName ?? "",
+            { workspacePath: ctx.workspacePath },
+          );
         }
 
         await hooks[hookName]?.(ctx, { hookName, signal, timeoutMs });

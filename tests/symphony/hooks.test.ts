@@ -129,6 +129,37 @@ describe("dispatchLifecycleHook", () => {
     expect(order).toEqual(["assemble_context", "before_run"]);
   });
 
+  it("calls the before-run context hook with run, task, agent type, and workspace before before_run hooks", async () => {
+    const ctx = await seedHookContext();
+    ctx.run.agentName = "codex";
+    const order: string[] = [];
+    const calls: unknown[] = [];
+
+    await dispatchLifecycleHook(
+      db!.em,
+      "before_run",
+      ctx,
+      {
+        before_run: () => { order.push("before_run"); },
+      },
+      {},
+      {
+        beforeRunContextHook: {
+          handle: async (...args: unknown[]) => {
+            order.push("before_run_context");
+            calls.push(args);
+            return { slices: [], tokenCount: 0 };
+          },
+        },
+      },
+    );
+
+    expect(order).toEqual(["before_run_context", "before_run"]);
+    expect(calls).toEqual([
+      [ctx.run.id, ctx.task.id, "codex", { workspacePath: ctx.workspacePath }],
+    ]);
+  });
+
   it("rejects hooks exceeding their per-hook timeout with HookTimeoutError", async () => {
     const ctx = await seedHookContext();
 

@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [08-context-bundle-assembler.md]
@@ -20,14 +20,18 @@ This is the integration slice — not new logic, just wiring assemble → hook �
 
 ## Acceptance criteria
 
-- [ ] `BeforeRunContextHook` exported from `src/memory/hooks/before-run-hook.ts`
-- [ ] Resolves `ContextAssembler`, calls `assemble(taskId, { agentType })`, and returns the `ContextBundle`
-- [ ] Writes `ContextBundle` JSON to `<worktree>/.fulcrum/context.json` (path configurable via env)
-- [ ] `ContextSnapshot.runId` set to `runId` after hook completes
-- [ ] Integration test: mock Symphony `before_run` trigger → assert `.fulcrum/context.json` written with 5 slices
-- [ ] Hook failure (e.g. retriever DB error) is non-fatal: logs warning and writes a minimal bundle `{ slices: [], tokenCount: 0, error: '...' }` so the run still proceeds
-- [ ] `fulcrum doctor --json` `context_assembly` subsystem: `ok`
-- [ ] No new `agent_runs` row written by this hook (snapshot row only)
+- [x] `BeforeRunContextHook` exported from `src/memory/hooks/before-run-hook.ts`
+- [x] Resolves `ContextAssembler`, calls `assemble(taskId, { agentType })`, and returns the `ContextBundle`
+- [x] Writes `ContextBundle` JSON to `<worktree>/.fulcrum/context.json` (path configurable via env)
+- [x] `ContextSnapshot.runId` set to `runId` after hook completes
+- [x] Integration test: mock Symphony `before_run` trigger → assert `.fulcrum/context.json` written with 5 slices
+- [x] Hook failure (e.g. retriever DB error) is non-fatal: logs warning and writes a minimal bundle `{ slices: [], tokenCount: 0, error: '...' }` so the run still proceeds
+- [ ] `fulcrum doctor --json` `context_assembly` subsystem: `ok` (outside this issue's allowed edit scope; Pillar 8 capstone issue 19 owns doctor aggregation)
+- [x] No new `agent_runs` row written by this hook (snapshot row only)
+
+## Implementation
+
+- 2026-05-03 codex: implemented `BeforeRunContextHook`, wired Symphony `before_run` lifecycle dispatch to call it before user hooks, added RED/GREEN tests for bundle write, env path override, non-fatal fallback, and lifecycle ordering.
 
 ## Blocked by
 
