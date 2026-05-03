@@ -19,6 +19,12 @@ import { registerTaskRoutes } from "./routes/tasks.ts";
 import { registerDocRoutes } from "./routes/docs.ts";
 import { registerSprintRoutes } from "./routes/sprints.ts";
 import { registerSavedViewRoutes } from "./routes/saved-views.ts";
+import { registerSearchRoutes } from "./routes/search.ts";
+import { registerAuditRoutes } from "./routes/audit.ts";
+import { registerRunsRoutes } from "./routes/runs.ts";
+import { registerNotificationRoutes } from "./routes/notifications.ts";
+import { registerArtifactRoutes } from "./routes/artifacts.ts";
+import { registerRepoRoutes } from "./routes/repos.ts";
 
 /** Check the `public-api` feature flag from FULCRUM_FEATURES env var (per-request). */
 function isPublicApiEnabled(): boolean {
@@ -47,6 +53,13 @@ export function createPublicApi(): OpenAPIHono {
   registerDocRoutes(api);
   registerSprintRoutes(api);
   registerSavedViewRoutes(api);
+  // P13#06 — secondary domains
+  registerSearchRoutes(api);
+  registerAuditRoutes(api);
+  registerRunsRoutes(api);
+  registerNotificationRoutes(api);
+  registerArtifactRoutes(api);
+  registerRepoRoutes(api);
 
   api.doc("/openapi.json", {
     openapi: "3.1.0",
