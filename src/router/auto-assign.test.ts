@@ -14,7 +14,9 @@ import type { EventRepository } from "../db/repositories/core/EventRepository.ts
 import type { RoutingRuleRepository } from "../db/repositories/router/RoutingRuleRepository.ts";
 import { DEFAULT_ORG_ID, SeedService } from "../db/seed.ts";
 import { autoAssign, configureAutoAssign } from "./auto-assign.ts";
+import { configureNoMatchPrompt, learnRule } from "./no-match-prompt.ts";
 import { RoutingEventPayloadSchema } from "./routing-event-payload.ts";
+import type { RoutingEventBus } from "./event-bus.ts";
 import { configureRulesEngine } from "./rules-engine.ts";
 import { configureRoutingTelemetry } from "./telemetry.ts";
 import type { TaskFacts } from "./types.ts";
@@ -41,10 +43,12 @@ const DOCS_CONDITIONS: RoutingConditions = {
 describe("autoAssign", () => {
   let rules: RoutingRule[];
   let recordCalls: number;
+  let rulesChangedBus: RoutingEventBus | null;
 
   beforeEach(() => {
     rules = [];
     recordCalls = 0;
+    rulesChangedBus = null;
     configureRulesEngine({ routingRuleRepository: repository() });
     configureAutoAssign({
       recordDecision: async () => {
@@ -56,6 +60,7 @@ describe("autoAssign", () => {
   afterEach(() => {
     configureRulesEngine({ routingRuleRepository: null });
     configureAutoAssign({ recordDecision: null });
+    configureNoMatchPrompt({ routingRuleRepository: null });
     configureRoutingTelemetry({ eventRepository: null });
   });
 
@@ -123,12 +128,106 @@ describe("autoAssign", () => {
     });
   });
 
-  it("returns null when no rule matches", async () => {
+  it("returns null when no rule matches and router-llm is enabled", async () => {
     createRule({ name: "docs", actionAgent: "claude-code", conditionsJson: DOCS_CONDITIONS });
+    const previousFeatures = process.env["FULCRUM_FEATURES"];
+    process.env["FULCRUM_FEATURES"] = "router-llm";
+
+    try {
+      await expect(
+        autoAssign({ taskId: TASK_ID, taskFacts: TASK_FACTS, orgId: DEFAULT_ORG_ID }),
+      ).resolves.toBeNull();
+    } finally {
+      if (previousFeatures === undefined) {
+        delete process.env["FULCRUM_FEATURES"];
+      } else {
+        process.env["FULCRUM_FEATURES"] = previousFeatures;
+      }
+    }
+  });
+
+  it("prompts, stores a learned rule, then resolves the identical task without prompting", async () => {
+    let promptCalls = 0;
+    configureAutoAssign({
+      recordDecision: async () => {
+        recordCalls += 1;
+      },
+      promptForAgent: async () => {
+        promptCalls += 1;
+        return "codex";
+      },
+      learnRule: async (facts, agent, orgId, projectId) => {
+        const rule = createRule({
+          name: `Learned ${facts.task.kind} routing`,
+          actionAgent: agent,
+          conditionsJson: {
+            all: [{ fact: "task", path: "$.kind", operator: "equal", value: facts.task.kind }],
+          },
+          project: projectId ?? null,
+        });
+        rule.source = RoutingRuleSource.Learned;
+        rulesChangedBus?.emitRulesChanged();
+        return rule;
+      },
+    });
+
+    const learnedDecision = await autoAssign({
+      taskId: TASK_ID,
+      taskFacts: TASK_FACTS,
+      orgId: DEFAULT_ORG_ID,
+    });
+    expect(learnedDecision).toEqual({
+      ruleId: rules[0]!.id,
+      source: "learned",
+      agent: "codex",
+      confidence: 1.0,
+    });
+
+    expect(promptCalls).toBe(1);
+    expect(rules[0]!.source).toBe(RoutingRuleSource.Learned);
+    expect(rules[0]!.enabled).toBe(true);
+    expect(rules[0]!.conditionsJson).toEqual(BUG_CONDITIONS);
+
+    const cachedDecision = await autoAssign({
+      taskId: TASK_ID,
+      taskFacts: TASK_FACTS,
+      orgId: DEFAULT_ORG_ID,
+    });
+    expect(cachedDecision).toEqual({
+      ruleId: rules[0]!.id,
+      source: "rule",
+      agent: "codex",
+      confidence: 1.0,
+    });
+    expect(promptCalls).toBe(1);
+  });
+
+  it("does not prompt or store learned rules during dry runs", async () => {
+    let promptCalls = 0;
+    let learnCalls = 0;
+    configureAutoAssign({
+      promptForAgent: async () => {
+        promptCalls += 1;
+        return "codex";
+      },
+      learnRule: async () => {
+        learnCalls += 1;
+        throw new Error("dry run should not learn rules");
+      },
+    });
 
     await expect(
-      autoAssign({ taskId: TASK_ID, taskFacts: TASK_FACTS, orgId: DEFAULT_ORG_ID }),
+      autoAssign({
+        taskId: TASK_ID,
+        taskFacts: TASK_FACTS,
+        orgId: DEFAULT_ORG_ID,
+        dryRun: true,
+      }),
     ).resolves.toBeNull();
+
+    expect(promptCalls).toBe(0);
+    expect(learnCalls).toBe(0);
+    expect(rules).toHaveLength(0);
   });
 
   it("suppresses routing event recording during dry runs", async () => {
@@ -330,8 +429,31 @@ describe("autoAssign", () => {
     }
   });
 
+  it("learnRule persists a learned routing rule derived from task kind", async () => {
+    const db = await buildMigratedOrm();
+    try {
+      const em = db.orm.em.fork();
+      const repo = em.getRepository(RoutingRule) as RoutingRuleRepository;
+      configureNoMatchPrompt({ routingRuleRepository: repo });
+
+      const rule = await learnRule(TASK_FACTS, "codex", DEFAULT_ORG_ID);
+
+      const persisted = await repo.findOneOrFail({ id: rule.id } as never);
+      expect(persisted.source).toBe(RoutingRuleSource.Learned);
+      expect(persisted.enabled).toBe(true);
+      expect(persisted.actionAgent).toBe("codex");
+      expect(persisted.conditionsJson).toEqual(BUG_CONDITIONS);
+    } finally {
+      configureNoMatchPrompt({ routingRuleRepository: null });
+      await db.close();
+    }
+  });
+
   function repository(): RoutingRuleRepository {
     return {
+      setEventBus(bus: RoutingEventBus) {
+        rulesChangedBus = bus;
+      },
       async findEnabledForDispatch(orgId: string, projectId?: string | null) {
         return rules
           .filter((rule) => rule.org.id === orgId && rule.enabled)
@@ -347,6 +469,9 @@ describe("autoAssign", () => {
         return {
           async flush() {
             return undefined;
+          },
+          getReference(entity: unknown, id: string) {
+            return { id, entity };
           },
         };
       },

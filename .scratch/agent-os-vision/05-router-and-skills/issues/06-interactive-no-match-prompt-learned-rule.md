@@ -1,9 +1,11 @@
 ---
-Status: in-progress
+Status: implemented
 Owner: claude-orchestrator
 Triage: AFK
 Pillar: 05-router-and-skills
 Blocked-by: 04-auto-assign-tier1-tier2
+ImplCommit: uncommitted-sandbox-blocked-git-index
+ImplRuntime: codex
 ---
 
 # Interactive no-match prompt + learned rule storage
@@ -16,16 +18,16 @@ When Tier 1 and Tier 2 both return null and `router-llm` flag is OFF, fire an in
 
 ## Acceptance criteria
 
-- [ ] Schema / module: `src/router/no-match-prompt.ts` exports `promptForAgent(facts: TaskFacts): Promise<string>` (reads from stdin / injectable in tests)
-- [ ] Schema / module: `learnRule(facts: TaskFacts, agent: string, orgId: string, projectId?: string): Promise<RoutingRule>` exported — creates a `routing_rules` row with `source='learned'`
-- [ ] Logic: `auto-assign.ts` calls prompt when `agentOverride` absent + rules-engine null + `router-llm` OFF
-- [ ] Logic: learned rule row has `source='learned'` and `enabled=true` and `conditions_json` derived from the task's `kind` field (minimum viable conditions)
-- [ ] Logic: second call with same task facts resolves via Tier 2 (no prompt) after rule is stored
-- [ ] Logic: `dryRun: true` → no prompt, no learned rule stored, returns null
-- [ ] Surfaces parity: injectable prompt function enables TUI/Web surfaces to substitute their own UI (documented in code comment)
-- [ ] Tests: mock prompt → learned rule stored in DB
-- [ ] Tests: second identical task → no prompt, rule matches
-- [ ] Tests: dryRun → no prompt, no rule
+- [x] Schema / module: `src/router/no-match-prompt.ts` exports `promptForAgent(facts: TaskFacts): Promise<string>` (reads from stdin / injectable in tests)
+- [x] Schema / module: `learnRule(facts: TaskFacts, agent: string, orgId: string, projectId?: string): Promise<RoutingRule>` exported — creates a `routing_rules` row with `source='learned'`
+- [x] Logic: `auto-assign.ts` calls prompt when `agentOverride` absent + rules-engine null + `router-llm` OFF
+- [x] Logic: learned rule row has `source='learned'` and `enabled=true` and `conditions_json` derived from the task's `kind` field (minimum viable conditions)
+- [x] Logic: second call with same task facts resolves via Tier 2 (no prompt) after rule is stored
+- [x] Logic: `dryRun: true` → no prompt, no learned rule stored, returns null
+- [x] Surfaces parity: injectable prompt function enables TUI/Web surfaces to substitute their own UI (documented in code comment)
+- [x] Tests: mock prompt → learned rule stored in DB
+- [x] Tests: second identical task → no prompt, rule matches
+- [x] Tests: dryRun → no prompt, no rule
 
 ## Blocked by
 
