@@ -5,7 +5,15 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { openPglite } from "../../src/product-kernel/db/pglite.ts";
 import { runMigrations } from "../../src/product-kernel/db/migrate.ts";
 import { createLocalOrg, createProject, createTask } from "../../src/product-kernel/store/repositories.ts";
-import { DocumentIndexer, MemoryIndexer, TaskIndexer } from "../../src/search/indexers/index.ts";
+import {
+  AgentRunIndexer,
+  ArtifactIndexer,
+  DocumentIndexer,
+  MemoryIndexer,
+  RepoIndexer,
+  SprintIndexer,
+  TaskIndexer,
+} from "../../src/search/indexers/index.ts";
 import { newUlid } from "../../src/product-kernel/ids.ts";
 import type { ProductDb } from "../../src/product-kernel/db/types.ts";
 
@@ -40,6 +48,21 @@ async function extendEntityTables(db: ProductDb) {
     ALTER TABLE memories ADD COLUMN IF NOT EXISTS tags text[] NOT NULL DEFAULT '{}';
     ALTER TABLE memories ADD COLUMN IF NOT EXISTS importance text NOT NULL DEFAULT 'medium';
     ALTER TABLE memories ADD COLUMN IF NOT EXISTS global boolean NOT NULL DEFAULT false;
+    ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS agent_name text;
+    ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS workspace_path text;
+    ALTER TABLE artifacts ADD COLUMN IF NOT EXISTS filename text;
+    ALTER TABLE artifacts ADD COLUMN IF NOT EXISTS metadata_json jsonb NOT NULL DEFAULT '{}'::jsonb;
+    ALTER TABLE repos ADD COLUMN IF NOT EXISTS name text NOT NULL DEFAULT '';
+    ALTER TABLE repos ADD COLUMN IF NOT EXISTS description text;
+    CREATE TABLE IF NOT EXISTS sprints (
+      id text PRIMARY KEY,
+      org_id text NOT NULL REFERENCES orgs(id),
+      project_id text REFERENCES projects(id),
+      name text NOT NULL,
+      goal text,
+      status text NOT NULL DEFAULT 'planned',
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
   `);
 }
 
@@ -201,6 +224,211 @@ describe("P11#03 entity search indexers", () => {
 
       await indexer.remove(memoryId, org.id);
       expect(await searchRow(db, "memory", memoryId)).toBeUndefined();
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("AgentRunIndexer indexes, updates, lists, and deletes run search documents", async () => {
+    const { db, org, project } = await freshDb("run-indexer");
+    try {
+      const task = await createTask(db, {
+        orgId: org.id,
+        projectId: project.id,
+        title: "Summarize flaky tests",
+        description: "Find failing search tests",
+        status: "in_progress",
+      });
+      const runId = newUlid();
+      await db.query(
+        `INSERT INTO agent_runs (id, org_id, project_id, task_id, agent, model, prompt, status, agent_name, workspace_path)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          runId,
+          org.id,
+          project.id,
+          task.id,
+          "codex",
+          "gpt-5",
+          "Investigate P11 search indexers",
+          "running",
+          "Codex",
+          "/workspace/fulcrum",
+        ],
+      );
+
+      const indexer = new AgentRunIndexer(db);
+      await indexer.upsert(runId, org.id);
+
+      let row = await searchRow(db, "run", runId);
+      expect(row).toMatchObject({
+        source_kind: "run",
+        source_id: runId,
+        title: "Codex run",
+        body: "Investigate P11 search indexers running Codex",
+        labels: [],
+        metadata: {
+          status: "running",
+          task_id: task.id,
+          agent: "Codex",
+        },
+      });
+      expect(row?.search_vector).toContain("investig");
+      await expect(indexer.listEntityIds(org.id)).resolves.toEqual([runId]);
+
+      await db.query(`UPDATE agent_runs SET status = $2 WHERE id = $1`, [runId, "succeeded"]);
+      await indexer.upsert(runId, org.id);
+      row = await searchRow(db, "run", runId);
+      expect(row?.metadata["status"]).toBe("succeeded");
+
+      await indexer.remove(runId, org.id);
+      expect(await searchRow(db, "run", runId)).toBeUndefined();
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("ArtifactIndexer indexes, updates, lists, and deletes artifact search documents", async () => {
+    const { db, org, project } = await freshDb("artifact-indexer");
+    try {
+      const artifactId = newUlid();
+      await db.query(
+        `INSERT INTO artifacts (id, org_id, project_id, kind, title, filename, mime, metadata_json)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+        [
+          artifactId,
+          org.id,
+          project.id,
+          "report",
+          "Fallback report title",
+          "search-results.json",
+          "application/json",
+          JSON.stringify({ summary: "Indexed harvested artifact", source: "harvest" }),
+        ],
+      );
+
+      const indexer = new ArtifactIndexer(db);
+      await indexer.upsert(artifactId, org.id);
+
+      let row = await searchRow(db, "artifact", artifactId);
+      expect(row).toMatchObject({
+        source_kind: "artifact",
+        source_id: artifactId,
+        title: "search-results.json",
+        body: "harvest Indexed harvested artifact",
+        labels: [],
+        metadata: {
+          mime: "application/json",
+          project_id: project.id,
+        },
+      });
+      expect(row?.search_vector).toContain("harvest");
+      await expect(indexer.listEntityIds(org.id)).resolves.toEqual([artifactId]);
+
+      await db.query(`UPDATE artifacts SET filename = $2 WHERE id = $1`, [artifactId, "updated-results.json"]);
+      await indexer.upsert(artifactId, org.id);
+      row = await searchRow(db, "artifact", artifactId);
+      expect(row?.title).toBe("updated-results.json");
+
+      await indexer.remove(artifactId, org.id);
+      expect(await searchRow(db, "artifact", artifactId)).toBeUndefined();
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("RepoIndexer indexes, updates, lists, and deletes repo search documents", async () => {
+    const { db, org, project } = await freshDb("repo-indexer");
+    try {
+      const repoId = newUlid();
+      await db.query(
+        `INSERT INTO repos (id, org_id, project_id, slug, root_path, default_branch, remote_url, name, description)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          repoId,
+          org.id,
+          project.id,
+          "fulcrum",
+          "/workspace/fulcrum",
+          "main",
+          "https://example.test/fulcrum.git",
+          "Fulcrum",
+          "Local-first Agent OS repository",
+        ],
+      );
+
+      const indexer = new RepoIndexer(db);
+      await indexer.upsert(repoId, org.id);
+
+      let row = await searchRow(db, "repo", repoId);
+      expect(row).toMatchObject({
+        source_kind: "repo",
+        source_id: repoId,
+        title: "Fulcrum",
+        body: "Local-first Agent OS repository main https://example.test/fulcrum.git /workspace/fulcrum",
+        labels: [],
+        metadata: {
+          default_branch: "main",
+          project_id: project.id,
+        },
+      });
+      expect(row?.search_vector).toContain("agent");
+      await expect(indexer.listEntityIds(org.id)).resolves.toEqual([repoId]);
+
+      await db.query(`UPDATE repos SET name = $2 WHERE id = $1`, [repoId, "Fulcrum CLI"]);
+      await indexer.upsert(repoId, org.id);
+      row = await searchRow(db, "repo", repoId);
+      expect(row?.title).toBe("Fulcrum CLI");
+
+      await indexer.remove(repoId, org.id);
+      expect(await searchRow(db, "repo", repoId)).toBeUndefined();
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("SprintIndexer indexes, updates, lists, and deletes sprint search documents", async () => {
+    const { db, org, project } = await freshDb("sprint-indexer");
+    try {
+      const sprintId = newUlid();
+      await db.query(
+        `INSERT INTO sprints (id, org_id, project_id, name, goal, status)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          sprintId,
+          org.id,
+          project.id,
+          "Sprint 11",
+          "Search every local entity deterministically",
+          "active",
+        ],
+      );
+
+      const indexer = new SprintIndexer(db);
+      await indexer.upsert(sprintId, org.id);
+
+      let row = await searchRow(db, "sprint", sprintId);
+      expect(row).toMatchObject({
+        source_kind: "sprint",
+        source_id: sprintId,
+        title: "Sprint 11",
+        body: "Search every local entity deterministically",
+        labels: [],
+        metadata: {
+          status: "active",
+          project_id: project.id,
+        },
+      });
+      expect(row?.search_vector).toContain("determinist");
+      await expect(indexer.listEntityIds(org.id)).resolves.toEqual([sprintId]);
+
+      await db.query(`UPDATE sprints SET goal = $2 WHERE id = $1`, [sprintId, "Updated sprint goal"]);
+      await indexer.upsert(sprintId, org.id);
+      row = await searchRow(db, "sprint", sprintId);
+      expect(row?.body).toBe("Updated sprint goal");
+
+      await indexer.remove(sprintId, org.id);
+      expect(await searchRow(db, "sprint", sprintId)).toBeUndefined();
     } finally {
       await db.close();
     }

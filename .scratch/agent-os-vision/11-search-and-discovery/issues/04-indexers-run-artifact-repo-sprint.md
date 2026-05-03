@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: search-and-discovery
 Blocked-by: [02-indexer-hook-base.md]
