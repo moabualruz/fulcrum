@@ -19,7 +19,7 @@
 import type { FeatureFlagRepository } from "../db/repositories/auth/FeatureFlagRepository.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Registered feature flags — all 16 (D5: lowercase-with-hyphens)
+// Registered feature flags — all 22 (D5: lowercase-with-hyphens)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const FEATURE_FLAGS = [
@@ -34,6 +34,7 @@ export const FEATURE_FLAGS = [
   "notify-email",
   "notify-webhook",
   "notify-slack",
+  "notify-discord",
   "casbin-policies",
   "pgvector",
   "connector-linear",
@@ -65,6 +66,7 @@ export const FLAG_DESCRIPTIONS: Record<FeatureFlagName, string> = {
   "notify-email": "Enable email notifications via configured SMTP provider.",
   "notify-webhook": "Enable webhook-based notifications to subscriber endpoints.",
   "notify-slack": "Enable Slack notifications via Slack app integration.",
+  "notify-discord": "Enable Discord notifications via Discord webhook integration.",
   "casbin-policies": "Enable ABAC policy enforcement via node-casbin (gated by CasbinRule table).",
   "pgvector": "Enable pgvector extension for native Postgres vector similarity search.",
   "connector-linear": "Enable Linear issue tracker sync via Linear API connector.",
