@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/11-doc-tree-reader-editor-history.md, 07-docs-editor-collab/issues/04-yjs-hocuspocus-gated.md]

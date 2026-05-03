@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from "svelte";
+	import { untrack, onMount, onDestroy } from "svelte";
 	import { enhance } from "$app/forms";
 	import type { ActionData, PageData } from "./$types";
 	import type { JSONContent } from "@tiptap/core";
@@ -11,6 +11,11 @@
 	import { cn } from "$lib/utils.js";
 	import type { DocType } from "../../../../../../db/entities/docs/enums.ts";
 	import type { FrontmatterValue } from "$lib/components/docs/frontmatter-ui.ts";
+	import FeatureGate from "$lib/components/FeatureGate.svelte";
+	import PresenceAvatars from "$lib/collab/PresenceAvatars.svelte";
+	import CursorOverlay from "$lib/collab/CursorOverlay.svelte";
+	import { isCollabEnabled, createBellWebSocket } from "$lib/collab/index.js";
+	import type { CollabProvider, CollabUser, CursorState, BellWebSocket } from "$lib/collab/index.js";
 
 	interface Props {
 		data: PageData;
@@ -40,6 +45,58 @@
 		frontmatterMissing.length ? `Missing required fields: ${frontmatterMissing.join(", ")}` : undefined,
 	);
 	const docType = $derived((data.doc.kind ?? "note") as DocType);
+
+	// Collab state — gated behind FULCRUM_FEATURES=real-time-collab-server
+	const collabEnabled = isCollabEnabled();
+	let presenceUsers = $state<CollabUser[]>([]);
+	let remoteCursors = $state<CursorState[]>([]);
+	let collabProvider = $state<CollabProvider | null>(null);
+	let bellSocket = $state<BellWebSocket | null>(null);
+	let bellConnected = $state(false);
+	const featureFlags = $derived({ "real-time-collab-server": collabEnabled });
+
+	onMount(async () => {
+		if (!collabEnabled) return;
+
+		// Dynamic import — Hocuspocus only bundled when flag ON
+		const { createCollabProvider } = await import("$lib/collab/index.js");
+		const user: CollabUser = {
+			id: data.doc.id + "-" + Math.random().toString(36).slice(2),
+			name: "You",
+			color: "#6366f1",
+		};
+		const provider = await createCollabProvider({ docId: data.doc.id, user });
+		provider.setUser(user);
+		provider.onPresenceChange((s) => {
+			presenceUsers = s.users;
+		});
+		provider.onCursorChange((c) => {
+			remoteCursors = c;
+		});
+		provider.connect();
+		collabProvider = provider;
+
+		bellSocket = createBellWebSocket(
+			{
+				url: "/api/ws/notify",
+				onOpen: () => {
+					bellConnected = true;
+				},
+				onClose: () => {
+					bellConnected = false;
+				},
+				onMessage: (_data) => {
+					/* handle notification */
+				},
+			},
+			true,
+		);
+	});
+
+	onDestroy(() => {
+		collabProvider?.disconnect();
+		bellSocket?.close();
+	});
 
 	function handleDocChange(event: CustomEvent<{ contentJson: JSONContent; bodyMd: string }>): void {
 		contentJson = event.detail.contentJson;
@@ -75,6 +132,9 @@
 		>← {data.doc.title}</a>
 		<h1 class={cn("text-2xl font-semibold tracking-tight")}>Edit document</h1>
 	</div>
+	<FeatureGate flag="real-time-collab-server" flags={featureFlags} fallback={false}>
+		<PresenceAvatars users={presenceUsers} />
+	</FeatureGate>
 	<a
 		data-doc-history
 		href="/docs/{data.doc.id}/history"
@@ -99,8 +159,9 @@
 					type="button"
 					data-frontmatter-toggle-yaml
 					class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-					onclick={() => frontmatterMode = frontmatterMode === "form" ? "yaml" : "form"}
-				>{frontmatterMode === "form" ? "YAML" : "Form"}</button>
+					onclick={() => (frontmatterMode = frontmatterMode === "form" ? "yaml" : "form")}
+					>{frontmatterMode === "form" ? "YAML" : "Form"}</button
+				>
 			</div>
 			{#if frontmatterToast}
 				<p data-frontmatter-toast class={cn("text-destructive text-xs")}>{frontmatterToast}</p>
@@ -135,53 +196,56 @@
 			{/if}
 		</div>
 
-	<div class={cn("flex flex-col gap-1.5")}>
-		<label for="doc-kind" class={cn("text-sm font-medium")}>Kind</label>
-		<select
-			id="doc-kind"
-			name="kind"
-			data-doc-kind
-			bind:value={kindValue}
-			aria-invalid={kindError ? "true" : undefined}
-			class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
-		>
-			{#each KINDS as kind (kind)}
-				<option value={kind}>{kind}</option>
-			{/each}
-		</select>
-		{#if kindError}
-			<p data-error-kind class={cn("text-destructive text-xs")}>{kindError}</p>
-		{/if}
-	</div>
+		<div class={cn("flex flex-col gap-1.5")}>
+			<label for="doc-kind" class={cn("text-sm font-medium")}>Kind</label>
+			<select
+				id="doc-kind"
+				name="kind"
+				data-doc-kind
+				bind:value={kindValue}
+				aria-invalid={kindError ? "true" : undefined}
+				class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
+			>
+				{#each KINDS as kind (kind)}
+					<option value={kind}>{kind}</option>
+				{/each}
+			</select>
+			{#if kindError}
+				<p data-error-kind class={cn("text-destructive text-xs")}>{kindError}</p>
+			{/if}
+		</div>
 
-	<div class={cn("flex flex-col gap-1.5")}>
-		<label for="doc-labels" class={cn("text-sm font-medium")}>Labels</label>
-		<input
-			id="doc-labels"
-			name="labels"
-			type="text"
-			data-doc-labels
-			bind:value={labelsValue}
-			placeholder="comma, separated"
-			class={cn("border-input bg-background h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
-		/>
-	</div>
+		<div class={cn("flex flex-col gap-1.5")}>
+			<label for="doc-labels" class={cn("text-sm font-medium")}>Labels</label>
+			<input
+				id="doc-labels"
+				name="labels"
+				type="text"
+				data-doc-labels
+				bind:value={labelsValue}
+				placeholder="comma, separated"
+				class={cn("border-input bg-background h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
+			/>
+		</div>
 
-	<div class={cn("flex flex-col gap-1.5")}>
-		<label for="doc-body" class={cn("text-sm font-medium")}>Body</label>
-		<DocEditor content={contentJson} onchange={handleDocChange} ariaLabel="Document body" />
-		<p data-autosave-indicator class={cn("text-xs text-muted-foreground")}>Autosave ready</p>
-		{#if bodyError}
-			<p data-error-body class={cn("text-destructive text-xs")}>{bodyError}</p>
-		{/if}
-	</div>
+		<div class={cn("flex flex-col gap-1.5")}>
+			<label for="doc-body" class={cn("text-sm font-medium")}>Body</label>
+			<div class="relative">
+				<DocEditor content={contentJson} onchange={handleDocChange} ariaLabel="Document body" />
+				<FeatureGate flag="real-time-collab-server" flags={featureFlags} fallback={false}>
+					<CursorOverlay cursors={remoteCursors} />
+				</FeatureGate>
+			</div>
+			<p data-autosave-indicator class={cn("text-xs text-muted-foreground")}>
+				{#if collabEnabled && bellConnected}Connected{:else}Autosave ready{/if}
+			</p>
+			{#if bodyError}
+				<p data-error-body class={cn("text-destructive text-xs")}>{bodyError}</p>
+			{/if}
+		</div>
 
 		<div class={cn("flex items-center gap-2 pt-2")}>
-			<button
-				type="submit"
-				data-doc-save
-				class={cn(buttonVariants({ variant: "default" }))}
-			>Save</button>
+			<button type="submit" data-doc-save class={cn(buttonVariants({ variant: "default" }))}>Save</button>
 			<a
 				href="/docs/{data.doc.id}"
 				data-doc-cancel
