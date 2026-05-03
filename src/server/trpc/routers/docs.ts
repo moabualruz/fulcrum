@@ -3,9 +3,11 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { Org } from "../../../db/entities/auth/Org.ts";
+import { DocLink } from "../../../db/entities/docs/DocLink.ts";
 import { Document } from "../../../db/entities/docs/Document.ts";
 import { DocVersion } from "../../../db/entities/docs/DocVersion.ts";
 import { DocTypeEnum, ScopeEnum } from "../../../db/entities/docs/enums.ts";
+import { syncDocWikilinks } from "../../../docs/wikilink-extractor.ts";
 import { SearchDocument } from "../../../db/entities/search/SearchDocument.ts";
 import { protectedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
@@ -79,6 +81,20 @@ const DeleteDocInputSchema = z.object({
 });
 
 const HardDeleteOutputSchema = z.object({ deleted: z.literal(true) });
+const DocLinksInputSchema = z.object({
+  docId: z.uuid(),
+});
+const BacklinkOutputSchema = z.object({
+  fromDocId: z.uuid(),
+  title: z.string(),
+  slug: z.string(),
+  linkKind: z.literal("wikilink"),
+});
+const ForwardLinkOutputSchema = z.object({
+  toDocId: z.uuid().nullable(),
+  toSlug: z.string(),
+  linkKind: z.literal("wikilink"),
+});
 
 type DocOutput = z.infer<typeof DocOutputSchema>;
 type AuthCtx = {
@@ -312,6 +328,7 @@ export const docsRouter = t.router({
       doc.updatedAt = new Date();
 
       em.persist(doc);
+      await syncDocWikilinks(em, ctx.orgId, doc, doc.contentJson);
       await writeVersion(em, ctx.orgId, doc);
       await upsertSearchDocument(em, ctx.orgId, doc.id);
       await em.flush();
@@ -340,6 +357,57 @@ export const docsRouter = t.router({
     }),
 
   templates: docTemplatesRouter,
+
+  links: t.router({
+    listBacklinks: protectedProcedure
+      .input(DocLinksInputSchema)
+      .output(z.array(BacklinkOutputSchema))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.em) return [];
+        const em = requireEntityManager(ctx);
+        const links = await em.find(DocLink, {
+          org: ctx.orgId,
+          toDoc: input.docId,
+          linkKind: "wikilink",
+        } as never, {
+          populate: ["fromDoc"],
+          orderBy: { createdAt: "ASC", id: "ASC" },
+        });
+
+        return links.map((link) => {
+          const from = link.fromDoc;
+          const frontmatter = from.frontmatter ?? {};
+          return {
+            fromDocId: from.id,
+            title: typeof frontmatter.title === "string" ? frontmatter.title : from.externalId ?? from.id,
+            slug: from.externalId ?? from.id,
+            linkKind: "wikilink" as const,
+          };
+        });
+      }),
+
+    listForwardLinks: protectedProcedure
+      .input(DocLinksInputSchema)
+      .output(z.array(ForwardLinkOutputSchema))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.em) return [];
+        const em = requireEntityManager(ctx);
+        const links = await em.find(DocLink, {
+          org: ctx.orgId,
+          fromDoc: input.docId,
+          linkKind: "wikilink",
+        } as never, {
+          populate: ["toDoc"],
+          orderBy: { createdAt: "ASC", id: "ASC" },
+        });
+
+        return links.map((link) => ({
+          toDocId: link.toDoc?.id ?? null,
+          toSlug: link.toSlug,
+          linkKind: "wikilink" as const,
+        }));
+      }),
+  }),
 });
 
 export type DocsRouter = typeof docsRouter;

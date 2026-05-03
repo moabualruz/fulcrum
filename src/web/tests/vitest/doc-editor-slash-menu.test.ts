@@ -45,7 +45,7 @@ describe("DocEditor slash menu helpers", () => {
     ["table", "\"table\""],
     ["horizontal-rule", "\"horizontalRule\""],
     ["template", "Template section"],
-    ["wikilink", "[[Doc Title]]"],
+    ["wikilink", "\"type\":\"wikilink\""],
   ])("%s inserts expected node/content", (id, expected) => {
     const editor = editorWithText("/");
 

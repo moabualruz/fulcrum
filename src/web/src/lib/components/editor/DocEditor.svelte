@@ -177,6 +177,7 @@
     if (node.type === "table") return (node.content ?? []).map(nodeToMarkdown).join("\n");
     if (node.type === "tableRow") return `| ${(node.content ?? []).map(nodeToMarkdown).join(" | ")} |`;
     if (node.type === "tableCell") return text;
+    if (node.type === "wikilink") return `[[${node.attrs?.slug ?? ""}]]`;
     return text;
   }
 
@@ -262,6 +263,22 @@
     border-radius: 0.5rem;
     min-height: 16rem;
     padding: 0.75rem;
+  }
+
+  :global(.wikilink-chip) {
+    border-radius: 0.25rem;
+    padding: 0.0625rem 0.25rem;
+    text-decoration: none;
+  }
+
+  :global(.wikilink-chip--resolved) {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+
+  :global(.wikilink-chip--unresolved) {
+    background: #ffedd5;
+    color: #c2410c;
   }
 
   :global(.doc-editor__content .ProseMirror:focus) {

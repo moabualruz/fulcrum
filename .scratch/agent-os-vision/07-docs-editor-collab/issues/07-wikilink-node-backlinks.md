@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 07-docs-editor-collab
 Blocked-by: [02-tiptap-svelte-binding-spike.md, 05-doc-crud-trpc.md]
@@ -26,17 +26,17 @@ dropdown of matching doc titles (fuzzy, max 10). tRPC: `docs.links.listBacklinks
 `docs.links.listForwardLinks`. Web sidebar "Referenced by N docs" panel. CLI + TUI parity.
 
 ## Acceptance criteria
-- [ ] `WikilinkNode` extension: `[[slug]]` typed in editor renders as chip NodeView (not raw text)
-- [ ] Resolved chip: blue, clickable → navigates to `/docs/<slug>`
+- [x] `WikilinkNode` extension: `[[slug]]` typed in editor renders as chip NodeView (not raw text)
+- [x] Resolved chip: blue, clickable → navigates to `/docs/<slug>`
 - [ ] Unresolved chip: orange, tooltip "create?" action → calls `docs.create` with that slug
 - [ ] Autocomplete: typing `[[te` shows dropdown with docs matching "te"; Enter inserts resolved node
-- [ ] On `docs.update`: `wikilink-extractor.ts` bulk-upserts `doc_links` for all `[[…]]` nodes in `content_json`
-- [ ] `wikilink-extractor.ts`: stale links (present in DB but not in current `content_json`) removed in same transaction
-- [ ] `docs.links.listBacklinks`: returns docs that link TO the current doc (filtered by `link_kind='wikilink'`); org-scoped
-- [ ] `docs.links.listForwardLinks`: returns all outbound `doc_links` rows for a doc
-- [ ] Tests: extractor is idempotent — run twice on same `content_json`, `doc_links` count unchanged
-- [ ] Tests: stale link removal — remove wikilink from doc, save, stale row gone from `doc_links`
-- [ ] Tests: `listBacklinks` returns correct referring docs after extraction
+- [x] On `docs.update`: `wikilink-extractor.ts` bulk-upserts `doc_links` for all `[[…]]` nodes in `content_json`
+- [x] `wikilink-extractor.ts`: stale links (present in DB but not in current `content_json`) removed in same transaction
+- [x] `docs.links.listBacklinks`: returns docs that link TO the current doc (filtered by `link_kind='wikilink'`); org-scoped
+- [x] `docs.links.listForwardLinks`: returns all outbound `doc_links` rows for a doc
+- [x] Tests: extractor is idempotent — run twice on same `content_json`, `doc_links` count unchanged
+- [x] Tests: stale link removal — remove wikilink from doc, save, stale row gone from `doc_links`
+- [x] Tests: `listBacklinks` returns correct referring docs after extraction
 - [ ] Web: `/docs/<slug>` read view sidebar shows "Referenced by N docs" list; clicking navigates
 - [ ] Web: `/docs/<slug>/edit` wikilink chips render; unresolved orange visible
 - [ ] CLI: `fulcrum docs backlinks <slug> --json` returns `[{from_doc_id, title, link_kind}]`

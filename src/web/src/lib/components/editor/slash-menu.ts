@@ -3,6 +3,7 @@ import { Node } from "@tiptap/core";
 import { TaskItem } from "@tiptap/extension-list/task-item";
 import { TaskList } from "@tiptap/extension-list/task-list";
 import { StarterKit } from "@tiptap/starter-kit";
+import { WikilinkNode } from "./wikilink";
 
 export type SlashMenuItem = {
   id: string;
@@ -81,6 +82,7 @@ export function createDocEditorExtensions(): Extension[] {
     }),
     TaskList,
     TaskItem.configure({ nested: true }),
+    WikilinkNode,
     Table,
     TableRow,
     TableCell,
@@ -120,7 +122,7 @@ export function insertSlashMenuItem(editor: Editor, itemId: string): boolean {
         content: [{ type: "text", text: "Template section" }],
       }).run();
     case "wikilink":
-      return chain.insertContent("[[Doc Title]]").run();
+      return chain.insertContent({ type: "wikilink", attrs: { slug: "doc-title", resolved: false } }).run();
     default:
       return false;
   }
