@@ -46,10 +46,18 @@ Usage:
                                      Run an FTS query over the product kernel search index.
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
                                      Render the assembled Markdown context for a task.
-  fulcrum sprints add-task --sprint-id <id> --task-id <id> [--json]
-                                     Assign a task to a sprint.
-  fulcrum sprints remove-task --sprint-id <id> --task-id <id> [--json]
-                                     Remove a task from a sprint.
+  fulcrum notify list [--unread] [--limit N] [--offset N] [--json]
+                                     List notifications.
+  fulcrum notify read <id>           Show a single notification.
+  fulcrum notify mark-read <id>|--all
+                                     Mark notification(s) as read.
+  fulcrum notify mute <kind> <id> [--until <ISO>] [--json]
+                                     Mute a subject.
+  fulcrum notify unmute <kind> <id>  Unmute a subject.
+  fulcrum notify rules <list|get|create|update|delete> ...
+                                     Manage notification rules.
+  fulcrum notify channels <list|config|test> ...
+                                     Manage notification channels.
   fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
   fulcrum version                    Print version.
   fulcrum help                       This message.
@@ -126,9 +134,9 @@ async function main() {
       await runProduct(rest);
       return;
     }
-    case "sprints": {
-      const { run: runSprints } = await import("./cli/sprints.ts");
-      await runSprints(rest);
+    case "notify": {
+      const { run: runNotify } = await import("./cli/notify.ts");
+      await runNotify(rest);
       return;
     }
     case "version":
