@@ -2249,58 +2249,23 @@ CI: typecheck GREEN, 83 pre-existing test failures from wave impl
 
 Next: dispatch 6 more impl + begin fixing pre-existing test failures to unblock milestone gates
 
-## 2026-05-03 — P2#08 structured output (claude)
-
-Landed: grammar-constrained generation via JSON Schema
-
-**Rust:**
-- `inference/inference-generate/src/grammar.rs` — schema_to_gbnf (object/array/string/number/boolean/null), validate_against_schema, generate_with_schema with 3x retry, needs_fallback for complex constructs ($ref/oneOf/anyOf/allOf)
-- `inference/inference-generate/src/lib.rs` — wired schema field into generate(), returns grammar_fallback flag
-- `inference/inference-server/src/main.rs` — schema requests bypass cache; 3 new server tests
-
-**TypeScript:**
-- `src/cli/inference.ts` — `--schema <json>` flag on generate command
-- `src/web/src/routes/settings/inference/+page.svelte` — JSON Schema textarea + validity indicator
-- `src/web/src/routes/settings/inference/+page.server.ts` — schema passthrough + JSON validity check
-
-**Tests:** 14 Rust grammar unit tests, 3 Rust server integration tests, 2 CLI tests, 2 web SSR tests, 2 tRPC integration tests — all green.
-
-Commit: e5396071
-
 ---
 
-## 2026-05-03 — claude (P9#12 web-project-repos-scoped-view)
+## 2026-05-03T05:57:24Z — codex (P4#13 gated sandbox providers)
 
-Issue: `.scratch/agent-os-vision/09-repos-git-supervision/issues/12-web-project-repos-scoped-view.md`
-Status: implemented
+Task: `.scratch/agent-os-vision/04-sandcastle-wrapper/issues/13-gated-sandbox-providers.md`.
 
-**Files:**
-- `src/product-kernel/db/migrations/0004_repos_columns_and_task_repo_fk.sql` — adds repo columns + tasks.repo_id FK
-- `src/product-kernel/store/repositories.ts` — createRepo, listReposForProject, linkRepoToProject, RepoRow type
-- `src/web/src/routes/projects/[id]/repos/+page.server.ts` — load + add/link actions
-- `src/web/src/routes/projects/[id]/repos/+page.svelte` — card grid UI
-- `src/web/src/routes/projects/[id]/repos/page.server.test.ts` — 5 tests (scoped list, card fields, 404, add, link)
+Summary: added runtime-gated Sandcastle provider resolution for Docker, Podman, Vercel, Daytona, Modal, and E2B; wired provider checks into `fulcrum doctor`; preserved `noSandbox` default and explicit provider failure behavior.
 
-**Tests:** 5 server-side tests — all green.
+Commit: `043dfa5499cfa9e6993e0d646775f225d469c4d3`
 
-Commit: 6b8d05d1
-
----
-
-## 2026-05-03 — codex (P7#23 gated LLM narration)
-
-Issue: `.scratch/agent-os-vision/07-docs-editor-collab/issues/23-gated-llm-narration.md`
-Status: implemented
-
-Implemented in working tree:
-- `src/docs/llm-narrator.ts` — feature-gated summary pipeline, backend suffix parse, sidecar injection for tests, summary prepend/replace helpers, failure logs warning and preserves save.
-- `src/server/trpc/routers/docs.ts` — `docs.update` applies narration only after body/content/doc_type edits.
-- `src/web/src/lib/components/editor/slash-menu.ts` and `DocEditor.svelte` — read-only `narration-block` TipTap node + editor styling + markdown export.
-- `tests/docs/llm-narrator.test.ts` and `tests/trpc/docs-llm-narration.test.ts` — red first, now green: OFF no sidecar call; ON ADR prepend; re-save replace; wiki skip; backend override.
+Files changed:
+- `src/orchestration/sandbox-runner.ts`
+- `tests/orchestration/sandbox-runner.test.ts`
+- `src/cli/doctor.ts`
 
 Verification:
-- `bun test tests/docs/llm-narrator.test.ts tests/trpc/docs-llm-narration.test.ts` PASS (6 tests, 22 assertions).
-- `bun run ci` BLOCKED at typecheck by unrelated pre-existing errors in `src/product-kernel/store/repositories.ts` and `tests/tui/sprints-and-reports.test.ts`.
-- `bun test` BLOCKED by unrelated existing failures/hang in CLI/vendor/inference/router tests.
-
-Commit: 13d67cb2
+- `bun test tests/orchestration/sandbox-runner.test.ts` = 12/12 pass
+- `bun test tests/cli/build.test.ts` = 2/2 pass
+- `bun run lint` = fails on pre-existing out-of-scope errors in `src/product-kernel`, `src/web`, and `tests/tui`
+- `bun test` = fails on pre-existing out-of-scope repository issues: 2433 pass, 185 fail, 25 errors
