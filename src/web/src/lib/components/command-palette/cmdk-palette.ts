@@ -17,6 +17,8 @@ export interface CmdkSearchOutput extends Omit<SearchQueryOutput, "results"> {
 
 export interface CmdkSearchClient {
   query(input: SearchQueryInput): Promise<CmdkSearchOutput>;
+  /** P11#16: Record click telemetry. No-op when search-click-telemetry flag OFF. */
+  recordClick?(input: { query: string; resultKind: string; resultId: string; position: number }): void;
 }
 
 export interface CmdkCommand {

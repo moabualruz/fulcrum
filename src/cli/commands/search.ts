@@ -156,13 +156,38 @@ async function runQuery(argv: readonly string[], opts: ResolvedOptions): Promise
     return;
   }
 
+  // P11#16: NL→filter pre-processing when report-llm-narration flag ON
+  const nlEnabled = isFeatureEnabled("report-llm-narration");
+  let resolvedQuery = query;
+  let resolvedKind = kind;
+  let resolvedStatus = flags.get("status");
+  let resolvedAssignee = flags.get("assignee");
+  let resolvedTag = flags.get("tag");
+
+  if (nlEnabled && !kind && !flags.get("status") && !flags.get("assignee")) {
+    try {
+      const { translateNlToFilter, HttpNlFilterSidecar } = await import("../../search/nl-filter.ts");
+      const sidecar = new HttpNlFilterSidecar();
+      const result = await translateNlToFilter(query, sidecar);
+      if (result.translated && result.ast) {
+        resolvedQuery = result.ast.text || query;
+        if (result.ast.facets.kind?.length) resolvedKind = result.ast.facets.kind[0] as SearchKind | undefined;
+        if (result.ast.facets.status?.length) resolvedStatus = result.ast.facets.status[0];
+        if (result.ast.facets.assignee?.length) resolvedAssignee = result.ast.facets.assignee[0];
+        if (result.ast.facets.label?.length) resolvedTag = result.ast.facets.label[0];
+      }
+    } catch {
+      // NL→filter failed — continue with plain-text query
+    }
+  }
+
   const input: SearchQueryInput = compact({
-    q: query,
-    kind,
+    q: resolvedQuery,
+    kind: resolvedKind,
     project: flags.get("project"),
-    status: flags.get("status"),
-    assignee: flags.get("assignee"),
-    tag: flags.get("tag"),
+    status: resolvedStatus,
+    assignee: resolvedAssignee,
+    tag: resolvedTag,
     dateRange: flags.get("date-range"),
     author: flags.get("author"),
     limit,
@@ -360,6 +385,14 @@ function errorMessage(err: unknown): string {
   if (err instanceof TRPCError) return `${err.code}: ${err.message}`;
   if (err instanceof SyntaxError) return `invalid JSON: ${err.message}`;
   return `Error: ${(err as Error).message}`;
+}
+
+function isFeatureEnabled(flag: string): boolean {
+  return (process.env["FULCRUM_FEATURES"] ?? "")
+    .split(",")
+    .map((f) => f.trim())
+    .filter(Boolean)
+    .includes(flag);
 }
 
 async function resolveCaller(opts: SearchRunOptions): Promise<SearchCaller> {

@@ -68,6 +68,23 @@
     return score.toFixed(3);
   }
 
+  /**
+   * P11#16: Record click telemetry (fire-and-forget).
+   * Only sends when search-click-telemetry flag ON (server-side gate).
+   */
+  function recordClick(hit: SearchHit, position: number): void {
+    fetch("/api/trpc/search.recordClick", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: data.q,
+        resultKind: hit.source_kind,
+        resultId: hit.source_id,
+        position,
+      }),
+    }).catch(() => {});
+  }
+
   function removeFacetHref(key: string): string {
     const params = new URLSearchParams();
     if (data.q) params.set("q", data.q);
@@ -177,9 +194,9 @@
         <section data-search-group data-source-kind={kind} class={cn("space-y-2")}>
           <h2 class={cn("text-sm font-semibold uppercase text-muted-foreground")}>{kind}</h2>
           <ul class={cn("divide-y divide-border rounded-md border border-border")}>
-            {#each hits as hit (hit.id)}
+            {#each hits as hit, hitIdx (hit.id)}
               <li data-search-hit class={cn("p-3")}>
-                <a href={hrefFor(hit)} class={cn("font-medium hover:underline")}>{hit.title}</a>
+                <a href={hrefFor(hit)} onclick={() => recordClick(hit, hitIdx)} class={cn("font-medium hover:underline")}>{hit.title}</a>
                 <div class={cn("mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground")}>
                   <span>{hit.source_kind}:{hit.source_id}</span>
                   <span>{new Date(hit.updated_at).toLocaleDateString()}</span>

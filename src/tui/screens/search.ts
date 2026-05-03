@@ -70,7 +70,21 @@ export class SearchScreen {
 
   async submitQuery(query: string): Promise<void> {
     this.query = query;
-    this.results = await this.opts.caller.search.query({ query, facets: this.activeFacets });
+    // P11#16: NL→filter pre-processing when report-llm-narration flag ON
+    let resolvedQuery = query;
+    if (this.isNlFilterEnabled()) {
+      try {
+        const { translateNlToFilter, HttpNlFilterSidecar } = await import("../../search/nl-filter.ts");
+        const sidecar = new HttpNlFilterSidecar();
+        const result = await translateNlToFilter(query, sidecar);
+        if (result.translated && result.ast) {
+          resolvedQuery = result.ast.text || query;
+        }
+      } catch {
+        // fallback to plain text
+      }
+    }
+    this.results = await this.opts.caller.search.query({ query: resolvedQuery, facets: this.activeFacets });
     this.cursor = 0;
   }
 
@@ -121,11 +135,39 @@ export class SearchScreen {
     if (key === "\r") {
       const result = this.results[this.cursor];
       if (!result) return false;
+      // P11#16: record click telemetry
+      this.maybeRecordClick(result, this.cursor);
       this.opts.onOpenEntity?.({ kind: result.kind, id: result.id });
       return true;
     }
 
     return false;
+  }
+
+  private maybeRecordClick(result: TuiSearchResult, position: number): void {
+    if (
+      !(process.env["FULCRUM_FEATURES"] ?? "")
+        .split(",")
+        .map((f) => f.trim())
+        .includes("search-click-telemetry")
+    )
+      return;
+    // Fire-and-forget; telemetry should not block UI
+    const caller = this.opts.caller as { search: { recordClick?: (input: unknown) => Promise<unknown> } };
+    caller.search.recordClick?.({
+      query: this.query,
+      resultKind: result.kind,
+      resultId: result.id,
+      position,
+    }).catch(() => {});
+  }
+
+  private isNlFilterEnabled(): boolean {
+    return (process.env["FULCRUM_FEATURES"] ?? "")
+      .split(",")
+      .map((f) => f.trim())
+      .filter(Boolean)
+      .includes("report-llm-narration");
   }
 
   private get activeFacets(): TuiSearchKind[] {
