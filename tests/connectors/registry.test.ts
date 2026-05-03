@@ -127,6 +127,23 @@ describe("ConnectorRegistry", () => {
     });
   });
 
+  it("throws FeatureDisabledError for GitLab and Bitbucket flags when off", async () => {
+    const registry = new ConnectorRegistry({
+      isFeatureEnabled: async () => false,
+    });
+    registry.register(adapter("gitlab"));
+    registry.register(adapter("bitbucket"));
+
+    await expect(registry.enable("gitlab", { orgId: "org-1" })).rejects.toMatchObject({
+      flag: "connector-gitlab",
+      kind: "gitlab",
+    });
+    await expect(registry.enable("bitbucket", { orgId: "org-1" })).rejects.toMatchObject({
+      flag: "connector-bitbucket",
+      kind: "bitbucket",
+    });
+  });
+
   it("enables connector when connector flag is on", async () => {
     const registry = new ConnectorRegistry({
       isFeatureEnabled: async () => true,

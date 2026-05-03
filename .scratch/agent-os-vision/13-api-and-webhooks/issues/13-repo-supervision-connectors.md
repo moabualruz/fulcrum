@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: api-and-webhooks
 Blocked-by: [13/issues/09-connector-framework-interface.md]
