@@ -1,51 +1,30 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { openPglite } from "../../../../product-kernel/db/pglite.ts";
 import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
-import {
-  createLocalOrg,
-  createProject,
-  appendEvent,
-  createNotification,
-  listNotifications,
-  countUnreadNotifications,
-  markNotificationRead,
-  listEventsByActor,
-} from "../../../../product-kernel/store/repositories.ts";
+import { createLocalOrg, appendEvent } from "../../../../product-kernel/store/repositories.ts";
+import { newUlid } from "../../../../product-kernel/ids.ts";
+
+mock.module("$lib/server/db", () => {
+  const { join: j } = require("node:path");
+  const { openPglite: oP } = require("../../../../product-kernel/db/pglite.ts");
+  const { runMigrations: rM } = require("../../../../product-kernel/db/migrate.ts");
+  return {
+    openProductDb: async () => {
+      const scratch = process.env["FULCRUM_HOME"]!;
+      const dbDir = j(scratch, "state", "product", "db");
+      const { mkdirSync: mk } = require("node:fs");
+      mk(dbDir, { recursive: true });
+      const db = await oP(j(dbDir, "main"));
+      await rM(db);
+      return db;
+    },
+  };
+});
 
 let scratch: string;
-
-interface InboxPayload {
-  notifications: Array<{
-    id: string;
-    title: string;
-    verb: string;
-    actor: string;
-    entity_kind: string;
-    entity_id: string;
-    read_at: string | null;
-    created_at: string;
-  }>;
-  unreadCount: number;
-}
-
-interface ActivityPayload {
-  events: Array<{
-    id: string;
-    actor: string;
-    subject_kind: string;
-    verb: string;
-    created_at: string;
-  }>;
-}
-
-function streamedData<T>(result: unknown): Promise<T> {
-  const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
-  expect(stream).toBeInstanceOf(Promise);
-  return stream as Promise<T>;
-}
 
 beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-inbox-"));
@@ -57,141 +36,116 @@ afterEach(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-async function seedDb() {
+function loadEvent(params: Record<string, string> = {}): Parameters<typeof import("./+page.server.ts").load>[0] {
+  const url = new URL("http://localhost/inbox");
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  return { url } as Parameters<typeof import("./+page.server.ts").load>[0];
+}
+
+async function setupDb(): Promise<{ orgId: string }> {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
   const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const project = await createProject(db, {
-    orgId: org.id, slug: "alpha", name: "Alpha",
-  });
-  return { db, org, project };
+  try {
+    await runMigrations(db);
+    const org = await createLocalOrg(db, { slug: "default", name: "Default" });
+    return { orgId: org.id };
+  } finally {
+    await db.close();
+  }
 }
 
-describe("/inbox — notifications", () => {
-  test("listNotifications returns created notifications in DESC order", async () => {
-    const { db, org, project } = await seedDb();
-    const ev = await appendEvent(db, {
-      orgId: org.id, projectId: project.id, actor: "alice",
-      subjectKind: "task", subjectId: "t1", verb: "assigned",
-    });
-    const n1 = await createNotification(db, {
-      orgId: org.id, userId: "user1", eventId: ev.id,
-      entityKind: "task", entityId: "t1", title: "Task assigned", verb: "assigned", actor: "alice",
-    });
-    const ev2 = await appendEvent(db, {
-      orgId: org.id, projectId: project.id, actor: "bob",
-      subjectKind: "task", subjectId: "t2", verb: "commented",
-    });
-    const n2 = await createNotification(db, {
-      orgId: org.id, userId: "user1", eventId: ev2.id,
-      entityKind: "task", entityId: "t2", title: "Comment on task", verb: "commented", actor: "bob",
-    });
-
-    const rows = await listNotifications(db, "user1");
-    expect(rows.length).toBe(2);
-    // DESC: n2 first
-    expect(rows[0]!.id).toBe(n2.id);
-    expect(rows[1]!.id).toBe(n1.id);
+async function seedNotification(orgId: string, readAt: string | null = null): Promise<void> {
+  const dbDir = join(scratch, "state", "product", "db");
+  const db = await openPglite(join(dbDir, "main"));
+  try {
+    const id = newUlid();
+    await db.query(
+      `INSERT INTO notifications (id, org_id, recipient, subject_kind, subject_id, verb, actor, read_at)
+       VALUES ($1, $2, 'local', 'task', 'task-1', 'created', 'system', $3)`,
+      [id, orgId, readAt],
+    );
+  } finally {
     await db.close();
+  }
+}
+
+async function seedActivity(orgId: string): Promise<void> {
+  const dbDir = join(scratch, "state", "product", "db");
+  const db = await openPglite(join(dbDir, "main"));
+  try {
+    await appendEvent(db, {
+      orgId,
+      actor: "local",
+      subjectKind: "task",
+      subjectId: "task-1",
+      verb: "created",
+    });
+  } finally {
+    await db.close();
+  }
+}
+
+describe("/inbox +page.server.ts load()", () => {
+  test("returns empty inbox when no data", async () => {
+    await setupDb();
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
+    const result = await mod.load(loadEvent());
+    expect(result.notifications).toHaveLength(0);
+    expect(result.unreadCount).toBe(0);
+    expect(result.activity).toHaveLength(0);
   });
 
-  test("countUnreadNotifications counts only unread", async () => {
-    const { db, org, project } = await seedDb();
-    const ev = await appendEvent(db, {
-      orgId: org.id, projectId: project.id, actor: "alice",
-      subjectKind: "task", subjectId: "t1", verb: "assigned",
-    });
-    await createNotification(db, {
-      orgId: org.id, userId: "user1", eventId: ev.id,
-      entityKind: "task", entityId: "t1", title: "n1", verb: "assigned", actor: "alice",
-    });
-    const ev2 = await appendEvent(db, {
-      orgId: org.id, projectId: project.id, actor: "bob",
-      subjectKind: "task", subjectId: "t2", verb: "commented",
-    });
-    const n2 = await createNotification(db, {
-      orgId: org.id, userId: "user1", eventId: ev2.id,
-      entityKind: "task", entityId: "t2", title: "n2", verb: "commented", actor: "bob",
-    });
-
-    expect(await countUnreadNotifications(db, "user1")).toBe(2);
-
-    await markNotificationRead(db, n2.id);
-    expect(await countUnreadNotifications(db, "user1")).toBe(1);
-    await db.close();
+  test("counts unread notifications correctly", async () => {
+    const { orgId } = await setupDb();
+    await seedNotification(orgId, null); // unread
+    await seedNotification(orgId, "2026-04-01T00:00:00Z"); // read
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
+    const result = await mod.load(loadEvent());
+    expect(result.unreadCount).toBe(1);
+    expect(result.notifications).toHaveLength(2);
   });
 
-  test("markNotificationRead sets read_at", async () => {
-    const { db, org, project } = await seedDb();
-    const ev = await appendEvent(db, {
-      orgId: org.id, projectId: project.id, actor: "alice",
-      subjectKind: "task", subjectId: "t1", verb: "assigned",
-    });
-    const n = await createNotification(db, {
-      orgId: org.id, userId: "user1", eventId: ev.id,
-      entityKind: "task", entityId: "t1", title: "n1", verb: "assigned", actor: "alice",
-    });
-    expect(n.read_at).toBeNull();
-
-    await markNotificationRead(db, n.id);
-    const rows = await listNotifications(db, "user1");
-    expect(rows[0]!.read_at).not.toBeNull();
-    await db.close();
+  test("notification cards contain actor, verb, subject fields", async () => {
+    const { orgId } = await setupDb();
+    await seedNotification(orgId, null);
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
+    const result = await mod.load(loadEvent());
+    const n = result.notifications[0];
+    expect(n.actor).toBe("system");
+    expect(n.verb).toBe("created");
+    expect(n.subject_kind).toBe("task");
   });
 
-  test("listNotifications pagination: limit + offset", async () => {
-    const { db, org, project } = await seedDb();
-    // Seed 5 notifications
-    for (let i = 0; i < 5; i++) {
-      const ev = await appendEvent(db, {
-        orgId: org.id, projectId: project.id, actor: "alice",
-        subjectKind: "task", subjectId: `t${i}`, verb: "created",
-      });
-      await createNotification(db, {
-        orgId: org.id, userId: "user1", eventId: ev.id,
-        entityKind: "task", entityId: `t${i}`, title: `n${i}`, verb: "created", actor: "alice",
-      });
-    }
+  test("activity lists events where actor=local", async () => {
+    const { orgId } = await setupDb();
+    await seedActivity(orgId);
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
+    const result = await mod.load(loadEvent());
+    expect(result.activity).toHaveLength(1);
+    expect(result.activity[0]!.actor).toBe("local");
+  });
 
-    const page1 = await listNotifications(db, "user1", { limit: 2, offset: 0 });
-    expect(page1.length).toBe(2);
-
-    const page2 = await listNotifications(db, "user1", { limit: 2, offset: 2 });
-    expect(page2.length).toBe(2);
-    // No overlap
-    expect(page2[0]!.id).not.toBe(page1[0]!.id);
-    expect(page2[0]!.id).not.toBe(page1[1]!.id);
-
-    const page3 = await listNotifications(db, "user1", { limit: 2, offset: 4 });
-    expect(page3.length).toBe(1);
-    await db.close();
+  test("activity pagination: page 2 with 21 events returns 1 row", async () => {
+    const { orgId } = await setupDb();
+    for (let i = 0; i < 21; i++) await seedActivity(orgId);
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 4}`);
+    const result = await mod.load(loadEvent({ activity_page: "2" }));
+    expect(result.activity).toHaveLength(1);
+    expect(result.activityTotal).toBe(21);
   });
 });
 
-describe("/inbox — my activity tab", () => {
-  test("listEventsByActor returns only actor's events DESC", async () => {
-    const { db, org, project } = await seedDb();
-    await appendEvent(db, {
-      orgId: org.id, projectId: project.id, actor: "alice",
-      subjectKind: "task", subjectId: "t1", verb: "created",
-    });
-    await appendEvent(db, {
-      orgId: org.id, projectId: project.id, actor: "bob",
-      subjectKind: "task", subjectId: "t2", verb: "created",
-    });
-    await appendEvent(db, {
-      orgId: org.id, projectId: project.id, actor: "alice",
-      subjectKind: "doc", subjectId: "d1", verb: "edited",
-    });
+describe("/inbox +page.server.ts actions.markAllRead()", () => {
+  test("marks all unread notifications as read", async () => {
+    const { orgId } = await setupDb();
+    await seedNotification(orgId, null);
+    await seedNotification(orgId, null);
 
-    const aliceEvents = await listEventsByActor(db, "alice");
-    expect(aliceEvents.length).toBe(2);
-    // All alice
-    expect(aliceEvents.every((e) => e.actor === "alice")).toBe(true);
-    // DESC order: doc edited last
-    expect(aliceEvents[0]!.subject_kind).toBe("doc");
-    await db.close();
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 5}`);
+    await mod.actions.markAllRead({ request: new Request("http://localhost", { method: "POST" }) });
+
+    const result = await mod.load(loadEvent());
+    expect(result.unreadCount).toBe(0);
   });
 });

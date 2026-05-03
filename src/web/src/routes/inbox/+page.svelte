@@ -1,135 +1,159 @@
 <script lang="ts">
-  import type { PageData } from "./$types";
-  import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { buttonVariants } from "$lib/components/ui/button";
   import { cn } from "$lib/utils.js";
+  import type { NotificationRow, ActivityRow } from "./+page.server.ts";
 
   interface Props {
-    data: PageData;
+    data: {
+      notifications: NotificationRow[];
+      unreadCount: number;
+      activity: ActivityRow[];
+      activityPage: number;
+      activityTotal: number;
+    };
   }
 
   let { data }: Props = $props();
 
-  const ICON_MAP: Record<string, string> = {
-    task: "check-square",
-    doc: "file-text",
-    project: "folder",
-    run: "play",
-  };
+  type Tab = "foryou" | "activity";
+  let activeTab = $state<Tab>("foryou");
 
-  function entityIcon(kind: string): string {
-    return ICON_MAP[kind] ?? "bell";
+  const PAGE_SIZE = 20;
+  const totalPages = $derived(Math.ceil(data.activityTotal / PAGE_SIZE));
+
+  function formatDate(iso: string): string {
+    return iso.slice(0, 16).replace("T", " ");
   }
 
-  function timeAgo(iso: string): string {
-    const ms = Date.now() - new Date(iso).getTime();
-    const minutes = Math.floor(ms / 60000);
-    if (minutes < 1) return "just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+  function activityPageHref(page: number): string {
+    return `/inbox?activity_page=${page}`;
   }
 </script>
 
-<header
-  data-inbox-header
-  class={cn("flex items-center justify-between gap-4 border-b border-border pb-4 mb-4")}
->
-  <h1 class={cn("text-2xl font-semibold tracking-tight")}>Inbox</h1>
+<header class={cn("mb-4 flex items-center justify-between gap-4 border-b border-border pb-4")}>
+  <h1 class={cn("text-2xl font-semibold tracking-tight")}>
+    Inbox
+    {#if data.unreadCount > 0}
+      <span
+        data-bell-badge
+        class={cn("ml-2 inline-flex items-center justify-center rounded-full bg-destructive px-2 py-0.5 text-xs font-bold text-destructive-foreground")}
+      >{data.unreadCount}</span>
+    {/if}
+  </h1>
+
+  {#if data.unreadCount > 0}
+    <form method="POST" action="?/markAllRead">
+      <button
+        type="submit"
+        data-mark-all-read
+        class={cn("rounded border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent")}
+      >Mark all read</button>
+    </form>
+  {/if}
 </header>
 
-<nav data-inbox-tabs class={cn("mb-4 flex gap-2")}>
-  <a
-    href="/inbox"
-    data-tab-notifications
+<!-- Tab bar -->
+<div data-inbox-tabs class={cn("mb-4 flex gap-2 border-b border-border")}>
+  <button
+    type="button"
+    data-tab="foryou"
     class={cn(
-      buttonVariants({ variant: data.tab === "notifications" ? "default" : "outline", size: "sm" }),
+      "px-4 py-2 text-sm font-medium border-b-2 -mb-px",
+      activeTab === "foryou"
+        ? "border-foreground text-foreground"
+        : "border-transparent text-muted-foreground hover:text-foreground",
     )}
-  >For you</a>
-  <a
-    href="/inbox?tab=activity"
-    data-tab-activity
+    onclick={() => (activeTab = "foryou")}
+  >For you</button>
+  <button
+    type="button"
+    data-tab="activity"
     class={cn(
-      buttonVariants({ variant: data.tab === "activity" ? "default" : "outline", size: "sm" }),
+      "px-4 py-2 text-sm font-medium border-b-2 -mb-px",
+      activeTab === "activity"
+        ? "border-foreground text-foreground"
+        : "border-transparent text-muted-foreground hover:text-foreground",
     )}
-  >My activity</a>
-</nav>
+    onclick={() => (activeTab = "activity")}
+  >My activity</button>
+</div>
 
-{#await data.streamed.data}
-  <RouteSkeleton kind="list" />
-{:then payload}
-  {#if "notifications" in payload}
-    {@const notifications = payload.notifications}
-    {#if notifications.length === 0}
+<!-- For you tab -->
+{#if activeTab === "foryou"}
+  <div data-tab-foryou>
+    {#if data.notifications.length === 0}
       <div
-        data-empty-inbox
+        data-inbox-empty
         class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
-      >No notifications yet.</div>
+      >No notifications.</div>
     {:else}
-      <div data-inbox-badge class={cn("mb-3 text-sm text-muted-foreground")}>
-        {payload.unreadCount} unread
-      </div>
-      <ul data-notification-list class={cn("space-y-2")}>
-        {#each notifications as notification (notification.id)}
+      <ul class={cn("divide-y divide-border rounded-md border border-border")}>
+        {#each data.notifications as n (n.id)}
           <li
-            data-notification-card
-            data-notification-id={notification.id}
-            class={cn(
-              "flex items-start gap-3 rounded-lg border p-3 transition-colors",
-              notification.read_at ? "border-border bg-background" : "border-primary/20 bg-primary/5",
-            )}
+            data-notification={n.id}
+            class={cn("flex items-start gap-3 p-3", n.read_at === null ? "bg-accent/30" : "")}
           >
-            <span data-notification-icon class={cn("mt-0.5 text-muted-foreground text-sm")}>
-              {entityIcon(notification.entity_kind)}
-            </span>
-            <div class={cn("min-w-0 flex-1")}>
-              <p data-notification-title class={cn("text-sm font-medium leading-tight")}>
-                {notification.title}
+            {#if n.read_at === null}
+              <span
+                data-unread-dot
+                class={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary")}
+              ></span>
+            {:else}
+              <span class={cn("mt-1.5 h-2 w-2 shrink-0")}></span>
+            {/if}
+            <div>
+              <p class={cn("text-sm font-medium")}>
+                <span data-notification-actor>{n.actor}</span>
+                {" "}<span data-notification-verb>{n.verb}</span>
+                {" "}<span data-notification-subject>{n.subject_kind}:{n.subject_id}</span>
               </p>
-              <p class={cn("text-xs text-muted-foreground mt-0.5")}>
-                <span data-notification-actor>{notification.actor}</span>
-                <span class="mx-1">&middot;</span>
-                <span data-notification-verb>{notification.verb}</span>
-                <span class="mx-1">&middot;</span>
-                <time data-notification-time>{timeAgo(notification.created_at)}</time>
+              <p class={cn("mt-0.5 text-xs text-muted-foreground")} data-notification-time>
+                {formatDate(n.created_at)}
               </p>
             </div>
           </li>
         {/each}
       </ul>
     {/if}
-  {:else if "events" in payload}
-    {@const events = payload.events}
-    {#if events.length === 0}
+  </div>
+{/if}
+
+<!-- My activity tab -->
+{#if activeTab === "activity"}
+  <div data-tab-activity>
+    {#if data.activity.length === 0}
       <div
-        data-empty-activity
+        data-activity-empty
         class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
       >No activity yet.</div>
     {:else}
-      <ul data-activity-list class={cn("space-y-2")}>
-        {#each events as event (event.id)}
-          <li
-            data-activity-card
-            data-event-id={event.id}
-            class={cn("flex items-start gap-3 rounded-lg border border-border p-3")}
-          >
-            <div class={cn("min-w-0 flex-1")}>
-              <p class={cn("text-sm font-medium")}>
-                <span data-activity-kind>{event.subject_kind}</span>
-                <span class="mx-1">&middot;</span>
-                <span data-activity-verb>{event.verb}</span>
-              </p>
-              <p class={cn("text-xs text-muted-foreground mt-0.5")}>
-                <span data-activity-actor>{event.actor}</span>
-                <span class="mx-1">&middot;</span>
-                <time data-activity-time>{timeAgo(event.created_at)}</time>
-              </p>
-            </div>
+      <ul class={cn("divide-y divide-border rounded-md border border-border")}>
+        {#each data.activity as ev (ev.id)}
+          <li data-activity-row={ev.id} class={cn("p-3")}>
+            <p class={cn("text-sm")}>
+              <span data-activity-verb class={cn("font-medium")}>{ev.verb}</span>
+              {" "}<span data-activity-subject>{ev.subject_kind}:{ev.subject_id}</span>
+              {#if ev.project_id}
+                <span class={cn("text-xs text-muted-foreground")}> (project {ev.project_id})</span>
+              {/if}
+            </p>
+            <p class={cn("mt-0.5 text-xs text-muted-foreground")} data-activity-time>
+              {formatDate(ev.created_at)}
+            </p>
           </li>
         {/each}
       </ul>
+
+      {#if totalPages > 1}
+        <nav data-activity-pagination class={cn("mt-4 flex items-center gap-2 text-sm")}>
+          {#if data.activityPage > 1}
+            <a href={activityPageHref(data.activityPage - 1)} class={cn("hover:underline")}>&larr; Prev</a>
+          {/if}
+          <span>Page {data.activityPage} of {totalPages}</span>
+          {#if data.activityPage < totalPages}
+            <a href={activityPageHref(data.activityPage + 1)} class={cn("hover:underline")}>Next &rarr;</a>
+          {/if}
+        </nav>
+      {/if}
     {/if}
-  {/if}
-{/await}
+  </div>
+{/if}

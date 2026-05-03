@@ -1,6 +1,7 @@
 import type { Component } from "svelte";
 import { beforeAll, describe, expect, mock, test } from "bun:test";
 import type { SearchHit } from "../../../../product-kernel/search";
+import type { SavedSearch } from "./+page.server.ts";
 
 mock.module("$app/state", () => ({
   page: {
@@ -25,29 +26,12 @@ mock.module("$app/environment", () => ({ browser: false, dev: false, building: f
 type PageProps = {
   data: {
     q: string;
+    kinds: string[];
+    dateFrom: string;
+    dateTo: string;
     hits: SearchHit[];
     grouped: Record<string, SearchHit[]>;
-    facets: {
-      kind: Record<string, number>;
-      status: Record<string, number>;
-      assignee: Record<string, number>;
-      project: Record<string, number>;
-      author: Record<string, number>;
-      tag: Record<string, number>;
-    };
-    params: {
-      q: string;
-      kind: string;
-      project: string;
-      status: string;
-      assignee: string;
-      tag: string;
-      date_from: string;
-      date_to: string;
-      author: string;
-      page: number;
-    };
-    pagination: { page: number; perPage: number; total: number; hasMore: boolean };
+    savedSearches: SavedSearch[];
   };
 };
 
@@ -61,35 +45,15 @@ const DOC_HIT: SearchHit = {
   updated_at: "2026-04-30T10:00:00.000Z",
 };
 
-function pageData(overrides: Partial<PageProps["data"]> = {}): PageProps["data"] {
-  return {
-    q: "kernel",
-    hits: [DOC_HIT],
-    grouped: { doc: [DOC_HIT] },
-    facets: {
-      kind: { doc: 1, task: 2 },
-      status: { open: 1 },
-      assignee: { ada: 1 },
-      project: { "project-1": 1 },
-      author: { grace: 1 },
-      tag: { architecture: 1 },
-    },
-    params: {
-      q: "kernel",
-      kind: "",
-      project: "",
-      status: "",
-      assignee: "",
-      tag: "",
-      date_from: "",
-      date_to: "",
-      author: "",
-      page: 1,
-    },
-    pagination: { page: 1, perPage: 20, total: 1, hasMore: false },
-    ...overrides,
-  };
-}
+const EMPTY_DATA: PageProps["data"] = {
+  q: "",
+  kinds: [],
+  dateFrom: "",
+  dateTo: "",
+  hits: [],
+  grouped: {},
+  savedSearches: [],
+};
 
 describe("/search +page.svelte", () => {
   let render: typeof import("svelte/server").render;
@@ -105,7 +69,9 @@ describe("/search +page.svelte", () => {
 
   test("renders heading, GET form, and populated q input", () => {
     const { body } = render(Page, {
-      props: { data: pageData() },
+      props: {
+        data: { ...EMPTY_DATA, q: "kernel", hits: [DOC_HIT], grouped: { doc: [DOC_HIT] } },
+      },
     });
     expect(body).toMatch(/<h1\b[^>]*>\s*Search\s*<\/h1>/);
     expect(body).toContain("data-search-form");
@@ -115,7 +81,9 @@ describe("/search +page.svelte", () => {
 
   test("renders one section for each non-empty group", () => {
     const { body } = render(Page, {
-      props: { data: pageData({ grouped: { doc: [DOC_HIT], task: [] } }) },
+      props: {
+        data: { ...EMPTY_DATA, q: "kernel", hits: [DOC_HIT], grouped: { doc: [DOC_HIT], task: [] } },
+      },
     });
     const groups = body.match(/data-search-group/g) ?? [];
     expect(groups).toHaveLength(1);
@@ -124,56 +92,47 @@ describe("/search +page.svelte", () => {
 
   test("shows empty state when query has no hits", () => {
     const { body } = render(Page, {
-      props: { data: pageData({ q: "nothing", hits: [], grouped: {} }) },
+      props: { data: { ...EMPTY_DATA, q: "nothing" } },
     });
     expect(body).toContain("data-search-empty");
   });
 
   test("shows no-query hint when q is empty", () => {
     const { body } = render(Page, {
-      props: { data: pageData({ q: "", hits: [], grouped: {} }) },
+      props: { data: EMPTY_DATA },
     });
     expect(body).toContain("data-search-no-query");
   });
 
-  test("renders facet controls with count badges and selected facet chips", () => {
+  test("renders facet panel with kind checkboxes", () => {
     const { body } = render(Page, {
-      props: {
-        data: pageData({
-          params: {
-            q: "kernel",
-            kind: "doc",
-            project: "project-1",
-            status: "open",
-            assignee: "ada",
-            tag: "architecture",
-            date_from: "",
-            date_to: "",
-            author: "",
-            page: 1,
-          },
-        }),
-      },
+      props: { data: EMPTY_DATA },
     });
-
-    expect(body).toContain("data-search-facets");
-    expect(body).toContain('name="kind"');
-    expect(body).toContain('value="doc"');
-    expect(body).toContain("doc");
-    expect(body).toContain("1");
-    expect(body).toContain("data-search-chip");
-    expect(body).toContain("data-remove-facet");
-    expect(body).toContain("kind: doc");
+    expect(body).toContain("data-facet-panel");
+    expect(body).toContain("data-facet-kinds");
+    expect(body).toContain('data-kind-checkbox="doc"');
+    expect(body).toContain('data-kind-checkbox="task"');
   });
 
-  test("renders save-search and load-more controls", () => {
+  test("renders date range inputs", () => {
     const { body } = render(Page, {
-      props: { data: pageData({ pagination: { page: 1, perPage: 1, total: 2, hasMore: true } }) },
+      props: { data: EMPTY_DATA },
     });
-    expect(body).toContain("data-save-search");
-    expect(body).toContain("Save this search");
-    expect(body).toContain("data-load-more");
-    expect(body).toContain('name="page"');
-    expect(body).toContain('value="2"');
+    expect(body).toContain("data-facet-date");
+    expect(body).toContain("data-date-from");
+    expect(body).toContain("data-date-to");
+  });
+
+  test("renders saved searches section when savedSearches non-empty", () => {
+    const saved: SavedSearch = {
+      id: "ss-1",
+      name: "My search",
+      params: { q: "kernel", kinds: ["doc"], dateFrom: "", dateTo: "" },
+    };
+    const { body } = render(Page, {
+      props: { data: { ...EMPTY_DATA, savedSearches: [saved] } },
+    });
+    expect(body).toContain("data-saved-searches");
+    expect(body).toContain('data-saved-search="My search"');
   });
 });

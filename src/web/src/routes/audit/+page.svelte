@@ -1,149 +1,182 @@
 <script lang="ts">
-  import type { PageData } from "./$types";
-  import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import { cn } from "$lib/utils.js";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import type { EventRow } from "./+page.server.ts";
 
   interface Props {
-    data: PageData;
+    data: {
+      events: EventRow[];
+      total: number;
+      page: number;
+      actor: string;
+      kind: string;
+      dateFrom: string;
+      dateTo: string;
+    };
   }
 
   let { data }: Props = $props();
 
-  function truncatePayload(payload: Record<string, unknown>): string {
-    const s = JSON.stringify(payload);
-    if (s.length <= 100) return s;
-    return s.slice(0, 100) + "…";
+  const PAGE_SIZE = 25;
+  const totalPages = $derived(Math.ceil(data.total / PAGE_SIZE));
+
+  let actor = $state(data.actor);
+  let kind = $state(data.kind);
+  let dateFrom = $state(data.dateFrom);
+  let dateTo = $state(data.dateTo);
+
+  function formatDate(iso: string): string {
+    return iso.slice(0, 16).replace("T", " ");
   }
 
-  function exportUrl(format: "csv" | "json"): string {
-    const params = new URLSearchParams();
-    params.set("format", format);
-    if (data.filter.kind) params.set("kind", data.filter.kind);
-    if (data.filter.verb) params.set("verb", data.filter.verb);
-    if (data.filter.actor) params.set("actor", data.filter.actor);
-    if (data.filter.project) params.set("project", data.filter.project);
-    if (data.filter.since) params.set("since", data.filter.since);
-    if (data.filter.until) params.set("until", data.filter.until);
-    return `/audit/export?${params.toString()}`;
+  function pageHref(p: number): string {
+    const url = new URL(window.location.href);
+    url.searchParams.set("page", String(p));
+    return url.toString();
+  }
+
+  function exportData(format: "csv" | "json"): void {
+    const rows = data.events;
+    let content: string;
+    let mime: string;
+    let filename: string;
+
+    if (format === "json") {
+      content = JSON.stringify(rows, null, 2);
+      mime = "application/json";
+      filename = "audit-log.json";
+    } else {
+      const header = "id,org_id,project_id,actor,subject_kind,subject_id,verb,created_at";
+      const csvRows = rows.map((r) =>
+        [r.id, r.org_id, r.project_id ?? "", r.actor, r.subject_kind, r.subject_id, r.verb, r.created_at]
+          .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+          .join(","),
+      );
+      content = [header, ...csvRows].join("\n");
+      mime = "text/csv";
+      filename = "audit-log.csv";
+    }
+
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 </script>
 
-<header
-  data-audit-header
-  class={cn("flex items-center justify-between gap-4 border-b border-border pb-4 mb-4")}
->
+<header class={cn("mb-4 flex items-center justify-between gap-4 border-b border-border pb-4")}>
   <h1 class={cn("text-2xl font-semibold tracking-tight")}>Audit log</h1>
   <div class={cn("flex gap-2")}>
-    <a
+    <button
+      type="button"
       data-export-csv
-      href={exportUrl("csv")}
-      download
-      class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-    >Download CSV</a>
-    <a
+      onclick={() => exportData("csv")}
+      class={cn("rounded border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent")}
+    >Export CSV</button>
+    <button
+      type="button"
       data-export-json
-      href={exportUrl("json")}
-      download
-      class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-    >Download JSON</a>
+      onclick={() => exportData("json")}
+      class={cn("rounded border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent")}
+    >Export JSON</button>
   </div>
 </header>
 
-<form
-  data-audit-filter
-  method="GET"
-  class={cn("mb-3 flex flex-wrap items-center gap-2")}
->
-  <input
-    data-audit-kind-filter
-    name="kind"
-    type="text"
-    placeholder="Subject kind"
-    value={data.filter.kind}
-    aria-label="Filter by subject kind"
-    class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
-  />
-  <input
-    data-audit-verb-filter
-    name="verb"
-    type="text"
-    placeholder="Verb"
-    value={data.filter.verb}
-    aria-label="Filter by verb"
-    class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
-  />
-  <input
-    data-audit-actor-filter
-    name="actor"
-    type="text"
-    placeholder="Actor"
-    value={data.filter.actor}
-    aria-label="Filter by actor"
-    class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
-  />
-  <input
-    data-audit-since-filter
-    name="since"
-    type="date"
-    value={data.filter.since}
-    aria-label="From date"
-    class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
-  />
-  <input
-    data-audit-until-filter
-    name="until"
-    type="date"
-    value={data.filter.until}
-    aria-label="Until date"
-    class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
-  />
+<!-- Filter toolbar -->
+<form data-audit-filter method="GET" class={cn("mb-4 flex flex-wrap items-end gap-3 text-sm")}>
+  <label class={cn("flex flex-col gap-1")}>
+    <span class={cn("text-xs font-medium text-muted-foreground")}>Actor</span>
+    <input
+      type="text"
+      name="actor"
+      bind:value={actor}
+      placeholder="system, local…"
+      class={cn("h-8 rounded border border-input bg-background px-2 text-sm")}
+    />
+  </label>
+  <label class={cn("flex flex-col gap-1")}>
+    <span class={cn("text-xs font-medium text-muted-foreground")}>Event kind</span>
+    <input
+      type="text"
+      name="kind"
+      bind:value={kind}
+      placeholder="task, doc, run…"
+      data-audit-kind-input
+      class={cn("h-8 rounded border border-input bg-background px-2 text-sm")}
+    />
+  </label>
+  <label class={cn("flex flex-col gap-1")}>
+    <span class={cn("text-xs font-medium text-muted-foreground")}>From</span>
+    <input
+      type="date"
+      name="date_from"
+      bind:value={dateFrom}
+      class={cn("h-8 rounded border border-input bg-background px-2 text-sm")}
+    />
+  </label>
+  <label class={cn("flex flex-col gap-1")}>
+    <span class={cn("text-xs font-medium text-muted-foreground")}>To</span>
+    <input
+      type="date"
+      name="date_to"
+      bind:value={dateTo}
+      class={cn("h-8 rounded border border-input bg-background px-2 text-sm")}
+    />
+  </label>
   <button
     type="submit"
-    class={cn(buttonVariants({ variant: "outline" }))}
-  >Apply</button>
+    class={cn("h-8 rounded border border-input bg-background px-3 text-sm font-medium hover:bg-accent")}
+  >Filter</button>
 </form>
 
-{#await data.streamed.data}
-  <RouteSkeleton kind="list" />
-{:then payload}
-  {@const events = payload.events}
-  {#if events.length === 0}
-    <div
-      data-empty-audit
-      class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
-    >No audit events match the current filters.</div>
-  {:else}
-    <div class={cn("overflow-x-auto")}>
-      <table class={cn("w-full text-sm")}>
-        <thead>
-          <tr class={cn("border-b text-left text-muted-foreground")}>
-            <th class={cn("px-2 py-2")}>Timestamp</th>
-            <th class={cn("px-2 py-2")}>Actor</th>
-            <th class={cn("px-2 py-2")}>Kind</th>
-            <th class={cn("px-2 py-2")}>Verb</th>
-            <th class={cn("px-2 py-2")}>Subject</th>
-            <th class={cn("px-2 py-2")}>Payload</th>
+<p class={cn("mb-2 text-xs text-muted-foreground")}>
+  {data.total} event{data.total === 1 ? "" : "s"}
+</p>
+
+{#if data.events.length === 0}
+  <div
+    data-audit-empty
+    class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
+  >No events match the current filters.</div>
+{:else}
+  <div class={cn("overflow-x-auto rounded-md border border-border")}>
+    <table data-audit-table class={cn("w-full text-sm")}>
+      <thead>
+        <tr class={cn("border-b border-border bg-muted/50 text-left text-xs font-semibold text-muted-foreground")}>
+          <th class={cn("px-3 py-2")}>Time</th>
+          <th class={cn("px-3 py-2")}>Actor</th>
+          <th class={cn("px-3 py-2")}>Kind</th>
+          <th class={cn("px-3 py-2")}>Subject</th>
+          <th class={cn("px-3 py-2")}>Verb</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each data.events as ev (ev.id)}
+          <tr data-audit-row={ev.id} class={cn("border-b border-border last:border-0 hover:bg-muted/30")}>
+            <td class={cn("px-3 py-2 text-xs text-muted-foreground whitespace-nowrap")} data-audit-time>
+              {formatDate(ev.created_at)}
+            </td>
+            <td class={cn("px-3 py-2")} data-audit-actor>{ev.actor}</td>
+            <td class={cn("px-3 py-2")} data-audit-kind>{ev.subject_kind}</td>
+            <td class={cn("px-3 py-2 font-mono text-xs")} data-audit-subject>{ev.subject_id}</td>
+            <td class={cn("px-3 py-2")} data-audit-verb>{ev.verb}</td>
           </tr>
-        </thead>
-        <tbody>
-          {#each events as event (event.id)}
-            <tr data-audit-row data-event-id={event.id} class={cn("border-b")}>
-              <td class={cn("px-2 py-2 whitespace-nowrap")}>{event.created_at}</td>
-              <td class={cn("px-2 py-2")}>{event.actor}</td>
-              <td class={cn("px-2 py-2")}>{event.subject_kind}</td>
-              <td class={cn("px-2 py-2")}>{event.verb}</td>
-              <td class={cn("px-2 py-2 font-mono text-xs")}>{event.subject_id}</td>
-              <td class={cn("px-2 py-2 font-mono text-xs max-w-xs truncate")}>{truncatePayload(event.payload)}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-    {#if payload.total > events.length}
-      <div class={cn("mt-3 text-sm text-muted-foreground")}>
-        Showing {events.length} of {payload.total} events.
-      </div>
-    {/if}
+        {/each}
+      </tbody>
+    </table>
+  </div>
+
+  {#if totalPages > 1}
+    <nav data-audit-pagination class={cn("mt-4 flex items-center gap-2 text-sm")}>
+      {#if data.page > 1}
+        <a href={pageHref(data.page - 1)} class={cn("hover:underline")}>&larr; Prev</a>
+      {/if}
+      <span>Page {data.page} of {totalPages}</span>
+      {#if data.page < totalPages}
+        <a href={pageHref(data.page + 1)} class={cn("hover:underline")}>Next &rarr;</a>
+      {/if}
+    </nav>
   {/if}
-{/await}
+{/if}

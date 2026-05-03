@@ -1,5 +1,6 @@
 import type { Component } from "svelte";
 import { beforeAll, describe, expect, mock, test } from "bun:test";
+import type { EventRow } from "./+page.server.ts";
 
 mock.module("$app/state", () => ({
   page: {
@@ -21,40 +22,51 @@ mock.module("$app/navigation", () => ({
 
 mock.module("$app/environment", () => ({ browser: false, dev: false, building: false, version: "" }));
 
-interface EventRow {
-  id: string;
-  org_id: string;
-  project_id: string | null;
-  actor: string;
-  subject_kind: string;
-  subject_id: string;
-  verb: string;
-  payload: Record<string, unknown>;
-  created_at: string;
-}
-
 type PageProps = {
   data: {
-    filter: { kind: string; verb: string; actor: string; project: string; since: string; until: string };
+    events: EventRow[];
+    total: number;
     page: number;
-    streamed: {
-      data: Promise<{ events: EventRow[]; total: number }> | { events: EventRow[]; total: number };
-    };
+    actor: string;
+    kind: string;
+    dateFrom: string;
+    dateTo: string;
   };
 };
 
-const SAMPLE_EVENTS: EventRow[] = [
-  { id: "e1", org_id: "o1", project_id: "p1", actor: "alice", subject_kind: "task", subject_id: "t1", verb: "created", payload: { title: "Task 1" }, created_at: "2026-05-01T10:00:00Z" },
-  { id: "e2", org_id: "o1", project_id: "p1", actor: "bob", subject_kind: "doc", subject_id: "d1", verb: "updated", payload: {}, created_at: "2026-05-01T09:00:00Z" },
-];
+const TASK_EVENT: EventRow = {
+  id: "ev-1",
+  org_id: "org-1",
+  project_id: null,
+  actor: "system",
+  subject_kind: "task",
+  subject_id: "task-1",
+  verb: "created",
+  payload: {},
+  created_at: "2026-04-30T10:00:00.000Z",
+};
 
-function pageData(events: EventRow[] = SAMPLE_EVENTS, total = events.length): PageProps["data"] {
-  return {
-    filter: { kind: "", verb: "", actor: "", project: "", since: "", until: "" },
-    page: 1,
-    streamed: { data: { events, total } },
-  };
-}
+const DOC_EVENT: EventRow = {
+  id: "ev-2",
+  org_id: "org-1",
+  project_id: null,
+  actor: "local",
+  subject_kind: "doc",
+  subject_id: "doc-1",
+  verb: "updated",
+  payload: {},
+  created_at: "2026-04-29T09:00:00.000Z",
+};
+
+const EMPTY_DATA: PageProps["data"] = {
+  events: [],
+  total: 0,
+  page: 1,
+  actor: "",
+  kind: "",
+  dateFrom: "",
+  dateTo: "",
+};
 
 describe("/audit +page.svelte", () => {
   let render: typeof import("svelte/server").render;
@@ -66,55 +78,52 @@ describe("/audit +page.svelte", () => {
     Page = mod.default;
   });
 
-  test("renders header with 'Audit log' title", () => {
-    const { body } = render(Page, { props: { data: pageData() } });
-    expect(body).toMatch(/<h1\b[^>]*>\s*Audit log\s*<\/h1>/);
+  test("renders Audit log heading", () => {
+    const { body } = render(Page, { props: { data: EMPTY_DATA } });
+    expect(body).toMatch(/<h1\b[^>]*>[\s\S]*Audit log[\s\S]*<\/h1>/);
   });
 
-  test("renders filter toolbar with kind, verb, and date inputs", () => {
-    const { body } = render(Page, { props: { data: pageData() } });
-    expect(body).toContain("data-audit-kind-filter");
-    expect(body).toContain("data-audit-verb-filter");
+  test("renders filter toolbar", () => {
+    const { body } = render(Page, { props: { data: EMPTY_DATA } });
+    expect(body).toContain("data-audit-filter");
+    expect(body).toContain("data-audit-kind-input");
   });
 
-  test("renders event rows in table", () => {
-    const { body } = render(Page, { props: { data: pageData() } });
-    const rowMatches = body.match(/data-audit-row/g) ?? [];
-    expect(rowMatches).toHaveLength(2);
-  });
-
-  test("renders empty state when no events", () => {
-    const { body } = render(Page, { props: { data: pageData([], 0) } });
-    expect(body).toContain("data-empty-audit");
-  });
-
-  test("renders export buttons for CSV and JSON", () => {
-    const { body } = render(Page, { props: { data: pageData() } });
+  test("shows Export CSV and Export JSON buttons", () => {
+    const { body } = render(Page, { props: { data: EMPTY_DATA } });
     expect(body).toContain("data-export-csv");
     expect(body).toContain("data-export-json");
   });
 
-  test("renders skeleton while data is pending", () => {
-    const pending = new Promise<{ events: EventRow[]; total: number }>(() => {});
-    const { body } = render(Page, {
-      props: {
-        data: {
-          filter: { kind: "", verb: "", actor: "", project: "", since: "", until: "" },
-          page: 1,
-          streamed: { data: pending },
-        },
-      },
-    });
-    expect(body).toContain("data-route-skeleton");
+  test("shows empty state when no events", () => {
+    const { body } = render(Page, { props: { data: EMPTY_DATA } });
+    expect(body).toContain("data-audit-empty");
   });
 
-  test("payload preview truncated to 100 chars", () => {
-    const longPayload = { data: "x".repeat(200) };
-    const events: EventRow[] = [
-      { id: "e1", org_id: "o1", project_id: null, actor: "a", subject_kind: "task", subject_id: "t1", verb: "created", payload: longPayload, created_at: "2026-05-01T00:00:00Z" },
-    ];
-    const { body } = render(Page, { props: { data: pageData(events) } });
-    // Should contain the truncation marker
-    expect(body).toContain("…");
+  test("renders table rows for events", () => {
+    const { body } = render(Page, {
+      props: {
+        data: { ...EMPTY_DATA, events: [TASK_EVENT, DOC_EVENT], total: 2 },
+      },
+    });
+    expect(body).toContain("data-audit-table");
+    const rows = body.match(/data-audit-row=/g) ?? [];
+    expect(rows).toHaveLength(2);
+  });
+
+  test("table row contains actor, kind, subject, verb", () => {
+    const { body } = render(Page, {
+      props: {
+        data: { ...EMPTY_DATA, events: [TASK_EVENT], total: 1 },
+      },
+    });
+    expect(body).toContain("data-audit-actor");
+    expect(body).toContain("system");
+    expect(body).toContain("data-audit-kind");
+    expect(body).toContain("task");
+    expect(body).toContain("data-audit-subject");
+    expect(body).toContain("task-1");
+    expect(body).toContain("data-audit-verb");
+    expect(body).toContain("created");
   });
 });
