@@ -11,6 +11,8 @@ const ROWS: readonly RunRow[] = [
     project_id: "p1",
     started_at: "2026-04-30T10:00:00Z",
     ended_at: "2026-04-30T10:30:00Z", // 30m
+    sandbox_mode: null,
+    iteration_count: null,
   },
   {
     id: "r2",
@@ -20,6 +22,8 @@ const ROWS: readonly RunRow[] = [
     project_id: null,
     started_at: "2026-04-30T11:00:00Z",
     ended_at: null, // open
+    sandbox_mode: null,
+    iteration_count: null,
   },
   {
     id: "r3",
@@ -29,6 +33,8 @@ const ROWS: readonly RunRow[] = [
     project_id: "p2",
     started_at: "2026-04-30T09:00:00Z",
     ended_at: "2026-04-30T09:05:00Z", // 5m
+    sandbox_mode: null,
+    iteration_count: null,
   },
 ];
 

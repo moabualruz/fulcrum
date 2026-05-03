@@ -1,6 +1,7 @@
 import type { Component } from "svelte";
 
 import Activity from "@lucide/svelte/icons/activity";
+import Bot from "@lucide/svelte/icons/bot";
 import FileText from "@lucide/svelte/icons/file-text";
 import Folder from "@lucide/svelte/icons/folder";
 import Kanban from "@lucide/svelte/icons/kanban";
@@ -13,6 +14,7 @@ import Workflow from "@lucide/svelte/icons/workflow";
 // every Svelte component into the suite. Keys MUST match `NavItem.iconName`.
 export const LUCIDE_ICONS = {
   Activity,
+  Bot,
   FileText,
   Folder,
   Kanban,
@@ -40,6 +42,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/projects", label: "Projects", iconName: "Folder" },
   { href: "/docs", label: "Docs", iconName: "FileText" },
   { href: "/boards", label: "Board", iconName: "Kanban" },
+  { href: "/agents", label: "Agents", iconName: "Bot" },
   { href: "/runs", label: "Runs", iconName: "Activity" },
   { href: "/orchestration", label: "Orchestration", iconName: "Workflow" },
   { href: "/search", label: "Search", iconName: "Search" },

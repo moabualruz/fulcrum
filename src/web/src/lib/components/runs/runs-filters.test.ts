@@ -17,6 +17,8 @@ const rows: readonly RunRow[] = [
     project_id: "proj-a",
     started_at: "2026-04-30T11:00:00Z",
     ended_at: "2026-04-30T11:30:00Z",
+    sandbox_mode: null,
+    iteration_count: null,
   },
   // 2 days ago — within 7d but outside 24h
   {
@@ -27,6 +29,8 @@ const rows: readonly RunRow[] = [
     project_id: "proj-b",
     started_at: "2026-04-28T12:00:00Z",
     ended_at: "2026-04-28T12:10:00Z",
+    sandbox_mode: null,
+    iteration_count: null,
   },
   // 10 days ago — within 30d but outside 7d
   {
@@ -37,6 +41,8 @@ const rows: readonly RunRow[] = [
     project_id: null,
     started_at: "2026-04-20T12:00:00Z",
     ended_at: null,
+    sandbox_mode: null,
+    iteration_count: null,
   },
   // 60 days ago — outside 30d
   {
@@ -47,6 +53,8 @@ const rows: readonly RunRow[] = [
     project_id: "proj-a",
     started_at: "2026-03-01T12:00:00Z",
     ended_at: null,
+    sandbox_mode: null,
+    iteration_count: null,
   },
 ];
 

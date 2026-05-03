@@ -3,8 +3,8 @@ import { describe, expect, test } from "bun:test";
 import { LUCIDE_ICONS, NAV_ITEMS, type NavItem } from "./nav-items.ts";
 
 describe("NAV_ITEMS surface", () => {
-  test("declares exactly 8 items", () => {
-    expect(NAV_ITEMS).toHaveLength(8);
+  test("declares exactly 7 items", () => {
+    expect(NAV_ITEMS).toHaveLength(7);
   });
 
   test("exposes hrefs in declared order", () => {
@@ -13,10 +13,9 @@ describe("NAV_ITEMS surface", () => {
       "/projects",
       "/docs",
       "/boards",
+      "/agents",
       "/runs",
-      "/orchestration",
       "/search",
-      "/settings/orchestration",
     ]);
   });
 
@@ -26,10 +25,9 @@ describe("NAV_ITEMS surface", () => {
       "Projects",
       "Docs",
       "Board",
+      "Agents",
       "Runs",
-      "Orchestration",
       "Search",
-      "Settings",
     ]);
   });
 
@@ -46,10 +44,9 @@ describe("NAV_ITEMS surface", () => {
       ["/projects", "Folder"],
       ["/docs", "FileText"],
       ["/boards", "Kanban"],
+      ["/agents", "Bot"],
       ["/runs", "Activity"],
-      ["/orchestration", "Workflow"],
       ["/search", "Search"],
-      ["/settings/orchestration", "Settings"],
     ];
     for (const [href, iconName] of pairs) {
       const entry = NAV_ITEMS.find((i) => i.href === href);

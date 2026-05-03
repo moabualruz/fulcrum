@@ -18,6 +18,8 @@ interface RawRow {
   project_id: string | null;
   started_at: string | Date;
   ended_at: string | Date | null;
+  sandbox_mode: string | null;
+  iteration_count: number | null;
 }
 
 interface ProjectOption {
@@ -86,7 +88,8 @@ export const load: PageServerLoad = ({ url, locals }) => {
             return { runs: [], projects: [], tasks: [] };
           }
           rows = await db.query<RawRow>(
-            `SELECT id, agent, model, status, project_id, started_at, ended_at
+            `SELECT id, agent, model, status, project_id, started_at, ended_at,
+                    sandbox_mode, iteration_count
                FROM agent_runs
               ORDER BY started_at DESC, id ASC`,
           );
@@ -111,6 +114,8 @@ export const load: PageServerLoad = ({ url, locals }) => {
           project_id: r.project_id,
           started_at: isoStamp(r.started_at),
           ended_at: r.ended_at === null ? null : isoStamp(r.ended_at),
+          sandbox_mode: r.sandbox_mode,
+          iteration_count: r.iteration_count,
         }));
         const filterState: RunsFilterState = {
           range,
