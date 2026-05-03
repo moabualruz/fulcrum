@@ -14,6 +14,7 @@
     "build:all": "bun run scripts/build-all.ts",
     "test": "bun test",
     "lint": "bun run --bun tsc --noEmit",
+    "lint:docs": "bun run scripts/lint-docs.ts",
     "ci": "bun run scripts/ci.ts",
     "migrate:test": "bun test src/db/inference-schema.test.ts",
     "changelog": "git-cliff -o CHANGELOG.md",
