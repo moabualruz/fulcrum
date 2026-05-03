@@ -75,6 +75,11 @@ export class DocsReaderEditorScreen {
       return true;
     }
 
+    if (this.mode === "reader" && key === "h") {
+      this.mode = "history" as any;
+      return true;
+    }
+
     if (this.mode === "editor" && (key === "q" || key === "\x1b")) {
       this.mode = "reader";
       return true;

@@ -144,6 +144,7 @@ export class TaskListScreen {
     if (ids.length === 0) return;
     await this.opts.caller.tasks.bulk({ ids, status });
     this.tasks = this.tasks.map((task) => (this.selected.has(task.id) ? { ...task, status } : task));
+    this.selected.clear();
     this.overlay = "none";
   }
 

@@ -199,6 +199,21 @@ export class ActiveSprintBoardScreen {
   }
 
   async handleKey(key: string): Promise<boolean> {
+    if (this.overlay === "close") {
+      if (key === "b" || key === "B") {
+        await this.submitClose("backlog");
+        return true;
+      }
+      if (key === "n" || key === "N") {
+        await this.submitClose("next-sprint");
+        return true;
+      }
+      if (key === "q" || key === "\x1b") {
+        this.overlay = "none";
+        return true;
+      }
+      return false;
+    }
     if (key === "c") {
       this.overlay = "create";
       return true;

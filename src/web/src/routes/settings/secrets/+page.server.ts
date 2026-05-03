@@ -50,7 +50,7 @@ export const actions: Actions = {
         INSERT INTO credentials (id, name, provider, value_hash, created_at)
         VALUES (gen_random_uuid()::text, $1, $2, $3, now()::text)
         ON CONFLICT (name) DO UPDATE SET provider = EXCLUDED.provider, value_hash = EXCLUDED.value_hash
-      `, [name, provider, `sha256:${Buffer.from(value).toString("base64")}`]);
+      `, [name, provider, `b64:${Buffer.from(value).toString("base64")}`]);
       return { success: true };
     } finally {
       await db.close();
@@ -66,7 +66,7 @@ export const actions: Actions = {
     try {
       await db.query(
         `UPDATE credentials SET value_hash = $1, last_used_at = now()::text WHERE id = $2`,
-        [`sha256:${Buffer.from(value).toString("base64")}`, id],
+        [`b64:${Buffer.from(value).toString("base64")}`, id],
       );
       return { success: true };
     } finally {
