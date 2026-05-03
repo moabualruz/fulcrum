@@ -1,0 +1,143 @@
+import type { Component } from "svelte";
+import { beforeAll, describe, expect, test } from "bun:test";
+import type { TaskViewRow } from "./task-view-types.ts";
+import { loadVisibleTaskColumns, saveVisibleTaskColumns } from "./task-table.ts";
+
+type TaskTableProps = {
+  tasks: TaskViewRow[];
+  sort?: { column: string; direction: "asc" | "desc" };
+  groupBy?: string | null;
+  visibleColumns?: string[];
+};
+
+const TASKS: TaskViewRow[] = [
+  {
+    id: "task-late",
+    title: "Late task",
+    status: "blocked",
+    priority: 3,
+    project_id: "project-1",
+    created_at: "2026-04-30T10:00:00.000Z",
+    updated_at: "2026-04-30T10:00:00.000Z",
+    assignee: "Maya",
+    sprint_name: "Sprint 2",
+    labels: ["api"],
+  },
+  {
+    id: "task-early",
+    title: "Early task",
+    status: "pending",
+    priority: 1,
+    project_id: "project-1",
+    created_at: "2026-04-28T10:00:00.000Z",
+    updated_at: "2026-04-28T10:00:00.000Z",
+    assignee: "Noah",
+    sprint_name: "Sprint 1",
+    labels: ["web"],
+  },
+  {
+    id: "task-middle",
+    title: "Middle task",
+    status: "blocked",
+    priority: 2,
+    project_id: "project-1",
+    created_at: "2026-04-29T10:00:00.000Z",
+    updated_at: "2026-04-29T10:00:00.000Z",
+    assignee: null,
+    sprint_name: null,
+    labels: ["ops"],
+  },
+];
+
+function storage(): Storage {
+  const values = new Map<string, string>();
+  return {
+    get length() {
+      return values.size;
+    },
+    clear() {
+      values.clear();
+    },
+    getItem(key: string) {
+      return values.get(key) ?? null;
+    },
+    key(index: number) {
+      return Array.from(values.keys())[index] ?? null;
+    },
+    removeItem(key: string) {
+      values.delete(key);
+    },
+    setItem(key: string, value: string) {
+      values.set(key, value);
+    },
+  };
+}
+
+describe("TaskTable component (SSR)", () => {
+  let render: typeof import("svelte/server").render;
+  let TaskTable: Component<TaskTableProps>;
+
+  beforeAll(async () => {
+    ({ render } = await import("svelte/server"));
+    const mod = (await import("./TaskTable.svelte")) as {
+      default: Component<TaskTableProps>;
+    };
+    TaskTable = mod.default;
+  });
+
+  test("renders task columns with sortable headers", () => {
+    const { body } = render(TaskTable, { props: { tasks: TASKS } });
+
+    for (const col of ["title", "status", "assignee", "priority", "sprint", "labels", "created_at"]) {
+      expect(body).toContain(`data-task-sort="${col}"`);
+    }
+  });
+
+  test("sorts created_at ascending so earliest task renders first", () => {
+    const { body } = render(TaskTable, {
+      props: { tasks: TASKS, sort: { column: "created_at", direction: "asc" } },
+    });
+
+    const rows = body.match(/data-task-row[^>]*data-task-id="([^"]+)"/g) ?? [];
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toContain('data-task-id="task-early"');
+    expect(rows[1]).toContain('data-task-id="task-middle"');
+    expect(rows[2]).toContain('data-task-id="task-late"');
+    expect(body).toMatch(/data-task-sort-direction[^>]*>\s*↑/);
+  });
+
+  test("groups rows by status with one group per unique status", () => {
+    const { body } = render(TaskTable, {
+      props: { tasks: TASKS, groupBy: "status" },
+    });
+
+    const groups = body.match(/data-task-group[^>]*data-group-key="([^"]+)"/g) ?? [];
+    expect(groups).toHaveLength(2);
+    expect(groups[0]).toContain('data-group-key="blocked"');
+    expect(groups[1]).toContain('data-group-key="pending"');
+    expect(body).toMatch(/data-task-group-count[^>]*>2</);
+  });
+
+  test("renders inline status editor that posts tasks.update", () => {
+    const { body } = render(TaskTable, { props: { tasks: TASKS } });
+
+    expect(body).toContain('data-inline-status="task-late"');
+    expect(body).toContain('name="intent"');
+    expect(body).toContain('value="tasks.update"');
+    expect(body).toContain('name="status"');
+  });
+
+  test("respects persisted visible columns", () => {
+    const localStorage = storage();
+    saveVisibleTaskColumns(["title", "status"], localStorage);
+
+    const { body } = render(TaskTable, {
+      props: { tasks: TASKS, visibleColumns: loadVisibleTaskColumns(localStorage) ?? undefined },
+    });
+
+    expect(body).toContain('data-task-column="title"');
+    expect(body).toContain('data-task-column="status"');
+    expect(body).not.toContain('data-task-column="assignee"');
+    expect(body).not.toContain('data-task-column="priority"');
+  });
+});

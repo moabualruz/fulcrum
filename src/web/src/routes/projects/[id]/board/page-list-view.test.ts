@@ -6,12 +6,12 @@ type PageProps = {
     activeProjectId: string | null;
     project: { id: string; name: string };
     tasks: [];
+    view?: "board" | "list" | "table";
     activeSprintId: null;
-    view: string;
   };
 };
 
-describe("/projects/[id]/board +page.svelte", () => {
+describe("/projects/[id]/board list view", () => {
   let render: typeof import("svelte/server").render;
   let Page: Component<PageProps>;
 
@@ -23,7 +23,7 @@ describe("/projects/[id]/board +page.svelte", () => {
     Page = mod.default;
   });
 
-  test("renders project view switcher and kanban board", () => {
+  test("renders task list when view=list", () => {
     const { body } = render(Page, {
       props: {
         data: {
@@ -31,13 +31,29 @@ describe("/projects/[id]/board +page.svelte", () => {
           project: { id: "project-1", name: "Alpha" },
           tasks: [],
           activeSprintId: null,
-          view: "board",
+          view: "list",
         },
       },
     });
 
-    expect(body).toMatch(/data-project-view-switcher/);
-    expect(body).toMatch(/data-project-view="board"[^>]*aria-current="page"/);
-    expect(body).toMatch(/data-kanban-board/);
+    expect(body).toMatch(/data-project-view="list"[^>]*aria-current="page"/);
+    expect(body).toMatch(/data-task-list/);
+  });
+
+  test("renders task table when view=table", () => {
+    const { body } = render(Page, {
+      props: {
+        data: {
+          activeProjectId: null,
+          project: { id: "project-1", name: "Alpha" },
+          tasks: [],
+          activeSprintId: null,
+          view: "table",
+        },
+      },
+    });
+
+    expect(body).toMatch(/data-project-view="table"[^>]*aria-current="page"/);
+    expect(body).toMatch(/data-task-table/);
   });
 });

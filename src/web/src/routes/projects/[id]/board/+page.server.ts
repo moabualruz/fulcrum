@@ -6,14 +6,14 @@ import { listBoardTasks } from "$lib/product-queries";
 import { getDefaultOrgId, openProductDb } from "$lib/server/db";
 import { actionFail, actionOk } from "$lib/feedback/action-result";
 import { BoardMoveSchema } from "$lib/server/boards.schema";
-import { moveTaskStatusAction } from "$lib/server/tasks";
+import { moveTaskStatusAction, updateTaskAction } from "$lib/server/tasks";
 
 interface ProjectRow {
   id: string;
   name: string;
 }
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, url }) => {
   const db = await openProductDb();
   try {
     const orgId = await getDefaultOrgId(db);
@@ -28,6 +28,7 @@ export const load: PageServerLoad = async ({ params }) => {
       project,
       tasks: await listBoardTasks(project.id),
       activeSprintId: null,
+      view: url.searchParams.get("view") ?? "board",
     };
   } finally {
     await db.close();
@@ -41,6 +42,21 @@ function fdToRecord(fd: FormData): Record<string, string | null> {
 }
 
 export const actions: Actions = {
+  update: async ({ request }) => {
+    const fd = await request.formData();
+    const id = String(fd.get("id") ?? "");
+    const status = String(fd.get("status") ?? "");
+
+    const db = await openProductDb();
+    try {
+      await updateTaskAction(db, { id, status: status as never });
+      return actionOk("Task updated");
+    } catch (err) {
+      return fail(400, actionFail((err as Error).message));
+    } finally {
+      await db.close();
+    }
+  },
   move: async ({ request }) => {
     const parsed = v.safeParse(BoardMoveSchema, fdToRecord(await request.formData()));
     if (!parsed.success) return fail(400, actionFail("invalid input"));

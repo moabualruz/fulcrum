@@ -1,8 +1,6 @@
 <script lang="ts">
-  import KanbanBoard from "$lib/components/board/KanbanBoard.svelte";
   import ProjectViewSwitcher from "$lib/components/board/ProjectViewSwitcher.svelte";
   import TaskList from "$lib/components/tasks/TaskList.svelte";
-  import TaskTable from "$lib/components/tasks/TaskTable.svelte";
   import { cn } from "$lib/utils.js";
   import type { PageData } from "./$types";
 
@@ -11,7 +9,6 @@
   }
 
   const { data }: Props = $props();
-  const activeView = $derived(data.view === "list" || data.view === "table" ? data.view : "board");
 </script>
 
 <div class={cn("flex flex-col gap-4")}>
@@ -22,12 +19,6 @@
     </div>
   </header>
 
-  <ProjectViewSwitcher projectId={data.project.id} active={activeView} />
-  {#if activeView === "list"}
-    <TaskList projectId={data.project.id} tasks={data.tasks} />
-  {:else if activeView === "table"}
-    <TaskTable tasks={data.tasks} sort={{ column: "created_at", direction: "asc" }} />
-  {:else}
-    <KanbanBoard projectId={data.project.id} tasks={data.tasks} activeSprintId={data.activeSprintId} />
-  {/if}
+  <ProjectViewSwitcher projectId={data.project.id} active="list" />
+  <TaskList projectId={data.project.id} tasks={data.tasks} />
 </div>
