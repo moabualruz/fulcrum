@@ -1,6 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
+ImplRuntime: claude
 Pillar: 03-symphony-orchestration
 Blocked-by: 17-api-trpc-procedures
 ---
