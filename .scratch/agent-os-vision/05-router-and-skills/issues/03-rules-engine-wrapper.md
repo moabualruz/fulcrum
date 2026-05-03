@@ -1,5 +1,5 @@
 ---
-Status: completed
+Status: implemented
 Owner: codex-orchestrator
 Triage: AFK
 Pillar: 05-router-and-skills
