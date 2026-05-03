@@ -1,6 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
+ImplRuntime: claude
 Pillar: 02-inference-sidecar
 Blocked-by: 09-classify-and-tokenize, 11-per-feature-backend-routing-config, 12-external-llm-provider-flag
 ---

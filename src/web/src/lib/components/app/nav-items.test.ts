@@ -16,6 +16,7 @@ describe("NAV_ITEMS surface", () => {
       "/agents",
       "/runs",
       "/search",
+      "/settings/inference",
     ]);
   });
 
@@ -28,6 +29,7 @@ describe("NAV_ITEMS surface", () => {
       "Agents",
       "Runs",
       "Search",
+      "Inference",
     ]);
   });
 
@@ -47,6 +49,7 @@ describe("NAV_ITEMS surface", () => {
       ["/agents", "Bot"],
       ["/runs", "Activity"],
       ["/search", "Search"],
+      ["/settings/inference", "Settings"],
     ];
     for (const [href, iconName] of pairs) {
       const entry = NAV_ITEMS.find((i) => i.href === href);

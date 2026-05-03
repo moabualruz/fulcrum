@@ -1,37 +1,32 @@
 <script lang="ts">
-	import Bell from "@lucide/svelte/icons/bell";
 	import Sun from "@lucide/svelte/icons/sun";
+	import Cpu from "@lucide/svelte/icons/cpu";
 
 	import { buttonVariants } from "$lib/components/ui/button";
-	import BellBadge from "$lib/components/app/BellBadge.svelte";
 	import { cn } from "$lib/utils.js";
-	import { t } from "../../../../../i18n/index.ts";
 
-	interface BellItem {
-		id: string;
-		kind: string;
-		title: string;
-	}
+	export type InferenceStatus = "healthy" | "degraded" | "unreachable" | "unknown";
 
 	interface Props {
 		pathname: string;
 		activeProjectId: string | null;
-		bellCount?: number;
-		bellItems?: BellItem[];
-		onBellOpen?: () => void;
 		onThemeToggle?: () => void;
-		i18n?: { enabled: boolean; locale: string };
+		inferenceStatus?: InferenceStatus;
 	}
 
 	let {
 		pathname,
 		activeProjectId,
-		bellCount = 0,
-		bellItems = [],
-		onBellOpen = () => {},
 		onThemeToggle = () => {},
-		i18n = { enabled: false, locale: "en" },
+		inferenceStatus = "unknown",
 	}: Props = $props();
+
+	function badgeColor(s: InferenceStatus): string {
+		if (s === "healthy") return "text-green-500";
+		if (s === "degraded") return "text-yellow-500";
+		if (s === "unreachable") return "text-red-500";
+		return "text-muted-foreground";
+	}
 
 	interface Crumb {
 		label: string;
@@ -97,25 +92,16 @@
 	</nav>
 
 	<div class={cn("ml-auto flex items-center gap-2")}>
-		<BellBadge count={bellCount} />
-		{#if i18n.enabled}
-			<form data-locale-picker method="POST" action="/api/locale" class={cn("flex items-center")}>
-				<label class={cn("sr-only")} for="locale-picker">Locale</label>
-				<select
-					id="locale-picker"
-					name="locale"
-					value={i18n.locale}
-					aria-label="Locale"
-					class={cn("h-8 rounded-md border border-input bg-background px-2 text-xs")}
-					onchange={(event) => event.currentTarget.form?.requestSubmit()}
-				>
-					<option value="en">English</option>
-					<option value="ar">Arabic</option>
-					<option value="fr">French</option>
-				</select>
-				<button type="submit" class={cn("sr-only")}>{t("common.save", i18n.locale)}</button>
-			</form>
-		{/if}
+		<a
+			data-inference-badge
+			data-inference-status={inferenceStatus}
+			href="/settings/inference"
+			aria-label="inference backend status: {inferenceStatus}"
+			class={cn("inline-flex items-center gap-1 text-xs", badgeColor(inferenceStatus))}
+		>
+			<Cpu class="h-4 w-4" aria-hidden="true" />
+			<span class="hidden sm:inline capitalize">{inferenceStatus}</span>
+		</a>
 		<kbd
 			class={cn(
 				"hidden h-6 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-xs sm:inline-flex",
@@ -132,40 +118,6 @@
 		>
 			<Sun aria-hidden="true" />
 		</button>
-		<div class={cn("relative")}>
-			<button
-				type="button"
-				data-slot="button"
-				data-notification-bell
-				aria-label="open notifications"
-				onclick={onBellOpen}
-				class={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
-			>
-				<Bell aria-hidden="true" />
-				{#if bellCount > 0}
-					<span
-						data-notification-badge
-						class={cn(
-							"absolute -right-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium leading-4 text-destructive-foreground",
-						)}
-					>{bellCount}</span>
-				{/if}
-			</button>
-			{#if bellItems.length > 0}
-				<div
-					data-notification-dropdown
-					class={cn("absolute right-0 z-20 mt-2 w-72 rounded-md border border-border bg-popover p-2 text-sm shadow-md")}
-				>
-					{#each bellItems.slice(0, 5) as item (item.id)}
-						<div class={cn("flex gap-2 py-1.5")}>
-							<span class={cn("text-muted-foreground")}>{item.kind}</span>
-							<span>{item.title}</span>
-						</div>
-					{/each}
-					<a href="/inbox" class={cn("block border-t border-border pt-2 text-xs text-muted-foreground hover:text-foreground")}>See all</a>
-				</div>
-			{/if}
-		</div>
 		<span
 			class={cn("text-xs text-muted-foreground")}
 			data-active-project>{activeProjectId ?? "—"}</span

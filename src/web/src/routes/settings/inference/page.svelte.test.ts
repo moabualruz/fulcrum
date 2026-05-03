@@ -1,47 +1,87 @@
 import type { Component } from "svelte";
-import { beforeAll, describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, mock, test } from "bun:test";
+
+mock.module("$app/state", () => ({
+  page: {
+    url: new URL("http://localhost/settings/inference"),
+    params: {},
+    route: { id: null },
+    status: 200,
+    error: null,
+    data: {},
+    state: {},
+    form: null,
+  },
+}));
+
+mock.module("$app/navigation", () => ({
+  goto: async () => {},
+  invalidateAll: async () => {},
+}));
+
+mock.module("$app/environment", () => ({
+  browser: false,
+  dev: false,
+  building: false,
+  version: "",
+}));
+
+interface InferenceData {
+  health: {
+    status: string;
+    backends: Array<{ name: string; status: string; models_loaded: number }>;
+    cache: { embed_hit_rate: number; gen_hit_rate: number; db_size_bytes: number };
+  } | null;
+  models: Array<{
+    id: string;
+    name: string;
+    size_bytes: number;
+    downloaded: boolean;
+    capabilities: string[];
+  }>;
+  backends: Array<{ name: string; status: string; models_loaded: number }>;
+  routing: Array<{ feature: string; backend: string; model: string }>;
+  externalLlmEnabled: boolean;
+  error: string | null;
+}
 
 type PageProps = {
   data: {
-    externalProviderEnabled?: boolean;
+    activeProjectId: string | null;
     streamed: {
-      health: Promise<{ status: string; backends: string[]; models: string[] }> | { status: string; backends: string[]; models: string[] };
-      models: Promise<Array<{ id: string; kind: string; downloaded: boolean; active: boolean; sizeBytes?: number }>>
-        | Array<{ id: string; kind: string; downloaded: boolean; active: boolean; sizeBytes?: number }>;
+      inference: Promise<InferenceData> | InferenceData;
     };
   };
-  form?: {
-    success?: boolean;
-    dimensions?: number;
-    preview?: number[];
-    model?: string;
-    cached?: boolean;
-    classifyResults?: Array<{ label: string; score: number }>;
-    tokenizeResult?: { count: number; tokens: string[] };
-    generateText?: string;
-    generateTokens?: number;
-    generateError?: string;
-    schemaValid?: boolean;
-    error?: string;
-    pullProgress?: { modelId: string; pct: number; downloaded: number; total: number };
-    providerResult?: { ok: boolean; latency_ms?: number };
-    providerError?: string;
-    providerSaved?: boolean;
-  } | null;
 };
 
-const data: PageProps["data"] = {
-  streamed: {
-    health: { status: "ok", backends: ["embedded"], models: ["BAAI/bge-small-en-v1.5"] },
-    models: [{
-      id: "BAAI/bge-small-en-v1.5",
-      kind: "embed",
-      downloaded: false,
-      active: true,
-      sizeBytes: 133466304,
-    }],
-  },
-};
+function makeData(overrides: Partial<InferenceData> = {}): InferenceData {
+  return {
+    health: {
+      status: "healthy",
+      backends: [{ name: "llama-cpp", status: "healthy", models_loaded: 2 }],
+      cache: { embed_hit_rate: 0.85, gen_hit_rate: 0.72, db_size_bytes: 1024000 },
+    },
+    models: [
+      { id: "phi-3", name: "Phi-3 Mini", size_bytes: 2_000_000_000, downloaded: true, capabilities: ["generate", "embed"] },
+      { id: "nomic-embed", name: "Nomic Embed", size_bytes: 500_000_000, downloaded: false, capabilities: ["embed"] },
+    ],
+    backends: [{ name: "llama-cpp", status: "healthy", models_loaded: 2 }],
+    routing: [
+      { feature: "embed", backend: "llama-cpp", model: "nomic-embed" },
+      { feature: "generate", backend: "llama-cpp", model: "phi-3" },
+    ],
+    externalLlmEnabled: false,
+    error: null,
+    ...overrides,
+  };
+}
+
+function pageData(inference: InferenceData): PageProps["data"] {
+  return {
+    activeProjectId: null,
+    streamed: { inference },
+  };
+}
 
 describe("/settings/inference +page.svelte", () => {
   let render: typeof import("svelte/server").render;
@@ -53,189 +93,91 @@ describe("/settings/inference +page.svelte", () => {
     Page = mod.default;
   });
 
-  test("renders test embed form and successful smoke result", () => {
+  test("renders loading skeleton while data pending", () => {
+    const pending = new Promise<InferenceData>(() => {});
     const { body } = render(Page, {
-      props: {
-        data,
-        form: {
-          success: true,
-          dimensions: 384,
-          preview: [0.11, 0.22, 0.33, 0.44, 0.55],
-          model: "BAAI/bge-small-en-v1.5",
-          cached: false,
-        },
-      },
+      props: { data: { activeProjectId: null, streamed: { inference: pending } } },
     });
-
-    expect(body).toContain("Test embed");
-    expect(body).toContain('name="text"');
-    expect(body).toContain('data-embed-dimensions="384"');
-    expect(body).toContain("0.11");
-    expect(body).toContain("0.55");
+    expect(body).toContain("data-route-skeleton");
   });
 
-  test("renders test classify and tokenize panels with results", () => {
-    const { body } = render(Page, {
-      props: {
-        data,
-        form: {
-          success: true,
-          classifyResults: [
-            { label: "task", score: 0.91 },
-            { label: "question", score: 0.2 },
-          ],
-          tokenizeResult: { count: 2, tokens: ["hello", "world"] },
-        },
-      },
-    });
-
-    expect(body).toContain("Test classify");
-    expect(body).toContain('name="labels"');
-    expect(body).toContain('data-classify-results="2"');
-    expect(body).toContain("task");
-    expect(body).toContain("0.91");
-    expect(body).toContain("Test tokenize");
-    expect(body).toContain('data-tokenize-count="2"');
-    expect(body).toContain("hello");
-    expect(body).toContain("world");
+  test("renders header with 'Inference Settings'", () => {
+    const { body } = render(Page, { props: { data: pageData(makeData()) } });
+    expect(body).toMatch(/<h1\b[^>]*>\s*Inference Settings\s*<\/h1>/);
   });
 
-  test("renders download control for missing models and progress overlay state", () => {
-    const { body } = render(Page, {
-      props: {
-        data,
-        form: {
-          pullProgress: { modelId: "BAAI/bge-small-en-v1.5", pct: 100, downloaded: 100, total: 100 },
-        },
-      },
-    });
-
-    expect(body).toContain("Download");
-    expect(body).toContain('name="modelId"');
-    expect(body).toContain('data-model-download-progress="100"');
-    expect(body).toContain("BAAI/bge-small-en-v1.5");
+  test("renders backend status cards", () => {
+    const { body } = render(Page, { props: { data: pageData(makeData()) } });
+    expect(body).toContain("data-inference-backend-status");
+    expect(body).toContain("data-backend-card");
+    expect(body).toContain('data-backend-name="llama-cpp"');
+    expect(body).toContain("data-backend-status-dot");
   });
 
-  test("renders JSON Schema textarea in test generate panel", () => {
-    const { body } = render(Page, {
-      props: { data, form: null },
-    });
-
-    expect(body).toContain('name="schema"');
-    expect(body).toContain("JSON Schema");
+  test("renders model rows with download/remove controls", () => {
+    const { body } = render(Page, { props: { data: pageData(makeData()) } });
+    expect(body).toContain("data-inference-models");
+    expect(body).toContain('data-model-id="phi-3"');
+    expect(body).toContain('data-model-id="nomic-embed"');
+    expect(body).toContain('data-model-status="downloaded"');
+    expect(body).toContain('data-model-status="not-downloaded"');
+    expect(body).toContain("data-pull-button");
+    expect(body).toContain("data-remove-button");
   });
 
-  test("renders schema validity indicator when schema output present", () => {
-    const { body } = render(Page, {
-      props: {
-        data,
-        form: {
-          success: true,
-          generateText: '{"agent": "router"}',
-          generateTokens: 5,
-          schemaValid: true,
-        },
-      },
-    });
-
-    expect(body).toContain('data-schema-valid="true"');
-    expect(body).toContain('data-schema-output');
-    expect(body).toContain('{"agent": "router"}');
+  test("renders routing table", () => {
+    const { body } = render(Page, { props: { data: pageData(makeData()) } });
+    expect(body).toContain("data-routing-table");
+    expect(body).toContain('data-feature="embed"');
+    expect(body).toContain('data-feature="generate"');
   });
 
-  test("renders External LLM Provider section when flag enabled", () => {
-    const { body } = render(Page, {
-      props: {
-        data: { ...data, externalProviderEnabled: true },
-        form: null,
-      },
-    });
-
-    expect(body).toContain("External LLM Provider");
-    expect(body).toContain('name="providerUrl"');
-    expect(body).toContain('name="providerKey"');
-    expect(body).toContain("Test Connection");
-    expect(body).toContain("data-external-provider");
+  test("renders cache stats", () => {
+    const { body } = render(Page, { props: { data: pageData(makeData()) } });
+    expect(body).toContain("data-inference-cache");
+    expect(body).toContain("data-cache-embed-hit");
+    expect(body).toContain("85.0%");
+    expect(body).toContain("data-cache-size");
+    expect(body).toContain("data-clear-cache");
   });
 
-  test("hides External LLM Provider section when flag disabled", () => {
-    const { body } = render(Page, {
-      props: {
-        data: { ...data, externalProviderEnabled: false },
-        form: null,
-      },
-    });
-
-    expect(body).not.toContain("External LLM Provider");
-    expect(body).not.toContain("data-external-provider");
+  test("renders test panels", () => {
+    const { body } = render(Page, { props: { data: pageData(makeData()) } });
+    expect(body).toContain("data-inference-tests");
+    expect(body).toContain("data-test-embed");
+    expect(body).toContain("data-test-generate");
+    expect(body).toContain("data-test-classify");
+    expect(body).toContain("data-test-tokenize");
+    expect(body).toContain("data-test-embed-button");
+    expect(body).toContain("data-test-generate-button");
   });
 
-  test("renders provider test success result", () => {
-    const { body } = render(Page, {
-      props: {
-        data: { ...data, externalProviderEnabled: true },
-        form: { providerResult: { ok: true, latency_ms: 42 } },
-      },
-    });
-
-    expect(body).toContain("data-provider-ok");
-    expect(body).toContain("42ms");
+  test("does not render external LLM card when flag disabled", () => {
+    const { body } = render(Page, { props: { data: pageData(makeData({ externalLlmEnabled: false })) } });
+    expect(body).not.toContain("data-inference-external-llm");
   });
 
-  test("renders provider error state", () => {
-    const { body } = render(Page, {
-      props: {
-        data: { ...data, externalProviderEnabled: true },
-        form: { providerError: "HTTP 401" },
-      },
-    });
-
-    expect(body).toContain("data-provider-error");
-    expect(body).toContain("HTTP 401");
+  test("renders external LLM card when flag enabled", () => {
+    const { body } = render(Page, { props: { data: pageData(makeData({ externalLlmEnabled: true })) } });
+    expect(body).toContain("data-inference-external-llm");
+    expect(body).toContain("external-llm-provider");
   });
 
-  test("renders per-feature backend routing config with dropdowns", () => {
+  test("renders error card when sidecar down", () => {
     const { body } = render(Page, {
-      props: {
-        data: {
-          ...data,
-          routingConfig: { embeddings: "ollama", "router-llm": "embedded" },
-          backendIds: ["embedded", "ollama", "lm-studio", "openai-compatible"],
-        },
-        form: null,
-      },
+      props: { data: pageData(makeData({ error: "Connection refused", health: null })) },
     });
-
-    expect(body).toContain("Per-feature backend routing");
-    expect(body).toContain("data-routing-config");
-    expect(body).toContain('name="feature"');
-    expect(body).toContain('name="backend"');
-    expect(body).toContain("embeddings");
-    expect(body).toContain("router-llm");
+    expect(body).toContain("data-inference-error");
+    expect(body).toContain("Connection refused");
+    expect(body).toContain("data-backend-unavailable");
   });
 
-  test("renders routing saved confirmation", () => {
+  test("renders empty states for models and routing", () => {
     const { body } = render(Page, {
-      props: {
-        data: {
-          ...data,
-          routingConfig: { embeddings: "ollama" },
-          backendIds: ["embedded", "ollama"],
-        },
-        form: { routingSaved: true, routingConfig: { embeddings: "ollama" } },
-      },
+      props: { data: pageData(makeData({ models: [], routing: [], health: null })) },
     });
-
-    expect(body).toContain("data-routing-saved");
-    expect(body).toContain("Routing updated");
-  });
-
-  test("renders smoke embed error state without throwing", () => {
-    const { body } = render(Page, {
-      props: { data, form: { success: false, error: "sidecar unavailable" } },
-    });
-
-    expect(body).toContain("sidecar unavailable");
-    expect(body).toContain('data-embed-error');
+    expect(body).toContain("No models available");
+    expect(body).toContain("No routing configured");
+    expect(body).toContain("Cache stats unavailable");
   });
 });

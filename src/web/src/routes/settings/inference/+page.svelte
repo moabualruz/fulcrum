@@ -1,261 +1,435 @@
 <script lang="ts">
-  let { data, form } = $props();
+  import type { PageData } from "./$types";
+  import type { InferencePageData } from "./+page.server";
+  import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
+  import { cn } from "$lib/utils.js";
+  import { buttonVariants } from "$lib/components/ui/button";
+
+  interface Props {
+    data: PageData;
+  }
+
+  let { data }: Props = $props();
+
+  // Client-side health polling state
+  let healthStatus = $state<"healthy" | "degraded" | "unreachable">("unreachable");
+  let pollError = $state<string | null>(null);
+
+  // Model pull progress state
+  let pullProgress = $state<Record<string, number>>({});
+  let pullActive = $state<Record<string, boolean>>({});
+
+  // Test panel results
+  let embedResult = $state<string | null>(null);
+  let generateResult = $state<string | null>(null);
+  let classifyResult = $state<string | null>(null);
+  let tokenizeResult = $state<string | null>(null);
+  let testLoading = $state<Record<string, boolean>>({});
+
+  // Confirm dialog for model removal
+  let confirmRemoveModelId = $state<string | null>(null);
+
+  function statusColor(status: string): string {
+    if (status === "healthy") return "bg-green-500";
+    if (status === "degraded") return "bg-yellow-500";
+    return "bg-red-500";
+  }
+
+  function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  }
+
+  async function handlePull(modelId: string) {
+    pullActive[modelId] = true;
+    pullProgress[modelId] = 0;
+    try {
+      const res = await fetch(`/api/inference/models/${encodeURIComponent(modelId)}/pull`, { method: "POST" });
+      if (!res.ok || !res.body) throw new Error("Pull failed");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const text = decoder.decode(value, { stream: true });
+        for (const line of text.split("\n")) {
+          if (line.startsWith("data:")) {
+            try {
+              const evt = JSON.parse(line.slice(5));
+              if (typeof evt.progress === "number") pullProgress[modelId] = evt.progress;
+            } catch { /* skip non-JSON lines */ }
+          }
+        }
+      }
+      pullProgress[modelId] = 100;
+    } catch {
+      pullProgress[modelId] = -1;
+    } finally {
+      pullActive[modelId] = false;
+    }
+  }
+
+  async function handleRemove(modelId: string) {
+    confirmRemoveModelId = null;
+    try {
+      await fetch(`/api/inference/models/${encodeURIComponent(modelId)}`, { method: "DELETE" });
+    } catch { /* degrade gracefully */ }
+  }
+
+  async function handleTestEmbed() {
+    testLoading["embed"] = true;
+    embedResult = null;
+    try {
+      const res = await fetch("/api/inference/test/embed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "test embedding" }),
+      });
+      const data = await res.json();
+      embedResult = `${data.dimensions} dimensions, model: ${data.model}`;
+    } catch (e) {
+      embedResult = `Error: ${e instanceof Error ? e.message : "unknown"}`;
+    } finally {
+      testLoading["embed"] = false;
+    }
+  }
+
+  async function handleTestGenerate() {
+    testLoading["generate"] = true;
+    generateResult = null;
+    try {
+      const res = await fetch("/api/inference/test/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: "Hello" }),
+      });
+      const data = await res.json();
+      generateResult = `"${data.text}" (${data.tokens_used} tokens, model: ${data.model})`;
+    } catch (e) {
+      generateResult = `Error: ${e instanceof Error ? e.message : "unknown"}`;
+    } finally {
+      testLoading["generate"] = false;
+    }
+  }
+
+  async function handleTestClassify() {
+    testLoading["classify"] = true;
+    classifyResult = null;
+    try {
+      const res = await fetch("/api/inference/test/classify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "great product" }),
+      });
+      const data = await res.json();
+      classifyResult = `${data.label} (confidence: ${(data.confidence * 100).toFixed(1)}%, model: ${data.model})`;
+    } catch (e) {
+      classifyResult = `Error: ${e instanceof Error ? e.message : "unknown"}`;
+    } finally {
+      testLoading["classify"] = false;
+    }
+  }
+
+  async function handleTestTokenize() {
+    testLoading["tokenize"] = true;
+    tokenizeResult = null;
+    try {
+      const res = await fetch("/api/inference/test/tokenize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "hello world" }),
+      });
+      const data = await res.json();
+      tokenizeResult = `${data.count} tokens, model: ${data.model}`;
+    } catch (e) {
+      tokenizeResult = `Error: ${e instanceof Error ? e.message : "unknown"}`;
+    } finally {
+      testLoading["tokenize"] = false;
+    }
+  }
+
+  async function handleClearCache() {
+    try {
+      await fetch("/api/inference/cache/clear", { method: "POST" });
+    } catch { /* degrade gracefully */ }
+  }
 </script>
 
-<section class="inference-settings">
-  <h1>Inference</h1>
+<header
+  data-inference-header
+  class={cn("flex items-center justify-between gap-4 border-b border-border pb-4 mb-4")}
+>
+  <h1 class={cn("text-2xl font-semibold tracking-tight")}>Inference Settings</h1>
+</header>
 
-  {#await data.streamed.health}
-    <p>Loading inference status</p>
-  {:then health}
-    <p class="status" data-status={health.status}>Backend status: {health.status}</p>
-    <p>Backends: {health.backends.join(", ")}</p>
-  {:catch}
-    <p class="status" data-status="down">Backend status: down</p>
-  {/await}
-
-  <h2>Models</h2>
-  {#await data.streamed.models}
-    <p>Loading models</p>
-  {:then models}
-    {#if models.length === 0}
-      <p>No models downloaded.</p>
-    {:else}
-      <ul>
-        {#each models as model}
-          <li class="model-row">
-            <span>{model.id} · {model.kind} · {model.downloaded ? "downloaded" : "missing"}</span>
-            {#if !model.downloaded}
-              <form method="POST" action="?/pullModel">
-                <input type="hidden" name="modelId" value={model.id} />
-                <button type="submit">Download</button>
-              </form>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    {/if}
-  {:catch}
-    <p>Model list unavailable.</p>
-  {/await}
-
-  {#if form?.pullProgress}
+{#await data.streamed.inference}
+  <RouteSkeleton kind="detail" />
+{:then inference}
+  {#if inference.error}
     <div
-      class="download-progress"
-      data-model-download-progress={form.pullProgress.pct}
-      aria-live="polite"
+      data-inference-error
+      class={cn("rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive mb-4")}
     >
-      <p>{form.pullProgress.modelId} download {form.pullProgress.pct}%</p>
-      <progress value={form.pullProgress.pct} max="100"></progress>
+      <strong>Sidecar unavailable:</strong> {inference.error}
     </div>
   {/if}
 
-  <h2>Per-feature backend routing</h2>
-  <div class="routing-config" data-routing-config>
-    {#each Object.entries(form?.routingConfig ?? data.routingConfig ?? {}) as [feature, backend]}
-      <form method="POST" action="?/setRouting" class="routing-row">
-        <label for="routing-{feature}">{feature}</label>
-        <input type="hidden" name="feature" value={feature} />
-        <select id="routing-{feature}" name="backend">
-          {#each data.backendIds ?? [] as bid}
-            <option value={bid} selected={bid === backend}>{bid}</option>
-          {/each}
-        </select>
-        <button type="submit">Save</button>
-      </form>
-    {/each}
-    {#if form?.routingSaved}
-      <p class="routing-status" data-routing-saved>Routing updated.</p>
-    {/if}
-    {#if form?.routingError}
-      <p class="routing-status routing-error" data-routing-error>{form.routingError}</p>
-    {/if}
-  </div>
-
-  {#if data.externalProviderEnabled}
-    <h2>External LLM Provider</h2>
-    <div class="external-provider" data-external-provider>
-      <form method="POST" action="?/setProvider" class="embed-form">
-        <label for="provider-url">URL</label>
-        <input id="provider-url" name="providerUrl" type="url" placeholder="https://api.openai.com/v1" />
-        <label for="provider-key">API Key</label>
-        <input id="provider-key" name="providerKey" type="password" placeholder="sk-..." />
-        <div class="embed-row">
-          <button type="submit">Save</button>
-          <button type="submit" formaction="?/testProvider">Test Connection</button>
-        </div>
-      </form>
-      {#if form?.providerResult}
-        <p class="provider-status" data-provider-ok>Connected (latency: {form.providerResult.latency_ms}ms)</p>
-      {/if}
-      {#if form?.providerSaved}
-        <p class="provider-status" data-provider-saved>Provider saved.</p>
-      {/if}
-      {#if form?.providerError}
-        <p class="provider-status provider-error" data-provider-error>{form.providerError}</p>
-      {/if}
-    </div>
-  {/if}
-
-  <h2>Test embed</h2>
-  <form method="POST" action="?/testEmbed" class="embed-form">
-    <label for="embed-text">Text</label>
-    <div class="embed-row">
-      <input id="embed-text" name="text" type="text" value="hello world" />
-      <button type="submit">Test embed</button>
-    </div>
-  </form>
-
-  {#if form?.success && form?.dimensions !== undefined}
-    <div class="embed-result" data-embed-dimensions={form.dimensions}>
-      <p>Dimensions: {form.dimensions}</p>
-      <p>Model: {form.model} · cached={form.cached}</p>
-      <p>Preview: {form.preview?.join(", ")}</p>
-    </div>
-  {:else if form?.error}
-    <p class="embed-error" data-embed-error>{form.error}</p>
-  {/if}
-
-  <h2>Test generate</h2>
-  <form method="POST" action="?/testGenerate" class="embed-form">
-    <label for="generate-prompt">Prompt</label>
-    <div class="embed-row">
-      <input id="generate-prompt" name="prompt" type="text" value="What is the capital of France?" />
-      <input name="maxTokens" type="hidden" value="64" />
-      <button type="submit">Test generate</button>
-    </div>
-    <label for="generate-schema">JSON Schema (optional)</label>
-    <textarea id="generate-schema" name="schema" rows="4" placeholder={'{"type":"object","properties":{"agent":{"type":"string"}},"required":["agent"]}'}></textarea>
-  </form>
-
-  {#if form?.success && form?.generateText !== undefined}
-    <div class="generate-result" data-generate-tokens={form.generateTokens}>
-      <p>Tokens: {form.generateTokens}</p>
-      {#if form.schemaValid !== undefined}
-        <p class="schema-validity" data-schema-valid={form.schemaValid}>Schema valid: {form.schemaValid}</p>
-      {/if}
-      {#if form.schemaValid}
-        <pre class="schema-output" data-schema-output>{form.generateText}</pre>
-      {:else}
-        <p>{form.generateText}</p>
-      {/if}
-    </div>
-  {:else if form?.generateError}
-    <p class="embed-error" data-generate-error>{form.generateError}</p>
-  {/if}
-
-  <h2>Test classify</h2>
-  <form method="POST" action="?/testClassify" class="embed-form">
-    <label for="classify-text">Text</label>
-    <input id="classify-text" name="text" type="text" value="buy groceries" />
-    <label for="classify-labels">Labels</label>
-    <div class="embed-row">
-      <input id="classify-labels" name="labels" type="text" value="task,question,reminder" />
-      <button type="submit">Test classify</button>
-    </div>
-  </form>
-
-  {#if form?.classifyResults}
-    <table class="result-table" data-classify-results={form.classifyResults.length}>
-      <thead>
-        <tr>
-          <th>Label</th>
-          <th>Score</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each form.classifyResults as result}
-          <tr>
-            <td>{result.label}</td>
-            <td>{result.score}</td>
-          </tr>
+  <!-- Backend status card -->
+  <section data-inference-backend-status class={cn("mb-6")}>
+    <h2 class={cn("text-lg font-medium mb-3")}>Backend Status</h2>
+    {#if inference.health}
+      <div class={cn("grid gap-3 sm:grid-cols-2 lg:grid-cols-3")}>
+        {#each inference.backends as backend (backend.name)}
+          <div
+            data-backend-card
+            data-backend-name={backend.name}
+            class={cn("rounded-lg border border-border p-4")}
+          >
+            <div class={cn("flex items-center gap-2 mb-2")}>
+              <span
+                data-backend-status-dot
+                class={cn("inline-block h-3 w-3 rounded-full", statusColor(backend.status))}
+              ></span>
+              <span class={cn("font-medium")}>{backend.name}</span>
+            </div>
+            <p class={cn("text-sm text-muted-foreground")}>
+              {backend.models_loaded} model{backend.models_loaded === 1 ? "" : "s"} loaded
+            </p>
+            <p class={cn("text-xs text-muted-foreground capitalize")}>{backend.status}</p>
+          </div>
         {/each}
-      </tbody>
-    </table>
+      </div>
+    {:else}
+      <div
+        data-backend-unavailable
+        class={cn("rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground")}
+      >
+        Backend status unavailable
+      </div>
+    {/if}
+  </section>
+
+  <!-- Per-feature routing -->
+  <section data-inference-routing class={cn("mb-6")}>
+    <h2 class={cn("text-lg font-medium mb-3")}>Feature Routing</h2>
+    {#if inference.routing.length > 0}
+      <div class={cn("overflow-x-auto")}>
+        <table data-routing-table class={cn("w-full text-sm")}>
+          <thead>
+            <tr class={cn("border-b border-border")}>
+              <th class={cn("text-left py-2 px-3 font-medium")}>Feature</th>
+              <th class={cn("text-left py-2 px-3 font-medium")}>Backend</th>
+              <th class={cn("text-left py-2 px-3 font-medium")}>Model</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each inference.routing as route (route.feature)}
+              <tr data-routing-row data-feature={route.feature} class={cn("border-b border-border/50")}>
+                <td class={cn("py-2 px-3")}>{route.feature}</td>
+                <td class={cn("py-2 px-3")}>{route.backend}</td>
+                <td class={cn("py-2 px-3")}>{route.model}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {:else}
+      <p class={cn("text-sm text-muted-foreground")}>No routing configured</p>
+    {/if}
+  </section>
+
+  <!-- Model list -->
+  <section data-inference-models class={cn("mb-6")}>
+    <h2 class={cn("text-lg font-medium mb-3")}>Models</h2>
+    {#if inference.models.length > 0}
+      <div class={cn("space-y-2")}>
+        {#each inference.models as model (model.id)}
+          <div
+            data-model-row
+            data-model-id={model.id}
+            class={cn("flex items-center justify-between rounded-lg border border-border p-3")}
+          >
+            <div>
+              <span class={cn("font-medium")}>{model.name}</span>
+              <span class={cn("ml-2 text-xs text-muted-foreground")}>{formatBytes(model.size_bytes)}</span>
+              <span class={cn("ml-2 text-xs")}>
+                {#if model.downloaded}
+                  <span data-model-status="downloaded" class={cn("text-green-600")}>Downloaded</span>
+                {:else}
+                  <span data-model-status="not-downloaded" class={cn("text-muted-foreground")}>Not downloaded</span>
+                {/if}
+              </span>
+              <span class={cn("ml-2 text-xs text-muted-foreground")}>
+                {model.capabilities.join(", ")}
+              </span>
+            </div>
+            <div class={cn("flex items-center gap-2")}>
+              {#if pullActive[model.id]}
+                <div data-pull-progress class={cn("relative w-32 h-2 bg-muted rounded overflow-hidden")}>
+                  <div
+                    class={cn("absolute inset-y-0 left-0 bg-primary rounded transition-all")}
+                    style="width: {Math.max(0, pullProgress[model.id] ?? 0)}%"
+                  ></div>
+                </div>
+                <span class={cn("text-xs text-muted-foreground")}>{pullProgress[model.id] ?? 0}%</span>
+              {:else if !model.downloaded}
+                <button
+                  data-pull-button
+                  type="button"
+                  onclick={() => handlePull(model.id)}
+                  class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                >Download</button>
+              {/if}
+              {#if model.downloaded}
+                <button
+                  data-remove-button
+                  type="button"
+                  onclick={() => { confirmRemoveModelId = model.id; }}
+                  class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}
+                >Remove</button>
+              {/if}
+            </div>
+          </div>
+        {/each}
+      </div>
+    {:else}
+      <p class={cn("text-sm text-muted-foreground")}>No models available</p>
+    {/if}
+  </section>
+
+  <!-- Remove confirmation dialog -->
+  {#if confirmRemoveModelId}
+    <div data-confirm-remove-dialog class={cn("fixed inset-0 z-50 flex items-center justify-center bg-black/50")}>
+      <div class={cn("rounded-lg border border-border bg-background p-6 shadow-lg max-w-sm")}>
+        <p class={cn("mb-4")}>Remove model <strong>{confirmRemoveModelId}</strong>?</p>
+        <div class={cn("flex justify-end gap-2")}>
+          <button
+            data-confirm-cancel
+            type="button"
+            onclick={() => { confirmRemoveModelId = null; }}
+            class={cn(buttonVariants({ variant: "outline" }))}
+          >Cancel</button>
+          <button
+            data-confirm-remove
+            type="button"
+            onclick={() => confirmRemoveModelId && handleRemove(confirmRemoveModelId)}
+            class={cn(buttonVariants({ variant: "destructive" }))}
+          >Remove</button>
+        </div>
+      </div>
+    </div>
   {/if}
 
-  <h2>Test tokenize</h2>
-  <form method="POST" action="?/testTokenize" class="embed-form">
-    <label for="tokenize-text">Text</label>
-    <div class="embed-row">
-      <input id="tokenize-text" name="text" type="text" value="hello world" />
-      <button type="submit">Test tokenize</button>
-    </div>
-  </form>
+  <!-- Cache stats -->
+  <section data-inference-cache class={cn("mb-6")}>
+    <h2 class={cn("text-lg font-medium mb-3")}>Cache</h2>
+    {#if inference.health?.cache}
+      <div class={cn("grid gap-3 sm:grid-cols-3")}>
+        <div data-cache-embed-hit class={cn("rounded-lg border border-border p-3")}>
+          <p class={cn("text-xs text-muted-foreground")}>Embed hit rate</p>
+          <p class={cn("text-xl font-semibold")}>{(inference.health.cache.embed_hit_rate * 100).toFixed(1)}%</p>
+        </div>
+        <div data-cache-gen-hit class={cn("rounded-lg border border-border p-3")}>
+          <p class={cn("text-xs text-muted-foreground")}>Generate hit rate</p>
+          <p class={cn("text-xl font-semibold")}>{(inference.health.cache.gen_hit_rate * 100).toFixed(1)}%</p>
+        </div>
+        <div data-cache-size class={cn("rounded-lg border border-border p-3")}>
+          <p class={cn("text-xs text-muted-foreground")}>Cache size</p>
+          <p class={cn("text-xl font-semibold")}>{formatBytes(inference.health.cache.db_size_bytes)}</p>
+        </div>
+      </div>
+      <button
+        data-clear-cache
+        type="button"
+        onclick={handleClearCache}
+        class={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3")}
+      >Clear cache</button>
+    {:else}
+      <p class={cn("text-sm text-muted-foreground")}>Cache stats unavailable</p>
+    {/if}
+  </section>
 
-  {#if form?.tokenizeResult}
-    <div class="tokenize-result" data-tokenize-count={form.tokenizeResult.count}>
-      <p>Tokens: {form.tokenizeResult.count}</p>
-      <p>{form.tokenizeResult.tokens.join(", ")}</p>
+  <!-- Test panels -->
+  <section data-inference-tests class={cn("mb-6")}>
+    <h2 class={cn("text-lg font-medium mb-3")}>Test Panels</h2>
+    <div class={cn("grid gap-4 sm:grid-cols-2")}>
+      <!-- Embed test -->
+      <div data-test-embed class={cn("rounded-lg border border-border p-4")}>
+        <h3 class={cn("font-medium mb-2")}>Test Embed</h3>
+        <button
+          data-test-embed-button
+          type="button"
+          disabled={testLoading["embed"]}
+          onclick={handleTestEmbed}
+          class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+        >{testLoading["embed"] ? "Running..." : "Run"}</button>
+        {#if embedResult}
+          <p data-test-embed-result class={cn("mt-2 text-sm text-muted-foreground")}>{embedResult}</p>
+        {/if}
+      </div>
+
+      <!-- Generate test -->
+      <div data-test-generate class={cn("rounded-lg border border-border p-4")}>
+        <h3 class={cn("font-medium mb-2")}>Test Generate</h3>
+        <button
+          data-test-generate-button
+          type="button"
+          disabled={testLoading["generate"]}
+          onclick={handleTestGenerate}
+          class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+        >{testLoading["generate"] ? "Running..." : "Run"}</button>
+        {#if generateResult}
+          <p data-test-generate-result class={cn("mt-2 text-sm text-muted-foreground")}>{generateResult}</p>
+        {/if}
+      </div>
+
+      <!-- Classify test -->
+      <div data-test-classify class={cn("rounded-lg border border-border p-4")}>
+        <h3 class={cn("font-medium mb-2")}>Test Classify</h3>
+        <button
+          data-test-classify-button
+          type="button"
+          disabled={testLoading["classify"]}
+          onclick={handleTestClassify}
+          class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+        >{testLoading["classify"] ? "Running..." : "Run"}</button>
+        {#if classifyResult}
+          <p data-test-classify-result class={cn("mt-2 text-sm text-muted-foreground")}>{classifyResult}</p>
+        {/if}
+      </div>
+
+      <!-- Tokenize test -->
+      <div data-test-tokenize class={cn("rounded-lg border border-border p-4")}>
+        <h3 class={cn("font-medium mb-2")}>Test Tokenize</h3>
+        <button
+          data-test-tokenize-button
+          type="button"
+          disabled={testLoading["tokenize"]}
+          onclick={handleTestTokenize}
+          class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+        >{testLoading["tokenize"] ? "Running..." : "Run"}</button>
+        {#if tokenizeResult}
+          <p data-test-tokenize-result class={cn("mt-2 text-sm text-muted-foreground")}>{tokenizeResult}</p>
+        {/if}
+      </div>
     </div>
+  </section>
+
+  <!-- External LLM provider card (flag-gated) -->
+  {#if inference.externalLlmEnabled}
+    <section data-inference-external-llm class={cn("mb-6")}>
+      <h2 class={cn("text-lg font-medium mb-3")}>External LLM Provider</h2>
+      <div class={cn("rounded-lg border border-border p-4")}>
+        <p class={cn("text-sm text-muted-foreground mb-2")}>
+          External LLM provider integration is enabled. Configure API keys and
+          provider settings for cloud-based inference fallback.
+        </p>
+        <p class={cn("text-xs text-muted-foreground")}>
+          Feature flag: <code>external-llm-provider</code>
+        </p>
+      </div>
+    </section>
   {/if}
-</section>
-
-<style>
-  .inference-settings {
-    max-width: 900px;
-    padding: 2rem;
-  }
-
-  .status {
-    font-weight: 600;
-  }
-
-  .embed-form {
-    display: grid;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
-  }
-
-  .embed-row {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .model-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin: 0.25rem 0;
-  }
-
-  .download-progress {
-    margin: 1rem 0;
-  }
-
-  input {
-    min-width: 0;
-    flex: 1;
-  }
-
-  .embed-result,
-  .embed-error,
-  .tokenize-result,
-  .result-table {
-    margin-top: 0.75rem;
-  }
-
-  .routing-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 0.25rem 0;
-  }
-
-  .routing-row label {
-    min-width: 10rem;
-  }
-
-  .result-table {
-    border-collapse: collapse;
-    width: 100%;
-  }
-
-  .result-table th,
-  .result-table td {
-    border-bottom: 1px solid #ddd;
-    padding: 0.35rem 0;
-    text-align: left;
-  }
-</style>
+{/await}

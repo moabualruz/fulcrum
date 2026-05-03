@@ -19,6 +19,8 @@
 	} from "$lib/util/media-query";
 	import { cn } from "$lib/utils.js";
 
+	import type { InferenceStatus } from "$lib/components/app/AppTopbar.svelte";
+
 	import "../app.css";
 	import type { LayoutData } from "./$types";
 
@@ -32,6 +34,26 @@
 	let mobile = $state(isMobileViewport(browserDriver()));
 	let sheetOpen = $state(false);
 	let paletteOpen = $state(false);
+	let inferenceStatus = $state<InferenceStatus>("unknown");
+
+	// Poll inference sidecar health every 30s (client-side only)
+	$effect(() => {
+		if (typeof window === "undefined" || typeof fetch !== "function") return;
+		let cancelled = false;
+		async function poll() {
+			try {
+				const res = await fetch("/api/inference/health");
+				if (!res.ok) { inferenceStatus = "unreachable"; return; }
+				const data = await res.json();
+				inferenceStatus = data.status ?? "unreachable";
+			} catch {
+				inferenceStatus = "unreachable";
+			}
+		}
+		void poll();
+		const id = setInterval(() => { if (!cancelled) void poll(); }, 30_000);
+		return () => { cancelled = true; clearInterval(id); };
+	});
 
 	const paletteItems = [
 		{ id: "home",     label: "Dashboard",  href: "/" },
@@ -42,6 +64,7 @@
 		{ id: "memory",   label: "Memory",     href: "/memory" },
 		{ id: "context",  label: "Context",    href: "/context/preview" },
 		{ id: "search",   label: "Search",     href: "/search" },
+		{ id: "inference", label: "Inference Settings", href: "/settings/inference" },
 	];
 
 	$effect(() => {
@@ -119,6 +142,7 @@
 						pathname={page.url.pathname}
 						activeProjectId={data.activeProjectId}
 						onThemeToggle={toggleMode}
+						{inferenceStatus}
 					/>
 				</div>
 			</div>
