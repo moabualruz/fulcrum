@@ -4,6 +4,93 @@ export function createDocsCommand(): Command {
   const command = new Command("docs");
   command.description("Generated docs commands.");
 
+  const commentsCreateCommand = command.command("comments create");
+  commentsCreateCommand.description("docs comments create");
+  commentsCreateCommand.option("--json", "Emit JSON output");
+  commentsCreateCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for docs.comments.create is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const commentsDeleteCommand = command.command("comments delete");
+  commentsDeleteCommand.description("docs comments delete");
+  commentsDeleteCommand.option("--json", "Emit JSON output");
+  commentsDeleteCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for docs.comments.delete is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const commentsListCommand = command.command("comments list");
+  commentsListCommand.description("docs comments list");
+  commentsListCommand.option("--json", "Emit JSON output");
+  commentsListCommand.option("--resolved", "resolved");
+  commentsListCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for docs.comments.list is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const commentsResolveCommand = command.command("comments resolve");
+  commentsResolveCommand.description("docs comments resolve");
+  commentsResolveCommand.option("--json", "Emit JSON output");
+  commentsResolveCommand.option("--resolved", "resolved");
+  commentsResolveCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for docs.comments.resolve is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const commentsUpdateCommand = command.command("comments update");
+  commentsUpdateCommand.description("docs comments update");
+  commentsUpdateCommand.option("--json", "Emit JSON output");
+  commentsUpdateCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for docs.comments.update is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   const createCommand = command.command("create");
   createCommand.description("docs create");
   createCommand.option("--json", "Emit JSON output");
@@ -47,6 +134,40 @@ export function createDocsCommand(): Command {
   getCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for docs.get is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const linksListBacklinksCommand = command.command("links list-backlinks");
+  linksListBacklinksCommand.description("docs links listBacklinks");
+  linksListBacklinksCommand.option("--json", "Emit JSON output");
+  linksListBacklinksCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for docs.links.listBacklinks is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const linksListForwardLinksCommand = command.command("links list-forward-links");
+  linksListForwardLinksCommand.description("docs links listForwardLinks");
+  linksListForwardLinksCommand.option("--json", "Emit JSON output");
+  linksListForwardLinksCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for docs.links.listForwardLinks is not wired yet.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

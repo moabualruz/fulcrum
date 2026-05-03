@@ -45,6 +45,7 @@ export const STEPS: Step[] = [
   { name: "symphony:lock", cmd: ["bun", "test", "tests/symphony/spec-lock.test.ts"] },
   { name: "test",        cmd: ["bun", "test", "--conditions=svelte"], env: "home-isolated" },
   { name: "license-audit", cmd: ["bun", "run", "scripts/license-audit.ts"] },
+  { name: "ci:codegen",  cmd: ["bun", "run", "scripts/ci/codegen.ts"] },
   { name: "build:all",   cmd: ["bun", "run", "scripts/build-all.ts"] },
   // Web pipeline runs from the SvelteKit subpackage. svelte-kit + svelte-check
   // catch regressions that the root tsc cannot see because src/web is excluded.
