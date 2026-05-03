@@ -19,6 +19,7 @@ import { docsRouter } from "../server/trpc/routers/docs.ts";
 import { customFieldDefsRouter, taskCustomFieldsRouter } from "../server/trpc/routers/custom-fields.ts";
 import { auditRouter } from "../server/trpc/routers/audit.ts";
 import { backupRouter } from "../server/trpc/routers/backup.ts";
+import { errorLogsRouter } from "../server/trpc/routers/error-logs.ts";
 import { themeRouter } from "../server/trpc/routers/theme.ts";
 import { orchestrationRouter } from "./routers/orchestration.ts";
 import { notificationsRouter } from "./routers/notifications.ts";
@@ -302,6 +303,7 @@ export const appRouter = t.router({
   notify: notificationsRouter,
   audit: auditRouter,
   backup: backupRouter,
+  errorLogs: errorLogsRouter,
   theme: themeRouter,
   routing: routingRouter,
   fulcrum_skills: fulcrumSkillsRouter,
