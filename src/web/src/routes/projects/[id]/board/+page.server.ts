@@ -13,6 +13,13 @@ interface ProjectRow {
   name: string;
 }
 
+interface SprintRow {
+  id: string;
+  name: string;
+  start_date: string | Date;
+  end_date: string | Date;
+}
+
 export const load: PageServerLoad = async ({ params, url }) => {
   const db = await openProductDb();
   try {
@@ -24,10 +31,29 @@ export const load: PageServerLoad = async ({ params, url }) => {
     const project = rows[0];
     if (!project) throw error(404, "Project not found");
 
+    const sprintRows = await db.query<SprintRow>(
+      `SELECT id, name, start_date, end_date
+         FROM sprints
+        WHERE project_id = $1 AND status = 'active'
+        ORDER BY start_date ASC, id ASC
+        LIMIT 1`,
+      [project.id],
+    ).catch(() => []);
+    const activeSprint = sprintRows[0]
+      ? {
+          id: sprintRows[0].id,
+          name: sprintRows[0].name,
+          start_date: String(sprintRows[0].start_date).slice(0, 10),
+          end_date: String(sprintRows[0].end_date).slice(0, 10),
+        }
+      : null;
+
     return {
       project,
       tasks: await listBoardTasks(project.id),
-      activeSprintId: null,
+      activeSprintId: activeSprint?.id ?? null,
+      activeSprint,
+      month: url.searchParams.get("month") ?? new Date().toISOString().slice(0, 10),
       view: url.searchParams.get("view") ?? "board",
     };
   } finally {
@@ -68,6 +94,21 @@ export const actions: Actions = {
     } catch (err) {
       const message = (err as Error).message;
       return fail(message.startsWith("status conflict") ? 409 : 400, actionFail(message));
+    } finally {
+      await db.close();
+    }
+  },
+  reschedule: async ({ request }) => {
+    const fd = await request.formData();
+    const id = String(fd.get("id") ?? "");
+    const dueDateValue = String(fd.get("due_date") ?? "");
+
+    const db = await openProductDb();
+    try {
+      await updateTaskAction(db, { id, dueDate: dueDateValue || null });
+      return actionOk("Task rescheduled");
+    } catch (err) {
+      return fail(400, actionFail((err as Error).message));
     } finally {
       await db.close();
     }

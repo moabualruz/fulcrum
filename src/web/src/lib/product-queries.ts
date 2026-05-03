@@ -35,6 +35,7 @@ export interface BoardTask {
   points?: number | null;
   sprint_id?: string | null;
   sprint_name?: string | null;
+  due_date?: string | null;
   epic?: string | null;
 }
 
@@ -64,7 +65,15 @@ function isoStampOrNull(value: string | Date | null): string | null {
 
 interface RawProject { id: string; slug: string; name: string; description: string | null; updated_at: string | Date }
 interface RawDocument { id: string; title: string; kind: string; updated_at: string | Date }
-interface RawTask { id: string; title: string; status: string; priority: number; project_id: string | null; updated_at: string | Date }
+interface RawTask {
+  id: string;
+  title: string;
+  status: string;
+  priority: number;
+  project_id: string | null;
+  updated_at: string | Date;
+  due_date?: string | Date | null;
+}
 
 export async function listProjects(): Promise<ProjectListing[]> {
   const db = await open();
@@ -103,21 +112,26 @@ export async function listDocuments(projectId?: string | null): Promise<Document
 export async function listBoardTasks(projectId?: string | null): Promise<BoardTask[]> {
   const db = await open();
   try {
+    await db.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_date date`);
     let rows: RawTask[];
     if (projectId) {
       rows = await db.query<RawTask>(
-        `SELECT id, title, status, priority, project_id, updated_at
+        `SELECT id, title, status, priority, project_id, updated_at, due_date
            FROM tasks WHERE project_id = $1
           ORDER BY priority DESC, updated_at DESC, id ASC`,
         [projectId],
       );
     } else {
       rows = await db.query<RawTask>(
-        `SELECT id, title, status, priority, project_id, updated_at
+        `SELECT id, title, status, priority, project_id, updated_at, due_date
            FROM tasks ORDER BY priority DESC, updated_at DESC, id ASC`,
       );
     }
-    return rows.map((r) => ({ ...r, updated_at: isoStamp(r.updated_at) }));
+    return rows.map((r) => ({
+      ...r,
+      updated_at: isoStamp(r.updated_at),
+      due_date: isoStampOrNull(r.due_date ?? null)?.slice(0, 10) ?? null,
+    }));
   } finally {
     await db.close();
   }

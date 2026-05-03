@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 06-tasks-and-scrum
 Blocked-by: [07-task-crud-baseline, 04-saved-views-schema]

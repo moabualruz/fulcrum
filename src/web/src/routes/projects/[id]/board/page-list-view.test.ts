@@ -6,7 +6,7 @@ type PageProps = {
     activeProjectId: string | null;
     project: { id: string; name: string };
     tasks: [];
-    view?: "board" | "list" | "table";
+    view?: "board" | "list" | "table" | "calendar";
     activeSprintId: null;
   };
 };
@@ -55,5 +55,22 @@ describe("/projects/[id]/board list view", () => {
 
     expect(body).toMatch(/data-project-view="table"[^>]*aria-current="page"/);
     expect(body).toMatch(/data-task-table/);
+  });
+
+  test("renders task calendar when view=calendar", () => {
+    const { body } = render(Page, {
+      props: {
+        data: {
+          activeProjectId: null,
+          project: { id: "project-1", name: "Alpha" },
+          tasks: [],
+          activeSprintId: null,
+          view: "calendar",
+        },
+      },
+    });
+
+    expect(body).toMatch(/data-project-view="calendar"[^>]*aria-current="page"/);
+    expect(body).toMatch(/data-task-calendar/);
   });
 });
