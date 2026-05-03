@@ -6,10 +6,12 @@ import type { Actions, PageServerLoad } from "./$types";
  * Uses the same env-var override logic as AuthService.isSaasAuthEnabled().
  * DB check is intentionally skipped here to avoid wiring ORM at route load time;
  * the env var override is sufficient for SaaS deployment configuration.
- * D5: FULCRUM_FLAG_SAAS_AUTH=true enables OAuth buttons on the login page.
+ * D5: FULCRUM_FEATURES=saas-auth (or FULCRUM_FLAG_SAAS_AUTH=true) enables OAuth buttons.
  */
-function isSaasAuthEnabled(): boolean {
-  return process.env["FULCRUM_FLAG_SAAS_AUTH"] === "true";
+export function isSaasAuthEnabled(): boolean {
+  if (process.env["FULCRUM_FLAG_SAAS_AUTH"] === "true") return true;
+  const features = (process.env["FULCRUM_FEATURES"] ?? "").split(",").map((f) => f.trim());
+  return features.includes("saas-auth");
 }
 
 export const load: PageServerLoad = async ({ locals }) => {

@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/04-auth-routes.md, 01-foundation-reset/issues/14-saas-auth-gated-oauth-and-email-otp.md, 13-api-and-webhooks/issues/03-hono-openapi-gated.md]
