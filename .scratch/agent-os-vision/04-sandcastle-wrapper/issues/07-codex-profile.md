@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 04-sandcastle-wrapper
 Blocked-by: 05-agent-profile-type-registry
@@ -15,8 +15,8 @@ Implement the `codex` agent profile at `src/agents/profiles/codex.ts`. The Codex
 
 ## Acceptance criteria
 
-- [ ] Adapter / profile: `src/agents/profiles/codex.ts` exports `AgentProfile` with `name: 'codex'`, `cliPath: 'codex'`, `authEnvVars: ['OPENAI_API_KEY']`, `skillFolder: '~/.codex/skills'`, `sandcastleProvider: 'noSandbox'`, `maxIterations` and `defaultTimeout` set to sane defaults.
-- [ ] Lifecycle integration: profile loaded by registry; `getProfile('codex')` returns profile.
+- [x] Adapter / profile: `src/agents/profiles/codex.ts` exports `AgentProfile` with `name: 'codex'`, `cliPath: 'codex'`, `authEnvVars: ['OPENAI_API_KEY']`, `skillFolder: '~/.codex/skills'`, `sandcastleProvider: 'noSandbox'`, `maxIterations` and `defaultTimeout` set to sane defaults.
+- [x] Lifecycle integration: profile loaded by registry; `getProfile('codex')` returns profile.
 - [ ] Lifecycle integration: `fulcrum agents test codex` spawns `codex --version`, checks `OPENAI_API_KEY`, writes `last_tested_at` + `test_passed` to DB.
 - [ ] Surfaces parity: `--json` output on `test`; `fulcrum doctor` includes codex binary + `OPENAI_API_KEY` check.
 - [ ] Tests: same mock-spawn pattern as claude-code slice; binary missing → `test_passed=false`; auth var missing → `test_passed=false` with descriptive reason.

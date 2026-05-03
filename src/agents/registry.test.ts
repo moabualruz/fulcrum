@@ -177,12 +177,12 @@ describe("AGENTS registry — specific path expectations", () => {
 const VALID_PROFILE: AgentProfile = {
   name: "codex",
   cliPath: "codex",
-  defaultFlags: ["--sandbox", "workspace-write"],
-  skillFolder: "codex",
+  defaultFlags: [],
+  skillFolder: "~/.codex/skills",
   authEnvVars: ["OPENAI_API_KEY"],
-  sandcastleProvider: "docker",
-  maxIterations: 8,
-  defaultTimeout: 300_000,
+  sandcastleProvider: "noSandbox",
+  maxIterations: 10,
+  defaultTimeout: 600_000,
 };
 
 describe("agent profile registry", () => {
@@ -194,7 +194,7 @@ describe("agent profile registry", () => {
     const profile = getProfile("codex");
 
     expect(profile.name).toBe("codex");
-    expect(profile.sandcastleProvider).toBe("docker");
+    expect(profile.sandcastleProvider).toBe("noSandbox");
   });
 
   test("listProfiles returns validated profiles", () => {

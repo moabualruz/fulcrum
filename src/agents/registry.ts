@@ -3,6 +3,7 @@
 
 import { AgentProfileSchema, type AgentProfile } from "./types.ts";
 import { claudeCodeProfile } from "./profiles/claude-code.ts";
+import { codexProfile } from "./profiles/codex.ts";
 
 export interface Agent {
   id: "claude-code" | "codex" | "gemini" | "opencode" | "pi";
@@ -100,16 +101,7 @@ export const AGENTS: readonly Agent[] = [
 
 const PROFILE_DEFINITIONS: readonly AgentProfile[] = [
   claudeCodeProfile,
-  {
-    name: "codex",
-    cliPath: "codex",
-    defaultFlags: [],
-    skillFolder: "codex",
-    authEnvVars: ["OPENAI_API_KEY"],
-    sandcastleProvider: "docker",
-    maxIterations: 8,
-    defaultTimeout: 300_000,
-  },
+  codexProfile,
   {
     name: "gemini",
     cliPath: "gemini",
