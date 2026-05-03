@@ -5,6 +5,7 @@ import {
   type NotificationRuleEngineRepositories,
   type RuleMatch,
 } from "./rule-engine.ts";
+import { DeliveryStatus } from "../db/entities/notifications/index.ts";
 
 export interface NotifyFanoutPayload {
   eventId: string;
@@ -33,6 +34,9 @@ export interface NotifyFanoutRepositories {
   featureFlags?: NotificationRuleEngineRepositories["featureFlags"];
   notificationRepo: {
     upsertFromMatch(match: RuleMatch, event: NotificationEventLike): Promise<unknown>;
+  };
+  notificationDeliveryRepo?: {
+    create(data: Record<string, unknown>): Promise<unknown>;
   };
   notificationQuietHoursRepo: {
     findOne(where: Record<string, unknown>): Promise<NotificationQuietHoursLike | null | undefined>;
@@ -109,11 +113,39 @@ async function enqueueDeliveryOrQuietRetry(
   const payload = deliveryPayload(match, event, channel, notification);
 
   if (quietHours && isInQuietHours(quietHours, now)) {
+    await createDelivery(repositories, match, event, channel, notification, "held-quiet-hours");
     await repositories.queue.addJob("notify-retry-after-quiet", payload);
     return;
   }
 
+  await createDelivery(repositories, match, event, channel, notification, DeliveryStatus.Pending);
   await repositories.queue.addJob(deliveryJobName(channel), payload);
+}
+
+async function createDelivery(
+  repositories: NotifyFanoutRepositories,
+  match: RuleMatch,
+  event: NotificationEventLike,
+  channel: Exclude<NotificationChannel, "in-app">,
+  notification: unknown,
+  status: DeliveryStatus.Pending | "held-quiet-hours",
+): Promise<void> {
+  if (!repositories.notificationDeliveryRepo) return;
+  await repositories.notificationDeliveryRepo.create({
+    orgId: eventOrgId(event),
+    ruleId: match.rule.id,
+    notificationId: objectId(notification),
+    userId: match.userId,
+    channel,
+    status,
+    attemptCount: 0,
+    payload: {
+      eventId: event.id,
+      subjectKind: event.subjectKind,
+      subjectId: event.subjectId ?? null,
+      verb: event.verb,
+    },
+  });
 }
 
 function deliveryPayload(

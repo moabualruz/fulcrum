@@ -63,6 +63,28 @@ describe("/docs/new component template picker", () => {
     expect(editorSource?.value).toBe(templates.adr);
   });
 
+  test("wizard shows doc type cards before template choices", async () => {
+    const { container, getByText } = render(DocsNewPage, {
+      props: {
+        data: { form: formState(), templates },
+        form: undefined,
+      },
+    });
+
+    expect(container.querySelectorAll("[data-doc-type-card]")).toHaveLength(9);
+
+    const adrCard = Array.from(container.querySelectorAll<HTMLElement>("[data-doc-type-card]"))
+      .find((card) => card.textContent?.includes("ADR"));
+    expect(adrCard).toBeDefined();
+    await fireEvent.click(adrCard!);
+
+    await waitFor(() => {
+      expect(container.querySelector("[data-template-picker]")).not.toBeNull();
+      expect(container.textContent).toContain("Default adr");
+      expect(container.textContent).toContain("## Decision");
+    });
+  });
+
   test("doc type changes do not clobber edited bodies", () => {
     const initial = createInitialTemplateState({
       formKind: "spec",

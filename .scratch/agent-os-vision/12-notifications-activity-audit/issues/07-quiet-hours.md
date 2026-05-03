@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: notifications-activity-audit
 Blocked-by: [01-schema-migration.md, 04-fanout-worker.md]

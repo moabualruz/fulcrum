@@ -5,6 +5,7 @@ import {
   filterSlashMenuItems,
   getSlashMenuItems,
   insertSlashMenuItem,
+  insertTemplateBody,
   createAutosaveScheduler,
 } from "../../src/lib/components/editor/slash-menu";
 
@@ -74,5 +75,15 @@ describe("DocEditor slash menu helpers", () => {
     expect(calls).toHaveLength(1);
     expect(JSON.stringify(calls[0])).toContain("ab");
     vi.useRealTimers();
+  });
+
+  test("template picker inserts selected template body at cursor", () => {
+    const editor = editorWithText("Intro");
+    editor.commands.setTextSelection(6);
+
+    insertTemplateBody(editor, "## Context\n\n## Decision");
+
+    expect(jsonTypes(editor)).toContain("Context");
+    expect(jsonTypes(editor)).toContain("Decision");
   });
 });

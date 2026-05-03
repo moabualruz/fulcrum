@@ -48,7 +48,7 @@ type ProcedureMetadata = {
   description: string | null;
 };
 
-type DomainMetadata = {
+export type DomainMetadata = {
   name: string;
   procedures: ProcedureMetadata[];
 };
@@ -56,6 +56,7 @@ type DomainMetadata = {
 export type GenerateCliFilesOptions = {
   routerPath: string;
   outDir: string;
+  completionsDir?: string;
   useAst?: boolean;
 };
 
@@ -98,6 +99,18 @@ export async function generateCliFiles(options: GenerateCliFilesOptions): Promis
   for (const domain of domains) {
     if (domain.procedures.length === 0) continue;
     await writeFile(join(outDir, `${domain.name}.ts`), emitDomain(domain));
+  }
+
+  if (options.completionsDir !== undefined) {
+    const completionsDir = resolve(options.completionsDir);
+    const { emitCompletionScripts } = await import("../../src/cli/completion.ts");
+    const scripts = emitCompletionScripts(domains);
+    await mkdir(completionsDir, { recursive: true });
+    await Promise.all([
+      writeFile(join(completionsDir, "completions.sh"), scripts.bash),
+      writeFile(join(completionsDir, "completions.zsh"), scripts.zsh),
+      writeFile(join(completionsDir, "completions.fish"), scripts.fish),
+    ]);
   }
 }
 
@@ -171,7 +184,7 @@ function schemaToFlags(schema: AstSchema | null, path: string[]): FlagDefinition
   return [];
 }
 
-async function extractRouterMetadata(routerPath: string): Promise<DomainMetadata[]> {
+export async function extractRouterMetadata(routerPath: string): Promise<DomainMetadata[]> {
   const project = new Project({
     compilerOptions: {
       allowImportingTsExtensions: true,
@@ -660,8 +673,9 @@ if (import.meta.main) {
   const root = resolve(import.meta.dir, "../..");
   const routerPath = join(root, "src/server/trpc/router.ts");
   const outDir = join(root, "src/cli/generated");
+  const completionsDir = join(root, "scripts/cli");
   const start = performance.now();
-  await generateCliFiles({ routerPath, outDir, useAst: !args.has("--no-ast") });
+  await generateCliFiles({ routerPath, outDir, completionsDir, useAst: !args.has("--no-ast") });
   const elapsed = performance.now() - start;
   if (elapsed > 30_000) {
     console.error("codegen exceeded 30s; rerun with --no-ast to force template emit fallback");

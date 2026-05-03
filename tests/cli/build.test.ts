@@ -32,6 +32,26 @@ async function buildBinary(): Promise<{
 }
 
 describe("fulcrum binary build", () => {
+  test("scripts/build-cli.ts creates dist/fulcrum with size gate", async () => {
+    await rm(BINARY, { force: true });
+
+    const proc = Bun.spawn(["bun", "run", "scripts/build-cli.ts"], {
+      cwd: process.cwd(),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+
+    expect(exitCode, `${stdout}\n${stderr}`).toBe(0);
+    expect(await Bun.file(BINARY).exists()).toBe(true);
+    expect(stdout).toContain("dist/fulcrum");
+    expect(stdout).toContain("binary size");
+  });
+
   test("bun build --compile creates dist/fulcrum", async () => {
     const result = await buildBinary();
 

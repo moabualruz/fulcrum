@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 04-sandcastle-wrapper
 Blocked-by: 09-sandbox-runner-nosandbox-happy-path
@@ -15,11 +15,11 @@ Extend `sandbox-runner.ts` with the iteration loop: after each agent turn, check
 
 ## Acceptance criteria
 
-- [ ] Adapter / profile: iteration loop in `runAgent()` loops while COMPLETE signal absent and `iterationCount < agentProfile.maxIterations`; each turn appends context bundle to prompt.
-- [ ] Lifecycle integration: `exitReason: 'max_iterations'` set on `AgentRunResult` when cap hit; `exitReason: 'complete'` when COMPLETE signal received; `iteration_count` written to `agent_runs` DB row.
-- [ ] Lifecycle integration: `FULCRUM_MAX_TOKENS_PER_RUN` env var read at startup; default `200000`; cap enforced across all turns; `exitReason: 'token_cap'` when hit.
+- [x] Adapter / profile: iteration loop in `runAgent()` loops while COMPLETE signal absent and `iterationCount < agentProfile.maxIterations`; each turn appends context bundle to prompt.
+- [x] Lifecycle integration: `exitReason: 'max_iterations'` set on `AgentRunResult` when cap hit; `exitReason: 'complete'` when COMPLETE signal received; `iteration_count` written to `agent_runs` DB row.
+- [x] Lifecycle integration: `FULCRUM_MAX_TOKENS_PER_RUN` env var read at startup; default `200000`; cap enforced across all turns; `exitReason: 'token_cap'` when hit.
 - [ ] Surfaces parity: `iteration_count` and `exit_reason` columns visible in DB; CLI `fulcrum runs show <id> --json` includes both fields.
-- [ ] Tests: test 1 — stub agent never emits COMPLETE → terminates at `maxIterations: 3`; `iteration_count = 3`; `exitReason = 'max_iterations'`. Test 2 — stub emits COMPLETE mid-content (`"some text COMPLETE more text"`) → loop does NOT terminate; terminates only when COMPLETE appears as standalone final line. Test 3 — stub emits COMPLETE on turn 2 of 10-cap run → `iteration_count = 2`; `exitReason = 'complete'`.
+- [x] Tests: test 1 — stub agent never emits COMPLETE → terminates at `maxIterations: 3`; `iteration_count = 3`; `exitReason = 'max_iterations'`. Test 2 — stub emits COMPLETE mid-content (`"some text COMPLETE more text"`) → loop does NOT terminate; terminates only when COMPLETE appears as standalone final line. Test 3 — stub emits COMPLETE on turn 2 of 10-cap run → `iteration_count = 2`; `exitReason = 'complete'`.
 
 ## Blocked by
 

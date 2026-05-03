@@ -3,6 +3,9 @@ export {
   type ConnectorAdapter,
   type ConnectorKind,
   type HealthStatus,
+  type HistoricalImportOptions,
+  type HistoricalImportResult,
+  type HistoricalImportStore,
   type SyncError,
   type SyncItem,
   type SyncResult,
@@ -28,3 +31,4 @@ export { GitLabConnector, type GitLabConnectorOptions } from "./gitlab.ts";
 export { BitbucketConnector, type BitbucketConnectorOptions } from "./bitbucket.ts";
 export { ConfluenceConnector, type ConfluenceConnectorOptions } from "./confluence.ts";
 export { NotionConnector, type NotionConnectorOptions } from "./notion.ts";
+export { PlaneConnector, type PlaneConnectorOptions } from "./plane.ts";

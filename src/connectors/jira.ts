@@ -1,4 +1,11 @@
-import type { ConnectorAdapter, HealthStatus, SyncItem, SyncResult } from "./interface.ts";
+import type {
+  ConnectorAdapter,
+  HealthStatus,
+  HistoricalImportOptions,
+  HistoricalImportResult,
+  SyncItem,
+  SyncResult,
+} from "./interface.ts";
 import { connectorFlag } from "./registry.ts";
 
 type ConnectorFetch = (input: string, init?: RequestInit) => Promise<Response>;
@@ -54,6 +61,36 @@ export class JiraConnector implements ConnectorAdapter {
     this.pulledItems.splice(0, this.pulledItems.length, ...items);
 
     return { pulled: items.length, pushed: 0, skipped: 0, errors: [] };
+  }
+
+  async importHistory(options: HistoricalImportOptions): Promise<HistoricalImportResult> {
+    this.assertEnabled();
+
+    const batchSize = options.batchSize ?? 100;
+    const maxResults = batchSize;
+    let startAt = 0;
+    let imported = 0;
+    let batches = 0;
+
+    for (;;) {
+      const path = `/rest/api/3/search/jql?jql=${encodeURIComponent(`project=${this.projectKey}`)}&startAt=${startAt}&maxResults=${maxResults}`;
+      const response = await this.request(path);
+      if (!response.ok) return importError(response, "jira_import_failed", imported, batches);
+
+      const body = (await response.json()) as JiraSearchResponse;
+      const items = (body.issues ?? []).map(mapJiraIssue);
+      for (const batch of chunk(items, batchSize)) {
+        await options.store.upsertBatch(this.kind, batch);
+        batches += 1;
+      }
+      imported += items.length;
+
+      const nextStartAt = (body.startAt ?? startAt) + (body.maxResults ?? items.length);
+      if (nextStartAt >= (body.total ?? imported) || items.length === 0) break;
+      startAt = nextStartAt;
+    }
+
+    return { imported, upserted: imported, batches, errors: [] };
   }
 
   async push(items: SyncItem[]): Promise<SyncResult> {
@@ -127,7 +164,15 @@ interface JiraIssue {
     assignee?: { emailAddress?: string; displayName?: string };
     duedate?: string;
     labels?: string[];
+    parent?: { key?: string };
   };
+}
+
+interface JiraSearchResponse {
+  startAt?: number;
+  maxResults?: number;
+  total?: number;
+  issues?: JiraIssue[];
 }
 
 function mapJiraIssue(issue: JiraIssue): SyncItem {
@@ -142,6 +187,7 @@ function mapJiraIssue(issue: JiraIssue): SyncItem {
       assignee: fields.assignee?.emailAddress ?? fields.assignee?.displayName,
       dueDate: fields.duedate,
       labels: fields.labels ?? [],
+      parentExternalId: fields.parent?.key,
     },
   };
 }
@@ -174,6 +220,24 @@ function mapPriority(priority?: string): string | undefined {
 
 async function syncError(response: Response, code: string): Promise<SyncResult> {
   return { pulled: 0, pushed: 0, skipped: 0, errors: [{ message: response.statusText, code }] };
+}
+
+async function importError(
+  response: Response,
+  code: string,
+  imported: number,
+  batches: number,
+): Promise<HistoricalImportResult> {
+  return { imported, upserted: imported, batches, errors: [{ message: response.statusText, code }] };
+}
+
+function chunk<T>(items: T[], batchSize: number): T[][] {
+  const size = Math.max(1, batchSize);
+  const batches = [];
+  for (let index = 0; index < items.length; index += size) {
+    batches.push(items.slice(index, index + size));
+  }
+  return batches;
 }
 
 function stripTrailingSlash(value: string): string {

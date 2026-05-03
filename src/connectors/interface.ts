@@ -1,6 +1,7 @@
 export const CONNECTOR_KINDS = [
   "jira",
   "linear",
+  "plane",
   "github-issues",
   "github",
   "gitlab",
@@ -26,6 +27,22 @@ export interface SyncResult {
   pulled: number;
   pushed: number;
   skipped: number;
+  errors: SyncError[];
+}
+
+export interface HistoricalImportStore {
+  upsertBatch(kind: ConnectorKind, items: SyncItem[]): Promise<void>;
+}
+
+export interface HistoricalImportOptions {
+  store: HistoricalImportStore;
+  batchSize?: number;
+}
+
+export interface HistoricalImportResult {
+  imported: number;
+  upserted: number;
+  batches: number;
   errors: SyncError[];
 }
 

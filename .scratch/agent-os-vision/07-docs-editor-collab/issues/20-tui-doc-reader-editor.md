@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: 07-docs-editor-collab
 Blocked-by: [05-doc-crud-trpc.md, 12-version-history-engine.md, 07-wikilink-node-backlinks.md]

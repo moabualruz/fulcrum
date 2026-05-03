@@ -1,4 +1,5 @@
 import type { ProductDb, SqlValue } from "../product-kernel/db/types.ts";
+import { createSearchBackend } from "./backend.ts";
 import {
   type EmbedText,
   cosineSimilarity,
@@ -396,7 +397,7 @@ async function queryHybridSearchDocuments(
   };
 }
 
-export async function querySearchDocuments(
+export async function queryPgliteSearchDocuments(
   db: ProductDb,
   input: SearchQueryInput,
 ): Promise<SearchQueryOutput> {
@@ -441,4 +442,11 @@ export async function querySearchDocuments(
     total: rows[0]?.total_count ?? 0,
     facetCounts: { kind, docType, status, assigneeId, repoId, authorId },
   };
+}
+
+export async function querySearchDocuments(
+  db: ProductDb,
+  input: SearchQueryInput,
+): Promise<SearchQueryOutput> {
+  return createSearchBackend(db).query(input);
 }

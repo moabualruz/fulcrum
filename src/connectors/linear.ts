@@ -1,4 +1,11 @@
-import type { ConnectorAdapter, HealthStatus, SyncItem, SyncResult } from "./interface.ts";
+import type {
+  ConnectorAdapter,
+  HealthStatus,
+  HistoricalImportOptions,
+  HistoricalImportResult,
+  SyncItem,
+  SyncResult,
+} from "./interface.ts";
 import { connectorFlag } from "./registry.ts";
 
 type ConnectorFetch = (input: string, init?: RequestInit) => Promise<Response>;
@@ -65,6 +72,49 @@ export class LinearConnector implements ConnectorAdapter {
     this.pulledItems.splice(0, this.pulledItems.length, ...items);
 
     return { pulled: items.length, pushed: 0, skipped: 0, errors: [] };
+  }
+
+  async importHistory(options: HistoricalImportOptions): Promise<HistoricalImportResult> {
+    this.assertEnabled();
+
+    const batchSize = options.batchSize ?? 100;
+    let after: string | undefined;
+    let imported = 0;
+    let batches = 0;
+
+    do {
+      const response = await this.graphql(
+        `query HistoricalTeamIssues($teamId: String!, $after: String) {
+          issues(filter: { team: { id: { eq: $teamId } } }, first: 100, after: $after) {
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              id
+              identifier
+              title
+              estimate
+              state { name type }
+              cycle { name }
+              assignee { email name }
+              labels { nodes { name } }
+            }
+          }
+        }`,
+        { teamId: this.teamId, after },
+      );
+      if (!response.ok) return importError(response, "linear_import_failed", imported, batches);
+
+      const body = (await response.json()) as { data?: { issues?: LinearIssueConnection } };
+      const connection = body.data?.issues;
+      const items = connection?.nodes?.map(mapLinearIssue) ?? [];
+      for (const batch of chunk(items, batchSize)) {
+        await options.store.upsertBatch(this.kind, batch);
+        batches += 1;
+      }
+      imported += items.length;
+      after = connection?.pageInfo?.hasNextPage ? (connection.pageInfo.endCursor ?? undefined) : undefined;
+    } while (after);
+
+    return { imported, upserted: imported, batches, errors: [] };
   }
 
   async push(items: SyncItem[]): Promise<SyncResult> {
@@ -141,6 +191,11 @@ interface LinearIssue {
   labels?: { nodes?: Array<{ name?: string }> };
 }
 
+interface LinearIssueConnection {
+  pageInfo?: { hasNextPage?: boolean; endCursor?: string | null };
+  nodes?: LinearIssue[];
+}
+
 function mapLinearIssue(issue: LinearIssue): SyncItem {
   return {
     externalId: issue.identifier ?? issue.id ?? "",
@@ -179,4 +234,22 @@ function linearStateName(status: string): string {
 
 async function syncError(response: Response, code: string): Promise<SyncResult> {
   return { pulled: 0, pushed: 0, skipped: 0, errors: [{ message: response.statusText, code }] };
+}
+
+async function importError(
+  response: Response,
+  code: string,
+  imported: number,
+  batches: number,
+): Promise<HistoricalImportResult> {
+  return { imported, upserted: imported, batches, errors: [{ message: response.statusText, code }] };
+}
+
+function chunk<T>(items: T[], batchSize: number): T[][] {
+  const size = Math.max(1, batchSize);
+  const batches = [];
+  for (let index = 0; index < items.length; index += size) {
+    batches.push(items.slice(index, index + size));
+  }
+  return batches;
 }

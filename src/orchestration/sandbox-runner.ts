@@ -35,7 +35,14 @@ interface WorktreeHandle {
 interface AgentRunRepositoryLike {
   updateSandcastleRun?(
     runId: string,
-    patch: { sandboxMode: "host"; exitCode: number; durationMs: number },
+    patch: {
+      sandboxMode: "host";
+      exitCode: number;
+      durationMs: number;
+      iterationCount: number;
+      exitReason: AgentRunResult["exitReason"];
+      tokenUsed: number;
+    },
   ): Promise<void>;
 }
 
@@ -75,28 +82,58 @@ export async function runAgent(
     try {
       logger.warn(TRUST_BOUNDARY_WARNING);
       const sandbox = noSandbox();
-      const interactiveResult = await worktree.interactive({
-        agent: deps.agentProvider ?? agentProviderFromProfile(req.agentProfile),
-        sandbox,
-        prompt: req.prompt,
-        name: req.runId,
-        env: req.opts?.env,
-        signal: controller.signal,
-      });
+      const agent = deps.agentProvider ?? agentProviderFromProfile(req.agentProfile);
+      const maxIterations = req.opts?.maxIterations ?? req.agentProfile.maxIterations;
+      const maxTokens = maxTokensPerRun();
+      const outputs: string[] = [];
+      let tokenUsed = 0;
+      let exitCode = 0;
+      let exitReason: AgentRunResult["exitReason"] = "max_iterations";
+
+      for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+        const interactiveResult = await worktree.interactive({
+          agent,
+          sandbox,
+          prompt: promptForIteration(req.prompt, req.contextBundle, outputs),
+          name: req.runId,
+          env: req.opts?.env,
+          signal: controller.signal,
+        });
+        const transcript = transcriptFromInteractiveResult(interactiveResult);
+        outputs.push(transcript);
+        tokenUsed += countTokens(transcript);
+        exitCode = interactiveResult.exitCode ?? 0;
+
+        if (tokenUsed > maxTokens) {
+          exitReason = "token_cap";
+          break;
+        }
+
+        if (hasStandaloneFinalCompleteLine(transcript)) {
+          exitReason = "complete";
+          break;
+        }
+      }
+
       const durationMs = Math.max(0, now() - startedAt);
       const result: AgentRunResult = {
-        transcript: transcriptFromInteractiveResult(interactiveResult),
-        exitCode: interactiveResult.exitCode ?? 0,
+        transcript: outputs.join(""),
+        exitCode,
         filesChanged: [],
         artifacts: [],
         durationMs,
-        iterationCount: 1,
+        iterationCount: outputs.length,
+        exitReason,
+        tokenUsed,
       };
       if (req.runId) {
         await deps.agentRunRepository?.updateSandcastleRun?.(req.runId, {
           sandboxMode: "host",
           exitCode: result.exitCode,
           durationMs,
+          iterationCount: result.iterationCount,
+          exitReason: result.exitReason,
+          tokenUsed,
         });
       }
       return result;
@@ -139,4 +176,45 @@ function transcriptFromInteractiveResult(result: unknown): string {
     return result.stdout;
   }
   return "";
+}
+
+function promptForIteration(
+  basePrompt: string,
+  contextBundle: unknown,
+  previousOutputs: readonly string[],
+): string {
+  if (previousOutputs.length === 0) {
+    return basePrompt;
+  }
+
+  return [
+    basePrompt,
+    "",
+    "Context bundle:",
+    JSON.stringify(contextBundle, null, 2),
+    "",
+    "Previous agent output:",
+    previousOutputs.at(-1) ?? "",
+    "",
+    "Continue. Finish by putting COMPLETE alone on the final non-empty line.",
+  ].join("\n");
+}
+
+function hasStandaloneFinalCompleteLine(transcript: string): boolean {
+  const finalLine = transcript
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .at(-1);
+  return finalLine === "COMPLETE";
+}
+
+function maxTokensPerRun(): number {
+  const value = Number(process.env.FULCRUM_MAX_TOKENS_PER_RUN ?? "200000");
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 200000;
+}
+
+function countTokens(text: string): number {
+  const trimmed = text.trim();
+  return trimmed.length === 0 ? 0 : trimmed.split(/\s+/).length;
 }

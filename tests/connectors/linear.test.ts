@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
+import type { SyncItem } from "../../src/connectors/index.ts";
 import { LinearConnector } from "../../src/connectors/linear.ts";
 
 describe("LinearConnector", () => {
@@ -98,5 +99,121 @@ describe("LinearConnector", () => {
       ok: false,
       status: "auth_failed",
     });
+  });
+
+  it("imports historical Linear issues across cursors and idempotently upserts batches", async () => {
+    const requests: Request[] = [];
+    const batches: SyncItem[][] = [];
+    const connector = new LinearConnector({
+      apiKey: "key",
+      teamId: "team-1",
+      fetch: async (input, init) => {
+        const request = new Request(input, init);
+        requests.push(request);
+        const body = (await request.json()) as { variables?: { after?: string } };
+        if (!body.variables?.after) {
+          return Response.json({
+            data: {
+              issues: {
+                pageInfo: { hasNextPage: true, endCursor: "cursor-1" },
+                nodes: [
+                  {
+                    id: "lin-1",
+                    identifier: "FUL-1",
+                    title: "Import Linear history",
+                    state: { name: "In Progress", type: "started" },
+                    cycle: { name: "Cycle 7" },
+                    assignee: { email: "owner@example.com" },
+                    labels: { nodes: [{ name: "history" }] },
+                  },
+                ],
+              },
+            },
+          });
+        }
+
+        return Response.json({
+          data: {
+            issues: {
+              pageInfo: { hasNextPage: false, endCursor: null },
+              nodes: [
+                {
+                  id: "lin-1",
+                  identifier: "FUL-1",
+                  title: "Import Linear history updated",
+                  state: { name: "Done", type: "completed" },
+                  cycle: { name: "Cycle 7" },
+                  assignee: { email: "owner@example.com" },
+                  labels: { nodes: [{ name: "history" }, { name: "api" }] },
+                },
+                {
+                  id: "lin-2",
+                  identifier: "FUL-2",
+                  title: "Second Linear issue",
+                  state: { name: "Todo" },
+                  cycle: { name: "Cycle 8" },
+                },
+              ],
+            },
+          },
+        });
+      },
+    });
+    connector.enable();
+
+    const result = await connector.importHistory({
+      batchSize: 2,
+      store: {
+        async upsertBatch(kind, items) {
+          expect(kind).toBe("linear");
+          batches.push(items);
+        },
+      },
+    });
+
+    expect(result).toEqual({ imported: 3, upserted: 3, batches: 2, errors: [] });
+    expect(requests).toHaveLength(2);
+    expect(batches).toEqual([
+      [
+        {
+          externalId: "FUL-1",
+          data: {
+            id: "lin-1",
+            title: "Import Linear history",
+            status: "in-progress",
+            sprint: "Cycle 7",
+            estimate: undefined,
+            assignee: "owner@example.com",
+            labels: ["history"],
+          },
+        },
+      ],
+      [
+        {
+          externalId: "FUL-1",
+          data: {
+            id: "lin-1",
+            title: "Import Linear history updated",
+            status: "done",
+            sprint: "Cycle 7",
+            estimate: undefined,
+            assignee: "owner@example.com",
+            labels: ["history", "api"],
+          },
+        },
+        {
+          externalId: "FUL-2",
+          data: {
+            id: "lin-2",
+            title: "Second Linear issue",
+            status: "todo",
+            sprint: "Cycle 8",
+            estimate: undefined,
+            assignee: undefined,
+            labels: [],
+          },
+        },
+      ],
+    ]);
   });
 });

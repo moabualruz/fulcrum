@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: cli-codegen
 Blocked-by: [14/issues/02-json-flag-and-watch-generation.md]

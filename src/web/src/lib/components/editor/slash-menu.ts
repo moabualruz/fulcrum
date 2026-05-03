@@ -155,6 +155,11 @@ export function insertSlashMenuItem(editor: Editor, itemId: string): boolean {
   }
 }
 
+export function insertTemplateBody(editor: Editor, bodyTemplate: string): boolean {
+  if (!bodyTemplate.trim()) return false;
+  return editor.chain().focus().insertContent(bodyTemplate).run();
+}
+
 export function createAutosaveScheduler(options: {
   delayMs?: number;
   save: (contentJson: JSONContent, bodyMd?: string) => Promise<void> | void;

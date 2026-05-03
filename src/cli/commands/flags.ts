@@ -43,7 +43,7 @@ export interface FlagsRunOptions {
   caller?: {
     flags: {
       list: () => Promise<FlagItem[]>;
-      set: (input: { flag: string; enabled: boolean }) => Promise<{ ok: boolean }>;
+      set: (input: { flag: string; enabled: boolean; rolloutPercent?: number }) => Promise<unknown>;
     };
   };
 
@@ -104,6 +104,8 @@ export async function run(
   }
 }
 
+export const runFlags = run;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // list
 // ─────────────────────────────────────────────────────────────────────────────
@@ -151,8 +153,24 @@ async function runSet(
 ): Promise<void> {
   const { print, printErr, exit } = opts;
 
-  // Filter out --json so positional args are clean
-  const positional = argv.filter((a) => !a.startsWith("-"));
+  const unknownFlag = argv.find((arg) =>
+    arg.startsWith("-") && !["--json", "--enabled", "--disabled", "--rollout-percent"].includes(arg)
+  );
+  if (unknownFlag) {
+    printErr(`fulcrum flags set: unknown flag '${unknownFlag}'`);
+    exit(2);
+    return;
+  }
+
+  const positional: string[] = [];
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i]!;
+    if (arg === "--rollout-percent") {
+      i += 1;
+      continue;
+    }
+    if (!arg.startsWith("-")) positional.push(arg);
+  }
   const jsonMode = argv.includes("--json");
 
   const [flagName, valueStr] = positional;
@@ -164,27 +182,41 @@ async function runSet(
     return;
   }
 
-  if (!valueStr) {
+  const usesBooleanFlags = argv.includes("--enabled") || argv.includes("--disabled");
+  if (!valueStr && !usesBooleanFlags) {
     printErr(`fulcrum flags set: missing required argument <on|off> for flag '${flagName}'`);
     printErr("Usage: fulcrum flags set <flag> <on|off>");
     exit(1);
     return;
   }
 
-  if (valueStr !== "on" && valueStr !== "off") {
+  if (valueStr && valueStr !== "on" && valueStr !== "off") {
     printErr(`fulcrum flags set: invalid value '${valueStr}' — must be 'on' or 'off'`);
     exit(1);
     return;
   }
 
-  const enabled = valueStr === "on";
+  const rolloutValue = argv[argv.indexOf("--rollout-percent") + 1];
+  const rolloutPercent = argv.includes("--rollout-percent") ? Number(rolloutValue) : undefined;
+  if (rolloutPercent !== undefined && (!Number.isInteger(rolloutPercent) || rolloutPercent < 0 || rolloutPercent > 100)) {
+    printErr("fulcrum flags set: --rollout-percent must be an integer from 0 to 100");
+    exit(1);
+    return;
+  }
+
+  const enabled = usesBooleanFlags ? argv.includes("--enabled") : valueStr === "on";
   const caller = await resolveCaller(opts);
 
   try {
-    const result = await caller.flags.set({ flag: flagName, enabled });
+    const result = await caller.flags.set({ flag: flagName, enabled, rolloutPercent });
 
     if (jsonMode) {
-      print(JSON.stringify({ flag: flagName, enabled, ok: result.ok }));
+      const objectResult = result && typeof result === "object" ? result as Record<string, unknown> : {};
+      print(JSON.stringify({
+        name: objectResult.name ?? flagName,
+        enabled: objectResult.enabled ?? enabled,
+        rollout_percent: objectResult.rollout_percent ?? rolloutPercent,
+      }));
     } else {
       print(`Flag '${flagName}' set to ${enabled ? "on" : "off"}.`);
     }
@@ -204,7 +236,7 @@ async function runSet(
 async function resolveCaller(opts: FlagsRunOptions): Promise<{
   flags: {
     list: () => Promise<FlagItem[]>;
-    set: (input: { flag: string; enabled: boolean }) => Promise<{ ok: boolean }>;
+    set: (input: { flag: string; enabled: boolean; rolloutPercent?: number }) => Promise<unknown>;
   };
 }> {
   if (opts.caller) return opts.caller;

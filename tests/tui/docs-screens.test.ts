@@ -1,8 +1,14 @@
 import { describe, expect, test } from "bun:test";
+import { performance } from "node:perf_hooks";
 
 import { DOC_TYPES } from "../../src/db/entities/docs/enums.ts";
 import { Renderer } from "../../src/tui/renderer.ts";
-import { DocsReaderEditorScreen } from "../../src/tui/screens/docs-reader-editor.ts";
+import {
+  docsReaderDataMatchesCliShow,
+  docsTreeDataMatchesWebSidebar,
+  DocsReaderEditorScreen,
+  renderMarkdown,
+} from "../../src/tui/screens/docs-reader-editor.ts";
 import { DocsTreeScreen } from "../../src/tui/screens/docs-tree.ts";
 import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
 
@@ -50,6 +56,93 @@ const docs = [
 ];
 
 describe("DocsTreeScreen", () => {
+  test("mounts from docs.tree, navigates 100+ docs, opens reader, archives, creates, and toggles scope", async () => {
+    const treeCalls: unknown[] = [];
+    const createCalls: unknown[] = [];
+    const deleteCalls: unknown[] = [];
+    const opened: string[] = [];
+    const projectDocs = Array.from({ length: 120 }, (_, index) => ({
+      id: `project-${index}`,
+      title: `Project ${String(index).padStart(3, "0")}`,
+      slug: `project-${index}`,
+      scope: "project",
+      projectId: "project-1",
+      docType: "wiki",
+      parentId: null,
+    }));
+    const globalDocs = [
+      {
+        id: "global-0",
+        title: "Global Handbook",
+        slug: "global-handbook",
+        scope: "global",
+        docType: "runbook",
+        parentId: null,
+      },
+    ];
+    let currentDocs = [...projectDocs];
+    const screen = new DocsTreeScreen({
+      projectId: "project-1",
+      caller: {
+        docs: {
+          tree: async (input) => {
+            treeCalls.push(input);
+            currentDocs = input.scope === "global" ? [...globalDocs] : [...projectDocs];
+            return currentDocs;
+          },
+          list: async () => {
+            throw new Error("docs.tree must be used when available");
+          },
+          create: async (input) => {
+            createCalls.push(input);
+            const created = {
+              id: "created-doc",
+              title: input.title,
+              slug: "created-doc",
+              scope: input.scope,
+              projectId: input.projectId,
+              docType: input.docType,
+              parentId: null,
+            };
+            currentDocs = [created, ...currentDocs];
+            return created;
+          },
+          delete: async (input) => {
+            deleteCalls.push(input);
+            currentDocs = currentDocs.filter((doc) => doc.id !== input.id);
+            return { ...projectDocs[1]!, archived: true };
+          },
+        },
+      },
+      onOpenDoc: (id) => opened.push(id),
+    });
+
+    const start = performance.now();
+    await screen.load();
+    const treeMs = performance.now() - start;
+    expect(treeMs).toBeLessThan(500);
+    expect(treeCalls).toEqual([{ scope: "project", projectId: "project-1" }]);
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Project 000");
+
+    await screen.handleKey("\x1b[B");
+    await screen.handleKey("\r");
+    expect(opened).toEqual(["project-1"]);
+
+    await screen.handleKey("d");
+    expect(deleteCalls).toEqual([{ id: "project-1", hard: false }]);
+    expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("Project 001");
+
+    await screen.handleKey("n");
+    await screen.handleKey("\r");
+    await screen.submitNewDocTitle("Fresh Spec");
+    expect(createCalls).toEqual([{ title: "Fresh Spec", docType: "spec", scope: "project", projectId: "project-1" }]);
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Fresh Spec");
+
+    await screen.handleKey("g");
+    expect(treeCalls.at(-1)).toEqual({ scope: "global" });
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Global Handbook");
+  });
+
   test("renders project and global trees, expands/collapses nodes, opens reader, and creates docs with type picker", async () => {
     const opened: string[] = [];
     const created: unknown[] = [];
@@ -104,6 +197,112 @@ describe("DocsTreeScreen", () => {
 });
 
 describe("DocsReaderEditorScreen", () => {
+  test("reader, edit, frontmatter, backlinks, history, fallback, and parity behavior match docs acceptance", async () => {
+    const updates: unknown[] = [];
+    const restores: unknown[] = [];
+    const doc = {
+      id: "doc-1",
+      title: "Reader Spec",
+      slug: "reader-spec",
+      docType: "spec",
+      scope: "project",
+      projectId: "project-1",
+      parentId: null,
+      frontmatter: { title: "Reader Spec", status: "draft" },
+      bodyMd: "# Reader Spec\n\nSee [[source-doc]] and **bold** with `inline`.",
+      updatedAt: "2026-05-03T08:00:00Z",
+    };
+    const screen = new DocsReaderEditorScreen({
+      docId: "doc-1",
+      textAreaAvailable: true,
+      caller: {
+        docs: {
+          get: async () => doc,
+          update: async (input) => {
+            updates.push(input);
+            if ("frontmatter" in input && typeof input.frontmatter?.title !== "string") {
+              throw new Error("title must be a string");
+            }
+            if (typeof input.bodyMd === "string") doc.bodyMd = input.bodyMd;
+            if (input.frontmatter) doc.frontmatter = input.frontmatter;
+            return doc;
+          },
+          versions: {
+            list: async () => [
+              { id: "v2", versionNum: 2, createdAt: "2026-05-03T09:00:00Z", author: "Ada", isSnapshot: true, bodyMd: "new" },
+              { id: "v1", versionNum: 1, createdAt: "2026-05-03T08:00:00Z", author: "Ada", isSnapshot: true, bodyMd: "old" },
+            ],
+            diff: async () => "-old\n+new",
+            restore: async (input) => {
+              restores.push(input);
+              return doc;
+            },
+          },
+          links: {
+            listBacklinks: async () => [
+              { fromDocId: "source-1", title: "Source Doc", slug: "source-doc", linkKind: "wikilink" },
+            ],
+          },
+        },
+      },
+      onNavigateDoc: (id) => {
+        doc.id = id;
+      },
+    });
+
+    await screen.load();
+    const renderStart = performance.now();
+    const reader = renderPlain((renderer) => screen.render(renderer));
+    expect(performance.now() - renderStart).toBeLessThan(100);
+    expect(reader).toContain("Reader Spec");
+    expect(reader).toContain("See [[source-doc]] and bold with inline.");
+    expect(reader).not.toContain("{\"slug\"");
+
+    await screen.handleKey("e");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("fulcrum docs edit");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("See [[source-doc]]");
+    screen.setEditorBody("# Reader Spec\n\nChanged [[source-doc]]");
+    await screen.handleKey("\x13");
+    expect(updates.at(-1)).toMatchObject({ id: "doc-1", bodyMd: "# Reader Spec\n\nChanged [[source-doc]]" });
+
+    await screen.handleKey("\x06");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("status: draft");
+    screen.setFrontmatterYaml("title: 100\nstatus: draft");
+    await screen.handleKey("\x13");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("title must be a string");
+    screen.setFrontmatterYaml("title: Reader Spec\nstatus: accepted");
+    await screen.handleKey("\x13");
+    expect(updates.at(-1)).toMatchObject({ id: "doc-1", frontmatter: { title: "Reader Spec", status: "accepted" } });
+
+    await screen.handleKey("b");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Source Doc");
+    await screen.handleKey("\r");
+    expect(doc.id).toBe("source-1");
+
+    await screen.handleKey("h");
+    const history = renderPlain((renderer) => screen.render(renderer));
+    expect(history).toContain("v2");
+    expect(history).toContain("Ada");
+    expect(history).toContain("-old");
+    await screen.handleKey("r");
+    expect(restores).toEqual([{ docId: "source-1", versionId: "v2" }]);
+  });
+
+  test("reader and tree expose deterministic parity helpers for web sidebar and CLI json", () => {
+    const row = { id: "doc-1", title: "Same Doc", bodyMd: "same", slug: "same-doc" };
+    expect(docsTreeDataMatchesWebSidebar([row], [row])).toBe(true);
+    expect(docsReaderDataMatchesCliShow(row, { ...row })).toBe(true);
+  });
+
+  test("markdown renderer handles 10 kB body under reader budget", () => {
+    const body = `# Large\n\n${"See [[slug]] with `code` and **bold**.\n".repeat(280)}`;
+    expect(body.length).toBeGreaterThan(10_000);
+    const start = performance.now();
+    const lines = renderMarkdown(body);
+    expect(performance.now() - start).toBeLessThan(100);
+    expect(lines.join("\n")).toContain("[[slug]] with code and bold.");
+  });
+
   test("renders markdown as ANSI-safe plain text and saves frontmatter plus body without data loss", async () => {
     const updates: unknown[] = [];
     const storedDoc = {

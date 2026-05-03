@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: tui
 Blocked-by: [15/issues/10-runs-and-artifacts.md]
@@ -24,9 +24,9 @@ Agents registry screen (`/agents`; list registered agent profiles; `Enter` opens
 
 ## Acceptance criteria
 
-- [ ] Agents registry: all registered CLI agents listed (claude-code, codex, pi, opencode, etc.); `d` dispatch form with project/task selectors; submit → `agent_runs.create`.
-- [ ] Orchestration dashboard: live run list; claim state badges (`pending`/`claimed`/`running`/`completed`); subscription fires → row updates within 200ms.
-- [ ] Inference dashboard: sidecar status (running/stopped/error); model list with `default` badge; `s` start → `inference.start` → status updates; `s` stop → `inference.stop`.
+- [x] Agents registry: all registered CLI agents listed (claude-code, codex, pi, opencode, etc.); `d` dispatch form with project/task selectors; submit → `agent_runs.create`.
+- [x] Orchestration dashboard: live run list; claim state badges (`pending`/`claimed`/`running`/`completed`); subscription fires → row updates within 200ms.
+- [x] Inference dashboard: sidecar status (running/stopped/error); model list with `default` badge; `s` start → `inference.start` → status updates; `s` stop → `inference.stop`.
 - [ ] After TUI dispatch, web orchestration dashboard shows new run; CLI `fulcrum runs list --json` reflects.
 - [ ] After TUI `inference start`, CLI `fulcrum inference status --json` shows `status='running'`.
 

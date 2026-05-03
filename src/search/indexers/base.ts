@@ -9,6 +9,7 @@ import {
   isEmbeddingsEnabled,
   serializeEmbedding,
 } from "../embeddings.ts";
+import { upsertMeilisearchDocument } from "../backend.ts";
 import { tableColumns } from "./entity-helpers.ts";
 
 export type SearchIndexKind =
@@ -104,6 +105,7 @@ export class SearchIndexHook implements IndexerHook {
           embedding,
         ],
       );
+      await upsertMeilisearchDocument(document);
       return;
     }
 
@@ -130,6 +132,7 @@ export class SearchIndexHook implements IndexerHook {
         JSON.stringify(document.metadata ?? {}),
       ],
     );
+    await upsertMeilisearchDocument(document);
   }
 
   async remove(entityId: string, orgId: string): Promise<void> {

@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: cli-codegen
 Blocked-by: [14/issues/01-codegen-scaffold.md]

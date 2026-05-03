@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: artifacts
 Blocked-by: [06-trpc-procedures.md, 07-manual-upload.md]

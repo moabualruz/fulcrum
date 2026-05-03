@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 05-router-and-skills
 Blocked-by: 07-routing-trpc-procedures
@@ -15,15 +15,15 @@ Build the OpenTUI routing rules screen in `src/tui/screens/routing-rules.ts`. Di
 
 ## Acceptance criteria
 
-- [ ] Schema / module: `src/tui/screens/routing-rules.ts` renders rule table with all specified columns
-- [ ] Logic: `n` key opens inline form; submitting calls `trpc.routing.create`; new row appears in table
-- [ ] Logic: `e` key opens pre-populated edit form for selected rule; submitting calls `trpc.routing.update`
-- [ ] Logic: `d` key shows confirmation prompt; confirming calls `trpc.routing.delete`; row removed from table
-- [ ] Logic: `t` key opens test pane; user inputs task fields; on submit calls `trpc.routing.dryRun`; decision banner shows agent + source
-- [ ] Logic: enabled toggle (via `e` → enable/disable field) calls `trpc.routing.update`
-- [ ] Surfaces parity: all operations produce identical data outcomes as Web and CLI equivalents
-- [ ] Tests: TUI unit tests (OpenTUI test utilities) for key bindings firing correct tRPC calls
-- [ ] Tests: test pane renders `RoutingDecision` output correctly
+- [x] Schema / module: `src/tui/screens/routing-rules.ts` renders rule table with all specified columns
+- [x] Logic: `n` key opens inline form; submitting calls `trpc.routing.create`; new row appears in table
+- [x] Logic: `e` key opens pre-populated edit form for selected rule; submitting calls `trpc.routing.update`
+- [x] Logic: `d` key shows confirmation prompt; confirming calls `trpc.routing.delete`; row removed from table
+- [x] Logic: `t` key opens test pane; user inputs task fields; on submit calls `trpc.routing.dryRun`; decision banner shows agent + source
+- [x] Logic: enabled toggle (via `e` → enable/disable field) calls `trpc.routing.update`
+- [x] Surfaces parity: all operations produce identical data outcomes as Web and CLI equivalents
+- [x] Tests: TUI unit tests (OpenTUI test utilities) for key bindings firing correct tRPC calls
+- [x] Tests: test pane renders `RoutingDecision` output correctly
 
 ## Blocked by
 

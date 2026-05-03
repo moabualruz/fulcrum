@@ -7,6 +7,7 @@ import {
   type NotificationQuietHoursLike,
   type NotifyFanoutRepositories,
 } from "../../src/notifications/fanout-worker.ts";
+import { DeliveryStatus } from "../../src/db/entities/notifications/index.ts";
 import type { NotificationRuleLike } from "../../src/notifications/rule-engine.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-00000000000a";
@@ -59,6 +60,7 @@ function createRepos(options: {
   quietHours?: NotificationQuietHoursLike | null;
 } = {}) {
   const notifications: Array<Record<string, unknown>> = [];
+  const deliveries: Array<Record<string, unknown>> = [];
   const jobs: Array<{ name: string; payload: Record<string, unknown> }> = [];
   const rules = options.rules ?? [rule({ id: "44444444-4444-4444-4444-444444444444" })];
   const repos: NotifyFanoutRepositories = {
@@ -111,6 +113,13 @@ function createRepos(options: {
         return stored;
       },
     },
+    notificationDeliveryRepo: {
+      async create(data: Record<string, unknown>) {
+        const stored = { id: crypto.randomUUID(), ...data };
+        deliveries.push(stored);
+        return stored;
+      },
+    },
     queue: {
       async addJob(name: string, payload: Record<string, unknown>) {
         jobs.push({ name, payload });
@@ -122,7 +131,7 @@ function createRepos(options: {
       },
     },
   };
-  return { repos, notifications, jobs };
+  return { repos, notifications, deliveries, jobs };
 }
 
 describe("notify fanout worker", () => {
@@ -150,15 +159,48 @@ describe("notify fanout worker", () => {
   });
 
   it("queues retry-after-quiet instead of channel delivery during quiet hours", async () => {
-    const { repos, jobs } = createRepos({
+    const { repos, notifications, deliveries, jobs } = createRepos({
       rules: [rule({ channels: ["in-app", "email"] })],
       quietHours: { orgId: ORG_ID, userId: USER_ID, tz: "UTC", startHour: 22, endHour: 7, daysOfWeek: [0, 1, 2, 3, 4, 5, 6] },
     });
 
     await createNotifyFanoutTask(repos, { now: new Date("2026-05-03T23:30:00.000Z") })({ eventId: EVENT_ID });
 
+    expect(notifications).toHaveLength(1);
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0]).toMatchObject({
+      orgId: ORG_ID,
+      userId: USER_ID,
+      channel: "email",
+      status: "held-quiet-hours",
+      attemptCount: 0,
+      payload: expect.objectContaining({ eventId: EVENT_ID }),
+    });
     expect(jobs).toEqual([{
       name: "notify-retry-after-quiet",
+      payload: expect.objectContaining({ eventId: EVENT_ID, userId: USER_ID, channel: "email" }),
+    }]);
+  });
+
+  it("queues channel delivery with pending status outside quiet hours", async () => {
+    const { repos, deliveries, jobs } = createRepos({
+      rules: [rule({ channels: ["email"] })],
+      quietHours: { orgId: ORG_ID, userId: USER_ID, tz: "UTC", startHour: 22, endHour: 7, daysOfWeek: [0, 1, 2, 3, 4, 5, 6] },
+    });
+
+    await createNotifyFanoutTask(repos, { now: new Date("2026-05-03T12:30:00.000Z") })({ eventId: EVENT_ID });
+
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0]).toMatchObject({
+      orgId: ORG_ID,
+      userId: USER_ID,
+      channel: "email",
+      status: DeliveryStatus.Pending,
+      attemptCount: 0,
+      payload: expect.objectContaining({ eventId: EVENT_ID }),
+    });
+    expect(jobs).toEqual([{
+      name: "notify-deliver-email",
       payload: expect.objectContaining({ eventId: EVENT_ID, userId: USER_ID, channel: "email" }),
     }]);
   });

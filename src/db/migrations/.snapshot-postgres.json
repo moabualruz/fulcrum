@@ -10203,6 +10203,22 @@
           "enumItems": [],
           "mappedType": "string"
         },
+        "tiptap_content": {
+          "name": "tiptap_content",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "'{\"type\": \"doc\", \"content\": [{\"type\": \"paragraph\"}]}'",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
+        },
         "title": {
           "name": "title",
           "type": "varchar(255)",
@@ -10271,6 +10287,17 @@
           "composite": false,
           "constraint": false,
           "keyName": "tasks_custom_fields_gin",
+          "primary": false,
+          "unique": false,
+          "type": "gin"
+        },
+        {
+          "columnNames": [
+            "dependencies"
+          ],
+          "composite": false,
+          "constraint": false,
+          "keyName": "tasks_dependencies_gin",
           "primary": false,
           "unique": false,
           "type": "gin"

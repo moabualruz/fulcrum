@@ -32,5 +32,6 @@ export interface AgentRunResult {
   readonly artifacts: AgentRunArtifact[];
   readonly durationMs: number;
   readonly iterationCount: number;
+  readonly exitReason: "complete" | "max_iterations" | "token_cap";
   readonly tokenUsed?: number;
 }
