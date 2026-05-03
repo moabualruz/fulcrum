@@ -16,3 +16,10 @@ export {
   FLAG_DESCRIPTIONS,
   type FeatureFlagName,
 } from "./registry.ts";
+export {
+  bucketFor,
+  evaluateFeatureFlag,
+  normalizeRolloutPercent,
+  type EvaluateFeatureFlagInput,
+  type FeatureFlagEvaluationConfig,
+} from "./evaluation.ts";

@@ -37,12 +37,18 @@ import {
   FLAG_DESCRIPTIONS,
   type FeatureFlagName,
 } from "../.././../flags/registry.ts";
+import { evaluateFeatureFlag } from "../../../flags/evaluation.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Input schema
 // ─────────────────────────────────────────────────────────────────────────────
 
 const flagNameSchema = z.enum(FEATURE_FLAGS);
+const rolloutPercentSchema = z.number().int().min(0).max(100);
+const orgOverridesSchema = z.record(z.string().uuid(), z.boolean()).default({});
+const rolloutCohortRulesSchema = z.object({
+  orgOverrides: orgOverridesSchema.optional(),
+}).passthrough();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Output type
@@ -79,6 +85,18 @@ async function getOrgMemberRepository() {
     "../../../db/repositories/auth/OrgMemberRepository.ts"
   );
   return OrgMemberRepository;
+}
+
+async function getOrgClass() {
+  const { Org } = await import("../../../db/entities/auth/Org.ts");
+  return Org;
+}
+
+async function getFeatureFlagRolloutClass() {
+  const { FeatureFlagRollout } = await import(
+    "../../../db/entities/platform/FeatureFlagRollout.ts"
+  );
+  return FeatureFlagRollout;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -209,6 +227,103 @@ async function requireWritableFlagScope(
   return ctx.orgId;
 }
 
+function readOrgOverrides(cohortRules: Record<string, unknown> | null | undefined): Record<string, boolean> {
+  const parsed = rolloutCohortRulesSchema.safeParse(cohortRules ?? {});
+  if (!parsed.success) return {};
+  return parsed.data.orgOverrides ?? {};
+}
+
+async function findScopedFeatureFlag(
+  em: import("@mikro-orm/postgresql").EntityManager,
+  flag: FeatureFlagName,
+  orgId: string,
+) {
+  const FeatureFlag = await getFeatureFlagClass();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return em.findOne(FeatureFlag, { flag, orgId, userId: null } as any);
+}
+
+async function ensureScopedFeatureFlag(
+  em: import("@mikro-orm/postgresql").EntityManager,
+  flag: FeatureFlagName,
+  orgId: string,
+) {
+  const existing = await findScopedFeatureFlag(em, flag, orgId);
+  if (existing) return existing;
+
+  const FeatureFlag = await getFeatureFlagClass();
+  const row = em.create(FeatureFlag, {
+    flag,
+    enabled: true,
+    orgId,
+    userId: null,
+    createdAt: new Date(),
+  } as any);
+  em.persist(row);
+  return row;
+}
+
+async function findRollout(
+  em: import("@mikro-orm/postgresql").EntityManager,
+  flag: FeatureFlagName,
+  orgId: string,
+) {
+  const FeatureFlagRollout = await getFeatureFlagRolloutClass();
+  const flagRow = await findScopedFeatureFlag(em, flag, orgId);
+  if (!flagRow) return null;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return em.findOne(FeatureFlagRollout, { org: orgId, flag: (flagRow as any).id } as any, {
+    refresh: true,
+  });
+}
+
+async function upsertRollout(
+  em: import("@mikro-orm/postgresql").EntityManager,
+  input: {
+    flag: FeatureFlagName;
+    orgId: string;
+    rolloutPercent?: number;
+    orgOverride?: boolean;
+    updatedBy?: string | null;
+  },
+) {
+  const FeatureFlagRollout = await getFeatureFlagRolloutClass();
+  const Org = await getOrgClass();
+  const User = (await import("../../../db/entities/auth/User.ts")).User;
+  const flagRow = await ensureScopedFeatureFlag(em, input.flag, input.orgId);
+  let rollout = await findRollout(em, input.flag, input.orgId);
+
+  if (!rollout) {
+    rollout = em.create(FeatureFlagRollout, {
+      org: em.getReference(Org, input.orgId),
+      flag: flagRow,
+      rolloutPercent: input.rolloutPercent ?? 100,
+      cohortRules: {},
+      updatedBy: input.updatedBy ? em.getReference(User, input.updatedBy) : undefined,
+      updatedAt: new Date(),
+    } as any);
+    em.persist(rollout);
+  }
+
+  if (typeof input.rolloutPercent === "number") {
+    (rollout as { rolloutPercent: number }).rolloutPercent = input.rolloutPercent;
+  }
+
+  if (typeof input.orgOverride === "boolean") {
+    const current = (rollout as { cohortRules: Record<string, unknown> }).cohortRules ?? {};
+    const orgOverrides = { ...readOrgOverrides(current), [input.orgId]: input.orgOverride };
+    (rollout as { cohortRules: Record<string, unknown> }).cohortRules = {
+      ...current,
+      orgOverrides,
+    };
+  }
+
+  (rollout as { updatedAt: Date }).updatedAt = new Date();
+  await em.flush();
+  return rollout;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // flags router
 // ─────────────────────────────────────────────────────────────────────────────
@@ -297,6 +412,111 @@ export const flagsRouter = t.router({
       const registry = await resolveFlagRegistry(ctx);
       registry.bustFlag(input.flag as FeatureFlagName);
 
+      return { ok: true };
+    }),
+
+  evaluate: protectedProcedure
+    .input(
+      z.object({
+        flag: flagNameSchema,
+        orgId: z.string().uuid(),
+        userId: z.string().min(1),
+      }),
+    )
+    .query(async ({ ctx, input }): Promise<{ enabled: boolean }> => {
+      if (input.orgId !== ctx.orgId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Cannot evaluate feature flags outside the active org.",
+        });
+      }
+
+      const registry = await resolveFlagRegistry(ctx);
+      const baseEnabled = await registry.isEnabled(input.flag, {
+        orgId: input.orgId,
+        userId: input.userId,
+      });
+
+      if (!ctx.em) {
+        return {
+          enabled: evaluateFeatureFlag({
+            flag: input.flag,
+            orgId: input.orgId,
+            userId: input.userId,
+            config: { enabled: baseEnabled, rolloutPercent: 100 },
+          }),
+        };
+      }
+
+      const rollout = await findRollout(ctx.em, input.flag, input.orgId);
+      const rolloutPercent = (rollout as { rolloutPercent?: number } | null)?.rolloutPercent ?? 100;
+      const cohortRules = (rollout as { cohortRules?: Record<string, unknown> } | null)?.cohortRules;
+
+      return {
+        enabled: evaluateFeatureFlag({
+          flag: input.flag,
+          orgId: input.orgId,
+          userId: input.userId,
+          config: {
+            enabled: baseEnabled,
+            rolloutPercent,
+            orgOverrides: readOrgOverrides(cohortRules),
+          },
+        }),
+      };
+    }),
+
+  setOverride: protectedProcedure
+    .input(
+      z.object({
+        flag: flagNameSchema,
+        orgId: z.string().uuid(),
+        enabled: z.boolean(),
+      }),
+    )
+    .mutation(async ({ ctx, input }): Promise<{ ok: true }> => {
+      await requireOwnerOrAdmin(ctx);
+      const targetOrgId = await requireWritableFlagScope(ctx, { orgId: input.orgId });
+      if (!ctx.em) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "EntityManager not available in tRPC context.",
+        });
+      }
+
+      await upsertRollout(ctx.em, {
+        flag: input.flag,
+        orgId: targetOrgId,
+        orgOverride: input.enabled,
+        updatedBy: ctx.userId,
+      });
+      return { ok: true };
+    }),
+
+  setRollout: protectedProcedure
+    .input(
+      z.object({
+        flag: flagNameSchema,
+        rolloutPercent: rolloutPercentSchema,
+        orgId: z.string().uuid().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }): Promise<{ ok: true }> => {
+      await requireOwnerOrAdmin(ctx);
+      const targetOrgId = await requireWritableFlagScope(ctx, input);
+      if (!ctx.em) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "EntityManager not available in tRPC context.",
+        });
+      }
+
+      await upsertRollout(ctx.em, {
+        flag: input.flag,
+        orgId: targetOrgId,
+        rolloutPercent: input.rolloutPercent,
+        updatedBy: ctx.userId,
+      });
       return { ok: true };
     }),
 });

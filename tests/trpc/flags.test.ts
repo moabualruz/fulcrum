@@ -24,6 +24,7 @@ import { FeatureFlag } from "../../src/db/entities/auth/FeatureFlag.ts";
 import { Org } from "../../src/db/entities/auth/Org.ts";
 import { User } from "../../src/db/entities/auth/User.ts";
 import { OrgMember } from "../../src/db/entities/auth/OrgMember.ts";
+import { FeatureFlagRollout } from "../../src/db/entities/platform/FeatureFlagRollout.ts";
 import { FeatureFlagRepository } from "../../src/db/repositories/auth/FeatureFlagRepository.ts";
 import { OrgMemberRepository } from "../../src/db/repositories/auth/OrgMemberRepository.ts";
 import { appRouter } from "../../src/trpc/router.ts";
@@ -31,11 +32,11 @@ import { createContext } from "../../src/trpc/context.ts";
 import { t } from "../../src/trpc/trpc.ts";
 import { FlagRegistry } from "../../src/flags/registry.ts";
 
-const TEST_ORG_ID = "00000000-0000-0000-0000-000000000001";
+const TEST_ORG_ID = "00000000-0000-4000-8000-000000000001";
 const OTHER_ORG_ID = "11111111-1111-4111-8111-111111111111";
-const TEST_USER_ID = "00000000-0000-0000-0000-000000000010";
-const TEST_ADMIN_USER_ID = "00000000-0000-0000-0000-000000000011";
-const OTHER_USER_ID = "00000000-0000-0000-0000-000000000020";
+const TEST_USER_ID = "00000000-0000-4000-8000-000000000010";
+const TEST_ADMIN_USER_ID = "00000000-0000-4000-8000-000000000011";
+const OTHER_USER_ID = "00000000-0000-4000-8000-000000000020";
 
 let orm: MikroORM;
 let pglite: PGlite;
@@ -119,7 +120,7 @@ beforeAll(async () => {
   orm = await MikroORM.init({
     dbName: "postgres",
     driverOptions: dialect,
-    entities: [FeatureFlag, Org, User, OrgMember],
+    entities: [FeatureFlag, FeatureFlagRollout, Org, User, OrgMember],
     debug: false,
   });
 
@@ -218,6 +219,7 @@ afterAll(async () => {
 beforeEach(async () => {
   // Wipe feature flags between tests
   const em = orm.em.fork();
+  await em.nativeDelete(FeatureFlagRollout, {});
   await em.nativeDelete(FeatureFlag, {});
   delete process.env["FULCRUM_FEATURES"];
 });
@@ -405,5 +407,78 @@ describe("flags.set — non-owner forbidden", () => {
     }
     expect(error).not.toBeNull();
     expect(error?.code).toBe("FORBIDDEN");
+  });
+});
+
+describe("flags rollout procedures", () => {
+  it("owner sets rollout percentage and evaluates users deterministically", async () => {
+    const caller = makeCaller(TEST_ADMIN_USER_ID, TEST_ORG_ID);
+    await caller.flags.set({ flag: "router-llm", enabled: true });
+    expect(await caller.flags.setRollout({ flag: "router-llm", rolloutPercent: 0 })).toEqual({
+      ok: true,
+    });
+
+    expect(
+      await caller.flags.evaluate({
+        flag: "router-llm",
+        orgId: TEST_ORG_ID,
+        userId: TEST_USER_ID,
+      }),
+    ).toEqual({ enabled: false });
+
+    expect(await caller.flags.setRollout({ flag: "router-llm", rolloutPercent: 100 })).toEqual({
+      ok: true,
+    });
+
+    expect(
+      await caller.flags.evaluate({
+        flag: "router-llm",
+        orgId: TEST_ORG_ID,
+        userId: TEST_USER_ID,
+      }),
+    ).toEqual({ enabled: true });
+  });
+
+  it("per-org override enable and disable wins over rollout", async () => {
+    const caller = makeCaller(TEST_ADMIN_USER_ID, TEST_ORG_ID);
+    await caller.flags.set({ flag: "embeddings", enabled: true });
+    await caller.flags.setRollout({ flag: "embeddings", rolloutPercent: 0 });
+
+    expect(
+      await caller.flags.setOverride({
+        flag: "embeddings",
+        orgId: TEST_ORG_ID,
+        enabled: true,
+      }),
+    ).toEqual({ ok: true });
+    expect(
+      await caller.flags.evaluate({
+        flag: "embeddings",
+        orgId: TEST_ORG_ID,
+        userId: TEST_USER_ID,
+      }),
+    ).toEqual({ enabled: true });
+
+    await caller.flags.setRollout({ flag: "embeddings", rolloutPercent: 100 });
+    await caller.flags.setOverride({
+      flag: "embeddings",
+      orgId: TEST_ORG_ID,
+      enabled: false,
+    });
+
+    expect(
+      await caller.flags.evaluate({
+        flag: "embeddings",
+        orgId: TEST_ORG_ID,
+        userId: TEST_USER_ID,
+      }),
+    ).toEqual({ enabled: false });
+  });
+
+  it("rejects rollout percentages outside 0-100", async () => {
+    const caller = makeCaller(TEST_ADMIN_USER_ID, TEST_ORG_ID);
+    await expect(
+      caller.flags.setRollout({ flag: "router-llm", rolloutPercent: 101 }),
+    ).rejects.toThrow();
   });
 });
