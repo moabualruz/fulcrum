@@ -1,21 +1,19 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
 import { openPglite } from "../../../../product-kernel/db/pglite.ts";
 import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
+import {
+  createLocalOrg,
+  type EventRow,
+} from "../../../../product-kernel/store/repositories.ts";
 import type { ProductDb } from "../../../../product-kernel/db/types.ts";
 import {
   listProfiles,
-  getProfile,
-  upsertProfile,
-  maskEnvValue,
-  maskProfile,
-  paginateLogs,
-  listArtifacts,
-  getWorkspaceDiff,
+  testProfileAction,
+  upsertProfileAction,
+  type AgentProfileRow,
 } from "./agents.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-agents-"));
@@ -24,222 +22,131 @@ afterAll(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-async function freshDb(name: string): Promise<{ db: ProductDb; orgId: string }> {
+async function freshDb(name: string): Promise<{
+  db: ProductDb;
+  orgId: string;
+}> {
   const db = await openPglite(join(scratch, name));
   await runMigrations(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   return { db, orgId: org.id };
 }
 
-describe("agents server module", () => {
-  test("listProfiles returns seeded profiles ordered by name", async () => {
-    const { db, orgId } = await freshDb("list");
+async function seedProfiles(
+  db: ProductDb,
+  orgId: string,
+  count: number,
+): Promise<string[]> {
+  const ids: string[] = [];
+  const agents = ["claude-code", "codex", "gemini", "opencode", "pi", "custom"];
+  for (let i = 0; i < count; i++) {
+    const name = agents[i] ?? `agent-${i}`;
+    const { id } = await upsertProfileAction(db, orgId, {
+      name,
+      cliPath: `/usr/local/bin/${name}`,
+      defaultFlags: "",
+      authEnvVars: [],
+    });
+    ids.push(id);
+  }
+  return ids;
+}
+
+describe("server actions: agents", () => {
+  test("listProfiles returns all seeded profiles", async () => {
+    const { db, orgId } = await freshDb("list-profiles");
     try {
-      await upsertProfile(db, { orgId, name: "codex", cliPath: "/usr/bin/codex" });
-      await upsertProfile(db, { orgId, name: "claude-code", cliPath: "/usr/bin/claude" });
+      await seedProfiles(db, orgId, 6);
+      const profiles = await listProfiles(db, orgId);
+      expect(profiles).toHaveLength(6);
+      expect(profiles.map((p) => p.name).sort()).toEqual([
+        "claude-code",
+        "codex",
+        "custom",
+        "gemini",
+        "opencode",
+        "pi",
+      ]);
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("upsertProfileAction creates a new profile", async () => {
+    const { db, orgId } = await freshDb("upsert-create");
+    try {
+      const result = await upsertProfileAction(db, orgId, {
+        name: "claude-code",
+        cliPath: "/usr/local/bin/claude",
+        defaultFlags: "--verbose",
+        authEnvVars: ["ANTHROPIC_API_KEY"],
+      });
+      expect(result.id).toBeTruthy();
 
       const profiles = await listProfiles(db, orgId);
-      expect(profiles).toHaveLength(2);
+      expect(profiles).toHaveLength(1);
       expect(profiles[0]!.name).toBe("claude-code");
-      expect(profiles[1]!.name).toBe("codex");
+      expect(profiles[0]!.cli_path).toBe("/usr/local/bin/claude");
+      expect(profiles[0]!.default_flags).toBe("--verbose");
+      expect(profiles[0]!.auth_env_vars).toEqual(["ANTHROPIC_API_KEY"]);
     } finally {
       await db.close();
     }
   });
 
-  test("getProfile returns single profile by name", async () => {
-    const { db, orgId } = await freshDb("get");
+  test("upsertProfileAction updates existing profile by name", async () => {
+    const { db, orgId } = await freshDb("upsert-update");
     try {
-      await upsertProfile(db, { orgId, name: "claude-code", cliPath: "/usr/bin/claude" });
-      const p = await getProfile(db, orgId, "claude-code");
-      expect(p).toBeDefined();
-      expect(p!.name).toBe("claude-code");
-      expect(p!.cli_path).toBe("/usr/bin/claude");
-    } finally {
-      await db.close();
-    }
-  });
-
-  test("getProfile returns undefined for missing profile", async () => {
-    const { db, orgId } = await freshDb("get-miss");
-    try {
-      const p = await getProfile(db, orgId, "nope");
-      expect(p).toBeUndefined();
-    } finally {
-      await db.close();
-    }
-  });
-
-  test("upsertProfile updates existing profile on conflict", async () => {
-    const { db, orgId } = await freshDb("upsert");
-    try {
-      await upsertProfile(db, { orgId, name: "claude-code", cliPath: "/old" });
-      await upsertProfile(db, { orgId, name: "claude-code", cliPath: "/new", flags: ["--yolo"] });
-      const p = await getProfile(db, orgId, "claude-code");
-      expect(p!.cli_path).toBe("/new");
-      expect(p!.flags).toEqual(["--yolo"]);
-    } finally {
-      await db.close();
-    }
-  });
-
-  test("upsertProfile stores auth_env as JSON", async () => {
-    const { db, orgId } = await freshDb("upsert-env");
-    try {
-      await upsertProfile(db, {
-        orgId,
-        name: "claude-code",
-        cliPath: "/usr/bin/claude",
-        authEnv: { ANTHROPIC_API_KEY: "sk-ant-1234abcd" },
+      await upsertProfileAction(db, orgId, {
+        name: "codex",
+        cliPath: "/old/codex",
+        defaultFlags: "",
+        authEnvVars: [],
       });
-      const p = await getProfile(db, orgId, "claude-code");
-      expect(p!.auth_env).toEqual({ ANTHROPIC_API_KEY: "sk-ant-1234abcd" });
-    } finally {
-      await db.close();
-    }
-  });
-});
+      await upsertProfileAction(db, orgId, {
+        name: "codex",
+        cliPath: "/new/codex",
+        defaultFlags: "--model gpt-5",
+        authEnvVars: ["OPENAI_API_KEY"],
+      });
 
-describe("maskEnvValue", () => {
-  test("masks long values showing last 4 chars", () => {
-    expect(maskEnvValue("sk-ant-1234abcd")).toBe("****abcd");
-  });
-
-  test("masks short values entirely", () => {
-    expect(maskEnvValue("abc")).toBe("****");
-    expect(maskEnvValue("abcd")).toBe("****");
-  });
-});
-
-describe("maskProfile", () => {
-  test("masks all auth_env values", () => {
-    const profile = {
-      auth_env: { KEY1: "secret12345", KEY2: "tiny" },
-      name: "test",
-    };
-    const masked = maskProfile(profile);
-    expect(masked.auth_env.KEY1).toBe("****2345");
-    expect(masked.auth_env.KEY2).toBe("****");
-    expect(masked.name).toBe("test");
-  });
-});
-
-describe("paginateLogs", () => {
-  test("paginates JSONL content with cursor", () => {
-    const lines = Array.from({ length: 5 }, (_, i) =>
-      JSON.stringify({ timestamp: `t${i}`, stream: "stdout", text: `line ${i}` }),
-    ).join("\n");
-
-    const page1 = paginateLogs(lines, 0, 3);
-    expect(page1.entries).toHaveLength(3);
-    expect(page1.entries[0]!.text).toBe("line 0");
-    expect(page1.cursor).toBe(3);
-
-    const page2 = paginateLogs(lines, 3, 3);
-    expect(page2.entries).toHaveLength(2);
-    expect(page2.entries[0]!.text).toBe("line 3");
-    expect(page2.cursor).toBeNull();
-  });
-
-  test("handles non-JSON lines as raw", () => {
-    const content = "not json\n";
-    const result = paginateLogs(content, 0, 10);
-    expect(result.entries).toHaveLength(1);
-    expect(result.entries[0]!.stream).toBe("raw");
-    expect(result.entries[0]!.text).toBe("not json");
-  });
-
-  test("returns empty for empty content", () => {
-    const result = paginateLogs("", 0, 10);
-    expect(result.entries).toHaveLength(0);
-    expect(result.cursor).toBeNull();
-  });
-});
-
-describe("listArtifacts", () => {
-  test("returns artifacts for a run", async () => {
-    const { db, orgId } = await freshDb("artifacts");
-    try {
-      const runId = newUlid();
-      await db.query(
-        `INSERT INTO agent_runs (id, org_id, agent, status) VALUES ($1, $2, 'claude', 'succeeded')`,
-        [runId, orgId],
-      );
-      const artId = newUlid();
-      await db.query(
-        `INSERT INTO artifacts (id, org_id, run_id, kind, title, size, mime)
-         VALUES ($1, $2, $3, 'diff', 'changes.diff', 1024, 'text/x-diff')`,
-        [artId, orgId, runId],
-      );
-      const arts = await listArtifacts(db, orgId, runId);
-      expect(arts).toHaveLength(1);
-      expect(arts[0]!.title).toBe("changes.diff");
-      expect(arts[0]!.mime).toBe("text/x-diff");
-      expect(arts[0]!.size).toBe(1024);
+      const profiles = await listProfiles(db, orgId);
+      expect(profiles).toHaveLength(1);
+      expect(profiles[0]!.cli_path).toBe("/new/codex");
+      expect(profiles[0]!.default_flags).toBe("--model gpt-5");
     } finally {
       await db.close();
     }
   });
 
-  test("returns empty for run with no artifacts", async () => {
-    const { db, orgId } = await freshDb("artifacts-empty");
+  test("testProfileAction sets test_passed and last_tested_at", async () => {
+    const { db, orgId } = await freshDb("test-profile");
     try {
-      const runId = newUlid();
-      await db.query(
-        `INSERT INTO agent_runs (id, org_id, agent, status) VALUES ($1, $2, 'claude', 'succeeded')`,
-        [runId, orgId],
-      );
-      const arts = await listArtifacts(db, orgId, runId);
-      expect(arts).toHaveLength(0);
-    } finally {
-      await db.close();
-    }
-  });
-});
+      const [id] = await seedProfiles(db, orgId, 1);
+      const result = await testProfileAction(db, id!, orgId, true);
+      expect(result.ok).toBe(true);
 
-describe("getWorkspaceDiff", () => {
-  test("returns diff content when diff_path is set", async () => {
-    const { db, orgId } = await freshDb("diff-ok");
-    try {
-      const diffFile = join(scratch, "test.diff");
-      writeFileSync(diffFile, "--- a/foo\n+++ b/foo\n@@ -1 +1 @@\n-old\n+new\n");
-      const runId = newUlid();
-      await db.query(
-        `INSERT INTO agent_runs (id, org_id, agent, status, diff_path) VALUES ($1, $2, 'claude', 'succeeded', $3)`,
-        [runId, orgId, diffFile],
-      );
-      const diff = await getWorkspaceDiff(db, orgId, runId);
-      expect(diff).toContain("+new");
+      const profiles = await listProfiles(db, orgId);
+      expect(profiles[0]!.test_passed).toBe(true);
+      expect(profiles[0]!.last_tested_at).not.toBeNull();
     } finally {
       await db.close();
     }
   });
 
-  test("returns null when diff_path is null", async () => {
-    const { db, orgId } = await freshDb("diff-null");
+  test("testProfileAction emits agent_profile.tested event", async () => {
+    const { db, orgId } = await freshDb("test-event");
     try {
-      const runId = newUlid();
-      await db.query(
-        `INSERT INTO agent_runs (id, org_id, agent, status) VALUES ($1, $2, 'claude', 'succeeded')`,
-        [runId, orgId],
-      );
-      const diff = await getWorkspaceDiff(db, orgId, runId);
-      expect(diff).toBeNull();
-    } finally {
-      await db.close();
-    }
-  });
+      const [id] = await seedProfiles(db, orgId, 1);
+      await testProfileAction(db, id!, orgId, false);
 
-  test("returns null when diff file does not exist", async () => {
-    const { db, orgId } = await freshDb("diff-missing");
-    try {
-      const runId = newUlid();
-      await db.query(
-        `INSERT INTO agent_runs (id, org_id, agent, status, diff_path) VALUES ($1, $2, 'claude', 'succeeded', '/nonexistent/path.diff')`,
-        [runId, orgId],
+      const events = await db.query<EventRow>(
+        `SELECT * FROM events WHERE subject_id = $1`,
+        [id!],
       );
-      const diff = await getWorkspaceDiff(db, orgId, runId);
-      expect(diff).toBeNull();
+      const tested = events.find((e) => e.verb === "tested");
+      expect(tested?.subject_kind).toBe("agent_profile");
+      expect(tested?.payload).toEqual({ test_passed: false });
     } finally {
       await db.close();
     }
