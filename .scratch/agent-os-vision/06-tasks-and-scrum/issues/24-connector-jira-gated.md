@@ -1,6 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
+ImplRuntime: claude
 Pillar: 06-tasks-and-scrum
 Blocked-by: [06-connector-framework-schema]
 PRD: .scratch/agent-os-vision/prds/06-tasks-and-scrum.md

@@ -53,7 +53,7 @@ describe("JiraConnector", () => {
     });
     expect(connector.pulledItems).toEqual([
       {
-        externalId: "FUL-1",
+        externalId: "jira:FUL-1",
         data: {
           id: "10001",
           title: "Ship connector",
@@ -62,6 +62,7 @@ describe("JiraConnector", () => {
           assignee: "owner@example.com",
           dueDate: "2026-05-15",
           labels: ["api", "sync"],
+          parentExternalId: undefined,
         },
       },
     ]);
@@ -84,7 +85,7 @@ describe("JiraConnector", () => {
     connector.enable();
 
     const result = await connector.push([
-      { externalId: "FUL-1", data: { title: "Finished connector", status: "done" } },
+      { externalId: "jira:FUL-1", data: { title: "Finished connector", status: "done" } },
     ]);
 
     expect(result).toEqual({ pulled: 0, pushed: 1, skipped: 0, errors: [] });
@@ -191,7 +192,7 @@ describe("JiraConnector", () => {
     expect(requests.map((request) => new URL(request.url).searchParams.get("startAt"))).toEqual(["0", "2"]);
     expect(batches[0]).toEqual([
       {
-        externalId: "FUL-1",
+        externalId: "jira:FUL-1",
         data: {
           id: "10001",
           title: "Parent Jira issue",
@@ -200,11 +201,11 @@ describe("JiraConnector", () => {
           assignee: "Owner",
           dueDate: "2026-06-01",
           labels: ["history"],
-          parentExternalId: "FUL-0",
+          parentExternalId: "jira:FUL-0",
         },
       },
       {
-        externalId: "FUL-2",
+        externalId: "jira:FUL-2",
         data: {
           id: "10002",
           title: "Child Jira issue",
@@ -213,13 +214,13 @@ describe("JiraConnector", () => {
           assignee: "child@example.com",
           dueDate: undefined,
           labels: ["api"],
-          parentExternalId: "FUL-1",
+          parentExternalId: "jira:FUL-1",
         },
       },
     ]);
     expect(batches[1]).toEqual([
       {
-        externalId: "FUL-3",
+        externalId: "jira:FUL-3",
         data: {
           id: "10003",
           title: "Final Jira issue",
@@ -232,5 +233,143 @@ describe("JiraConnector", () => {
         },
       },
     ]);
+  });
+
+  it("uses configurable status map to translate Jira statuses", async () => {
+    const connector = new JiraConnector({
+      url: "https://example.atlassian.net",
+      token: "token",
+      projectKey: "FUL",
+      statusMap: { "In Progress": "in_progress", "QA Review": "review" },
+      fetch: async () =>
+        Response.json({
+          issues: [
+            {
+              id: "10001",
+              key: "FUL-1",
+              fields: { summary: "Task A", status: { name: "In Progress" }, labels: [] },
+            },
+            {
+              id: "10002",
+              key: "FUL-2",
+              fields: { summary: "Task B", status: { name: "QA Review" }, labels: [] },
+            },
+            {
+              id: "10003",
+              key: "FUL-3",
+              fields: { summary: "Task C", status: { name: "Done" }, labels: [] },
+            },
+          ],
+        }),
+    });
+    connector.enable();
+
+    const result = await connector.pull();
+
+    expect(result.pulled).toBe(3);
+    expect(connector.pulledItems[0]!.externalId).toBe("jira:FUL-1");
+    expect(connector.pulledItems[0]!.data.status).toBe("in_progress");
+    expect(connector.pulledItems[1]!.data.status).toBe("review");
+    expect(connector.pulledItems[2]!.data.status).toBe("done");
+  });
+
+  it("mock 3 issues → 3 tasks upserted with jira:<key> external IDs", async () => {
+    const connector = new JiraConnector({
+      url: "https://example.atlassian.net",
+      token: "token",
+      projectKey: "FUL",
+      fetch: async () =>
+        Response.json({
+          issues: [
+            { id: "1", key: "FUL-10", fields: { summary: "A", status: { name: "To Do" }, labels: [] } },
+            { id: "2", key: "FUL-11", fields: { summary: "B", status: { name: "In Progress" }, labels: [] } },
+            { id: "3", key: "FUL-12", fields: { summary: "C", status: { name: "Done" }, labels: [] } },
+          ],
+        }),
+    });
+    connector.enable();
+
+    const result = await connector.pull();
+
+    expect(result.pulled).toBe(3);
+    expect(connector.pulledItems.map((i) => i.externalId)).toEqual(["jira:FUL-10", "jira:FUL-11", "jira:FUL-12"]);
+  });
+
+  it("duplicate import run is idempotent — upserts same rows without duplicating", async () => {
+    const upserted: SyncItem[][] = [];
+    const connector = new JiraConnector({
+      url: "https://example.atlassian.net",
+      token: "token",
+      projectKey: "FUL",
+      fetch: async () =>
+        Response.json({
+          startAt: 0,
+          maxResults: 10,
+          total: 2,
+          issues: [
+            { id: "1", key: "FUL-1", fields: { summary: "A", status: { name: "To Do" }, labels: [] } },
+            { id: "2", key: "FUL-2", fields: { summary: "B", status: { name: "Done" }, labels: [] } },
+          ],
+        }),
+    });
+    connector.enable();
+
+    const store = {
+      async upsertBatch(_kind: string, items: SyncItem[]) {
+        upserted.push(items);
+      },
+    };
+
+    const r1 = await connector.importHistory({ store, batchSize: 10 });
+    const r2 = await connector.importHistory({ store, batchSize: 10 });
+
+    expect(r1.imported).toBe(2);
+    expect(r2.imported).toBe(2);
+    expect(upserted[0]!.map((i) => i.externalId)).toEqual(["jira:FUL-1", "jira:FUL-2"]);
+    expect(upserted[1]!.map((i) => i.externalId)).toEqual(["jira:FUL-1", "jira:FUL-2"]);
+  });
+
+  it("flag OFF → JiraConnector.fetch() not called (spy assertion)", async () => {
+    let fetchCalled = false;
+    const connector = new JiraConnector({
+      url: "https://example.atlassian.net",
+      token: "token",
+      projectKey: "FUL",
+      fetch: async () => {
+        fetchCalled = true;
+        return Response.json({ issues: [] });
+      },
+    });
+
+    await expect(connector.pull()).rejects.toThrow("connector disabled");
+    expect(fetchCalled).toBe(false);
+  });
+
+  it("sync returns JSON-serializable result with imported/upserted/errors shape", async () => {
+    const connector = new JiraConnector({
+      url: "https://example.atlassian.net",
+      token: "token",
+      projectKey: "FUL",
+      fetch: async () =>
+        Response.json({
+          startAt: 0,
+          maxResults: 10,
+          total: 2,
+          issues: [
+            { id: "1", key: "FUL-1", fields: { summary: "A", status: { name: "To Do" }, labels: [] } },
+            { id: "2", key: "FUL-2", fields: { summary: "B", status: { name: "Done" }, labels: [] } },
+          ],
+        }),
+    });
+    connector.enable();
+
+    const result = await connector.importHistory({
+      batchSize: 10,
+      store: { async upsertBatch() {} },
+    });
+
+    expect(result).toMatchObject({ imported: 2, upserted: 2, errors: [] });
+    const json = JSON.stringify(result);
+    expect(JSON.parse(json)).toEqual(result);
   });
 });

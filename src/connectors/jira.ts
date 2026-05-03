@@ -10,11 +10,16 @@ import { connectorFlag } from "./registry.ts";
 
 type ConnectorFetch = (input: string, init?: RequestInit) => Promise<Response>;
 
+export interface JiraStatusMap {
+  [jiraStatus: string]: string;
+}
+
 export interface JiraConnectorOptions {
   url?: string;
   token?: string;
   projectKey?: string;
   fetch?: ConnectorFetch;
+  statusMap?: JiraStatusMap;
 }
 
 export interface ConnectorHealthStatus extends HealthStatus {
@@ -30,12 +35,14 @@ export class JiraConnector implements ConnectorAdapter {
   private readonly token: string;
   private readonly projectKey: string;
   private readonly fetchImpl: ConnectorFetch;
+  private readonly statusMap: JiraStatusMap;
 
   constructor(options: JiraConnectorOptions = {}) {
     this.url = stripTrailingSlash(options.url ?? process.env.JIRA_URL ?? "");
     this.token = options.token ?? process.env.JIRA_TOKEN ?? "";
     this.projectKey = options.projectKey ?? process.env.JIRA_PROJECT_KEY ?? "";
     this.fetchImpl = options.fetch ?? ((input, init) => fetch(input, init));
+    this.statusMap = options.statusMap ?? {};
   }
 
   enable(): void {
@@ -57,7 +64,7 @@ export class JiraConnector implements ConnectorAdapter {
     if (!response.ok) return syncError(response, "jira_pull_failed");
 
     const body = (await response.json()) as { issues?: JiraIssue[] };
-    const items = (body.issues ?? []).map(mapJiraIssue);
+    const items = (body.issues ?? []).map((issue) => mapJiraIssue(issue, this.statusMap));
     this.pulledItems.splice(0, this.pulledItems.length, ...items);
 
     return { pulled: items.length, pushed: 0, skipped: 0, errors: [] };
@@ -78,7 +85,7 @@ export class JiraConnector implements ConnectorAdapter {
       if (!response.ok) return importError(response, "jira_import_failed", imported, batches);
 
       const body = (await response.json()) as JiraSearchResponse;
-      const items = (body.issues ?? []).map(mapJiraIssue);
+      const items = (body.issues ?? []).map((issue) => mapJiraIssue(issue, this.statusMap));
       for (const batch of chunk(items, batchSize)) {
         await options.store.upsertBatch(this.kind, batch);
         batches += 1;
@@ -99,7 +106,8 @@ export class JiraConnector implements ConnectorAdapter {
     const errors = [];
     let pushed = 0;
     for (const item of items) {
-      const response = await this.request(`/rest/api/3/issue/${encodeURIComponent(item.externalId)}`, {
+      const jiraKey = stripExternalIdPrefix(item.externalId);
+      const response = await this.request(`/rest/api/3/issue/${encodeURIComponent(jiraKey)}`, {
         method: "PATCH",
         body: JSON.stringify(jiraUpdatePayload(item)),
       });
@@ -175,19 +183,20 @@ interface JiraSearchResponse {
   issues?: JiraIssue[];
 }
 
-function mapJiraIssue(issue: JiraIssue): SyncItem {
+function mapJiraIssue(issue: JiraIssue, statusMap: JiraStatusMap): SyncItem {
   const fields = issue.fields ?? {};
+  const key = issue.key ?? issue.id ?? "";
   return {
-    externalId: issue.key ?? issue.id ?? "",
+    externalId: `jira:${key}`,
     data: {
       id: issue.id,
       title: fields.summary,
-      status: mapJiraStatus(fields.status?.name),
+      status: mapJiraStatus(fields.status?.name, statusMap),
       priority: mapPriority(fields.priority?.name),
       assignee: fields.assignee?.emailAddress ?? fields.assignee?.displayName,
       dueDate: fields.duedate,
       labels: fields.labels ?? [],
-      parentExternalId: fields.parent?.key,
+      parentExternalId: fields.parent?.key ? `jira:${fields.parent.key}` : undefined,
     },
   };
 }
@@ -201,8 +210,10 @@ function jiraUpdatePayload(item: SyncItem): Record<string, unknown> {
   return payload;
 }
 
-function mapJiraStatus(status?: string): string {
+function mapJiraStatus(status?: string, statusMap: JiraStatusMap = {}): string {
+  if (status && status in statusMap) return statusMap[status]!;
   const normalized = status?.toLowerCase();
+  if (normalized && normalized in statusMap) return statusMap[normalized]!;
   if (normalized === "done" || normalized === "closed" || normalized === "resolved") return "done";
   if (normalized === "in progress") return "in-progress";
   return "todo";
@@ -242,4 +253,8 @@ function chunk<T>(items: T[], batchSize: number): T[][] {
 
 function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
+}
+
+function stripExternalIdPrefix(externalId: string): string {
+  return externalId.startsWith("jira:") ? externalId.slice(5) : externalId;
 }
