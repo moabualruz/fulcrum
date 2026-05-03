@@ -559,9 +559,13 @@ function emitDomain(domain: DomainMetadata): string {
   for (const procedure of domain.procedures) {
     const constName = `${camel(procedure.path.join("_"))}Command`;
     const commandPath = procedure.path.map(kebab).join(" ");
+    const procedurePath = `${domain.name}.${procedure.path.join(".")}`;
     lines.push(`  const ${constName} = command.command(${JSON.stringify(commandPath)});`);
     lines.push(`  ${constName}.description(${JSON.stringify(procedure.description ?? `${domain.name} ${procedure.path.join(" ")}`)});`);
     lines.push(`  ${constName}.option("--json", "Emit JSON output");`);
+    if (procedure.type === "subscription") {
+      lines.push(`  ${constName}.option("--watch", "Stream subscription events as JSON lines");`);
+    }
     for (const flag of schemaToFlags(procedure.input, [])) {
       const help = flag.description ?? flag.name;
       if (flag.type === "enum") {
@@ -572,8 +576,24 @@ function emitDomain(domain: DomainMetadata): string {
         lines.push(`  ${constName}.option(${JSON.stringify(flag.flag)}, ${JSON.stringify(help)});`);
       }
     }
-    lines.push(`  ${constName}.action(async () => {`);
-    lines.push(`    throw new Error(${JSON.stringify(`Generated tRPC invocation for ${domain.name}.${procedure.path.join(".")} is not wired yet.`)});`);
+    lines.push(`  ${constName}.action(async (options) => {`);
+    lines.push(`    try {`);
+    if (procedure.type === "subscription") {
+      lines.push(`      if (options.watch === true) {`);
+      lines.push(`        await runGeneratedSubscriptionWatch({ procedurePath: ${JSON.stringify(procedurePath)} });`);
+      lines.push(`        return;`);
+      lines.push(`      }`);
+    }
+    lines.push(`      throw new Error(${JSON.stringify(`Generated tRPC invocation for ${procedurePath} is not wired yet.`)});`);
+    lines.push(`    } catch (error) {`);
+    lines.push(`      if (options.json === true) {`);
+    lines.push(`        const message = error instanceof Error ? error.message : String(error);`);
+    lines.push(`        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));`);
+    lines.push(`        process.exitCode = 1;`);
+    lines.push(`        return;`);
+    lines.push(`      }`);
+    lines.push(`      throw error;`);
+    lines.push(`    }`);
     lines.push(`  });`);
     lines.push("");
   }
@@ -581,6 +601,18 @@ function emitDomain(domain: DomainMetadata): string {
   lines.push("  return command;");
   lines.push("}");
   lines.push("");
+  if (domain.procedures.some((procedure) => procedure.type === "subscription")) {
+    lines.push("async function runGeneratedSubscriptionWatch(options: { procedurePath: string }): Promise<void> {");
+    lines.push("  const shutdown = new Promise<void>((resolve) => {");
+    lines.push("    process.once(\"SIGINT\", () => resolve());");
+    lines.push("  });");
+    lines.push("  await Promise.race([");
+    lines.push("    shutdown,");
+    lines.push("    Promise.reject(new Error(`Generated tRPC subscription for ${options.procedurePath} is not wired yet.`)),");
+    lines.push("  ]);");
+    lines.push("}");
+    lines.push("");
+  }
   return lines.join("\n");
 }
 

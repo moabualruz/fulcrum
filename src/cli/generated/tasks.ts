@@ -4,63 +4,179 @@ export function createTasksCommand(): Command {
   const command = new Command("tasks");
   command.description("Generated tasks commands.");
 
-  const bulkCommand = command.command("bulk");
-  bulkCommand.description("tasks bulk");
-  bulkCommand.option("--json", "Emit JSON output");
-  bulkCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for tasks.bulk is not wired yet.");
+  const bulkDeleteCommand = command.command("bulk-delete");
+  bulkDeleteCommand.description("tasks bulkDelete");
+  bulkDeleteCommand.option("--json", "Emit JSON output");
+  bulkDeleteCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for tasks.bulkDelete is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
-  const claimCommand = command.command("claim");
-  claimCommand.description("tasks claim");
-  claimCommand.option("--json", "Emit JSON output");
-  claimCommand.option("--id <string>", "id");
-  claimCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for tasks.claim is not wired yet.");
+  const bulkUpdateCommand = command.command("bulk-update");
+  bulkUpdateCommand.description("tasks bulkUpdate");
+  bulkUpdateCommand.option("--json", "Emit JSON output");
+  bulkUpdateCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for tasks.bulkUpdate is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const createCommand = command.command("create");
   createCommand.description("tasks create");
   createCommand.option("--json", "Emit JSON output");
-  createCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for tasks.create is not wired yet.");
+  createCommand.option("--description <string>", "description");
+  createCommand.option("--description-text <string>", "description-text");
+  createCommand.option("--points <number>", "points", Number.parseFloat);
+  createCommand.option("--priority <number>", "priority", Number.parseFloat);
+  createCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for tasks.create is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const deleteCommand = command.command("delete");
   deleteCommand.description("tasks delete");
   deleteCommand.option("--json", "Emit JSON output");
-  deleteCommand.option("--id <string>", "id");
-  deleteCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for tasks.delete is not wired yet.");
+  deleteCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for tasks.delete is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const getCommand = command.command("get");
   getCommand.description("tasks get");
   getCommand.option("--json", "Emit JSON output");
-  getCommand.option("--id <string>", "id");
-  getCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for tasks.get is not wired yet.");
+  getCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for tasks.get is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const listCommand = command.command("list");
   listCommand.description("tasks list");
   listCommand.option("--json", "Emit JSON output");
-  listCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for tasks.list is not wired yet.");
+  listCommand.option("--include-deleted", "include-deleted");
+  listCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for tasks.list is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
-  const moveCommand = command.command("move");
-  moveCommand.description("tasks move");
-  moveCommand.option("--json", "Emit JSON output");
-  moveCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for tasks.move is not wired yet.");
+  const listChildrenCommand = command.command("list-children");
+  listChildrenCommand.description("tasks listChildren");
+  listChildrenCommand.option("--json", "Emit JSON output");
+  listChildrenCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for tasks.listChildren is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const setDependenciesCommand = command.command("set-dependencies");
+  setDependenciesCommand.description("tasks setDependencies");
+  setDependenciesCommand.option("--json", "Emit JSON output");
+  setDependenciesCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for tasks.setDependencies is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const setParentCommand = command.command("set-parent");
+  setParentCommand.description("tasks setParent");
+  setParentCommand.option("--json", "Emit JSON output");
+  setParentCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for tasks.setParent is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const updateCommand = command.command("update");
   updateCommand.description("tasks update");
   updateCommand.option("--json", "Emit JSON output");
-  updateCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for tasks.update is not wired yet.");
+  updateCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for tasks.update is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   return command;

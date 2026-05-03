@@ -7,32 +7,101 @@ export function createArtifactsCommand(): Command {
   const deleteCommand = command.command("delete");
   deleteCommand.description("artifacts delete");
   deleteCommand.option("--json", "Emit JSON output");
-  deleteCommand.option("--id <string>", "id");
-  deleteCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for artifacts.delete is not wired yet.");
+  deleteCommand.option("--id <string>", "Artifact identifier.");
+  deleteCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for artifacts.delete is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const downloadCommand = command.command("download");
   downloadCommand.description("artifacts download");
   downloadCommand.option("--json", "Emit JSON output");
-  downloadCommand.option("--id <string>", "id");
-  downloadCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for artifacts.download is not wired yet.");
+  downloadCommand.option("--id <string>", "Artifact identifier.");
+  downloadCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for artifacts.download is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const getCommand = command.command("get");
   getCommand.description("artifacts get");
   getCommand.option("--json", "Emit JSON output");
-  getCommand.option("--id <string>", "id");
-  getCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for artifacts.get is not wired yet.");
+  getCommand.option("--id <string>", "Artifact identifier.");
+  getCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for artifacts.get is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const listCommand = command.command("list");
   listCommand.description("artifacts list");
   listCommand.option("--json", "Emit JSON output");
-  listCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for artifacts.list is not wired yet.");
+  listCommand.option("--archived", "Filter by archive state.");
+  listCommand.option("--mime <string>", "Filter by MIME type.");
+  listCommand.option("--org-id <string>", "Filter by organisation. Omit for current org.");
+  listCommand.option("--project-id <string>", "Filter by project.");
+  listCommand.option("--run-id <string>", "Filter by producing run.");
+  listCommand.option("--task-id <string>", "Filter by linked task.");
+  listCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for artifacts.list is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const uploadCommand = command.command("upload");
+  uploadCommand.description("artifacts upload");
+  uploadCommand.option("--json", "Emit JSON output");
+  uploadCommand.option("--doc-id <string>", "Linked document, when available.");
+  uploadCommand.option("--filename <string>", "Original filename.");
+  uploadCommand.option("--mime <string>", "MIME type.");
+  uploadCommand.option("--project-id <string>", "Project scope, when available.");
+  uploadCommand.option("--run-id <string>", "Producing run, when available.");
+  uploadCommand.option("--task-id <string>", "Linked task, when available.");
+  uploadCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for artifacts.upload is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   return command;

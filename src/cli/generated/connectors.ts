@@ -8,52 +8,122 @@ export function createConnectorsCommand(): Command {
   disableCommand.description("connectors disable");
   disableCommand.option("--json", "Emit JSON output");
   disableCommand.option("--id <string>", "id");
-  disableCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for connectors.disable is not wired yet.");
+  disableCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for connectors.disable is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const enableCommand = command.command("enable");
   enableCommand.description("connectors enable");
   enableCommand.option("--json", "Emit JSON output");
-  enableCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for connectors.enable is not wired yet.");
+  enableCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for connectors.enable is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const getCommand = command.command("get");
   getCommand.description("connectors get");
   getCommand.option("--json", "Emit JSON output");
   getCommand.option("--id <string>", "id");
-  getCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for connectors.get is not wired yet.");
+  getCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for connectors.get is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const listCommand = command.command("list");
   listCommand.description("connectors list");
   listCommand.option("--json", "Emit JSON output");
-  listCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for connectors.list is not wired yet.");
+  listCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for connectors.list is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const runsGetCommand = command.command("runs get");
   runsGetCommand.description("connectors runs get");
   runsGetCommand.option("--json", "Emit JSON output");
   runsGetCommand.option("--id <string>", "id");
-  runsGetCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for connectors.runs.get is not wired yet.");
+  runsGetCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for connectors.runs.get is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const runsListCommand = command.command("runs list");
   runsListCommand.description("connectors runs list");
   runsListCommand.option("--json", "Emit JSON output");
-  runsListCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for connectors.runs.list is not wired yet.");
+  runsListCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for connectors.runs.list is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const syncCommand = command.command("sync");
   syncCommand.description("connectors sync");
   syncCommand.option("--json", "Emit JSON output");
-  syncCommand.action(async () => {
-    throw new Error("Generated tRPC invocation for connectors.sync is not wired yet.");
+  syncCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for connectors.sync is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   return command;

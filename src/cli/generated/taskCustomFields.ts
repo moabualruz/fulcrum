@@ -1,15 +1,15 @@
 import { Command, Option } from "commander";
 
-export function createFlagsCommand(): Command {
-  const command = new Command("flags");
-  command.description("Generated flags commands.");
+export function createTaskCustomFieldsCommand(): Command {
+  const command = new Command("taskCustomFields");
+  command.description("Generated taskCustomFields commands.");
 
-  const listCommand = command.command("list");
-  listCommand.description("flags list");
-  listCommand.option("--json", "Emit JSON output");
-  listCommand.action(async (options) => {
+  const clearCommand = command.command("clear");
+  clearCommand.description("taskCustomFields clear");
+  clearCommand.option("--json", "Emit JSON output");
+  clearCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for flags.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for taskCustomFields.clear is not wired yet.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -22,15 +22,11 @@ export function createFlagsCommand(): Command {
   });
 
   const setCommand = command.command("set");
-  setCommand.description("flags set");
+  setCommand.description("taskCustomFields set");
   setCommand.option("--json", "Emit JSON output");
-  setCommand.option("--enabled", "enabled");
-  setCommand.addOption(new Option("--flag <choice>", "flag").choices([]));
-  setCommand.option("--org-id <string>", "org-id");
-  setCommand.option("--user-id <string>", "user-id");
   setCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for flags.set is not wired yet.");
+      throw new Error("Generated tRPC invocation for taskCustomFields.set is not wired yet.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

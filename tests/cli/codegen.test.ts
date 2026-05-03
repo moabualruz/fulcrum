@@ -149,4 +149,79 @@ describe("CLI codegen", () => {
       await rm(scratch, { recursive: true, force: true });
     }
   });
+
+  test("emits JSON error handling for generated command actions", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "fulcrum-codegen-json-"));
+    try {
+      const routerPath = join(scratch, "router.ts");
+      await writeFile(routerPath, `
+        import { z } from "zod";
+        import { t } from "./trpc";
+        import { protectedProcedure } from "./middleware";
+
+        const projectsRouter = t.router({
+          list: protectedProcedure
+            .output(z.array(z.object({ id: z.string() })))
+            .query(() => []),
+        });
+
+        export const appRouter = t.router({ projects: projectsRouter });
+        export type AppRouter = typeof appRouter;
+      `);
+
+      await generateCliFiles({ routerPath, outDir: scratch, useAst: true });
+      const generated = await readFile(join(scratch, "projects.ts"), "utf8");
+
+      expect(generated).toContain('listCommand.option("--json", "Emit JSON output");');
+      expect(generated).toContain("listCommand.action(async (options) => {");
+      expect(generated).toContain("if (options.json === true) {");
+      expect(generated).toContain('console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));');
+      expect(generated).toContain("process.exitCode = 1;");
+      expect(generated).toContain("throw error;");
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
+  test("emits watch mode only for subscription procedures", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "fulcrum-codegen-watch-"));
+    try {
+      const routerPath = join(scratch, "router.ts");
+      await writeFile(routerPath, `
+        import { observable } from "@trpc/server/observable";
+        import { z } from "zod";
+        import { t } from "./trpc";
+        import { protectedProcedure } from "./middleware";
+
+        const inferenceRouter = t.router({
+          health: protectedProcedure
+            .output(z.object({ ok: z.boolean() }))
+            .query(() => ({ ok: true })),
+          models: t.router({
+            pull: protectedProcedure
+              .input(z.object({ modelId: z.string() }))
+              .subscription(() => observable((emit) => {
+                emit.next({ ok: true });
+                emit.complete();
+                return () => {};
+              })),
+          }),
+        });
+
+        export const appRouter = t.router({ inference: inferenceRouter });
+        export type AppRouter = typeof appRouter;
+      `);
+
+      await generateCliFiles({ routerPath, outDir: scratch, useAst: true });
+      const generated = await readFile(join(scratch, "inference.ts"), "utf8");
+
+      expect(generated).toContain('modelsPullCommand.option("--watch", "Stream subscription events as JSON lines");');
+      expect(generated).toContain("if (options.watch === true) {");
+      expect(generated).toContain("await runGeneratedSubscriptionWatch");
+      expect(generated).toContain('procedurePath: "inference.models.pull"');
+      expect(generated).not.toContain('healthCommand.option("--watch"');
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
 });
