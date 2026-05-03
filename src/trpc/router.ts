@@ -15,6 +15,7 @@ import { flagsRouter } from "../server/trpc/routers/flags.ts";
 import { inferenceRouter } from "../server/trpc/routers/inference.ts";
 import { orgsRouter } from "../server/trpc/routers/orgs.ts";
 import { tasksRouter } from "../server/trpc/routers/tasks.ts";
+import { customFieldDefsRouter, taskCustomFieldsRouter } from "../server/trpc/routers/custom-fields.ts";
 import { auditRouter } from "../server/trpc/routers/audit.ts";
 import { orchestrationRouter } from "./routers/orchestration.ts";
 import { notificationsRouter } from "./routers/notifications.ts";
@@ -286,6 +287,8 @@ export const appRouter = t.router({
   flags: flagsRouter,
   projects: projectsRouter,
   tasks: tasksRouter,
+  customFieldDefs: customFieldDefsRouter,
+  taskCustomFields: taskCustomFieldsRouter,
   sprints: sprintsRouter,
   custom_fields: customFieldsRouter,
   saved_views: savedViewsRouter,
