@@ -35,6 +35,11 @@ import { reposRouter } from "./routers/repos.ts";
 import { credentialsRouter } from "../secrets/credentials-router.ts";
 import { reportsRouter } from "./routers/reports.ts";
 import { webhooksRouter } from "./routers/webhooks.ts";
+import {
+  runsSubscriptionRouter,
+  notifySubscriptionRouter,
+  orchestrationSubscriptionRouter,
+} from "../subscriptions/procedures.ts";
 import { getProfile, listProfiles } from "../agents/registry.ts";
 import { AgentProfileSchema } from "../agents/types.ts";
 import { AgentProfile as AgentProfileEntity } from "../db/entities/sandbox/AgentProfile.ts";
@@ -363,6 +368,11 @@ export const appRouter = t.router({
 
   db: dbRouter,
   health: healthRouter,
+
+  // P13#02: WebSocket subscription routers.
+  runsSubscriptions: runsSubscriptionRouter,
+  notifySubscriptions: notifySubscriptionRouter,
+  orchestrationSubscriptions: orchestrationSubscriptionRouter,
 
   // Backward-compatible aliases for pre-P13 root names.
   memory: memoryRouter,
