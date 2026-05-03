@@ -1,33 +1,34 @@
-# Issue 14 — Repos Browser Routes
+---
+Status: in-progress
+Triage: AFK
+Pillar: 16-web-shell-rebuild
+Blocked-by: [16-web-shell-rebuild/issues/01-v0-teardown-and-sveltekit-scaffold.md, 09-repos-git-supervision/issues/01-repo-schema-and-watcher.md]
+PRD: .scratch/agent-os-vision/prds/16-web-shell-rebuild.md
+Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 16 section)
+Decisions: [Q24, C4]
+Vision: .scratch/agent-os-vision/VISION-GAPS.md (row: "Repo supervision — no git integration")
+Docs: https://kit.svelte.dev/docs
+---
 
-**Status:** implemented
+# Repos browser — /repos, /repos/[id], /repos/[id]/files, /repos/[id]/commits
 
-## Summary
+## What to build
 
-Four SvelteKit routes for the repos browser feature:
+Four repo routes. `/repos`: global repo list table (name, remote URL, branch count, last_synced_at, stale badge) + "Sync" button per row → `repos.sync(id)` tRPC. `/repos/[id]`: repo detail — branch list (active/stale badges), recent commits (SHA, message, author, date), open tasks linked to this repo. `/repos/[id]/files`: file tree browser (lazy-load directories on expand) + file content viewer (syntax highlighted via shiki, read-only). `/repos/[id]/commits`: paginated commit log (SHA link, message, author avatar, date, diff stat).
 
-- `/repos` — list table with sync button and stale >24h badge
-- `/repos/[id]` — detail: branches, 10 recent commits, linked tasks via edges
-- `/repos/[id]/files` — lazy file tree (git ls-tree) + content viewer with binary placeholder
-- `/repos/[id]/commits` — paginated commit log at PAGE_SIZE=50, monospace SHA, author avatar
+Cuts through: `repos.list` tRPC → repo list → click → `repos.get(id)` → branch list → click file tree → lazy load dirs → click file → content viewer.
 
-## Implementation notes
+## Acceptance criteria
 
-- All routes use direct PGlite DB queries (same pattern as existing routes)
-- Git operations (branches, commits, file tree) use `node:child_process` `execFile` against `root_path`
-- Git failures (missing repo, no commits) return empty arrays — never throw
-- `@sveltejs/kit` `error()` used for 404 on unknown repo id
-- Stale badge shown when `last_seen_at` > 24h ago
-- File tree lazy: depth-1 by default; dirs expand client-side via `$state`
-- Binary files detected by extension; placeholder shown, no content fetch
-- Syntax highlighting: plain `<pre><code>` block (shiki not available in this project)
-- Commit log pagination: `?page=N`, PAGE_SIZE=50 constant exported for tests
-- Author avatar via `ui-avatars.com` fallback (no MD5/gravatar dependency needed)
+- [ ] Repo list: 3 repos rendered; sync button → `repos.sync` called; list updates `last_synced_at`; stale badge shows when `stale_since` > 24h.
+- [ ] Repo detail: branches listed; recent 10 commits shown; tasks linked via `edges(from_kind='repo', to_kind='task')` shown as task chips.
+- [ ] File tree: root dirs expand lazily; click file → content pane shows shiki-highlighted content; binary files show "Binary file" placeholder.
+- [ ] Commit log: pagination works at 50+ commits; SHA is monospace; author avatar from `users` table if matched.
+- [ ] Playwright: expand file tree folder → child items appear; commit pagination works.
+- [ ] CLI: `fulcrum repo list --json`; `fulcrum repo status <id> --json`; `fulcrum repo sync <id>`.
+- [ ] TUI: repo browser screen (Pillar 15).
 
-## Tests
+## Blocked by
 
-16 tests across 4 files — all green:
-- `src/web/src/routes/repos/page.server.test.ts` — list load, empty list, ISO stamp, sync action
-- `src/web/src/routes/repos/[id]/page.server.test.ts` — detail load, 404, git empty graceful
-- `src/web/src/routes/repos/[id]/files/page.server.test.ts` — empty tree, binary flag, 404, real git tree
-- `src/web/src/routes/repos/[id]/commits/page.server.test.ts` — PAGE_SIZE, empty commits, 404, real git pagination
+- Issue 01 (scaffold) — layout needed.
+- Pillar 9 issue 01 (repo schema + watcher) — `repos` table and `repos.*` tRPC.

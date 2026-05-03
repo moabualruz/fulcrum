@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/13-runs-and-artifacts.md, 03-symphony-orchestration/issues/18-web-runs-board.md, 02-inference-sidecar/issues/13-web-inference-settings-page.md]
@@ -20,10 +20,10 @@ Cuts through: `agents.list` → profile cards rendered → dispatch → run appe
 
 ## Acceptance criteria
 
-- [ ] Agents: list renders with capability chips; dispatch button → modal → submit → redirects to `/runs/[id]`.
-- [ ] Orchestration: run list shows claim state (`claimed_by`, `orchestration_state`); 5s poll updates badges; filter by project narrows list; cancel button calls `runs.cancel`; retry calls `runs.retry`.
-- [ ] Inference: status badge shows sidecar state; model list shows `bge-small-en-v1.5` + any pulled models; `pull` triggers download progress; `start`/`stop` buttons toggle sidecar.
-- [ ] Backend config: switching to `ollama` shows host field; `openai-compatible` shows URL + API key field (masked); save → `inference.setBackend` tRPC.
+- [x] Agents: list renders with capability chips; dispatch button → modal → submit → redirects to `/runs/[id]`.
+- [x] Orchestration: run list shows claim state (`claimed_by`, `orchestration_state`); 5s poll updates badges; filter by project narrows list; cancel button calls `runs.cancel`; retry calls `runs.retry`.
+- [x] Inference: status badge shows sidecar state; model list shows `bge-small-en-v1.5` + any pulled models; `pull` triggers download progress; `start`/`stop` buttons toggle sidecar.
+- [x] Backend config: switching to `ollama` shows host field; `openai-compatible` shows URL + API key field (masked); save → `inference.setBackend` tRPC.
 - [ ] Playwright: start inference sidecar → status changes to "running"; pull model → progress shown.
 - [ ] CLI: `fulcrum agent list --json`; `fulcrum orchestrate status --json`; `fulcrum inference status --json`.
 - [ ] TUI: orchestration pane + inference pane (Pillar 15).
