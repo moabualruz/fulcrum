@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 17-cross-cutting-platform
 Blocked-by: [17-cross-cutting-platform/issues/01-schema-migration-credentials-telemetry-errors-experiments.md, 01-foundation-reset/issues/03-composite-indexes-and-flag-stub-tables.md]
@@ -11,6 +11,8 @@ Docs: https://kit.svelte.dev/docs
 ---
 
 # Theme engine — generator.ts, useTheme() composable, theme.* tRPC, CLI + TUI integration
+
+Implemented slice P17#04: theme tRPC router with `listThemes`, `getTheme`, `setTheme`; SSR-safe web `useTheme()` composable; focused RED→GREEN tests. Broader generator/CLI/TUI/reset criteria remain for later slices.
 
 ## What to build
 
