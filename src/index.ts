@@ -46,19 +46,11 @@ Usage:
                                      Run an FTS query over the product kernel search index.
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
                                      Render the assembled Markdown context for a task.
-  fulcrum symphony status [--json]    Orchestrator status.
-  fulcrum symphony sync [--daily] [--json]
-                                     Sync orchestration state.
-  fulcrum symphony runs list [--project <id>] [--state <state>] [--json]
-  fulcrum symphony runs show <runId> [--json] [--verbose]
-  fulcrum symphony runs cancel <runId> [--json]
-  fulcrum symphony runs retry <runId> [--json]
-  fulcrum symphony conformance [--verbose] [--json]
-                                     SPEC conformance check.
-  fulcrum audit query [--kind <kind>] [--verb <verb>] [--since <ISO>] [--until <ISO>] [--limit <n>] [--json]
-                                     Query audit events.
-  fulcrum audit export --format csv|json [same filters] [--output <file>]
-                                     Export audit events (compliance export per A4).
+  fulcrum connectors list [--json]   List configured connectors.
+  fulcrum connectors runs <kind> [--json]
+                                     Show recent connector sync runs.
+  fulcrum backup [--output DIR] [--json]
+                                     Create a product-kernel backup.
   fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
   fulcrum version                    Print version.
   fulcrum help                       This message.
@@ -110,6 +102,16 @@ async function main() {
       await runUninstall(rest);
       return;
     }
+    case "connectors": {
+      const { run: runConnectors } = await import("./cli/connectors.ts");
+      await runConnectors(rest);
+      return;
+    }
+    case "backup": {
+      const { run: runBackup } = await import("./cli/backup.ts");
+      await runBackup(rest);
+      return;
+    }
     case "doctor": {
       const { run: runDoctor } = await import("./cli/doctor.ts");
       await runDoctor(rest);
@@ -133,18 +135,6 @@ async function main() {
     case "product": {
       const { run: runProduct } = await import("./cli/product.ts");
       await runProduct(rest);
-      return;
-    }
-    case "audit": {
-      const { run: runAudit } = await import("./cli/audit.ts");
-      await runAudit(rest);
-      return;
-    }
-    case "symphony": {
-      const { run: runSymphony } = await import("./cli/symphony.ts");
-      // CLI caller stub — real tRPC caller wired when orchestration backend available.
-      const caller = (await import("./cli/symphony.ts")).stubCaller();
-      await runSymphony(rest, { caller });
       return;
     }
     case "version":

@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplRuntime: claude
 Triage: AFK
 Pillar: tui
 Blocked-by: [15/issues/14-settings-navigator-and-core-screens.md]
@@ -24,13 +25,13 @@ Remaining settings screens: Integrations/Connectors (enabled connector cards, `s
 
 ## Acceptance criteria
 
-- [ ] Connectors screen: enabled connectors shown with last-sync-at; `s` triggers sync → `connector_runs` row; run log shows last 10 runs.
-- [ ] Theme screen: `n` cycles 5 presets; preview panel updates ANSI output; writes `tenant_settings`.
-- [ ] Secrets screen: values masked (`****`); `a` adds with masked input (input chars show `*`); `d` confirms before delete.
-- [ ] Backups screen: `b` runs backup progress bar; backup file path shown; restore form prompts "Confirm overwrite? [y/N]".
-- [ ] Doctor screen: all subsystem check rows; green/yellow/red status icons; `Enter` shows recovery guide text; counts in footer (pass/warn/fail).
-- [ ] After TUI connector `s` sync, CLI `fulcrum connectors runs <kind> --json` shows new `connector_runs` row.
-- [ ] After TUI `b` backup, `fulcrum backup --output /tmp` file matches TUI-created backup file content.
+- [x] Connectors screen: enabled connectors shown with last-sync-at; `s` triggers sync → `connector_runs` row; run log shows last 10 runs.
+- [x] Theme screen: `n` cycles 5 presets; preview panel updates ANSI output; writes `tenant_settings`.
+- [x] Secrets screen: values masked (`****`); `a` adds with masked input (input chars show `*`); `d` confirms before delete.
+- [x] Backups screen: `b` runs backup progress bar; backup file path shown; restore form prompts "Confirm overwrite? [y/N]".
+- [x] Doctor screen: all subsystem check rows; green/yellow/red status icons; `Enter` shows recovery guide text; counts in footer (pass/warn/fail).
+- [x] After TUI connector `s` sync, CLI `fulcrum connectors runs <kind> --json` shows new `connector_runs` row.
+- [x] After TUI `b` backup, `fulcrum backup --output /tmp` file matches TUI-created backup file content.
 
 ## Blocked by
 
