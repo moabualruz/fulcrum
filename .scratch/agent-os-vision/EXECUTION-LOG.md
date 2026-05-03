@@ -2249,20 +2249,13 @@ CI: typecheck GREEN, 83 pre-existing test failures from wave impl
 
 Next: dispatch 6 more impl + begin fixing pre-existing test failures to unblock milestone gates
 
-## 2026-05-03 — P2#08 structured output (claude)
+## P14#08 — runs, notify, audit, webhooks, connectors commands
 
-Landed: grammar-constrained generation via JSON Schema
+**Commit:** `36eda920` feat(cli): wire runs notify audit webhooks commands
 
-**Rust:**
-- `inference/inference-generate/src/grammar.rs` — schema_to_gbnf (object/array/string/number/boolean/null), validate_against_schema, generate_with_schema with 3x retry, needs_fallback for complex constructs ($ref/oneOf/anyOf/allOf)
-- `inference/inference-generate/src/lib.rs` — wired schema field into generate(), returns grammar_fallback flag
-- `inference/inference-server/src/main.rs` — schema requests bypass cache; 3 new server tests
+**What was built:**
+- Added P14 generated-domain runner for `runs list/cancel`, `notify list --unread --json|--watch`, `audit query/export`, `webhooks list/test`, `connectors enable/sync`, and flags JSON set/list reflection.
+- Routed `runs`, `notify`, `audit`, `webhooks`, and `connectors` through the binary/CLI entrypoints with in-process tRPC caller resolution.
+- Added TDD coverage for P14#08 JSON contracts, audit export file writing, watch JSON lines, ping delivery output, and `FeatureDisabledError` JSON exit.
 
-**TypeScript:**
-- `src/cli/inference.ts` — `--schema <json>` flag on generate command
-- `src/web/src/routes/settings/inference/+page.svelte` — JSON Schema textarea + validity indicator
-- `src/web/src/routes/settings/inference/+page.server.ts` — schema passthrough + JSON validity check
-
-**Tests:** 14 Rust grammar unit tests, 3 Rust server integration tests, 2 CLI tests, 2 web SSR tests, 2 tRPC integration tests — all green.
-
-Commit: e5396071
+Tests: `bun test tests/cli/runs-notify-audit-webhooks.test.ts` (11/11 pass); `bun test tests/cli/runs-notify-audit-webhooks.test.ts tests/cli/entrypoint.test.ts` (19/19 pass). Full `bun run ci` reached typecheck and failed on pre-existing non-P14 errors in product-kernel/web/TUI files.
