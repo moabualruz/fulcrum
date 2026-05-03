@@ -1,6 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
+ImplRuntime: claude
 Pillar: 06-tasks-and-scrum
 Blocked-by: [05-metrics-cache-schema, 17-sprints-trpc-crud]
 PRD: .scratch/agent-os-vision/prds/06-tasks-and-scrum.md

@@ -48,6 +48,17 @@ function callerFor(em: import("@mikro-orm/postgresql").EntityManager) {
   );
 }
 
+/** Insert task via raw SQL (MikroORM lazy fields don't persist via em.create). */
+async function insertTask(
+  em: import("@mikro-orm/postgresql").EntityManager,
+  opts: { sprintId: string; points: number; status?: string; title?: string },
+): Promise<void> {
+  await em.getConnection().execute(
+    `INSERT INTO tasks (org_id, title, status, sprint_id, points) VALUES (?, ?, ?, ?, ?)`,
+    [ORG_ID, opts.title ?? "task", opts.status ?? "todo", opts.sprintId, opts.points],
+  );
+}
+
 /**
  * BurndownPoint Zod schema — matches the tRPC output type.
  * AC: CLI --json schema matches return type (Zod parse).
@@ -66,7 +77,7 @@ describe("reports.burndown tRPC", () => {
       const em = db.em.fork();
       const org = em.getReference(Org, ORG_ID);
 
-      // Create sprint: 4 days (Jan 1-4)
+      // Create sprint: 3 days (Jan 1-4, daysBetween = 3)
       const sprint = em.create(Sprint, {
         org,
         projectId: PROJECT_ID,
@@ -77,17 +88,11 @@ describe("reports.burndown tRPC", () => {
         capacityPoints: 12,
       });
       em.persist(sprint);
+      await em.flush();
 
-      // Seed tasks with 12 total points
-      const t1 = em.create(Task, {
-        org, title: "T1", status: "todo",
-        points: 8, sprint: sprint.id,
-      } as never);
-      const t2 = em.create(Task, {
-        org, title: "T2", status: "todo",
-        points: 4, sprint: sprint.id,
-      } as never);
-      em.persist([t1, t2]);
+      // Insert tasks with 12 total points via raw SQL
+      await insertTask(em, { sprintId: sprint.id, points: 8, title: "T1" });
+      await insertTask(em, { sprintId: sprint.id, points: 4, title: "T2" });
 
       // Seed metrics_cache entries for day 0 and day 1
       const mc0 = em.create(MetricsCache, {
@@ -151,14 +156,10 @@ describe("reports.burndown tRPC", () => {
         capacityPoints: 10,
       });
       em.persist(sprint);
-
-      // Tasks but NO metrics_cache entries
-      const task = em.create(Task, {
-        org, title: "T3", status: "todo",
-        points: 10, sprint: sprint.id,
-      } as never);
-      em.persist(task);
       await em.flush();
+
+      // Task but NO metrics_cache entries
+      await insertTask(em, { sprintId: sprint.id, points: 10, title: "T3" });
 
       const caller = callerFor(em);
       const result = await caller.reports.burndown({
@@ -188,7 +189,7 @@ describe("reports.burndown tRPC", () => {
       const caller = callerFor(em);
       const result = await caller.reports.burndown({
         projectId: PROJECT_ID,
-        sprintId: "00000000-0000-0000-0000-000000000099",
+        sprintId: "00000000-0000-4000-a000-000000000099",
       });
       expect(result).toEqual([]);
     } finally {
@@ -212,6 +213,10 @@ describe("reports.burndown tRPC", () => {
         capacityPoints: 20,
       });
       em.persist(sprint);
+      await em.flush();
+
+      // Insert task via raw SQL
+      await insertTask(em, { sprintId: sprint.id, points: 20, title: "T-perf" });
 
       // Seed 14 days of metrics
       for (let d = 0; d < 14; d++) {
@@ -221,14 +226,9 @@ describe("reports.burndown tRPC", () => {
           projectId: PROJECT_ID,
           sprint,
           date,
-          pointsRemaining: Math.max(0, 20 - d * 1.5),
+          pointsRemaining: Math.max(0, Math.round(20 - d * 1.5)),
         }));
       }
-      const task = em.create(Task, {
-        org, title: "T-perf", status: "todo",
-        points: 20, sprint: sprint.id,
-      } as never);
-      em.persist(task);
       await em.flush();
 
       const caller = callerFor(em);

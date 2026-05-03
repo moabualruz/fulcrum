@@ -113,11 +113,18 @@ async function computeBurndown(
 
     let remaining: number;
     if (hasCachedData) {
-      // Use cached value or interpolate
-      remaining = actualMap.get(ds) ?? (d === 0 ? totalPoints : -1);
-      if (remaining < 0) continue; // skip days without data
+      const cached = actualMap.get(ds);
+      // Use cached value, or carry forward last known value
+      if (cached !== undefined) {
+        remaining = cached;
+      } else if (d === 0) {
+        remaining = totalPoints;
+      } else {
+        // Carry forward last known actual (or totalPoints if none yet)
+        remaining = points.length > 0 ? points[points.length - 1]!.pointsRemaining : totalPoints;
+      }
     } else {
-      // Fallback: day 0 = total, today = on-demand, rest = total (future)
+      // Fallback: day 0 = total, rest = on-demand remaining
       remaining = d === 0 ? totalPoints : onDemandRemaining;
     }
 
