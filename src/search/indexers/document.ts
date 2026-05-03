@@ -18,6 +18,21 @@ interface DocumentRow {
   frontmatter?: Record<string, unknown>;
 }
 
+export function stripDocumentMarkdown(markdown: string): string {
+  return markdown
+    .replace(/^---[\s\S]*?---\s*/u, "")
+    .replace(/!\[[^\]]*\]\([^)]*\)/gu, "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/gu, "$1")
+    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/gu, (_match, target: string, alias?: string) => alias ?? target)
+    .replace(/^#{1,6}\s+/gmu, "")
+    .replace(/[*_~`>]+/gu, "")
+    .replace(/^\s*[-+]\s+/gmu, "")
+    .replace(/^\s*\d+\.\s+/gmu, "")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .slice(0, 10_000);
+}
+
 @Injectable()
 export class DocumentIndexer extends SearchIndexHook {
   override readonly kind = "doc";
@@ -49,7 +64,7 @@ export class DocumentIndexer extends SearchIndexHook {
       sourceKind: this.kind,
       sourceId: doc.id,
       title: doc.title,
-      body: doc.body_md || doc.body || textFromUnknown(doc.content_json),
+      body: stripDocumentMarkdown(doc.body_md || doc.body || textFromUnknown(doc.content_json)),
       labels: tagsFromUnknown(doc.frontmatter?.["tags"]),
       metadata: {
         doc_type: doc.doc_type ?? doc.kind ?? null,

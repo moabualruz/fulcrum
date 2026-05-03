@@ -9,7 +9,7 @@ import { DocLink } from "../../../db/entities/docs/DocLink.ts";
 import { Document } from "../../../db/entities/docs/Document.ts";
 import { DocVersion } from "../../../db/entities/docs/DocVersion.ts";
 import { DocTypeEnum, ScopeEnum } from "../../../db/entities/docs/enums.ts";
-import { SearchDocument } from "../../../db/entities/search/SearchDocument.ts";
+import { archiveDocIndex, indexDoc, removeDocIndex } from "../../../docs/search-indexer.ts";
 import { diffDocVersionsHtml, reconstructDocVersion } from "../../../docs/version-reconstructor.ts";
 import { writeDocVersion } from "../../../docs/version-writer.ts";
 import { syncDocWikilinks } from "../../../docs/wikilink-extractor.ts";
@@ -259,20 +259,11 @@ async function upsertSearchDocument(
   em: import("@mikro-orm/postgresql").EntityManager,
   orgId: string,
   docId: string,
+  authorId: string | null = null,
 ): Promise<void> {
-  const existing = await em.findOne(SearchDocument, {
-    org: orgId,
-    entityKind: "doc",
-    entityId: docId,
-  } as never);
-  if (existing) return;
-
-  em.persist(em.create(SearchDocument, {
-    id: randomUUID(),
-    org: em.getReference(Org, orgId),
-    entityKind: "doc",
-    entityId: docId,
-  }));
+  const doc = await em.findOne(Document, { org: orgId, id: docId } as never, { populate: ["org"] });
+  if (!doc) return;
+  await indexDoc(em, doc, authorId);
 }
 
 async function resolveParent(
@@ -422,7 +413,7 @@ export const docsRouter = t.router({
       });
       em.persist(doc);
       await writeDocVersion(em, { orgId: ctx.orgId, doc, authorId: ctx.userId });
-      await upsertSearchDocument(em, ctx.orgId, doc.id);
+      await upsertSearchDocument(em, ctx.orgId, doc.id, ctx.userId);
       await em.flush();
       return serializeDoc(doc);
     }),
@@ -453,7 +444,7 @@ export const docsRouter = t.router({
       em.persist(doc);
       await syncDocWikilinks(em, ctx.orgId, doc, doc.contentJson);
       await writeDocVersion(em, { orgId: ctx.orgId, doc, authorId: ctx.userId });
-      await upsertSearchDocument(em, ctx.orgId, doc.id);
+      await upsertSearchDocument(em, ctx.orgId, doc.id, ctx.userId);
       await em.flush();
       return serializeDoc(doc);
     }),
@@ -467,6 +458,7 @@ export const docsRouter = t.router({
       if (!doc) return null;
 
       if (input.hard) {
+        await removeDocIndex(em, ctx.orgId, doc.id);
         em.remove(doc);
         await em.flush();
         return { deleted: true };
@@ -475,6 +467,7 @@ export const docsRouter = t.router({
       doc.archived = true;
       doc.updatedAt = new Date();
       em.persist(doc);
+      await archiveDocIndex(em, ctx.orgId, doc.id);
       await em.flush();
       return serializeDoc(doc);
     }),
@@ -695,7 +688,7 @@ export const docsRouter = t.router({
           authorId: ctx.userId,
           restoreOf: reconstructed.version,
         });
-        await upsertSearchDocument(em, ctx.orgId, doc.id);
+        await upsertSearchDocument(em, ctx.orgId, doc.id, ctx.userId);
         await em.flush();
         return serializeDoc(doc);
       }),
