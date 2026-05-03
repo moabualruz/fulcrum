@@ -1,6 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
+ImplRuntime: claude
 Pillar: 07-docs-editor-collab
 Blocked-by: [01-docs-schema-foundation.md, 05-doc-crud-trpc.md, 24-gated-connector-confluence.md]
 PRD: .scratch/agent-os-vision/prds/07-docs-editor-collab.md
