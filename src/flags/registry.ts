@@ -40,6 +40,8 @@ export const FEATURE_FLAGS = [
   "symphony-ssh-worker",
   "symphony-http-api",
   "i18n",
+  "report-llm-narration",
+  "search-click-telemetry",
 ] as const;
 
 /** Union type of all registered feature flag names. */
@@ -67,6 +69,8 @@ export const FLAG_DESCRIPTIONS: Record<FeatureFlagName, string> = {
   "symphony-ssh-worker": "Enable Symphony SSH worker for remote command execution.",
   "symphony-http-api": "Enable Symphony HTTP API for webhook-triggered agent runs.",
   "i18n": "Enable locale catalogs, locale picker, and RTL rendering.",
+  "report-llm-narration": "Enable LLM-powered memory digest and doc narration via inference sidecar.",
+  "search-click-telemetry": "Enable search click telemetry writes to search_clicks table.",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

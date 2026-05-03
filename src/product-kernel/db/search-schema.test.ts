@@ -118,15 +118,19 @@ describe("P11#01 search schema extension", () => {
     try {
       await runMigrations(db);
       expect(await tableExists(db, "saved_views")).toBe(true);
-      // FK requires a real org row
+      // FK requires a real org + project row (0004 schema has NOT NULL project_id)
       await db.query(
         `INSERT INTO orgs (id, slug, name) VALUES ($1, $2, $3)`,
         ["org1", "org1", "Org One"],
       );
       await db.query(
-        `INSERT INTO saved_views (id, org_id, view_type, name, filters)
-         VALUES ($1, $2, $3, $4, $5)`,
-        ["v1", "org1", "search", "My search", "{}"],
+        `INSERT INTO projects (id, org_id, slug, name) VALUES ($1, $2, $3, $4)`,
+        ["p1", "org1", "p1", "Project One"],
+      );
+      await db.query(
+        `INSERT INTO saved_views (id, org_id, project_id, scope, view_type, name, filters)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        ["v1", "org1", "p1", "project", "search", "My search", "{}"],
       );
       const rows = await db.query<{ view_type: string }>(
         `SELECT view_type FROM saved_views WHERE id = $1`,

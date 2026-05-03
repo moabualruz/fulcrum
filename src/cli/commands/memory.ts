@@ -40,6 +40,7 @@ Usage:
   fulcrum memory delete <id> [--json]
   fulcrum memory search <query> [--project <id>] [--global] [--kind <kind>] [--tag <tag>] [--importance <level>] [--archived] [--top <n>] [--json]
   fulcrum memory promote <id> [--json]
+  fulcrum memory digest --project <id> [--since <date>] [--json]
 
 Options:
   --json              Output as machine-readable JSON.
@@ -50,6 +51,7 @@ Options:
   --importance <lvl>  Memory importance.
   --archived          Include archived rows.
   --top <n>           Search result limit.
+  --since <date>      Digest: filter memories to created_at >= date (default: 7 days).
   -h, --help          Show this help.
 `;
 
@@ -102,6 +104,58 @@ export async function run(
         const caller = await resolveCaller(runOpts);
         const result = await caller.memory.promote({ id });
         printOutput(result, rest, print, () => `Promoted memory ${id}.`);
+      });
+    case "digest":
+      return withErrors("digest", runOpts, async () => {
+        const { isDigestEnabled, MemoryDigestJob } = await import("../../memory/digest.ts");
+        if (!isDigestEnabled()) {
+          throw new Error("feature not enabled");
+        }
+        const projectId = flagValue(rest, "--project");
+        if (!projectId) {
+          throw new Error("fulcrum memory digest: missing required --project <id>");
+        }
+        const sinceStr = flagValue(rest, "--since");
+        const since = sinceStr ? new Date(sinceStr) : undefined;
+
+        const { MikroORM } = await import("@mikro-orm/postgresql");
+        const orm = runOpts.container?.get(MikroORM);
+        if (!orm) {
+          throw new Error("Database not available. Run `fulcrum init` first.");
+        }
+        const em = orm.em.fork();
+        const socketPath = process.env["FULCRUM_SIDECAR_SOCKET"] ?? "/tmp/fulcrum-sidecar.sock";
+        // Adapt InferenceClient to InferenceClientLike (call method)
+        const client = {
+          async call(method: string, params: unknown) {
+            // JSON-RPC over the sidecar socket
+            const body = JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 });
+            const resp = await fetch("http://localhost/rpc", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body,
+              // @ts-expect-error — Bun fetch supports unix sockets
+              unix: socketPath,
+            });
+            const json = await resp.json() as { result?: unknown; error?: { message: string } };
+            if (json.error) throw new Error(json.error.message);
+            return json.result;
+          },
+        };
+        const job = new MemoryDigestJob(em, client, printErr);
+        const result = await job.run(
+          await resolveOrgId(runOpts),
+          projectId,
+          since,
+        );
+        if (!result) {
+          print("No memories in window to digest.");
+          return;
+        }
+        printOutput(result, rest, print, (r) => {
+          const d = r as { docId: string; body: string; projectId: string; since: string };
+          return `Created digest doc ${d.docId}\n\n${d.body}`;
+        });
       });
     case "help":
     case "--help":
@@ -257,6 +311,19 @@ async function resolveCaller(opts: MemoryRunOptions): Promise<MemoryCaller> {
   });
   const factory = t.createCallerFactory(appRouter);
   return factory(ctx) as unknown as MemoryCaller;
+}
+
+async function resolveOrgId(opts: MemoryRunOptions): Promise<string> {
+  const cliContext = buildCliContext(opts.container ?? null);
+  const session = await resolveActiveCliSession(cliContext.em);
+  if (!session) {
+    throw new Error("No active CLI session. Run `fulcrum init` or `fulcrum auth login`.");
+  }
+  const orgId = session.activeOrganizationId ?? session.orgId;
+  if (!orgId) {
+    throw new Error("Active CLI session missing orgId. Re-authenticate.");
+  }
+  return orgId;
 }
 
 function buildCliContext(container: Container | null): { container: Container | null; em: EntityManager | null } {

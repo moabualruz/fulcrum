@@ -54,18 +54,10 @@ CREATE TABLE IF NOT EXISTS search_clicks (
 CREATE INDEX IF NOT EXISTS search_clicks_scope_idx
   ON search_clicks (org_id, project_id, clicked_at);
 
--- 5. saved_views — persisted view configs; view_type text column accepts any
---    string including 'search', 'board', 'list', etc.
-CREATE TABLE IF NOT EXISTS saved_views (
-  id text PRIMARY KEY,
-  org_id text NOT NULL REFERENCES orgs(id),
-  project_id text REFERENCES projects(id),
-  view_type text NOT NULL,
-  name text NOT NULL,
-  filters jsonb NOT NULL DEFAULT '{}'::jsonb,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
+-- 5. saved_views — extend with view_type column for search/board/list discrimination.
+--    Table already created in 0004_project_settings.sql; add column + index only.
+ALTER TABLE saved_views
+  ADD COLUMN IF NOT EXISTS view_type text NOT NULL DEFAULT 'board';
 
 CREATE INDEX IF NOT EXISTS saved_views_scope_idx
   ON saved_views (org_id, project_id, view_type);
