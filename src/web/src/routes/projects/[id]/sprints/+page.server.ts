@@ -14,6 +14,8 @@ import {
   CompleteSprintSchema,
 } from "$lib/server/sprints.schema";
 import { actionOk, actionFail } from "$lib/feedback/action-result";
+import { generateNarration } from "$lib/server/reports";
+import { isFeatureEnabled } from "$lib/server/feature-flags";
 
 export const load: PageServerLoad = async ({ params }) => {
   const projectId = params.id;
@@ -78,13 +80,34 @@ export const actions: Actions = {
     }
   },
 
-  completeSprint: async ({ request }) => {
+  completeSprint: async ({ request, params }) => {
     const fd = await request.formData();
     const parsed = v.safeParse(CompleteSprintSchema, fdToRecord(fd));
     if (!parsed.success) return fail(400, actionFail("invalid input"));
     const db = await openProductDb();
     try {
-      await completeSprintAction(db, parsed.output.id);
+      const { id: sprintId, metrics } = await completeSprintAction(db, parsed.output.id);
+
+      // LLM narrative step — gated behind FULCRUM_FEATURES=report-llm-narration
+      const llmEnabled = isFeatureEnabled("report-llm-narration");
+      if (llmEnabled) {
+        const narration = await generateNarration({
+          projectId: params.id,
+          sprintId,
+          velocity: metrics.velocity,
+          completedTasks: metrics.completed_tasks,
+          blockedTasks: 0, // best-effort; not in metrics snapshot
+          cycleTimeDays: 0, // best-effort; not in metrics snapshot
+        });
+        if ("text" in narration) {
+          return { ...actionOk("Sprint completed"), narrative: narration.text };
+        }
+        if ("error" in narration) {
+          // Sidecar offline — return ok but with warning; sprint close not blocked
+          return { ...actionOk("Sprint completed"), narrativeError: "Narrative unavailable — sidecar offline" };
+        }
+      }
+
       return actionOk("Sprint completed");
     } catch (err) {
       return fail(400, actionFail((err as Error).message));

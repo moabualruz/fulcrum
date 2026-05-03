@@ -2,6 +2,7 @@
   import type { SprintListing } from "$lib/product-queries";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import { cn } from "$lib/utils.js";
+  import { enhance } from "$app/forms";
 
   interface VelocityPoint { sprintName: string; points: number }
 
@@ -51,6 +52,12 @@
   const maxVelocity = $derived(Math.max(1, ...resolvedVelocity.map((v) => v.points)));
 
   let showCreate = $state(false);
+
+  // LLM narrative state (populated after completeSprint action when flag ON)
+  let narrativeText = $state<string | null>(null);
+  let narrativeError = $state<string | null>(null);
+  let narrativeLoading = $state(false);
+  let narrativeSprintId = $state<string | null>(null);
 </script>
 
 <header data-sprints-header class={cn("flex items-center justify-between border-b border-border pb-3 mb-4")}>
@@ -121,7 +128,29 @@
         <div data-sprint-card data-sprint-status="active" class={cn("rounded-lg border border-primary/30 bg-primary/5 p-4 mb-2")}>
           <div class={cn("flex items-center justify-between")}>
             <a href="/projects/{data.projectId}/sprint/{sprint.id}" class={cn("text-base font-medium hover:underline")}>{sprint.name}</a>
-            <form method="POST" action="?/completeSprint" class={cn("inline")}>
+            <form
+              method="POST"
+              action="?/completeSprint"
+              class={cn("inline")}
+              use:enhance={() => {
+                narrativeLoading = true;
+                narrativeSprintId = sprint.id;
+                narrativeText = null;
+                narrativeError = null;
+                return async ({ result, update }) => {
+                  narrativeLoading = false;
+                  if (result.type === "success" && result.data) {
+                    const d = result.data as Record<string, unknown>;
+                    if (typeof d["narrative"] === "string") {
+                      narrativeText = d["narrative"];
+                    } else if (typeof d["narrativeError"] === "string") {
+                      narrativeError = d["narrativeError"];
+                    }
+                  }
+                  await update();
+                };
+              }}
+            >
               <input type="hidden" name="id" value={sprint.id} />
               <button type="submit" data-complete-sprint-btn class={cn("text-xs text-primary hover:underline")}>Complete</button>
             </form>
@@ -131,6 +160,25 @@
         </div>
       {/each}
     </section>
+  {/if}
+
+  <!-- LLM Narrative (flag ON only — shown after completeSprint) -->
+  {#if narrativeLoading && narrativeSprintId}
+    <div data-narrative-loading class={cn("mb-4 flex items-center gap-2 text-sm text-muted-foreground")}>
+      <span class={cn("inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent")} aria-hidden="true"></span>
+      Generate AI narrative…
+    </div>
+  {/if}
+  {#if narrativeText && !narrativeLoading}
+    <div data-narrative-result class={cn("mb-4 rounded-lg border border-border bg-muted/30 p-4")}>
+      <h3 class={cn("text-sm font-semibold mb-1")}>AI Sprint Narrative</h3>
+      <p class={cn("text-sm text-foreground")}>{narrativeText}</p>
+    </div>
+  {/if}
+  {#if narrativeError && !narrativeLoading}
+    <div data-narrative-error class={cn("mb-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive")}>
+      {narrativeError}
+    </div>
   {/if}
 
   <!-- Planned sprints -->

@@ -2,6 +2,8 @@ import type { ProductDb } from "../../../../product-kernel/db/types.ts";
 import {
   createSprint,
   listSprints,
+  updateSprint,
+  closeSprint,
   addTaskToSprint,
   removeTaskFromSprint,
   listBacklogTasks,
@@ -9,6 +11,7 @@ import {
   sprintCapacityUsed,
   type SprintRow,
   type TaskRow,
+  type MetricsSnapshot,
 } from "../../../../product-kernel/store/repositories.ts";
 
 export type SprintStatus = "planning" | "active" | "completed" | "cancelled";
@@ -68,6 +71,22 @@ export async function listSprintTasksAction(
   sprintId: string,
 ): Promise<TaskRow[]> {
   return listSprintTasks(db, sprintId);
+}
+
+export async function startSprintAction(
+  db: ProductDb,
+  sprintId: string,
+): Promise<{ id: string }> {
+  const sprint = await updateSprint(db, { id: sprintId, status: "active" });
+  return { id: sprint.id };
+}
+
+export async function completeSprintAction(
+  db: ProductDb,
+  sprintId: string,
+): Promise<{ id: string; metrics: MetricsSnapshot }> {
+  const { sprint, metrics } = await closeSprint(db, sprintId);
+  return { id: sprint.id, metrics };
 }
 
 export interface CapacityInfo {

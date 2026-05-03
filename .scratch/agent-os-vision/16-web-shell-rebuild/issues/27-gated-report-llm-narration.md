@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/08-reports-hub.md, 02-inference-sidecar/issues/07-generate-operation.md]
@@ -20,11 +20,11 @@ Flag OFF: sprint close modal has no LLM step; retro doc is blank (user fills man
 
 ## Acceptance criteria
 
-- [ ] Flag OFF: sprint close modal shows no LLM section; `reports.generateNarration` not called.
-- [ ] Flag ON: sprint close modal shows "Generate AI narrative" step with progress spinner; on completion, narrative paragraph inserted into retro doc as TipTap `paragraph` block.
-- [ ] `reports.generateNarration(sprintId)`: assembles sprint stats → calls `inference.generate(prompt)` tRPC → returns text → appends to retro doc.
-- [ ] Failure gate: inference sidecar offline → `reports.generateNarration` returns `{error: "sidecar_unavailable"}`; modal shows "Narrative unavailable — sidecar offline" without blocking sprint close.
-- [ ] Vitest: `generateNarration` with mocked inference sidecar → returns expected text block; flag OFF → procedure is no-op.
+- [x] Flag OFF: sprint close modal shows no LLM section; `reports.generateNarration` not called.
+- [x] Flag ON: sprint close modal shows "Generate AI narrative" step with progress spinner; on completion, narrative paragraph inserted into retro doc as TipTap `paragraph` block.
+- [x] `reports.generateNarration(sprintId)`: assembles sprint stats → calls `inference.generate(prompt)` tRPC → returns text → appends to retro doc.
+- [x] Failure gate: inference sidecar offline → `reports.generateNarration` returns `{error: "sidecar_unavailable"}`; modal shows "Narrative unavailable — sidecar offline" without blocking sprint close.
+- [x] Vitest: `generateNarration` with mocked inference sidecar → returns expected text block; flag OFF → procedure is no-op.
 
 ## Blocked by
 

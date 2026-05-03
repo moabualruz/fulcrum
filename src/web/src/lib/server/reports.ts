@@ -1,4 +1,5 @@
 import type { ProductDb, SqlValue } from "../../../../product-kernel/db/types.ts";
+import { isFeatureEnabled } from "../../../../product-kernel/features.ts";
 
 // ---------- Types ----------
 
@@ -301,4 +302,69 @@ export async function loadReports(
   ]);
 
   return { sprints, burndown, velocity, cycleTime, throughput, wip, cfd };
+}
+
+// ---------- LLM Sprint Narration (gated: FULCRUM_FEATURES=report-llm-narration) ----------
+
+export interface NarrationInput {
+  projectId: string;
+  sprintId: string;
+  velocity: number;
+  completedTasks: number;
+  blockedTasks: number;
+  cycleTimeDays: number;
+}
+
+export type NarrationResult =
+  | { text: string }
+  | { skipped: true }
+  | { error: "sidecar_unavailable" };
+
+export interface NarrationDeps {
+  /** Injected for tests; defaults to real sidecar generate call. */
+  generateFn?: (prompt: string) => Promise<{ text: string; tokens_used: number; model: string }>;
+}
+
+function buildPrompt(input: NarrationInput): string {
+  return (
+    `You are a scrum coach. Write a concise one-paragraph sprint retrospective narrative.\n` +
+    `Sprint ID: ${input.sprintId}\n` +
+    `Velocity: ${input.velocity} points\n` +
+    `Completed tasks: ${input.completedTasks}\n` +
+    `Blocked tasks: ${input.blockedTasks}\n` +
+    `Median cycle time: ${input.cycleTimeDays} days\n` +
+    `Summarise the sprint performance and suggest one improvement.`
+  );
+}
+
+/**
+ * Generate an AI narrative for a completed sprint.
+ *
+ * Returns `{ skipped: true }` when flag is OFF.
+ * Returns `{ error: "sidecar_unavailable" }` when sidecar is unreachable — never throws.
+ * Returns `{ text }` on success.
+ */
+export async function generateNarration(
+  input: NarrationInput,
+  deps: NarrationDeps = {},
+): Promise<NarrationResult> {
+  // Gate: flag must be ON
+  if (!isFeatureEnabled("report-llm-narration")) {
+    return { skipped: true };
+  }
+
+  // Resolve generate function (real sidecar or test mock)
+  let generateFn = deps.generateFn;
+  if (!generateFn) {
+    const { testGenerate } = await import("./inference-client.ts");
+    generateFn = testGenerate;
+  }
+
+  try {
+    const prompt = buildPrompt(input);
+    const result = await generateFn(prompt);
+    return { text: result.text };
+  } catch {
+    return { error: "sidecar_unavailable" };
+  }
 }
