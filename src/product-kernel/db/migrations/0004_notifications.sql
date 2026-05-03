@@ -1,64 +1,33 @@
--- Notification system tables: rules, user notifications, deliveries, mutes, channels, quiet hours.
+-- Email notification channel: users table with email_verified, notification_deliveries table.
 
-CREATE TABLE IF NOT EXISTS notification_rules (
+CREATE TABLE IF NOT EXISTS users (
   id text PRIMARY KEY,
-  org_id text NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  name text NOT NULL,
-  event_pattern jsonb NOT NULL DEFAULT '{}'::jsonb,
-  channels text[] NOT NULL DEFAULT '{}',
-  enabled boolean NOT NULL DEFAULT true,
+  org_id text NOT NULL REFERENCES orgs(id),
+  email text,
+  email_verified boolean NOT NULL DEFAULT false,
+  email_verify_token text,
+  email_verify_token_expires_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS notification_rules_org_idx ON notification_rules (org_id);
+CREATE INDEX IF NOT EXISTS users_org_idx ON users (org_id);
 
-CREATE TABLE IF NOT EXISTS user_notifications (
+CREATE TABLE IF NOT EXISTS notification_deliveries (
   id text PRIMARY KEY,
-  org_id text NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  user_id text NOT NULL,
-  subject_kind text NOT NULL,
-  subject_id text NOT NULL,
-  verb text NOT NULL,
-  title text NOT NULL,
+  org_id text NOT NULL REFERENCES orgs(id),
+  user_id text NOT NULL REFERENCES users(id),
+  channel text NOT NULL,
+  notification_id text,
+  subject text,
   body text,
-  read_at timestamptz,
+  status text NOT NULL CHECK (status IN ('sent', 'failed', 'suppressed')),
+  suppression_reason text,
+  last_error text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS user_notifications_user_idx ON user_notifications (org_id, user_id, read_at, created_at DESC);
-
-CREATE TABLE IF NOT EXISTS notification_mutes (
-  id text PRIMARY KEY,
-  org_id text NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  user_id text NOT NULL,
-  subject_kind text NOT NULL,
-  subject_id text NOT NULL,
-  muted_until timestamptz,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (org_id, user_id, subject_kind, subject_id)
-);
-
-CREATE TABLE IF NOT EXISTS notification_channels (
-  id text PRIMARY KEY,
-  org_id text NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  kind text NOT NULL,
-  config jsonb NOT NULL DEFAULT '{}'::jsonb,
-  enabled boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (org_id, kind)
-);
-
-CREATE TABLE IF NOT EXISTS notification_quiet_hours (
-  id text PRIMARY KEY,
-  org_id text NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  user_id text NOT NULL,
-  start_hour integer NOT NULL CHECK (start_hour >= 0 AND start_hour < 24),
-  end_hour integer NOT NULL CHECK (end_hour >= 0 AND end_hour < 24),
-  timezone text NOT NULL DEFAULT 'UTC',
-  enabled boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (org_id, user_id)
-);
+CREATE INDEX IF NOT EXISTS notification_deliveries_user_channel_idx
+  ON notification_deliveries (user_id, channel, created_at);
+CREATE INDEX IF NOT EXISTS notification_deliveries_status_idx
+  ON notification_deliveries (status, created_at);
