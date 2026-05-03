@@ -299,7 +299,7 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       return;
     }
     case "docs": {
-      const { runDocsCommand } = await import("./docs-templates.ts");
+      const { run: runDocsCommand } = await import("./commands/docs.ts");
       const [sub = "help"] = rest;
       if (sub === "help" || sub === "--help" || sub === "-h") {
         await runDocsCommand(rest);
