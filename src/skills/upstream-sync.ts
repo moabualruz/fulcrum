@@ -13,6 +13,7 @@ import {
 import { initOrm } from "../db/mikro-orm.config.ts";
 import { parseKernelMarkdown } from "../product-kernel/markdown.ts";
 import { AGENT_DIRS, type AgentName } from "./loader.ts";
+import { installSkill } from "./loader.ts";
 import { readSkillsLockFile, writeSkillsLockFile } from "./lock.ts";
 
 export type SyncResult = {
@@ -353,6 +354,60 @@ export async function syncUpstream(
 
     await writeSkillsLockFile(lock);
     return result;
+  } finally {
+    await ormHandle.close();
+  }
+}
+
+async function upstreamSkillRows(
+  orm: MikroORM,
+  orgId: string,
+  slug: string | "all",
+): Promise<FulcrumSkill[]> {
+  const where = {
+    org: orgId,
+    source: SkillSource.Upstream,
+    upstreamRepo: { $ne: null },
+    ...(slug === "all" ? {} : { slug }),
+  };
+  return orm.em.fork().find(FulcrumSkill, where, { orderBy: { slug: "ASC" } });
+}
+
+export async function upgradeSkills(
+  orgId: string,
+  slug: string | "all",
+): Promise<FulcrumSkill[]> {
+  const ormHandle = await ormForSync();
+  try {
+    const skills = await upstreamSkillRows(ormHandle.orm, orgId, slug);
+    const upgraded: FulcrumSkill[] = [];
+
+    for (const skill of skills) {
+      if (!skill.upstreamRepo) continue;
+      const cloneParent = await mkdtemp(join(tmpdir(), "fulcrum-skills-upgrade-"));
+      const cloneDir = join(cloneParent, "repo");
+      try {
+        await cloneUpstream(skill.upstreamRepo, skill.upstreamRef, cloneDir);
+        const upstreamPath = await findSkillMarkdown(cloneDir, skill.slug);
+        if (!upstreamPath) throw new Error(`missing SKILL.md for ${skill.slug}`);
+
+        await installSkill(upstreamPath, orgId);
+        const em = ormHandle.orm.em.fork();
+        const reloaded = await em.findOneOrFail(FulcrumSkill, {
+          org: orgId,
+          slug: skill.slug,
+        });
+        reloaded.source = SkillSource.Upstream;
+        reloaded.upstreamRepo = skill.upstreamRepo;
+        reloaded.upstreamRef = skill.upstreamRef;
+        await em.flush();
+        upgraded.push(reloaded);
+      } finally {
+        await rm(cloneParent, { recursive: true, force: true });
+      }
+    }
+
+    return upgraded;
   } finally {
     await ormHandle.close();
   }

@@ -1,8 +1,9 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 05-router-and-skills
 Blocked-by: 15-skills-conflict-resolver
+ImplRuntime: codex
 ---
 
 # tRPC skills.* procedures (list/install/upgrade/uninstall/sync/resolveConflict)

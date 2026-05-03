@@ -400,3 +400,48 @@ export async function installSkill(
     await installOrm.close();
   }
 }
+
+export async function listInstalledSkills(orgId: string): Promise<FulcrumSkill[]> {
+  const installOrm = await ormForInstall();
+  try {
+    return installOrm.orm.em.fork().find(FulcrumSkill, { org: orgId }, {
+      orderBy: { slug: "ASC" },
+    });
+  } finally {
+    await installOrm.close();
+  }
+}
+
+export async function uninstallSkill(
+  slug: string,
+  orgId: string,
+): Promise<void> {
+  const installOrm = await ormForInstall();
+  try {
+    await withSkillsLock(async () => {
+      const em = installOrm.orm.em.fork();
+      const skill = await em.findOne(FulcrumSkill, { org: orgId, slug });
+      const lock = await readSkillsLockFile();
+      const lockAgents = lock[slug]?.enabled_agents ?? [];
+      const agents = (lockAgents.length > 0 ? lockAgents : skill?.enabledAgents ?? [])
+        .filter((agent): agent is AgentName => agent in AGENT_DIRS);
+
+      for (const agent of agents) {
+        await rm(join(expandHome(AGENT_DIRS[agent]), slug), {
+          recursive: true,
+          force: true,
+        });
+      }
+
+      if (skill) {
+        em.remove(skill);
+        await em.flush();
+      }
+
+      delete lock[slug];
+      await writeSkillsLockFile(lock);
+    });
+  } finally {
+    await installOrm.close();
+  }
+}
