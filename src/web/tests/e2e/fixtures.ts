@@ -20,6 +20,7 @@ import {
   createTask,
 } from "../../../product-kernel/store/repositories.ts";
 import { newUlid } from "../../../product-kernel/ids.ts";
+import { createArtifact } from "../../../product-kernel/artifacts.ts";
 import type { ProductDb } from "../../../product-kernel/db/types.ts";
 
 export interface SeedTaskInput {
@@ -27,6 +28,18 @@ export interface SeedTaskInput {
   title: string;
   status?: string;
   priority?: number;
+}
+
+export interface SeedArtifactInput {
+  projectId?: string | null;
+  taskId?: string | null;
+  title: string;
+  kind?: string;
+  mime?: string;
+  size?: number;
+  bodyPath?: string | null;
+  sha256?: string | null;
+  archived?: boolean;
 }
 
 export interface SeedDocInput {
@@ -42,6 +55,7 @@ export interface FulcrumHome {
   seedProject: (slug: string, name?: string) => Promise<{ id: string }>;
   seedTask: (input: SeedTaskInput) => Promise<{ id: string }>;
   seedDoc: (input: SeedDocInput) => Promise<{ id: string }>;
+  seedArtifact: (input: SeedArtifactInput) => Promise<{ id: string }>;
 }
 
 // Worker-scoped: second type param declares worker fixtures.
@@ -76,6 +90,27 @@ export const test = base.extend<Record<never, never>, { fulcrumHome: FulcrumHome
         return { id: row.id };
       };
 
+      const artifactIds: string[] = [];
+
+      const seedArtifact = async (input: SeedArtifactInput): Promise<{ id: string }> => {
+        const row = await createArtifact(db, {
+          orgId,
+          projectId: input.projectId ?? null,
+          taskId: input.taskId ?? null,
+          kind: input.kind ?? "file",
+          title: input.title,
+          bodyPath: input.bodyPath ?? null,
+          sha256: input.sha256 ?? null,
+          size: input.size ?? null,
+          mime: input.mime ?? "application/octet-stream",
+        });
+        if (input.archived) {
+          await db.query(`UPDATE artifacts SET archived = true WHERE id = $1`, [row.id]);
+        }
+        artifactIds.push(row.id);
+        return { id: row.id };
+      };
+
       const seedDoc = async (input: SeedDocInput): Promise<{ id: string }> => {
         const id = newUlid();
         await db.query(
@@ -87,9 +122,10 @@ export const test = base.extend<Record<never, never>, { fulcrumHome: FulcrumHome
         return { id };
       };
 
-      await use({ home, orgId, seedProject, seedTask, seedDoc });
+      await use({ home, orgId, seedProject, seedTask, seedDoc, seedArtifact });
 
-      // Cleanup: dependency order — docs → tasks → events/projects.
+      // Cleanup: dependency order — artifacts → docs → tasks → events/projects.
+      for (const id of artifactIds) await db.query("DELETE FROM artifacts WHERE id = $1", [id]);
       for (const id of docIds) await db.query("DELETE FROM documents WHERE id = $1", [id]);
       for (const id of taskIds) await db.query("DELETE FROM tasks WHERE id = $1", [id]);
       for (const id of projectIds) {

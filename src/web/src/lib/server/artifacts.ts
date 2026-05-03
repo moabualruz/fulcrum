@@ -82,6 +82,64 @@ export async function listArtifacts(
   }));
 }
 
+export interface ArtifactDetail extends ArtifactRow {
+  downloadHref: string;
+  retentionDaysRemaining: number;
+  content: string | null;
+}
+
+/** Read a single artifact with computed detail fields for the detail page. */
+export async function readArtifactDetail(
+  db: ProductDb,
+  input: { orgId: string; id: string },
+): Promise<ArtifactDetail | null> {
+  const rows = await db.query<ArtifactRow & { created_at: string | Date }>(
+    `SELECT id, org_id, project_id, run_id, task_id, kind, title,
+            body_path, sha256, size, mime, COALESCE(archived, false) AS archived, created_at
+       FROM artifacts
+      WHERE id = $1 AND org_id = $2`,
+    [input.id, input.orgId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+
+  const createdAt = row.created_at instanceof Date ? row.created_at : new Date(row.created_at);
+  const retentionDays = 90;
+  const elapsed = Math.floor((Date.now() - createdAt.getTime()) / 86_400_000);
+  const remaining = Math.max(0, retentionDays - elapsed);
+
+  let content: string | null = null;
+  if (row.body_path && row.mime?.startsWith("text/")) {
+    try {
+      const { readFile } = await import("node:fs/promises");
+      content = await readFile(row.body_path, "utf-8");
+    } catch {
+      content = null;
+    }
+  }
+
+  return {
+    ...row,
+    archived: Boolean(row.archived),
+    created_at: isoStamp(row.created_at),
+    downloadHref: `/artifacts/${row.id}/download`,
+    retentionDaysRemaining: remaining,
+    content,
+  };
+}
+
+/** Delete an artifact row (soft: archive; hard: remove row). */
+export async function deleteArtifactAction(
+  db: ProductDb,
+  id: string,
+  orgId: string,
+): Promise<void> {
+  await db.query(
+    `DELETE FROM artifacts WHERE id = $1 AND org_id = $2`,
+    [id, orgId],
+  );
+}
+
 export async function getArtifactStats(
   db: ProductDb,
   orgId: string,
