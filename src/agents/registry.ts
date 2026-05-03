@@ -4,6 +4,10 @@
 import { AgentProfileSchema, type AgentProfile } from "./types.ts";
 import { claudeCodeProfile } from "./profiles/claude-code.ts";
 import { codexProfile } from "./profiles/codex.ts";
+import { copilotProfile } from "./profiles/copilot.ts";
+import { geminiCliProfile } from "./profiles/gemini-cli.ts";
+import { opencodeProfile } from "./profiles/opencode.ts";
+import { piProfile } from "./profiles/pi.ts";
 
 export interface Agent {
   id: "claude-code" | "codex" | "gemini" | "opencode" | "pi";
@@ -102,36 +106,10 @@ export const AGENTS: readonly Agent[] = [
 const PROFILE_DEFINITIONS: readonly AgentProfile[] = [
   claudeCodeProfile,
   codexProfile,
-  {
-    name: "gemini",
-    cliPath: "gemini",
-    defaultFlags: [],
-    skillFolder: "gemini",
-    authEnvVars: ["GEMINI_API_KEY"],
-    sandcastleProvider: "docker",
-    maxIterations: 8,
-    defaultTimeout: 300_000,
-  },
-  {
-    name: "opencode",
-    cliPath: "opencode",
-    defaultFlags: [],
-    skillFolder: "opencode",
-    authEnvVars: [],
-    sandcastleProvider: "docker",
-    maxIterations: 8,
-    defaultTimeout: 300_000,
-  },
-  {
-    name: "pi",
-    cliPath: "pi",
-    defaultFlags: [],
-    skillFolder: "pi",
-    authEnvVars: [],
-    sandcastleProvider: "docker",
-    maxIterations: 8,
-    defaultTimeout: 300_000,
-  },
+  copilotProfile,
+  geminiCliProfile,
+  opencodeProfile,
+  piProfile,
 ] as const;
 
 export class UnknownAgentError extends Error {
