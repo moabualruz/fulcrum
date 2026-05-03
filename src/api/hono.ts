@@ -91,7 +91,10 @@ export function createPublicApiRouter(): Hono {
 
   // Guard middleware — 404 when flag is OFF.
   // Read env per-request so flag toggles take effect without restart.
-  router.get("/api/openapi.json", (c) => api.fetch(new Request(new URL("/openapi.json", c.req.url).toString(), c.req.raw)));
+  router.get("/api/openapi.json", (c) => {
+    if (!isPublicApiEnabled()) return c.notFound();
+    return api.fetch(new Request(new URL("/openapi.json", c.req.url).toString(), c.req.raw));
+  });
 
   router.use("/api/v1/*", async (c, next) => {
     if (!isPublicApiEnabled()) {

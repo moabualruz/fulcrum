@@ -49,9 +49,13 @@ CREATE INDEX IF NOT EXISTS user_notifications_user_idx ON user_notifications (or
 CREATE TABLE IF NOT EXISTS notification_deliveries (
   id text PRIMARY KEY,
   org_id text NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-  notification_id text NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+  notification_id text REFERENCES notifications(id) ON DELETE CASCADE,
   channel text NOT NULL,
-  status text NOT NULL CHECK (status IN ('pending', 'sent', 'failed', 'held-quiet-hours')),
+  status text NOT NULL CHECK (status IN ('pending', 'sent', 'failed', 'held-quiet-hours', 'suppressed')),
+  user_id text,
+  subject text,
+  body text,
+  suppression_reason text,
   attempts integer NOT NULL DEFAULT 0,
   max_attempts integer NOT NULL DEFAULT 5,
   retry_after timestamptz,
@@ -61,15 +65,6 @@ CREATE TABLE IF NOT EXISTS notification_deliveries (
 );
 
 CREATE INDEX IF NOT EXISTS notification_deliveries_status_idx ON notification_deliveries (status, retry_after);
-
-ALTER TABLE notification_deliveries DROP CONSTRAINT IF EXISTS notification_deliveries_status_check;
-ALTER TABLE notification_deliveries ADD CONSTRAINT notification_deliveries_status_check
-  CHECK (status IN ('pending', 'sent', 'failed', 'held-quiet-hours', 'suppressed'));
-ALTER TABLE notification_deliveries ADD COLUMN IF NOT EXISTS user_id text;
-ALTER TABLE notification_deliveries ADD COLUMN IF NOT EXISTS subject text;
-ALTER TABLE notification_deliveries ADD COLUMN IF NOT EXISTS body text;
-ALTER TABLE notification_deliveries ADD COLUMN IF NOT EXISTS suppression_reason text;
-ALTER TABLE notification_deliveries ALTER COLUMN notification_id DROP NOT NULL;
 
 CREATE TABLE IF NOT EXISTS webhook_rule_configs (
   id text PRIMARY KEY,
@@ -102,11 +97,11 @@ CREATE TABLE IF NOT EXISTS notification_mutes (
   subject_kind text NOT NULL,
   subject_id text NOT NULL,
   until timestamptz,
+  muted_until timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (user_id, subject_kind, subject_id)
 );
 
-ALTER TABLE notification_mutes ADD COLUMN IF NOT EXISTS muted_until timestamptz;
 CREATE UNIQUE INDEX IF NOT EXISTS notification_mutes_org_user_subject_idx
   ON notification_mutes (org_id, user_id, subject_kind, subject_id);
 
@@ -133,9 +128,6 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (user_id, endpoint)
 );
-
-ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS user_agent text;
-ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
 CREATE TABLE IF NOT EXISTS event_retention_policies (
   id text PRIMARY KEY,
