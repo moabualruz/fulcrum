@@ -1,5 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplRuntime: claude
+LastVerifiedRuntime: codex
 Triage: AFK
 Pillar: 06-tasks-and-scrum
 Blocked-by: [06-connector-framework-schema]

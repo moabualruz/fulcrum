@@ -66,8 +66,8 @@ export async function createUser(
 ): Promise<UserRow> {
   const id = newUlid();
   await db.query(
-    `INSERT INTO users (id, org_id, email, email_verified) VALUES ($1, $2, $3, $4)`,
-    [id, input.orgId, input.email ?? null, input.emailVerified ?? false],
+    `INSERT INTO users (id, org_id, handle, email, email_verified) VALUES ($1, $2, $3, $4, $5)`,
+    [id, input.orgId, input.email ?? id, input.email ?? null, input.emailVerified ?? false],
   );
   const rows = await db.query<UserRow>(`SELECT * FROM users WHERE id = $1`, [id]);
   if (rows.length === 0) throw new Error(`user insert lost: ${id}`);

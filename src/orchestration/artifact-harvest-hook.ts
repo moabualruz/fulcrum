@@ -82,7 +82,7 @@ function matchesPattern(relativePath: string, pattern: string): boolean {
 }
 
 async function listFilesRecursive(dir: string): Promise<string[]> {
-  let entries: Awaited<ReturnType<typeof readdir>>;
+  let entries: Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>;
   try {
     entries = await readdir(dir, { withFileTypes: true });
   } catch {

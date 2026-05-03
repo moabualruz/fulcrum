@@ -17,6 +17,7 @@ mock.module("$lib/product-queries", () => ({
 }));
 
 mock.module("$lib/server/tasks", () => ({
+  TASK_STATUSES: ["pending", "in_progress", "blocked", "completed", "cancelled"],
   createTaskAction: mock(() => Promise.resolve({ id: "t-new" })),
   moveTaskStatusAction: mock(() => Promise.resolve()),
   updateTaskAction: mock(() => Promise.resolve()),

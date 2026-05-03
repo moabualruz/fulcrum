@@ -178,11 +178,22 @@ export interface SprintRow {
   name: string;
   goal: string | null;
   status: string;
-  capacity_points: number;
+  capacity_points: number | null;
   start_date: string | null;
   end_date: string | null;
+  closed_at: string | null;
+  metrics_snapshot: MetricsSnapshot | null;
+  retro_doc_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface MetricsSnapshot {
+  capacity_points: number | null;
+  completed_points: number;
+  total_tasks: number;
+  completed_tasks: number;
+  velocity: number;
 }
 
 export async function createSprint(
@@ -193,7 +204,7 @@ export async function createSprint(
     name: string;
     goal?: string | null;
     status?: string;
-    capacityPoints?: number;
+    capacityPoints?: number | null;
     startDate?: string | null;
     endDate?: string | null;
   },
@@ -236,7 +247,7 @@ export async function updateSprint(
     name?: string;
     goal?: string | null;
     status?: string;
-    capacityPoints?: number;
+    capacityPoints?: number | null;
     startDate?: string | null;
     endDate?: string | null;
   },
@@ -272,6 +283,209 @@ export async function listSprints(
     `SELECT * FROM sprints WHERE project_id = $1 ORDER BY created_at DESC, id ASC`,
     [projectId],
   );
+}
+
+export async function addTaskToSprint(
+  db: ProductDb,
+  input: { sprintId: string; taskId: string },
+): Promise<{ ok: true }> {
+  const sprintRows = await db.query<SprintRow>(`SELECT * FROM sprints WHERE id = $1`, [
+    input.sprintId,
+  ]);
+  const sprint = sprintRows[0];
+  if (!sprint) throw new Error(`sprint not found: ${input.sprintId}`);
+
+  const taskRows = await db.query<TaskRow>(`SELECT * FROM tasks WHERE id = $1`, [
+    input.taskId,
+  ]);
+  const task = taskRows[0];
+  if (!task) throw new Error(`task not found: ${input.taskId}`);
+  if (task.org_id !== sprint.org_id || task.project_id !== sprint.project_id) {
+    throw new Error(`task ${input.taskId} is outside sprint scope ${input.sprintId}`);
+  }
+
+  await db.query(
+    `UPDATE tasks SET sprint_id = $1, updated_at = now()
+      WHERE id = $2 AND org_id = $3 AND project_id = $4`,
+    [sprint.id, task.id, sprint.org_id, sprint.project_id],
+  );
+  await appendEvent(db, {
+    orgId: sprint.org_id,
+    projectId: sprint.project_id,
+    actor: "system",
+    subjectKind: "task",
+    subjectId: task.id,
+    verb: "sprint.added",
+    payload: { sprint_id: sprint.id },
+  });
+  return { ok: true };
+}
+
+export async function removeTaskFromSprint(
+  db: ProductDb,
+  input: { sprintId: string; taskId: string },
+): Promise<{ ok: true }> {
+  const sprintRows = await db.query<SprintRow>(`SELECT * FROM sprints WHERE id = $1`, [
+    input.sprintId,
+  ]);
+  const sprint = sprintRows[0];
+  if (!sprint) throw new Error(`sprint not found: ${input.sprintId}`);
+
+  const rows = await db.query<TaskRow>(
+    `UPDATE tasks SET sprint_id = NULL, updated_at = now()
+      WHERE id = $1 AND org_id = $2 AND project_id = $3 AND sprint_id = $4
+      RETURNING *`,
+    [input.taskId, sprint.org_id, sprint.project_id, sprint.id],
+  );
+  const task = rows[0];
+  if (!task) throw new Error(`task not found in sprint: ${input.taskId}`);
+  await appendEvent(db, {
+    orgId: sprint.org_id,
+    projectId: sprint.project_id,
+    actor: "system",
+    subjectKind: "task",
+    subjectId: task.id,
+    verb: "sprint.removed",
+    payload: { sprint_id: sprint.id },
+  });
+  return { ok: true };
+}
+
+export async function listBacklogTasks(
+  db: ProductDb,
+  projectId: string,
+): Promise<TaskRow[]> {
+  return db.query<TaskRow>(
+    `SELECT * FROM tasks
+      WHERE project_id = $1
+        AND sprint_id IS NULL
+        AND status NOT IN ('completed', 'cancelled')
+      ORDER BY priority DESC, updated_at DESC, id ASC`,
+    [projectId],
+  );
+}
+
+export async function listSprintTasks(
+  db: ProductDb,
+  sprintId: string,
+): Promise<TaskRow[]> {
+  return db.query<TaskRow>(
+    `SELECT * FROM tasks
+      WHERE sprint_id = $1
+      ORDER BY priority DESC, updated_at DESC, id ASC`,
+    [sprintId],
+  );
+}
+
+export async function sprintCapacityUsed(db: ProductDb, sprintId: string): Promise<number> {
+  const rows = await db.query<{ used: number | string | null }>(
+    `SELECT COALESCE(SUM(estimate_points), 0) AS used
+      FROM tasks
+      WHERE sprint_id = $1`,
+    [sprintId],
+  );
+  return Number(rows[0]?.used ?? 0);
+}
+
+export async function closeSprint(
+  db: ProductDb,
+  sprintId: string,
+): Promise<{ sprint: SprintRow; metrics: MetricsSnapshot; event: EventRow }> {
+  const sprintRows = await db.query<SprintRow>(`SELECT * FROM sprints WHERE id = $1`, [
+    sprintId,
+  ]);
+  const sprint = sprintRows[0];
+  if (!sprint) throw new Error(`sprint not found: ${sprintId}`);
+  if (sprint.status === "completed") throw new Error(`sprint already closed: ${sprintId}`);
+
+  const metricRows = await db.query<{
+    completed_points: number | string | null;
+    total_tasks: number | string;
+    completed_tasks: number | string;
+  }>(
+    `SELECT
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN estimate_points ELSE 0 END), 0) AS completed_points,
+        COUNT(*) AS total_tasks,
+        COUNT(*) FILTER (WHERE status = 'completed') AS completed_tasks
+      FROM tasks
+      WHERE sprint_id = $1`,
+    [sprint.id],
+  );
+  const metricRow = metricRows[0];
+  const completedPoints = Number(metricRow?.completed_points ?? 0);
+  const metrics: MetricsSnapshot = {
+    capacity_points: sprint.capacity_points,
+    completed_points: completedPoints,
+    total_tasks: Number(metricRow?.total_tasks ?? 0),
+    completed_tasks: Number(metricRow?.completed_tasks ?? 0),
+    velocity: completedPoints,
+  };
+
+  const closedRows = await db.query<SprintRow>(
+    `UPDATE sprints
+      SET status = 'completed', closed_at = now(), metrics_snapshot = $1::jsonb, updated_at = now()
+      WHERE id = $2 AND status <> 'completed'
+      RETURNING *`,
+    [JSON.stringify(metrics), sprint.id],
+  );
+  const closed = closedRows[0];
+  if (!closed) throw new Error(`sprint already closed: ${sprintId}`);
+
+  const event = await appendEvent(db, {
+    orgId: closed.org_id,
+    projectId: closed.project_id,
+    actor: "system",
+    subjectKind: "sprint",
+    subjectId: closed.id,
+    verb: "closed",
+    payload: {
+      name: closed.name,
+      goal: closed.goal,
+      start_date: closed.start_date,
+      end_date: closed.end_date,
+      metrics_snapshot: metrics,
+    },
+  });
+  return { sprint: closed, metrics, event };
+}
+
+export async function checkEventHandled(
+  db: ProductDb,
+  eventId: string,
+  handler: string,
+): Promise<boolean> {
+  const rows = await db.query<{ event_id: string }>(
+    `SELECT event_id FROM event_handler_log WHERE event_id = $1 AND handler = $2`,
+    [eventId, handler],
+  );
+  return rows.length > 0;
+}
+
+export async function markEventHandled(
+  db: ProductDb,
+  eventId: string,
+  handler: string,
+): Promise<void> {
+  await db.query(
+    `INSERT INTO event_handler_log (event_id, handler)
+      VALUES ($1, $2)
+      ON CONFLICT (event_id, handler) DO NOTHING`,
+    [eventId, handler],
+  );
+}
+
+export async function setSprintRetroDocId(
+  db: ProductDb,
+  sprintId: string,
+  docId: string,
+): Promise<SprintRow> {
+  const rows = await db.query<SprintRow>(
+    `UPDATE sprints SET retro_doc_id = $1, updated_at = now() WHERE id = $2 RETURNING *`,
+    [docId, sprintId],
+  );
+  const sprint = rows[0];
+  if (!sprint) throw new Error(`sprint not found: ${sprintId}`);
+  return sprint;
 }
 
 export async function listTasks(

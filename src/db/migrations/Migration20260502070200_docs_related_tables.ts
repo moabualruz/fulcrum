@@ -34,7 +34,7 @@ export class Migration20260502070200_docs_related_tables extends Migration {
     );
 
     this.addSql(
-      `create table "doc_versions" ("id" uuid not null default gen_random_uuid(), "org_id" uuid not null, "doc_id" uuid not null, "version_num" int not null, "snapshot" jsonb null, "delta" jsonb null, "body_md_snapshot" text null, "author_id" uuid null, "restore_of" uuid null, "created_at" timestamptz not null default now(), primary key ("id"))`,
+      `create table "doc_versions" ("id" uuid not null default gen_random_uuid(), "org_id" uuid not null, "doc_id" uuid not null, "version_num" int not null, "snapshot" jsonb null, "delta" jsonb null, "body_md_snapshot" text null, "yjs_state" bytea null, "author_id" uuid null, "restore_of" uuid null, "created_at" timestamptz not null default now(), primary key ("id"))`,
     );
     this.addSql(
       `create unique index "doc_versions_id_org_unique" on "doc_versions" ("id", "org_id")`,

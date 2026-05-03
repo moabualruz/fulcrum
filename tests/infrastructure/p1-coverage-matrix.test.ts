@@ -59,14 +59,16 @@ describe("P1 test coverage matrix", () => {
 });
 
 describe("scripts/ci.ts baseline gate", () => {
-  it("keeps the default CI gate at 13 always-on stages", () => {
+  it("keeps the default CI gate at 15 always-on stages", () => {
     const names = STEPS.map((step) => step.name);
     expect(names).toEqual([
       "install",
       "typecheck",
       "symphony:lock",
+      "symphony:conformance",
       "test",
       "license-audit",
+      "ci:codegen",
       "build:all",
       "web:install",
       "web:check",
@@ -83,9 +85,9 @@ describe("scripts/ci.ts baseline gate", () => {
     expect(names).not.toContain("web:e2e");
   });
 
-  it("runs root tests with the Svelte condition enabled", () => {
+  it("runs root tests through the root test runner", () => {
     const testStep = STEPS.find((step) => step.name === "test");
-    expect(testStep?.cmd).toEqual(["bun", "test", "--conditions=svelte"]);
+    expect(testStep?.cmd).toEqual(["bun", "run", "scripts/test-root.ts"]);
   });
 
   it("runs root tests with a sandbox-safe home without global FULCRUM_HOME", () => {

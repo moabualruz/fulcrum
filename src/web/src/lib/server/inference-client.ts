@@ -5,10 +5,11 @@
  * catches and degrades gracefully when the sidecar is down.
  */
 
-const SIDECAR_BASE =
-  process.env["FULCRUM_INFERENCE_URL"] ?? "http://127.0.0.1:8420";
-
 const TIMEOUT_MS = 5_000;
+
+function sidecarBaseUrl(): string {
+  return process.env["FULCRUM_INFERENCE_URL"] ?? "http://127.0.0.1:8420";
+}
 
 export type BackendStatus = "healthy" | "degraded" | "unreachable";
 
@@ -72,7 +73,7 @@ async function sidecarFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(String(new URL(path, SIDECAR_BASE)), {
+    const res = await fetch(String(new URL(path, sidecarBaseUrl())), {
       ...init,
       signal: controller.signal,
     });
@@ -104,7 +105,7 @@ export async function listRouting(): Promise<FeatureRouting[]> {
 export async function pullModel(modelId: string): Promise<ReadableStream<Uint8Array>> {
   const controller = new AbortController();
   // No timeout for pull — it's long-running
-  const res = await fetch(String(new URL(`/models/${encodeURIComponent(modelId)}/pull`, SIDECAR_BASE)), {
+  const res = await fetch(String(new URL(`/models/${encodeURIComponent(modelId)}/pull`, sidecarBaseUrl())), {
     method: "POST",
     signal: controller.signal,
   });

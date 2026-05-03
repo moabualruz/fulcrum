@@ -11,6 +11,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260503120000_doc_versions_yjs_state extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     this.addSql(
       'ALTER TABLE "doc_versions" ADD COLUMN IF NOT EXISTS "yjs_state" bytea DEFAULT NULL;',

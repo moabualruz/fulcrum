@@ -1,5 +1,8 @@
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
+let lastTime = -1;
+let lastRandom: number[] = [];
+
 function encodeTime(now: number): string {
   let n = now;
   const out = new Array<string>(10);
@@ -10,19 +13,30 @@ function encodeTime(now: number): string {
   return out.join("");
 }
 
-function encodeRandom(bytes: Uint8Array): string {
-  let out = "";
-  for (let i = 0; i < bytes.length; i++) {
-    out += CROCKFORD[(bytes[i] as number) % 32];
+function incrementRandom(value: number[]): number[] {
+  const next = value.slice();
+  for (let i = next.length - 1; i >= 0; i--) {
+    if ((next[i] as number) < 31) {
+      next[i] = (next[i] as number) + 1;
+      return next;
+    }
+    next[i] = 0;
   }
-  return out;
+  return next;
 }
 
 export function newUlid(): string {
-  const time = encodeTime(Date.now());
-  const random = new Uint8Array(16);
-  crypto.getRandomValues(random);
-  return time + encodeRandom(random);
+  const now = Date.now();
+  const time = encodeTime(now);
+  if (now === lastTime) {
+    lastRandom = incrementRandom(lastRandom);
+  } else {
+    const random = new Uint8Array(16);
+    crypto.getRandomValues(random);
+    lastTime = now;
+    lastRandom = Array.from(random, (byte) => byte % 32);
+  }
+  return time + lastRandom.map((index) => CROCKFORD[index] as string).join("");
 }
 
 export function testUlid(seed: string): string {

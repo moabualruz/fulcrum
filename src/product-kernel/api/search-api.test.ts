@@ -139,10 +139,12 @@ describe("search API — flag ON + authed", () => {
         { headers: { authorization: "Bearer valid-token" } },
       );
       expect(res.status).toBe(200);
-      const json = await res.json();
+      const json = await res.json() as Array<{ title: string }>;
       expect(Array.isArray(json)).toBe(true);
       expect(json.length).toBeGreaterThanOrEqual(1);
-      expect(json[0].title).toBe("kernel task");
+      const first = json[0];
+      expect(first).toBeDefined();
+      expect(first!.title).toBe("kernel task");
     } finally {
       await db.close();
     }
@@ -170,7 +172,7 @@ describe("search API — flag ON + authed", () => {
         { headers: { authorization: "Bearer valid-token" } },
       );
       expect(res.status).toBe(200);
-      const json = await res.json();
+      const json = await res.json() as { suggestions: string[] };
       expect(json.suggestions).toContain("foobar doc");
     } finally {
       await db.close();
@@ -205,7 +207,7 @@ describe("search API — flag ON + authed", () => {
         }),
       });
       expect(createRes.status).toBe(201);
-      const created = await createRes.json();
+      const created = await createRes.json() as { name: string };
       expect(created.name).toBe("my saved");
 
       // List
@@ -234,7 +236,7 @@ describe("search API — OpenAPI spec", () => {
       });
       const res = await app.request("/api/openapi.json");
       expect(res.status).toBe(200);
-      const spec = await res.json();
+      const spec = await res.json() as { openapi: string; paths: Record<string, unknown> };
       expect(spec.openapi).toBe("3.1.0");
       expect(spec.paths["/api/v1/search"]).toBeDefined();
       expect(spec.paths["/api/v1/search/suggest"]).toBeDefined();

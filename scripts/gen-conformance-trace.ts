@@ -103,7 +103,7 @@ export function scanExportedFunctions(filePath: string): string[] {
   const re = /^export\s+(?:async\s+)?(?:function|class)\s+(\w+)/gm;
   let m: RegExpExecArray | null;
   while ((m = re.exec(content)) !== null) {
-    names.push(m[1]);
+    if (m[1]) names.push(m[1]);
   }
 
   return names;
@@ -203,7 +203,12 @@ export function renderTrace(
     "",
     "## 18.1 REQUIRED for Conformance",
     "",
-    ...items.flatMap((item) => [`### ${item}`, ""]),
+    ...items.flatMap((item, index) => [
+      `### ${item}`,
+      "",
+      `Test ID: symphony-conformance-${String(index + 1).padStart(2, "0")}`,
+      "",
+    ]),
     "## Function → SPEC Mapping",
     "",
     "| File | Function | SPEC Section |",

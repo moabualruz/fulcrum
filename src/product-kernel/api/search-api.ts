@@ -210,7 +210,7 @@ export function createSearchApi(deps: SearchApiDeps): OpenAPIHono {
     if (!userId) {
       return c.json({ error: "unauthorized" }, 401);
     }
-    c.set("userId", userId);
+    (c as { set(key: string, value: string): void }).set("userId", userId);
     await next();
   });
 

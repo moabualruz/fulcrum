@@ -5,7 +5,7 @@ import { listBoardTasks } from "$lib/product-queries";
 import { getDefaultOrgId, openProductDb } from "$lib/server/db";
 import { actionFail, actionOk } from "$lib/feedback/action-result";
 import { BoardMoveSchema } from "$lib/server/boards.schema";
-import { createTaskAction, moveTaskStatusAction, updateTaskAction } from "$lib/server/tasks";
+import { createTaskAction, moveTaskStatusAction } from "$lib/server/tasks";
 
 interface ProjectRow {
   id: string;
@@ -76,13 +76,16 @@ export const actions: Actions = {
     const db = await openProductDb();
     try {
       const orgId = await getDefaultOrgId(db);
-      await createTaskAction(db, {
+      const task = await createTaskAction(db, {
         orgId,
         projectId: params.id,
         title,
         status: status as never,
-        sprintId: params.sprintId,
       });
+      await db.query(`UPDATE tasks SET sprint_id = $1, updated_at = now() WHERE id = $2`, [
+        params.sprintId,
+        task.id,
+      ]);
       return actionOk("Task created");
     } catch (err) {
       return fail(400, actionFail((err as Error).message));

@@ -15,6 +15,15 @@ CREATE TABLE IF NOT EXISTS workflow_defs (
   UNIQUE (org_id, slug)
 );
 
+ALTER TABLE workflow_defs ADD COLUMN IF NOT EXISTS slug text;
+UPDATE workflow_defs SET slug = id WHERE slug IS NULL;
+ALTER TABLE workflow_defs ALTER COLUMN slug SET NOT NULL;
+ALTER TABLE workflow_defs ADD COLUMN IF NOT EXISTS prompt_template text;
+ALTER TABLE workflow_defs ALTER COLUMN prompt_template DROP NOT NULL;
+ALTER TABLE workflow_defs ADD COLUMN IF NOT EXISTS hooks jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE workflow_defs ADD COLUMN IF NOT EXISTS config jsonb NOT NULL DEFAULT '{}'::jsonb;
+CREATE UNIQUE INDEX IF NOT EXISTS workflow_defs_org_slug_idx ON workflow_defs (org_id, slug);
+
 CREATE TABLE IF NOT EXISTS symphony_runs (
   id text PRIMARY KEY,
   org_id text NOT NULL REFERENCES orgs(id),

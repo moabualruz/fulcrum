@@ -5,7 +5,7 @@ export function createMemoryCommand(): Command {
   command.description("Generated memory commands.");
 
   const createCommand = command.command("create");
-  createCommand.description("memories create");
+  createCommand.description("memory create");
   createCommand.option("--json", "Emit JSON output");
   createCommand.action(async (options) => {
     try {
@@ -24,7 +24,6 @@ export function createMemoryCommand(): Command {
   const deleteCommand = command.command("delete");
   deleteCommand.description("memory delete");
   deleteCommand.option("--json", "Emit JSON output");
-  deleteCommand.option("--id <string>", "id");
   deleteCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for memory.delete is not wired yet.");
@@ -42,7 +41,6 @@ export function createMemoryCommand(): Command {
   const getCommand = command.command("get");
   getCommand.description("memory get");
   getCommand.option("--json", "Emit JSON output");
-  getCommand.option("--id <string>", "id");
   getCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for memory.get is not wired yet.");
@@ -60,6 +58,13 @@ export function createMemoryCommand(): Command {
   const listCommand = command.command("list");
   listCommand.description("memory list");
   listCommand.option("--json", "Emit JSON output");
+  listCommand.option("--archived", "archived");
+  listCommand.option("--global", "global");
+  listCommand.addOption(new Option("--importance <choice>", "importance").choices([]));
+  listCommand.addOption(new Option("--kind <choice>", "kind").choices([]));
+  listCommand.option("--limit <number>", "limit", Number.parseFloat);
+  listCommand.option("--offset <number>", "offset", Number.parseFloat);
+  listCommand.addOption(new Option("--source <choice>", "source").choices([]));
   listCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for memory.list is not wired yet.");
@@ -74,13 +79,12 @@ export function createMemoryCommand(): Command {
     }
   });
 
-  const promoteCommand = command.command("promote");
-  promoteCommand.description("memory promote");
-  promoteCommand.option("--json", "Emit JSON output");
-  promoteCommand.option("--id <string>", "id");
-  promoteCommand.action(async (options) => {
+  const searchCommand = command.command("search");
+  searchCommand.description("memory search");
+  searchCommand.option("--json", "Emit JSON output");
+  searchCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for memory.promote is not wired yet.");
+      throw new Error("Generated tRPC invocation for memory.search is not wired yet.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -93,7 +97,7 @@ export function createMemoryCommand(): Command {
   });
 
   const updateCommand = command.command("update");
-  updateCommand.description("memories update");
+  updateCommand.description("memory update");
   updateCommand.option("--json", "Emit JSON output");
   updateCommand.action(async (options) => {
     try {

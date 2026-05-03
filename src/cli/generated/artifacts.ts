@@ -4,9 +4,28 @@ export function createArtifactsCommand(): Command {
   const command = new Command("artifacts");
   command.description("Generated artifacts commands.");
 
+  const archiveCommand = command.command("archive");
+  archiveCommand.description("artifacts archive");
+  archiveCommand.option("--json", "Emit JSON output");
+  archiveCommand.option("--id <string>", "Artifact identifier.");
+  archiveCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for artifacts.archive is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   const deleteCommand = command.command("delete");
   deleteCommand.description("artifacts delete");
   deleteCommand.option("--json", "Emit JSON output");
+  deleteCommand.option("--hard", "Hard-delete: remove from disk + DB row.");
   deleteCommand.option("--id <string>", "Artifact identifier.");
   deleteCommand.action(async (options) => {
     try {
@@ -70,6 +89,24 @@ export function createArtifactsCommand(): Command {
   listCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for artifacts.list is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const unarchiveCommand = command.command("unarchive");
+  unarchiveCommand.description("artifacts unarchive");
+  unarchiveCommand.option("--json", "Emit JSON output");
+  unarchiveCommand.option("--id <string>", "Artifact identifier.");
+  unarchiveCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for artifacts.unarchive is not wired yet.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

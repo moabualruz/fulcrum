@@ -103,7 +103,8 @@ export async function readArtifactDetail(
   const row = rows[0];
   if (!row) return null;
 
-  const createdAt = row.created_at instanceof Date ? row.created_at : new Date(row.created_at);
+  const rawCreatedAt = row.created_at as string | Date;
+  const createdAt = rawCreatedAt instanceof Date ? rawCreatedAt : new Date(rawCreatedAt);
   const retentionDays = 90;
   const elapsed = Math.floor((Date.now() - createdAt.getTime()) / 86_400_000);
   const remaining = Math.max(0, retentionDays - elapsed);

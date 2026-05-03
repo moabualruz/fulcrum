@@ -228,7 +228,7 @@ export async function syncNotion(
 ): Promise<SyncResult> {
   const syncLogId = newUlid();
   await db.query(
-    `INSERT INTO connector_sync_log (id, connector, org_id, started_at) VALUES ($1, 'notion', $2, now())`,
+    `INSERT INTO connector_sync_log (id, connector, org_id, started_at, status) VALUES ($1, 'notion', $2, now(), 'running')`,
     [syncLogId, orgId],
   );
 
@@ -257,14 +257,14 @@ export async function syncNotion(
 
     // Finalize sync log
     await db.query(
-      `UPDATE connector_sync_log SET finished_at = now(), pages_synced = $2, errors_json = $3::jsonb WHERE id = $1`,
-      [syncLogId, pagesSynced, JSON.stringify(errors)],
+      `UPDATE connector_sync_log SET finished_at = now(), status = $4, pages_synced = $2, errors_json = $3::jsonb WHERE id = $1`,
+      [syncLogId, pagesSynced, JSON.stringify(errors), errors.length > 0 ? "failed" : "succeeded"],
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     errors.push(msg);
     await db.query(
-      `UPDATE connector_sync_log SET finished_at = now(), pages_synced = $2, errors_json = $3::jsonb WHERE id = $1`,
+      `UPDATE connector_sync_log SET finished_at = now(), status = 'failed', pages_synced = $2, errors_json = $3::jsonb WHERE id = $1`,
       [syncLogId, pagesSynced, JSON.stringify(errors)],
     );
     throw err;

@@ -81,7 +81,7 @@ function makeContainer(): Container {
         { id: "embedded", available: true, active: true, reason: null },
         { id: "ollama", available: false, active: false, reason: "flag disabled" },
       ],
-    } satisfies Partial<InferenceClient> as unknown as InferenceClient,
+    } as unknown as InferenceClient,
   });
   container.bind({ provide: FlagRegistry, useValue: stubFlagRegistry() });
   return container;
@@ -415,7 +415,7 @@ describe("inference tRPC router", () => {
         },
         rmModel: async () => ({ ok: true }),
         listBackends: async () => [],
-      } satisfies Partial<InferenceClient> as unknown as InferenceClient,
+      } as unknown as InferenceClient,
     });
     container.bind({ provide: FlagRegistry, useValue: stubFlagRegistry() });
     const caller = createCaller(container);

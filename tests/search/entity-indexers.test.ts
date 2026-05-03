@@ -95,11 +95,16 @@ describe("P11#03 entity search indexers", () => {
         description: "Need search over task descriptions",
         status: "in_progress",
       });
+      const sprintId = newUlid();
+      await db.query(
+        `INSERT INTO sprints (id, org_id, project_id, name) VALUES ($1, $2, $3, $4)`,
+        [sprintId, org.id, project.id, "Search Sprint"],
+      );
       await db.query(
         `UPDATE tasks
             SET custom_fields = $2::jsonb, sprint_id = $3
           WHERE id = $1`,
-        [task.id, JSON.stringify({ customer: "Acme", estimate: 8 }), newUlid()],
+        [task.id, JSON.stringify({ customer: "Acme", estimate: 8 }), sprintId],
       );
 
       const indexer = new TaskIndexer(db);

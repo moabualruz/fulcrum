@@ -33,14 +33,30 @@ export function parseFeatures(raw?: string): FeatureFlag[] {
     });
 }
 
+export const parseFeatureFlags = parseFeatures;
+
 /**
  * Check whether a feature is enabled.
+ *
+ * Supports both explicit parsed flags (`isFeatureEnabled(flags, name)`) and
+ * env-style checks (`isFeatureEnabled(name, rawEnv?)`) while older call sites
+ * converge on one form.
  */
+export function isFeatureEnabled(flags: readonly FeatureFlag[], name: string): boolean;
+export function isFeatureEnabled(name: string, raw?: string): boolean;
+export function isFeatureEnabled(name: string, flags: readonly FeatureFlag[]): boolean;
 export function isFeatureEnabled(
-  flags: readonly FeatureFlag[],
-  name: string,
+  flagsOrName: readonly FeatureFlag[] | string,
+  nameOrRaw?: string | readonly FeatureFlag[],
 ): boolean {
-  return flags.some((f) => f.name === name);
+  if (Array.isArray(flagsOrName)) {
+    return flagsOrName.some((f) => f.name === nameOrRaw);
+  }
+
+  const flags = typeof nameOrRaw === "string" || nameOrRaw === undefined
+    ? parseFeatures(nameOrRaw ?? process.env.FULCRUM_FEATURES)
+    : nameOrRaw;
+  return flags.some((f) => f.name === flagsOrName);
 }
 
 /**
@@ -58,4 +74,8 @@ export function getFeatureBackend(
  */
 export function loadFeatures(): FeatureFlag[] {
   return parseFeatures(process.env.FULCRUM_FEATURES);
+}
+
+export function _resetFeatureCache(): void {
+  // Compatibility hook for tests; this module currently reads env eagerly.
 }

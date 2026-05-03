@@ -7,11 +7,13 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260502121000_task_crud_baseline extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
-    this.addSql(`alter table "tasks" add column "updated_at" timestamptz not null default now()`);
-    this.addSql(`alter table "tasks" add column "title" varchar(255) not null default 'Untitled task'`);
-    this.addSql(`alter table "tasks" add column "description" text null`);
-    this.addSql(`alter table "tasks" add column "deleted_at" timestamptz null`);
+    this.addSql(`alter table "tasks" add column if not exists "updated_at" timestamptz not null default now()`);
+    this.addSql(`alter table "tasks" add column if not exists "title" varchar(255) not null default 'Untitled task'`);
+    this.addSql(`alter table "tasks" add column if not exists "description" text null`);
+    this.addSql(`alter table "tasks" add column if not exists "deleted_at" timestamptz null`);
     this.addSql(
       `create index "tasks_org_deleted_created" on "tasks" ("org_id", "deleted_at", "created_at" desc)`,
     );

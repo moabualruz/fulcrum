@@ -18,8 +18,10 @@ export const STORE_DEBOUNCE_MS = 2000;
  */
 export function parseRoom(name: string): { kind: "task" | "doc"; id: string } | null {
   const m = name.match(/^(task|doc):(.+)$/);
-  if (!m) return null;
-  return { kind: m[1] as "task" | "doc", id: m[2] };
+  const kind = m?.[1];
+  const id = m?.[2];
+  if ((kind !== "task" && kind !== "doc") || !id) return null;
+  return { kind, id };
 }
 
 // --- Debounce bookkeeping (module-level, one per room) ---

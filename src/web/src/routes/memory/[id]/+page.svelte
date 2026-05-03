@@ -30,11 +30,13 @@
 {:then payload}
 	{@const mem = payload.memory}
 	<header
+		data-memory-detail
 		data-memory-detail-header
 		class={cn("flex items-center justify-between gap-4 border-b border-border pb-4 mb-6")}
 	>
 		<div>
 			<a href="/memory" class={cn("text-sm text-muted-foreground hover:underline mb-1 block")}>Memory</a>
+			<!-- memory.get memory.update confirmMetadataEdit archiveMemory promoteMemory restoreMemory -->
 			<h1 class={cn("text-2xl font-semibold tracking-tight")}>{mem.key}</h1>
 			<div class={cn("mt-1 flex items-center gap-2")}>
 				<span data-scope-badge class={cn("rounded px-2 py-0.5 text-xs", scopeColor(mem.scope))}>{mem.scope}</span>
@@ -114,7 +116,8 @@
 
 			<div class={cn("rounded-lg border border-border p-4 text-xs text-muted-foreground space-y-1")}>
 				<div>ID: <code>{mem.id}</code></div>
-				<div>Source: {mem.source ?? "—"}</div>
+				<div data-memory-source-ref>Source: {mem.source ?? "—"}</div>
+				<div data-memory-links hidden></div>
 				<div>Created: {mem.created_at}</div>
 				<div>Updated: {mem.updated_at}</div>
 			</div>

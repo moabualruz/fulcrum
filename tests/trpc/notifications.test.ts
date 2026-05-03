@@ -255,7 +255,7 @@ describe("notifications router", () => {
 
   it("returns channels and queues a test delivery", async () => {
     const channels = await caller().channels.list();
-    expect(channels.map((c) => c.name)).toEqual(["in-app", "email", "slack", "webhook"]);
+    expect(channels.map((c) => c.name)).toEqual(["in-app", "email", "slack", "discord", "webhook", "push"]);
 
     const delivery = await caller().channels.test({ channel: "email" });
     expect(delivery).toMatchObject({ channel: "email", status: "pending" });

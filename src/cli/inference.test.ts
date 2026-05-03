@@ -267,7 +267,7 @@ describe("fulcrum inference CLI", () => {
         call: async () => health,
         embed: async () => ({ vectors: [[0.3, 0.4]], model: "token-bound", cached: false }),
         generate: async () => ({ text: "unused", model: "token-bound", tokens: 1 }),
-      } satisfies Partial<InferenceClient> as unknown as InferenceClient,
+      } as unknown as InferenceClient,
     });
 
     await run(["embed", "hello", "--json"], {

@@ -64,16 +64,16 @@ describe("VirtualList", () => {
 
   it("fires select callback on Enter", () => {
     const items = ["a", "b", "c"];
-    let selected: string | null = null;
+    const selections: string[] = [];
     const vl = new VirtualList({
       items,
       visibleRows: 10,
       renderItem: (item) => item,
-      onSelect: (item) => { selected = item; },
+      onSelect: (item) => { selections.push(item); },
     });
     vl.selectedIndex = 1;
     vl.select();
-    expect(selected).toBe("b");
+    expect(selections.at(-1)).toBe("b");
   });
 
   it("renders within 16ms for 1000 items", () => {
@@ -160,12 +160,12 @@ describe("Palette", () => {
   });
 
   it(">create-task dispatches task.create action", () => {
-    let dispatched: string | null = null;
+    const dispatched: string[] = [];
     const p = new Palette({
       width: 60,
       height: 20,
       items: ["task.create", "doc.create", "project.list"],
-      onAction: (action) => { dispatched = action; },
+      onAction: (action) => { dispatched.push(action); },
     });
     p.open();
     p.setQuery(">create-task");

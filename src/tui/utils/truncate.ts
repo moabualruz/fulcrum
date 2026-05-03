@@ -2,22 +2,40 @@
  * wcwidth-aware string truncation for TUI.
  *
  * CJK double-width characters and emoji occupy 2 terminal columns.
- * This module uses the wcwidth npm package to measure visual width
- * and truncate accordingly.
+ * This module keeps the width rules local so the TUI does not need a runtime
+ * package for tests or the compiled binary.
  */
-
-// wcwidth has no default export in its types; use require-style
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const wcwidth: (char: string) => number = require("wcwidth");
 
 /** Measure the visual (terminal column) width of a string. */
 export function stringWidth(str: string): number {
   let w = 0;
   for (const ch of str) {
-    const cw = wcwidth(ch);
-    w += cw < 0 ? 0 : cw;
+    w += charWidth(ch);
   }
   return w;
+}
+
+function charWidth(ch: string): number {
+  const code = ch.codePointAt(0);
+  if (code === undefined) return 0;
+  if (code === 0) return 0;
+  if (code < 32 || (code >= 0x7f && code < 0xa0)) return 0;
+  if (
+    (code >= 0x1100 && code <= 0x115f)
+    || code === 0x2329
+    || code === 0x232a
+    || (code >= 0x2e80 && code <= 0xa4cf)
+    || (code >= 0xac00 && code <= 0xd7a3)
+    || (code >= 0xf900 && code <= 0xfaff)
+    || (code >= 0xfe10 && code <= 0xfe19)
+    || (code >= 0xfe30 && code <= 0xfe6f)
+    || (code >= 0xff00 && code <= 0xff60)
+    || (code >= 0xffe0 && code <= 0xffe6)
+    || (code >= 0x1f300 && code <= 0x1faff)
+  ) {
+    return 2;
+  }
+  return 1;
 }
 
 /**
@@ -37,11 +55,10 @@ export function truncateWide(str: string, maxCols: number): string {
   const reservedForEllipsis = 1;
 
   for (const ch of str) {
-    const cw = wcwidth(ch);
-    const charWidth = cw < 0 ? 0 : cw;
-    if (w + charWidth > maxCols - reservedForEllipsis) break;
+    const width = charWidth(ch);
+    if (w + width > maxCols - reservedForEllipsis) break;
     result += ch;
-    w += charWidth;
+    w += width;
   }
   return result + ellipsis;
 }

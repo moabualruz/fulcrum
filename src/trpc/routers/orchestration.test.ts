@@ -11,6 +11,7 @@ import {
   registerHook,
   type SymphonyRunRow,
 } from "../../product-kernel/symphony.ts";
+import { createContext } from "../context.ts";
 import { orchestrationRouter } from "./orchestration.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-orch-"));
@@ -31,7 +32,26 @@ async function freshDb(name: string) {
 
 // Create a tRPC caller bound to a context
 function createCaller(db: ReturnType<typeof openPglite> extends Promise<infer T> ? T : never, orgId: string) {
-  return orchestrationRouter.createCaller({ db, orgId });
+  const userId = "user-1";
+  return orchestrationRouter.createCaller(
+    createContext({
+      db,
+      orgId,
+      session: {
+        id: "session-1",
+        userId,
+        expiresAt: new Date(Date.now() + 60_000),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        token: "test-token",
+        ipAddress: null,
+        userAgent: null,
+      },
+      userId,
+      em: null,
+      container: null,
+    }),
+  );
 }
 
 describe("orchestration tRPC procedures", () => {

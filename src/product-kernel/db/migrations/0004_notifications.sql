@@ -31,6 +31,21 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications (org_id, user_id, read, created_at);
 
+CREATE TABLE IF NOT EXISTS user_notifications (
+  id text PRIMARY KEY,
+  org_id text NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  user_id text NOT NULL,
+  subject_kind text NOT NULL,
+  subject_id text NOT NULL,
+  verb text NOT NULL,
+  title text NOT NULL,
+  body text,
+  read_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS user_notifications_user_idx ON user_notifications (org_id, user_id, read_at, created_at);
+
 CREATE TABLE IF NOT EXISTS notification_deliveries (
   id text PRIMARY KEY,
   org_id text NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
@@ -46,6 +61,15 @@ CREATE TABLE IF NOT EXISTS notification_deliveries (
 );
 
 CREATE INDEX IF NOT EXISTS notification_deliveries_status_idx ON notification_deliveries (status, retry_after);
+
+ALTER TABLE notification_deliveries DROP CONSTRAINT IF EXISTS notification_deliveries_status_check;
+ALTER TABLE notification_deliveries ADD CONSTRAINT notification_deliveries_status_check
+  CHECK (status IN ('pending', 'sent', 'failed', 'held-quiet-hours', 'suppressed'));
+ALTER TABLE notification_deliveries ADD COLUMN IF NOT EXISTS user_id text;
+ALTER TABLE notification_deliveries ADD COLUMN IF NOT EXISTS subject text;
+ALTER TABLE notification_deliveries ADD COLUMN IF NOT EXISTS body text;
+ALTER TABLE notification_deliveries ADD COLUMN IF NOT EXISTS suppression_reason text;
+ALTER TABLE notification_deliveries ALTER COLUMN notification_id DROP NOT NULL;
 
 CREATE TABLE IF NOT EXISTS webhook_rule_configs (
   id text PRIMARY KEY,
@@ -82,6 +106,21 @@ CREATE TABLE IF NOT EXISTS notification_mutes (
   UNIQUE (user_id, subject_kind, subject_id)
 );
 
+ALTER TABLE notification_mutes ADD COLUMN IF NOT EXISTS muted_until timestamptz;
+CREATE UNIQUE INDEX IF NOT EXISTS notification_mutes_org_user_subject_idx
+  ON notification_mutes (org_id, user_id, subject_kind, subject_id);
+
+CREATE TABLE IF NOT EXISTS notification_channels (
+  id text PRIMARY KEY,
+  org_id text NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  kind text NOT NULL,
+  config jsonb NOT NULL DEFAULT '{}'::jsonb,
+  enabled boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (org_id, kind)
+);
+
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id text PRIMARY KEY,
   org_id text NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
@@ -89,9 +128,14 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   endpoint text NOT NULL,
   p256dh text NOT NULL,
   auth text NOT NULL,
+  user_agent text,
   created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (user_id, endpoint)
 );
+
+ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS user_agent text;
+ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
 CREATE TABLE IF NOT EXISTS event_retention_policies (
   id text PRIMARY KEY,

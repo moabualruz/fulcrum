@@ -220,7 +220,7 @@ export function rankMemoryMatchesHybrid<TMemory extends HybridMemoryRankInput>(
 
   const ranked = tokenized.map(({ memory }, i) => {
     const cosine = cosineSimilarity(queryEmbedding as number[], memory.embedding);
-    const hybridBase = hybridScore(bm25Scores[i], maxBm25, cosine);
+    const hybridBase = hybridScore(bm25Scores[i] ?? 0, maxBm25, cosine);
     const recencyBoost = recencyBoostForDate(memory.createdAt, now);
     const importanceBoost_ = importanceBoostFor(memory.importance);
     const score = hybridBase + recencyBoost + importanceBoost_;

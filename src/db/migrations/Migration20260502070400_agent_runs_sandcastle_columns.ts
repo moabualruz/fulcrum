@@ -33,6 +33,9 @@ export class Migration20260502070400_agent_runs_sandcastle_columns extends Migra
       `alter table "agent_runs" add column "transcript_path" varchar(255) null`,
     );
     this.addSql(
+      `alter table "agent_runs" add column "transcript_truncated" boolean not null default false`,
+    );
+    this.addSql(
       `alter table "agent_runs" add column "workspace_diff_path" varchar(255) null`,
     );
     this.addSql(
@@ -70,6 +73,7 @@ export class Migration20260502070400_agent_runs_sandcastle_columns extends Migra
       `alter table "agent_runs" drop column if exists "workspace_diff_path"`,
     );
     this.addSql(`alter table "agent_runs" drop column if exists "transcript_path"`);
+    this.addSql(`alter table "agent_runs" drop column if exists "transcript_truncated"`);
     this.addSql(`alter table "agent_runs" drop column if exists "token_used"`);
     this.addSql(`alter table "agent_runs" drop column if exists "iteration_count"`);
     this.addSql(`alter table "agent_runs" drop column if exists "sandbox_mode"`);

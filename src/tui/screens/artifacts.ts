@@ -56,6 +56,7 @@ export class ArtifactsScreen {
   private scrollTop = 0;
   private overlay: ArtifactOverlay = "none";
   private filters: TuiArtifactFilters = {};
+  private selectedIds = new Set<string>();
 
   constructor(private readonly opts: ArtifactsScreenOptions) {}
 
@@ -77,8 +78,9 @@ export class ArtifactsScreen {
       for (const artifact of this.visibleArtifacts) {
         const index = this.artifacts.indexOf(artifact);
         const pointer = index === this.cursor ? c.bold(">") : " ";
+        const checked = this.selectedIds.has(artifact.id) ? "[x]" : "[ ]";
         renderer.writeln(
-          `${pointer} ${displayName(artifact)}  [${mimeBadge(artifact)}]  ${attachmentBadge(artifact)}  ${formatBytes(artifact.sizeBytes)}`,
+          `${pointer} ${checked} ${displayName(artifact)}  [${mimeBadge(artifact)}]  ${attachmentBadge(artifact)}  ${formatBytes(artifact.sizeBytes)}`,
         );
       }
     }
@@ -98,14 +100,18 @@ export class ArtifactsScreen {
 
     if (this.overlay === "archive") {
       renderer.writeln();
-      renderer.writeln(c.yellow(`  Archive ${displayName(this.selectedArtifact)}?`));
+      const targets = this.targetArtifacts;
+      renderer.writeln(c.yellow(`  Archive ${targets.length === 1 ? displayName(targets[0]) : `${targets.length} artifacts`}?`));
+      for (const artifact of targets) renderer.writeln(`  ${displayName(artifact)}`);
       renderer.writeln("  Confirm? [y/N]");
     }
 
     if (this.overlay === "delete") {
       renderer.writeln();
       renderer.writeln(c.red("  Delete artifact"));
-      renderer.writeln(`  Delete ${displayName(this.selectedArtifact)}?`);
+      const targets = this.targetArtifacts;
+      renderer.writeln(`  Delete ${targets.length === 1 ? displayName(targets[0]) : `${targets.length} artifacts`}?`);
+      for (const artifact of targets) renderer.writeln(`  ${displayName(artifact)}`);
       renderer.writeln("  Confirm? [y/N]");
     }
 
@@ -123,18 +129,21 @@ export class ArtifactsScreen {
 
   async handleKey(key: string): Promise<boolean> {
     if (this.overlay === "archive" && key === "y") {
-      const artifact = this.selectedArtifact;
-      if (!artifact) return false;
-      await this.opts.caller.artifacts.archive({ id: artifact.id });
+      const targets = this.targetArtifacts;
+      if (targets.length === 0) return false;
+      for (const artifact of targets) await this.opts.caller.artifacts.archive({ id: artifact.id });
+      this.selectedIds.clear();
       this.overlay = "none";
       return true;
     }
 
     if (this.overlay === "delete" && key === "y") {
-      const artifact = this.selectedArtifact;
-      if (!artifact) return false;
-      await this.opts.caller.artifacts.delete({ id: artifact.id });
-      this.artifacts = this.artifacts.filter((item) => item.id !== artifact.id);
+      const targets = this.targetArtifacts;
+      if (targets.length === 0) return false;
+      for (const artifact of targets) await this.opts.caller.artifacts.delete({ id: artifact.id });
+      const ids = new Set(targets.map((artifact) => artifact.id));
+      this.artifacts = this.artifacts.filter((item) => !ids.has(item.id));
+      this.selectedIds.clear();
       this.overlay = "none";
       this.clampCursor();
       await this.loadPreview();
@@ -175,13 +184,13 @@ export class ArtifactsScreen {
     }
 
     if (key === "a") {
-      if (!this.selectedArtifact) return false;
+      if (this.targetArtifacts.length === 0) return false;
       this.overlay = "archive";
       return true;
     }
 
     if (key === "D") {
-      if (!this.selectedArtifact) return false;
+      if (this.targetArtifacts.length === 0) return false;
       this.overlay = "delete";
       return true;
     }
@@ -194,6 +203,14 @@ export class ArtifactsScreen {
     if (key === "\r" || key === "\n") {
       if (!this.selectedArtifact) return false;
       this.overlay = "detail";
+      return true;
+    }
+
+    if (key === " ") {
+      const artifact = this.selectedArtifact;
+      if (!artifact) return false;
+      if (this.selectedIds.has(artifact.id)) this.selectedIds.delete(artifact.id);
+      else this.selectedIds.add(artifact.id);
       return true;
     }
 
@@ -219,6 +236,11 @@ export class ArtifactsScreen {
 
   private get selectedArtifact(): TuiArtifact | undefined {
     return this.artifacts[this.cursor];
+  }
+
+  private get targetArtifacts(): TuiArtifact[] {
+    if (this.selectedIds.size > 0) return this.artifacts.filter((artifact) => this.selectedIds.has(artifact.id));
+    return this.selectedArtifact ? [this.selectedArtifact] : [];
   }
 
   private get previewLines(): string[] {

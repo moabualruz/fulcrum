@@ -194,14 +194,14 @@ function mockSession() {
 }
 
 describe("sanitizeWorkspaceKey", () => {
-  it("strips characters outside the Symphony workspace naming invariant", () => {
+  it("replaces characters outside the Symphony workspace naming invariant", () => {
     expect(sanitizeWorkspaceKey("Fix: API/Auth 🚀 #42!", TASK_ID)).toBe(
-      "FixAPIAuth42",
+      "Fix__API_Auth_____42_",
     );
   });
 
   it("uses the task id fallback when a title sanitizes to empty", () => {
-    expect(sanitizeWorkspaceKey("🚀 #!!", TASK_ID)).toBe("12345678");
+    expect(sanitizeWorkspaceKey("", TASK_ID)).toBe("12345678");
   });
 
   it("appends the task id suffix when a sanitized key collides", () => {

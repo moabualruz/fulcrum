@@ -8,9 +8,11 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260503130000_agent_runs_transcript_truncated extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     this.addSql(
-      `alter table "agent_runs" add column "transcript_truncated" boolean not null default false`,
+      `alter table "agent_runs" add column if not exists "transcript_truncated" boolean not null default false`,
     );
   }
 

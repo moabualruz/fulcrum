@@ -39,6 +39,41 @@ export function createInferenceCommand(): Command {
     }
   });
 
+  const configGetCommand = command.command("config get");
+  configGetCommand.description("inference config get");
+  configGetCommand.option("--json", "Emit JSON output");
+  configGetCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.config.get is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const configSetCommand = command.command("config set");
+  configSetCommand.description("inference config set");
+  configSetCommand.option("--json", "Emit JSON output");
+  configSetCommand.addOption(new Option("--feature <choice>", "feature").choices(["embeddings","router-llm","memory-llm-extract","classify","tokenize"]));
+  configSetCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.config.set is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   const embedCommand = command.command("embed");
   embedCommand.description("inference embed");
   embedCommand.option("--json", "Emit JSON output");
@@ -141,6 +176,42 @@ export function createInferenceCommand(): Command {
   modelsRmCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for inference.models.rm is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const providerSetCommand = command.command("provider set");
+  providerSetCommand.description("inference provider set");
+  providerSetCommand.option("--json", "Emit JSON output");
+  providerSetCommand.option("--key <string>", "key");
+  providerSetCommand.option("--url <string>", "url");
+  providerSetCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.provider.set is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const providerTestCommand = command.command("provider test");
+  providerTestCommand.description("inference provider test");
+  providerTestCommand.option("--json", "Emit JSON output");
+  providerTestCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.provider.test is not wired yet.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

@@ -185,7 +185,7 @@ export function createBitbucketHttpClient(
     const results: T[] = [];
     let url: string | null = baseUrl;
     while (url) {
-      const page = await apiFetch<{ values: T[]; next?: string }>(url);
+      const page: { values: T[]; next?: string } = await apiFetch(url);
       results.push(...page.values);
       url = page.next ?? null;
     }

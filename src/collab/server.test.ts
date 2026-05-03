@@ -37,7 +37,7 @@ describe("onLoadDocument", () => {
   test("hydrates Y.Doc from DB tiptap_content", async () => {
     const stored = { type: "doc", content: [{ type: "paragraph" }] };
     const fakeDb: CollabDb = {
-      query: mock(async () => [{ tiptap_content: stored }]),
+      query: mock(async <T>() => [{ tiptap_content: stored } as T]) as CollabDb["query"],
     };
     const handler = makeOnLoadDocument(fakeDb);
     const hydrated: unknown[] = [];
@@ -137,9 +137,11 @@ describe("onStoreDocument + debounce", () => {
     await new Promise((r) => setTimeout(r, STORE_DEBOUNCE_MS + 50));
 
     expect(queries).toHaveLength(1);
-    expect(queries[0].sql).toContain("UPDATE tasks SET tiptap_content");
-    expect(queries[0].params[0]).toBe(JSON.stringify(content));
-    expect(queries[0].params[1]).toBe("t3");
+    const query = queries[0];
+    if (!query) throw new Error("expected one DB query");
+    expect(query.sql).toContain("UPDATE tasks SET tiptap_content");
+    expect(query.params[0]).toBe(JSON.stringify(content));
+    expect(query.params[1]).toBe("t3");
   });
 });
 
@@ -150,19 +152,24 @@ describe("convergence (simulated)", () => {
     // Simulate: client A inserts "hello" → stored → client B loads → sees "hello".
     const stored: Record<string, unknown> = {};
     const fakeDb: CollabDb = {
-      query: mock(async (sql: string, params?: unknown[]) => {
+      query: mock(async <T>(sql: string, params?: unknown[]) => {
         if (sql.includes("SELECT")) {
-          const id = (params as string[])[0];
-          return stored[id] ? [{ tiptap_content: stored[id] }] : [];
+          const id = params?.[0];
+          if (typeof id !== "string") throw new Error("expected task id param");
+          return (stored[id] ? [{ tiptap_content: stored[id] }] : []) as T[];
         }
         if (sql.includes("UPDATE")) {
-          const content = JSON.parse((params as string[])[0]);
-          const id = (params as string[])[1];
+          const rawContent = params?.[0];
+          const id = params?.[1];
+          if (typeof rawContent !== "string" || typeof id !== "string") {
+            throw new Error("expected update params");
+          }
+          const content = JSON.parse(rawContent);
           stored[id] = content;
-          return [];
+          return [] as T[];
         }
-        return [];
-      }),
+        return [] as T[];
+      }) as CollabDb["query"],
     };
 
     const onLoad = makeOnLoadDocument(fakeDb);
@@ -219,7 +226,9 @@ describe("cursor broadcast (simulated)", () => {
 
     // Client B receives it
     expect(receivedStates).toHaveLength(1);
-    expect(receivedStates[0].user.name).toBe("Alice");
-    expect(receivedStates[0].cursor).toEqual({ anchor: 5, head: 5 });
+    const received = receivedStates[0];
+    if (!received) throw new Error("expected cursor state");
+    expect(received.user.name).toBe("Alice");
+    expect(received.cursor).toEqual({ anchor: 5, head: 5 });
   });
 });

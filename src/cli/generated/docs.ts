@@ -253,5 +253,73 @@ export function createDocsCommand(): Command {
     }
   });
 
+  const versionsDiffCommand = command.command("versions diff");
+  versionsDiffCommand.description("docs versions diff");
+  versionsDiffCommand.option("--json", "Emit JSON output");
+  versionsDiffCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for docs.versions.diff is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const versionsGetCommand = command.command("versions get");
+  versionsGetCommand.description("docs versions get");
+  versionsGetCommand.option("--json", "Emit JSON output");
+  versionsGetCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for docs.versions.get is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const versionsListCommand = command.command("versions list");
+  versionsListCommand.description("docs versions list");
+  versionsListCommand.option("--json", "Emit JSON output");
+  versionsListCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for docs.versions.list is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const versionsRestoreCommand = command.command("versions restore");
+  versionsRestoreCommand.description("docs versions restore");
+  versionsRestoreCommand.option("--json", "Emit JSON output");
+  versionsRestoreCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for docs.versions.restore is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   return command;
 }

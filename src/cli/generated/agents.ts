@@ -39,5 +39,23 @@ export function createAgentsCommand(): Command {
     }
   });
 
+  const testProfileCommand = command.command("test-profile");
+  testProfileCommand.description("agents testProfile");
+  testProfileCommand.option("--json", "Emit JSON output");
+  testProfileCommand.option("--name <string>", "name");
+  testProfileCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for agents.testProfile is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   return command;
 }

@@ -14,6 +14,14 @@ export interface Backlink {
   link_type: string;
 }
 
+interface BacklinkRow {
+  source_doc_id: string | null;
+  from_doc_id: string | null;
+  title: string;
+  link_type: string | null;
+  link_kind: string | null;
+}
+
 export async function upsertDocLink(db: ProductDb, input: UpsertDocLinkInput): Promise<void> {
   const id = newUlid();
   await db.query(
@@ -26,12 +34,17 @@ export async function upsertDocLink(db: ProductDb, input: UpsertDocLinkInput): P
 
 /** Get all documents linking TO a given document (backlinks). */
 export async function getBacklinks(db: ProductDb, targetDocId: string): Promise<Backlink[]> {
-  return db.query<Backlink>(
-    `SELECT dl.source_doc_id, d.title, dl.link_type
+  const rows = await db.query<BacklinkRow>(
+    `SELECT dl.source_doc_id, dl.from_doc_id, d.title, dl.link_type, dl.link_kind
        FROM doc_links dl
-       JOIN documents d ON d.id = dl.source_doc_id
-      WHERE dl.target_doc_id = $1
+       JOIN documents d ON d.id = COALESCE(dl.source_doc_id, dl.from_doc_id)
+      WHERE COALESCE(dl.target_doc_id, dl.to_doc_id) = $1
       ORDER BY d.title ASC`,
     [targetDocId],
   );
+  return rows.map((row) => ({
+    source_doc_id: row.source_doc_id ?? row.from_doc_id ?? "",
+    title: row.title,
+    link_type: row.link_type ?? row.link_kind ?? "wikilink",
+  }));
 }

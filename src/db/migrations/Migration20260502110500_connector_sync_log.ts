@@ -1,6 +1,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260502110500_connector_sync_log extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     this.addSql(
       `create table if not exists "connector_sync_log" (` +

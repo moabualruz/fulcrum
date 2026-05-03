@@ -2305,3 +2305,63 @@ Next: wave 16 from 61 ready.
 
 Landed waves 18-20. Status: 272 implemented, 39 completed, 31 ready = 311/341 (91.2%)
 31 issues remain. Dispatching final waves to reach 100% implementation.
+
+## 2026-05-03T10:54:50Z — codex-only resume (CI/typecheck stabilization)
+
+User requested Codex-only run because Claude limit hit. No Claude tools used.
+
+Work completed:
+- Restored tracked deleted implementation files that were blocking typecheck (`src/tui`, `src/doctor/checks`, `src/cli/flags.ts`).
+- Repaired API drift across inference, skills loader, context assembler, collab, GitHub issues connector, orchestration router, web docs/inference routes, TUI sprint screens, settings/search API strict typing, runtime-free TUI chart/truncate helpers, and saved-view product SQL compatibility.
+- Added `0008_saved_views_compat.sql` to reconcile product-kernel saved-view schema variants.
+- Cleaned stale multi-hour Bun test/inference processes before final verification.
+- Ran `graphify update .`.
+
+Verification:
+- `bun run --bun tsc --noEmit --pretty false` = pass.
+- Focused regression bundle = 197 pass, 0 fail.
+- Saved-view/settings/search schema focused tests = 28 pass, 0 fail.
+- Full `bun run ci` reached root test stage and failed broad pre-existing gate: 4031 pass, 4 skip, 286 fail, 10 errors. Sampled root causes: migration/entity drift around `agent_runs.transcript_truncated`, `doctor --json` missing `memoriesSchema`, root Bun running browser/Tiptap tests without `window`, stale nav expectation for `/agents`, and many web route/component tests outside this stabilization patch.
+
+Next:
+- Split remaining CI root-test failures into Codex-only clusters before claiming full gate green.
+
+## 2026-05-03T22:02:17Z — codex-only resume (root gate green + web/codegen blockers fixed)
+
+User requested Codex-only continuation after network returned; no Claude tools used.
+
+Status snapshot:
+- 341 issues total.
+- 39 completed.
+- 272 implemented.
+- 31 ready-for-agent.
+- 0 in-progress / needs-review / blocked.
+- Implemented-or-completed: 311/341 (91.2%).
+
+Work completed:
+- Replaced ad-hoc root test discovery with `scripts/test-root.ts`; CI root `test` stage now excludes `src/web` SvelteKit subpackage tests and leaves web gates to the dedicated web steps.
+- Fixed migration/schema drift across root + product-kernel migration paths, including agent-run transcript truncation, docs Yjs state, task CRUD baseline, connector sync log shape, notification tables, embedding vector schema, sprints/metrics compatibility, users compatibility, and Symphony compatibility.
+- Fixed doctor/api/orchestration reporting paths used by root tests.
+- Fixed tRPC request-id/error formatting, protected orchestration mutations, repos empty-list fallback, and notification schema descriptions for generated clients.
+- Fixed skill install hash/tamper behavior so same-version reinstall verifies installed content while upgrades can overwrite old content.
+- Added missing runtime dependencies for Confluence conversion: `unified`, `rehype-parse`, `rehype-remark`, `remark-stringify`.
+- Fixed Confluence sync to write `connector_sync_log.status = running|succeeded|failed`.
+- Made product-kernel `newUlid()` monotonic within one millisecond to remove event-order flake.
+- Regenerated generated CLI snapshots and completions; `ci:codegen` now passes.
+- Removed duplicate SvelteKit route `src/web/src/routes/projects/[id]/sprint/[sid]` in favor of richer `[sprintId]` route; route conflict fixed.
+- Fixed `[sprintId]` route create action to assign `sprint_id` after task creation.
+- Ran `graphify update .`.
+
+Verification:
+- `bun test src/product-kernel/connectors/confluence-sync.test.ts` = 8 pass, 0 fail.
+- `bun run --bun tsc --noEmit --pretty false` = pass.
+- `bun run scripts/test-root.ts` = 3387 pass, 2 skip, 0 fail.
+- `bun run scripts/ci/codegen.ts` = pass.
+- `bun run scripts/build-all.ts` = pass.
+- `cd src/web && bunx svelte-kit sync` = pass.
+- `bun test src/web/src/routes/projects/[id]/sprint/[sprintId]/page.server.test.ts src/web/src/routes/projects/[id]/sprint/[sprintId]/page.svelte.test.ts` = 5 pass, 0 fail.
+- `cd src/web && NODE_OPTIONS='--max-old-space-size=8192' bunx svelte-check --tsconfig ./tsconfig.json` = fails by Node heap OOM after route conflict was fixed; tracked as checker memory issue, not the previous route-conflict failure.
+
+CI note:
+- Full `bun run ci` was not rerun after the final web route fix per user instruction to stop rerunning full cycles and verify only failing parts.
+- Last full CI before final route fix passed install, typecheck, Symphony lock/conformance, root test, license audit, then failed `ci:codegen`; `ci:codegen` is now fixed and verified directly.

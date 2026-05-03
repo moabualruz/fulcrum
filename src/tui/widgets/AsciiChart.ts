@@ -1,11 +1,9 @@
 /**
- * ASCII chart renderer — asciichart wrapper with TUI size-aware scaling.
+ * ASCII chart renderer with TUI size-aware scaling.
  *
  * Provides: burndown line, velocity bar, sparkline, histogram.
  * Deterministic snapshot output for testing.
  */
-
-import asciichart from "asciichart";
 
 export interface ChartOpts {
   width?: number;
@@ -14,14 +12,27 @@ export interface ChartOpts {
 
 /** Render a burndown line chart. */
 export function renderBurndown(data: number[], opts: ChartOpts = {}): string {
+  if (data.length === 0) return "";
   const height = opts.height ?? 10;
   const width = opts.width ?? 60;
-  // asciichart.plot takes the data and renders a line chart
-  return asciichart.plot(data, {
-    height,
-    width: Math.max(width - 10, 10), // account for axis labels
-    format: (x: number) => x.toFixed(0).padStart(4),
-  });
+  const chartWidth = Math.max(width - 8, 10);
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const rows = Math.max(height, 2);
+  const grid = Array.from({ length: rows }, () => Array.from({ length: chartWidth }, () => " "));
+
+  for (let i = 0; i < data.length; i++) {
+    const value = data[i]!;
+    const x = data.length === 1 ? 0 : Math.round((i / (data.length - 1)) * (chartWidth - 1));
+    const y = rows - 1 - Math.round(((value - min) / range) * (rows - 1));
+    grid[y]![x] = "*";
+  }
+
+  return grid.map((row, index) => {
+    const value = max - ((range / Math.max(rows - 1, 1)) * index);
+    return `${value.toFixed(0).padStart(4)} |${row.join("")}`;
+  }).join("\n");
 }
 
 /** Render a velocity bar chart (horizontal bars). */

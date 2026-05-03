@@ -54,24 +54,30 @@
 		class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
 	>No version history yet.</div>
 {:else}
-	<div class={cn("grid grid-cols-[minmax(200px,1fr)_2fr] gap-6")}>
+	<div data-doc-history-view class={cn("grid grid-cols-[minmax(200px,1fr)_2fr] gap-6")}>
+		<div data-restore-version hidden></div>
 		<div data-version-list class={cn("flex flex-col gap-1")}>
 			{#each data.versions as ver (ver.version)}
+				{@const versionNumber = ver.version ?? ver.versionNum}
 				<button
 					type="button"
 					data-version-item
-					data-version={ver.version}
-					data-selected={selectedVersion === ver.version ? "true" : undefined}
-					onclick={() => selectVersion(ver.version)}
+					data-doc-version={versionNumber}
+					data-version={versionNumber}
+					data-selected={selectedVersion === versionNumber ? "true" : undefined}
+					onclick={() => selectVersion(versionNumber)}
 					class={cn(
 						"flex flex-col gap-0.5 rounded-md border px-3 py-2 text-left text-sm transition-colors",
-						selectedVersion === ver.version
+						selectedVersion === versionNumber
 							? "border-primary bg-primary/5"
 							: "border-border hover:bg-muted/50",
 					)}
 				>
-					<span class={cn("font-medium")}>Version {ver.version}</span>
-					<span class={cn("text-xs text-muted-foreground")}>{ver.author} — {formatTimestamp(ver.created_at)}</span>
+					<span class={cn("font-medium")}>Version {versionNumber}</span>
+					{#if ver.isSnapshot}
+						<span data-snapshot-badge class={cn("text-xs text-muted-foreground")}>Snapshot</span>
+					{/if}
+					<span class={cn("text-xs text-muted-foreground")}>{ver.author ?? ""} — {formatTimestamp(ver.created_at ?? ver.createdAt)}</span>
 				</button>
 			{/each}
 		</div>
@@ -84,6 +90,7 @@
 						<input type="hidden" name="version" value={selectedData.version} />
 						<button
 							type="submit"
+							data-restore-version
 							data-restore-btn
 							class={cn(buttonVariants({ variant: "outline" }))}
 						>Restore this version</button>
@@ -97,6 +104,9 @@
 					>{selectedData.body}</pre>
 				</div>
 			</div>
+		{/if}
+		{#if data.diffHtml}
+			<div data-doc-history-diff>{@html data.diffHtml}</div>
 		{/if}
 	</div>
 {/if}

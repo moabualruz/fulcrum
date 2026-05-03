@@ -4,7 +4,7 @@ import { openPglite } from "../product-kernel/db/pglite.ts";
 import { runMigrations } from "../product-kernel/db/migrate.ts";
 import { productDbDir } from "../product-kernel/paths.ts";
 import type { ProductDb } from "../product-kernel/db/types.ts";
-import { listArtifacts } from "../web/src/lib/server/artifacts.ts";
+import { listArtifacts, readArtifactDetail } from "../web/src/lib/server/artifacts.ts";
 
 const HELP = `fulcrum artifact — artifact commands
 
@@ -40,8 +40,14 @@ export async function run(argv: readonly string[]): Promise<void> {
       else console.log("no artifacts");
       return;
     }
-    const rows = await listArtifacts(db, { orgId });
-    if (json) console.log(JSON.stringify(rows, null, 2));
+    const rows = await listArtifacts(db, orgId);
+    if (json) {
+      const withPreview = await Promise.all(rows.map(async (row) => {
+        const detail = await readArtifactDetail(db, { orgId, id: row.id });
+        return { ...row, preview: detail?.content ?? undefined };
+      }));
+      console.log(JSON.stringify(withPreview, null, 2));
+    }
     else if (rows.length === 0) console.log("no artifacts");
     else for (const a of rows) console.log(`${a.kind}\t${a.title}\t${a.id}`);
   } finally {

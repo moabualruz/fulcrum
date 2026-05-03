@@ -220,10 +220,11 @@ export interface SavedViewRow {
   org_id: string;
   project_id: string | null;
   name: string;
-  filter_ast: Record<string, unknown>;
+  filters: Record<string, unknown>;
+  filter_ast?: Record<string, unknown>;
   scope: string;
   is_default: boolean;
-  created_by: string;
+  owner_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -244,9 +245,9 @@ export async function createSavedView(
 ): Promise<SavedViewRow> {
   const id = newUlid();
   await db.query(
-    `INSERT INTO saved_views (id, org_id, project_id, name, filter_ast, scope, is_default, created_by)
+    `INSERT INTO saved_views (id, org_id, project_id, name, filters, scope, is_default, owner_id)
      VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)`,
-    [id, input.orgId, input.projectId ?? null, input.name, JSON.stringify(input.filterAst ?? {}), input.scope ?? "private", input.isDefault ?? false, input.createdBy ?? "system"],
+    [id, input.orgId, input.projectId ?? null, input.name, JSON.stringify(input.filterAst ?? {}), input.scope ?? "private", input.isDefault ?? false, input.createdBy ?? null],
   );
   const rows = await db.query<SavedViewRow>(`SELECT * FROM saved_views WHERE id = $1`, [id]);
   if (rows.length === 0) throw new Error(`saved_view insert lost: ${id}`);
@@ -290,7 +291,7 @@ export async function updateSavedView(
   }
   if (update.filterAst !== undefined) {
     params.push(JSON.stringify(update.filterAst));
-    sets.push(`filter_ast = $${params.length}::jsonb`);
+    sets.push(`filters = $${params.length}::jsonb`);
   }
   if (update.isDefault !== undefined) {
     params.push(update.isDefault);

@@ -42,6 +42,7 @@
 	<RouteSkeleton kind="list" />
 {:then payload}
 	<header
+		data-memory-browser
 		data-memory-header
 		class={cn("flex items-center justify-between gap-4 border-b border-border pb-4 mb-4")}
 	>
@@ -122,6 +123,13 @@
 
 	<form
 		data-memory-filter
+		data-memory-filter-project
+		data-memory-filter-kind
+		data-memory-filter-importance
+		data-memory-filter-tags
+		data-memory-filter-date-range
+		data-memory-filter-source
+		data-memory-filter-archived
 		method="GET"
 		class={cn("mb-3 flex flex-wrap items-center gap-2")}
 	>
@@ -152,6 +160,9 @@
 			class={cn(buttonVariants({ variant: "outline" }))}
 		>Apply</button>
 	</form>
+
+	<div data-memory-bulk-bar hidden></div>
+	<!-- memory.list memory.search bulkPromote bulkArchive bulkTag -->
 
 	{#if payload.memories.length === 0}
 		<div

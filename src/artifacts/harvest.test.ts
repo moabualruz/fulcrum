@@ -105,25 +105,28 @@ describe("harvestArtifacts", () => {
 
     // Assert: one artifact
     expect(result.artifacts).toHaveLength(1);
-    expect(result.artifacts[0].filename).toBe("output.js");
+    const artifact = result.artifacts[0]!;
+    expect(artifact.filename).toBe("output.js");
 
     // Assert: artifact row created with expected fields
     expect(created).toHaveLength(1);
-    expect(created[0].filename).toBe("output.js");
-    expect(created[0].mime).toBe("text/javascript");
-    expect(typeof created[0].checksumSha256).toBe("string");
-    expect((created[0].checksumSha256 as string).length).toBe(64);
+    const createdArtifact = created[0]!;
+    expect(createdArtifact.filename).toBe("output.js");
+    expect(createdArtifact.mime).toBe("text/javascript");
+    expect(typeof createdArtifact.checksumSha256).toBe("string");
+    expect((createdArtifact.checksumSha256 as string).length).toBe(64);
 
     // Assert: edges row — artifact generated_by agent_run + agent_run produced artifact
     expect(edges).toHaveLength(1);
-    expect(edges[0]).toHaveLength(2);
-    expect(edges[0][0]).toMatchObject({
+    const artifactEdges = edges[0]!;
+    expect(artifactEdges).toHaveLength(2);
+    expect(artifactEdges[0]).toMatchObject({
       fromKind: "artifact",
       toKind: "agent_run",
       toId: RUN_ID,
       kind: "generated_by",
     });
-    expect(edges[0][1]).toMatchObject({
+    expect(artifactEdges[1]).toMatchObject({
       fromKind: "agent_run",
       fromId: RUN_ID,
       toKind: "artifact",
@@ -132,8 +135,9 @@ describe("harvestArtifacts", () => {
 
     // Assert: search_documents row with filename + content preview
     expect(searchDocs).toHaveLength(1);
-    expect(searchDocs[0].title).toBe("output.js");
-    expect(searchDocs[0].body).toContain("console.log");
+    const searchDoc = searchDocs[0]!;
+    expect(searchDoc.title).toBe("output.js");
+    expect(searchDoc.body).toContain("console.log");
 
     // Assert: event emitted
     expect(events).toHaveLength(1);
@@ -213,7 +217,7 @@ describe("harvestArtifacts", () => {
 
     // Duplicate found → reuse, no new create
     expect(result.artifacts).toHaveLength(1);
-    expect(result.artifacts[0].id).toBe("existing-1");
+    expect(result.artifacts[0]!.id).toBe("existing-1");
     expect(outerCreated).toHaveLength(0);
   });
 
@@ -231,7 +235,7 @@ describe("harvestArtifacts", () => {
     });
 
     expect(created).toHaveLength(1);
-    expect(created[0].mime).toBe("application/octet-stream");
-    expect(searchDocs[0].body).toBe("");
+    expect(created[0]!.mime).toBe("application/octet-stream");
+    expect(searchDocs[0]!.body).toBe("");
   });
 });

@@ -7,6 +7,7 @@ export function createFulcrumSkillsCommand(): Command {
   const installCommand = command.command("install");
   installCommand.description("fulcrum_skills install");
   installCommand.option("--json", "Emit JSON output");
+  installCommand.option("--path <string>", "path");
   installCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for fulcrum_skills.install is not wired yet.");
@@ -41,6 +42,8 @@ export function createFulcrumSkillsCommand(): Command {
   const resolveConflictCommand = command.command("resolve-conflict");
   resolveConflictCommand.description("fulcrum_skills resolveConflict");
   resolveConflictCommand.option("--json", "Emit JSON output");
+  resolveConflictCommand.addOption(new Option("--resolution <choice>", "resolution").choices(["local","upstream","editor"]));
+  resolveConflictCommand.option("--slug <string>", "slug");
   resolveConflictCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for fulcrum_skills.resolveConflict is not wired yet.");
@@ -58,6 +61,7 @@ export function createFulcrumSkillsCommand(): Command {
   const syncCommand = command.command("sync");
   syncCommand.description("fulcrum_skills sync");
   syncCommand.option("--json", "Emit JSON output");
+  syncCommand.option("--fetch-upstream", "fetch-upstream");
   syncCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for fulcrum_skills.sync is not wired yet.");
@@ -75,7 +79,7 @@ export function createFulcrumSkillsCommand(): Command {
   const uninstallCommand = command.command("uninstall");
   uninstallCommand.description("fulcrum_skills uninstall");
   uninstallCommand.option("--json", "Emit JSON output");
-  uninstallCommand.option("--id <string>", "id");
+  uninstallCommand.option("--slug <string>", "slug");
   uninstallCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for fulcrum_skills.uninstall is not wired yet.");

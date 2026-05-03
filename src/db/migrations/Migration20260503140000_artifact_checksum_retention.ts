@@ -8,6 +8,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260503140000_artifact_checksum_retention extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     this.addSql(
       `alter table "artifacts" add column "checksum_sha256" varchar(64) null`,

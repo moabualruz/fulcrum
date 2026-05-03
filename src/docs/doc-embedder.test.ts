@@ -26,7 +26,7 @@ function mockClient(vector: number[]): InferenceClient {
     async embed(_text: string): Promise<EmbeddingResponse> {
       return { vector };
     },
-  };
+  } as unknown as InferenceClient;
 }
 
 function failingClient(err: Error): InferenceClient {
@@ -34,7 +34,7 @@ function failingClient(err: Error): InferenceClient {
     async embed(_text: string): Promise<EmbeddingResponse> {
       throw err;
     },
-  };
+  } as unknown as InferenceClient;
 }
 
 async function freshDb(name: string): Promise<{ db: ProductDb; orgId: string }> {

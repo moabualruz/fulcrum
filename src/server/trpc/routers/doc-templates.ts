@@ -36,7 +36,7 @@ const DocTemplateRowSchema = z.object({
   frontmatterTemplate: z.record(z.string(), z.unknown()),
   bodyTemplate: z.string(),
   isDefault: z.boolean(),
-  createdAt: z.date(),
+  createdAt: z.union([z.string(), z.date().transform((date) => date.toISOString())]),
 });
 
 // ─── Service resolver ─────────────────────────────────────────────────────────

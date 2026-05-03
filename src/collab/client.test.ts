@@ -13,15 +13,19 @@ describe("buildCollabExtensions", () => {
   test("flag ON → returns collaboration + collaborationCursor descriptors", () => {
     const exts = buildCollabExtensions("t1", { id: "u1", name: "Alice" }, FLAG_ON);
     expect(exts).toHaveLength(2);
-    expect(exts[0].name).toBe("collaboration");
-    expect(exts[0].config.room).toBe("task:t1");
-    expect(exts[1].name).toBe("collaborationCursor");
-    expect((exts[1].config.user as { name: string }).name).toBe("Alice");
+    const [collaboration, cursor] = exts;
+    if (!collaboration || !cursor) throw new Error("expected collab descriptors");
+    expect(collaboration.name).toBe("collaboration");
+    expect(collaboration.config.room).toBe("task:t1");
+    expect(cursor.name).toBe("collaborationCursor");
+    expect((cursor.config.user as { name: string }).name).toBe("Alice");
   });
 
   test("flag ON → cursor user colour derived from user ID", () => {
     const exts = buildCollabExtensions("t1", { id: "u1", name: "Alice" }, FLAG_ON);
-    const color = (exts[1].config.user as { color: string }).color;
+    const cursor = exts[1];
+    if (!cursor) throw new Error("expected cursor descriptor");
+    const color = (cursor.config.user as { color: string }).color;
     expect(color).toMatch(/^hsl\(\d+, 70%, 50%\)$/);
   });
 

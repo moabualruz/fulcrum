@@ -122,6 +122,7 @@ export const reposRouter = t.router({
     .input(ListReposInputSchema)
     .output(z.array(RepoOutputSchema))
     .query(async ({ ctx, input }) => {
+      if (!ctx.container && !ctx.em) return [];
       const repo = resolveRepoRepository(ctx);
       const repos = await repo.list({
         orgId: ctx.orgId,

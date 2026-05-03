@@ -26,6 +26,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260502120000_webhooks extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     // webhooks table
     this.addSql(

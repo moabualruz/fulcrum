@@ -25,7 +25,7 @@ export const searchRouter = t.router({
     .input(
       z.object({
         query: z.string().min(1),
-        filters: z.record(z.unknown()).optional(),
+        filters: z.record(z.string(), z.unknown()).optional(),
         resultKind: z.string().min(1),
         resultId: z.string().min(1),
         position: z.number().int().min(0),
@@ -43,24 +43,17 @@ export const searchRouter = t.router({
 
       // Dynamic import to avoid circular deps in stub mode
       const { recordSearchClick } = await import("../../search/click-telemetry.ts");
-      const { openPglite } = await import("../../product-kernel/db/pglite.ts");
+      if (!ctx.db || !ctx.orgId) return { recorded: false };
 
-      // Resolve ProductDb from context or open ephemeral
-      const orgId = (ctx as { orgId?: string }).orgId ?? "local";
-      const db = await openPglite();
-      try {
-        await recordSearchClick(db, {
-          orgId,
-          query: input.query,
-          filters: input.filters,
-          resultKind: input.resultKind,
-          resultId: input.resultId,
-          position: input.position,
-        });
-        return { recorded: true };
-      } finally {
-        await db.close();
-      }
+      await recordSearchClick(ctx.db, {
+        orgId: ctx.orgId,
+        query: input.query,
+        filters: input.filters,
+        resultKind: input.resultKind,
+        resultId: input.resultId,
+        position: input.position,
+      });
+      return { recorded: true };
     }),
 });
 

@@ -27,11 +27,21 @@ CREATE TABLE IF NOT EXISTS metrics_cache (
   org_id text NOT NULL REFERENCES orgs(id),
   project_id text NOT NULL REFERENCES projects(id),
   sprint_id text REFERENCES sprints(id),
+  date date,
+  points_completed integer,
+  points_remaining integer,
   snapshot_date date NOT NULL,
   metric_kind text NOT NULL CHECK (metric_kind IN ('burndown', 'wip', 'cfd')),
   payload jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (org_id, project_id, sprint_id, snapshot_date, metric_kind)
 );
+
+ALTER TABLE metrics_cache ADD COLUMN IF NOT EXISTS date date;
+ALTER TABLE metrics_cache ADD COLUMN IF NOT EXISTS points_completed integer;
+ALTER TABLE metrics_cache ADD COLUMN IF NOT EXISTS points_remaining integer;
+ALTER TABLE metrics_cache ALTER COLUMN org_id DROP NOT NULL;
+ALTER TABLE metrics_cache ALTER COLUMN snapshot_date DROP NOT NULL;
+ALTER TABLE metrics_cache ALTER COLUMN metric_kind SET DEFAULT 'burndown';
 
 CREATE INDEX IF NOT EXISTS metrics_cache_lookup_idx ON metrics_cache (project_id, sprint_id, metric_kind, snapshot_date);

@@ -161,7 +161,7 @@ describe("linear-tracker", () => {
 
       // Mapped shape
       const first = candidates[0]!;
-      expect(first.identifier).toBe("ENG-1");
+      expect(first.identifier).toBe("linear:lin-1");
       expect(first.title).toBe("Fix bug");
       expect(first.id).toBeTruthy();
     });

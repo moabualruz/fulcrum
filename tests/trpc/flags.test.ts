@@ -247,11 +247,11 @@ describe("flags.list — unauthenticated", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("flags.list — authenticated", () => {
-  it("returns all 16 flags with name, enabled, description fields", async () => {
+  it("returns all 22 flags with name, enabled, description fields", async () => {
     const caller = makeCaller(TEST_ADMIN_USER_ID, TEST_ORG_ID);
     const result = await caller.flags.list();
     expect(Array.isArray(result)).toBe(true);
-    expect(result).toHaveLength(16);
+    expect(result).toHaveLength(22);
     for (const item of result) {
       expect(typeof item.name).toBe("string");
       expect(typeof item.enabled).toBe("boolean");

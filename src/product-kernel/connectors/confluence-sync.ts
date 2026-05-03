@@ -36,8 +36,8 @@ export async function runConfluenceSync(
 
   const logId = newUlid();
   await db.query(
-    `INSERT INTO connector_sync_log (id, connector, org_id, started_at)
-     VALUES ($1, 'confluence', $2, now())`,
+    `INSERT INTO connector_sync_log (id, connector, org_id, started_at, status)
+     VALUES ($1, 'confluence', $2, now(), 'running')`,
     [logId, input.orgId],
   );
 
@@ -73,10 +73,11 @@ export async function runConfluenceSync(
   await db.query(
     `UPDATE connector_sync_log
         SET finished_at = now(),
+            status = $4,
             pages_synced = $2,
             errors_json = $3::jsonb
       WHERE id = $1`,
-    [logId, pagesSynced, JSON.stringify(errors)],
+    [logId, pagesSynced, JSON.stringify(errors), errors.length === 0 ? "succeeded" : "failed"],
   );
 
   return { logId, pagesSynced, errors };

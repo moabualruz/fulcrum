@@ -145,7 +145,7 @@ describe("runAgent noSandbox happy path", () => {
       now: () => 1_000,
     });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       transcript: "COMPLETE\n",
       exitCode: 0,
       filesChanged: [],
@@ -154,7 +154,10 @@ describe("runAgent noSandbox happy path", () => {
       iterationCount: 1,
       exitReason: "complete",
       tokenUsed: 1,
+      transcriptTruncated: false,
     });
+    expect(result.transcriptPath).toBe("/tmp/fulcrum-agent-run/transcripts/run-1.jsonl");
+    expect(result.workspaceDiffPath).toBe("/tmp/fulcrum-agent-run/diffs/run-1.diff");
     expect(warnings).toEqual([TRUST_BOUNDARY_WARNING]);
     expect(sandboxTag).toBe("none");
     expect(closeCalls).toBe(1);
@@ -218,13 +221,14 @@ describe("runAgent iteration loop", () => {
     expect(prompts[1]).toContain("Previous agent output");
     expect(result.iterationCount).toBe(3);
     expect(result.exitReason).toBe("max_iterations");
-    expect(patches.at(-1)).toEqual({
+    expect(patches.at(-1)).toMatchObject({
       sandboxMode: "host",
       exitCode: 0,
       durationMs: 0,
       iterationCount: 3,
       exitReason: "max_iterations",
       tokenUsed: expect.any(Number),
+      transcriptTruncated: false,
     });
   });
 

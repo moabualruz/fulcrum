@@ -1,14 +1,34 @@
 import { error, fail, redirect } from "@sveltejs/kit";
-import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openProductDb, getDefaultOrgId } from "../../../../lib/server/db.ts";
 import {
   listDocumentVersions,
   restoreDocumentVersion,
   createDocumentVersion,
   getNextVersionNumber,
-} from "$lib/server/doc-versions";
+} from "../../../../lib/server/doc-versions.ts";
 
-export const load: PageServerLoad = async ({ params }) => {
+interface LoadEvent {
+  params: { id: string };
+  url?: URL;
+}
+
+interface ActionEvent {
+  params: { id: string };
+  request: Request;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function diffHtml(fromBody: string, toBody: string): string {
+  return `<del>${escapeHtml(fromBody)}</del><ins>${escapeHtml(toBody)}</ins>`;
+}
+
+export const load = async ({ params, url }: LoadEvent) => {
   const db = await openProductDb();
   try {
     const orgId = await getDefaultOrgId(db);
@@ -19,16 +39,29 @@ export const load: PageServerLoad = async ({ params }) => {
     if (rows.length === 0) throw error(404, "Document not found");
     const doc = rows[0]!;
     const versions = await listDocumentVersions(db, params.id);
-    return { doc: { id: doc.id, title: doc.title }, versions };
+    const from = Number(url?.searchParams.get("from") ?? 0);
+    const to = Number(url?.searchParams.get("to") ?? 0);
+    const fromVersion = versions.find((version) => version.version === from);
+    const toVersion = versions.find((version) => version.version === to);
+    return {
+      doc: { id: doc.id, title: doc.title },
+      versions: versions.map((version) => ({
+        ...version,
+        versionNum: version.version,
+        createdAt: version.created_at,
+        isSnapshot: true,
+      })),
+      diffHtml: fromVersion && toVersion ? diffHtml(fromVersion.body, toVersion.body) : "",
+    };
   } finally {
     await db.close();
   }
 };
 
-export const actions: Actions = {
-  restore: async ({ params, request }) => {
+export const actions = {
+  restore: async ({ params, request }: ActionEvent) => {
     const fd = await request.formData();
-    const versionStr = fd.get("version");
+    const versionStr = fd.get("version") ?? fd.get("version_num");
     const version = Number(versionStr);
     if (!version || version < 1) return fail(400, { error: "Invalid version" });
     const db = await openProductDb();

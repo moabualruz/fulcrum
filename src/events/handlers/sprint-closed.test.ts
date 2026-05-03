@@ -252,9 +252,9 @@ describe("buildRetroContent", () => {
     expect(result.type).toBe("doc");
     expect(Array.isArray(result.content)).toBe(true);
 
-    const texts = (result.content as Array<Record<string, unknown[]>>)
-      .flatMap((p) => p.content || [])
-      .map((n: Record<string, string>) => n.text);
+    const texts = (result.content as Array<{ content?: Array<{ text?: string }> }>)
+      .flatMap((p) => p.content ?? [])
+      .flatMap((n) => (n.text ? [n.text] : []));
 
     expect(texts).toContain("Sprint: Sprint 42");
     expect(texts).toContain("Goal: Launch v2");

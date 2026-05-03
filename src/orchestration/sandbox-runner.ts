@@ -356,7 +356,7 @@ export async function runAgent(
         durationMs,
         iterationCount: outputs.length,
         exitReason,
-        tokenUsed: tokenTrackingOn ? tokenUsed : undefined,
+        tokenUsed,
         transcriptPath: transcriptResult.transcriptPath,
         workspaceDiffPath: diffResult.diffPath,
         transcriptTruncated: transcriptResult.truncated,

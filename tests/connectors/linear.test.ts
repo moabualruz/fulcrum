@@ -45,7 +45,7 @@ describe("LinearConnector", () => {
     expect(result).toEqual({ pulled: 1, pushed: 0, skipped: 0, errors: [] });
     expect(connector.pulledItems).toEqual([
       {
-        externalId: "FUL-1",
+        externalId: "linear:lin-1",
         data: {
           id: "lin-1",
           title: "Ship Linear connector",
@@ -54,11 +54,12 @@ describe("LinearConnector", () => {
           estimate: 5,
           assignee: "owner@example.com",
           labels: ["api", "sync"],
+          priority: "none",
         },
       },
     ]);
     expect(requests[0]!.url).toBe("https://api.linear.app/graphql");
-    expect(requests[0]!.headers.get("authorization")).toBe("key");
+    expect(requests[0]!.headers.get("authorization")).toBe("Bearer key");
   });
 
   it("pushes title and status updates with GraphQL mutation", async () => {
@@ -176,7 +177,7 @@ describe("LinearConnector", () => {
     expect(batches).toEqual([
       [
         {
-          externalId: "FUL-1",
+          externalId: "linear:lin-1",
           data: {
             id: "lin-1",
             title: "Import Linear history",
@@ -185,12 +186,13 @@ describe("LinearConnector", () => {
             estimate: undefined,
             assignee: "owner@example.com",
             labels: ["history"],
+            priority: "none",
           },
         },
       ],
       [
         {
-          externalId: "FUL-1",
+          externalId: "linear:lin-1",
           data: {
             id: "lin-1",
             title: "Import Linear history updated",
@@ -199,10 +201,11 @@ describe("LinearConnector", () => {
             estimate: undefined,
             assignee: "owner@example.com",
             labels: ["history", "api"],
+            priority: "none",
           },
         },
         {
-          externalId: "FUL-2",
+          externalId: "linear:lin-2",
           data: {
             id: "lin-2",
             title: "Second Linear issue",
@@ -211,6 +214,7 @@ describe("LinearConnector", () => {
             estimate: undefined,
             assignee: undefined,
             labels: [],
+            priority: "none",
           },
         },
       ],

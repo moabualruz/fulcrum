@@ -59,5 +59,18 @@ CREATE TABLE IF NOT EXISTS connector_sync_log (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE connector_sync_log ADD COLUMN IF NOT EXISTS status text;
+UPDATE connector_sync_log SET status = 'succeeded' WHERE status IS NULL;
+ALTER TABLE connector_sync_log ALTER COLUMN status SET NOT NULL;
+ALTER TABLE connector_sync_log DROP CONSTRAINT IF EXISTS connector_sync_log_status_check;
+ALTER TABLE connector_sync_log ADD CONSTRAINT connector_sync_log_status_check
+  CHECK (status IN ('running', 'succeeded', 'failed'));
+ALTER TABLE connector_sync_log ADD COLUMN IF NOT EXISTS items_imported integer NOT NULL DEFAULT 0;
+ALTER TABLE connector_sync_log ADD COLUMN IF NOT EXISTS items_updated integer NOT NULL DEFAULT 0;
+ALTER TABLE connector_sync_log ADD COLUMN IF NOT EXISTS errors integer NOT NULL DEFAULT 0;
+ALTER TABLE connector_sync_log ADD COLUMN IF NOT EXISTS last_run_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE connector_sync_log ADD COLUMN IF NOT EXISTS error text;
+ALTER TABLE connector_sync_log ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS connector_sync_log_org_connector
   ON connector_sync_log (org_id, connector);
