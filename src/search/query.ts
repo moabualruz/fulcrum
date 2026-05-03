@@ -342,7 +342,7 @@ async function queryHybridSearchDocuments(
 
   const hybridWhere = buildHybridWhere(input);
   const now = (input.now ?? new Date()).toISOString();
-  const nowParamIndex = hybridWhere.params.length + 1;
+  const nowParamIndex = where.params.length + 1;
   const queryVector = input.embedQuery ? await input.embedQuery(where.query) : [];
   const rows = await db.query<{
     id: string;
@@ -357,7 +357,7 @@ async function queryHybridSearchDocuments(
     embedding: string | number[] | null;
     updated_at: Date | string;
     bm25_score: number;
-  }>(hybridResultsSql(hybridWhere, where, nowParamIndex), [...hybridWhere.params, now]);
+  }>(hybridResultsSql(hybridWhere, where, nowParamIndex), [...where.params, now]);
 
   const maxBm25 = Math.max(...rows.map((row) => Number(row.bm25_score)), 0);
   const scored = rows
