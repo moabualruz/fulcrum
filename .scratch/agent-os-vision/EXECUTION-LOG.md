@@ -2277,3 +2277,12 @@ Status: 187 implemented, 39 completed, 115 ready = 226/341 (66.3%)
 CI: typecheck GREEN, pre-existing test failures being tracked for gate review
 
 Continuous dispatch: filling all 6 impl slots per wave, cherry-picking results, resolving conflicts.
+
+## 2026-05-03T15:00:00Z — claude-orchestrator (wave 8 — crossed 70%)
+
+Landed waves 7-8: P2#10, P2#12, P3#15, P3#16, P5#16, P5#18, P6#20, P8#02, P8#16, P9#13, P10#10, P10#11, P12#15, P16#08-11, P16#13, P17#13
+Status: 200 implemented, 39 completed, 102 ready = 239/341 (70.1%)
+CI: typecheck GREEN, pre-existing test failures tracked
+Remaining: 102 ready + P16#14 in-flight
+
+Codex sandbox pattern: worktree isolation blocks Codex git writes → re-dispatch as Claude. ~30% Codex dispatches blocked, recovered by Claude re-dispatch. Codex effective for read-heavy analysis but blocked on commit in worktree mode.
