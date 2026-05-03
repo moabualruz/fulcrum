@@ -1,7 +1,6 @@
 ---
-Status: implemented
+Status: ready-for-agent
 Triage: AFK
-ImplRuntime: claude
 Pillar: tui
 Blocked-by: [15/issues/01-tui-foundation-launcher.md]
 PRD: .scratch/agent-os-vision/prds/15-tui.md
