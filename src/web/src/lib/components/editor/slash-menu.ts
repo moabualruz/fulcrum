@@ -3,7 +3,7 @@ import { Node } from "@tiptap/core";
 import { TaskItem } from "@tiptap/extension-list/task-item";
 import { TaskList } from "@tiptap/extension-list/task-list";
 import { StarterKit } from "@tiptap/starter-kit";
-import { ExcalidrawNode, MathBlockNode, MathNode, MermaidNode } from "./embeds";
+import { ExcalidrawNode, FileAttachmentNode, ImageNode, MathBlockNode, MathNode, MermaidNode } from "./embeds";
 import { MentionNode } from "./mention";
 import { WikilinkNode } from "./wikilink";
 
@@ -36,6 +36,7 @@ export const SLASH_MENU_ITEMS: SlashMenuItem[] = [
   { id: "math-block", label: "Math block", aliases: ["latex-block", "katex-block", "$$"] },
   { id: "mermaid", label: "Mermaid diagram", aliases: ["diagram", "flowchart"] },
   { id: "sketch", label: "Sketch", aliases: ["excalidraw", "drawing"] },
+  { id: "file", label: "File attachment", aliases: ["attachment", "upload"] },
 ];
 
 export const TableCell = Node.create({
@@ -94,6 +95,8 @@ export function createDocEditorExtensions(): Extension[] {
     MathBlockNode,
     MermaidNode,
     ExcalidrawNode,
+    ImageNode,
+    FileAttachmentNode,
     Table,
     TableRow,
     TableCell,
@@ -101,8 +104,8 @@ export function createDocEditorExtensions(): Extension[] {
 }
 
 export function insertSlashMenuItem(editor: Editor, itemId: string): boolean {
-  const chain = editor.chain().focus();
   deleteSlashQuery(editor);
+  const chain = editor.chain().focus();
 
   if (itemId.startsWith("heading-")) {
     const level = Number(itemId.replace("heading-", ""));
@@ -145,6 +148,8 @@ export function insertSlashMenuItem(editor: Editor, itemId: string): boolean {
       }).run();
     case "sketch":
       return chain.insertContent({ type: "excalidraw" }).run();
+    case "file":
+      return chain.insertContent({ type: "fileAttachment", attrs: { uploading: true } }).run();
     default:
       return false;
   }

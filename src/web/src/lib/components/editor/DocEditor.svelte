@@ -3,6 +3,7 @@
   import { createEventDispatcher, onDestroy, onMount, tick } from "svelte";
   import type { Unsubscriber } from "svelte/store";
   import { createEditor, EditorContent } from "svelte-tiptap";
+  import { handleAttachmentFiles } from "./embeds";
   import {
     createAutosaveScheduler,
     createDocEditorExtensions,
@@ -150,6 +151,14 @@
     }
   }
 
+  function handleEditorFiles(files: File[]): boolean {
+    if (!editor || files.length === 0) return false;
+    void handleAttachmentFiles(editor, files).then(() => {
+      if (editor) handleUpdate(editor);
+    });
+    return true;
+  }
+
   onMount(() => {
     const store = createEditor({
       extensions: createDocEditorExtensions(),
@@ -162,6 +171,16 @@
         handleKeyDown: (_view, event) => {
           handleKeydown(event);
           return event.defaultPrevented;
+        },
+        handlePaste: (_view, event) => {
+          const handled = handleEditorFiles(Array.from(event.clipboardData?.files ?? []));
+          if (handled) event.preventDefault();
+          return handled;
+        },
+        handleDrop: (_view, event) => {
+          const handled = handleEditorFiles(Array.from(event.dataTransfer?.files ?? []));
+          if (handled) event.preventDefault();
+          return handled;
         },
       },
       onUpdate: ({ editor: updatedEditor }) => handleUpdate(updatedEditor),
@@ -199,6 +218,8 @@
     if (node.type === "tableCell") return text;
     if (node.type === "wikilink") return `[[${node.attrs?.slug ?? ""}]]`;
     if (node.type === "mention") return String(node.attrs?.label ?? `@${node.attrs?.id ?? ""}`);
+    if (node.type === "image") return `![${node.attrs?.alt || node.attrs?.filename || ""}](${node.attrs?.src || node.attrs?.url || ""})`;
+    if (node.type === "fileAttachment") return `[${node.attrs?.filename ?? "Attachment"}](${node.attrs?.url ?? ""})`;
     return text;
   }
 

@@ -5,11 +5,14 @@ import { Window } from "happy-dom";
 import {
   createMermaidIframeSrcDoc,
   ExcalidrawNode,
+  FileAttachmentNode,
+  handleAttachmentFiles,
+  ImageNode,
   MathBlockNode,
   MathNode,
   MermaidNode,
 } from "./embeds";
-import { createDocEditorExtensions, getSlashMenuItems } from "./slash-menu";
+import { createDocEditorExtensions, getSlashMenuItems, insertSlashMenuItem } from "./slash-menu";
 
 beforeAll(() => {
   const window = new Window();
@@ -18,6 +21,7 @@ beforeAll(() => {
   globals.window = window;
   globals.document = window.document;
   globals.HTMLElement = window.HTMLElement;
+  globals.requestAnimationFrame = (callback: FrameRequestCallback) => setTimeout(callback, 0);
 });
 
 describe("editor embeds", () => {
@@ -102,5 +106,102 @@ describe("editor embeds", () => {
     expect(slashItemIds).toContain("math-block");
     expect(slashItemIds).toContain("mermaid");
     expect(slashItemIds).toContain("sketch");
+    expect(extensionNames).toContain("image");
+    expect(extensionNames).toContain("fileAttachment");
+    expect(slashItemIds).toContain("file");
+  });
+
+  test("image node renders inline media with upload progress and error states", () => {
+    const editor = new Editor({
+      extensions: [StarterKit, ImageNode],
+      content: {
+        type: "doc",
+        content: [
+          { type: "image", attrs: { src: "/api/uploads/org-1/chart.png", alt: "chart.png" } },
+          { type: "image", attrs: { src: "", alt: "uploading.png", uploading: true } },
+          { type: "image", attrs: { src: "", alt: "failed.png", error: "Upload failed" } },
+        ],
+      },
+    });
+
+    const html = editor.getHTML();
+
+    expect(html).toContain('src="/api/uploads/org-1/chart.png"');
+    expect(html).toContain('alt="chart.png"');
+    expect(html).toContain("image-attachment--uploading");
+    expect(html).toContain("data-upload-state=\"uploading\"");
+    expect(html).toContain("image-attachment--error");
+    expect(html).toContain("Upload failed");
+  });
+
+  test("file attachment node renders a downloadable chip with filename and size", () => {
+    const editor = new Editor({
+      extensions: [StarterKit, FileAttachmentNode],
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "fileAttachment",
+            attrs: {
+              url: "/api/uploads/org-1/spec.pdf",
+              filename: "spec.pdf",
+              size: 1536,
+              mime: "application/pdf",
+            },
+          },
+        ],
+      },
+    });
+
+    const html = editor.getHTML();
+
+    expect(html).toContain("file-attachment-chip");
+    expect(html).toContain('href="/api/uploads/org-1/spec.pdf"');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('download="spec.pdf"');
+    expect(html).toContain("spec.pdf");
+    expect(html).toContain("1.5 KB");
+    expect(html).toContain("application/pdf");
+  });
+
+  test("file slash command inserts a placeholder attachment chip", () => {
+    const editor = new Editor({
+      extensions: createDocEditorExtensions(),
+      content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "/file" }] }] },
+    });
+    editor.commands.setTextSelection(6);
+
+    const inserted = insertSlashMenuItem(editor, "file");
+
+    expect(inserted).toBe(true);
+    expect(editor.getJSON().content?.[0]?.type).toBe("fileAttachment");
+    expect(editor.getJSON().content?.[0]?.attrs?.filename).toBe("Upload file");
+    expect(editor.getHTML()).toContain("file-attachment-chip--uploading");
+  });
+
+  test("attachment file handler uploads images as image nodes and other files as chips", async () => {
+    const editor = new Editor({
+      extensions: createDocEditorExtensions(),
+      content: { type: "doc", content: [{ type: "paragraph" }] },
+    });
+    const uploads: File[] = [];
+    const image = new File(["png"], "chart.png", { type: "image/png" });
+    const pdf = new File(["pdf"], "brief.pdf", { type: "application/pdf" });
+
+    await handleAttachmentFiles(editor, [image, pdf], async (file) => {
+      uploads.push(file);
+      return {
+        url: `/api/uploads/org-1/${file.name}`,
+        filename: file.name,
+        size: file.size,
+        mime: file.type,
+      };
+    });
+
+    expect(uploads.map((file) => file.name)).toEqual(["chart.png", "brief.pdf"]);
+    expect(editor.getJSON().content?.map((node) => node.type)).toContain("image");
+    expect(editor.getJSON().content?.map((node) => node.type)).toContain("fileAttachment");
+    expect(editor.getHTML()).toContain('src="/api/uploads/org-1/chart.png"');
+    expect(editor.getHTML()).toContain("brief.pdf");
   });
 });
