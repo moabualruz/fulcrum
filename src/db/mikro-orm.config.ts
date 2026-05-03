@@ -34,6 +34,7 @@ import { Task } from "./entities/tasks/Task.ts";
 import { TaskStatus } from "./entities/tasks/TaskStatus.ts";
 import { Sprint } from "./entities/tasks/Sprint.ts";
 import { MetricsCache } from "./entities/tasks/MetricsCache.ts";
+import { CustomFieldDef } from "./entities/tasks/CustomFieldDef.ts";
 import { SavedView } from "./entities/tasks/SavedView.ts";
 import { Document } from "./entities/docs/Document.ts";
 import { DocLink } from "./entities/docs/DocLink.ts";
@@ -88,6 +89,7 @@ export {
   TaskStatus,
   Sprint,
   MetricsCache,
+  CustomFieldDef,
   SavedView,
   Document,
   DocLink,
@@ -177,6 +179,7 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     TaskStatus,
     Sprint,
     MetricsCache,
+    CustomFieldDef,
     SavedView,
     Document,
     DocLink,
@@ -215,7 +218,7 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     SkillVersion,
   ];
 
-  const allEntities: Options["entities"] = [...builtinEntities, ...entities];
+  const allEntities: Options["entities"] = [...new Set([...builtinEntities, ...entities])];
 
   if (isSaas) {
     // SaaS: standard PostgreSQL driver
