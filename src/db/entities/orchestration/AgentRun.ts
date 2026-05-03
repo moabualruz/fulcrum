@@ -56,6 +56,7 @@ export class AgentRun {
     | "workspaceDiffPath"
     | "agentName"
     | "agentVersion"
+    | "transcriptTruncated"
     | "claimedBy"
     | "searchDoc";
 
@@ -121,6 +122,9 @@ export class AgentRun {
 
   @Property({ type: "string", fieldName: "workspace_diff_path", nullable: true })
   workspaceDiffPath?: string;
+
+  @Property({ type: "boolean", fieldName: "transcript_truncated", default: false })
+  transcriptTruncated: boolean = false;
 
   @Property({ type: "string", fieldName: "agent_name", nullable: true })
   agentName?: string;

@@ -34,4 +34,7 @@ export interface AgentRunResult {
   readonly iterationCount: number;
   readonly exitReason: "complete" | "max_iterations" | "token_cap";
   readonly tokenUsed?: number;
+  readonly transcriptPath?: string;
+  readonly workspaceDiffPath?: string;
+  readonly transcriptTruncated?: boolean;
 }

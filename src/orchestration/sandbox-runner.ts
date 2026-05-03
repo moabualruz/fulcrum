@@ -8,6 +8,11 @@ import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import { noSandbox } from "@ai-hero/sandcastle/sandboxes/no-sandbox";
 import { podman } from "@ai-hero/sandcastle/sandboxes/podman";
 import type { AgentRunRequest, AgentRunResult } from "./types.ts";
+import {
+  TranscriptWriter,
+  captureWorkspaceDiff,
+  maxTranscriptSize,
+} from "./transcript-diff.ts";
 
 export const SANDCASTLE_API_VERSION = "0.5.6";
 
@@ -46,6 +51,9 @@ interface AgentRunRepositoryLike {
       iterationCount: number;
       exitReason: AgentRunResult["exitReason"];
       tokenUsed: number;
+      transcriptPath?: string;
+      workspaceDiffPath?: string;
+      transcriptTruncated?: boolean;
     },
   ): Promise<void>;
 }
@@ -63,6 +71,8 @@ export interface SandboxRunnerDeps {
   readonly features?: string;
   readonly env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
   readonly commandExists?: (command: string, args: readonly string[]) => Promise<boolean>;
+  readonly workspaceRoot?: string;
+  readonly gitDiff?: (worktreePath: string) => Promise<string>;
 }
 
 const defaultLogger: Logger = console;
@@ -212,6 +222,14 @@ export async function runAgent(
       const agent = deps.agentProvider ?? agentProviderFromProfile(req.agentProfile);
       const maxIterations = req.opts?.maxIterations ?? req.agentProfile.maxIterations;
       const maxTokens = maxTokensPerRun();
+      const envBag = deps.env ?? process.env;
+      const wsRoot = deps.workspaceRoot ?? worktree.worktreePath;
+      const runId = req.runId ?? crypto.randomUUID();
+      const transcriptWriter = new TranscriptWriter(
+        wsRoot,
+        runId,
+        maxTranscriptSize(envBag as Record<string, string | undefined>),
+      );
       const outputs: string[] = [];
       let tokenUsed = 0;
       let exitCode = 0;
@@ -231,6 +249,13 @@ export async function runAgent(
         tokenUsed += countTokens(transcript);
         exitCode = interactiveResult.exitCode ?? 0;
 
+        // Write each line of transcript output to JSONL
+        for (const line of transcript.split(/\r?\n/)) {
+          if (line.length > 0) {
+            await transcriptWriter.write("stdout", line);
+          }
+        }
+
         if (tokenUsed > maxTokens) {
           exitReason = "token_cap";
           break;
@@ -242,6 +267,15 @@ export async function runAgent(
         }
       }
 
+      // Close transcript + capture diff
+      const transcriptResult = await transcriptWriter.close();
+      const gitDiffFn = deps.gitDiff ?? defaultGitDiff;
+      const diffResult = await captureWorkspaceDiff(
+        wsRoot,
+        runId,
+        () => gitDiffFn(worktree.worktreePath),
+      );
+
       const durationMs = Math.max(0, now() - startedAt);
       const result: AgentRunResult = {
         transcript: outputs.join(""),
@@ -252,6 +286,9 @@ export async function runAgent(
         iterationCount: outputs.length,
         exitReason,
         tokenUsed,
+        transcriptPath: transcriptResult.transcriptPath,
+        workspaceDiffPath: diffResult.diffPath,
+        transcriptTruncated: transcriptResult.truncated,
       };
       if (req.runId) {
         await deps.agentRunRepository?.updateSandcastleRun?.(req.runId, {
@@ -261,6 +298,9 @@ export async function runAgent(
           iterationCount: result.iterationCount,
           exitReason: result.exitReason,
           tokenUsed,
+          transcriptPath: result.transcriptPath,
+          workspaceDiffPath: result.workspaceDiffPath,
+          transcriptTruncated: result.transcriptTruncated,
         });
       }
       return result;
@@ -397,6 +437,21 @@ function maxTokensPerRun(): number {
 function countTokens(text: string): number {
   const trimmed = text.trim();
   return trimmed.length === 0 ? 0 : trimmed.split(/\s+/).length;
+}
+
+async function defaultGitDiff(worktreePath: string): Promise<string> {
+  try {
+    const proc = Bun.spawn(["git", "diff", "HEAD"], {
+      cwd: worktreePath,
+      stdout: "pipe",
+      stderr: "ignore",
+    });
+    const stdout = await new Response(proc.stdout).text();
+    await proc.exited;
+    return stdout;
+  } catch {
+    return "";
+  }
 }
 
 function providerCheck(
