@@ -1,12 +1,16 @@
-// fulcrum import — gated behind FULCRUM_FEATURES=import-csv.
+// fulcrum import — gated behind FULCRUM_FEATURES.
 //
 // Usage:
 //   fulcrum import --input <path> --format csv --column-map <json> [--dry-run] [--json]
+//   fulcrum import --format linear --project <teamId> [--dry-run] [--json]
+//   fulcrum import --format jira --project <projectKey> [--dry-run] [--json]
+//   fulcrum import --format plane --project <projectId> --workspace <slug> [--dry-run] [--json]
 
 import { join } from "node:path";
 import { mkdir } from "node:fs/promises";
 import { assertFeatureEnabled } from "../data/features.ts";
 import { importCsv } from "../data/csv-import.ts";
+import { runImport, formatImportResult } from "./import-pm.ts";
 import { openPglite } from "../product-kernel/db/pglite.ts";
 import { runMigrations } from "../product-kernel/db/migrate.ts";
 import { productDbDir } from "../product-kernel/paths.ts";
@@ -57,9 +61,44 @@ export async function run(args: string[]): Promise<void> {
     else if (a === "--json") { jsonMode = true; }
   }
 
+  let projectId: string | undefined;
+  let workspace: string | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--project" && args[i + 1]) { projectId = args[++i]; }
+    else if (a === "--workspace" && args[i + 1]) { workspace = args[++i]; }
+  }
+
   if (!format) {
     console.error("fulcrum import: --format required");
     process.exit(1);
+  }
+
+  // PM tool imports (linear / jira / plane)
+  if (format === "linear" || format === "jira" || format === "plane") {
+    if (!projectId) {
+      console.error("fulcrum import: --project required");
+      process.exit(1);
+    }
+    try {
+      // Use a no-op credential repo and fetch client in CLI context
+      // (real impl would wire CredentialRepository from product kernel)
+      const { NullCredentialRepository, FetchHttpClient } = await import("./import-pm.ts");
+      const result = await runImport({
+        format,
+        project: projectId,
+        dryRun,
+        json: jsonMode,
+        credentials: new NullCredentialRepository(),
+        http: new FetchHttpClient(),
+        workspace,
+      });
+      console.log(formatImportResult(result, jsonMode));
+    } catch (err) {
+      console.error(`fulcrum import: ${(err as Error).message}`);
+      process.exit(1);
+    }
+    return;
   }
 
   if (format === "csv") {

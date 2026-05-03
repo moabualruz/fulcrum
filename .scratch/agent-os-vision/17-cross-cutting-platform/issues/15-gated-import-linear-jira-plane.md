@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 17-cross-cutting-platform
 Blocked-by: [17-cross-cutting-platform/issues/02-secrets-keyring-and-vault.md, 17-cross-cutting-platform/issues/09-json-import-export-trpc.md, 13-api-and-webhooks/issues/04-connector-framework.md]
