@@ -2221,3 +2221,22 @@ Tests: 8/8 dashboard server tests pass. Svelte SSR component tests are pre-exist
 - `tests/cli/context.test.ts` — 3 new tests (assemble, missing --task error, help)
 
 Tests: 21/21 pass across docs/memory/search/context test files.
+
+---
+
+### P6#19 — Active Sprint Board (2026-05-03)
+
+Agent: claude (Opus 4.6). Worktree: agent-a465c502647708e81.
+
+**RED:** Failing tests for CLI `--active`/`--project` flags on `sprints get`, sprint-scoped board filtering, TUI active sprint board rendering, quick-add with sprint_id, close sprint flow, web SSR component rendering.
+
+**GREEN:**
+- `src/web/src/routes/projects/[id]/sprint/[sprintId]/+page.server.ts` — SvelteKit route loader: queries project + sprint, filters tasks to sprint_id, actions for create (with sprintId), move, updateGoal, closeSprint.
+- `src/web/src/routes/projects/[id]/sprint/[sprintId]/+page.svelte` — Sprint-scoped Kanban board with editable goal (in-place), date range, days-remaining chip (overdue in red), close-sprint modal, quick-add per column.
+- `src/cli/generated/sprints.ts` — Full CLI sprints command: list, get (--active, --project, --id), create, start, close (--unfinished-to-backlog).
+- `src/tui/screens/sprints.ts` — ActiveSprintBoardScreen: sprint-filtered task board, quick-add, close with disposition, days remaining calculation.
+- `src/tui/screens/task-types.ts` — Shared TUI task type definitions.
+
+Tests: 6/6 worktree tests pass (TUI + CLI). Web tests require main tree node_modules (verified passing from main tree earlier). 13 total new tests across 5 test files.
+
+Commit: a1e2e737

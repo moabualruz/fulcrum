@@ -1,5 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplCommit: a1e2e737
+ImplRuntime: claude
 Triage: AFK
 Pillar: 06-tasks-and-scrum
 Blocked-by: [17-sprints-trpc-crud, 11-kanban-board-view]

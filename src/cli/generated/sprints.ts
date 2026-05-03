@@ -1,69 +1,16 @@
-import { Command, Option } from "commander";
+import { Command } from "commander";
 
 export function createSprintsCommand(): Command {
   const command = new Command("sprints");
-  command.description("Generated sprints commands.");
+  command.description("Sprint management commands.");
 
-  const activateCommand = command.command("activate");
-  activateCommand.description("sprints activate");
-  activateCommand.option("--json", "Emit JSON output");
-  activateCommand.option("--id <string>", "id");
-  activateCommand.action(async (options) => {
+  const listCommand = command.command("list");
+  listCommand.description("List sprints");
+  listCommand.option("--json", "Emit JSON output");
+  listCommand.option("--project <string>", "Project ID");
+  listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for sprints.activate is not wired yet.");
-    } catch (error) {
-      if (options.json === true) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
-        process.exitCode = 1;
-        return;
-      }
-      throw error;
-    }
-  });
-
-  const completeCommand = command.command("complete");
-  completeCommand.description("sprints complete");
-  completeCommand.option("--json", "Emit JSON output");
-  completeCommand.option("--id <string>", "id");
-  completeCommand.action(async (options) => {
-    try {
-      throw new Error("Generated tRPC invocation for sprints.complete is not wired yet.");
-    } catch (error) {
-      if (options.json === true) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
-        process.exitCode = 1;
-        return;
-      }
-      throw error;
-    }
-  });
-
-  const createCommand = command.command("create");
-  createCommand.description("sprints create");
-  createCommand.option("--json", "Emit JSON output");
-  createCommand.action(async (options) => {
-    try {
-      throw new Error("Generated tRPC invocation for sprints.create is not wired yet.");
-    } catch (error) {
-      if (options.json === true) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
-        process.exitCode = 1;
-        return;
-      }
-      throw error;
-    }
-  });
-
-  const deleteCommand = command.command("delete");
-  deleteCommand.description("sprints delete");
-  deleteCommand.option("--json", "Emit JSON output");
-  deleteCommand.option("--id <string>", "id");
-  deleteCommand.action(async (options) => {
-    try {
-      throw new Error("Generated tRPC invocation for sprints.delete is not wired yet.");
+      throw new Error("Generated tRPC invocation for sprints.list is not wired yet.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -76,9 +23,9 @@ export function createSprintsCommand(): Command {
   });
 
   const getCommand = command.command("get");
-  getCommand.description("sprints get");
+  getCommand.description("Get a sprint by ID or active sprint");
   getCommand.option("--json", "Emit JSON output");
-  getCommand.option("--id <string>", "id");
+  getCommand.option("--id <string>", "Sprint ID");
   getCommand.option("--active", "Get the currently active sprint");
   getCommand.option("--project <string>", "Project ID to scope the query");
   getCommand.action(async (options) => {
@@ -98,12 +45,16 @@ export function createSprintsCommand(): Command {
     }
   });
 
-  const listCommand = command.command("list");
-  listCommand.description("sprints list");
-  listCommand.option("--json", "Emit JSON output");
-  listCommand.action(async (options) => {
+  const createCommand = command.command("create");
+  createCommand.description("Create a sprint");
+  createCommand.option("--json", "Emit JSON output");
+  createCommand.option("--project <string>", "Project ID");
+  createCommand.option("--name <string>", "Sprint name");
+  createCommand.option("--start-date <string>", "Start date (YYYY-MM-DD)");
+  createCommand.option("--end-date <string>", "End date (YYYY-MM-DD)");
+  createCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for sprints.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for sprints.create is not wired yet.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -115,12 +66,32 @@ export function createSprintsCommand(): Command {
     }
   });
 
-  const updateCommand = command.command("update");
-  updateCommand.description("sprints update");
-  updateCommand.option("--json", "Emit JSON output");
-  updateCommand.action(async (options) => {
+  const startCommand = command.command("start");
+  startCommand.description("Start a planned sprint");
+  startCommand.option("--json", "Emit JSON output");
+  startCommand.option("--id <string>", "Sprint ID");
+  startCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for sprints.update is not wired yet.");
+      throw new Error("Generated tRPC invocation for sprints.start is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const closeCommand = command.command("close");
+  closeCommand.description("Close an active sprint");
+  closeCommand.option("--json", "Emit JSON output");
+  closeCommand.option("--id <string>", "Sprint ID");
+  closeCommand.option("--unfinished-to-backlog", "Move unfinished tasks to backlog (non-interactive)");
+  closeCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for sprints.close is not wired yet.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

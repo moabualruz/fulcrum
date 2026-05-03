@@ -18,4 +18,3 @@ export function dateKey(value: string | Date | null | undefined): string | null 
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   return value.slice(0, 10);
 }
-
