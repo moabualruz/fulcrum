@@ -3,6 +3,13 @@ import { injectable as Injectable } from "@needle-di/core";
 import { enqueueJob } from "../../product-kernel/jobs.ts";
 import { newUlid } from "../../product-kernel/ids.ts";
 import type { ProductDb } from "../../product-kernel/db/types.ts";
+import {
+  type EmbedText,
+  embeddingText,
+  isEmbeddingsEnabled,
+  serializeEmbedding,
+} from "../embeddings.ts";
+import { tableColumns } from "./entity-helpers.ts";
 
 export type SearchIndexKind =
   | "doc"
@@ -32,6 +39,10 @@ export interface IndexerHook {
   listEntityIds?(orgId: string): Promise<readonly string[]>;
 }
 
+export interface SearchIndexHookOptions {
+  embedText?: EmbedText;
+}
+
 function toPostgresTextArray(values: readonly string[]): string {
   return `{${values.map((value) => `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(",")}}`;
 }
@@ -40,7 +51,10 @@ function toPostgresTextArray(values: readonly string[]): string {
 export class SearchIndexHook implements IndexerHook {
   readonly kind: SearchIndexKind | string = "unknown";
 
-  constructor(protected readonly db: ProductDb) {}
+  constructor(
+    protected readonly db: ProductDb,
+    private readonly options: SearchIndexHookOptions = {},
+  ) {}
 
   protected buildDocument(_entityId: string, _orgId: string): Promise<SearchDocumentInput> {
     throw new Error("SearchIndexHook subclasses must implement buildDocument");
@@ -56,6 +70,41 @@ export class SearchIndexHook implements IndexerHook {
     }
     if (document.sourceId !== entityId) {
       throw new Error("Search index document sourceId must match upsert entityId");
+    }
+
+    const embedding =
+      isEmbeddingsEnabled() && this.options.embedText
+        ? serializeEmbedding(await this.options.embedText(embeddingText(document.title, document.body)))
+        : null;
+
+    const columns = await tableColumns(this.db, "search_documents");
+    if (columns.has("embedding")) {
+      await this.db.query(
+        `INSERT INTO search_documents
+           (id, org_id, project_id, source_kind, source_id, title, body, labels, metadata, embedding)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text[], $9::jsonb, $10)
+         ON CONFLICT (org_id, source_kind, source_id) DO UPDATE
+            SET project_id = EXCLUDED.project_id,
+                title = EXCLUDED.title,
+                body = EXCLUDED.body,
+                labels = EXCLUDED.labels,
+                metadata = EXCLUDED.metadata,
+                embedding = EXCLUDED.embedding,
+                updated_at = now()`,
+        [
+          newUlid(),
+          orgId,
+          document.projectId ?? null,
+          this.kind,
+          entityId,
+          document.title,
+          document.body,
+          toPostgresTextArray(document.labels ?? []),
+          JSON.stringify(document.metadata ?? {}),
+          embedding,
+        ],
+      );
+      return;
     }
 
     await this.db.query(

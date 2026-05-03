@@ -1,4 +1,11 @@
 import type { ProductDb, SqlValue } from "../product-kernel/db/types.ts";
+import {
+  type EmbedText,
+  cosineSimilarity,
+  ensureEmbeddingIndex,
+  isEmbeddingsEnabled,
+  parseEmbedding,
+} from "./embeddings.ts";
 import type { SearchIndexKind } from "./indexers/base.ts";
 
 export interface SearchQueryInput {
@@ -20,6 +27,7 @@ export interface SearchQueryInput {
   limit?: number;
   offset?: number;
   now?: Date;
+  embedQuery?: EmbedText;
 }
 
 export interface SearchResult {
@@ -53,6 +61,7 @@ type Where = {
   sql: string;
   params: SqlValue[];
   hasQuery: boolean;
+  query: string;
 };
 
 const DEFAULT_LIMIT = 20;
@@ -133,7 +142,12 @@ function buildWhere(input: SearchQueryInput): Where {
     sql: clauses.join(" AND "),
     params,
     hasQuery: query !== "",
+    query,
   };
+}
+
+function buildHybridWhere(input: SearchQueryInput): Where {
+  return buildWhere({ ...input, q: undefined });
 }
 
 function baseScoreSql(where: Where, nowParamIndex: number): string {
@@ -203,6 +217,47 @@ function resultsSql(where: Where, nowParamIndex: number, limitParamIndex: number
   `;
 }
 
+function hybridResultsSql(where: Where, originalWhere: Where, nowParamIndex: number): string {
+  return `
+    WITH ranked AS (
+      SELECT
+        id,
+        org_id,
+        project_id,
+        source_kind,
+        source_id,
+        title,
+        body,
+        labels,
+        metadata,
+        embedding,
+        updated_at,
+        (${baseScoreSql(originalWhere, nowParamIndex)})::float8 AS bm25_score,
+        row_number() OVER (
+          PARTITION BY org_id, source_kind, source_id
+          ORDER BY updated_at DESC, id DESC
+        ) AS dedupe_rank
+      FROM search_documents
+      WHERE ${where.sql}
+    )
+    SELECT
+      id,
+      org_id,
+      project_id,
+      source_kind,
+      source_id,
+      title,
+      body,
+      labels,
+      metadata,
+      embedding,
+      updated_at,
+      bm25_score
+    FROM ranked
+    WHERE dedupe_rank = 1
+  `;
+}
+
 async function facetCount(
   db: ProductDb,
   where: Where,
@@ -259,11 +314,96 @@ function normalizeRow(row: {
   };
 }
 
+function normalizeHybridRow(
+  row: {
+    id: string;
+    org_id: string;
+    project_id: string | null;
+    source_kind: string;
+    source_id: string;
+    title: string;
+    body: string;
+    labels: string[];
+    metadata: Record<string, unknown>;
+    updated_at: Date | string;
+  },
+  score: number,
+): SearchResult {
+  return normalizeRow({ ...row, score });
+}
+
+async function queryHybridSearchDocuments(
+  db: ProductDb,
+  input: SearchQueryInput,
+  where: Where,
+): Promise<SearchQueryOutput> {
+  await ensureEmbeddingIndex(db);
+
+  const hybridWhere = buildHybridWhere(input);
+  const now = (input.now ?? new Date()).toISOString();
+  const nowParamIndex = hybridWhere.params.length + 1;
+  const queryVector = input.embedQuery ? await input.embedQuery(where.query) : [];
+  const rows = await db.query<{
+    id: string;
+    org_id: string;
+    project_id: string | null;
+    source_kind: string;
+    source_id: string;
+    title: string;
+    body: string;
+    labels: string[];
+    metadata: Record<string, unknown>;
+    embedding: string | number[] | null;
+    updated_at: Date | string;
+    bm25_score: number;
+  }>(hybridResultsSql(hybridWhere, where, nowParamIndex), [...hybridWhere.params, now]);
+
+  const maxBm25 = Math.max(...rows.map((row) => Number(row.bm25_score)), 0);
+  const scored = rows
+    .map((row) => {
+      const normalizedBm25 = maxBm25 > 0 ? Number(row.bm25_score) / maxBm25 : 0;
+      const embedding = parseEmbedding(row.embedding);
+      const semanticScore = embedding ? cosineSimilarity(queryVector, embedding) : 0;
+      return {
+        row,
+        score: 0.6 * normalizedBm25 + 0.4 * semanticScore,
+      };
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => {
+      if (right.score !== left.score) return right.score - left.score;
+      const updatedAt = new Date(right.row.updated_at).getTime() - new Date(left.row.updated_at).getTime();
+      if (updatedAt !== 0) return updatedAt;
+      return left.row.id.localeCompare(right.row.id);
+    });
+
+  const offset = offsetValue(input.offset);
+  const limit = clampLimit(input.limit);
+  const page = scored.slice(offset, offset + limit);
+  const [kind, docType, status, assigneeId, repoId, authorId] = await Promise.all([
+    facetCount(db, hybridWhere, "source_kind"),
+    facetCount(db, hybridWhere, "metadata ->> 'doc_type'"),
+    facetCount(db, hybridWhere, "metadata ->> 'status'"),
+    facetCount(db, hybridWhere, "metadata ->> 'assignee_id'"),
+    facetCount(db, hybridWhere, "metadata ->> 'repo_id'"),
+    facetCount(db, hybridWhere, "metadata ->> 'author_id'"),
+  ]);
+
+  return {
+    results: page.map((entry) => normalizeHybridRow(entry.row, entry.score)),
+    total: scored.length,
+    facetCounts: { kind, docType, status, assigneeId, repoId, authorId },
+  };
+}
+
 export async function querySearchDocuments(
   db: ProductDb,
   input: SearchQueryInput,
 ): Promise<SearchQueryOutput> {
   const where = buildWhere(input);
+  if (where.hasQuery && isEmbeddingsEnabled()) {
+    return queryHybridSearchDocuments(db, input, where);
+  }
   const now = (input.now ?? new Date()).toISOString();
   const limit = clampLimit(input.limit);
   const offset = offsetValue(input.offset);

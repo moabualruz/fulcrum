@@ -9,6 +9,7 @@ import {
   IndexerRegistry,
   SearchIndexHook,
   type SearchDocumentInput,
+  type SearchIndexHookOptions,
 } from "../../src/search/indexers/base.ts";
 import type { ProductDb } from "../../src/product-kernel/db/types.ts";
 
@@ -21,8 +22,8 @@ afterAll(() => {
 class TaskSearchIndexHook extends SearchIndexHook {
   override readonly kind = "task";
 
-  constructor(db: ProductDb) {
-    super(db);
+  constructor(db: ProductDb, options: SearchIndexHookOptions = {}) {
+    super(db, options);
   }
 
   protected override async buildDocument(entityId: string, orgId: string): Promise<SearchDocumentInput> {
@@ -45,6 +46,7 @@ class TaskSearchIndexHook extends SearchIndexHook {
 async function freshDb(name: string) {
   const db = await openPglite(join(scratch, name));
   await runMigrations(db);
+  await db.exec(`ALTER TABLE search_documents ADD COLUMN IF NOT EXISTS embedding text NULL`);
   const org = await createLocalOrg(db, { slug: name, name });
   return { db, org };
 }
@@ -155,6 +157,62 @@ describe("P11#02 search indexer hook base", () => {
         { kind: "task", entityId: `${org.id}-task-2`, orgId: org.id },
       ]);
     } finally {
+      await db.close();
+    }
+  });
+
+  test("embeddings flag defaults OFF so upsert leaves embedding NULL and does not call sidecar", async () => {
+    const { db, org } = await freshDb("embeddings-off-upsert");
+    const previousFeatures = process.env["FULCRUM_FEATURES"];
+    delete process.env["FULCRUM_FEATURES"];
+    let calls = 0;
+    try {
+      const hook = new TaskSearchIndexHook(db, {
+        embedText: async () => {
+          calls += 1;
+          return [0.1, 0.2];
+        },
+      });
+
+      await hook.upsert("task-embedding-off", org.id);
+
+      const rows = await db.query<{ embedding: string | null }>(
+        `SELECT embedding FROM search_documents WHERE source_kind = $1 AND source_id = $2`,
+        ["task", "task-embedding-off"],
+      );
+      expect(calls).toBe(0);
+      expect(rows[0]?.embedding).toBeNull();
+    } finally {
+      if (previousFeatures === undefined) delete process.env["FULCRUM_FEATURES"];
+      else process.env["FULCRUM_FEATURES"] = previousFeatures;
+      await db.close();
+    }
+  });
+
+  test("embeddings flag ON calls sidecar and writes embedding vector", async () => {
+    const { db, org } = await freshDb("embeddings-on-upsert");
+    const previousFeatures = process.env["FULCRUM_FEATURES"];
+    process.env["FULCRUM_FEATURES"] = "embeddings";
+    const embeddedTexts: string[] = [];
+    try {
+      const hook = new TaskSearchIndexHook(db, {
+        embedText: async (text) => {
+          embeddedTexts.push(text);
+          return [0.1, 0.2];
+        },
+      });
+
+      await hook.upsert("task-embedding-on", org.id);
+
+      const rows = await db.query<{ embedding: string | null }>(
+        `SELECT embedding FROM search_documents WHERE source_kind = $1 AND source_id = $2`,
+        ["task", "task-embedding-on"],
+      );
+      expect(embeddedTexts).toEqual(["Task task-embedding-on\n\nkernel search body"]);
+      expect(rows[0]?.embedding).toBe("[0.1,0.2]");
+    } finally {
+      if (previousFeatures === undefined) delete process.env["FULCRUM_FEATURES"];
+      else process.env["FULCRUM_FEATURES"] = previousFeatures;
       await db.close();
     }
   });

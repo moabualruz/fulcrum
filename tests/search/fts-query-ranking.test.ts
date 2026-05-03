@@ -17,6 +17,7 @@ afterAll(() => {
 async function freshDb(name: string) {
   const db = await openPglite(join(scratch, name));
   await runMigrations(db);
+  await db.exec(`ALTER TABLE search_documents ADD COLUMN IF NOT EXISTS embedding text NULL`);
   return db;
 }
 
@@ -32,13 +33,14 @@ async function insertDoc(
     body?: string;
     labels?: readonly string[];
     metadata?: Record<string, unknown>;
+    embedding?: readonly number[] | null;
     updatedAt?: string;
   },
 ) {
   await db.query(
     `INSERT INTO search_documents
-       (id, org_id, project_id, source_kind, source_id, title, body, labels, metadata, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text[], $9::jsonb, $10::timestamptz)`,
+       (id, org_id, project_id, source_kind, source_id, title, body, labels, metadata, embedding, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text[], $9::jsonb, $10, $11::timestamptz)`,
     [
       input.id,
       input.orgId ?? "org-search",
@@ -49,6 +51,7 @@ async function insertDoc(
       input.body ?? "",
       `{${(input.labels ?? []).join(",")}}`,
       JSON.stringify(input.metadata ?? {}),
+      input.embedding === undefined ? null : JSON.stringify(input.embedding),
       input.updatedAt ?? "2026-05-03T00:00:00.000Z",
     ],
   );
@@ -241,6 +244,81 @@ describe("P11#05 FTS query + ranking", () => {
         "repo:repo-older",
       ]);
     } finally {
+      await db.close();
+    }
+  });
+
+  test("embeddings flag defaults OFF and keeps BM25-only ranking even when embeddings exist", async () => {
+    const db = await freshDb("embeddings-off-ranking");
+    const previousFeatures = process.env["FULCRUM_FEATURES"];
+    delete process.env["FULCRUM_FEATURES"];
+    try {
+      await insertDoc(db, {
+        id: "exact",
+        kind: "doc",
+        entityId: "exact",
+        title: "Deploy to production",
+        embedding: [0, 1],
+      });
+      await insertDoc(db, {
+        id: "semantic",
+        kind: "doc",
+        entityId: "semantic",
+        title: "Release pipeline",
+        body: "Ship build",
+        embedding: [1, 0],
+      });
+
+      const result = await querySearchDocuments(db, {
+        orgId: "org-search",
+        q: "deploy production",
+        embedQuery: async () => [1, 0],
+      });
+
+      expect(result.results.map((row) => row.id)).toEqual(["exact"]);
+    } finally {
+      if (previousFeatures === undefined) delete process.env["FULCRUM_FEATURES"];
+      else process.env["FULCRUM_FEATURES"] = previousFeatures;
+      await db.close();
+    }
+  });
+
+  test("embeddings flag ON uses hybrid scoring so semantic matches can outrank exact text matches", async () => {
+    const db = await freshDb("embeddings-hybrid-ranking");
+    const previousFeatures = process.env["FULCRUM_FEATURES"];
+    process.env["FULCRUM_FEATURES"] = "embeddings";
+    try {
+      await insertDoc(db, {
+        id: "exact",
+        kind: "doc",
+        entityId: "exact",
+        title: "Deploy to production",
+        body: "Run command",
+        embedding: [0, 1],
+      });
+      await insertDoc(db, {
+        id: "semantic",
+        kind: "doc",
+        entityId: "semantic",
+        title: "Release pipeline",
+        body: "Promote build through rollout gates",
+        embedding: [1, 0],
+      });
+
+      const result = await querySearchDocuments(db, {
+        orgId: "org-search",
+        q: "deploy production",
+        embedQuery: async (query) => {
+          expect(query).toBe("deploy production");
+          return [1, 0];
+        },
+      });
+
+      expect(result.results.map((row) => row.id)).toEqual(["semantic", "exact"]);
+      expect(result.results[0]!.score).toBeGreaterThan(result.results[1]!.score);
+    } finally {
+      if (previousFeatures === undefined) delete process.env["FULCRUM_FEATURES"];
+      else process.env["FULCRUM_FEATURES"] = previousFeatures;
       await db.close();
     }
   });
