@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: tui
 Blocked-by: [15/issues/04-dashboard-and-projects.md]
