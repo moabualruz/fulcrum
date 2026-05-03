@@ -79,8 +79,13 @@ export function createSprintsCommand(): Command {
   getCommand.description("sprints get");
   getCommand.option("--json", "Emit JSON output");
   getCommand.option("--id <string>", "id");
+  getCommand.option("--active", "Get the currently active sprint");
+  getCommand.option("--project <string>", "Project ID to scope the query");
   getCommand.action(async (options) => {
     try {
+      if (options.active) {
+        throw new Error("Generated tRPC invocation for sprints.getActive is not wired yet.");
+      }
       throw new Error("Generated tRPC invocation for sprints.get is not wired yet.");
     } catch (error) {
       if (options.json === true) {

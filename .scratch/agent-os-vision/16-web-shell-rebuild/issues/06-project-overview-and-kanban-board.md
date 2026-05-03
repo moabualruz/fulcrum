@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/05-dashboard-and-projects-list.md, 06-tasks-and-scrum/issues/02-task-status-engine.md]
@@ -8,6 +8,8 @@ Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 16 section)
 Decisions: [C4, Q36, Q9]
 Vision: .scratch/agent-os-vision/VISION-GAPS.md (row: "Jira-grade task management — only kanban drag")
 Docs: https://github.com/isaacHagoel/svelte-dnd-action
+ImplCommit: pending
+ImplRuntime: codex
 ---
 
 # Project overview (/projects/[id]) + Kanban board (/projects/[id]/board)
@@ -20,11 +22,11 @@ Cuts through: `tasks.list(projectId, statusFilter)` tRPC → Kanban rendered →
 
 ## Acceptance criteria
 
-- [ ] `/projects/[id]` tabs render; each navigates correct sub-route; summary counts match `tasks.list` aggregate.
+- [x] `/projects/[id]` tabs render; each navigates correct sub-route; summary counts match `tasks.list` aggregate.
 - [ ] Kanban: 200 tasks × 7 columns cold load < 300ms (Playwright performance assertion).
-- [ ] Drag card: `onconsider` shows ghost; `onfinalize` calls `tasks.update`; `TaskRepository` state updated; event service records `verb='status_changed'`.
-- [ ] Swimlane toggle: assignee mode groups cards by assignee; label mode groups by first label; none = flat column.
-- [ ] Sprint filter chip: filters board to sprint_id; "All" clears filter.
+- [x] Drag card: `onconsider` shows ghost; `onfinalize` calls `tasks.update`; `TaskRepository` state updated; event service records `verb='status_changed'`.
+- [x] Swimlane toggle: assignee mode groups cards by assignee; label mode groups by first label; none = flat column.
+- [x] Sprint filter chip: filters board to sprint_id; "All" clears filter.
 - [ ] Failure gate: if `svelte-dnd-action` Svelte 5 `onconsider`/`onfinalize` API breaks → `pragmatic-drag-and-drop` fallback; test verifies same board behavior.
 - [ ] Playwright: drag card from "todo" to "in_review" → status badge updates; no extra network requests after move.
 - [ ] CLI: `fulcrum task list --project <id> --json` returns same tasks (parity).

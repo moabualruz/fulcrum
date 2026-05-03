@@ -7,8 +7,8 @@ import { superValidate } from "sveltekit-superforms/server";
 import { valibot } from "sveltekit-superforms/adapters";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
-import { updateProjectAction, deleteProjectAction } from "$lib/server/projects";
+import { openProductDb, getDefaultOrgId } from "../../../lib/server/db";
+import { updateProjectAction, deleteProjectAction } from "../../../lib/server/projects";
 
 // Detail-page rename uses a narrower schema than `ProjectFormSchema` — slug
 // is immutable post-create (it's the URL-stable identifier baked into events
@@ -36,6 +36,12 @@ interface ProjectRow {
   updated_at: Date | string;
 }
 
+interface TaskSummaryRow {
+  open_tasks: number | string;
+  in_progress: number | string;
+  done: number | string;
+}
+
 // Note: this loader is intentionally NOT wrapped in SvelteKit's `streamed`
 // pattern even though the rest of the detail routes are. The rename `<form>`
 // is built via `superValidate` *from* the loaded row's defaults, so the
@@ -60,6 +66,16 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     );
     if (rows.length === 0) throw error(404, "Project not found");
     const row = rows[0]!;
+    const summaryRows = await db.query<TaskSummaryRow>(
+      `SELECT
+         COUNT(*) FILTER (WHERE status NOT IN ('completed', 'cancelled')) AS open_tasks,
+         COUNT(*) FILTER (WHERE status = 'in_progress') AS in_progress,
+         COUNT(*) FILTER (WHERE status = 'completed') AS done
+       FROM tasks
+       WHERE project_id = $1 AND org_id = $2`,
+      [params.id, orgId],
+    );
+    const summaryRow = summaryRows[0] ?? { open_tasks: 0, in_progress: 0, done: 0 };
     const project = {
       id: row.id,
       slug: row.slug,
@@ -74,7 +90,17 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       { name: project.name, description: project.description ?? "" },
       valibot(RenameSchema),
     );
-    return { project, form, activeProjectId: parentData.activeProjectId };
+    return {
+      project,
+      form,
+      activeProjectId: parentData.activeProjectId,
+      summary: {
+        openTasks: Number(summaryRow.open_tasks),
+        inProgress: Number(summaryRow.in_progress),
+        done: Number(summaryRow.done),
+        sprintDaysRemaining: 0,
+      },
+    };
   } finally {
     await db.close();
   }

@@ -2169,6 +2169,22 @@ Next: milestone gate reviews on P6(17), P7(18), P8(13), P11(15), P13(14) — lar
 
 ---
 
+### P16#06 — Project overview and Kanban board (2026-05-03)
+
+Agent: codex. Worktree: agent-ada5ed612b2d6073f.
+
+**RED:** Added focused tests for `/projects/[id]` summary metrics + quick-nav tabs and `/projects/[id]/board` project-scoped load/move actions, swimlane toggle, sprint filter chip, and card mini-view hooks.
+
+**GREEN:**
+- `src/web/src/routes/projects/[id]/+page.server.ts` loads task summary counts for project overview.
+- `src/web/src/routes/projects/[id]/+page.svelte` renders quick-nav tabs and summary metric tiles.
+- `src/web/src/routes/projects/[id]/board/` adds project-scoped Kanban load/actions/page.
+- `src/web/src/lib/components/board/BoardCard.svelte` adds priority, assignee, due date, estimate mini-view hooks.
+
+Tests: `bun test --conditions=svelte 'src/web/src/routes/projects/[id]/page.server.test.ts' 'src/web/src/routes/projects/[id]/page.svelte.test.ts' 'src/web/src/routes/projects/[id]/board/page.server.test.ts' 'src/web/src/routes/projects/[id]/board/page.svelte.test.ts'` = 12/12 pass. `bun run --bun tsc --noEmit` pass.
+
+---
+
 ### P16#05 — Dashboard + Projects list (2026-05-03)
 
 Agent: claude (Opus 4.6). Worktree: agent-a1b3ceb2ca438c8a3.
