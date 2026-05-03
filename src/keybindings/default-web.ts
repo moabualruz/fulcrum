@@ -1,6 +1,6 @@
 import type { KeybindingMap } from "./schema";
 
-export const DEFAULT_WEB_KEYBINDINGS: KeybindingMap = {
+export const DEFAULT_WEB_KEYBINDINGS: Partial<KeybindingMap> = {
 	"palette.open": { context: "global", key: "Mod+K" },
 	"navigate.search": { context: "navigation", key: "/" },
 	"navigate.back": { context: "navigation", key: "Alt+ArrowLeft" },
