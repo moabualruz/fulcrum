@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplRuntime: claude
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/06-project-overview-and-kanban-board.md, 06-tasks-and-scrum/issues/03-task-detail-and-custom-fields.md]
@@ -20,15 +21,15 @@ Cuts through: `tasks.get(id)` tRPC → all sections render → TipTap loads desc
 
 ## Acceptance criteria
 
-- [ ] Modal pattern: card click updates URL + opens modal overlay; Esc closes; direct URL renders full-page (both tested in Playwright).
-- [ ] All sections render with seed data: description (TipTap JSON), 3 subtasks, 1 blocked-by, assignee, due, priority, labels, sprint, 2 custom fields, 2 comments, 5 activity events, 1 attachment.
-- [ ] Autosave: type in description → 1000ms debounce → `tasks.update` called → "Saved" indicator.
-- [ ] Keyboard shortcuts: `e`, `a`, `s`, `p`, `d`, `l` each trigger overlay; `Esc` closes; no conflict with system shortcuts.
-- [ ] Bulk ops: shift+click 5 tasks → floating bar shows count; bulk status → all 5 updated; bulk delete → confirmation dialog → all deleted.
-- [ ] `view=table`: TanStack Table sorts; `view=calendar`: task appears on due date, drag reschedules; `view=timeline`: svelte-gantt dependency arrows render.
-- [ ] Saved view: build filter (status=open + assignee=me), save, refresh → filter restored from `saved_views` tRPC.
-- [ ] Playwright: create task, open detail, edit description, add comment, close.
-- [ ] CLI: `fulcrum task get <id> --json`; `fulcrum task update <id> --status in_review --json`.
+- [x] Modal pattern: card click updates URL + opens modal overlay; Esc closes; direct URL renders full-page (both tested in Playwright).
+- [x] All sections render with seed data: description (TipTap JSON), 3 subtasks, 1 blocked-by, assignee, due, priority, labels, sprint, 2 custom fields, 2 comments, 5 activity events, 1 attachment.
+- [x] Autosave: type in description → 1000ms debounce → `tasks.update` called → "Saved" indicator.
+- [x] Keyboard shortcuts: `e`, `a`, `s`, `p`, `d`, `l` each trigger overlay; `Esc` closes; no conflict with system shortcuts.
+- [x] Bulk ops: shift+click 5 tasks → floating bar shows count; bulk status → all 5 updated; bulk delete → confirmation dialog → all deleted.
+- [x] `view=table`: TanStack Table sorts; `view=calendar`: task appears on due date, drag reschedules; `view=timeline`: svelte-gantt dependency arrows render.
+- [x] Saved view: build filter (status=open + assignee=me), save, refresh → filter restored from `saved_views` tRPC.
+- [x] Playwright: create task, open detail, edit description, add comment, close.
+- [x] CLI: `fulcrum task get <id> --json`; `fulcrum task update <id> --status in_review --json`.
 
 ## Blocked by
 
