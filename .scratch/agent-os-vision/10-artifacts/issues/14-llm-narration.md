@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplRuntime: claude
 Triage: AFK
 Pillar: artifacts
 Blocked-by: [03-harvest-pipeline.md, 06-trpc-procedures.md]
@@ -19,12 +20,12 @@ PRD: `.scratch/agent-os-vision/prds/10-artifacts.md` (Gated features: report-llm
 Post-harvest hook in `src/artifacts/narration.ts`: when `FULCRUM_FEATURES=report-llm-narration` ON and inference sidecar running, call sidecar with artifact filename + first 2000 chars of content; write plain-language description/summary into `artifacts.metadata_json.narration`. Triggered as a graphile-worker follow-on job `artifact.narrate` after `artifact.harvest` completes. Web artifact detail page shows narration when present. Flag OFF → zero inference calls, no narration field, no error.
 
 ## Acceptance criteria
-- [ ] Schema migration: no new columns; `artifacts.metadata_json` is `jsonb NOT NULL DEFAULT '{}'`; narration written as `metadata_json.narration: string`.
-- [ ] tRPC procedure / module: `artifacts.get` includes `metadata_json.narration` when present; `artifacts.list` does not include narration (performance).
+- [x] Schema migration: no new columns; `artifacts.metadata_json` is `jsonb NOT NULL DEFAULT '{}'`; narration written as `metadata_json.narration: string`.
+- [x] tRPC procedure / module: `artifacts.get` includes `metadata_json.narration` when present; `artifacts.list` does not include narration (performance).
 - [ ] Web surface: `/artifacts/<id>` detail page shows "Summary" card with narration text when `metadata_json.narration` set; card absent when not set.
 - [ ] CLI command: `fulcrum artifacts show <id> --json` includes `metadata_json.narration` field when set.
 - [ ] TUI screen: Artifacts detail overlay shows narration line when present.
-- [ ] Tests: flag ON + sidecar mock → `metadata_json.narration` populated with non-empty string; flag OFF → zero inference sidecar calls, `narration` field absent; sidecar timeout (>5s) → graceful skip (no narration, no job failure); RED→GREEN.
+- [x] Tests: flag ON + sidecar mock → `metadata_json.narration` populated with non-empty string; flag OFF → zero inference sidecar calls, `narration` field absent; sidecar timeout (>5s) → graceful skip (no narration, no job failure); RED→GREEN.
 
 ## Blocked by
 - `03-harvest-pipeline.md` — harvest must complete before narration job enqueued.
