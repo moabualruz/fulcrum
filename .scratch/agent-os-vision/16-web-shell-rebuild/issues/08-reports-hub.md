@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplRuntime: claude
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/07-backlog-sprints-and-sprint-board.md, 06-tasks-and-scrum/issues/05-burndown-and-metrics-cache.md]
@@ -20,10 +21,10 @@ Cuts through: `metrics.burndown(projectId, sprintId)` tRPC → `metrics_cache` q
 
 ## Acceptance criteria
 
-- [ ] Burndown: ideal line + actual from `metrics_cache`; sprint selector filters to specific sprint; chart updates without page reload.
-- [ ] Velocity: bar chart with 3-sprint window; correct story-point sums per sprint.
-- [ ] Cycle-time: histogram bins with correct day counts; p50/p90 annotated.
-- [ ] Throughput / WIP / CFD: each renders from correct tRPC query; no blank chart on empty data (shows "No data yet" state).
+- [x] Burndown: ideal line + actual from `metrics_cache`; sprint selector filters to specific sprint; chart updates without page reload.
+- [x] Velocity: bar chart with 3-sprint window; correct story-point sums per sprint.
+- [x] Cycle-time: histogram bins with correct day counts; p50/p90 annotated.
+- [x] Throughput / WIP / CFD: each renders from correct tRPC query; no blank chart on empty data (shows "No data yet" state).
 - [ ] Failure gate: if LayerChart type missing → `Chart.js` fallback; same data shape; same visual tests pass.
 - [ ] Playwright: load `/projects/[id]/reports` → all 6 chart tabs render without error; burndown has ≥1 data point on seeded sprint.
 - [ ] CLI: `fulcrum report burndown --project <id> --sprint <sid> --json` returns same data.
