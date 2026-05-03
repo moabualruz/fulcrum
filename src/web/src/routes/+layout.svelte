@@ -1,13 +1,15 @@
 <script lang="ts">
-	import { onDestroy, onMount } from "svelte";
 	import type { Snippet } from "svelte";
-	import { ModeWatcher, toggleMode } from "mode-watcher";
+	import { ModeWatcher } from "mode-watcher";
 	import { Toaster } from "svelte-sonner";
 
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
 	import favicon from "$lib/assets/favicon.svg";
 	import { toastFromForm } from "$lib/feedback/use-form-toast";
+	import { installKeybindingDispatcher } from "$lib/keybindings";
+	import { installGlobalErrorHandler } from "$lib/telemetry";
+	import { useTheme } from "$lib/theme";
 	import AppSidebar from "$lib/components/app/AppSidebar.svelte";
 	import AppTopbar from "$lib/components/app/AppTopbar.svelte";
 	import CommandPalette from "$lib/components/command-palette/CommandPalette.svelte";
@@ -19,7 +21,6 @@
 		isMobileViewport,
 	} from "$lib/util/media-query";
 	import { cn } from "$lib/utils.js";
-	import { BellCounterPoll, type BellCounterItem } from "../../../notifications/bell-counter-poll";
 
 	import "../app.css";
 	import type { LayoutData } from "./$types";
@@ -34,9 +35,7 @@
 	let mobile = $state(isMobileViewport(browserDriver()));
 	let sheetOpen = $state(false);
 	let paletteOpen = $state(false);
-	let bellCount = $state(0);
-	let bellItems = $state<BellCounterItem[]>([]);
-	let bellPoll: BellCounterPoll<ReturnType<typeof setInterval>> | null = null;
+	let theme = $derived(useTheme(data.theme));
 
 	const paletteItems = [
 		{ id: "home",     label: "Dashboard",  href: "/" },
@@ -63,51 +62,24 @@
 		toastFromForm(page.form as Parameters<typeof toastFromForm>[0]);
 	});
 
-	async function trpc<T>(procedure: string, input: unknown, method: "GET" | "POST" = "POST"): Promise<T> {
-		const response = await fetch(`/api/trpc/${procedure}`, {
-			method,
-			headers: { "content-type": "application/json" },
-			body: JSON.stringify({ json: input }),
-		});
-		if (!response.ok) throw new Error(await response.text());
-		const payload = await response.json();
-		return (payload.result?.data?.json ?? payload.result?.data ?? payload.json ?? payload) as T;
-	}
-
-	onMount(() => {
-		bellPoll = new BellCounterPoll<ReturnType<typeof setInterval>>({
-			realtimeEnabled: false,
-			unreadCount: () => trpc("notify.unreadCount", {}),
-			listUnread: (input) => trpc("notify.list", input),
-			markAllRead: () => trpc("notify.markAllRead", {}),
-			onCount: (count) => {
-				bellCount = count;
-			},
-		});
-		void bellPoll.start();
-	});
-
-	onDestroy(() => {
-		bellPoll?.stop();
-	});
-
 	$effect(() => {
-		if (page.url.pathname === "/inbox" && bellCount > 0) {
-			void bellPoll?.clearForInboxVisit();
-		}
+		return installKeybindingDispatcher({
+			overrides: data.keybindingOverrides,
+			openPalette: () => (paletteOpen = true),
+			closePalette: () => (paletteOpen = false),
+			performance: globalThis.performance,
+		});
 	});
 
-	async function openBell(): Promise<void> {
-		const unread = await bellPoll?.openDropdown();
-		bellItems = unread?.items ?? [];
-	}
+	$effect(() => installGlobalErrorHandler());
 </script>
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
+	{@html `<style>:root { ${theme.style} }</style>`}
 </svelte:head>
 
-<ModeWatcher />
+<ModeWatcher defaultMode={theme.mode === "auto" ? "system" : theme.mode} />
 <Toaster richColors closeButton position="top-right" />
 
 <CommandPalette
@@ -119,7 +91,7 @@
 	}}
 />
 
-<div class={cn("flex min-h-screen bg-background text-foreground")}>
+<div class={cn("flex min-h-screen bg-background text-foreground")} data-mode={theme.dataMode}>
 	{#if mobile}
 		<Sheet.Root bind:open={sheetOpen}>
 			<Sheet.Content side="left" class="w-64 p-0">
@@ -141,10 +113,7 @@
 						<AppTopbar
 							pathname={page.url.pathname}
 							activeProjectId={data.activeProjectId}
-							bellCount={bellCount}
-							bellItems={bellItems}
-							onBellOpen={() => void openBell()}
-							onThemeToggle={toggleMode}
+							onThemeToggle={() => theme.setMode(theme.mode === "dark" ? "light" : "dark")}
 						/>
 					</div>
 				</div>
@@ -163,10 +132,7 @@
 					<AppTopbar
 						pathname={page.url.pathname}
 						activeProjectId={data.activeProjectId}
-						bellCount={bellCount}
-						bellItems={bellItems}
-						onBellOpen={() => void openBell()}
-						onThemeToggle={toggleMode}
+						onThemeToggle={() => theme.setMode(theme.mode === "dark" ? "light" : "dark")}
 					/>
 				</div>
 			</div>

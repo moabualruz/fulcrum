@@ -1,14 +1,55 @@
 import type { LayoutServerLoad } from "./$types";
+import { getThemeCookieValue, normalizeMode, type ThemeSettings } from "../lib/theme";
+import type { KeybindingOverrides } from "../lib/keybindings";
 
-export const load: LayoutServerLoad = async ({ locals }) => {
-  // TODO(P1#04 / Pillar 13 tRPC wiring / Pillar 16 web shell rebuild):
-  // Wire idempotent SeedService.run() here once web owns event.locals.container.
-  // Direct cross-package import from "../../../db/seed.ts" previously produced
-  // a Vite SSR bundle SyntaxError, and dynamic import is not clean until the
-  // web shell has the DI lifecycle. See:
-  // .scratch/agent-os-vision/01-foundation-reset/issues/04-local-org-seed-and-init.md
-  // User impact: web-only users who never run CLI will not have the local org
-  // bootstrapped on first request; until Pillar 13/16 lands, they MUST run
-  // `fulcrum init` first.
-  return { activeProjectId: locals.activeProjectId };
+export const load: LayoutServerLoad = async ({ locals, request }) => {
+  if (request === undefined) return { activeProjectId: locals.activeProjectId };
+
+  const theme = await readTheme(locals.container, request.headers.get("cookie"));
+  const keybindingOverrides = await readKeybindingOverrides(locals.container);
+  const featureFlags = await readFeatureFlags(locals.container);
+
+  return {
+    activeProjectId: locals.activeProjectId,
+    theme,
+    keybindingOverrides,
+    featureFlags,
+  };
 };
+
+async function readTheme(container: App.Locals["container"], cookieHeader: string | null): Promise<ThemeSettings> {
+  const cookieMode = getThemeCookieValue(cookieHeader);
+  const service = resolveService(container, "ThemeService");
+  const result = await callOptional<{ mode?: unknown; vars?: Record<string, string> }>(service, "get");
+
+  return {
+    mode: cookieMode ?? normalizeMode(result?.mode),
+    vars: result?.vars ?? {},
+  };
+}
+
+async function readKeybindingOverrides(container: App.Locals["container"]): Promise<KeybindingOverrides> {
+  const service = resolveService(container, "KeybindingService");
+  const result = await callOptional<KeybindingOverrides>(service, "getOverrides");
+  return result ?? {};
+}
+
+async function readFeatureFlags(container: App.Locals["container"]): Promise<Record<string, boolean>> {
+  const service = resolveService(container, "FeatureFlagService");
+  const result = await callOptional<Record<string, boolean>>(service, "getAll");
+  return result ?? {};
+}
+
+function resolveService(container: App.Locals["container"], token: string): unknown {
+  try {
+    return container?.get(token);
+  } catch {
+    return undefined;
+  }
+}
+
+async function callOptional<T>(service: unknown, method: string): Promise<T | undefined> {
+  const fn = (service as Record<string, unknown> | undefined)?.[method];
+  if (typeof fn !== "function") return undefined;
+  return (await fn.call(service)) as T;
+}
