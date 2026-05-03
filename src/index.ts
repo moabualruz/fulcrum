@@ -39,6 +39,8 @@ Usage:
                                      Show component details and surfaces.
   fulcrum component plan <install|remove|enable|disable> <component> [--agent <id>] [--all-agents] [--json]
                                      Plan component changes without applying them.
+  fulcrum artifacts <verb> [--json]   Manage artifacts (list, show, upload, download, attach,
+                                     detach, archive, unarchive, delete, prune).
   fulcrum product init [--json]      Initialise the local product kernel (PGlite + migrations).
   fulcrum product projects list [--json]
                                      List product-kernel projects.
@@ -118,6 +120,13 @@ async function main() {
     case "component": {
       const { run: runComponent } = await import("./cli/component.ts");
       await runComponent(rest);
+      return;
+    }
+    case "artifacts": {
+      const { run: runArtifacts } = await import("./cli/artifacts.ts");
+      // Until Pillar 14 codegen lands, caller must provide a client.
+      // For now, print help — real client wired when tRPC transport ready.
+      await runArtifacts(rest, undefined as never);
       return;
     }
     case "product": {
