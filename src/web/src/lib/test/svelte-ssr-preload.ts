@@ -9,26 +9,20 @@
 import { plugin } from "bun";
 import { compile, compileModule } from "svelte/compiler";
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
-const cwd = process.cwd();
-const webRoot = cwd.endsWith("/src/web") ? cwd : join(cwd, "src/web");
-const webSrc = join(webRoot, "src");
-
-function resolveModulePath(path: string): string {
-  if (existsSync(path)) return path;
-  for (const ext of [".ts", ".js", ".svelte"]) {
-    if (existsSync(`${path}${ext}`)) return `${path}${ext}`;
-  }
-  return path;
-}
+const webRoot = join(import.meta.dir, "../..");
 
 plugin({
   name: "svelte-ssr-loader",
   setup(build) {
-    build.onResolve({ filter: /^\$lib\// }, (args) => ({
-      path: resolveModulePath(resolve(webSrc, args.path.replace(/^\$lib\//, "lib/"))),
-    }));
+    build.onResolve({ filter: /^\$lib\// }, (args) => {
+      const path = join(webRoot, "lib", args.path.slice("$lib/".length));
+      if (path.endsWith(".js") && existsSync(path.slice(0, -3) + ".ts")) {
+        return { path: path.slice(0, -3) + ".ts" };
+      }
+      return { path };
+    });
     build.onLoad({ filter: /\.svelte$/ }, (args) => {
       const source = readFileSync(args.path, "utf8");
       const { js } = compile(source, {

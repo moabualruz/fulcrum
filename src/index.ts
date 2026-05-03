@@ -46,7 +46,9 @@ Usage:
                                      Run an FTS query over the product kernel search index.
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
                                      Render the assembled Markdown context for a task.
-  fulcrum tui                        Launch interactive TUI (repos browser, tasks, runs).
+  fulcrum agent run --task <id> [--agent <id>] [--json]
+                                     Queue a local agent run for a task.
+  fulcrum artifact list [--json]    List product-kernel artifacts.
   fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
   fulcrum version                    Print version.
   fulcrum help                       This message.
@@ -123,14 +125,14 @@ async function main() {
       await runProduct(rest);
       return;
     }
-    case "tui": {
-      const { runTui } = await import("./tui/app.ts");
-      await runTui(rest);
+    case "agent": {
+      const { run: runAgent } = await import("./cli/agent.ts");
+      await runAgent(rest);
       return;
     }
-    case "symphony": {
-      const { run: runSymphony } = await import("./cli/commands/symphony.ts");
-      await runSymphony(rest);
+    case "artifact": {
+      const { run: runArtifact } = await import("./cli/artifact.ts");
+      await runArtifact(rest);
       return;
     }
     case "version":

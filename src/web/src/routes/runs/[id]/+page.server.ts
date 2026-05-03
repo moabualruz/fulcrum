@@ -2,6 +2,7 @@ import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { openProductDb, getDefaultOrgId } from "$lib/server/db";
 import { cancelRunAction, retryRunAction, type RunStatus } from "$lib/server/runs";
+import { listArtifactsForRun } from "$lib/server/artifacts";
 import { actionOk } from "$lib/feedback/action-result";
 
 interface AgentRunDetail {
@@ -87,8 +88,12 @@ export const load: PageServerLoad = ({ params, locals }) => {
             ...e,
             created_at: isoStamp(e.created_at),
           }));
+          const artifacts = await listArtifactsForRun(db, {
+            orgId,
+            runId: run.id,
+          });
 
-          return { run, transcript, events };
+          return { run, transcript, artifacts, events };
         } finally {
           await db.close();
         }

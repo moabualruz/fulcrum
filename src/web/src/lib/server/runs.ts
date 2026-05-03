@@ -10,6 +10,15 @@ export type RunStatus =
   | "failed"
   | "cancelled";
 
+export interface DispatchRunInput {
+  orgId: string;
+  projectId?: string | null;
+  taskId: string;
+  agent: string;
+  model?: string | null;
+  prompt?: string | null;
+}
+
 interface RunScopeRow {
   org_id: string;
   project_id: string | null;
@@ -22,6 +31,47 @@ interface RunSourceRow {
   agent: string;
   model: string | null;
   prompt: string | null;
+}
+
+export async function dispatchRunAction(
+  db: ProductDb,
+  input: DispatchRunInput,
+): Promise<{ id: string; task_id: string; agent: string; status: RunStatus }> {
+  const id = newUlid();
+  await db.query(
+    `INSERT INTO agent_runs
+       (id, org_id, project_id, task_id, agent, model, prompt, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'queued')`,
+    [
+      id,
+      input.orgId,
+      input.projectId ?? null,
+      input.taskId,
+      input.agent,
+      input.model ?? null,
+      input.prompt ?? null,
+    ],
+  );
+
+  await enqueueJob(db, {
+    orgId: input.orgId,
+    projectId: input.projectId ?? null,
+    queue: "agent-runs",
+    kind: "agent_run",
+    payload: { run_id: id },
+  });
+
+  await appendEvent(db, {
+    orgId: input.orgId,
+    projectId: input.projectId ?? null,
+    actor: "system",
+    subjectKind: "agent_run",
+    subjectId: id,
+    verb: "dispatched",
+    payload: { task_id: input.taskId, agent: input.agent },
+  });
+
+  return { id, task_id: input.taskId, agent: input.agent, status: "queued" };
 }
 
 export async function cancelRunAction(

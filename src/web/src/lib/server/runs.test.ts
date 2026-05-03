@@ -11,7 +11,7 @@ import {
 } from "../../../../product-kernel/store/repositories.ts";
 import { newUlid } from "../../../../product-kernel/ids.ts";
 import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { cancelRunAction, retryRunAction } from "./runs.ts";
+import { cancelRunAction, dispatchRunAction, retryRunAction } from "./runs.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-runs-"));
 
@@ -85,6 +85,41 @@ async function readEventsForSubject(db: ProductDb, subjectId: string): Promise<E
 }
 
 describe("server actions: runs", () => {
+  test("dispatchRunAction creates queued run + agent job + event", async () => {
+    const { db, orgId, projectId } = await freshDb("dispatch-ok");
+    try {
+      const taskId = newUlid();
+      await db.query(
+        `INSERT INTO tasks (id, org_id, project_id, title, status)
+         VALUES ($1, $2, $3, 'Ship artifacts', 'pending')`,
+        [taskId, orgId, projectId],
+      );
+
+      const { id } = await dispatchRunAction(db, {
+        orgId,
+        projectId,
+        taskId,
+        agent: "codex",
+      });
+
+      const row = await readRun(db, id);
+      expect(row?.status).toBe("queued");
+      expect(row?.agent).toBe("codex");
+      expect(row?.project_id).toBe(projectId);
+
+      const jobs = await db.query<{ payload: Record<string, unknown> }>(
+        `SELECT payload FROM jobs WHERE queue = 'agent-runs'`,
+      );
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0]?.payload).toEqual({ run_id: id });
+
+      const events = await readEventsForSubject(db, id);
+      expect(events.find((e) => e.verb === "dispatched")?.subject_kind).toBe("agent_run");
+    } finally {
+      await db.close();
+    }
+  });
+
   test("cancelRunAction sets status=cancelled + emits agent_run.cancelled", async () => {
     const { db, orgId, projectId } = await freshDb("cancel-ok");
     try {

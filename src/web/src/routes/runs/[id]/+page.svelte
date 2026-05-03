@@ -39,6 +39,7 @@
 {:then payload}
   {@const run = payload.run}
   {@const transcript = payload.transcript}
+  {@const artifacts = payload.artifacts}
   {@const events = payload.events}
   <header
     data-runs-detail-header
@@ -117,6 +118,20 @@
       <div data-runs-transcript-empty class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}>No transcript recorded</div>
     {/if}
   </div>
+
+  <section data-runs-artifacts class={cn("mt-4 rounded-md border border-border p-3")}>
+    <h2 class={cn("mb-2 text-sm font-semibold")}>Artifacts</h2>
+    <ul class={cn("flex flex-col gap-2")}>
+      {#each artifacts as artifact (artifact.id)}
+        <li data-run-artifact data-artifact-id={artifact.id} class={cn("flex items-center justify-between gap-3 text-sm")}>
+          <a href={`/artifacts/${artifact.id}`} class={cn("font-medium hover:underline")}>{artifact.title}</a>
+          <span class={cn("text-xs text-muted-foreground")}>{artifact.kind}</span>
+        </li>
+      {:else}
+        <li data-runs-artifacts-empty class={cn("text-xs text-muted-foreground")}>No artifacts produced.</li>
+      {/each}
+    </ul>
+  </section>
 
   <div role="tabpanel" data-runs-tabpanel="payload" hidden={tab !== "payload"}>
     <pre data-runs-payload class={cn("max-h-[60vh] overflow-auto rounded-md border border-border bg-muted/30 p-3 text-xs whitespace-pre-wrap")}>{JSON.stringify(run, null, 2)}</pre>

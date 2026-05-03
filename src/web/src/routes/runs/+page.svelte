@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PageData } from "./$types";
+  import { enhance } from "$app/forms";
   import RunsTable from "$lib/components/runs/RunsTable.svelte";
   import InContextSearchBar from "$lib/components/search/InContextSearchBar.svelte";
   import type { SortColumn, SortDirection } from "$lib/components/runs/runs-table-sort";
@@ -47,11 +48,53 @@
   <RouteSkeleton kind="list" />
 {:then payload}
   {@const runs = payload.runs}
+  {@const tasks = payload.tasks ?? []}
+  {@const projectOptions = payload.projects ?? []}
   {@const agents = Array.from(new Set(runs.map((r) => r.agent))).sort()}
   {@const projects = Array.from(new Set(runs.map((r) => r.project_id ?? ""))).sort()}
   <div class={cn("mb-3")}>
     <InContextSearchBar kind="run" projectId={data.filter.project === "__any__" ? null : data.filter.project} placeholder="Search runs" />
   </div>
+  <form
+    data-runs-dispatch
+    method="POST"
+    action="?/dispatch"
+    use:enhance
+    class={cn("mb-4 flex flex-wrap items-center gap-2 rounded-md border border-border p-3")}
+  >
+    <select
+      name="projectId"
+      aria-label="Project"
+      class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
+    >
+      <option value="">No project</option>
+      {#each projectOptions as project (project.id)}
+        <option value={project.id}>{project.name}</option>
+      {/each}
+    </select>
+    <select
+      name="taskId"
+      aria-label="Task"
+      required
+      class={cn("border-input bg-background flex h-9 min-w-48 rounded-md border px-3 py-1 text-sm shadow-xs")}
+    >
+      <option value="">Task</option>
+      {#each tasks as task (task.id)}
+        <option value={task.id}>{task.title}</option>
+      {/each}
+    </select>
+    <select
+      name="agent"
+      aria-label="Agent"
+      class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
+    >
+      <option value="codex">codex</option>
+      <option value="claude">claude</option>
+      <option value="gemini">gemini</option>
+    </select>
+    <button type="submit" class={cn(buttonVariants())}>Dispatch</button>
+  </form>
+
   <form
     data-runs-filter
     method="GET"

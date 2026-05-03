@@ -59,6 +59,7 @@
 		{ id: "docs",     label: "Documents",  href: "/docs" },
 		{ id: "boards",   label: "Boards",     href: "/boards" },
 		{ id: "runs",     label: "Agent runs", href: "/runs" },
+		{ id: "artifacts", label: "Artifacts", href: "/artifacts" },
 		{ id: "search",   label: "Search",     href: "/search" },
 	];
 

@@ -14,6 +14,7 @@ describe("NAV_ITEMS surface", () => {
       "/docs",
       "/boards",
       "/runs",
+      "/artifacts",
       "/search",
       "/audit",
     ]);
@@ -26,6 +27,7 @@ describe("NAV_ITEMS surface", () => {
       "Docs",
       "Board",
       "Runs",
+      "Artifacts",
       "Search",
       "Audit",
     ]);
@@ -45,6 +47,7 @@ describe("NAV_ITEMS surface", () => {
       ["/docs", "FileText"],
       ["/boards", "Kanban"],
       ["/runs", "Activity"],
+      ["/artifacts", "Archive"],
       ["/search", "Search"],
       ["/audit", "Shield"],
     ];
