@@ -1,0 +1,14 @@
+{
+  "settings.i18n.title": "Language & Region",
+  "settings.i18n.locale_label": "Language",
+  "settings.i18n.save": "Save",
+  "settings.i18n.saved": "Locale saved",
+  "nav.settings": "Settings",
+  "nav.dashboard": "Dashboard",
+  "nav.projects": "Projects",
+  "nav.docs": "Documents",
+  "nav.boards": "Boards",
+  "nav.runs": "Agent Runs",
+  "date.format": "{date}",
+  "number.format": "{number}"
+}
