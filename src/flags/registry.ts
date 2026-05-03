@@ -45,6 +45,8 @@ export const FEATURE_FLAGS = [
   "search-click-telemetry",
   "token-tracking",
   "session-resume",
+  "telemetry-remote",
+  "error-reporting-remote",
 ] as const;
 
 /** Union type of all registered feature flag names. */
@@ -77,6 +79,8 @@ export const FLAG_DESCRIPTIONS: Record<FeatureFlagName, string> = {
   "search-click-telemetry": "Enable search click telemetry writes to search_clicks table.",
   "token-tracking": "Enable per-profile token count parsing from agent stdout; writes token_used to agent_runs.",
   "session-resume": "Enable session resumption on retry runs (claude-code profile only); passes prior transcript to sandcastle.",
+  "telemetry-remote": "Enable remote telemetry batch POST to FULCRUM_TELEMETRY_ENDPOINT (HMAC-signed, outbox-queued, graphile-worker flushed).",
+  "error-reporting-remote": "Enable remote crash reporting: new ErrorLog entries are POSTed (scrubbed + HMAC-signed) to FULCRUM_ERROR_REPORT_ENDPOINT.",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -53,6 +53,14 @@ interface PlatformDoctorOptions {
     dsn?: string | null;
     testPut(): Promise<boolean>;
   };
+  errorReporting?: {
+    /** Whether error-reporting-remote feature flag is ON. */
+    featureEnabled: boolean;
+    /** Whether FULCRUM_ERROR_REPORT_ENDPOINT is configured. */
+    endpointConfigured?: boolean;
+    /** Status of last outbound report attempt: "ok" | "4xx" | "error" | undefined. */
+    lastReportStatus?: "ok" | "4xx" | "error";
+  };
 }
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
@@ -255,6 +263,25 @@ export async function runPlatformDoctorChecks(options: PlatformDoctorOptions = {
     } catch (err) {
       results.push(check("platform.remote_backup", "fail", `Remote backup test failed: ${(err as Error).message}`, "Verify remote backup DSN and credentials."));
     }
+  }
+
+  // error-reporting-remote check
+  const errReporting = options.errorReporting ?? {
+    featureEnabled: (process.env["FULCRUM_FEATURES"] ?? "")
+      .split(",").map((f) => f.trim()).includes("error-reporting-remote"),
+    endpointConfigured: !!(process.env["FULCRUM_ERROR_REPORT_ENDPOINT"]),
+    lastReportStatus: undefined,
+  };
+  if (!errReporting.featureEnabled) {
+    results.push(check("platform.error_reporting", "skip", "error-reporting-remote flag is off.", "Enable error-reporting-remote flag and set FULCRUM_ERROR_REPORT_ENDPOINT to activate."));
+  } else if (!errReporting.endpointConfigured) {
+    results.push(check("platform.error_reporting", "fail", "error-reporting-remote is ON but FULCRUM_ERROR_REPORT_ENDPOINT is not set.", "Set FULCRUM_ERROR_REPORT_ENDPOINT to a valid HTTPS URL."));
+  } else if (errReporting.lastReportStatus === "4xx") {
+    results.push(check("platform.error_reporting", "warn", "error-reporting-remote is degraded: last report returned 4xx.", "Verify endpoint URL and authentication; check dead-letter queue."));
+  } else if (errReporting.lastReportStatus === "error") {
+    results.push(check("platform.error_reporting", "fail", "error-reporting-remote: last report failed with network error.", "Check endpoint reachability and FULCRUM_ERROR_REPORT_SECRET."));
+  } else {
+    results.push(check("platform.error_reporting", "pass", "error-reporting-remote is ON and endpoint is configured.", "No action needed."));
   }
 
   return results;
