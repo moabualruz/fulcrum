@@ -2383,3 +2383,23 @@ Landed: P17#14-22, P15#16, P15#18-19, P16#14-28, P12#15, P12#22, P13#17, P14#13,
 Status: 303 implemented, 39 completed, 0 ready-for-agent = 341/341 (100% implemented)
 Last in-flight: P16#16 (agents/orchestration/inference dashboards)
 Next: full status audit, CI verification, milestone gate reviews for 303 implemented issues
+
+## 2026-05-04T01:45:00Z — claude-orchestrator (gate reviews complete, 10 bugs fixed)
+
+Gate reviews: 6 parallel correctness reviewers across all 17 pillars.
+Results: All 6 gates returned CHANGES_REQUIRED. 10 critical/high bugs found and fixed:
+- Gate A CF-01: OpenAI backend flag bypass (inference/backends/client.ts)
+- Gate B F1: Sprint metrics empty ID before flush (sprints.ts)
+- Gate B F2: next-sprint disposition no-op (sprints.ts)
+- Gate D F1: Hybrid search params/SQL mismatch (search/query.ts)
+- Gate E F-001: PGlite-incompatible ALTER TABLE in migration (0004_notifications.sql)
+- Gate E F-002: /api/openapi.json unguarded by public-api flag (hono.ts)
+- Gate F F01: Bulk status selection not cleared (task-list.ts)
+- Gate F F03: Doc history keybinding dead (docs-reader-editor.ts)
+- Gate F F04: Sprint close overlay keyboard flow broken (sprints.ts)
+- Gate F F06: Misleading sha256 prefix on base64 secrets (secrets page.server.ts)
+
+Remaining non-blocking: P07 missing docs.tree/move (spec gap), P02 pullModel streaming (arch),
+P17#03 backup stub (documented), DDL-in-transaction in tasks (medium), unchecked AC checkboxes.
+
+Typecheck: GREEN (0 errors). Root tests: running post-migration-fix.
