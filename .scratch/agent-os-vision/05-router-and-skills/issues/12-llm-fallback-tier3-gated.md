@@ -1,8 +1,9 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 05-router-and-skills
 Blocked-by: 04-auto-assign-tier1-tier2
+ImplRuntime: claude
 ---
 
 # LLM fallback Tier 3 (FULCRUM_FEATURES=router-llm) + backend selection
