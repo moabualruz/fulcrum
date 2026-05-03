@@ -504,6 +504,19 @@ export class TuiApp {
       r.writeln();
       r.writeln(`  Last download ${this.inferenceLastDownload.modelId} ${this.inferenceLastDownload.pct}%`);
     }
+
+    // External LLM Provider — shown only when flag enabled
+    const externalEnabled = (process.env["FULCRUM_FEATURES"] ?? "")
+      .split(",").map((s) => s.trim()).includes("external-llm-provider");
+    if (externalEnabled) {
+      r.writeln();
+      r.writeln(c.bold("  External LLM Provider"));
+      const url = process.env["FULCRUM_INFERENCE_URL"] ?? "(not set)";
+      const key = process.env["FULCRUM_INFERENCE_API_KEY"] ? "••••" : "(not set)";
+      r.infoRow("URL", url);
+      r.infoRow("API Key", key);
+    }
+
     r.writeln();
     r.writeln(c.dim("  Press [q] to go back"));
   }
