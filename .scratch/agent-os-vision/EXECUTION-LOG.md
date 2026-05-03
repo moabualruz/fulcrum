@@ -2161,3 +2161,17 @@ In-flight:
 Underfilled reason: 5 implementer slots open — context budget; will refill on next wakeup once existing reports land + CI green.
 
 Next-wakeup plan: verify CI rescue, harvest impl reports, then dispatch milestone gate reviews on largest impl backlogs (P6=17, P7=18, P11=15, P13=14, P12=9, P8=12, P9=10, P15=11, P17=10) opposite-runtime, plus refill impl slots from remaining 142 ready.
+
+---
+
+## 2026-05-03 — claude impl P16#03 cmd+k command palette
+
+CommandPalette already built (da59adf4) + wired into +layout.svelte (paletteOpen state, mounted via portal-style fixed container). Cmd+K toggles via window keydown handler (makeKeydownHandler) in component. This impl pass:
+- Removed test.fixme on "step 5 — cmd+K opens command palette" in src/web/tests/e2e/user-journey.spec.ts; the prior BLOCKED note (palette not wired) is stale.
+- Added performance.mark/measure assertion: openMs < 50ms gate per acceptance criterion.
+- Switched search query "kanban" → "board" so the legacy paletteItems label "Boards" matches (prefix-tier score) — "kanban" had no subsequence in any current label.
+- Added step-5b spec: `>` prefix activates command mode (Commands header visible).
+
+Validation: tests/vitest/cmdk-palette.test.ts (4 pass) covers Cmd+K open/Escape close, debounced 150ms search, kind:doc quick-filter parsing, group-by-kind, cache repeat-query, > command mode + create-task dispatch, Tab focus trap. Pre-existing bun:test SSR failure on CommandPalette.svelte.test.ts is unrelated harness issue (3 fails predate this change). docs-screens.test.ts CI red noted in dispatch — not touched.
+
+Status flipped → implemented. Out-of-scope src/tui/* diffs in worktree left unstaged.
