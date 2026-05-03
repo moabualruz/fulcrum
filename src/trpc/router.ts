@@ -15,13 +15,14 @@ import { flagsRouter } from "../server/trpc/routers/flags.ts";
 import { inferenceRouter } from "../server/trpc/routers/inference.ts";
 import { orgsRouter } from "../server/trpc/routers/orgs.ts";
 import { tasksRouter } from "../server/trpc/routers/tasks.ts";
+import { docsRouter } from "../server/trpc/routers/docs.ts";
 import { customFieldDefsRouter, taskCustomFieldsRouter } from "../server/trpc/routers/custom-fields.ts";
 import { auditRouter } from "../server/trpc/routers/audit.ts";
+import { backupRouter } from "../server/trpc/routers/backup.ts";
 import { orchestrationRouter } from "./routers/orchestration.ts";
 import { notificationsRouter } from "./routers/notifications.ts";
 import { artifactsRouter } from "./routers/artifacts.ts";
 import { reposRouter } from "./routers/repos.ts";
-import { docTemplatesRouter } from "../server/trpc/routers/doc-templates.ts";
 import { credentialsRouter } from "../secrets/credentials-router.ts";
 import { webhooksRouter } from "./routers/webhooks.ts";
 import {
@@ -135,13 +136,6 @@ const customFieldsRouter = t.router({
 });
 
 const savedViewsRouter = crudRouter("saved_views");
-
-const docsRouter = t.router({
-  ...crudProcedures("docs"),
-  move: mutationProcedure("docs", "move"),
-  reorder: mutationProcedure("docs", "reorder"),
-  templates: docTemplatesRouter,
-});
 
 const docVersionsRouter = t.router({
   list: listProcedure(),
@@ -306,6 +300,7 @@ export const appRouter = t.router({
   search: searchRouter,
   notify: notificationsRouter,
   audit: auditRouter,
+  backup: backupRouter,
   routing: routingRouter,
   fulcrum_skills: fulcrumSkillsRouter,
   orchestration: orchestrationRouter,
