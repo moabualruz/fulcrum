@@ -9,4 +9,6 @@ export const claudeCodeProfile: AgentProfile = {
   sandcastleProvider: "noSandbox",
   maxIterations: 10,
   defaultTimeout: 600_000,
+  tokenCountPattern: "Tokens used:\\s*(\\d+)\\s*input,\\s*(\\d+)\\s*output",
+  supportsSessionResume: true,
 };

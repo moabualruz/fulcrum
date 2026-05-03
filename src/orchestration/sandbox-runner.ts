@@ -22,6 +22,14 @@ import {
   harvestArtifacts,
   type HarvestArtifactDeps,
 } from "../artifacts/harvest.ts";
+import {
+  createTokenTracker,
+  isTokenTrackingEnabled,
+} from "./token-tracking.ts";
+import {
+  resolveSessionResume,
+  type PriorRunLookup,
+} from "./session-resume.ts";
 
 export const SANDCASTLE_API_VERSION = "0.5.6";
 
@@ -86,6 +94,8 @@ export interface SandboxRunnerDeps {
   readonly harvestDeps?: HarvestArtifactDeps;
   readonly orgSlug?: string;
   readonly projectSlug?: string | null;
+  readonly priorRunLookup?: PriorRunLookup;
+  readonly taskId?: string;
 }
 
 const defaultLogger: Logger = console;

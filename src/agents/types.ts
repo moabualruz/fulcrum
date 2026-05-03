@@ -19,6 +19,8 @@ export const AgentProfileSchema = z.object({
   sandcastleProvider: SandcastleProviderSchema,
   maxIterations: z.number().int().positive(),
   defaultTimeout: z.number().int().positive(),
+  tokenCountPattern: z.string().optional(),
+  supportsSessionResume: z.boolean().optional(),
 });
 
 export type SandcastleProvider = z.infer<typeof SandcastleProviderSchema>;
