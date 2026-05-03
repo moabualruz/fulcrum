@@ -22,6 +22,9 @@ import {
 } from "./keyring.ts";
 import { isVaultIntegrationEnabled } from "./vault-adapter.ts";
 
+// Issue 21 imports
+import { activePlatformFlag } from "./keyring-platform.ts";
+
 export interface DoctorCheckResult {
   check: string;
   status: "pass" | "fail" | "warn";
@@ -89,6 +92,81 @@ export async function vaultHealthCheck(
       detail: `Vault unreachable at ${addr}: ${e instanceof Error ? e.message : String(e)}`,
       hint:
         "Ensure Vault is running and FULCRUM_VAULT_ADDR is reachable. Credentials with provider='vault' will not be accessible.",
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Keyring health check (Issue 02)
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Issue 21: platform.keyring + platform.keyring_mode checks
+// ---------------------------------------------------------------------------
+
+/**
+ * platformKeyringHealthCheck — check `platform.keyring`.
+ *
+ * pass = native keyring active; warn = fallback file in use.
+ */
+export async function platformKeyringHealthCheck(
+  cfg: KeyringConfig = {},
+): Promise<DoctorCheckResult> {
+  try {
+    const r = await loadOrCreateMasterKey(cfg);
+    const flag = activePlatformFlag();
+    if (r.status === KeyringStatus.OS) {
+      return {
+        check: "platform.keyring",
+        status: "pass",
+        detail: `Native OS keyring active${flag ? ` (flag: ${flag})` : ""}.`,
+      };
+    }
+    return {
+      check: "platform.keyring",
+      status: "warn",
+      detail: `Keyring running in fallback-file mode${flag ? ` (flag: ${flag} set but native load failed)` : ""}.`,
+      hint: "Install node-keytar to use native keyring.",
+    };
+  } catch (e) {
+    return {
+      check: "platform.keyring",
+      status: "warn",
+      detail: `Keyring check failed: ${e instanceof Error ? e.message : String(e)}`,
+      hint: "Install node-keytar to use native keyring.",
+    };
+  }
+}
+
+/**
+ * keyringModeHealthCheck — check `platform.keyring_mode`.
+ *
+ * Explicitly surfaces "Install node-keytar" when fallback in use.
+ */
+export async function keyringModeHealthCheck(
+  cfg: KeyringConfig = {},
+): Promise<DoctorCheckResult> {
+  try {
+    const r = await loadOrCreateMasterKey(cfg);
+    if (r.status === KeyringStatus.OS) {
+      return {
+        check: "platform.keyring_mode",
+        status: "pass",
+        detail: "Keyring mode: native (OS keyring).",
+      };
+    }
+    return {
+      check: "platform.keyring_mode",
+      status: "warn",
+      detail: "Keyring mode: fallback file. Install node-keytar to use native keyring.",
+      hint: "Run `fulcrum secrets init-keyring` after installing node-keytar.",
+    };
+  } catch (e) {
+    return {
+      check: "platform.keyring_mode",
+      status: "warn",
+      detail: `Install node-keytar to use native keyring (error: ${e instanceof Error ? e.message : String(e)})`,
+      hint: "Run `fulcrum secrets init-keyring` to attempt native module reload.",
     };
   }
 }

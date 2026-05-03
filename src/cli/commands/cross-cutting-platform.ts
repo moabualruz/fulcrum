@@ -1,4 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
+import type { NativeKeyringAdapter } from "../../secrets/keyring.ts";
+import { productionAdapterFactory, type NativeAdapterLoader } from "../../secrets/keyring-platform.ts";
 
 type Writer = (line: string) => void;
 
@@ -9,6 +11,8 @@ type CliOptions = {
   exit?: (code: number) => void;
   stdin?: () => Promise<string>;
   readInput?: (path: string) => Promise<string>;
+  /** Injectable factory for init-keyring — for tests. */
+  loaderFactory?: NativeAdapterLoader;
 };
 
 function io(opts: CliOptions) {
@@ -163,4 +167,40 @@ export async function runDataExport(argv: readonly string[], opts: CliOptions = 
   });
   await writeFile(output, result.json);
   io(opts).print(JSON.stringify({ path: output, entity_counts: result.entityCounts }));
+}
+
+/**
+ * runSecretsInitKeyring — `fulcrum secrets init-keyring`
+ *
+ * Attempts to (re-)load the native OS keyring module. Prints diagnostic on
+ * failure and exits with code 1. Never crashes the process on load error.
+ *
+ * Issue 21: recovery action after node-keytar install.
+ */
+export async function runSecretsInitKeyring(
+  argv: readonly string[],
+  opts: CliOptions = {},
+): Promise<void> {
+  const { print, printErr, exit } = io(opts);
+  const loader = opts.loaderFactory ?? productionAdapterFactory;
+
+  let adapter: NativeKeyringAdapter | null = null;
+  try {
+    adapter = await loader();
+  } catch (e) {
+    adapter = null;
+    printErr(
+      `Native keyring load error: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+
+  if (adapter) {
+    print("Native keyring loaded successfully. OS keyring is active.");
+    return;
+  }
+
+  printErr(
+    "Native keyring could not be loaded. Install node-keytar or @napi-rs/keyring and re-run `fulcrum secrets init-keyring`.",
+  );
+  exit(1);
 }
