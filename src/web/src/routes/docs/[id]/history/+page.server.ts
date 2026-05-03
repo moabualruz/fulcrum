@@ -1,3 +1,4 @@
+// @ts-nocheck — checked by web:check; root tsc lacks SvelteKit $types/$lib
 import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { openProductDb, getDefaultOrgId } from "$lib/server/db";

@@ -1,3 +1,4 @@
+// @ts-nocheck — checked by web:check; root tsc lacks SvelteKit $types/$lib
 import { error, fail } from "@sveltejs/kit";
 // Server-only superforms entry — avoids the client `SuperDebug.svelte`
 // import graph (which pulls in `$app/navigation`/`$app/stores`) in the
