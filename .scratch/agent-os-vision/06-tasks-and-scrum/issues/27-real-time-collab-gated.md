@@ -1,6 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
+ImplRuntime: claude
 Pillar: 06-tasks-and-scrum
 Blocked-by: [10-tiptap-task-description]
 PRD: .scratch/agent-os-vision/prds/06-tasks-and-scrum.md
@@ -23,18 +24,18 @@ no Hocuspocus connection. Cross-references Pillar 5 (docs editor) — same Hocus
 server lifecycle.
 
 ## Acceptance criteria
-- [ ] Logic: `FULCRUM_FEATURES=real-time-collab-server` flag guard around Hocuspocus server startup in `src/collab/server.ts`; flag OFF → server not started, no port bound
-- [ ] Logic: Hocuspocus server room keyed by `task:<task_id>`; Yjs `Y.Doc` bound to TipTap `@tiptap/extension-collaboration`
-- [ ] Logic: Hocuspocus `onLoadDocument` fetches current `tiptap_content` from DB and hydrates Yjs doc; `onStoreDocument` debounce-saves Yjs doc → `tasks.update({tiptap_content})`
-- [ ] Logic: collab cursor extension (`@tiptap/extension-collaboration-cursor`) shows collaborator name + colour; colour assigned from user ID hash
-- [ ] Web: flag ON → TipTap mounts with `CollaborationExtension` + `CollaborationCursorExtension`; cursor overlay visible for concurrent editors
-- [ ] Web: flag OFF → TipTap mounts without collab extensions; no WebSocket connection attempt
-- [ ] CLI: unaffected (edits description as plain text; Hocuspocus persists on next doc load)
-- [ ] TUI: unaffected (plain textarea; description round-trips via `tasks.update`)
-- [ ] Tests (flag ON): two Hocuspocus clients connect to same `task:<id>` room; client A inserts "hello" → client B document contains "hello" (convergence test using `@hocuspocus/server` test utilities)
-- [ ] Tests (flag ON): cursor position broadcast — client A moves cursor → client B receives cursor update event
-- [ ] Tests (flag OFF): TipTap editor mounts without WebSocket (no `CollaborationExtension` in editor extensions list)
-- [ ] Tests: `onStoreDocument` debounce fires after 2s of inactivity (vitest fake timers)
+- [x] Logic: `FULCRUM_FEATURES=real-time-collab-server` flag guard around Hocuspocus server startup in `src/collab/server.ts`; flag OFF → server not started, no port bound
+- [x] Logic: Hocuspocus server room keyed by `task:<task_id>`; Yjs `Y.Doc` bound to TipTap `@tiptap/extension-collaboration`
+- [x] Logic: Hocuspocus `onLoadDocument` fetches current `tiptap_content` from DB and hydrates Yjs doc; `onStoreDocument` debounce-saves Yjs doc → `tasks.update({tiptap_content})`
+- [x] Logic: collab cursor extension (`@tiptap/extension-collaboration-cursor`) shows collaborator name + colour; colour assigned from user ID hash
+- [x] Web: flag ON → TipTap mounts with `CollaborationExtension` + `CollaborationCursorExtension`; cursor overlay visible for concurrent editors
+- [x] Web: flag OFF → TipTap mounts without collab extensions; no WebSocket connection attempt
+- [x] CLI: unaffected (edits description as plain text; Hocuspocus persists on next doc load)
+- [x] TUI: unaffected (plain textarea; description round-trips via `tasks.update`)
+- [x] Tests (flag ON): two Hocuspocus clients connect to same `task:<id>` room; client A inserts "hello" → client B document contains "hello" (convergence test using `@hocuspocus/server` test utilities)
+- [x] Tests (flag ON): cursor position broadcast — client A moves cursor → client B receives cursor update event
+- [x] Tests (flag OFF): TipTap editor mounts without WebSocket (no `CollaborationExtension` in editor extensions list)
+- [x] Tests: `onStoreDocument` debounce fires after 2s of inactivity (vitest fake timers)
 
 ## Blocked by
 - 10-tiptap-task-description (TipTap editor already mounted for task description)
