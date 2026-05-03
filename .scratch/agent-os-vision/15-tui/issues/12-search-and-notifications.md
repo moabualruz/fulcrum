@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: tui
 Blocked-by: [15/issues/02-global-widgets.md]
@@ -24,10 +24,10 @@ Full-screen search pane (`/search`; facet checkboxes left rail via FilterChips; 
 
 ## Acceptance criteria
 
-- [ ] Search: query → grouped results (tasks/docs/memories/runs/artifacts); facet checkbox `Tab` cycles; `Enter` navigates to entity.
-- [ ] Notifications inbox: "For you" tab shows user-relevant notifications; `R` marks single notification read; bell badge in StatusBar decrements; `M` mutes source.
-- [ ] Bell badge live update: new notification event via subscription → badge increments within 200ms.
-- [ ] Audit log: filter by `kind=task` + `since` date → correct rows; `E` exports JSON to file (test with temp path).
+- [x] Search: query → grouped results (tasks/docs/memories/runs/artifacts); facet checkbox `Tab` cycles; `Enter` navigates to entity.
+- [x] Notifications inbox: "For you" tab shows user-relevant notifications; `R` marks single notification read; bell badge in StatusBar decrements; `M` mutes source.
+- [x] Bell badge live update: new notification event via subscription → badge increments within 200ms.
+- [x] Audit log: filter by `kind=task` + `since` date → correct rows; `E` exports JSON to file (test with temp path).
 - [ ] After TUI `R` mark-read, web inbox shows notification as read; CLI `fulcrum notify list --unread --json` excludes it.
 
 ## Blocked by
