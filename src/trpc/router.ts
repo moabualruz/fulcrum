@@ -36,6 +36,7 @@ import { webhooksRouter } from "./routers/webhooks.ts";
 import { getProfile, listProfiles } from "../agents/registry.ts";
 import { AgentProfileSchema } from "../agents/types.ts";
 import { AgentProfile as AgentProfileEntity } from "../db/entities/sandbox/AgentProfile.ts";
+import { resolveConflict } from "../skills/conflict-resolver.ts";
 import {
   createSavedSearch,
   deleteSavedSearch,
@@ -50,6 +51,19 @@ import {
 const EmptyInputSchema = z.void();
 const IdInputSchema = z.object({ id: z.string().min(1) });
 const OptionalRecordInputSchema = z.record(z.string(), z.unknown()).optional();
+const SkillResolveConflictInputSchema = z.object({
+  slug: z.string().min(1),
+  resolution: z.enum(["local", "upstream"]),
+});
+const SkillOutputSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  source: z.string(),
+  upstreamRepo: z.string().nullable(),
+  upstreamRef: z.string().nullable(),
+  enabledAgents: z.array(z.string()),
+});
 const StubRowSchema = z.object({
   id: z.string(),
   orgId: z.string().nullable(),
@@ -281,7 +295,25 @@ const fulcrumSkillsRouter = t.router({
   upgrade: mutationProcedure("fulcrum_skills", "upgrade"),
   uninstall: idMutationProcedure("fulcrum_skills", "uninstall"),
   sync: mutationProcedure("fulcrum_skills", "sync"),
-  resolveConflict: mutationProcedure("fulcrum_skills", "resolveConflict"),
+  resolveConflict: protectedProcedure
+    .input(SkillResolveConflictInputSchema)
+    .output(SkillOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const skill = await resolveConflict(
+        input.slug,
+        input.resolution,
+        ctx.orgId,
+      );
+      return {
+        id: skill.id,
+        name: skill.name,
+        slug: skill.slug,
+        source: skill.source,
+        upstreamRepo: skill.upstreamRepo ?? null,
+        upstreamRef: skill.upstreamRef ?? null,
+        enabledAgents: skill.enabledAgents,
+      };
+    }),
 });
 
 // webhooksRouter imported from ./routers/webhooks.ts (Pillar 13, Issue 07).

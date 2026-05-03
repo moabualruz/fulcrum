@@ -3,6 +3,7 @@
 // against the strictest union of all 5 agents' rules.
 // fulcrum skills list — enumerate authored skills with name, desc preview, eval coverage.
 // fulcrum skills upstream — sync curated third-party skills.
+// fulcrum skills conflicts resolve <slug> --keep <local|upstream|editor>
 
 import { mkdir, readdir, readFile, copyFile, writeFile, stat, rm, rename } from "node:fs/promises";
 import { join, basename, dirname, resolve } from "node:path";
@@ -10,6 +11,7 @@ import { AGENTS } from "../agents/registry.ts";
 import type { AgentId } from "./mcp-registry.ts";
 import { which, run as runProc } from "../utils/proc.ts";
 import { pruneSourceBackupFiles } from "../utils/source-clean.ts";
+import { DEFAULT_ORG_ID } from "../db/seed.ts";
 
 function repoRoot(): string {
   // When invoked from a clone, this binary's enclosing repo is the source of
@@ -687,12 +689,64 @@ async function cmdList(args: string[] = []): Promise<void> {
   }
 }
 
+async function cmdConflicts(args: string[]): Promise<void> {
+  const sub = args[0];
+  if (sub === "list") {
+    const { readSkillsLockFile } = await import("../skills/lock.ts");
+    const lock = await readSkillsLockFile();
+    const conflicts = Object.entries(lock)
+      .filter(([, entry]) => entry.upstream_conflict)
+      .map(([slug]) => slug)
+      .sort();
+    for (const slug of conflicts) console.log(slug);
+    return;
+  }
+
+  if (sub !== "resolve") {
+    console.error("usage: fulcrum skills conflicts <list|resolve>");
+    process.exit(2);
+  }
+
+  const slug = args[1];
+  let keep: "local" | "upstream" | "editor" | undefined;
+  let orgId = DEFAULT_ORG_ID;
+  let i = 2;
+  while (i < args.length) {
+    const arg = args[i]!;
+    if (arg === "--keep") {
+      const value = args[i + 1];
+      if (value !== "local" && value !== "upstream" && value !== "editor") {
+        console.error("fulcrum skills conflicts resolve: --keep must be local, upstream, or editor");
+        process.exit(2);
+      }
+      keep = value;
+      i += 2;
+    } else if (arg === "--org-id") {
+      orgId = args[i + 1] ?? orgId;
+      i += 2;
+    } else {
+      console.error(`fulcrum skills conflicts resolve: unknown arg '${arg}'`);
+      process.exit(2);
+    }
+  }
+
+  if (!slug || !keep) {
+    console.error("usage: fulcrum skills conflicts resolve <slug> --keep <local|upstream|editor> [--org-id <id>]");
+    process.exit(2);
+  }
+
+  const { resolveConflict } = await import("../skills/conflict-resolver.ts");
+  const skill = await resolveConflict(slug, keep, orgId);
+  console.log(`resolved ${skill.slug}: ${keep}`);
+}
+
 export async function run(args: string[]): Promise<void> {
   const sub = args[0] ?? "sync";
   switch (sub) {
     case "sync":  return cmdSync(args.slice(1));
     case "lint":  return cmdLint(args[1]);
     case "list":  return cmdList(args.slice(1));
+    case "conflicts": return cmdConflicts(args.slice(1));
     case "upstream": {
       let dryRun = false;
       let updatePins = false;
