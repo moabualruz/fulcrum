@@ -8,6 +8,8 @@ export interface TuiNotification {
   id: string;
   sourceId: string;
   sourceKind: string;
+  entityId?: string;
+  entityKind?: string;
   title: string;
   forYou?: boolean;
   read?: boolean;
@@ -16,9 +18,10 @@ export interface TuiNotification {
 export interface NotificationsScreenOptions {
   caller: {
     notify: {
-      list: (input: { tab: NotificationTab }) => Promise<TuiNotification[]>;
-      markRead: (input: { id: string }) => Promise<{ ok: boolean }>;
-      mute: (input: { sourceKind: string; sourceId: string }) => Promise<{ ok: boolean }>;
+      list: (input: { tab?: NotificationTab; unread?: boolean; limit?: number; offset?: number }) =>
+        Promise<TuiNotification[] | { items: TuiNotification[] }>;
+      markRead: (input: { id: string }) => Promise<unknown>;
+      mute: (input: { sourceKind: string; sourceId: string }) => Promise<unknown>;
     };
   };
   subscriptions?: SubscriptionBridge;
@@ -57,7 +60,7 @@ export class NotificationsScreen {
         const index = this.notifications.indexOf(notification);
         const pointer = index === this.cursor ? c.bold(">") : " ";
         const read = notification.read ? c.dim("[read]") : "[unread]";
-        renderer.writeln(`${pointer} ${read} ${notification.title}  ${c.dim(`${notification.sourceKind}:${notification.sourceId}`)}`);
+        renderer.writeln(`${pointer} ${read} ${notification.title}  ${c.dim(`${subjectKind(notification)}:${subjectId(notification)}`)}`);
       }
     }
 
@@ -84,7 +87,7 @@ export class NotificationsScreen {
     if (key === "M") {
       const notification = this.selectedNotification;
       if (!notification) return false;
-      await this.opts.caller.notify.mute({ sourceKind: notification.sourceKind, sourceId: notification.sourceId });
+      await this.opts.caller.notify.mute({ sourceKind: subjectKind(notification), sourceId: subjectId(notification) });
       return true;
     }
 
@@ -101,7 +104,7 @@ export class NotificationsScreen {
     if (key === "\r") {
       const notification = this.selectedNotification;
       if (!notification) return false;
-      this.opts.onOpenEntity?.({ kind: notification.sourceKind, id: notification.sourceId });
+      this.opts.onOpenEntity?.({ kind: subjectKind(notification), id: subjectId(notification) });
       return true;
     }
 
@@ -118,7 +121,13 @@ export class NotificationsScreen {
   }
 
   private async reload(): Promise<void> {
-    this.notifications = await this.opts.caller.notify.list({ tab: this.tab });
+    const result = await this.opts.caller.notify.list({
+      tab: this.tab,
+      unread: this.tab === "for-you" ? true : undefined,
+      limit: 50,
+      offset: 0,
+    });
+    this.notifications = Array.isArray(result) ? result : result.items;
     this.cursor = Math.min(this.cursor, Math.max(0, this.notifications.length - 1));
   }
 
@@ -130,4 +139,12 @@ export class NotificationsScreen {
       }),
     );
   }
+}
+
+function subjectKind(notification: TuiNotification): string {
+  return notification.entityKind ?? notification.sourceKind;
+}
+
+function subjectId(notification: TuiNotification): string {
+  return notification.entityId ?? notification.sourceId;
 }

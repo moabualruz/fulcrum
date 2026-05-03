@@ -36,6 +36,10 @@ import type { AuthInfo } from "./screens/auth.ts";
 import { FlagsScreen } from "./screens/flags.ts";
 import type { FlagItem } from "./screens/flags.ts";
 import { NewDocScreen } from "./screens/new-doc.ts";
+import { NotificationsScreen } from "./screens/notifications.ts";
+import { ActivityFeedScreen } from "./screens/activity.ts";
+import { NotificationRulesScreen } from "./screens/notification-rules.ts";
+import { AuditLogScreen } from "./screens/audit.ts";
 import { TuiRouter, type TuiRoute } from "./router.ts";
 import { JsonlCrashLog, type TuiCrashLog } from "./crashlog.ts";
 import { DbTelemetrySink, NullTelemetrySink, type TuiTelemetrySink } from "./telemetry.ts";
@@ -93,6 +97,23 @@ export interface TuiCaller {
   };
   notify?: {
     unreadCount: () => Promise<{ count: number }>;
+    list?: (input: { tab?: "for-you" | "all"; unread?: boolean; limit?: number; offset?: number }) => Promise<unknown>;
+    markRead?: (input: { id: string }) => Promise<unknown>;
+    mute?: (input: { subjectKind: string; subjectId: string } | { sourceKind: string; sourceId: string }) => Promise<unknown>;
+    rules?: {
+      list: () => Promise<unknown[]>;
+      create: (input: { name: string; eventPattern: Record<string, unknown>; channels: string[]; enabled: boolean }) => Promise<unknown>;
+      update: (input: { id: string; enabled?: boolean; name?: string }) => Promise<unknown>;
+      delete: (input: { id: string }) => Promise<{ ok: boolean }>;
+    };
+    quietHours?: {
+      get: () => Promise<unknown | null>;
+      set: (input: { tz: string; startHour: number; endHour: number; daysOfWeek: number[] }) => Promise<unknown>;
+    };
+  };
+  audit?: {
+    query: (input: Record<string, unknown>) => Promise<unknown>;
+    export: (input: Record<string, unknown>) => Promise<unknown>;
   };
 }
 
@@ -144,7 +165,7 @@ const KEYBINDING_TO_TUI_ACTION: Partial<Record<KeybindingAction, TuiAction>> = {
 // Screen enum
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc";
+type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "inbox" | "activity" | "notification-rules" | "audit";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Navigation entries
@@ -156,8 +177,12 @@ interface NavEntry {
 }
 
 const NAV_ENTRIES: NavEntry[] = [
+  { label: "Inbox", screen: "inbox" },
+  { label: "Activity", screen: "activity" },
   { label: "Auth", screen: "auth" },
   { label: "Feature Flags", screen: "flags" },
+  { label: "Notification Rules", screen: "notification-rules" },
+  { label: "Audit", screen: "audit" },
   { label: "Inference", screen: "inference" },
   { label: "Dashboard (Pillar 3)", screen: "nav" },
   { label: "Tasks (Pillar 4)", screen: "nav" },
@@ -202,6 +227,10 @@ export class TuiApp {
   private authScreen: AuthScreen | null = null;
   private flagsScreen: FlagsScreen | null = null;
   private newDocScreen: NewDocScreen | null = null;
+  private notificationsScreen: NotificationsScreen | null = null;
+  private activityScreen: ActivityFeedScreen | null = null;
+  private notificationRulesScreen: NotificationRulesScreen | null = null;
+  private auditLogScreen: AuditLogScreen | null = null;
 
   constructor(opts: TuiAppOptions) {
     const out = opts.output ?? new StdoutOutput();
@@ -387,6 +416,18 @@ export class TuiApp {
         case "new-doc":
           this._renderNewDoc();
           break;
+        case "inbox":
+          this.notificationsScreen?.render(this.renderer);
+          break;
+        case "activity":
+          this.activityScreen?.render(this.renderer);
+          break;
+        case "notification-rules":
+          this.notificationRulesScreen?.render(this.renderer);
+          break;
+        case "audit":
+          this.auditLogScreen?.render(this.renderer);
+          break;
       }
     } catch (error) {
       this.renderer.clearScreen();
@@ -547,6 +588,50 @@ export class TuiApp {
       return;
     }
 
+    if (this.currentScreen === "inbox" && this.notificationsScreen) {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      const consumed = await this.notificationsScreen.handleKey(key);
+      if (consumed) await this._renderCurrentScreen();
+      return;
+    }
+
+    if (this.currentScreen === "activity" && this.activityScreen) {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      const consumed = await this.activityScreen.handleKey(key);
+      if (consumed) await this._renderCurrentScreen();
+      return;
+    }
+
+    if (this.currentScreen === "notification-rules" && this.notificationRulesScreen) {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      const consumed = await this.notificationRulesScreen.handleKey(key);
+      if (consumed) await this._renderCurrentScreen();
+      return;
+    }
+
+    if (this.currentScreen === "audit" && this.auditLogScreen) {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      const consumed = await this.auditLogScreen.handleKey(key);
+      if (consumed) await this._renderCurrentScreen();
+      return;
+    }
+
     // Nav screen
     if (this.currentScreen === "nav") {
       await this._handleNavKey(key);
@@ -581,6 +666,14 @@ export class TuiApp {
     }
     if (key === "n") {
       await this._openNewDoc();
+      return;
+    }
+    if (key === "I") {
+      await this._navigate("inbox");
+      return;
+    }
+    if (key === "A") {
+      await this._navigate("activity");
       return;
     }
     if (key === "c") {
@@ -680,6 +773,47 @@ export class TuiApp {
     if (screen === "inference") {
       await this._loadInferenceBadge();
       await this._loadInferenceModels();
+    }
+
+    if (screen === "inbox") {
+      this.notificationsScreen = this.caller.notify?.list && this.caller.notify.markRead && this.caller.notify.mute
+        ? new NotificationsScreen({
+          caller: { notify: tuiNotifyCaller(this.caller.notify) as never },
+          initialBellCount: this.bellCount,
+          onOpenEntity: (entity) => {
+            this.renderer.writeln(c.dim(`  Open ${entity.kind}:${entity.id}`));
+          },
+        })
+        : null;
+      await this.notificationsScreen?.load();
+    }
+
+    if (screen === "activity") {
+      this.activityScreen = this.caller.audit
+        ? new ActivityFeedScreen({
+          caller: { audit: this.caller.audit as never },
+          filterChips: {
+            kind: ["task", "doc", "agent_run"],
+            verb: ["created", "updated", "completed"],
+            actor: [],
+          },
+        })
+        : null;
+      await this.activityScreen?.load();
+    }
+
+    if (screen === "notification-rules") {
+      this.notificationRulesScreen = this.caller.notify?.rules && this.caller.notify.quietHours
+        ? new NotificationRulesScreen({ caller: { notify: this.caller.notify as never } })
+        : null;
+      await this.notificationRulesScreen?.load();
+    }
+
+    if (screen === "audit") {
+      this.auditLogScreen = this.caller.audit
+        ? new AuditLogScreen({ caller: { audit: this.caller.audit as never } })
+        : null;
+      await this.auditLogScreen?.setFilters({});
     }
 
     await this._renderCurrentScreen();
@@ -834,6 +968,14 @@ function enrichTuiCaller(caller: TuiCaller, em: EntityManager | null): TuiCaller
         };
       },
     },
+  };
+}
+
+function tuiNotifyCaller(notify: NonNullable<TuiCaller["notify"]>) {
+  return {
+    ...notify,
+    mute: (input: { sourceKind: string; sourceId: string }) =>
+      notify.mute?.({ subjectKind: input.sourceKind, subjectId: input.sourceId } as never) ?? Promise.resolve({ ok: false }),
   };
 }
 
