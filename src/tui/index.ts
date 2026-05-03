@@ -41,6 +41,8 @@ import { JsonlCrashLog, type TuiCrashLog } from "./crashlog.ts";
 import { DbTelemetrySink, NullTelemetrySink, type TuiTelemetrySink } from "./telemetry.ts";
 import { ENTITY_MANAGER_TOKEN, registerDbBindings } from "../db/db.module.ts";
 import type { InferenceModel, ModelPullProgress } from "../inference/protocol.ts";
+import type { KeybindingMap, KeybindingAction } from "../keybindings/index.ts";
+import type { TuiTheme } from "./theme/index.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -120,7 +122,23 @@ export interface TuiAppOptions {
 
   /** Crash log writer for render errors. */
   crashLog?: TuiCrashLog;
+
+  /**
+   * Resolved keybinding map (Pillar 14). When provided, single-character
+   * shortcut keys are matched (case-insensitive) against the corresponding
+   * action in the action handler table.
+   */
+  keybindings?: KeybindingMap;
+
+  /** Resolved TUI theme contract (Pillar 17). Exposed via `app.theme`. */
+  theme?: TuiTheme;
 }
+
+/** Map keybinding action → semantic TuiAction handler key. */
+const KEYBINDING_TO_TUI_ACTION: Partial<Record<KeybindingAction, TuiAction>> = {
+  "task.create": "CreateItem",
+  "doc.create": "CreateItem",
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Screen enum
@@ -160,6 +178,8 @@ export class TuiApp {
   private readonly pathRouter: TuiRouter | null;
   private readonly telemetry: TuiTelemetrySink;
   private readonly crashLog: TuiCrashLog;
+  private readonly keybindings: KeybindingMap | null;
+  private readonly _theme: TuiTheme | null;
   private keyHandler: ((key: string) => void) | null = null;
 
   private currentScreen: Screen = "nav";
@@ -202,6 +222,13 @@ export class TuiApp {
       : null;
     this.telemetry = opts.telemetry ?? new NullTelemetrySink();
     this.crashLog = opts.crashLog ?? new JsonlCrashLog();
+    this.keybindings = opts.keybindings ?? null;
+    this._theme = opts.theme ?? null;
+  }
+
+  /** Resolved theme contract (Pillar 17), if injected. */
+  get theme(): TuiTheme | null {
+    return this._theme;
   }
 
   /**
@@ -467,6 +494,17 @@ export class TuiApp {
       return;
     }
 
+    // Keybinding registry dispatch (Pillar 14). Resolves single-character
+    // shortcuts to semantic TuiActions before per-screen routing.
+    const tuiAction = this._resolveKeybindingAction(key);
+    if (tuiAction) {
+      const handler = this.actions[tuiAction];
+      if (handler) {
+        await handler();
+        return;
+      }
+    }
+
     // Delegate to active screen
     if (this.currentScreen === "auth" && this.authScreen) {
       const consumed = this.authScreen.handleKey(key);
@@ -513,6 +551,21 @@ export class TuiApp {
     if (this.currentScreen === "nav") {
       await this._handleNavKey(key);
     }
+  }
+
+  private _resolveKeybindingAction(key: string): TuiAction | null {
+    if (!this.keybindings) return null;
+    if (!key || key.length !== 1) return null;
+    const upper = key.toUpperCase();
+    for (const [action, binding] of Object.entries(this.keybindings)) {
+      if (!binding) continue;
+      // Only match plain single-character shortcuts (no Ctrl/Alt/Shift chord).
+      if (binding.key.length === 1 && binding.key.toUpperCase() === upper) {
+        const tuiAction = KEYBINDING_TO_TUI_ACTION[action as KeybindingAction];
+        if (tuiAction) return tuiAction;
+      }
+    }
+    return null;
   }
 
   private async _handleNavKey(key: string): Promise<void> {
@@ -844,4 +897,16 @@ async function resolveActiveTuiSession(em: EntityManager | null): Promise<TuiCli
   } catch {
     return null;
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// launchTui — convenience launcher used by the `fulcrum tui` binary entry.
+// Constructs a TuiApp, mounts it, and returns the running instance.
+// Headless tests inject FakeTTY for both output + input.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function launchTui(opts: TuiAppOptions): Promise<TuiApp> {
+  const app = new TuiApp(opts);
+  await app.mount();
+  return app;
 }

@@ -2175,3 +2175,20 @@ CommandPalette already built (da59adf4) + wired into +layout.svelte (paletteOpen
 Validation: tests/vitest/cmdk-palette.test.ts (4 pass) covers Cmd+K open/Escape close, debounced 150ms search, kind:doc quick-filter parsing, group-by-kind, cache repeat-query, > command mode + create-task dispatch, Tab focus trap. Pre-existing bun:test SSR failure on CommandPalette.svelte.test.ts is unrelated harness issue (3 fails predate this change). docs-screens.test.ts CI red noted in dispatch — not touched.
 
 Status flipped → implemented. Out-of-scope src/tui/* diffs in worktree left unstaged.
+
+## 2026-05-03 — P15#01 TUI foundation parity (claude implementer)
+
+Issue: `.scratch/agent-os-vision/15-tui/issues/01-tui-foundation-launcher.md` (reopened 2026-05-02 for renderer/foundation parity).
+
+Added:
+- `src/tui/screen-registry.ts` — formal screen-key registry (register/get/list, dup-detection).
+- `launchTui(opts)` helper exported from `src/tui/index.ts` — convenience launcher used by `fulcrum tui` binary entry.
+- `TuiAppOptions.keybindings: KeybindingMap` (Pillar 14 contract). TuiApp resolves single-character shortcuts case-insensitively to semantic TuiActions (`task.create`/`doc.create` → `CreateItem`).
+- `TuiAppOptions.theme: TuiTheme` (Pillar 17 contract). Exposed via `app.theme` getter.
+- Tests: `tests/tui/launcher-parity.test.ts` (4 cases — registry contract, launcher boot/quit, keybinding-driven CreateItem dispatch, theme getter).
+
+RED: `tests/tui/launcher-parity.test.ts` failed with `Cannot find module '../../src/tui/screen-registry.ts'` + `launchTui` export missing + no `keybindings`/`theme` opt.
+
+GREEN: `bun test tests/tui/foundation.test.ts tests/tui/launcher-parity.test.ts tests/tui/smoke.test.ts tests/tui/theme.test.ts` → 50 pass / 0 fail. tsc clean for changed files. Pre-existing `tests/tui/docs-screens.test.ts` CI red left untouched per dispatch instructions.
+
+Frontmatter flipped → implemented; ImplRuntime: claude; RepairCompletedAt set.

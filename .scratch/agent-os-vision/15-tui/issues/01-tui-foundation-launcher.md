@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: tui
 Owner: codex-worker-tui-foundation
@@ -8,6 +8,9 @@ ReopenedAt: 2026-05-02T16:02:54Z
 ReopenedBecause: Resume wave landed partial harness only; remaining work includes production auth container, local_telemetry DB insert, and renderer integration.
 RepairProgressAt: 2026-05-02T16:24:24Z
 RepairProgress: Production DB/auth container and local_telemetry insert fixed; issue stays in-progress for renderer/foundation parity work.
+RepairCompletedAt: 2026-05-03T00:00:00Z
+ImplCommit: PENDING
+ImplRuntime: claude
 Blocked-by: []
 PRD: .scratch/agent-os-vision/prds/15-tui.md
 Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 15 section)
