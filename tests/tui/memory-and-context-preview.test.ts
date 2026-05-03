@@ -20,8 +20,10 @@ const memories = [
     body: "Use deterministic context assembly before every agent run.",
     tags: ["context", "agents"],
     importance: "high",
+    source: "manual",
     global: false,
     updatedAt: "2026-05-03T08:00:00Z",
+    links: [{ targetKind: "doc", targetId: "doc-1", label: "Agent OS vision" }],
   },
   {
     id: "memory-2",
@@ -31,6 +33,7 @@ const memories = [
     body: "Global memory applies across repositories.",
     tags: ["global"],
     importance: "medium",
+    source: "heuristic",
     global: true,
     updatedAt: "2026-05-03T09:00:00Z",
   },
@@ -54,6 +57,10 @@ describe("MemoryBrowserScreen", () => {
             if (memory) memory.global = true;
             return { ok: true };
           },
+          search: async () => memories,
+          archive: async () => ({ ok: true }),
+          delete: async () => ({ deleted: true }),
+          update: async (input) => ({ ...memories[0]!, ...input }),
         },
       },
     });
@@ -65,13 +72,13 @@ describe("MemoryBrowserScreen", () => {
     expect(initial).toContain("global-rules");
     expect(initial).toContain("Use deterministic context assembly");
 
-    await screen.handleKey("g");
+    await screen.handleKey("G");
     const globalOnly = renderPlain((renderer) => screen.render(renderer));
     expect(globalOnly).toContain("Global only");
     expect(globalOnly).toContain("global-rules");
     expect(globalOnly).not.toContain("deterministic-context");
 
-    await screen.handleKey("g");
+    await screen.handleKey("G");
     await screen.handleKey("/");
     screen.setSearchQuery("deterministic");
     const searched = renderPlain((renderer) => screen.render(renderer));
@@ -88,6 +95,137 @@ describe("MemoryBrowserScreen", () => {
     expect(promoted).toEqual(["memory-1"]);
     expect(renderPlain((renderer) => screen.render(renderer))).toContain("[global]");
     expect(listInputs[0]).toEqual({ projectId: "project-1" });
+  });
+
+  test("renders facets, filters rows from selected facet, and shows linked entities in detail", async () => {
+    const screen = new MemoryBrowserScreen({
+      projectId: "project-1",
+      caller: {
+        memory: {
+          list: async () => memories,
+          promote: async () => ({ ok: true }),
+          search: async () => memories,
+          archive: async () => ({ ok: true }),
+          delete: async () => ({ deleted: true }),
+          update: async (input) => ({ ...memories[0]!, ...input }),
+        },
+      },
+    });
+
+    await screen.load();
+    const initial = renderPlain((renderer) => screen.render(renderer));
+    for (const facet of ["Facets", "kind", "importance", "source", "project", "decision", "high", "manual", "project-1"]) {
+      expect(initial).toContain(facet);
+    }
+
+    await screen.handleKey("f");
+    await screen.handleKey("\r");
+    const filtered = renderPlain((renderer) => screen.render(renderer));
+    expect(filtered).toContain("Filter: kind=decision");
+    expect(filtered).toContain("deterministic-context");
+    expect(filtered).not.toContain("global-rules");
+
+    await screen.handleKey("\r");
+    const detail = renderPlain((renderer) => screen.render(renderer));
+    expect(detail).toContain("Linked entities");
+    expect(detail).toContain("doc:doc-1");
+    expect(detail).toContain("Agent OS vision");
+  });
+
+  test("searches through memory.search with debounce and replaces the list", async () => {
+    const searches: unknown[] = [];
+    const screen = new MemoryBrowserScreen({
+      projectId: "project-1",
+      searchDebounceMs: 5,
+      caller: {
+        memory: {
+          list: async () => memories,
+          promote: async () => ({ ok: true }),
+          search: async (input) => {
+            searches.push(input);
+            return [memories[1]!];
+          },
+          archive: async () => ({ ok: true }),
+          delete: async () => ({ deleted: true }),
+          update: async (input) => ({ ...memories[0]!, ...input }),
+        },
+      },
+    });
+
+    await screen.load();
+    screen.setSearchQuery("global");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(searches).toEqual([{ projectId: "project-1", query: "global" }]);
+    const rendered = renderPlain((renderer) => screen.render(renderer));
+    expect(rendered).toContain("Search: global");
+    expect(rendered).toContain("global-rules");
+    expect(rendered).not.toContain("deterministic-context");
+  });
+
+  test("archives, confirms delete, and opens inline edit for selected memory", async () => {
+    const archived: string[] = [];
+    const deleted: string[] = [];
+    const updates: unknown[] = [];
+    const screen = new MemoryBrowserScreen({
+      caller: {
+        memory: {
+          list: async () => memories,
+          promote: async () => ({ ok: true }),
+          search: async () => memories,
+          archive: async (input) => {
+            archived.push(input.id);
+            return { ok: true };
+          },
+          delete: async (input) => {
+            deleted.push(input.id);
+            return { deleted: true };
+          },
+          update: async (input) => {
+            updates.push(input);
+            return { ...memories[0]!, ...input };
+          },
+        },
+      },
+    });
+
+    await screen.load();
+    await screen.handleKey("e");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Edit memory");
+    await screen.submitEdit({ body: "Updated memory body.", importance: "medium", tags: ["edited"] });
+    expect(updates).toEqual([{ id: "memory-1", body: "Updated memory body.", importance: "medium", tags: ["edited"], forceEdit: true }]);
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Updated memory body.");
+
+    await screen.handleKey("a");
+    expect(archived).toEqual(["memory-1"]);
+    expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("deterministic-context");
+
+    await screen.handleKey("d");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Delete global-rules? [y/N]");
+    await screen.handleKey("y");
+    expect(deleted).toEqual(["memory-2"]);
+    expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("global-rules");
+  });
+
+  test("renders empty state with remember shortcut", async () => {
+    const screen = new MemoryBrowserScreen({
+      projectId: "project-empty",
+      caller: {
+        memory: {
+          list: async () => [],
+          promote: async () => ({ ok: true }),
+          search: async () => [],
+          archive: async () => ({ ok: true }),
+          delete: async () => ({ deleted: true }),
+          update: async (input) => input,
+        },
+      },
+    });
+
+    await screen.load();
+    const rendered = renderPlain((renderer) => screen.render(renderer));
+    expect(rendered).toContain("No memories for this project.");
+    expect(rendered).toContain("Press r to run memory remember");
   });
 });
 
