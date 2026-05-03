@@ -14,9 +14,23 @@ import { authRouter } from "../server/trpc/routers/auth.ts";
 import { flagsRouter } from "../server/trpc/routers/flags.ts";
 import { inferenceRouter } from "../server/trpc/routers/inference.ts";
 import { orgsRouter } from "../server/trpc/routers/orgs.ts";
+import { tasksRouter } from "../server/trpc/routers/tasks.ts";
 import { orchestrationRouter } from "./routers/orchestration.ts";
+import { notificationsRouter } from "./routers/notifications.ts";
+import { artifactsRouter } from "./routers/artifacts.ts";
 import { docTemplatesRouter } from "../server/trpc/routers/doc-templates.ts";
 import { credentialsRouter } from "../secrets/credentials-router.ts";
+import { webhooksRouter } from "./routers/webhooks.ts";
+import {
+  createSavedSearch,
+  deleteSavedSearch,
+  listSavedSearches,
+  SavedSearchCreateInputSchema,
+  SavedSearchDeleteInputSchema,
+  SavedSearchOutputSchema,
+  SavedSearchUpdateInputSchema,
+  updateSavedSearch,
+} from "../search/saved-searches.ts";
 
 const EmptyInputSchema = z.void();
 const IdInputSchema = z.object({ id: z.string().min(1) });
@@ -103,13 +117,6 @@ const projectsRouter = t.router({
     .query(() => ({})),
 });
 
-const tasksRouter = t.router({
-  ...crudProcedures("tasks"),
-  bulk: mutationProcedure("tasks", "bulk"),
-  move: mutationProcedure("tasks", "move"),
-  claim: idMutationProcedure("tasks", "claim"),
-});
-
 const sprintsRouter = t.router({
   ...crudProcedures("sprints"),
   activate: idMutationProcedure("sprints", "activate"),
@@ -176,13 +183,6 @@ const agentRunsRouter = t.router({
   retry: idMutationProcedure("agent_runs", "retry"),
 });
 
-const artifactsRouter = t.router({
-  list: listProcedure(),
-  get: getProcedure(),
-  download: getProcedure(),
-  delete: idMutationProcedure("artifacts", "delete"),
-});
-
 const reposRouter = t.router({
   list: listProcedure(),
   get: getProcedure(),
@@ -210,39 +210,22 @@ const searchRouter = t.router({
     .input(z.object({ q: z.string().default("") }))
     .output(z.array(z.string()))
     .query(() => []),
-  savedList: listProcedure(),
-  savedCreate: mutationProcedure("search", "savedCreate"),
-  savedDelete: idMutationProcedure("search", "savedDelete"),
-});
-
-const notifyRouter = t.router({
-  list: listProcedure(),
-  unreadCount: protectedProcedure
+  savedList: protectedProcedure
     .input(EmptyInputSchema)
-    .output(z.object({ count: z.number().int().nonnegative() }))
-    .query(() => ({ count: 0 })),
-  markRead: idMutationProcedure("notify", "markRead"),
-  mute: mutationProcedure("notify", "mute"),
-  unmute: mutationProcedure("notify", "unmute"),
-  rules: t.router({
-    list: listProcedure(),
-    get: getProcedure(),
-    create: mutationProcedure("notify.rules", "create"),
-    update: mutationProcedure("notify.rules", "update"),
-    delete: idMutationProcedure("notify.rules", "delete"),
-  }),
-  channels: t.router({
-    list: listProcedure(),
-    config: mutationProcedure("notify.channels", "config"),
-    test: mutationProcedure("notify.channels", "test"),
-  }),
-  quietHours: t.router({
-    get: protectedProcedure
-      .input(EmptyInputSchema)
-      .output(StubOperationOutputSchema)
-      .query(({ ctx }) => op(ctx, "notify.quietHours", "get")),
-    set: mutationProcedure("notify.quietHours", "set"),
-  }),
+    .output(z.array(SavedSearchOutputSchema))
+    .query(({ ctx }) => listSavedSearches(ctx)),
+  savedCreate: protectedProcedure
+    .input(SavedSearchCreateInputSchema)
+    .output(SavedSearchOutputSchema)
+    .mutation(({ ctx, input }) => createSavedSearch(ctx, input)),
+  savedUpdate: protectedProcedure
+    .input(SavedSearchUpdateInputSchema)
+    .output(SavedSearchOutputSchema)
+    .mutation(({ ctx, input }) => updateSavedSearch(ctx, input)),
+  savedDelete: protectedProcedure
+    .input(SavedSearchDeleteInputSchema)
+    .output(z.object({ ok: z.literal(true) }))
+    .mutation(({ ctx, input }) => deleteSavedSearch(ctx, input)),
 });
 
 const auditRouter = t.router({
@@ -279,13 +262,7 @@ const fulcrumSkillsRouter = t.router({
   resolveConflict: mutationProcedure("fulcrum_skills", "resolveConflict"),
 });
 
-const webhooksRouter = t.router({
-  ...crudProcedures("webhooks"),
-  deliveries: t.router({
-    list: listProcedure(),
-    get: getProcedure(),
-  }),
-});
+// webhooksRouter imported from ./routers/webhooks.ts (Pillar 13, Issue 07).
 
 const connectorsRouter = t.router({
   list: listProcedure(),
@@ -346,7 +323,7 @@ export const appRouter = t.router({
   repo_branches: repoBranchesRouter,
   repo_commits: repoCommitsRouter,
   search: searchRouter,
-  notify: notifyRouter,
+  notify: notificationsRouter,
   audit: auditRouter,
   routing: routingRouter,
   fulcrum_skills: fulcrumSkillsRouter,
@@ -364,7 +341,7 @@ export const appRouter = t.router({
   // Backward-compatible aliases for pre-P13 root names.
   memory: memoriesRouter,
   runs: agentRunsRouter,
-  notifications: notifyRouter,
+  notifications: notificationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

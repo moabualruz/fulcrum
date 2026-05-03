@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: notifications-activity-audit
 Blocked-by: [04-fanout-worker.md]
@@ -19,12 +19,12 @@ PRD: `.scratch/agent-os-vision/prds/12-notifications-activity-audit.md` (Issues 
 All `notify.*` tRPC procedures in `src/trpc/routers/notify.ts`. `list` (filters: unread, limit, offset); `unreadCount`; `markRead(id)`; `markAllRead`; `mute(subjectKind, subjectId, mutedUntil?)`; `unmute(subjectKind, subjectId)`; `rules.list/create/update/delete/get`; `channels.list/config/test`; `quietHours.get/set`. All Zod-validated; `assertPermission(ctx, 'notify:read'|'notify:write')` on each; mutations emit `events` rows where applicable (e.g. `notification_rule.created`).
 
 ## Acceptance criteria
-- [ ] Schema migration: reads/writes all notification entities through repositories.
-- [ ] tRPC procedure / module: all listed procedures in `notify.*` router; each has passing Zod unit test; `assertPermission` on each; unread count decrements on `markRead`.
+- [x] Schema migration: reads/writes all notification entities through repositories.
+- [x] tRPC procedure / module: all listed procedures in `notify.*` router; each has passing Zod unit test; `assertPermission` on each; unread count decrements on `markRead`.
 - [ ] Web surface: `/inbox` loads from `notify.list`; bell counter from `notify.unreadCount`; `/settings/notifications` loads from `notify.rules.list` + `notify.channels.list` + `notify.quietHours.get`.
 - [ ] CLI command: `fulcrum notify list --unread --json` returns `UserNotification[]`; `fulcrum notify mark-read <id>`; `fulcrum notify rules list --json`; `fulcrum notify mute task <task-id> --until 2026-12-31`.
 - [ ] TUI screen: Inbox reads from `notify.list`; `R` calls `notify.markRead`; `M` calls `notify.mute`.
-- [ ] Tests: each procedure Zod-validated (invalid input → error); permission checks (wrong org → forbidden); `markAllRead` clears all unread for user; `mute` creates row; `unmute` deletes row; rule CRUD round-trips; RED→GREEN.
+- [x] Tests: each procedure Zod-validated (invalid input → error); permission checks (wrong org → forbidden); `markAllRead` clears all unread for user; `mute` creates row; `unmute` deletes row; rule CRUD round-trips; RED→GREEN.
 
 ## Blocked by
 - `04-fanout-worker.md` — `user_notifications` rows needed for `list`/`unreadCount` tests.

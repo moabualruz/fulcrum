@@ -1,30 +1,48 @@
-/**
- * Zod schemas for the notifications domain.
- * Pillar 13 (notifications + webhooks) fills these out fully.
- *
- * C6: No raw SQL.
- * C4: Shared across web, CLI, and TUI surfaces.
- */
-
 import { z } from "zod";
 
-/** Notification channel — Pillar 13 extends with delivery adapters. */
-export const NotificationChannelSchema = z.enum(["in_app", "email", "slack", "webhook"]);
+export const ChannelNameSchema = z.enum(["in-app", "email", "slack", "webhook"]);
 
-/** Minimal Notification output schema — Pillar 13 extends with delivery state. */
-export const NotificationSchema = z.object({
-  id: z.string().uuid().describe("Unique notification identifier."),
-  orgId: z.string().uuid().describe("Organisation the notification belongs to."),
-  title: z.string().describe("Short human-readable notification title."),
-  channel: NotificationChannelSchema.describe("Delivery channel for the notification."),
-  createdAt: z.date().describe("Timestamp when the notification was created."),
+export const IdInputSchema = z.object({
+  id: z.string().uuid(),
 });
 
-/** Input for listing notifications — Pillar 13 adds filters/pagination. */
 export const ListNotificationsInputSchema = z.object({
-  orgId: z.string().uuid().optional().describe("Filter by organisation."),
+  unread: z.boolean().optional(),
+  limit: z.number().int().min(1).max(100).default(50),
+  offset: z.number().int().min(0).default(0),
 });
 
-export type Notification = z.infer<typeof NotificationSchema>;
-export type NotificationChannel = z.infer<typeof NotificationChannelSchema>;
-export type ListNotificationsInput = z.infer<typeof ListNotificationsInputSchema>;
+export const SubjectInputSchema = z.object({
+  subjectKind: z.string().min(1),
+  subjectId: z.string().uuid(),
+});
+
+export const MuteInputSchema = SubjectInputSchema.extend({
+  mutedUntil: z.date().nullable().optional(),
+});
+
+export const NotificationRuleCreateInputSchema = z.object({
+  name: z.string().min(1),
+  subjectKind: z.string().min(1).nullable().optional(),
+  eventPattern: z.record(z.string(), z.unknown()),
+  channels: z.array(ChannelNameSchema).min(1).default(["in-app"]),
+  enabled: z.boolean().default(true),
+});
+
+export const NotificationRuleUpdateInputSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).optional(),
+  subjectKind: z.string().min(1).nullable().optional(),
+  eventPattern: z.record(z.string(), z.unknown()).optional(),
+  channels: z.array(ChannelNameSchema).min(1).optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const QuietHoursSetInputSchema = z.object({
+  tz: z.string().min(1).default("UTC"),
+  startHour: z.number().int().min(0).max(23),
+  endHour: z.number().int().min(0).max(23),
+  daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1).max(7).default([0, 1, 2, 3, 4, 5, 6]),
+});
+
+export type NotificationChannel = z.infer<typeof ChannelNameSchema>;
