@@ -737,6 +737,119 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
   return { report, errors };
 }
 
+/**
+ * Orchestration health checks (P4#15): agent binaries, auth vars,
+ * docker/podman daemon, workspace writable, Effect singleton.
+ */
+async function buildOrchestrationChecks(): Promise<DoctorReport["orchestration"]> {
+  const checks: DoctorReport["orchestration"]["checks"] = [];
+
+  // 1. Agent binaries on PATH
+  const { listProfiles: lp } = await import("../agents/registry.ts");
+  const profiles = lp();
+  for (const profile of profiles) {
+    const binPath = await which(profile.cliPath);
+    if (binPath) {
+      checks.push({ name: `agent-binary:${profile.name}`, level: "ok", message: `${profile.cliPath} found at ${binPath}` });
+    } else {
+      checks.push({ name: `agent-binary:${profile.name}`, level: "warning", message: `${profile.cliPath} not on PATH` });
+    }
+  }
+
+  // 2. Auth env vars set (per profile)
+  for (const profile of profiles) {
+    const missing = profile.authEnvVars.filter((v) => !process.env[v]);
+    if (missing.length === 0) {
+      checks.push({ name: `auth-vars:${profile.name}`, level: "ok", message: "all auth env vars set" });
+    } else {
+      checks.push({ name: `auth-vars:${profile.name}`, level: "warning", message: `missing: ${missing.join(", ")}` });
+    }
+  }
+
+  // 3. Docker / Podman daemon reachable (only when sandcastleProvider requires it)
+  const needsDocker = profiles.some((p) => p.sandcastleProvider === "docker");
+  const needsPodman = profiles.some((p) => p.sandcastleProvider === "podman");
+  if (needsDocker) {
+    const dockerPath = await which("docker");
+    if (dockerPath) {
+      try {
+        const proc = Bun.spawn(["docker", "info"], { stdout: "ignore", stderr: "ignore" });
+        const code = await proc.exited;
+        checks.push({
+          name: "docker-daemon",
+          level: code === 0 ? "ok" : "error",
+          message: code === 0 ? "docker daemon reachable" : "docker daemon not reachable (exit " + code + ")",
+        });
+      } catch {
+        checks.push({ name: "docker-daemon", level: "error", message: "docker info failed" });
+      }
+    } else {
+      checks.push({ name: "docker-daemon", level: "error", message: "docker not on PATH but profile requires it" });
+    }
+  }
+  if (needsPodman) {
+    const podmanPath = await which("podman");
+    if (podmanPath) {
+      try {
+        const proc = Bun.spawn(["podman", "info"], { stdout: "ignore", stderr: "ignore" });
+        const code = await proc.exited;
+        checks.push({
+          name: "podman-daemon",
+          level: code === 0 ? "ok" : "error",
+          message: code === 0 ? "podman daemon reachable" : "podman daemon not reachable (exit " + code + ")",
+        });
+      } catch {
+        checks.push({ name: "podman-daemon", level: "error", message: "podman info failed" });
+      }
+    } else {
+      checks.push({ name: "podman-daemon", level: "error", message: "podman not on PATH but profile requires it" });
+    }
+  }
+
+  // 4. Workspace root writable
+  const home = process.env["HOME"] ?? "";
+  const workspaceRoot = process.env["FULCRUM_HOME"] ?? `${home}/.fulcrum`;
+  try {
+    const testFile = `${workspaceRoot}/.doctor-write-test-${Date.now()}`;
+    await Bun.write(testFile, "test");
+    const { unlink } = await import("node:fs/promises");
+    await unlink(testFile);
+    checks.push({ name: "workspace-writable", level: "ok", message: `${workspaceRoot} is writable` });
+  } catch {
+    checks.push({ name: "workspace-writable", level: "error", message: `${workspaceRoot} not writable` });
+  }
+
+  // 5. Effect singleton — check for multiple effect versions
+  try {
+    const effectPath = `${repoRoot()}/node_modules/effect`;
+    if (await exists(effectPath)) {
+      const nested = `${repoRoot()}/node_modules/.pnpm`;
+      let effectVersions = 0;
+      if (await exists(nested)) {
+        try {
+          const dirs = await readdir(nested);
+          effectVersions = dirs.filter((d) => d.startsWith("effect@")).length;
+        } catch {
+          effectVersions = 1;
+        }
+      } else {
+        effectVersions = 1;
+      }
+      if (effectVersions > 1) {
+        checks.push({ name: "effect-singleton", level: "error", message: `${effectVersions} effect versions — singleton violation` });
+      } else {
+        checks.push({ name: "effect-singleton", level: "ok", message: "effect singleton ok" });
+      }
+    } else {
+      checks.push({ name: "effect-singleton", level: "ok", message: "effect not installed (n/a)" });
+    }
+  } catch {
+    checks.push({ name: "effect-singleton", level: "ok", message: "effect check skipped" });
+  }
+
+  return { checks };
+}
+
 async function buildPackageParityReport(home: string): Promise<PackageParityReport[]> {
   const reports: PackageParityReport[] = [];
   for (const packageId of MANAGED_PACKAGE_IDS) {
@@ -1055,6 +1168,16 @@ function printHumanFormat(report: DoctorReport, home: string): void {
       const mark = agent.installed ? "✓" : "·";
       const note = agent.installed ? "installed" : "not installed";
       console.log(`  ${pad(agent.label, 14)} ${mark}  ${note}`);
+    }
+    console.log();
+  }
+
+  // Orchestration
+  if (report.orchestration.checks.length > 0) {
+    console.log("Orchestration:");
+    for (const check of report.orchestration.checks) {
+      const mark = check.level === "ok" ? "✓" : check.level === "warning" ? "⚠" : "✗";
+      console.log(`  ${mark} ${pad(check.name, 28)} ${check.message}`);
     }
     console.log();
   }
