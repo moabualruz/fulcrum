@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [07-trpc-memory-crud-and-search.md]
@@ -43,3 +43,7 @@ fulcrum context preview    --task <id> [--budget <n>] [--json]
 ## Blocked by
 
 - `07-trpc-memory-crud-and-search.md`
+
+## Implementation notes
+
+- 2026-05-03 codex: implemented scoped P8#10 CLI verbs from orchestrator task: `list`, `get`, `add`, `delete`, `search`, `promote` in `src/cli/commands/memory.ts`; added TDD coverage in `tests/cli/memory.test.ts`. RED: `bun test tests/cli/memory.test.ts` failed with missing module (6 fail). GREEN: `bun test tests/cli/memory.test.ts` (6 pass); `bun run lint` (pass).
