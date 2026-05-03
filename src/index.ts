@@ -1,29 +1,10 @@
 #!/usr/bin/env bun
 // fulcrum — multi-agent foundation CLI.
 
-import { GENERATED_DOMAIN_COMMANDS, isGeneratedDomainCommand } from "./cli/generated-domains.ts";
-
-const GENERATED_DOMAIN_HELP = GENERATED_DOMAIN_COMMANDS.map((name) => `  fulcrum ${name} ...`).join("\n");
-
 const HELP = `fulcrum — multi-agent foundation CLI
 
 Usage:
-  fulcrum init                       Bootstrap local org + admin session.
-  fulcrum auth <whoami|invite|login|logout>
-                                     Manage local CLI authentication.
-  fulcrum flags <list|set> [--json]  Manage feature flags.
-  fulcrum routing rules <list|add|edit|delete> [--json]
-                                     Manage task routing rules.
-  fulcrum routing <assign|simulate> [--json]
-                                     Test task routing decisions.
-  fulcrum docs template list [--json]
-                                     List seeded documentation templates.
-  fulcrum db <migrate|status|history>
-                                     Manage local schema migrations.
-  fulcrum web                        Start the SvelteKit web server.
-  fulcrum tui                        Start the TUI (stub).
-  fulcrum inference start|status|stop [--json]
-                                     Manage the local inference sidecar.
+  fulcrum init [DIR]                 Bootstrap a project (AGENTS.md, .claude/CLAUDE.md, .gitignore).
   fulcrum hook <name> [args...]      Run a hook recipe (reads JSON envelope on stdin).
                                      Recipes: format, lint-gate, pm-policy, test-on-edit,
                                               audit-log, index-check, index-rebuild, router
@@ -65,10 +46,8 @@ Usage:
                                      Run an FTS query over the product kernel search index.
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
                                      Render the assembled Markdown context for a task.
-  fulcrum symphony runs list --state ready [--json]
-                                     List Symphony candidate tasks ready for dispatch.
-  Generated domains:
-${GENERATED_DOMAIN_HELP}
+  fulcrum notify <verb>              Notification inbox, rules, channels CLI surface.
+  fulcrum audit <query|export>       Query and export audit events.
   fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
   fulcrum version                    Print version.
   fulcrum help                       This message.
@@ -81,93 +60,11 @@ Environment:
 
 const VERSION = "0.1.0";
 
-const HAND_WRITTEN_COMMANDS = [
-  "init",
-  "auth",
-  "flags",
-  "routing",
-  "docs",
-  "db",
-  "web",
-  "tui",
-  "inference",
-  "symphony",
-  "runs",
-  "notify",
-  "audit",
-  "webhooks",
-  "connectors",
-  "hook",
-  "hooks",
-  "skills",
-  "install",
-  "uninstall",
-  "doctor",
-  "compress",
-  "mcp",
-  "component",
-  "product",
-  "version",
-  "help",
-] as const;
-
-function editDistance(a: string, b: string): number {
-  const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
-  const current = Array<number>(b.length + 1);
-
-  for (let i = 1; i <= a.length; i += 1) {
-    current[0] = i;
-    for (let j = 1; j <= b.length; j += 1) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      current[j] = Math.min(
-        (current[j - 1] ?? i) + 1,
-        (previous[j] ?? j) + 1,
-        (previous[j - 1] ?? j) + cost,
-      );
-    }
-    previous.splice(0, previous.length, ...current);
-  }
-
-  return previous[b.length] ?? a.length;
-}
-
-function suggestCommand(command: string): string | null {
-  const candidates = [...HAND_WRITTEN_COMMANDS, ...GENERATED_DOMAIN_COMMANDS];
-  const ranked = candidates
-    .map((candidate) => ({ candidate, distance: editDistance(command, candidate) }))
-    .sort((a, b) => a.distance - b.distance || a.candidate.localeCompare(b.candidate));
-  const best = ranked[0];
-  if (!best || best.distance > Math.max(2, Math.floor(command.length / 3))) return null;
-  return best.candidate;
-}
-
-export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<void> {
+async function main() {
+  const argv = Bun.argv.slice(2);
   const [cmd = "help", ...rest] = argv;
 
   switch (cmd) {
-    case "init":
-    case "auth":
-    case "flags":
-    case "routing":
-    case "docs":
-    case "db":
-    case "web":
-    case "tui":
-    case "inference":
-    case "symphony": {
-      const { run: runCli } = await import("./cli/index.ts");
-      await runCli([cmd, ...rest]);
-      return;
-    }
-    case "runs":
-    case "notify":
-    case "audit":
-    case "webhooks":
-    case "connectors": {
-      const { run: runCli } = await import("./cli/index.ts");
-      await runCli([cmd, ...rest]);
-      return;
-    }
     case "hook": {
       const [name, ...args] = rest;
       if (!name) {
@@ -185,6 +82,11 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "skills": {
       const { run: runSkills } = await import("./cli/skills.ts");
       await runSkills(rest);
+      return;
+    }
+    case "init": {
+      const { run: runInit } = await import("./cli/init.ts");
+      await runInit(rest);
       return;
     }
     case "install": {
@@ -222,10 +124,16 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       await runProduct(rest);
       return;
     }
-    case isGeneratedDomainCommand(cmd) ? cmd : undefined:
-      console.error(`fulcrum: generated domain '${cmd}' is scaffolded, but runtime tRPC invocation is not wired yet`);
-      process.exit(1);
+    case "notify": {
+      const { run: runNotify } = await import("./cli/notify.ts");
+      await runNotify(rest);
       return;
+    }
+    case "audit": {
+      const { run: runAudit } = await import("./cli/audit.ts");
+      await runAudit(rest);
+      return;
+    }
     case "version":
     case "--version":
     case "-v":
@@ -238,10 +146,7 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       return;
     default:
       console.error(`fulcrum: unknown command '${cmd}'`);
-      {
-        const suggestion = suggestCommand(cmd);
-        if (suggestion) console.error(`Did you mean '${suggestion}'?`);
-      }
+      console.error(HELP);
       process.exit(1);
   }
 }
@@ -298,9 +203,7 @@ async function runHook(name: string, _args: string[]) {
   }
 }
 
-if (import.meta.main) {
-  run().catch((err) => {
-    console.error(`fulcrum: fatal: ${(err as Error).message}`);
-    process.exit(1);
-  });
-}
+main().catch((err) => {
+  console.error(`fulcrum: fatal: ${(err as Error).message}`);
+  process.exit(1);
+});
