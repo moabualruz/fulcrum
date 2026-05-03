@@ -58,6 +58,11 @@ import type { TaskDependencies } from "./schemas.ts";
     'CREATE INDEX "tasks_custom_fields_gin" ON "tasks" USING GIN ("custom_fields")',
 })
 @Index({
+  name: "tasks_dependencies_gin",
+  expression:
+    'CREATE INDEX "tasks_dependencies_gin" ON "tasks" USING GIN ("dependencies")',
+})
+@Index({
   name: "tasks_org_external_id",
   expression:
     'CREATE UNIQUE INDEX "tasks_org_external_id" ON "tasks" ("org_id", "external_id") WHERE "external_id" IS NOT NULL',

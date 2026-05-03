@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { Container } from "@needle-di/core";
 
 import { createTestOrm } from "../../src/test-utils/db.ts";
+import { Event } from "../../src/db/entities/core/Event.ts";
 import { Task } from "../../src/db/entities/tasks/Task.ts";
 import { TaskRepository } from "../../src/db/repositories/tasks/TaskRepository.ts";
 import { appRouter } from "../../src/trpc/router.ts";
@@ -149,5 +150,130 @@ describe("tasks CRUD tRPC baseline", () => {
     }
 
     expect(error?.code).toBe("UNAUTHORIZED");
+  });
+});
+
+describe("tasks subtasks and dependencies tRPC", () => {
+  test("setParent rejects direct cycles and accepts deeper non-cycles", async () => {
+    const db = await createTestOrm();
+    try {
+      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const caller = callerFor(repo);
+
+      const a = await caller.tasks.create({ title: "A" });
+      const b = await caller.tasks.create({ title: "B" });
+      const c = await caller.tasks.create({ title: "C" });
+
+      await expect(caller.tasks.setParent({ taskId: b.id, parentId: a.id })).resolves
+        .toMatchObject({ id: b.id, parentId: a.id });
+      await expect(caller.tasks.setParent({ taskId: c.id, parentId: b.id })).resolves
+        .toMatchObject({ id: c.id, parentId: b.id });
+
+      await expect(caller.tasks.setParent({ taskId: a.id, parentId: c.id })).rejects
+        .toMatchObject({ code: "CONFLICT", message: "Task parent cycle rejected." });
+
+      const events = await repo.getEntityManager().find(Event, {
+        org: ORG_ID,
+        verb: "parent_changed",
+        subjectKind: "task",
+        subjectId: b.id,
+      } as never);
+      expect(events).toHaveLength(1);
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("listChildren returns direct children for a 3-level nesting tree", async () => {
+    const db = await createTestOrm();
+    try {
+      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const caller = callerFor(repo);
+
+      const root = await caller.tasks.create({ title: "Root" });
+      const child = await caller.tasks.create({ title: "Child" });
+      const grandchild = await caller.tasks.create({ title: "Grandchild" });
+
+      await caller.tasks.setParent({ taskId: child.id, parentId: root.id });
+      await caller.tasks.setParent({ taskId: grandchild.id, parentId: child.id });
+
+      expect((await caller.tasks.listChildren({ taskId: root.id })).map((task) => task.id))
+        .toEqual([child.id]);
+      expect((await caller.tasks.listChildren({ taskId: child.id })).map((task) => task.id))
+        .toEqual([grandchild.id]);
+      expect(await caller.tasks.listChildren({ taskId: grandchild.id })).toEqual([]);
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("setDependencies rejects circular blocks with typed error", async () => {
+    const db = await createTestOrm();
+    try {
+      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const caller = callerFor(repo);
+
+      const a = await caller.tasks.create({ title: "A" });
+      const b = await caller.tasks.create({ title: "B" });
+
+      await expect(
+        caller.tasks.setDependencies({
+          taskId: a.id,
+          dependencies: { blocks: [b.id], blocked_by: [] },
+        }),
+      ).resolves.toMatchObject({
+        id: a.id,
+        dependencies: { blocks: [b.id], blocked_by: [] },
+      });
+
+      await expect(
+        caller.tasks.setDependencies({
+          taskId: b.id,
+          dependencies: { blocks: [a.id], blocked_by: [] },
+        }),
+      ).rejects.toMatchObject({
+        code: "CONFLICT",
+        message: "Task dependency cycle rejected.",
+      });
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("setDependencies stores normalized directions and emits dependency_updated", async () => {
+    const db = await createTestOrm();
+    try {
+      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const caller = callerFor(repo);
+
+      const blocked = await caller.tasks.create({ title: "Blocked" });
+      const blocker = await caller.tasks.create({ title: "Blocker" });
+
+      const updated = await caller.tasks.setDependencies({
+        taskId: blocked.id,
+        dependencies: { blocks: [], blocked_by: [blocker.id] },
+      });
+
+      expect(updated).toMatchObject({
+        id: blocked.id,
+        dependencies: { blocks: [], blocked_by: [blocker.id] },
+      });
+
+      const blockerRow = await caller.tasks.get({ id: blocker.id });
+      expect(blockerRow).toMatchObject({
+        id: blocker.id,
+        dependencies: { blocks: [blocked.id], blocked_by: [] },
+      });
+
+      const events = await repo.getEntityManager().find(Event, {
+        org: ORG_ID,
+        verb: "dependency_updated",
+        subjectKind: "task",
+        subjectId: blocked.id,
+      } as never);
+      expect(events).toHaveLength(1);
+    } finally {
+      await db.close();
+    }
   });
 });
