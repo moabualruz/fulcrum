@@ -1,5 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplCommit: 13d67cb2
+ImplRuntime: codex
 Triage: AFK
 Pillar: 07-docs-editor-collab
 Blocked-by: [05-doc-crud-trpc.md, 06-slash-menu-core-marks-blocks.md]

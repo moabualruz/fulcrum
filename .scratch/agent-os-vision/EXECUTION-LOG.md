@@ -2290,7 +2290,7 @@ Commit: 6b8d05d1
 ## 2026-05-03 — codex (P7#23 gated LLM narration)
 
 Issue: `.scratch/agent-os-vision/07-docs-editor-collab/issues/23-gated-llm-narration.md`
-Status: blocked at commit/metadata step
+Status: implemented
 
 Implemented in working tree:
 - `src/docs/llm-narrator.ts` — feature-gated summary pipeline, backend suffix parse, sidecar injection for tests, summary prepend/replace helpers, failure logs warning and preserves save.
@@ -2303,5 +2303,4 @@ Verification:
 - `bun run ci` BLOCKED at typecheck by unrelated pre-existing errors in `src/product-kernel/store/repositories.ts` and `tests/tui/sprints-and-reports.test.ts`.
 - `bun test` BLOCKED by unrelated existing failures/hang in CLI/vendor/inference/router tests.
 
-Blocker:
-- Sandbox denies git metadata writes: `git add` fails creating `.git/index.lock`; direct `.git/objects/*` probe also `Operation not permitted`. No commit SHA available, so issue status left unchanged and `ImplCommit` not written.
+Commit: 13d67cb2
