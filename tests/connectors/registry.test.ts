@@ -110,6 +110,23 @@ describe("ConnectorRegistry", () => {
     });
   });
 
+  it("throws FeatureDisabledError for Confluence and Notion flags when off", async () => {
+    const registry = new ConnectorRegistry({
+      isFeatureEnabled: async () => false,
+    });
+    registry.register(adapter("confluence"));
+    registry.register(adapter("notion"));
+
+    await expect(registry.enable("confluence", { orgId: "org-1" })).rejects.toMatchObject({
+      flag: "connector-confluence",
+      kind: "confluence",
+    });
+    await expect(registry.enable("notion", { orgId: "org-1" })).rejects.toMatchObject({
+      flag: "connector-notion",
+      kind: "notion",
+    });
+  });
+
   it("enables connector when connector flag is on", async () => {
     const registry = new ConnectorRegistry({
       isFeatureEnabled: async () => true,

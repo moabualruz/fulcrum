@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: api-and-webhooks
 Blocked-by: [13/issues/09-connector-framework-interface.md]
@@ -30,11 +30,11 @@ Both adapters: one-way; no push. `connector_runs` recorded. Idempotent by `exter
 
 ## Acceptance criteria
 
-- [ ] Confluence `pull()` against mocked API: Fulcrum docs created with `doc_type='wiki'`; `scope='project'` if project connector; TipTap JSON round-trips.
-- [ ] Notion `pull()` against mocked API: database rows → tasks with correct field mapping; pages → docs.
-- [ ] Both adapters idempotent: re-pull with same source data → no duplicate rows.
-- [ ] `healthCheck()` passes with valid mock credentials; `auth_failed` on 401.
-- [ ] Both flags tested: OFF → `FeatureDisabledError`; ON → sync completes.
+- [x] Confluence `pull()` against mocked API: Fulcrum docs created with `doc_type='wiki'`; `scope='project'` if project connector; TipTap JSON round-trips.
+- [x] Notion `pull()` against mocked API: database rows → tasks with correct field mapping; pages → docs.
+- [x] Both adapters idempotent: re-pull with same source data → no duplicate rows.
+- [x] `healthCheck()` passes with valid mock credentials; `auth_failed` on 401.
+- [x] Both flags tested: OFF → `FeatureDisabledError`; ON → sync completes.
 - [ ] Web, CLI, TUI all show `connector_runs` run log for both connectors.
 
 ## Blocked by

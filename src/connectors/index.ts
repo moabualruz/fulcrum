@@ -15,3 +15,5 @@ export {
   type ConnectorState,
 } from "./registry.ts";
 export { GitHubIssuesConnector, type GitHubIssuesConnectorOptions } from "./github-issues.ts";
+export { ConfluenceConnector, type ConfluenceConnectorOptions } from "./confluence.ts";
+export { NotionConnector, type NotionConnectorOptions } from "./notion.ts";
