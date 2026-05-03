@@ -3,6 +3,7 @@
 	import { enhance } from "$app/forms";
 	import type { ActionData, PageData } from "./$types";
 	import type { JSONContent } from "@tiptap/core";
+	import CommentsPanel from "$lib/components/editor/CommentsPanel.svelte";
 	import DocEditor from "$lib/components/editor/DocEditor.svelte";
 	import { buttonVariants } from "$lib/components/ui/button";
 	import { cn } from "$lib/utils.js";
@@ -60,29 +61,30 @@
 	</div>
 </header>
 
-<form
-	method="POST"
-	data-doc-edit-form
-	use:enhance
-	class={cn("flex flex-col gap-4 max-w-3xl")}
->
-	<div class={cn("flex flex-col gap-1.5")}>
-		<label for="doc-title" class={cn("text-sm font-medium")}>Title</label>
-		<input
-			id="doc-title"
-			name="title"
-			type="text"
-			data-doc-title
-			bind:value={titleValue}
-			aria-invalid={titleError ? "true" : undefined}
-			required
-			maxlength="120"
-			class={cn("border-input bg-background h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
-		/>
-		{#if titleError}
-			<p data-error-title class={cn("text-destructive text-xs")}>{titleError}</p>
-		{/if}
-	</div>
+<div data-doc-edit-with-comments class={cn("grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]")}>
+	<form
+		method="POST"
+		data-doc-edit-form
+		use:enhance
+		class={cn("flex max-w-3xl flex-col gap-4")}
+	>
+		<div class={cn("flex flex-col gap-1.5")}>
+			<label for="doc-title" class={cn("text-sm font-medium")}>Title</label>
+			<input
+				id="doc-title"
+				name="title"
+				type="text"
+				data-doc-title
+				bind:value={titleValue}
+				aria-invalid={titleError ? "true" : undefined}
+				required
+				maxlength="120"
+				class={cn("border-input bg-background h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
+			/>
+			{#if titleError}
+				<p data-error-title class={cn("text-destructive text-xs")}>{titleError}</p>
+			{/if}
+		</div>
 
 	<div class={cn("flex flex-col gap-1.5")}>
 		<label for="doc-kind" class={cn("text-sm font-medium")}>Kind</label>
@@ -124,16 +126,21 @@
 		{/if}
 	</div>
 
-	<div class={cn("flex items-center gap-2 pt-2")}>
-		<button
-			type="submit"
-			data-doc-save
-			class={cn(buttonVariants({ variant: "default" }))}
-		>Save</button>
-		<a
-			href="/docs/{data.doc.id}"
-			data-doc-cancel
-			class={cn(buttonVariants({ variant: "outline" }))}
-		>Cancel</a>
+		<div class={cn("flex items-center gap-2 pt-2")}>
+			<button
+				type="submit"
+				data-doc-save
+				class={cn(buttonVariants({ variant: "default" }))}
+			>Save</button>
+			<a
+				href="/docs/{data.doc.id}"
+				data-doc-cancel
+				class={cn(buttonVariants({ variant: "outline" }))}
+			>Cancel</a>
+		</div>
+	</form>
+
+	<div data-comments-sidebar>
+		<CommentsPanel threads={[]} resolvedThreads={[]} />
 	</div>
-</form>
+</div>

@@ -3,6 +3,8 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { Org } from "../../../db/entities/auth/Org.ts";
+import { User } from "../../../db/entities/auth/User.ts";
+import { DocComment } from "../../../db/entities/docs/DocComment.ts";
 import { DocLink } from "../../../db/entities/docs/DocLink.ts";
 import { Document } from "../../../db/entities/docs/Document.ts";
 import { DocVersion } from "../../../db/entities/docs/DocVersion.ts";
@@ -95,8 +97,56 @@ const ForwardLinkOutputSchema = z.object({
   toSlug: z.string(),
   linkKind: z.literal("wikilink"),
 });
+const CommentAnchorSchema = z.record(z.string(), z.unknown());
+const CommentReplyOutputSchema = z.object({
+  id: z.uuid(),
+  orgId: z.string().regex(/^[0-9a-fA-F-]{36}$/),
+  docId: z.uuid(),
+  anchorRange: CommentAnchorSchema.nullable(),
+  authorId: z.uuid().nullable(),
+  bodyMd: z.string(),
+  parentCommentId: z.uuid().nullable(),
+  resolved: z.boolean(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  replies: z.array(z.never()),
+});
+const CommentOutputSchema = z.object({
+  id: z.uuid(),
+  orgId: z.string().regex(/^[0-9a-fA-F-]{36}$/),
+  docId: z.uuid(),
+  anchorRange: CommentAnchorSchema.nullable(),
+  authorId: z.uuid().nullable(),
+  bodyMd: z.string(),
+  parentCommentId: z.uuid().nullable(),
+  resolved: z.boolean(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  replies: z.array(CommentReplyOutputSchema),
+});
+const ListCommentsInputSchema = z.object({
+  docId: z.uuid(),
+  resolved: z.boolean().optional(),
+});
+const CreateCommentInputSchema = z.object({
+  docId: z.uuid(),
+  anchorRange: CommentAnchorSchema.nullable().optional(),
+  bodyMd: z.string().trim().min(1),
+  parentCommentId: z.uuid().nullable().optional(),
+});
+const UpdateCommentInputSchema = z.object({
+  id: z.uuid(),
+  bodyMd: z.string().trim().min(1),
+});
+const DeleteCommentInputSchema = z.object({ id: z.uuid() });
+const ResolveCommentInputSchema = z.object({
+  id: z.uuid(),
+  resolved: z.boolean().default(true),
+});
+const DeleteCommentOutputSchema = z.object({ deleted: z.literal(true) });
 
 type DocOutput = z.infer<typeof DocOutputSchema>;
+type CommentOutput = z.infer<typeof CommentOutputSchema>;
 type AuthCtx = {
   orgId: string;
   userId: string;
@@ -236,6 +286,53 @@ async function resolveParent(
   return parent;
 }
 
+function anchorPosition(comment: DocComment): number {
+  const from = comment.anchorRange?.from;
+  return typeof from === "number" ? from : Number.MAX_SAFE_INTEGER;
+}
+
+function serializeComment(comment: DocComment, replies: CommentOutput["replies"] = []): CommentOutput {
+  return {
+    id: comment.id,
+    orgId: comment.org.id,
+    docId: comment.doc.id,
+    anchorRange: comment.anchorRange,
+    authorId: comment.author?.id ?? null,
+    bodyMd: comment.bodyMd,
+    parentCommentId: comment.parentComment?.id ?? null,
+    resolved: comment.resolved,
+    createdAt: comment.createdAt,
+    updatedAt: comment.updatedAt,
+    replies,
+  };
+}
+
+async function findComment(
+  em: import("@mikro-orm/postgresql").EntityManager,
+  orgId: string,
+  id: string,
+): Promise<DocComment | null> {
+  return em.findOne(DocComment, { org: orgId, id } as never, {
+    populate: ["org", "doc", "author", "parentComment"],
+  });
+}
+
+async function assertCommentDeleteAllowed(
+  em: import("@mikro-orm/postgresql").EntityManager,
+  ctx: AuthCtx,
+  comment: DocComment,
+): Promise<void> {
+  if (comment.author?.id === ctx.userId) return;
+
+  const user = await em.findOne(User, { orgId: ctx.orgId, id: ctx.userId });
+  if (user?.role === "owner" || user?.role === "admin") return;
+
+  throw new TRPCError({
+    code: "FORBIDDEN",
+    message: "Only the author or an org admin can delete this comment.",
+  });
+}
+
 export const docsRouter = t.router({
   list: protectedProcedure
     .input(ListDocsInputSchema)
@@ -355,6 +452,141 @@ export const docsRouter = t.router({
       await em.flush();
       return serializeDoc(doc);
     }),
+
+  comments: t.router({
+    list: protectedProcedure
+      .input(ListCommentsInputSchema)
+      .output(z.array(CommentOutputSchema))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.em) return [];
+        const em = requireEntityManager(ctx);
+        const doc = await em.findOne(Document, { org: ctx.orgId, id: input.docId } as never);
+        if (!doc) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Document not found." });
+        }
+
+        const comments = await em.find(DocComment, {
+          org: ctx.orgId,
+          doc: input.docId,
+          resolved: input.resolved ?? false,
+        } as never, {
+          populate: ["org", "doc", "author", "parentComment"],
+          orderBy: { createdAt: "ASC", id: "ASC" },
+        });
+        const roots = comments
+          .filter((comment) => comment.parentComment === null)
+          .sort((left, right) => anchorPosition(left) - anchorPosition(right));
+        const repliesByParent = new Map<string, DocComment[]>();
+        for (const comment of comments) {
+          const parentId = comment.parentComment?.id;
+          if (!parentId) continue;
+          const replies = repliesByParent.get(parentId) ?? [];
+          replies.push(comment);
+          repliesByParent.set(parentId, replies);
+        }
+
+        return roots.map((comment) => serializeComment(
+          comment,
+          (repliesByParent.get(comment.id) ?? []).map((reply) => serializeComment(reply, []) as CommentOutput["replies"][number]),
+        ));
+      }),
+
+    create: protectedProcedure
+      .input(CreateCommentInputSchema)
+      .output(CommentOutputSchema)
+      .mutation(async ({ ctx, input }) => {
+        const em = requireEntityManager(ctx);
+        const doc = await em.findOne(Document, { org: ctx.orgId, id: input.docId, archived: false } as never);
+        if (!doc) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Document not found." });
+        }
+
+        let parentComment: DocComment | null = null;
+        if (input.parentCommentId) {
+          parentComment = await em.findOne(DocComment, {
+            org: ctx.orgId,
+            doc: input.docId,
+            id: input.parentCommentId,
+          } as never);
+          if (!parentComment) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Parent comment not found." });
+          }
+        }
+
+        const author = await em.findOne(User, { orgId: ctx.orgId, id: ctx.userId });
+        const comment = em.create(DocComment, {
+          id: randomUUID(),
+          org: em.getReference(Org, ctx.orgId),
+          doc,
+          anchorRange: input.anchorRange ?? null,
+          author,
+          bodyMd: input.bodyMd,
+          parentComment,
+          resolved: parentComment?.resolved ?? false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as never);
+        em.persist(comment);
+        await em.flush();
+        return serializeComment(comment);
+      }),
+
+    update: protectedProcedure
+      .input(UpdateCommentInputSchema)
+      .output(CommentOutputSchema.nullable())
+      .mutation(async ({ ctx, input }) => {
+        const em = requireEntityManager(ctx);
+        const comment = await findComment(em, ctx.orgId, input.id);
+        if (!comment) return null;
+        if (comment.author?.id !== ctx.userId) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only the author can update this comment.",
+          });
+        }
+
+        comment.bodyMd = input.bodyMd;
+        comment.updatedAt = new Date();
+        em.persist(comment);
+        await em.flush();
+        return serializeComment(comment);
+      }),
+
+    delete: protectedProcedure
+      .input(DeleteCommentInputSchema)
+      .output(DeleteCommentOutputSchema.nullable())
+      .mutation(async ({ ctx, input }) => {
+        const em = requireEntityManager(ctx);
+        const comment = await findComment(em, ctx.orgId, input.id);
+        if (!comment) return null;
+
+        await assertCommentDeleteAllowed(em, ctx, comment);
+        em.remove(comment);
+        await em.flush();
+        return { deleted: true };
+      }),
+
+    resolve: protectedProcedure
+      .input(ResolveCommentInputSchema)
+      .output(CommentOutputSchema.nullable())
+      .mutation(async ({ ctx, input }) => {
+        const em = requireEntityManager(ctx);
+        const comment = await findComment(em, ctx.orgId, input.id);
+        if (!comment) return null;
+        if (comment.parentComment) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Only root comment threads can be resolved.",
+          });
+        }
+
+        comment.resolved = input.resolved;
+        comment.updatedAt = new Date();
+        em.persist(comment);
+        await em.flush();
+        return serializeComment(comment);
+      }),
+  }),
 
   templates: docTemplatesRouter,
 

@@ -16,17 +16,22 @@
     content?: JSONContent;
     save?: (contentJson: JSONContent, bodyMd: string) => Promise<void> | void;
     onchange?: (event: CustomEvent<{ contentJson: JSONContent; bodyMd: string }>) => void;
+    oncomment?: (event: CustomEvent<{ anchorRange: { from: number; to: number; text_preview: string } }>) => void;
     ariaLabel?: string;
   }
 
   const EMPTY_DOC: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
   const ALL_ITEMS = getSlashMenuItems();
-  const dispatch = createEventDispatcher<{ change: { contentJson: JSONContent; bodyMd: string } }>();
+  const dispatch = createEventDispatcher<{
+    change: { contentJson: JSONContent; bodyMd: string };
+    comment: { anchorRange: { from: number; to: number; text_preview: string } };
+  }>();
 
   let {
     content = EMPTY_DOC,
     save,
     onchange,
+    oncomment,
     ariaLabel = "Document editor",
   }: Props = $props();
 
@@ -102,6 +107,21 @@
     void tick().then(() => {
       if (editor) handleUpdate(editor);
     });
+  }
+
+  function createCommentAnchor(): void {
+    if (!editor) return;
+    const selectionText = window.getSelection()?.toString() ?? "";
+    const { from, to } = editor.state.selection;
+    const preview = selectionText || editor.state.doc.textBetween(from, to, " ", " ");
+    if (!preview.trim()) return;
+    const anchorRange = {
+      from,
+      to: Math.max(to, from + preview.length),
+      text_preview: preview,
+    };
+    dispatch("comment", { anchorRange });
+    oncomment?.(new CustomEvent("comment", { detail: { anchorRange } }));
   }
 
   function handleKeydown(event: KeyboardEvent): void {
@@ -211,6 +231,7 @@
       <button type="button" aria-label="Code block" title="Code block" data-doc-code-block onclick={() => editor?.chain().focus().toggleCodeBlock().run()}>{`</>`}</button>
       <button type="button" aria-label="Table" title="Table" data-doc-table onclick={() => editor && insertSlashMenuItem(editor, "table")}>▦</button>
       <button type="button" aria-label="Unlink" title="Unlink" data-doc-unlink onclick={() => editor?.chain().focus().unsetLink().run()}>⨯</button>
+      <button type="button" aria-label="Comment" title="Comment" data-doc-comment onclick={createCommentAnchor}>💬</button>
     </div>
     <div class="doc-editor__surface">
       <EditorContent editor={editor as never} class="doc-editor__content" />

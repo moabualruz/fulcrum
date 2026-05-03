@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from "$app/forms";
 	import type { PageData } from "./$types";
+	import CommentsPanel from "$lib/components/editor/CommentsPanel.svelte";
 	import MarkdownPreview from "$lib/components/markdown/MarkdownPreview.svelte";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 	import { buttonVariants } from "$lib/components/ui/button";
@@ -33,6 +34,7 @@
 			<a href="/docs" data-back-docs class={cn("text-sm text-muted-foreground hover:underline")}>← Documents</a>
 			<h1 data-doc-title class={cn("text-2xl font-semibold tracking-tight")}>{doc.title}</h1>
 			<span data-doc-kind-pill class={cn("rounded bg-muted px-2 py-0.5 text-xs")}>{doc.kind}</span>
+			<span data-doc-comment-count class={cn("rounded bg-muted px-2 py-0.5 text-xs")}>0 comments</span>
 			{#if doc.project_id}
 				<span data-doc-project class={cn("text-xs text-muted-foreground")}>{doc.project_id}</span>
 			{/if}
@@ -47,7 +49,12 @@
 		</div>
 	</header>
 
-	<MarkdownPreview value={doc.body} />
+	<div data-doc-read-with-comments class={cn("grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]")}>
+		<MarkdownPreview value={doc.body} />
+		<div data-comments-sidebar>
+			<CommentsPanel threads={[]} resolvedThreads={[]} readonly />
+		</div>
+	</div>
 
 	<div class={cn("my-8 border-t border-border")}></div>
 

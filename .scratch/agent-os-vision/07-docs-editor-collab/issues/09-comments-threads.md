@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 07-docs-editor-collab
 Blocked-by: [02-tiptap-svelte-binding-spike.md, 05-doc-crud-trpc.md]
@@ -25,19 +25,19 @@ tRPC: `docs.comments.list`, `docs.comments.create`, `docs.comments.update`,
 `docs.comments.delete`, `docs.comments.resolve`.
 
 ## Acceptance criteria
-- [ ] TipTap Comment extension wired: select text → toolbar "comment" button → new thread anchored to selection
-- [ ] `doc_comments` row created: `anchor_range` jsonb stores TipTap comment mark reference, `body_md` not empty
-- [ ] `CommentsPanel.svelte`: lists all non-resolved threads ordered by position in document; resolved threads collapsible
-- [ ] Hover over thread in panel → highlights corresponding text range in editor
-- [ ] Thread reply: `parent_comment_id` set; replies nested under parent in panel
-- [ ] Resolve thread: `resolved=true`, thread collapses in panel, gutter indicator removed; data preserved in DB
-- [ ] Re-open: resolved thread can be re-opened (sets `resolved=false`)
-- [ ] `docs.comments.delete`: only author or org admin can delete; cascade deletes replies
-- [ ] Tests: create comment → resolve → re-open lifecycle integration test on PGlite
-- [ ] Tests: cascade — delete root comment, all replies removed
-- [ ] Tests: `docs.comments.list` returns only non-resolved by default; `resolved=true` param returns resolved
-- [ ] Web: `/docs/<slug>/edit` shows `CommentsPanel` as slide-in sidebar; gutter indicator dots on commented lines
-- [ ] Web: `/docs/<slug>` read view shows comment count badge; comments panel read-only (no new anchoring from read view)
+- [x] TipTap Comment extension wired: select text → toolbar "comment" button → new thread anchored to selection
+- [x] `doc_comments` row created: `anchor_range` jsonb stores TipTap comment mark reference, `body_md` not empty
+- [x] `CommentsPanel.svelte`: lists all non-resolved threads ordered by position in document; resolved threads collapsible
+- [x] Hover over thread in panel → highlights corresponding text range in editor
+- [x] Thread reply: `parent_comment_id` set; replies nested under parent in panel
+- [x] Resolve thread: `resolved=true`, thread collapses in panel, gutter indicator removed; data preserved in DB
+- [x] Re-open: resolved thread can be re-opened (sets `resolved=false`)
+- [x] `docs.comments.delete`: only author or org admin can delete; cascade deletes replies
+- [x] Tests: create comment → resolve → re-open lifecycle integration test on PGlite
+- [x] Tests: cascade — delete root comment, all replies removed
+- [x] Tests: `docs.comments.list` returns only non-resolved by default; `resolved=true` param returns resolved
+- [x] Web: `/docs/<slug>/edit` shows `CommentsPanel` as slide-in sidebar; gutter indicator dots on commented lines
+- [x] Web: `/docs/<slug>` read view shows comment count badge; comments panel read-only (no new anchoring from read view)
 - [ ] CLI: `fulcrum docs comments list <slug> --json` returns `[{id, body_md, anchor_range, resolved, replies:[…]}]`
 - [ ] TUI: no inline comment creation (TipTap unavailable); CLI fallback noted in TUI help text
 
