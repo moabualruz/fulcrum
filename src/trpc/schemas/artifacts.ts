@@ -51,38 +51,38 @@ export const LegacyArtifactSchema = z.object({
 /** Input for listing artifacts. */
 export const ListArtifactsInputSchema = z.object({
   orgId: UuidSchema.optional().describe("Filter by organisation. Omit for current org."),
-  projectId: UuidSchema.optional(),
-  runId: UuidSchema.optional(),
-  taskId: UuidSchema.optional(),
-  archived: z.boolean().optional(),
-  mime: z.string().min(1).optional(),
-  createdFrom: z.date().optional(),
-  createdTo: z.date().optional(),
+  projectId: UuidSchema.optional().describe("Filter by project."),
+  runId: UuidSchema.optional().describe("Filter by producing run."),
+  taskId: UuidSchema.optional().describe("Filter by linked task."),
+  archived: z.boolean().optional().describe("Filter by archive state."),
+  mime: z.string().min(1).optional().describe("Filter by MIME type."),
+  createdFrom: z.date().optional().describe("Filter artifacts created at or after this timestamp."),
+  createdTo: z.date().optional().describe("Filter artifacts created at or before this timestamp."),
 }).default({});
 
 export const ArtifactIdInputSchema = z.object({
-  id: UuidSchema,
+  id: UuidSchema.describe("Artifact identifier."),
 });
 
 export const UploadArtifactInputSchema = z.object({
-  filename: z.string().min(1),
-  mime: z.string().min(1),
-  sizeBytes: BigIntStringSchema,
-  taskId: UuidSchema.optional(),
-  runId: UuidSchema.optional(),
-  docId: UuidSchema.optional(),
-  projectId: UuidSchema.optional(),
-  metadataJson: z.record(z.string(), z.unknown()).optional(),
+  filename: z.string().min(1).describe("Original filename."),
+  mime: z.string().min(1).describe("MIME type."),
+  sizeBytes: BigIntStringSchema.describe("File size in bytes as a decimal string."),
+  taskId: UuidSchema.optional().describe("Linked task, when available."),
+  runId: UuidSchema.optional().describe("Producing run, when available."),
+  docId: UuidSchema.optional().describe("Linked document, when available."),
+  projectId: UuidSchema.optional().describe("Project scope, when available."),
+  metadataJson: z.record(z.string(), z.unknown()).optional().describe("Artifact metadata."),
 });
 
 export const DownloadArtifactOutputSchema = z.object({
-  artifact: ArtifactSchema,
-  url: z.string(),
+  artifact: ArtifactSchema.describe("Artifact metadata."),
+  url: z.string().describe("Download URL or storage path."),
 });
 
 export const DeleteArtifactOutputSchema = z.object({
-  ok: z.literal(true),
-  id: UuidSchema,
+  ok: z.literal(true).describe("Whether deletion completed."),
+  id: UuidSchema.describe("Deleted artifact identifier."),
 });
 
 export type Artifact = z.infer<typeof ArtifactSchema>;
