@@ -1058,6 +1058,32 @@ export async function run(args: string[]): Promise<void> {
   const isJsonOutput = args.includes("--json");
   const probe = args.includes("--probe");
 
+  // --subsystem <name>: run only that subsystem's checks and exit.
+  const subsystemIdx = args.indexOf("--subsystem");
+  if (subsystemIdx !== -1) {
+    const subsystem = args[subsystemIdx + 1];
+    if (subsystem === "api") {
+      const { runApiDoctorChecks, buildDefaultApiDoctorConfig } = await import("../doctor/checks/api.ts");
+      const result = await runApiDoctorChecks(buildDefaultApiDoctorConfig());
+      if (isJsonOutput) {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        console.log("fulcrum doctor — api subsystem\n");
+        for (const c of result.checks) {
+          const mark = c.status === "pass" ? "✓" : c.status === "warn" ? "⚠" : c.status === "skip" ? "·" : "✗";
+          console.log(`  ${mark}  ${pad(c.name, 30)} ${c.status}  ${c.message}`);
+          if (c.recovery) console.log(`     recovery: ${c.recovery}`);
+        }
+        console.log();
+        console.log(`  pass=${result.summary.pass} warn=${result.summary.warn} fail=${result.summary.fail} skip=${result.summary.skip}`);
+      }
+      if (result.summary.fail > 0) process.exit(1);
+      return;
+    }
+    console.error(`fulcrum doctor: unknown subsystem '${subsystem}'`);
+    process.exit(2);
+  }
+
   const { report, errors } = await buildReport({ probe });
 
   if (isJsonOutput) {
