@@ -9,33 +9,94 @@
 	}
 
 	let { data }: Props = $props();
+
+	function formatTimestamp(value: string): string {
+		const d = new Date(value);
+		return d.toLocaleString("en-US", {
+			year: "numeric",
+			month: "short",
+			day: "numeric",
+			hour: "2-digit",
+			minute: "2-digit",
+		});
+	}
+
+	let selectedVersion = $state<number | null>(null);
+	let diffView = $state(false);
+
+	function selectVersion(version: number): void {
+		selectedVersion = version;
+		diffView = true;
+	}
+
+	const selectedData = $derived(
+		data.versions.find((v) => v.version === selectedVersion),
+	);
 </script>
 
-<header data-doc-history-header class={cn("flex items-baseline justify-between gap-4 border-b border-border pb-4 mb-4")}>
+<header
+	data-doc-history-header
+	class={cn("flex items-baseline justify-between gap-4 border-b border-border pb-4 mb-4")}
+>
 	<div class={cn("flex items-baseline gap-3")}>
-		<a href="/docs/{data.doc.id}" data-back-doc class={cn("text-sm text-muted-foreground hover:underline")}>← {data.doc.title}</a>
+		<a
+			href="/docs/{data.doc.id}"
+			data-back-doc
+			class={cn("text-sm text-muted-foreground hover:underline")}
+		>← {data.doc.title}</a>
 		<h1 class={cn("text-2xl font-semibold tracking-tight")}>History</h1>
 	</div>
 </header>
 
-<div data-doc-history-view class={cn("grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]")}>
-	<ol data-doc-history-timeline class={cn("space-y-2")}>
-		{#each data.versions as version (version.id)}
-			<li data-doc-version={version.versionNum} class={cn("rounded-md border border-border p-3")}>
-				<div class={cn("flex items-center justify-between gap-2")}>
-					<a href="?to={version.versionNum}" class={cn("font-medium hover:underline")}>Version {version.versionNum}</a>
-					{#if version.isSnapshot}
-						<span data-snapshot-badge class={cn("rounded bg-muted px-2 py-0.5 text-xs")}>snapshot</span>
-					{/if}
+{#if data.versions.length === 0}
+	<div
+		data-empty-history
+		class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
+	>No version history yet.</div>
+{:else}
+	<div class={cn("grid grid-cols-[minmax(200px,1fr)_2fr] gap-6")}>
+		<div data-version-list class={cn("flex flex-col gap-1")}>
+			{#each data.versions as ver (ver.version)}
+				<button
+					type="button"
+					data-version-item
+					data-version={ver.version}
+					data-selected={selectedVersion === ver.version ? "true" : undefined}
+					onclick={() => selectVersion(ver.version)}
+					class={cn(
+						"flex flex-col gap-0.5 rounded-md border px-3 py-2 text-left text-sm transition-colors",
+						selectedVersion === ver.version
+							? "border-primary bg-primary/5"
+							: "border-border hover:bg-muted/50",
+					)}
+				>
+					<span class={cn("font-medium")}>Version {ver.version}</span>
+					<span class={cn("text-xs text-muted-foreground")}>{ver.author} — {formatTimestamp(ver.created_at)}</span>
+				</button>
+			{/each}
+		</div>
+
+		{#if diffView && selectedData}
+			<div data-version-detail class={cn("flex flex-col gap-4")}>
+				<div class={cn("flex items-center justify-between")}>
+					<h2 class={cn("text-lg font-semibold")}>Version {selectedData.version}</h2>
+					<form method="POST" action="?/restore" use:enhance>
+						<input type="hidden" name="version" value={selectedData.version} />
+						<button
+							type="submit"
+							data-restore-btn
+							class={cn(buttonVariants({ variant: "outline" }))}
+						>Restore this version</button>
+					</form>
 				</div>
-				<form method="POST" action="?/restore" use:enhance class={cn("mt-2")}>
-					<input type="hidden" name="version_num" value={version.versionNum} />
-					<button data-restore-version class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>Restore</button>
-				</form>
-			</li>
-		{/each}
-	</ol>
-	<section data-doc-history-diff class={cn("rounded-md border border-border p-4")}>
-		{@html data.diffHtml}
-	</section>
-</div>
+				<div class={cn("rounded-md border border-border p-4")}>
+					<h3 data-version-title class={cn("mb-2 text-sm font-medium")}>{selectedData.title}</h3>
+					<pre
+						data-version-body
+						class={cn("whitespace-pre-wrap text-sm text-muted-foreground")}
+					>{selectedData.body}</pre>
+				</div>
+			</div>
+		{/if}
+	</div>
+{/if}

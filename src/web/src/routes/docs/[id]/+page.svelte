@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from "$app/forms";
 	import type { PageData } from "./$types";
-	import CommentsPanel from "$lib/components/editor/CommentsPanel.svelte";
+	import MarkdownPreview from "$lib/components/markdown/MarkdownPreview.svelte";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 	import { buttonVariants } from "$lib/components/ui/button";
 	import { cn } from "$lib/utils.js";
@@ -25,7 +25,6 @@
 	<RouteSkeleton kind="detail" />
 {:then payload}
 	{@const doc = payload.doc}
-	{@const backlinks = payload.backlinks ?? []}
 	<header
 		data-doc-detail-header
 		class={cn("flex items-baseline justify-between gap-4 border-b border-border pb-4 mb-4")}
@@ -34,13 +33,17 @@
 			<a href="/docs" data-back-docs class={cn("text-sm text-muted-foreground hover:underline")}>← Documents</a>
 			<h1 data-doc-title class={cn("text-2xl font-semibold tracking-tight")}>{doc.title}</h1>
 			<span data-doc-kind-pill class={cn("rounded bg-muted px-2 py-0.5 text-xs")}>{doc.kind}</span>
-			<span data-doc-comment-count class={cn("rounded bg-muted px-2 py-0.5 text-xs")}>0 comments</span>
 			{#if doc.project_id}
 				<span data-doc-project class={cn("text-xs text-muted-foreground")}>{doc.project_id}</span>
 			{/if}
 		</div>
 		<div class={cn("flex items-center gap-2")}>
 			<span data-doc-updated class={cn("text-xs text-muted-foreground")}>Updated {formatUpdated(doc.updated_at)}</span>
+			<a
+				data-doc-history
+				href="/docs/{doc.id}/history"
+				class={cn(buttonVariants({ variant: "ghost" }), "text-xs")}
+			>History</a>
 			<a
 				data-doc-edit
 				href="/docs/{doc.id}/edit"
@@ -49,40 +52,22 @@
 		</div>
 	</header>
 
-	<div data-doc-read-with-comments class={cn("grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]")}>
+	<div class={cn("grid grid-cols-[1fr_minmax(0,200px)] gap-6")}>
 		<div>
-			<nav data-doc-breadcrumbs class={cn("mb-3 text-sm text-muted-foreground")}>
-				<a href="/docs" class={cn("hover:underline")}>Docs</a>
-				<span aria-hidden="true"> / </span>
-				<span>{doc.title}</span>
-			</nav>
-			<section data-doc-frontmatter-card class={cn("mb-4 rounded-md border border-border p-3")}>
-				<h2 class={cn("text-sm font-semibold")}>Frontmatter</h2>
-				{#if doc.frontmatter.status}
-					<span data-doc-status-badge class={cn("mt-2 inline-flex rounded bg-muted px-2 py-0.5 text-xs")}>{doc.frontmatter.status}</span>
-				{/if}
-			</section>
-			<article
-				data-markdown-preview
-				data-doc-rendered-html
-				class={cn("prose prose-zinc dark:prose-invert max-w-none")}
-			>{@html doc.renderedHtml}</article>
+			<MarkdownPreview value={doc.body} />
 		</div>
-		<div data-comments-sidebar>
-			<section data-backlinks-panel class={cn("mb-4 rounded-md border border-border p-3")}>
-				<h2 class={cn("text-sm font-semibold")}>Backlinks</h2>
-				{#if backlinks.length === 0}
-					<p class={cn("mt-2 text-xs text-muted-foreground")}>No backlinks.</p>
-				{:else}
-					<ul class={cn("mt-2 space-y-1 text-sm")}>
-						{#each backlinks as backlink (backlink.id)}
-							<li><a data-backlink href={backlink.href} class={cn("hover:underline")}>{backlink.title}</a></li>
-						{/each}
-					</ul>
-				{/if}
-			</section>
-			<CommentsPanel threads={[]} resolvedThreads={[]} readonly />
-		</div>
+		{#if payload.backlinks && payload.backlinks.length > 0}
+			<aside data-backlinks-sidebar class={cn("flex flex-col gap-2")}>
+				<h2 class={cn("text-sm font-semibold text-muted-foreground")}>Backlinks</h2>
+				{#each payload.backlinks as link (link.source_doc_id)}
+					<a
+						href="/docs/{link.source_doc_id}"
+						data-backlink
+						class={cn("text-sm hover:underline")}
+					>{link.title}</a>
+				{/each}
+			</aside>
+		{/if}
 	</div>
 
 	<div class={cn("my-8 border-t border-border")}></div>

@@ -75,6 +75,11 @@
 		>← {data.doc.title}</a>
 		<h1 class={cn("text-2xl font-semibold tracking-tight")}>Edit document</h1>
 	</div>
+	<a
+		data-doc-history
+		href="/docs/{data.doc.id}/history"
+		class={cn(buttonVariants({ variant: "ghost" }), "text-xs")}
+	>History</a>
 </header>
 
 <div data-doc-edit-with-comments class={cn("grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]")}>
