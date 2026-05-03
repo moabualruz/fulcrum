@@ -2,25 +2,26 @@ import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { openProductDb, getDefaultOrgId } from "../../../../../lib/server/db";
 import {
-  createSavedView,
-  updateSavedView,
-  deleteSavedView,
-  listSavedViews,
-  VIEW_SCOPES,
-  type ViewScope,
-} from "../../../../../lib/server/saved-views";
+  createCustomField,
+  updateCustomField,
+  archiveCustomField,
+  listCustomFields,
+  FIELD_TYPES,
+  type FieldType,
+} from "../../../../../lib/server/custom-fields";
 
 export const load: PageServerLoad = async ({ params }) => {
   const db = await openProductDb();
   try {
     const orgId = await getDefaultOrgId(db);
+    // Verify project exists
     const projRows = await db.query<{ id: string }>(
       `SELECT id FROM projects WHERE id = $1 AND org_id = $2`,
       [params.id, orgId],
     );
     if (projRows.length === 0) throw error(404, "Project not found");
-    const views = await listSavedViews(db, params.id);
-    return { views, projectId: params.id };
+    const fields = await listCustomFields(db, params.id);
+    return { fields, projectId: params.id };
   } finally {
     await db.close();
   }
@@ -30,31 +31,26 @@ export const actions: Actions = {
   create: async ({ params, request }) => {
     const fd = await request.formData();
     const name = (fd.get("name") as string | null)?.trim();
-    const scope = (fd.get("scope") as string | null) || "project";
-    const filtersRaw = fd.get("filters") as string | null;
-    const isDefault = fd.get("isDefault") === "on";
+    const fieldType = fd.get("fieldType") as string | null;
+    const required = fd.get("required") === "on";
+    const optionsRaw = fd.get("options") as string | null;
     if (!name) return fail(400, { error: "Name is required" });
-    if (!VIEW_SCOPES.includes(scope as ViewScope)) {
-      return fail(400, { error: "Invalid scope" });
+    if (!fieldType || !FIELD_TYPES.includes(fieldType as FieldType)) {
+      return fail(400, { error: "Invalid field type" });
     }
-    let filters: Record<string, unknown> = {};
-    if (filtersRaw) {
-      try {
-        filters = JSON.parse(filtersRaw);
-      } catch {
-        return fail(400, { error: "Invalid filters JSON" });
-      }
-    }
+    const options = optionsRaw
+      ? optionsRaw.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
     const db = await openProductDb();
     try {
       const orgId = await getDefaultOrgId(db);
-      await createSavedView(db, {
+      await createCustomField(db, {
         orgId,
         projectId: params.id!,
         name,
-        scope: scope as ViewScope,
-        filters,
-        isDefault,
+        fieldType: fieldType as FieldType,
+        required,
+        options,
       });
     } finally {
       await db.close();
@@ -66,26 +62,26 @@ export const actions: Actions = {
     const id = fd.get("id") as string | null;
     if (!id) return fail(400, { error: "id required" });
     const name = fd.get("name") as string | null;
-    const isDefaultRaw = fd.get("isDefault");
+    const sortOrderRaw = fd.get("sortOrder") as string | null;
     const db = await openProductDb();
     try {
-      await updateSavedView(db, {
+      await updateCustomField(db, {
         id,
         ...(name ? { name: name.trim() } : {}),
-        ...(isDefaultRaw != null ? { isDefault: isDefaultRaw === "on" } : {}),
+        ...(sortOrderRaw != null ? { sortOrder: Number(sortOrderRaw) } : {}),
       });
     } finally {
       await db.close();
     }
     return { success: true };
   },
-  delete: async ({ request }) => {
+  archive: async ({ request }) => {
     const fd = await request.formData();
     const id = fd.get("id") as string | null;
     if (!id) return fail(400, { error: "id required" });
     const db = await openProductDb();
     try {
-      await deleteSavedView(db, id);
+      await archiveCustomField(db, id);
     } finally {
       await db.close();
     }

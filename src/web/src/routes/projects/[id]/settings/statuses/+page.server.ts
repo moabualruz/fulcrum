@@ -2,13 +2,11 @@ import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { openProductDb, getDefaultOrgId } from "../../../../../lib/server/db";
 import {
-  createSavedView,
-  updateSavedView,
-  deleteSavedView,
-  listSavedViews,
-  VIEW_SCOPES,
-  type ViewScope,
-} from "../../../../../lib/server/saved-views";
+  createProjectStatus,
+  updateProjectStatus,
+  deleteProjectStatus,
+  listProjectStatuses,
+} from "../../../../../lib/server/project-statuses";
 
 export const load: PageServerLoad = async ({ params }) => {
   const db = await openProductDb();
@@ -19,8 +17,8 @@ export const load: PageServerLoad = async ({ params }) => {
       [params.id, orgId],
     );
     if (projRows.length === 0) throw error(404, "Project not found");
-    const views = await listSavedViews(db, params.id);
-    return { views, projectId: params.id };
+    const statuses = await listProjectStatuses(db, params.id);
+    return { statuses, projectId: params.id };
   } finally {
     await db.close();
   }
@@ -30,31 +28,18 @@ export const actions: Actions = {
   create: async ({ params, request }) => {
     const fd = await request.formData();
     const name = (fd.get("name") as string | null)?.trim();
-    const scope = (fd.get("scope") as string | null) || "project";
-    const filtersRaw = fd.get("filters") as string | null;
-    const isDefault = fd.get("isDefault") === "on";
+    const color = (fd.get("color") as string | null)?.trim() || "#6b7280";
+    const isFinal = fd.get("isFinal") === "on";
     if (!name) return fail(400, { error: "Name is required" });
-    if (!VIEW_SCOPES.includes(scope as ViewScope)) {
-      return fail(400, { error: "Invalid scope" });
-    }
-    let filters: Record<string, unknown> = {};
-    if (filtersRaw) {
-      try {
-        filters = JSON.parse(filtersRaw);
-      } catch {
-        return fail(400, { error: "Invalid filters JSON" });
-      }
-    }
     const db = await openProductDb();
     try {
       const orgId = await getDefaultOrgId(db);
-      await createSavedView(db, {
+      await createProjectStatus(db, {
         orgId,
         projectId: params.id!,
         name,
-        scope: scope as ViewScope,
-        filters,
-        isDefault,
+        color,
+        isFinal,
       });
     } finally {
       await db.close();
@@ -66,13 +51,17 @@ export const actions: Actions = {
     const id = fd.get("id") as string | null;
     if (!id) return fail(400, { error: "id required" });
     const name = fd.get("name") as string | null;
-    const isDefaultRaw = fd.get("isDefault");
+    const color = fd.get("color") as string | null;
+    const isFinalRaw = fd.get("isFinal");
+    const sortOrderRaw = fd.get("sortOrder") as string | null;
     const db = await openProductDb();
     try {
-      await updateSavedView(db, {
+      await updateProjectStatus(db, {
         id,
         ...(name ? { name: name.trim() } : {}),
-        ...(isDefaultRaw != null ? { isDefault: isDefaultRaw === "on" } : {}),
+        ...(color ? { color: color.trim() } : {}),
+        ...(isFinalRaw != null ? { isFinal: isFinalRaw === "on" } : {}),
+        ...(sortOrderRaw != null ? { sortOrder: Number(sortOrderRaw) } : {}),
       });
     } finally {
       await db.close();
@@ -85,7 +74,7 @@ export const actions: Actions = {
     if (!id) return fail(400, { error: "id required" });
     const db = await openProductDb();
     try {
-      await deleteSavedView(db, id);
+      await deleteProjectStatus(db, id);
     } finally {
       await db.close();
     }

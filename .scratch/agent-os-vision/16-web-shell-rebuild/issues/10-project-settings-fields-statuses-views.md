@@ -1,6 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
+ImplRuntime: claude
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/09-task-detail-and-bulk-ops.md, 06-tasks-and-scrum/issues/03-task-detail-and-custom-fields.md]
 PRD: .scratch/agent-os-vision/prds/16-web-shell-rebuild.md
