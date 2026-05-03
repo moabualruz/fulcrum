@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplRuntime: claude
 Triage: AFK
 Pillar: notifications-activity-audit
 Blocked-by: [04-fanout-worker.md, 07-quiet-hours.md]
