@@ -92,6 +92,11 @@ const HAND_WRITTEN_COMMANDS = [
   "tui",
   "inference",
   "symphony",
+  "runs",
+  "notify",
+  "audit",
+  "webhooks",
+  "connectors",
   "hook",
   "hooks",
   "skills",
@@ -150,6 +155,15 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "tui":
     case "inference":
     case "symphony": {
+      const { run: runCli } = await import("./cli/index.ts");
+      await runCli([cmd, ...rest]);
+      return;
+    }
+    case "runs":
+    case "notify":
+    case "audit":
+    case "webhooks":
+    case "connectors": {
       const { run: runCli } = await import("./cli/index.ts");
       await runCli([cmd, ...rest]);
       return;

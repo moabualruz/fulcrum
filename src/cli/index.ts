@@ -39,6 +39,11 @@ Usage:
   fulcrum repos <register|list|sync|unregister|status> [options]
   fulcrum docs template list [--json]
   fulcrum symphony runs list --state ready [--json]
+  fulcrum runs <list|cancel> [--json]
+  fulcrum notify list [--unread] [--json|--watch]
+  fulcrum audit <query|export> [--json]
+  fulcrum webhooks <list|test> [--json]
+  fulcrum connectors <enable|sync> <id> [--json]
   fulcrum db <migrate|status|history> [options]
   fulcrum web
   fulcrum tui
@@ -337,6 +342,26 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       const { container, cleanup } = await buildDbContainer();
       try {
         await runSymphony(rest, { container });
+      } finally {
+        await cleanup();
+      }
+      return;
+    }
+    case "runs":
+    case "notify":
+    case "audit":
+    case "webhooks":
+    case "connectors": {
+      const { runPillar14Command } = await import("./commands/pillar14-generated.ts");
+      const helpOnly = rest.includes("--help") || rest.includes("-h") || rest[0] === "help";
+      if (helpOnly) {
+        await runPillar14Command(cmd, rest);
+        return;
+      }
+
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runPillar14Command(cmd, rest, { container });
       } finally {
         await cleanup();
       }
