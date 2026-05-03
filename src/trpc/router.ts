@@ -33,6 +33,7 @@ import { notificationsRouter } from "./routers/notifications.ts";
 import { artifactsRouter } from "./routers/artifacts.ts";
 import { reposRouter } from "./routers/repos.ts";
 import { credentialsRouter } from "../secrets/credentials-router.ts";
+import { reportsRouter } from "./routers/reports.ts";
 import { webhooksRouter } from "./routers/webhooks.ts";
 import { getProfile, listProfiles } from "../agents/registry.ts";
 import { AgentProfileSchema } from "../agents/types.ts";
@@ -357,6 +358,7 @@ export const appRouter = t.router({
   connectors: connectorsRouter,
   doctor: doctorRouter,
   invitations: invitationsRouter,
+  reports: reportsRouter,
   credentials: credentialsRouter,
 
   db: dbRouter,
