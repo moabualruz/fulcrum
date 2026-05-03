@@ -1,10 +1,12 @@
 <script lang="ts">
   import KanbanBoard from "$lib/components/board/KanbanBoard.svelte";
   import ProjectViewSwitcher from "$lib/components/board/ProjectViewSwitcher.svelte";
+  import InContextSearchBar from "$lib/components/search/InContextSearchBar.svelte";
   import TaskCalendar from "$lib/components/tasks/TaskCalendar.svelte";
   import TaskList from "$lib/components/tasks/TaskList.svelte";
   import TaskTable from "$lib/components/tasks/TaskTable.svelte";
   import TaskTimeline from "$lib/components/tasks/TaskTimeline.svelte";
+  import SavedViewFilterBuilder from "$lib/components/saved-views/SavedViewFilterBuilder.svelte";
   import { cn } from "$lib/utils.js";
   import type { PageData } from "./$types";
 
@@ -27,6 +29,13 @@
   </header>
 
   <ProjectViewSwitcher projectId={data.project.id} active={activeView} />
+  <InContextSearchBar kind="task" projectId={data.project.id} placeholder="Search tasks" />
+  <SavedViewFilterBuilder
+    projectId={data.project.id}
+    activeView={activeView}
+    query={data.transientQuery}
+    savedViews={data.savedViews}
+  />
   {#if activeView === "list"}
     <TaskList projectId={data.project.id} tasks={data.tasks} />
   {:else if activeView === "table"}

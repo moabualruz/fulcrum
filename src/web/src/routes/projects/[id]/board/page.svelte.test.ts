@@ -1,5 +1,12 @@
 import type { Component } from "svelte";
-import { beforeAll, describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, mock, test } from "bun:test";
+
+mock.module("svelte-tiptap", () => ({
+  createEditor: () => ({
+    subscribe: () => () => {},
+  }),
+  EditorContent: "div",
+}));
 
 type PageProps = {
   data: {
@@ -21,8 +28,12 @@ type PageProps = {
     activeSprint?: null;
     month?: string;
     view: string;
+    transientQuery?: { filters: unknown[]; sort: null; group: null };
+    savedViews?: unknown[];
   };
 };
+
+const transientQuery = { filters: [], sort: null, group: null };
 
 describe("/projects/[id]/board +page.svelte", () => {
   let render: typeof import("svelte/server").render;
@@ -45,11 +56,16 @@ describe("/projects/[id]/board +page.svelte", () => {
           tasks: [],
           activeSprintId: null,
           view: "board",
+          transientQuery,
+          savedViews: [],
         },
       },
     });
 
     expect(body).toMatch(/data-project-view-switcher/);
+    expect(body).toMatch(/data-in-context-search/);
+    expect(body).toMatch(/data-search-kind="task"/);
+    expect(body).toMatch(/data-search-project-id="project-1"/);
     expect(body).toMatch(/data-project-view="board"[^>]*aria-current="page"/);
     expect(body).toMatch(/data-kanban-board/);
   });
@@ -63,6 +79,8 @@ describe("/projects/[id]/board +page.svelte", () => {
           activeSprintId: null,
           activeSprint: null,
           view: "timeline",
+          transientQuery,
+          savedViews: [],
           tasks: [
             {
               id: "blocker",

@@ -3,6 +3,7 @@
 
 	import { buttonVariants } from "$lib/components/ui/button";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
+	import InContextSearchBar from "$lib/components/search/InContextSearchBar.svelte";
 	import { cn } from "$lib/utils.js";
 
 	interface Props {
@@ -44,6 +45,10 @@
 			class={cn(buttonVariants({ variant: "default" }), "gap-2")}
 		>New document</a>
 	</header>
+
+	<div class={cn("mb-3")}>
+		<InContextSearchBar kind="doc" projectId={data.activeProjectId} placeholder="Search documents" />
+	</div>
 
 	<form
 		data-docs-filter

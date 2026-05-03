@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { PageData } from "./$types";
   import RunsTable from "$lib/components/runs/RunsTable.svelte";
+  import InContextSearchBar from "$lib/components/search/InContextSearchBar.svelte";
   import type { SortColumn, SortDirection } from "$lib/components/runs/runs-table-sort";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import { buttonVariants } from "$lib/components/ui/button";
@@ -48,6 +49,9 @@
   {@const runs = payload.runs}
   {@const agents = Array.from(new Set(runs.map((r) => r.agent))).sort()}
   {@const projects = Array.from(new Set(runs.map((r) => r.project_id ?? ""))).sort()}
+  <div class={cn("mb-3")}>
+    <InContextSearchBar kind="run" projectId={data.filter.project === "__any__" ? null : data.filter.project} placeholder="Search runs" />
+  </div>
   <form
     data-runs-filter
     method="GET"

@@ -7,6 +7,14 @@ import { getDefaultOrgId, openProductDb } from "$lib/server/db";
 import { actionFail, actionOk } from "$lib/feedback/action-result";
 import { BoardMoveSchema } from "$lib/server/boards.schema";
 import { moveTaskStatusAction, updateTaskAction } from "$lib/server/tasks";
+import {
+  decodeSavedViewFormValue,
+  decodeSavedViewParam,
+  normalizeSavedViewQuery,
+  type SavedViewQuery,
+  type SavedViewScope,
+  type SavedViewType,
+} from "$lib/components/saved-views/saved-view-query";
 
 interface ProjectRow {
   id: string;
@@ -18,6 +26,46 @@ interface SprintRow {
   name: string;
   start_date: string | Date;
   end_date: string | Date;
+}
+
+interface SavedViewRow {
+  id: string;
+  name: string;
+  scope: SavedViewScope;
+  view_type: SavedViewType;
+  query_json: unknown;
+  default_for: string | null;
+}
+
+interface UserRow {
+  id: string;
+}
+
+async function listSavedViews(db: Awaited<ReturnType<typeof openProductDb>>, orgId: string, projectId: string) {
+  const rows = await db.query<SavedViewRow>(
+    `SELECT id, name, scope, view_type, query_json, default_for
+       FROM saved_views
+      WHERE org_id = $1
+        AND (project_id = $2 OR project_id IS NULL)
+        AND scope IN ('private', 'project', 'org')
+      ORDER BY updated_at DESC, name ASC`,
+    [orgId, projectId],
+  ).catch(() => []);
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    scope: row.scope,
+    viewType: row.view_type,
+    queryJson: normalizeSavedViewQuery(row.query_json),
+    defaultFor: row.default_for,
+  }));
+}
+
+async function firstUserId(db: Awaited<ReturnType<typeof openProductDb>>): Promise<string> {
+  const rows = await db.query<UserRow>(`SELECT id FROM users ORDER BY created_at ASC, id ASC LIMIT 1`);
+  const user = rows[0];
+  if (!user) throw new Error("No user exists for saved view ownership");
+  return user.id;
 }
 
 export const load: PageServerLoad = async ({ params, url }) => {
@@ -55,6 +103,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
       activeSprint,
       month: url.searchParams.get("month") ?? new Date().toISOString().slice(0, 10),
       view: url.searchParams.get("view") ?? "board",
+      transientQuery: decodeSavedViewParam(url.searchParams.get("view")),
+      savedViews: await listSavedViews(db, orgId, project.id),
     };
   } finally {
     await db.close();
@@ -112,6 +162,35 @@ export const actions: Actions = {
         dueDate: fd.has("due_date") ? dueDateValue || null : undefined,
       });
       return actionOk("Task rescheduled");
+    } catch (err) {
+      return fail(400, actionFail((err as Error).message));
+    } finally {
+      await db.close();
+    }
+  },
+  savedView: async ({ request }) => {
+    const fd = await request.formData();
+    const intent = String(fd.get("intent") ?? "");
+
+    const db = await openProductDb();
+    try {
+      const orgId = await getDefaultOrgId(db);
+      if (intent === "savedViews.create") {
+        const name = String(fd.get("name") ?? "").trim();
+        const projectId = String(fd.get("project_id") ?? "").trim();
+        const scope = String(fd.get("scope") ?? "private") as SavedViewScope;
+        const viewType = String(fd.get("view_type") ?? "board") as SavedViewType;
+        const queryJson: SavedViewQuery = decodeSavedViewFormValue(String(fd.get("query_json") ?? ""));
+        if (!name || !projectId) return fail(400, actionFail("invalid input"));
+        const createdBy = await firstUserId(db);
+        await db.query(
+          `INSERT INTO saved_views (org_id, project_id, name, scope, view_type, query_json, created_by)
+           VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)`,
+          [orgId, projectId, name, scope, viewType, JSON.stringify(queryJson), createdBy],
+        );
+        return actionOk("Saved view created");
+      }
+      return fail(400, actionFail("invalid intent"));
     } catch (err) {
       return fail(400, actionFail((err as Error).message));
     } finally {

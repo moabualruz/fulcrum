@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: search-and-discovery
 Blocked-by: [05-fts-query-ranking.md, 06-suggest-and-quick-filter.md]
@@ -34,3 +34,8 @@ Scoped search bar `<SearchBar kind="task" projectId={...} />` Svelte component e
 - `SearchBar` component: debounce 150ms on input; on-clear call list data source directly (no search).
 - Facet pills generated from `facetCounts` in response; clicking pill appends to filter state.
 - List views should conditionally render either: (a) normal list query (when search bar empty) or (b) `search.query` results (when query active) — use Svelte 5 derived state.
+
+## Implementation
+- Added shared in-context search component and query helpers under `src/web/src/lib/components/search/`.
+- Embedded bars in task board, docs, runs, and repos list views. `/artifacts` route not present under `src/web/src/routes/` in this branch.
+- Tests added for component rendering, kind/project scoping, quick-filter parsing, active-result filtering, and list-view embedding.

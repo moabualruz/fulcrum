@@ -126,6 +126,8 @@ describe("/docs +page.svelte", () => {
     expect(cta).toBeDefined();
     expect(cta).toContain('href="/docs/new"');
     expect(body).toContain("data-docs-filter");
+    expect(body).toContain("data-in-context-search");
+    expect(body).toContain('data-search-kind="doc"');
     expect(body).toContain("data-kind-filter");
     expect(body).toContain("data-q-filter");
     for (const doc of SAMPLE) {
