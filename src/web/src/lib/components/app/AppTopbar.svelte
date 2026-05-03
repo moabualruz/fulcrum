@@ -3,6 +3,7 @@
 	import Sun from "@lucide/svelte/icons/sun";
 
 	import { buttonVariants } from "$lib/components/ui/button";
+	import BellBadge from "$lib/components/app/BellBadge.svelte";
 	import { cn } from "$lib/utils.js";
 
 	interface BellItem {
@@ -18,6 +19,7 @@
 		bellItems?: BellItem[];
 		onBellOpen?: () => void;
 		onThemeToggle?: () => void;
+		bellCount?: number;
 	}
 
 	let {
@@ -27,6 +29,7 @@
 		bellItems = [],
 		onBellOpen = () => {},
 		onThemeToggle = () => {},
+		bellCount = 0,
 	}: Props = $props();
 
 	interface Crumb {
@@ -93,6 +96,7 @@
 	</nav>
 
 	<div class={cn("ml-auto flex items-center gap-2")}>
+		<BellBadge count={bellCount} />
 		<kbd
 			class={cn(
 				"hidden h-6 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-xs sm:inline-flex",

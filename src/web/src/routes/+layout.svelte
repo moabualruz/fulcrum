@@ -1,15 +1,12 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
-	import { ModeWatcher } from "mode-watcher";
+	import { ModeWatcher, toggleMode } from "mode-watcher";
 	import { Toaster } from "svelte-sonner";
 
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
 	import favicon from "$lib/assets/favicon.svg";
 	import { toastFromForm } from "$lib/feedback/use-form-toast";
-	import { installKeybindingDispatcher } from "$lib/keybindings";
-	import { installGlobalErrorHandler } from "$lib/telemetry";
-	import { useTheme } from "$lib/theme";
 	import AppSidebar from "$lib/components/app/AppSidebar.svelte";
 	import AppTopbar from "$lib/components/app/AppTopbar.svelte";
 	import CommandPalette from "$lib/components/command-palette/CommandPalette.svelte";
@@ -35,7 +32,24 @@
 	let mobile = $state(isMobileViewport(browserDriver()));
 	let sheetOpen = $state(false);
 	let paletteOpen = $state(false);
-	let theme = $derived(useTheme(data.theme));
+	let bellCount = $state(0);
+
+	// Poll /api/bell every 60s for unread notification count
+	$effect(() => {
+		if (typeof window === "undefined") return;
+		async function fetchBell() {
+			try {
+				const res = await fetch("/api/bell");
+				if (res.ok) {
+					const json = await res.json();
+					bellCount = json.count ?? 0;
+				}
+			} catch { /* swallow — badge stays at last known value */ }
+		}
+		void fetchBell();
+		const id = setInterval(fetchBell, 60_000);
+		return () => clearInterval(id);
+	});
 
 	const paletteItems = [
 		{ id: "home",     label: "Dashboard",  href: "/" },
@@ -61,25 +75,13 @@
 	$effect(() => {
 		toastFromForm(page.form as Parameters<typeof toastFromForm>[0]);
 	});
-
-	$effect(() => {
-		return installKeybindingDispatcher({
-			overrides: data.keybindingOverrides,
-			openPalette: () => (paletteOpen = true),
-			closePalette: () => (paletteOpen = false),
-			performance: globalThis.performance,
-		});
-	});
-
-	$effect(() => installGlobalErrorHandler());
 </script>
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
-	{@html `<style>:root { ${theme.style} }</style>`}
 </svelte:head>
 
-<ModeWatcher defaultMode={theme.mode === "auto" ? "system" : theme.mode} />
+<ModeWatcher />
 <Toaster richColors closeButton position="top-right" />
 
 <CommandPalette
@@ -91,7 +93,7 @@
 	}}
 />
 
-<div class={cn("flex min-h-screen bg-background text-foreground")} data-mode={theme.dataMode}>
+<div class={cn("flex min-h-screen bg-background text-foreground")}>
 	{#if mobile}
 		<Sheet.Root bind:open={sheetOpen}>
 			<Sheet.Content side="left" class="w-64 p-0">
@@ -113,7 +115,8 @@
 						<AppTopbar
 							pathname={page.url.pathname}
 							activeProjectId={data.activeProjectId}
-							onThemeToggle={() => theme.setMode(theme.mode === "dark" ? "light" : "dark")}
+							onThemeToggle={toggleMode}
+							{bellCount}
 						/>
 					</div>
 				</div>
@@ -132,7 +135,7 @@
 					<AppTopbar
 						pathname={page.url.pathname}
 						activeProjectId={data.activeProjectId}
-						onThemeToggle={() => theme.setMode(theme.mode === "dark" ? "light" : "dark")}
+						onThemeToggle={toggleMode}
 					/>
 				</div>
 			</div>

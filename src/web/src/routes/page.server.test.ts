@@ -136,9 +136,13 @@ describe("+page.server load contract", () => {
     expect(data).toHaveProperty("recentRuns");
     expect(data).toHaveProperty("recentDocs");
     expect(data).toHaveProperty("topTasks");
+    expect(data).toHaveProperty("projectTiles");
+    expect(data).toHaveProperty("unreadCount");
     expect(Array.isArray(data.recentRuns)).toBe(true);
     expect(Array.isArray(data.recentDocs)).toBe(true);
     expect(Array.isArray(data.topTasks)).toBe(true);
+    expect(Array.isArray(data.projectTiles)).toBe(true);
+    expect(typeof data.unreadCount).toBe("number");
   });
 
   test("activeProjectId is null when locals has no active project", () => {

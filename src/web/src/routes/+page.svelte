@@ -1,6 +1,7 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
   import MetricCard from "$lib/components/dashboard/MetricCard.svelte";
+  import ProjectTiles from "$lib/components/dashboard/ProjectTiles.svelte";
   import RecentRuns from "$lib/components/dashboard/RecentRuns.svelte";
   import RecentDocs from "$lib/components/dashboard/RecentDocs.svelte";
   import TopTasks from "$lib/components/dashboard/TopTasks.svelte";
@@ -28,6 +29,7 @@
       <MetricCard label="Docs" value={dashboard.counters.docs} href="/docs" />
       <MetricCard label="Runs (7d)" value={dashboard.counters.runsLast7d} href="/runs" />
     </div>
+    <ProjectTiles tiles={dashboard.projectTiles} />
     <div class={cn("grid gap-6 md:grid-cols-3")}>
       <RecentRuns runs={dashboard.recentRuns} />
       <RecentDocs docs={dashboard.recentDocs} />
