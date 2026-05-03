@@ -48,30 +48,41 @@ export class LinearConnector implements ConnectorAdapter {
   async pull(): Promise<SyncResult> {
     this.assertEnabled();
 
-    const response = await this.graphql(
-      `query TeamIssues($teamId: String!) {
-        issues(filter: { team: { id: { eq: $teamId } } }) {
-          nodes {
-            id
-            identifier
-            title
-            estimate
-            state { name type }
-            cycle { name }
-            assignee { email name }
-            labels { nodes { name } }
+    let after: string | undefined;
+    const allItems: SyncItem[] = [];
+
+    do {
+      const response = await this.graphql(
+        `query TeamIssues($teamId: String!, $after: String) {
+          issues(filter: { team: { id: { eq: $teamId } } }, first: 100, after: $after) {
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              id
+              identifier
+              title
+              estimate
+              priority
+              state { name type }
+              cycle { name startsAt endsAt }
+              assignee { email name }
+              labels { nodes { name } }
+            }
           }
-        }
-      }`,
-      { teamId: this.teamId },
-    );
-    if (!response.ok) return syncError(response, "linear_pull_failed");
+        }`,
+        { teamId: this.teamId, after },
+      );
+      if (!response.ok) return syncError(response, "linear_pull_failed");
 
-    const body = (await response.json()) as { data?: { issues?: { nodes?: LinearIssue[] } } };
-    const items = (body.data?.issues?.nodes ?? []).map(mapLinearIssue);
-    this.pulledItems.splice(0, this.pulledItems.length, ...items);
+      const body = (await response.json()) as { data?: { issues?: LinearIssueConnection } };
+      const connection = body.data?.issues;
+      const items = (connection?.nodes ?? []).map(mapLinearIssue);
+      allItems.push(...items);
+      after = connection?.pageInfo?.hasNextPage ? (connection.pageInfo.endCursor ?? undefined) : undefined;
+    } while (after);
 
-    return { pulled: items.length, pushed: 0, skipped: 0, errors: [] };
+    this.pulledItems.splice(0, this.pulledItems.length, ...allItems);
+
+    return { pulled: allItems.length, pushed: 0, skipped: 0, errors: [] };
   }
 
   async importHistory(options: HistoricalImportOptions): Promise<HistoricalImportResult> {
@@ -92,8 +103,9 @@ export class LinearConnector implements ConnectorAdapter {
               identifier
               title
               estimate
+              priority
               state { name type }
-              cycle { name }
+              cycle { name startsAt endsAt }
               assignee { email name }
               labels { nodes { name } }
             }
@@ -123,11 +135,15 @@ export class LinearConnector implements ConnectorAdapter {
     const errors = [];
     let pushed = 0;
     for (const item of items) {
+      // strip linear: prefix for Linear API
+      const linearId = item.externalId.startsWith("linear:")
+        ? item.externalId.slice("linear:".length)
+        : item.externalId;
       const response = await this.graphql(
         `mutation UpdateIssue($id: String!, $input: IssueUpdateInput!) {
           issueUpdate(id: $id, input: $input) { success }
         }`,
-        { id: item.externalId, input: linearUpdateInput(item) },
+        { id: linearId, input: linearUpdateInput(item) },
       );
       if (response.ok) {
         pushed += 1;
@@ -167,7 +183,7 @@ export class LinearConnector implements ConnectorAdapter {
     return this.fetchImpl("https://api.linear.app/graphql", {
       method: "POST",
       headers: {
-        authorization: this.apiKey,
+        authorization: `Bearer ${this.apiKey}`,
         accept: "application/json",
         "content-type": "application/json",
       },
@@ -185,8 +201,9 @@ interface LinearIssue {
   identifier?: string;
   title?: string;
   estimate?: number;
+  priority?: number;
   state?: { name?: string; type?: string };
-  cycle?: { name?: string };
+  cycle?: { name?: string; startsAt?: string; endsAt?: string } | null;
   assignee?: { email?: string; name?: string };
   labels?: { nodes?: Array<{ name?: string }> };
 }
@@ -198,17 +215,34 @@ interface LinearIssueConnection {
 
 function mapLinearIssue(issue: LinearIssue): SyncItem {
   return {
-    externalId: issue.identifier ?? issue.id ?? "",
+    externalId: `linear:${issue.id ?? ""}`,
     data: {
       id: issue.id,
       title: issue.title,
       status: mapLinearStatus(issue.state),
-      sprint: issue.cycle?.name,
+      priority: mapLinearPriority(issue.priority),
+      sprint: issue.cycle?.name ?? undefined,
       estimate: issue.estimate,
       assignee: issue.assignee?.email ?? issue.assignee?.name,
       labels: issue.labels?.nodes?.map((label) => label.name).filter((name) => typeof name === "string") ?? [],
     },
   };
+}
+
+/** Linear priority: 0=none, 1=urgent, 2=high, 3=medium, 4=low */
+function mapLinearPriority(priority?: number): string {
+  switch (priority) {
+    case 1:
+      return "urgent";
+    case 2:
+      return "high";
+    case 3:
+      return "medium";
+    case 4:
+      return "low";
+    default:
+      return "none";
+  }
 }
 
 function linearUpdateInput(item: SyncItem): Record<string, unknown> {
@@ -220,15 +254,18 @@ function linearUpdateInput(item: SyncItem): Record<string, unknown> {
 
 function mapLinearStatus(state?: { name?: string; type?: string }): string {
   if (state?.type === "completed") return "done";
+  if (state?.type === "canceled") return "cancelled";
   const normalized = state?.name?.toLowerCase();
   if (normalized === "done" || normalized === "completed") return "done";
   if (normalized === "started" || normalized === "in progress") return "in-progress";
+  if (normalized === "cancelled" || normalized === "canceled") return "cancelled";
   return "todo";
 }
 
 function linearStateName(status: string): string {
   if (status === "done") return "Done";
   if (status === "in-progress") return "In Progress";
+  if (status === "cancelled") return "Cancelled";
   return "Todo";
 }
 
