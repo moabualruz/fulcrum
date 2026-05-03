@@ -93,7 +93,7 @@ describe("saved_views schema", () => {
     }
   });
 
-  test("view_type CHECK constraint rejects values outside (kanban|table|calendar|timeline|list)", async () => {
+  test("view_type CHECK constraint rejects values outside (kanban|table|calendar|timeline|list|search)", async () => {
     const db = await createTestOrm();
     try {
       const userId = db.seed.userId;
@@ -180,7 +180,7 @@ describe("saved_views schema", () => {
     const db = await createTestOrm();
     try {
       const userId = db.seed.userId;
-      for (const vt of ["kanban", "table", "calendar", "timeline", "list"] as const) {
+      for (const vt of ["kanban", "table", "calendar", "timeline", "list", "search"] as const) {
         const r = await db.pglite.query<{ id: string }>(
           `insert into "saved_views" ("org_id", "name", "scope", "view_type", "created_by") values ('${DEFAULT_ORG_ID}', 'View ${vt}', 'private', '${vt}', '${userId}') returning id`,
         );

@@ -57,6 +57,10 @@ import { CasbinRule } from "./entities/flags/CasbinRule.ts";
 import { WebhookSubscription } from "./entities/flags/WebhookSubscription.ts";
 import { NotificationRule } from "./entities/flags/NotificationRule.ts";
 
+// Webhook entities (P13#07).
+import { Webhook } from "./entities/notifications/Webhook.ts";
+import { WebhookDelivery } from "./entities/notifications/WebhookDelivery.ts";
+
 // Platform / cross-cutting entities (P17#01 — Pillar 17 always-on).
 import { Credential } from "./entities/platform/Credential.ts";
 import { TelemetryEvent } from "./entities/platform/TelemetryEvent.ts";
@@ -109,6 +113,8 @@ export {
   CasbinRule,
   WebhookSubscription,
   NotificationRule,
+  Webhook,
+  WebhookDelivery,
   Credential,
   TelemetryEvent,
   ErrorLog,
@@ -195,6 +201,8 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     CasbinRule,
     WebhookSubscription,
     NotificationRule,
+    Webhook,
+    WebhookDelivery,
     Credential,
     TelemetryEvent,
     ErrorLog,

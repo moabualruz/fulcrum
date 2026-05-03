@@ -70,6 +70,9 @@ import type { TaskDependencies } from "./schemas.ts";
 export class Task {
   [OptionalProps]?:
     | "createdAt"
+    | "updatedAt"
+    | "title"
+    | "description"
     | "blockedByIds"
     | "workflowId"
     | "status"
@@ -80,7 +83,8 @@ export class Task {
     | "parent"
     | "dependencies"
     | "externalId"
-    | "repo";
+    | "repo"
+    | "deletedAt";
 
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
@@ -90,6 +94,15 @@ export class Task {
 
   @Property({ type: "datetime", fieldName: "created_at", defaultRaw: "now()" })
   createdAt!: Date;
+
+  @Property({ type: "datetime", fieldName: "updated_at", defaultRaw: "now()" })
+  updatedAt!: Date;
+
+  @Property({ type: "string", default: "Untitled task" })
+  title: string = "Untitled task";
+
+  @Property({ type: "text", nullable: true })
+  description: string | null = null;
 
   // P3#02 eligibility columns — added by Migration20260502000001.
   @Property({ type: "array", fieldName: "blocked_by_ids", default: [] })
@@ -147,4 +160,7 @@ export class Task {
     lazy: true,
   })
   repo?: Repo | null;
+
+  @Property({ type: "datetime", fieldName: "deleted_at", nullable: true })
+  deletedAt: Date | null = null;
 }

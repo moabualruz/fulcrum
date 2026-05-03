@@ -24,6 +24,8 @@ class MemoryRepoStore implements RepoStore {
   async createLocal(input: {
     localPath: string;
     projectId?: string | null;
+    name?: string;
+    slug?: string;
   }): Promise<RegisteredRepo> {
     this.createdInputs.push({ ...input });
     const id = `repo-${this.rows.size + 1}`;
@@ -33,6 +35,28 @@ class MemoryRepoStore implements RepoStore {
       slug: basename(input.localPath),
       kind: "local",
       localPath: input.localPath,
+      projectId: input.projectId ?? null,
+      syncStatus: "idle",
+      archived: false,
+    };
+    this.rows.set(id, row);
+    return row;
+  }
+
+  async createRemote(input: {
+    remoteUrl: string;
+    projectId?: string | null;
+    name?: string;
+    slug?: string;
+  }): Promise<RegisteredRepo> {
+    this.createdInputs.push({ ...input });
+    const id = `repo-${this.rows.size + 1}`;
+    const row: RegisteredRepo = {
+      id,
+      name: input.name,
+      slug: input.slug,
+      kind: "remote",
+      remoteUrl: input.remoteUrl,
       projectId: input.projectId ?? null,
       syncStatus: "idle",
       archived: false,
@@ -145,6 +169,37 @@ describe("local repo registration and watcher", () => {
 
     expect(store.createdInputs[0]).toMatchObject({
       projectId: "00000000-0000-0000-0000-000000000123",
+    });
+  });
+
+  test("registers remote repos idle without starting a watcher", async () => {
+    const store = new MemoryRepoStore();
+    const queue = new MemoryQueue();
+    const backend = new ManualBackend();
+    const registry = new WatcherRegistry(store, queue, { backend });
+    const service = new RepoRegistrationService(store, registry);
+
+    const row = await service.addRemote({
+      url: "https://github.com/moabualruz/fulcrum.git",
+      name: "Fulcrum Mirror",
+      projectId: "project-remote",
+    });
+
+    expect(row).toMatchObject({
+      kind: "remote",
+      remoteUrl: "https://github.com/moabualruz/fulcrum.git",
+      name: "Fulcrum Mirror",
+      slug: "fulcrum",
+      projectId: "project-remote",
+      syncStatus: "idle",
+      archived: false,
+    });
+    expect(registry.count).toBe(0);
+    expect(store.createdInputs[0]).toMatchObject({
+      remoteUrl: "https://github.com/moabualruz/fulcrum.git",
+      name: "Fulcrum Mirror",
+      slug: "fulcrum",
+      projectId: "project-remote",
     });
   });
 

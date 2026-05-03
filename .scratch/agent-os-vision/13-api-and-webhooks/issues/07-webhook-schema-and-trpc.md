@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: in-progress
 Triage: AFK
 Pillar: api-and-webhooks
 Blocked-by: [13/issues/01-trpc-router-scaffold.md, 13/issues/03-zod-schema-registry.md]

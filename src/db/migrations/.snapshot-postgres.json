@@ -1200,6 +1200,147 @@
       "comment": null
     },
     {
+      "name": "connector_sync_log",
+      "schema": "public",
+      "columns": {
+        "connector": {
+          "name": "connector",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": true,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "gen_random_uuid()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "last_run_at": {
+          "name": "last_run_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": "now()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        }
+      },
+      "indexes": [
+        {
+          "columnNames": [
+            "org_id",
+            "connector"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "connector_sync_log_org_connector",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "id"
+          ],
+          "composite": false,
+          "constraint": true,
+          "keyName": "connector_sync_log_pkey",
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "connector_sync_log_org_id_foreign": {
+          "columnNames": [
+            "org_id"
+          ],
+          "constraintName": "connector_sync_log_org_id_foreign",
+          "localTableName": "public.connector_sync_log",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.orgs",
+          "deleteRule": "cascade"
+        }
+      },
+      "comment": null
+    },
+    {
       "name": "context_snapshots",
       "schema": "public",
       "columns": {
@@ -8800,7 +8941,8 @@
             "table",
             "calendar",
             "timeline",
-            "list"
+            "list",
+            "search"
           ],
           "mappedType": "enum"
         }
@@ -8847,8 +8989,8 @@
         },
         {
           "name": "saved_views_view_type_check",
-          "expression": "\"view_type\" in ('kanban', 'table', 'calendar', 'timeline', 'list')",
-          "definition": "check (\"view_type\" in ('kanban', 'table', 'calendar', 'timeline', 'list'))",
+          "expression": "\"view_type\" in ('kanban', 'table', 'calendar', 'timeline', 'list', 'search')",
+          "definition": "check (\"view_type\" in ('kanban', 'table', 'calendar', 'timeline', 'list', 'search'))",
           "columnName": "view_type"
         }
       ],
@@ -9869,6 +10011,22 @@
           "enumItems": [],
           "mappedType": "json"
         },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
         "dependencies": {
           "name": "dependencies",
           "type": "jsonb",
@@ -9884,6 +10042,22 @@
           "comment": null,
           "enumItems": [],
           "mappedType": "json"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
         },
         "external_id": {
           "name": "external_id",
@@ -10029,6 +10203,38 @@
           "enumItems": [],
           "mappedType": "string"
         },
+        "title": {
+          "name": "title",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": "'Untitled task'",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": "now()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
         "workflow_id": {
           "name": "workflow_id",
           "type": "uuid",
@@ -10093,6 +10299,30 @@
           "keyName": "tasks_id_org_unique",
           "primary": false,
           "unique": true
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "deleted_at",
+            "created_at"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "tasks_org_deleted_created",
+          "primary": false,
+          "unique": false,
+          "columns": [
+            {
+              "name": "org_id"
+            },
+            {
+              "name": "deleted_at"
+            },
+            {
+              "name": "created_at",
+              "sort": "DESC"
+            }
+          ]
         },
         {
           "columnNames": [
@@ -11033,6 +11263,262 @@
       "comment": null
     },
     {
+      "name": "webhook_deliveries",
+      "schema": "public",
+      "columns": {
+        "attempt": {
+          "name": "attempt",
+          "type": "int",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "1",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": "now()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
+        "event_id": {
+          "name": "event_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": true,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "gen_random_uuid()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "next_retry_at": {
+          "name": "next_retry_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
+        },
+        "response_code": {
+          "name": "response_code",
+          "type": "int",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "'pending'",
+          "comment": null,
+          "enumItems": [
+            "pending",
+            "delivered",
+            "failed",
+            "retrying"
+          ],
+          "mappedType": "enum"
+        },
+        "webhook_id": {
+          "name": "webhook_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        }
+      },
+      "indexes": [
+        {
+          "columnNames": [
+            "next_retry_at"
+          ],
+          "composite": false,
+          "constraint": false,
+          "keyName": "idx_wd_next_retry",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "webhook_id",
+            "status"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "idx_wd_org_webhook_status",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "id"
+          ],
+          "composite": false,
+          "constraint": true,
+          "keyName": "webhook_deliveries_pkey",
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [
+        {
+          "name": "webhook_deliveries_status_check",
+          "expression": "\"status\" in ('pending', 'delivered', 'failed', 'retrying')",
+          "definition": "check (\"status\" in ('pending', 'delivered', 'failed', 'retrying'))",
+          "columnName": "status"
+        }
+      ],
+      "foreignKeys": {
+        "webhook_deliveries_org_id_foreign": {
+          "columnNames": [
+            "org_id"
+          ],
+          "constraintName": "webhook_deliveries_org_id_foreign",
+          "localTableName": "public.webhook_deliveries",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.orgs",
+          "deleteRule": "cascade"
+        },
+        "webhook_deliveries_webhook_id_foreign": {
+          "columnNames": [
+            "webhook_id"
+          ],
+          "constraintName": "webhook_deliveries_webhook_id_foreign",
+          "localTableName": "public.webhook_deliveries",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.webhooks",
+          "deleteRule": "cascade"
+        }
+      },
+      "comment": null
+    },
+    {
       "name": "webhook_rule_configs",
       "schema": "public",
       "columns": {
@@ -11256,6 +11742,222 @@
             "id"
           ],
           "referencedTableName": "public.orgs"
+        }
+      },
+      "comment": null
+    },
+    {
+      "name": "webhooks",
+      "schema": "public",
+      "columns": {
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": "now()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "true",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "boolean"
+        },
+        "encrypted_secret": {
+          "name": "encrypted_secret",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
+        "events_filter": {
+          "name": "events_filter",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
+        },
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": true,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "gen_random_uuid()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "last_delivery_at": {
+          "name": "last_delivery_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": true,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": "now()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        }
+      },
+      "indexes": [
+        {
+          "columnNames": [
+            "org_id",
+            "enabled"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "idx_webhooks_org_enabled",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "name"
+          ],
+          "composite": true,
+          "constraint": true,
+          "keyName": "uq_webhooks_org_name",
+          "primary": false,
+          "unique": true
+        },
+        {
+          "columnNames": [
+            "id"
+          ],
+          "composite": false,
+          "constraint": true,
+          "keyName": "webhooks_pkey",
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "webhooks_org_id_foreign": {
+          "columnNames": [
+            "org_id"
+          ],
+          "constraintName": "webhooks_org_id_foreign",
+          "localTableName": "public.webhooks",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.orgs",
+          "deleteRule": "cascade"
         }
       },
       "comment": null

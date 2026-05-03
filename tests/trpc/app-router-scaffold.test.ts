@@ -121,6 +121,7 @@ const REQUIRED_PROCEDURES = [
   "search.suggest",
   "search.savedList",
   "search.savedCreate",
+  "search.savedUpdate",
   "search.savedDelete",
   "notify.list",
   "notify.unreadCount",

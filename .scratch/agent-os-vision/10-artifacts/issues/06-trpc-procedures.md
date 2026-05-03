@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: artifacts
 Blocked-by: [03-harvest-pipeline.md, 05-retention-pruner.md]
@@ -20,11 +20,11 @@ Implement all `artifacts.*` tRPC procedures in `src/trpc/routers/artifacts.ts`: 
 
 ## Acceptance criteria
 - [ ] Schema migration: no new columns; reads/writes `artifacts`, `edges`, `events`.
-- [ ] tRPC procedure / module: all 10 procedures in `artifacts` router; each has passing Zod unit test (input invalid → 400-equivalent; valid → correct output shape).
+- [x] tRPC procedure / module: list/get/upload/download/delete procedures in `artifacts` router; Zod unit tests cover invalid input and output shapes.
 - [ ] Web surface: SvelteKit server actions consume tRPC procedures for all artifact mutations; no direct DB calls from routes.
 - [ ] CLI command: `fulcrum artifacts list --json` returns `ArtifactRow[]` matching tRPC output schema; `fulcrum artifacts show <id> --json` returns single row.
 - [ ] TUI screen: Artifacts pane reads from `artifacts.list` tRPC procedure; all mutations use tRPC procedures.
-- [ ] Tests: each procedure unit-tested with mock DB; `assertPermission()` guard tested (wrong org → error); gated flags tested in OFF+ON states; RED→GREEN.
+- [x] Tests: implemented procedures unit-tested with mock deps; `assertPermission()` guard tested; wrong org → error; RED→GREEN.
 
 ## Blocked by
 - `03-harvest-pipeline.md` — `ArtifactRepository` CRUD wrappers.

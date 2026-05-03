@@ -3,7 +3,7 @@
  *
  * Creates `saved_views` with:
  *   - scope CHECK ('private'|'project'|'org')
- *   - view_type CHECK ('kanban'|'table'|'calendar'|'timeline'|'list')
+ *   - view_type CHECK ('kanban'|'table'|'calendar'|'timeline'|'list'|'search')
  *   - Composite index saved_views_org_project (org_id, project_id)
  *   - Index saved_views_created_by (created_by)
  *   - FK org_id → orgs(id) ON DELETE CASCADE (unconditional)
@@ -37,7 +37,7 @@ export class Migration20260502095500_saved_views extends Migration {
         `"created_at" timestamptz not null default now(), ` +
         `"updated_at" timestamptz not null default now(), ` +
         `constraint "saved_views_scope_check" check (scope in ('private','project','org')), ` +
-        `constraint "saved_views_view_type_check" check (view_type in ('kanban','table','calendar','timeline','list')), ` +
+        `constraint "saved_views_view_type_check" check (view_type in ('kanban','table','calendar','timeline','list','search')), ` +
         `primary key ("id")` +
         `)`,
     );
@@ -69,6 +69,14 @@ export class Migration20260502095500_saved_views extends Migration {
         `alter table "saved_views" add constraint "saved_views_project_id_foreign" ` +
         `foreign key ("project_id") references "projects" ("id") on delete cascade; ` +
         `end if; end $$`,
+    );
+
+    this.addSql(
+      `do $$ begin ` +
+        `alter table "saved_views" drop constraint if exists "saved_views_view_type_check"; ` +
+        `alter table "saved_views" add constraint "saved_views_view_type_check" ` +
+        `check (view_type in ('kanban','table','calendar','timeline','list','search')); ` +
+        `end $$`,
     );
 
     // Composite index: (org_id, project_id) for per-project view queries

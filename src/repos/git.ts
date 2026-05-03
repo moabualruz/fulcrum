@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { access } from "node:fs/promises";
 import { simpleGit } from "simple-git";
 
 const require = createRequire(import.meta.url);
@@ -294,12 +295,26 @@ export async function getStashList(localPath: string): Promise<GitStash[]> {
     });
 }
 
+export async function ensureMirror(remoteUrl: string, mirrorPath: string): Promise<void> {
+  if (await pathExists(mirrorPath)) {
+    await simpleGit({ baseDir: mirrorPath }).fetch(["--all", "--prune"]);
+    return;
+  }
+
+  await simpleGit().clone(remoteUrl, mirrorPath, ["--mirror"]);
+}
+
 async function resolveDefaultBranch(raw: (args: string[]) => Promise<string>): Promise<string | undefined> {
   try {
     const output = await raw(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]);
     return normalizeBranchName(output.trim());
   } catch {
-    return undefined;
+    try {
+      const output = await raw(["symbolic-ref", "--short", "HEAD"]);
+      return normalizeBranchName(output.trim());
+    } catch {
+      return undefined;
+    }
   }
 }
 
@@ -346,6 +361,15 @@ async function refExists(raw: (args: string[]) => Promise<string>, ref: string):
   try {
     const output = await raw(["show-ref", "--verify", ref]);
     return output.trim() !== "";
+  } catch {
+    return false;
+  }
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
   } catch {
     return false;
   }

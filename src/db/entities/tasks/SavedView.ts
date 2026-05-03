@@ -36,6 +36,7 @@ export const SAVED_VIEW_TYPES = [
   "calendar",
   "timeline",
   "list",
+  "search",
 ] as const;
 export type SavedViewType = (typeof SAVED_VIEW_TYPES)[number];
 
@@ -105,7 +106,7 @@ export class SavedView {
     type: "string",
     fieldName: "view_type",
     default: "list",
-    check: "view_type in ('kanban','table','calendar','timeline','list')",
+    check: "view_type in ('kanban','table','calendar','timeline','list','search')",
   })
   viewType: SavedViewType = "list";
 

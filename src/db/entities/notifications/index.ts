@@ -13,3 +13,5 @@ export { NotificationQuietHours } from "./NotificationQuietHours.ts";
 export { EventRetentionPolicy } from "./EventRetentionPolicy.ts";
 export { WebhookRuleConfig } from "./WebhookRuleConfig.ts";
 export { PushSubscription } from "./PushSubscription.ts";
+export { Webhook } from "./Webhook.ts";
+export { WebhookDelivery, WebhookDeliveryStatus } from "./WebhookDelivery.ts";

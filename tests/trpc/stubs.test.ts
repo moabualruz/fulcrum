@@ -120,19 +120,11 @@ describe("stub routers — authenticated list() returns []", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("notifications.list returns [] for authenticated caller", async () => {
-    const caller = authenticatedCaller();
-    const result = await caller.notifications.list();
-    expect(Array.isArray(result)).toBe(true);
-    expect(result).toHaveLength(0);
-  });
+  // Note: notifications.list is excluded here — it is a real implementation (Pillar 12 P12#05)
+  // that requires em in ctx. Its tests live in tests/notifications/.
 
-  it("webhooks.list returns [] for authenticated caller", async () => {
-    const caller = authenticatedCaller();
-    const result = await caller.webhooks.list();
-    expect(Array.isArray(result)).toBe(true);
-    expect(result).toHaveLength(0);
-  });
+  // Note: webhooks.list is excluded here — it is a real implementation (Pillar 13 P13#07)
+  // that requires FULCRUM_FEATURES=outbound-webhooks. Its tests live in tests/trpc/webhooks.test.ts.
 
   it("orchestration.list returns [] for authenticated caller", async () => {
     const caller = authenticatedCaller();

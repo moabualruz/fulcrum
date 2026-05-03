@@ -6,11 +6,18 @@ export interface RegisteredRepo extends WatchableRepo {
   name?: string;
   slug?: string;
   projectId?: string | null;
+  remoteUrl?: string | null;
 }
 
 export interface RepoStore {
   createLocal(input: {
     localPath: string;
+    projectId?: string | null;
+    name?: string;
+    slug?: string;
+  }): Promise<RegisteredRepo>;
+  createRemote(input: {
+    remoteUrl: string;
     projectId?: string | null;
     name?: string;
     slug?: string;
@@ -22,6 +29,12 @@ export interface RepoStore {
 export interface RepoAddInput {
   path: string;
   projectId?: string | null;
+}
+
+export interface RepoAddRemoteInput {
+  url: string;
+  projectId?: string | null;
+  name?: string;
 }
 
 export class RepoRegistrationService {
@@ -44,8 +57,24 @@ export class RepoRegistrationService {
     return repo;
   }
 
+  async addRemote(input: RepoAddRemoteInput): Promise<RegisteredRepo> {
+    const slug = slugFromRemoteUrl(input.url);
+    return this.repos.createRemote({
+      remoteUrl: input.url,
+      projectId: input.projectId ?? null,
+      name: input.name ?? slug,
+      slug,
+    });
+  }
+
   async remove(id: string): Promise<RegisteredRepo | null> {
     await this.watchers.stop(id);
     return this.repos.archive(id);
   }
+}
+
+function slugFromRemoteUrl(url: string): string {
+  const withoutTrailingSlash = url.replace(/\/$/, "");
+  const lastSegment = withoutTrailingSlash.split(/[/:]/).filter(Boolean).at(-1) ?? "repo";
+  return lastSegment.replace(/\.git$/, "") || "repo";
 }

@@ -29,7 +29,7 @@ describe("pruneArtifacts", () => {
       softDeleted: 1,
       hardDeleted: 0,
       bytesFreed: 12n,
-      candidates: [artifactRepository.rows[0]],
+      candidates: [artifactRepository.rows[0]!],
       hardDeleteCandidates: [],
       confirmationRequired: false,
     });
