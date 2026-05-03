@@ -1,4 +1,5 @@
 import type { MemoryImportance } from "../../db/entities/memory/enums.ts";
+import { cosineSimilarity, hybridScore } from "./hybrid-scoring.ts";
 
 const DEFAULT_K1 = 1.5;
 const DEFAULT_B = 0.75;
@@ -164,4 +165,86 @@ function compareNumberDesc(left: number, right: number): number {
 function compareStringAsc(left: string, right: string): number {
   if (left === right) return 0;
   return left < right ? -1 : 1;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Hybrid scoring (gated: FULCRUM_FEATURES=embeddings)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface HybridMemoryRankInput extends MemoryRankInput {
+  embedding: number[];
+}
+
+export interface HybridRankedMemoryMatch<TMemory extends HybridMemoryRankInput = HybridMemoryRankInput> {
+  memory: TMemory;
+  hybridBase: number;
+  recencyBoost: number;
+  importanceBoost: number;
+  score: number;
+}
+
+export interface RankHybridOptions {
+  now?: Date;
+  topK?: number;
+  k1?: number;
+  b?: number;
+}
+
+/**
+ * Hybrid ranking: 0.6 * normalize(bm25) + 0.4 * cosine(queryEmbed, memEmbed)
+ * plus additive recency + importance boosts.
+ */
+export function rankMemoryMatchesHybrid<TMemory extends HybridMemoryRankInput>(
+  query: string,
+  memories: readonly TMemory[],
+  queryEmbedding: readonly number[],
+  options: RankHybridOptions = {},
+): HybridRankedMemoryMatch<TMemory>[] {
+  const queryTerms = tokenize(query);
+  const now = options.now ?? new Date();
+  const k1 = options.k1 ?? DEFAULT_K1;
+  const b = options.b ?? DEFAULT_B;
+
+  const tokenized = memories.map((memory) => ({
+    memory,
+    terms: tokenize(memory.body),
+  }));
+  const avgDocLen = averageLength(tokenized.map((r) => r.terms.length));
+  const docFreqs = documentFrequenciesFor(queryTerms, tokenized);
+
+  // Compute raw BM25 scores to find max
+  const bm25Scores = tokenized.map(({ terms }) =>
+    bm25Score(queryTerms, terms, memories.length, avgDocLen, docFreqs, k1, b),
+  );
+  const maxBm25 = bm25Scores.reduce((max, s) => Math.max(max, s), 0);
+
+  const ranked = tokenized.map(({ memory }, i) => {
+    const cosine = cosineSimilarity(queryEmbedding as number[], memory.embedding);
+    const hybridBase = hybridScore(bm25Scores[i], maxBm25, cosine);
+    const recencyBoost = recencyBoostForDate(memory.createdAt, now);
+    const importanceBoost_ = importanceBoostFor(memory.importance);
+    const score = hybridBase + recencyBoost + importanceBoost_;
+
+    return {
+      memory,
+      hybridBase,
+      recencyBoost,
+      importanceBoost: importanceBoost_,
+      score,
+    };
+  }).sort(compareHybridMatches);
+
+  return options.topK === undefined ? ranked : ranked.slice(0, options.topK);
+}
+
+function compareHybridMatches(
+  left: HybridRankedMemoryMatch,
+  right: HybridRankedMemoryMatch,
+): number {
+  return compareNumberDesc(left.score, right.score) ||
+    compareNumberDesc(left.hybridBase, right.hybridBase) ||
+    compareNumberDesc(left.recencyBoost, right.recencyBoost) ||
+    compareNumberDesc(left.importanceBoost, right.importanceBoost) ||
+    compareNumberDesc(left.memory.createdAt.getTime(), right.memory.createdAt.getTime()) ||
+    compareStringAsc(left.memory.id, right.memory.id);
 }

@@ -1,6 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
+ImplRuntime: claude
 Pillar: 08-memory-context-engine
 Blocked-by: [16-gated-embeddings-write-pipeline.md, 06-retriever-bm25-recency-importance.md]
 PRD: .scratch/agent-os-vision/prds/08-memory-context-engine.md
