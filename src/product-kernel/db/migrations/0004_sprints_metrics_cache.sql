@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS metrics_cache (
   id text PRIMARY KEY,
   project_id text NOT NULL REFERENCES projects(id),
   sprint_id text NOT NULL REFERENCES sprints(id) ON DELETE CASCADE,
-  date date NOT NULL,
+  snapshot_date date NOT NULL,
   points_remaining integer NOT NULL DEFAULT 0,
   points_completed integer NOT NULL DEFAULT 0,
   tasks_completed integer NOT NULL DEFAULT 0,
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS metrics_cache (
   scope_change integer NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (project_id, sprint_id, date)
+  UNIQUE (project_id, sprint_id, snapshot_date)
 );
 
-CREATE INDEX IF NOT EXISTS metrics_cache_project_sprint_date ON metrics_cache (project_id, sprint_id, date);
+CREATE INDEX IF NOT EXISTS metrics_cache_project_sprint_date ON metrics_cache (project_id, sprint_id, snapshot_date);

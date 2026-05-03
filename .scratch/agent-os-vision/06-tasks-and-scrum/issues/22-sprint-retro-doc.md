@@ -8,6 +8,7 @@ Requirements: .scratch/agent-os-vision/REQUIREMENTS.md (Pillar 6 section)
 Decisions: [C1, Q7, Q11]
 Vision: .scratch/agent-os-vision/VISION-GAPS.md (Sprint/scrum/dev cycles row)
 Docs: []
+ImplRuntime: claude
 ---
 
 # Sprint close → retro doc auto-create (cross-ref Pillar 7)

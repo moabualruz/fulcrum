@@ -1,16 +1,8 @@
 export {
   appendEvent,
   listEventsForProject,
-  listEventsFiltered,
-  listEventsForEntity,
-  listEventsByActor,
-  createNotification,
-  listNotifications,
-  countUnreadNotifications,
-  markNotificationRead,
+  checkEventHandled,
+  markEventHandled,
   type AppendEventInput,
   type EventRow,
-  type NotificationRow,
-  type CreateNotificationInput,
-  type EventFilterInput,
 } from "./store/repositories.ts";
