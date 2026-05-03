@@ -334,7 +334,7 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "symphony": {
       const { run: runSymphony } = await import("./commands/symphony.ts");
       const [sub = "help"] = rest;
-      if (sub === "help" || sub === "--help" || sub === "-h") {
+      if (sub === "help" || sub === "--help" || sub === "-h" || sub === "conformance") {
         await runSymphony(rest);
         return;
       }

@@ -61,6 +61,7 @@ Orchestration commands.
 Usage:
   fulcrum symphony runs list --state <state> [--limit N] [--json]
   fulcrum symphony runs show <runId> [--verbose] [--json]
+  fulcrum symphony conformance [--verbose]
 
 Options:
   --state <state>  State filter. 'ready' lists candidate tasks; run states list agent runs.
@@ -80,6 +81,8 @@ export async function run(
   switch (domain) {
     case "runs":
       return runRuns(rest, { ...opts, print, printErr, exit });
+    case "conformance":
+      return runConformance(rest, { ...opts, print, printErr, exit });
     case "help":
     case "--help":
     case "-h":
@@ -89,6 +92,79 @@ export async function run(
       printErr(`fulcrum symphony: unknown command '${domain}'`);
       printErr(HELP);
       exit(2);
+  }
+}
+
+async function runConformance(
+  argv: readonly string[],
+  opts: Required<Pick<SymphonyRunOptions, "print" | "printErr" | "exit">> &
+    SymphonyRunOptions,
+): Promise<void> {
+  const { print, printErr, exit } = opts;
+  const verbose = argv.includes("--verbose");
+
+  try {
+    const { readFileSync, existsSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const {
+      requiredConformanceItems,
+      scanExportedFunctions,
+      buildFunctionSpecMapping,
+      renderTrace,
+      generateLockHash,
+    } = await import("../../../scripts/gen-conformance-trace.ts");
+
+    const root = process.cwd();
+    const specPath = join(root, "vendor/openai-symphony/SPEC.md");
+
+    if (!existsSync(specPath)) {
+      printErr("FAIL  SPEC.md not found at vendor/openai-symphony/SPEC.md");
+      exit(1);
+      return;
+    }
+
+    const specText = readFileSync(specPath, "utf8");
+    const items = requiredConformanceItems(specText);
+
+    const coreFiles = [
+      "orchestrator.ts", "tracker.ts", "hooks.ts",
+      "workspace.ts", "prompt.ts", "retry.ts",
+    ] as const;
+    const symphonyDir = "src/orchestration/symphony";
+    const exports: Record<string, string[]> = {};
+    for (const file of coreFiles) {
+      const filePath = join(root, symphonyDir, file);
+      exports[file] = existsSync(filePath) ? scanExportedFunctions(filePath) : [];
+    }
+
+    const functionMap = buildFunctionSpecMapping(exports);
+    const output = renderTrace(items, functionMap);
+    const hash = generateLockHash(output);
+
+    const lockPath = join(root, ".symphony-conformance.lock");
+    const tracePath = join(root, "docs/symphony-conformance.md");
+
+    const docOk = existsSync(tracePath) && readFileSync(tracePath, "utf8") === output;
+    const lockOk = existsSync(lockPath) && readFileSync(lockPath, "utf8").trim() === hash;
+
+    if (verbose) {
+      for (const row of functionMap) {
+        print(`PASS  ${row.file}:${row.fn} → ${row.specSection}`);
+      }
+      print("");
+    }
+
+    if (docOk && lockOk) {
+      print(`PASS  conformance trace doc up-to-date (${functionMap.length} mappings, hash ${hash.slice(0, 12)}…)`);
+    } else {
+      if (!docOk) printErr("FAIL  docs/symphony-conformance.md is stale");
+      if (!lockOk) printErr("FAIL  .symphony-conformance.lock is stale");
+      printErr("Run: bun run scripts/gen-conformance-trace.ts --write");
+      exit(1);
+    }
+  } catch (err) {
+    printErr(`Error: ${(err as Error).message}`);
+    exit(1);
   }
 }
 

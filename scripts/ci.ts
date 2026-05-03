@@ -44,6 +44,7 @@ export const STEPS: Step[] = [
   { name: "typecheck",   cmd: ["bun", "run", "--bun", "tsc", "--noEmit"] },
   { name: "symphony:lock", cmd: ["bun", "test", "tests/symphony/spec-lock.test.ts"] },
   { name: "symphony:conformance", cmd: ["bun", "test", "src/orchestration/__tests__/symphony-conformance.test.ts"] },
+  { name: "symphony:trace-hash", cmd: ["bun", "run", "scripts/gen-conformance-trace.ts", "--check"] },
   { name: "test",        cmd: ["bun", "test", "--conditions=svelte"], env: "home-isolated" },
   { name: "license-audit", cmd: ["bun", "run", "scripts/license-audit.ts"] },
   { name: "ci:codegen",  cmd: ["bun", "run", "scripts/ci/codegen.ts"] },

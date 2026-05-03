@@ -128,6 +128,11 @@ async function main() {
       await runTui(rest);
       return;
     }
+    case "symphony": {
+      const { run: runSymphony } = await import("./cli/commands/symphony.ts");
+      await runSymphony(rest);
+      return;
+    }
     case "version":
     case "--version":
     case "-v":

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Pre-commit hook: regenerate conformance trace doc + lock if symphony files changed.
+# Install: ln -sf ../../hooks/pre-commit .git/hooks/pre-commit
+
+set -euo pipefail
+
+SYMPHONY_DIR="src/orchestration/symphony"
+CORE_FILES=("orchestrator.ts" "tracker.ts" "hooks.ts" "workspace.ts" "prompt.ts" "retry.ts")
+
+# Check if any core symphony file is staged
+changed=0
+for f in "${CORE_FILES[@]}"; do
+  if git diff --cached --name-only | grep -q "^${SYMPHONY_DIR}/${f}$"; then
+    changed=1
+    break
+  fi
+done
+
+# Also check if SPEC.md changed
+if git diff --cached --name-only | grep -q "^vendor/openai-symphony/SPEC.md$"; then
+  changed=1
+fi
+
+if [ "$changed" -eq 1 ]; then
+  echo "[pre-commit] Regenerating symphony conformance trace..."
+  bun run scripts/gen-conformance-trace.ts --write
+  git add docs/symphony-conformance.md .symphony-conformance.lock
+fi
