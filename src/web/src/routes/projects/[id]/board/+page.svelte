@@ -4,6 +4,7 @@
   import TaskCalendar from "$lib/components/tasks/TaskCalendar.svelte";
   import TaskList from "$lib/components/tasks/TaskList.svelte";
   import TaskTable from "$lib/components/tasks/TaskTable.svelte";
+  import TaskTimeline from "$lib/components/tasks/TaskTimeline.svelte";
   import { cn } from "$lib/utils.js";
   import type { PageData } from "./$types";
 
@@ -13,7 +14,7 @@
 
   const { data }: Props = $props();
   const activeView = $derived(
-    data.view === "list" || data.view === "table" || data.view === "calendar" ? data.view : "board",
+    data.view === "list" || data.view === "table" || data.view === "calendar" || data.view === "timeline" ? data.view : "board",
   );
 </script>
 
@@ -37,6 +38,8 @@
       initialMonth={data.month ?? new Date()}
       activeSprint={data.activeSprint ?? null}
     />
+  {:else if activeView === "timeline"}
+    <TaskTimeline projectId={data.project.id} tasks={data.tasks} />
   {:else}
     <KanbanBoard projectId={data.project.id} tasks={data.tasks} activeSprintId={data.activeSprintId} />
   {/if}

@@ -101,11 +101,16 @@ export const actions: Actions = {
   reschedule: async ({ request }) => {
     const fd = await request.formData();
     const id = String(fd.get("id") ?? "");
+    const startDateValue = String(fd.get("start_date") ?? "");
     const dueDateValue = String(fd.get("due_date") ?? "");
 
     const db = await openProductDb();
     try {
-      await updateTaskAction(db, { id, dueDate: dueDateValue || null });
+      await updateTaskAction(db, {
+        id,
+        startDate: fd.has("start_date") ? startDateValue || null : undefined,
+        dueDate: fd.has("due_date") ? dueDateValue || null : undefined,
+      });
       return actionOk("Task rescheduled");
     } catch (err) {
       return fail(400, actionFail((err as Error).message));

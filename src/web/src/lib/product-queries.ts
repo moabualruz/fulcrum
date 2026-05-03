@@ -35,7 +35,11 @@ export interface BoardTask {
   points?: number | null;
   sprint_id?: string | null;
   sprint_name?: string | null;
+  created_at?: string;
+  start_date?: string | null;
   due_date?: string | null;
+  blocks?: string[];
+  blocked_by?: string[];
   epic?: string | null;
 }
 
@@ -71,8 +75,11 @@ interface RawTask {
   status: string;
   priority: number;
   project_id: string | null;
+  created_at?: string | Date | null;
   updated_at: string | Date;
+  start_date?: string | Date | null;
   due_date?: string | Date | null;
+  dependencies?: { blocks?: string[]; blocked_by?: string[] } | null;
 }
 
 export async function listProjects(): Promise<ProjectListing[]> {
@@ -113,24 +120,30 @@ export async function listBoardTasks(projectId?: string | null): Promise<BoardTa
   const db = await open();
   try {
     await db.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_date date`);
+    await db.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS start_date date`);
+    await db.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS dependencies jsonb NOT NULL DEFAULT '{"blocks": [], "blocked_by": []}'::jsonb`);
     let rows: RawTask[];
     if (projectId) {
       rows = await db.query<RawTask>(
-        `SELECT id, title, status, priority, project_id, updated_at, due_date
+        `SELECT id, title, status, priority, project_id, created_at, updated_at, start_date, due_date, dependencies
            FROM tasks WHERE project_id = $1
           ORDER BY priority DESC, updated_at DESC, id ASC`,
         [projectId],
       );
     } else {
       rows = await db.query<RawTask>(
-        `SELECT id, title, status, priority, project_id, updated_at, due_date
+        `SELECT id, title, status, priority, project_id, created_at, updated_at, start_date, due_date, dependencies
            FROM tasks ORDER BY priority DESC, updated_at DESC, id ASC`,
       );
     }
     return rows.map((r) => ({
       ...r,
+      created_at: isoStampOrNull(r.created_at ?? null) ?? isoStamp(r.updated_at),
       updated_at: isoStamp(r.updated_at),
+      start_date: isoStampOrNull(r.start_date ?? null)?.slice(0, 10) ?? null,
       due_date: isoStampOrNull(r.due_date ?? null)?.slice(0, 10) ?? null,
+      blocks: r.dependencies?.blocks ?? [],
+      blocked_by: r.dependencies?.blocked_by ?? [],
     }));
   } finally {
     await db.close();

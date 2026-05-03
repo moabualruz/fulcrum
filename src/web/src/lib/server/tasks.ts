@@ -31,6 +31,7 @@ export interface UpdateTaskInput {
   description?: string | null;
   status?: TaskStatus;
   priority?: number;
+  startDate?: string | null;
   dueDate?: string | null;
 }
 
@@ -68,10 +69,12 @@ export async function updateTaskAction(
     push("status", input.status);
   }
   if (input.priority !== undefined) push("priority", input.priority);
+  if (input.startDate !== undefined) push("start_date", input.startDate);
   if (input.dueDate !== undefined) push("due_date", input.dueDate);
   if (changed.length === 0) throw new Error("updateTaskAction: no fields to update");
-  if (changed.includes("due_date")) {
+  if (changed.includes("due_date") || changed.includes("start_date")) {
     await db.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_date date`);
+    await db.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS start_date date`);
   }
   sets.push(`updated_at = now()`);
   params.push(input.id);
