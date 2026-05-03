@@ -39,6 +39,7 @@ export class DocVersion {
     | "snapshot"
     | "delta"
     | "bodyMdSnapshot"
+    | "yjsState"
     | "author"
     | "restoreOf"
     | "createdAt";
@@ -71,6 +72,10 @@ export class DocVersion {
 
   @Property({ type: "text", fieldName: "body_md_snapshot", nullable: true })
   bodyMdSnapshot: string | null = null;
+
+  /** Yjs binary state vector; written by Hocuspocus persistence when collab flag ON. */
+  @Property({ type: "blob", fieldName: "yjs_state", nullable: true })
+  yjsState: Buffer | null = null;
 
   @ManyToOne(() => User, {
     fieldName: "author_id",
