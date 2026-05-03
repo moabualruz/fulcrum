@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplRuntime: codex
 Triage: AFK
 Pillar: artifacts
 Blocked-by: [06-trpc-procedures.md, 08-preview-and-download.md]
