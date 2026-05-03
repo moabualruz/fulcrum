@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplRuntime: claude
 Triage: AFK
 Pillar: 09-repos-git-supervision
 Blocked-by: [07-trpc-procedures, 08-cli-verbs]

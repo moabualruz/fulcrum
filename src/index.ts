@@ -46,8 +46,7 @@ Usage:
                                      Run an FTS query over the product kernel search index.
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
                                      Render the assembled Markdown context for a task.
-  fulcrum notify <verb>              Notification inbox, rules, channels CLI surface.
-  fulcrum audit <query|export>       Query and export audit events.
+  fulcrum tui                        Launch interactive TUI (repos browser, tasks, runs).
   fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
   fulcrum version                    Print version.
   fulcrum help                       This message.
@@ -124,14 +123,9 @@ async function main() {
       await runProduct(rest);
       return;
     }
-    case "notify": {
-      const { run: runNotify } = await import("./cli/notify.ts");
-      await runNotify(rest);
-      return;
-    }
-    case "audit": {
-      const { run: runAudit } = await import("./cli/audit.ts");
-      await runAudit(rest);
+    case "tui": {
+      const { runTui } = await import("./tui/app.ts");
+      await runTui(rest);
       return;
     }
     case "version":
