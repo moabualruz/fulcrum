@@ -115,6 +115,85 @@ export const VelocityRow = z.object({
   completed_points: z.number(),
 });
 
+// ── Notification schemas ────────────────────────────────────────────
+
+export const NotificationRow = z.object({
+  id: z.string(),
+  org_id: z.string(),
+  user_id: z.string(),
+  title: z.string(),
+  body: z.string().nullable(),
+  read: z.boolean(),
+  created_at: z.string(),
+});
+
+export const NotificationListResponse = z.object({
+  data: z.array(NotificationRow),
+});
+
+export const NotificationRuleRow = z.object({
+  id: z.string(),
+  org_id: z.string(),
+  name: z.string(),
+  event_pattern: z.record(z.string(), z.unknown()),
+  channels: z.array(z.string()),
+  enabled: z.boolean(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export const CreateRuleBody = z.object({
+  name: z.string().min(1),
+  event_pattern: z.record(z.string(), z.unknown()),
+  channels: z.array(z.string()),
+  enabled: z.boolean().optional(),
+});
+
+export const UpdateRuleBody = z.object({
+  name: z.string().min(1).optional(),
+  event_pattern: z.record(z.string(), z.unknown()).optional(),
+  channels: z.array(z.string()).optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const WebhookConfigBody = z.object({
+  url: z.string().url(),
+  secret: z.string().min(1),
+});
+
+export const WebhookConfigResponse = z.object({
+  url: z.string(),
+  secret: z.string(),
+});
+
+// ── Audit schemas ──────────────────────────────────────────────────
+
+export const AuditEventRow = z.object({
+  id: z.string(),
+  org_id: z.string(),
+  project_id: z.string().nullable(),
+  actor: z.string(),
+  subject_kind: z.string(),
+  subject_id: z.string(),
+  verb: z.string(),
+  payload: z.record(z.string(), z.unknown()),
+  created_at: z.string(),
+});
+
+export const AuditQueryParams = z.object({
+  kind: z.string().optional(),
+  verb: z.string().optional(),
+  since: z.string().optional(),
+  until: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
+export const AuditListResponse = z.object({
+  data: z.array(AuditEventRow),
+  total: z.number().int(),
+});
+
 // ── Error schema ─────────────────────────────────────────────────────
 
 export const ErrorResponse = z.object({
