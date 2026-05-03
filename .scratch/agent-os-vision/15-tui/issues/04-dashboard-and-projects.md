@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: tui
 Blocked-by: [15/issues/02-global-widgets.md]
@@ -24,11 +24,11 @@ Dashboard screen (projects count, open tasks count, recent runs, bell badge), Pr
 
 ## Acceptance criteria
 
-- [ ] Dashboard: shows `projectsCount`, `openTasksCount`, `runsLast7d`, `bellCount`; bell increments on new notification (subscription).
-- [ ] Projects list: 20 projects render in VirtualList; `c` opens create overlay; `Enter` navigates to project detail; `d` deletes with "Confirm? [y/N]".
-- [ ] Project detail: tabs board/list/sprints/reports/repos/docs switchable; active tab highlighted; navigation preserves scroll position.
-- [ ] After web creates project, TUI projects list shows it (same DB); CLI `fulcrum projects list --json` reflects.
-- [ ] FakeTTY snapshot for dashboard screen (strip-ansi).
+- [x] Dashboard: shows `projectsCount`, `openTasksCount`, `runsLast7d`, `bellCount`; bell increments on new notification (subscription).
+- [x] Projects list: 20 projects render in VirtualList; `c` opens create overlay; `Enter` navigates to project detail; `d` deletes with "Confirm? [y/N]".
+- [x] Project detail: tabs board/list/sprints/reports/repos/docs switchable; active tab highlighted; navigation preserves scroll position.
+- [x] After web creates project, TUI projects list shows it (same DB); CLI `fulcrum projects list --json` reflects.
+- [x] FakeTTY snapshot for dashboard screen (strip-ansi).
 
 ## Blocked by
 
