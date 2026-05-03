@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/10-project-settings-fields-statuses-views.md, 17-cross-cutting-platform/issues/14-gated-import-csv.md, 17-cross-cutting-platform/issues/15-gated-import-linear-jira-plane.md]
