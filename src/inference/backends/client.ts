@@ -94,7 +94,9 @@ function createBackend(id: BackendId): InferenceBackend {
     case "lm-studio":
       return new LmStudioBackend();
     case "openai-compatible":
-      return new OpenAICompatibleBackend();
+      return new OpenAICompatibleBackend({
+        flagEnabled: enabledFlags().has("external-llm-provider"),
+      });
   }
 }
 

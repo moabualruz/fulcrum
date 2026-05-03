@@ -277,8 +277,28 @@ export const sprintsRouter = t.router({
         );
       }
 
+      // Move next-sprint tasks to the next planned sprint (or backlog if none)
+      const nextSprintTaskIds = unfinished
+        .filter((task) => (dispositionByTask.get(task.id) ?? input.unfinishedDisposition) === "next-sprint")
+        .map((task) => task.id);
+      if (nextSprintTaskIds.length > 0) {
+        const nextSprint = await em.findOne(Sprint, {
+          org: ctx.orgId,
+          projectId: sprint.projectId,
+          status: SprintStatus.planned,
+          id: { $ne: sprint.id },
+        }, { orderBy: { startDate: "ASC" } });
+        const targetSprintId = nextSprint?.id ?? null;
+        await em.getConnection().execute(
+          `update tasks set sprint_id = ${targetSprintId ? "?" : "null"}, updated_at = now() where org_id = ? and id in (${nextSprintTaskIds.map(() => "?").join(", ")})`,
+          [...(targetSprintId ? [targetSprintId] : []), ctx.orgId, ...nextSprintTaskIds],
+        );
+      }
+
       const completed = rows.filter((task) => ["done", "completed", "closed"].includes(task.status ?? ""));
+      const metricsId = crypto.randomUUID();
       const metrics = em.create(MetricsCache, {
+        id: metricsId,
         projectId: sprint.projectId,
         sprint,
         date: new Date(),
