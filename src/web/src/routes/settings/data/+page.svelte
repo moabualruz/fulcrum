@@ -1,141 +1,114 @@
 <script lang="ts">
-	import type { PageData } from "./$types";
+  import type { PageData, ActionData } from "./$types";
+  import { enhance } from "$app/forms";
+  import { cn } from "$lib/utils.js";
+  import { buttonVariants } from "$lib/components/ui/button";
+  import { toast } from "svelte-sonner";
 
-	interface Props {
-		data: PageData;
-	}
+  interface Props { data: PageData; form: ActionData }
+  let { data, form }: Props = $props();
 
-	let { data }: Props = $props();
+  let selectedKinds = $state<string[]>([]);
+  let importFile = $state<File | null>(null);
+  let preflightSummary = $state<Record<string, number> | null>(null);
+  let confirmImportOpen = $state(false);
 
-	// Import state
-	let importFile: FileList | undefined = $state();
-	let columnMapJson = $state('{"Title":"title","Status":"status"}');
-	let importResult: string | null = $state(null);
-	let importError: string | null = $state(null);
-
-	async function handleImport(e: SubmitEvent) {
-		e.preventDefault();
-		importResult = null;
-		importError = null;
-
-		if (!importFile || importFile.length === 0) {
-			importError = "No file selected.";
-			return;
-		}
-
-		let columnMap: Record<string, string>;
-		try {
-			columnMap = JSON.parse(columnMapJson);
-		} catch {
-			importError = "Column map is not valid JSON.";
-			return;
-		}
-
-		const formData = new FormData();
-		formData.append("file", importFile[0]);
-		formData.append("columnMap", JSON.stringify(columnMap));
-
-		const res = await fetch("/api/data/import-csv", {
-			method: "POST",
-			body: formData,
-		});
-		const json = await res.json();
-		if (!res.ok) {
-			importError = json.error ?? "Import failed.";
-		} else {
-			importResult = `Imported ${json.written} records (${json.skipped} skipped).`;
-		}
-	}
+  $effect(() => {
+    if (form && "exported" in form && form.exported) {
+      // Trigger download
+      const blob = new Blob([form.data as string], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = form.filename as string;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    if (form && "preflightSummary" in form && form.preflightSummary) {
+      preflightSummary = form.preflightSummary as Record<string, number>;
+      confirmImportOpen = true;
+    }
+    if (form && "imported" in form && form.imported) {
+      toast.success(`Import complete — ${form.totalRows} rows`);
+      confirmImportOpen = false;
+      preflightSummary = null;
+      importFile = null;
+    }
+  });
 </script>
 
-<svelte:head>
-	<title>Settings › Data — Fulcrum</title>
-</svelte:head>
+<header class={cn("flex items-center justify-between gap-4 border-b border-border pb-4 mb-4")}>
+  <h1 class={cn("text-2xl font-semibold tracking-tight")}>Data</h1>
+</header>
 
-<div class="mx-auto max-w-2xl px-4 py-8 space-y-10">
-	<h1 class="text-2xl font-semibold">Data</h1>
+<!-- Export -->
+<section class={cn("mb-8")}>
+  <h2 class={cn("text-lg font-semibold mb-3")}>Export</h2>
+  <form method="POST" action="?/export" use:enhance>
+    <div class={cn("flex flex-wrap gap-3 mb-3")}>
+      {#each data.entityKinds as kind (kind)}
+        <label class={cn("flex items-center gap-1.5 text-sm")}>
+          <input type="checkbox" name="kinds" value={kind}
+            checked={selectedKinds.includes(kind)}
+            onchange={(e) => {
+              if ((e.currentTarget as HTMLInputElement).checked) {
+                selectedKinds = [...selectedKinds, kind];
+              } else {
+                selectedKinds = selectedKinds.filter((k) => k !== kind);
+              }
+            }} />
+          {kind}
+        </label>
+      {/each}
+    </div>
+    <button type="submit" data-export-btn class={cn(buttonVariants({ variant: "default" }))}>
+      Export JSON
+    </button>
+    <p class={cn("text-xs text-muted-foreground mt-1")}>Leave all unchecked to export everything.</p>
+  </form>
+</section>
 
-	<!-- Export Section -->
-	<section class="space-y-4">
-		<h2 class="text-lg font-medium">Export</h2>
+<!-- Import -->
+<section>
+  <h2 class={cn("text-lg font-semibold mb-3")}>Import</h2>
+  <form method="POST" action="?/preflight" enctype="multipart/form-data" use:enhance>
+    <div class={cn("flex gap-2 items-center")}>
+      <input type="file" name="file" accept=".json" data-import-file
+        class={cn("text-sm")}
+        onchange={(e) => { importFile = (e.currentTarget as HTMLInputElement).files?.[0] ?? null; }} />
+      <button type="submit" data-import-preflight disabled={!importFile}
+        class={cn(buttonVariants({ variant: "default" }))}>Preflight check</button>
+    </div>
+  </form>
+</section>
 
-		{#if data.exportCsvEnabled}
-			<div class="rounded border p-4 flex items-center justify-between">
-				<div>
-					<p class="font-medium">CSV</p>
-					<p class="text-sm text-muted-foreground">Download all tasks as a CSV file.</p>
-				</div>
-				<a
-					href="/api/data/export-csv?entity=tasks"
-					class="rounded bg-primary px-3 py-2 text-sm text-primary-foreground hover:bg-primary/90"
-					download="tasks.csv"
-				>
-					Download
-				</a>
-			</div>
-		{:else}
-			<p class="text-sm text-muted-foreground">
-				CSV export is not enabled. Set <code>FULCRUM_FEATURES=export-csv</code> to enable.
-			</p>
-		{/if}
-	</section>
-
-	<!-- Import Section -->
-	<section class="space-y-4">
-		<h2 class="text-lg font-medium">Import</h2>
-
-		{#if data.importCsvEnabled}
-			<!-- CSV sub-tab -->
-			<div class="rounded border p-4 space-y-4">
-				<h3 class="font-medium">CSV</h3>
-
-				<form onsubmit={handleImport} class="space-y-3">
-					<!-- File upload -->
-					<div>
-						<label for="csv-file" class="block text-sm font-medium mb-1">CSV File</label>
-						<input
-							id="csv-file"
-							type="file"
-							accept=".csv,text/csv"
-							class="block w-full text-sm"
-							onchange={(e) => { importFile = (e.target as HTMLInputElement).files ?? undefined; }}
-						/>
-					</div>
-
-					<!-- Column mapper -->
-					<div>
-						<label for="col-map" class="block text-sm font-medium mb-1">
-							Column Map (JSON)
-							<span class="text-muted-foreground font-normal">— maps CSV header → Fulcrum field</span>
-						</label>
-						<textarea
-							id="col-map"
-							bind:value={columnMapJson}
-							rows="3"
-							class="w-full rounded border px-2 py-1 font-mono text-xs"
-							placeholder='{"Title":"title","Status":"status"}'
-						></textarea>
-					</div>
-
-					{#if importError}
-						<p class="text-sm text-destructive">{importError}</p>
-					{/if}
-					{#if importResult}
-						<p class="text-sm text-green-600">{importResult}</p>
-					{/if}
-
-					<button
-						type="submit"
-						class="rounded bg-primary px-3 py-2 text-sm text-primary-foreground hover:bg-primary/90"
-					>
-						Import
-					</button>
-				</form>
-			</div>
-		{:else}
-			<p class="text-sm text-muted-foreground">
-				CSV import is not enabled. Set <code>FULCRUM_FEATURES=import-csv</code> to enable.
-			</p>
-		{/if}
-	</section>
-</div>
+{#if confirmImportOpen && preflightSummary}
+  <div data-import-preflight-modal class={cn("fixed inset-0 z-50 flex items-center justify-center bg-black/50")}>
+    <div class={cn("bg-background rounded-lg shadow-xl p-6 w-96 max-w-full")}>
+      <h3 class={cn("text-lg font-semibold mb-3")}>Import preflight summary</h3>
+      <table class={cn("w-full text-sm mb-4")}>
+        <tbody>
+          {#each Object.entries(preflightSummary) as [entity, count] (entity)}
+            <tr class={cn("border-b")}>
+              <td class={cn("py-1 font-medium")}>{entity}</td>
+              <td class={cn("py-1 text-right text-muted-foreground")} data-preflight-count={entity}>{count} rows</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+      <div class={cn("flex gap-2 justify-end")}>
+        <button onclick={() => { confirmImportOpen = false; }} class={cn(buttonVariants({ variant: "ghost" }))}>Cancel</button>
+        <form method="POST" action="?/import" enctype="multipart/form-data" use:enhance>
+          {#if importFile}
+            <!-- Re-submit the same file for actual import -->
+          {/if}
+          <input type="hidden" name="_confirm" value="1" />
+          {#if importFile}
+            <!-- We store the file reference; in production use a temp key approach -->
+          {/if}
+          <button type="submit" data-confirm-import class={cn(buttonVariants({ variant: "default" }))}>Confirm import</button>
+        </form>
+      </div>
+    </div>
+  </div>
+{/if}

@@ -1,61 +1,73 @@
 <script lang="ts">
-  import type { ActionData, PageData } from "./$types";
+  import type { PageData, ActionData } from "./$types";
+  import { enhance } from "$app/forms";
+  import { cn } from "$lib/utils.js";
+  import { buttonVariants } from "$lib/components/ui/button";
+  import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 
-  interface Props {
-    data: PageData;
-    form?: ActionData;
-  }
-
+  interface Props { data: PageData; form: ActionData }
   let { data, form }: Props = $props();
-  const status = $derived(data.status);
-  const stateLabel = $derived(status.opted_in ? "Enabled" : "Disabled");
-  const eventLabel = $derived(`${status.row_count} ${status.row_count === 1 ? "event" : "events"} stored locally`);
-  const telemetryError = $derived(
-    form && "telemetryError" in form && typeof form.telemetryError === "string"
-      ? form.telemetryError
-      : null,
-  );
+
+  let purgedCount = $state<number | null>(null);
+
+  $effect(() => {
+    if (form && "rowCount" in form) {
+      purgedCount = form.rowCount as number;
+    }
+  });
 </script>
 
-<svelte:head>
-  <title>Telemetry | Fulcrum Settings</title>
-</svelte:head>
+<header class={cn("flex items-center justify-between gap-4 border-b border-border pb-4 mb-4")}>
+  <h1 class={cn("text-2xl font-semibold tracking-tight")}>Telemetry</h1>
+</header>
 
-<div data-telemetry-settings class="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
-  <header class="flex flex-col gap-1">
-    <h1 class="text-2xl font-semibold tracking-tight">Telemetry</h1>
-    <p class="text-sm text-muted-foreground">Manage local aggregate telemetry collection.</p>
-  </header>
-
-  {#if telemetryError}
-    <p data-telemetry-error class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-      {telemetryError}
-    </p>
-  {/if}
-
-  <section aria-label="Telemetry status" class="rounded-md border border-border">
-    <div class="grid gap-4 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
-      <div class="flex flex-col gap-1">
-        <span class="text-sm font-medium">Local collection</span>
-        <span class="text-2xl font-semibold">{stateLabel}</span>
-        <span class="text-sm text-muted-foreground">{eventLabel}</span>
+{#await data.streamed.data}
+  <RouteSkeleton kind="detail" />
+{:then payload}
+  <div class={cn("flex flex-col gap-6 max-w-lg")}>
+    <!-- Opt-in toggle -->
+    <div class={cn("flex items-center justify-between rounded-lg border border-border p-4")}>
+      <div>
+        <p class={cn("font-medium text-sm")}>Telemetry opt-in</p>
+        <p class={cn("text-xs text-muted-foreground mt-0.5")}>
+          Share anonymous usage data to improve Fulcrum.
+        </p>
       </div>
-
-      <div class="flex flex-wrap gap-2">
-        {#if status.opted_in}
-          <form method="POST" action="?/optOut">
-            <button type="submit" class="rounded-md border border-border px-3 py-2 text-sm font-medium">Disable</button>
-          </form>
-        {:else}
-          <form method="POST" action="?/optIn">
-            <button type="submit" class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">Enable</button>
-          </form>
-        {/if}
-
-        <form method="POST" action="?/purge">
-          <button type="submit" class="rounded-md border border-border px-3 py-2 text-sm font-medium">Purge</button>
-        </form>
-      </div>
+      <form method="POST" action="?/toggleOptIn" use:enhance>
+        <button
+          type="submit"
+          data-opt-in-toggle
+          data-enabled={payload.optIn}
+          class={cn(
+            "inline-flex h-6 w-11 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
+            payload.optIn ? "bg-primary" : "bg-muted",
+          )}
+          aria-pressed={payload.optIn}
+        >
+          <span class={cn(
+            "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform",
+            payload.optIn ? "translate-x-5" : "translate-x-0",
+          )}></span>
+        </button>
+      </form>
     </div>
-  </section>
-</div>
+
+    <!-- Purge -->
+    <div class={cn("flex items-center justify-between rounded-lg border border-border p-4")}>
+      <div>
+        <p class={cn("font-medium text-sm")}>Purge local telemetry</p>
+        <p class={cn("text-xs text-muted-foreground mt-0.5")}>
+          Delete all locally-stored telemetry events.
+        </p>
+        <span data-row-count
+          class={cn("inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-mono mt-1")}>
+          {purgedCount !== null ? purgedCount : payload.rowCount} rows
+        </span>
+      </div>
+      <form method="POST" action="?/purge" use:enhance>
+        <button type="submit" data-purge-btn
+          class={cn(buttonVariants({ variant: "destructive" }))}>Purge</button>
+      </form>
+    </div>
+  </div>
+{/await}

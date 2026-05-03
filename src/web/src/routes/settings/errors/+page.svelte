@@ -1,90 +1,105 @@
 <script lang="ts">
-  import type { ActionData, PageData } from "./$types";
+  import type { PageData } from "./$types";
+  import { enhance } from "$app/forms";
+  import { cn } from "$lib/utils.js";
+  import { buttonVariants } from "$lib/components/ui/button";
+  import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 
-  interface Props {
-    data: PageData;
-    form?: ActionData;
-  }
+  interface Props { data: PageData }
+  let { data }: Props = $props();
 
-  let { data, form }: Props = $props();
-  const errorLogs = $derived(data.errorLogs ?? []);
+  let expanded = $state(new Set<string>());
+  let clearBefore = $state("");
 
-  function formatOccurred(value: string | Date): string {
-    const date = value instanceof Date ? value : new Date(value);
-    return Number.isNaN(date.getTime()) ? String(value) : date.toISOString();
+  function toggle(id: string) {
+    if (expanded.has(id)) {
+      expanded.delete(id);
+      expanded = new Set(expanded);
+    } else {
+      expanded.add(id);
+      expanded = new Set(expanded);
+    }
   }
 </script>
 
-<svelte:head>
-  <title>Errors | Fulcrum Settings</title>
-</svelte:head>
-
-<div data-settings-errors class="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
-  <header class="flex flex-col gap-1">
-    <h1 class="text-2xl font-semibold tracking-tight">Errors</h1>
-    <p class="text-sm text-muted-foreground">Local crashlog entries mirrored from the Fulcrum runtime.</p>
-  </header>
-
-  {#if form?.clearError}
-    <p data-clear-error class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-      {form.clearError}
-    </p>
-  {:else if form?.ok}
-    <p data-clear-result class="rounded-md border border-border bg-muted/50 px-3 py-2 text-sm">
-      Cleared {form.deleted} error logs.
-    </p>
-  {/if}
-
-  <form method="POST" action="?/clear" class="flex flex-wrap items-end gap-3">
-    <label class="grid gap-1 text-sm">
-      <span class="font-medium">Clear before</span>
-      <input
-        class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-        name="before"
-        type="datetime-local"
-      />
+<header class={cn("flex items-center justify-between gap-4 border-b border-border pb-4 mb-4")}>
+  <h1 class={cn("text-2xl font-semibold tracking-tight")}>Error logs</h1>
+  <form method="POST" action="?/clearBefore" use:enhance class={cn("flex items-center gap-2")}>
+    <label class={cn("text-sm font-medium")}>
+      Clear before:
+      <input type="datetime-local" name="before" bind:value={clearBefore}
+        data-clear-before-input
+        class={cn("ml-1 border-input bg-background h-8 rounded-md border px-2 text-xs")} />
     </label>
-    <button class="h-9 rounded-md border border-border px-3 text-sm font-medium" type="submit">Clear</button>
+    <button type="submit" data-clear-before-btn disabled={!clearBefore}
+      class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}>Clear</button>
   </form>
+</header>
 
-  <section aria-label="Local error logs" class="flex flex-col gap-3">
-    {#if errorLogs.length === 0}
-      <p class="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">No error logs recorded.</p>
-    {:else}
-      {#each errorLogs as item (item.id)}
-        <article class="rounded-md border border-border p-4">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="grid gap-1">
-              <h2 class="text-base font-semibold">{item.errorMessage}</h2>
-              <p class="text-xs text-muted-foreground">{formatOccurred(item.occurredAt)}</p>
-            </div>
-            <code class="rounded bg-muted px-2 py-1 text-xs">{item.id}</code>
-          </div>
+{#await data.streamed.data}
+  <RouteSkeleton kind="list" />
+{:then payload}
+  {#if payload.errors.length === 0}
+    <div data-empty-errors class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}>
+      No errors logged.
+    </div>
+  {:else}
+    <div class={cn("relative w-full overflow-x-auto")}>
+      <table class={cn("w-full caption-bottom text-sm")}>
+        <thead class={cn("[&_tr]:border-b")}>
+          <tr class={cn("border-b")}>
+            <th class={cn("h-10 px-2 text-left align-middle font-medium w-8")}></th>
+            <th class={cn("h-10 px-2 text-left align-middle font-medium")}>Message</th>
+            <th class={cn("h-10 px-2 text-left align-middle font-medium")}>OS</th>
+            <th class={cn("h-10 px-2 text-left align-middle font-medium")}>Version</th>
+            <th class={cn("h-10 px-2 text-left align-middle font-medium")}>Occurred</th>
+          </tr>
+        </thead>
+        <tbody class={cn("[&_tr:last-child]:border-0")}>
+          {#each payload.errors as err (err.id)}
+            <tr data-error-row data-error-id={err.id} class={cn("hover:bg-muted/50 border-b transition-colors")}>
+              <td class={cn("p-2 align-top")}>
+                <button
+                  data-expand-btn
+                  onclick={() => toggle(err.id)}
+                  class={cn("text-muted-foreground hover:text-foreground transition-transform", expanded.has(err.id) && "rotate-90")}
+                  aria-expanded={expanded.has(err.id)}
+                >▶</button>
+              </td>
+              <td class={cn("p-2 align-top")} colspan={expanded.has(err.id) ? 1 : 1}>
+                <div class={cn("font-medium text-sm")}>{err.message}</div>
+                {#if expanded.has(err.id)}
+                  <div data-stack-trace class={cn("mt-2 rounded-md bg-muted px-3 py-2 font-mono text-xs whitespace-pre-wrap")}>
+                    {err.stack_trace ?? "(no stack trace)"}
+                  </div>
+                  <details class={cn("mt-1")}>
+                    <summary class={cn("text-xs text-muted-foreground cursor-pointer")}>Context JSON</summary>
+                    <pre data-context-json class={cn("mt-1 rounded-md bg-muted px-3 py-2 font-mono text-xs overflow-x-auto")}>{JSON.stringify(err.context, null, 2)}</pre>
+                  </details>
+                {/if}
+              </td>
+              <td class={cn("p-2 align-top text-xs text-muted-foreground")}>{err.os ?? "—"}</td>
+              <td class={cn("p-2 align-top text-xs text-muted-foreground")}>{err.version ?? "—"}</td>
+              <td class={cn("p-2 align-top text-xs text-muted-foreground")}>{err.occurred_at.slice(0, 16)}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
 
-          <dl class="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-            <div>
-              <dt class="font-medium">Command</dt>
-              <dd class="break-words text-muted-foreground">{item.recentCliCommand ?? "unknown"}</dd>
-            </div>
-            <div>
-              <dt class="font-medium">Procedure</dt>
-              <dd class="break-words text-muted-foreground">{item.recentTrpcProcedure ?? "unknown"}</dd>
-            </div>
-            <div>
-              <dt class="font-medium">Runtime</dt>
-              <dd class="text-muted-foreground">{item.os ?? "unknown"} / {item.arch ?? "unknown"} / Bun {item.bunVersion ?? "unknown"}</dd>
-            </div>
-            <div>
-              <dt class="font-medium">Fulcrum</dt>
-              <dd class="text-muted-foreground">{item.fulcrumVersion ?? "unknown"}</dd>
-            </div>
-          </dl>
-
-          {#if item.stackTrace}
-            <pre data-error-stack class="mt-4 max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs">{item.stackTrace}</pre>
-          {/if}
-        </article>
-      {/each}
+    <!-- Pagination -->
+    {#if payload.total > payload.pageSize}
+      <div class={cn("flex gap-2 mt-4 justify-center")}>
+        {#if payload.page > 1}
+          <a href="?page={payload.page - 1}" class={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>← Prev</a>
+        {/if}
+        <span class={cn("text-sm text-muted-foreground self-center")}>
+          Page {payload.page} of {Math.ceil(payload.total / payload.pageSize)}
+        </span>
+        {#if payload.page < Math.ceil(payload.total / payload.pageSize)}
+          <a href="?page={payload.page + 1}" class={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>Next →</a>
+        {/if}
+      </div>
     {/if}
-  </section>
-</div>
+  {/if}
+{/await}
