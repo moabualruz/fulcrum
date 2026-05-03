@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/02-theme-keybindings-errorbound-featuregate.md, 17-cross-cutting-platform/issues/04-theme-trpc-and-composable.md, 05-router-and-skills/issues/05-skills-web-ui.md]
