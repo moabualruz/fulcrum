@@ -28,6 +28,8 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { experimentStore } from "../../../flags/experiments.ts";
+import { isFeatureEnabled } from "../../../tui/feature-flags.ts";
 
 import { t } from "../../../trpc/trpc.ts";
 import { protectedProcedure } from "../../../trpc/middleware.ts";
@@ -519,4 +521,79 @@ export const flagsRouter = t.router({
       });
       return { ok: true };
     }),
+
+  /**
+   * flags.experiments — A/B experiment admin procedures.
+   * All gated by FULCRUM_FEATURES=experiments (C1).
+   */
+  experiments: t.router({
+    list: protectedProcedure
+      .output(z.array(z.object({
+        id: z.string(),
+        name: z.string(),
+        description: z.string(),
+        variants: z.array(z.string()),
+        rolloutPercent: z.number(),
+        startDate: z.date().nullable(),
+        endDate: z.date().nullable(),
+        createdAt: z.date(),
+      })))
+      .query(() => {
+        if (!isFeatureEnabled("experiments")) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "FEATURE_DISABLED" });
+        }
+        return experimentStore.list();
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        description: z.string().optional(),
+        variants: z.array(z.string().min(1)).min(2),
+        rolloutPercent: z.number().int().min(0).max(100).default(100),
+        startDate: z.date().optional().nullable(),
+        endDate: z.date().optional().nullable(),
+      }))
+      .output(z.object({
+        id: z.string(),
+        name: z.string(),
+        description: z.string(),
+        variants: z.array(z.string()),
+        rolloutPercent: z.number(),
+        startDate: z.date().nullable(),
+        endDate: z.date().nullable(),
+        createdAt: z.date(),
+      }))
+      .mutation(({ input }) => {
+        if (!isFeatureEnabled("experiments")) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "FEATURE_DISABLED" });
+        }
+        // Validate unique variant names
+        const unique = new Set(input.variants);
+        if (unique.size !== input.variants.length) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Variant names must be unique." });
+        }
+        return experimentStore.create(input);
+      }),
+
+    assignments: protectedProcedure
+      .input(z.object({ experimentId: z.string() }))
+      .output(z.record(z.string(), z.number()))
+      .query(({ input }) => {
+        if (!isFeatureEnabled("experiments")) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "FEATURE_DISABLED" });
+        }
+        return experimentStore.assignments(input.experimentId);
+      }),
+
+    metrics: protectedProcedure
+      .input(z.object({ experimentId: z.string(), conversionKind: z.string() }))
+      .output(z.record(z.string(), z.object({ assigned: z.number(), conversions: z.number() })))
+      .query(({ input }) => {
+        if (!isFeatureEnabled("experiments")) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "FEATURE_DISABLED" });
+        }
+        return experimentStore.metrics(input.experimentId, input.conversionKind);
+      }),
+  }),
 });

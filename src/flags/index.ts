@@ -23,3 +23,11 @@ export {
   type EvaluateFeatureFlagInput,
   type FeatureFlagEvaluationConfig,
 } from "./evaluation.ts";
+export {
+  ExperimentStore,
+  experimentStore,
+  type Experiment,
+  type ExperimentAssignment,
+  type AssignmentCounts,
+  type MetricsResult,
+} from "./experiments.ts";

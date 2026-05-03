@@ -53,4 +53,76 @@ describe("ExperimentsPanel", () => {
       path: "settings/experiments",
     });
   });
+
+  // ── keyboard navigation + metrics pane ──────────────────────────────────
+
+  test("selectNext / selectedExperiment", () => {
+    process.env["FULCRUM_FEATURES"] = "experiments";
+    const panel = new ExperimentsPanel();
+    panel.addExperiment({ id: "e1", name: "Exp1", variant: "A" });
+    panel.addExperiment({ id: "e2", name: "Exp2", variant: "B" });
+    expect(panel.selectedExperiment()).toBeNull();
+    panel.selectNext();
+    expect(panel.selectedExperiment()?.id).toBe("e1");
+    panel.selectNext();
+    expect(panel.selectedExperiment()?.id).toBe("e2");
+    // clamps at end
+    panel.selectNext();
+    expect(panel.selectedExperiment()?.id).toBe("e2");
+  });
+
+  test("selectPrev navigates back", () => {
+    process.env["FULCRUM_FEATURES"] = "experiments";
+    const panel = new ExperimentsPanel();
+    panel.addExperiment({ id: "e1", name: "Exp1", variant: "A" });
+    panel.addExperiment({ id: "e2", name: "Exp2", variant: "B" });
+    panel.selectNext();
+    panel.selectNext();
+    panel.selectPrev();
+    expect(panel.selectedExperiment()?.id).toBe("e1");
+  });
+
+  test("openMetrics returns metrics pane with name", () => {
+    process.env["FULCRUM_FEATURES"] = "experiments";
+    const panel = new ExperimentsPanel();
+    panel.addExperiment({ id: "e1", name: "btn-color", variant: "blue" });
+    panel.selectNext();
+    const pane = panel.openMetrics({ blue: { assigned: 50, conversions: 5 }, red: { assigned: 50, conversions: 8 } });
+    expect(pane).not.toBeNull();
+    expect(pane!.experimentName).toBe("btn-color");
+    expect(pane!.metrics["blue"]!.assigned).toBe(50);
+  });
+
+  test("renderList shows cursor for selected row", () => {
+    process.env["FULCRUM_FEATURES"] = "experiments";
+    const panel = new ExperimentsPanel();
+    panel.addExperiment({ id: "e1", name: "Exp1", variant: "A" });
+    panel.addExperiment({ id: "e2", name: "Exp2", variant: "B" });
+    panel.selectNext();
+    const rows = panel.renderList();
+    expect(rows[0]).toContain("▶");
+    expect(rows[1]).not.toContain("▶");
+  });
+
+  test("renderMetrics shows variant metrics", () => {
+    process.env["FULCRUM_FEATURES"] = "experiments";
+    const panel = new ExperimentsPanel();
+    panel.addExperiment({ id: "e1", name: "color", variant: "blue" });
+    panel.selectNext();
+    panel.openMetrics({ blue: { assigned: 30, conversions: 3 } });
+    const lines = panel.renderMetrics();
+    expect(lines.some((l) => l.includes("blue"))).toBe(true);
+    expect(lines.some((l) => l.includes("assigned=30"))).toBe(true);
+  });
+
+  test("closeMetrics clears metrics pane", () => {
+    process.env["FULCRUM_FEATURES"] = "experiments";
+    const panel = new ExperimentsPanel();
+    panel.addExperiment({ id: "e1", name: "x", variant: "A" });
+    panel.selectNext();
+    panel.openMetrics({ A: { assigned: 10, conversions: 1 } });
+    expect(panel.currentMetricsPane()).not.toBeNull();
+    panel.closeMetrics();
+    expect(panel.currentMetricsPane()).toBeNull();
+  });
 });

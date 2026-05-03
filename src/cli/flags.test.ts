@@ -1,5 +1,6 @@
-import { describe, expect, test, afterEach } from "bun:test";
+import { describe, expect, test, afterEach, beforeEach } from "bun:test";
 import { parseArgs, formatOutput } from "./flags.ts";
+import { experimentStore } from "../flags/experiments.ts";
 
 describe("flags CLI", () => {
   afterEach(() => {
@@ -63,6 +64,73 @@ describe("flags CLI", () => {
       const parsed = JSON.parse(out);
       expect(parsed.experiments).toBe(true);
       expect(parsed["desktop-app"]).toBe(false);
+    });
+  });
+
+  describe("experiments sub-commands", () => {
+    beforeEach(() => {
+      experimentStore._reset();
+    });
+
+    test("parseArgs experiments list", () => {
+      expect(parseArgs(["experiments", "list"])).toEqual({ action: "experiments:list" });
+    });
+
+    test("parseArgs experiments create", () => {
+      expect(parseArgs(["experiments", "create", "--name", "btn-color", "--variants", "blue,red", "--rollout-percent", "50"])).toEqual({
+        action: "experiments:create",
+        name: "btn-color",
+        variants: ["blue", "red"],
+        rolloutPercent: 50,
+      });
+    });
+
+    test("parseArgs experiments create requires --name", () => {
+      const r = parseArgs(["experiments", "create"]);
+      expect(r.action).toBe("error");
+    });
+
+    test("parseArgs experiments create requires 2+ variants", () => {
+      const r = parseArgs(["experiments", "create", "--name", "x", "--variants", "only-one"]);
+      expect(r.action).toBe("error");
+    });
+
+    test("parseArgs experiments metrics", () => {
+      expect(parseArgs(["experiments", "metrics", "--experiment-id", "e1", "--conversion-kind", "task.created"])).toEqual({
+        action: "experiments:metrics",
+        experimentId: "e1",
+        conversionKind: "task.created",
+      });
+    });
+
+    test("formatOutput experiments:list empty", () => {
+      const out = formatOutput({ action: "experiments:list" }, false);
+      expect(out).toContain("No experiments");
+    });
+
+    test("formatOutput experiments:list with data", () => {
+      experimentStore.create({ name: "my-exp", variants: ["A", "B"] });
+      const out = formatOutput({ action: "experiments:list" }, false);
+      expect(out).toContain("my-exp");
+      expect(out).toContain("A,B");
+    });
+
+    test("formatOutput experiments:list as JSON", () => {
+      experimentStore.create({ name: "json-exp", variants: ["X", "Y"], rolloutPercent: 75 });
+      const out = formatOutput({ action: "experiments:list" }, true);
+      const data = JSON.parse(out);
+      expect(Array.isArray(data)).toBe(true);
+      expect(data[0].name).toBe("json-exp");
+      expect(data[0].rolloutPercent).toBe(75);
+    });
+
+    test("formatOutput experiments:metrics as JSON", () => {
+      const exp = experimentStore.create({ name: "m-exp", variants: ["A", "B"], rolloutPercent: 100 });
+      experimentStore.assign(exp.id, "u1");
+      experimentStore.recordConversion(exp.id, "u1", "task.done");
+      const out = formatOutput({ action: "experiments:metrics", experimentId: exp.id, conversionKind: "task.done" }, true);
+      const data = JSON.parse(out);
+      expect(typeof data).toBe("object");
     });
   });
 });
