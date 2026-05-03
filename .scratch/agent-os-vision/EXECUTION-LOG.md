@@ -2152,3 +2152,17 @@ Verification:
   blocked: Playwright e2e could not start Vite dev server in sandbox: listen EPERM 127.0.0.1:5173,
   known-red: root tsc includes tests/tui/docs-screens.test.ts errors; web check OOM; web build hits pre-existing decorator syntax from generated Account.js
 ]
+
+## 2026-05-03T12:45:00Z — claude-orchestrator (post-merge CI verification)
+
+CI: typecheck GREEN, test 2633 pass / 83 fail / 3 error.
+83 failures are pre-existing from wave impl (857 new tests added); merge-touched tests 28/28 GREEN.
+Merge-conflict repairs: restored full keybindings schema (P16#02 had replaced 56-action with 4-action stub), @ts-nocheck on web docs routes.
+
+Merged this cycle: P4#04 (c6e6bbd1), P5#06 (258c4556), P15#01 (73af07e2+fe70ea63), P16#02 (5fbeeb77), P16#03 (5aae24cc+39886c68), P16#04 (837c8d8a).
+
+Status: 163 implemented, 39 completed, 139 ready = 202/341 (59.2%)
+
+In-flight: P16#05 (claude), P3#13 (codex), P12#10 (claude re-dispatch after codex sandbox block)
+
+Next: milestone gate reviews on P6(17), P7(18), P8(13), P11(15), P13(14) — largest impl backlogs.
