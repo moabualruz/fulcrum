@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [15-gated-llm-extraction.md]
