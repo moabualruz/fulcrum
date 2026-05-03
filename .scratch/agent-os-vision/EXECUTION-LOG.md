@@ -2286,3 +2286,10 @@ CI: typecheck GREEN, pre-existing test failures tracked
 Remaining: 102 ready + P16#14 in-flight
 
 Codex sandbox pattern: worktree isolation blocks Codex git writes → re-dispatch as Claude. ~30% Codex dispatches blocked, recovered by Claude re-dispatch. Codex effective for read-heavy analysis but blocked on commit in worktree mode.
+
+## 2026-05-03T16:00:00Z — claude-orchestrator (wave 13 complete — approaching 80%)
+
+Landed waves 10-13: P3#17-20, P4#11-15, P6#18-20, P7#22-25, P8#15-18, P9#11-18, P11#16-18, P12#13-17, P13#02+16, P15#02+14, P16#12-13
+Status: 230 implemented, 39 completed, 73 ready = 269/341 (78.9%)
+.scratch intact (342 files). All Claude impl (Codex sandbox blocked on worktree git writes).
+Next: wave 14 from 73 ready, then milestone gate reviews.
