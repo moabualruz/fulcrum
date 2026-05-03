@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: tui
 Blocked-by: [15/issues/04-dashboard-and-projects.md]
@@ -40,3 +40,5 @@ Note: TipTap block editor cannot run in terminal. TUI uses plain-text fallback; 
 ## Notes
 
 T15-38–T15-41 maps to this slice.
+
+Implemented: P15#08 docs tree + reader/editor TUI screens.
