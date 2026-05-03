@@ -1,0 +1,20 @@
+{
+  "common.save": "حفظ",
+  "common.cancel": "إلغاء",
+  "common.delete": "حذف",
+  "common.edit": "تعديل",
+  "common.create": "إنشاء",
+  "common.search": "بحث",
+  "common.loading": "جارٍ التحميل…",
+  "common.error": "حدث خطأ ما",
+  "common.confirm": "تأكيد",
+  "common.close": "إغلاق",
+  "nav.dashboard": "لوحة التحكم",
+  "nav.projects": "المشاريع",
+  "nav.documents": "المستندات",
+  "nav.boards": "اللوحات",
+  "nav.runs": "تشغيلات الوكيل",
+  "nav.search": "بحث",
+  "settings.locale": "اللغة",
+  "settings.locale.description": "اختر لغتك المفضلة"
+}

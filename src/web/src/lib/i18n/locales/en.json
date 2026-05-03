@@ -1,0 +1,20 @@
+{
+  "common.save": "Save",
+  "common.cancel": "Cancel",
+  "common.delete": "Delete",
+  "common.edit": "Edit",
+  "common.create": "Create",
+  "common.search": "Search",
+  "common.loading": "Loading…",
+  "common.error": "Something went wrong",
+  "common.confirm": "Confirm",
+  "common.close": "Close",
+  "nav.dashboard": "Dashboard",
+  "nav.projects": "Projects",
+  "nav.documents": "Documents",
+  "nav.boards": "Boards",
+  "nav.runs": "Agent runs",
+  "nav.search": "Search",
+  "settings.locale": "Language",
+  "settings.locale.description": "Choose your preferred language"
+}
