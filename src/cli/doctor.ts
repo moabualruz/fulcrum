@@ -15,6 +15,7 @@ import { auditPackageParity, type PackageParityReport } from "./package-parity.t
 import { planPackageMirrorTargets } from "./package-mirror.ts";
 import { getPackageSurfaceManifest, MANAGED_PACKAGE_IDS, packageCacheSourceRoot } from "./package-surfaces.ts";
 import { runPlatformDoctorChecks, type PlatformDoctorCheck } from "../platform/doctor-checks.ts";
+import { sandboxProviderDoctorChecks, type SandboxProviderDoctorCheck } from "../orchestration/sandbox-runner.ts";
 
 interface ToolCheck {
   cmd: string;
@@ -116,6 +117,7 @@ interface DoctorReport {
     ok: boolean;
   };
   platformChecks: PlatformDoctorCheck[];
+  sandboxProviders: SandboxProviderDoctorCheck[];
   worktrees: {
     projectLocalIgnoredRoots: Array<{
       path: string;
@@ -618,6 +620,11 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
     if (platformCheck.status === "fail") errors += 1;
     else if (platformCheck.status === "warn") warnings += 1;
   }
+  const sandboxProviders = await sandboxProviderDoctorChecks();
+  for (const check of sandboxProviders) {
+    if (check.status === "error") errors += 1;
+    else if (check.status === "warn") warnings += 1;
+  }
 
   // Managed MCPs
   const mcpReport: DoctorReport["mcp"] = { servers: [] };
@@ -739,6 +746,7 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
     productKernel,
     memoriesSchema,
     platformChecks,
+    sandboxProviders,
     worktrees,
     skillBudget,
     skillsCount,
@@ -1022,6 +1030,15 @@ function printHumanFormat(report: DoctorReport, home: string): void {
         );
       }
     }
+  }
+  console.log();
+
+  // Sandcastle provider gates
+  console.log("Sandcastle providers:");
+  for (const check of report.sandboxProviders) {
+    const mark = check.status === "ok" ? "✓" : check.status === "warn" ? "⚠" : "✗";
+    console.log(`  ${pad(check.flag, 22)} ${mark}  ${check.detail}`);
+    if (check.hint) console.log(`    ${check.hint}`);
   }
   console.log();
 

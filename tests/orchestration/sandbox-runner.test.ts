@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { AgentProvider } from "@ai-hero/sandcastle";
-import { runAgent, TRUST_BOUNDARY_WARNING } from "../../src/orchestration/sandbox-runner.ts";
+import {
+  resolveProvider,
+  runAgent,
+  SandboxProviderUnavailableError,
+  sandboxProviderDoctorChecks,
+  TRUST_BOUNDARY_WARNING,
+} from "../../src/orchestration/sandbox-runner.ts";
 import type { AgentRunRequest } from "../../src/orchestration/types.ts";
 
 function echoAgent(): AgentProvider {
@@ -40,6 +46,79 @@ function request(overrides: Partial<AgentRunRequest> = {}): AgentRunRequest {
 afterEach(() => {
   delete process.env.FULCRUM_KEEP_WORKTREE_ON_FAILURE;
   delete process.env.FULCRUM_MAX_TOKENS_PER_RUN;
+});
+
+describe("resolveProvider gated sandbox providers", () => {
+  test("defaults to noSandbox when no sandbox flags are active", async () => {
+    const provider = await resolveProvider({ features: "", env: {}, commandExists: async () => true });
+
+    expect(provider.mode).toBe("host");
+    expect(provider.provider.tag).toBe("none");
+  });
+
+  test("throws when Docker and Podman flags are both active", async () => {
+    await expect(resolveProvider({
+      features: "sandbox-docker,sandbox-podman",
+      env: {},
+      commandExists: async () => true,
+    })).rejects.toThrow("sandbox-docker and sandbox-podman are mutually exclusive");
+  });
+
+  test("throws SandboxProviderUnavailableError when requested Docker daemon is unavailable", async () => {
+    await expect(resolveProvider({
+      features: "sandbox-docker",
+      env: {},
+      commandExists: async (cmd) => cmd !== "docker",
+    })).rejects.toBeInstanceOf(SandboxProviderUnavailableError);
+  });
+
+  test("returns the requested provider object for every gated sandbox flag", async () => {
+    const cases = [
+      ["sandbox-docker", {}, "docker", "docker"],
+      ["sandbox-podman", {}, "podman", "podman"],
+      ["sandbox-vercel", { VERCEL_TOKEN: "token" }, "vercel", "vercel"],
+      ["sandbox-daytona", { DAYTONA_API_KEY: "key", DAYTONA_SERVER_URL: "https://daytona.test" }, "daytona", "daytona"],
+      ["sandbox-modal", { MODAL_TOKEN_ID: "id", MODAL_TOKEN_SECRET: "secret" }, "modal", "modal"],
+      ["sandbox-e2b", { E2B_API_KEY: "key" }, "e2b", "e2b"],
+    ] as const;
+
+    for (const [flag, env, mode, providerName] of cases) {
+      const provider = await resolveProvider({
+        features: flag,
+        env,
+        commandExists: async () => true,
+      });
+
+      expect(provider.mode).toBe(mode);
+      expect(provider.provider.name).toBe(providerName);
+    }
+  });
+
+  test("requires cloud provider environment variables", async () => {
+    await expect(resolveProvider({
+      features: "sandbox-daytona",
+      env: { DAYTONA_API_KEY: "key" },
+      commandExists: async () => true,
+    })).rejects.toThrow("sandbox-daytona requires DAYTONA_SERVER_URL");
+  });
+
+  test("doctor checks report each provider gate without enabling sandbox flags", async () => {
+    const checks = await sandboxProviderDoctorChecks({
+      features: "",
+      env: {},
+      commandExists: async () => false,
+    });
+
+    expect(checks.map((check) => [check.flag, check.status])).toEqual([
+      ["sandbox-docker", "ok"],
+      ["sandbox-podman", "ok"],
+      ["sandbox-vercel", "ok"],
+      ["sandbox-daytona", "ok"],
+      ["sandbox-modal", "ok"],
+      ["sandbox-e2b", "ok"],
+    ]);
+    expect(checks.every((check) => check.detail.includes("noSandbox"))).toBe(true);
+  });
 });
 
 describe("runAgent noSandbox happy path", () => {

@@ -1,8 +1,12 @@
 import {
   createWorktree as sandcastleCreateWorktree,
   type AgentProvider,
+  type AnySandboxProvider,
+  type IsolatedSandboxProvider,
 } from "@ai-hero/sandcastle";
+import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import { noSandbox } from "@ai-hero/sandcastle/sandboxes/no-sandbox";
+import { podman } from "@ai-hero/sandcastle/sandboxes/podman";
 import type { AgentRunRequest, AgentRunResult } from "./types.ts";
 
 export const SANDCASTLE_API_VERSION = "0.5.6";
@@ -19,7 +23,7 @@ interface WorktreeHandle {
   readonly worktreePath: string;
   interactive(options: {
     readonly agent: AgentProvider;
-    readonly sandbox?: ReturnType<typeof noSandbox>;
+    readonly sandbox?: SandboxProvider;
     readonly prompt: string;
     readonly name?: string;
     readonly env?: Record<string, string>;
@@ -36,7 +40,7 @@ interface AgentRunRepositoryLike {
   updateSandcastleRun?(
     runId: string,
     patch: {
-      sandboxMode: "host";
+      sandboxMode: "host" | "docker" | "podman";
       exitCode: number;
       durationMs: number;
       iterationCount: number;
@@ -56,9 +60,126 @@ export interface SandboxRunnerDeps {
   readonly agentProvider?: AgentProvider;
   readonly now?: () => number;
   readonly agentRunRepository?: AgentRunRepositoryLike;
+  readonly features?: string;
+  readonly env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
+  readonly commandExists?: (command: string, args: readonly string[]) => Promise<boolean>;
 }
 
 const defaultLogger: Logger = console;
+
+type SandboxProvider = AnySandboxProvider;
+
+export type SandboxMode = "host" | "docker" | "podman" | "vercel" | "daytona" | "modal" | "e2b";
+
+export class SandboxProviderUnavailableError extends Error {
+  readonly code = "SANDBOX_PROVIDER_UNAVAILABLE";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "SandboxProviderUnavailableError";
+  }
+}
+
+export interface ResolveProviderOptions {
+  readonly features?: string;
+  readonly env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
+  readonly commandExists?: (command: string, args: readonly string[]) => Promise<boolean>;
+}
+
+export interface ResolvedSandboxProvider {
+  readonly mode: SandboxMode;
+  readonly provider: SandboxProvider;
+}
+
+export interface SandboxProviderDoctorCheck {
+  readonly provider: SandboxMode;
+  readonly flag: string;
+  readonly status: "ok" | "warn" | "error";
+  readonly detail: string;
+  readonly hint?: string;
+}
+
+export async function resolveProvider(options: ResolveProviderOptions = {}): Promise<ResolvedSandboxProvider> {
+  const flags = parseFeatureFlags(options.features ?? process.env.FULCRUM_FEATURES ?? "");
+  const env = options.env ?? process.env;
+  const commandExists = options.commandExists ?? commandSucceeds;
+
+  if (flags.has("sandbox-docker") && flags.has("sandbox-podman")) {
+    throw new SandboxProviderUnavailableError(
+      "sandbox-docker and sandbox-podman are mutually exclusive; disable one FULCRUM_FEATURES flag.",
+    );
+  }
+
+  if (flags.has("sandbox-docker")) {
+    if (!(await commandExists("docker", ["info"]))) {
+      throw new SandboxProviderUnavailableError("sandbox-docker requested but `docker info` failed.");
+    }
+    return { mode: "docker", provider: docker() };
+  }
+
+  if (flags.has("sandbox-podman")) {
+    if (!(await commandExists("podman", ["info"]))) {
+      throw new SandboxProviderUnavailableError("sandbox-podman requested but `podman info` failed.");
+    }
+    return { mode: "podman", provider: podman() };
+  }
+
+  if (flags.has("sandbox-vercel")) {
+    requireEnv("sandbox-vercel", env, ["VERCEL_TOKEN"]);
+    const { vercel } = await importOptionalSandbox<{ vercel: () => SandboxProvider }>(
+      "@ai-hero/sandcastle/sandboxes/vercel",
+    );
+    return { mode: "vercel", provider: vercel() };
+  }
+
+  if (flags.has("sandbox-daytona")) {
+    requireEnv("sandbox-daytona", env, ["DAYTONA_API_KEY", "DAYTONA_SERVER_URL"]);
+    const { daytona } = await importOptionalSandbox<{ daytona: () => SandboxProvider }>(
+      "@ai-hero/sandcastle/sandboxes/daytona",
+    );
+    return { mode: "daytona", provider: daytona() };
+  }
+
+  if (flags.has("sandbox-modal")) {
+    requireEnv("sandbox-modal", env, ["MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"]);
+    return { mode: "modal", provider: cloudProviderPlaceholder("modal") };
+  }
+
+  if (flags.has("sandbox-e2b")) {
+    requireEnv("sandbox-e2b", env, ["E2B_API_KEY"]);
+    return { mode: "e2b", provider: cloudProviderPlaceholder("e2b") };
+  }
+
+  return { mode: "host", provider: noSandbox() };
+}
+
+export async function sandboxProviderDoctorChecks(
+  options: ResolveProviderOptions = {},
+): Promise<SandboxProviderDoctorCheck[]> {
+  const features = options.features ?? process.env.FULCRUM_FEATURES ?? "";
+  const flags = parseFeatureFlags(features);
+  const env = options.env ?? process.env;
+  const commandExists = options.commandExists ?? commandSucceeds;
+  const checks: SandboxProviderDoctorCheck[] = [];
+
+  const dockerOn = flags.has("sandbox-docker");
+  const podmanOn = flags.has("sandbox-podman");
+  if (dockerOn && podmanOn) {
+    const detail = "sandbox-docker and sandbox-podman are mutually exclusive.";
+    checks.push(providerCheck("docker", "sandbox-docker", "error", detail, "Disable one sandbox feature flag."));
+    checks.push(providerCheck("podman", "sandbox-podman", "error", detail, "Disable one sandbox feature flag."));
+  } else {
+    checks.push(await daemonProviderCheck("docker", "sandbox-docker", dockerOn, commandExists));
+    checks.push(await daemonProviderCheck("podman", "sandbox-podman", podmanOn, commandExists));
+  }
+
+  checks.push(envProviderCheck("vercel", "sandbox-vercel", flags, env, ["VERCEL_TOKEN"]));
+  checks.push(envProviderCheck("daytona", "sandbox-daytona", flags, env, ["DAYTONA_API_KEY", "DAYTONA_SERVER_URL"]));
+  checks.push(envProviderCheck("modal", "sandbox-modal", flags, env, ["MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"]));
+  checks.push(envProviderCheck("e2b", "sandbox-e2b", flags, env, ["E2B_API_KEY"]));
+
+  return checks;
+}
 
 export async function runAgent(
   req: AgentRunRequest,
@@ -80,8 +201,14 @@ export async function runAgent(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(new Error("agent run timed out")), req.timeout);
     try {
-      logger.warn(TRUST_BOUNDARY_WARNING);
-      const sandbox = noSandbox();
+      const { provider: sandbox, mode: sandboxMode } = await resolveProvider({
+        features: deps.features,
+        env: deps.env,
+        commandExists: deps.commandExists,
+      });
+      if (sandboxMode === "host") {
+        logger.warn(TRUST_BOUNDARY_WARNING);
+      }
       const agent = deps.agentProvider ?? agentProviderFromProfile(req.agentProfile);
       const maxIterations = req.opts?.maxIterations ?? req.agentProfile.maxIterations;
       const maxTokens = maxTokensPerRun();
@@ -128,7 +255,7 @@ export async function runAgent(
       };
       if (req.runId) {
         await deps.agentRunRepository?.updateSandcastleRun?.(req.runId, {
-          sandboxMode: "host",
+          sandboxMode: persistedSandboxMode(sandboxMode),
           exitCode: result.exitCode,
           durationMs,
           iterationCount: result.iterationCount,
@@ -148,6 +275,59 @@ export async function runAgent(
       await worktree.close();
     }
   }
+}
+
+function parseFeatureFlags(value: string): Set<string> {
+  return new Set(
+    value
+      .split(",")
+      .map((feature) => feature.trim().split(":")[0]?.toLowerCase())
+      .filter((feature): feature is string => Boolean(feature)),
+  );
+}
+
+function requireEnv(
+  flag: string,
+  env: NodeJS.ProcessEnv | Record<string, string | undefined>,
+  names: readonly string[],
+): void {
+  const missing = names.filter((name) => !env[name]);
+  if (missing.length > 0) {
+    throw new SandboxProviderUnavailableError(`${flag} requires ${missing.join(", ")}.`);
+  }
+}
+
+async function commandSucceeds(command: string, args: readonly string[]): Promise<boolean> {
+  try {
+    const proc = Bun.spawn([command, ...args], { stdout: "ignore", stderr: "ignore" });
+    const exitCode = await proc.exited;
+    return exitCode === 0;
+  } catch {
+    return false;
+  }
+}
+
+async function importOptionalSandbox<T>(specifier: string): Promise<T> {
+  const runtimeImport = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<T>;
+  return runtimeImport(specifier);
+}
+
+function cloudProviderPlaceholder(name: "modal" | "e2b"): IsolatedSandboxProvider {
+  return {
+    tag: "isolated",
+    name,
+    env: {},
+    create: async () => {
+      throw new SandboxProviderUnavailableError(
+        `sandbox-${name} provider is gated but @ai-hero/sandcastle 0.5.6 does not expose a ${name} sandbox driver.`,
+      );
+    },
+  };
+}
+
+function persistedSandboxMode(mode: SandboxMode): "host" | "docker" | "podman" {
+  if (mode === "docker" || mode === "podman") return mode;
+  return "host";
 }
 
 function agentProviderFromProfile(profile: AgentRunRequest["agentProfile"]): AgentProvider {
@@ -217,4 +397,58 @@ function maxTokensPerRun(): number {
 function countTokens(text: string): number {
   const trimmed = text.trim();
   return trimmed.length === 0 ? 0 : trimmed.split(/\s+/).length;
+}
+
+function providerCheck(
+  provider: SandboxMode,
+  flag: string,
+  status: SandboxProviderDoctorCheck["status"],
+  detail: string,
+  hint?: string,
+): SandboxProviderDoctorCheck {
+  return { provider, flag, status, detail, ...(hint ? { hint } : {}) };
+}
+
+async function daemonProviderCheck(
+  provider: "docker" | "podman",
+  flag: string,
+  enabled: boolean,
+  commandExists: (command: string, args: readonly string[]) => Promise<boolean>,
+): Promise<SandboxProviderDoctorCheck> {
+  if (!enabled) {
+    return providerCheck(provider, flag, "ok", `${flag} disabled; noSandbox host mode remains active.`);
+  }
+  if (await commandExists(provider, ["info"])) {
+    return providerCheck(provider, flag, "ok", `${provider} daemon reachable.`);
+  }
+  return providerCheck(
+    provider,
+    flag,
+    "error",
+    `${flag} enabled but \`${provider} info\` failed.`,
+    `Start ${provider} or remove ${flag} from FULCRUM_FEATURES.`,
+  );
+}
+
+function envProviderCheck(
+  provider: Exclude<SandboxMode, "host" | "docker" | "podman">,
+  flag: string,
+  flags: ReadonlySet<string>,
+  env: NodeJS.ProcessEnv | Record<string, string | undefined>,
+  names: readonly string[],
+): SandboxProviderDoctorCheck {
+  if (!flags.has(flag)) {
+    return providerCheck(provider, flag, "ok", `${flag} disabled; noSandbox host mode remains active.`);
+  }
+  const missing = names.filter((name) => !env[name]);
+  if (missing.length === 0) {
+    return providerCheck(provider, flag, "ok", `${flag} prerequisites present.`);
+  }
+  return providerCheck(
+    provider,
+    flag,
+    "error",
+    `${flag} enabled but missing ${missing.join(", ")}.`,
+    `Set ${missing.join(", ")} or remove ${flag} from FULCRUM_FEATURES.`,
+  );
 }
