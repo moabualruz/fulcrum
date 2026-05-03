@@ -5,8 +5,12 @@
 	import type { JSONContent } from "@tiptap/core";
 	import CommentsPanel from "$lib/components/editor/CommentsPanel.svelte";
 	import DocEditor from "$lib/components/editor/DocEditor.svelte";
+	import FrontmatterForm from "$lib/components/docs/FrontmatterForm.svelte";
+	import FrontmatterYaml from "$lib/components/docs/FrontmatterYaml.svelte";
 	import { buttonVariants } from "$lib/components/ui/button";
 	import { cn } from "$lib/utils.js";
+	import type { DocType } from "../../../../../../db/entities/docs/enums.ts";
+	import type { FrontmatterValue } from "$lib/components/docs/frontmatter-ui.ts";
 
 	interface Props {
 		data: PageData;
@@ -21,6 +25,8 @@
 	let kindValue = $state(untrack(() => data.form.data.kind ?? "note"));
 	let labelsValue = $state(untrack(() => data.form.data.labels ?? ""));
 	let bodyValue = $state(untrack(() => data.form.data.body ?? ""));
+	let frontmatterValue = $state<FrontmatterValue>(untrack(() => data.doc.frontmatter ?? {}));
+	let frontmatterMode = $state<"form" | "yaml">("form");
 	/* svelte-ignore state_referenced_locally */
 	let contentJson = $state<JSONContent>(markdownToDoc(bodyValue));
 
@@ -28,10 +34,20 @@
 	const titleError = $derived<string | undefined>(errors.title?.[0]);
 	const kindError = $derived<string | undefined>(errors.kind?.[0]);
 	const bodyError = $derived<string | undefined>(errors.body?.[0]);
+	const frontmatterErrors = $derived<Record<string, string[]>>(errors.frontmatter ?? {});
+	const frontmatterMissing = $derived<string[]>(form?.missingFrontmatter ?? []);
+	const frontmatterToast = $derived(
+		frontmatterMissing.length ? `Missing required fields: ${frontmatterMissing.join(", ")}` : undefined,
+	);
+	const docType = $derived((data.doc.kind ?? "note") as DocType);
 
 	function handleDocChange(event: CustomEvent<{ contentJson: JSONContent; bodyMd: string }>): void {
 		contentJson = event.detail.contentJson;
 		bodyValue = event.detail.bodyMd;
+	}
+
+	function handleFrontmatterChange(event: CustomEvent<FrontmatterValue>): void {
+		frontmatterValue = event.detail;
 	}
 
 	function markdownToDoc(body: string): JSONContent {
@@ -68,6 +84,34 @@
 		use:enhance
 		class={cn("flex max-w-3xl flex-col gap-4")}
 	>
+		<aside
+			data-frontmatter-panel
+			class={cn("border-border bg-muted/30 flex flex-col gap-3 rounded-md border p-3")}
+		>
+			<div class={cn("flex items-center justify-between gap-3")}>
+				<h2 class={cn("text-sm font-semibold")}>Frontmatter</h2>
+				<button
+					type="button"
+					data-frontmatter-toggle-yaml
+					class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+					onclick={() => frontmatterMode = frontmatterMode === "form" ? "yaml" : "form"}
+				>{frontmatterMode === "form" ? "YAML" : "Form"}</button>
+			</div>
+			{#if frontmatterToast}
+				<p data-frontmatter-toast class={cn("text-destructive text-xs")}>{frontmatterToast}</p>
+			{/if}
+			{#if frontmatterMode === "form"}
+				<FrontmatterForm
+					docType={docType}
+					value={frontmatterValue}
+					errors={frontmatterErrors}
+					onchange={handleFrontmatterChange}
+				/>
+			{:else}
+				<FrontmatterYaml docType={docType} value={frontmatterValue} onchange={handleFrontmatterChange} />
+			{/if}
+		</aside>
+
 		<div class={cn("flex flex-col gap-1.5")}>
 			<label for="doc-title" class={cn("text-sm font-medium")}>Title</label>
 			<input

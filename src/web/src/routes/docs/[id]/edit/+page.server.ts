@@ -9,6 +9,12 @@ import { DocumentFormSchema } from "$lib/server/documents.schema";
 import { updateDocumentAction } from "$lib/server/documents";
 import { openProductDb, getDefaultOrgId } from "$lib/server/db";
 import { parseLabels, serializeLabels } from "$lib/markdown/labels";
+import {
+  parseFrontmatterYaml,
+  validateFrontmatter,
+  type FrontmatterValue,
+} from "$lib/components/docs/frontmatter-ui";
+import type { DocType } from "../../../../../../db/entities/docs/enums.ts";
 
 interface DocRow {
   id: string;
@@ -70,8 +76,9 @@ export const load: PageServerLoad = async ({ params }) => {
 
 export const actions: Actions = {
   default: async ({ params, request }) => {
-    const form = await superValidate(request, valibot(DocumentFormSchema));
+    const form = await superValidate(request.clone(), valibot(DocumentFormSchema));
     if (!form.valid) return fail(400, { form });
+    const fd = await request.formData();
     const db = await openProductDb();
     try {
       const orgId = await getDefaultOrgId(db);
@@ -85,6 +92,13 @@ export const actions: Actions = {
       );
       if (rows.length === 0) throw error(404, "Document not found");
       const rawFm = rows[0]?.frontmatter ?? {};
+      const frontmatter = readFrontmatter(fd, form.data.kind as DocType, rawFm);
+      if (!frontmatter.valid) {
+        return fail(400, {
+          form,
+          missingFrontmatter: frontmatter.missingRequired,
+        });
+      }
       const labels = parseLabels(form.data.labels ?? "");
       await updateDocumentAction(db, {
         id: params.id!,
@@ -93,7 +107,7 @@ export const actions: Actions = {
         kind: form.data.kind,
         body: form.data.body,
         frontmatter: {
-          ...rawFm,
+          ...frontmatter.value,
           title: form.data.title,
           kind: form.data.kind,
           labels,
@@ -105,3 +119,34 @@ export const actions: Actions = {
     return { form };
   },
 };
+
+function readFrontmatter(
+  fd: FormData,
+  docType: DocType,
+  previous: FrontmatterValue,
+): { valid: true; value: FrontmatterValue } | { valid: false; missingRequired: string[] } {
+  const yaml = fd.get("frontmatter_yaml");
+  const json = fd.get("frontmatter_json");
+  let value = previous;
+
+  if (typeof yaml === "string" && yaml.trim()) {
+    const parsed = parseFrontmatterYaml(docType, yaml, previous);
+    if (!parsed.ok) return { valid: false, missingRequired: [] };
+    value = parsed.value;
+  } else if (typeof json === "string" && json.trim()) {
+    try {
+      const parsed = JSON.parse(json) as unknown;
+      value = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as FrontmatterValue)
+        : {};
+    } catch {
+      return { valid: false, missingRequired: [] };
+    }
+  }
+
+  const validated = validateFrontmatter(docType, value);
+  if (!validated.success) {
+    return { valid: false, missingRequired: validated.missingRequired };
+  }
+  return { valid: true, value: validated.value };
+}
