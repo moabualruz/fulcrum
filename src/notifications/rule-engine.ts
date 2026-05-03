@@ -45,6 +45,7 @@ export interface NotificationRuleLike {
   enabled?: boolean;
   active?: boolean;
   name?: string | null;
+  subjectKind?: string | null;
   eventPattern?: Record<string, unknown> | null;
   channels?: string[] | null;
 }
