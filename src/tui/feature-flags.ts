@@ -1,5 +1,5 @@
 /**
- * Feature flags system for gated TUI features.
+ * Feature flags system for gated features.
  * Flags controlled via FULCRUM_FEATURES env var (comma-separated).
  */
 
@@ -7,13 +7,15 @@ export type FeatureFlag =
   | "desktop-app"
   | "experiments"
   | "casbin-policies"
-  | "scheduled-backups";
+  | "scheduled-backups"
+  | "skill-marketplace";
 
 export const KNOWN_FLAGS: readonly FeatureFlag[] = [
   "desktop-app",
   "experiments",
   "casbin-policies",
   "scheduled-backups",
+  "skill-marketplace",
 ] as const;
 
 const knownSet = new Set<string>(KNOWN_FLAGS);

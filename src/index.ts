@@ -16,6 +16,16 @@ Usage:
                                      computes and writes subpath_sha256 for unpinned entries.
   fulcrum skills lint <path>         Validate a SKILL.md (frontmatter + required body sections).
   fulcrum skills list [--installed]  Enumerate authored skills, or installed skill budgets.
+  fulcrum skills marketplace browse [--query Q] [--tags t1,t2] [--json]
+                                     Browse marketplace listings.
+  fulcrum skills marketplace fetch --slug <s> [--version <v>] [--json]
+                                     Fetch a single marketplace listing.
+  fulcrum skills marketplace publish --slug <s> --version <v> --content <c> [--json]
+                                     Publish a skill to the marketplace.
+  fulcrum skills marketplace verify --slug <s> [--json]
+                                     Verify listing signature (CLI only).
+  fulcrum skills marketplace install --slug <s> [--version <v>] [--json]
+                                     Install a marketplace skill (verifies sig first).
   fulcrum install [--profile minimal|rules-only|full] [--with-project DIR]
                   [--no-skills] [--no-upstream-skills]
                   [--no-default-mcps] [--enable-all-mcps]
