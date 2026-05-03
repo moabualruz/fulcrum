@@ -14,3 +14,4 @@ export {
   type ConnectorRegistryOptions,
   type ConnectorState,
 } from "./registry.ts";
+export { GitHubIssuesConnector, type GitHubIssuesConnectorOptions } from "./github-issues.ts";
