@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: tui
 Blocked-by: [15/issues/06-task-detail-and-forms.md, 15/issues/07-sprints-and-reports.md, 15/issues/08-docs-tree-reader-editor.md, 15/issues/09-memory-and-context-preview.md, 15/issues/10-runs-and-artifacts.md, 15/issues/11-repos-browser.md, 15/issues/12-search-and-notifications.md, 15/issues/13-agents-orchestration-inference.md, 15/issues/15-settings-integrations-secrets-backups.md, 15/issues/16-gated-i18n-embeddings.md, 15/issues/17-gated-desktop-experiments-casbin-backups.md, 15/issues/18-doctor-integration-and-opentui-gate.md]
