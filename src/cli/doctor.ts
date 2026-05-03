@@ -84,13 +84,6 @@ interface DoctorReport {
     database: string;
     packageParity: PackageParityReport[];
   };
-  repos: {
-    totalRepos: number;
-    syncErrors: number;
-    activeWatchers: number;
-    lruQueueDepth: number;
-    mirrorDiskGb: number;
-  };
   productKernel: {
     engine: "pglite" | "postgres" | "absent";
     dbPath: string;
@@ -105,10 +98,25 @@ interface DoctorReport {
     latestEventAt: string | null;
     error?: string;
   };
+  embeddingsSchema: {
+    status: "ok" | "absent" | "error";
+    tables: { memory_embeddings: boolean; doc_embeddings: boolean };
+    indexes: { memory_embeddings_hnsw: boolean; doc_embeddings_hnsw: boolean };
+    vectorDim: number | null;
+    flag: "on" | "off";
+    error?: string;
+  };
   worktrees: {
     projectLocalIgnoredRoots: Array<{
       path: string;
       entries: string[];
+    }>;
+  };
+  orchestration: {
+    checks: Array<{
+      name: string;
+      level: "ok" | "warning" | "error";
+      message: string;
     }>;
   };
   skillBudget: SkillBudgetReport;
@@ -584,9 +592,7 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
   }
   const packageParity = await buildPackageParityReport(home);
   const productKernel = await buildProductKernelReport();
-  const reposReport = await buildReposDoctorReport();
-  if (reposReport.syncErrors > 0) errors += 1;
-  if (reposReport.mirrorDiskGb > 10) errors += 1;
+  const embeddingsSchema = await buildEmbeddingsSchemaReport();
   if (productKernel.error) {
     // A PGlite/Postgres failure means a key product surface is offline.
     // Surface it through the doctor verdict so users see "verdict: error"
@@ -683,6 +689,13 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
     // Registry not yet initialised — no entries to report
   }
 
+  // Orchestration checks (P4#15)
+  const orchestration = await buildOrchestrationChecks();
+  for (const check of orchestration.checks) {
+    if (check.level === "error") errors++;
+    else if (check.level === "warning") warnings++;
+  }
+
   // Verdict
   const verdict: "ok" | "warning" | "error" =
     errors > 0 ? "error" : warnings > 0 ? "warning" : "ok";
@@ -710,8 +723,9 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       database: componentDatabase,
       packageParity,
     },
-    repos: reposReport,
     productKernel,
+    embeddingsSchema,
+    orchestration,
     worktrees,
     skillBudget,
     skillsCount,
@@ -820,53 +834,64 @@ async function buildProductKernelReport(): Promise<DoctorReport["productKernel"]
   }
 }
 
-async function buildReposDoctorReport(): Promise<DoctorReport["repos"]> {
-  const { productDbDir } = await import("../product-kernel/paths.ts");
-  const dir = productDbDir();
-  const dbPath = `${dir}/main`;
-  const pgVersionExists = await Bun.file(`${dbPath}/PG_VERSION`).exists();
-  if (!pgVersionExists) {
-    return { totalRepos: 0, syncErrors: 0, activeWatchers: 0, lruQueueDepth: 0, mirrorDiskGb: 0 };
-  }
+async function buildEmbeddingsSchemaReport(): Promise<DoctorReport["embeddingsSchema"]> {
+  const flag = (process.env.FULCRUM_FEATURES ?? "").split(",").map(s => s.trim()).includes("embeddings")
+    ? "on" as const
+    : "off" as const;
+  const absent: DoctorReport["embeddingsSchema"] = {
+    status: "absent",
+    tables: { memory_embeddings: false, doc_embeddings: false },
+    indexes: { memory_embeddings_hnsw: false, doc_embeddings_hnsw: false },
+    vectorDim: null,
+    flag,
+  };
   try {
+    const { productDbDir } = await import("../product-kernel/paths.ts");
+    const dir = productDbDir();
+    const dbPath = `${dir}/main`;
+    const pgExists = await Bun.file(`${dbPath}/PG_VERSION`).exists();
+    if (!pgExists) return absent;
+
     const { openPglite } = await import("../product-kernel/db/pglite.ts");
     const db = await openPglite(dbPath);
     try {
-      // Check if repos table has sync_status column (migration 0004 applied)
-      const colCheck = await db.query<{ count: number }>(
-        `SELECT COUNT(*)::int AS count FROM information_schema.columns
-         WHERE table_name = 'repos' AND column_name = 'sync_status'`,
+      const tblRows = await db.query<{ relname: string }>(
+        `SELECT relname FROM pg_class WHERE relname IN ('memory_embeddings', 'doc_embeddings') AND relkind = 'r'`,
       );
-      if ((colCheck[0]?.count ?? 0) === 0) {
-        // Migration not applied yet — just count repos
-        const rows = await db.query<{ total: number }>(
-          `SELECT COUNT(*)::int AS total FROM repos`,
+      const tables = {
+        memory_embeddings: tblRows.some(r => r.relname === "memory_embeddings"),
+        doc_embeddings: tblRows.some(r => r.relname === "doc_embeddings"),
+      };
+      const idxRows = await db.query<{ relname: string }>(
+        `SELECT relname FROM pg_class WHERE relname IN ('memory_embeddings_hnsw', 'doc_embeddings_hnsw') AND relkind = 'i'`,
+      );
+      const indexes = {
+        memory_embeddings_hnsw: idxRows.some(r => r.relname === "memory_embeddings_hnsw"),
+        doc_embeddings_hnsw: idxRows.some(r => r.relname === "doc_embeddings_hnsw"),
+      };
+      let vectorDim: number | null = null;
+      if (tables.memory_embeddings) {
+        const dimRows = await db.query<{ atttypmod: number }>(
+          `SELECT a.atttypmod FROM pg_attribute a
+           JOIN pg_class c ON c.oid = a.attrelid
+           WHERE c.relname = 'memory_embeddings' AND a.attname = 'embedding'`,
         );
-        return {
-          totalRepos: rows[0]?.total ?? 0,
-          syncErrors: 0,
-          activeWatchers: 0,
-          lruQueueDepth: 0,
-          mirrorDiskGb: 0,
-        };
+        if (dimRows.length > 0) vectorDim = dimRows[0]!.atttypmod;
       }
-      const { getReposDoctorStats } = await import("../product-kernel/store/repos.ts");
-      const stats = await getReposDoctorStats(db);
-      const mirrorDiskGb = Math.round((stats.mirrorDiskBytes / 1_073_741_824) * 100) / 100;
+      const allPresent = tables.memory_embeddings && tables.doc_embeddings
+        && indexes.memory_embeddings_hnsw && indexes.doc_embeddings_hnsw;
       return {
-        totalRepos: stats.totalRepos,
-        syncErrors: stats.syncErrors,
-        // Watcher registry and LRU queue are runtime state — not persisted yet.
-        // Doctor reports 0 until the watcher subsystem is built (P9#04).
-        activeWatchers: 0,
-        lruQueueDepth: 0,
-        mirrorDiskGb,
+        status: allPresent ? "ok" : "absent",
+        tables,
+        indexes,
+        vectorDim,
+        flag,
       };
     } finally {
       await db.close();
     }
-  } catch {
-    return { totalRepos: 0, syncErrors: 0, activeWatchers: 0, lruQueueDepth: 0, mirrorDiskGb: 0 };
+  } catch (err) {
+    return { ...absent, status: "error", error: (err as Error).message };
   }
 }
 
@@ -961,17 +986,6 @@ function printHumanFormat(report: DoctorReport, home: string): void {
   console.log(`  database: ${report.components.database}`);
   console.log();
 
-  // Repos
-  {
-    const r = report.repos;
-    console.log(`Repos: ${r.totalRepos} registered`);
-    if (r.syncErrors > 0) console.log(`  ✗ ${r.syncErrors} sync error(s)`);
-    if (r.mirrorDiskGb > 10) console.log(`  ✗ mirror disk usage ${r.mirrorDiskGb} GB (> 10 GB threshold)`);
-    else if (r.mirrorDiskGb > 0) console.log(`  mirror disk: ${r.mirrorDiskGb} GB`);
-    console.log(`  active watchers: ${r.activeWatchers}  LRU queue: ${r.lruQueueDepth}`);
-    console.log();
-  }
-
   // Product kernel
   const pk = report.productKernel;
   console.log(`Product kernel: ${pk.engine === "absent" ? "not initialised" : `engine=${pk.engine}`}`);
@@ -984,6 +998,16 @@ function printHumanFormat(report: DoctorReport, home: string): void {
     if (pk.latestEventAt) console.log(`  latest event: ${pk.latestEventAt}`);
   } else if (pk.error) {
     console.log(`  error: ${pk.error}`);
+  }
+  console.log();
+
+  // Embeddings schema
+  const es = report.embeddingsSchema;
+  console.log(`Embeddings schema: ${es.status}  flag: ${es.flag}`);
+  if (es.status === "ok") {
+    console.log(`  vector dim: ${es.vectorDim ?? "unknown"}`);
+  } else if (es.error) {
+    console.log(`  error: ${es.error}`);
   }
   console.log();
 
@@ -1048,6 +1072,32 @@ function printHumanFormat(report: DoctorReport, home: string): void {
 export async function run(args: string[]): Promise<void> {
   const isJsonOutput = args.includes("--json");
   const probe = args.includes("--probe");
+
+  // --subsystem <name>: run only that subsystem's checks and exit.
+  const subsystemIdx = args.indexOf("--subsystem");
+  if (subsystemIdx !== -1) {
+    const subsystem = args[subsystemIdx + 1];
+    if (subsystem === "api") {
+      const { runApiDoctorChecks, buildDefaultApiDoctorConfig } = await import("../doctor/checks/api.ts");
+      const result = await runApiDoctorChecks(buildDefaultApiDoctorConfig());
+      if (isJsonOutput) {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        console.log("fulcrum doctor — api subsystem\n");
+        for (const c of result.checks) {
+          const mark = c.status === "pass" ? "✓" : c.status === "warn" ? "⚠" : c.status === "skip" ? "·" : "✗";
+          console.log(`  ${mark}  ${pad(c.name, 30)} ${c.status}  ${c.message}`);
+          if (c.recovery) console.log(`     recovery: ${c.recovery}`);
+        }
+        console.log();
+        console.log(`  pass=${result.summary.pass} warn=${result.summary.warn} fail=${result.summary.fail} skip=${result.summary.skip}`);
+      }
+      if (result.summary.fail > 0) process.exit(1);
+      return;
+    }
+    console.error(`fulcrum doctor: unknown subsystem '${subsystem}'`);
+    process.exit(2);
+  }
 
   const { report, errors } = await buildReport({ probe });
 

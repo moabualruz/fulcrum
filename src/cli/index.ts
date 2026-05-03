@@ -39,7 +39,8 @@ Usage:
   fulcrum repos <register|list|sync|unregister|status> [options]
   fulcrum docs template list [--json]
   fulcrum symphony runs list --state ready [--json]
-  fulcrum runs <list|cancel> [--json]
+  fulcrum agents <list|profile|test> [--json]
+  fulcrum runs <list|show|cancel|retry|logs> [--json]
   fulcrum notify list [--unread] [--json|--watch]
   fulcrum audit <query|export> [--json]
   fulcrum webhooks <list|test> [--json]
@@ -237,6 +238,11 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "init": {
       const { run: runInit } = await import("./commands/init.ts");
       await runInit(rest);
+      return;
+    }
+    case "agents": {
+      const { run: runAgents } = await import("./commands/agents.ts");
+      await runAgents(rest);
       return;
     }
     case "auth": {

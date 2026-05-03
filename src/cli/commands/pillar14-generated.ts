@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { writeFile, readFile, stat as fsStat } from "node:fs/promises";
 import { Container } from "@needle-di/core";
 import { MikroORM, type EntityManager } from "@mikro-orm/postgresql";
 import type { Session as BetterAuthSession } from "better-auth";
@@ -22,7 +22,7 @@ export interface Pillar14RunOptions {
 type Io = Required<Pick<Pillar14RunOptions, "print" | "printErr" | "exit">>;
 
 const HELP: Record<Pillar14Domain, string> = {
-  runs: "fulcrum runs <list|cancel> [--json]",
+  runs: "fulcrum runs <list|show|cancel|retry|logs|attach> [--json]",
   notify: "fulcrum notify list [--unread] [--json|--watch]",
   audit: "fulcrum audit <query|export> [--json]",
   webhooks: "fulcrum webhooks <list|test> [--json]",
@@ -80,13 +80,127 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
     emitJson(result, io);
     return;
   }
+  if (sub === "show") {
+    const id = positional(argv)[0] ?? optionValue(argv, "--id");
+    requireValue(id, "runs show: missing run id");
+    const run = await caller.runs.get({ id });
+    if (!run) {
+      emitError(new Error(`run '${id}' not found`), hasFlag(argv, "--json"), io);
+      return;
+    }
+    emitJson(run, io);
+    return;
+  }
   if (sub === "cancel") {
     const id = positional(argv)[0] ?? optionValue(argv, "--id");
     requireValue(id, "runs cancel: missing run id");
     emitJson(await caller.runs.cancel({ id }), io);
     return;
   }
+  if (sub === "retry") {
+    const id = positional(argv)[0] ?? optionValue(argv, "--id");
+    requireValue(id, "runs retry: missing run id");
+    emitJson(await caller.runs.retry({ id }), io);
+    return;
+  }
+  if (sub === "logs") {
+    const id = positional(argv)[0] ?? optionValue(argv, "--id");
+    requireValue(id, "runs logs: missing run id");
+    const follow = hasFlag(argv, "--follow");
+    await streamRunLogs(id, follow, caller, io);
+    return;
+  }
+  if (sub === "attach") {
+    const id = positional(argv)[0] ?? optionValue(argv, "--id");
+    requireValue(id, "runs attach: missing run id");
+    await streamRunLogs(id, true, caller, io);
+    return;
+  }
   unknown("runs", sub, io);
+}
+
+/**
+ * Stream JSONL log file for a run. In follow mode, watches for new lines
+ * using stat-based polling until the run completes.
+ */
+async function streamRunLogs(
+  runId: string,
+  follow: boolean,
+  caller: any,
+  io: Io,
+): Promise<void> {
+  const run = await caller.runs.get({ id: runId });
+  if (!run) {
+    emitError(new Error(`run '${runId}' not found`), false, io);
+    return;
+  }
+
+  const logPath = resolveLogPath(run);
+  if (!logPath) {
+    emitError(new Error(`no log file for run '${runId}'`), false, io);
+    return;
+  }
+
+  // Read existing lines
+  let bytesRead = 0;
+  try {
+    const content = await readFile(logPath, "utf8");
+    bytesRead = Buffer.byteLength(content, "utf8");
+    for (const line of content.split("\n")) {
+      if (line.trim()) io.print(line);
+    }
+  } catch (err: any) {
+    if (err?.code === "ENOENT") {
+      if (!follow) {
+        emitError(new Error(`log file not found: ${logPath}`), false, io);
+        return;
+      }
+    } else {
+      throw err;
+    }
+  }
+
+  if (!follow) return;
+
+  // Tail: stat-based poll every 500ms
+  const POLL_MS = 500;
+  const MAX_WAIT_MS = 300_000; // 5 min max follow
+  const start = Date.now();
+
+  while (Date.now() - start < MAX_WAIT_MS) {
+    await new Promise((r) => setTimeout(r, POLL_MS));
+
+    const current = await caller.runs.get({ id: runId });
+    const done = !current || ["succeeded", "failed", "cancelled"].includes(current.symphony_state ?? current.status ?? "");
+
+    try {
+      const st = await fsStat(logPath);
+      if (st.size > bytesRead) {
+        const fd = Bun.file(logPath);
+        const tail = await fd.slice(bytesRead, st.size).text();
+        bytesRead = st.size;
+        for (const line of tail.split("\n")) {
+          if (line.trim()) io.print(line);
+        }
+      }
+    } catch {
+      // File not yet created or disappeared
+    }
+
+    if (done) break;
+  }
+}
+
+function resolveLogPath(run: Record<string, unknown>): string | null {
+  const candidates = [
+    run["transcript_path"],
+    run["log_path"],
+    (run["payload"] as Record<string, unknown> | undefined)?.["logPath"],
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.length > 0) return c;
+  }
+  return null;
 }
 
 async function runNotify(sub: string, argv: readonly string[], caller: any, io: Io) {
