@@ -35,6 +35,8 @@
     {#if data.unreadCount > 0}
       <span
         data-bell-badge
+        aria-live="polite"
+        aria-label="{data.unreadCount} unread notifications"
         class={cn("ml-2 inline-flex items-center justify-center rounded-full bg-destructive px-2 py-0.5 text-xs font-bold text-destructive-foreground")}
       >{data.unreadCount}</span>
     {/if}
@@ -51,10 +53,14 @@
   {/if}
 </header>
 
-<!-- Tab bar -->
-<div data-inbox-tabs class={cn("mb-4 flex gap-2 border-b border-border")}>
+<!-- Tab bar: ARIA tablist/tab/tabpanel pattern -->
+<div data-inbox-tabs role="tablist" aria-label="Inbox sections" class={cn("mb-4 flex gap-2 border-b border-border")}>
   <button
     type="button"
+    role="tab"
+    id="tab-foryou"
+    aria-selected={activeTab === "foryou"}
+    aria-controls="panel-foryou"
     data-tab="foryou"
     class={cn(
       "px-4 py-2 text-sm font-medium border-b-2 -mb-px",
@@ -66,6 +72,10 @@
   >For you</button>
   <button
     type="button"
+    role="tab"
+    id="tab-activity"
+    aria-selected={activeTab === "activity"}
+    aria-controls="panel-activity"
     data-tab="activity"
     class={cn(
       "px-4 py-2 text-sm font-medium border-b-2 -mb-px",
@@ -79,7 +89,13 @@
 
 <!-- For you tab -->
 {#if activeTab === "foryou"}
-  <div data-tab-foryou>
+  <div
+    data-tab-foryou
+    role="tabpanel"
+    id="panel-foryou"
+    aria-labelledby="tab-foryou"
+    tabindex="0"
+  >
     {#if data.notifications.length === 0}
       <div
         data-inbox-empty
@@ -95,10 +111,12 @@
             {#if n.read_at === null}
               <span
                 data-unread-dot
+                aria-label="Unread"
+                role="img"
                 class={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary")}
               ></span>
             {:else}
-              <span class={cn("mt-1.5 h-2 w-2 shrink-0")}></span>
+              <span aria-hidden="true" class={cn("mt-1.5 h-2 w-2 shrink-0")}></span>
             {/if}
             <div>
               <p class={cn("text-sm font-medium")}>
@@ -119,7 +137,13 @@
 
 <!-- My activity tab -->
 {#if activeTab === "activity"}
-  <div data-tab-activity>
+  <div
+    data-tab-activity
+    role="tabpanel"
+    id="panel-activity"
+    aria-labelledby="tab-activity"
+    tabindex="0"
+  >
     {#if data.activity.length === 0}
       <div
         data-activity-empty

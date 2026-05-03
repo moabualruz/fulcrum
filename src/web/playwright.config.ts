@@ -6,7 +6,7 @@ const fulcrumHome = path.join(tempRoot, `fulcrum-e2e-${process.pid}`);
 const port = Number(process.env.FULCRUM_E2E_PORT ?? "5173");
 
 export default defineConfig({
-	testDir: "tests/e2e/",
+	testDir: "tests/",
 	timeout: 30000,
 	retries: 0,
 	use: {

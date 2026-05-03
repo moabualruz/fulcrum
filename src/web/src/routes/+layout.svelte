@@ -89,7 +89,16 @@
 </svelte:head>
 
 <ModeWatcher />
-<Toaster richColors closeButton position="top-right" />
+
+<!-- Toast region: aria-live so screen readers announce toasts without overwhelming them -->
+<div
+	data-toast-region
+	aria-live="polite"
+	aria-atomic="false"
+	aria-label="Notifications"
+>
+	<Toaster richColors closeButton position="top-right" />
+</div>
 
 <CommandPalette
 	items={paletteItems}
@@ -100,23 +109,34 @@
 	}}
 />
 
+<!-- Skip link: must be first focusable element; becomes visible on focus -->
+<a
+	href="#main-content"
+	id="skip-to-content"
+	class={cn(
+		"sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[9999]",
+		"focus:rounded focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus:ring-2 focus:ring-ring",
+	)}
+>Skip to main content</a>
+
 <div class={cn("flex min-h-screen bg-background text-foreground")}>
 	{#if mobile}
 		<Sheet.Root bind:open={sheetOpen}>
-			<Sheet.Content side="left" class="w-64 p-0">
+			<Sheet.Content side="left" class="w-64 p-0" aria-label="Navigation menu">
 				<AppSidebar activeProjectId={data.activeProjectId} />
 			</Sheet.Content>
 			<div class={cn("flex min-w-0 flex-1 flex-col")}>
 				<div class={cn("flex items-center")}>
 					<Sheet.Trigger
 						data-mobile-sheet-trigger
-						aria-label="open navigation"
+						aria-label="Open navigation menu"
+						aria-expanded={sheetOpen}
 						class={cn(
 							buttonVariants({ variant: "ghost", size: "icon" }),
 							"ml-2",
 						)}
 					>
-						☰
+						<span aria-hidden="true">☰</span>
 					</Sheet.Trigger>
 					<div class="flex-1">
 						<AppTopbar
@@ -126,7 +146,7 @@
 						/>
 					</div>
 				</div>
-				<main class={cn("flex-1 px-6 py-6")}>
+				<main id="main-content" tabindex="-1" class={cn("flex-1 px-6 py-6")}>
 					{@render children?.()}
 				</main>
 			</div>
@@ -146,7 +166,7 @@
 					/>
 				</div>
 			</div>
-			<main class={cn("flex-1 px-6 py-6")}>
+			<main id="main-content" tabindex="-1" class={cn("flex-1 px-6 py-6")}>
 				{@render children?.()}
 			</main>
 		</div>
