@@ -1,7 +1,16 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
   import type { TaskColumn, TaskSortDirection, TaskViewRow } from "./task-view-types";
-  import { DEFAULT_TASK_COLUMNS, groupTaskRows, sortTaskRows, visibleTaskColumns } from "./task-table";
+  import {
+    buildBulkMutationRequest,
+    DEFAULT_TASK_COLUMNS,
+    groupTaskRows,
+    nextTaskSelection,
+    sortTaskRows,
+    submitBulkTaskMutation,
+    visibleTaskColumns,
+    type BulkTaskAction,
+  } from "./task-table";
 
   interface Props {
     tasks: TaskViewRow[];
@@ -15,6 +24,13 @@
   const columns = $derived(visibleTaskColumns(visibleColumns));
   const rows = $derived(sort ? sortTaskRows(tasks, sort.column, sort.direction) : tasks);
   const groups = $derived(groupTaskRows(rows, groupBy));
+  const orderedIds = $derived(rows.map((task) => task.id));
+  let selectedIds = $state<Set<string>>(new Set());
+  let anchorId = $state<string | null>(null);
+  let bulkAction = $state<BulkTaskAction | null>(null);
+  let bulkValue = $state("");
+  let pending = $state(false);
+  const selectedCount = $derived(selectedIds.size);
 
   function cell(task: TaskViewRow, column: TaskColumn): string {
     if (column.key === "title") return task.title;
@@ -25,6 +41,52 @@
     if (column.key === "labels") return (task.labels ?? []).join(", ");
     if (column.key === "created_at") return (task.created_at ?? task.updated_at).slice(0, 10);
     return "";
+  }
+
+  function selectTask(taskId: string, event: MouseEvent): void {
+    const next = nextTaskSelection({
+      orderedIds,
+      selectedIds,
+      clickedId: taskId,
+      anchorId,
+      metaKey: event.metaKey || event.ctrlKey,
+      shiftKey: event.shiftKey,
+    });
+    selectedIds = next.selectedIds;
+    anchorId = next.anchorId;
+  }
+
+  async function runBulkAction(action: BulkTaskAction, value: unknown): Promise<void> {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    if (action === "delete" && !confirm(`Delete ${ids.length} tasks? This cannot be undone.`)) return;
+
+    pending = true;
+    try {
+      await submitBulkTaskMutation(fetch, buildBulkMutationRequest({ action, ids, value }));
+      selectedIds = new Set();
+      anchorId = null;
+      bulkAction = null;
+      bulkValue = "";
+      location.reload();
+    } finally {
+      pending = false;
+    }
+  }
+
+  function submitScopedCommand(): void {
+    if (!bulkAction) return;
+    if (bulkAction === "priority") {
+      void runBulkAction(bulkAction, Number(bulkValue));
+    } else if (bulkAction === "move") {
+      const [projectId, sprintId] = bulkValue.split(":");
+      void runBulkAction(bulkAction, {
+        projectId: projectId || null,
+        sprintId: sprintId || null,
+      });
+    } else {
+      void runBulkAction(bulkAction, bulkValue);
+    }
   }
 </script>
 
@@ -58,6 +120,9 @@
     <table class={cn("w-full caption-bottom text-sm")}>
       <thead class={cn("[&_tr]:border-b")}>
         <tr class={cn("border-b transition-colors")}>
+          <th class={cn("h-10 w-10 px-2 text-left align-middle font-medium")}>
+            <span class={cn("sr-only")}>Select</span>
+          </th>
           {#each columns as column (column.key)}
             <th data-task-column={column.key} class={cn("h-10 px-2 text-left align-middle font-medium")}>
               <button type="button" data-task-sort={column.key} class={cn("inline-flex items-center gap-1 hover:underline")}>
@@ -74,7 +139,7 @@
         <tbody data-task-group data-group-key={group.key} class={cn("[&_tr:last-child]:border-0")}>
           {#if groupBy}
             <tr class={cn("border-b bg-muted/40")}>
-              <td colspan={columns.length} class={cn("px-2 py-2 font-medium")}>
+              <td colspan={columns.length + 1} class={cn("px-2 py-2 font-medium")}>
                 <button type="button" data-task-group-collapse={group.key} class={cn("inline-flex items-center gap-2")}>
                   <span>{group.label}</span>
                   <span data-task-group-count class={cn("text-xs text-muted-foreground")}>{group.tasks.length}</span>
@@ -83,7 +148,25 @@
             </tr>
           {/if}
           {#each group.tasks as task (task.id)}
-            <tr data-task-row data-task-id={task.id} class={cn("hover:bg-muted/50 border-b transition-colors")}>
+            <tr
+              data-task-row
+              data-task-id={task.id}
+              data-selected={selectedIds.has(task.id) ? "true" : "false"}
+              class={cn("hover:bg-muted/50 border-b transition-colors", selectedIds.has(task.id) && "bg-muted")}
+              onclick={(event) => selectTask(task.id, event)}
+            >
+              <td class={cn("p-2 align-middle")}>
+                <input
+                  data-task-select={task.id}
+                  type="checkbox"
+                  checked={selectedIds.has(task.id)}
+                  aria-label={`Select ${task.title}`}
+                  onclick={(event) => {
+                    event.stopPropagation();
+                    selectTask(task.id, event);
+                  }}
+                />
+              </td>
               {#each columns as column (column.key)}
                 <td class={cn("p-2 align-middle")}>
                   {#if column.key === "title"}
@@ -111,4 +194,50 @@
       {/each}
     </table>
   </div>
+
+  {#if selectedCount >= 2}
+    <div
+      data-bulk-action-bar
+      class={cn("fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm shadow-lg")}
+    >
+      <span data-bulk-selection-count class={cn("font-medium")}>{selectedCount} selected</span>
+      {#each ["assignee", "status", "sprint", "label", "priority", "move"] as action (action)}
+        <button
+          type="button"
+          data-bulk-action={action}
+          class={cn("rounded-md border border-border px-2 py-1")}
+          disabled={pending}
+          onclick={() => {
+            bulkAction = action as BulkTaskAction;
+            bulkValue = "";
+          }}
+        >{action}</button>
+      {/each}
+      <button
+        type="button"
+        data-bulk-action="delete"
+        class={cn("rounded-md border border-destructive px-2 py-1 text-destructive")}
+        disabled={pending}
+        onclick={() => void runBulkAction("delete", null)}
+      >Delete</button>
+    </div>
+  {/if}
+
+  {#if bulkAction}
+    <div data-bulk-command-palette data-action={bulkAction} class={cn("fixed inset-x-4 bottom-20 z-40 mx-auto max-w-lg rounded-md border border-border bg-background p-3 shadow-lg")}>
+      <label class={cn("flex flex-col gap-2 text-sm font-medium")}>
+        <span>{bulkAction}</span>
+        <input
+          data-bulk-command-input
+          class={cn("h-9 rounded-md border border-input bg-background px-3 text-sm")}
+          bind:value={bulkValue}
+          placeholder={bulkAction === "move" ? "project-id:sprint-id" : "Value"}
+        />
+      </label>
+      <div class={cn("mt-3 flex justify-end gap-2")}>
+        <button type="button" data-bulk-command-cancel class={cn("rounded-md border border-border px-2 py-1")} onclick={() => (bulkAction = null)}>Cancel</button>
+        <button type="button" data-bulk-command-submit class={cn("rounded-md border border-border px-2 py-1")} disabled={pending} onclick={submitScopedCommand}>Apply</button>
+      </div>
+    </div>
+  {/if}
 </section>

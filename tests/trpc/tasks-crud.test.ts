@@ -292,3 +292,107 @@ describe("tasks subtasks and dependencies tRPC", () => {
     }
   });
 });
+
+describe("tasks bulk operations tRPC", () => {
+  test("bulkUpdate updates all matching tasks, emits one event per task, and rolls back on invalid ids", async () => {
+    const db = await createTestOrm();
+    try {
+      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const caller = callerFor(repo);
+
+      const tasks = await Promise.all([
+        caller.tasks.create({ title: "A", status: "todo", priority: 1 }),
+        caller.tasks.create({ title: "B", status: "todo", priority: 2 }),
+        caller.tasks.create({ title: "C", status: "todo", priority: 3 }),
+      ]);
+
+      await expect(
+        caller.tasks.bulkUpdate({
+          ids: tasks.map((task) => task.id),
+          patch: { status: "in_review", priority: 5 },
+        }),
+      ).resolves.toEqual({ updated: 3 });
+
+      expect((await Promise.all(tasks.map((task) => caller.tasks.get({ id: task.id })))).map((task) => task?.status))
+        .toEqual(["in_review", "in_review", "in_review"]);
+
+      const events = await repo.getEntityManager().find(Event, {
+        org: ORG_ID,
+        verb: "bulk_updated",
+        subjectKind: "task",
+      } as never);
+      expect(events.map((event) => event.subjectId).sort()).toEqual(tasks.map((task) => task.id).sort());
+
+      await expect(
+        caller.tasks.bulkUpdate({
+          ids: [tasks[0].id, "22222222-2222-4222-8222-222222222222"],
+          patch: { status: "blocked" },
+        }),
+      ).rejects.toMatchObject({
+        code: "NOT_FOUND",
+        message: "One or more tasks were not found.",
+      });
+
+      expect((await caller.tasks.get({ id: tasks[0].id }))?.status).toBe("in_review");
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("bulkDelete soft-deletes selected tasks and returns deleted count", async () => {
+    const db = await createTestOrm();
+    try {
+      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const caller = callerFor(repo);
+
+      const keep = await caller.tasks.create({ title: "Keep" });
+      const deleted = await Promise.all([
+        caller.tasks.create({ title: "Delete A" }),
+        caller.tasks.create({ title: "Delete B" }),
+      ]);
+
+      await expect(caller.tasks.bulkDelete({ ids: deleted.map((task) => task.id) })).resolves.toEqual({ deleted: 2 });
+      expect((await caller.tasks.list()).map((task) => task.id)).toEqual([keep.id]);
+      expect((await caller.tasks.list({ includeDeleted: true })).filter((task) => task.deletedAt !== null)).toHaveLength(2);
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("bulkUpdate moves selected tasks to another sprint and project", async () => {
+    const db = await createTestOrm();
+    try {
+      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const caller = callerFor(repo);
+      const projectId = "33333333-3333-4333-8333-333333333333";
+      const sprintId = "44444444-4444-4444-8444-444444444444";
+      await repo.getEntityManager().getConnection().execute(
+        `insert into sprints (id, org_id, project_id, name, start_date, end_date) values (?, ?, ?, ?, ?, ?)`,
+        [sprintId, ORG_ID, projectId, "Sprint Bulk", "2026-05-01", "2026-05-14"],
+      );
+      const tasks = await Promise.all([
+        caller.tasks.create({ title: "Move A" }),
+        caller.tasks.create({ title: "Move B" }),
+      ]);
+
+      await expect(
+        caller.tasks.bulkUpdate({
+          ids: tasks.map((task) => task.id),
+          patch: { projectId, sprintId },
+        }),
+      ).resolves.toEqual({ updated: 2 });
+
+      const rows = await repo.getEntityManager().getConnection().execute(
+        `select id, project_id, sprint_id from tasks where id in (?, ?) order by id`,
+        tasks.map((task) => task.id),
+      );
+      expect(rows).toEqual(
+        tasks
+          .map((task) => ({ id: task.id, project_id: projectId, sprint_id: sprintId }))
+          .sort((a, b) => a.id.localeCompare(b.id)),
+      );
+    } finally {
+      await db.close();
+    }
+  });
+});

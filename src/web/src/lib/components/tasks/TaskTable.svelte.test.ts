@@ -1,7 +1,12 @@
 import type { Component } from "svelte";
 import { beforeAll, describe, expect, test } from "bun:test";
 import type { TaskViewRow } from "./task-view-types.ts";
-import { loadVisibleTaskColumns, saveVisibleTaskColumns } from "./task-table.ts";
+import {
+  buildBulkMutationRequest,
+  nextTaskSelection,
+  loadVisibleTaskColumns,
+  saveVisibleTaskColumns,
+} from "./task-table.ts";
 
 type TaskTableProps = {
   tasks: TaskViewRow[];
@@ -139,5 +144,83 @@ describe("TaskTable component (SSR)", () => {
     expect(body).toContain('data-task-column="status"');
     expect(body).not.toContain('data-task-column="assignee"');
     expect(body).not.toContain('data-task-column="priority"');
+  });
+});
+
+describe("TaskTable bulk selection helpers", () => {
+  test("cmd-click toggles individual task ids and shift-click selects contiguous range", () => {
+    const orderedIds = TASKS.map((task) => task.id);
+    let selection = nextTaskSelection({
+      orderedIds,
+      selectedIds: new Set(),
+      clickedId: "task-late",
+      anchorId: null,
+      metaKey: true,
+      shiftKey: false,
+    });
+
+    expect(selection.selectedIds).toEqual(new Set(["task-late"]));
+
+    selection = nextTaskSelection({
+      orderedIds,
+      selectedIds: selection.selectedIds,
+      clickedId: "task-middle",
+      anchorId: selection.anchorId,
+      metaKey: false,
+      shiftKey: true,
+    });
+
+    expect([...selection.selectedIds]).toEqual(["task-late", "task-early", "task-middle"]);
+
+    selection = nextTaskSelection({
+      orderedIds,
+      selectedIds: selection.selectedIds,
+      clickedId: "task-early",
+      anchorId: selection.anchorId,
+      metaKey: true,
+      shiftKey: false,
+    });
+
+    expect([...selection.selectedIds]).toEqual(["task-late", "task-middle"]);
+  });
+
+  test("buildBulkMutationRequest targets real tRPC bulk update, move, and delete mutations", () => {
+    expect(
+      buildBulkMutationRequest({
+        action: "status",
+        ids: ["task-a", "task-b"],
+        value: "blocked",
+      }),
+    ).toEqual({
+      procedure: "tasks.bulkUpdate",
+      input: { ids: ["task-a", "task-b"], patch: { status: "blocked" } },
+    });
+
+    expect(
+      buildBulkMutationRequest({
+        action: "move",
+        ids: ["task-a", "task-b"],
+        value: { projectId: "project-1", sprintId: "sprint-1" },
+      }),
+    ).toEqual({
+      procedure: "tasks.bulkUpdate",
+      input: { ids: ["task-a", "task-b"], patch: { projectId: "project-1", sprintId: "sprint-1" } },
+    });
+
+    expect(
+      buildBulkMutationRequest({
+        action: "sprint",
+        ids: ["task-a", "task-b"],
+        value: "sprint-2",
+      }),
+    ).toEqual({
+      procedure: "tasks.bulkUpdate",
+      input: { ids: ["task-a", "task-b"], patch: { sprintId: "sprint-2" } },
+    });
+
+    expect(buildBulkMutationRequest({ action: "delete", ids: ["task-a"], value: null })).toEqual({
+      procedure: "tasks.bulkDelete",
+      input: { ids: ["task-a"] },
+    });
   });
 });
