@@ -1,5 +1,5 @@
 ---
-Status: completed
+Status: implemented
 Owner: codex-orchestrator
 Triage: AFK
 Pillar: 05-router-and-skills
@@ -7,6 +7,8 @@ Blocked-by: 03-rules-engine-wrapper
 ---
 
 # auto-assign.ts — Tier 1 explicit override + Tier 2 rules evaluation
+
+IMPLEMENTED
 
 ## Parent: PRD `prds/05-router-and-skills.md`
 

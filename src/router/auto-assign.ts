@@ -20,6 +20,7 @@ async function defaultRecordDecision({
   input: AutoAssignInput;
   decision: RoutingDecision;
 }): Promise<void> {
+  if (!input.taskId) return;
   await recordRoutingEvent(decision, input.taskId, input.orgId, Boolean(input.dryRun));
 }
 
