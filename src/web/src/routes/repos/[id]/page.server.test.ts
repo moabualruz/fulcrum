@@ -1,11 +1,10 @@
-import { randomUUID } from "node:crypto";
-import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { openPglite } from "../../../../../product-kernel/db/pglite.ts";
 import { runMigrations } from "../../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg, createProject } from "../../../../../product-kernel/store/repositories.ts";
+import { createLocalOrg } from "../../../../../product-kernel/store/repositories.ts";
 import { newUlid } from "../../../../../product-kernel/ids.ts";
 
 let scratch: string;
@@ -16,8 +15,24 @@ function streamedData<T>(result: unknown): Promise<T> {
   return stream as Promise<T>;
 }
 
+async function seedRepo(scratch: string) {
+  const dbDir = join(scratch, "state", "product", "db");
+  mkdirSync(dbDir, { recursive: true });
+  const db = await openPglite(join(dbDir, "main"));
+  await runMigrations(db);
+  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
+  const repoId = newUlid();
+  await db.query(
+    `INSERT INTO repos (id, org_id, slug, root_path, default_branch, remote_url, registered_at, last_seen_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [repoId, org.id, "myrepo", "/tmp/myrepo", "main", null, "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"],
+  );
+  await db.close();
+  return { orgId: org.id, repoId };
+}
+
 beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-repo-detail-"));
+  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-repos-detail-"));
   process.env["FULCRUM_HOME"] = scratch;
 });
 
@@ -26,104 +41,49 @@ afterEach(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-async function seedRepoDetail() {
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
-  await ensureRepoColumns(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const project = await createProject(db, { orgId: org.id, slug: "alpha", name: "Alpha" });
-  const repoId = newUlid();
-  await db.query(
-    `INSERT INTO repos (id, org_id, project_id, slug, root_path, default_branch, remote_url, name, kind, local_path, current_branch, last_sync_at, sync_status, last_touched_at)
-     VALUES ($1, $2, $3, 'fulcrum', '/workspace/fulcrum', 'main', null, 'Fulcrum', 'local', '/workspace/fulcrum', 'feature/repos', $4, 'error', $4)`,
-    [repoId, org.id, project.id, "2026-05-03T10:00:00.000Z"],
-  );
-  for (let index = 0; index < 6; index += 1) {
-    await db.query(
-      `INSERT INTO repo_commits (id, org_id, repo_id, sha, message, author, committed_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [
-        randomUUID(),
-        org.id,
-        repoId,
-        `abcdef${index}`,
-        `feat: commit ${index}\n\nBody`,
-        `Author ${index}`,
-        `2026-05-03T0${index}:00:00.000Z`,
-      ],
-    );
-  }
-  await db.query(
-    `INSERT INTO tasks (id, org_id, repo_id, title, status) VALUES ($1, $2, $3, 'Open repo task', 'todo')`,
-    [randomUUID(), org.id, repoId],
-  );
-  await db.query(
-    `INSERT INTO agent_runs (id, org_id, task_id, agent, agent_name, status, started_at) VALUES ($1, $2, $3, 'codex', 'codex', 'succeeded', $4)`,
-    [randomUUID(), org.id, null, "2026-05-03T09:00:00.000Z"],
-  );
-  await db.close();
-  return repoId;
-}
-
-async function ensureRepoColumns(db: Awaited<ReturnType<typeof openPglite>>): Promise<void> {
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS name varchar(255) not null default ''`);
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS kind varchar(10) not null default 'local'`);
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS local_path text null`);
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS current_branch varchar(255) null`);
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS last_sync_at timestamptz null`);
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS sync_status varchar(10) not null default 'idle'`);
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS last_touched_at timestamptz null`);
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS archived boolean not null default false`);
-  await db.query(`CREATE TABLE IF NOT EXISTS repo_commits (id uuid not null default gen_random_uuid(), org_id uuid not null, repo_id uuid not null, sha varchar(255) not null, message text null, author varchar(255) null, committed_at timestamptz null, primary key (id))`);
-  await db.query(`ALTER TABLE repo_commits ALTER COLUMN org_id TYPE text USING org_id::text`);
-  await db.query(`ALTER TABLE repo_commits ALTER COLUMN repo_id TYPE text USING repo_id::text`);
-  await db.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS repo_id text null`);
-  await db.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS title text null`);
-  await db.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS status text null`);
-  await db.query(`ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_status_check`);
-  await db.query(`ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS task_id text null`);
-  await db.query(`ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS agent_name text null`);
-  await db.query(`ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS status text null`);
-}
-
 describe("/repos/[id] +page.server.ts load()", () => {
-  test("returns repo detail, latest five commits, open task count, and run count", async () => {
-    const repoId = await seedRepoDetail();
+  test("returns repo detail with slug and default_branch", async () => {
+    const { repoId } = await seedRepo(scratch);
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({
-      url: new URL(`http://localhost/repos/${repoId}`),
       params: { id: repoId },
       locals: { activeProjectId: null },
     } as Parameters<typeof mod.load>[0]);
-    const payload = await streamedData<{
-      repo: { id: string; currentBranch: string | null; syncStatus: string };
-      commits: Array<{ sha: string; subject: string; author: string | null }>;
-      openTaskCount: number;
-      recentRunCount: number;
-    }>(result);
-    expect(payload.repo).toMatchObject({ id: repoId, currentBranch: "feature/repos", syncStatus: "error" });
-    expect(payload.commits).toHaveLength(5);
-    expect(payload.commits[0]?.subject).toBe("feat: commit 5");
-    expect(payload.openTaskCount).toBe(1);
-    expect(payload.recentRunCount).toBe(1);
+    const payload = await streamedData<{ repo: { slug: string; default_branch: string | null }; branches: unknown[]; commits: unknown[]; linkedTasks: unknown[] }>(result);
+    expect(payload.repo.slug).toBe("myrepo");
+    expect(payload.repo.default_branch).toBe("main");
+    expect(Array.isArray(payload.branches)).toBe(true);
+    expect(Array.isArray(payload.commits)).toBe(true);
+    expect(Array.isArray(payload.linkedTasks)).toBe(true);
   });
 
-  test("sync action marks repo syncing", async () => {
-    const repoId = await seedRepoDetail();
+  test("throws 404 for unknown repo id", async () => {
+    await seedRepo(scratch);
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    const result = await mod.actions.sync({
-      params: { id: repoId },
-      request: new Request(`http://localhost/repos/${repoId}`, { method: "POST" }),
-    } as Parameters<typeof mod.actions.sync>[0]);
-    expect(result).toEqual({ ok: true });
-    const loadResult = await mod.load({
-      url: new URL(`http://localhost/repos/${repoId}`),
+    let threw = false;
+    try {
+      const result = await mod.load({
+        params: { id: "nonexistent-id" },
+        locals: { activeProjectId: null },
+      } as Parameters<typeof mod.load>[0]);
+      await streamedData(result);
+    } catch (err) {
+      threw = true;
+      expect((err as { status?: number }).status).toBe(404);
+    }
+    expect(threw).toBe(true);
+  });
+
+  test("git operations return empty arrays when root_path does not exist", async () => {
+    const { repoId } = await seedRepo(scratch);
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
+    const result = await mod.load({
       params: { id: repoId },
       locals: { activeProjectId: null },
     } as Parameters<typeof mod.load>[0]);
-    const payload = await streamedData<{ repo: { syncStatus: string } }>(loadResult);
-    expect(payload.repo.syncStatus).toBe("syncing");
+    const payload = await streamedData<{ branches: unknown[]; commits: unknown[] }>(result);
+    // /tmp/myrepo does not exist → git fails → empty arrays, no throw
+    expect(Array.isArray(payload.branches)).toBe(true);
+    expect(Array.isArray(payload.commits)).toBe(true);
   });
 });

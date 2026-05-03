@@ -1,69 +1,104 @@
 <script lang="ts">
-  import { enhance } from "$app/forms";
-  import type { PageData } from "./$types";
-  import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { buttonVariants } from "$lib/components/ui/button";
-  import { cn } from "$lib/utils.js";
+	import type { PageData } from "./$types";
+	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
+	import { cn } from "$lib/utils.js";
 
-  interface Props {
-    data: PageData;
-  }
+	interface Props {
+		data: PageData;
+	}
 
-  let { data }: Props = $props();
+	let { data }: Props = $props();
 
-  function shortSha(sha: string): string {
-    return sha.slice(0, 7);
-  }
+	function formatStamp(value: string): string {
+		return value.slice(0, 16).replace("T", " ");
+	}
 </script>
 
 {#await data.streamed.data}
-  <RouteSkeleton kind="detail" />
+	<RouteSkeleton kind="detail" />
 {:then payload}
-  <header data-repo-detail-header class={cn("mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4")}>
-    <div>
-      <a href="/repos" class={cn("text-sm text-muted-foreground hover:underline")}>← Repos</a>
-      <div class={cn("mt-1 flex flex-wrap items-center gap-2")}>
-        <h1 class={cn("text-2xl font-semibold tracking-tight")}>{payload.repo.name}</h1>
-        <span class={cn("text-sm text-muted-foreground")}>{payload.repo.slug}</span>
-        <span class={cn("rounded border border-border px-2 py-0.5 text-xs")}>{payload.repo.kind}</span>
-      </div>
-    </div>
-    <form method="POST" action="?/sync" use:enhance>
-      <button type="submit" data-sync-now class={cn(buttonVariants({ variant: "outline" }))}>Sync now</button>
-    </form>
-  </header>
+	{@const repo = payload.repo}
+	<header
+		data-repo-detail-header
+		class={cn("flex items-center justify-between gap-4 border-b border-border pb-4 mb-6")}
+	>
+		<div>
+			<h1 class={cn("text-2xl font-semibold tracking-tight")}>{repo.slug}</h1>
+			<p class={cn("text-sm text-muted-foreground font-mono mt-1")}>{repo.root_path}</p>
+		</div>
+		<nav class={cn("flex gap-2 text-sm")}>
+			<a href="/repos/{repo.id}/files" class={cn("hover:underline text-muted-foreground")}>Files</a>
+			<a href="/repos/{repo.id}/commits" class={cn("hover:underline text-muted-foreground")}>Commits</a>
+		</nav>
+	</header>
 
-  <section class={cn("mb-4 flex flex-wrap items-center gap-2 text-sm")}>
-    <span data-current-branch class={cn("rounded border border-border px-2 py-1 font-mono text-xs")}>{payload.repo.currentBranch ?? "unknown"}</span>
-    <span data-sync-status data-status={payload.repo.syncStatus} class={cn("rounded border border-border px-2 py-1 text-xs")}>{payload.repo.syncStatus === "syncing" ? "Syncing..." : payload.repo.syncStatus}</span>
-    {#if payload.repo.syncError}
-      <span data-sync-error title={payload.repo.syncError} class={cn("text-xs text-destructive")}>{payload.repo.syncError}</span>
-    {/if}
-  </section>
+	<div class={cn("grid grid-cols-1 gap-6 lg:grid-cols-3")}>
+		<!-- Branches -->
+		<section data-repo-branches class={cn("space-y-2")}>
+			<h2 class={cn("text-sm font-semibold uppercase tracking-wide text-muted-foreground")}>Branches</h2>
+			{#if payload.branches.length === 0}
+				<p class={cn("text-sm text-muted-foreground")}>No branches found.</p>
+			{:else}
+				<ul class={cn("space-y-1")}>
+					{#each payload.branches as branch (branch.name)}
+						<li
+							data-branch-row
+							data-branch-name={branch.name}
+							class={cn("flex items-center gap-2 font-mono text-xs")}
+						>
+							{#if branch.isCurrent}
+								<span class={cn("text-green-600 dark:text-green-400")}>●</span>
+							{:else}
+								<span class={cn("text-muted-foreground")}>○</span>
+							{/if}
+							<span class={branch.isCurrent ? cn("font-semibold") : ""}>{branch.name}</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</section>
 
-  <section class={cn("mb-4 grid gap-3 sm:grid-cols-2")}>
-    <a href="/tasks?repo={payload.repo.id}" data-open-task-count class={cn("rounded-md border border-border p-4 hover:bg-muted/50")}>
-      <div class={cn("text-xs text-muted-foreground")}>Open tasks</div>
-      <div class={cn("text-2xl font-semibold")}>{payload.openTaskCount}</div>
-    </a>
-    <div data-recent-run-count class={cn("rounded-md border border-border p-4")}>
-      <div class={cn("text-xs text-muted-foreground")}>Recent runs</div>
-      <div class={cn("text-2xl font-semibold")}>{payload.recentRunCount}</div>
-    </div>
-  </section>
+		<!-- Recent commits -->
+		<section data-repo-commits class={cn("lg:col-span-2 space-y-2")}>
+			<h2 class={cn("text-sm font-semibold uppercase tracking-wide text-muted-foreground")}>Recent commits</h2>
+			{#if payload.commits.length === 0}
+				<p class={cn("text-sm text-muted-foreground")}>No commits found.</p>
+			{:else}
+				<ul class={cn("space-y-1")}>
+					{#each payload.commits as commit (commit.sha)}
+						<li
+							data-commit-row
+							data-sha={commit.sha}
+							class={cn("flex items-start gap-2 text-sm")}
+						>
+							<span class={cn("font-mono text-xs text-muted-foreground w-20 shrink-0 pt-0.5")}>{commit.shortSha}</span>
+							<span class={cn("flex-1 truncate")}>{commit.message}</span>
+							<span class={cn("font-mono text-xs text-muted-foreground shrink-0")}>{formatStamp(commit.date)}</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</section>
 
-  <section data-recent-commits class={cn("rounded-md border border-border")}>
-    <h2 class={cn("border-b border-border px-3 py-2 text-sm font-semibold")}>Recent commits</h2>
-    <ul>
-      {#each payload.commits as commit (commit.sha)}
-        <li class={cn("grid gap-1 border-b border-border p-3 last:border-b-0 sm:grid-cols-[7rem_1fr_10rem]")}>
-          <span class={cn("font-mono text-xs")}>{shortSha(commit.sha)}</span>
-          <span>{commit.subject}</span>
-          <span class={cn("text-xs text-muted-foreground")}>{commit.author ?? "unknown"}</span>
-        </li>
-      {:else}
-        <li class={cn("p-3 text-sm text-muted-foreground")}>No commits synced.</li>
-      {/each}
-    </ul>
-  </section>
+		<!-- Linked tasks -->
+		<section data-repo-linked-tasks class={cn("lg:col-span-3 space-y-2")}>
+			<h2 class={cn("text-sm font-semibold uppercase tracking-wide text-muted-foreground")}>Linked tasks</h2>
+			{#if payload.linkedTasks.length === 0}
+				<p class={cn("text-sm text-muted-foreground")}>No linked tasks.</p>
+			{:else}
+				<ul class={cn("space-y-1")}>
+					{#each payload.linkedTasks as task (task.id)}
+						<li
+							data-linked-task
+							data-task-id={task.id}
+							class={cn("flex items-center gap-2 text-sm")}
+						>
+							<span class={cn("text-muted-foreground text-xs w-24 shrink-0")}>{task.status}</span>
+							<span>{task.title}</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</section>
+	</div>
 {/await}

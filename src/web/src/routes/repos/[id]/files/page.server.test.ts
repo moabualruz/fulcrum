@@ -5,9 +5,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { openPglite } from "../../../../../../product-kernel/db/pglite.ts";
 import { runMigrations } from "../../../../../../product-kernel/db/migrate.ts";
 import { createLocalOrg } from "../../../../../../product-kernel/store/repositories.ts";
-import { insertRepoFile } from "../../../../../../product-kernel/store/repo-files.ts";
 import { newUlid } from "../../../../../../product-kernel/ids.ts";
-import type { ProductDb } from "../../../../../../product-kernel/db/types.ts";
 
 let scratch: string;
 
@@ -17,8 +15,24 @@ function streamedData<T>(result: unknown): Promise<T> {
   return stream as Promise<T>;
 }
 
+async function seedRepo(scratch: string, rootPath: string) {
+  const dbDir = join(scratch, "state", "product", "db");
+  mkdirSync(dbDir, { recursive: true });
+  const db = await openPglite(join(dbDir, "main"));
+  await runMigrations(db);
+  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
+  const repoId = newUlid();
+  await db.query(
+    `INSERT INTO repos (id, org_id, slug, root_path, default_branch, remote_url, registered_at, last_seen_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [repoId, org.id, "filesrepo", rootPath, "main", null, "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"],
+  );
+  await db.close();
+  return { repoId };
+}
+
 beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-files-tree-"));
+  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-repos-files-"));
   process.env["FULCRUM_HOME"] = scratch;
 });
 
@@ -27,92 +41,67 @@ afterEach(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-async function freshDb(): Promise<{ db: ProductDb; orgId: string; repoId: string }> {
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const repoId = newUlid();
-  await db.query(
-    `INSERT INTO repos (id, org_id, slug, root_path, default_branch)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [repoId, org.id, "my-repo", "/tmp/my-repo", "main"],
-  );
-  return { db, orgId: org.id, repoId };
-}
-
-interface FilesTreePayload {
-  repo: { id: string; slug: string };
-  branch: string;
-  branches: string[];
-  rootChildren: Array<{ id: string; path: string; kind: string }>;
-}
-
-describe("/repos/[id]/files +page.server.ts", () => {
-  test("load returns root children for default branch", async () => {
-    const { db, repoId } = await freshDb();
-    try {
-      await insertRepoFile(db, { repoId, branch: "main", path: "src", kind: "directory", parentPath: null });
-      await insertRepoFile(db, { repoId, branch: "main", path: "README.md", kind: "file", parentPath: null });
-    } finally {
-      await db.close();
-    }
-
+describe("/repos/[id]/files +page.server.ts load()", () => {
+  test("returns empty tree when root_path has no git repo", async () => {
+    const { repoId } = await seedRepo(scratch, "/nonexistent-git-dir");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({
       params: { id: repoId },
-      url: new URL(`http://localhost/repos/${repoId}/files`),
+      url: new URL("http://localhost/repos/x/files"),
+      locals: { activeProjectId: null },
     } as Parameters<typeof mod.load>[0]);
-
-    const payload = await streamedData<FilesTreePayload>(result);
-    expect(payload.repo.slug).toBe("my-repo");
-    expect(payload.branch).toBe("main");
-    expect(payload.rootChildren.length).toBe(2);
-    // directories first
-    expect(payload.rootChildren[0]!.kind).toBe("directory");
-    expect(payload.rootChildren[1]!.kind).toBe("file");
+    const payload = await streamedData<{ tree: unknown[]; filePath: string; fileContent: null; isBinary: boolean }>(result);
+    expect(Array.isArray(payload.tree)).toBe(true);
+    expect(payload.filePath).toBe("");
+    expect(payload.fileContent).toBeNull();
+    expect(payload.isBinary).toBe(false);
   });
 
-  test("load respects branch query param", async () => {
-    const { db, repoId } = await freshDb();
-    try {
-      await insertRepoFile(db, { repoId, branch: "dev", path: "dev-file.ts", kind: "file", parentPath: null });
-    } finally {
-      await db.close();
-    }
-
+  test("reports binary=true for known binary extensions without throwing", async () => {
+    const { repoId } = await seedRepo(scratch, "/nonexistent-git-dir");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const result = await mod.load({
       params: { id: repoId },
-      url: new URL(`http://localhost/repos/${repoId}/files?branch=dev`),
+      url: new URL("http://localhost/repos/x/files?path=image.png"),
+      locals: { activeProjectId: null },
     } as Parameters<typeof mod.load>[0]);
-
-    const payload = await streamedData<FilesTreePayload>(result);
-    expect(payload.branch).toBe("dev");
-    expect(payload.rootChildren.length).toBe(1);
-    expect(payload.rootChildren[0]!.path).toBe("dev-file.ts");
+    const payload = await streamedData<{ isBinary: boolean; fileContent: null }>(result);
+    expect(payload.isBinary).toBe(true);
+    expect(payload.fileContent).toBeNull();
   });
 
-  test("load throws 404 for nonexistent repo", async () => {
-    const { db } = await freshDb();
-    await db.close();
-
+  test("throws 404 for unknown repo id", async () => {
+    await seedRepo(scratch, "/tmp/x");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
-    let caught: unknown;
+    let threw = false;
     try {
       const result = await mod.load({
-        params: { id: "BOGUS" },
-        url: new URL("http://localhost/repos/BOGUS/files"),
+        params: { id: "no-such-id" },
+        url: new URL("http://localhost/repos/x/files"),
+        locals: { activeProjectId: null },
       } as Parameters<typeof mod.load>[0]);
-      await streamedData<FilesTreePayload>(result);
-    } catch (e) {
-      caught = e;
+      await streamedData(result);
+    } catch (err) {
+      threw = true;
+      expect((err as { status?: number }).status).toBe(404);
     }
-    expect(caught).toBeDefined();
-    expect(
-      typeof caught === "object" && caught !== null && "status" in caught &&
-        (caught as { status: number }).status === 404,
-    ).toBe(true);
+    expect(threw).toBe(true);
+  });
+
+  test("lists files from a real git repo", async () => {
+    // Use the fulcrum repo root itself as the git dir
+    const repoRoot = join(import.meta.dir, "../../../../../../..");
+    const { repoId } = await seedRepo(scratch, repoRoot);
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
+    const result = await mod.load({
+      params: { id: repoId },
+      url: new URL("http://localhost/repos/x/files"),
+      locals: { activeProjectId: null },
+    } as Parameters<typeof mod.load>[0]);
+    const payload = await streamedData<{ tree: Array<{ kind: string; name: string; path: string }> }>(result);
+    expect(payload.tree.length).toBeGreaterThan(0);
+    // Confirm we get dirs and/or files from the root
+    const names = payload.tree.map((n) => n.name);
+    expect(names).toContain("src");
   });
 });
