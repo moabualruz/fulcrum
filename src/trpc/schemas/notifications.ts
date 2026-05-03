@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const ChannelNameSchema = z.enum(["in-app", "email", "slack", "webhook"]);
+export const ChannelNameSchema = z.enum(["in-app", "email", "slack", "discord", "webhook", "push"]);
 
 export const IdInputSchema = z.object({
   id: z.string().uuid(),

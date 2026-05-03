@@ -21,7 +21,9 @@ const CHANNELS = [
   { name: "in-app", enabled: true, configurable: false },
   { name: "email", enabled: true, configurable: true },
   { name: "slack", enabled: true, configurable: true },
+  { name: "discord", enabled: true, configurable: true },
   { name: "webhook", enabled: true, configurable: true },
+  { name: "push", enabled: true, configurable: true },
 ] as const;
 
 const NotificationOutputSchema = z.object({
@@ -250,6 +252,20 @@ export const notificationsRouter = t.router({
       return muteToOutput(row);
     }),
 
+  mutes: t.router({
+    list: protectedProcedure
+      .output(z.array(MuteOutputSchema))
+      .query(async ({ ctx }) => {
+        const em = requireEm(ctx);
+        const { NotificationMute } = await entities();
+        const rows = await em.find(NotificationMute, {
+          org: ctx.orgId,
+          userId: ctx.userId,
+        } as any, { orderBy: { subjectKind: "ASC" } as any });
+        return rows.map(muteToOutput);
+      }),
+  }),
+
   unmute: protectedProcedure
     .input(SubjectInputSchema)
     .output(z.object({ ok: z.literal(true) }))
@@ -372,9 +388,51 @@ export const notificationsRouter = t.router({
       .query(() => [...CHANNELS]),
 
     config: protectedProcedure
-      .input(z.object({ channel: ChannelNameSchema, enabled: z.boolean() }))
+      .input(z.object({
+        channel: ChannelNameSchema,
+        enabled: z.boolean(),
+        email: z.string().optional(),
+        token: z.string().optional(),
+        url: z.string().optional(),
+        secret: z.string().optional(),
+        subscription: z.string().optional(),
+      }))
       .output(z.object({ ok: z.literal(true) }))
-      .mutation(() => ({ ok: true })),
+      .mutation(async ({ ctx, input }) => {
+        if (input.channel !== "push" || !input.subscription) return { ok: true };
+
+        const em = requireEm(ctx);
+        const { PushSubscription } = await entities();
+        let parsed: {
+          endpoint?: string;
+          keys?: { p256dh?: string; auth?: string };
+          userAgent?: string;
+        };
+        try {
+          parsed = JSON.parse(input.subscription) as typeof parsed;
+        } catch {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Push subscription must be JSON." });
+        }
+        if (!parsed.endpoint || !parsed.keys?.p256dh || !parsed.keys.auth) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Push subscription is incomplete." });
+        }
+        const existing = await em.findOne(PushSubscription, {
+          org: ctx.orgId,
+          userId: ctx.userId,
+          endpoint: parsed.endpoint,
+        } as any);
+        const row = existing ?? em.create(PushSubscription, {
+          org: await findOrgRef(em, ctx.orgId),
+          userId: ctx.userId,
+          endpoint: parsed.endpoint,
+        } as any);
+        (row as any).p256dh = parsed.keys.p256dh;
+        (row as any).auth = parsed.keys.auth;
+        (row as any).userAgent = parsed.userAgent ?? null;
+        em.persist(row);
+        await em.flush();
+        return { ok: true };
+      }),
 
     test: protectedProcedure
       .input(z.object({ channel: ChannelNameSchema }))

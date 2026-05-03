@@ -1,5 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplCommit: unavailable-sandbox-git-index-lock
+ImplRuntime: codex
 Triage: AFK
 Pillar: notifications-activity-audit
 Blocked-by: [05-trpc-notify-procedures.md, 07-quiet-hours.md]
