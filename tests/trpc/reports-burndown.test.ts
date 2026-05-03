@@ -1,0 +1,248 @@
+import { describe, expect, test } from "bun:test";
+import { Container } from "@needle-di/core";
+import { z } from "zod";
+
+import { createTestOrm } from "../../src/test-utils/db.ts";
+import { MetricsCache } from "../../src/db/entities/tasks/MetricsCache.ts";
+import { Sprint, SprintStatus } from "../../src/db/entities/tasks/Sprint.ts";
+import { Task } from "../../src/db/entities/tasks/Task.ts";
+import { Org } from "../../src/db/entities/auth/Org.ts";
+import { TaskRepository } from "../../src/db/repositories/tasks/TaskRepository.ts";
+import { appRouter } from "../../src/trpc/router.ts";
+import { createContext } from "../../src/trpc/context.ts";
+import { t } from "../../src/trpc/trpc.ts";
+
+const createCaller = t.createCallerFactory(appRouter);
+const ORG_ID = "00000000-0000-0000-0000-000000000001";
+const USER_ID = "00000000-0000-0000-0000-000000000010";
+const PROJECT_ID = "33333333-3333-4333-8333-333333333333";
+
+function mockSession() {
+  return {
+    id: "sess-reports",
+    userId: USER_ID,
+    orgId: ORG_ID,
+    activeOrganizationId: ORG_ID,
+    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    token: "tok-reports",
+    ipAddress: null,
+    userAgent: null,
+  };
+}
+
+function callerFor(em: import("@mikro-orm/postgresql").EntityManager) {
+  const container = new Container();
+  const repo = em.getRepository(Task) as TaskRepository;
+  container.bind({ provide: TaskRepository, useValue: repo });
+
+  return createCaller(
+    createContext({
+      session: mockSession() as unknown as import("better-auth").Session,
+      orgId: ORG_ID,
+      userId: USER_ID,
+      em: em as unknown as import("@mikro-orm/postgresql").EntityManager,
+      container,
+    }),
+  );
+}
+
+/**
+ * BurndownPoint Zod schema — matches the tRPC output type.
+ * AC: CLI --json schema matches return type (Zod parse).
+ */
+export const BurndownPointSchema = z.object({
+  date: z.string(),
+  pointsRemaining: z.number(),
+  ideal: z.number(),
+});
+export const BurndownOutputSchema = z.array(BurndownPointSchema);
+
+describe("reports.burndown tRPC", () => {
+  test("returns ideal line: day 0 = capacity, day N = 0, linear interpolation", async () => {
+    const db = await createTestOrm();
+    try {
+      const em = db.em.fork();
+      const org = em.getReference(Org, ORG_ID);
+
+      // Create sprint: 4 days (Jan 1-4)
+      const sprint = em.create(Sprint, {
+        org,
+        projectId: PROJECT_ID,
+        name: "S1",
+        startDate: new Date("2025-01-01"),
+        endDate: new Date("2025-01-04"),
+        status: SprintStatus.active,
+        capacityPoints: 12,
+      });
+      em.persist(sprint);
+
+      // Seed tasks with 12 total points
+      const t1 = em.create(Task, {
+        org, title: "T1", status: "todo",
+        points: 8, sprint: sprint.id,
+      } as never);
+      const t2 = em.create(Task, {
+        org, title: "T2", status: "todo",
+        points: 4, sprint: sprint.id,
+      } as never);
+      em.persist([t1, t2]);
+
+      // Seed metrics_cache entries for day 0 and day 1
+      const mc0 = em.create(MetricsCache, {
+        projectId: PROJECT_ID,
+        sprint,
+        date: new Date("2025-01-01"),
+        pointsRemaining: 12,
+      });
+      const mc1 = em.create(MetricsCache, {
+        projectId: PROJECT_ID,
+        sprint,
+        date: new Date("2025-01-02"),
+        pointsRemaining: 8,
+      });
+      em.persist([mc0, mc1]);
+      await em.flush();
+
+      const caller = callerFor(em);
+      const result = await caller.reports.burndown({
+        projectId: PROJECT_ID,
+        sprintId: sprint.id,
+      });
+
+      // Validate shape with Zod
+      const parsed = BurndownOutputSchema.parse(result);
+      expect(parsed.length).toBeGreaterThanOrEqual(2);
+
+      // Day 0: ideal = 12 (capacity), actual = 12
+      const day0 = parsed.find((p) => p.date === "2025-01-01");
+      expect(day0).toBeDefined();
+      expect(day0!.ideal).toBe(12);
+      expect(day0!.pointsRemaining).toBe(12);
+
+      // Day 1: ideal = 12 - (12/3)*1 = 8, actual = 8
+      const day1 = parsed.find((p) => p.date === "2025-01-02");
+      expect(day1).toBeDefined();
+      expect(day1!.ideal).toBe(8);
+      expect(day1!.pointsRemaining).toBe(8);
+
+      // Last day ideal should be 0
+      const lastDay = parsed[parsed.length - 1]!;
+      expect(lastDay.ideal).toBe(0);
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("fallback: returns same shape when cache is empty (on-demand computation)", async () => {
+    const db = await createTestOrm();
+    try {
+      const em = db.em.fork();
+      const org = em.getReference(Org, ORG_ID);
+
+      const sprint = em.create(Sprint, {
+        org,
+        projectId: PROJECT_ID,
+        name: "S2",
+        startDate: new Date("2025-02-01"),
+        endDate: new Date("2025-02-03"),
+        status: SprintStatus.active,
+        capacityPoints: 10,
+      });
+      em.persist(sprint);
+
+      // Tasks but NO metrics_cache entries
+      const task = em.create(Task, {
+        org, title: "T3", status: "todo",
+        points: 10, sprint: sprint.id,
+      } as never);
+      em.persist(task);
+      await em.flush();
+
+      const caller = callerFor(em);
+      const result = await caller.reports.burndown({
+        projectId: PROJECT_ID,
+        sprintId: sprint.id,
+      });
+
+      // Same Zod shape — AC: fallback returns same shape
+      const parsed = BurndownOutputSchema.parse(result);
+      expect(parsed.length).toBeGreaterThanOrEqual(2);
+
+      // Day 0 ideal = total points
+      expect(parsed[0]!.ideal).toBe(10);
+      expect(parsed[0]!.pointsRemaining).toBe(10);
+
+      // Last day ideal = 0
+      expect(parsed[parsed.length - 1]!.ideal).toBe(0);
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("returns empty for nonexistent sprint", async () => {
+    const db = await createTestOrm();
+    try {
+      const em = db.em.fork();
+      const caller = callerFor(em);
+      const result = await caller.reports.burndown({
+        projectId: PROJECT_ID,
+        sprintId: "00000000-0000-0000-0000-000000000099",
+      });
+      expect(result).toEqual([]);
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("chart load time < 100ms from metrics_cache", async () => {
+    const db = await createTestOrm();
+    try {
+      const em = db.em.fork();
+      const org = em.getReference(Org, ORG_ID);
+
+      const sprint = em.create(Sprint, {
+        org,
+        projectId: PROJECT_ID,
+        name: "S3",
+        startDate: new Date("2025-03-01"),
+        endDate: new Date("2025-03-14"),
+        status: SprintStatus.active,
+        capacityPoints: 20,
+      });
+      em.persist(sprint);
+
+      // Seed 14 days of metrics
+      for (let d = 0; d < 14; d++) {
+        const date = new Date("2025-03-01");
+        date.setDate(date.getDate() + d);
+        em.persist(em.create(MetricsCache, {
+          projectId: PROJECT_ID,
+          sprint,
+          date,
+          pointsRemaining: Math.max(0, 20 - d * 1.5),
+        }));
+      }
+      const task = em.create(Task, {
+        org, title: "T-perf", status: "todo",
+        points: 20, sprint: sprint.id,
+      } as never);
+      em.persist(task);
+      await em.flush();
+
+      const caller = callerFor(em);
+      const start = performance.now();
+      const result = await caller.reports.burndown({
+        projectId: PROJECT_ID,
+        sprintId: sprint.id,
+      });
+      const elapsed = performance.now() - start;
+
+      expect(result.length).toBeGreaterThan(0);
+      expect(elapsed).toBeLessThan(100);
+    } finally {
+      await db.close();
+    }
+  });
+});

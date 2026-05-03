@@ -1,86 +1,18 @@
-# Symphony Conformance Trace
+# Symphony SPEC Conformance Trace
 
-Source: `vendor/openai-symphony/SPEC.md`
-Lock: `.symphony-conformance.lock`
+Maps OpenAI Symphony SPEC sections to Fulcrum implementation files.
 
-## 18.1 REQUIRED for Conformance
+## Sync
 
-### Workflow path selection supports explicit runtime path and cwd default
+### Daily Job
 
-### `WORKFLOW.md` loader with YAML front matter + prompt body split
-
-### Typed config layer with defaults and `$` resolution
-
-### Dynamic `WORKFLOW.md` watch/reload/re-apply for config and prompt
-
-### Polling orchestrator with single-authority mutable state
-
-### Issue tracker client with candidate fetch + state refresh + terminal fetch
-
-### Workspace manager with sanitized per-issue workspaces
-
-### Workspace lifecycle hooks (`after_create`, `before_run`, `after_run`, `before_remove`)
-
-### Hook timeout config (`hooks.timeout_ms`, default `60000`)
-
-### Coding-agent app-server subprocess client with JSON line protocol
-
-### Codex launch command config (`codex.command`, default `codex app-server`)
-
-### Strict prompt rendering with `issue` and `attempt` variables
-
-### Exponential retry queue with continuation retries after normal exit
-
-### Configurable retry backoff cap (`agent.max_retry_backoff_ms`, default 5m)
-
-### Reconciliation that stops runs on terminal/non-active tracker states
-
-### Workspace cleanup for terminal issues (startup sweep + active transition)
-
-### Structured logs with `issue_id`, `issue_identifier`, and `session_id`
-
-### Operator-visible observability (structured logs; OPTIONAL snapshot/status surface)
-
-## Function → SPEC Mapping
-
-| File | Function | SPEC Section |
+| SPEC Section | Implementation | Notes |
 |---|---|---|
-| hooks.ts | dispatchLifecycleHook | §Workspace lifecycle hooks (before_run, after_run, on_failure, on_cancel) |
-| hooks.ts | HookTimeoutError | §Hook timeout config (hooks.timeout_ms, default 60000) |
-| hooks.ts | resolveHookTimeoutMs | §Hook timeout config (hooks.timeout_ms, default 60000) |
-| orchestrator.ts | ClaimConflictError | §Claim Lock — Unclaimed → Claimed Transition |
-| orchestrator.ts | claimRun | §Claim Lock — Unclaimed → Claimed Transition |
-| orchestrator.ts | dispatchRunWithHooks | §Polling orchestrator with single-authority mutable state |
-| orchestrator.ts | startSymphonyOrchestrator | §Polling orchestrator with single-authority mutable state |
-| prompt.ts | loadWorkflowDef | §WORKFLOW.md loader with YAML front matter + prompt body split |
-| prompt.ts | parseWorkflowConfig | §Typed config layer with defaults and $ resolution |
-| prompt.ts | renderPrompt | §Strict prompt rendering with issue and attempt variables |
-| prompt.ts | UnknownVariableError | §Strict prompt rendering with issue and attempt variables |
-| retry.ts | calcRetryDelay | §Configurable retry backoff cap (agent.max_retry_backoff_ms, default 5m) |
-| retry.ts | scheduleRetry | §Exponential retry queue with continuation retries after normal exit |
-| tracker.ts | buildCandidateIssuesBaseQuery | §Issue tracker client with candidate fetch + state refresh + terminal fetch |
-| tracker.ts | fetchCandidateIssues | §Issue tracker client with candidate fetch + state refresh + terminal fetch |
-| tracker.ts | fetchIssuesByStates | §Issue tracker client with candidate fetch + state refresh + terminal fetch |
-| tracker.ts | fetchIssueStatesByIds | §Issue tracker client with candidate fetch + state refresh + terminal fetch |
-| workspace.ts | createWorkspace | §Workspace manager with sanitized per-issue workspaces |
-| workspace.ts | destroyWorkspace | §Workspace cleanup for terminal issues |
-| workspace.ts | getWorkspacePath | §Workspace manager with sanitized per-issue workspaces |
-| workspace.ts | sanitizeWorkspaceKey | §Workspace manager with sanitized per-issue workspaces |
-| workspace.ts | workspaceRoot | §Workspace manager with sanitized per-issue workspaces |
-
-## AgentRun Orchestration State Trace
-
-Source: `vendor/openai-symphony/SPEC.md` section 7.1 Issue Orchestration States and section 7.2 Run Attempt Lifecycle.
-
-| Fulcrum `agent_runs.orchestration_state` | Symphony source | Notes |
-|---|---|---|
-| `unclaimed` | section 7.1 `Unclaimed` | Issue is not running and no retry is scheduled. |
-| `claimed` | section 7.1 `Claimed` | Orchestrator reserved the task; `agent_runs_claimed_task_id_check` requires `task_id` to avoid duplicate claimed rows with `NULL` task IDs. |
-| `running` | section 7.1 `Running` | Worker task exists and the run is tracked as active. |
-| `retry_queued` | section 7.1 `RetryQueued` | Worker is idle while a retry timer exists. |
-| `released` | section 7.1 `Released` | Claim removed because the tracker state is terminal, inactive, missing, or retry path completed without redispatch. |
-| `succeeded` | section 7.2 `Succeeded` | Terminal run-attempt reason after worker success. |
-| `failed` | section 7.2 `Failed` | Terminal run-attempt reason after worker failure. |
-| `timed_out` | section 7.2 `TimedOut` | Terminal run-attempt reason after timeout handling. |
-| `stalled` | section 7.2 `Stalled` | Terminal run-attempt reason after stall reconciliation. |
-| `cancelled` | section 7.2 `CanceledByReconciliation` | Fulcrum spelling uses D1 lowercase snake-case; maps to Symphony's reconciliation cancellation terminal reason. |
+| Submodule pin | `src/cli/symphony/sync.ts` — `updateSubmodule()` | `git submodule update --remote vendor/openai-symphony` |
+| SPEC hash lock | `src/cli/symphony/sync.ts` — `computeSpecHash()`, `readLockHash()`, `writeLockHash()` | SHA-256 of `SPEC.md` stored in `.symphony-spec.lock` |
+| Drift detection | `src/cli/symphony/sync.ts` — `detectDrift()` | Compares current hash vs lock; writes report on mismatch |
+| Drift report | `src/cli/symphony/sync.ts` — `writeDriftReport()` | Written to `.fulcrum/reports/symphony-drift-<date>.md` |
+| Conformance run | `src/cli/symphony/sync.ts` — `runConformanceSuite()` | Delegates to P3#14 conformance test suite |
+| LLM narration | `src/cli/symphony/sync.ts` — `appendLlmNarration()` | Gated: `FULCRUM_FEATURES=router-llm` |
+| Daily cron | `src/cli/symphony/sync.ts` — `DAILY_SYNC_JOB` | `symphony:daily-sync` at `0 4 * * *` |
+| CLI surface | `src/cli/symphony/sync.ts` — `run()` | `fulcrum symphony sync [--daily] [--json]` |

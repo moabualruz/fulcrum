@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplRuntime: claude
 Triage: AFK
 Pillar: 03-symphony-orchestration
 Blocked-by: 01-submodule-spec-pin, 15-conformance-trace-doc-hash-gate

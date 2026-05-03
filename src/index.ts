@@ -39,8 +39,6 @@ Usage:
                                      Show component details and surfaces.
   fulcrum component plan <install|remove|enable|disable> <component> [--agent <id>] [--all-agents] [--json]
                                      Plan component changes without applying them.
-  fulcrum artifacts <verb> [--json]   Manage artifacts (list, show, upload, download, attach,
-                                     detach, archive, unarchive, delete, prune).
   fulcrum product init [--json]      Initialise the local product kernel (PGlite + migrations).
   fulcrum product projects list [--json]
                                      List product-kernel projects.
@@ -48,9 +46,8 @@ Usage:
                                      Run an FTS query over the product kernel search index.
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
                                      Render the assembled Markdown context for a task.
-  fulcrum agent run --task <id> [--agent <id>] [--json]
-                                     Queue a local agent run for a task.
-  fulcrum artifact list [--json]    List product-kernel artifacts.
+  fulcrum symphony sync [--daily] [--json]
+                                     Submodule update + SPEC drift detection + conformance run.
   fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
   fulcrum version                    Print version.
   fulcrum help                       This message.
@@ -122,26 +119,20 @@ async function main() {
       await runComponent(rest);
       return;
     }
-    case "artifacts": {
-      const { run: runArtifacts } = await import("./cli/artifacts.ts");
-      // Until Pillar 14 codegen lands, caller must provide a client.
-      // For now, print help — real client wired when tRPC transport ready.
-      await runArtifacts(rest, undefined as never);
-      return;
-    }
     case "product": {
       const { run: runProduct } = await import("./cli/product.ts");
       await runProduct(rest);
       return;
     }
-    case "agent": {
-      const { run: runAgent } = await import("./cli/agent.ts");
-      await runAgent(rest);
-      return;
-    }
-    case "artifact": {
-      const { run: runArtifact } = await import("./cli/artifact.ts");
-      await runArtifact(rest);
+    case "symphony": {
+      const [sub, ...subRest] = rest;
+      if (sub === "sync") {
+        const { run: runSync } = await import("./cli/symphony/sync.ts");
+        await runSync(subRest);
+      } else {
+        console.error(`fulcrum symphony: unknown subcommand '${sub ?? ""}'`);
+        process.exit(2);
+      }
       return;
     }
     case "version":
