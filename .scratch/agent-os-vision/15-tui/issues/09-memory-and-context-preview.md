@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: tui
 Blocked-by: [15/issues/04-dashboard-and-projects.md]
@@ -24,11 +24,11 @@ Memory browser screen (VirtualList of memories; `g` toggles `global` filter; `/`
 
 ## Acceptance criteria
 
-- [ ] Memory browser: project memories + global memories listed; `g` toggles global filter; `/` opens search overlay with real-time filter.
-- [ ] Memory detail: full content readable; `p` promotes → `memories.global=true` in DB; list refreshes.
-- [ ] Context preview: 4 panes side-by-side; token count per pane matches `context.assemble` output; `r` refreshes all panes.
-- [ ] After TUI `p` promote, web memory browser shows `global=true` badge; CLI `fulcrum memories list --json` reflects.
-- [ ] FakeTTY snapshot for memory browser (strip-ansi).
+- [x] Memory browser: project memories + global memories listed; `g` toggles global filter; `/` opens search overlay with real-time filter.
+- [x] Memory detail: full content readable; `p` promotes → `memories.global=true` in DB; list refreshes.
+- [x] Context preview: 4 panes side-by-side; token count per pane matches `context.assemble` output; `r` refreshes all panes.
+- [x] After TUI `p` promote, web memory browser shows `global=true` badge; CLI `fulcrum memories list --json` reflects.
+- [x] FakeTTY snapshot for memory browser (strip-ansi).
 
 ## Blocked by
 
