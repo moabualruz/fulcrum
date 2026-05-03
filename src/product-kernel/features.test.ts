@@ -1,31 +1,33 @@
 import { describe, expect, test } from "bun:test";
-import { isFeatureEnabled, parseFeatures } from "./features.ts";
+import { isFeatureEnabled, parseFeatureFlags } from "./features.ts";
 
-describe("parseFeatures", () => {
-  test("empty string → empty set", () => {
-    expect(parseFeatures("")).toEqual(new Set());
+describe("feature flags", () => {
+  test("empty env returns empty set", () => {
+    expect(parseFeatureFlags("")).toEqual(new Set());
+    expect(parseFeatureFlags(undefined)).toEqual(new Set());
   });
-  test("undefined → empty set", () => {
-    expect(parseFeatures(undefined)).toEqual(new Set());
-  });
-  test("single flag", () => {
-    expect(parseFeatures("public-api")).toEqual(new Set(["public-api"]));
-  });
-  test("comma-separated, trims whitespace, lowercases", () => {
-    expect(parseFeatures(" Public-API , embeddings ")).toEqual(
-      new Set(["public-api", "embeddings"]),
-    );
-  });
-});
 
-describe("isFeatureEnabled", () => {
-  test("returns true when flag present", () => {
-    expect(isFeatureEnabled("public-api", "public-api,embeddings")).toBe(true);
+  test("parses comma-separated known flags", () => {
+    const flags = parseFeatureFlags("real-time-collab-server,symphony-ssh-worker");
+    expect(flags.has("real-time-collab-server")).toBe(true);
+    expect(flags.has("symphony-ssh-worker")).toBe(true);
+    expect(flags.has("symphony-http-api")).toBe(false);
   });
-  test("returns false when flag absent", () => {
-    expect(isFeatureEnabled("public-api", "embeddings")).toBe(false);
+
+  test("ignores unknown flags", () => {
+    const flags = parseFeatureFlags("real-time-collab-server,bogus-flag");
+    expect(flags.size).toBe(1);
   });
-  test("returns false for empty env", () => {
-    expect(isFeatureEnabled("public-api", "")).toBe(false);
+
+  test("trims whitespace", () => {
+    const flags = parseFeatureFlags(" symphony-http-api , real-time-collab-server ");
+    expect(flags.has("symphony-http-api")).toBe(true);
+    expect(flags.has("real-time-collab-server")).toBe(true);
+  });
+
+  test("isFeatureEnabled checks against provided set", () => {
+    const flags = parseFeatureFlags("symphony-http-api");
+    expect(isFeatureEnabled("symphony-http-api", flags)).toBe(true);
+    expect(isFeatureEnabled("symphony-ssh-worker", flags)).toBe(false);
   });
 });
