@@ -52,6 +52,27 @@ describe("fulcrum binary entrypoint", () => {
     expect(result.stdout).toContain("web");
     expect(result.stdout).toContain("tui");
     expect(result.stdout).toContain("inference");
+    expect(result.stdout).toContain("projects");
+    expect(result.stdout).toContain("tasks");
+    expect(result.stdout).toContain("credentials");
+    expect(result.stdout).toContain("webhooks");
+  });
+
+  test("--version exits 0 with package semver", async () => {
+    const result = await runFulcrum(["--version"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
+  test("unknown command exits 1 with suggestion", async () => {
+    const result = await runFulcrum(["projcts"]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("unknown command 'projcts'");
+    expect(result.stderr).toContain("Did you mean 'projects'?");
   });
 
   test("no args prints help and exits 0", async () => {
@@ -91,5 +112,15 @@ describe("fulcrum binary entrypoint", () => {
     expect(result.stdout).toContain("fulcrum flags");
     expect(result.stdout).toContain("list");
     expect(result.stdout).toContain("set");
+  });
+
+  test("routing help is dispatched by the top-level binary", async () => {
+    const result = await runFulcrum(["routing", "--help"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("fulcrum routing");
+    expect(result.stdout).toContain("rules list");
+    expect(result.stdout).toContain("simulate");
   });
 });
