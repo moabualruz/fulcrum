@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 05-router-and-skills
 Blocked-by: 16-skills-trpc-procedures

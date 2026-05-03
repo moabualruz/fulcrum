@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 02-inference-sidecar
 Blocked-by: 10-ts-backend-abstraction
