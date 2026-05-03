@@ -1,6 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
+ImplRuntime: claude
 Pillar: cli-codegen
 Blocked-by: [14/issues/05-binary-entrypoint-and-compile.md]
 PRD: .scratch/agent-os-vision/prds/14-cli-codegen.md
