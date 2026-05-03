@@ -46,16 +46,15 @@ Usage:
                                      Run an FTS query over the product kernel search index.
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
                                      Render the assembled Markdown context for a task.
-  fulcrum connectors list [--json]   List configured connectors.
-  fulcrum connectors runs <kind> [--json]
-                                     Show recent connector sync runs.
-  fulcrum backup [--output DIR] [--json]
-                                     Create a product-kernel backup.
+  fulcrum flags set <flag> on|off     Toggle a feature flag.
+  fulcrum flags get <flag>           Show flag state.
+  fulcrum flags list [--json]        List all feature flags.
   fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
   fulcrum version                    Print version.
   fulcrum help                       This message.
 
 Environment:
+  FULCRUM_FEATURES       comma-separated feature flags (desktop-app,experiments,casbin-policies,scheduled-backups)
   FULCRUM_HOME           override ~/.fulcrum
   FULCRUM_POLICY         override ~/.fulcrum/tool-output-policy.toml
   FULCRUM_HEAD_LINES     head lines for summary tiers (default 20)
@@ -102,16 +101,6 @@ async function main() {
       await runUninstall(rest);
       return;
     }
-    case "connectors": {
-      const { run: runConnectors } = await import("./cli/connectors.ts");
-      await runConnectors(rest);
-      return;
-    }
-    case "backup": {
-      const { run: runBackup } = await import("./cli/backup.ts");
-      await runBackup(rest);
-      return;
-    }
     case "doctor": {
       const { run: runDoctor } = await import("./cli/doctor.ts");
       await runDoctor(rest);
@@ -147,6 +136,11 @@ async function main() {
     case "-h":
       console.log(HELP);
       return;
+    case "flags": {
+      const { run: runFlags } = await import("./cli/flags.ts");
+      await runFlags(rest);
+      return;
+    }
     default:
       console.error(`fulcrum: unknown command '${cmd}'`);
       console.error(HELP);
