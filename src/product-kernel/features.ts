@@ -3,7 +3,7 @@
  * Comma-separated list of feature names, e.g. "connector-github,beta-ui".
  */
 
-const KNOWN_FEATURES = ["connector-github", "connector-bitbucket"] as const;
+const KNOWN_FEATURES = ["connector-github", "connector-gitlab"] as const;
 export type FeatureName = (typeof KNOWN_FEATURES)[number];
 
 let _cache: Set<string> | null = null;
