@@ -1,6 +1,8 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
+ImplCommit: be7d9f5b
+ImplRuntime: claude
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/01-v0-teardown-and-sveltekit-scaffold.md, 06-tasks-and-scrum/issues/01-tasks-schema-migration.md]
 PRD: .scratch/agent-os-vision/prds/16-web-shell-rebuild.md
