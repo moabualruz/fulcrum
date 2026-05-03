@@ -23,3 +23,10 @@ export { LmStudioBackend } from "./lm-studio.ts";
 export { OpenAICompatibleBackend } from "./openai-compatible.ts";
 export { InferenceClient } from "./client.ts";
 export type { BackendInfo } from "./client.ts";
+export {
+  getRoutingConfig,
+  setRoutingConfig,
+  selectBackend,
+  resetRoutingConfig,
+  replaceRoutingConfig,
+} from "../routing-config.ts";

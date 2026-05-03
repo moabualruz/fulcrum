@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { InferenceClient } from "../client.ts";
+import { resetRoutingConfig } from "../../routing-config.ts";
 import type { BackendId } from "../types.ts";
 
 describe("InferenceClient", () => {
@@ -17,6 +18,7 @@ describe("InferenceClient", () => {
     delete process.env["FULCRUM_FEATURES"];
     delete process.env["FULCRUM_INFERENCE_URL"];
     delete process.env["FULCRUM_INFERENCE_API_KEY"];
+    resetRoutingConfig();
   });
 
   afterEach(() => {
@@ -24,6 +26,7 @@ describe("InferenceClient", () => {
       if (v === undefined) delete process.env[k];
       else process.env[k] = v;
     }
+    resetRoutingConfig();
   });
 
   it("defaults to embedded when no env set", () => {
@@ -40,6 +43,7 @@ describe("InferenceClient", () => {
   it("per-feature qualifier overrides global default", () => {
     process.env["FULCRUM_INFERENCE_BACKEND"] = "embedded";
     process.env["FULCRUM_FEATURES"] = "embeddings:ollama,router-llm:embedded";
+    resetRoutingConfig();
     const c = new InferenceClient();
     expect(c.resolveBackendId("embeddings")).toBe("ollama");
     expect(c.resolveBackendId("router-llm")).toBe("embedded");
@@ -56,6 +60,7 @@ describe("InferenceClient", () => {
 
   it("resolveBackend() with feature qualifier", () => {
     process.env["FULCRUM_FEATURES"] = "embeddings:ollama";
+    resetRoutingConfig();
     const c = new InferenceClient();
     const b = c.resolveBackend("embeddings");
     expect(b.id).toBe("ollama");
@@ -66,6 +71,7 @@ describe("InferenceClient", () => {
     // ollama not enabled by default — only when FULCRUM_FEATURES includes it or backend=ollama
     expect(c.isEnabled("ollama")).toBe(false);
     process.env["FULCRUM_FEATURES"] = "embeddings:ollama";
+    resetRoutingConfig();
     const c2 = new InferenceClient();
     expect(c2.isEnabled("ollama")).toBe(true);
   });
@@ -76,6 +82,7 @@ describe("InferenceClient", () => {
     process.env["FULCRUM_FEATURES"] = "external-llm-provider";
     process.env["FULCRUM_INFERENCE_URL"] = "http://example.com";
     process.env["FULCRUM_INFERENCE_API_KEY"] = "sk-test";
+    resetRoutingConfig();
     const c2 = new InferenceClient();
     expect(c2.isEnabled("openai-compatible")).toBe(true);
   });

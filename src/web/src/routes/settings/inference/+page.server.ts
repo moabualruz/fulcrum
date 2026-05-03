@@ -1,5 +1,10 @@
 import { InferenceClient } from "../../../../../inference/client.ts";
 import { INFERENCE_CLIENT_TOKEN } from "../../../../../inference/tokens.ts";
+import {
+  getRoutingConfig,
+  setRoutingConfig,
+} from "../../../../../inference/routing-config.ts";
+import { BACKEND_IDS } from "../../../../../inference/backends/types.ts";
 import type { Session } from "better-auth";
 
 interface InferenceLocals {
@@ -51,6 +56,8 @@ export function load({ locals }: { locals: InferenceLocals }) {
 
   return {
     externalProviderEnabled: externalLlmProviderEnabled(),
+    routingConfig: { ...getRoutingConfig() },
+    backendIds: [...BACKEND_IDS],
     streamed: {
       health: client.health(),
       models: client.listModels(),
@@ -251,6 +258,21 @@ export const actions = {
     process.env["FULCRUM_INFERENCE_URL"] = url;
     process.env["FULCRUM_INFERENCE_API_KEY"] = key;
     return { success: true, providerSaved: true };
+  },
+
+  setRouting: async ({ request, locals }: { request: Request; locals: InferenceLocals }) => {
+    if (!locals.session) {
+      return { success: false, error: "Authentication required." };
+    }
+    const form = await request.formData();
+    const feature = String(form.get("feature") ?? "").trim();
+    const backend = String(form.get("backend") ?? "").trim();
+    if (!feature) return { success: false, routingError: "Feature is required." };
+    if (!backend || !BACKEND_IDS.includes(backend as never)) {
+      return { success: false, routingError: `Invalid backend '${backend}'.` };
+    }
+    setRoutingConfig(feature as never, backend as never);
+    return { success: true, routingSaved: true, routingConfig: { ...getRoutingConfig() } };
   },
 
   testTokenize: async ({ request, locals }: { request: Request; locals: InferenceLocals }) => {

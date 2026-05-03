@@ -370,6 +370,81 @@ describe("fulcrum inference CLI", () => {
     expect(cap.errors.join("\n")).toContain("--schema value must be valid JSON");
   });
 
+  test("config list --json returns routing map via tRPC caller", async () => {
+    const cap = capture();
+    await run(["config", "list", "--json"], {
+      ...cap.opts,
+      caller: {
+        inference: {
+          health: async () => health,
+          embed: async () => ({ vectors: [[0.1]], model: "m", cached: false }),
+          generate: async () => ({ text: "x", model: "m", tokens: 1 }),
+          config: {
+            get: async () => ({ embeddings: "ollama", "router-llm": "embedded" }),
+            set: async () => ({ ok: true }),
+          },
+        },
+      } as never,
+    });
+
+    expect(cap.exitCode).toBeUndefined();
+    expect(JSON.parse(cap.lines.join("\n"))).toEqual({
+      embeddings: "ollama",
+      "router-llm": "embedded",
+    });
+  });
+
+  test("config list without --json prints human-readable output", async () => {
+    const cap = capture();
+    await run(["config", "list"], {
+      ...cap.opts,
+      caller: {
+        inference: {
+          health: async () => health,
+          embed: async () => ({ vectors: [[0.1]], model: "m", cached: false }),
+          generate: async () => ({ text: "x", model: "m", tokens: 1 }),
+          config: {
+            get: async () => ({ embeddings: "ollama" }),
+            set: async () => ({ ok: true }),
+          },
+        },
+      } as never,
+    });
+
+    expect(cap.exitCode).toBeUndefined();
+    expect(cap.lines).toEqual(["embeddings: ollama"]);
+  });
+
+  test("config set updates routing via tRPC caller", async () => {
+    const cap = capture();
+    let observedInput: unknown;
+    await run(["config", "set", "embeddings", "ollama"], {
+      ...cap.opts,
+      caller: {
+        inference: {
+          health: async () => health,
+          embed: async () => ({ vectors: [[0.1]], model: "m", cached: false }),
+          generate: async () => ({ text: "x", model: "m", tokens: 1 }),
+          config: {
+            get: async () => ({}),
+            set: async (input: unknown) => { observedInput = input; return { ok: true }; },
+          },
+        },
+      } as never,
+    });
+
+    expect(cap.exitCode).toBeUndefined();
+    expect(observedInput).toEqual({ feature: "embeddings", backend: "ollama" });
+    expect(cap.lines).toEqual(["embeddings: ollama"]);
+  });
+
+  test("config set errors without feature arg", async () => {
+    const cap = capture();
+    await run(["config", "set"], cap.opts);
+    expect(cap.exitCode).toBe(1);
+    expect(cap.errors.join("\n")).toContain("config set requires <feature>");
+  });
+
   test("config set-provider sets env vars", async () => {
     const cap = capture();
     const origUrl = process.env["FULCRUM_INFERENCE_URL"];

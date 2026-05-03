@@ -194,6 +194,42 @@ describe("/settings/inference +page.svelte", () => {
     expect(body).toContain("HTTP 401");
   });
 
+  test("renders per-feature backend routing config with dropdowns", () => {
+    const { body } = render(Page, {
+      props: {
+        data: {
+          ...data,
+          routingConfig: { embeddings: "ollama", "router-llm": "embedded" },
+          backendIds: ["embedded", "ollama", "lm-studio", "openai-compatible"],
+        },
+        form: null,
+      },
+    });
+
+    expect(body).toContain("Per-feature backend routing");
+    expect(body).toContain("data-routing-config");
+    expect(body).toContain('name="feature"');
+    expect(body).toContain('name="backend"');
+    expect(body).toContain("embeddings");
+    expect(body).toContain("router-llm");
+  });
+
+  test("renders routing saved confirmation", () => {
+    const { body } = render(Page, {
+      props: {
+        data: {
+          ...data,
+          routingConfig: { embeddings: "ollama" },
+          backendIds: ["embedded", "ollama"],
+        },
+        form: { routingSaved: true, routingConfig: { embeddings: "ollama" } },
+      },
+    });
+
+    expect(body).toContain("data-routing-saved");
+    expect(body).toContain("Routing updated");
+  });
+
   test("renders smoke embed error state without throwing", () => {
     const { body } = render(Page, {
       props: { data, form: { success: false, error: "sidecar unavailable" } },

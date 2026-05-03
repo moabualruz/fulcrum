@@ -128,12 +128,12 @@ export const InferenceFeatureSchema = z.enum([
 export type InferenceFeatureKey = z.infer<typeof InferenceFeatureSchema>;
 
 export const FeatureBackendMapSchema = z.record(
-  InferenceFeatureSchema,
+  z.string(),
   BackendSchema.shape.id,
 );
 
 /** Per-feature backend routing map — e.g. { embeddings: "ollama", "router-llm": "embedded" } */
-export type FeatureBackendMap = z.infer<typeof FeatureBackendMapSchema>;
+export type FeatureBackendMap = Partial<Record<InferenceFeatureKey, z.infer<typeof BackendSchema>["id"]>>;
 
 export const DEFAULT_FEATURE_BACKEND_MAP: Readonly<FeatureBackendMap> = {
   embeddings: "embedded",

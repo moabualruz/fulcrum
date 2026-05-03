@@ -50,6 +50,28 @@
     </div>
   {/if}
 
+  <h2>Per-feature backend routing</h2>
+  <div class="routing-config" data-routing-config>
+    {#each Object.entries(form?.routingConfig ?? data.routingConfig ?? {}) as [feature, backend]}
+      <form method="POST" action="?/setRouting" class="routing-row">
+        <label for="routing-{feature}">{feature}</label>
+        <input type="hidden" name="feature" value={feature} />
+        <select id="routing-{feature}" name="backend">
+          {#each data.backendIds ?? [] as bid}
+            <option value={bid} selected={bid === backend}>{bid}</option>
+          {/each}
+        </select>
+        <button type="submit">Save</button>
+      </form>
+    {/each}
+    {#if form?.routingSaved}
+      <p class="routing-status" data-routing-saved>Routing updated.</p>
+    {/if}
+    {#if form?.routingError}
+      <p class="routing-status routing-error" data-routing-error>{form.routingError}</p>
+    {/if}
+  </div>
+
   {#if data.externalProviderEnabled}
     <h2>External LLM Provider</h2>
     <div class="external-provider" data-external-provider>
@@ -212,6 +234,17 @@
   .tokenize-result,
   .result-table {
     margin-top: 0.75rem;
+  }
+
+  .routing-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.25rem 0;
+  }
+
+  .routing-row label {
+    min-width: 10rem;
   }
 
   .result-table {
