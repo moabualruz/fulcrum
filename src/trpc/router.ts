@@ -20,6 +20,7 @@ import { customFieldDefsRouter, taskCustomFieldsRouter } from "../server/trpc/ro
 import { auditRouter } from "../server/trpc/routers/audit.ts";
 import { backupRouter } from "../server/trpc/routers/backup.ts";
 import { errorLogsRouter } from "../server/trpc/routers/error-logs.ts";
+import { telemetryRouter } from "../server/trpc/routers/telemetry.ts";
 import { themeRouter } from "../server/trpc/routers/theme.ts";
 import { orchestrationRouter } from "./routers/orchestration.ts";
 import { notificationsRouter } from "./routers/notifications.ts";
@@ -304,6 +305,7 @@ export const appRouter = t.router({
   audit: auditRouter,
   backup: backupRouter,
   errorLogs: errorLogsRouter,
+  telemetry: telemetryRouter,
   theme: themeRouter,
   routing: routingRouter,
   fulcrum_skills: fulcrumSkillsRouter,
