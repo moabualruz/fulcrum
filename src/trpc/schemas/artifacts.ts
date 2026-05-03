@@ -80,9 +80,20 @@ export const DownloadArtifactOutputSchema = z.object({
   url: z.string().describe("Download URL or storage path."),
 });
 
+export const DeleteArtifactInputSchema = z.object({
+  id: UuidSchema.describe("Artifact identifier."),
+  hard: z.boolean().optional().default(false).describe("Hard-delete: remove from disk + DB row."),
+});
+
 export const DeleteArtifactOutputSchema = z.object({
   ok: z.literal(true).describe("Whether deletion completed."),
   id: UuidSchema.describe("Deleted artifact identifier."),
+});
+
+export const ArchiveArtifactOutputSchema = z.object({
+  ok: z.literal(true).describe("Whether the operation completed."),
+  id: UuidSchema.describe("Artifact identifier."),
+  archived: z.boolean().describe("Current archive state after the operation."),
 });
 
 export type Artifact = z.infer<typeof ArtifactSchema>;

@@ -6,6 +6,7 @@ export interface ArtifactsFilterState {
   taskId?: string;
   mime?: string;
   kind?: string;
+  showArchived?: boolean;
 }
 
 export function applyArtifactsFilters(

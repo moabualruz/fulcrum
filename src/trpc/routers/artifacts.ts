@@ -4,8 +4,10 @@ import type { TRPCContext } from "../context.ts";
 import { t } from "../trpc.ts";
 import { protectedProcedure } from "../middleware.ts";
 import {
+  ArchiveArtifactOutputSchema,
   ArtifactIdInputSchema,
   ArtifactSchema,
+  DeleteArtifactInputSchema,
   DeleteArtifactOutputSchema,
   DownloadArtifactOutputSchema,
   ListArtifactsInputSchema,
@@ -40,6 +42,7 @@ type ArtifactRepositoryLike = {
   list?: (input: ListArtifactsInput & { orgId: string }) => Promise<ArtifactRecord[]> | ArtifactRecord[];
   getById?: (input: { id: string }) => Promise<ArtifactRecord | null | undefined> | ArtifactRecord | null | undefined;
   create?: (input: Record<string, unknown>) => Promise<ArtifactRecord> | ArtifactRecord;
+  update?: (input: { id: string; data: Partial<ArtifactRecord> }) => Promise<ArtifactRecord> | ArtifactRecord;
   delete?: (input: { id: string }) => Promise<unknown> | unknown;
 };
 
@@ -220,14 +223,41 @@ export const artifactsRouter = t.router({
       return { artifact, url };
     }),
 
-  delete: protectedProcedure
+  archive: protectedProcedure
     .input(ArtifactIdInputSchema)
+    .output(ArchiveArtifactOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const record = await findArtifact(ctx, input.id);
+      const updated = await deps(ctx).repository.update?.({ id: input.id, data: { archived: true } });
+      const artifact = toArtifact(updated ?? { ...record, archived: true });
+      await recordEvent(ctx, "artifact.archived", artifact);
+      return { ok: true as const, id: input.id, archived: true };
+    }),
+
+  unarchive: protectedProcedure
+    .input(ArtifactIdInputSchema)
+    .output(ArchiveArtifactOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const record = await findArtifact(ctx, input.id);
+      const updated = await deps(ctx).repository.update?.({ id: input.id, data: { archived: false } });
+      const artifact = toArtifact(updated ?? { ...record, archived: false });
+      await recordEvent(ctx, "artifact.unarchived", artifact);
+      return { ok: true as const, id: input.id, archived: false };
+    }),
+
+  delete: protectedProcedure
+    .input(DeleteArtifactInputSchema)
     .output(DeleteArtifactOutputSchema)
     .mutation(async ({ ctx, input }) => {
       const artifact = toArtifact(await findArtifact(ctx, input.id));
-      await deps(ctx).storage.delete?.(artifact.path);
-      await deps(ctx).repository.delete?.({ id: input.id });
-      await recordEvent(ctx, "artifact.deleted", artifact);
+      if (input.hard) {
+        await deps(ctx).storage.delete?.(artifact.path);
+        await deps(ctx).repository.delete?.({ id: input.id });
+        await recordEvent(ctx, "artifact.deleted", artifact, { hard: true });
+      } else {
+        await deps(ctx).repository.update?.({ id: input.id, data: { archived: true } });
+        await recordEvent(ctx, "artifact.deleted", artifact, { hard: false });
+      }
       return { ok: true, id: input.id };
     }),
 });

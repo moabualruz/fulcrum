@@ -9,6 +9,7 @@ import {
 export const load: PageServerLoad = ({ url, locals }) => {
   const mime = (url.searchParams.get("mime") ?? "").trim();
   const kind = (url.searchParams.get("kind") ?? "").trim();
+  const archived = url.searchParams.get("archived") ?? "";
   const projectParam = url.searchParams.get("project");
   const projectRaw = projectParam === null ? undefined : projectParam.trim();
 
@@ -16,17 +17,18 @@ export const load: PageServerLoad = ({ url, locals }) => {
     ...(mime ? { mime } : {}),
     ...(kind ? { kind } : {}),
     ...(projectRaw !== undefined ? { projectId: projectRaw } : {}),
+    ...(archived === "true" ? { showArchived: true } : {}),
   };
 
   return {
     activeProjectId: locals?.activeProjectId ?? null,
-    filter: { mime, kind, project: projectRaw ?? "" },
+    filter: { mime, kind, project: projectRaw ?? "", archived },
     streamed: {
       data: (async () => {
         const db = await openProductDb();
         try {
           const orgId = await getDefaultOrgId(db);
-          const rows = await listArtifacts(db, orgId);
+          const rows = await listArtifacts(db, orgId, filter.showArchived ? { includeArchived: true } : undefined);
           const filtered = applyArtifactsFilters(rows, filter);
           return { artifacts: filtered };
         } finally {

@@ -9,6 +9,44 @@
   }
 
   let { data }: Props = $props();
+  let selected: Set<string> = $state(new Set());
+  let showConfirmDelete = $state(false);
+
+  function toggleSelect(id: string) {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    selected = next;
+  }
+
+  function toggleAll(artifacts: { id: string }[]) {
+    if (selected.size === artifacts.length) {
+      selected = new Set();
+    } else {
+      selected = new Set(artifacts.map((a) => a.id));
+    }
+  }
+
+  async function bulkArchive() {
+    // Client-side iteration calling tRPC per item (MVP approach per issue notes)
+    const form = new FormData();
+    form.set("ids", JSON.stringify([...selected]));
+    form.set("action", "archive");
+    await fetch("?/bulk", { method: "POST", body: form });
+    selected = new Set();
+    // Refresh via navigation
+    window.location.reload();
+  }
+
+  async function bulkDelete() {
+    const form = new FormData();
+    form.set("ids", JSON.stringify([...selected]));
+    form.set("action", "delete");
+    await fetch("?/bulk", { method: "POST", body: form });
+    selected = new Set();
+    showConfirmDelete = false;
+    window.location.reload();
+  }
 </script>
 
 <header
@@ -51,11 +89,69 @@
         <option value={kind} selected={data.filter.kind === kind}>{kind}</option>
       {/each}
     </select>
+    <label class={cn("flex items-center gap-1 text-sm")}>
+      <input
+        data-show-archived-toggle
+        type="checkbox"
+        name="archived"
+        checked={data.filter.archived === "true"}
+      />
+      Show archived
+    </label>
     <button
       type="submit"
       class={cn(buttonVariants({ variant: "outline" }))}
     >Apply</button>
   </form>
+
+  {#if selected.size > 0}
+    <div
+      data-bulk-action-bar
+      class={cn("mb-3 flex items-center gap-2 rounded-md border border-border bg-muted p-2 text-sm")}
+    >
+      <span>{selected.size} selected</span>
+      <button
+        data-bulk-archive
+        type="button"
+        class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+        onclick={bulkArchive}
+      >Archive selected</button>
+      <button
+        data-bulk-delete
+        type="button"
+        class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}
+        onclick={() => (showConfirmDelete = true)}
+      >Delete selected</button>
+    </div>
+  {/if}
+
+  {#if showConfirmDelete}
+    <div
+      data-confirm-delete-modal
+      class={cn("mb-3 rounded-md border border-destructive bg-destructive/10 p-4 text-sm")}
+    >
+      <p class={cn("font-medium mb-2")}>Delete {selected.size} artifact(s)?</p>
+      <ul class={cn("mb-2 list-disc pl-5")}>
+        {#each artifacts.filter((a) => selected.has(a.id)) as artifact (artifact.id)}
+          <li>{artifact.title}</li>
+        {/each}
+      </ul>
+      <div class={cn("flex gap-2")}>
+        <button
+          data-confirm-delete-yes
+          type="button"
+          class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}
+          onclick={bulkDelete}
+        >Confirm delete</button>
+        <button
+          data-confirm-delete-cancel
+          type="button"
+          class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          onclick={() => (showConfirmDelete = false)}
+        >Cancel</button>
+      </div>
+    </div>
+  {/if}
 
   {#if artifacts.length === 0}
     <div
@@ -67,6 +163,15 @@
       <table class={cn("w-full text-sm")}>
         <thead>
           <tr class={cn("border-b border-border text-left")}>
+            <th class={cn("pb-2 w-8")}>
+              <input
+                data-select-all
+                type="checkbox"
+                checked={selected.size === artifacts.length && artifacts.length > 0}
+                onchange={() => toggleAll(artifacts)}
+                aria-label="Select all"
+              />
+            </th>
             <th class={cn("pb-2 font-medium")}>Title</th>
             <th class={cn("pb-2 font-medium")}>Kind</th>
             <th class={cn("pb-2 font-medium")}>MIME</th>
@@ -78,7 +183,19 @@
           {#each artifacts as artifact (artifact.id)}
             <tr data-artifact-row={artifact.id} class={cn("border-b border-border/50")}>
               <td class={cn("py-2")}>
+                <input
+                  data-artifact-checkbox={artifact.id}
+                  type="checkbox"
+                  checked={selected.has(artifact.id)}
+                  onchange={() => toggleSelect(artifact.id)}
+                  aria-label="Select {artifact.title}"
+                />
+              </td>
+              <td class={cn("py-2")}>
                 <a href="/artifacts/{artifact.id}" class={cn("text-primary underline-offset-4 hover:underline")}>{artifact.title}</a>
+                {#if artifact.archived}
+                  <span data-archived-badge class={cn("ml-1 rounded bg-yellow-200 px-1.5 py-0.5 text-xs font-medium text-yellow-800")}>Archived</span>
+                {/if}
               </td>
               <td class={cn("py-2")}>{artifact.kind}</td>
               <td class={cn("py-2")}>{artifact.mime ?? "—"}</td>

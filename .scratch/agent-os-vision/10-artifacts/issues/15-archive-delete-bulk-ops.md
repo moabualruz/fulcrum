@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplRuntime: claude
 Triage: AFK
 Pillar: artifacts
 Blocked-by: [06-trpc-procedures.md, 09-web-list-and-scoped-routes.md]

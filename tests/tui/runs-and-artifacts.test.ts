@@ -201,6 +201,70 @@ describe("ArtifactsScreen", () => {
     expect(renderPlain((renderer) => screen.render(renderer))).toContain("trace.bin");
   });
 
+  test("multi-select with Space, bulk archive, and bulk delete", async () => {
+    const archived: string[] = [];
+    const deleted: string[] = [];
+    const screen = new ArtifactsScreen({
+      caller: {
+        artifacts: {
+          list: async () => [
+            { id: "a1", filename: "one.txt", mime: "text/plain", path: "one.txt", sizeBytes: "10" },
+            { id: "a2", filename: "two.txt", mime: "text/plain", path: "two.txt", sizeBytes: "20" },
+            { id: "a3", filename: "three.txt", mime: "text/plain", path: "three.txt", sizeBytes: "30" },
+          ],
+          get: async () => null,
+          upload: async () => ({ id: "x", filename: "x", mime: "text/plain", path: "x", sizeBytes: "0" }),
+          download: async () => ({ ok: true, path: "/tmp/x" }),
+          archive: async (input) => {
+            archived.push(input.id);
+            return { ok: true, id: input.id };
+          },
+          delete: async (input) => {
+            deleted.push(input.id);
+            return { ok: true, id: input.id };
+          },
+        },
+      },
+    });
+
+    await screen.load();
+
+    // Select first two with Space
+    await screen.handleKey(" "); // select a1 (cursor at 0)
+    await screen.handleKey("j"); // move to a2
+    await screen.handleKey(" "); // select a2
+
+    // Verify selection markers
+    const listing = renderPlain((renderer) => screen.render(renderer));
+    expect(listing).toContain("[x]");
+
+    // Bulk archive
+    await screen.handleKey("a");
+    const archiveOverlay = renderPlain((renderer) => screen.render(renderer));
+    expect(archiveOverlay).toContain("Archive 2 artifacts?");
+    expect(archiveOverlay).toContain("one.txt");
+    expect(archiveOverlay).toContain("two.txt");
+    await screen.handleKey("y");
+    expect(archived).toEqual(["a1", "a2"]);
+
+    // Re-select for bulk delete
+    await screen.handleKey("k"); // back to a1
+    await screen.handleKey(" "); // select a1
+    await screen.handleKey("j"); // to a2
+    await screen.handleKey(" "); // select a2
+    await screen.handleKey("j"); // to a3
+    await screen.handleKey(" "); // select a3
+
+    await screen.handleKey("D");
+    const deleteOverlay = renderPlain((renderer) => screen.render(renderer));
+    expect(deleteOverlay).toContain("Delete 3 artifacts?");
+    await screen.handleKey("y");
+    expect(deleted).toEqual(["a1", "a2", "a3"]);
+
+    // All removed from list
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("No artifacts");
+  });
+
   test("supports per-run and per-task sub-view filters", async () => {
     const filters: unknown[] = [];
     const screen = new ArtifactsScreen({

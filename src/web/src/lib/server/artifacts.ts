@@ -12,6 +12,7 @@ export interface ArtifactRow {
   sha256: string | null;
   size: number | null;
   mime: string | null;
+  archived: boolean;
   created_at: string;
 }
 
@@ -35,11 +36,14 @@ function isoStamp(value: string | Date): string {
 export async function listArtifacts(
   db: ProductDb,
   orgId: string,
-  filter?: ArtifactFilter,
+  filter?: ArtifactFilter & { includeArchived?: boolean },
 ): Promise<ArtifactRow[]> {
   const conditions = ["org_id = $1"];
   const params: (string | null)[] = [orgId];
 
+  if (!filter?.includeArchived) {
+    conditions.push("(archived = false OR archived IS NULL)");
+  }
   if (filter?.projectId) {
     params.push(filter.projectId);
     conditions.push(`project_id = $${params.length}`);
@@ -64,7 +68,7 @@ export async function listArtifacts(
   const where = conditions.join(" AND ");
   const rows = await db.query<ArtifactRow & { created_at: string | Date }>(
     `SELECT id, org_id, project_id, run_id, task_id, kind, title,
-            body_path, sha256, size, mime, created_at
+            body_path, sha256, size, mime, COALESCE(archived, false) AS archived, created_at
        FROM artifacts
       WHERE ${where}
       ORDER BY created_at DESC, id ASC`,
@@ -73,6 +77,7 @@ export async function listArtifacts(
 
   return rows.map((r) => ({
     ...r,
+    archived: Boolean(r.archived),
     created_at: isoStamp(r.created_at),
   }));
 }
