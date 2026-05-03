@@ -134,7 +134,6 @@ export async function run(
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body,
-              // @ts-expect-error — Bun fetch supports unix sockets
               unix: socketPath,
             });
             const json = await resp.json() as { result?: unknown; error?: { message: string } };
