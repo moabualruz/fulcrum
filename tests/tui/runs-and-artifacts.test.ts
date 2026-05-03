@@ -94,45 +94,134 @@ describe("RunDetailScreen", () => {
 });
 
 describe("ArtifactsScreen", () => {
-  test("renders artifacts, previews first fifty text lines, writes to disk path, and deletes with confirmation", async () => {
-    const writes: unknown[] = [];
+  test("renders artifacts, previews first fifty text lines, uploads, downloads, archives, deletes, and filters", async () => {
+    const uploads: unknown[] = [];
+    const downloads: unknown[] = [];
+    const archived: string[] = [];
     const deleted: string[] = [];
     const content = Array.from({ length: 55 }, (_, index) => `line ${index + 1}`).join("\n");
     const screen = new ArtifactsScreen({
       caller: {
         artifacts: {
           list: async () => [
-            { id: "artifact-1", runId: "run-1", type: "text", path: "logs/run.txt", sizeBytes: 2048, createdAt: "2026-05-03T10:00:00Z" },
+            {
+              id: "artifact-1",
+              runId: "run-1",
+              taskId: "task-1",
+              filename: "run.txt",
+              mime: "text/plain",
+              path: "logs/run.txt",
+              sizeBytes: "2048",
+              createdAt: "2026-05-03T10:00:00Z",
+            },
+            {
+              id: "artifact-2",
+              filename: "trace.bin",
+              mime: "application/octet-stream",
+              path: "bins/trace.bin",
+              sizeBytes: "16",
+              createdAt: "2026-05-03T10:01:00Z",
+            },
           ],
-          get: async () => ({ id: "artifact-1", type: "text", content }),
-          write: async (input) => {
-            writes.push(input);
-            return { ok: true };
+          get: async (input) => input.id === "artifact-1"
+            ? {
+              kind: "text",
+              artifact: {
+                id: "artifact-1",
+                filename: "run.txt",
+                mime: "text/plain",
+                path: "logs/run.txt",
+              },
+              language: "text",
+              content,
+              truncated: false,
+            }
+            : {
+              kind: "binary",
+              artifact: {
+                id: "artifact-2",
+                filename: "trace.bin",
+                mime: "application/octet-stream",
+                path: "bins/trace.bin",
+              },
+              hexHeader: "00010203",
+              bytesShown: 4,
+            },
+          upload: async (input) => {
+            uploads.push(input);
+            return { id: "artifact-3", filename: "new.log", mime: "text/plain", path: "new.log", sizeBytes: "7" };
+          },
+          download: async (input) => {
+            downloads.push(input);
+            return { ok: true, path: "/home/mkh/Downloads/run.txt" };
+          },
+          archive: async (input) => {
+            archived.push(input.id);
+            return { ok: true, id: input.id };
           },
           delete: async (input) => {
             deleted.push(input.id);
-            return { ok: true };
+            return { ok: true, id: input.id };
           },
         },
       },
+      homeDir: "/home/mkh",
     });
 
     await screen.load();
     const listing = renderPlain((renderer) => screen.render(renderer));
-    expect(listing).toContain("logs/run.txt");
+    expect(listing).toContain("run.txt");
+    expect(listing).toContain("[text/plain]");
+    expect(listing).toContain("task:task-1");
     expect(listing).toContain("line 1");
     expect(listing).toContain("line 50");
     expect(listing).not.toContain("line 51");
 
-    await screen.handleKey("w");
-    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Write artifact");
-    await screen.submitWritePath("/tmp/run.txt");
-    expect(writes).toEqual([{ id: "artifact-1", path: "/tmp/run.txt" }]);
+    await screen.handleKey("u");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Upload artifact");
+    await screen.submitUploadPath("/tmp/new.log");
+    expect(uploads).toEqual([{ path: "/tmp/new.log" }]);
+
+    await screen.handleKey("d");
+    expect(downloads).toEqual([{ id: "artifact-1", outPath: "/home/mkh/Downloads/run.txt" }]);
+
+    await screen.handleKey("a");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Archive run.txt?");
+    await screen.handleKey("y");
+    expect(archived).toEqual(["artifact-1"]);
 
     await screen.handleKey("D");
-    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Confirm? [y/N]");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Delete run.txt?");
     await screen.handleKey("y");
     expect(deleted).toEqual(["artifact-1"]);
     expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("logs/run.txt");
+
+    await screen.handleKey("f");
+    await screen.submitFilters({ mime: "application/octet-stream" });
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("trace.bin");
+  });
+
+  test("supports per-run and per-task sub-view filters", async () => {
+    const filters: unknown[] = [];
+    const screen = new ArtifactsScreen({
+      caller: {
+        artifacts: {
+          list: async (input) => {
+            filters.push(input);
+            return [];
+          },
+          get: async () => null,
+          upload: async () => ({ id: "artifact-1", filename: "noop", mime: "text/plain", path: "noop", sizeBytes: "0" }),
+          download: async () => ({ ok: true, path: "/tmp/noop" }),
+          archive: async (input) => ({ ok: true, id: input.id }),
+          delete: async (input) => ({ ok: true, id: input.id }),
+        },
+      },
+      runId: "run-1",
+      taskId: "task-1",
+    });
+
+    await screen.load();
+    expect(filters).toEqual([{ runId: "run-1", taskId: "task-1" }]);
   });
 });

@@ -40,6 +40,7 @@ import { NotificationsScreen } from "./screens/notifications.ts";
 import { ActivityFeedScreen } from "./screens/activity.ts";
 import { NotificationRulesScreen } from "./screens/notification-rules.ts";
 import { AuditLogScreen } from "./screens/audit.ts";
+import { ArtifactsScreen, type TuiArtifact, type TuiArtifactFilters, type TuiArtifactPreview } from "./screens/artifacts.ts";
 import { TuiRouter, type TuiRoute } from "./router.ts";
 import { JsonlCrashLog, type TuiCrashLog } from "./crashlog.ts";
 import { DbTelemetrySink, NullTelemetrySink, type TuiTelemetrySink } from "./telemetry.ts";
@@ -115,6 +116,14 @@ export interface TuiCaller {
     query: (input: Record<string, unknown>) => Promise<unknown>;
     export: (input: Record<string, unknown>) => Promise<unknown>;
   };
+  artifacts?: {
+    list: (input?: TuiArtifactFilters) => Promise<TuiArtifact[]>;
+    get: (input: { id: string }) => Promise<TuiArtifactPreview>;
+    upload: (input: { path: string }) => Promise<TuiArtifact>;
+    download: (input: { id: string; outPath: string }) => Promise<{ ok: boolean; path: string }>;
+    archive: (input: { id: string }) => Promise<{ ok: boolean; id: string }>;
+    delete: (input: { id: string }) => Promise<{ ok: boolean; id: string }>;
+  };
 }
 
 export type TuiAction = "CreateItem";
@@ -165,7 +174,7 @@ const KEYBINDING_TO_TUI_ACTION: Partial<Record<KeybindingAction, TuiAction>> = {
 // Screen enum
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "inbox" | "activity" | "notification-rules" | "audit";
+type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "inbox" | "activity" | "notification-rules" | "audit" | "artifacts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Navigation entries
@@ -183,6 +192,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { label: "Feature Flags", screen: "flags" },
   { label: "Notification Rules", screen: "notification-rules" },
   { label: "Audit", screen: "audit" },
+  { label: "Artifacts", screen: "artifacts" },
   { label: "Inference", screen: "inference" },
   { label: "Dashboard (Pillar 3)", screen: "nav" },
   { label: "Tasks (Pillar 4)", screen: "nav" },
@@ -231,6 +241,7 @@ export class TuiApp {
   private activityScreen: ActivityFeedScreen | null = null;
   private notificationRulesScreen: NotificationRulesScreen | null = null;
   private auditLogScreen: AuditLogScreen | null = null;
+  private artifactsScreen: ArtifactsScreen | null = null;
 
   constructor(opts: TuiAppOptions) {
     const out = opts.output ?? new StdoutOutput();
@@ -427,6 +438,9 @@ export class TuiApp {
           break;
         case "audit":
           this.auditLogScreen?.render(this.renderer);
+          break;
+        case "artifacts":
+          this.artifactsScreen?.render(this.renderer);
           break;
       }
     } catch (error) {
@@ -645,6 +659,17 @@ export class TuiApp {
       return;
     }
 
+    if (this.currentScreen === "artifacts" && this.artifactsScreen) {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      const consumed = await this.artifactsScreen.handleKey(key);
+      if (consumed) await this._renderCurrentScreen();
+      return;
+    }
+
     // Nav screen
     if (this.currentScreen === "nav") {
       await this._handleNavKey(key);
@@ -827,6 +852,13 @@ export class TuiApp {
         ? new AuditLogScreen({ caller: { audit: this.caller.audit as never } })
         : null;
       await this.auditLogScreen?.setFilters({});
+    }
+
+    if (screen === "artifacts") {
+      this.artifactsScreen = this.caller.artifacts
+        ? new ArtifactsScreen({ caller: { artifacts: this.caller.artifacts } })
+        : null;
+      await this.artifactsScreen?.load();
     }
 
     await this._renderCurrentScreen();

@@ -131,6 +131,7 @@ describe("TuiApp — headless mount", () => {
     const text = tty.plainText();
     expect(text).toContain("Auth");
     expect(text).toContain("Feature Flags");
+    expect(text).toContain("Artifacts");
     app.stop();
   });
 
@@ -141,6 +142,42 @@ describe("TuiApp — headless mount", () => {
 
     expect(app.screen).toBe("nav");
     app.stop();
+  });
+});
+
+describe("TuiApp — artifacts pane", () => {
+  it("navigateTo('artifacts') renders artifact list from in-process caller", async () => {
+    const tty = new FakeTTY();
+    const app = new TuiApp({
+      output: tty,
+      caller: {
+        ...fakeCaller(),
+        artifacts: {
+          list: async () => [{
+            id: "artifact-1",
+            filename: "run.txt",
+            mime: "text/plain",
+            path: "logs/run.txt",
+            sizeBytes: "12",
+            runId: "run-1",
+          }],
+          get: async () => ({
+            kind: "text",
+            artifact: { id: "artifact-1", filename: "run.txt", mime: "text/plain", path: "logs/run.txt" },
+            language: "text",
+            content: "hello",
+            truncated: false,
+          }),
+          upload: async () => ({ id: "artifact-2", filename: "next.txt", mime: "text/plain", path: "next.txt", sizeBytes: "1" }),
+          download: async () => ({ ok: true, path: "/tmp/run.txt" }),
+          archive: async (input) => ({ ok: true, id: input.id }),
+          delete: async (input) => ({ ok: true, id: input.id }),
+        },
+      },
+    });
+
+    await app.navigateTo("artifacts");
+    expect(tty.plainText()).toContain("run.txt");
   });
 });
 
