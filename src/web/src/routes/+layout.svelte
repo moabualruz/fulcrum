@@ -53,6 +53,7 @@
 
 	const paletteItems = [
 		{ id: "home",     label: "Dashboard",  href: "/" },
+		{ id: "inbox",    label: "Inbox",      href: "/inbox" },
 		{ id: "projects", label: "Projects",   href: "/projects" },
 		{ id: "docs",     label: "Documents",  href: "/docs" },
 		{ id: "boards",   label: "Boards",     href: "/boards" },
