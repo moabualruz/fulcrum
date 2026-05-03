@@ -28,8 +28,6 @@ export interface TaskRow {
   description: string | null;
   status: string;
   priority: number;
-  sprint_id: string | null;
-  estimate_points: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -178,22 +176,11 @@ export interface SprintRow {
   name: string;
   goal: string | null;
   status: string;
-  capacity_points: number | null;
+  capacity_points: number;
   start_date: string | null;
   end_date: string | null;
-  closed_at: string | null;
-  metrics_snapshot: Record<string, unknown> | null;
-  retro_doc_id: string | null;
   created_at: string;
   updated_at: string;
-}
-
-export interface MetricsSnapshot {
-  capacity_points: number | null;
-  completed_points: number;
-  total_tasks: number;
-  completed_tasks: number;
-  velocity: number;
 }
 
 export async function createSprint(
@@ -204,7 +191,7 @@ export async function createSprint(
     name: string;
     goal?: string | null;
     status?: string;
-    capacityPoints?: number | null;
+    capacityPoints?: number;
     startDate?: string | null;
     endDate?: string | null;
   },
@@ -221,7 +208,7 @@ export async function createSprint(
       input.name,
       input.goal ?? null,
       status,
-      input.capacityPoints ?? null,
+      input.capacityPoints ?? 0,
       input.startDate ?? null,
       input.endDate ?? null,
     ],
@@ -240,6 +227,41 @@ export async function createSprint(
   return rows[0] as SprintRow;
 }
 
+export async function updateSprint(
+  db: ProductDb,
+  input: {
+    id: string;
+    name?: string;
+    goal?: string | null;
+    status?: string;
+    capacityPoints?: number;
+    startDate?: string | null;
+    endDate?: string | null;
+  },
+): Promise<SprintRow> {
+  const sets: string[] = [];
+  const params: (string | number | null)[] = [];
+  const push = (col: string, val: string | number | null) => {
+    params.push(val);
+    sets.push(`${col} = $${params.length}`);
+  };
+  if (input.name !== undefined) push("name", input.name);
+  if (input.goal !== undefined) push("goal", input.goal);
+  if (input.status !== undefined) push("status", input.status);
+  if (input.capacityPoints !== undefined) push("capacity_points", input.capacityPoints);
+  if (input.startDate !== undefined) push("start_date", input.startDate);
+  if (input.endDate !== undefined) push("end_date", input.endDate);
+  if (sets.length === 0) throw new Error("updateSprint: no fields to update");
+  sets.push("updated_at = now()");
+  params.push(input.id);
+  const rows = await db.query<SprintRow>(
+    `UPDATE sprints SET ${sets.join(", ")} WHERE id = $${params.length} RETURNING *`,
+    params,
+  );
+  if (rows.length === 0) throw new Error(`sprint not found: ${input.id}`);
+  return rows[0] as SprintRow;
+}
+
 export async function listSprints(
   db: ProductDb,
   projectId: string,
@@ -250,202 +272,59 @@ export async function listSprints(
   );
 }
 
-export async function addTaskToSprint(
+export async function listTasks(
   db: ProductDb,
-  input: { sprintId: string; taskId: string },
-): Promise<{ ok: true }> {
-  // Verify sprint exists and get org/project for event
-  const sprintRows = await db.query<SprintRow>(
-    `SELECT * FROM sprints WHERE id = $1`,
-    [input.sprintId],
-  );
-  const sprint = sprintRows[0];
-  if (!sprint) throw new Error(`sprint not found: ${input.sprintId}`);
-
-  const rows = await db.query<TaskRow>(
-    `UPDATE tasks SET sprint_id = $1, updated_at = now()
-       WHERE id = $2 RETURNING *`,
-    [input.sprintId, input.taskId],
-  );
-  if (rows.length === 0) throw new Error(`task not found: ${input.taskId}`);
-  await appendEvent(db, {
-    orgId: sprint.org_id,
-    projectId: sprint.project_id,
-    actor: "system",
-    subjectKind: "task",
-    subjectId: input.taskId,
-    verb: "added_to_sprint",
-    payload: { sprintId: input.sprintId },
-  });
-  return { ok: true };
-}
-
-export async function removeTaskFromSprint(
-  db: ProductDb,
-  input: { sprintId: string; taskId: string },
-): Promise<{ ok: true }> {
-  const sprintRows = await db.query<SprintRow>(
-    `SELECT * FROM sprints WHERE id = $1`,
-    [input.sprintId],
-  );
-  const sprint = sprintRows[0];
-  if (!sprint) throw new Error(`sprint not found: ${input.sprintId}`);
-
-  const rows = await db.query<TaskRow>(
-    `UPDATE tasks SET sprint_id = NULL, updated_at = now()
-       WHERE id = $1 AND sprint_id = $2 RETURNING *`,
-    [input.taskId, input.sprintId],
-  );
-  if (rows.length === 0) throw new Error(`task not in sprint: ${input.taskId}`);
-  await appendEvent(db, {
-    orgId: sprint.org_id,
-    projectId: sprint.project_id,
-    actor: "system",
-    subjectKind: "task",
-    subjectId: input.taskId,
-    verb: "removed_from_sprint",
-    payload: { sprintId: input.sprintId },
-  });
-  return { ok: true };
-}
-
-export async function listBacklogTasks(
-  db: ProductDb,
-  projectId: string,
-): Promise<TaskRow[]> {
-  return db.query<TaskRow>(
-    `SELECT * FROM tasks
-       WHERE project_id = $1
-         AND sprint_id IS NULL
-         AND status NOT IN ('completed', 'cancelled')
-       ORDER BY priority DESC, updated_at DESC, id ASC`,
-    [projectId],
-  );
-}
-
-export async function listSprintTasks(
-  db: ProductDb,
-  sprintId: string,
-): Promise<TaskRow[]> {
-  return db.query<TaskRow>(
-    `SELECT * FROM tasks
-       WHERE sprint_id = $1
-       ORDER BY priority DESC, updated_at DESC, id ASC`,
-    [sprintId],
-  );
-}
-
-export async function sprintCapacityUsed(
-  db: ProductDb,
-  sprintId: string,
-): Promise<number> {
-  const rows = await db.query<{ total: string | null }>(
-    `SELECT COALESCE(SUM(estimate_points), 0) AS total FROM tasks WHERE sprint_id = $1`,
-    [sprintId],
-  );
-  return Number(rows[0]?.total ?? 0);
-}
-
-// ── Sprint close ────────────────────────────────────────────────────
-
-export interface CloseSprintResult {
-  sprint: SprintRow;
-  event: EventRow;
-  metrics: MetricsSnapshot;
-}
-
-export async function closeSprint(
-  db: ProductDb,
-  sprintId: string,
-): Promise<CloseSprintResult> {
-  const sprintRows = await db.query<SprintRow>(
-    `SELECT * FROM sprints WHERE id = $1`,
-    [sprintId],
-  );
-  const sprint = sprintRows[0];
-  if (!sprint) throw new Error(`sprint not found: ${sprintId}`);
-  if (sprint.status === "completed") throw new Error(`sprint already closed: ${sprintId}`);
-
-  // Compute metrics snapshot
-  const tasks = await listSprintTasks(db, sprintId);
-  const completedTasks = tasks.filter((t) => t.status === "completed");
-  const completedPoints = completedTasks.reduce(
-    (sum, t) => sum + (t.estimate_points ?? 0),
-    0,
-  );
-  const metrics: MetricsSnapshot = {
-    capacity_points: sprint.capacity_points,
-    completed_points: completedPoints,
-    total_tasks: tasks.length,
-    completed_tasks: completedTasks.length,
-    velocity: completedPoints,
+  filters: {
+    projectId?: string;
+    status?: string;
+    sprintId?: string;
+    assigneeId?: string;
+    cursor?: string;
+    limit?: number;
+  },
+): Promise<{ data: TaskRow[]; cursor: string | null }> {
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+  const push = (cond: string, val: string | number) => {
+    params.push(val);
+    conditions.push(cond.replace("?", `$${params.length}`));
   };
-
-  await db.query(
-    `UPDATE sprints SET status = 'completed', closed_at = now(),
-       metrics_snapshot = $2::jsonb, updated_at = now()
-     WHERE id = $1`,
-    [sprintId, JSON.stringify(metrics)],
+  if (filters.projectId) push("project_id = ?", filters.projectId);
+  if (filters.status) push("status = ?", filters.status);
+  if (filters.sprintId) push("sprint_id = ?", filters.sprintId);
+  if (filters.cursor) push("id > ?", filters.cursor);
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const limit = filters.limit ?? 50;
+  params.push(limit + 1);
+  const rows = await db.query<TaskRow>(
+    `SELECT * FROM tasks ${where} ORDER BY id ASC LIMIT $${params.length}`,
+    params,
   );
-
-  const event = await appendEvent(db, {
-    orgId: sprint.org_id,
-    projectId: sprint.project_id,
-    actor: "system",
-    subjectKind: "sprint",
-    subjectId: sprintId,
-    verb: "closed",
-    payload: {
-      name: sprint.name,
-      goal: sprint.goal,
-      start_date: sprint.start_date,
-      end_date: sprint.end_date,
-      metrics_snapshot: metrics,
-    },
-  });
-
-  const updatedRows = await db.query<SprintRow>(
-    `SELECT * FROM sprints WHERE id = $1`,
-    [sprintId],
-  );
-
-  return { sprint: updatedRows[0] as SprintRow, event, metrics };
+  const hasMore = rows.length > limit;
+  const data = hasMore ? rows.slice(0, limit) : rows;
+  const cursor = hasMore ? data[data.length - 1]!.id : null;
+  return { data, cursor };
 }
 
-// ── Event handler dedup ─────────────────────────────────────────────
+// ── API Key helpers ──────────────────────────────────────────────────
 
-export async function checkEventHandled(
-  db: ProductDb,
-  eventId: string,
-  handler: string,
-): Promise<boolean> {
-  const rows = await db.query<{ event_id: string }>(
-    `SELECT event_id FROM event_handler_log WHERE event_id = $1 AND handler = $2`,
-    [eventId, handler],
-  );
-  return rows.length > 0;
+export interface ApiKeyRow {
+  id: string;
+  org_id: string;
+  user_id: string;
+  key_hash: string;
+  name: string;
+  created_at: string;
+  last_used_at: string | null;
 }
 
-export async function markEventHandled(
+export async function findApiKeyByHash(
   db: ProductDb,
-  eventId: string,
-  handler: string,
-): Promise<void> {
-  await db.query(
-    `INSERT INTO event_handler_log (event_id, handler) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-    [eventId, handler],
+  keyHash: string,
+): Promise<ApiKeyRow | undefined> {
+  const rows = await db.query<ApiKeyRow>(
+    `UPDATE api_keys SET last_used_at = now() WHERE key_hash = $1 RETURNING *`,
+    [keyHash],
   );
-}
-
-// ── Sprint retro doc link ───────────────────────────────────────────
-
-export async function setSprintRetroDocId(
-  db: ProductDb,
-  sprintId: string,
-  docId: string,
-): Promise<void> {
-  await db.query(
-    `UPDATE sprints SET retro_doc_id = $2, updated_at = now() WHERE id = $1`,
-    [sprintId, docId],
-  );
+  return rows[0];
 }
