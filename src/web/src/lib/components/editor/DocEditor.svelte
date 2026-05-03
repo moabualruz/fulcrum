@@ -178,6 +178,7 @@
     if (node.type === "tableRow") return `| ${(node.content ?? []).map(nodeToMarkdown).join(" | ")} |`;
     if (node.type === "tableCell") return text;
     if (node.type === "wikilink") return `[[${node.attrs?.slug ?? ""}]]`;
+    if (node.type === "mention") return String(node.attrs?.label ?? `@${node.attrs?.id ?? ""}`);
     return text;
   }
 
@@ -279,6 +280,23 @@
   :global(.wikilink-chip--unresolved) {
     background: #ffedd5;
     color: #c2410c;
+  }
+
+  :global(.mention-chip) {
+    border-radius: 0.25rem;
+    font-weight: 600;
+    padding: 0.0625rem 0.25rem;
+    white-space: nowrap;
+  }
+
+  :global(.mention-chip--user) {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  :global(.mention-chip--team) {
+    background: #e0e7ff;
+    color: #3730a3;
   }
 
   :global(.doc-editor__content .ProseMirror:focus) {

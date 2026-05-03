@@ -3,6 +3,7 @@ import { Node } from "@tiptap/core";
 import { TaskItem } from "@tiptap/extension-list/task-item";
 import { TaskList } from "@tiptap/extension-list/task-list";
 import { StarterKit } from "@tiptap/starter-kit";
+import { MentionNode } from "./mention";
 import { WikilinkNode } from "./wikilink";
 
 export type SlashMenuItem = {
@@ -82,6 +83,7 @@ export function createDocEditorExtensions(): Extension[] {
     }),
     TaskList,
     TaskItem.configure({ nested: true }),
+    MentionNode,
     WikilinkNode,
     Table,
     TableRow,
