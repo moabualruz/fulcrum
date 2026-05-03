@@ -1,6 +1,8 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
+ImplCommit: 6b8d05d1
+ImplRuntime: claude
 Pillar: 09-repos-git-supervision
 Blocked-by: [09-web-repo-list-and-dashboard]
 PRD: .scratch/agent-os-vision/prds/09-repos-git-supervision.md

@@ -317,6 +317,101 @@ export async function listEventsFiltered(
   );
 }
 
+// ── Repos ──────────────────────────────────────────────────────
+
+export interface RepoRow {
+  id: string;
+  org_id: string;
+  project_id: string | null;
+  slug: string;
+  root_path: string;
+  default_branch: string | null;
+  remote_url: string | null;
+  name: string;
+  kind: string;
+  local_path: string | null;
+  current_branch: string | null;
+  last_sync_at: string | Date | null;
+  sync_status: string;
+  last_touched_at: string | Date | null;
+  archived: boolean;
+  registered_at: string;
+  last_seen_at: string;
+}
+
+export interface CreateRepoInput {
+  orgId: string;
+  projectId?: string | null;
+  slug: string;
+  rootPath: string;
+  defaultBranch?: string | null;
+  remoteUrl?: string | null;
+  name: string;
+  kind: "local" | "remote";
+  localPath?: string | null;
+  currentBranch?: string | null;
+}
+
+export async function createRepo(
+  db: ProductDb,
+  input: CreateRepoInput,
+): Promise<RepoRow> {
+  const id = newUlid();
+  await db.query(
+    `INSERT INTO repos (id, org_id, project_id, slug, root_path, default_branch, remote_url, name, kind, local_path, current_branch, sync_status, last_touched_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'idle', now())`,
+    [
+      id,
+      input.orgId,
+      input.projectId ?? null,
+      input.slug,
+      input.rootPath,
+      input.defaultBranch ?? "main",
+      input.remoteUrl ?? null,
+      input.name,
+      input.kind,
+      input.localPath ?? null,
+      input.currentBranch ?? "main",
+    ],
+  );
+  await appendEvent(db, {
+    orgId: input.orgId,
+    projectId: input.projectId ?? null,
+    actor: "system",
+    subjectKind: "repo",
+    subjectId: id,
+    verb: "created",
+    payload: { name: input.name, kind: input.kind },
+  });
+  const rows = await db.query<RepoRow>(`SELECT * FROM repos WHERE id = $1`, [id]);
+  if (rows.length === 0) throw new Error(`repo insert lost: ${id}`);
+  return rows[0] as RepoRow;
+}
+
+export async function listReposForProject(
+  db: ProductDb,
+  projectId: string,
+  orgId: string,
+): Promise<RepoRow[]> {
+  return db.query<RepoRow>(
+    `SELECT * FROM repos
+     WHERE project_id = $1 AND org_id = $2 AND COALESCE(archived, false) = false
+     ORDER BY COALESCE(last_touched_at, last_sync_at) DESC NULLS LAST, slug ASC`,
+    [projectId, orgId],
+  );
+}
+
+export async function linkRepoToProject(
+  db: ProductDb,
+  repoId: string,
+  projectId: string,
+): Promise<void> {
+  await db.query(
+    `UPDATE repos SET project_id = $1 WHERE id = $2`,
+    [projectId, repoId],
+  );
+}
+
 export async function listEventsByActor(
   db: ProductDb,
   actor: string,

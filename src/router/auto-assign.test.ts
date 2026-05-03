@@ -14,6 +14,7 @@ import type { EventRepository } from "../db/repositories/core/EventRepository.ts
 import type { RoutingRuleRepository } from "../db/repositories/router/RoutingRuleRepository.ts";
 import { DEFAULT_ORG_ID, SeedService } from "../db/seed.ts";
 import { autoAssign, configureAutoAssign } from "./auto-assign.ts";
+import { configureLlmFallback } from "./llm-fallback.ts";
 import { configureNoMatchPrompt, learnRule } from "./no-match-prompt.ts";
 import { RoutingEventPayloadSchema } from "./routing-event-payload.ts";
 import type { RoutingEventBus } from "./event-bus.ts";
@@ -44,11 +45,13 @@ describe("autoAssign", () => {
   let rules: RoutingRule[];
   let recordCalls: number;
   let rulesChangedBus: RoutingEventBus | null;
+  let savedFeatures: string | undefined;
 
   beforeEach(() => {
     rules = [];
     recordCalls = 0;
     rulesChangedBus = null;
+    savedFeatures = process.env["FULCRUM_FEATURES"];
     configureRulesEngine({ routingRuleRepository: repository() });
     configureAutoAssign({
       recordDecision: async () => {
@@ -60,8 +63,14 @@ describe("autoAssign", () => {
   afterEach(() => {
     configureRulesEngine({ routingRuleRepository: null });
     configureAutoAssign({ recordDecision: null });
+    configureLlmFallback({ sidecarClient: null });
     configureNoMatchPrompt({ routingRuleRepository: null });
     configureRoutingTelemetry({ eventRepository: null });
+    if (savedFeatures === undefined) {
+      delete process.env["FULCRUM_FEATURES"];
+    } else {
+      process.env["FULCRUM_FEATURES"] = savedFeatures;
+    }
   });
 
   it("returns an explicit decision without evaluating matching rules", async () => {
@@ -128,22 +137,46 @@ describe("autoAssign", () => {
     });
   });
 
-  it("returns null when no rule matches and router-llm is enabled", async () => {
+  it("falls through to prompt when router-llm enabled but sidecar returns null", async () => {
     createRule({ name: "docs", actionAgent: "claude-code", conditionsJson: DOCS_CONDITIONS });
-    const previousFeatures = process.env["FULCRUM_FEATURES"];
     process.env["FULCRUM_FEATURES"] = "router-llm";
+    let promptCalls = 0;
+    configureAutoAssign({
+      recordDecision: async () => { recordCalls += 1; },
+      promptForAgent: async () => { promptCalls += 1; return ""; },
+    });
 
-    try {
-      await expect(
-        autoAssign({ taskId: TASK_ID, taskFacts: TASK_FACTS, orgId: DEFAULT_ORG_ID }),
-      ).resolves.toBeNull();
-    } finally {
-      if (previousFeatures === undefined) {
-        delete process.env["FULCRUM_FEATURES"];
-      } else {
-        process.env["FULCRUM_FEATURES"] = previousFeatures;
-      }
-    }
+    // No sidecar configured → llmFallback returns null → prompt returns "" → null
+    await expect(
+      autoAssign({ taskId: TASK_ID, taskFacts: TASK_FACTS, orgId: DEFAULT_ORG_ID }),
+    ).resolves.toBeNull();
+    expect(promptCalls).toBe(1);
+  });
+
+  it("returns llm-fallback decision when router-llm enabled and sidecar succeeds", async () => {
+    createRule({ name: "docs", actionAgent: "claude-code", conditionsJson: DOCS_CONDITIONS });
+    process.env["FULCRUM_FEATURES"] = "router-llm";
+    let promptCalls = 0;
+    configureLlmFallback({
+      sidecarClient: {
+        healthCheck: async () => true,
+        classify: async () => ({ agent: "codex", confidence: 0.85, reasoning: "bug task" }),
+      },
+    });
+    configureAutoAssign({
+      recordDecision: async () => { recordCalls += 1; },
+      promptForAgent: async () => { promptCalls += 1; return "should-not-reach"; },
+    });
+
+    const result = await autoAssign({ taskId: TASK_ID, taskFacts: TASK_FACTS, orgId: DEFAULT_ORG_ID });
+    expect(result).toEqual({
+      ruleId: null,
+      source: "llm-fallback",
+      agent: "codex",
+      confidence: 0.85,
+    });
+    expect(promptCalls).toBe(0);
+    expect(recordCalls).toBe(1);
   });
 
   it("prompts, stores a learned rule, then resolves the identical task without prompting", async () => {

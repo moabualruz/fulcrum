@@ -10,6 +10,7 @@ import { Document } from "../../../db/entities/docs/Document.ts";
 import { DocVersion } from "../../../db/entities/docs/DocVersion.ts";
 import { DocTypeEnum, ScopeEnum } from "../../../db/entities/docs/enums.ts";
 import { archiveDocIndex, indexDoc, removeDocIndex } from "../../../docs/search-indexer.ts";
+import { applyNarrationToDoc } from "../../../docs/llm-narrator.ts";
 import { diffDocVersionsHtml, reconstructDocVersion } from "../../../docs/version-reconstructor.ts";
 import { writeDocVersion } from "../../../docs/version-writer.ts";
 import { syncDocWikilinks } from "../../../docs/wikilink-extractor.ts";
@@ -439,6 +440,17 @@ export const docsRouter = t.router({
       if (input.contentJson !== undefined) doc.contentJson = input.contentJson;
       if (input.sortPosition !== undefined) doc.sortPosition = input.sortPosition;
       if (input.archived !== undefined) doc.archived = input.archived;
+      if (input.bodyMd !== undefined || input.contentJson !== undefined || input.docType !== undefined) {
+        const narrated = await applyNarrationToDoc({
+          docType: doc.docType,
+          bodyMd: doc.bodyMd,
+          contentJson: doc.contentJson,
+        });
+        if (narrated.changed) {
+          doc.bodyMd = narrated.bodyMd;
+          doc.contentJson = narrated.contentJson;
+        }
+      }
       doc.updatedAt = new Date();
 
       em.persist(doc);

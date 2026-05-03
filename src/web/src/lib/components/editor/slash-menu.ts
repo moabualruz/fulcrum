@@ -63,6 +63,27 @@ export const Table = Node.create({
   renderHTML: ({ HTMLAttributes }) => ["table", HTMLAttributes, ["tbody", 0]],
 });
 
+export const NarrationBlockNode = Node.create({
+  name: "narration-block",
+  group: "block",
+  atom: true,
+  selectable: false,
+  addAttributes: () => ({
+    readonly: { default: true },
+    text: { default: "" },
+  }),
+  parseHTML: () => [{ tag: "aside[data-narration-block]" }],
+  renderHTML: ({ node }) => [
+    "aside",
+    {
+      "data-narration-block": "true",
+      "contenteditable": "false",
+      class: "narration-block",
+    },
+    String(node.attrs.text ?? ""),
+  ],
+});
+
 export function getSlashMenuItems(): SlashMenuItem[] {
   return SLASH_MENU_ITEMS;
 }
@@ -97,6 +118,7 @@ export function createDocEditorExtensions(): Extension[] {
     ExcalidrawNode,
     ImageNode,
     FileAttachmentNode,
+    NarrationBlockNode,
     Table,
     TableRow,
     TableCell,

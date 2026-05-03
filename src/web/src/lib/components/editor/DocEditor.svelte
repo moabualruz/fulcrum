@@ -216,6 +216,7 @@
     if (node.type === "table") return (node.content ?? []).map(nodeToMarkdown).join("\n");
     if (node.type === "tableRow") return `| ${(node.content ?? []).map(nodeToMarkdown).join(" | ")} |`;
     if (node.type === "tableCell") return text;
+    if (node.type === "narration-block") return `> [AI Summary]\n>\n${String(node.attrs?.text ?? "").split("\n").map((line) => line.trim() ? `> ${line}` : ">").join("\n")}\n\n---`;
     if (node.type === "wikilink") return `[[${node.attrs?.slug ?? ""}]]`;
     if (node.type === "mention") return String(node.attrs?.label ?? `@${node.attrs?.id ?? ""}`);
     if (node.type === "image") return `![${node.attrs?.alt || node.attrs?.filename || ""}](${node.attrs?.src || node.attrs?.url || ""})`;
@@ -339,6 +340,18 @@
   :global(.mention-chip--team) {
     background: #e0e7ff;
     color: #3730a3;
+  }
+
+  :global(.narration-block) {
+    background: #eff6ff;
+    border-left: 0.25rem solid #2563eb;
+    border-radius: 0.375rem;
+    color: #1e3a8a;
+    cursor: default;
+    margin: 0.75rem 0;
+    padding: 0.75rem;
+    user-select: text;
+    white-space: pre-wrap;
   }
 
   :global(.doc-editor__content .ProseMirror:focus) {

@@ -3,6 +3,7 @@ import {
   learnRule as defaultLearnRule,
   promptForAgent as defaultPromptForAgent,
 } from "./no-match-prompt.ts";
+import { llmFallback } from "./llm-fallback.ts";
 import { recordRoutingEvent } from "./telemetry.ts";
 import type { AutoAssignInput, RoutingDecision, TaskFacts } from "./types.ts";
 
@@ -64,7 +65,14 @@ export async function autoAssign(
 
   const match = await evaluateRuleMatch(input.taskFacts, input.orgId, input.projectId);
   if (!match) {
-    if (input.dryRun || isRouterLlmEnabled()) return null;
+    if (input.dryRun) return null;
+
+    // Tier 3: LLM fallback (gated by FULCRUM_FEATURES=router-llm)
+    if (isRouterLlmEnabled()) {
+      const llmResult = await llmFallback(input.taskFacts, input.orgId);
+      if (llmResult) return recordIfNeeded(input, llmResult);
+      // LLM returned null → fall through to interactive prompt
+    }
 
     const agent = (await promptForAgent(input.taskFacts)).trim();
     if (!agent) return null;
