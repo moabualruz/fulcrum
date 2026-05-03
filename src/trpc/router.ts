@@ -15,6 +15,7 @@ import { flagsRouter } from "../server/trpc/routers/flags.ts";
 import { inferenceRouter } from "../server/trpc/routers/inference.ts";
 import { orgsRouter } from "../server/trpc/routers/orgs.ts";
 import { tasksRouter } from "../server/trpc/routers/tasks.ts";
+import { memoryRouter } from "../server/trpc/routers/memory.ts";
 import { docsRouter } from "../server/trpc/routers/docs.ts";
 import { customFieldDefsRouter, taskCustomFieldsRouter } from "../server/trpc/routers/custom-fields.ts";
 import { auditRouter } from "../server/trpc/routers/audit.ts";
@@ -23,6 +24,7 @@ import { dataExportRouter, dataImportRouter } from "../server/trpc/routers/json-
 import { errorLogsRouter } from "../server/trpc/routers/error-logs.ts";
 import { telemetryRouter } from "../server/trpc/routers/telemetry.ts";
 import { themeRouter } from "../server/trpc/routers/theme.ts";
+import { routingRouter } from "../server/trpc/routers/routing.ts";
 import { orchestrationRouter } from "./routers/orchestration.ts";
 import { notificationsRouter } from "./routers/notifications.ts";
 import { artifactsRouter } from "./routers/artifacts.ts";
@@ -162,11 +164,6 @@ const docLinksRouter = t.router({
   delete: idMutationProcedure("doc_links", "delete"),
 });
 
-const memoriesRouter = t.router({
-  ...crudProcedures("memories"),
-  promote: idMutationProcedure("memories", "promote"),
-});
-
 const contextRouter = t.router({
   assemble: protectedProcedure
     .input(OptionalRecordInputSchema)
@@ -233,15 +230,6 @@ const searchRouter = t.router({
     .mutation(({ ctx, input }) => deleteSavedSearch(ctx, input)),
 });
 
-const routingRouter = t.router({
-  ...crudProcedures("routing"),
-  test: mutationProcedure("routing", "test"),
-  dryRun: protectedProcedure
-    .input(OptionalRecordInputSchema)
-    .output(StubOperationOutputSchema)
-    .query(({ ctx }) => op(ctx, "routing", "dryRun")),
-});
-
 const fulcrumSkillsRouter = t.router({
   list: listProcedure(),
   install: mutationProcedure("fulcrum_skills", "install"),
@@ -306,7 +294,7 @@ export const appRouter = t.router({
   doc_versions: docVersionsRouter,
   doc_comments: docCommentsRouter,
   doc_links: docLinksRouter,
-  memories: memoriesRouter,
+  memories: memoryRouter,
   context: contextRouter,
   agents: agentsRouter,
   agent_runs: agentRunsRouter,
@@ -337,7 +325,7 @@ export const appRouter = t.router({
   health: healthRouter,
 
   // Backward-compatible aliases for pre-P13 root names.
-  memory: memoriesRouter,
+  memory: memoryRouter,
   runs: agentRunsRouter,
   notifications: notificationsRouter,
 });

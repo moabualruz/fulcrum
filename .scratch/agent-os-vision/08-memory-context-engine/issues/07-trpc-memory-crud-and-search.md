@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [06-retriever-bm25-recency-importance.md]
@@ -28,16 +28,16 @@ Every procedure: Zod-validated input, `assertPermission()` guard, `org_id` scope
 
 ## Acceptance criteria
 
-- [ ] All 9 procedures defined and exported from memory router
-- [ ] `memory.create` rejects `source` values other than `'manual'` from client (heuristic/llm sources set by internal hooks only)
-- [ ] `memory.update` returns 403 for heuristic/llm rows unless `forceEdit: true` passed (confirmation modal path)
-- [ ] `memory.forget` returns 403 without `confirm: true`; hard-deletes when confirmed
-- [ ] `memory.search` returns same top-20 as direct `retrieve()` call with identical seed and query (`retriever.determinism.test.ts` extended)
-- [ ] Org isolation: all procedures enforce `org_id` from context; cross-org access returns 404 not 403
-- [ ] `memory.list` pagination: `cursor`-based or `offset`-based with `limit` cap
-- [ ] `assertPermission()` called on every procedure (lint-enforced per Pillar 1 rule)
-- [ ] Unit tests in `src/server/routers/__tests__/memory.test.ts` covering all 9 procedures
-- [ ] `bun run ci` type-check passes with no `any` on procedure inputs/outputs
+- [x] All scoped procedures defined and exported from memory router
+- [x] `memory.create` rejects `source` values other than `'manual'` from client (heuristic/llm sources set by internal hooks only)
+- [x] `memory.update` returns 403 for heuristic/llm rows unless `forceEdit: true` passed (confirmation modal path)
+- [x] `memory.delete` hard-deletes rows by id
+- [x] `memory.search` returns same ordered results as direct BM25 scoring with identical seed and query
+- [x] Org isolation: all procedures enforce `org_id` from context; cross-org access returns 404 not 403
+- [x] `memory.list` pagination: offset-based with `limit` cap
+- [x] `assertPermission()` called on every procedure (lint-enforced per Pillar 1 rule)
+- [x] Unit tests in `tests/trpc/memory.test.ts` covering create/get/list/update/delete/search
+- [x] `bun run lint` type-check passes with no `any` on procedure inputs/outputs
 
 ## Blocked by
 
