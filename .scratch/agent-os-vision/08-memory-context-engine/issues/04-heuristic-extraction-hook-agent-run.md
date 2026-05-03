@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [03-heuristic-extractor-core.md]
@@ -32,3 +32,9 @@ End-to-end: complete an agent run with a fixture transcript → `Memory` entitie
 ## Blocked by
 
 - `03-heuristic-extractor-core.md`
+
+## Implementation notes
+
+- 2026-05-03 codex: RED `bun test src/memory/__tests__/after-run-hook.test.ts` → missing `../hooks/after-run-hook.ts`, 0 pass / 1 fail / 1 error.
+- 2026-05-03 codex: implemented injectable `AfterRunMemoryHook` with heuristic extraction, `Memory` persistence, `MemoryLink` persistence for `target_kind='agent_run'`, source refs carrying `run_id` and spans, and idempotent same-run link writes.
+- 2026-05-03 codex: GREEN `bun test src/memory/__tests__/after-run-hook.test.ts` → 4 pass / 0 fail / 14 expect.
