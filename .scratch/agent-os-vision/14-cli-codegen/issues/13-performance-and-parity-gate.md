@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: cli-codegen
 Blocked-by: [14/issues/06-projects-tasks-sprints-commands.md, 14/issues/07-docs-memory-search-commands.md, 14/issues/08-runs-notify-audit-webhooks-commands.md, 14/issues/09-interactive-flows-init-backup.md, 14/issues/10-interactive-flows-routing-skills-imports.md, 14/issues/11-doctor-orchestrator.md, 14/issues/12-keybindings-registry.md]
