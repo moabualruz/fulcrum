@@ -11,9 +11,10 @@ import { t } from "../../../trpc/trpc.ts";
 type EntityManager = import("@mikro-orm/postgresql").EntityManager;
 
 const SprintStatusSchema = z.enum(["planned", "active", "completed"]);
+const OrgIdSchema = z.string().regex(/^[0-9a-fA-F-]{36}$/);
 const SprintOutputSchema = z.object({
   id: z.uuid(),
-  orgId: z.uuid(),
+  orgId: OrgIdSchema,
   projectId: z.uuid(),
   name: z.string(),
   goal: z.string().nullable(),
