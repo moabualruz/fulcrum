@@ -2166,3 +2166,42 @@ Status: 163 implemented, 39 completed, 139 ready = 202/341 (59.2%)
 In-flight: P16#05 (claude), P3#13 (codex), P12#10 (claude re-dispatch after codex sandbox block)
 
 Next: milestone gate reviews on P6(17), P7(18), P8(13), P11(15), P13(14) — largest impl backlogs.
+
+---
+
+### P16#05 — Dashboard + Projects list (2026-05-03)
+
+Agent: claude (Opus 4.6). Worktree: agent-a1b3ceb2ca438c8a3.
+
+**RED:** Failing tests for `projectTiles` (per-project name + open task count) and `unreadCount` (events in last 24h) in `dashboard.test.ts`. Component tests for `ProjectTiles.svelte` and `BellBadge.svelte` (SSR component tests pre-broken across worktree — same failure on existing `MetricCard.svelte.test.ts`).
+
+**GREEN:**
+- `src/web/src/lib/server/dashboard.ts` — added `projectTiles` query (LEFT JOIN tasks + events per project) and `unreadCount` query (events in last 24h) to `loadDashboard`.
+- `src/web/src/lib/components/dashboard/ProjectTiles.svelte` — new component: project tile grid with name, open task count, link to `/projects/[id]`.
+- `src/web/src/lib/components/app/BellBadge.svelte` — new component: bell icon with red badge showing unread count.
+- `src/web/src/lib/components/app/AppTopbar.svelte` — wired BellBadge with `bellCount` prop.
+- `src/web/src/routes/+layout.svelte` — added 60s client-side poll to `/api/bell` for bell count.
+- `src/web/src/routes/api/bell/+server.ts` — new API endpoint returning `{ count }` of events in last 24h.
+- `src/web/src/routes/+page.svelte` — wired `ProjectTiles` into dashboard grid.
+
+Tests: 8/8 dashboard server tests pass. Svelte SSR component tests are pre-existing failures (not a regression).
+
+## P14#07 — docs, memory, search, context commands
+
+**Commit:** `2c43f0fc` feat(cli): add docs --project, doc-versions, --semantic gate, context assemble (P14#07)
+
+**What was built:**
+- `docs list --project P` now passes `projectId` filter to tRPC caller
+- `docs versions list <doc-id>` subcommand dispatches to `docs.versionsList`
+- `search --semantic` gate returns `FeatureDisabledError` (exit 1) when embeddings flag not enabled
+- New `context.ts` command with `assemble --task T --json` returning context bundle (memories, docs, transcripts, repoState, tokenCount)
+
+**Files:**
+- `src/cli/commands/docs.ts` — added `--project` to list, `versions` subcommand, `versionsList` caller type
+- `src/cli/commands/search.ts` — added `--semantic` flag gate before query dispatch
+- `src/cli/commands/context.ts` — new command module for context assembly
+- `tests/cli/docs.test.ts` — 3 new tests (create with --project, list with --project, doc-versions list)
+- `tests/cli/search.test.ts` — 1 new test (--semantic FeatureDisabledError)
+- `tests/cli/context.test.ts` — 3 new tests (assemble, missing --task error, help)
+
+Tests: 21/21 pass across docs/memory/search/context test files.

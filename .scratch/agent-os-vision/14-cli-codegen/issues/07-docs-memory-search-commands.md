@@ -1,5 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplCommit: 2c43f0fc
+ImplRuntime: claude
 Triage: AFK
 Pillar: cli-codegen
 Blocked-by: [14/issues/05-binary-entrypoint-and-compile.md]
