@@ -61,6 +61,7 @@ Orchestration commands.
 Usage:
   fulcrum symphony runs list --state <state> [--limit N] [--json]
   fulcrum symphony runs show <runId> [--verbose] [--json]
+  fulcrum symphony connector linear sync [--json]
   fulcrum symphony conformance [--verbose]
 
 Options:
@@ -81,6 +82,8 @@ export async function run(
   switch (domain) {
     case "runs":
       return runRuns(rest, { ...opts, print, printErr, exit });
+    case "connector":
+      return runConnector(rest, { ...opts, print, printErr, exit });
     case "conformance":
       return runConformance(rest, { ...opts, print, printErr, exit });
     case "help":
@@ -399,4 +402,67 @@ function readFlag(argv: readonly string[], flag: string): string | undefined {
 function excerpt(value: string, maxChars = 240): string {
   if (value.length <= maxChars) return value;
   return `${value.slice(0, maxChars - 3)}...`;
+}
+
+async function runConnector(
+  argv: readonly string[],
+  opts: Required<Pick<SymphonyRunOptions, "print" | "printErr" | "exit">> &
+    SymphonyRunOptions,
+): Promise<void> {
+  const { print, printErr, exit } = opts;
+  const [connectorKind = "help", action = "help", ...rest] = argv;
+  const jsonMode = rest.includes("--json");
+
+  if (connectorKind === "help" || connectorKind === "--help") {
+    print("Usage: fulcrum symphony connector linear sync [--json]");
+    return;
+  }
+
+  if (connectorKind !== "linear") {
+    printErr(`fulcrum symphony connector: unsupported connector '${connectorKind}'`);
+    exit(2);
+    return;
+  }
+
+  if (action !== "sync") {
+    printErr(`fulcrum symphony connector linear: unknown action '${action}'`);
+    printErr("Usage: fulcrum symphony connector linear sync [--json]");
+    exit(2);
+    return;
+  }
+
+  const { createLinearTrackerAdapter } = await import(
+    "../../orchestration/symphony/linear-tracker.ts"
+  );
+  const adapter = createLinearTrackerAdapter();
+
+  if (!adapter) {
+    const msg = "Linear connector not available. Set FULCRUM_FEATURES=connector-linear and LINEAR_API_KEY.";
+    if (jsonMode) {
+      print(JSON.stringify({ ok: false, error: msg }));
+    } else {
+      printErr(msg);
+    }
+    exit(1);
+    return;
+  }
+
+  try {
+    const orgId = opts.orgId ?? DEFAULT_ORG_ID;
+    const result = await adapter.sync(orgId);
+
+    if (jsonMode) {
+      print(JSON.stringify({ ok: true, ...result }));
+    } else {
+      print(`Linear sync complete: pulled=${result.pulled} pushed=${result.pushed} errors=${result.errors.length}`);
+    }
+  } catch (err) {
+    const msg = (err as Error).message;
+    if (jsonMode) {
+      print(JSON.stringify({ ok: false, error: msg }));
+    } else {
+      printErr(`Linear sync failed: ${msg}`);
+    }
+    exit(1);
+  }
 }

@@ -111,6 +111,10 @@ export class OrchestratorPane {
       }
     }
 
+    // Integration status line
+    renderer.writeln();
+    renderer.writeln(c.dim(`  Integrations: ${connectorLinearStatusLine()}`));
+
     renderer.writeln();
     renderer.writeln(
       c.dim("  j/k navigate  Enter detail  r retry  x cancel  l logs  a artifacts  1-5 tabs  q back"),
@@ -252,4 +256,16 @@ function truncatePath(path: string | null, maxLen: number): string {
   if (!path) return "—";
   if (path.length <= maxLen) return path;
   return "…" + path.slice(-(maxLen - 1));
+}
+
+function connectorLinearStatusLine(): string {
+  const features = (process.env["FULCRUM_FEATURES"] ?? "")
+    .split(",")
+    .map((f) => f.trim());
+  const enabled = features.includes("connector-linear");
+  const hasKey = typeof process.env["LINEAR_API_KEY"] === "string" && process.env["LINEAR_API_KEY"].length > 0;
+
+  if (!enabled) return "Linear OFF";
+  if (!hasKey) return "Linear ON (no API key)";
+  return "Linear ON";
 }
