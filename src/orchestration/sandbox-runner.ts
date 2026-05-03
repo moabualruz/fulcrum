@@ -254,22 +254,50 @@ export async function runAgent(
         maxTranscriptSize(envBag as Record<string, string | undefined>),
       );
       const outputs: string[] = [];
+      const featureFlags = deps.features ?? process.env.FULCRUM_FEATURES ?? "";
+      const tokenTrackingOn = isTokenTrackingEnabled(featureFlags);
+      const tokenTracker = tokenTrackingOn
+        ? createTokenTracker(req.agentProfile.tokenCountPattern)
+        : null;
       let tokenUsed = 0;
       let exitCode = 0;
       let exitReason: AgentRunResult["exitReason"] = "max_iterations";
 
+      // Session resume: resolve prior transcript for retry runs
+      const sessionResume = await resolveSessionResume({
+        features: featureFlags,
+        supportsSessionResume: req.agentProfile.supportsSessionResume,
+        taskId: deps.taskId,
+        currentRunId: runId,
+        priorRunLookup: deps.priorRunLookup,
+      });
+
       for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+        const basePrompt = promptForIteration(req.prompt, req.contextBundle, outputs);
+        const prompt = iteration === 0 && sessionResume.transcriptPath
+          ? `${basePrompt}\n\nResume from prior session transcript: ${sessionResume.transcriptPath}`
+          : basePrompt;
+
         const interactiveResult = await worktree.interactive({
           agent,
           sandbox,
-          prompt: promptForIteration(req.prompt, req.contextBundle, outputs),
+          prompt,
           name: req.runId,
           env: req.opts?.env,
           signal: controller.signal,
         });
         const transcript = transcriptFromInteractiveResult(interactiveResult);
         outputs.push(transcript);
-        tokenUsed += countTokens(transcript);
+
+        // Token counting: pattern-based when tracking on, word-count fallback otherwise
+        if (tokenTracker) {
+          for (const line of transcript.split(/\r?\n/)) {
+            tokenTracker.parseLine(line);
+          }
+          tokenUsed = tokenTracker.total;
+        } else {
+          tokenUsed += countTokens(transcript);
+        }
         exitCode = interactiveResult.exitCode ?? 0;
 
         // Write each line of transcript output to JSONL
@@ -328,7 +356,7 @@ export async function runAgent(
         durationMs,
         iterationCount: outputs.length,
         exitReason,
-        tokenUsed,
+        tokenUsed: tokenTrackingOn ? tokenUsed : undefined,
         transcriptPath: transcriptResult.transcriptPath,
         workspaceDiffPath: diffResult.diffPath,
         transcriptTruncated: transcriptResult.truncated,
@@ -340,7 +368,7 @@ export async function runAgent(
           durationMs,
           iterationCount: result.iterationCount,
           exitReason: result.exitReason,
-          tokenUsed,
+          tokenUsed: tokenTrackingOn ? tokenUsed : 0,
           transcriptPath: result.transcriptPath,
           workspaceDiffPath: result.workspaceDiffPath,
           transcriptTruncated: result.transcriptTruncated,

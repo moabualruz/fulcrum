@@ -42,6 +42,8 @@ export const FEATURE_FLAGS = [
   "i18n",
   "report-llm-narration",
   "search-click-telemetry",
+  "token-tracking",
+  "session-resume",
 ] as const;
 
 /** Union type of all registered feature flag names. */
@@ -71,6 +73,8 @@ export const FLAG_DESCRIPTIONS: Record<FeatureFlagName, string> = {
   "i18n": "Enable locale catalogs, locale picker, and RTL rendering.",
   "report-llm-narration": "Enable LLM-powered memory digest and doc narration via inference sidecar.",
   "search-click-telemetry": "Enable search click telemetry writes to search_clicks table.",
+  "token-tracking": "Enable per-profile token count parsing from agent stdout; writes token_used to agent_runs.",
+  "session-resume": "Enable session resumption on retry runs (claude-code profile only); passes prior transcript to sandcastle.",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

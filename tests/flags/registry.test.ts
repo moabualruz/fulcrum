@@ -75,7 +75,7 @@ beforeEach(async () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("FEATURE_FLAGS constant", () => {
-  it("contains all 16 registered flags", () => {
+  it("contains all 21 registered flags", () => {
     const expected: FeatureFlagName[] = [
       "router-llm",
       "embeddings",
@@ -93,8 +93,13 @@ describe("FEATURE_FLAGS constant", () => {
       "connector-linear",
       "symphony-ssh-worker",
       "symphony-http-api",
+      "i18n",
+      "report-llm-narration",
+      "search-click-telemetry",
+      "token-tracking",
+      "session-resume",
     ];
-    expect(FEATURE_FLAGS).toHaveLength(16);
+    expect(FEATURE_FLAGS).toHaveLength(21);
     for (const flag of expected) {
       expect(FEATURE_FLAGS).toContain(flag);
     }

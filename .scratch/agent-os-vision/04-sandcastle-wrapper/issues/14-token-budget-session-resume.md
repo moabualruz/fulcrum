@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplRuntime: claude
 Triage: AFK
 Pillar: 04-sandcastle-wrapper
 Blocked-by: 10-iteration-loop-hard-cap
