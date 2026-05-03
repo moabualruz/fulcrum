@@ -60,6 +60,7 @@ import { NotificationRule } from "./entities/flags/NotificationRule.ts";
 // Webhook entities (P13#07).
 import { Webhook } from "./entities/notifications/Webhook.ts";
 import { WebhookDelivery } from "./entities/notifications/WebhookDelivery.ts";
+import { EventRetentionPolicy } from "./entities/notifications/EventRetentionPolicy.ts";
 
 // Platform / cross-cutting entities (P17#01 — Pillar 17 always-on).
 import { Credential } from "./entities/platform/Credential.ts";
@@ -115,6 +116,7 @@ export {
   NotificationRule,
   Webhook,
   WebhookDelivery,
+  EventRetentionPolicy,
   Credential,
   TelemetryEvent,
   ErrorLog,
@@ -203,6 +205,7 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     NotificationRule,
     Webhook,
     WebhookDelivery,
+    EventRetentionPolicy,
     Credential,
     TelemetryEvent,
     ErrorLog,

@@ -15,9 +15,11 @@ import { flagsRouter } from "../server/trpc/routers/flags.ts";
 import { inferenceRouter } from "../server/trpc/routers/inference.ts";
 import { orgsRouter } from "../server/trpc/routers/orgs.ts";
 import { tasksRouter } from "../server/trpc/routers/tasks.ts";
+import { auditRouter } from "../server/trpc/routers/audit.ts";
 import { orchestrationRouter } from "./routers/orchestration.ts";
 import { notificationsRouter } from "./routers/notifications.ts";
 import { artifactsRouter } from "./routers/artifacts.ts";
+import { reposRouter } from "./routers/repos.ts";
 import { docTemplatesRouter } from "../server/trpc/routers/doc-templates.ts";
 import { credentialsRouter } from "../secrets/credentials-router.ts";
 import { webhooksRouter } from "./routers/webhooks.ts";
@@ -183,14 +185,6 @@ const agentRunsRouter = t.router({
   retry: idMutationProcedure("agent_runs", "retry"),
 });
 
-const reposRouter = t.router({
-  list: listProcedure(),
-  get: getProcedure(),
-  register: mutationProcedure("repos", "register"),
-  sync: idMutationProcedure("repos", "sync"),
-  unregister: idMutationProcedure("repos", "unregister"),
-});
-
 const repoBranchesRouter = t.router({
   list: listProcedure(),
   get: getProcedure(),
@@ -226,22 +220,6 @@ const searchRouter = t.router({
     .input(SavedSearchDeleteInputSchema)
     .output(z.object({ ok: z.literal(true) }))
     .mutation(({ ctx, input }) => deleteSavedSearch(ctx, input)),
-});
-
-const auditRouter = t.router({
-  query: protectedProcedure
-    .input(OptionalRecordInputSchema)
-    .output(z.array(StubRowSchema))
-    .query(() => []),
-  export: mutationProcedure("audit", "export"),
-  retentionPolicy: t.router({
-    get: protectedProcedure
-      .input(EmptyInputSchema)
-      .output(StubOperationOutputSchema)
-      .query(({ ctx }) => op(ctx, "audit.retentionPolicy", "get")),
-    list: listProcedure(),
-    set: mutationProcedure("audit.retentionPolicy", "set"),
-  }),
 });
 
 const routingRouter = t.router({
