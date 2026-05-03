@@ -24,7 +24,12 @@ const REQUIRED_TABLES = [
   "events",
   "search_documents",
   "jobs",
-  "connector_sync_log",
+  "org_settings",
+  "github_prs",
+  "github_issues",
+  "repo_branches",
+  "bb_prs",
+  "bb_issues",
 ] as const;
 
 async function tableExists(
@@ -43,7 +48,7 @@ describe("product kernel migrations", () => {
     const db = await openPglite(join(scratch, "fresh"));
     try {
       const applied = await runMigrations(db);
-      expect(applied.length).toBeGreaterThanOrEqual(4);
+      expect(applied.length).toBeGreaterThanOrEqual(5);
       for (const name of REQUIRED_TABLES) {
         expect(await tableExists(db, name)).toBe(true);
       }
@@ -85,4 +90,5 @@ describe("product kernel migrations", () => {
       await db.close();
     }
   });
+
 });

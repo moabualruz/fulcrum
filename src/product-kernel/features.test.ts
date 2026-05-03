@@ -25,4 +25,16 @@ describe("feature flags", () => {
     process.env.FULCRUM_FEATURES = "other-feature";
     expect(isFeatureEnabled("connector-github")).toBe(false);
   });
+
+  test("connector-bitbucket flag works", () => {
+    process.env.FULCRUM_FEATURES = "connector-bitbucket";
+    expect(isFeatureEnabled("connector-bitbucket")).toBe(true);
+    expect(isFeatureEnabled("connector-github")).toBe(false);
+  });
+
+  test("both connectors can be enabled simultaneously", () => {
+    process.env.FULCRUM_FEATURES = "connector-github,connector-bitbucket";
+    expect(isFeatureEnabled("connector-github")).toBe(true);
+    expect(isFeatureEnabled("connector-bitbucket")).toBe(true);
+  });
 });
