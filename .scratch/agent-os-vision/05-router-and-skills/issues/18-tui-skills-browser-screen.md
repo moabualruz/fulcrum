@@ -1,6 +1,7 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
+ImplRuntime: claude
 Pillar: 05-router-and-skills
 Blocked-by: 16-skills-trpc-procedures
 ---
