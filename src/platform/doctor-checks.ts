@@ -53,6 +53,14 @@ interface PlatformDoctorOptions {
     dsn?: string | null;
     testPut(): Promise<boolean>;
   };
+  remoteTelemetry?: {
+    /** Whether telemetry-remote flag is currently enabled. */
+    enabled: boolean;
+    /** FULCRUM_TELEMETRY_ENDPOINT value. */
+    endpoint?: string | null;
+    /** Whether outbox has dead-lettered entries awaiting review. */
+    hasDeadLettered?: boolean;
+  };
   errorReporting?: {
     /** Whether error-reporting-remote feature flag is ON. */
     featureEnabled: boolean;
@@ -263,6 +271,23 @@ export async function runPlatformDoctorChecks(options: PlatformDoctorOptions = {
     } catch (err) {
       results.push(check("platform.remote_backup", "fail", `Remote backup test failed: ${(err as Error).message}`, "Verify remote backup DSN and credentials."));
     }
+  }
+
+  // telemetry-remote check
+  const remoteTelemetry = options.remoteTelemetry ?? {
+    enabled: (process.env["FULCRUM_FEATURES"] ?? "")
+      .split(",").map((f) => f.trim()).includes("telemetry-remote"),
+    endpoint: process.env["FULCRUM_TELEMETRY_ENDPOINT"] ?? null,
+    hasDeadLettered: false,
+  };
+  if (!remoteTelemetry.enabled) {
+    results.push(check("platform.remote_telemetry", "skip", "telemetry-remote flag is off.", "Enable telemetry-remote flag and set FULCRUM_TELEMETRY_ENDPOINT + FULCRUM_TELEMETRY_SECRET to activate."));
+  } else if (!remoteTelemetry.endpoint) {
+    results.push(check("platform.remote_telemetry", "fail", "telemetry-remote is ON but FULCRUM_TELEMETRY_ENDPOINT is not set.", "Set FULCRUM_TELEMETRY_ENDPOINT to a valid HTTPS URL and FULCRUM_TELEMETRY_SECRET for HMAC signing."));
+  } else if (remoteTelemetry.hasDeadLettered) {
+    results.push(check("platform.remote_telemetry", "warn", "telemetry-remote: outbox has dead-lettered entries (4xx response from endpoint).", "Verify endpoint URL and FULCRUM_TELEMETRY_SECRET; inspect telemetry_outbox table for dead entries."));
+  } else {
+    results.push(check("platform.remote_telemetry", "pass", "telemetry-remote is ON and endpoint is configured.", "No action needed."));
   }
 
   // error-reporting-remote check

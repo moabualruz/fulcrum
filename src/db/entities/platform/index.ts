@@ -14,3 +14,4 @@ export { TelemetryEvent } from "./TelemetryEvent.ts";
 export { ErrorLog } from "./ErrorLog.ts";
 export { ExperimentAssignment } from "./ExperimentAssignment.ts";
 export { FeatureFlagRollout } from "./FeatureFlagRollout.ts";
+export { TelemetryOutbox } from "./TelemetryOutbox.ts";
