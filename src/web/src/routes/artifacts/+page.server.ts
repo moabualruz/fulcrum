@@ -1,25 +1,34 @@
 import type { PageServerLoad } from "./$types";
 import { openProductDb, getDefaultOrgId } from "$lib/server/db";
-import { listArtifacts } from "$lib/server/artifacts";
+import { listArtifacts, type ArtifactRow } from "$lib/server/artifacts";
+import {
+  applyArtifactsFilters,
+  type ArtifactsFilterState,
+} from "$lib/components/artifacts/artifacts-filters";
 
-export const load: PageServerLoad = ({ url }) => {
+export const load: PageServerLoad = ({ url, locals }) => {
+  const mime = (url.searchParams.get("mime") ?? "").trim();
   const kind = (url.searchParams.get("kind") ?? "").trim();
-  const project = (url.searchParams.get("project") ?? "").trim();
-  const run = (url.searchParams.get("run") ?? "").trim();
+  const projectParam = url.searchParams.get("project");
+  const projectRaw = projectParam === null ? undefined : projectParam.trim();
+
+  const filter: ArtifactsFilterState = {
+    ...(mime ? { mime } : {}),
+    ...(kind ? { kind } : {}),
+    ...(projectRaw !== undefined ? { projectId: projectRaw } : {}),
+  };
+
   return {
-    filter: { kind, project, run },
+    activeProjectId: locals?.activeProjectId ?? null,
+    filter: { mime, kind, project: projectRaw ?? "" },
     streamed: {
       data: (async () => {
         const db = await openProductDb();
         try {
           const orgId = await getDefaultOrgId(db);
-          const artifacts = await listArtifacts(db, {
-            orgId,
-            ...(project ? { projectId: project } : {}),
-            ...(run ? { runId: run } : {}),
-            ...(kind ? { kind } : {}),
-          });
-          return { artifacts };
+          const rows = await listArtifacts(db, orgId);
+          const filtered = applyArtifactsFilters(rows, filter);
+          return { artifacts: filtered };
         } finally {
           await db.close();
         }

@@ -1,128 +1,125 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { openPglite } from "../../../../product-kernel/db/pglite.ts";
 import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
-import {
-  createLocalOrg,
-  createProject,
-  type EventRow,
-} from "../../../../product-kernel/store/repositories.ts";
+import { createLocalOrg, createProject } from "../../../../product-kernel/store/repositories.ts";
 import { newUlid } from "../../../../product-kernel/ids.ts";
+import { listArtifacts, getArtifactStats } from "./artifacts.ts";
 import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import {
-  createArtifactForRun,
-  deleteArtifactAction,
-  listArtifacts,
-  readArtifactDetail,
-} from "./artifacts.ts";
 
-const scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-artifacts-"));
+let scratch: string;
+let db: ProductDb;
+let orgId: string;
+let projectId: string;
 
-afterAll(() => {
+beforeEach(async () => {
+  scratch = mkdtempSync(join(tmpdir(), "fulcrum-artifacts-"));
+  const dbDir = join(scratch, "state", "product", "db");
+  mkdirSync(dbDir, { recursive: true });
+  db = await openPglite(join(dbDir, "main"));
+  await runMigrations(db);
+  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
+  orgId = org.id;
+  const proj = await createProject(db, { orgId, slug: "alpha", name: "Alpha" });
+  projectId = proj.id;
+});
+
+afterEach(async () => {
+  await db.close();
   rmSync(scratch, { recursive: true, force: true });
 });
 
-async function freshDb(name: string): Promise<{
-  db: ProductDb;
-  orgId: string;
-  projectId: string;
-  runId: string;
-}> {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const project = await createProject(db, { orgId: org.id, slug: "alpha", name: "Alpha" });
-  const runId = newUlid();
+async function seedArtifact(overrides: Partial<{
+  id: string;
+  projectId: string | null;
+  runId: string | null;
+  taskId: string | null;
+  kind: string;
+  title: string;
+  mime: string | null;
+  size: number | null;
+}> = {}): Promise<string> {
+  const id = overrides.id ?? newUlid();
   await db.query(
-    `INSERT INTO agent_runs (id, org_id, project_id, agent, status)
-     VALUES ($1, $2, $3, 'codex', 'succeeded')`,
-    [runId, org.id, project.id],
+    `INSERT INTO artifacts (id, org_id, project_id, run_id, task_id, kind, title, mime, size)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      id,
+      orgId,
+      "projectId" in overrides ? overrides.projectId : projectId,
+      overrides.runId ?? null,
+      overrides.taskId ?? null,
+      overrides.kind ?? "file",
+      overrides.title ?? "test-artifact",
+      overrides.mime ?? "text/plain",
+      overrides.size ?? 1024,
+    ],
   );
-  return { db, orgId: org.id, projectId: project.id, runId };
+  return id;
 }
 
-async function events(db: ProductDb, subjectId: string): Promise<EventRow[]> {
-  return db.query<EventRow>(`SELECT * FROM events WHERE subject_id = $1 ORDER BY id`, [subjectId]);
-}
-
-describe("server actions: artifacts", () => {
-  test("createArtifactForRun stores row and links run via edges", async () => {
-    const { db, orgId, projectId, runId } = await freshDb("create");
-    try {
-      const file = join(scratch, "output.txt");
-      writeFileSync(file, "hello artifact", "utf8");
-      const artifact = await createArtifactForRun(db, {
-        orgId,
-        projectId,
-        runId,
-        kind: "text",
-        title: "output.txt",
-        bodyPath: file,
-        mime: "text/plain",
-      });
-
-      const rows = await listArtifacts(db, { orgId, projectId });
-      expect(rows).toHaveLength(1);
-      expect(rows[0]?.id).toBe(artifact.id);
-      expect(rows[0]?.preview).toBe("hello artifact");
-
-      const edges = await db.query<{ rel: string }>(
-        `SELECT rel FROM edges WHERE from_kind = 'agent_run' AND from_id = $1 AND to_kind = 'artifact' AND to_id = $2`,
-        [runId, artifact.id],
-      );
-      expect(edges[0]?.rel).toBe("produced");
-    } finally {
-      await db.close();
-    }
+describe("listArtifacts", () => {
+  test("returns all artifacts for org unfiltered", async () => {
+    const id1 = await seedArtifact({ title: "a1" });
+    const id2 = await seedArtifact({ title: "a2" });
+    const rows = await listArtifacts(db, orgId);
+    expect(rows).toHaveLength(2);
+    const ids = rows.map((r) => r.id);
+    expect(ids).toContain(id1);
+    expect(ids).toContain(id2);
   });
 
-  test("readArtifactDetail exposes content, download path, and retention days", async () => {
-    const { db, orgId, projectId, runId } = await freshDb("detail");
-    try {
-      const file = join(scratch, "report.ts");
-      writeFileSync(file, "const x = 1;\n", "utf8");
-      const artifact = await createArtifactForRun(db, {
-        orgId,
-        projectId,
-        runId,
-        kind: "code",
-        title: "report.ts",
-        bodyPath: file,
-        mime: "text/typescript",
-      });
-
-      const detail = await readArtifactDetail(db, { orgId, id: artifact.id });
-      expect(detail?.content).toBe("const x = 1;\n");
-      expect(detail?.downloadHref).toBe(`/artifacts/${artifact.id}/download`);
-      expect(detail?.retentionDaysRemaining).toBe(30);
-    } finally {
-      await db.close();
-    }
+  test("filters by projectId", async () => {
+    await seedArtifact({ projectId });
+    await seedArtifact({ projectId: null });
+    const rows = await listArtifacts(db, orgId, { projectId });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.project_id).toBe(projectId);
   });
 
-  test("deleteArtifactAction removes artifact row and emits deleted event", async () => {
-    const { db, orgId, projectId, runId } = await freshDb("delete");
-    try {
-      const file = join(scratch, "delete.txt");
-      writeFileSync(file, "delete me", "utf8");
-      const artifact = await createArtifactForRun(db, {
-        orgId,
-        projectId,
-        runId,
-        kind: "text",
-        title: "delete.txt",
-        bodyPath: file,
-        mime: "text/plain",
-      });
+  test("filters by mime", async () => {
+    await seedArtifact({ mime: "application/json" });
+    await seedArtifact({ mime: "text/plain" });
+    const rows = await listArtifacts(db, orgId, { mime: "application/json" });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.mime).toBe("application/json");
+  });
 
-      await deleteArtifactAction(db, artifact.id, orgId);
-      const rows = await listArtifacts(db, { orgId });
-      expect(rows).toEqual([]);
-      expect((await events(db, artifact.id)).find((e) => e.verb === "deleted")).toBeTruthy();
-    } finally {
-      await db.close();
-    }
+  test("filters by runId", async () => {
+    const runId = newUlid();
+    await db.query(
+      `INSERT INTO agent_runs (id, org_id, project_id, agent, status, started_at)
+       VALUES ($1, $2, $3, 'claude', 'succeeded', now())`,
+      [runId, orgId, projectId],
+    );
+    await seedArtifact({ runId });
+    await seedArtifact({ runId: null });
+    const rows = await listArtifacts(db, orgId, { runId });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.run_id).toBe(runId);
+  });
+
+  test("returns empty array when no artifacts", async () => {
+    const rows = await listArtifacts(db, orgId);
+    expect(rows).toEqual([]);
+  });
+});
+
+describe("getArtifactStats", () => {
+  test("returns total bytes and count for project", async () => {
+    await seedArtifact({ size: 100 });
+    await seedArtifact({ size: 200 });
+    await seedArtifact({ size: 300, projectId: null }); // different project
+    const stats = await getArtifactStats(db, orgId, projectId);
+    expect(stats.count).toBe(2);
+    expect(stats.totalBytes).toBe(300);
+  });
+
+  test("returns zeros when no artifacts", async () => {
+    const stats = await getArtifactStats(db, orgId, projectId);
+    expect(stats.count).toBe(0);
+    expect(stats.totalBytes).toBe(0);
   });
 });

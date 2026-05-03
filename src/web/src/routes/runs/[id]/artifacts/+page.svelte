@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { PageData } from "./$types";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { buttonVariants } from "$lib/components/ui/button";
   import { cn } from "$lib/utils.js";
 
   interface Props {
@@ -12,58 +11,24 @@
 </script>
 
 <header
-  data-artifacts-header
+  data-run-artifacts-header
   class={cn("flex items-center justify-between gap-4 border-b border-border pb-4 mb-4")}
 >
-  <h1 class={cn("text-2xl font-semibold tracking-tight")}>Artifacts</h1>
+  <h1 class={cn("text-2xl font-semibold tracking-tight")}>Run artifacts</h1>
+  <span class={cn("text-sm text-muted-foreground")}>Run {data.runId}</span>
 </header>
 
 {#await data.streamed.data}
   <RouteSkeleton kind="list" />
 {:then payload}
   {@const artifacts = payload.artifacts}
-  {@const mimeTypes = Array.from(new Set(artifacts.filter((a) => a.mime).map((a) => a.mime!))).sort()}
-  {@const kinds = Array.from(new Set(artifacts.map((a) => a.kind))).sort()}
-  <form
-    data-artifacts-filter
-    method="GET"
-    class={cn("mb-3 flex flex-wrap items-center gap-2")}
-  >
-    <select
-      data-artifacts-mime-filter
-      name="mime"
-      aria-label="Filter by MIME type"
-      class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
-    >
-      <option value="" selected={data.filter.mime === ""}>All types</option>
-      {#each mimeTypes as mime (mime)}
-        <option value={mime} selected={data.filter.mime === mime}>{mime}</option>
-      {/each}
-    </select>
-    <select
-      data-artifacts-kind-filter
-      name="kind"
-      aria-label="Filter by kind"
-      class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
-    >
-      <option value="" selected={data.filter.kind === ""}>All kinds</option>
-      {#each kinds as kind (kind)}
-        <option value={kind} selected={data.filter.kind === kind}>{kind}</option>
-      {/each}
-    </select>
-    <button
-      type="submit"
-      class={cn(buttonVariants({ variant: "outline" }))}
-    >Apply</button>
-  </form>
-
   {#if artifacts.length === 0}
     <div
-      data-empty-artifacts
+      data-empty-run-artifacts
       class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
-    >No artifacts match the current filters.</div>
+    >No artifacts for this run.</div>
   {:else}
-    <div data-artifacts-list>
+    <div data-run-artifacts-list>
       <table class={cn("w-full text-sm")}>
         <thead>
           <tr class={cn("border-b border-border text-left")}>

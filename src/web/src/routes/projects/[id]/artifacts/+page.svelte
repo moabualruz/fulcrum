@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { PageData } from "./$types";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { buttonVariants } from "$lib/components/ui/button";
   import { cn } from "$lib/utils.js";
 
   interface Props {
@@ -9,61 +8,51 @@
   }
 
   let { data }: Props = $props();
+
+  function formatBytes(bytes: number): string {
+    if (bytes === 0) return "0 B";
+    const units = ["B", "KB", "MB", "GB"];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const value = bytes / Math.pow(1024, i);
+    return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+  }
 </script>
 
 <header
-  data-artifacts-header
+  data-project-artifacts-header
   class={cn("flex items-center justify-between gap-4 border-b border-border pb-4 mb-4")}
 >
-  <h1 class={cn("text-2xl font-semibold tracking-tight")}>Artifacts</h1>
+  <h1 class={cn("text-2xl font-semibold tracking-tight")}>Project artifacts</h1>
+  <span class={cn("text-sm text-muted-foreground")}>Project {data.projectId}</span>
 </header>
 
 {#await data.streamed.data}
   <RouteSkeleton kind="list" />
 {:then payload}
   {@const artifacts = payload.artifacts}
-  {@const mimeTypes = Array.from(new Set(artifacts.filter((a) => a.mime).map((a) => a.mime!))).sort()}
-  {@const kinds = Array.from(new Set(artifacts.map((a) => a.kind))).sort()}
-  <form
-    data-artifacts-filter
-    method="GET"
-    class={cn("mb-3 flex flex-wrap items-center gap-2")}
+  {@const stats = payload.stats}
+
+  <div
+    data-disk-usage-card
+    class={cn("mb-6 grid grid-cols-2 gap-4 rounded-lg border border-border p-4")}
   >
-    <select
-      data-artifacts-mime-filter
-      name="mime"
-      aria-label="Filter by MIME type"
-      class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
-    >
-      <option value="" selected={data.filter.mime === ""}>All types</option>
-      {#each mimeTypes as mime (mime)}
-        <option value={mime} selected={data.filter.mime === mime}>{mime}</option>
-      {/each}
-    </select>
-    <select
-      data-artifacts-kind-filter
-      name="kind"
-      aria-label="Filter by kind"
-      class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
-    >
-      <option value="" selected={data.filter.kind === ""}>All kinds</option>
-      {#each kinds as kind (kind)}
-        <option value={kind} selected={data.filter.kind === kind}>{kind}</option>
-      {/each}
-    </select>
-    <button
-      type="submit"
-      class={cn(buttonVariants({ variant: "outline" }))}
-    >Apply</button>
-  </form>
+    <div>
+      <div class={cn("text-sm text-muted-foreground")}>Total size</div>
+      <div data-total-bytes class={cn("text-lg font-semibold")}>{formatBytes(stats.totalBytes)}</div>
+    </div>
+    <div>
+      <div class={cn("text-sm text-muted-foreground")}>Artifact count</div>
+      <div data-artifact-count class={cn("text-lg font-semibold")}>{stats.count}</div>
+    </div>
+  </div>
 
   {#if artifacts.length === 0}
     <div
-      data-empty-artifacts
+      data-empty-project-artifacts
       class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
-    >No artifacts match the current filters.</div>
+    >No artifacts for this project.</div>
   {:else}
-    <div data-artifacts-list>
+    <div data-project-artifacts-list>
       <table class={cn("w-full text-sm")}>
         <thead>
           <tr class={cn("border-b border-border text-left")}>
