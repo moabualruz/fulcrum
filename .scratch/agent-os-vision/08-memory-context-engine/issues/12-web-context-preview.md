@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [08-context-bundle-assembler.md, 11-web-memory-browser.md]
@@ -22,14 +22,14 @@ Both surfaces read from the same `context.preview` tRPC procedure (slice 08). Th
 
 ## Acceptance criteria
 
-- [ ] `/context/preview?task=<id>` renders 5 slice panels with labels (Memories, Linked Docs, Recent Runs, Repo State, Skill Prompts)
-- [ ] Each panel shows: content preview (first 200 chars), token count, expand/collapse toggle
-- [ ] Token budget bar: visual progress bar showing `usedTokens / budgetTokens`; over-budget highlighted
-- [ ] Page does NOT write any `agent_runs` row (preview-only confirmed in integration test)
+- [x] `/context/preview?task=<id>` renders 5 slice panels with labels (Memories, Linked Docs, Recent Runs, Repo State, Skill Prompts)
+- [x] Each panel shows: content preview (first 200 chars), token count, expand/collapse toggle
+- [x] Token budget bar: visual progress bar showing `usedTokens / budgetTokens`; over-budget highlighted
+- [x] Page does NOT write any `agent_runs` row (preview-only confirmed in integration test)
 - [ ] TUI `cx`/`C` keybind opens context preview screen with same 5 slices
 - [ ] TUI slice panels: expand/collapse on Enter; `q` closes screen
 - [ ] TUI token budget bar renders as ASCII progress bar
-- [ ] Both surfaces show error state gracefully when task has no repo linked (slice 4 empty)
+- [x] Both surfaces show error state gracefully when task has no repo linked (slice 4 empty)
 - [ ] Playwright e2e: navigate to `/context/preview?task=<fixture-id>` → assert 5 panels present
 - [ ] CLI `fulcrum context preview --task <id> --json` output (from slice 10) matches web page data
 
