@@ -77,12 +77,21 @@
       <input name="maxTokens" type="hidden" value="64" />
       <button type="submit">Test generate</button>
     </div>
+    <label for="generate-schema">JSON Schema (optional)</label>
+    <textarea id="generate-schema" name="schema" rows="4" placeholder={'{"type":"object","properties":{"agent":{"type":"string"}},"required":["agent"]}'}></textarea>
   </form>
 
   {#if form?.success && form?.generateText !== undefined}
     <div class="generate-result" data-generate-tokens={form.generateTokens}>
       <p>Tokens: {form.generateTokens}</p>
-      <p>{form.generateText}</p>
+      {#if form.schemaValid !== undefined}
+        <p class="schema-validity" data-schema-valid={form.schemaValid}>Schema valid: {form.schemaValid}</p>
+      {/if}
+      {#if form.schemaValid}
+        <pre class="schema-output" data-schema-output>{form.generateText}</pre>
+      {:else}
+        <p>{form.generateText}</p>
+      {/if}
     </div>
   {:else if form?.generateError}
     <p class="embed-error" data-generate-error>{form.generateError}</p>

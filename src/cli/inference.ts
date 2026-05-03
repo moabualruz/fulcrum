@@ -30,7 +30,7 @@ Usage:
   fulcrum inference models pull <model-id> [--force]
   fulcrum inference models rm <model-id> [--json]
   fulcrum inference embed <text> [--model <id>] [--json]
-  fulcrum inference generate <prompt> [--json]
+  fulcrum inference generate <prompt> [--schema <json>] [--json]
   fulcrum inference classify <text> --labels <csv> [--json]
   fulcrum inference tokenize <text> [--model <id>] [--json]
   fulcrum inference stop [--json]
@@ -353,11 +353,13 @@ async function runGenerate(
   opts: InferenceRunOptions & { print: (line: string) => void },
 ): Promise<void> {
   const json = hasFlag(argv, "json");
-  const prompt = argv.filter((arg) => arg !== "--json").join(" ").trim();
+  const { values, schema } = parseGenerateArgs(argv.filter((arg) => arg !== "--json"));
+  const prompt = values.join(" ").trim();
   if (!prompt) throw new Error("generate requires prompt");
+  const options: GenerateOptions = schema ? { schema } : {};
   const payload = GenerateResultSchema.parse(opts.caller
-    ? await opts.caller.inference.generate({ prompt })
-    : await generateWithClient(resolveServices(opts).client, prompt));
+    ? await opts.caller.inference.generate({ prompt, options })
+    : await generateWithClient(resolveServices(opts).client, prompt, options));
   if (json) {
     opts.print(JSON.stringify(payload));
   } else {
@@ -510,14 +512,37 @@ async function tokenizeWithClient(
   return client.tokenize(text, model);
 }
 
+function parseGenerateArgs(argv: readonly string[]): { values: string[]; schema?: Record<string, unknown> } {
+  const values: string[] = [];
+  let schema: Record<string, unknown> | undefined;
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--schema") {
+      const raw = argv[index + 1];
+      if (!raw) throw new Error("--schema requires a JSON value");
+      try {
+        schema = JSON.parse(raw) as Record<string, unknown>;
+      } catch {
+        throw new Error("--schema value must be valid JSON");
+      }
+      index += 1;
+      continue;
+    }
+    if (arg === undefined) continue;
+    values.push(arg);
+  }
+  return { values, schema };
+}
+
 async function generateWithClient(
   client: InferenceCliClient,
   prompt: string,
+  options?: GenerateOptions,
 ): Promise<GenerateResult> {
   if (!client.generate) {
     throw new Error("generate requires a tRPC caller or inference client generate method");
   }
-  return client.generate(prompt);
+  return client.generate(prompt, options);
 }
 
 async function listModelsWithClient(client: InferenceCliClient): Promise<InferenceModel[]> {

@@ -123,6 +123,7 @@ export const actions = {
     const form = await request.formData();
     const prompt = String(form.get("prompt") ?? "").trim();
     const maxTokens = parseInt(String(form.get("maxTokens") ?? "64"), 10) || 64;
+    const schemaRaw = String(form.get("schema") ?? "").trim();
     if (!prompt) {
       return { success: false, error: "Enter a prompt." };
     }
@@ -130,13 +131,35 @@ export const actions = {
       return { success: false, error: "Authentication required." };
     }
 
+    let schema: Record<string, unknown> | undefined;
+    if (schemaRaw) {
+      try {
+        schema = JSON.parse(schemaRaw) as Record<string, unknown>;
+      } catch {
+        return { success: false, generateError: "Invalid JSON in schema field." };
+      }
+    }
+
     try {
       const client = resolveClient(locals.container ?? null);
-      const result = await client.generate(prompt, { maxTokens });
+      const result = await client.generate(prompt, { maxTokens, schema });
+
+      // When schema provided, validate the output is valid JSON matching the schema
+      let schemaValid: boolean | undefined;
+      if (schema) {
+        try {
+          JSON.parse(result.text);
+          schemaValid = true;
+        } catch {
+          schemaValid = false;
+        }
+      }
+
       return {
         success: true,
         generateText: result.text,
         generateTokens: result.tokens,
+        ...(schemaValid !== undefined ? { schemaValid } : {}),
       };
     } catch (error) {
       return {

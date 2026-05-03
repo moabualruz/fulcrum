@@ -1,8 +1,10 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 02-inference-sidecar
 Blocked-by: 07-generate-operation
+ImplCommit: pending
+ImplRuntime: claude
 ---
 
 # Structured output — grammar-constrained generation via JSON Schema

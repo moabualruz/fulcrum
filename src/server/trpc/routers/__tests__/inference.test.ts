@@ -354,6 +354,40 @@ describe("inference tRPC router", () => {
     });
   });
 
+  test("generate with schema passes schema option through to client and returns result", async () => {
+    const caller = createCaller();
+    const schema = { type: "object", properties: { agent: { type: "string" } }, required: ["agent"] };
+
+    const result = await caller.inference.generate({
+      prompt: "route this task",
+      options: { schema },
+    });
+
+    expect(result.text).toBeDefined();
+    expect(result.model).toBeDefined();
+    expect(result.tokens).toBeGreaterThanOrEqual(0);
+  });
+
+  test("web settings testGenerate action passes schema and reports validity", async () => {
+    const container = makeContainer();
+    const schema = JSON.stringify({ type: "object", properties: { agent: { type: "string" } }, required: ["agent"] });
+    const request = new Request("http://localhost/settings/inference", {
+      method: "POST",
+      body: new URLSearchParams({ prompt: "route this", maxTokens: "64", schema }),
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+    });
+
+    const result = await inferenceSettingsActions.testGenerate({
+      request,
+      locals: { container, session: mockSession(), orgId: "00000000-0000-0000-0000-000000000001" },
+    } as Parameters<typeof inferenceSettingsActions.testGenerate>[0]);
+
+    expect(result.success).toBe(true);
+    expect(result.generateText).toBeDefined();
+    // schemaValid should be present when schema was provided
+    expect("schemaValid" in result).toBe(true);
+  });
+
   test("class-token binding remains supported for existing callers", async () => {
     const container = new Container();
     container.bind({

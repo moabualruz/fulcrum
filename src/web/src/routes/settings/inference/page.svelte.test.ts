@@ -17,9 +17,13 @@ type PageProps = {
     cached?: boolean;
     classifyResults?: Array<{ label: string; score: number }>;
     tokenizeResult?: { count: number; tokens: string[] };
+    generateText?: string;
+    generateTokens?: number;
+    generateError?: string;
+    schemaValid?: boolean;
     error?: string;
     pullProgress?: { modelId: string; pct: number; downloaded: number; total: number };
-  };
+  } | null;
 };
 
 const data: PageProps["data"] = {
@@ -106,6 +110,33 @@ describe("/settings/inference +page.svelte", () => {
     expect(body).toContain('name="modelId"');
     expect(body).toContain('data-model-download-progress="100"');
     expect(body).toContain("BAAI/bge-small-en-v1.5");
+  });
+
+  test("renders JSON Schema textarea in test generate panel", () => {
+    const { body } = render(Page, {
+      props: { data, form: null },
+    });
+
+    expect(body).toContain('name="schema"');
+    expect(body).toContain("JSON Schema");
+  });
+
+  test("renders schema validity indicator when schema output present", () => {
+    const { body } = render(Page, {
+      props: {
+        data,
+        form: {
+          success: true,
+          generateText: '{"agent": "router"}',
+          generateTokens: 5,
+          schemaValid: true,
+        },
+      },
+    });
+
+    expect(body).toContain('data-schema-valid="true"');
+    expect(body).toContain('data-schema-output');
+    expect(body).toContain('{"agent": "router"}');
   });
 
   test("renders smoke embed error state without throwing", () => {

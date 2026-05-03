@@ -323,6 +323,53 @@ describe("fulcrum inference CLI", () => {
     expect(cap.errors.join("\n")).toContain("fulcrum inference generate:");
   });
 
+  test("generate --schema passes schema to tRPC caller and returns structured JSON", async () => {
+    const cap = capture();
+    let observedInput: unknown;
+    const schema = '{"type":"object","properties":{"agent":{"type":"string"}},"required":["agent"]}';
+
+    await run(["generate", "route this task", "--schema", schema, "--json"], {
+      ...cap.opts,
+      caller: {
+        inference: {
+          health: async () => health,
+          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false }),
+          generate: async (input: unknown) => {
+            observedInput = input;
+            return { text: '{"agent": "router"}', model: "Qwen2.5-0.5B-Instruct", tokens: 5 };
+          },
+        },
+      },
+    });
+
+    expect(cap.exitCode).toBeUndefined();
+    const payload = JSON.parse(cap.lines.join("\n"));
+    expect(payload.text).toBe('{"agent": "router"}');
+    expect(JSON.parse(payload.text)).toEqual({ agent: "router" });
+    expect(observedInput).toEqual({
+      prompt: "route this task",
+      options: { schema: JSON.parse(schema) },
+    });
+  });
+
+  test("generate --schema rejects invalid JSON schema value", async () => {
+    const cap = capture();
+
+    await run(["generate", "test", "--schema", "not-json"], {
+      ...cap.opts,
+      caller: {
+        inference: {
+          health: async () => health,
+          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false }),
+          generate: async () => ({ text: "unused", model: "m", tokens: 1 }),
+        },
+      },
+    });
+
+    expect(cap.exitCode).toBe(1);
+    expect(cap.errors.join("\n")).toContain("--schema value must be valid JSON");
+  });
+
   test("stop confirms socket removal", async () => {
     const cap = capture();
 

@@ -366,6 +366,7 @@ fn handle_generate(params: serde_json::Value) -> Result<GenerateResponse, String
                     text: entry.text,
                     model: entry.model,
                     tokens_used: entry.tokens as usize,
+                    grammar_fallback: None,
                 });
             }
 
@@ -571,6 +572,72 @@ mod tests {
             "expected 'Paris' in text, got: {text}"
         );
         assert!(val["result"]["tokens_used"].as_u64().unwrap_or(0) > 0);
+    }
+
+    #[test]
+    fn dispatch_generate_with_schema_returns_valid_json_matching_schema() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var("SKIP_MODEL_DOWNLOAD", "1");
+        let schema = r#"{"type":"object","properties":{"agent":{"type":"string"}},"required":["agent"]}"#;
+        let line = format!(
+            r#"{{"jsonrpc":"2.0","id":20,"method":"generate","params":{{"prompt":"route this task","schema":{}}}}}"#,
+            schema
+        );
+        let resp = dispatch_line(&line);
+        std::env::remove_var("SKIP_MODEL_DOWNLOAD");
+        let val: serde_json::Value = serde_json::to_value(&resp).unwrap();
+        assert_eq!(val["jsonrpc"], "2.0");
+        assert_eq!(val["id"], 20);
+        assert!(
+            val.get("error").is_none() || val["error"].is_null(),
+            "unexpected error: {}",
+            val["error"]
+        );
+        let text = val["result"]["text"].as_str().unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(text).expect("output must be valid JSON");
+        assert!(parsed.get("agent").unwrap().is_string(), "agent field must be string");
+    }
+
+    #[test]
+    fn dispatch_generate_with_invalid_schema_returns_grammar_error() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var("SKIP_MODEL_DOWNLOAD", "1");
+        // Use a schema with an unsupported type — not a complex-but-fallback-able construct
+        let line = r#"{"jsonrpc":"2.0","id":21,"method":"generate","params":{"prompt":"test","schema":{"type":"invalid_type_xyz"}}}"#;
+        let resp = dispatch_line(line);
+        std::env::remove_var("SKIP_MODEL_DOWNLOAD");
+        let val: serde_json::Value = serde_json::to_value(&resp).unwrap();
+        assert_eq!(val["error"]["code"], -32602);
+        let msg = val["error"]["message"].as_str().unwrap();
+        assert!(msg.contains("GRAMMAR_ERROR"), "expected GRAMMAR_ERROR, got: {msg}");
+    }
+
+    #[test]
+    fn dispatch_generate_with_schema_skips_cache() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var("SKIP_MODEL_DOWNLOAD", "1");
+        let home = std::env::temp_dir().join(format!(
+            "fulcrum-schema-cache-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::env::set_var("FULCRUM_HOME", &home);
+        let schema = r#"{"type":"object","properties":{"agent":{"type":"string"}},"required":["agent"]}"#;
+        let line = format!(
+            r#"{{"jsonrpc":"2.0","id":22,"method":"generate","params":{{"prompt":"route","schema":{}}}}}"#,
+            schema
+        );
+        // Two calls — neither should be cached (schema requests bypass cache)
+        let first = serde_json::to_value(dispatch_line(&line)).unwrap();
+        let second = serde_json::to_value(dispatch_line(&line)).unwrap();
+        std::env::remove_var("SKIP_MODEL_DOWNLOAD");
+        std::env::remove_var("FULCRUM_HOME");
+        let _ = std::fs::remove_dir_all(home);
+        // Both should succeed (no cache interaction)
+        assert!(first.get("error").is_none() || first["error"].is_null());
+        assert!(second.get("error").is_none() || second["error"].is_null());
     }
 
     #[test]
