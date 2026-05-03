@@ -36,6 +36,8 @@ export class Artifact {
     | "task"
     | "mime"
     | "sizeBytes"
+    | "checksumSha256"
+    | "retentionUntil"
     | "metadataJson"
     | "createdAt";
 
@@ -74,6 +76,12 @@ export class Artifact {
 
   @Property({ type: "string" })
   path!: string;
+
+  @Property({ type: "string", fieldName: "checksum_sha256", nullable: true })
+  checksumSha256?: string;
+
+  @Property({ type: "datetime", fieldName: "retention_until", nullable: true })
+  retentionUntil?: Date;
 
   @Property({ type: "json", fieldName: "metadata_json", nullable: true })
   metadataJson?: Record<string, unknown>;

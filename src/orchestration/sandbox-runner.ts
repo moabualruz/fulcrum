@@ -13,6 +13,15 @@ import {
   captureWorkspaceDiff,
   maxTranscriptSize,
 } from "./transcript-diff.ts";
+import {
+  matchArtifactGlob,
+  extractArtifacts,
+  DEFAULT_ARTIFACT_GLOB,
+} from "./artifact-harvest-hook.ts";
+import {
+  harvestArtifacts,
+  type HarvestArtifactDeps,
+} from "../artifacts/harvest.ts";
 
 export const SANDCASTLE_API_VERSION = "0.5.6";
 
@@ -73,6 +82,10 @@ export interface SandboxRunnerDeps {
   readonly commandExists?: (command: string, args: readonly string[]) => Promise<boolean>;
   readonly workspaceRoot?: string;
   readonly gitDiff?: (worktreePath: string) => Promise<string>;
+  readonly artifactGlob?: string;
+  readonly harvestDeps?: HarvestArtifactDeps;
+  readonly orgSlug?: string;
+  readonly projectSlug?: string | null;
 }
 
 const defaultLogger: Logger = console;
@@ -276,12 +289,32 @@ export async function runAgent(
         () => gitDiffFn(worktree.worktreePath),
       );
 
+      // After-run artifact harvest
+      const artifactGlob = deps.artifactGlob ?? DEFAULT_ARTIFACT_GLOB;
+      const matchedFiles = await matchArtifactGlob(worktree.worktreePath, artifactGlob);
+      let harvestedArtifacts: AgentRunResult["artifacts"] = [];
+      if (matchedFiles.length > 0 && deps.harvestDeps) {
+        const extractedDir = await extractArtifacts(matchedFiles, wsRoot, runId);
+        const harvestResult = await harvestArtifacts({
+          runId,
+          extractedDir,
+          orgSlug: deps.orgSlug ?? "default",
+          projectSlug: deps.projectSlug,
+          deps: deps.harvestDeps,
+        });
+        harvestedArtifacts = harvestResult.artifacts.map((a) => ({
+          id: a.id,
+          path: a.path,
+          kind: a.mime,
+        }));
+      }
+
       const durationMs = Math.max(0, now() - startedAt);
       const result: AgentRunResult = {
         transcript: outputs.join(""),
         exitCode,
         filesChanged: [],
-        artifacts: [],
+        artifacts: harvestedArtifacts,
         durationMs,
         iterationCount: outputs.length,
         exitReason,
