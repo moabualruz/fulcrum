@@ -28,6 +28,14 @@ export interface BoardTask {
   updated_at: string;
   description_text?: string | null;
   tiptap_content?: unknown;
+  assignee?: string | null;
+  avatar_url?: string | null;
+  labels?: string[];
+  blocked?: boolean;
+  points?: number | null;
+  sprint_id?: string | null;
+  sprint_name?: string | null;
+  epic?: string | null;
 }
 
 export interface RunListing {
