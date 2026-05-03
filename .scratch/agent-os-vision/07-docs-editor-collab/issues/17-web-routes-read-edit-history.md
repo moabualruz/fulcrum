@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: 07-docs-editor-collab
 Blocked-by: [05-doc-crud-trpc.md, 06-slash-menu-core-marks-blocks.md, 07-wikilink-node-backlinks.md, 09-comments-threads.md, 12-version-history-engine.md, 13-frontmatter-form-yaml-ui.md, 14-doc-tree-crud-ui.md]

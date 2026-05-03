@@ -23,6 +23,7 @@ interface DocRow {
   kind: string;
   title: string;
   body: string;
+  content_json?: Record<string, unknown>;
   frontmatter: Record<string, unknown>;
   updated_at: Date | string;
 }
@@ -38,8 +39,10 @@ export const load: PageServerLoad = async ({ params }) => {
   const db = await openProductDb();
   try {
     const orgId = await getDefaultOrgId(db);
+    const hasContentJson = await columnExists(db, "documents", "content_json");
     const rows = await db.query<DocRow>(
       `SELECT id, org_id, project_id, kind, title, body, frontmatter, updated_at
+              ${hasContentJson ? ", content_json" : ""}
          FROM documents WHERE id = $1 AND org_id = $2`,
       [params.id, orgId],
     );
@@ -52,6 +55,7 @@ export const load: PageServerLoad = async ({ params }) => {
       kind: row.kind,
       title: row.title,
       body: row.body,
+      contentJson: row.content_json ?? markdownToDoc(row.body),
       frontmatter: row.frontmatter ?? {},
       updated_at:
         row.updated_at instanceof Date
@@ -73,6 +77,32 @@ export const load: PageServerLoad = async ({ params }) => {
     await db.close();
   }
 };
+
+async function columnExists(
+  db: Awaited<ReturnType<typeof openProductDb>>,
+  tableName: string,
+  columnName: string,
+): Promise<boolean> {
+  const rows = await db.query<{ exists: boolean }>(
+    `SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
+    ) AS exists`,
+    [tableName, columnName],
+  );
+  return rows[0]?.exists === true;
+}
+
+function markdownToDoc(body: string): Record<string, unknown> {
+  const paragraphs = body.split(/\n{2,}/).map((text) => ({
+    type: "paragraph",
+    content: text ? [{ type: "text", text }] : undefined,
+  }));
+  return {
+    type: "doc",
+    content: paragraphs.length ? paragraphs : [{ type: "paragraph" }],
+  };
+}
 
 export const actions: Actions = {
   default: async ({ params, request }) => {

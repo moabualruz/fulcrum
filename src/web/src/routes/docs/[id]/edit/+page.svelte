@@ -28,7 +28,7 @@
 	let frontmatterValue = $state<FrontmatterValue>(untrack(() => data.doc.frontmatter ?? {}));
 	let frontmatterMode = $state<"form" | "yaml">("form");
 	/* svelte-ignore state_referenced_locally */
-	let contentJson = $state<JSONContent>(markdownToDoc(bodyValue));
+	let contentJson = $state<JSONContent>(untrack(() => data.doc.contentJson ?? markdownToDoc(bodyValue)));
 
 	const errors = $derived(form?.form?.errors ?? data.form.errors ?? {});
 	const titleError = $derived<string | undefined>(errors.title?.[0]);
@@ -165,6 +165,7 @@
 	<div class={cn("flex flex-col gap-1.5")}>
 		<label for="doc-body" class={cn("text-sm font-medium")}>Body</label>
 		<DocEditor content={contentJson} onchange={handleDocChange} ariaLabel="Document body" />
+		<p data-autosave-indicator class={cn("text-xs text-muted-foreground")}>Autosave ready</p>
 		{#if bodyError}
 			<p data-error-body class={cn("text-destructive text-xs")}>{bodyError}</p>
 		{/if}

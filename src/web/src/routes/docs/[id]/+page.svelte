@@ -2,7 +2,6 @@
 	import { enhance } from "$app/forms";
 	import type { PageData } from "./$types";
 	import CommentsPanel from "$lib/components/editor/CommentsPanel.svelte";
-	import MarkdownPreview from "$lib/components/markdown/MarkdownPreview.svelte";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 	import { buttonVariants } from "$lib/components/ui/button";
 	import { cn } from "$lib/utils.js";
@@ -26,6 +25,7 @@
 	<RouteSkeleton kind="detail" />
 {:then payload}
 	{@const doc = payload.doc}
+	{@const backlinks = payload.backlinks ?? []}
 	<header
 		data-doc-detail-header
 		class={cn("flex items-baseline justify-between gap-4 border-b border-border pb-4 mb-4")}
@@ -50,8 +50,37 @@
 	</header>
 
 	<div data-doc-read-with-comments class={cn("grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]")}>
-		<MarkdownPreview value={doc.body} />
+		<div>
+			<nav data-doc-breadcrumbs class={cn("mb-3 text-sm text-muted-foreground")}>
+				<a href="/docs" class={cn("hover:underline")}>Docs</a>
+				<span aria-hidden="true"> / </span>
+				<span>{doc.title}</span>
+			</nav>
+			<section data-doc-frontmatter-card class={cn("mb-4 rounded-md border border-border p-3")}>
+				<h2 class={cn("text-sm font-semibold")}>Frontmatter</h2>
+				{#if doc.frontmatter.status}
+					<span data-doc-status-badge class={cn("mt-2 inline-flex rounded bg-muted px-2 py-0.5 text-xs")}>{doc.frontmatter.status}</span>
+				{/if}
+			</section>
+			<article
+				data-markdown-preview
+				data-doc-rendered-html
+				class={cn("prose prose-zinc dark:prose-invert max-w-none")}
+			>{@html doc.renderedHtml}</article>
+		</div>
 		<div data-comments-sidebar>
+			<section data-backlinks-panel class={cn("mb-4 rounded-md border border-border p-3")}>
+				<h2 class={cn("text-sm font-semibold")}>Backlinks</h2>
+				{#if backlinks.length === 0}
+					<p class={cn("mt-2 text-xs text-muted-foreground")}>No backlinks.</p>
+				{:else}
+					<ul class={cn("mt-2 space-y-1 text-sm")}>
+						{#each backlinks as backlink (backlink.id)}
+							<li><a data-backlink href={backlink.href} class={cn("hover:underline")}>{backlink.title}</a></li>
+						{/each}
+					</ul>
+				{/if}
+			</section>
 			<CommentsPanel threads={[]} resolvedThreads={[]} readonly />
 		</div>
 	</div>

@@ -2,6 +2,7 @@ import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { openProductDb, getDefaultOrgId } from "$lib/server/db";
 import { deleteDocumentAction } from "$lib/server/documents";
+import { renderDocMarkdownToHtml } from "./doc-render";
 
 interface DocRow {
   id: string;
@@ -15,6 +16,10 @@ interface DocRow {
 }
 
 type ProductDb = Awaited<ReturnType<typeof openProductDb>>;
+interface BacklinkRow {
+  id: string;
+  title: string;
+}
 
 async function loadDoc(db: ProductDb, id: string, orgId: string): Promise<{ doc: {
   id: string;
@@ -24,8 +29,9 @@ async function loadDoc(db: ProductDb, id: string, orgId: string): Promise<{ doc:
   title: string;
   body: string;
   frontmatter: Record<string, unknown>;
+  renderedHtml: string;
   updated_at: string;
-} }> {
+}; backlinks: Array<{ id: string; title: string; href: string }> }> {
   const rows = await db.query<DocRow>(
     `SELECT id, org_id, project_id, kind, title, body, frontmatter, updated_at
        FROM documents WHERE id = $1 AND org_id = $2`,
@@ -42,12 +48,42 @@ async function loadDoc(db: ProductDb, id: string, orgId: string): Promise<{ doc:
       title: row.title,
       body: row.body,
       frontmatter: row.frontmatter ?? {},
+      renderedHtml: renderDocMarkdownToHtml(row.body),
       updated_at:
         row.updated_at instanceof Date
           ? row.updated_at.toISOString()
           : row.updated_at,
     },
+    backlinks: await loadBacklinks(db, id, orgId),
   };
+}
+
+async function loadBacklinks(
+  db: ProductDb,
+  id: string,
+  orgId: string,
+): Promise<Array<{ id: string; title: string; href: string }>> {
+  if (!(await relationExists(db, "doc_links"))) return [];
+  const rows = await db.query<BacklinkRow>(
+    `SELECT d.id, d.title
+       FROM doc_links l
+       JOIN documents d ON d.id = l.from_doc_id AND d.org_id = l.org_id
+      WHERE l.to_doc_id = $1 AND l.org_id = $2
+      ORDER BY d.updated_at DESC, d.title ASC`,
+    [id, orgId],
+  );
+  return rows.map((row) => ({ id: row.id, title: row.title, href: `/docs/${row.id}` }));
+}
+
+async function relationExists(db: ProductDb, name: string): Promise<boolean> {
+  const rows = await db.query<{ exists: boolean }>(
+    `SELECT EXISTS (
+      SELECT 1 FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = $1
+    ) AS exists`,
+    [name],
+  );
+  return rows[0]?.exists === true;
 }
 
 export const load: PageServerLoad = ({ params, locals }) => ({
