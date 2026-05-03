@@ -1,5 +1,6 @@
 ---
-Status: ready-for-agent
+Status: implemented
+ImplRuntime: claude
 Triage: AFK
 Pillar: search-and-discovery
 Blocked-by: [09-web-search-page.md, 10-cmdk-palette-web.md, 12-cli-commands.md, 13-tui-search-and-palette.md]
