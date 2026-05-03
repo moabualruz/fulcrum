@@ -1,5 +1,5 @@
 ---
-Status: in-progress
+Status: implemented
 Triage: AFK
 Pillar: 04-sandcastle-wrapper
 Blocked-by: 05-agent-profile-type-registry
