@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: implemented
 Triage: AFK
 Pillar: api-and-webhooks
 Blocked-by: [13/issues/09-connector-framework-interface.md]
@@ -24,11 +24,11 @@ CSV import (`import-csv`) and export (`export-csv`) gated by individual flags. I
 
 ## Acceptance criteria
 
-- [ ] Valid CSV with 100 tasks → all imported; returned `created=100, skipped=0, errors=[]`.
-- [ ] CSV with duplicate `external_id` → idempotent (first import creates, second import skips; `skipped=N`).
-- [ ] CSV with missing required header → `{ error: { code: 'VALIDATION_ERROR', columns: ['title'] } }` (422 on REST).
-- [ ] Export 1k tasks → streaming response; `Content-Disposition` header present; CSV headers correct.
-- [ ] `import-csv` flag OFF → `FeatureDisabledError`; ON → import succeeds.
+- [x] Valid CSV with 100 tasks → all imported; returned `created=100, skipped=0, errors=[]`.
+- [x] CSV with duplicate `external_id` → idempotent (first import creates, second import skips; `skipped=N`).
+- [x] CSV with missing required header → `{ error: { code: 'VALIDATION_ERROR', columns: ['title'] } }` (422 on REST).
+- [x] Export 1k tasks → streaming response; `Content-Disposition` header present; CSV headers correct.
+- [x] `import-csv` flag OFF → `FeatureDisabledError`; ON → import succeeds.
 - [ ] Web import modal, CLI `fulcrum import csv`, TUI import flow all import into same project visible from all surfaces.
 
 ## Blocked by

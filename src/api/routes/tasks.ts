@@ -9,6 +9,7 @@
  */
 
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { CsvValidationError, exportTasksCsv, importTasksCsv } from "../../connectors/csv.ts";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,7 @@ const TaskSchema = z
   .object({
     id: z.string().uuid(),
     orgId: z.string().uuid(),
+    externalId: z.string().optional(),
     title: z.string(),
     status: TaskStatusSchema,
     createdAt: z.string().datetime(),
@@ -47,6 +49,27 @@ const ErrorSchema = z
   .object({ error: z.string(), code: z.string() })
   .openapi("RestError");
 
+const ImportCsvBodySchema = z
+  .object({
+    entity: z.literal("tasks"),
+    projectId: z.string().uuid(),
+    csv: z.string(),
+    columnMap: z.record(z.string(), z.string()).optional(),
+  })
+  .openapi("ImportCsvBody");
+
+const ImportCsvResultSchema = z
+  .object({
+    created: z.number().int(),
+    skipped: z.number().int(),
+    errors: z.array(z.object({
+      row: z.number().int().optional(),
+      message: z.string(),
+      code: z.string().optional(),
+    })),
+  })
+  .openapi("ImportCsvResult");
+
 // ── In-memory stub store (replaced by repo in Pillar 3) ──────────────────────
 
 const FIXED_ORG = "11111111-1111-4111-8111-111111111111";
@@ -73,6 +96,13 @@ function extractOrgId(auth: string | null): string | null {
   const token = auth.replace(/^Bearer\s+/, "");
   if (token.startsWith("test-jwt:")) return token.slice("test-jwt:".length);
   return null; // real JWT path: decode + verify
+}
+
+function isFeatureEnabled(flag: string): boolean {
+  return (process.env["FULCRUM_FEATURES"] ?? "")
+    .split(",")
+    .map((feature) => feature.trim())
+    .includes(flag);
 }
 
 // ── Route definitions ────────────────────────────────────────────────────────
@@ -140,6 +170,36 @@ const deleteRoute = createRoute({
   },
 });
 
+const exportCsvRoute = createRoute({
+  method: "get",
+  path: "/connectors/export-csv",
+  tags: ["connectors"],
+  summary: "Export tasks to CSV",
+  request: {
+    query: z.object({
+      entity: z.literal("tasks"),
+      projectId: z.string().uuid(),
+    }),
+  },
+  responses: {
+    200: { content: { "text/csv": { schema: z.string() } }, description: "Task CSV" },
+    403: { content: { "application/json": { schema: ErrorSchema } }, description: "Feature disabled" },
+  },
+});
+
+const importCsvRoute = createRoute({
+  method: "post",
+  path: "/connectors/import-csv",
+  tags: ["connectors"],
+  summary: "Import tasks from CSV",
+  request: { body: { content: { "application/json": { schema: ImportCsvBodySchema } } } },
+  responses: {
+    200: { content: { "application/json": { schema: ImportCsvResultSchema } }, description: "Import result" },
+    403: { content: { "application/json": { schema: ErrorSchema } }, description: "Feature disabled" },
+    422: { content: { "application/json": { schema: z.object({ error: z.unknown() }) } }, description: "Invalid CSV" },
+  },
+});
+
 // ── Router factory ───────────────────────────────────────────────────────────
 
 export function registerTaskRoutes(api: OpenAPIHono): void {
@@ -192,5 +252,66 @@ export function registerTaskRoutes(api: OpenAPIHono): void {
     if (callerOrg !== task.orgId) return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
     store.delete(id);
     return new Response(null, { status: 204 });
+  });
+
+  api.openapi(exportCsvRoute, (c) => {
+    if (!isFeatureEnabled("export-csv")) {
+      return c.json({ error: "Feature disabled", code: "FEATURE_DISABLED" }, 403);
+    }
+
+    const { projectId } = c.req.valid("query");
+    const csv = exportTasksCsv(
+      [...store.values()]
+        .filter((task) => task.orgId === projectId)
+        .map((task) => ({
+          id: task.id,
+          externalId: task.externalId,
+          title: task.title,
+          status: task.status,
+          createdAt: task.createdAt,
+        })),
+    );
+
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": "attachment; filename=\"tasks.csv\"",
+      },
+    });
+  });
+
+  api.openapi(importCsvRoute, async (c) => {
+    if (!isFeatureEnabled("import-csv")) {
+      return c.json({ error: "Feature disabled", code: "FEATURE_DISABLED" }, 403);
+    }
+
+    const body = c.req.valid("json");
+    try {
+      const result = importTasksCsv(
+        body.csv,
+        ({ externalId, title, status }) => {
+          const parsedStatus = TaskStatusSchema.safeParse(status);
+          const task: z.infer<typeof TaskSchema> = {
+            id: crypto.randomUUID(),
+            orgId: body.projectId,
+            externalId,
+            title,
+            status: parsedStatus.success ? parsedStatus.data : "todo",
+            createdAt: new Date().toISOString(),
+          };
+          store.set(task.id, task);
+        },
+        (externalId) => [...store.values()].some((task) =>
+          task.orgId === body.projectId && task.externalId === externalId
+        ),
+      );
+      return c.json(result, 200);
+    } catch (error) {
+      if (error instanceof CsvValidationError) {
+        return c.json({ error: { code: "VALIDATION_ERROR", columns: error.columns } }, 422);
+      }
+      throw error;
+    }
   });
 }
