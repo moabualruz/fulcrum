@@ -36,7 +36,18 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
   3. No ALTER TABLE in request handlers; single PGlite connection pool shared across requests
   4. Webhook secrets encrypted at rest; agent testProfile validates cliPath against allowlist
   5. AppRouter: zero stubs, zero duplicate mounts, zero cross-boundary imports
-**Plans**: TBD
+**Plans:** 10 plans
+Plans:
+- [ ] 01-01-PLAN.md — Router cleanup: remove stub routers + duplicate mount aliases (ARCH-07, ARCH-08)
+- [ ] 01-02-PLAN.md — Security fixes: cliPath allowlist, webhook encryption, semgrep/gitleaks (SEC-01..04)
+- [ ] 01-03-PLAN.md — DDL removal: move ALTER TABLE from handlers to migrations (ARCH-11)
+- [ ] 01-04-PLAN.md — PGlite connection pool: singleton startup init (ARCH-10)
+- [ ] 01-05-PLAN.md — Product-kernel raw SQL migration to MikroORM repositories (ARCH-02)
+- [ ] 01-06-PLAN.md — Web server raw SQL migration: 17 files, ~120 db.query() calls (ARCH-01, ARCH-02)
+- [ ] 01-07-PLAN.md — Service layer extraction: TaskService, DocService, SprintService (ARCH-03)
+- [ ] 01-08-PLAN.md — Event unification: single EventDispatcher, remove appendEvent + RoutingEventBus (ARCH-04)
+- [ ] 01-09-PLAN.md — Module boundaries: fix layering violations, barrel exports, lint enforcement (ARCH-05, ARCH-06)
+- [ ] 01-10-PLAN.md — API consolidation + TrpcContext cleanup (ARCH-09, ARCH-12)
 
 ### Phase 2: Bug Fixes + Foundation
 **Goal**: All 18 confirmed bugs resolved and foundation infrastructure in place
@@ -164,7 +175,7 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Architecture + Security | 0/? | Not started | - |
+| 1. Architecture + Security | 0/10 | Planned | - |
 | 2. Bug Fixes + Foundation | 0/? | Not started | - |
 | 3. Symphony + Sandcastle | 0/? | Not started | - |
 | 4. Inference + Router/Skills | 0/? | Not started | - |
