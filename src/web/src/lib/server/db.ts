@@ -11,7 +11,19 @@ import type { ProductDb } from "../../../../product-kernel/db/types.ts";
 export async function openProductDb(): Promise<ProductDb> {
   const db = await openPglite(join(productDbDir(), "main"));
   await runMigrations(db);
+  await ensureDefaultOrg(db);
   return db;
+}
+
+async function ensureDefaultOrg(db: ProductDb): Promise<void> {
+  const rows = await db.query<{ id: string }>("SELECT id FROM orgs WHERE slug = $1", ["default"]);
+  if (rows.length === 0) {
+    const id = crypto.randomUUID();
+    await db.query(
+      "INSERT INTO orgs (id, slug, name) VALUES ($1, $2, $3)",
+      [id, "default", "Local"],
+    );
+  }
 }
 
 /**

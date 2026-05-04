@@ -1,20 +1,4 @@
--- Notifications inbox + saved searches + audit helpers
-
-CREATE TABLE IF NOT EXISTS notifications (
-  id text PRIMARY KEY,
-  org_id text NOT NULL REFERENCES orgs(id),
-  recipient text NOT NULL,
-  event_id text REFERENCES events(id),
-  subject_kind text NOT NULL,
-  subject_id text NOT NULL,
-  verb text NOT NULL,
-  actor text NOT NULL,
-  read_at timestamptz,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS notifications_recipient_idx
-  ON notifications (org_id, recipient, read_at, created_at DESC);
+-- Saved searches (inbox_audit supplement — notifications table owned by 0004_notifications.sql)
 
 CREATE TABLE IF NOT EXISTS saved_searches (
   id text PRIMARY KEY,
