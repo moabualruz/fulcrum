@@ -429,28 +429,14 @@ async function probeMcpInitialize(
   }
 }
 
-async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: DoctorReport; errors: number }> {
+async function buildAgentsReport(agentsList: AgentDir[]): Promise<{ agents: DoctorReport["agents"]; warnings: number }> {
   let warnings = 0;
-  let errors = 0;
-  const warningsList: DoctorReport["warningsList"] = [];
-
-  // Bun and platform
-  const bunVersion = Bun.version;
-  const platform = `${process.platform}-${process.arch}`;
-
-  // Agents
-  const agentsList = agentDirs();
-  const agentsReport: DoctorReport["agents"] = [];
+  const agents: DoctorReport["agents"] = [];
   for (const a of agentsList) {
     const dirOk = await exists(a.path);
     const rulesOk = a.rulesFile ? await exists(a.rulesFile) : false;
-
     if (!dirOk) {
-      agentsReport.push({
-        label: a.label,
-        detected: false,
-        rulesSpliced: false,
-      });
+      agents.push({ label: a.label, detected: false, rulesSpliced: false });
       continue;
     }
 
@@ -459,148 +445,256 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       try {
         const text = await Bun.file(a.rulesFile).text();
         rulesSpliced = text.includes("BEGIN FULCRUM RULES");
-        if (!rulesSpliced) warnings++;
+        if (!rulesSpliced) warnings += 1;
       } catch { /* unreadable, ignore */ }
     } else if (a.rulesFile) {
-      warnings++;
+      warnings += 1;
     }
-
-    agentsReport.push({
-      label: a.label,
-      detected: dirOk,
-      rulesSpliced,
-    });
+    agents.push({ label: a.label, detected: dirOk, rulesSpliced });
   }
+  return { agents, warnings };
+}
 
-  // Tools
-  const toolsReport: DoctorReport["tools"] = [];
+async function buildToolsReport(): Promise<{ tools: DoctorReport["tools"]; errors: number }> {
+  let errors = 0;
+  const tools: DoctorReport["tools"] = [];
   for (const t of TOOLS) {
     const path = await which(t.cmd);
-    toolsReport.push({
-      cmd: t.cmd,
-      path: path ?? null,
-      present: path !== null,
-      usedBy: t.usedBy,
-    });
-    if (!path && t.required) {
-      errors++;
-    }
+    tools.push({ cmd: t.cmd, path: path ?? null, present: path !== null, usedBy: t.usedBy });
+    if (!path && t.required) errors += 1;
   }
+  return { tools, errors };
+}
 
-  // Policy
-  const policyFilePath = await policyPath();
-  let policySize: number | null = null;
-  let policyMtime: string | null = null;
-  let policyExists = false;
-
-  if (await exists(policyFilePath)) {
-    policyExists = true;
-    try {
-      const s = await stat(policyFilePath);
-      policySize = s.size;
-      policyMtime = s.mtime.toISOString();
-    } catch { /* ignore */ }
-  } else {
-    warnings++;
+async function buildPolicyReport(): Promise<{ policy: DoctorReport["policy"]; warnings: number }> {
+  const path = await policyPath();
+  if (!(await exists(path))) {
+    return { policy: { path, exists: false, size: null, mtime: null }, warnings: 1 };
   }
+  try {
+    const s = await stat(path);
+    return {
+      policy: { path, exists: true, size: s.size, mtime: s.mtime.toISOString() },
+      warnings: 0,
+    };
+  } catch {
+    return { policy: { path, exists: true, size: null, mtime: null }, warnings: 0 };
+  }
+}
 
-  const policyReport: DoctorReport["policy"] = {
-    path: policyFilePath,
-    exists: policyExists,
-    size: policySize,
-    mtime: policyMtime,
-  };
-
-  // Caveman config + per-agent install detection.
-  // defaultMode resolution: env CAVEMAN_DEFAULT_MODE wins, else config file,
-  // else "" with source "default". Malformed JSON reported with source "malformed".
-  const home = process.env["HOME"] ?? "";
+async function buildCavemanReport(
+  home: string,
+  agentsList: AgentDir[],
+): Promise<DoctorReport["caveman"]> {
   const xdg = process.env["XDG_CONFIG_HOME"];
   const cavemanConfigPath = xdg
     ? `${xdg}/caveman/config.json`
     : `${home}/.config/caveman/config.json`;
-  let cavemanDefaultMode = "";
-  let cavemanSource: "file" | "env" | "default" | "malformed" = "default";
-  let cavemanConfigPathOut = "";
+  let defaultMode = "";
+  let defaultModeSource: DoctorReport["caveman"]["defaultModeSource"] = "default";
+  let configPath = "";
   const envMode = process.env["CAVEMAN_DEFAULT_MODE"];
   if (envMode) {
-    cavemanDefaultMode = envMode;
-    cavemanSource = "env";
+    defaultMode = envMode;
+    defaultModeSource = "env";
   }
   if (await exists(cavemanConfigPath)) {
-    cavemanConfigPathOut = cavemanConfigPath;
-    if (cavemanSource !== "env") {
+    configPath = cavemanConfigPath;
+    if (defaultModeSource !== "env") {
       try {
         const parsed = JSON.parse(await Bun.file(cavemanConfigPath).text());
         if (parsed && typeof parsed === "object" && typeof parsed.defaultMode === "string") {
-          cavemanDefaultMode = parsed.defaultMode;
-          cavemanSource = "file";
+          defaultMode = parsed.defaultMode;
+          defaultModeSource = "file";
         } else {
-          cavemanSource = "malformed";
+          defaultModeSource = "malformed";
         }
       } catch {
-        cavemanSource = "malformed";
+        defaultModeSource = "malformed";
       }
     }
   }
-  const cavemanAgents: DoctorReport["caveman"]["agents"] = [];
+  const agents: DoctorReport["caveman"]["agents"] = [];
   for (const a of agentsList) {
-    const installed = a.cavemanPath ? await exists(a.cavemanPath) : false;
-    cavemanAgents.push({
+    agents.push({
       label: a.label,
-      installed,
+      installed: a.cavemanPath ? await exists(a.cavemanPath) : false,
       activationHookPresent: await cavemanActivationHookPresent(a, home),
     });
   }
+  return { agents, defaultMode, defaultModeSource, configPath };
+}
 
-  // Pi MCP adapter check (informational; not a warning/error if absent)
+async function buildPiMcpAdapterReport(home: string): Promise<DoctorReport["piMcpAdapter"]> {
   const piAgentDir = `${home}/.pi/agent`;
-  let piAdapterPresent = false;
-  let piDeepwikiPresent = false;
-  if (await exists(piAgentDir)) {
-    try {
-      const settingsRaw = await Bun.file(`${piAgentDir}/settings.json`).text();
-      const settings = JSON.parse(settingsRaw);
-      if (settings && typeof settings === "object" && Array.isArray(settings.packages)) {
-        piAdapterPresent = settings.packages.includes("npm:pi-mcp-adapter");
-      }
-    } catch { /* no settings.json or bad JSON */ }
-    try {
-      const mcpRaw = await Bun.file(`${piAgentDir}/mcp.json`).text();
-      const mcp = JSON.parse(mcpRaw);
-      if (mcp && typeof mcp === "object" && mcp.mcpServers && typeof mcp.mcpServers === "object") {
-        piDeepwikiPresent = "deepwiki" in (mcp.mcpServers as Record<string, unknown>);
-      }
-    } catch { /* no mcp.json or bad JSON */ }
-  }
+  let adapterPresent = false;
+  let deepwikiPresent = false;
+  if (!(await exists(piAgentDir))) return { adapterPresent, deepwikiPresent };
+  try {
+    const settings = JSON.parse(await Bun.file(`${piAgentDir}/settings.json`).text());
+    if (settings && typeof settings === "object" && Array.isArray(settings.packages)) {
+      adapterPresent = settings.packages.includes("npm:pi-mcp-adapter");
+    }
+  } catch { /* no settings.json or bad JSON */ }
+  try {
+    const mcp = JSON.parse(await Bun.file(`${piAgentDir}/mcp.json`).text());
+    if (mcp && typeof mcp === "object" && mcp.mcpServers && typeof mcp.mcpServers === "object") {
+      deepwikiPresent = "deepwiki" in (mcp.mcpServers as Record<string, unknown>);
+    }
+  } catch { /* no mcp.json or bad JSON */ }
+  return { adapterPresent, deepwikiPresent };
+}
 
-  // Skills
+async function countInstalledComponents(): Promise<number> {
+  const database = componentLedgerPath();
+  if (!(await exists(database))) return 0;
+  const ledger = ComponentLedger.open(database);
+  try {
+    return ALL_COMPONENTS.filter((component) => ledger.componentStatus(component.id)?.status === "installed").length;
+  } finally {
+    ledger.close();
+  }
+}
+
+async function buildMemoryEngineReport(
+  productKernel: DoctorReport["productKernel"],
+): Promise<{ memoryEngine: MemoryDoctorReport; warnings: number; errors: number }> {
+  let db: import("../product-kernel/db/types.ts").ProductDb | null = null;
+  if (productKernel.engine === "pglite" && !productKernel.error) {
+    try {
+      const { openPglite } = await import("../product-kernel/db/pglite.ts");
+      db = await openPglite(productKernel.dbPath);
+    } catch { /* use null db */ }
+  } else {
+    try {
+      const { mkdtemp } = await import("node:fs/promises");
+      const { tmpdir } = await import("node:os");
+      const { join } = await import("node:path");
+      const { openPglite } = await import("../product-kernel/db/pglite.ts");
+      const { runMigrations } = await import("../product-kernel/db/migrate.ts");
+      db = await openPglite(join(await mkdtemp(join(tmpdir(), "fulcrum-doctor-memory-")), "db"));
+      await runMigrations(db);
+    } catch { /* use null db */ }
+  }
+  const memoryEngine = await runMemoryDoctorChecks(db);
+  if (db) {
+    try { await db.close(); } catch { /* ignore */ }
+  }
+  let warnings = 0;
+  let errors = 0;
+  for (const check of memoryEngine.checks) {
+    if (check.status === "error") errors += 1;
+    else if (check.status === "warning") warnings += 1;
+  }
+  return { memoryEngine, warnings, errors };
+}
+
+async function buildPlatformReport(): Promise<{ platformChecks: PlatformDoctorCheck[]; warnings: number; errors: number }> {
+  const platformChecks = await runPlatformDoctorChecks();
+  let warnings = 0;
+  let errors = 0;
+  for (const check of platformChecks) {
+    if (check.status === "fail") errors += 1;
+    else if (check.status === "warn") warnings += 1;
+  }
+  return { platformChecks, warnings, errors };
+}
+
+async function checkServerReachable(server: { transport: "http" | "stdio"; url?: string; command?: string }): Promise<boolean | null> {
+  if (server.transport === "http" && server.url) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3000);
+      const res = await fetch(server.url, { method: "HEAD", signal: ctrl.signal });
+      clearTimeout(timer);
+      return res.ok || res.status < 500;
+    } catch {
+      return false;
+    }
+  }
+  if (server.transport === "stdio" && server.command) {
+    const cmd = server.command.split(/\s+/)[0] ?? "";
+    return cmd === "npx" ? true : !!(await which(cmd));
+  }
+  return null;
+}
+
+async function buildMcpReport(home: string, opts: { probe?: boolean }): Promise<{ mcp: DoctorReport["mcp"]; warnings: number }> {
+  let warnings = 0;
+  const mcp: DoctorReport["mcp"] = { servers: [] };
+  try {
+    const reg = await loadRegistry();
+    for (const server of Object.values(reg.servers)) {
+      const reachable = await checkServerReachable(server);
+      const agentState: Record<string, "enabled" | "disabled" | "hidden"> = {};
+      for (const id of ALL_AGENT_IDS) {
+        agentState[id] = !server.agent_visibility[id] ? "hidden" : isEnabled(server, id) ? "enabled" : "disabled";
+      }
+      const enabledAgents = Object.entries(agentState).filter(([, v]) => v === "enabled").map(([k]) => k as AgentId);
+      const drift = !server.default_enabled && !(MINIMAL_DEFAULT_MCPS as readonly string[]).includes(server.name) && enabledAgents.length > 0;
+      if (drift) warnings += 1;
+
+      const optionalAuth = server.name === "context7";
+      const auth_status = server.auth_env_vars.length > 0 && enabledAgents.length > 0 && !optionalAuth
+        ? server.auth_env_vars.every((v) => !!process.env[v]) ? "ok" : "missing-env"
+        : "n/a";
+      const wiring: Record<string, "ok" | "missing" | "n/a"> = {};
+      const needsAuth = server.transport === "http" && server.auth_env_vars.length > 0 && !optionalAuth;
+      for (const id of ALL_AGENT_IDS) {
+        if (!needsAuth || agentState[id] !== "enabled") { wiring[id] = "n/a"; continue; }
+        wiring[id] = (await checkMcpAuthWiring(home, id, server.name)) ? "ok" : "missing";
+        if (wiring[id] === "missing") warnings += 1;
+      }
+
+      let handshake: "ok" | "fail" | "skipped" = "skipped";
+      let handshake_error: string | undefined;
+      if (opts.probe) {
+        const res = await probeMcpInitialize(server);
+        handshake = res.ok ? "ok" : "fail";
+        if (!res.ok) { handshake_error = res.error; warnings += 1; }
+      }
+      mcp.servers.push({
+        name: server.name,
+        transport: server.transport,
+        vendor: server.vendor,
+        default_enabled: server.default_enabled,
+        agent_state: agentState,
+        auth_status,
+        reachable,
+        drift,
+        wiring,
+        handshake,
+        ...(handshake_error ? { handshake_error } : {}),
+      });
+    }
+  } catch { /* Registry not yet initialised — no entries to report */ }
+  return { mcp, warnings };
+}
+
+async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: DoctorReport; errors: number }> {
+  const bunVersion = Bun.version;
+  const platform = `${process.platform}-${process.arch}`;
+  const home = process.env["HOME"] ?? "";
+  let warnings = 0;
+  let errors = 0;
+  const warningsList: DoctorReport["warningsList"] = [];
+  const agentsList = agentDirs();
+  const agentsBuilt = await buildAgentsReport(agentsList);
+  const toolsBuilt = await buildToolsReport();
+  const policyBuilt = await buildPolicyReport();
+  warnings += agentsBuilt.warnings + policyBuilt.warnings;
+  errors += toolsBuilt.errors;
+  const caveman = await buildCavemanReport(home, agentsList);
+  const piMcpAdapter = await buildPiMcpAdapterReport(home);
   const skillsCount = await countSkills();
   const skillBudget = await scanSkillBudgets(home);
   for (const agent of skillBudget.agents) {
     if (agent.overThreshold) warnings += 1;
   }
-
-  // Ignored project-local agent worktrees are easy to miss during release and
-  // package hygiene checks because `.claude/` is ignored in this repo.
   const worktrees = await scanProjectLocalWorktrees();
   if (worktrees.projectLocalIgnoredRoots.length > 0) warnings += worktrees.projectLocalIgnoredRoots.length;
-
-  // Component lifecycle ledger
   const componentDatabase = componentLedgerPath();
-  let installedComponents = 0;
-  if (await exists(componentDatabase)) {
-    const ledger = ComponentLedger.open(componentDatabase);
-    try {
-      for (const component of ALL_COMPONENTS) {
-        if (ledger.componentStatus(component.id)?.status === "installed") {
-          installedComponents += 1;
-        }
-      }
-    } finally {
-      ledger.close();
-    }
-  }
+  const installedComponents = await countInstalledComponents();
   const packageParity = await buildPackageParityReport(home);
   const productKernel = await buildProductKernelReport();
   if (productKernel.error) {
@@ -614,150 +708,26 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
   if (repos.syncErrors > 0 || repos.mirrorDiskGb > 10) {
     errors += 1;
   }
-
-  // Memory engine subsystem checks (Pillar 8)
-  let memoryEngineDb: import("../product-kernel/db/types.ts").ProductDb | null = null;
-  if (productKernel.engine === "pglite" && !productKernel.error) {
-    try {
-      const { openPglite } = await import("../product-kernel/db/pglite.ts");
-      memoryEngineDb = await openPglite(productKernel.dbPath);
-    } catch { /* use null db */ }
-  } else {
-    try {
-      const { mkdtemp } = await import("node:fs/promises");
-      const { tmpdir } = await import("node:os");
-      const { join } = await import("node:path");
-      const { openPglite } = await import("../product-kernel/db/pglite.ts");
-      const { runMigrations } = await import("../product-kernel/db/migrate.ts");
-      memoryEngineDb = await openPglite(join(await mkdtemp(join(tmpdir(), "fulcrum-doctor-memory-")), "db"));
-      await runMigrations(memoryEngineDb);
-    } catch { /* use null db */ }
-  }
-  const memoryEngine = await runMemoryDoctorChecks(memoryEngineDb);
-  if (memoryEngineDb) {
-    try { await memoryEngineDb.close(); } catch { /* ignore */ }
-  }
-  for (const check of memoryEngine.checks) {
-    if (check.status === "error") errors += 1;
-    else if (check.status === "warning") warnings += 1;
-  }
-
-  const platformChecks = await runPlatformDoctorChecks();
-  for (const check of platformChecks) {
-    if (check.status === "fail") errors += 1;
-    else if (check.status === "warn") warnings += 1;
-  }
-
-  // Managed MCPs
-  const mcpReport: DoctorReport["mcp"] = { servers: [] };
-  try {
-    const reg = await loadRegistry();
-    for (const server of Object.values(reg.servers)) {
-      // Reachability (HEAD probe for HTTP servers; which check for stdio)
-      let reachable: boolean | null = null;
-      if (server.transport === "http" && server.url) {
-        try {
-          const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 3000);
-          const res = await fetch(server.url, { method: "HEAD", signal: ctrl.signal });
-          clearTimeout(timer);
-          reachable = res.ok || res.status < 500;
-        } catch {
-          reachable = false;
-        }
-      } else if (server.transport === "stdio" && server.command) {
-        const cmd = server.command.split(/\s+/)[0] ?? "";
-        reachable = cmd === "npx" ? true : !!(await which(cmd));
-      }
-
-      const agentState: Record<string, "enabled" | "disabled" | "hidden"> = {};
-      for (const id of ALL_AGENT_IDS) {
-        agentState[id] = !server.agent_visibility[id] ? "hidden" : isEnabled(server, id) ? "enabled" : "disabled";
-      }
-
-      // Drift: registry says default-disabled but some agent has it enabled.
-      // Package MCPs stay disabled by default when CLI/skill surfaces cover
-      // the same job; explicit enables are still visible here as opt-in drift.
-      const enabledAgents = Object.entries(agentState)
-        .filter(([, v]) => v === "enabled")
-        .map(([k]) => k as AgentId);
-      const isMinimalDefault = (MINIMAL_DEFAULT_MCPS as readonly string[]).includes(server.name);
-      const drift = !server.default_enabled && !isMinimalDefault && enabledAgents.length > 0;
-      if (drift) warnings += 1;
-
-      // Auth status: missing env matters only for enabled servers that require
-      // auth. Context7 declares an optional key for higher limits, but works
-      // keyless, so absence is not a failure.
-      let authStatus: "ok" | "missing-env" | "n/a" = "n/a";
-      const optionalAuth = server.name === "context7";
-      if (server.auth_env_vars.length > 0 && enabledAgents.length > 0 && !optionalAuth) {
-        const allPresent = server.auth_env_vars.every((v) => !!process.env[v]);
-        authStatus = allPresent ? "ok" : "missing-env";
-      }
-
-      // Auth wiring: only meaningful for HTTP servers with declared auth.
-      const wiring: Record<string, "ok" | "missing" | "n/a"> = {};
-      const needsAuth = server.transport === "http" && server.auth_env_vars.length > 0 && !optionalAuth;
-      for (const id of ALL_AGENT_IDS) {
-        if (!needsAuth) { wiring[id] = "n/a"; continue; }
-        if (agentState[id] !== "enabled") { wiring[id] = "n/a"; continue; }
-        wiring[id] = (await checkMcpAuthWiring(home, id, server.name)) ? "ok" : "missing";
-        if (wiring[id] === "missing") warnings += 1;
-      }
-
-      // Optional MCP `initialize` handshake. Only fired when caller passed
-      // `--probe`. Stdio MCPs are spawned once per server (not per agent —
-      // the binary is the same); HTTP MCPs are POSTed once per server.
-      let handshake: "ok" | "fail" | "skipped" = "skipped";
-      let handshakeError: string | undefined;
-      if (opts.probe) {
-        const res = await probeMcpInitialize(server);
-        handshake = res.ok ? "ok" : "fail";
-        if (!res.ok) {
-          handshakeError = res.error;
-          warnings += 1;
-        }
-      }
-
-      mcpReport.servers.push({
-        name: server.name,
-        transport: server.transport,
-        vendor: server.vendor,
-        default_enabled: server.default_enabled,
-        agent_state: agentState,
-        auth_status: authStatus,
-        reachable,
-        drift,
-        wiring,
-        handshake,
-        ...(handshakeError ? { handshake_error: handshakeError } : {}),
-      });
-    }
-  } catch {
-    // Registry not yet initialised — no entries to report
-  }
-
-  // Verdict
+  const memoryBuilt = await buildMemoryEngineReport(productKernel);
+  warnings += memoryBuilt.warnings;
+  errors += memoryBuilt.errors;
+  const platformBuilt = await buildPlatformReport();
+  warnings += platformBuilt.warnings;
+  errors += platformBuilt.errors;
+  const mcpBuilt = await buildMcpReport(home, opts);
+  warnings += mcpBuilt.warnings;
   const verdict: "ok" | "warning" | "error" =
     errors > 0 ? "error" : warnings > 0 ? "warning" : "ok";
 
   const report: DoctorReport = {
     bun: bunVersion,
     platform,
-    agents: agentsReport,
-    caveman: {
-      agents: cavemanAgents,
-      defaultMode: cavemanDefaultMode,
-      defaultModeSource: cavemanSource,
-      configPath: cavemanConfigPathOut,
-    },
-    tools: toolsReport,
-    policy: policyReport,
-    piMcpAdapter: {
-      adapterPresent: piAdapterPresent,
-      deepwikiPresent: piDeepwikiPresent,
-    },
-    mcp: mcpReport,
+    agents: agentsBuilt.agents,
+    caveman,
+    tools: toolsBuilt.tools,
+    policy: policyBuilt.policy,
+    piMcpAdapter,
+    mcp: mcpBuilt.mcp,
     components: {
       total: ALL_COMPONENTS.length,
       installed: installedComponents,
@@ -766,12 +736,12 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
     },
     productKernel,
     repos,
-    memoryEngine,
-    platformChecks,
-    memoriesSchema: memoryEngine.checks.find((check) => check.name === "memories_schema")
+    memoryEngine: memoryBuilt.memoryEngine,
+    platformChecks: platformBuilt.platformChecks,
+    memoriesSchema: memoryBuilt.memoryEngine.checks.find((check) => check.name === "memories_schema")
       ? {
           subsystem: "memories_schema",
-          ok: memoryEngine.checks.find((check) => check.name === "memories_schema")!.status === "ok",
+          ok: memoryBuilt.memoryEngine.checks.find((check) => check.name === "memories_schema")!.status === "ok",
         }
       : undefined,
     worktrees,
