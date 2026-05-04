@@ -7,6 +7,7 @@ import {
   KNOWN_FLAGS,
   type FeatureFlag,
 } from "./feature-flags.ts";
+import { isEnvFeatureEnabled } from "../flags/registry.ts";
 
 describe("feature-flags", () => {
   const origEnv = process.env["FULCRUM_FEATURES"];
@@ -64,6 +65,11 @@ describe("feature-flags", () => {
     test("returns false when env unset", () => {
       delete process.env["FULCRUM_FEATURES"];
       expect(isFeatureEnabled("experiments")).toBe(false);
+    });
+
+    test("matches canonical registry env bridge for shared flags", () => {
+      process.env["FULCRUM_FEATURES"] = "casbin-policies";
+      expect(isFeatureEnabled("casbin-policies")).toBe(isEnvFeatureEnabled("casbin-policies"));
     });
   });
 

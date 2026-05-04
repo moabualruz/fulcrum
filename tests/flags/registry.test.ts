@@ -25,6 +25,7 @@ import {
   FlagRegistry,
   FEATURE_FLAGS,
   FLAG_DESCRIPTIONS,
+  isEnvFeatureEnabled,
   type FeatureFlagName,
 } from "../../src/flags/registry.ts";
 
@@ -156,6 +157,14 @@ describe("FlagRegistry.isEnabled — env var", () => {
     registry.clearCache();
     expect(await registry.isEnabled("router-llm")).toBe(true);
     expect(await registry.isEnabled("embeddings")).toBe(true);
+  });
+});
+
+describe("canonical env feature flag bridge", () => {
+  it("returns stable booleans for registered flags", () => {
+    process.env["FULCRUM_FEATURES"] = "casbin-policies";
+    expect(isEnvFeatureEnabled("casbin-policies")).toBe(true);
+    expect(isEnvFeatureEnabled("public-api")).toBe(false);
   });
 });
 

@@ -46,6 +46,9 @@ import { CasbinRule } from "../../../src/db/entities/flags/CasbinRule.ts";
 import { WebhookSubscription } from "../../../src/db/entities/flags/WebhookSubscription.ts";
 import { NotificationRule } from "../../../src/db/entities/flags/NotificationRule.ts";
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 const WELL_KNOWN_ORG_ID = "00000000-0000-0000-0000-000000000001";
 
 let orm: MikroORM;
@@ -165,6 +168,40 @@ const STUBS: StubSpec[] = [
     indexProps: ["org", "entityKind", "entityId"],
   },
 ];
+
+const PRODUCT_KERNEL_INDEX_SPECS = [
+  {
+    tableName: "tenant_settings",
+    indexName: "tenant_settings_org_key_idx",
+    columns: ["org_id", "key"],
+  },
+  {
+    tableName: "metrics_cache",
+    indexName: "metrics_cache_scope_idx",
+    columns: ["org_id", "project_id", "sprint_id", "metric_kind", "snapshot_date"],
+  },
+];
+
+describe("product-kernel tenant-scoped composite indexes", () => {
+  for (const spec of PRODUCT_KERNEL_INDEX_SPECS) {
+    it(`${spec.tableName} has ${spec.indexName} beginning with org_id`, () => {
+      const migrationText = readFileSync(
+        join(process.cwd(), "src/product-kernel/db/migrations/0004_tenant_settings.sql"),
+        "utf8",
+      ) + "\n" + readFileSync(
+        join(process.cwd(), "src/product-kernel/db/migrations/0004_sprints_and_metrics.sql"),
+        "utf8",
+      );
+      const columnsPattern = spec.columns.map((column) => `\\s*${column}\\s*`).join(",");
+      expect(migrationText).toMatch(
+        new RegExp(
+          `CREATE\\s+(?:UNIQUE\\s+)?INDEX\\s+IF\\s+NOT\\s+EXISTS\\s+${spec.indexName}\\s+ON\\s+${spec.tableName}\\s*\\(${columnsPattern}\\)`,
+          "i",
+        ),
+      );
+    });
+  }
+});
 
 for (const spec of STUBS) {
   describe(`Stub entity metadata — ${spec.label}`, () => {

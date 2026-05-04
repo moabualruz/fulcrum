@@ -29,6 +29,13 @@ describe("TenantSettingRepository", () => {
     expect(val).toBeNull();
   });
 
+  it("migration schema includes repository-written id column", async () => {
+    const columns = await db.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'tenant_settings'`,
+    );
+    expect(columns.map((row) => row.column_name)).toContain("id");
+  });
+
   it("upsertValue inserts then retrieves", async () => {
     const repo = createTenantSettingRepository(db);
     await repo.upsertValue(orgId, "web.locale", "ar");
