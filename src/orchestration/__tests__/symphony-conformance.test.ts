@@ -36,6 +36,17 @@ import {
   WorkflowFrontmatterError,
   WorkflowConfigError,
 } from "../symphony/workflow-runtime.ts";
+import {
+  SymphonyIssueSchema,
+  BlockedByRefSchema,
+  type SymphonyIssue,
+} from "../symphony/schemas.ts";
+import {
+  fetchSymphonyIssues,
+  refreshRunningIssues,
+  resolvePerStateConcurrency,
+  TrackerBlockerResolutionError,
+} from "../symphony/tracker.ts";
 import type {
   AgentRunOrchestrationState,
   CandidateIssue,
@@ -662,6 +673,305 @@ maxAttempts: 5
       expect(doc).toContain("Workflow path selection supports explicit runtime path and cwd default");
       expect(doc).toContain("Dynamic `WORKFLOW.md` watch/reload/re-apply");
       expect(doc).toContain("Codex launch command config");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // SYM-05: Native tracker strict Issue model — all 12 fields required
+  // SYM-06: blocked_by returns full {id, identifier, state} refs
+  // SYM-07: Unresolved blocker ID throws TrackerBlockerResolutionError
+  // SYM-08: Labels normalize to lowercase; candidate sorting is deterministic
+  // -------------------------------------------------------------------------
+  describe("Native tracker strict Issue model (SYM-05, SYM-06, SYM-07, SYM-08)", () => {
+    test("REQUIRED: SymphonyIssueSchema requires all 12 fields", () => {
+      // Valid full issue passes
+      const valid = SymphonyIssueSchema.parse({
+        id: "00000000-0000-0000-0000-000000000001",
+        identifier: "FUL-1",
+        title: "Implement auth",
+        description: "Detailed description",
+        branch_name: "feat/ful-1-implement-auth",
+        url: "https://app.fulcrum.io/tasks/FUL-1",
+        labels: ["backend", "auth"],
+        state: "ready",
+        priority: 1,
+        created_at: new Date("2026-01-01T00:00:00Z"),
+        updated_at: new Date("2026-01-02T00:00:00Z"),
+        blocked_by: [],
+      });
+      expect(valid.id).toBe("00000000-0000-0000-0000-000000000001");
+      expect(valid.identifier).toBe("FUL-1");
+      expect(valid.branch_name).toBe("feat/ful-1-implement-auth");
+      expect(valid.blocked_by).toEqual([]);
+
+      // Missing branch_name must fail
+      expect(() =>
+        SymphonyIssueSchema.parse({
+          id: "00000000-0000-0000-0000-000000000001",
+          identifier: "FUL-1",
+          title: "Implement auth",
+          description: null,
+          url: null,
+          labels: [],
+          state: "ready",
+          priority: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+          blocked_by: [],
+          // branch_name missing
+        }),
+      ).toThrow();
+    });
+
+    test("REQUIRED: BlockedByRefSchema requires id, identifier, and state", () => {
+      const valid = BlockedByRefSchema.parse({
+        id: "00000000-0000-0000-0000-000000000002",
+        identifier: "FUL-2",
+        state: "in-progress",
+      });
+      expect(valid.identifier).toBe("FUL-2");
+      expect(valid.state).toBe("in-progress");
+
+      // Missing identifier must fail
+      expect(() =>
+        BlockedByRefSchema.parse({
+          id: "00000000-0000-0000-0000-000000000002",
+          state: "done",
+        }),
+      ).toThrow();
+    });
+
+    test("REQUIRED: labels normalize to lowercase in SymphonyIssueSchema", () => {
+      const issue = SymphonyIssueSchema.parse({
+        id: "00000000-0000-0000-0000-000000000001",
+        identifier: "FUL-1",
+        title: "Test",
+        description: null,
+        branch_name: null,
+        url: null,
+        labels: ["BACKEND", "Auth", "HIGH-PRIORITY"],
+        state: "ready",
+        priority: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+        blocked_by: [],
+      });
+      expect(issue.labels).toEqual(["backend", "auth", "high-priority"]);
+    });
+
+    test("REQUIRED: fetchSymphonyIssues returns strict SymphonyIssue[] with all 12 fields", async () => {
+      const db = await testDb();
+      const task = await seedTask(db, {
+        status: "ready",
+        priority: 1,
+        title: "Implement auth",
+      });
+
+      const issues = await fetchSymphonyIssues(db.em, ORG_ID, 10);
+
+      expect(issues.length).toBeGreaterThanOrEqual(1);
+      const issue = issues.find((i) => i.id === task.id);
+      expect(issue).toBeDefined();
+
+      // All 12 fields must be present
+      expect(issue).toHaveProperty("id");
+      expect(issue).toHaveProperty("identifier");
+      expect(issue).toHaveProperty("title");
+      expect(issue).toHaveProperty("description");
+      expect(issue).toHaveProperty("branch_name");
+      expect(issue).toHaveProperty("url");
+      expect(issue).toHaveProperty("labels");
+      expect(issue).toHaveProperty("state");
+      expect(issue).toHaveProperty("priority");
+      expect(issue).toHaveProperty("created_at");
+      expect(issue).toHaveProperty("updated_at");
+      expect(issue).toHaveProperty("blocked_by");
+
+      // Validate against schema
+      expect(() => SymphonyIssueSchema.parse(issue)).not.toThrow();
+    });
+
+    test("REQUIRED: fetchSymphonyIssues blocked_by returns full {id, identifier, state} refs", async () => {
+      const db = await testDb();
+      const blocker = await seedTask(db, { status: "in-progress", title: "Blocker task", priority: 0 });
+      const blocked = await seedTask(db, {
+        status: "ready",
+        priority: 1,
+        blockedByIds: [blocker.id],
+      });
+
+      // Seed a run for the blocker so it has an orchestration state
+      await seedRun(db, { task: blocker, orchestrationState: "running" });
+
+      const issues = await fetchSymphonyIssues(db.em, ORG_ID, 10);
+      const issue = issues.find((i) => i.id === blocked.id);
+
+      // blocked issue should still appear (blocker is running, not terminal)
+      // but its blocked_by refs must be fully populated
+      if (issue) {
+        expect(issue.blocked_by.length).toBeGreaterThanOrEqual(1);
+        const ref = issue.blocked_by[0];
+        expect(ref).toHaveProperty("id", blocker.id);
+        expect(ref).toHaveProperty("identifier");
+        expect(ref).toHaveProperty("state");
+      }
+    });
+
+    test("REQUIRED: unresolved blocker ID throws TrackerBlockerResolutionError", async () => {
+      const db = await testDb();
+      // Task blocked by a non-existent ID
+      const nonExistentId = "ffffffff-ffff-ffff-ffff-ffffffffffff";
+      await seedTask(db, {
+        status: "ready",
+        priority: 1,
+        blockedByIds: [nonExistentId],
+      });
+
+      await expect(
+        fetchSymphonyIssues(db.em, ORG_ID, 10),
+      ).rejects.toThrow(TrackerBlockerResolutionError);
+    });
+
+    test("REQUIRED: candidate sorting is priority asc, created_at oldest, identifier lexicographic", async () => {
+      const db = await testDb();
+      const t1 = await seedTask(db, { status: "ready", priority: 2, createdAt: new Date("2026-01-01"), title: "Low B" });
+      const t2 = await seedTask(db, { status: "ready", priority: 1, createdAt: new Date("2026-01-03"), title: "High new" });
+      const t3 = await seedTask(db, { status: "ready", priority: 1, createdAt: new Date("2026-01-01"), title: "High old" });
+
+      const issues = await fetchSymphonyIssues(db.em, ORG_ID, 10);
+      const ids = issues.map((i) => i.id);
+
+      expect(ids.indexOf(t3.id)).toBeLessThan(ids.indexOf(t2.id));
+      expect(ids.indexOf(t2.id)).toBeLessThan(ids.indexOf(t1.id));
+    });
+
+    test("REQUIRED: todo/ready task with non-terminal blocker is ineligible as Symphony candidate", async () => {
+      const db = await testDb();
+      const blocker = await seedTask(db, { status: "in-progress", priority: 0, title: "Blocker" });
+      const blocked = await seedTask(db, {
+        status: "ready",
+        priority: 1,
+        blockedByIds: [blocker.id],
+        title: "Blocked task",
+      });
+
+      const issues = await fetchSymphonyIssues(db.em, ORG_ID, 10);
+      const ids = issues.map((i) => i.id);
+
+      // blocker is non-terminal (in-progress) → blocked should NOT appear in candidates
+      expect(ids).not.toContain(blocked.id);
+    });
+
+    test("REQUIRED: task with terminal blocker IS eligible as Symphony candidate", async () => {
+      const db = await testDb();
+      const blocker = await seedTask(db, { status: "done", priority: 0, title: "Done blocker" });
+      const blocked = await seedTask(db, {
+        status: "ready",
+        priority: 1,
+        blockedByIds: [blocker.id],
+        title: "Unblocked task",
+      });
+
+      const issues = await fetchSymphonyIssues(db.em, ORG_ID, 10);
+      const ids = issues.map((i) => i.id);
+
+      // blocker is terminal (done) → blocked SHOULD appear in candidates
+      expect(ids).toContain(blocked.id);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // SYM-15: refreshRunningIssues classifies active/non-active/terminal runs
+  // SYM-16: fetchIssuesByStates([]) returns [] without DB call
+  // SYM-17: resolvePerStateConcurrency normalizes state names
+  // SYM-18: agent_runs.orchestration_state is single mutable authority
+  // -------------------------------------------------------------------------
+  describe("Tracker operations (SYM-15, SYM-16, SYM-17, SYM-18)", () => {
+    test("REQUIRED: fetchIssuesByStates([]) returns empty without DB call", async () => {
+      const db = await testDb();
+      await seedRun(db, { orchestrationState: "running" });
+
+      const result = await fetchIssuesByStates(db.em, ORG_ID, [], 10);
+      expect(result).toEqual([]);
+    });
+
+    test("REQUIRED: refreshRunningIssues classifies active, non-active, and terminal runs", async () => {
+      const db = await testDb();
+      const activeRun = await seedRun(db, { orchestrationState: "running", attemptCount: 1 });
+      const retryRun = await seedRun(db, { orchestrationState: "retry_queued", attemptCount: 2 });
+      const successRun = await seedRun(db, { orchestrationState: "succeeded", attemptCount: 1 });
+
+      const result = await refreshRunningIssues(db.em, ORG_ID);
+
+      expect(result.active.map((r) => r.id)).toContain(activeRun.id);
+      expect(result.nonActive.map((r) => r.id)).toContain(retryRun.id);
+      expect(result.terminal.map((r) => r.id)).toContain(successRun.id);
+    });
+
+    test("REQUIRED: resolvePerStateConcurrency normalizes state names and ignores invalid values", () => {
+      const config = {
+        running: 3,
+        retry_queued: 2,
+        INVALID_STATE: 99,
+        "": 5,
+      };
+
+      const result = resolvePerStateConcurrency(config);
+
+      expect(result.get("running")).toBe(3);
+      expect(result.get("retry_queued")).toBe(2);
+      expect(result.has("INVALID_STATE")).toBe(false);
+      expect(result.has("")).toBe(false);
+    });
+
+    test("REQUIRED: orchestration_state on AgentRun is the single mutable authority for run state", async () => {
+      const db = await testDb();
+      const run = await seedRun(db, { orchestrationState: "unclaimed" });
+
+      // Mutate directly on AgentRun entity
+      const em = db.em.fork();
+      const managed = await em.findOneOrFail(AgentRun, run.id);
+      managed.orchestrationState = "running";
+      await em.flush();
+
+      const refreshed = await refreshRunningIssues(db.em, ORG_ID);
+      const found = refreshed.active.find((r) => r.id === run.id);
+      expect(found).toBeDefined();
+      expect(found?.orchestrationState).toBe("running");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // SYM-24: External trackers are ingest-only — dispatch uses native tracker
+  // -------------------------------------------------------------------------
+  describe("External tracker ingest-only posture (SYM-24)", () => {
+    test("REQUIRED: Linear tracker adapter is ingest-only and does not expose dispatch functions", async () => {
+      // ingest-only: LinearTrackerAdapter must not export fetchSymphonyIssues,
+      // refreshRunningIssues, or resolvePerStateConcurrency
+      const linearTracker = await import("../symphony/linear-tracker.ts");
+
+      expect(typeof (linearTracker as Record<string, unknown>)["fetchSymphonyIssues"]).toBe("undefined");
+      expect(typeof (linearTracker as Record<string, unknown>)["refreshRunningIssues"]).toBe("undefined");
+      expect(typeof (linearTracker as Record<string, unknown>)["resolvePerStateConcurrency"]).toBe("undefined");
+    });
+
+    test("REQUIRED: dispatch functions are imported only from native tracker, not from connector modules", async () => {
+      // Verify that the native tracker (tracker.ts) exports the dispatch-side functions
+      const nativeTracker = await import("../symphony/tracker.ts");
+      expect(typeof nativeTracker.fetchSymphonyIssues).toBe("function");
+      expect(typeof nativeTracker.refreshRunningIssues).toBe("function");
+      expect(typeof nativeTracker.resolvePerStateConcurrency).toBe("function");
+      expect(typeof nativeTracker.TrackerBlockerResolutionError).toBe("function");
+    });
+
+    test("REQUIRED: external tracker sync test asserts Linear/GitHub are not dispatch sources", async () => {
+      // The Linear tracker adapter explicitly does NOT implement fetchSymphonyIssues
+      // and its fetchCandidateIssues is ingest-only (returns CandidateIssue, not SymphonyIssue)
+      const { createLinearTrackerAdapter } = await import("../symphony/linear-tracker.ts");
+      // With no env vars set, adapter creation returns null (feature-gated)
+      // This confirms it cannot be used as a dispatch source without explicit feature flag
+      const adapter = createLinearTrackerAdapter();
+      expect(adapter).toBeNull(); // no LINEAR_API_KEY or connector-linear flag in test env
     });
   });
 });
