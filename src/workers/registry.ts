@@ -62,7 +62,8 @@ export function createWorkerRegistry(): WorkerRegistry {
     async runTask<THelpers = unknown>(name: string, payload: unknown, helpers: THelpers): Promise<void> {
       const task = tasks.get(name);
       if (!task) throw new WorkerTaskNotRegisteredError(name);
-      task.assertPayload(payload);
+      const assertPayload: WorkerPayloadAssertion<unknown> = task.assertPayload;
+      assertPayload(payload);
       await task.handler(payload, helpers);
     },
   };
