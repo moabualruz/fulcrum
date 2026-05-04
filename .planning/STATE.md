@@ -2,26 +2,26 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-last_updated: "2026-05-04T13:06:22.262Z"
+status: Phase complete — ready for verification
+last_updated: "2026-05-04T13:34:22.660Z"
 progress:
   total_phases: 10
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 18
-  completed_plans: 17
-  percent: 94
+  completed_plans: 18
+  percent: 100
 ---
 
 # Planning State
 
 ## Current Position
 
-Phase: 02 (bug-fixes-foundation) — EXECUTING
+Phase: 02 (bug-fixes-foundation) — COMPLETE
 Plan: 8 of 8
 
 - **Phase**: 02-bug-fixes-foundation
 - **Plan**: 8 plans created
-- **Status**: Ready to execute
+- **Status**: Phase complete — ready for verification
 - **Branch**: dev/v1.0
 
 ## Decisions
@@ -48,3 +48,7 @@ Plan: 8 of 8
 - [Phase 02]: Protected tRPC routers use explicit permission metadata as the authorization source of truth; path derivation remains fallback only for migration/test surfaces.
 - [Phase 02]: Local development permission bypass is controlled by the registered trpc-permission-local-dev-bypass feature flag and logs each bypass.
 - [Phase 02]: Default CI now runs a hard trpc:permissions gate before the broad root test suite.
+- [Phase 02-08]: Worker payload assertions run before task handlers and async handler failures propagate.
+- [Phase 02-08]: fulcrum init and auth whoami use the same PGlite resolver path.
+- [Phase 02-08]: Local dev auto-session is excluded from /auth/*; /auth/auto-session keeps the explicit seeded-session redirect.
+- [Phase 02-08]: BUG-17 deferred outside Phase 2 product/runtime execution per D-04.

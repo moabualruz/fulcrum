@@ -74,7 +74,7 @@ Plans:
 - [x] 02-07-PLAN.md — Permission enforcement lint and explicit tRPC resource/action checks (FND-02)
 
 **Wave 3 (blocked on DB, flags, permissions foundations)**
-- [ ] 02-08-PLAN.md — Worker registry and Web/CLI/TUI auth parity; BUG-17 deferral preserved (FND-04, FND-05, BUG-17)
+- [x] 02-08-PLAN.md — Worker registry and Web/CLI/TUI auth parity; BUG-17 deferral preserved (FND-04, FND-05, BUG-17)
 
 Cross-cutting constraints:
 - RED tests/repros are committed before GREEN fixes for every bug where feasible.
