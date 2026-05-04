@@ -68,7 +68,7 @@ Plans:
 - [x] 02-03-PLAN.md — Installer ownership and package/component parity safety (BUG-02, BUG-06, BUG-07, BUG-08, BUG-10, BUG-11, BUG-14)
 
 **Wave 2 (blocked on relevant Wave 1 foundations)**
-- [ ] 02-04-PLAN.md — Byte-stable frontmatter and targeted JSON/TOML config patchers (BUG-05, BUG-13)
+- [x] 02-04-PLAN.md — Byte-stable frontmatter and targeted JSON/TOML config patchers (BUG-05, BUG-13)
 - [ ] 02-05-PLAN.md — Product CLI parser, doctor warnings, complexity hotspots, Cmd+K shortcut (BUG-09, BUG-12, BUG-15, BUG-18)
 - [ ] 02-06-PLAN.md — Tenant settings, migration/index verification, canonical flags (FND-01, FND-03, FND-06, FND-07)
 - [ ] 02-07-PLAN.md — Permission enforcement lint and explicit tRPC resource/action checks (FND-02)

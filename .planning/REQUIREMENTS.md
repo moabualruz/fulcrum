@@ -34,7 +34,7 @@
 - [x] **BUG-02**: Claude plugin uninstall gated by ownership markers (critical — prevents removing user-installed plugins)
 - [ ] **BUG-03**: Web type-check passes with correct `bun:test` type handling
 - [ ] **BUG-04**: Root CI includes web checks (`src/web/**` not excluded from tsconfig)
-- [ ] **BUG-05**: Frontmatter YAML round-trips byte-stable (patcher approach, not parse/stringify)
+- [x] **BUG-05**: Frontmatter YAML round-trips byte-stable (patcher approach, not parse/stringify)
 - [x] **BUG-06**: Claude settings cleanup scoped to Fulcrum-owned keys only
 - [x] **BUG-07**: Claude cache/marketplace removals marker-gated
 - [x] **BUG-08**: Agent install does not auto-invoke Claude CLI plugin commands without confirmation
@@ -42,7 +42,7 @@
 - [x] **BUG-10**: Component status inspects filesystem, not ledger state
 - [x] **BUG-11**: Package parity validates native roots, not over-trusts
 - [ ] **BUG-12**: Doctor increments warnings on product-kernel DB errors
-- [ ] **BUG-13**: JSON/TOML config uses targeted patchers, not whole-file rewrites
+- [x] **BUG-13**: JSON/TOML config uses targeted patchers, not whole-file rewrites
 - [x] **BUG-14**: Vendor mirrors do not overwrite top-level skill/command names
 - [ ] **BUG-15**: Complexity hotspots (CCN 18-59) refactored below CCN 15 threshold
 - [ ] **BUG-16**: cookie@0.6.0 advisory resolved in web lockfile

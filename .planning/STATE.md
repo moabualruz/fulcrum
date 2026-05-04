@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-last_updated: "2026-05-04T11:43:01.579Z"
+last_updated: "2026-05-04T12:03:34.231Z"
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 18
-  completed_plans: 13
-  percent: 72
+  completed_plans: 14
+  percent: 78
 ---
 
 # Planning State
@@ -17,7 +17,7 @@ progress:
 ## Current Position
 
 Phase: 02 (bug-fixes-foundation) — EXECUTING
-Plan: 3 of 8
+Plan: 4 of 8
 
 - **Phase**: 02-bug-fixes-foundation
 - **Plan**: 8 plans created
@@ -37,3 +37,5 @@ Plan: 3 of 8
 - [Phase 02-bug-fixes-foundation]: 02-03: Claude plugin cleanup now requires Fulcrum ownership markers before deleting cache or marketplace surfaces.
 - [Phase 02-bug-fixes-foundation]: 02-03: Component/package lifecycle status now reports filesystem truth alongside ledger state.
 - [Phase 02-bug-fixes-foundation]: 02-03: Loadable package skill mirrors preserve existing non-Fulcrum target skills unless Fulcrum mirror metadata permits replacement.
+- [Phase 02-04]: Targeted patchers preserve unowned bytes instead of reserializing whole files.
+- [Phase 02-04]: Config mutation requires explicit Fulcrum ownership markers before changing existing JSON/TOML keys.
