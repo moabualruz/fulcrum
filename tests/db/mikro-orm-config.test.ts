@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { PGlite } from "@electric-sql/pglite";
 
 import { __resetDefaultOrmForTest, initOrm } from "../../src/db/mikro-orm.config.ts";
+import { resolveDatabaseConfig } from "../../src/config/database.ts";
 
 describe("initOrm", () => {
   afterEach(async () => {
@@ -49,5 +50,42 @@ describe("initOrm", () => {
       await first.close(true);
       await second.close(true);
     }
+  });
+});
+
+describe("resolveDatabaseConfig", () => {
+  test("defaults to PGlite under Fulcrum home", () => {
+    const config = resolveDatabaseConfig({
+      env: { FULCRUM_HOME: "/tmp/fulcrum-home" },
+      config: {},
+    });
+
+    expect(config.backend).toBe("pglite");
+    expect(config.dataDir).toBe("/tmp/fulcrum-home/pglite.data");
+  });
+
+  test("DATABASE_URL selects PostgreSQL when no persisted backend exists", () => {
+    const config = resolveDatabaseConfig({
+      env: { DATABASE_URL: "postgresql://fulcrum:fulcrum@127.0.0.1:5432/fulcrum" },
+      config: {},
+    });
+
+    expect(config.backend).toBe("postgres");
+    expect(config.url).toBe("postgresql://fulcrum:fulcrum@127.0.0.1:5432/fulcrum");
+  });
+
+  test("persisted db.backend can select PostgreSQL", () => {
+    const config = resolveDatabaseConfig({
+      env: {},
+      config: {
+        db: {
+          backend: "postgres",
+          url: "postgres://fulcrum:fulcrum@localhost:5432/fulcrum",
+        },
+      },
+    });
+
+    expect(config.backend).toBe("postgres");
+    expect(config.url).toBe("postgres://fulcrum:fulcrum@localhost:5432/fulcrum");
   });
 });

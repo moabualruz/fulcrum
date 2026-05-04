@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 const BINARY = join(process.cwd(), "dist", "fulcrum");
@@ -63,6 +64,37 @@ describe("fulcrum binary build", () => {
       console.warn(
         `fulcrum binary ${(stat.size / 1024 / 1024).toFixed(1)}MB exceeds 150MB warning threshold`,
       );
+    }
+  });
+
+  test("compiled binary can report DB status with default PGlite backend", async () => {
+    const result = await buildBinary();
+    expect(result.exitCode, result.stderr).toBe(0);
+
+    const home = await mkdtemp(join(tmpdir(), "fulcrum-compiled-db-"));
+    try {
+      const proc = Bun.spawn([BINARY, "db", "status", "--json"], {
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          FULCRUM_HOME: home,
+          DATABASE_URL: "",
+        },
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const [stdout, stderr, exitCode] = await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+        proc.exited,
+      ]);
+
+      expect(`${stdout}\n${stderr}`).not.toContain("/$bunfs/root/pglite.data");
+      expect(`${stdout}\n${stderr}`).not.toContain("Compiled Bun binary cannot use PGlite");
+      expect(exitCode, `${stdout}\n${stderr}`).toBe(0);
+      expect(() => JSON.parse(stdout)).not.toThrow();
+    } finally {
+      await rm(home, { recursive: true, force: true });
     }
   });
 });

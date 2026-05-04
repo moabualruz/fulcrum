@@ -63,6 +63,7 @@ import {
 import { sha256Hex } from "../../src/db/migration-checksums.ts";
 import { dbMigrationVersion, dbCanRunOnCurrentBinary, MAX_KNOWN_MIGRATION_VERSION } from "../../src/db/doctor-checks.ts";
 import { PermissionNotAvailableError } from "../../src/db/db.router.ts";
+import { run as runDbCommand } from "../../src/cli/commands/db.ts";
 
 // All entity classes for the test ORM
 const ALL_ENTITIES = [
@@ -371,6 +372,54 @@ describe("doctor-checks", () => {
     // version 20260501120000 < MAX_KNOWN_MIGRATION_VERSION 20260501140000 → check must PASS.
     expect(result.check).toBe("db.canRunOnCurrentBinary");
     expect(result.status).toBe("pass");
+  });
+});
+
+describe("fulcrum db migration command", () => {
+  it("routes explicit PGlite migration through the db command surface", async () => {
+    const lines: string[] = [];
+    const original = console.log;
+    console.log = (line: unknown) => {
+      lines.push(String(line));
+    };
+    try {
+      await runDbCommand(["migrate", "--backend", "pglite", "--json"], null);
+    } finally {
+      console.log = original;
+    }
+
+    const payload = JSON.parse(lines.join("\n"));
+    expect(payload.backend).toBe("pglite");
+    expect(payload.ok).toBe(true);
+    expect(Array.isArray(payload.applied)).toBe(true);
+    expect(Array.isArray(payload.pending)).toBe(true);
+  });
+
+  it("routes explicit PostgreSQL migration through the db command surface", async () => {
+    const lines: string[] = [];
+    const original = console.log;
+    console.log = (line: unknown) => {
+      lines.push(String(line));
+    };
+    try {
+      await runDbCommand([
+        "migrate",
+        "--backend",
+        "postgres",
+        "--url",
+        "postgresql://fulcrum:fulcrum@127.0.0.1:5432/fulcrum_test",
+        "--json",
+      ], null);
+    } catch (error) {
+      expect(String((error as Error).message)).not.toContain("Database command requires a wired CLI context");
+      return;
+    } finally {
+      console.log = original;
+    }
+
+    const payload = JSON.parse(lines.join("\n"));
+    expect(payload.backend).toBe("postgres");
+    expect(payload.ok).toBe(true);
   });
 });
 
