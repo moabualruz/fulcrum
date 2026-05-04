@@ -4,7 +4,7 @@
  */
 
 import type { EntityManager } from "@mikro-orm/postgresql";
-import { appendEventOrm } from "./orm-helpers.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 
 export type TaskStatus =
   | "pending"
@@ -54,7 +54,7 @@ export async function createTaskAction(
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [id, input.orgId, input.projectId, input.title, input.description ?? null, status, priority],
   );
-  await appendEventOrm(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: input.orgId,
     projectId: input.projectId,
     actor: "system",
@@ -104,7 +104,7 @@ export async function updateTaskAction(
   );
   const row = rows[0];
   if (!row) throw new Error(`updateTaskAction: task not found: ${input.id}`);
-  await appendEventOrm(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: row.org_id,
     projectId: row.project_id,
     actor: "system",
@@ -127,7 +127,7 @@ export async function deleteTaskAction(
   );
   const row = rows[0];
   if (row) {
-    await appendEventOrm(em, {
+    await eventDispatcher.dispatch(em, {
       orgId: row.org_id,
       projectId: row.project_id,
       actor: "system",
@@ -155,7 +155,7 @@ export async function moveTaskStatusAction(
   if (!row) {
     throw new Error(`status conflict: task ${input.id} not in ${input.from}`);
   }
-  await appendEventOrm(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: row.org_id,
     projectId: row.project_id,
     actor: "system",

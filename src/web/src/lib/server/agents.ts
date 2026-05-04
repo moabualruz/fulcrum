@@ -5,7 +5,7 @@
 
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
-import { appendEventOrm } from "./orm-helpers.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 
 export interface AgentProfileRow {
   id: string;
@@ -77,7 +77,7 @@ export async function testProfileAction(
     [passed, profileId, orgId],
   );
 
-  await appendEventOrm(em, {
+  await eventDispatcher.dispatch(em, {
     orgId,
     actor: "system",
     subjectKind: "agent_profile",

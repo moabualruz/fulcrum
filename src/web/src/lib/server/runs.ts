@@ -5,7 +5,8 @@
 
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
-import { appendEventOrm, enqueueJobOrm } from "./orm-helpers.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
+import { enqueueJobOrm } from "./orm-helpers.ts";
 
 export type RunStatus =
   | "queued"
@@ -66,7 +67,7 @@ export async function dispatchRunAction(
     payload: { run_id: id },
   });
 
-  await appendEventOrm(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: input.orgId,
     projectId: input.projectId ?? null,
     actor: "system",
@@ -94,7 +95,7 @@ export async function cancelRunAction(
   );
   const row = rows[0];
   if (row) {
-    await appendEventOrm(em, {
+    await eventDispatcher.dispatch(em, {
       orgId: row.org_id,
       projectId: row.project_id,
       actor: "system",
@@ -144,7 +145,7 @@ export async function retryRunAction(
     payload: { run_id: newId },
   });
 
-  await appendEventOrm(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: source.org_id,
     projectId: source.project_id,
     actor: "system",

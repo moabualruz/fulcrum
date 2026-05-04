@@ -14,6 +14,7 @@ import { newUlid } from "../ids.ts";
 import { Org } from "../../db/entities/auth/Org.ts";
 import { Sprint, type MetricsSnapshot } from "../../db/entities/tasks/Sprint.ts";
 import { Event } from "../../db/entities/core/Event.ts";
+import { eventDispatcher } from "../event-dispatcher.ts";
 
 /**
  * Database handle — accepts either MikroORM EntityManager (preferred)
@@ -250,7 +251,7 @@ export async function createProject(
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [id, input.orgId, input.slug, input.name, input.description ?? null, now, now],
   );
-  await appendEvent(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: input.orgId,
     projectId: id,
     actor: "system",
@@ -302,7 +303,7 @@ export async function createTask(
     [id, input.orgId, input.projectId ?? null, input.parentId ?? null, input.title, input.description ?? null, status, priority, now, now],
   );
 
-  await appendEvent(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: input.orgId,
     projectId: input.projectId ?? null,
     actor: "system",
@@ -394,7 +395,7 @@ export async function createSprint(
   em.persist(sprint);
   await em.flush();
 
-  await appendEvent(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: input.orgId,
     projectId: input.projectId,
     actor: "system",
@@ -475,7 +476,7 @@ export async function addTaskToSprint(
     [sprint.id, input.taskId, orgId, sprint.projectId],
   );
 
-  await appendEvent(em, {
+  await eventDispatcher.dispatch(em, {
     orgId,
     projectId: sprint.projectId,
     actor: "system",
@@ -507,7 +508,7 @@ export async function removeTaskFromSprint(
   );
   if (rows.length === 0) throw new Error(`task not found in sprint: ${input.taskId}`);
 
-  await appendEvent(em, {
+  await eventDispatcher.dispatch(em, {
     orgId,
     projectId: sprint.projectId,
     actor: "system",
@@ -602,7 +603,7 @@ export async function closeSprint(
   await em.flush();
 
   const orgId = typeof sprint.org === "string" ? sprint.org : sprint.org?.id ?? "";
-  const event = await appendEvent(em, {
+  const event = await eventDispatcher.dispatch(em, {
     orgId,
     projectId: sprint.projectId,
     actor: "system",
@@ -739,7 +740,7 @@ export async function updateTask(
   if (rows.length === 0) throw new Error(`task not found: ${input.id}`);
   const task = rawToTaskRow(rows[0]!);
 
-  await appendEvent(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: task.org_id,
     projectId: task.project_id,
     actor: "system",

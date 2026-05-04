@@ -5,7 +5,7 @@
 
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
-import { appendEventOrm } from "./orm-helpers.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 
 export type FieldType = "text" | "number" | "date" | "select" | "multi_select" | "checkbox";
 
@@ -74,7 +74,7 @@ export async function createCustomField(
       nextOrder,
     ],
   );
-  await appendEventOrm(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: input.orgId,
     projectId: input.projectId,
     actor: "system",
@@ -117,7 +117,7 @@ export async function updateCustomField(
     params,
   );
   if (!rows[0]) throw new Error(`updateCustomField: not found: ${input.id}`);
-  await appendEventOrm(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: rows[0].org_id,
     projectId: rows[0].project_id,
     actor: "system",
@@ -140,7 +140,7 @@ export async function archiveCustomField(
     [id],
   );
   if (!rows[0]) throw new Error(`archiveCustomField: not found: ${id}`);
-  await appendEventOrm(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: rows[0].org_id,
     projectId: rows[0].project_id,
     actor: "system",

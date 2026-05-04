@@ -5,7 +5,7 @@
 
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
-import { appendEventOrm } from "./orm-helpers.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 
 export interface ProjectConnectorRow {
   id: string;
@@ -56,7 +56,7 @@ export async function upsertProjectConnector(
         params,
       );
     }
-    await appendEventOrm(em, {
+    await eventDispatcher.dispatch(em, {
       orgId: input.orgId,
       projectId: input.projectId,
       actor: "system",
@@ -81,7 +81,7 @@ export async function upsertProjectConnector(
       JSON.stringify(input.config ?? {}),
     ],
   );
-  await appendEventOrm(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: input.orgId,
     projectId: input.projectId,
     actor: "system",
@@ -105,7 +105,7 @@ export async function syncProjectConnector(
   );
   if (!rows[0]) throw new Error(`syncProjectConnector: not found: ${id}`);
   if (!rows[0].enabled) throw new Error(`syncProjectConnector: connector not enabled: ${id}`);
-  await appendEventOrm(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: rows[0].org_id,
     projectId: rows[0].project_id,
     actor: "system",

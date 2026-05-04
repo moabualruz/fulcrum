@@ -5,7 +5,8 @@
 
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { newUlid } from "../../../../product-kernel/ids.ts";
-import { appendEventOrm, indexSearchDocumentOrm } from "./orm-helpers.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
+import { indexSearchDocument } from "../../../../product-kernel/search.ts";
 
 export interface CreateDocumentInput {
   orgId: string;
@@ -53,12 +54,9 @@ export async function createDocumentAction(
      VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)`,
     [id, input.orgId, input.projectId, input.kind, input.title, input.body, JSON.stringify(fm), input.sourcePath ?? null],
   );
-  await appendEventOrm(em, {
-    orgId: input.orgId, projectId: input.projectId,
-    actor: "system", subjectKind: "document", subjectId: id,
-    verb: "created", payload: { title: input.title, kind: input.kind },
-  });
-  await indexSearchDocumentOrm(em, {
+  const ctx = { orgId: input.orgId, projectId: input.projectId, subjectKind: "document", subjectId: id } as const;
+  await eventDispatcher.dispatch(em, { ...ctx, actor: "system", verb: "created", payload: { title: input.title, kind: input.kind } });
+  await indexSearchDocument(em, {
     orgId: input.orgId, projectId: input.projectId, sourceKind: "document", sourceId: id,
     title: input.title, body: input.body, labels: extractLabels(fm),
   });
@@ -97,11 +95,11 @@ export async function updateDocumentAction(
   );
   const row = rows[0];
   if (!row) throw new Error(`updateDocumentAction: document not found: ${input.id}`);
-  await appendEventOrm(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: row.org_id, projectId: row.project_id, actor: "system",
     subjectKind: "document", subjectId: input.id, verb: "updated", payload: { changed },
   });
-  await indexSearchDocumentOrm(em, {
+  await indexSearchDocument(em, {
     orgId: row.org_id, projectId: row.project_id, sourceKind: "document", sourceId: input.id,
     title: row.title, body: row.body, labels: extractLabels(row.frontmatter),
   });
@@ -121,7 +119,7 @@ export async function deleteDocumentAction(em: EntityManager, id: string, orgId:
   );
   const row = rows[0];
   if (row) {
-    await appendEventOrm(em, {
+    await eventDispatcher.dispatch(em, {
       orgId: row.org_id, projectId: row.project_id, actor: "system",
       subjectKind: "document", subjectId: id, verb: "deleted",
     });

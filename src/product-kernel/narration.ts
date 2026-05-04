@@ -1,5 +1,5 @@
 import type { ProductDb } from "./db/types.ts";
-import { appendEvent } from "./store/repositories.ts";
+import { eventDispatcher } from "./event-dispatcher.ts";
 import { getArtifact, updateArtifactMetadata } from "./artifacts.ts";
 
 const NARRATION_PROMPT_TEMPLATE =
@@ -72,7 +72,7 @@ export async function narrateArtifact(
     const isTimeout =
       message.includes("timeout") || message.includes("TIMEOUT") || message.includes("timed out");
 
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(db, {
       orgId: input.orgId,
       projectId: input.projectId ?? null,
       actor: "system",

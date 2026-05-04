@@ -5,7 +5,7 @@
 
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
-import { appendEventOrm } from "./orm-helpers.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 
 export interface ProjectStatusRow {
   id: string;
@@ -51,7 +51,7 @@ export async function createProjectStatus(
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
     [id, input.orgId, input.projectId, input.name, input.color ?? "#6b7280", nextOrder, input.isFinal ?? false],
   );
-  await appendEventOrm(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: input.orgId,
     projectId: input.projectId,
     actor: "system",
@@ -89,7 +89,7 @@ export async function updateProjectStatus(
     params,
   );
   if (!rows[0]) throw new Error(`updateProjectStatus: not found: ${input.id}`);
-  await appendEventOrm(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: rows[0].org_id,
     projectId: rows[0].project_id,
     actor: "system",
@@ -111,7 +111,7 @@ export async function deleteProjectStatus(
     [id],
   );
   if (rows[0]) {
-    await appendEventOrm(em, {
+    await eventDispatcher.dispatch(em, {
       orgId: rows[0].org_id,
       projectId: rows[0].project_id,
       actor: "system",

@@ -1,5 +1,6 @@
 import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { createProject, appendEvent } from "../../../../product-kernel/store/repositories.ts";
+import { createProject } from "../../../../product-kernel/store/repositories.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 
 export interface CreateProjectInput {
   orgId: string;
@@ -55,7 +56,7 @@ export async function updateProjectAction(
   );
   const orgId = rows[0]?.org_id;
   if (!orgId) throw new Error(`updateProjectAction: project not found: ${input.id}`);
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId,
     projectId: input.id,
     actor: "system",
@@ -84,7 +85,7 @@ export async function deleteProjectAction(
     [id, orgId],
   );
   if (rows.length > 0) {
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(db, {
       orgId,
       projectId: null,
       actor: "system",

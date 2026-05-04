@@ -5,7 +5,7 @@
 
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
-import { appendEventOrm } from "./orm-helpers.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 
 export type ViewScope = "org" | "project" | "private";
 
@@ -80,7 +80,7 @@ export async function createSavedView(
       input.isDefault ?? false,
     ],
   );
-  await appendEventOrm(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: input.orgId,
     projectId: input.projectId,
     actor: "system",
@@ -142,7 +142,7 @@ export async function updateSavedView(
     params,
   );
   if (!rows[0]) throw new Error(`updateSavedView: not found: ${input.id}`);
-  await appendEventOrm(em, {
+  await eventDispatcher.dispatch(em, {
     orgId: rows[0].org_id,
     projectId: rows[0].project_id,
     actor: "system",
@@ -164,7 +164,7 @@ export async function deleteSavedView(
     [id],
   );
   if (rows[0]) {
-    await appendEventOrm(em, {
+    await eventDispatcher.dispatch(em, {
       orgId: rows[0].org_id,
       projectId: rows[0].project_id,
       actor: "system",
