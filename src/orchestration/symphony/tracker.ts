@@ -15,6 +15,7 @@ import {
   AgentRunIssueListSchema,
   AgentRunIssueSchema,
   AgentRunOrchestrationStateSchema,
+  BlockedByRefSchema,
   CandidateIssueSchema,
   CandidateIssueListSchema,
   FetchCandidateIssuesInputSchema,
@@ -23,11 +24,14 @@ import {
   IssueStateSchema,
   IssueStateListSchema,
   READY_TASK_STATUS,
+  SymphonyIssueSchema,
   TrackerTaskSchema,
   type AgentRunIssue,
   type AgentRunOrchestrationState,
+  type BlockedByRef,
   type CandidateIssue,
   type IssueState,
+  type SymphonyIssue,
   type TrackerTask,
 } from "./schemas.ts";
 
@@ -35,6 +39,7 @@ export {
   AgentRunIssueListSchema,
   AgentRunIssueSchema,
   AgentRunOrchestrationStateSchema,
+  BlockedByRefSchema,
   CandidateIssueSchema,
   CandidateIssueListSchema,
   FetchCandidateIssuesInputSchema,
@@ -43,9 +48,34 @@ export {
   IssueStateSchema,
   IssueStateListSchema,
   READY_TASK_STATUS,
+  SymphonyIssueSchema,
   TrackerTaskSchema,
 } from "./schemas.ts";
-export type { AgentRunIssue, CandidateIssue, IssueState, TrackerTask } from "./schemas.ts";
+export type {
+  AgentRunIssue,
+  BlockedByRef,
+  CandidateIssue,
+  IssueState,
+  SymphonyIssue,
+  TrackerTask,
+} from "./schemas.ts";
+
+// ---------------------------------------------------------------------------
+// TrackerBlockerResolutionError (SYM-07)
+// Thrown when a blocker ID referenced by a task cannot be found in org scope.
+// ---------------------------------------------------------------------------
+
+export class TrackerBlockerResolutionError extends Error {
+  constructor(
+    public readonly taskId: string,
+    public readonly unresolvedBlockerIds: string[],
+  ) {
+    super(
+      `TrackerBlockerResolutionError: task ${taskId} references blocker IDs that could not be resolved: ${unresolvedBlockerIds.join(", ")}`,
+    );
+    this.name = "TrackerBlockerResolutionError";
+  }
+}
 
 const RESOLVED_BLOCKER_STATUSES = new Set([
   "closed",
@@ -112,6 +142,77 @@ export async function fetchCandidateIssues(
     .map(toCandidateIssue);
 
   return CandidateIssueListSchema.parse(candidates);
+}
+
+/**
+ * Strict Symphony issue fetch — returns full 12-field SymphonyIssue[] (SYM-05).
+ *
+ * - Resolves all blocker IDs into full {id, identifier, state} refs (SYM-06).
+ * - Throws TrackerBlockerResolutionError if any blocker ID cannot be resolved (SYM-07).
+ * - Labels normalized to lowercase by SymphonyIssueSchema transform (SYM-08).
+ * - Sorting: priority asc, created_at oldest, id lexicographic (SYM-08).
+ * - Tasks blocked by non-terminal blockers are excluded from candidates (SYM-08).
+ * - Tasks blocked by terminal blockers ARE included (SYM-08).
+ */
+export async function fetchSymphonyIssues(
+  em: EntityManager,
+  orgId: string,
+  limit = 50,
+): Promise<SymphonyIssue[]> {
+  const input = FetchCandidateIssuesInputSchema.parse({ orgId, limit });
+  const [{ AgentRun }, { Task }] = await Promise.all([
+    import("../../db/entities/orchestration/AgentRun.ts"),
+    import("../../db/entities/tasks/Task.ts"),
+  ]);
+  const fork = em.fork();
+  const taskRepo = fork.getRepository(Task) as TaskRepository;
+  const agentRunRepo = fork.getRepository(AgentRun) as AgentRunRepository;
+
+  const readyTasks = await buildCandidateIssuesBaseQuery(
+    taskRepo,
+    input.orgId,
+  ).getResultList();
+  if (readyTasks.length === 0) return [];
+
+  const claimedTaskIds = await fetchClaimedTaskIds(
+    agentRunRepo,
+    input.orgId,
+    readyTasks.map((task) => task.id),
+  );
+
+  // Collect all blocker IDs across all ready tasks
+  const allBlockerIds = [
+    ...new Set(readyTasks.flatMap((task) => task.blockedByIds ?? [])),
+  ];
+
+  // Batch-load all blocker tasks to construct full refs
+  const blockerTasksById = await fetchBlockerTasksById(
+    taskRepo,
+    input.orgId,
+    allBlockerIds,
+  );
+
+  // Validate: throw TrackerBlockerResolutionError if any blocker ID is unresolvable
+  for (const task of readyTasks) {
+    const unresolvedIds = (task.blockedByIds ?? []).filter(
+      (id) => !blockerTasksById.has(id),
+    );
+    if (unresolvedIds.length > 0) {
+      throw new TrackerBlockerResolutionError(task.id, unresolvedIds);
+    }
+  }
+
+  const blockerStatusById = new Map(
+    [...blockerTasksById.entries()].map(([id, t]) => [id, t.status]),
+  );
+
+  const candidates = readyTasks
+    .filter((task) => !claimedTaskIds.has(task.id))
+    .filter((task) => blockersResolved(task, blockerStatusById))
+    .slice(0, input.limit)
+    .map((task) => toSymphonyIssue(task, blockerTasksById));
+
+  return candidates.map((issue) => SymphonyIssueSchema.parse(issue));
 }
 
 export async function fetchIssuesByStates(
@@ -299,5 +400,79 @@ function toTrackerTask(task: Task): TrackerTask {
     createdAt: task.createdAt,
     blockedByIds: task.blockedByIds ?? [],
     workflowId: task.workflowId,
+  };
+}
+
+/**
+ * Batch-load blocker tasks by ID for full ref resolution (SYM-06).
+ * Returns a Map<id, Task> for tasks found in org scope.
+ */
+async function fetchBlockerTasksById(
+  taskRepo: TaskRepository,
+  orgId: string,
+  blockerIds: readonly string[],
+): Promise<Map<string, Task>> {
+  if (blockerIds.length === 0) return new Map();
+
+  const blockers = await taskRepo.find({
+    org: orgId,
+    id: { $in: [...blockerIds] },
+  } as never);
+
+  return new Map(blockers.map((task) => [task.id, task]));
+}
+
+/**
+ * Map a Task into the strict Symphony 12-field Issue shape (SYM-05).
+ * - identifier: task.title slug when available, fallback to task.id
+ * - branch_name: derived from identifier slug or null
+ * - url: null (no public URL in local-first Fulcrum v1.0)
+ * - labels: empty array by default (Pillar 6 adds label domain later)
+ * - blocked_by: full {id, identifier, state} refs from blockerTasksById map
+ */
+function toSymphonyIssue(
+  task: Task,
+  blockerTasksById: ReadonlyMap<string, Task>,
+): SymphonyIssue {
+  // Derive a stable identifier: prefer "FUL-<shortId>" pattern using title slug
+  const titleSlug = task.title && task.title !== "Untitled task"
+    ? task.title
+    : task.id;
+  const identifier = task.id; // stable; Pillar 6 will add named identifiers
+
+  // Derive branch_name from title when a meaningful title exists
+  const branchName = task.title && task.title !== "Untitled task"
+    ? `task/${task.id.slice(0, 8)}-${task.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "")
+        .slice(0, 40)}`
+    : null;
+
+  // Resolve blocked_by refs — all blocker IDs already validated as resolvable
+  const blockedBy: BlockedByRef[] = (task.blockedByIds ?? []).map((blockerId) => {
+    const blocker = blockerTasksById.get(blockerId)!;
+    return BlockedByRefSchema.parse({
+      id: blocker.id,
+      identifier: blocker.id, // stable until Pillar 6 named identifiers
+      state: blocker.status ?? "unknown",
+    });
+  });
+
+  void titleSlug; // suppress unused warning — kept for future Pillar 6 identifier derivation
+
+  return {
+    id: task.id,
+    identifier,
+    title: task.title ?? task.id,
+    description: task.description,
+    branch_name: branchName,
+    url: null,
+    labels: [], // Pillar 6 adds label domain; default empty
+    state: task.status ?? READY_TASK_STATUS,
+    priority: task.priority,
+    created_at: task.createdAt,
+    updated_at: task.updatedAt,
+    blocked_by: blockedBy,
   };
 }
