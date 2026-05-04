@@ -8,6 +8,7 @@ import { DocComment } from "../db/entities/docs/DocComment.ts";
 import { DocLink } from "../db/entities/docs/DocLink.ts";
 import { Document } from "../db/entities/docs/Document.ts";
 import { DocVersion } from "../db/entities/docs/DocVersion.ts";
+import type { DocType, Scope } from "../db/entities/docs/enums.ts";
 import { archiveDocIndex, indexDoc, removeDocIndex } from "../docs/search-indexer.ts";
 import { applyNarrationToDoc } from "../docs/llm-narrator.ts";
 import { diffDocVersionsHtml, reconstructDocVersion } from "../docs/version-reconstructor.ts";
@@ -23,8 +24,8 @@ export interface DocOutput {
   slug: string;
   parentId: string | null;
   projectId: string | null;
-  scope: string;
-  docType: string;
+  scope: Scope;
+  docType: DocType;
   frontmatter: Record<string, unknown>;
   bodyMd: string;
   contentJson: Record<string, unknown>;
@@ -32,6 +33,20 @@ export interface DocOutput {
   archived: boolean;
   externalId: string | null;
   updatedAt: Date;
+}
+
+export interface CommentReplyOutput {
+  id: string;
+  orgId: string;
+  docId: string;
+  anchorRange: Record<string, unknown> | null;
+  authorId: string | null;
+  bodyMd: string;
+  parentCommentId: string | null;
+  resolved: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  replies: never[];
 }
 
 export interface CommentOutput {
@@ -45,7 +60,7 @@ export interface CommentOutput {
   resolved: boolean;
   createdAt: Date;
   updatedAt: Date;
-  replies: CommentOutput[];
+  replies: CommentReplyOutput[];
 }
 
 export interface VersionOutput {
@@ -72,8 +87,8 @@ export class DocService {
   // ── Document CRUD ──────────────────────────────────────────────
 
   async list(orgId: string, input?: {
-    scope?: string;
-    docType?: string;
+    scope?: Scope;
+    docType?: DocType;
     archived?: boolean;
     parentId?: string | null;
     limit?: number;
@@ -109,8 +124,8 @@ export class DocService {
     title: string;
     parentId?: string | null;
     projectId?: string | null;
-    scope?: string;
-    docType?: string;
+    scope?: Scope;
+    docType?: DocType;
     frontmatter?: Record<string, unknown>;
     bodyMd?: string;
     contentJson?: Record<string, unknown>;
@@ -146,8 +161,8 @@ export class DocService {
     title?: string;
     parentId?: string | null;
     projectId?: string | null;
-    scope?: string;
-    docType?: string;
+    scope?: Scope;
+    docType?: DocType;
     frontmatter?: Record<string, unknown>;
     bodyMd?: string;
     contentJson?: Record<string, unknown>;
@@ -241,7 +256,7 @@ export class DocService {
 
     return roots.map((c) => serializeComment(
       c,
-      (repliesByParent.get(c.id) ?? []).map((r) => serializeComment(r, [])),
+      (repliesByParent.get(c.id) ?? []).map((r) => serializeCommentReply(r)),
     ));
   }
 
@@ -461,7 +476,23 @@ export function serializeDoc(doc: Document): DocOutput {
   };
 }
 
-function serializeComment(comment: DocComment, replies: CommentOutput[] = []): CommentOutput {
+function serializeCommentReply(comment: DocComment): CommentReplyOutput {
+  return {
+    id: comment.id,
+    orgId: comment.org.id,
+    docId: comment.doc.id,
+    anchorRange: comment.anchorRange,
+    authorId: comment.author?.id ?? null,
+    bodyMd: comment.bodyMd,
+    parentCommentId: comment.parentComment?.id ?? null,
+    resolved: comment.resolved,
+    createdAt: comment.createdAt,
+    updatedAt: comment.updatedAt,
+    replies: [] as never[],
+  };
+}
+
+function serializeComment(comment: DocComment, replies: CommentReplyOutput[] = []): CommentOutput {
   return {
     id: comment.id,
     orgId: comment.org.id,

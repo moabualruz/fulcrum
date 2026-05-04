@@ -16,7 +16,7 @@ export interface SprintOutput {
   goal: string | null;
   startDate: Date;
   endDate: Date;
-  status: string;
+  status: "planned" | "active" | "completed";
   capacityPoints: number | null;
   createdAt: Date;
 }

@@ -35,7 +35,7 @@ describe("EventDispatcher", () => {
       const project = await createProject(db, { orgId: org.id, slug: "p1", name: "P1" });
 
       const received: EventRow[] = [];
-      dispatcher.on((e) => received.push(e));
+      dispatcher.on((e) => { received.push(e); });
 
       const event = await dispatcher.dispatch(db, {
         orgId: org.id,
@@ -69,8 +69,8 @@ describe("EventDispatcher", () => {
 
       const taskEvents: EventRow[] = [];
       const closedEvents: EventRow[] = [];
-      dispatcher.on((e) => taskEvents.push(e), { subjectKind: "task" });
-      dispatcher.on((e) => closedEvents.push(e), { verb: "closed" });
+      dispatcher.on((e) => { taskEvents.push(e); }, { subjectKind: "task" });
+      dispatcher.on((e) => { closedEvents.push(e); }, { verb: "closed" });
 
       await dispatcher.dispatch(db, {
         orgId: org.id,
@@ -103,7 +103,7 @@ describe("EventDispatcher", () => {
       const org = await createLocalOrg(db, { slug: "default", name: "Default" });
 
       const sprintClosed: EventRow[] = [];
-      dispatcher.on((e) => sprintClosed.push(e), { subjectKind: "sprint", verb: "closed" });
+      dispatcher.on((e) => { sprintClosed.push(e); }, { subjectKind: "sprint", verb: "closed" });
 
       await dispatcher.dispatch(db, {
         orgId: org.id,
@@ -141,7 +141,7 @@ describe("EventDispatcher", () => {
       const org = await createLocalOrg(db, { slug: "default", name: "Default" });
 
       const received: EventRow[] = [];
-      const unsub = dispatcher.on((e) => received.push(e));
+      const unsub = dispatcher.on((e) => { received.push(e); });
 
       await dispatcher.dispatch(db, {
         orgId: org.id,
@@ -174,7 +174,7 @@ describe("EventDispatcher", () => {
       const org = await createLocalOrg(db, { slug: "default", name: "Default" });
 
       const received: EventRow[] = [];
-      dispatcher.once((e) => received.push(e));
+      dispatcher.once((e) => { received.push(e); });
 
       await dispatcher.dispatch(db, {
         orgId: org.id,
@@ -207,7 +207,7 @@ describe("EventDispatcher", () => {
       dispatcher.on(() => {
         throw new Error("boom");
       });
-      dispatcher.on((e) => received.push(e));
+      dispatcher.on((e) => { received.push(e); });
 
       await dispatcher.dispatch(db, {
         orgId: org.id,
@@ -243,7 +243,7 @@ describe("EventDispatcher", () => {
     dispatcher = new EventDispatcher();
 
     const received: EventRow[] = [];
-    dispatcher.on((e) => received.push(e));
+    dispatcher.on((e) => { received.push(e); });
 
     const fakeEvent: EventRow = {
       id: "test-id",
