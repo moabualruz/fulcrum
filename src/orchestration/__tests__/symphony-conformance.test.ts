@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -29,6 +29,13 @@ import {
 import { scanForStalledRuns } from "../symphony/stall.ts";
 import { sanitizeWorkspaceKey, workspaceRoot } from "../symphony/workspace.ts";
 import { tick, type TickDeps } from "../symphony/dispatch.ts";
+import {
+  loadWorkflowRuntime,
+  createWorkflowRuntimeReloader,
+  WorkflowNotFoundError,
+  WorkflowFrontmatterError,
+  WorkflowConfigError,
+} from "../symphony/workflow-runtime.ts";
 import type {
   AgentRunOrchestrationState,
   CandidateIssue,
@@ -433,5 +440,228 @@ maxAttempts: 5
       "FUL_14_conformance_test",
     );
     expect(workspaceRoot("")).toContain(join(".fulcrum", "workspaces"));
+  });
+
+  // -------------------------------------------------------------------------
+  // SYM-01: Workflow path selection — explicit path wins over cwd default
+  // SYM-02: Missing default WORKFLOW.md throws WorkflowNotFoundError
+  // -------------------------------------------------------------------------
+  describe("Workflow runtime — path selection (SYM-01, SYM-02)", () => {
+    let tmpDir: string;
+
+    afterEach(async () => {
+      if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    test("REQUIRED: explicit workflowPath wins over cwd default WORKFLOW.md", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      const explicit = join(tmpDir, "custom.md");
+      const body = "---\n---\nHello {{ issue.title }}";
+      await writeFile(explicit, body);
+      // cwd has no WORKFLOW.md — explicit path must be used
+      const runtime = await loadWorkflowRuntime({ workflowPath: explicit, cwd: tmpDir, env: {}, homeDir: "/home/user" });
+      expect(runtime.promptTemplate).toBe("Hello {{ issue.title }}");
+    });
+
+    test("REQUIRED: missing default ./WORKFLOW.md throws WorkflowNotFoundError", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      await expect(loadWorkflowRuntime({ cwd: tmpDir, env: {}, homeDir: "/home/user" }))
+        .rejects.toThrow(WorkflowNotFoundError);
+    });
+
+    test("REQUIRED: invalid explicit workflowPath throws WorkflowNotFoundError", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      await expect(
+        loadWorkflowRuntime({ workflowPath: join(tmpDir, "nonexistent.md"), cwd: tmpDir, env: {}, homeDir: "/home/user" }),
+      ).rejects.toThrow(WorkflowNotFoundError);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // SYM-03: YAML front matter / body split + invalid YAML errors
+  // SYM-04: Front matter non-map throws WorkflowFrontmatterError
+  // -------------------------------------------------------------------------
+  describe("Workflow runtime — front matter parsing (SYM-03, SYM-04)", () => {
+    let tmpDir: string;
+
+    afterEach(async () => {
+      if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    test("REQUIRED: YAML front matter and Markdown body split correctly", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      const wf = join(tmpDir, "WORKFLOW.md");
+      await writeFile(wf, "---\ncodex:\n  command: codex app-server\n---\nWork on {{ issue.title }}");
+      const runtime = await loadWorkflowRuntime({ cwd: tmpDir, env: {}, homeDir: "/home/user" });
+      expect(runtime.promptTemplate).toBe("Work on {{ issue.title }}");
+      expect(runtime.config.codex.command).toBe("codex app-server");
+    });
+
+    test("REQUIRED: no front matter treats entire file as prompt body with empty config", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      const wf = join(tmpDir, "WORKFLOW.md");
+      await writeFile(wf, "Just a prompt with no front matter");
+      const runtime = await loadWorkflowRuntime({ cwd: tmpDir, env: {}, homeDir: "/home/user" });
+      expect(runtime.promptTemplate).toBe("Just a prompt with no front matter");
+    });
+
+    test("REQUIRED: invalid YAML front matter throws WorkflowFrontmatterError", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      const wf = join(tmpDir, "WORKFLOW.md");
+      await writeFile(wf, "---\n: bad: yaml: [\n---\nBody");
+      await expect(loadWorkflowRuntime({ cwd: tmpDir, env: {}, homeDir: "/home/user" }))
+        .rejects.toThrow(WorkflowFrontmatterError);
+    });
+
+    test("REQUIRED: front matter non-map YAML throws WorkflowFrontmatterError", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      const wf = join(tmpDir, "WORKFLOW.md");
+      await writeFile(wf, "---\n- item1\n- item2\n---\nBody");
+      await expect(loadWorkflowRuntime({ cwd: tmpDir, env: {}, homeDir: "/home/user" }))
+        .rejects.toThrow(WorkflowFrontmatterError);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // SYM-14: Codex launch defaults — codex.command = "codex app-server"
+  // SYM-21: $VAR env resolution and ~ expansion
+  // SYM-24: Missing $VAR throws WorkflowConfigError
+  // -------------------------------------------------------------------------
+  describe("Workflow runtime — config defaults and env expansion (SYM-14, SYM-21, SYM-24)", () => {
+    let tmpDir: string;
+
+    afterEach(async () => {
+      if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    test("REQUIRED: default codex.command is 'codex app-server'", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      const wf = join(tmpDir, "WORKFLOW.md");
+      await writeFile(wf, "---\n---\nPrompt");
+      const runtime = await loadWorkflowRuntime({ cwd: tmpDir, env: {}, homeDir: "/home/user" });
+      expect(runtime.config.codex.command).toBe("codex app-server");
+    });
+
+    test("REQUIRED: $VAR env reference is resolved from env", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      const wf = join(tmpDir, "WORKFLOW.md");
+      await writeFile(wf, "---\ntracker:\n  api_key: $LINEAR_API_KEY\n---\nPrompt");
+      const runtime = await loadWorkflowRuntime({
+        cwd: tmpDir,
+        env: { LINEAR_API_KEY: "secret-token" },
+        homeDir: "/home/user",
+      });
+      expect(runtime.config.tracker?.api_key).toBe("secret-token");
+    });
+
+    test("REQUIRED: ~ is expanded to homeDir in path values", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      const wf = join(tmpDir, "WORKFLOW.md");
+      await writeFile(wf, "---\nworkspace:\n  root: ~/workspaces\n---\nPrompt");
+      const runtime = await loadWorkflowRuntime({
+        cwd: tmpDir,
+        env: {},
+        homeDir: "/home/testuser",
+      });
+      expect(runtime.config.workspace?.root).toBe("/home/testuser/workspaces");
+    });
+
+    test("REQUIRED: missing $VAR reference throws WorkflowConfigError", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      const wf = join(tmpDir, "WORKFLOW.md");
+      await writeFile(wf, "---\ntracker:\n  api_key: $MISSING_VAR\n---\nPrompt");
+      await expect(
+        loadWorkflowRuntime({ cwd: tmpDir, env: {}, homeDir: "/home/user" }),
+      ).rejects.toThrow(WorkflowConfigError);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // SYM-26: Unknown prompt variables fail closed (UnknownVariableError)
+  // -------------------------------------------------------------------------
+  describe("Workflow runtime — strict prompt rendering (SYM-26)", () => {
+    let tmpDir: string;
+
+    afterEach(async () => {
+      if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    test("REQUIRED: unknown prompt variables throw UnknownVariableError", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      const wf = join(tmpDir, "WORKFLOW.md");
+      await writeFile(wf, "---\n---\nWork on {{ issue.title }} and {{ missing_var }}");
+      const runtime = await loadWorkflowRuntime({ cwd: tmpDir, env: {}, homeDir: "/home/user" });
+      await expect(
+        renderPrompt(
+          { id: "wf-1", configYaml: "", promptMd: runtime.promptTemplate },
+          { issue: { title: "Task" }, attempt: 1 },
+        ),
+      ).rejects.toThrow(UnknownVariableError);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // SYM-02 / D-07: Invalid reload keeps last good config
+  // -------------------------------------------------------------------------
+  describe("Workflow runtime — reload last-good (SYM-02, D-07)", () => {
+    let tmpDir: string;
+
+    afterEach(async () => {
+      if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    test("REQUIRED: invalid reload keeps last good config and records visible error", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      const wf = join(tmpDir, "WORKFLOW.md");
+      await writeFile(wf, "---\ncodex:\n  command: codex app-server\n---\nGood prompt");
+
+      const reloader = await createWorkflowRuntimeReloader({ workflowPath: wf, cwd: tmpDir, env: {}, homeDir: "/home/user" });
+      const initial = reloader.current();
+      expect(initial.config.codex.command).toBe("codex app-server");
+
+      // Corrupt the file
+      await writeFile(wf, "---\n: bad: yaml: [\n---\nBad");
+      const result = await reloader.reload();
+      expect(result.ok).toBe(false);
+      expect(result.runtime.config.codex.command).toBe("codex app-server");
+      expect(result.error).toBeDefined();
+      expect(result.error?.message).toBeTruthy();
+      expect(result.error?.kind).toBeTruthy();
+      expect(result.error?.workflowPath).toBe(wf);
+    });
+
+    test("REQUIRED: valid reload replaces runtime with new config", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      const wf = join(tmpDir, "WORKFLOW.md");
+      await writeFile(wf, "---\ncodex:\n  command: codex app-server\n---\nOriginal");
+
+      const reloader = await createWorkflowRuntimeReloader({ workflowPath: wf, cwd: tmpDir, env: {}, homeDir: "/home/user" });
+      await writeFile(wf, "---\ncodex:\n  command: codex app-server --verbose\n---\nUpdated");
+      const result = await reloader.reload();
+      expect(result.ok).toBe(true);
+      expect(result.runtime.config.codex.command).toBe("codex app-server --verbose");
+      expect(result.error).toBeNull();
+    });
+
+    test("REQUIRED: conformance trace has test IDs for workflow runtime items", async () => {
+      const doc = await readFile("docs/symphony-conformance.md", "utf8");
+      expect(doc).toContain("Workflow path selection supports explicit runtime path and cwd default");
+      expect(doc).toContain("Dynamic `WORKFLOW.md` watch/reload/re-apply");
+      expect(doc).toContain("Codex launch command config");
+    });
   });
 });
