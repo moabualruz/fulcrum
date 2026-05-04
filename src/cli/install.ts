@@ -29,6 +29,8 @@ import { tmpdir } from "node:os";
 import { which, run as runProc } from "../utils/proc.ts";
 import { pruneSourceBackupFiles } from "../utils/source-clean.ts";
 import { AGENTS } from "../agents/registry.ts";
+import { patchJsonOwnedKey, patchTomlOwnedKey } from "../utils/config-patcher.ts";
+import { FULCRUM_RULES_BEGIN as BEGIN, FULCRUM_RULES_END as END, replaceSentinelBlock } from "./vendor-rules.ts";
 
 // ---------------------------------------------------------------------------
 // Dry-run mode
@@ -56,6 +58,10 @@ async function mk(path: string): Promise<void> {
 async function cp(src: string, dst: string): Promise<void> {
   if (DRY_RUN) { console.log(`     [dry-run] would copy: ${src} → ${dst}`); return; }
   await copyFile(src, dst);
+}
+
+function prettyJson(value: unknown): string {
+  return `${JSON.stringify(value, undefined, 2)}\n`;
 }
 
 function isMirrorExcludedName(name: string): boolean {
@@ -101,11 +107,17 @@ function upsertTomlSection(existing: string, header: string, body: string): stri
 }
 
 function ensureCodexHooksFeature(existing: string): string {
+  if (/^fulcrum_owned_keys\s*=/m.test(existing)) {
+    return patchTomlOwnedKey(existing, "features.codex_hooks", true, "fulcrum_owned_keys");
+  }
   if (/^codex_hooks\s*=\s*true$/m.test(existing)) return existing;
   if (/^\[features\]$/m.test(existing)) {
-    return existing.replace(/^\[features\]$/m, "[features]\ncodex_hooks = true");
+    return existing.replace(/^\[features\]$/m, "[features]\ncodex_hooks = true").replace(
+      /^(?![\s\S]*^fulcrum_owned_keys\s*=)/,
+      'fulcrum_owned_keys = ["features.codex_hooks"]\n\n',
+    );
   }
-  return `${existing.trimEnd()}\n\n[features]\ncodex_hooks = true\n`.trimStart();
+  return `${existing.trimEnd()}\n\nfulcrum_owned_keys = ["features.codex_hooks"]\n\n[features]\ncodex_hooks = true\n`.trimStart();
 }
 
 async function mergeCodexCavemanHooks(home: string, repoRootDir: string): Promise<void> {
@@ -145,7 +157,7 @@ async function mergeCodexCavemanHooks(home: string, repoRootDir: string): Promis
 
   targetJson.hooks = targetHooks;
   await mk(dirname(target));
-  await wf(target, `${JSON.stringify(targetJson, null, 2)}\n`);
+  await wf(target, prettyJson(targetJson));
 }
 
 async function configureCodexCavemanPlugin(home: string, repoRootDir: string): Promise<void> {
@@ -206,11 +218,11 @@ async function installCavemanPackagePayload(
   await copyTree(sourceRoot, targetRoot);
   const unsupported = unsupportedCavemanSurfaces(agentId);
   if (unsupported.length > 0) {
-    await wf(`${targetRoot}/.fulcrum-unsupported.json`, JSON.stringify({
+    await wf(`${targetRoot}/.fulcrum-unsupported.json`, prettyJson({
       package: "caveman",
       agent: agentId,
       unsupported,
-    }, null, 2) + "\n");
+    }));
   }
 }
 
@@ -300,9 +312,6 @@ async function runProcDry(cmd: string[]): Promise<{ exit: number; stdout: string
 }
 
 
-const BEGIN = "<!-- BEGIN FULCRUM RULES -->";
-const END   = "<!-- END FULCRUM RULES -->";
-
 function repoRoot(): string {
   return process.env["FULCRUM_REPO_DIR"] ?? process.cwd();
 }
@@ -344,10 +353,7 @@ export async function spliceSentinel(target: string, body: string, label: string
       console.error(`     ✗ ${label}  refused: ${target} has ${nb} BEGIN / ${ne} END markers (expected 1/1). Fix manually.`);
       return;
     }
-    const out = existing.replace(
-      new RegExp(`${BEGIN}[\\s\\S]*?${END}`, "m"),
-      `${BEGIN}\n${body}\n${END}`,
-    );
+    const out = replaceSentinelBlock(existing, body);
     await wf(target, out);
     console.log(`     ↻ ${label}  (block replaced) → ${target}`);
   } else {
@@ -714,12 +720,18 @@ export async function lockCavemanUltra(home: string): Promise<void> {
         console.log(`     · caveman defaultMode already 'ultra' (${cfgPath})`);
         return;
       }
+      const source = await readFile(cfgPath, "utf8");
+      if (Array.isArray(existing?.__fulcrum_owned_keys)) {
+        await wf(cfgPath, patchJsonOwnedKey(source, ["defaultMode"], "ultra", "__fulcrum_owned_keys"));
+        console.log(`     ✓ caveman defaultMode set to 'ultra' (${cfgPath})`);
+        return;
+      }
     } catch {
       // malformed JSON — overwrite below
     }
   }
   await mk(cfgDir);
-  await wf(cfgPath, JSON.stringify({ defaultMode: "ultra" }, null, 2) + "\n");
+  await wf(cfgPath, prettyJson({ defaultMode: "ultra" }));
   console.log(`     ✓ caveman defaultMode set to 'ultra' (${cfgPath})`);
 }
 
