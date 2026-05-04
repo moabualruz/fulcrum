@@ -53,7 +53,7 @@ describe("memory tRPC CRUD and search", () => {
       const caller = callerFor(em);
       const projectId = "22222222-2222-4222-8222-222222222222";
 
-      const created = await caller.memory.create({
+      const created = await caller.memories.create({
         projectId,
         global: false,
         kind: "decision",
@@ -74,16 +74,16 @@ describe("memory tRPC CRUD and search", () => {
         archived: false,
       });
 
-      expect(await caller.memory.get({ id: created.id })).toMatchObject({
+      expect(await caller.memories.get({ id: created.id })).toMatchObject({
         id: created.id,
         body: created.body,
       });
-      expect((await caller.memory.list({ projectId })).map((memory) => memory.id))
+      expect((await caller.memories.list({ projectId })).map((memory) => memory.id))
         .toEqual([created.id]);
-      expect((await caller.memory.list({ tags: ["memory"], importance: "high" })).map((memory) => memory.id))
+      expect((await caller.memories.list({ tags: ["memory"], importance: "high" })).map((memory) => memory.id))
         .toEqual([created.id]);
 
-      const updated = await caller.memory.update({
+      const updated = await caller.memories.update({
         id: created.id,
         body: "Use deterministic local BM25 memory retrieval.",
         tags: ["retrieval", "local"],
@@ -97,10 +97,10 @@ describe("memory tRPC CRUD and search", () => {
         importance: "medium",
       });
 
-      await expect(caller.memory.delete({ id: created.id })).resolves.toEqual({
+      await expect(caller.memories.delete({ id: created.id })).resolves.toEqual({
         deleted: true,
       });
-      await expect(caller.memory.get({ id: created.id })).rejects.toMatchObject({
+      await expect(caller.memories.get({ id: created.id })).rejects.toMatchObject({
         code: "NOT_FOUND",
       });
     } finally {
@@ -113,10 +113,10 @@ describe("memory tRPC CRUD and search", () => {
     try {
       const caller = callerFor(db.em.fork());
 
-      await expect(caller.memory.create({
+      await expect(caller.memories.create({
         body: "Hook-owned memory",
         source: "heuristic",
-      } as unknown as Parameters<typeof caller.memory.create>[0])).rejects.toBeInstanceOf(Error);
+      } as unknown as Parameters<typeof caller.memories.create>[0])).rejects.toBeInstanceOf(Error);
     } finally {
       await db.close();
     }
@@ -135,9 +135,9 @@ describe("memory tRPC CRUD and search", () => {
       await em.flush();
 
       const caller = callerFor(em);
-      await expect(caller.memory.update({ id: memory.id, body: "Manual edit" }))
+      await expect(caller.memories.update({ id: memory.id, body: "Manual edit" }))
         .rejects.toMatchObject({ code: "FORBIDDEN" });
-      await expect(caller.memory.update({ id: memory.id, body: "Manual edit", forceEdit: true }))
+      await expect(caller.memories.update({ id: memory.id, body: "Manual edit", forceEdit: true }))
         .resolves.toMatchObject({ id: memory.id, body: "Manual edit" });
     } finally {
       await db.close();
@@ -150,12 +150,12 @@ describe("memory tRPC CRUD and search", () => {
       const em = db.em.fork();
       const caller = callerFor(em);
       const otherOrgCaller = callerFor(em, OTHER_ORG_ID);
-      const created = await caller.memory.create({ body: "Org scoped memory" });
+      const created = await caller.memories.create({ body: "Org scoped memory" });
 
-      await expect(otherOrgCaller.memory.get({ id: created.id })).rejects.toMatchObject({ code: "NOT_FOUND" });
-      await expect(otherOrgCaller.memory.update({ id: created.id, body: "Nope" })).rejects.toMatchObject({ code: "NOT_FOUND" });
-      await expect(otherOrgCaller.memory.delete({ id: created.id })).rejects.toMatchObject({ code: "NOT_FOUND" });
-      expect(await otherOrgCaller.memory.list()).toEqual([]);
+      await expect(otherOrgCaller.memories.get({ id: created.id })).rejects.toMatchObject({ code: "NOT_FOUND" });
+      await expect(otherOrgCaller.memories.update({ id: created.id, body: "Nope" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+      await expect(otherOrgCaller.memories.delete({ id: created.id })).rejects.toMatchObject({ code: "NOT_FOUND" });
+      expect(await otherOrgCaller.memories.list()).toEqual([]);
     } finally {
       await db.close();
     }
@@ -195,7 +195,7 @@ describe("memory tRPC CRUD and search", () => {
       em.persist(rows);
       await em.flush();
 
-      const result = await caller.memory.search({
+      const result = await caller.memories.search({
         query: "alpha",
         topK: 2,
         now: "2026-05-03T12:00:00.000Z",
@@ -231,7 +231,7 @@ describe("memory tRPC CRUD and search", () => {
 
     let error: TRPCError | null = null;
     try {
-      await caller.memory.list();
+      await caller.memories.list();
     } catch (caught) {
       if (caught instanceof TRPCError) error = caught;
     }

@@ -429,7 +429,7 @@ describe("authenticated calls", () => {
 
   it("memory.list returns empty array for authenticated caller", async () => {
     const caller = authenticatedCaller();
-    const result = await caller.memory.list();
+    const result = await caller.memories.list();
     expect(Array.isArray(result)).toBe(true);
   });
 });

@@ -105,13 +105,13 @@ describe("skills tRPC router", () => {
 
     const caller = await createTestCaller(createTestContainer(db));
 
-    const installed = await caller.skills.install({ path: skillPath });
+    const installed = await caller.fulcrum_skills.install({ path: skillPath });
     expect(installed.slug).toBe("demo-skill");
     expect(await exists(join(home, ".claude", "skills", "demo-skill", "SKILL.md"))).toBe(true);
     expect(await exists(join(home, ".codex", "skills", "demo-skill", "SKILL.md"))).toBe(true);
     expect(await db.em.fork().findOne(FulcrumSkill, { org: DEFAULT_ORG_ID, slug: "demo-skill" })).not.toBeNull();
 
-    const listed = await caller.skills.list();
+    const listed = await caller.fulcrum_skills.list();
     expect(listed.map((skill) => skill.slug)).toContain("demo-skill");
 
     const em = db.em.fork();
@@ -120,20 +120,20 @@ describe("skills tRPC router", () => {
     stored.upstreamRepo = upstreamDir;
     await em.flush();
 
-    const upgraded = await caller.skills.upgrade({ slug: "demo-skill" });
+    const upgraded = await caller.fulcrum_skills.upgrade({ slug: "demo-skill" });
     expect(upgraded.map((skill) => skill.slug)).toEqual(["demo-skill"]);
     expect(await readFile(join(home, ".claude", "skills", "demo-skill", "SKILL.md"), "utf8")).toContain("Use v2.");
 
     await writeFile(join(home, ".claude", "skills", "demo-skill", "SKILL.md"), SKILL_V1, "utf8");
-    const syncResult = await caller.skills.sync({ fetchUpstream: true });
+    const syncResult = await caller.fulcrum_skills.sync({ fetchUpstream: true });
     expect(syncResult.conflicts).toEqual(["demo-skill"]);
     expect((await readSkillsLockFile())["demo-skill"]?.upstream_conflict).toContain("Use v2.");
 
-    const resolved = await caller.skills.resolveConflict({ slug: "demo-skill", resolution: "upstream" });
+    const resolved = await caller.fulcrum_skills.resolveConflict({ slug: "demo-skill", resolution: "upstream" });
     expect(resolved.slug).toBe("demo-skill");
     expect((await readSkillsLockFile())["demo-skill"]?.upstream_conflict).toBeUndefined();
 
-    await caller.skills.uninstall({ slug: "demo-skill" });
+    await caller.fulcrum_skills.uninstall({ slug: "demo-skill" });
     expect(await exists(join(home, ".claude", "skills", "demo-skill"))).toBe(false);
     expect(await exists(join(home, ".codex", "skills", "demo-skill"))).toBe(false);
     expect(await db.em.fork().findOne(FulcrumSkill, { org: DEFAULT_ORG_ID, slug: "demo-skill" })).toBeNull();
@@ -150,9 +150,9 @@ describe("skills tRPC router", () => {
     await writeFile(codexSentinel, "do not remove", "utf8");
 
     const caller = await createTestCaller(createTestContainer(db));
-    await caller.skills.install({ path: skillPath });
+    await caller.fulcrum_skills.install({ path: skillPath });
 
-    await caller.skills.uninstall({ slug: "claude-only" });
+    await caller.fulcrum_skills.uninstall({ slug: "claude-only" });
 
     expect(await exists(join(home, ".claude", "skills", "claude-only"))).toBe(false);
     expect(await readFile(codexSentinel, "utf8")).toBe("do not remove");

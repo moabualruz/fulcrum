@@ -10,12 +10,54 @@ import { z } from "zod";
 
 import { t } from "../trpc.ts";
 import { protectedProcedure } from "../middleware.ts";
+import { EmptyInputSchema, StubRowSchema } from "./stub-helpers.ts";
+import {
+  createSavedSearch,
+  deleteSavedSearch,
+  listSavedSearches,
+  SavedSearchCreateInputSchema,
+  SavedSearchDeleteInputSchema,
+  SavedSearchOutputSchema,
+  SavedSearchUpdateInputSchema,
+  updateSavedSearch,
+} from "../../search/saved-searches.ts";
 
 export const searchRouter = t.router({
-  /** query — stub; Pillar 12 replaces with: await searchService.query(input.q, ctx.orgId) */
+  /** query — stub; Pillar 12 replaces with real implementation. */
   query: protectedProcedure
-    .input(z.object({ q: z.string() }))
+    .input(z.object({ q: z.string().default("") }))
+    .output(z.array(StubRowSchema))
     .query(() => []),
+
+  /** suggest — stub; Pillar 12 replaces with real implementation. */
+  suggest: protectedProcedure
+    .input(z.object({ q: z.string().default("") }))
+    .output(z.array(z.string()))
+    .query(() => []),
+
+  /** savedList — real: returns saved searches for the org. */
+  savedList: protectedProcedure
+    .input(EmptyInputSchema)
+    .output(z.array(SavedSearchOutputSchema))
+    .query(({ ctx }) => listSavedSearches(ctx)),
+
+  /** savedCreate — real: persists a new saved search. */
+  savedCreate: protectedProcedure
+    .input(SavedSearchCreateInputSchema)
+    .output(SavedSearchOutputSchema)
+    .mutation(({ ctx, input }) => createSavedSearch(ctx, input)),
+
+  /** savedUpdate — real: updates an existing saved search. */
+  savedUpdate: protectedProcedure
+    .input(SavedSearchUpdateInputSchema)
+    .output(SavedSearchOutputSchema)
+    .mutation(({ ctx, input }) => updateSavedSearch(ctx, input)),
+
+  /** savedDelete — real: deletes a saved search by id. */
+  savedDelete: protectedProcedure
+    .input(SavedSearchDeleteInputSchema)
+    .output(z.object({ ok: z.literal(true) }))
+    .mutation(({ ctx, input }) => deleteSavedSearch(ctx, input)),
 
   /**
    * recordClick — write search click telemetry row.
@@ -32,7 +74,6 @@ export const searchRouter = t.router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      // Check feature flag via env var (lightweight; no DB lookup needed for gate)
       const flags = (process.env["FULCRUM_FEATURES"] ?? "")
         .split(",")
         .map((f) => f.trim())
@@ -41,7 +82,6 @@ export const searchRouter = t.router({
         return { recorded: false };
       }
 
-      // Dynamic import to avoid circular deps in stub mode
       const { recordSearchClick } = await import("../../search/click-telemetry.ts");
       if (!ctx.db || !ctx.orgId) return { recorded: false };
 
