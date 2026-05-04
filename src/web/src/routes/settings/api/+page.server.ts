@@ -8,10 +8,7 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 
-function isPublicApiEnabled(): boolean {
-  const features = (process.env["FULCRUM_FEATURES"] ?? "").split(",").map((f) => f.trim());
-  return features.includes("public-api");
-}
+import { isPublicApiEnabled } from "../../../../../api/feature-flags.ts";
 
 export const load: PageServerLoad = async ({ locals, url }) => {
   if (!locals.session) {
