@@ -70,7 +70,7 @@ Plans:
 **Wave 2 (blocked on relevant Wave 1 foundations)**
 - [x] 02-04-PLAN.md — Byte-stable frontmatter and targeted JSON/TOML config patchers (BUG-05, BUG-13)
 - [x] 02-05-PLAN.md — Product CLI parser, doctor warnings, complexity hotspots, Cmd+K shortcut (BUG-09, BUG-12, BUG-15, BUG-18)
-- [ ] 02-06-PLAN.md — Tenant settings, migration/index verification, canonical flags (FND-01, FND-03, FND-06, FND-07)
+- [x] 02-06-PLAN.md — Tenant settings, migration/index verification, canonical flags (FND-01, FND-03, FND-06, FND-07)
 - [ ] 02-07-PLAN.md — Permission enforcement lint and explicit tRPC resource/action checks (FND-02)
 
 **Wave 3 (blocked on DB, flags, permissions foundations)**
@@ -195,7 +195,7 @@ Cross-cutting constraints:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Architecture + Security | 0/10 | Planned | - |
-| 2. Bug Fixes + Foundation | 0/? | Not started | - |
+| 2. Bug Fixes + Foundation | 6/8 | Executing | - |
 | 3. Symphony + Sandcastle | 0/? | Not started | - |
 | 4. Inference + Router/Skills | 0/? | Not started | - |
 | 5. Task Management + Metrics | 0/? | Not started | - |

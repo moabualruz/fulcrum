@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-last_updated: "2026-05-04T12:20:00.279Z"
+last_updated: "2026-05-04T12:41:22Z"
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 18
-  completed_plans: 15
-  percent: 83
+  completed_plans: 16
+  percent: 89
 ---
 
 # Planning State
@@ -17,7 +17,7 @@ progress:
 ## Current Position
 
 Phase: 02 (bug-fixes-foundation) — EXECUTING
-Plan: 5 of 8
+Plan: 7 of 8
 
 - **Phase**: 02-bug-fixes-foundation
 - **Plan**: 8 plans created
@@ -42,3 +42,6 @@ Plan: 5 of 8
 - [Phase 02-05]: Product CLI parsing fails closed on unknown or valueless flags.
 - [Phase 02-05]: Doctor product-kernel DB probe failures are warning-level with subsystem product-kernel-db.
 - [Phase 02-05]: Web Cmd+K/Ctrl+K uses existing CommandPalette controlled state with no visible shortcut UI.
+- [Phase 02-06]: Tenant settings use a standalone MikroORM entity keyed by orgId and key.
+- [Phase 02-06]: Product-kernel tenant indexes keep org_id as the leading column for tenant-scoped access paths.
+- [Phase 02-06]: TUI feature flags use the canonical registry and shared env parsing.
