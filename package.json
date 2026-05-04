@@ -14,6 +14,7 @@
     "build:all": "bun run scripts/build-all.ts",
     "test": "bun test",
     "lint": "bun run --bun tsc --noEmit",
+    "lint:boundaries": "bun run scripts/check-module-boundaries.ts",
     "ci": "bun run scripts/ci.ts",
     "changelog": "git-cliff -o CHANGELOG.md",
     "compress": "bun run src/index.ts compress",

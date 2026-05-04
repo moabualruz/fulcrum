@@ -4,8 +4,7 @@ import { openPglite } from "../product-kernel/db/pglite.ts";
 import { runMigrations } from "../product-kernel/db/migrate.ts";
 import { productDbDir } from "../product-kernel/paths.ts";
 import type { ProductDb } from "../product-kernel/db/types.ts";
-import { dispatchRunAction } from "../web/src/lib/server/runs.ts";
-import { getEm } from "../web/src/lib/server/em.ts";
+import { dispatchRunAction } from "../services/runs.ts";
 
 const HELP = `fulcrum agent — agent run commands
 
@@ -57,8 +56,7 @@ export async function run(argv: readonly string[]): Promise<void> {
       console.error(`task not found: ${taskId}`);
       process.exit(1);
     }
-    const em = await getEm();
-    const result = await dispatchRunAction(em, {
+    const result = await dispatchRunAction(db, {
       orgId: task.org_id,
       projectId: task.project_id,
       taskId,
