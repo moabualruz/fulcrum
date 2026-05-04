@@ -451,6 +451,23 @@ describe("vendor capability packages", () => {
     expect(await Bun.file(join(TMP, ".codex", "skills", "cloudflare", "_archive", "old", "SKILL.md")).exists()).toBe(false);
   });
 
+  test("does not overwrite top-level user-owned loadable skill names", async () => {
+    const cache = join(TMP, ".fulcrum", "cache", "cloudflare-skills");
+    await mkdir(join(cache, "skills", "wrangler"), { recursive: true });
+    await writeFile(join(cache, "skills", "wrangler", "SKILL.md"), "---\nname: wrangler\n---\nUse wrangler.\n");
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    await mkdir(join(TMP, ".codex", "skills", "cloudflare", "wrangler"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "skills", "cloudflare", "wrangler", "SKILL.md"), "user-owned\n");
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await installCloudflarePackage({ agents: ["codex"] });
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    expect(await readFile(join(TMP, ".codex", "skills", "cloudflare", "wrangler", "SKILL.md"), "utf8")).toBe("user-owned\n");
+  });
+
   test("uninstall removes adapted Cloudflare package MCP and loadable skill surfaces", async () => {
     const cache = join(TMP, ".fulcrum", "cache", "cloudflare-skills");
     await mkdir(join(cache, "skills", "wrangler"), { recursive: true });

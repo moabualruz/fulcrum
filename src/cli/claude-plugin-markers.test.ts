@@ -99,6 +99,17 @@ describe("claude plugin markers", () => {
     expect(await hasMarker("nope@nope")).toBe(false);
   });
 
+  test("safeClaudePluginInstall reports confirmation required before Claude CLI mutation", async () => {
+    const { safeClaudePluginInstall } = await import("./claude-plugin-markers.ts");
+    const result = await safeClaudePluginInstall("fulcrum@fulcrum", {
+      marketplace: "moabualruz/fulcrum",
+      source: "package.fulcrum",
+    });
+    expect(result.ran).toBe(false);
+    expect(result.reason).toContain("confirmation required");
+    expect(await hasMarker("fulcrum@fulcrum")).toBe(false);
+  });
+
   test("safeClaudePluginUninstall refuses without a marker even when opt-in is set", async () => {
     const { safeClaudePluginUninstall } = await import("./claude-plugin-markers.ts");
     setClaudeCliAllowed(true);

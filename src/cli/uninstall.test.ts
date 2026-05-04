@@ -302,7 +302,7 @@ describe("run", () => {
     expect(piSettings.packages).toBeUndefined();
   });
 
-  test("--purge removes markerless Claude plugin cache leftovers", async () => {
+  test("--purge preserves markerless Claude plugin cache leftovers", async () => {
     const leftovers = [
       [".claude", "plugins", "cache", "fulcrum"],
       [".claude", "plugins", "marketplaces", "fulcrum"],
@@ -327,8 +327,30 @@ describe("run", () => {
     }
 
     for (const parts of leftovers) {
-      expect(await Bun.file(join(TMP, ...parts)).exists()).toBe(false);
+      expect(await Bun.file(join(TMP, ...parts, "marker.txt")).exists()).toBe(true);
     }
+  });
+
+  test("--purge removes Claude plugin cache leftovers only with Fulcrum ownership markers", async () => {
+    const { writeMarker } = await import("./claude-plugin-markers.ts");
+    await writeMarker({ plugin: "fulcrum@fulcrum", marketplace: "moabualruz/fulcrum", source: "package.fulcrum", operation: "install" });
+    await writeMarker({ plugin: "cloudflare@cloudflare", marketplace: "cloudflare/skills", source: "package.cloudflare", operation: "install" });
+    await mkdir(join(TMP, ".claude", "plugins", "cache", "fulcrum"), { recursive: true });
+    await mkdir(join(TMP, ".claude", "plugins", "marketplaces", "fulcrum"), { recursive: true });
+    await mkdir(join(TMP, ".claude", "plugins", "cache", "cloudflare"), { recursive: true });
+    await mkdir(join(TMP, ".claude", "plugins", "marketplaces", "cloudflare"), { recursive: true });
+
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await run(["--purge", "--include-caveman"]);
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    expect(await Bun.file(join(TMP, ".claude", "plugins", "cache", "fulcrum")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".claude", "plugins", "marketplaces", "fulcrum")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".claude", "plugins", "cache", "cloudflare")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".claude", "plugins", "marketplaces", "cloudflare")).exists()).toBe(false);
   });
 
   test("preserves unmarked user-owned upstream vendor skill dirs", async () => {

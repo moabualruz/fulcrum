@@ -69,6 +69,25 @@ describe("package parity audit", () => {
     expect(report.missing.some((target) => target.support === "native")).toBe(true);
   });
 
+  test("missing native package root carries machine-readable reason", async () => {
+    const home = await mkdtemp(join(tmpdir(), "fulcrum-package-parity-"));
+    const manifest = await getPackageSurfaceManifest("package.cloudflare");
+    const targets = planPackageMirrorTargets(manifest, ["claude-code"]);
+
+    const report = await auditPackageParity(manifest, targets, { home });
+
+    expect(report.ok).toBe(false);
+    expect(report.missing.some((target) => target.support === "native")).toBe(true);
+    expect(report.missingReasons).toContainEqual(expect.objectContaining({
+      agentId: "claude-code",
+      status: "missing-native-root",
+      reason: "missing-native-root",
+      nativeExists: false,
+      ledgerExists: false,
+      owned: false,
+    }));
+  });
+
   test("accepts native package installer surfaces when native state is present", async () => {
     const home = await mkdtemp(join(tmpdir(), "fulcrum-package-parity-"));
     await mkdir(join(home, ".claude", "plugins", "cache", "cloudflare"), { recursive: true });

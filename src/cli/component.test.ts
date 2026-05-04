@@ -197,14 +197,25 @@ describe("fulcrum component apply", () => {
 });
 
 describe("fulcrum component status", () => {
-  test("--json reports ledger component state", async () => {
+  test("--json reports native filesystem truth instead of ledger-only state", async () => {
     const home = await mkdtemp(join(tmpdir(), "fulcrum-component-status-"));
     const previousFulcrumHome = process.env["FULCRUM_HOME"];
+    const previousHome = process.env["HOME"];
     process.env["FULCRUM_HOME"] = join(home, ".fulcrum");
+    process.env["HOME"] = home;
     try {
       const { ComponentLedger } = await import("../components/ledger.ts");
       const ledger = ComponentLedger.open();
       ledger.recordComponent({ id: "hooks.format", kind: "hook", status: "installed" });
+      ledger.recordSurface({
+        id: "hooks.format:codex",
+        componentId: "hooks.format",
+        agentId: "codex",
+        kind: "hook-registration",
+        target: "~/.codex/hooks.json",
+        ownerKey: "fulcrum.hooks.format",
+        removePolicy: "delete",
+      });
       ledger.close();
 
       const { logs, restore } = captureConsole();
@@ -214,13 +225,32 @@ describe("fulcrum component status", () => {
         restore();
       }
 
-      const parsed = JSON.parse(logs.join("\n")) as { componentId: string; status: string };
-      expect(parsed).toMatchObject({ componentId: "hooks.format", status: "installed" });
+      const parsed = JSON.parse(logs.join("\n")) as {
+        componentId: string;
+        status: string;
+        ledgerExists: boolean;
+        nativeExists: boolean;
+        owned: boolean;
+        reason: string;
+      };
+      expect(parsed).toMatchObject({
+        componentId: "hooks.format",
+        status: "missing-native-root",
+        ledgerExists: true,
+        nativeExists: false,
+        owned: true,
+        reason: "missing-native-root",
+      });
     } finally {
       if (previousFulcrumHome === undefined) {
         delete process.env["FULCRUM_HOME"];
       } else {
         process.env["FULCRUM_HOME"] = previousFulcrumHome;
+      }
+      if (previousHome === undefined) {
+        delete process.env["HOME"];
+      } else {
+        process.env["HOME"] = previousHome;
       }
       await rm(home, { recursive: true, force: true });
     }
