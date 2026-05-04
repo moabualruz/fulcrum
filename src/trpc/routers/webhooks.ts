@@ -28,7 +28,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { t } from "../trpc.ts";
-import { protectedProcedure } from "../middleware.ts";
+import { permissionedProcedure } from "../middleware.ts";
 import {
   WebhookInputSchema,
   WebhookUpdateInputSchema,
@@ -148,7 +148,7 @@ function projectDelivery(row: {
 // ─── Deliveries sub-router ────────────────────────────────────────────────────
 
 const deliveriesRouter = t.router({
-  list: protectedProcedure
+  list: permissionedProcedure({ resource: "webhooks", action: "list" })
     .input(ListDeliveriesInputSchema)
     .output(z.array(DeliveryOutputSchema))
     .query(async ({ ctx, input }) => {
@@ -164,7 +164,7 @@ const deliveriesRouter = t.router({
       return rows.map(projectDelivery);
     }),
 
-  get: protectedProcedure
+  get: permissionedProcedure({ resource: "webhooks", action: "get" })
     .input(z.object({ id: z.string().uuid() }))
     .output(DeliveryOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
@@ -180,7 +180,7 @@ const deliveriesRouter = t.router({
 // ─── Main router ──────────────────────────────────────────────────────────────
 
 export const webhooksRouter = t.router({
-  list: protectedProcedure
+  list: permissionedProcedure({ resource: "webhooks", action: "list" })
     .input(z.void())
     .output(z.array(WebhookOutputSchema))
     .query(async ({ ctx }) => {
@@ -192,7 +192,7 @@ export const webhooksRouter = t.router({
       return rows.map(projectWebhook);
     }),
 
-  get: protectedProcedure
+  get: permissionedProcedure({ resource: "webhooks", action: "get" })
     .input(z.object({ id: z.string().uuid() }))
     .output(WebhookOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
@@ -204,7 +204,7 @@ export const webhooksRouter = t.router({
       return row ? projectWebhook(row) : null;
     }),
 
-  create: protectedProcedure
+  create: permissionedProcedure({ resource: "webhooks", action: "create" })
     .input(WebhookInputSchema)
     .output(WebhookOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -231,7 +231,7 @@ export const webhooksRouter = t.router({
       return projectWebhook(webhook);
     }),
 
-  update: protectedProcedure
+  update: permissionedProcedure({ resource: "webhooks", action: "update" })
     .input(WebhookUpdateInputSchema)
     .output(WebhookOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -252,7 +252,7 @@ export const webhooksRouter = t.router({
       return projectWebhook(webhook);
     }),
 
-  delete: protectedProcedure
+  delete: permissionedProcedure({ resource: "webhooks", action: "delete" })
     .input(z.object({ id: z.string().uuid() }))
     .output(z.object({ ok: z.literal(true) }))
     .mutation(async ({ ctx, input }) => {

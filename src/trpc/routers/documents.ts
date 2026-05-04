@@ -6,11 +6,11 @@
  */
 
 import { t } from "../trpc.ts";
-import { protectedProcedure } from "../middleware.ts";
+import { permissionedProcedure } from "../middleware.ts";
 
 export const documentsRouter = t.router({
   /** list — stub; Pillar 7 replaces with: await repo.find({ org: ctx.orgId }) */
-  list: protectedProcedure.query(() => []),
+  list: permissionedProcedure({ resource: "documents", action: "list" }).query(() => []),
 });
 
 export type DocumentsRouter = typeof documentsRouter;

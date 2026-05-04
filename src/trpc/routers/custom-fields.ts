@@ -4,7 +4,7 @@ import { t } from "../trpc.ts";
 import { listProcedure, mutationProcedure, idMutationProcedure } from "./stub-helpers.ts";
 
 export const customFieldsRouter = t.router({
-  list: listProcedure(),
+  list: listProcedure("custom_fields"),
   create: mutationProcedure("custom_fields", "create"),
   update: mutationProcedure("custom_fields", "update"),
   delete: idMutationProcedure("custom_fields", "delete"),

@@ -5,7 +5,7 @@ import { Event } from "../../../db/entities/core/Event.ts";
 import { Org } from "../../../db/entities/auth/Org.ts";
 import { User } from "../../../db/entities/auth/User.ts";
 import { EventRetentionPolicy } from "../../../db/entities/notifications/EventRetentionPolicy.ts";
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 
 const UuidLikeSchema = z.string().regex(/^[0-9a-fA-F-]{36}$/);
@@ -206,12 +206,12 @@ async function findRetentionPolicy(
 }
 
 export const auditRouter = t.router({
-  query: protectedProcedure
+  query: permissionedProcedure({ resource: "audit", action: "query" })
     .input(AuditQueryInputSchema)
     .output(AuditQueryOutputSchema)
     .query(({ ctx, input }) => queryEvents(ctx, input)),
 
-  export: protectedProcedure
+  export: permissionedProcedure({ resource: "audit", action: "export" })
     .input(AuditExportInputSchema)
     .output(AuditExportOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -233,7 +233,7 @@ export const auditRouter = t.router({
     }),
 
   retentionPolicy: t.router({
-    get: protectedProcedure
+    get: permissionedProcedure({ resource: "audit", action: "get" })
       .input(RetentionPolicyInputSchema.optional())
       .output(RetentionPolicyOutputSchema.nullable())
       .query(async ({ ctx, input }) => {
@@ -244,7 +244,7 @@ export const auditRouter = t.router({
         return policy ? serializeRetentionPolicy(policy) : null;
       }),
 
-    list: protectedProcedure
+    list: permissionedProcedure({ resource: "audit", action: "list" })
       .input(RetentionPolicyInputSchema.optional())
       .output(z.array(RetentionPolicyOutputSchema))
       .query(async ({ ctx, input }) => {
@@ -261,7 +261,7 @@ export const auditRouter = t.router({
         return rows.map(serializeRetentionPolicy);
       }),
 
-    set: protectedProcedure
+    set: permissionedProcedure({ resource: "audit", action: "set" })
       .input(RetentionPolicySetInputSchema)
       .output(RetentionPolicyOutputSchema)
       .mutation(async ({ ctx, input }) => {

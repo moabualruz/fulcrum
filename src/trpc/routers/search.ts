@@ -9,7 +9,7 @@
 import { z } from "zod";
 
 import { t } from "../trpc.ts";
-import { protectedProcedure } from "../middleware.ts";
+import { permissionedProcedure } from "../middleware.ts";
 import { EmptyInputSchema, StubRowSchema } from "./stub-helpers.ts";
 import {
   createSavedSearch,
@@ -24,37 +24,37 @@ import {
 
 export const searchRouter = t.router({
   /** query — stub; Pillar 12 replaces with real implementation. */
-  query: protectedProcedure
+  query: permissionedProcedure({ resource: "search", action: "query" })
     .input(z.object({ q: z.string().default("") }))
     .output(z.array(StubRowSchema))
     .query(() => []),
 
   /** suggest — stub; Pillar 12 replaces with real implementation. */
-  suggest: protectedProcedure
+  suggest: permissionedProcedure({ resource: "search", action: "suggest" })
     .input(z.object({ q: z.string().default("") }))
     .output(z.array(z.string()))
     .query(() => []),
 
   /** savedList — real: returns saved searches for the org. */
-  savedList: protectedProcedure
+  savedList: permissionedProcedure({ resource: "search", action: "savedList" })
     .input(EmptyInputSchema)
     .output(z.array(SavedSearchOutputSchema))
     .query(({ ctx }) => listSavedSearches(ctx)),
 
   /** savedCreate — real: persists a new saved search. */
-  savedCreate: protectedProcedure
+  savedCreate: permissionedProcedure({ resource: "search", action: "savedCreate" })
     .input(SavedSearchCreateInputSchema)
     .output(SavedSearchOutputSchema)
     .mutation(({ ctx, input }) => createSavedSearch(ctx, input)),
 
   /** savedUpdate — real: updates an existing saved search. */
-  savedUpdate: protectedProcedure
+  savedUpdate: permissionedProcedure({ resource: "search", action: "savedUpdate" })
     .input(SavedSearchUpdateInputSchema)
     .output(SavedSearchOutputSchema)
     .mutation(({ ctx, input }) => updateSavedSearch(ctx, input)),
 
   /** savedDelete — real: deletes a saved search by id. */
-  savedDelete: protectedProcedure
+  savedDelete: permissionedProcedure({ resource: "search", action: "savedDelete" })
     .input(SavedSearchDeleteInputSchema)
     .output(z.object({ ok: z.literal(true) }))
     .mutation(({ ctx, input }) => deleteSavedSearch(ctx, input)),
@@ -63,7 +63,7 @@ export const searchRouter = t.router({
    * recordClick — write search click telemetry row.
    * No-op when `search-click-telemetry` flag OFF; writes when ON.
    */
-  recordClick: protectedProcedure
+  recordClick: permissionedProcedure({ resource: "search", action: "recordClick" })
     .input(
       z.object({
         query: z.string().min(1),

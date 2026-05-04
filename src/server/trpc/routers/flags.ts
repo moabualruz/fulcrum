@@ -2,7 +2,7 @@
  * flags tRPC router — feature-flag registry procedures.
  *
  * Procedures:
- *   - flags.list()     → { name, enabled, description }[]  (protectedProcedure)
+ *   - flags.list()     → { name, enabled, description }[]  (permissionedProcedure)
  *   - flags.set(input) → { ok: boolean }                    (owner/admin only)
  *
  * Authorization:
@@ -32,7 +32,7 @@ import { experimentStore } from "../../../flags/experiments.ts";
 import { isFeatureEnabled } from "../../../tui/feature-flags.ts";
 
 import { t } from "../../../trpc/trpc.ts";
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import {
   FlagRegistry,
   FEATURE_FLAGS,
@@ -336,7 +336,7 @@ export const flagsRouter = t.router({
    * Reads from FlagRegistry (env + DB, 60s TTL cache).
    * Any authenticated user may call this.
    */
-  list: protectedProcedure.query(async ({ ctx }): Promise<FlagListItem[]> => {
+  list: permissionedProcedure({ resource: "flags", action: "list" }).query(async ({ ctx }): Promise<FlagListItem[]> => {
     const registry = await resolveFlagRegistry(ctx);
     const { orgId, userId } = ctx;
 
@@ -358,7 +358,7 @@ export const flagsRouter = t.router({
    * flags.set — upsert a FeatureFlag row; bust the registry cache.
    * Owner/admin only — FORBIDDEN for other roles.
    */
-  set: protectedProcedure
+  set: permissionedProcedure({ resource: "flags", action: "set" })
     .input(
       z.object({
         flag: flagNameSchema,
@@ -417,7 +417,7 @@ export const flagsRouter = t.router({
       return { ok: true };
     }),
 
-  evaluate: protectedProcedure
+  evaluate: permissionedProcedure({ resource: "flags", action: "evaluate" })
     .input(
       z.object({
         flag: flagNameSchema,
@@ -468,7 +468,7 @@ export const flagsRouter = t.router({
       };
     }),
 
-  setOverride: protectedProcedure
+  setOverride: permissionedProcedure({ resource: "flags", action: "setOverride" })
     .input(
       z.object({
         flag: flagNameSchema,
@@ -495,7 +495,7 @@ export const flagsRouter = t.router({
       return { ok: true };
     }),
 
-  setRollout: protectedProcedure
+  setRollout: permissionedProcedure({ resource: "flags", action: "setRollout" })
     .input(
       z.object({
         flag: flagNameSchema,
@@ -527,7 +527,7 @@ export const flagsRouter = t.router({
    * All gated by FULCRUM_FEATURES=experiments (C1).
    */
   experiments: t.router({
-    list: protectedProcedure
+    list: permissionedProcedure({ resource: "flags", action: "list" })
       .output(z.array(z.object({
         id: z.string(),
         name: z.string(),
@@ -545,7 +545,7 @@ export const flagsRouter = t.router({
         return experimentStore.list();
       }),
 
-    create: protectedProcedure
+    create: permissionedProcedure({ resource: "flags", action: "create" })
       .input(z.object({
         name: z.string().min(1),
         description: z.string().optional(),
@@ -576,7 +576,7 @@ export const flagsRouter = t.router({
         return experimentStore.create(input);
       }),
 
-    assignments: protectedProcedure
+    assignments: permissionedProcedure({ resource: "flags", action: "assignments" })
       .input(z.object({ experimentId: z.string() }))
       .output(z.record(z.string(), z.number()))
       .query(({ input }) => {
@@ -586,7 +586,7 @@ export const flagsRouter = t.router({
         return experimentStore.assignments(input.experimentId);
       }),
 
-    metrics: protectedProcedure
+    metrics: permissionedProcedure({ resource: "flags", action: "metrics" })
       .input(z.object({ experimentId: z.string(), conversionKind: z.string() }))
       .output(z.record(z.string(), z.object({ assigned: z.number(), conversions: z.number() })))
       .query(({ input }) => {

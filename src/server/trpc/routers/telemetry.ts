@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { TelemetryEvent } from "../../../db/entities/platform/TelemetryEvent.ts";
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import type { AuthenticatedContext } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 
@@ -127,7 +127,7 @@ function storeFromContext(ctx: AuthenticatedContext): TelemetryStore {
 }
 
 export const telemetryRouter = t.router({
-  status: protectedProcedure
+  status: permissionedProcedure({ resource: "telemetry", action: "status" })
     .input(EmptyInputSchema)
     .output(StatusOutputSchema)
     .query(async ({ ctx }) => {
@@ -138,7 +138,7 @@ export const telemetryRouter = t.router({
       };
     }),
 
-  optIn: protectedProcedure
+  optIn: permissionedProcedure({ resource: "telemetry", action: "optIn" })
     .input(EmptyInputSchema)
     .output(OkOutputSchema)
     .mutation(async ({ ctx }) => {
@@ -146,7 +146,7 @@ export const telemetryRouter = t.router({
       return { ok: true as const };
     }),
 
-  optOut: protectedProcedure
+  optOut: permissionedProcedure({ resource: "telemetry", action: "optOut" })
     .input(EmptyInputSchema)
     .output(OkOutputSchema)
     .mutation(async ({ ctx }) => {
@@ -154,7 +154,7 @@ export const telemetryRouter = t.router({
       return { ok: true as const };
     }),
 
-  purge: protectedProcedure
+  purge: permissionedProcedure({ resource: "telemetry", action: "purge" })
     .input(EmptyInputSchema)
     .output(PurgeOutputSchema)
     .mutation(async ({ ctx }) => ({

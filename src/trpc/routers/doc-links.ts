@@ -4,7 +4,7 @@ import { t } from "../trpc.ts";
 import { listProcedure, mutationProcedure, idMutationProcedure } from "./stub-helpers.ts";
 
 export const docLinksRouter = t.router({
-  list: listProcedure(),
+  list: listProcedure("doc_links"),
   create: mutationProcedure("doc_links", "create"),
   delete: idMutationProcedure("doc_links", "delete"),
 });

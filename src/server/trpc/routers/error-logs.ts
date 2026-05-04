@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { ErrorLog } from "../../../db/entities/platform/ErrorLog.ts";
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import type { AuthenticatedContext } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 
@@ -121,17 +121,17 @@ function storeFromContext(ctx: AuthenticatedContext): ErrorLogStore {
 }
 
 export const errorLogsRouter = t.router({
-  list: protectedProcedure
+  list: permissionedProcedure({ resource: "error_logs", action: "list" })
     .input(ListInputSchema)
     .output(z.array(ErrorLogOutputSchema))
     .query(({ ctx, input }) => storeFromContext(ctx).list(ctx.orgId, input)),
 
-  get: protectedProcedure
+  get: permissionedProcedure({ resource: "error_logs", action: "get" })
     .input(GetInputSchema)
     .output(ErrorLogOutputSchema.nullable())
     .query(({ ctx, input }) => storeFromContext(ctx).get(ctx.orgId, input.id)),
 
-  clear: protectedProcedure
+  clear: permissionedProcedure({ resource: "error_logs", action: "clear" })
     .input(ClearInputSchema)
     .output(z.object({ ok: z.literal(true), deleted: z.number().int().nonnegative() }))
     .mutation(async ({ ctx, input }) => ({

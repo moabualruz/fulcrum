@@ -1,7 +1,7 @@
 /**
  * credentials tRPC router — Pillar 17 (Issue 02 secrets vault).
  *
- * Procedures (all protectedProcedure → assertPermission session check):
+ * Procedures (all permissionedProcedure → assertPermission session check):
  *   - list({ includeArchived? })           → list rows scoped to ctx.orgId
  *   - get({ name, userId? })               → plaintext value (auth-scoped)
  *   - set({ name, value })                 → upsert ciphertext for caller
@@ -31,7 +31,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { t } from "../trpc/trpc.ts";
-import { protectedProcedure } from "../trpc/middleware.ts";
+import { permissionedProcedure } from "../trpc/middleware.ts";
 import {
   ALGO_LABEL,
   KDF_LABEL,
@@ -218,7 +218,7 @@ function rowFor(c: {
 }
 
 export const credentialsRouter = t.router({
-  list: protectedProcedure
+  list: permissionedProcedure({ resource: "credentials", action: "list" })
     .input(ListInput)
     .output(z.array(RowOutput))
     .query(async ({ ctx, input }) => {
@@ -236,7 +236,7 @@ export const credentialsRouter = t.router({
       return rows.map(rowFor);
     }),
 
-  get: protectedProcedure
+  get: permissionedProcedure({ resource: "credentials", action: "get" })
     .input(GetInput)
     .output(GetOutput)
     .query(async ({ ctx, input }) => {
@@ -256,7 +256,7 @@ export const credentialsRouter = t.router({
       return { name: cred.name, value: new TextDecoder().decode(plain) };
     }),
 
-  set: protectedProcedure
+  set: permissionedProcedure({ resource: "credentials", action: "set" })
     .input(SetInput)
     .output(SetOutput)
     .mutation(async ({ ctx, input }) => {
@@ -293,7 +293,7 @@ export const credentialsRouter = t.router({
       return { id: (created as { id: string }).id, name: input.name };
     }),
 
-  rotate: protectedProcedure
+  rotate: permissionedProcedure({ resource: "credentials", action: "rotate" })
     .input(RotateInput)
     .output(OkOutput)
     .mutation(async ({ ctx, input }) => {
@@ -317,7 +317,7 @@ export const credentialsRouter = t.router({
       return { ok: true as const };
     }),
 
-  archive: protectedProcedure
+  archive: permissionedProcedure({ resource: "credentials", action: "archive" })
     .input(NameInput)
     .output(OkOutput)
     .mutation(async ({ ctx, input }) => {
@@ -336,7 +336,7 @@ export const credentialsRouter = t.router({
       return { ok: true as const };
     }),
 
-  remove: protectedProcedure
+  remove: permissionedProcedure({ resource: "credentials", action: "remove" })
     .input(NameInput)
     .output(OkOutput)
     .mutation(async ({ ctx, input }) => {

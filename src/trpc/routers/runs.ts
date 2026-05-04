@@ -9,7 +9,7 @@
 
 import { z } from "zod/v4";
 import { t } from "../trpc.ts";
-import { protectedProcedure } from "../middleware.ts";
+import { permissionedProcedure } from "../middleware.ts";
 import { readTranscriptLines } from "../../orchestration/transcript-diff.ts";
 
 const TranscriptLineSchema = z.object({
@@ -20,10 +20,10 @@ const TranscriptLineSchema = z.object({
 
 export const runsRouter = t.router({
   /** list — stub; Pillar 5 replaces with: await repo.find({ org: ctx.orgId }) */
-  list: protectedProcedure.query(() => []),
+  list: permissionedProcedure({ resource: "runs", action: "list" }).query(() => []),
 
   /** getLogs — read JSONL transcript, paginated */
-  getLogs: protectedProcedure
+  getLogs: permissionedProcedure({ resource: "runs", action: "getLogs" })
     .input(
       z.object({
         transcriptPath: z.string(),

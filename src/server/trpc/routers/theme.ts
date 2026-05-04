@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 import type { AuthenticatedContext } from "../../../trpc/middleware.ts";
 
@@ -112,7 +112,7 @@ function themeSetting(key: ThemeKey, overrides: Map<ThemeKey, string>): ThemeSet
 }
 
 export const themeRouter = t.router({
-  listThemes: protectedProcedure
+  listThemes: permissionedProcedure({ resource: "theme", action: "listThemes" })
     .output(z.array(ThemeSettingSchema))
     .query(async ({ ctx }) => {
       const overrides = await readThemeMap(ctx);
@@ -121,7 +121,7 @@ export const themeRouter = t.router({
       );
     }),
 
-  getTheme: protectedProcedure
+  getTheme: permissionedProcedure({ resource: "theme", action: "getTheme" })
     .input(GetThemeInputSchema)
     .output(ThemeSettingSchema)
     .query(async ({ ctx, input }) => {
@@ -130,7 +130,7 @@ export const themeRouter = t.router({
       return themeSetting(key, overrides);
     }),
 
-  setTheme: protectedProcedure
+  setTheme: permissionedProcedure({ resource: "theme", action: "setTheme" })
     .input(SetThemeInputSchema)
     .output(ThemeSettingSchema)
     .mutation(async ({ ctx, input }) => {

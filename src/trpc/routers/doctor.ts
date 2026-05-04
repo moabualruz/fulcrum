@@ -3,11 +3,11 @@
 import { z } from "zod";
 
 import { t } from "../trpc.ts";
-import { protectedProcedure } from "../middleware.ts";
+import { permissionedProcedure } from "../middleware.ts";
 import { EmptyInputSchema } from "./stub-helpers.ts";
 
 export const doctorRouter = t.router({
-  run: protectedProcedure
+  run: permissionedProcedure({ resource: "doctor", action: "run" })
     .input(EmptyInputSchema)
     .output(z.object({
       ok: z.boolean(),
@@ -19,7 +19,7 @@ export const doctorRouter = t.router({
       subsystem: "api" as const,
       requestId: ctx.requestId ?? "",
     })),
-  subsystems: protectedProcedure
+  subsystems: permissionedProcedure({ resource: "doctor", action: "subsystems" })
     .input(EmptyInputSchema)
     .output(z.array(z.string()))
     .query(() => ["api"]),

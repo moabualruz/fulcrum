@@ -9,7 +9,7 @@
 import { z } from "zod";
 
 import { t } from "../trpc.ts";
-import { protectedProcedure } from "../middleware.ts";
+import { permissionedProcedure } from "../middleware.ts";
 
 export const EmptyInputSchema = z.void();
 export const IdInputSchema = z.object({ id: z.string().min(1) });
@@ -36,29 +36,29 @@ export function op(ctx: { requestId: string | null }, domain: string, procedure:
   };
 }
 
-export function listProcedure() {
-  return protectedProcedure
+export function listProcedure(domain: string) {
+  return permissionedProcedure({ resource: domain, action: "list" })
     .input(EmptyInputSchema)
     .output(z.array(StubRowSchema))
     .query(() => []);
 }
 
-export function getProcedure() {
-  return protectedProcedure
+export function getProcedure(domain: string) {
+  return permissionedProcedure({ resource: domain, action: "get" })
     .input(IdInputSchema)
     .output(StubRowSchema.nullable())
     .query(() => null);
 }
 
 export function mutationProcedure(domain: string, procedure: string) {
-  return protectedProcedure
+  return permissionedProcedure({ resource: domain, action: procedure })
     .input(OptionalRecordInputSchema)
     .output(StubOperationOutputSchema)
     .mutation(({ ctx }) => op(ctx, domain, procedure));
 }
 
 export function idMutationProcedure(domain: string, procedure: string) {
-  return protectedProcedure
+  return permissionedProcedure({ resource: domain, action: procedure })
     .input(IdInputSchema)
     .output(StubOperationOutputSchema)
     .mutation(({ ctx }) => op(ctx, domain, procedure));
@@ -66,8 +66,8 @@ export function idMutationProcedure(domain: string, procedure: string) {
 
 export function crudProcedures(domain: string) {
   return {
-    list: listProcedure(),
-    get: getProcedure(),
+    list: listProcedure(domain),
+    get: getProcedure(domain),
     create: mutationProcedure(domain, "create"),
     update: mutationProcedure(domain, "update"),
     delete: idMutationProcedure(domain, "delete"),

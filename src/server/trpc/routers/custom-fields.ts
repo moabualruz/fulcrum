@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { CustomFieldDef, CustomFieldConfigSchema } from "../../../db/entities/tasks/CustomFieldDef.ts";
 import { Task } from "../../../db/entities/tasks/Task.ts";
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 
 const FieldTypeSchema = z.enum([
@@ -175,7 +175,7 @@ function validateValue(field: CustomFieldDef, value: unknown): unknown {
 }
 
 export const customFieldDefsRouter = t.router({
-  list: protectedProcedure
+  list: permissionedProcedure({ resource: "custom_fields", action: "list" })
     .input(ListCustomFieldDefsInputSchema)
     .output(z.array(CustomFieldDefOutputSchema))
     .query(async ({ ctx, input }) => {
@@ -191,7 +191,7 @@ export const customFieldDefsRouter = t.router({
 });
 
 export const taskCustomFieldsRouter = t.router({
-  set: protectedProcedure
+  set: permissionedProcedure({ resource: "custom_fields", action: "set" })
     .input(FieldValueInputSchema)
     .output(TaskCustomFieldsOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
@@ -210,7 +210,7 @@ export const taskCustomFieldsRouter = t.router({
       return { taskId: task.id, customFields: task.customFields };
     }),
 
-  clear: protectedProcedure
+  clear: permissionedProcedure({ resource: "custom_fields", action: "clear" })
     .input(ClearFieldInputSchema)
     .output(TaskCustomFieldsOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {

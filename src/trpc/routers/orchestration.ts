@@ -2,7 +2,7 @@ import { z } from "zod/v4";
 import { TRPCError } from "@trpc/server";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { router, publicProcedure } from "../trpc.ts";
-import { protectedProcedure } from "../middleware.ts";
+import { permissionedProcedure } from "../middleware.ts";
 import {
   cancelRun,
   createRun,
@@ -173,7 +173,7 @@ async function getAgentRunForApi(
 // Router
 // ---------------------------------------------------------------------------
 export const orchestrationRouter = router({
-  list: protectedProcedure
+  list: permissionedProcedure({ resource: "orchestration", action: "list" })
     .input(z.void())
     .output(z.array(z.never()))
     .query(() => []),
@@ -209,14 +209,14 @@ export const orchestrationRouter = router({
       return getRun(requireDb(ctx), input.id as string);
     }),
 
-  cancelRun: protectedProcedure
+  cancelRun: permissionedProcedure({ resource: "orchestration", action: "cancelRun" })
     .input(z.object({ id: z.string() }))
     .output(SymphonyRunSchema.nullable())
     .mutation(async ({ input, ctx }) => {
       return cancelRun(requireDb(ctx), input.id);
     }),
 
-  retryRun: protectedProcedure
+  retryRun: permissionedProcedure({ resource: "orchestration", action: "retryRun" })
     .input(z.object({ id: z.string() }))
     .output(SymphonyRunSchema.nullable())
     .mutation(async ({ input, ctx }) => {
@@ -237,7 +237,7 @@ export const orchestrationRouter = router({
       return listWorkflowDefs(requireDb(ctx), requireOrgId(ctx));
     }),
 
-  upsertWorkflowDef: protectedProcedure
+  upsertWorkflowDef: permissionedProcedure({ resource: "orchestration", action: "upsertWorkflowDef" })
     .input(
       z.object({
         projectId: z.string().nullable().optional(),
@@ -358,7 +358,7 @@ export const orchestrationRouter = router({
       );
     }),
 
-  claimRun: protectedProcedure
+  claimRun: permissionedProcedure({ resource: "orchestration", action: "claimRun" })
     .input(
       z.object({
         orgId: z.string().optional(),

@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 import { SprintService } from "../../../services/SprintService.ts";
 
@@ -97,7 +97,7 @@ function requireService(ctx: { em: EntityManager | null }): SprintService {
 // ── Router (thin delegation layer) ─────────────────────────────────
 
 export const sprintsRouter = t.router({
-  list: protectedProcedure
+  list: permissionedProcedure({ resource: "sprints", action: "list" })
     .input(ListSprintsInputSchema)
     .output(z.array(SprintOutputSchema))
     .query(async ({ ctx, input }) => {
@@ -105,56 +105,56 @@ export const sprintsRouter = t.router({
       return requireService(ctx).list(ctx.orgId, input ?? undefined);
     }),
 
-  get: protectedProcedure
+  get: permissionedProcedure({ resource: "sprints", action: "get" })
     .input(SprintIdInputSchema)
     .output(SprintOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
       return requireService(ctx).get(ctx.orgId, input.id);
     }),
 
-  create: protectedProcedure
+  create: permissionedProcedure({ resource: "sprints", action: "create" })
     .input(CreateSprintInputSchema)
     .output(SprintOutputSchema)
     .mutation(async ({ ctx, input }) => {
       return requireService(ctx).create(ctx.orgId, input);
     }),
 
-  update: protectedProcedure
+  update: permissionedProcedure({ resource: "sprints", action: "update" })
     .input(UpdateSprintInputSchema)
     .output(SprintOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
       return requireService(ctx).update(ctx.orgId, input);
     }),
 
-  delete: protectedProcedure
+  delete: permissionedProcedure({ resource: "sprints", action: "delete" })
     .input(SprintIdInputSchema)
     .output(SprintOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
       return requireService(ctx).delete(ctx.orgId, input.id);
     }),
 
-  start: protectedProcedure
+  start: permissionedProcedure({ resource: "sprints", action: "start" })
     .input(SprintIdInputSchema)
     .output(SprintOutputSchema)
     .mutation(async ({ ctx, input }) => {
       return requireService(ctx).start(ctx, input.id);
     }),
 
-  close: protectedProcedure
+  close: permissionedProcedure({ resource: "sprints", action: "close" })
     .input(CloseSprintInputSchema)
     .output(CloseSprintOutputSchema)
     .mutation(async ({ ctx, input }) => {
       return requireService(ctx).close(ctx, input);
     }),
 
-  addTask: protectedProcedure
+  addTask: permissionedProcedure({ resource: "sprints", action: "addTask" })
     .input(SprintTaskInputSchema)
     .output(MoveTaskOutputSchema)
     .mutation(async ({ ctx, input }) => {
       return requireService(ctx).addTask(ctx.orgId, input.sprintId, input.taskId);
     }),
 
-  removeTask: protectedProcedure
+  removeTask: permissionedProcedure({ resource: "sprints", action: "removeTask" })
     .input(SprintTaskInputSchema)
     .output(MoveTaskOutputSchema)
     .mutation(async ({ ctx, input }) => {

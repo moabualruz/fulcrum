@@ -51,6 +51,7 @@ export const FEATURE_FLAGS = [
   "experiments",
   "scheduled-backups",
   "skill-marketplace",
+  "trpc-permission-local-dev-bypass",
 ] as const;
 
 /** Union type of all registered feature flag names. */
@@ -89,6 +90,7 @@ export const FLAG_DESCRIPTIONS: Record<FeatureFlagName, string> = {
   "experiments": "Enable experimental product surfaces gated from default local-first flows.",
   "scheduled-backups": "Enable scheduled local and remote backup tasks.",
   "skill-marketplace": "Enable skill marketplace client and publisher commands.",
+  "trpc-permission-local-dev-bypass": "Allow local development tRPC permission bypass logging when Casbin denies access.",
 };
 
 const featureFlagSet = new Set<string>(FEATURE_FLAGS);

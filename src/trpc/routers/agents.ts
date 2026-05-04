@@ -5,7 +5,7 @@ import { TRPCError } from "@trpc/server";
 
 import { t } from "../trpc.ts";
 import { publicProcedure } from "../trpc.ts";
-import { protectedProcedure } from "../middleware.ts";
+import { permissionedProcedure } from "../middleware.ts";
 import { getProfile, listProfiles } from "../../agents/registry.ts";
 import { AgentProfileSchema } from "../../agents/types.ts";
 import { AgentProfile as AgentProfileEntity } from "../../db/entities/sandbox/AgentProfile.ts";
@@ -45,7 +45,7 @@ export const agentsRouter = t.router({
     .input(z.object({ name: z.string().min(1) }))
     .output(AgentProfileSchema)
     .query(({ input }) => getProfile(input.name)),
-  testProfile: protectedProcedure
+  testProfile: permissionedProcedure({ resource: "agents", action: "testProfile" })
     .input(z.object({ name: z.string().min(1) }))
     .output(z.object({
       name: z.string(),

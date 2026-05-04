@@ -4,6 +4,6 @@ import { t } from "../trpc.ts";
 import { listProcedure, getProcedure } from "./stub-helpers.ts";
 
 export const repoBranchesRouter = t.router({
-  list: listProcedure(),
-  get: getProcedure(),
+  list: listProcedure("repo_branches"),
+  get: getProcedure("repo_branches"),
 });

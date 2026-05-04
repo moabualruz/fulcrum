@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 
 const FORMAT = "fulcrum.db-dump.v1" as const;
@@ -180,7 +180,7 @@ function toPostgresArrayLiteral(values: unknown[]): string {
 }
 
 export const backupRouter = t.router({
-  create: protectedProcedure
+  create: permissionedProcedure({ resource: "backup", action: "create" })
     .output(BackupOutputSchema)
     .mutation(async ({ ctx }) => {
       const em = requireEntityManager(ctx);
@@ -193,7 +193,7 @@ export const backupRouter = t.router({
       };
     }),
 
-  restore: protectedProcedure
+  restore: permissionedProcedure({ resource: "backup", action: "restore" })
     .input(RestoreInputSchema)
     .output(RestoreOutputSchema)
     .mutation(async ({ ctx, input }) => {

@@ -2,11 +2,11 @@
  * orgs tRPC router — Pillar 9 (org management procedures).
  *
  * Procedures:
- *   - orgs.get()                     → Org row                  (protectedProcedure)
- *   - orgs.update(name)              → { ok: true }             (protectedProcedure, owner)
- *   - orgs.members.list()            → OrgMember[]              (protectedProcedure, admin/owner)
- *   - orgs.members.updateRole(...)   → { ok: true }             (protectedProcedure, owner)
- *   - orgs.members.remove(...)       → { ok: true }             (protectedProcedure, owner/admin)
+ *   - orgs.get()                     → Org row                  (permissionedProcedure)
+ *   - orgs.update(name)              → { ok: true }             (permissionedProcedure, owner)
+ *   - orgs.members.list()            → OrgMember[]              (permissionedProcedure, admin/owner)
+ *   - orgs.members.updateRole(...)   → { ok: true }             (permissionedProcedure, owner)
+ *   - orgs.members.remove(...)       → { ok: true }             (permissionedProcedure, owner/admin)
  *
  * C6: No raw SQL.
  * C7: MikroORM v7 em.findOne / em.find / em.flush / em.removeAndFlush.
@@ -16,7 +16,7 @@
 import { TRPCError } from "@trpc/server";
 
 import { t } from "../../../trpc/trpc.ts";
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import {
   UpdateOrgInputSchema,
   UpdateMemberRoleInputSchema,
@@ -121,7 +121,7 @@ const orgsMembersRouter = t.router({
    * orgs.members.list — list all OrgMember rows for ctx.orgId.
    * Admin/owner only.
    */
-  list: protectedProcedure.query(async ({ ctx }) => {
+  list: permissionedProcedure({ resource: "orgs", action: "list" }).query(async ({ ctx }) => {
     await requireAdminOrOwner(ctx as unknown as CtxWithEm);
     const em = await requireEm(ctx);
     const OrgMember = await getOrgMemberClass();
@@ -140,7 +140,7 @@ const orgsMembersRouter = t.router({
    * orgs.members.updateRole — change a member's role.
    * Owner only.
    */
-  updateRole: protectedProcedure
+  updateRole: permissionedProcedure({ resource: "orgs", action: "updateRole" })
     .input(UpdateMemberRoleInputSchema)
     .mutation(async ({ ctx, input }) => {
       await requireOwner(ctx as unknown as CtxWithEm);
@@ -166,7 +166,7 @@ const orgsMembersRouter = t.router({
    * orgs.members.remove — remove a member.
    * Owner/admin only. Cannot remove self if last owner.
    */
-  remove: protectedProcedure
+  remove: permissionedProcedure({ resource: "orgs", action: "remove" })
     .input(RemoveMemberInputSchema)
     .mutation(async ({ ctx, input }) => {
       await requireAdminOrOwner(ctx as unknown as CtxWithEm);
@@ -211,7 +211,7 @@ export const orgsRouter = t.router({
   /**
    * orgs.get — returns the current org.
    */
-  get: protectedProcedure.query(async ({ ctx }) => {
+  get: permissionedProcedure({ resource: "orgs", action: "get" }).query(async ({ ctx }) => {
     const em = await requireEm(ctx);
     const Org = await getOrgClass();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -236,7 +236,7 @@ export const orgsRouter = t.router({
    * orgs.update — update org name.
    * Owner only.
    */
-  update: protectedProcedure
+  update: permissionedProcedure({ resource: "orgs", action: "update" })
     .input(UpdateOrgInputSchema)
     .mutation(async ({ ctx, input }) => {
       await requireOwner(ctx as unknown as CtxWithEm);

@@ -9,7 +9,7 @@ import {
   MEMORY_SOURCES,
 } from "../../../db/entities/memory/enums.ts";
 import { rankMemoryMatches } from "../../../memory/retrieval/scoring.ts";
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 
 type EntityManager = import("@mikro-orm/postgresql").EntityManager;
@@ -152,7 +152,7 @@ function filterTags<TMemory extends Memory>(
 }
 
 export const memoryRouter = t.router({
-  create: protectedProcedure
+  create: permissionedProcedure({ resource: "memories", action: "create" })
     .input(CreateMemoryInputSchema)
     .output(MemoryOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -177,7 +177,7 @@ export const memoryRouter = t.router({
       return serializeMemory(memory);
     }),
 
-  get: protectedProcedure
+  get: permissionedProcedure({ resource: "memories", action: "get" })
     .input(IdInputSchema)
     .output(MemoryOutputSchema)
     .query(async ({ ctx, input }) => {
@@ -185,7 +185,7 @@ export const memoryRouter = t.router({
       return serializeMemory(memory);
     }),
 
-  list: protectedProcedure
+  list: permissionedProcedure({ resource: "memories", action: "list" })
     .input(ListMemoriesInputSchema)
     .output(z.array(MemoryOutputSchema))
     .query(async ({ ctx, input }) => {
@@ -199,7 +199,7 @@ export const memoryRouter = t.router({
       return filterTags(memories, input?.tags).map(serializeMemory);
     }),
 
-  update: protectedProcedure
+  update: permissionedProcedure({ resource: "memories", action: "update" })
     .input(UpdateMemoryInputSchema)
     .output(MemoryOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -221,7 +221,7 @@ export const memoryRouter = t.router({
       return serializeMemory(memory);
     }),
 
-  delete: protectedProcedure
+  delete: permissionedProcedure({ resource: "memories", action: "delete" })
     .input(IdInputSchema)
     .output(DeleteMemoryOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -232,7 +232,7 @@ export const memoryRouter = t.router({
       return { deleted: true as const };
     }),
 
-  search: protectedProcedure
+  search: permissionedProcedure({ resource: "memories", action: "search" })
     .input(SearchMemoryInputSchema)
     .output(z.array(RankedMemoryOutputSchema))
     .query(async ({ ctx, input }) => {

@@ -2,8 +2,8 @@
  * auth tRPC router — Pillar 9 (auth tRPC procedures + org management).
  *
  * Procedures:
- *   - auth.whoami        → { userId, orgId, email, role }       (protectedProcedure)
- *   - auth.invite        → { invitationId, token }              (protectedProcedure, admin/owner)
+ *   - auth.whoami        → { userId, orgId, email, role }       (permissionedProcedure)
+ *   - auth.invite        → { invitationId, token }              (permissionedProcedure, admin/owner)
  *   - auth.acceptInvite  → { userId, orgId }                    (publicProcedure)
  *
  * Notes (from issue #09):
@@ -26,7 +26,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { t } from "../../../trpc/trpc.ts";
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { publicProcedure } from "../../../trpc/trpc.ts";
 import {
   InviteInputSchema,
@@ -162,7 +162,7 @@ export const authRouter = t.router({
    * Looks up the User row to get email + role when em is available.
    * Falls back to session-only data (no email/role) when em is null (e.g. test stubs).
    */
-  whoami: protectedProcedure.query(async ({ ctx }) => {
+  whoami: permissionedProcedure({ resource: "auth", action: "whoami" }).query(async ({ ctx }) => {
     // Base response from session (always available after assertPermission)
     const base = {
       userId: ctx.userId,
@@ -194,7 +194,7 @@ export const authRouter = t.router({
    * auth.invite — create an Invitation row + return plaintext token.
    * Admin/owner only. Token stored HASHED; plaintext returned once.
    */
-  invite: protectedProcedure
+  invite: permissionedProcedure({ resource: "auth", action: "invite" })
     .input(InviteInputSchema)
     .mutation(async ({ ctx, input }) => {
       // ── Authorization: owner or admin only ────────────────────────────────

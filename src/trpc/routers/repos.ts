@@ -9,7 +9,7 @@ import { Event } from "../../db/entities/core/Event.ts";
 import { Org } from "../../db/entities/auth/Org.ts";
 import { Repo } from "../../db/entities/repos/Repo.ts";
 import { RepoRepository } from "../../db/repositories/repos/RepoRepository.ts";
-import { protectedProcedure } from "../middleware.ts";
+import { permissionedProcedure } from "../middleware.ts";
 import { t } from "../trpc.ts";
 
 const RepoOutputSchema = z.object({
@@ -118,7 +118,7 @@ async function emitRepoEvent(ctx: {
 }
 
 export const reposRouter = t.router({
-  list: protectedProcedure
+  list: permissionedProcedure({ resource: "repos", action: "list" })
     .input(ListReposInputSchema)
     .output(z.array(RepoOutputSchema))
     .query(async ({ ctx, input }) => {
@@ -131,7 +131,7 @@ export const reposRouter = t.router({
       return repos.map(serializeRepo);
     }),
 
-  get: protectedProcedure
+  get: permissionedProcedure({ resource: "repos", action: "get" })
     .input(RepoIdInputSchema)
     .output(RepoOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
@@ -140,7 +140,7 @@ export const reposRouter = t.router({
       return found ? serializeRepo(found) : null;
     }),
 
-  register: protectedProcedure
+  register: permissionedProcedure({ resource: "repos", action: "register" })
     .input(RegisterRepoInputSchema)
     .output(RepoOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -170,7 +170,7 @@ export const reposRouter = t.router({
       return serializeRepo(created);
     }),
 
-  sync: protectedProcedure
+  sync: permissionedProcedure({ resource: "repos", action: "sync" })
     .input(RepoIdInputSchema)
     .output(RepoOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
@@ -191,7 +191,7 @@ export const reposRouter = t.router({
       return serializeRepo(found);
     }),
 
-  unregister: protectedProcedure
+  unregister: permissionedProcedure({ resource: "repos", action: "unregister" })
     .input(RepoIdInputSchema)
     .output(RepoOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {

@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { readFile, writeFile } from "node:fs/promises";
 import { z } from "zod";
 
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 
 const FORMAT = "fulcrum.json-export.v1" as const;
@@ -319,7 +319,7 @@ async function importManifest(
 }
 
 export const dataExportRouter = t.router({
-  create: protectedProcedure
+  create: permissionedProcedure({ resource: "data", action: "create" })
     .input(ExportCreateInputSchema)
     .output(ExportCreateOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -337,7 +337,7 @@ export const dataExportRouter = t.router({
 });
 
 export const dataImportRouter = t.router({
-  preflight: protectedProcedure
+  preflight: permissionedProcedure({ resource: "data", action: "preflight" })
     .input(ImportPreflightInputSchema)
     .output(ImportPreflightOutputSchema)
     .query(async ({ ctx, input }) => {
@@ -350,7 +350,7 @@ export const dataImportRouter = t.router({
       };
     }),
 
-  run: protectedProcedure
+  run: permissionedProcedure({ resource: "data", action: "run" })
     .input(ImportRunInputSchema)
     .output(ImportRunOutputSchema)
     .mutation(async ({ ctx, input }) => {

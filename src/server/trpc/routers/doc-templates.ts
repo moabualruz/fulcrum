@@ -18,7 +18,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { t } from "../../../trpc/trpc.ts";
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import {
   DOC_TEMPLATE_SERVICE_TOKEN,
   type DocTemplateService,
@@ -75,7 +75,7 @@ export const docTemplatesRouter = t.router({
    * List all templates for the authenticated org.
    * If projectId is supplied, results are scoped to that project (project-specific + org-defaults).
    */
-  list: protectedProcedure
+  list: permissionedProcedure({ resource: "docs.templates", action: "list" })
     .input(
       z.object({
         projectId: z.string().uuid().nullable().optional(),
@@ -91,7 +91,7 @@ export const docTemplatesRouter = t.router({
    * Resolve the best template for a doc_type + optional project.
    * Project-specific template wins over org default.
    */
-  resolve: protectedProcedure
+  resolve: permissionedProcedure({ resource: "docs.templates", action: "resolve" })
     .input(
       z.object({
         docType: DocTypeEnum,

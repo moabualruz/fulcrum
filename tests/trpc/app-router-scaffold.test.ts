@@ -246,17 +246,18 @@ function findMutationPermissionViolations(): string[] {
 
     for (const match of matches) {
       const index = match.index ?? 0;
-      const windowStart = Math.max(0, index - 700);
+      const windowStart = Math.max(0, index - 2_000);
       const window = source.slice(windowStart, index);
-      const procedureStarts = [...window.matchAll(/([A-Za-z_$][\w$]*)\s*:\s*(publicProcedure|protectedProcedure)/g)];
+      const procedureStarts = [...window.matchAll(/([A-Za-z_$][\w$]*)\s*:\s*(publicProcedure|protectedProcedure|permissionedProcedure)/g)];
       const start = procedureStarts.at(-1);
       const name = start?.[1] ?? "<unknown>";
       const builder = start?.[2] ?? "<unknown>";
       const allowKey = `${rel}:${name}`;
-      const protectedHelperChain = /\breturn\s+protectedProcedure\b/.test(window);
+      const protectedHelperChain = /\breturn\s+(protectedProcedure|permissionedProcedure)\b/.test(window);
 
       if (
         builder !== "protectedProcedure" &&
+        builder !== "permissionedProcedure" &&
         !protectedHelperChain &&
         !PUBLIC_MUTATION_ALLOWLIST.has(allowKey)
       ) {

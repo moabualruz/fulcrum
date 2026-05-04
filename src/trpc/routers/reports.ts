@@ -10,7 +10,7 @@ import { z } from "zod";
 
 import { MetricsCache } from "../../db/entities/tasks/MetricsCache.ts";
 import { Sprint } from "../../db/entities/tasks/Sprint.ts";
-import { protectedProcedure } from "../middleware.ts";
+import { permissionedProcedure } from "../middleware.ts";
 import { t } from "../trpc.ts";
 
 type EntityManager = import("@mikro-orm/postgresql").EntityManager;
@@ -135,7 +135,7 @@ async function computeBurndown(
 }
 
 export const reportsRouter = t.router({
-  burndown: protectedProcedure
+  burndown: permissionedProcedure({ resource: "reports", action: "burndown" })
     .input(BurndownInputSchema)
     .output(BurndownOutputSchema)
     .query(async ({ ctx, input }) => {

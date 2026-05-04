@@ -8,7 +8,7 @@ import {
   uninstallSkill,
 } from "../../../skills/loader.ts";
 import { syncUpstream, upgradeSkills } from "../../../skills/upstream-sync.ts";
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 
 const SkillOutputSchema = z.object({
@@ -61,33 +61,33 @@ function serializeSkill(skill: FulcrumSkill): z.infer<typeof SkillOutputSchema> 
 }
 
 export const skillsRouter = t.router({
-  list: protectedProcedure
+  list: permissionedProcedure({ resource: "fulcrum_skills", action: "list" })
     .output(z.array(SkillOutputSchema))
     .query(({ ctx }) => listInstalledSkills(ctx.orgId).then((skills) => skills.map(serializeSkill))),
 
-  install: protectedProcedure
+  install: permissionedProcedure({ resource: "fulcrum_skills", action: "install" })
     .input(InstallInputSchema)
     .output(SkillOutputSchema)
     .mutation(({ ctx, input }) => installSkill(input.path, ctx.orgId).then(serializeSkill)),
 
-  upgrade: protectedProcedure
+  upgrade: permissionedProcedure({ resource: "fulcrum_skills", action: "upgrade" })
     .input(UpgradeInputSchema)
     .output(z.array(SkillOutputSchema))
     .mutation(({ ctx, input }) =>
       upgradeSkills(ctx.orgId, input.slug).then((skills) => skills.map(serializeSkill))
     ),
 
-  uninstall: protectedProcedure
+  uninstall: permissionedProcedure({ resource: "fulcrum_skills", action: "uninstall" })
     .input(UninstallInputSchema)
     .output(z.void())
     .mutation(({ ctx, input }) => uninstallSkill(input.slug, ctx.orgId)),
 
-  sync: protectedProcedure
+  sync: permissionedProcedure({ resource: "fulcrum_skills", action: "sync" })
     .input(SyncInputSchema)
     .output(SyncResultSchema)
     .mutation(({ ctx, input }) => syncUpstream(ctx.orgId, input)),
 
-  resolveConflict: protectedProcedure
+  resolveConflict: permissionedProcedure({ resource: "fulcrum_skills", action: "resolveConflict" })
     .input(ResolveConflictInputSchema)
     .output(SkillOutputSchema)
     .mutation(({ ctx, input }) =>

@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { DocTypeEnum, ScopeEnum } from "../../../db/entities/docs/enums.ts";
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 import { DocService } from "../../../services/DocService.ts";
 import { docTemplatesRouter } from "./doc-templates.ts";
@@ -167,7 +167,7 @@ function requireService(ctx: { em: import("@mikro-orm/postgresql").EntityManager
 // ── Router (thin delegation layer) ─────────────────────────────────
 
 export const docsRouter = t.router({
-  list: protectedProcedure
+  list: permissionedProcedure({ resource: "docs", action: "list" })
     .input(ListDocsInputSchema)
     .output(z.array(DocOutputSchema))
     .query(async ({ ctx, input }) => {
@@ -175,7 +175,7 @@ export const docsRouter = t.router({
       return requireService(ctx).list(ctx.orgId, input ?? undefined);
     }),
 
-  get: protectedProcedure
+  get: permissionedProcedure({ resource: "docs", action: "get" })
     .input(GetDocInputSchema)
     .output(DocOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
@@ -183,21 +183,21 @@ export const docsRouter = t.router({
       return requireService(ctx).get(ctx.orgId, input);
     }),
 
-  create: protectedProcedure
+  create: permissionedProcedure({ resource: "docs", action: "create" })
     .input(CreateDocInputSchema)
     .output(DocOutputSchema)
     .mutation(async ({ ctx, input }) => {
       return requireService(ctx).create(ctx, input);
     }),
 
-  update: protectedProcedure
+  update: permissionedProcedure({ resource: "docs", action: "update" })
     .input(UpdateDocInputSchema)
     .output(DocOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
       return requireService(ctx).update(ctx, input);
     }),
 
-  delete: protectedProcedure
+  delete: permissionedProcedure({ resource: "docs", action: "delete" })
     .input(DeleteDocInputSchema)
     .output(z.union([DocOutputSchema, HardDeleteOutputSchema]).nullable())
     .mutation(async ({ ctx, input }) => {
@@ -205,7 +205,7 @@ export const docsRouter = t.router({
     }),
 
   comments: t.router({
-    list: protectedProcedure
+    list: permissionedProcedure({ resource: "docs", action: "list" })
       .input(ListCommentsInputSchema)
       .output(z.array(CommentOutputSchema))
       .query(async ({ ctx, input }) => {
@@ -213,28 +213,28 @@ export const docsRouter = t.router({
         return requireService(ctx).listComments(ctx, input.docId, input.resolved);
       }),
 
-    create: protectedProcedure
+    create: permissionedProcedure({ resource: "docs", action: "create" })
       .input(CreateCommentInputSchema)
       .output(CommentOutputSchema)
       .mutation(async ({ ctx, input }) => {
         return requireService(ctx).createComment(ctx, input);
       }),
 
-    update: protectedProcedure
+    update: permissionedProcedure({ resource: "docs", action: "update" })
       .input(UpdateCommentInputSchema)
       .output(CommentOutputSchema.nullable())
       .mutation(async ({ ctx, input }) => {
         return requireService(ctx).updateComment(ctx, input.id, input.bodyMd);
       }),
 
-    delete: protectedProcedure
+    delete: permissionedProcedure({ resource: "docs", action: "delete" })
       .input(DeleteCommentInputSchema)
       .output(DeleteCommentOutputSchema.nullable())
       .mutation(async ({ ctx, input }) => {
         return requireService(ctx).deleteComment(ctx, input.id);
       }),
 
-    resolve: protectedProcedure
+    resolve: permissionedProcedure({ resource: "docs", action: "resolve" })
       .input(ResolveCommentInputSchema)
       .output(CommentOutputSchema.nullable())
       .mutation(async ({ ctx, input }) => {
@@ -243,28 +243,28 @@ export const docsRouter = t.router({
   }),
 
   versions: t.router({
-    list: protectedProcedure
+    list: permissionedProcedure({ resource: "docs", action: "list" })
       .input(VersionDocInputSchema)
       .output(z.array(VersionListOutputSchema))
       .query(async ({ ctx, input }) => {
         return requireService(ctx).listVersions(ctx, input.docId);
       }),
 
-    get: protectedProcedure
+    get: permissionedProcedure({ resource: "docs", action: "get" })
       .input(VersionGetInputSchema)
       .output(VersionOutputSchema.nullable())
       .query(async ({ ctx, input }) => {
         return requireService(ctx).getVersion(ctx, input.docId, input.versionNum);
       }),
 
-    diff: protectedProcedure
+    diff: permissionedProcedure({ resource: "docs", action: "diff" })
       .input(VersionDiffInputSchema)
       .output(VersionDiffOutputSchema)
       .query(async ({ ctx, input }) => {
         return requireService(ctx).diffVersions(ctx, input.docId, input.fromVersionNum, input.toVersionNum);
       }),
 
-    restore: protectedProcedure
+    restore: permissionedProcedure({ resource: "docs", action: "restore" })
       .input(VersionGetInputSchema)
       .output(DocOutputSchema)
       .mutation(async ({ ctx, input }) => {
@@ -275,7 +275,7 @@ export const docsRouter = t.router({
   templates: docTemplatesRouter,
 
   links: t.router({
-    listBacklinks: protectedProcedure
+    listBacklinks: permissionedProcedure({ resource: "docs", action: "listBacklinks" })
       .input(DocLinksInputSchema)
       .output(z.array(BacklinkOutputSchema))
       .query(async ({ ctx, input }) => {
@@ -283,7 +283,7 @@ export const docsRouter = t.router({
         return requireService(ctx).listBacklinks(ctx.orgId, input.docId);
       }),
 
-    listForwardLinks: protectedProcedure
+    listForwardLinks: permissionedProcedure({ resource: "docs", action: "listForwardLinks" })
       .input(DocLinksInputSchema)
       .output(z.array(ForwardLinkOutputSchema))
       .query(async ({ ctx, input }) => {

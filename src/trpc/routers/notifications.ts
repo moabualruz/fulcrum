@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { protectedProcedure } from "../middleware.ts";
+import { permissionedProcedure } from "../middleware.ts";
 import { t } from "../trpc.ts";
 import {
   ChannelNameSchema,
@@ -159,7 +159,7 @@ async function findOrgRef(em: EntityManager, orgId: string) {
 }
 
 export const notificationsRouter = t.router({
-  list: protectedProcedure
+  list: permissionedProcedure({ resource: "notify", action: "list" })
     .input(ListNotificationsInputSchema.default({ limit: 50, offset: 0 }))
     .output(NotificationListOutputSchema)
     .query(async ({ ctx, input }) => {
@@ -180,7 +180,7 @@ export const notificationsRouter = t.router({
       return { items: items.map(notificationToOutput), total };
     }),
 
-  unreadCount: protectedProcedure
+  unreadCount: permissionedProcedure({ resource: "notify", action: "unreadCount" })
     .output(z.object({ count: z.number().int().nonnegative() }))
     .query(async ({ ctx }) => {
       const em = requireEm(ctx);
@@ -193,7 +193,7 @@ export const notificationsRouter = t.router({
       return { count };
     }),
 
-  markRead: protectedProcedure
+  markRead: permissionedProcedure({ resource: "notify", action: "markRead" })
     .input(IdInputSchema)
     .output(NotificationOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -212,7 +212,7 @@ export const notificationsRouter = t.router({
       return notificationToOutput(row);
     }),
 
-  markAllRead: protectedProcedure
+  markAllRead: permissionedProcedure({ resource: "notify", action: "markAllRead" })
     .output(z.object({ count: z.number().int().nonnegative() }))
     .mutation(async ({ ctx }) => {
       const em = requireEm(ctx);
@@ -228,7 +228,7 @@ export const notificationsRouter = t.router({
       return { count: rows.length };
     }),
 
-  mute: protectedProcedure
+  mute: permissionedProcedure({ resource: "notify", action: "mute" })
     .input(MuteInputSchema)
     .output(MuteOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -253,7 +253,7 @@ export const notificationsRouter = t.router({
     }),
 
   mutes: t.router({
-    list: protectedProcedure
+    list: permissionedProcedure({ resource: "notify", action: "list" })
       .output(z.array(MuteOutputSchema))
       .query(async ({ ctx }) => {
         const em = requireEm(ctx);
@@ -266,7 +266,7 @@ export const notificationsRouter = t.router({
       }),
   }),
 
-  unmute: protectedProcedure
+  unmute: permissionedProcedure({ resource: "notify", action: "unmute" })
     .input(SubjectInputSchema)
     .output(z.object({ ok: z.literal(true) }))
     .mutation(async ({ ctx, input }) => {
@@ -284,7 +284,7 @@ export const notificationsRouter = t.router({
     }),
 
   rules: t.router({
-    list: protectedProcedure
+    list: permissionedProcedure({ resource: "notify", action: "list" })
       .output(z.array(NotificationRuleOutputSchema))
       .query(async ({ ctx }) => {
         const em = requireEm(ctx);
@@ -296,7 +296,7 @@ export const notificationsRouter = t.router({
         return rows.map(ruleToOutput);
       }),
 
-    get: protectedProcedure
+    get: permissionedProcedure({ resource: "notify", action: "get" })
       .input(IdInputSchema)
       .output(NotificationRuleOutputSchema.nullable())
       .query(async ({ ctx, input }) => {
@@ -310,7 +310,7 @@ export const notificationsRouter = t.router({
         return row ? ruleToOutput(row) : null;
       }),
 
-    create: protectedProcedure
+    create: permissionedProcedure({ resource: "notify", action: "create" })
       .input(NotificationRuleCreateInputSchema)
       .output(NotificationRuleOutputSchema)
       .mutation(async ({ ctx, input }) => {
@@ -334,7 +334,7 @@ export const notificationsRouter = t.router({
         return ruleToOutput(row);
       }),
 
-    update: protectedProcedure
+    update: permissionedProcedure({ resource: "notify", action: "update" })
       .input(NotificationRuleUpdateInputSchema)
       .output(NotificationRuleOutputSchema)
       .mutation(async ({ ctx, input }) => {
@@ -361,7 +361,7 @@ export const notificationsRouter = t.router({
         return ruleToOutput(row);
       }),
 
-    delete: protectedProcedure
+    delete: permissionedProcedure({ resource: "notify", action: "delete" })
       .input(IdInputSchema)
       .output(z.object({ ok: z.literal(true) }))
       .mutation(async ({ ctx, input }) => {
@@ -379,7 +379,7 @@ export const notificationsRouter = t.router({
   }),
 
   channels: t.router({
-    list: protectedProcedure
+    list: permissionedProcedure({ resource: "notify", action: "list" })
       .output(z.array(z.object({
         name: ChannelNameSchema,
         enabled: z.boolean(),
@@ -387,7 +387,7 @@ export const notificationsRouter = t.router({
       })))
       .query(() => [...CHANNELS]),
 
-    config: protectedProcedure
+    config: permissionedProcedure({ resource: "notify", action: "config" })
       .input(z.object({
         channel: ChannelNameSchema,
         enabled: z.boolean(),
@@ -434,7 +434,7 @@ export const notificationsRouter = t.router({
         return { ok: true };
       }),
 
-    test: protectedProcedure
+    test: permissionedProcedure({ resource: "notify", action: "test" })
       .input(z.object({ channel: ChannelNameSchema }))
       .output(z.object({
         id: z.string().uuid(),
@@ -449,7 +449,7 @@ export const notificationsRouter = t.router({
   }),
 
   quietHours: t.router({
-    get: protectedProcedure
+    get: permissionedProcedure({ resource: "notify", action: "get" })
       .output(QuietHoursOutputSchema.nullable())
       .query(async ({ ctx }) => {
         const em = requireEm(ctx);
@@ -461,7 +461,7 @@ export const notificationsRouter = t.router({
         return row ? quietHoursToOutput(row) : null;
       }),
 
-    set: protectedProcedure
+    set: permissionedProcedure({ resource: "notify", action: "set" })
       .input(QuietHoursSetInputSchema)
       .output(QuietHoursOutputSchema)
       .mutation(async ({ ctx, input }) => {

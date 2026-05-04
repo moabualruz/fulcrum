@@ -24,7 +24,7 @@ import {
 import { INFERENCE_CLIENT_TOKEN } from "../../../inference/tokens.ts";
 import { FlagRegistry } from "../../../flags/registry.ts";
 import { t, publicProcedure } from "../../../trpc/trpc.ts";
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import type { TRPCContext } from "../../../trpc/context.ts";
 
 const MAX_TEXT_ITEMS = 64;
@@ -220,17 +220,17 @@ export const inferenceRouter = t.router({
     .output(HealthResultSchema)
     .query(async ({ ctx }) => (await resolveClient(ctx)).health()),
 
-  embed: protectedProcedure
+  embed: permissionedProcedure({ resource: "inference", action: "embed" })
     .input(EmbedInputSchema)
     .output(EmbedResultSchema)
     .query(async ({ ctx, input }) => (await resolveClient(ctx)).embed(input.texts, { model: input.model })),
 
-  generate: protectedProcedure
+  generate: permissionedProcedure({ resource: "inference", action: "generate" })
     .input(GenerateInputSchema)
     .output(GenerateResultSchema)
     .query(async ({ ctx, input }) => (await resolveClient(ctx)).generate(input.prompt, input.options)),
 
-  classify: protectedProcedure
+  classify: permissionedProcedure({ resource: "inference", action: "classify" })
     .input(ClassifyInputSchema)
     .output(ClassifyResultSchema)
     .query(async ({ ctx, input }) => {
@@ -238,7 +238,7 @@ export const inferenceRouter = t.router({
       return (await resolveClient(ctx)).classify(input.text, input.labels);
     }),
 
-  tokenize: protectedProcedure
+  tokenize: permissionedProcedure({ resource: "inference", action: "tokenize" })
     .input(TokenizeInputSchema)
     .output(TokenizeResultSchema)
     .query(async ({ ctx, input }) => {
@@ -251,7 +251,7 @@ export const inferenceRouter = t.router({
       .output(InferenceModelSchema.array())
       .query(async ({ ctx }) => (await resolveClient(ctx)).listModels()),
 
-    pull: protectedProcedure
+    pull: permissionedProcedure({ resource: "inference", action: "pull" })
       .input(ModelInputSchema)
       .subscription(({ ctx, input }) => {
         return observable<ModelPullProgress>((emit) => {
@@ -282,7 +282,7 @@ export const inferenceRouter = t.router({
         });
       }),
 
-    rm: protectedProcedure
+    rm: permissionedProcedure({ resource: "inference", action: "rm" })
       .input(ModelInputSchema)
       .output(z.object({ ok: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
@@ -309,7 +309,7 @@ export const inferenceRouter = t.router({
       .output(FeatureBackendMapSchema)
       .query(() => ({ ...getRoutingConfig() })),
 
-    set: protectedProcedure
+    set: permissionedProcedure({ resource: "inference", action: "set" })
       .input(FeatureBackendSetInputSchema)
       .output(z.object({ ok: z.boolean() }))
       .mutation(({ input }) => {
@@ -319,7 +319,7 @@ export const inferenceRouter = t.router({
   }),
 
   provider: t.router({
-    test: protectedProcedure
+    test: permissionedProcedure({ resource: "inference", action: "test" })
       .output(ProviderTestResultSchema)
       .query(async ({ ctx }) => {
         const flagOn = await isEnabled(ctx, "external-llm-provider");
@@ -328,7 +328,7 @@ export const inferenceRouter = t.router({
         return backend.testConnection();
       }),
 
-    set: protectedProcedure
+    set: permissionedProcedure({ resource: "inference", action: "set" })
       .input(SetProviderInputSchema)
       .output(z.object({ ok: z.boolean() }))
       .mutation(async ({ ctx, input }) => {

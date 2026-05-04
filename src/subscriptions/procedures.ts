@@ -12,10 +12,8 @@ import { z } from "zod";
 import { observable } from "@trpc/server/observable";
 
 import { t } from "../trpc/trpc.ts";
-import { assertPermission } from "../trpc/middleware.ts";
+import { permissionedProcedure } from "../trpc/middleware.ts";
 import { getEventBus, type SubscriptionEvent } from "./event-bus.ts";
-
-const protectedProcedure = t.procedure.use(assertPermission);
 
 // --- Schemas ---
 
@@ -48,7 +46,7 @@ export type OrchestrationStatePayload = z.infer<typeof OrchestrationStatePayload
 // --- Subscription procedures ---
 
 export const runsSubscriptionRouter = t.router({
-  onRunUpdate: protectedProcedure
+  onRunUpdate: permissionedProcedure({ resource: "runs", action: "onRunUpdate" })
     .input(z.object({ runId: z.string().min(1) }))
     .subscription(({ input }) => {
       const bus = getEventBus();
@@ -64,7 +62,7 @@ export const runsSubscriptionRouter = t.router({
 });
 
 export const notifySubscriptionRouter = t.router({
-  onNewNotification: protectedProcedure
+  onNewNotification: permissionedProcedure({ resource: "notify", action: "onNewNotification" })
     .subscription(({ ctx }) => {
       const bus = getEventBus();
       const topic = `org.${ctx.orgId}.notifications`;
@@ -79,7 +77,7 @@ export const notifySubscriptionRouter = t.router({
 });
 
 export const orchestrationSubscriptionRouter = t.router({
-  onStateChange: protectedProcedure
+  onStateChange: permissionedProcedure({ resource: "orchestration", action: "onStateChange" })
     .subscription(({ ctx }) => {
       const bus = getEventBus();
       const topic = `orchestration.${ctx.orgId}`;

@@ -11,7 +11,7 @@ import { EventRepository } from "../../../db/repositories/core/EventRepository.t
 import { autoAssign } from "../../../router/auto-assign.ts";
 import { configureRulesEngine } from "../../../router/rules-engine.ts";
 import { configureRoutingTelemetry } from "../../../router/telemetry.ts";
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 import type { RoutingDecision, TaskFacts } from "../../../router/types.ts";
 
@@ -187,7 +187,7 @@ function taskFactsFromJson(taskJson: z.infer<typeof TaskJsonSchema>): TaskFacts 
 }
 
 export const routingRouter = t.router({
-  list: protectedProcedure
+  list: permissionedProcedure({ resource: "routing", action: "list" })
     .input(ListInputSchema)
     .output(z.array(RoutingRuleOutputSchema))
     .query(async ({ ctx, input }) => {
@@ -205,7 +205,7 @@ export const routingRouter = t.router({
       return rows.map(serializeRule);
     }),
 
-  get: protectedProcedure
+  get: permissionedProcedure({ resource: "routing", action: "get" })
     .input(GetInputSchema)
     .output(RoutingRuleOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
@@ -214,7 +214,7 @@ export const routingRouter = t.router({
       return rule ? serializeRule(rule) : null;
     }),
 
-  create: protectedProcedure
+  create: permissionedProcedure({ resource: "routing", action: "create" })
     .input(CreateInputSchema)
     .output(RoutingRuleOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -237,7 +237,7 @@ export const routingRouter = t.router({
       return serializeRule(rule);
     }),
 
-  update: protectedProcedure
+  update: permissionedProcedure({ resource: "routing", action: "update" })
     .input(UpdateInputSchema)
     .output(RoutingRuleOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
@@ -262,7 +262,7 @@ export const routingRouter = t.router({
       return serializeRule(rule);
     }),
 
-  delete: protectedProcedure
+  delete: permissionedProcedure({ resource: "routing", action: "delete" })
     .input(GetInputSchema)
     .output(z.object({ ok: z.literal(true) }))
     .mutation(async ({ ctx, input }) => {
@@ -272,7 +272,7 @@ export const routingRouter = t.router({
       return { ok: true as const };
     }),
 
-  test: protectedProcedure
+  test: permissionedProcedure({ resource: "routing", action: "test" })
     .input(TestInputSchema)
     .output(RoutingDecisionOutputSchema.nullable())
     .mutation(async ({ ctx, input }): Promise<RoutingDecision | null> => {
@@ -290,7 +290,7 @@ export const routingRouter = t.router({
       });
     }),
 
-  dryRun: protectedProcedure
+  dryRun: permissionedProcedure({ resource: "routing", action: "dryRun" })
     .input(DryRunInputSchema)
     .output(RoutingDecisionOutputSchema.nullable())
     .query(async ({ ctx, input }): Promise<RoutingDecision | null> => {

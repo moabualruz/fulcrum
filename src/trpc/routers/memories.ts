@@ -6,11 +6,11 @@
  */
 
 import { t } from "../trpc.ts";
-import { protectedProcedure } from "../middleware.ts";
+import { permissionedProcedure } from "../middleware.ts";
 
 export const memoriesRouter = t.router({
   /** list — stub; Pillar 10 replaces with: await repo.find({ org: ctx.orgId }) */
-  list: protectedProcedure.query(() => []),
+  list: permissionedProcedure({ resource: "memories", action: "list" }).query(() => []),
 });
 
 export type MemoriesRouter = typeof memoriesRouter;

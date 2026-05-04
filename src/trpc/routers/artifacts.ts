@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 
 import type { TRPCContext } from "../context.ts";
 import { t } from "../trpc.ts";
-import { protectedProcedure } from "../middleware.ts";
+import { permissionedProcedure } from "../middleware.ts";
 import {
   ArchiveArtifactOutputSchema,
   ArtifactIdInputSchema,
@@ -164,7 +164,7 @@ async function recordEvent(
 }
 
 export const artifactsRouter = t.router({
-  list: protectedProcedure
+  list: permissionedProcedure({ resource: "artifacts", action: "list" })
     .input(ListArtifactsInputSchema)
     .output(ArtifactSchema.array())
     .query(async ({ ctx, input }) => {
@@ -179,12 +179,12 @@ export const artifactsRouter = t.router({
       return rows.map(toArtifact);
     }),
 
-  get: protectedProcedure
+  get: permissionedProcedure({ resource: "artifacts", action: "get" })
     .input(ArtifactIdInputSchema)
     .output(ArtifactSchema)
     .query(async ({ ctx, input }) => toArtifact(await findArtifact(ctx, input.id))),
 
-  upload: protectedProcedure
+  upload: permissionedProcedure({ resource: "artifacts", action: "upload" })
     .input(UploadArtifactInputSchema)
     .output(ArtifactSchema)
     .mutation(async ({ ctx, input }) => {
@@ -214,7 +214,7 @@ export const artifactsRouter = t.router({
       return artifact;
     }),
 
-  download: protectedProcedure
+  download: permissionedProcedure({ resource: "artifacts", action: "download" })
     .input(ArtifactIdInputSchema)
     .output(DownloadArtifactOutputSchema)
     .query(async ({ ctx, input }) => {
@@ -223,7 +223,7 @@ export const artifactsRouter = t.router({
       return { artifact, url };
     }),
 
-  archive: protectedProcedure
+  archive: permissionedProcedure({ resource: "artifacts", action: "archive" })
     .input(ArtifactIdInputSchema)
     .output(ArchiveArtifactOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -234,7 +234,7 @@ export const artifactsRouter = t.router({
       return { ok: true as const, id: input.id, archived: true };
     }),
 
-  unarchive: protectedProcedure
+  unarchive: permissionedProcedure({ resource: "artifacts", action: "unarchive" })
     .input(ArtifactIdInputSchema)
     .output(ArchiveArtifactOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -245,7 +245,7 @@ export const artifactsRouter = t.router({
       return { ok: true as const, id: input.id, archived: false };
     }),
 
-  delete: protectedProcedure
+  delete: permissionedProcedure({ resource: "artifacts", action: "delete" })
     .input(DeleteArtifactInputSchema)
     .output(DeleteArtifactOutputSchema)
     .mutation(async ({ ctx, input }) => {

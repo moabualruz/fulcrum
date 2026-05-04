@@ -30,6 +30,11 @@ import { TRPCError } from "@trpc/server";
 
 import { publicProcedure, t } from "./trpc.ts";
 import type { TRPCContext } from "./context.ts";
+import {
+  LOCAL_DEV_PERMISSION_BYPASS_FLAG,
+  permission,
+  type TrpcProcedureMeta,
+} from "./permissions.ts";
 import { FlagRegistry } from "../flags/registry.ts";
 
 /**
@@ -73,6 +78,20 @@ function actionFromProcedurePath(path: string): string {
   return leaf;
 }
 
+function hasEnvFeature(flag: string): boolean {
+  return (process.env["FULCRUM_FEATURES"] ?? "")
+    .split(",")
+    .map((token) => token.trim())
+    .includes(flag);
+}
+
+function permissionFromMetaOrPath(meta: TrpcProcedureMeta | undefined, path: string) {
+  return meta?.permission ?? {
+    resource: resourceFromProcedurePath(path),
+    action: actionFromProcedurePath(path),
+  };
+}
+
 // Process-level cached enforcer service (60s TTL).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _cachedEnforcer: { svc: any; createdAt: number } | null = null;
@@ -97,7 +116,7 @@ function getCachedEnforcerService(AdapterCtor: any, EnforcerCtor: any, casbinRep
  * Phase 2: when `casbin-policies` flag is ON, calls checkCasbinGate() before
  *   passing through to Better-Auth. When flag is OFF: existing session-only check.
  */
-export const assertPermission = t.middleware(async ({ ctx, next, path }) => {
+export const assertPermission = t.middleware(async ({ ctx, next, path, meta }) => {
   if (!ctx.session) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
@@ -121,8 +140,7 @@ export const assertPermission = t.middleware(async ({ ctx, next, path }) => {
 
     if (casbinOn) {
       try {
-        const resource = resourceFromProcedurePath(path);
-        const action = actionFromProcedurePath(path);
+        const { resource, action } = permissionFromMetaOrPath(meta, path);
 
         // Dynamic imports — excluded from web SSR static bundle (decorator safety).
         const [{ FulcrumCasbinAdapter }, { CasbinEnforcerService, checkCasbinGate }, { CasbinRuleRepository }] =
@@ -139,13 +157,21 @@ export const assertPermission = t.middleware(async ({ ctx, next, path }) => {
           casbinRepo,
         );
 
-        await checkCasbinGate(
-          enforcerSvc,
-          ctx.orgId,
-          ctx.userId,
-          resource,
-          action,
-        );
+        try {
+          await checkCasbinGate(
+            enforcerSvc,
+            ctx.orgId,
+            ctx.userId,
+            resource,
+            action,
+          );
+        } catch (e) {
+          if (e instanceof TRPCError && e.code === "FORBIDDEN" && hasEnvFeature(LOCAL_DEV_PERMISSION_BYPASS_FLAG)) {
+            console.warn(`permission bypass resource=${resource} action=${action} user=${ctx.userId} org=${ctx.orgId}`);
+          } else {
+            throw e;
+          }
+        }
       } catch (e) {
         // Re-throw TRPCErrors (FORBIDDEN from checkCasbinGate)
         if (e instanceof TRPCError) throw e;
@@ -176,3 +202,7 @@ export const assertPermission = t.middleware(async ({ ctx, next, path }) => {
  * Only use publicProcedure for genuinely unauthenticated endpoints.
  */
 export const protectedProcedure = publicProcedure.use(assertPermission);
+
+export function permissionedProcedure(input: { resource: string; action: string }) {
+  return protectedProcedure.meta(permission(input.resource, input.action));
+}

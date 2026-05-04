@@ -5,7 +5,7 @@ import { Task } from "../../../db/entities/tasks/Task.ts";
 import { DependenciesSchema } from "../../../db/entities/tasks/schemas.ts";
 import { TaskRepository } from "../../../db/repositories/tasks/TaskRepository.ts";
 import { type TipTapJson } from "../../../db/tasks-rich-text.ts";
-import { protectedProcedure } from "../../../trpc/middleware.ts";
+import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 import { TaskService, normalizedUnique } from "../../../services/TaskService.ts";
 
@@ -123,7 +123,7 @@ function hasEm(ctx: {
 // ── Router (thin delegation layer) ─────────────────────────────────
 
 export const tasksRouter = t.router({
-  list: protectedProcedure
+  list: permissionedProcedure({ resource: "tasks", action: "list" })
     .input(ListTasksInputSchema)
     .output(z.array(TaskOutputSchema))
     .query(async ({ ctx, input }) => {
@@ -131,7 +131,7 @@ export const tasksRouter = t.router({
       return resolveService(ctx).list(ctx.orgId, input?.includeDeleted ?? false);
     }),
 
-  get: protectedProcedure
+  get: permissionedProcedure({ resource: "tasks", action: "get" })
     .input(TaskIdInputSchema)
     .output(TaskOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
@@ -139,56 +139,56 @@ export const tasksRouter = t.router({
       return resolveService(ctx).get(ctx.orgId, input.id);
     }),
 
-  create: protectedProcedure
+  create: permissionedProcedure({ resource: "tasks", action: "create" })
     .input(CreateTaskInputSchema)
     .output(TaskOutputSchema)
     .mutation(async ({ ctx, input }) => {
       return resolveService(ctx).create(ctx.orgId, input);
     }),
 
-  update: protectedProcedure
+  update: permissionedProcedure({ resource: "tasks", action: "update" })
     .input(UpdateTaskInputSchema)
     .output(TaskOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
       return resolveService(ctx).update(ctx.orgId, input);
     }),
 
-  delete: protectedProcedure
+  delete: permissionedProcedure({ resource: "tasks", action: "delete" })
     .input(TaskIdInputSchema)
     .output(TaskOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
       return resolveService(ctx).delete(ctx.orgId, input.id);
     }),
 
-  bulkUpdate: protectedProcedure
+  bulkUpdate: permissionedProcedure({ resource: "tasks", action: "bulkUpdate" })
     .input(BulkUpdateTasksInputSchema)
     .output(BulkUpdateOutputSchema)
     .mutation(async ({ ctx, input }) => {
       return resolveService(ctx).bulkUpdate(ctx, input.ids, input.patch);
     }),
 
-  bulkDelete: protectedProcedure
+  bulkDelete: permissionedProcedure({ resource: "tasks", action: "bulkDelete" })
     .input(TaskIdsInputSchema)
     .output(BulkDeleteOutputSchema)
     .mutation(async ({ ctx, input }) => {
       return resolveService(ctx).bulkDelete(ctx, input.ids);
     }),
 
-  setParent: protectedProcedure
+  setParent: permissionedProcedure({ resource: "tasks", action: "setParent" })
     .input(SetParentInputSchema)
     .output(TaskOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
       return resolveService(ctx).setParent(ctx, input.taskId, input.parentId);
     }),
 
-  listChildren: protectedProcedure
+  listChildren: permissionedProcedure({ resource: "tasks", action: "listChildren" })
     .input(TaskRelationIdInputSchema)
     .output(z.array(TaskOutputSchema))
     .query(async ({ ctx, input }) => {
       return resolveService(ctx).listChildren(ctx.orgId, input.taskId);
     }),
 
-  setDependencies: protectedProcedure
+  setDependencies: permissionedProcedure({ resource: "tasks", action: "setDependencies" })
     .input(SetDependenciesInputSchema)
     .output(TaskOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
