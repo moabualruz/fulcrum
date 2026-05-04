@@ -3,7 +3,7 @@
  * Canonical home; web layer re-exports from here.
  * Dependency direction: services -> product-kernel (never web).
  */
-import type { ProductDb } from "../product-kernel/db/types.ts";
+import type { DbHandle } from "../product-kernel/store/repositories.ts";
 
 export interface ArtifactRow {
   id: string;
@@ -38,12 +38,22 @@ function isoStamp(value: string | Date): string {
   return value instanceof Date ? value.toISOString() : value;
 }
 
+/** Resolve EntityManager from DbHandle (mirrors repositories.ts pattern). */
+function assertEm(db: DbHandle) {
+  if ("persist" in db && typeof (db as { persist: unknown }).persist === "function") {
+    return db as import("@mikro-orm/postgresql").EntityManager;
+  }
+  throw new Error("artifacts.ts: EntityManager required — pass em instead of raw ProductDb.");
+}
+
 export async function listArtifacts(
-  db: ProductDb,
+  db: DbHandle,
   orgId: string,
   filter?: ArtifactFilter & { includeArchived?: boolean },
 ): Promise<ArtifactRow[]> {
-  const conditions = ["org_id = $1"];
+  const em = assertEm(db);
+  const conn = em.getConnection();
+  const conditions = ["org_id = ?"];
   const params: (string | null)[] = [orgId];
 
   if (!filter?.includeArchived) {
@@ -51,34 +61,34 @@ export async function listArtifacts(
   }
   if (filter?.projectId) {
     params.push(filter.projectId);
-    conditions.push(`project_id = $${params.length}`);
+    conditions.push(`project_id = ?`);
   }
   if (filter?.runId) {
     params.push(filter.runId);
-    conditions.push(`run_id = $${params.length}`);
+    conditions.push(`run_id = ?`);
   }
   if (filter?.taskId) {
     params.push(filter.taskId);
-    conditions.push(`task_id = $${params.length}`);
+    conditions.push(`task_id = ?`);
   }
   if (filter?.mime) {
     params.push(filter.mime);
-    conditions.push(`mime = $${params.length}`);
+    conditions.push(`mime = ?`);
   }
   if (filter?.kind) {
     params.push(filter.kind);
-    conditions.push(`kind = $${params.length}`);
+    conditions.push(`kind = ?`);
   }
 
   const where = conditions.join(" AND ");
-  const rows = await db.query<ArtifactRow & { created_at: string | Date }>(
+  const rows = await conn.execute(
     `SELECT id, org_id, project_id, run_id, task_id, kind, title,
             body_path, sha256, size, mime, COALESCE(archived, false) AS archived, created_at
        FROM artifacts
       WHERE ${where}
       ORDER BY created_at DESC, id ASC`,
     params,
-  );
+  ) as Array<ArtifactRow & { created_at: string | Date }>;
 
   return rows.map((r) => ({
     ...r,
@@ -95,16 +105,18 @@ export interface ArtifactDetail extends ArtifactRow {
 
 /** Read a single artifact with computed detail fields for the detail page. */
 export async function readArtifactDetail(
-  db: ProductDb,
+  db: DbHandle,
   input: { orgId: string; id: string },
 ): Promise<ArtifactDetail | null> {
-  const rows = await db.query<ArtifactRow & { created_at: string | Date }>(
+  const em = assertEm(db);
+  const conn = em.getConnection();
+  const rows = await conn.execute(
     `SELECT id, org_id, project_id, run_id, task_id, kind, title,
             body_path, sha256, size, mime, COALESCE(archived, false) AS archived, created_at
        FROM artifacts
-      WHERE id = $1 AND org_id = $2`,
+      WHERE id = ? AND org_id = ?`,
     [input.id, input.orgId],
-  );
+  ) as Array<ArtifactRow & { created_at: string | Date }>;
   const row = rows[0];
   if (!row) return null;
 
@@ -136,27 +148,31 @@ export async function readArtifactDetail(
 
 /** Delete an artifact row (soft: archive; hard: remove row). */
 export async function deleteArtifactAction(
-  db: ProductDb,
+  db: DbHandle,
   id: string,
   orgId: string,
 ): Promise<void> {
-  await db.query(
-    `DELETE FROM artifacts WHERE id = $1 AND org_id = $2`,
+  const em = assertEm(db);
+  const conn = em.getConnection();
+  await conn.execute(
+    `DELETE FROM artifacts WHERE id = ? AND org_id = ?`,
     [id, orgId],
   );
 }
 
 export async function getArtifactStats(
-  db: ProductDb,
+  db: DbHandle,
   orgId: string,
   projectId: string,
 ): Promise<ArtifactStats> {
-  const rows = await db.query<{ total_bytes: string | number | null; count: string | number }>(
+  const em = assertEm(db);
+  const conn = em.getConnection();
+  const rows = await conn.execute(
     `SELECT COALESCE(SUM(size), 0) AS total_bytes, COUNT(*)::int AS count
        FROM artifacts
-      WHERE org_id = $1 AND project_id = $2`,
+      WHERE org_id = ? AND project_id = ?`,
     [orgId, projectId],
-  );
+  ) as Array<{ total_bytes: string | number | null; count: string | number }>;
   const row = rows[0]!;
   return {
     totalBytes: Number(row.total_bytes ?? 0),

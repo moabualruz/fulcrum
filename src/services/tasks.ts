@@ -3,8 +3,9 @@
  * Canonical home for task actions; web layer re-exports from here.
  * Dependency direction: services -> product-kernel (never web).
  */
-import type { ProductDb } from "../product-kernel/db/types.ts";
-import { createTask, appendEvent } from "../product-kernel/store/repositories.ts";
+import type { DbHandle } from "../product-kernel/store/repositories.ts";
+import { createTask } from "../product-kernel/store/repositories.ts";
+import { eventDispatcher } from "../product-kernel/event-dispatcher.ts";
 
 export type TaskStatus =
   | "pending"
@@ -41,7 +42,7 @@ export interface UpdateTaskInput {
 }
 
 export async function createTaskAction(
-  db: ProductDb,
+  db: DbHandle,
   input: CreateTaskInput,
 ): Promise<{ id: string }> {
   if (input.status !== undefined) assertStatus(input.status, "createTaskAction");
@@ -54,17 +55,28 @@ interface TaskScopeRow {
   project_id: string | null;
 }
 
+/** Resolve EntityManager from DbHandle (mirrors repositories.ts pattern). */
+function assertEm(db: DbHandle) {
+  if ("persist" in db && typeof (db as { persist: unknown }).persist === "function") {
+    return db as import("@mikro-orm/postgresql").EntityManager;
+  }
+  throw new Error("tasks.ts: EntityManager required — pass em instead of raw ProductDb.");
+}
+
 export async function updateTaskAction(
-  db: ProductDb,
+  db: DbHandle,
   input: UpdateTaskInput,
 ): Promise<{ ok: true }> {
   if (!input.id) throw new Error("updateTaskAction: id is required");
+  const em = assertEm(db);
+  const conn = em.getConnection();
+
   const sets: string[] = [];
   const params: (string | number | null)[] = [];
   const changed: string[] = [];
   const push = (col: string, val: string | number | null) => {
     params.push(val);
-    sets.push(`${col} = $${params.length}`);
+    sets.push(`${col} = ?`);
     changed.push(col);
   };
   if (input.title !== undefined) push("title", input.title);
@@ -77,20 +89,18 @@ export async function updateTaskAction(
   if (input.startDate !== undefined) push("start_date", input.startDate);
   if (input.dueDate !== undefined) push("due_date", input.dueDate);
   if (changed.length === 0) throw new Error("updateTaskAction: no fields to update");
-  if (changed.includes("due_date") || changed.includes("start_date")) {
-    await db.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_date date`);
-    await db.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS start_date date`);
-  }
+
   sets.push(`updated_at = now()`);
   params.push(input.id);
-  const rows = await db.query<TaskScopeRow>(
-    `UPDATE tasks SET ${sets.join(", ")} WHERE id = $${params.length}
+  const rows = await conn.execute(
+    `UPDATE tasks SET ${sets.join(", ")} WHERE id = ?
        RETURNING org_id, project_id`,
     params,
-  );
+  ) as Array<TaskScopeRow>;
   const row = rows[0];
   if (!row) throw new Error(`updateTaskAction: task not found: ${input.id}`);
-  await appendEvent(db, {
+
+  await eventDispatcher.dispatch(db, {
     orgId: row.org_id,
     projectId: row.project_id,
     actor: "system",
@@ -103,16 +113,18 @@ export async function updateTaskAction(
 }
 
 export async function deleteTaskAction(
-  db: ProductDb,
+  db: DbHandle,
   id: string,
 ): Promise<{ ok: true }> {
-  const rows = await db.query<TaskScopeRow>(
-    `DELETE FROM tasks WHERE id = $1 RETURNING org_id, project_id`,
+  const em = assertEm(db);
+  const conn = em.getConnection();
+  const rows = await conn.execute(
+    `DELETE FROM tasks WHERE id = ? RETURNING org_id, project_id`,
     [id],
-  );
+  ) as Array<TaskScopeRow>;
   const row = rows[0];
   if (row) {
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(db, {
       orgId: row.org_id,
       projectId: row.project_id,
       actor: "system",
@@ -125,21 +137,23 @@ export async function deleteTaskAction(
 }
 
 export async function moveTaskStatusAction(
-  db: ProductDb,
+  db: DbHandle,
   input: { id: string; from: TaskStatus; to: TaskStatus },
 ): Promise<{ ok: true }> {
   assertStatus(input.from, "moveTaskStatusAction.from");
   assertStatus(input.to, "moveTaskStatusAction.to");
-  const rows = await db.query<TaskScopeRow>(
-    `UPDATE tasks SET status = $1, updated_at = now()
-       WHERE id = $2 AND status = $3 RETURNING org_id, project_id`,
+  const em = assertEm(db);
+  const conn = em.getConnection();
+  const rows = await conn.execute(
+    `UPDATE tasks SET status = ?, updated_at = now()
+       WHERE id = ? AND status = ? RETURNING org_id, project_id`,
     [input.to, input.id, input.from],
-  );
+  ) as Array<TaskScopeRow>;
   const row = rows[0];
   if (!row) {
     throw new Error(`status conflict: task ${input.id} not in ${input.from}`);
   }
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: row.org_id,
     projectId: row.project_id,
     actor: "system",

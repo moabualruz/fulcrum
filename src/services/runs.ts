@@ -3,9 +3,8 @@
  * Canonical home; web layer re-exports from here.
  * Dependency direction: services -> product-kernel (never web).
  */
-import type { ProductDb } from "../product-kernel/db/types.ts";
-import { appendEvent } from "../product-kernel/store/repositories.ts";
-import { enqueueJob } from "../product-kernel/jobs.ts";
+import type { DbHandle } from "../product-kernel/store/repositories.ts";
+import { eventDispatcher } from "../product-kernel/event-dispatcher.ts";
 import { newUlid } from "../product-kernel/ids.ts";
 
 export type RunStatus =
@@ -38,15 +37,26 @@ interface RunSourceRow {
   prompt: string | null;
 }
 
+/** Resolve EntityManager from DbHandle (mirrors repositories.ts pattern). */
+function assertEm(db: DbHandle) {
+  if ("persist" in db && typeof (db as { persist: unknown }).persist === "function") {
+    return db as import("@mikro-orm/postgresql").EntityManager;
+  }
+  throw new Error("runs.ts: EntityManager required — pass em instead of raw ProductDb.");
+}
+
 export async function dispatchRunAction(
-  db: ProductDb,
+  db: DbHandle,
   input: DispatchRunInput,
 ): Promise<{ id: string; task_id: string; agent: string; status: RunStatus }> {
+  const em = assertEm(db);
+  const conn = em.getConnection();
   const id = newUlid();
-  await db.query(
+
+  await conn.execute(
     `INSERT INTO agent_runs
        (id, org_id, project_id, task_id, agent, model, prompt, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, 'queued')`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'queued')`,
     [
       id,
       input.orgId,
@@ -58,15 +68,25 @@ export async function dispatchRunAction(
     ],
   );
 
-  await enqueueJob(db, {
-    orgId: input.orgId,
-    projectId: input.projectId ?? null,
-    queue: "agent-runs",
-    kind: "agent_run",
-    payload: { run_id: id },
-  });
+  // Inline job enqueue via EntityManager connection (enqueueJob takes ProductDb)
+  const jobId = newUlid();
+  await conn.execute(
+    `INSERT INTO jobs
+       (id, org_id, project_id, queue, kind, payload, status, max_attempts, available_at)
+     VALUES (?, ?, ?, ?, ?, ?::jsonb, 'queued', ?, ?)`,
+    [
+      jobId,
+      input.orgId,
+      input.projectId ?? null,
+      "agent-runs",
+      "agent_run",
+      JSON.stringify({ run_id: id }),
+      3,
+      new Date().toISOString(),
+    ],
+  );
 
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: input.orgId,
     projectId: input.projectId ?? null,
     actor: "system",
@@ -80,20 +100,22 @@ export async function dispatchRunAction(
 }
 
 export async function cancelRunAction(
-  db: ProductDb,
+  db: DbHandle,
   id: string,
   orgId: string,
 ): Promise<{ ok: boolean }> {
-  const rows = await db.query<RunScopeRow>(
+  const em = assertEm(db);
+  const conn = em.getConnection();
+  const rows = await conn.execute(
     `UPDATE agent_runs
         SET status = 'cancelled', ended_at = now()
-      WHERE id = $1 AND org_id = $2 AND status IN ('queued', 'running')
+      WHERE id = ? AND org_id = ? AND status IN ('queued', 'running')
       RETURNING org_id, project_id`,
     [id, orgId],
-  );
+  ) as Array<RunScopeRow>;
   const row = rows[0];
   if (row) {
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(db, {
       orgId: row.org_id,
       projectId: row.project_id,
       actor: "system",
@@ -106,35 +128,47 @@ export async function cancelRunAction(
 }
 
 export async function retryRunAction(
-  db: ProductDb,
+  db: DbHandle,
   id: string,
   orgId: string,
 ): Promise<{ id: string }> {
-  const sourceRows = await db.query<RunSourceRow>(
+  const em = assertEm(db);
+  const conn = em.getConnection();
+  const sourceRows = await conn.execute(
     `SELECT id, org_id, project_id, agent, model, prompt
-       FROM agent_runs WHERE id = $1 AND org_id = $2`,
+       FROM agent_runs WHERE id = ? AND org_id = ?`,
     [id, orgId],
-  );
+  ) as Array<RunSourceRow>;
   const source = sourceRows[0];
   if (!source) throw new Error(`retryRunAction: run not found: ${id}`);
 
   const newId = newUlid();
-  await db.query(
+  await conn.execute(
     `INSERT INTO agent_runs
        (id, org_id, project_id, agent, model, prompt, status, parent_run_id)
-     VALUES ($1, $2, $3, $4, $5, $6, 'queued', $7)`,
+     VALUES (?, ?, ?, ?, ?, ?, 'queued', ?)`,
     [newId, source.org_id, source.project_id, source.agent, source.model, source.prompt, id],
   );
 
-  await enqueueJob(db, {
-    orgId: source.org_id,
-    projectId: source.project_id,
-    queue: "agent-runs",
-    kind: "agent_run",
-    payload: { run_id: newId },
-  });
+  // Inline job enqueue via EntityManager connection
+  const jobId = newUlid();
+  await conn.execute(
+    `INSERT INTO jobs
+       (id, org_id, project_id, queue, kind, payload, status, max_attempts, available_at)
+     VALUES (?, ?, ?, ?, ?, ?::jsonb, 'queued', ?, ?)`,
+    [
+      jobId,
+      source.org_id,
+      source.project_id,
+      "agent-runs",
+      "agent_run",
+      JSON.stringify({ run_id: newId }),
+      3,
+      new Date().toISOString(),
+    ],
+  );
 
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: source.org_id,
     projectId: source.project_id,
     actor: "system",
