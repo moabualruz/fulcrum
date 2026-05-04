@@ -416,14 +416,31 @@ async function installPackageSkillMirrors(
     const agent = AGENTS.find((a) => a.id === agentId)!;
     if (!(await isDir(agent.rootDir(home)))) continue;
     const targetRoot = `${agent.skillsDir(home)}/${packageName}`;
-    if (!dryRun) await rm(targetRoot, { recursive: true, force: true });
     for (const entry of await readdir(sourceSkills, { withFileTypes: true })) {
       if (!entry.isDirectory() || entry.name.startsWith("_")) continue;
       const skillDir = `${sourceSkills}/${entry.name}`;
       if (!(await exists(`${skillDir}/SKILL.md`))) continue;
-      await copyTree(skillDir, `${targetRoot}/${entry.name}`, dryRun);
+      const targetSkill = `${targetRoot}/${entry.name}`;
+      if (!(await canOverwritePackageMirrorTarget(targetSkill, packageName))) {
+        console.log(`     · keep ${agent.label} ${packageName} skill ${entry.name} (not-owned-by-fulcrum)`);
+        continue;
+      }
+      if (!dryRun) await rm(targetSkill, { recursive: true, force: true });
+      await copyTree(skillDir, targetSkill, dryRun);
     }
+    await writePackageMirrorMetadata(targetRoot, packageName, agentId, sourceRoot, dryRun);
     console.log(`     ✓ ${agent.label} ${packageName} loadable skill mirror installed`);
+  }
+}
+
+async function canOverwritePackageMirrorTarget(targetPath: string, packageName: PackageName): Promise<boolean> {
+  if (!(await exists(targetPath))) return true;
+  const markerPath = `${dirname(targetPath)}/${PACKAGE_MIRROR_METADATA}`;
+  try {
+    const parsed = JSON.parse(await readFile(markerPath, "utf8"));
+    return parsed?.package === packageName && parsed?.mirrorVersion === PACKAGE_MIRROR_VERSION;
+  } catch {
+    return false;
   }
 }
 

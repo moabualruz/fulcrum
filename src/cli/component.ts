@@ -52,21 +52,40 @@ async function runStatus(argv: string[]): Promise<void> {
         throw new Error(`unknown component: ${options.target}`);
       }
       const status = ledger.componentStatus(component.id);
-      const surfaces = ledger.surfacesForComponent(component.id)
+      const surfaceRows = ledger.surfacesForComponent(component.id)
         .filter((surface) => options.agent === undefined || surface.agent_id === options.agent)
-        .map((surface) => ({
+      const surfaces = await Promise.all(surfaceRows.map(async (surface) => {
+        const nativeExists = await nativeTargetExists(surface.target);
+        return {
           id: surface.id,
           componentId: surface.component_id,
           agentId: surface.agent_id,
           kind: surface.kind,
           target: surface.target,
-          state: "present",
+          state: nativeExists ? "present" : "missing-native-root",
           managed: true,
           modified: false,
-        }));
+          owned: true,
+          nativeExists,
+          ledgerExists: true,
+          status: nativeExists ? "installed" : "missing-native-root",
+          reason: nativeExists ? "ok" : "missing-native-root",
+        };
+      }));
+      const ledgerExists = status !== null;
+      const nativeExists = surfaces.length === 0 ? ledgerExists : surfaces.every((surface) => surface.nativeExists);
+      const effectiveStatus = !ledgerExists
+        ? "not-installed"
+        : nativeExists
+          ? status.status
+          : "missing-native-root";
       const payload = {
         componentId: component.id,
-        status: status?.status ?? "not-installed",
+        status: effectiveStatus,
+        owned: ledgerExists,
+        nativeExists,
+        ledgerExists,
+        reason: !ledgerExists ? "not-installed" : nativeExists ? "ok" : "missing-native-root",
         surfaces,
         ...(component.kind === "package" ? { parity: await packageParity(component.id) } : {}),
       };
@@ -97,6 +116,11 @@ async function runStatus(argv: string[]): Promise<void> {
   }
 }
 
+async function nativeTargetExists(target: string): Promise<boolean> {
+  if (!target.startsWith("~/") && !target.startsWith("/")) return true;
+  return (await existingPath(expandHome(target, process.env["HOME"] ?? ""))) !== undefined;
+}
+
 async function packageParity(componentId: string): Promise<unknown> {
   const { getPackageSurfaceManifest, isKnownPackageId, packageCacheSourceRoot } = await import("./package-surfaces.ts");
   const { planPackageMirrorTargets } = await import("./package-mirror.ts");
@@ -121,6 +145,10 @@ async function existingPath(path: string): Promise<string | undefined> {
   } catch {
     return undefined;
   }
+}
+
+function expandHome(path: string, home: string): string {
+  return path.startsWith("~/") ? `${home}/${path.slice(2)}` : path;
 }
 
 function runList(argv: string[]): void {

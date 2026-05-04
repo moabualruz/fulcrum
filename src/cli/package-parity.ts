@@ -8,9 +8,21 @@ export interface PackageParityReport {
   sourceCounts: Record<PackageSurfaceKind, number>;
   installedCounts: Record<PackageSurfaceKind, number>;
   missing: readonly AgentSurfaceTarget[];
+  missingReasons: readonly PackageParityMissingReason[];
   unsupported: readonly AgentSurfaceTarget[];
   leakedSourceOnlyFiles: readonly string[];
   ok: boolean;
+}
+
+export interface PackageParityMissingReason {
+  agentId: AgentId;
+  kind: PackageSurfaceKind;
+  targetPath?: string;
+  owned: boolean;
+  nativeExists: boolean;
+  ledgerExists: boolean;
+  status: "missing-native-root" | "missing-target";
+  reason: "missing-native-root" | "missing-target";
 }
 
 const SURFACE_KINDS: readonly PackageSurfaceKind[] = [
@@ -34,6 +46,7 @@ export async function auditPackageParity(
   const sourceCounts = emptyCounts();
   const installedCounts = emptyCounts();
   const missing: AgentSurfaceTarget[] = [];
+  const missingReasons: PackageParityMissingReason[] = [];
   const unsupported: AgentSurfaceTarget[] = [];
   const leakRoots = new Set<string>();
 
@@ -51,12 +64,30 @@ export async function auditPackageParity(
         installedCounts[target.surface.kind] += 1;
       } else {
         missing.push(target);
+        missingReasons.push({
+          agentId: target.agentId,
+          kind: target.surface.kind,
+          owned: false,
+          nativeExists: false,
+          ledgerExists: false,
+          status: "missing-native-root",
+          reason: "missing-native-root",
+        });
       }
       continue;
     }
     const targetPaths = [target.targetPath, ...(target.additionalTargetPaths ?? [])].filter((path): path is string => !!path);
     if (targetPaths.length === 0) {
       missing.push(target);
+      missingReasons.push({
+        agentId: target.agentId,
+        kind: target.surface.kind,
+        owned: false,
+        nativeExists: false,
+        ledgerExists: false,
+        status: "missing-target",
+        reason: "missing-target",
+      });
       continue;
     }
     const expandedPaths = targetPaths.map((path) => expandHome(path, home));
@@ -71,6 +102,16 @@ export async function auditPackageParity(
       installedCounts[target.surface.kind] += 1;
     } else {
       missing.push(target);
+      missingReasons.push({
+        agentId: target.agentId,
+        kind: target.surface.kind,
+        targetPath: target.targetPath,
+        owned: false,
+        nativeExists: allPathsPresent,
+        ledgerExists: false,
+        status: "missing-target",
+        reason: "missing-target",
+      });
     }
   }
 
@@ -84,6 +125,7 @@ export async function auditPackageParity(
     sourceCounts,
     installedCounts,
     missing,
+    missingReasons,
     unsupported,
     leakedSourceOnlyFiles,
     ok: missing.length === 0 && leakedSourceOnlyFiles.length === 0,
