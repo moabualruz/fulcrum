@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-last_updated: "2026-05-04T23:31:14.460Z"
+last_updated: "2026-05-05T00:09:30Z"
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 24
-  completed_plans: 21
-  percent: 88
+  completed_plans: 22
+  percent: 92
 ---
 
 # Planning State
@@ -17,7 +17,7 @@ progress:
 ## Current Position
 
 Phase: 03 (symphony-sandcastle) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 
 - **Phase**: 02-bug-fixes-foundation
 - **Plan**: 8 plans created
@@ -58,3 +58,6 @@ Plan: 4 of 6
 - [Phase ?]: TrackerBlockerResolutionError thrown on any unresolved blocker ID before candidate filtering (03-02)
 - [Phase ?]: [Phase 03-02]: External trackers are ingest-only; native Fulcrum tracker is sole Symphony dispatch source (D-04)
 - [Phase ?]: [Phase 03-02]: identifier and branch_name use task.id stable stub until Pillar 6 named identifiers land
+- [Phase 03-04]: Response ID matching in CodexAppServerClient accepts any response carrying thread.id data (single in-flight request per process)
+- [Phase 03-04]: TokenUsageAggregator.updateCumulative() replaces stored total per thread_id — no double-counting (D-22)
+- [Phase 03-04]: logSymphonyEvent() catches all sink errors — observability must not crash orchestration (§17.6)

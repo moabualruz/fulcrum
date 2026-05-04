@@ -90,14 +90,14 @@
 - [x] **SYM-17**: Per-state concurrency limits via `max_concurrent_agents_by_state` config
 - [x] **SYM-18**: Reconciliation Part B: per-tick tracker state refresh for running issues — terminal → stop + cleanup, non-active → stop, active → update snapshot
 - [ ] **SYM-19**: Startup terminal workspace cleanup sweep
-- [ ] **SYM-20**: Coding-agent app-server subprocess client — JSON line protocol, session startup, thread/turn ID extraction, read/turn timeouts
+- [x] **SYM-20**: Coding-agent app-server subprocess client — JSON line protocol, session startup, thread/turn ID extraction, read/turn timeouts
 - [x] **SYM-21**: Codex launch command config (`codex.command`, default `codex app-server`)
-- [ ] **SYM-22**: Structured logs with `issue_id`, `issue_identifier`, and `session_id` on every log entry
-- [ ] **SYM-23**: Token accounting — cumulative totals from `thread/tokenUsage/updated`, no double-counting, keyed by thread_id
+- [x] **SYM-22**: Structured logs with `issue_id`, `issue_identifier`, and `session_id` on every log entry
+- [x] **SYM-23**: Token accounting — cumulative totals from `thread/tokenUsage/updated`, no double-counting, keyed by thread_id
 - [x] **SYM-24**: Conformance tests pass for all §17.1-17.7 categories
 - [ ] **SYM-25**: HTTP server extension (GET /, /api/v1/state, /api/v1/<issue>, POST /api/v1/refresh)
 - [x] **SYM-26**: Approval/sandbox posture documented per §10.5 REQUIRED
-- [ ] **SYM-27**: Run attempt lifecycle states implemented: PreparingWorkspace → BuildingPrompt → LaunchingAgentProcess → InitializingSession → StreamingTurn → Finishing → terminal
+- [x] **SYM-27**: Run attempt lifecycle states implemented: PreparingWorkspace → BuildingPrompt → LaunchingAgentProcess → InitializingSession → StreamingTurn → Finishing → terminal
 
 ### Sandcastle — Pillar 4 (SND)
 
