@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-import { AGENT_RUN_ORCHESTRATION_STATES } from "../states.ts";
+import { AGENT_RUN_ORCHESTRATION_STATES, ATTEMPT_LIFECYCLE_STATES } from "../states.ts";
 
-export { AGENT_RUN_ORCHESTRATION_STATES } from "../states.ts";
-export type { AgentRunOrchestrationState } from "../states.ts";
+export { AGENT_RUN_ORCHESTRATION_STATES, ATTEMPT_LIFECYCLE_STATES } from "../states.ts";
+export type { AgentRunOrchestrationState, AttemptLifecycleState } from "../states.ts";
 
 export const READY_TASK_STATUS = "ready";
 
@@ -13,6 +13,10 @@ export const FulcrumUuidSchema = z.string().regex(
 
 export const AgentRunOrchestrationStateSchema = z.enum(
   AGENT_RUN_ORCHESTRATION_STATES,
+);
+
+export const AttemptLifecycleStateSchema = z.enum(
+  ATTEMPT_LIFECYCLE_STATES,
 );
 
 export const FetchCandidateIssuesInputSchema = z.object({
