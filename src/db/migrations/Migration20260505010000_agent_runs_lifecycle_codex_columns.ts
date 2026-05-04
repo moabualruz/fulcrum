@@ -15,6 +15,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260505010000_agent_runs_lifecycle_codex_columns extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     // Add run-attempt lifecycle state column
     this.addSql(

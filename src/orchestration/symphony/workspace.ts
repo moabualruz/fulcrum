@@ -8,6 +8,7 @@ import { mkdir, readdir, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import type { EntityManager } from "@mikro-orm/postgresql";
+import type { AgentRun as AgentRunType } from "../../db/entities/orchestration/AgentRun.ts";
 
 import { Org } from "../../db/entities/auth/Org.ts";
 import type { AgentRun } from "../../db/entities/orchestration/AgentRun.ts";
@@ -24,6 +25,15 @@ const MAX_WORKSPACE_KEY_LENGTH = 128;
 const MAX_WORKSPACE_KEY_COLLISION_ATTEMPTS = 1_000;
 const WORKSPACE_SAFE_CHARS = /[^A-Za-z0-9._-]/g;
 const TERMINAL_FAILURE_STATES = new Set([
+  "failed",
+  "timed_out",
+  "stalled",
+  "cancelled",
+]);
+
+const TERMINAL_ORCHESTRATION_STATES = new Set([
+  "released",
+  "succeeded",
   "failed",
   "timed_out",
   "stalled",
@@ -172,6 +182,75 @@ export async function getWorkspacePath(
 
 export function workspaceRoot(root = process.env["FULCRUM_WORKSPACE_ROOT"]): string {
   return root && root.length > 0 ? root : join(homedir(), ".fulcrum", "workspaces");
+}
+
+// ---------------------------------------------------------------------------
+// Startup cleanup sweep (SYM-18)
+// ---------------------------------------------------------------------------
+
+export interface SweepOptions {
+  root?: string;
+  /** Called before each workspace removal (e.g. before_remove hook). */
+  beforeRemove?: (run: AgentRunType) => Promise<void>;
+  /** When true, logs what would be removed but does not delete. */
+  dryRun?: boolean;
+}
+
+/**
+ * sweepTerminalWorkspaces — startup cleanup sweep (SYM-18).
+ *
+ * Scans all AgentRun records for the given org that:
+ * 1. Are in a terminal orchestration state (released, succeeded, failed,
+ *    timed_out, stalled, cancelled)
+ * 2. Have a non-null workspacePath
+ *
+ * For each such run, calls `beforeRemove` hook (if provided) and then
+ * removes the workspace directory (unless dryRun=true).
+ *
+ * Returns the count of workspaces swept.
+ */
+export async function sweepTerminalWorkspaces(
+  em: EntityManager,
+  orgId: string,
+  opts: SweepOptions = {},
+): Promise<number> {
+  const { AgentRun } = await import(
+    "../../db/entities/orchestration/AgentRun.ts"
+  );
+  const fork = em.fork();
+
+  const terminalRuns = await fork.find(AgentRun, {
+    org: orgId,
+    orchestrationState: { $in: [...TERMINAL_ORCHESTRATION_STATES] },
+    workspacePath: { $ne: null },
+  } as never) as AgentRunType[];
+
+  let swept = 0;
+
+  for (const run of terminalRuns) {
+    const workspacePath = run.workspacePath;
+    if (!workspacePath) continue;
+
+    if (opts.beforeRemove) {
+      await opts.beforeRemove(run);
+    }
+
+    if (!opts.dryRun) {
+      try {
+        await rm(workspacePath, { recursive: true, force: true });
+        const managed = await findManagedRun(fork, run.id);
+        managed.workspacePath = undefined;
+        await fork.flush();
+      } catch {
+        // Non-fatal: log and continue sweep
+        console.error(`sweepTerminalWorkspaces: failed to remove ${workspacePath}`);
+      }
+    }
+
+    swept += 1;
+  }
+
+  return swept;
 }
 
 async function readExistingWorkspaceKeys(orgRoot: string): Promise<Set<string>> {
