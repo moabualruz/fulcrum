@@ -7,6 +7,7 @@ import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { stripVendorRuleBlocks } from "./install.ts";
+import { replaceSentinelBlock } from "./vendor-rules.ts";
 
 const BEGIN = "<!-- BEGIN FULCRUM RULES -->";
 const END = "<!-- END FULCRUM RULES -->";
@@ -216,5 +217,37 @@ describe("stripVendorRuleBlocks", () => {
 
     const result = await readFile(target, "utf8");
     expect(result).toBe(content);
+  });
+
+  test("replaceSentinelBlock preserves bytes outside Fulcrum sentinel markers", () => {
+    const content = [
+      "# User Rules",
+      "",
+      "Keep before.",
+      "",
+      SENTINEL_BLOCK,
+      "",
+      "# After",
+      "",
+      "Keep after.",
+      "",
+    ].join("\n");
+
+    expect(replaceSentinelBlock(content, "## New Fulcrum body\n\n- updated")).toBe([
+      "# User Rules",
+      "",
+      "Keep before.",
+      "",
+      BEGIN,
+      "## New Fulcrum body",
+      "",
+      "- updated",
+      END,
+      "",
+      "# After",
+      "",
+      "Keep after.",
+      "",
+    ].join("\n"));
   });
 });

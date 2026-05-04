@@ -11,6 +11,7 @@ import { planPackageMirrorTargets } from "./package-mirror.ts";
 import { getPackageSurfaceManifest } from "./package-surfaces.ts";
 import { run as runProc } from "../utils/proc.ts";
 import * as proc from "../utils/proc.ts";
+import { patchJsonOwnedKey, patchTomlOwnedKey } from "../utils/config-patcher.ts";
 
 // ---------------------------------------------------------------------------
 // 1. ~/.agents/ guard
@@ -110,6 +111,34 @@ describe("lockCavemanUltra", () => {
     expect(parsed.defaultMode).toBe("ultra");
   });
 
+  test("existing owned config keeps comments, order, and unrelated formatting", async () => {
+    const cfgDir = join(testHome, ".config", "caveman");
+    await mkdir(cfgDir, { recursive: true });
+    const cfgPath = join(cfgDir, "config.json");
+    const original = [
+      "{",
+      '  "__fulcrum_owned_keys": ["defaultMode"],',
+      '  "theme": "unchanged",',
+      "",
+      '  "defaultMode": "full"',
+      "}",
+      "",
+    ].join("\n");
+    await writeFile(cfgPath, original);
+
+    await lockCavemanUltra(testHome);
+
+    expect(await readFile(cfgPath, "utf8")).toBe([
+      "{",
+      '  "__fulcrum_owned_keys": ["defaultMode"],',
+      '  "theme": "unchanged",',
+      "",
+      '  "defaultMode": "ultra"',
+      "}",
+      "",
+    ].join("\n"));
+  });
+
   test("existing malformed JSON → overwritten to ultra (no throw)", async () => {
     const cfgDir = join(testHome, ".config", "caveman");
     await mkdir(cfgDir, { recursive: true });
@@ -153,6 +182,64 @@ describe("lockCavemanUltra", () => {
       }
       await rm(xdgDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("targeted config patchers", () => {
+  test("patchJsonOwnedKey updates only marker-owned key bytes", () => {
+    const source = [
+      "{",
+      '  "__fulcrum_owned_keys": ["defaultMode"],',
+      '  "theme": "user",',
+      "",
+      '  "defaultMode": "full",',
+      '  "nested": { "keep": true }',
+      "}",
+      "",
+    ].join("\n");
+
+    expect(patchJsonOwnedKey(source, ["defaultMode"], "ultra", "__fulcrum_owned_keys")).toBe([
+      "{",
+      '  "__fulcrum_owned_keys": ["defaultMode"],',
+      '  "theme": "user",',
+      "",
+      '  "defaultMode": "ultra",',
+      '  "nested": { "keep": true }',
+      "}",
+      "",
+    ].join("\n"));
+  });
+
+  test("patchJsonOwnedKey refuses unowned paths", () => {
+    const source = '{ "__fulcrum_owned_keys": ["defaultMode"], "theme": "user" }\n';
+
+    expect(() =>
+      patchJsonOwnedKey(source, ["theme"], "fulcrum", "__fulcrum_owned_keys"),
+    ).toThrow("not owned by Fulcrum");
+  });
+
+  test("patchTomlOwnedKey updates only marker-owned key bytes", () => {
+    const source = [
+      '# user comment',
+      'fulcrum_owned_keys = ["features.codex_hooks"]',
+      "",
+      "[features]",
+      "other = true",
+      "codex_hooks = false",
+      "",
+    ].join("\n");
+
+    expect(
+      patchTomlOwnedKey(source, "features.codex_hooks", true, "fulcrum_owned_keys"),
+    ).toBe([
+      '# user comment',
+      'fulcrum_owned_keys = ["features.codex_hooks"]',
+      "",
+      "[features]",
+      "other = true",
+      "codex_hooks = true",
+      "",
+    ].join("\n"));
   });
 });
 

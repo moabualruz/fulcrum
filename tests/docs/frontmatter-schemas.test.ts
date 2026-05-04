@@ -15,6 +15,7 @@ import {
   SpecFrontmatterSchema,
   WikiFrontmatterSchema,
 } from "../../src/docs/frontmatter-schemas.ts";
+import { patchFrontmatterKey } from "../../src/utils/frontmatter.ts";
 
 const VALID_FRONTMATTER = {
   spec: { status: "approved" },
@@ -136,5 +137,47 @@ describe("frontmatter schemas", () => {
       doc_type: "adr",
       ...VALID_FRONTMATTER.adr,
     });
+  });
+
+  test("patchFrontmatterKey preserves unowned frontmatter and body bytes", () => {
+    const source = [
+      "---",
+      "# keep this comment",
+      "title: 'Original title'",
+      "",
+      'status: "draft"',
+      "tags: [docs, rules]",
+      "---",
+      "",
+      "# Body",
+      "",
+      "Body bytes stay exact.",
+      "",
+    ].join("\n");
+
+    const patched = patchFrontmatterKey(source, "status", "approved");
+
+    expect(patched).toBe([
+      "---",
+      "# keep this comment",
+      "title: 'Original title'",
+      "",
+      'status: "approved"',
+      "tags: [docs, rules]",
+      "---",
+      "",
+      "# Body",
+      "",
+      "Body bytes stay exact.",
+      "",
+    ].join("\n"));
+  });
+
+  test("patchFrontmatterKey inserts missing scalar before closing delimiter", () => {
+    const source = "---\n# comment\ntitle: \"Doc\"\n---\n\nBody\n";
+
+    expect(patchFrontmatterKey(source, "status", "review")).toBe(
+      "---\n# comment\ntitle: \"Doc\"\nstatus: \"review\"\n---\n\nBody\n",
+    );
   });
 });
