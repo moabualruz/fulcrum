@@ -39,7 +39,7 @@ export async function indexSearchDocument(
   await db.query(
     `INSERT INTO search_documents (id, org_id, project_id, source_kind, source_id, title, body, labels)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text[])
-     ON CONFLICT (source_kind, source_id) DO UPDATE
+     ON CONFLICT (org_id, source_kind, source_id) DO UPDATE
        SET title = EXCLUDED.title,
            body = EXCLUDED.body,
            labels = EXCLUDED.labels,

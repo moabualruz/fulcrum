@@ -16,9 +16,9 @@
 </script>
 
 {#if href !== undefined}
-  <a data-metric-card data-metric-label={label} href={href} class={cardClass}>
-    <div data-metric-value class={cn("text-2xl font-bold tabular-nums")}>{value}</div>
-    <div data-metric-label-text class={cn("text-sm text-muted-foreground mt-1")}>{label}</div>
+  <a data-metric-card data-metric-label={label} href={href} aria-label="{label}: {value}" class={cardClass}>
+    <div data-metric-value aria-hidden="true" class={cn("text-2xl font-bold tabular-nums")}>{value}</div>
+    <div data-metric-label-text aria-hidden="true" class={cn("text-sm text-muted-foreground mt-1")}>{label}</div>
   </a>
 {:else}
   <div data-metric-card data-metric-label={label} class={cardClass}>

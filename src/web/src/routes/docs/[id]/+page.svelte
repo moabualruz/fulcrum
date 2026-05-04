@@ -40,6 +40,11 @@
 		<div class={cn("flex items-center gap-2")}>
 			<span data-doc-updated class={cn("text-xs text-muted-foreground")}>Updated {formatUpdated(doc.updated_at)}</span>
 			<a
+				data-doc-history
+				href="/docs/{doc.id}/history"
+				class={cn(buttonVariants({ variant: "ghost" }), "text-xs")}
+			>History</a>
+			<a
 				data-doc-edit
 				href="/docs/{doc.id}/edit"
 				class={cn(buttonVariants({ variant: "outline" }))}
@@ -47,7 +52,23 @@
 		</div>
 	</header>
 
-	<MarkdownPreview value={doc.body} />
+	<div class={cn("grid grid-cols-[1fr_minmax(0,200px)] gap-6")}>
+		<div>
+			<MarkdownPreview value={doc.body} />
+		</div>
+		{#if payload.backlinks && payload.backlinks.length > 0}
+			<aside data-backlinks-sidebar class={cn("flex flex-col gap-2")}>
+				<h2 class={cn("text-sm font-semibold text-muted-foreground")}>Backlinks</h2>
+				{#each payload.backlinks as link (link.source_doc_id)}
+					<a
+						href="/docs/{link.source_doc_id}"
+						data-backlink
+						class={cn("text-sm hover:underline")}
+					>{link.title}</a>
+				{/each}
+			</aside>
+		{/if}
+	</div>
 
 	<div class={cn("my-8 border-t border-border")}></div>
 

@@ -32,6 +32,18 @@ interface DocRow {
   body_excerpt: string;
 }
 
+interface DocTreeNode {
+  id: string;
+  title: string;
+  slug: string;
+  parentId: string | null;
+  projectId: string | null;
+  scope: "project" | "global";
+  docType: string;
+  sortPosition: number;
+  children: DocTreeNode[];
+}
+
 type PageProps = {
   data: {
     kind: string;
@@ -39,8 +51,8 @@ type PageProps = {
     activeProjectId: string | null;
     streamed: {
       data:
-        | Promise<{ documents: DocRow[] }>
-        | { documents: DocRow[] };
+        | Promise<{ documents: DocRow[]; projectTree: DocTreeNode[]; globalTree: DocTreeNode[] }>
+        | { documents: DocRow[]; projectTree: DocTreeNode[]; globalTree: DocTreeNode[] };
     };
   };
 };
@@ -74,6 +86,8 @@ const SAMPLE: DocRow[] = [
 
 function pageData(input: {
   documents: DocRow[];
+  projectTree?: DocTreeNode[];
+  globalTree?: DocTreeNode[];
   kind?: string;
   q?: string;
   activeProjectId?: string | null;
@@ -82,7 +96,13 @@ function pageData(input: {
     kind: input.kind ?? "",
     q: input.q ?? "",
     activeProjectId: input.activeProjectId ?? null,
-    streamed: { data: { documents: input.documents } },
+    streamed: {
+      data: {
+        documents: input.documents,
+        projectTree: input.projectTree ?? [],
+        globalTree: input.globalTree ?? [],
+      },
+    },
   };
 }
 
@@ -126,6 +146,8 @@ describe("/docs +page.svelte", () => {
     expect(cta).toBeDefined();
     expect(cta).toContain('href="/docs/new"');
     expect(body).toContain("data-docs-filter");
+    expect(body).toContain("data-in-context-search");
+    expect(body).toContain('data-search-kind="doc"');
     expect(body).toContain("data-kind-filter");
     expect(body).toContain("data-q-filter");
     for (const doc of SAMPLE) {
@@ -175,5 +197,42 @@ describe("/docs +page.svelte", () => {
       props: { data: pageData({ documents: [] }) },
     });
     expect(body).toMatch(/<h1\b[^>]*>\s*Documents\s*<\/h1>/);
+  });
+
+  test("/docs hub renders project and global doc tree sidebars", () => {
+    const projectTree: DocTreeNode[] = [{
+      id: "project-root",
+      title: "Project handbook",
+      slug: "project-handbook",
+      parentId: null,
+      projectId: "project-1",
+      scope: "project",
+      docType: "wiki",
+      sortPosition: 1,
+      children: [],
+    }];
+    const globalTree: DocTreeNode[] = [{
+      id: "global-root",
+      title: "Global policy",
+      slug: "global-policy",
+      parentId: null,
+      projectId: null,
+      scope: "global",
+      docType: "spec",
+      sortPosition: 1,
+      children: [],
+    }];
+
+    const { body } = render(Page, {
+      props: { data: pageData({ documents: SAMPLE, projectTree, globalTree }) },
+    });
+
+    expect(body).toContain("data-docs-hub");
+    expect(body).toContain("data-project-doc-tree");
+    expect(body).toContain("data-global-doc-tree");
+    expect(body).toContain('data-scope="project"');
+    expect(body).toContain('data-scope="global"');
+    expect(body).toContain("Project handbook");
+    expect(body).toContain("Global policy");
   });
 });

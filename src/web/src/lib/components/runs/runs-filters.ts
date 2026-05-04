@@ -17,6 +17,8 @@ export interface RunRow {
   project_id: string | null;
   started_at: string;
   ended_at: string | null;
+  sandbox_mode: string | null;
+  iteration_count: number | null;
 }
 
 const RANGE_MS: Record<Exclude<RunRange, "all">, number> = {

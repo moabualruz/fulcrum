@@ -35,6 +35,7 @@
 				href={item.href}
 				data-slot="button"
 				data-current={current ? "true" : undefined}
+				aria-current={current ? "page" : undefined}
 				class={cn(
 					buttonVariants({ variant: "ghost" }),
 					"justify-start gap-2",

@@ -17,6 +17,8 @@ const ROWS: RunRow[] = [
     project_id: "p1",
     started_at: "2026-04-30T10:00:00Z",
     ended_at: "2026-04-30T10:30:00Z",
+    sandbox_mode: null,
+    iteration_count: null,
   },
   {
     id: "r2",
@@ -26,6 +28,8 @@ const ROWS: RunRow[] = [
     project_id: null,
     started_at: "2026-04-30T11:00:00Z",
     ended_at: null,
+    sandbox_mode: "strict",
+    iteration_count: 3,
   },
   {
     id: "r3",
@@ -35,6 +39,8 @@ const ROWS: RunRow[] = [
     project_id: "p2",
     started_at: "2026-04-30T09:00:00Z",
     ended_at: "2026-04-30T09:05:00Z",
+    sandbox_mode: null,
+    iteration_count: null,
   },
 ];
 
@@ -52,7 +58,7 @@ describe("RunsTable component (SSR)", () => {
 
   test("renders header buttons with data-runs-sort for each column", () => {
     const { body } = render(RunsTable, { props: { rows: ROWS } });
-    for (const col of ["agent", "model", "status", "started_at", "duration"]) {
+    for (const col of ["agent", "model", "status", "sandbox_mode", "iteration_count", "started_at", "duration"]) {
       expect(body).toContain(`data-runs-sort="${col}"`);
     }
   });

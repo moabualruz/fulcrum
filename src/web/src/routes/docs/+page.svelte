@@ -3,6 +3,8 @@
 
 	import { buttonVariants } from "$lib/components/ui/button";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
+	import DocTree from "$lib/components/docs/DocTree.svelte";
+	import InContextSearchBar from "$lib/components/search/InContextSearchBar.svelte";
 	import { cn } from "$lib/utils.js";
 
 	interface Props {
@@ -36,7 +38,14 @@
 		data-docs-header
 		class={cn("flex items-center justify-between gap-4 border-b border-border pb-4 mb-4")}
 	>
-		<h1 class={cn("text-2xl font-semibold tracking-tight")}>Documents</h1>
+		<div class={cn("flex items-center gap-3")}>
+			<h1 class={cn("text-2xl font-semibold tracking-tight")}>Documents</h1>
+			<a
+				href="/docs/global"
+				data-global-tree
+				class={cn("text-sm text-muted-foreground hover:underline")}
+			>Global tree</a>
+		</div>
 		<a
 			href="/docs/new"
 			data-new-doc
@@ -44,6 +53,22 @@
 			class={cn(buttonVariants({ variant: "default" }), "gap-2")}
 		>New document</a>
 	</header>
+
+	<div class={cn("mb-3")}>
+		<InContextSearchBar kind="doc" projectId={data.activeProjectId} placeholder="Search documents" />
+	</div>
+
+	<div
+		data-docs-hub
+		class={cn("mb-4 grid gap-3 lg:grid-cols-2")}
+	>
+		<div data-project-doc-tree>
+			<DocTree title="Project docs" scope="project" nodes={payload.projectTree ?? []} />
+		</div>
+		<div data-global-doc-tree>
+			<DocTree title="Global docs" scope="global" nodes={payload.globalTree ?? []} />
+		</div>
+	</div>
 
 	<form
 		data-docs-filter

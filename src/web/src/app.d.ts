@@ -5,8 +5,15 @@ declare global {
 		// interface Error {}
 		interface Locals {
 			activeProjectId: string | null;
+			container?: {
+				get: (token: unknown) => unknown;
+			};
 		}
-		// interface PageData {}
+		interface PageData {
+			theme?: import("$lib/theme").ThemeSettings;
+			keybindingOverrides?: import("$lib/keybindings").KeybindingOverrides;
+			featureFlags?: Record<string, boolean>;
+		}
 		// interface PageState {}
 		// interface Platform {}
 	}

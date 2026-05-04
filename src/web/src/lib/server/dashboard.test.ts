@@ -157,6 +157,57 @@ describe("loadDashboard", () => {
     } finally { await db.close(); }
   });
 
+  test("projectTiles returns project name, open task count, and last activity", async () => {
+    const { db, orgId } = await freshDb("project-tiles");
+    try {
+      const pA = await createProject(db, { orgId, slug: "alpha", name: "Alpha" });
+      const pB = await createProject(db, { orgId, slug: "beta", name: "Beta" });
+      await seedTask(db, orgId, pA.id, "pending", 1, "t1");
+      await seedTask(db, orgId, pA.id, "in_progress", 2, "t2");
+      await seedTask(db, orgId, pA.id, "completed", 3, "t3"); // should not count
+      await seedTask(db, orgId, pB.id, "pending", 1, "t4");
+
+      const data = await loadDashboard(db, orgId);
+      expect(data.projectTiles).toBeDefined();
+      expect(data.projectTiles).toHaveLength(2);
+
+      const alpha = data.projectTiles.find((t: any) => t.name === "Alpha");
+      expect(alpha).toBeDefined();
+      expect(alpha!.openTasks).toBe(2);
+      expect(alpha!.id).toBe(pA.id);
+
+      const beta = data.projectTiles.find((t: any) => t.name === "Beta");
+      expect(beta).toBeDefined();
+      expect(beta!.openTasks).toBe(1);
+    } finally { await db.close(); }
+  });
+
+  test("unreadCount returns count of events in the last 24h", async () => {
+    const { db, orgId } = await freshDb("unread-count");
+    try {
+      await createProject(db, { orgId, slug: "p", name: "P" });
+      // Seed 3 recent events
+      for (let i = 0; i < 3; i++) {
+        await db.query(
+          `INSERT INTO events (id, org_id, actor, subject_kind, subject_id, verb)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+          [newUlid(), orgId, "system", "task", newUlid(), "created"],
+        );
+      }
+      // Seed 1 old event (>24h ago)
+      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+      await db.query(
+        `INSERT INTO events (id, org_id, actor, subject_kind, subject_id, verb, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [newUlid(), orgId, "system", "task", newUlid(), "created", twoDaysAgo],
+      );
+
+      const data = await loadDashboard(db, orgId);
+      // 3 seeded + 1 from createProject in freshDb = 4 recent events
+      expect(data.unreadCount).toBe(4);
+    } finally { await db.close(); }
+  });
+
   test("projectId === null scopes to project_id IS NULL", async () => {
     const { db, orgId } = await freshDb("project-null");
     try {

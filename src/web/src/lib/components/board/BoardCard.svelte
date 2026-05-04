@@ -27,7 +27,14 @@
 >
   <span data-board-card-title class="block text-sm font-medium">{task.title}</span>
   <span class="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-    <span data-board-card-priority>P{task.priority}</span>
+    <span data-board-card-priority class="rounded border border-border px-1.5 py-0.5">P{task.priority}</span>
+    <span data-board-card-assignee>{task.assignee ?? "Unassigned"}</span>
+  </span>
+  <span class="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+    <span data-board-card-due-date>{task.due_date ?? "No due date"}</span>
+    <span data-board-card-estimate>{task.estimate == null ? "0pt" : `${task.estimate}pt`}</span>
+  </span>
+  <span class="mt-1 flex items-center justify-end text-xs text-muted-foreground">
     {#if task.project_id}
       <span data-board-card-project>·</span>
     {/if}

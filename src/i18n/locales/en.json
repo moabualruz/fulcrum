@@ -1,0 +1,8 @@
+{
+  "common": {
+    "save": "Save"
+  },
+  "tasks": {
+    "noDueDate": "No due date"
+  }
+}

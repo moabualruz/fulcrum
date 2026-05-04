@@ -19,6 +19,8 @@
 	} from "$lib/util/media-query";
 	import { cn } from "$lib/utils.js";
 
+	import type { InferenceStatus } from "$lib/components/app/AppTopbar.svelte";
+
 	import "../app.css";
 	import type { LayoutData } from "./$types";
 
@@ -32,6 +34,26 @@
 	let mobile = $state(isMobileViewport(browserDriver()));
 	let sheetOpen = $state(false);
 	let paletteOpen = $state(false);
+	let inferenceStatus = $state<InferenceStatus>("unknown");
+
+	// Poll inference sidecar health every 30s (client-side only)
+	$effect(() => {
+		if (typeof window === "undefined" || typeof fetch !== "function") return;
+		let cancelled = false;
+		async function poll() {
+			try {
+				const res = await fetch("/api/inference/health");
+				if (!res.ok) { inferenceStatus = "unreachable"; return; }
+				const data = await res.json();
+				inferenceStatus = data.status ?? "unreachable";
+			} catch {
+				inferenceStatus = "unreachable";
+			}
+		}
+		void poll();
+		const id = setInterval(() => { if (!cancelled) void poll(); }, 30_000);
+		return () => { cancelled = true; clearInterval(id); };
+	});
 
 	const paletteItems = [
 		{ id: "home",     label: "Dashboard",  href: "/" },
@@ -39,7 +61,10 @@
 		{ id: "docs",     label: "Documents",  href: "/docs" },
 		{ id: "boards",   label: "Boards",     href: "/boards" },
 		{ id: "runs",     label: "Agent runs", href: "/runs" },
+		{ id: "memory",   label: "Memory",     href: "/memory" },
+		{ id: "context",  label: "Context",    href: "/context/preview" },
 		{ id: "search",   label: "Search",     href: "/search" },
+		{ id: "inference", label: "Inference Settings", href: "/settings/inference" },
 	];
 
 	$effect(() => {
@@ -64,7 +89,16 @@
 </svelte:head>
 
 <ModeWatcher />
-<Toaster richColors closeButton position="top-right" />
+
+<!-- Toast region: aria-live so screen readers announce toasts without overwhelming them -->
+<div
+	data-toast-region
+	aria-live="polite"
+	aria-atomic="false"
+	aria-label="Notifications"
+>
+	<Toaster richColors closeButton position="top-right" />
+</div>
 
 <CommandPalette
 	items={paletteItems}
@@ -75,23 +109,34 @@
 	}}
 />
 
+<!-- Skip link: must be first focusable element; becomes visible on focus -->
+<a
+	href="#main-content"
+	id="skip-to-content"
+	class={cn(
+		"sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[9999]",
+		"focus:rounded focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus:ring-2 focus:ring-ring",
+	)}
+>Skip to main content</a>
+
 <div class={cn("flex min-h-screen bg-background text-foreground")}>
 	{#if mobile}
 		<Sheet.Root bind:open={sheetOpen}>
-			<Sheet.Content side="left" class="w-64 p-0">
+			<Sheet.Content side="left" class="w-64 p-0" aria-label="Navigation menu">
 				<AppSidebar activeProjectId={data.activeProjectId} />
 			</Sheet.Content>
 			<div class={cn("flex min-w-0 flex-1 flex-col")}>
 				<div class={cn("flex items-center")}>
 					<Sheet.Trigger
 						data-mobile-sheet-trigger
-						aria-label="open navigation"
+						aria-label="Open navigation menu"
+						aria-expanded={sheetOpen}
 						class={cn(
 							buttonVariants({ variant: "ghost", size: "icon" }),
 							"ml-2",
 						)}
 					>
-						☰
+						<span aria-hidden="true">☰</span>
 					</Sheet.Trigger>
 					<div class="flex-1">
 						<AppTopbar
@@ -101,7 +146,7 @@
 						/>
 					</div>
 				</div>
-				<main class={cn("flex-1 px-6 py-6")}>
+				<main id="main-content" tabindex="-1" class={cn("flex-1 px-6 py-6")}>
 					{@render children?.()}
 				</main>
 			</div>
@@ -117,10 +162,11 @@
 						pathname={page.url.pathname}
 						activeProjectId={data.activeProjectId}
 						onThemeToggle={toggleMode}
+						{inferenceStatus}
 					/>
 				</div>
 			</div>
-			<main class={cn("flex-1 px-6 py-6")}>
+			<main id="main-content" tabindex="-1" class={cn("flex-1 px-6 py-6")}>
 				{@render children?.()}
 			</main>
 		</div>

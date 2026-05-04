@@ -678,6 +678,126 @@ describe("doctor --json product kernel section", () => {
   });
 });
 
+describe("doctor --json repos section", () => {
+  test("repos section present with zeros before any repo registered", async () => {
+    const home = join(TMP, "repos-absent");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    // Init product kernel so DB exists
+    const initProc = Bun.spawn(["bun", "src/index.ts", "product", "init", "--json"], {
+      cwd: process.cwd(),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, HOME: home, FULCRUM_HOME: fulcrumHome },
+    });
+    await new Response(initProc.stdout).text();
+    await initProc.exited;
+
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const repos = report["repos"] as Record<string, unknown>;
+    expect(repos).toBeDefined();
+    expect(repos["totalRepos"]).toBe(0);
+    expect(repos["syncErrors"]).toBe(0);
+    expect(repos["activeWatchers"]).toBe(0);
+    expect(repos["lruQueueDepth"]).toBe(0);
+    expect(repos["mirrorDiskGb"]).toBe(0);
+  });
+
+  test("repos section absent (zeros) when product kernel not initialised", async () => {
+    const home = join(TMP, "repos-no-kernel");
+    await mkdir(home, { recursive: true });
+    const report = await runDoctor(home);
+    const repos = report["repos"] as Record<string, unknown>;
+    expect(repos).toBeDefined();
+    expect(repos["totalRepos"]).toBe(0);
+  });
+
+  test("doctor exits non-zero when syncErrors > 0", async () => {
+    const home = join(TMP, "repos-sync-errors");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    // Init product kernel and insert a repo with sync error
+    const initProc = Bun.spawn(["bun", "src/index.ts", "product", "init", "--json"], {
+      cwd: process.cwd(),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, HOME: home, FULCRUM_HOME: fulcrumHome },
+    });
+    await new Response(initProc.stdout).text();
+    await initProc.exited;
+
+    // Insert a repo with error directly via SQL
+    const { productDbDir } = await import("../product-kernel/paths.ts");
+    const { openPglite } = await import("../product-kernel/db/pglite.ts");
+    const dbPath = join(fulcrumHome, "state", "product", "db", "main");
+    const db = await openPglite(dbPath);
+    try {
+      // Get the default org
+      const orgs = await db.query<{ id: string }>("SELECT id FROM orgs LIMIT 1");
+      const orgId = orgs[0]!.id;
+      await db.query(
+        `INSERT INTO repos (id, org_id, slug, root_path, sync_status, sync_error)
+         VALUES ('TESTREPO00000000000000001', $1, 'err-repo', '/tmp/err', 'error', 'git fetch failed')`,
+        [orgId],
+      );
+    } finally {
+      await db.close();
+    }
+
+    const proc = Bun.spawn(["bun", "src/index.ts", "doctor", "--json"], {
+      cwd: process.cwd(),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, HOME: home, FULCRUM_HOME: fulcrumHome },
+    });
+    await new Response(proc.stdout).text();
+    const exitCode = await proc.exited;
+    expect(exitCode).not.toBe(0);
+  });
+
+  test("doctor exits non-zero when mirrorDiskGb > 10", async () => {
+    const home = join(TMP, "repos-mirror-over-10gb");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    const initProc = Bun.spawn(["bun", "src/index.ts", "product", "init", "--json"], {
+      cwd: process.cwd(),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, HOME: home, FULCRUM_HOME: fulcrumHome },
+    });
+    await new Response(initProc.stdout).text();
+    await initProc.exited;
+
+    const dbPath = join(fulcrumHome, "state", "product", "db", "main");
+    const { openPglite } = await import("../product-kernel/db/pglite.ts");
+    const db = await openPglite(dbPath);
+    try {
+      const orgs = await db.query<{ id: string }>("SELECT id FROM orgs LIMIT 1");
+      const orgId = orgs[0]!.id;
+      // 11 GB in bytes
+      await db.query(
+        `INSERT INTO repos (id, org_id, slug, root_path, mirror_size_bytes)
+         VALUES ('TESTREPO00000000000000002', $1, 'big-repo', '/tmp/big', 11811160064)`,
+        [orgId],
+      );
+    } finally {
+      await db.close();
+    }
+
+    const proc = Bun.spawn(["bun", "src/index.ts", "doctor", "--json"], {
+      cwd: process.cwd(),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, HOME: home, FULCRUM_HOME: fulcrumHome },
+    });
+    const out = await new Response(proc.stdout).text();
+    const exitCode = await proc.exited;
+    const report = JSON.parse(out);
+    expect(report["repos"]["mirrorDiskGb"]).toBeGreaterThan(10);
+    expect(exitCode).not.toBe(0);
+  });
+});
+
 describe("doctor product-kernel verdict (issue 19)", () => {
   test("forces verdict=error when product DB cannot open", async () => {
     const home = join(TMP, "product-kernel-broken");

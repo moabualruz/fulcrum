@@ -1,0 +1,4 @@
+artifact.prune dry-run 2026-05-03T00:00:00.000Z
+soft-delete candidates: 1
+a1	acme/run/out.txt	10
+hard-delete candidates: 0

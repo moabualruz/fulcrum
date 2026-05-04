@@ -2,6 +2,7 @@ import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { openProductDb, getDefaultOrgId } from "$lib/server/db";
 import { cancelRunAction, retryRunAction, type RunStatus } from "$lib/server/runs";
+import { listArtifacts, getWorkspaceDiff, paginateLogs } from "$lib/server/agents";
 import { actionOk } from "$lib/feedback/action-result";
 
 interface AgentRunDetail {
@@ -71,6 +72,15 @@ export const load: PageServerLoad = ({ params, locals }) => {
             }
           }
 
+          // Paginated JSONL logs from transcript
+          const logs = transcript ? paginateLogs(transcript, 0, 100) : null;
+
+          // Workspace diff
+          const diff = await getWorkspaceDiff(db, orgId, params.id);
+
+          // Artifacts
+          const artifacts = await listArtifacts(db, orgId, params.id);
+
           const eventRows = await db.query<EventRow>(
             `SELECT * FROM events
               WHERE subject_kind = 'agent_run' AND subject_id = $1
@@ -83,7 +93,7 @@ export const load: PageServerLoad = ({ params, locals }) => {
             created_at: isoStamp(e.created_at),
           }));
 
-          return { run, transcript, events };
+          return { run, transcript, logs, diff, artifacts, events };
         } finally {
           await db.close();
         }

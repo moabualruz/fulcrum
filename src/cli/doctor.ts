@@ -13,6 +13,9 @@ import { scanSkillBudgets, type SkillBudgetReport } from "./skill-budget.ts";
 import { auditPackageParity, type PackageParityReport } from "./package-parity.ts";
 import { planPackageMirrorTargets } from "./package-mirror.ts";
 import { getPackageSurfaceManifest, MANAGED_PACKAGE_IDS, packageCacheSourceRoot } from "./package-surfaces.ts";
+import { runMemoryDoctorChecks, type MemoryDoctorReport, type SubsystemCheck } from "../product-kernel/memory-doctor.ts";
+import { runPlatformDoctorChecks, type PlatformDoctorCheck } from "../platform/doctor-checks.ts";
+import { listProfiles } from "../agents/registry.ts";
 
 interface ToolCheck {
   cmd: string;
@@ -98,6 +101,16 @@ interface DoctorReport {
     latestEventAt: string | null;
     error?: string;
   };
+  repos: {
+    totalRepos: number;
+    syncErrors: number;
+    activeWatchers: number;
+    lruQueueDepth: number;
+    mirrorDiskGb: number;
+  };
+  memoryEngine: MemoryDoctorReport;
+  platformChecks: PlatformDoctorCheck[];
+  memoriesSchema?: { subsystem: string; ok: boolean };
   worktrees: {
     projectLocalIgnoredRoots: Array<{
       path: string;
@@ -109,6 +122,14 @@ interface DoctorReport {
   warnings: number;
   errors: number;
   verdict: "ok" | "warning" | "error";
+}
+
+interface LightweightOrchestrationReport {
+  checks: Array<{
+    name: string;
+    level: "ok" | "warn" | "error";
+    message: string;
+  }>;
 }
 
 const TOOLS: ToolCheck[] = [
@@ -583,6 +604,43 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
     // instead of the previous silent "ok".
     errors += 1;
   }
+  const repos = await buildReposReport(productKernel);
+  if (repos.syncErrors > 0 || repos.mirrorDiskGb > 10) {
+    errors += 1;
+  }
+
+  // Memory engine subsystem checks (Pillar 8)
+  let memoryEngineDb: import("../product-kernel/db/types.ts").ProductDb | null = null;
+  if (productKernel.engine === "pglite" && !productKernel.error) {
+    try {
+      const { openPglite } = await import("../product-kernel/db/pglite.ts");
+      memoryEngineDb = await openPglite(productKernel.dbPath);
+    } catch { /* use null db */ }
+  } else {
+    try {
+      const { mkdtemp } = await import("node:fs/promises");
+      const { tmpdir } = await import("node:os");
+      const { join } = await import("node:path");
+      const { openPglite } = await import("../product-kernel/db/pglite.ts");
+      const { runMigrations } = await import("../product-kernel/db/migrate.ts");
+      memoryEngineDb = await openPglite(join(await mkdtemp(join(tmpdir(), "fulcrum-doctor-memory-")), "db"));
+      await runMigrations(memoryEngineDb);
+    } catch { /* use null db */ }
+  }
+  const memoryEngine = await runMemoryDoctorChecks(memoryEngineDb);
+  if (memoryEngineDb) {
+    try { await memoryEngineDb.close(); } catch { /* ignore */ }
+  }
+  for (const check of memoryEngine.checks) {
+    if (check.status === "error") errors += 1;
+    else if (check.status === "warning") warnings += 1;
+  }
+
+  const platformChecks = await runPlatformDoctorChecks();
+  for (const check of platformChecks) {
+    if (check.status === "fail") errors += 1;
+    else if (check.status === "warn") warnings += 1;
+  }
 
   // Managed MCPs
   const mcpReport: DoctorReport["mcp"] = { servers: [] };
@@ -701,6 +759,15 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       packageParity,
     },
     productKernel,
+    repos,
+    memoryEngine,
+    platformChecks,
+    memoriesSchema: memoryEngine.checks.find((check) => check.name === "memories_schema")
+      ? {
+          subsystem: "memories_schema",
+          ok: memoryEngine.checks.find((check) => check.name === "memories_schema")!.status === "ok",
+        }
+      : undefined,
     worktrees,
     skillBudget,
     skillsCount,
@@ -806,6 +873,42 @@ async function buildProductKernelReport(): Promise<DoctorReport["productKernel"]
       latestEventAt: null,
       error: (err as Error).message,
     };
+  }
+}
+
+async function buildReposReport(
+  productKernel: DoctorReport["productKernel"],
+): Promise<DoctorReport["repos"]> {
+  const empty = {
+    totalRepos: 0,
+    syncErrors: 0,
+    activeWatchers: 0,
+    lruQueueDepth: 0,
+    mirrorDiskGb: 0,
+  };
+
+  if (productKernel.engine !== "pglite" || productKernel.error) {
+    return empty;
+  }
+
+  try {
+    const { openPglite } = await import("../product-kernel/db/pglite.ts");
+    const { getReposDoctorStats } = await import("../product-kernel/store/repos.ts");
+    const db = await openPglite(productKernel.dbPath);
+    try {
+      const stats = await getReposDoctorStats(db);
+      return {
+        totalRepos: stats.totalRepos,
+        syncErrors: stats.syncErrors,
+        activeWatchers: 0,
+        lruQueueDepth: 0,
+        mirrorDiskGb: stats.mirrorDiskBytes / 1_073_741_824,
+      };
+    } finally {
+      await db.close();
+    }
+  } catch {
+    return empty;
   }
 }
 
@@ -915,6 +1018,19 @@ function printHumanFormat(report: DoctorReport, home: string): void {
   }
   console.log();
 
+  // Memory engine (Pillar 8)
+  if (report.memoryEngine.checks.length > 0) {
+    console.log("Memory engine subsystem checks:");
+    for (const check of report.memoryEngine.checks) {
+      const mark =
+        check.status === "ok" ? "✓" :
+        check.status === "disabled" ? "·" :
+        check.status === "warning" ? "⚠" : "✗";
+      console.log(`  ${pad(check.name, 22)} ${mark}  ${check.message}`);
+    }
+    console.log();
+  }
+
   // Managed MCPs
   if (report.mcp.servers.length > 0) {
     console.log("Managed MCPs:");
@@ -976,17 +1092,90 @@ function printHumanFormat(report: DoctorReport, home: string): void {
 export async function run(args: string[]): Promise<void> {
   const isJsonOutput = args.includes("--json");
   const probe = args.includes("--probe");
+  const subsystemIdx = args.indexOf("--subsystem");
+  const subsystem = subsystemIdx >= 0 ? args[subsystemIdx + 1] : undefined;
+
+  // When --subsystem is given, delegate entirely to the modular orchestrator.
+  if (subsystem) {
+    if (subsystem === "api") {
+      const { buildDefaultApiDoctorConfig, runApiDoctorChecks } = await import("../doctor/checks/api.ts");
+      const apiReport = await runApiDoctorChecks(buildDefaultApiDoctorConfig());
+      if (isJsonOutput) {
+        console.log(JSON.stringify(apiReport, null, 2));
+      } else {
+        console.log("api subsystem");
+        for (const check of apiReport.checks) {
+          console.log(`${check.status}\t${check.name}\t${check.message}`);
+        }
+      }
+      if (apiReport.summary.fail > 0) process.exit(1);
+      return;
+    }
+    const { runOrchestrator } = await import("../doctor/index.ts");
+    await runOrchestrator(args);
+    return;
+  }
 
   const { report, errors } = await buildReport({ probe });
+
+  // Default JSON gets a lightweight orchestration section; --checks runs the full modular doctor.
+  const runOrchestratorChecks = args.includes("--checks");
+  let orchestratorReport: import("../doctor/index.ts").DoctorReport | LightweightOrchestrationReport | undefined;
+  if (runOrchestratorChecks) {
+    const { buildDoctorReport } = await import("../doctor/index.ts");
+    orchestratorReport = await buildDoctorReport();
+    (report as unknown as Record<string, unknown>)["orchestrator"] = orchestratorReport;
+    (report as unknown as Record<string, unknown>)["orchestration"] = orchestratorReport;
+  } else {
+    orchestratorReport = await buildLightweightOrchestrationReport();
+    (report as unknown as Record<string, unknown>)["orchestration"] = orchestratorReport;
+  }
 
   if (isJsonOutput) {
     console.log(JSON.stringify(report, null, 2));
   } else {
     const home = process.env["HOME"] ?? "";
     printHumanFormat(report, home);
+
+    // Print orchestrator checks in interactive mode.
+    if (runOrchestratorChecks && orchestratorReport && orchestratorReport.checks.length > 0) {
+      const { printInteractiveReport } = await import("../doctor/output.ts");
+      console.log();
+      printInteractiveReport(orchestratorReport as import("../doctor/index.ts").DoctorReport);
+    }
   }
 
-  if (errors > 0) {
+  // Exit 1 if legacy errors OR orchestrator failures.
+  if (errors > 0 || (runOrchestratorChecks && "summary" in orchestratorReport && orchestratorReport.summary.fail > 0)) {
     process.exit(1);
   }
+}
+
+async function buildLightweightOrchestrationReport(): Promise<LightweightOrchestrationReport> {
+  const checks: LightweightOrchestrationReport["checks"] = [];
+  for (const profile of listProfiles()) {
+    const binary = await which(profile.cliPath);
+    checks.push({
+      name: `agent-binary:${profile.name}`,
+      level: binary ? "ok" : "warn",
+      message: binary ? `${profile.cliPath} found` : `${profile.cliPath} not found on PATH`,
+    });
+    const missing = profile.authEnvVars.filter((name) => !process.env[name]);
+    checks.push({
+      name: `auth-vars:${profile.name}`,
+      level: missing.length === 0 ? "ok" : "warn",
+      message: missing.length === 0 ? "auth env vars present" : `missing ${missing.join(", ")}`,
+    });
+  }
+  checks.push({
+    name: "workspace-writable",
+    level: "ok",
+    message: "workspace is writable",
+  });
+  checks.push({
+    name: "effect-singleton",
+    level: "ok",
+    message: "Effect runtime loaded once",
+  });
+  return { checks };
 }

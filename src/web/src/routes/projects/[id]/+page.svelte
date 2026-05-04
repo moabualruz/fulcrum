@@ -31,6 +31,21 @@
 		const isoTime = value.slice(11, 16);
 		return isoTime ? `${isoDate} ${isoTime}` : isoDate;
 	}
+
+	const quickNav = $derived([
+		{ label: "Board", href: `/projects/${data.project.id}/board` },
+		{ label: "Backlog", href: `/projects/${data.project.id}/backlog` },
+		{ label: "Sprints", href: `/projects/${data.project.id}/sprints` },
+		{ label: "Reports", href: `/projects/${data.project.id}/reports` },
+		{ label: "Repos", href: `/projects/${data.project.id}/repos` },
+		{ label: "Docs", href: `/projects/${data.project.id}/docs` },
+	]);
+	const summary = $derived([
+		{ key: "openTasks", label: "Open tasks", value: data.summary.openTasks },
+		{ key: "inProgress", label: "In progress", value: data.summary.inProgress },
+		{ key: "done", label: "Done", value: data.summary.done },
+		{ key: "sprintDaysRemaining", label: "Sprint days", value: data.summary.sprintDaysRemaining },
+	]);
 </script>
 
 <header
@@ -45,6 +60,21 @@
 	</div>
 	<span data-project-updated class={cn("text-xs text-muted-foreground")}>Updated {formatUpdated(data.project.updated_at)}</span>
 </header>
+
+<nav data-project-quick-nav class={cn("mb-4 flex flex-wrap gap-2")} aria-label="Project sections">
+	{#each quickNav as item (item.href)}
+		<a href={item.href} class={cn("rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted")}>{item.label}</a>
+	{/each}
+</nav>
+
+<section data-project-summary-grid class={cn("mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4")}>
+	{#each summary as item (item.key)}
+		<div data-project-summary={item.key} class={cn("rounded-md border border-border bg-card p-3")}>
+			<div class={cn("text-2xl font-semibold")}>{item.value}</div>
+			<div class={cn("text-sm text-muted-foreground")}>{item.label}</div>
+		</div>
+	{/each}
+</section>
 
 <form
 	method="POST"

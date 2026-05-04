@@ -693,6 +693,10 @@ export async function run(args: string[]): Promise<void> {
     case "sync":  return cmdSync(args.slice(1));
     case "lint":  return cmdLint(args[1]);
     case "list":  return cmdList(args.slice(1));
+    case "marketplace": {
+      const { run: runMarketplace } = await import("./marketplace.ts");
+      return runMarketplace(args.slice(1));
+    }
     case "upstream": {
       let dryRun = false;
       let updatePins = false;

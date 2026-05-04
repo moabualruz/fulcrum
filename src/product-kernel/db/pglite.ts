@@ -36,7 +36,8 @@ export async function openPglite(dataDir: string): Promise<ProductDb> {
   // Lazy-import PGlite so the compiled binary doesn't try to extract its
   // wasm/data assets at import time and crash before our friendly error fires.
   const { PGlite } = await import("@electric-sql/pglite");
-  const db = new PGlite(dataDir);
+  const { vector } = await import("@electric-sql/pglite/vector");
+  const db = new PGlite(dataDir, { extensions: { vector } });
   await db.waitReady;
   return {
     engine: "pglite",

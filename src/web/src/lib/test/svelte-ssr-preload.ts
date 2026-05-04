@@ -8,11 +8,21 @@
 // server-mode components are also plain functions.
 import { plugin } from "bun";
 import { compile, compileModule } from "svelte/compiler";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const webRoot = join(import.meta.dir, "../..");
 
 plugin({
   name: "svelte-ssr-loader",
   setup(build) {
+    build.onResolve({ filter: /^\$lib\// }, (args) => {
+      const path = join(webRoot, "lib", args.path.slice("$lib/".length));
+      if (path.endsWith(".js") && existsSync(path.slice(0, -3) + ".ts")) {
+        return { path: path.slice(0, -3) + ".ts" };
+      }
+      return { path };
+    });
     build.onLoad({ filter: /\.svelte$/ }, (args) => {
       const source = readFileSync(args.path, "utf8");
       const { js } = compile(source, {

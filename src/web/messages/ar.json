@@ -1,0 +1,14 @@
+{
+  "settings.i18n.title": "اللغة والمنطقة",
+  "settings.i18n.locale_label": "اللغة",
+  "settings.i18n.save": "حفظ",
+  "settings.i18n.saved": "تم حفظ اللغة",
+  "nav.settings": "الإعدادات",
+  "nav.dashboard": "لوحة التحكم",
+  "nav.projects": "المشاريع",
+  "nav.docs": "المستندات",
+  "nav.boards": "اللوحات",
+  "nav.runs": "تشغيلات الوكيل",
+  "date.format": "{date}",
+  "number.format": "{number}"
+}

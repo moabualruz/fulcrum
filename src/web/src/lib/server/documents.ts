@@ -36,10 +36,21 @@ function extractLabels(fm: Record<string, unknown> | null | undefined): string[]
   return Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string") : [];
 }
 
+async function ensureDocLinksCompatibility(db: ProductDb): Promise<void> {
+  await db.query(`ALTER TABLE doc_links ADD COLUMN IF NOT EXISTS from_doc_id text REFERENCES documents(id)`);
+  await db.query(`ALTER TABLE doc_links ADD COLUMN IF NOT EXISTS to_doc_id text REFERENCES documents(id)`);
+  await db.query(`ALTER TABLE doc_links ADD COLUMN IF NOT EXISTS to_slug text`);
+  await db.query(`ALTER TABLE doc_links ADD COLUMN IF NOT EXISTS link_kind text NOT NULL DEFAULT 'wikilink'`);
+  await db.query(`ALTER TABLE doc_links ALTER COLUMN id SET DEFAULT gen_random_uuid()::text`);
+  await db.query(`ALTER TABLE doc_links ALTER COLUMN source_doc_id DROP NOT NULL`);
+  await db.query(`ALTER TABLE doc_links ALTER COLUMN target_doc_id DROP NOT NULL`);
+}
+
 export async function createDocumentAction(
   db: ProductDb,
   input: CreateDocumentInput,
 ): Promise<{ id: string }> {
+  await ensureDocLinksCompatibility(db);
   const id = newUlid();
   const fm = input.frontmatter ?? {};
   await db.query(

@@ -7,6 +7,7 @@ import { runMigrations } from "../../../../../product-kernel/db/migrate.ts";
 import {
   createLocalOrg,
   createProject,
+  createTask,
   type EventRow,
   type ProjectRow,
 } from "../../../../../product-kernel/store/repositories.ts";
@@ -80,6 +81,33 @@ describe("/projects/[id] +page.server.ts", () => {
     expect(typeof result.project.updated_at).toBe("string");
     expect(result.form?.data?.name).toBe("Alpha");
     expect(result.form?.data?.description).toBe("first project");
+  });
+
+  test("load returns task summary metrics for the project only", async () => {
+    const dbDir = join(scratch, "state", "product", "db");
+    mkdirSync(dbDir, { recursive: true });
+    const db = await openPglite(join(dbDir, "main"));
+    await runMigrations(db);
+    const org = await createLocalOrg(db, { slug: "default", name: "Default" });
+    const alpha = await createProject(db, { orgId: org.id, slug: "alpha", name: "Alpha" });
+    const beta = await createProject(db, { orgId: org.id, slug: "beta", name: "Beta" });
+    await createTask(db, { orgId: org.id, projectId: alpha.id, title: "Todo", status: "pending" });
+    await createTask(db, { orgId: org.id, projectId: alpha.id, title: "Doing", status: "in_progress" });
+    await createTask(db, { orgId: org.id, projectId: alpha.id, title: "Done", status: "completed" });
+    await createTask(db, { orgId: org.id, projectId: beta.id, title: "Other", status: "pending" });
+    await db.close();
+
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 20}`);
+    const result = await mod.load({ params: { id: alpha.id } } as Parameters<
+      typeof mod.load
+    >[0]);
+
+    expect(result.summary).toEqual({
+      openTasks: 2,
+      inProgress: 1,
+      done: 1,
+      sprintDaysRemaining: 0,
+    });
   });
 
   test("rename action updates row + returns { form }", async () => {

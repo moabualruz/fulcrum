@@ -1,9 +1,8 @@
 <script lang="ts">
-  import { browser } from "$app/environment";
   import { cn } from "$lib/utils.js";
 
   import { filterAndSort, type CommandItem } from "./command-palette-filter";
-  import { makeKeydownHandler, makeSelect } from "./command-palette-handlers";
+  import { makeSelect } from "./command-palette-handlers";
 
   interface Props {
     items: CommandItem[];
@@ -31,14 +30,6 @@
     event.preventDefault();
     selectTop();
   }
-
-  $effect(() => {
-    if (!browser) return;
-
-    const handleKeydown = makeKeydownHandler(open, onOpenChange);
-    window.addEventListener("keydown", handleKeydown);
-    return () => window.removeEventListener("keydown", handleKeydown);
-  });
 </script>
 
 <div data-command-palette data-state={open ? "open" : "closed"}>

@@ -1,7 +1,8 @@
 import { error, redirect } from "@sveltejs/kit";
-import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
-import { deleteDocumentAction } from "$lib/server/documents";
+import { openProductDb, getDefaultOrgId } from "../../../lib/server/db.ts";
+import { deleteDocumentAction } from "../../../lib/server/documents.ts";
+import { getBacklinks } from "../../../lib/server/doc-links.ts";
+import { renderDocMarkdownToHtml } from "./doc-render.ts";
 
 interface DocRow {
   id: string;
@@ -10,11 +11,21 @@ interface DocRow {
   kind: string;
   title: string;
   body: string;
+  renderedHtml: string;
   frontmatter: Record<string, unknown>;
   updated_at: Date | string;
 }
 
 type ProductDb = Awaited<ReturnType<typeof openProductDb>>;
+
+interface LoadEvent {
+  params: { id: string };
+  locals?: { activeProjectId?: string | null };
+}
+
+interface ActionEvent {
+  params: { id: string };
+}
 
 async function loadDoc(db: ProductDb, id: string, orgId: string): Promise<{ doc: {
   id: string;
@@ -23,6 +34,7 @@ async function loadDoc(db: ProductDb, id: string, orgId: string): Promise<{ doc:
   kind: string;
   title: string;
   body: string;
+  renderedHtml: string;
   frontmatter: Record<string, unknown>;
   updated_at: string;
 } }> {
@@ -41,6 +53,7 @@ async function loadDoc(db: ProductDb, id: string, orgId: string): Promise<{ doc:
       kind: row.kind,
       title: row.title,
       body: row.body,
+      renderedHtml: renderDocMarkdownToHtml(row.body),
       frontmatter: row.frontmatter ?? {},
       updated_at:
         row.updated_at instanceof Date
@@ -50,14 +63,20 @@ async function loadDoc(db: ProductDb, id: string, orgId: string): Promise<{ doc:
   };
 }
 
-export const load: PageServerLoad = ({ params, locals }) => ({
+export const load = ({ params, locals }: LoadEvent) => ({
   activeProjectId: locals?.activeProjectId ?? null,
   streamed: {
     data: (async () => {
       const db = await openProductDb();
       try {
         const orgId = await getDefaultOrgId(db);
-        return await loadDoc(db, params.id, orgId);
+        const docResult = await loadDoc(db, params.id, orgId);
+        const backlinks = (await getBacklinks(db, params.id)).map((backlink) => ({
+          id: backlink.source_doc_id,
+          title: backlink.title,
+          href: `/docs/${backlink.source_doc_id}`,
+        }));
+        return { ...docResult, backlinks };
       } finally {
         await db.close();
       }
@@ -65,15 +84,15 @@ export const load: PageServerLoad = ({ params, locals }) => ({
   },
 });
 
-export const actions: Actions = {
-  delete: async ({ params }) => {
-  const db = await openProductDb();
-  try {
-    const orgId = await getDefaultOrgId(db);
-    await deleteDocumentAction(db, params.id!, orgId);
-  } finally {
-    await db.close();
-  }
-  throw redirect(303, "/docs");
+export const actions = {
+  delete: async ({ params }: ActionEvent) => {
+    const db = await openProductDb();
+    try {
+      const orgId = await getDefaultOrgId(db);
+      await deleteDocumentAction(db, params.id!, orgId);
+    } finally {
+      await db.close();
+    }
+    throw redirect(303, "/docs");
   },
 };

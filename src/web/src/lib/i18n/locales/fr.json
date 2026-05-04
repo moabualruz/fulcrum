@@ -1,0 +1,20 @@
+{
+  "common.save": "Enregistrer",
+  "common.cancel": "Annuler",
+  "common.delete": "Supprimer",
+  "common.edit": "Modifier",
+  "common.create": "Créer",
+  "common.search": "Rechercher",
+  "common.loading": "Chargement…",
+  "common.error": "Une erreur est survenue",
+  "common.confirm": "Confirmer",
+  "common.close": "Fermer",
+  "nav.dashboard": "Tableau de bord",
+  "nav.projects": "Projets",
+  "nav.documents": "Documents",
+  "nav.boards": "Tableaux",
+  "nav.runs": "Exécutions d'agent",
+  "nav.search": "Rechercher",
+  "settings.locale": "Langue",
+  "settings.locale.description": "Choisissez votre langue préférée"
+}

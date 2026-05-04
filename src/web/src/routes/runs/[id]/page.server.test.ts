@@ -25,6 +25,7 @@ interface RunDetailPayload {
     transcript_path: string | null;
   };
   transcript: string | null;
+  artifacts: Array<{ id: string; title: string; kind: string; downloadHref: string }>;
   events: Array<{ id: string; created_at: string }>;
 }
 
@@ -123,6 +124,38 @@ describe("/runs/[id] +page.server.ts", () => {
     const result = await mod.load({ params: { id } } as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<RunDetailPayload>(result);
     expect(payload.transcript).toBe("hello transcript");
+  });
+
+  test("load returns artifacts produced by the run through edges", async () => {
+    const { db, orgId, projectId } = await freshDb();
+    let id: string;
+    let artifactId: string;
+    try {
+      id = await seedRun(db, orgId, projectId, "succeeded");
+      artifactId = newUlid();
+      await db.query(
+        `INSERT INTO artifacts (id, org_id, project_id, run_id, kind, title, body_path, mime)
+         VALUES ($1, $2, $3, $4, 'text', 'summary.txt', '/tmp/summary.txt', 'text/plain')`,
+        [artifactId, orgId, projectId, id],
+      );
+      await db.query(
+        `INSERT INTO edges (id, org_id, project_id, from_kind, from_id, to_kind, to_id, rel)
+         VALUES ($1, $2, $3, 'agent_run', $4, 'artifact', $5, 'produced')`,
+        [newUlid(), orgId, projectId, id, artifactId],
+      );
+    } finally {
+      await db.close();
+    }
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 11}`);
+    const result = await mod.load({ params: { id } } as Parameters<typeof mod.load>[0]);
+    const payload = await streamedData<RunDetailPayload>(result);
+    expect(payload.artifacts).toHaveLength(1);
+    expect(payload.artifacts[0]).toMatchObject({
+      id: artifactId,
+      title: "summary.txt",
+      kind: "text",
+      downloadHref: `/artifacts/${artifactId}/download`,
+    });
   });
 
   test("load throws 404 when run does not exist", async () => {

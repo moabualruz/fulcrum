@@ -3,6 +3,9 @@
   import { buttonVariants } from "$lib/components/ui/button/index.js";
   import { cn } from "$lib/utils.js";
   import type { TaskStatus } from "$lib/server/tasks";
+  import TaskDescriptionEditor from "$lib/components/tasks/TaskDescriptionEditor.svelte";
+  import type { JSONContent } from "@tiptap/core";
+  import { textToTipTapDoc } from "$lib/components/tasks/task-description";
   import { TASK_STATUSES, describeStatus } from "./board-helpers.ts";
 
   interface Props {
@@ -25,7 +28,10 @@
   let status = $state<TaskStatus>(task && isStatus(task.status) ? task.status : "pending");
   /* svelte-ignore state_referenced_locally */
   let priority = $state(task?.priority ?? 0);
-  let description = $state("");
+  /* svelte-ignore state_referenced_locally */
+  let description = $state(task?.description_text ?? "");
+  /* svelte-ignore state_referenced_locally */
+  let tiptapContent = $state<JSONContent>((task?.tiptap_content as JSONContent | undefined) ?? textToTipTapDoc(task?.description_text ?? ""));
   /* svelte-ignore state_referenced_locally */
   let syncedId = $state(task?.id ?? null);
 
@@ -34,7 +40,8 @@
       title = task.title;
       status = isStatus(task.status) ? task.status : "pending";
       priority = task.priority;
-      description = "";
+      description = task.description_text ?? "";
+      tiptapContent = (task.tiptap_content as JSONContent | undefined) ?? textToTipTapDoc(description);
       syncedId = task.id;
     } else if (!task && syncedId !== null) {
       syncedId = null;
@@ -80,7 +87,15 @@
 
       <label class="block text-sm">
         Description
-        <textarea data-board-sheet-description bind:value={description} class={cn(fieldCls, "min-h-24")}></textarea>
+        <div data-board-sheet-description class={cn(fieldCls, "p-0")}>
+          <TaskDescriptionEditor
+            taskId={task.id}
+            content={tiptapContent}
+            save={async (_taskId, content) => {
+              tiptapContent = content;
+            }}
+          />
+        </div>
       </label>
 
       <div class="flex items-center gap-2">

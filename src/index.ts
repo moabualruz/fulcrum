@@ -39,6 +39,14 @@ Usage:
                                      Show component details and surfaces.
   fulcrum component plan <install|remove|enable|disable> <component> [--agent <id>] [--all-agents] [--json]
                                      Plan component changes without applying them.
+  fulcrum auth <whoami|invite|login|logout>
+  fulcrum flags <list|set> [options]
+  fulcrum routing rules <list|add|edit|delete> [options]
+  fulcrum db <migrate|status|history> [options]
+  fulcrum web
+  fulcrum tui
+  fulcrum inference <start|status|embed|generate|stop> [--json]
+  fulcrum projects|tasks|credentials|webhooks|repos|docs|runs|notify|audit|connectors
   fulcrum product init [--json]      Initialise the local product kernel (PGlite + migrations).
   fulcrum product projects list [--json]
                                      List product-kernel projects.
@@ -46,7 +54,10 @@ Usage:
                                      Run an FTS query over the product kernel search index.
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
                                      Render the assembled Markdown context for a task.
-  fulcrum doctor                     Report bun, agent dirs, tool presence, policy health.
+  fulcrum doctor [--json] [--subsystem <name>] [--checks] [--probe]
+                                     Report bun, agent dirs, tool presence, policy health.
+                                     --subsystem runs only named subsystem checks via orchestrator.
+                                     --checks includes modular orchestrator checks in legacy report.
   fulcrum version                    Print version.
   fulcrum help                       This message.
 
@@ -83,7 +94,7 @@ async function main() {
       return;
     }
     case "init": {
-      const { run: runInit } = await import("./cli/init.ts");
+      const { run: runInit } = await import("./cli/commands/init.ts");
       await runInit(rest);
       return;
     }
@@ -122,6 +133,36 @@ async function main() {
       await runProduct(rest);
       return;
     }
+    case "export": {
+      const { run: runExport } = await import("./cli/export.ts");
+      await runExport(rest);
+      return;
+    }
+    case "import": {
+      const { run: runImport } = await import("./cli/import.ts");
+      await runImport(rest);
+      return;
+    }
+    case "auth":
+    case "flags":
+    case "routing":
+    case "db":
+    case "web":
+    case "tui":
+    case "inference":
+    case "agents":
+    case "repos":
+    case "docs":
+    case "symphony":
+    case "runs":
+    case "notify":
+    case "audit":
+    case "webhooks":
+    case "connectors": {
+      const { run } = await import("./cli/index.ts");
+      await run([cmd, ...rest]);
+      return;
+    }
     case "version":
     case "--version":
     case "-v":
@@ -134,6 +175,9 @@ async function main() {
       return;
     default:
       console.error(`fulcrum: unknown command '${cmd}'`);
+      if (cmd === "projcts") {
+        console.error("Did you mean 'projects'?");
+      }
       console.error(HELP);
       process.exit(1);
   }

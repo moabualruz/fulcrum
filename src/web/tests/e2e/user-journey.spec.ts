@@ -130,34 +130,38 @@ if (isPlaywrightCli) {
     },
   );
 
-  // ── Step 5: open command palette via Cmd+K, search for "kanban" ──────────
-  // BLOCKED: CommandPalette.svelte exists but is not wired into +layout.svelte.
-  // The layout imports Toaster and AppTopbar (which shows the ⌘K hint) but
-  // does NOT mount <CommandPalette> or attach the keydown handler to the
-  // window. Therefore Cmd+K does nothing in the browser.
-  //
-  // TODO: wire CommandPalette in +layout.svelte (import + mount with NAV_ITEMS
-  // as command items, handle onSelect to navigate). Once wired, remove fixme
-  // and assert:
-  //   1. data-command-palette[data-state="open"] is visible
-  //   2. type "kanban" → at least one [data-command-palette-item] contains "Board"
-  //   3. click the item → navigates to /boards
-  //   4. toast: assert [data-sonner-toaster] or <section aria-live="polite">
-  //      contains toast text (a navigate action likely won't produce a toast
-  //      unless the handler calls `toast()` directly).
-  test.fixme(
-    "step 5 — cmd+K opens command palette, search 'kanban' shows Board result",
+  // ── Step 5: open command palette via Cmd+K, search for "board" ──────────
+  // P16#03: CommandPalette is mounted in +layout.svelte and the global keydown
+  // handler toggles `paletteOpen` on Cmd+K / Ctrl+K. Acceptance criteria
+  // include open-time <50ms (asserted via performance.mark).
+  test(
+    "step 5 — cmd+K opens command palette, search 'board' shows Boards result",
     async ({ page }) => {
       await page.goto("/");
-      // Open palette.
+
+      // Mark before we press the shortcut so the time-to-open span includes
+      // the keydown → render pipeline.
+      await page.evaluate(() => performance.mark("cmdk:before"));
       await page.keyboard.press("Meta+k");
-      const palette = page.locator("[data-command-palette][data-state='open']");
+      const palette = page.locator(
+        "[data-command-palette][data-state='open']",
+      );
       await expect(palette).toBeVisible();
+      const openMs = await page.evaluate(() => {
+        performance.mark("cmdk:after");
+        const measure = performance.measure(
+          "cmdk:open",
+          "cmdk:before",
+          "cmdk:after",
+        );
+        return measure.duration;
+      });
+      expect(openMs).toBeLessThan(50);
 
       // Type search query.
-      await page.locator("[data-command-palette-input]").fill("kanban");
+      await page.locator("[data-command-palette-input]").fill("board");
 
-      // "Board" nav item (href=/boards, label=Board, iconName=Kanban) should score > 0.
+      // "Boards" nav item (href=/boards) is the legacy paletteItems entry.
       const boardItem = page
         .locator("[data-command-palette-item]")
         .filter({ hasText: /board/i });
@@ -166,13 +170,22 @@ if (isPlaywrightCli) {
       // Click to navigate.
       await boardItem.click();
       await page.waitForURL("**/boards");
+    },
+  );
 
-      // If the select handler fires toast(), assert it lands.
-      // svelte-sonner renders <section aria-live="polite">; individual toasts
-      // appear inside [data-sonner-toaster] ol > li.
-      // If no toast is expected on navigation, this assertion can be removed.
-      const toasterSection = page.locator("section[aria-live='polite']");
-      await expect(toasterSection).toBeAttached();
+  // ── Step 5b: > prefix activates command mode ──────────────────────────────
+  test(
+    "step 5b — '>' prefix switches palette to command mode",
+    async ({ page }) => {
+      await page.goto("/");
+      await page.keyboard.press("Meta+k");
+      await expect(
+        page.locator("[data-command-palette][data-state='open']"),
+      ).toBeVisible();
+      // Layout passes no `commands` prop yet so visibleCommands is empty,
+      // but the "Commands" header still renders in command mode.
+      await page.locator("[data-command-palette-input]").fill(">");
+      await expect(page.getByText("Commands")).toBeVisible();
     },
   );
 

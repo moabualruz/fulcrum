@@ -1,6 +1,7 @@
 import type { PageServerLoad } from "./$types";
 import { openProductDb } from "$lib/server/db";
 import { searchProductDocuments } from "../../../../product-kernel/search.ts";
+import { buildDocTree, type DocScope, type DocTreeNode } from "$lib/components/docs/doc-tree";
 
 interface DocRow {
   id: string;
@@ -18,6 +19,17 @@ interface RawRow {
   project_id: string | null;
   updated_at: string | Date;
   body_excerpt: string | null;
+}
+
+interface RawTreeRow {
+  id: string;
+  title: string | null;
+  slug: string | null;
+  parent_id: string | null;
+  project_id: string | null;
+  scope: DocScope;
+  doc_type: string | null;
+  sort_position: number | string | null;
 }
 
 function isoStamp(value: string | Date): string {
@@ -74,6 +86,43 @@ async function loadDocuments(
   };
 }
 
+function normalizeTreeRows(rows: RawTreeRow[]): DocTreeNode[] {
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title ?? row.slug ?? row.id,
+    slug: row.slug ?? row.id,
+    parentId: row.parent_id,
+    projectId: row.project_id,
+    scope: row.scope,
+    docType: row.doc_type ?? "note",
+    sortPosition: Number(row.sort_position ?? 0),
+    children: [],
+  }));
+}
+
+async function loadDocTree(
+  db: ProductDb,
+  scope: DocScope,
+  activeProjectId: string | null,
+): Promise<DocTreeNode[]> {
+  const rows = await db.query<RawTreeRow>(
+    `SELECT id,
+            COALESCE(frontmatter->>'title', title, id) AS title,
+            id AS slug,
+            NULL::text AS parent_id,
+            project_id,
+            CASE WHEN project_id IS NULL THEN 'global' ELSE 'project' END AS scope,
+            COALESCE(kind, 'note') AS doc_type,
+            0 AS sort_position
+       FROM documents
+      WHERE (($1 = 'global' AND project_id IS NULL) OR ($1 = 'project' AND project_id IS NOT NULL))
+        AND ($2::text IS NULL OR project_id = $2)
+      ORDER BY title ASC, id ASC`,
+    [scope, scope === "project" ? activeProjectId : null],
+  );
+  return buildDocTree(normalizeTreeRows(rows));
+}
+
 export const load: PageServerLoad = ({ url, locals }) => {
   const activeProjectId = locals?.activeProjectId ?? null;
   const kind = url.searchParams.get("kind") ?? "";
@@ -86,7 +135,12 @@ export const load: PageServerLoad = ({ url, locals }) => {
       data: (async () => {
         const db = await openProductDb();
         try {
-          return await loadDocuments(db, kind, q, activeProjectId);
+          const [list, projectTree, globalTree] = await Promise.all([
+            loadDocuments(db, kind, q, activeProjectId),
+            loadDocTree(db, "project", activeProjectId),
+            loadDocTree(db, "global", null),
+          ]);
+          return { ...list, projectTree, globalTree };
         } finally {
           await db.close();
         }

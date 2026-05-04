@@ -3,6 +3,8 @@
     { key: "agent", label: "Agent" },
     { key: "model", label: "Model" },
     { key: "status", label: "Status" },
+    { key: "sandbox_mode", label: "Sandbox" },
+    { key: "iteration_count", label: "Iterations" },
     { key: "started_at", label: "Started" },
     { key: "duration", label: "Duration" },
   ] as const;
@@ -82,6 +84,12 @@
           >
           <td class={cn("p-2 align-middle")}
             ><RunStatusBadge status={row.status} /></td
+          >
+          <td class={cn("p-2 align-middle text-xs text-muted-foreground")}
+            >{#if row.sandbox_mode}<span data-sandbox-chip class={cn("inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs")}>{row.sandbox_mode}</span>{:else}—{/if}</td
+          >
+          <td class={cn("p-2 align-middle text-muted-foreground")}
+            >{row.iteration_count ?? 0}</td
           >
           <td
             class={cn("p-2 align-middle font-mono text-xs text-muted-foreground")}

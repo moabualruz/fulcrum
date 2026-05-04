@@ -18,7 +18,12 @@ mock.module("$app/state", () => ({
   },
 }));
 
-type AppTopbarProps = { pathname: string; activeProjectId: string | null };
+type AppTopbarProps = {
+  pathname: string;
+  activeProjectId: string | null;
+  bellCount?: number;
+  bellItems?: Array<{ id: string; kind: string; title: string }>;
+};
 
 describe("AppTopbar component", () => {
   let render: typeof import("svelte/server").render;
@@ -116,5 +121,25 @@ describe("AppTopbar component", () => {
     expect(body).toMatch(
       /<span[^>]*data-active-project[^>]*>fulcrum<\/span>/,
     );
+  });
+
+  test("bell badge renders count, top-five unread items, and See all inbox link", () => {
+    const { body } = render(AppTopbar, {
+      props: {
+        pathname: "/projects",
+        activeProjectId: null,
+        bellCount: 3,
+        bellItems: [
+          { id: "n-1", kind: "task", title: "Task assigned" },
+          { id: "n-2", kind: "doc", title: "Doc mentioned" },
+        ],
+      },
+    });
+
+    expect(body).toMatch(/<button\b[^>]*data-notification-bell/);
+    expect(body).toMatch(/<span\b[^>]*data-notification-badge[^>]*>3<\/span>/);
+    expect(body).toContain("Task assigned");
+    expect(body).toContain("Doc mentioned");
+    expect(body).toMatch(/<a\b[^>]*href="\/inbox"[^>]*>See all<\/a>/);
   });
 });

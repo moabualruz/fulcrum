@@ -1,6 +1,14 @@
 // Single source of truth for per-agent metadata used by install, doctor, and
 // skills sync. Adding a new agent or changing a path only requires editing here.
 
+import { AgentProfileSchema, type AgentProfile } from "./types.ts";
+import { claudeCodeProfile } from "./profiles/claude-code.ts";
+import { codexProfile } from "./profiles/codex.ts";
+import { copilotProfile } from "./profiles/copilot.ts";
+import { geminiCliProfile } from "./profiles/gemini-cli.ts";
+import { opencodeProfile } from "./profiles/opencode.ts";
+import { piProfile } from "./profiles/pi.ts";
+
 export interface Agent {
   id: "claude-code" | "codex" | "gemini" | "opencode" | "pi";
   /** Human-readable display name. */
@@ -94,3 +102,54 @@ export const AGENTS: readonly Agent[] = [
     cavemanInstallDir:(home) => `${home}/.pi/agent/skills/caveman`,
   },
 ] as const;
+
+const PROFILE_DEFINITIONS: readonly AgentProfile[] = [
+  claudeCodeProfile,
+  codexProfile,
+  copilotProfile,
+  geminiCliProfile,
+  opencodeProfile,
+  piProfile,
+] as const;
+
+export class UnknownAgentError extends Error {
+  constructor(name: string, knownNames: readonly string[]) {
+    super(`Unknown agent profile '${name}'. Known profiles: ${knownNames.join(", ")}`);
+    this.name = "UnknownAgentError";
+  }
+}
+
+export function createProfileRegistry(profiles: readonly unknown[]) {
+  const validatedProfiles = profiles.map((profile) => AgentProfileSchema.parse(profile));
+  const profilesByName = new Map<string, AgentProfile>();
+
+  for (const profile of validatedProfiles) {
+    if (profilesByName.has(profile.name)) {
+      throw new Error(`Duplicate agent profile '${profile.name}'`);
+    }
+    profilesByName.set(profile.name, profile);
+  }
+
+  const knownNames = [...profilesByName.keys()].sort();
+
+  return {
+    getProfile(name: string): AgentProfile {
+      const profile = profilesByName.get(name);
+      if (!profile) throw new UnknownAgentError(name, knownNames);
+      return profile;
+    },
+    listProfiles(): AgentProfile[] {
+      return knownNames.map((name) => profilesByName.get(name)!);
+    },
+  };
+}
+
+const PROFILE_REGISTRY = createProfileRegistry(PROFILE_DEFINITIONS);
+
+export function getProfile(name: string): AgentProfile {
+  return PROFILE_REGISTRY.getProfile(name);
+}
+
+export function listProfiles(): AgentProfile[] {
+  return PROFILE_REGISTRY.listProfiles();
+}

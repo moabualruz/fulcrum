@@ -15,6 +15,8 @@ import {
   BoardMoveSchema,
   BoardUpdateSchema,
 } from "$lib/server/boards.schema";
+import { BulkStatusSchema, BulkDeleteSchema } from "$lib/server/task-bulk.schema";
+import { bulkUpdateStatus, bulkDeleteTasks } from "$lib/server/task-detail";
 import { actionOk, actionFail } from "$lib/feedback/action-result";
 
 // Inherit `activeProjectId` from the root layout-data so the optional
@@ -109,6 +111,42 @@ export const actions: Actions = {
     try {
       await deleteTaskAction(db, parsed.output.id);
       return actionOk("Task deleted");
+    } finally {
+      await db.close();
+    }
+  },
+
+  bulkStatus: async ({ request }) => {
+    const fd = await request.formData();
+    const raw = fdToRecord(fd);
+    const parsed = v.safeParse(BulkStatusSchema, raw);
+    if (!parsed.success) return fail(400, actionFail("invalid input"));
+    const ids = parsed.output.ids.split(",").filter(Boolean);
+    if (ids.length === 0) return fail(400, actionFail("no ids"));
+    const db = await openProductDb();
+    try {
+      const orgId = await defaultOrgId(db);
+      if (!orgId) return fail(500, actionFail("no-org"));
+      const result = await bulkUpdateStatus(db, ids, parsed.output.status, orgId);
+      return actionOk(`${result.updated} task(s) updated`);
+    } finally {
+      await db.close();
+    }
+  },
+
+  bulkDelete: async ({ request }) => {
+    const fd = await request.formData();
+    const raw = fdToRecord(fd);
+    const parsed = v.safeParse(BulkDeleteSchema, raw);
+    if (!parsed.success) return fail(400, actionFail("invalid input"));
+    const ids = parsed.output.ids.split(",").filter(Boolean);
+    if (ids.length === 0) return fail(400, actionFail("no ids"));
+    const db = await openProductDb();
+    try {
+      const orgId = await defaultOrgId(db);
+      if (!orgId) return fail(500, actionFail("no-org"));
+      const result = await bulkDeleteTasks(db, ids, orgId);
+      return actionOk(`${result.deleted} task(s) deleted`);
     } finally {
       await db.close();
     }
