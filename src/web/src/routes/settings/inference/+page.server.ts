@@ -1,11 +1,11 @@
-import { InferenceClient } from "@fulcrum/inference/client.ts";
+import { InferenceClient } from "../../../../../inference/client.ts";
 import type {
   GenerateOptions,
   HealthResult,
   InferenceBackendInfo,
   InferenceModel,
-} from "@fulcrum/inference/protocol.ts";
-import { INFERENCE_CLIENT_TOKEN } from "@fulcrum/inference/tokens.ts";
+} from "../../../../../inference/protocol.ts";
+import { INFERENCE_CLIENT_TOKEN } from "../../../../../inference/tokens.ts";
 import {
   getHealth,
   listModels,
@@ -18,7 +18,7 @@ import {
   type ModelInfo,
   type BackendInfo,
   type FeatureRouting,
-} from "@fulcrum/lib/server/inference-client.ts";
+} from "../../../lib/server/inference-client.ts";
 
 export interface InferencePageData {
   health: HealthResponse | null;

@@ -1,6 +1,6 @@
-import type { ProductDb } from "@fulcrum/product-kernel/db/types.ts";
-import type { EventRow } from "@fulcrum/product-kernel/store/repositories.ts";
-import { newUlid } from "@fulcrum/product-kernel/ids.ts";
+import type { ProductDb } from "../../../../product-kernel/db/types.ts";
+import type { EventRow } from "../../../../product-kernel/store/repositories.ts";
+import { newUlid } from "../../../../product-kernel/ids.ts";
 
 export interface AuditFilter {
   orgId: string;

@@ -1,6 +1,6 @@
 import type { ServerLoad } from "@sveltejs/kit";
 import { openProductDb } from "$lib/server/db";
-import type { EventRow } from "@fulcrum/product-kernel/store/repositories.ts";
+import type { EventRow } from "../../../../product-kernel/store/repositories.ts";
 
 export type { EventRow };
 

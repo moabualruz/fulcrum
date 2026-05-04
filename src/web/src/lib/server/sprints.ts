@@ -1,4 +1,4 @@
-import type { ProductDb } from "@fulcrum/product-kernel/db/types.ts";
+import type { ProductDb } from "../../../../product-kernel/db/types.ts";
 import {
   createSprint,
   listSprints,
@@ -12,7 +12,7 @@ import {
   type SprintRow,
   type TaskRow,
   type MetricsSnapshot,
-} from "@fulcrum/product-kernel/store/repositories.ts";
+} from "../../../../product-kernel/store/repositories.ts";
 
 export type SprintStatus = "planning" | "active" | "completed" | "cancelled";
 

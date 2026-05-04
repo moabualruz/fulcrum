@@ -1,6 +1,6 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "@fulcrum/lib/server/db";
+import { openProductDb, getDefaultOrgId } from "../../../../../lib/server/db";
 import {
   createSavedView,
   updateSavedView,
@@ -8,7 +8,7 @@ import {
   listSavedViews,
   VIEW_SCOPES,
   type ViewScope,
-} from "@fulcrum/lib/server/saved-views";
+} from "../../../../../lib/server/saved-views";
 
 export const load: PageServerLoad = async ({ params }) => {
   const db = await openProductDb();

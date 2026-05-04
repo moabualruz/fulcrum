@@ -5,12 +5,12 @@ import type { RequestHandler } from "@sveltejs/kit";
 import { join } from "node:path";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isFeatureEnabled } from "@fulcrum/data/features.ts";
-import { exportTasksToCsv } from "@fulcrum/data/csv-export.ts";
-import { openPglite } from "@fulcrum/product-kernel/db/pglite.ts";
-import { runMigrations } from "@fulcrum/product-kernel/db/migrate.ts";
-import { productDbDir } from "@fulcrum/product-kernel/paths.ts";
-import type { TaskRow } from "@fulcrum/product-kernel/store/repositories.ts";
+import { isFeatureEnabled } from "../../../../../../data/features.ts";
+import { exportTasksToCsv } from "../../../../../../data/csv-export.ts";
+import { openPglite } from "../../../../../../product-kernel/db/pglite.ts";
+import { runMigrations } from "../../../../../../product-kernel/db/migrate.ts";
+import { productDbDir } from "../../../../../../product-kernel/paths.ts";
+import type { TaskRow } from "../../../../../../product-kernel/store/repositories.ts";
 
 function jsonError(msg: string, status = 400): Response {
   return new Response(JSON.stringify({ error: msg }), {

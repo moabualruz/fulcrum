@@ -1,12 +1,12 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "@fulcrum/lib/server/db";
+import { openProductDb, getDefaultOrgId } from "../../../../../lib/server/db";
 import {
   createProjectStatus,
   updateProjectStatus,
   deleteProjectStatus,
   listProjectStatuses,
-} from "@fulcrum/lib/server/project-statuses";
+} from "../../../../../lib/server/project-statuses";
 
 export const load: PageServerLoad = async ({ params }) => {
   const db = await openProductDb();

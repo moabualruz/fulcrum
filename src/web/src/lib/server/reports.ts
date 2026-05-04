@@ -1,5 +1,5 @@
-import type { ProductDb, SqlValue } from "@fulcrum/product-kernel/db/types.ts";
-import { isFeatureEnabled } from "@fulcrum/product-kernel/features.ts";
+import type { ProductDb, SqlValue } from "../../../../product-kernel/db/types.ts";
+import { isFeatureEnabled } from "../../../../product-kernel/features.ts";
 
 // ---------- Types ----------
 

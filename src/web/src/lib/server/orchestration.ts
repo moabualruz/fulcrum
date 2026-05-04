@@ -1,4 +1,4 @@
-import type { ProductDb, SqlValue } from "@fulcrum/product-kernel/db/types.ts";
+import type { ProductDb, SqlValue } from "../../../../product-kernel/db/types.ts";
 
 // --- Types ---
 

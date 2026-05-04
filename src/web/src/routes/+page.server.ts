@@ -1,7 +1,7 @@
 import type { PageServerLoad } from "./$types";
 import { openProductDb } from "$lib/server/db";
 import { loadDashboard } from "$lib/server/dashboard";
-import type { ProductDb } from "@fulcrum/product-kernel/db/types.ts";
+import type { ProductDb } from "../../../product-kernel/db/types.ts";
 
 async function getDefaultOrgId(db: ProductDb): Promise<string> {
   const rows = await db.query<{ id: string }>(

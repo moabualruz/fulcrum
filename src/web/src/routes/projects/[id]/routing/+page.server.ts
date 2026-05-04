@@ -3,7 +3,7 @@ import {
   routingActions,
   type RoutingActionEvent,
   type RoutingLoadEvent,
-} from "@fulcrum/settings/routing/routing.server";
+} from "../../../settings/routing/routing.server";
 
 function projectId(event: RoutingLoadEvent | RoutingActionEvent): string {
   return event.params?.id ?? "";

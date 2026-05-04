@@ -6,15 +6,15 @@ import type { RequestHandler } from "@sveltejs/kit";
 import { join } from "node:path";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isFeatureEnabled } from "@fulcrum/data/features.ts";
-import { importCsv } from "@fulcrum/data/csv-import.ts";
-import { openPglite } from "@fulcrum/product-kernel/db/pglite.ts";
-import { runMigrations } from "@fulcrum/product-kernel/db/migrate.ts";
-import { productDbDir } from "@fulcrum/product-kernel/paths.ts";
+import { isFeatureEnabled } from "../../../../../../data/features.ts";
+import { importCsv } from "../../../../../../data/csv-import.ts";
+import { openPglite } from "../../../../../../product-kernel/db/pglite.ts";
+import { runMigrations } from "../../../../../../product-kernel/db/migrate.ts";
+import { productDbDir } from "../../../../../../product-kernel/paths.ts";
 import {
   createLocalOrg,
   createTask,
-} from "@fulcrum/product-kernel/store/repositories.ts";
+} from "../../../../../../product-kernel/store/repositories.ts";
 
 const DEFAULT_ORG_SLUG = "default";
 const DEFAULT_ORG_NAME = "Local";

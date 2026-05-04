@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from "./$types";
 import { error, fail } from "@sveltejs/kit";
 import { openProductDb, getDefaultOrgId } from "$lib/server/db";
-import { newUlid } from "@fulcrum/product-kernel/ids.ts";
+import { newUlid } from "../../../../../../product-kernel/ids.ts";
 
 interface RepoRow {
   id: string;

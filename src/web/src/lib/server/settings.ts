@@ -1,4 +1,4 @@
-import type { ProductDb } from "@fulcrum/product-kernel/db/types.ts";
+import type { ProductDb } from "../../../../product-kernel/db/types.ts";
 import {
   createRoutingRule,
   listRoutingRules,
@@ -25,7 +25,7 @@ import {
   type CreateRoutingRuleInput,
   type CreateCustomFieldInput,
   type CreateSavedViewInput,
-} from "@fulcrum/product-kernel/store/settings.ts";
+} from "../../../../product-kernel/store/settings.ts";
 
 // --- Settings Navigator ---
 

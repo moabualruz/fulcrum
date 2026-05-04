@@ -4,11 +4,11 @@ import { error, fail } from "@sveltejs/kit";
 // test harness.
 import { superValidate } from "sveltekit-superforms/server";
 import { valibot } from "sveltekit-superforms/adapters";
-import { DocumentFormSchema } from "@fulcrum/lib/server/documents.schema.ts";
-import { updateDocumentAction } from "@fulcrum/lib/server/documents.ts";
-import { openProductDb, getDefaultOrgId } from "@fulcrum/lib/server/db.ts";
-import { parseLabels, serializeLabels } from "@fulcrum/lib/markdown/labels.ts";
-import { createDocumentVersion, getNextVersionNumber } from "@fulcrum/lib/server/doc-versions.ts";
+import { DocumentFormSchema } from "../../../../lib/server/documents.schema.ts";
+import { updateDocumentAction } from "../../../../lib/server/documents.ts";
+import { openProductDb, getDefaultOrgId } from "../../../../lib/server/db.ts";
+import { parseLabels, serializeLabels } from "../../../../lib/markdown/labels.ts";
+import { createDocumentVersion, getNextVersionNumber } from "../../../../lib/server/doc-versions.ts";
 
 interface DocRow {
   id: string;

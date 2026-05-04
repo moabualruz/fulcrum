@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { DocType } from "@fulcrum/db/entities/docs/enums.ts";
+	import type { DocType } from "../../../../../db/entities/docs/enums.ts";
 	import { cn } from "$lib/utils.js";
 	import {
 		getFrontmatterFields,

@@ -1,7 +1,7 @@
-import type { ProductDb } from "@fulcrum/product-kernel/db/types.ts";
+import type { ProductDb } from "../../../../product-kernel/db/types.ts";
 import type { TaskStatus } from "./tasks.ts";
 import { TASK_STATUSES } from "./tasks.ts";
-import { appendEvent } from "@fulcrum/product-kernel/store/repositories.ts";
+import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
 
 export interface TaskDetail {
   id: string;
