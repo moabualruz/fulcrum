@@ -27,6 +27,7 @@ export const STEPS: Step[] = [
   { name: "typecheck",   cmd: ["bun", "run", "--bun", "tsc", "--noEmit"] },
   { name: "symphony:lock", cmd: ["bun", "test", "tests/symphony/spec-lock.test.ts"] },
   { name: "symphony:conformance", cmd: ["bun", "test", "src/orchestration/__tests__/symphony-conformance.test.ts"] },
+  { name: "trpc:permissions", cmd: ["bun", "test", "tests/trpc/app-router-scaffold.test.ts", "tests/trpc/router.test.ts"] },
   { name: "test",        cmd: ["bun", "run", "scripts/test-root.ts"] },
   { name: "license-audit", cmd: ["bun", "run", "scripts/license-audit.ts"] },
   { name: "ci:codegen", cmd: ["bun", "run", "scripts/ci/codegen.ts"] },

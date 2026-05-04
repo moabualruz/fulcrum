@@ -103,3 +103,26 @@ describe("ci STEPS — Symphony SPEC lock gate", () => {
     expect(step!.cmd).toEqual(["bun", "test", "tests/symphony/spec-lock.test.ts"]);
   });
 });
+
+describe("ci STEPS — tRPC permission gate", () => {
+  it("includes hard-fail trpc:permissions step before the broad test suite", () => {
+    const names = STEPS.map((s) => s.name);
+    const step = STEPS.find((s) => s.name === "trpc:permissions");
+
+    expect(step).toBeDefined();
+    expect(step!.soft).not.toBe(true);
+    expect(names.indexOf("trpc:permissions")).toBeLessThan(names.indexOf("test"));
+  });
+
+  it("runs the focused tRPC permission lint tests", () => {
+    const step = STEPS.find((s) => s.name === "trpc:permissions");
+
+    expect(step).toBeDefined();
+    expect(step!.cmd).toEqual([
+      "bun",
+      "test",
+      "tests/trpc/app-router-scaffold.test.ts",
+      "tests/trpc/router.test.ts",
+    ]);
+  });
+});

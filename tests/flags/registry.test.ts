@@ -8,7 +8,7 @@
  *   4. TTL cache: second call within 60s does NOT call repo again.
  *   5. Cache bust (via clearCache()) forces a fresh repo lookup.
  *   6. FLAG_DESCRIPTIONS exported for every registered flag.
- *   7. FEATURE_FLAGS list includes all 16 expected flags.
+ *   7. FEATURE_FLAGS list includes all expected flags.
  *
  * Per C6: No raw SQL — schema via orm.schema.create() + em.create/persistAndFlush.
  * Per C7: MikroORM v7 fork() pattern for every operation.
@@ -106,6 +106,7 @@ describe("FEATURE_FLAGS constant", () => {
       "experiments",
       "scheduled-backups",
       "skill-marketplace",
+      "trpc-permission-local-dev-bypass",
     ];
     expect(FEATURE_FLAGS).toHaveLength(expected.length);
     for (const flag of expected) {

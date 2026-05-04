@@ -22,6 +22,27 @@ export function createSearchCommand(): Command {
     }
   });
 
+  const recordClickCommand = command.command("record-click");
+  recordClickCommand.description("search recordClick");
+  recordClickCommand.option("--json", "Emit JSON output");
+  recordClickCommand.option("--position <number>", "position", Number.parseFloat);
+  recordClickCommand.option("--query <string>", "query");
+  recordClickCommand.option("--result-id <string>", "result-id");
+  recordClickCommand.option("--result-kind <string>", "result-kind");
+  recordClickCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for search.recordClick is not wired yet.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   const savedCreateCommand = command.command("saved-create");
   savedCreateCommand.description("search savedCreate");
   savedCreateCommand.option("--json", "Emit JSON output");
