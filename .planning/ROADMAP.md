@@ -60,7 +60,26 @@ Plans:
   3. graphile-worker bootstrapped with extensible registry; migrations clean on PGlite + PostgreSQL
   4. `assertPermission()` enforced on every tRPC procedure; `tenant_settings` entity exists
   5. Cmd+K keyboard shortcut opens palette in web layout
-**Plans**: TBD
+**Plans:** 8 plans
+Plans:
+**Wave 1**
+- [ ] 02-01-PLAN.md — CI and web gates: stable root CI, smoke e2e, release-only skills/compress, cookie advisory (BUG-03, BUG-04, BUG-16)
+- [ ] 02-02-PLAN.md — Compiled binary + DB backend config: PGlite default, PostgreSQL override, explicit migrate (BUG-01, FND-01)
+- [ ] 02-03-PLAN.md — Installer ownership and package/component parity safety (BUG-02, BUG-06, BUG-07, BUG-08, BUG-10, BUG-11, BUG-14)
+
+**Wave 2 (blocked on relevant Wave 1 foundations)**
+- [ ] 02-04-PLAN.md — Byte-stable frontmatter and targeted JSON/TOML config patchers (BUG-05, BUG-13)
+- [ ] 02-05-PLAN.md — Product CLI parser, doctor warnings, complexity hotspots, Cmd+K shortcut (BUG-09, BUG-12, BUG-15, BUG-18)
+- [ ] 02-06-PLAN.md — Tenant settings, migration/index verification, canonical flags (FND-01, FND-03, FND-06, FND-07)
+- [ ] 02-07-PLAN.md — Permission enforcement lint and explicit tRPC resource/action checks (FND-02)
+
+**Wave 3 (blocked on DB, flags, permissions foundations)**
+- [ ] 02-08-PLAN.md — Worker registry and Web/CLI/TUI auth parity; BUG-17 deferral preserved (FND-04, FND-05, BUG-17)
+
+Cross-cutting constraints:
+- RED tests/repros are committed before GREEN fixes for every bug where feasible.
+- Plans touching schema must run explicit `fulcrum db migrate` verification.
+- `bun run ci` remains final phase gate.
 
 ### Phase 3: Symphony + Sandcastle
 **Goal**: Full Symphony SPEC.md conformance with native Fulcrum tracker + Sandcastle agent dispatch functional
