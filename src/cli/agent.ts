@@ -5,6 +5,7 @@ import { runMigrations } from "../product-kernel/db/migrate.ts";
 import { productDbDir } from "../product-kernel/paths.ts";
 import type { ProductDb } from "../product-kernel/db/types.ts";
 import { dispatchRunAction } from "../web/src/lib/server/runs.ts";
+import { getEm } from "../web/src/lib/server/em.ts";
 
 const HELP = `fulcrum agent — agent run commands
 
@@ -56,7 +57,8 @@ export async function run(argv: readonly string[]): Promise<void> {
       console.error(`task not found: ${taskId}`);
       process.exit(1);
     }
-    const result = await dispatchRunAction(db, {
+    const em = await getEm();
+    const result = await dispatchRunAction(em, {
       orgId: task.org_id,
       projectId: task.project_id,
       taskId,

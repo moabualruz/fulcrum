@@ -96,6 +96,7 @@ export async function updateTaskAction(
   if (changed.length === 0) throw new Error("updateTaskAction: no fields to update");
   sets.push(`updated_at = now()`);
   params.push(input.id);
+  const conn = em.getConnection();
   const rows = await conn.execute<TaskScopeRow[]>(
     `UPDATE tasks SET ${sets.join(", ")} WHERE id = $${params.length}
        RETURNING org_id, project_id`,

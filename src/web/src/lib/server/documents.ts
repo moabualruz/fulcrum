@@ -4,7 +4,7 @@
  */
 
 import type { EntityManager } from "@mikro-orm/postgresql";
-import { randomUUID } from "node:crypto";
+import { newUlid } from "../../../../product-kernel/ids.ts";
 import { appendEventOrm, indexSearchDocumentOrm } from "./orm-helpers.ts";
 
 export interface CreateDocumentInput {

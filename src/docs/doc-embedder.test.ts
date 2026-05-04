@@ -2,11 +2,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
+import type { EntityManager } from "@mikro-orm/postgresql";
 import { openPglite } from "../product-kernel/db/pglite.ts";
 import { runMigrations } from "../product-kernel/db/migrate.ts";
 import { createLocalOrg } from "../product-kernel/store/repositories.ts";
 import type { ProductDb } from "../product-kernel/db/types.ts";
 import type { InferenceClient, EmbeddingResponse } from "../inference/client.ts";
+import { initOrm } from "../db/mikro-orm.config.ts";
 import {
   isEmbeddingsEnabled,
   truncateToTokens,
@@ -37,11 +39,34 @@ function failingClient(err: Error): InferenceClient {
   } as unknown as InferenceClient;
 }
 
-async function freshDb(name: string): Promise<{ db: ProductDb; orgId: string }> {
-  const db = await openPglite(join(scratch, name));
+async function freshDb(name: string): Promise<{ db: ProductDb; em: EntityManager; orgId: string; close: () => Promise<void> }> {
+  const { PGlite } = await import("@electric-sql/pglite");
+  const { vector } = await import("@electric-sql/pglite/vector");
+  const pglite = new PGlite(join(scratch, name), { extensions: { vector } });
+  await pglite.waitReady;
+
+  // ProductDb wrapper for legacy callers (embedDocument, readEmbedding)
+  const db: ProductDb = {
+    engine: "pglite",
+    async query<T>(sql: string, params: readonly import("../product-kernel/db/types.ts").SqlValue[] = []) {
+      const result = await pglite.query<T>(sql, params as unknown[]);
+      return result.rows;
+    },
+    async exec(sql: string) { await pglite.exec(sql); },
+    async close() { await pglite.close(); },
+  };
+
   await runMigrations(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  return { db, orgId: org.id };
+
+  // ORM EntityManager from the same PGlite instance
+  const orm = await initOrm({ pglite });
+  const em = orm.em.fork();
+
+  return {
+    db, em, orgId: org.id,
+    async close() { await orm.close(true); await db.close(); },
+  };
 }
 
 async function readEmbedding(db: ProductDb, docId: string): Promise<number[] | null> {
@@ -98,20 +123,20 @@ describe("truncateToTokens", () => {
 
 describe("flag OFF: embedding stays NULL", () => {
   test("docs.update with flag OFF leaves embedding NULL", async () => {
-    const { db, orgId } = await freshDb("flag-off");
+    const ctx = await freshDb("flag-off");
     try {
-      const { id } = await createDocumentAction(db, {
-        orgId,
+      const { id } = await createDocumentAction(ctx.em, {
+        orgId: ctx.orgId,
         projectId: null,
         kind: "note",
         title: "T",
         body: "body content",
       });
-      await updateDocumentAction(db, { id, orgId, body: "updated body" });
-      const emb = await readEmbedding(db, id);
+      await updateDocumentAction(ctx.em, { id, orgId: ctx.orgId, body: "updated body" });
+      const emb = await readEmbedding(ctx.db, id);
       expect(emb).toBeNull();
     } finally {
-      await db.close();
+      await ctx.close();
     }
   });
 
@@ -125,59 +150,59 @@ describe("flag OFF: embedding stays NULL", () => {
 
 describe("flag ON: mock sidecar returns fixed vector", () => {
   test("embedDocument writes vector to documents.embedding", async () => {
-    const { db, orgId } = await freshDb("embed-ok");
+    const ctx = await freshDb("embed-ok");
     try {
       const fixedVector = Array.from({ length: 384 }, (_, i) => i * 0.001);
       const client = mockClient(fixedVector);
 
-      const { id } = await createDocumentAction(db, {
-        orgId,
+      const { id } = await createDocumentAction(ctx.em, {
+        orgId: ctx.orgId,
         projectId: null,
         kind: "note",
         title: "T",
         body: "some markdown body",
       });
 
-      await embedDocument(db, client, { docId: id, bodyMd: "some markdown body" });
+      await embedDocument(ctx.db, client, { docId: id, bodyMd: "some markdown body" });
 
-      const emb = await readEmbedding(db, id);
+      const emb = await readEmbedding(ctx.db, id);
       expect(emb).not.toBeNull();
       expect(emb!.length).toBe(384);
       // Check first and last values (PGlite returns float32 so check approximate)
       expect(emb![0]).toBeCloseTo(0.0, 3);
       expect(emb![383]).toBeCloseTo(0.383, 3);
     } finally {
-      await db.close();
+      await ctx.close();
     }
   });
 
   test("re-embedding with unchanged body still refreshes embedding (deterministic)", async () => {
-    const { db, orgId } = await freshDb("re-embed");
+    const ctx = await freshDb("re-embed");
     try {
       const vec1 = Array.from({ length: 384 }, () => 0.5);
       const client = mockClient(vec1);
 
-      const { id } = await createDocumentAction(db, {
-        orgId,
+      const { id } = await createDocumentAction(ctx.em, {
+        orgId: ctx.orgId,
         projectId: null,
         kind: "note",
         title: "T",
         body: "body",
       });
 
-      await embedDocument(db, client, { docId: id, bodyMd: "body" });
-      const emb1 = await readEmbedding(db, id);
+      await embedDocument(ctx.db, client, { docId: id, bodyMd: "body" });
+      const emb1 = await readEmbedding(ctx.db, id);
 
       // Embed again with same body — should still work
       const vec2 = Array.from({ length: 384 }, () => 0.7);
       const client2 = mockClient(vec2);
-      await embedDocument(db, client2, { docId: id, bodyMd: "body" });
-      const emb2 = await readEmbedding(db, id);
+      await embedDocument(ctx.db, client2, { docId: id, bodyMd: "body" });
+      const emb2 = await readEmbedding(ctx.db, id);
 
       expect(emb2![0]).toBeCloseTo(0.7, 3);
       expect(emb1![0]).toBeCloseTo(0.5, 3);
     } finally {
-      await db.close();
+      await ctx.close();
     }
   });
 });
@@ -186,39 +211,39 @@ describe("flag ON: mock sidecar returns fixed vector", () => {
 
 describe("sidecar failure: embedding stays NULL, update succeeds", () => {
   test("embedDocument throws on sidecar failure", async () => {
-    const { db, orgId } = await freshDb("sidecar-fail");
+    const ctx = await freshDb("sidecar-fail");
     try {
       const client = failingClient(new Error("sidecar unreachable"));
 
-      const { id } = await createDocumentAction(db, {
-        orgId,
+      const { id } = await createDocumentAction(ctx.em, {
+        orgId: ctx.orgId,
         projectId: null,
         kind: "note",
         title: "T",
         body: "body",
       });
 
-      await expect(embedDocument(db, client, { docId: id, bodyMd: "body" })).rejects.toThrow(
+      await expect(embedDocument(ctx.db, client, { docId: id, bodyMd: "body" })).rejects.toThrow(
         "sidecar unreachable",
       );
 
       // Embedding should remain NULL
-      const emb = await readEmbedding(db, id);
+      const emb = await readEmbedding(ctx.db, id);
       expect(emb).toBeNull();
     } finally {
-      await db.close();
+      await ctx.close();
     }
   });
 
   test("triggerEmbedding catches sidecar error, logs warning", async () => {
-    const { db, orgId } = await freshDb("trigger-fail");
+    const ctx = await freshDb("trigger-fail");
     try {
       const client = failingClient(new Error("sidecar down"));
       const warnings: string[] = [];
       const logger = { warn: (msg: string) => warnings.push(msg) };
 
-      const { id } = await createDocumentAction(db, {
-        orgId,
+      const { id } = await createDocumentAction(ctx.em, {
+        orgId: ctx.orgId,
         projectId: null,
         kind: "note",
         title: "T",
@@ -229,7 +254,7 @@ describe("sidecar failure: embedding stays NULL, update succeeds", () => {
       const origEnv = process.env.FULCRUM_FEATURES;
       process.env.FULCRUM_FEATURES = "embeddings";
       try {
-        triggerEmbedding(db, client, { docId: id, bodyMd: "body" }, logger);
+        triggerEmbedding(ctx.db, client, { docId: id, bodyMd: "body" }, logger);
         // Wait for the fire-and-forget promise to settle
         await new Promise((r) => setTimeout(r, 100));
         expect(warnings.length).toBeGreaterThanOrEqual(1);
@@ -240,18 +265,18 @@ describe("sidecar failure: embedding stays NULL, update succeeds", () => {
       }
 
       // Embedding stays NULL
-      const emb = await readEmbedding(db, id);
+      const emb = await readEmbedding(ctx.db, id);
       expect(emb).toBeNull();
     } finally {
-      await db.close();
+      await ctx.close();
     }
   });
 
   test("docs.update still succeeds when sidecar fails", async () => {
-    const { db, orgId } = await freshDb("update-sidecar-fail");
+    const ctx = await freshDb("update-sidecar-fail");
     try {
-      const { id } = await createDocumentAction(db, {
-        orgId,
+      const { id } = await createDocumentAction(ctx.em, {
+        orgId: ctx.orgId,
         projectId: null,
         kind: "note",
         title: "T",
@@ -259,10 +284,10 @@ describe("sidecar failure: embedding stays NULL, update succeeds", () => {
       });
 
       // updateDocumentAction should succeed regardless of embedding
-      const result = await updateDocumentAction(db, { id, orgId, body: "new body" });
+      const result = await updateDocumentAction(ctx.em, { id, orgId: ctx.orgId, body: "new body" });
       expect(result).toEqual({ ok: true });
     } finally {
-      await db.close();
+      await ctx.close();
     }
   });
 });

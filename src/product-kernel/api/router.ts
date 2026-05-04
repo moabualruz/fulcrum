@@ -4,6 +4,7 @@
  */
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import type { ProductDb } from "../db/types.ts";
+import type { EntityManager } from "@mikro-orm/postgresql";
 import {
   createTask,
   createSprint,
@@ -18,6 +19,7 @@ import {
   updateTaskAction,
   deleteTaskAction,
 } from "../../web/src/lib/server/tasks.ts";
+import { getEm } from "../../web/src/lib/server/em.ts";
 import { velocity, burndown } from "../reports.ts";
 import {
   listRules,
@@ -461,7 +463,8 @@ export function createPublicApi(db: ProductDb, defaultOrgId: string) {
     const { id } = c.req.valid("param");
     const body = c.req.valid("json");
     try {
-      await updateTaskAction(db, { id, ...body });
+      const em = await getEm();
+      await updateTaskAction(em, { id, ...body });
       return c.json({ ok: true as const }, 200);
     } catch (err: any) {
       if (err.message.includes("not found")) {
@@ -473,7 +476,8 @@ export function createPublicApi(db: ProductDb, defaultOrgId: string) {
 
   app.openapi(deleteTaskRoute, async (c) => {
     const { id } = c.req.valid("param");
-    await deleteTaskAction(db, id);
+    const em = await getEm();
+    await deleteTaskAction(em, id);
     return c.body(null, 204);
   });
 

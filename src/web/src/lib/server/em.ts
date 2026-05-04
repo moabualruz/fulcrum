@@ -19,3 +19,18 @@ export async function getEm(): Promise<EntityManager> {
   const orm = await initOrm();
   return orm.em.fork();
 }
+
+/**
+ * Resolve the default org ID via EntityManager.
+ * Mirror of `getDefaultOrgId(db)` from db.ts but using the ORM connection.
+ */
+export async function getDefaultOrgIdOrm(em: EntityManager): Promise<string> {
+  const conn = em.getConnection();
+  const rows = await conn.execute<{ id: string }[]>(
+    `SELECT id FROM orgs WHERE slug = $1`,
+    ["default"],
+  );
+  const id = rows[0]?.id;
+  if (!id) throw new Error("default org not found — run fulcrum init first");
+  return id;
+}

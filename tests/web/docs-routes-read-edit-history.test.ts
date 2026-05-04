@@ -7,6 +7,7 @@ import { openPglite } from "../../src/product-kernel/db/pglite.ts";
 import { runMigrations } from "../../src/product-kernel/db/migrate.ts";
 import { createLocalOrg } from "../../src/product-kernel/store/repositories.ts";
 import { createDocumentAction } from "../../src/web/src/lib/server/documents.ts";
+import { initOrm } from "../../src/db/mikro-orm.config.ts";
 
 mock.module("$app/forms", () => ({
   enhance: () => ({ destroy() {} }),
@@ -32,7 +33,20 @@ function dbDir(): string {
 
 async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: string }> {
   mkdirSync(dbDir(), { recursive: true });
-  const db = await openPglite(join(dbDir(), "main"));
+  const { PGlite } = await import("@electric-sql/pglite");
+  const { vector } = await import("@electric-sql/pglite/vector");
+  const pglite = new PGlite(join(dbDir(), "main"), { extensions: { vector } });
+  await pglite.waitReady;
+  // ProductDb wrapper for legacy code (runMigrations, createLocalOrg, raw queries)
+  const db = {
+    engine: "pglite" as const,
+    async query<T>(sql: string, params: readonly unknown[] = []) {
+      const result = await pglite.query<T>(sql, params as unknown[]);
+      return result.rows;
+    },
+    async exec(sql: string) { await pglite.exec(sql); },
+    async close() { await pglite.close(); },
+  };
   await runMigrations(db);
   await db.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS content_json jsonb NOT NULL DEFAULT '{}'::jsonb`);
   await db.query(
@@ -60,7 +74,10 @@ async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: str
     )`,
   );
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const linked = await createDocumentAction(db, {
+  // EntityManager for migrated action functions
+  const orm = await initOrm({ pglite });
+  const em = orm.em.fork();
+  const linked = await createDocumentAction(em, {
     orgId: org.id,
     projectId: null,
     kind: "note",
@@ -68,7 +85,7 @@ async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: str
     body: "Linked body",
     frontmatter: { title: "Linked Doc", kind: "note" },
   });
-  const created = await createDocumentAction(db, {
+  const created = await createDocumentAction(em, {
     orgId: org.id,
     projectId: null,
     kind: "adr",
@@ -103,6 +120,7 @@ async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: str
       JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Second body" }] }] }),
     ],
   );
+  await orm.close(true);
   await db.close();
   return { docId: created.id, linkedId: linked.id, orgId: org.id };
 }
