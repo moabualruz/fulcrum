@@ -22,7 +22,7 @@ export interface ThemeSettings {
   preset: "default" | "ocean" | "forest" | "sunset" | "monochrome";
 }
 
-export const THEME_DEFAULTS: ThemeSettings = {
+const THEME_DEFAULTS: ThemeSettings = {
   accentHue: 262,
   accentSaturation: 83,
   accentLightness: 58,
@@ -34,7 +34,7 @@ export const THEME_DEFAULTS: ThemeSettings = {
   preset: "default",
 };
 
-export const PRESETS: Record<ThemeSettings["preset"], Partial<ThemeSettings>> = {
+const PRESETS: Record<ThemeSettings["preset"], Partial<ThemeSettings>> = {
   default:     { accentHue: 262, accentSaturation: 83, accentLightness: 58 },
   ocean:       { accentHue: 210, accentSaturation: 90, accentLightness: 50 },
   forest:      { accentHue: 140, accentSaturation: 70, accentLightness: 40 },

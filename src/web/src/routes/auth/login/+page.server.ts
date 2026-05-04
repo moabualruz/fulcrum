@@ -8,7 +8,7 @@ import type { Actions, PageServerLoad } from "./$types";
  * the env var override is sufficient for SaaS deployment configuration.
  * D5: FULCRUM_FEATURES=saas-auth (or FULCRUM_FLAG_SAAS_AUTH=true) enables OAuth buttons.
  */
-export function isSaasAuthEnabled(): boolean {
+function isSaasAuthEnabled(): boolean {
   if (process.env["FULCRUM_FLAG_SAAS_AUTH"] === "true") return true;
   const features = (process.env["FULCRUM_FEATURES"] ?? "").split(",").map((f) => f.trim());
   return features.includes("saas-auth");

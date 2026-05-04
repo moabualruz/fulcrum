@@ -8,7 +8,7 @@
 import { error, fail, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 
-export function isNotifyWebhookEnabled(): boolean {
+function isNotifyWebhookEnabled(): boolean {
   const features = (process.env["FULCRUM_FEATURES"] ?? "").split(",").map((f) => f.trim());
   return features.includes("notify-webhook");
 }
@@ -34,15 +34,15 @@ export interface WebhookDelivery {
 const _subscriptions: WebhookSubscription[] = [];
 const _deliveries: WebhookDelivery[] = [];
 
-export function getSubscriptions(): WebhookSubscription[] {
+function getSubscriptions(): WebhookSubscription[] {
   return _subscriptions;
 }
 
-export function addSubscription(sub: WebhookSubscription): void {
+function addSubscription(sub: WebhookSubscription): void {
   _subscriptions.push(sub);
 }
 
-export function getDeliveries(): WebhookDelivery[] {
+function getDeliveries(): WebhookDelivery[] {
   return _deliveries;
 }
 

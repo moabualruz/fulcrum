@@ -34,32 +34,32 @@ export interface SyncLogEntry {
 const _configs: Map<ConnectorName, ConnectorConfig> = new Map();
 const _syncLog: SyncLogEntry[] = [];
 
-export function getFeatures(): string[] {
+function getFeatures(): string[] {
   return (process.env["FULCRUM_FEATURES"] ?? "").split(",").map((f) => f.trim()).filter(Boolean);
 }
 
-export function isConnectorEnabled(name: ConnectorName): boolean {
+function isConnectorEnabled(name: ConnectorName): boolean {
   return getFeatures().includes(`connector-${name}`);
 }
 
-export function hasAnyConnector(): boolean {
+function hasAnyConnector(): boolean {
   const names: ConnectorName[] = ["confluence", "notion", "github-issues"];
   return names.some((n) => isConnectorEnabled(n));
 }
 
-export function getConnectorConfig(name: ConnectorName): ConnectorConfig | undefined {
+function getConnectorConfig(name: ConnectorName): ConnectorConfig | undefined {
   return _configs.get(name);
 }
 
-export function setConnectorConfig(cfg: ConnectorConfig): void {
+function setConnectorConfig(cfg: ConnectorConfig): void {
   _configs.set(cfg.name, cfg);
 }
 
-export function getSyncLog(): SyncLogEntry[] {
+function getSyncLog(): SyncLogEntry[] {
   return _syncLog;
 }
 
-export function addSyncLogEntry(entry: SyncLogEntry): void {
+function addSyncLogEntry(entry: SyncLogEntry): void {
   _syncLog.push(entry);
 }
 

@@ -8,7 +8,7 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 
-export function isPublicApiEnabled(): boolean {
+function isPublicApiEnabled(): boolean {
   const features = (process.env["FULCRUM_FEATURES"] ?? "").split(",").map((f) => f.trim());
   return features.includes("public-api");
 }

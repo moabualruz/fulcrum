@@ -33,19 +33,19 @@ export interface ImportResult {
 /** In-memory stub store (replaced by DB in production). */
 const _importHistory: ImportResult[] = [];
 
-export function getFeatures(): string[] {
+function getFeatures(): string[] {
   return (process.env["FULCRUM_FEATURES"] ?? "").split(",").map((f) => f.trim()).filter(Boolean);
 }
 
-export function isImporterEnabled(name: ImporterName): boolean {
+function isImporterEnabled(name: ImporterName): boolean {
   return getFeatures().includes(`import-${name}`);
 }
 
-export function getImportHistory(): ImportResult[] {
+function getImportHistory(): ImportResult[] {
   return _importHistory;
 }
 
-export function addImportResult(result: ImportResult): void {
+function addImportResult(result: ImportResult): void {
   _importHistory.push(result);
 }
 

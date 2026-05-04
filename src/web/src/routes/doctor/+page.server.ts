@@ -167,7 +167,7 @@ const CHECKS: CheckFn[] = [
 // runAll — exported for CLI / test reuse
 // ----------------------------------------------------------------------------
 
-export async function runAll(): Promise<SubsystemCheckResult[]> {
+async function _runAll(): Promise<SubsystemCheckResult[]> {
   return Promise.all(CHECKS.map((fn) => fn()));
 }
 
@@ -177,6 +177,6 @@ export async function runAll(): Promise<SubsystemCheckResult[]> {
 
 export const load: PageServerLoad = () => ({
   streamed: {
-    checks: runAll(),
+    checks: _runAll(),
   },
 });

@@ -9,7 +9,7 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 
-export function isSaasAuthEnabled(): boolean {
+function isSaasAuthEnabled(): boolean {
   if (process.env["FULCRUM_FLAG_SAAS_AUTH"] === "true") return true;
   const features = (process.env["FULCRUM_FEATURES"] ?? "").split(",").map((f) => f.trim());
   return features.includes("saas-auth");

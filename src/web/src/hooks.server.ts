@@ -267,7 +267,8 @@ export const handle: Handle = async ({ event, resolve }) => {
       if (
         !event.locals.session &&
         !url.pathname.startsWith("/auth") &&
-        !url.pathname.startsWith("/api")
+        !url.pathname.startsWith("/api") &&
+        !url.pathname.startsWith("/doctor")
       ) {
         const { redirect } = await import("@sveltejs/kit");
         throw redirect(302, "/auth/login");

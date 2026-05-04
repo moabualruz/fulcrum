@@ -6,7 +6,7 @@ import { openProductDb, getDefaultOrgId } from "$lib/server/db";
 
 const execFileAsync = promisify(execFile);
 
-export const PAGE_SIZE = 50;
+const PAGE_SIZE = 50;
 
 export interface CommitEntry {
   sha: string;
