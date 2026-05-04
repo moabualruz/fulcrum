@@ -11,8 +11,8 @@
 import type { RequestEvent } from "@sveltejs/kit";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 
-import { appRouter } from "../../../../../../trpc/router.ts";
-import { createContext } from "../../../../../../trpc/context.ts";
+import { appRouter } from "@fulcrum/trpc/router.ts";
+import { createContext } from "@fulcrum/trpc/context.ts";
 
 /**
  * Handles GET and POST requests to /api/trpc/[...path].

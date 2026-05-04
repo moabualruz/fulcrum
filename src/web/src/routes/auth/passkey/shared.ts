@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { json, type Cookies } from "@sveltejs/kit";
 
-import type { PasskeyUser } from "../../../../../auth/passkey.ts";
+import type { PasskeyUser } from "@fulcrum/auth/passkey.ts";
 
 export const PASSKEY_LOGIN_CHALLENGE_COOKIE = "fulcrum.passkey_challenge";
 

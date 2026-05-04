@@ -1,11 +1,11 @@
 import { error, fail, redirect } from "@sveltejs/kit";
-import { openProductDb, getDefaultOrgId } from "../../../../lib/server/db.ts";
+import { openProductDb, getDefaultOrgId } from "@fulcrum/lib/server/db.ts";
 import {
   listDocumentVersions,
   restoreDocumentVersion,
   createDocumentVersion,
   getNextVersionNumber,
-} from "../../../../lib/server/doc-versions.ts";
+} from "@fulcrum/lib/server/doc-versions.ts";
 
 interface LoadEvent {
   params: { id: string };

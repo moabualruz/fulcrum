@@ -1,4 +1,4 @@
-import type { SearchQueryInput, SearchQueryOutput } from "../../../../../search/query";
+import type { SearchQueryInput, SearchQueryOutput } from "@fulcrum/search/query";
 
 export interface CmdkSearchResult {
   id: string;

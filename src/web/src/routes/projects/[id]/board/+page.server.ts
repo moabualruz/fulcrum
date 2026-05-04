@@ -1,21 +1,21 @@
 import { fail } from "@sveltejs/kit";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
-import { listBoardTasks } from "../../../../lib/product-queries";
-import { openProductDb } from "../../../../lib/server/db";
+import { listBoardTasks } from "@fulcrum/lib/product-queries";
+import { openProductDb } from "@fulcrum/lib/server/db";
 import {
   createTaskAction,
   deleteTaskAction,
   moveTaskStatusAction,
   updateTaskAction,
-} from "../../../../lib/server/tasks";
+} from "@fulcrum/lib/server/tasks";
 import {
   BoardCreateSchema,
   BoardDeleteSchema,
   BoardMoveSchema,
   BoardUpdateSchema,
-} from "../../../../lib/server/boards.schema";
-import { actionFail, actionOk } from "../../../../lib/feedback/action-result";
+} from "@fulcrum/lib/server/boards.schema";
+import { actionFail, actionOk } from "@fulcrum/lib/feedback/action-result";
 
 export const load: PageServerLoad = async ({ params, url }) => {
   const projectId = params.id;

@@ -1,7 +1,7 @@
 import {
   parseKernelMarkdown,
   serializeKernelMarkdown,
-} from "../../../../product-kernel/markdown.ts";
+} from "@fulcrum/product-kernel/markdown.ts";
 
 export interface FrontmatterFormValues {
   title: string;

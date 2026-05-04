@@ -2,8 +2,8 @@ import {
   resolveKeybindings,
   type KeybindingPlatform,
   type TenantSettingsReader,
-} from "../../../keybindings/index.ts";
-import type { KeybindingAction } from "../../../keybindings/schema.ts";
+} from "@fulcrum/keybindings/index.ts";
+import type { KeybindingAction } from "@fulcrum/keybindings/schema.ts";
 
 export function createKeybind(action: KeybindingAction) {
   return { action };

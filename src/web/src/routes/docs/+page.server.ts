@@ -1,6 +1,6 @@
 import type { PageServerLoad } from "./$types";
 import { openProductDb } from "$lib/server/db";
-import { searchProductDocuments } from "../../../../product-kernel/search.ts";
+import { searchProductDocuments } from "@fulcrum/product-kernel/search.ts";
 import { buildDocTree, type DocScope, type DocTreeNode } from "$lib/components/docs/doc-tree";
 
 interface DocRow {

@@ -1,8 +1,8 @@
 import type { ServerLoad, Actions } from "@sveltejs/kit";
 import { openProductDb } from "$lib/server/db";
-import { searchProductDocuments } from "../../../../product-kernel/search.ts";
-import type { SearchHit } from "../../../../product-kernel/search";
-import { newUlid } from "../../../../product-kernel/ids.ts";
+import { searchProductDocuments } from "@fulcrum/product-kernel/search.ts";
+import type { SearchHit } from "@fulcrum/product-kernel/search";
+import { newUlid } from "@fulcrum/product-kernel/ids.ts";
 
 type ProductDb = Awaited<ReturnType<typeof openProductDb>>;
 type GroupedSearchHits = Record<string, SearchHit[]>;

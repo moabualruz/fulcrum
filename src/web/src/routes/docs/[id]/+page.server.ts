@@ -1,7 +1,7 @@
 import { error, redirect } from "@sveltejs/kit";
-import { openProductDb, getDefaultOrgId } from "../../../lib/server/db.ts";
-import { deleteDocumentAction } from "../../../lib/server/documents.ts";
-import { getBacklinks } from "../../../lib/server/doc-links.ts";
+import { openProductDb, getDefaultOrgId } from "@fulcrum/lib/server/db.ts";
+import { deleteDocumentAction } from "@fulcrum/lib/server/documents.ts";
+import { getBacklinks } from "@fulcrum/lib/server/doc-links.ts";
 import { renderDocMarkdownToHtml } from "./doc-render.ts";
 
 interface DocRow {

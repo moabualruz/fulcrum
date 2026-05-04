@@ -9,11 +9,11 @@ import { DocumentFormSchema } from "$lib/server/documents.schema";
 import { createDocumentAction } from "$lib/server/documents";
 import { openProductDb } from "$lib/server/db";
 import { parseLabels } from "$lib/markdown/labels";
-import { TEMPLATE_BODY_MAP } from "../../../../../docs/template-seeds.ts";
-import type { DocType } from "../../../../../db/entities/docs/enums.ts";
+import { TEMPLATE_BODY_MAP } from "@fulcrum/docs/template-seeds.ts";
+import type { DocType } from "@fulcrum/db/entities/docs/enums.ts";
 import {
   DOC_TEMPLATE_SERVICE_TOKEN,
-} from "../../../../../docs/doc-template-service.ts";
+} from "@fulcrum/docs/doc-template-service.ts";
 
 // ─── Load ────────────────────────────────────────────────────────────────────
 

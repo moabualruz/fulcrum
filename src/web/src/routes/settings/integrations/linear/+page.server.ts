@@ -13,7 +13,7 @@ import {
   upsertTenantSetting,
   createCredential,
   listConnectorRuns,
-} from "../../../../../../../../product-kernel/store/settings-connectors-credentials";
+} from "@fulcrum/product-kernel/store/settings-connectors-credentials";
 import { actionOk } from "$lib/feedback/action-result";
 
 function isConnectorLinearEnabled(): boolean {

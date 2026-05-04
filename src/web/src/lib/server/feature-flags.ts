@@ -7,4 +7,4 @@ export {
   loadFeatures,
   getFeatureBackend,
   type FeatureFlag,
-} from "../../../../product-kernel/features.ts";
+} from "@fulcrum/product-kernel/features.ts";

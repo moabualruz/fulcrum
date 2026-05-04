@@ -1,4 +1,4 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
+import type { ProductDb } from "@fulcrum/product-kernel/db/types.ts";
 
 export interface ArtifactRow {
   id: string;

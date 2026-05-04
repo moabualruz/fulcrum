@@ -1,7 +1,7 @@
 import type { PageServerLoad } from "./$types";
 import { openProductDb } from "$lib/server/db";
 import { getDefaultOrgId } from "$lib/server/db";
-import { listEventsFiltered } from "../../../../../../product-kernel/store/repositories.ts";
+import { listEventsFiltered } from "@fulcrum/product-kernel/store/repositories.ts";
 
 export const load: PageServerLoad = ({ params, url, locals }) => {
   const projectId = params.id;

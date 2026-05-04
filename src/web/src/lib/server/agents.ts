@@ -1,6 +1,6 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
+import type { ProductDb } from "@fulcrum/product-kernel/db/types.ts";
+import { appendEvent } from "@fulcrum/product-kernel/store/repositories.ts";
+import { newUlid } from "@fulcrum/product-kernel/ids.ts";
 
 export interface AgentProfileRow {
   id: string;

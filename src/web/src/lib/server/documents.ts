@@ -1,7 +1,7 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
-import { indexSearchDocument } from "../../../../product-kernel/search.ts";
+import type { ProductDb } from "@fulcrum/product-kernel/db/types.ts";
+import { newUlid } from "@fulcrum/product-kernel/ids.ts";
+import { appendEvent } from "@fulcrum/product-kernel/store/repositories.ts";
+import { indexSearchDocument } from "@fulcrum/product-kernel/search.ts";
 
 export interface CreateDocumentInput {
   orgId: string;

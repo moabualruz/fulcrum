@@ -1,14 +1,14 @@
 import { basename, resolve } from "node:path";
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "../../../../lib/server/db";
+import { openProductDb, getDefaultOrgId } from "@fulcrum/lib/server/db";
 import {
   listReposForProject,
   linkRepoToProject,
   type RepoRow,
-} from "../../../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../../../product-kernel/ids.ts";
-import type { ProductDb } from "../../../../../../product-kernel/db/types.ts";
+} from "@fulcrum/product-kernel/store/repositories.ts";
+import { newUlid } from "@fulcrum/product-kernel/ids.ts";
+import type { ProductDb } from "@fulcrum/product-kernel/db/types.ts";
 
 export interface ProjectRepoCard {
   id: string;

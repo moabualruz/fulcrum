@@ -7,8 +7,8 @@ import { superValidate } from "sveltekit-superforms/server";
 import { valibot } from "sveltekit-superforms/adapters";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "../../../lib/server/db";
-import { updateProjectAction, deleteProjectAction } from "../../../lib/server/projects";
+import { openProductDb, getDefaultOrgId } from "@fulcrum/lib/server/db";
+import { updateProjectAction, deleteProjectAction } from "@fulcrum/lib/server/projects";
 
 // Detail-page rename uses a narrower schema than `ProjectFormSchema` — slug
 // is immutable post-create (it's the URL-stable identifier baked into events

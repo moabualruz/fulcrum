@@ -1,4 +1,4 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
+import type { ProductDb } from "@fulcrum/product-kernel/db/types.ts";
 import {
   listTreeChildren,
   getFileByPath,
@@ -8,7 +8,7 @@ import {
   type RepoFileRow,
   type RepoFileBlameRow,
   type RepoFileContentRow,
-} from "../../../../product-kernel/store/repo-files.ts";
+} from "@fulcrum/product-kernel/store/repo-files.ts";
 
 export type { RepoFileRow, RepoFileBlameRow, RepoFileContentRow };
 

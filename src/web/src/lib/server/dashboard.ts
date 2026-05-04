@@ -1,4 +1,4 @@
-import type { ProductDb, SqlValue } from "../../../../product-kernel/db/types.ts";
+import type { ProductDb, SqlValue } from "@fulcrum/product-kernel/db/types.ts";
 
 // Kernel schema uses 'completed' for terminal-success (migration 0001); contract
 // phrases the same idea as "done". Both 'completed' and 'cancelled' = terminal.

@@ -1,5 +1,5 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { createProject, appendEvent } from "../../../../product-kernel/store/repositories.ts";
+import type { ProductDb } from "@fulcrum/product-kernel/db/types.ts";
+import { createProject, appendEvent } from "@fulcrum/product-kernel/store/repositories.ts";
 
 export interface CreateProjectInput {
   orgId: string;

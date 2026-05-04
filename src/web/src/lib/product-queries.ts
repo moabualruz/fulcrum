@@ -1,8 +1,8 @@
 import { join } from "node:path";
-import { openPglite } from "../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../product-kernel/db/migrate.ts";
-import { productDbDir } from "../../../product-kernel/paths.ts";
-import type { ProductDb } from "../../../product-kernel/db/types.ts";
+import { openPglite } from "@fulcrum/product-kernel/db/pglite.ts";
+import { runMigrations } from "@fulcrum/product-kernel/db/migrate.ts";
+import { productDbDir } from "@fulcrum/product-kernel/paths.ts";
+import type { ProductDb } from "@fulcrum/product-kernel/db/types.ts";
 
 export interface ProjectListing {
   id: string;

@@ -1,6 +1,6 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "../../../../../lib/server/db";
+import { openProductDb, getDefaultOrgId } from "@fulcrum/lib/server/db";
 import {
   createCustomField,
   updateCustomField,
@@ -8,7 +8,7 @@ import {
   listCustomFields,
   FIELD_TYPES,
   type FieldType,
-} from "../../../../../lib/server/custom-fields";
+} from "@fulcrum/lib/server/custom-fields";
 
 export const load: PageServerLoad = async ({ params }) => {
   const db = await openProductDb();
