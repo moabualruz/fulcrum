@@ -920,8 +920,8 @@ maxAttempts: 5
 
       expect(result.get("running")).toBe(3);
       expect(result.get("retry_queued")).toBe(2);
-      expect(result.has("INVALID_STATE")).toBe(false);
-      expect(result.has("")).toBe(false);
+      expect(result.has("INVALID_STATE" as never)).toBe(false);
+      expect(result.has("" as never)).toBe(false);
     });
 
     test("REQUIRED: orchestration_state on AgentRun is the single mutable authority for run state", async () => {
