@@ -1,4 +1,9 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
+/**
+ * Artifacts — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
 
 export interface ArtifactRow {
   id: string;
@@ -34,7 +39,7 @@ function isoStamp(value: string | Date): string {
 }
 
 export async function listArtifacts(
-  db: ProductDb,
+  em: EntityManager,
   orgId: string,
   filter?: ArtifactFilter & { includeArchived?: boolean },
 ): Promise<ArtifactRow[]> {
@@ -66,7 +71,8 @@ export async function listArtifacts(
   }
 
   const where = conditions.join(" AND ");
-  const rows = await db.query<ArtifactRow & { created_at: string | Date }>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<(ArtifactRow & { created_at: string | Date })[]>(
     `SELECT id, org_id, project_id, run_id, task_id, kind, title,
             body_path, sha256, size, mime, COALESCE(archived, false) AS archived, created_at
        FROM artifacts
@@ -90,10 +96,11 @@ export interface ArtifactDetail extends ArtifactRow {
 
 /** Read a single artifact with computed detail fields for the detail page. */
 export async function readArtifactDetail(
-  db: ProductDb,
+  em: EntityManager,
   input: { orgId: string; id: string },
 ): Promise<ArtifactDetail | null> {
-  const rows = await db.query<ArtifactRow & { created_at: string | Date }>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<(ArtifactRow & { created_at: string | Date })[]>(
     `SELECT id, org_id, project_id, run_id, task_id, kind, title,
             body_path, sha256, size, mime, COALESCE(archived, false) AS archived, created_at
        FROM artifacts
@@ -131,22 +138,24 @@ export async function readArtifactDetail(
 
 /** Delete an artifact row (soft: archive; hard: remove row). */
 export async function deleteArtifactAction(
-  db: ProductDb,
+  em: EntityManager,
   id: string,
   orgId: string,
 ): Promise<void> {
-  await db.query(
+  const conn = em.getConnection();
+  await conn.execute(
     `DELETE FROM artifacts WHERE id = $1 AND org_id = $2`,
     [id, orgId],
   );
 }
 
 export async function getArtifactStats(
-  db: ProductDb,
+  em: EntityManager,
   orgId: string,
   projectId: string,
 ): Promise<ArtifactStats> {
-  const rows = await db.query<{ total_bytes: string | number | null; count: string | number }>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<{ total_bytes: string | number | null; count: string | number }[]>(
     `SELECT COALESCE(SUM(size), 0) AS total_bytes, COUNT(*)::int AS count
        FROM artifacts
       WHERE org_id = $1 AND project_id = $2`,
