@@ -9,9 +9,10 @@ export const FULCRUM_REQUEST_ID_HEADER = "x-fulcrum-request-id";
 /**
  * tRPC context shared by web, CLI, TUI, and tests.
  *
- * Some older product-kernel routers still consume `db`; newer feature routers
- * consume MikroORM `em` + needle-di `container`. Keep both until those surfaces
- * converge.
+ * Canonical data access is via MikroORM `em` + needle-di `container`.
+ * `db` (ProductDb) is **deprecated** — retained only for the orchestration
+ * router's symphony functions which still consume raw ProductDb.
+ * Plans 01-05/06 migrated all other callers to EntityManager.
  */
 export interface TrpcContext {
   session: Session | null;
@@ -19,6 +20,11 @@ export interface TrpcContext {
   orgId: string | null;
   em: EntityManager | null;
   container: Container | null;
+  /**
+   * @deprecated Use `em` (EntityManager) instead. Retained only for
+   * orchestration/symphony procedures pending their ORM migration.
+   * Will be removed once those are converted.
+   */
   db?: ProductDb;
   requestId: string | null;
   responseHeaders: Headers | null;
@@ -32,6 +38,7 @@ export interface CreateContextInput {
   userId: string | null;
   em: EntityManager | null;
   container: Container | null;
+  /** @deprecated Pass `em` instead. See TrpcContext.db. */
   db?: ProductDb;
   requestId?: string | null;
   responseHeaders?: Headers | null;
