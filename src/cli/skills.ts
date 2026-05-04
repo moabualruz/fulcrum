@@ -292,6 +292,15 @@ async function uninstallClaudeFulcrumPlugin(opts: { dryRun: boolean }): Promise<
   }
 }
 
+async function removeOwnedClaudeFulcrumDir(path: string, opts: { dryRun: boolean; label: string }): Promise<void> {
+  const { hasMarker } = await import("./claude-plugin-markers.ts");
+  if (!(await hasMarker(PLUGIN_SPEC))) {
+    console.log(`    · keep ${opts.label} (not-owned-by-fulcrum): ${path}`);
+    return;
+  }
+  await removeDirIfPresent(path, opts);
+}
+
 function selectedAgent(opts: { agents?: readonly AgentId[] }, agentId: AgentId): boolean {
   return opts.agents === undefined || opts.agents.includes(agentId);
 }
@@ -305,10 +314,10 @@ export async function removeAuthoredSkills(opts: { dryRun?: boolean; agents?: re
   const claudeAgent = AGENTS.find((a) => a.id === "claude-code")!;
   if (selectedAgent(opts, "claude-code") && await isDir(claudeAgent.baseDir(home))) {
     console.log(`→ Claude Code (${PLUGIN_SPEC})`);
-    await uninstallClaudeFulcrumPlugin({ dryRun });
     await removeDirIfPresent(`${claudeAgent.skillsDir(home)}/${NAMESPACE}`, { dryRun, label: "legacy layout" });
-    await removeDirIfPresent(`${home}/.claude/plugins/cache/fulcrum`, { dryRun, label: "plugin cache" });
-    await removeDirIfPresent(`${home}/.claude/plugins/marketplaces/fulcrum`, { dryRun, label: "marketplace cache" });
+    await removeOwnedClaudeFulcrumDir(`${home}/.claude/plugins/cache/fulcrum`, { dryRun, label: "plugin cache" });
+    await removeOwnedClaudeFulcrumDir(`${home}/.claude/plugins/marketplaces/fulcrum`, { dryRun, label: "marketplace cache" });
+    await uninstallClaudeFulcrumPlugin({ dryRun });
     console.log();
   }
 

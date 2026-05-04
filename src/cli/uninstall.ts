@@ -581,14 +581,35 @@ async function cleanupClaudeManagedPluginSettings(home: string): Promise<void> {
   const file = `${home}/.claude/settings.json`;
   const root = await readJsonObject(file);
   if (!root) return;
+  const { hasMarker } = await import("./claude-plugin-markers.ts");
 
   let changed = false;
   const marketplaces = root["extraKnownMarketplaces"];
   if (marketplaces && typeof marketplaces === "object" && !Array.isArray(marketplaces)) {
-    for (const key of ["fulcrum", "caveman", "repomix", "cloudflare"]) {
+    const ownedMarketplaces = [
+      ["fulcrum", "fulcrum@fulcrum"],
+      ["caveman", "caveman@caveman"],
+      ["cloudflare", "cloudflare@cloudflare"],
+    ] as const;
+    for (const [key, plugin] of ownedMarketplaces) {
       if (key in marketplaces) {
+        if (!(await hasMarker(plugin))) {
+          console.log(`     · keep Claude Code marketplace ${key} (not-owned-by-fulcrum)`);
+          continue;
+        }
         delete (marketplaces as Record<string, unknown>)[key];
         changed = true;
+      }
+    }
+    if ("repomix" in marketplaces) {
+      const owned = await hasMarker("repomix-mcp@repomix")
+        || await hasMarker("repomix-explorer@repomix")
+        || await hasMarker("repomix-commands@repomix");
+      if (owned) {
+        delete (marketplaces as Record<string, unknown>)["repomix"];
+        changed = true;
+      } else {
+        console.log("     · keep Claude Code marketplace repomix (not-owned-by-fulcrum)");
       }
     }
     if (Object.keys(marketplaces as Record<string, unknown>).length === 0) {
@@ -608,6 +629,10 @@ async function cleanupClaudeManagedPluginSettings(home: string): Promise<void> {
       "superpowers@claude-plugins-official",
     ]) {
       if (key in enabledPlugins) {
+        if (!(await hasMarker(key))) {
+          console.log(`     · keep Claude Code plugin setting ${key} (not-owned-by-fulcrum)`);
+          continue;
+        }
         delete (enabledPlugins as Record<string, unknown>)[key];
         changed = true;
       }
@@ -626,18 +651,24 @@ async function cleanupClaudeManagedPluginSettings(home: string): Promise<void> {
 }
 
 async function removeClaudePluginCacheLeftovers(home: string): Promise<void> {
-  const paths: Array<[string, string]> = [
-    [`${home}/.claude/plugins/cache/fulcrum`, "Claude Code fulcrum plugin cache"],
-    [`${home}/.claude/plugins/marketplaces/fulcrum`, "Claude Code fulcrum marketplace cache"],
-    [`${home}/.claude/plugins/cache/caveman`, "Claude Code caveman plugin cache"],
-    [`${home}/.claude/plugins/marketplaces/caveman`, "Claude Code caveman marketplace cache"],
-    [`${home}/.claude/plugins/cache/repomix`, "Repomix Claude plugin cache"],
-    [`${home}/.claude/plugins/marketplaces/repomix`, "Repomix Claude marketplace cache"],
-    [`${home}/.claude/plugins/cache/cloudflare`, "Cloudflare Claude plugin cache"],
-    [`${home}/.claude/plugins/marketplaces/cloudflare`, "Cloudflare Claude marketplace cache"],
-    [`${home}/.claude/plugins/cache/claude-plugins-official/superpowers`, "Superpowers Claude plugin cache"],
+  const { hasMarker } = await import("./claude-plugin-markers.ts");
+  const paths: Array<[string, string, readonly string[]]> = [
+    [`${home}/.claude/plugins/cache/fulcrum`, "Claude Code fulcrum plugin cache", ["fulcrum@fulcrum"]],
+    [`${home}/.claude/plugins/marketplaces/fulcrum`, "Claude Code fulcrum marketplace cache", ["fulcrum@fulcrum"]],
+    [`${home}/.claude/plugins/cache/caveman`, "Claude Code caveman plugin cache", ["caveman@caveman"]],
+    [`${home}/.claude/plugins/marketplaces/caveman`, "Claude Code caveman marketplace cache", ["caveman@caveman"]],
+    [`${home}/.claude/plugins/cache/repomix`, "Repomix Claude plugin cache", ["repomix-mcp@repomix", "repomix-explorer@repomix", "repomix-commands@repomix"]],
+    [`${home}/.claude/plugins/marketplaces/repomix`, "Repomix Claude marketplace cache", ["repomix-mcp@repomix", "repomix-explorer@repomix", "repomix-commands@repomix"]],
+    [`${home}/.claude/plugins/cache/cloudflare`, "Cloudflare Claude plugin cache", ["cloudflare@cloudflare"]],
+    [`${home}/.claude/plugins/marketplaces/cloudflare`, "Cloudflare Claude marketplace cache", ["cloudflare@cloudflare"]],
+    [`${home}/.claude/plugins/cache/claude-plugins-official/superpowers`, "Superpowers Claude plugin cache", ["superpowers@claude-plugins-official"]],
   ];
-  for (const [path, label] of paths) {
+  for (const [path, label, plugins] of paths) {
+    const owned = (await Promise.all(plugins.map((plugin) => hasMarker(plugin)))).some(Boolean);
+    if (!owned) {
+      console.log(`     · keep ${label} (not-owned-by-fulcrum)`);
+      continue;
+    }
     await removePath(path, label);
   }
   await cleanupClaudeManagedPluginSettings(home);

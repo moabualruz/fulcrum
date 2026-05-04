@@ -157,7 +157,7 @@ export async function safeClaudePluginInstall(
     return {
       ran: false,
       ok: true,
-      reason: "no-marker; pass --allow-claude-cli to opt in",
+      reason: "confirmation required; pass --allow-claude-cli to opt in",
     };
   }
   const { run } = await import("../utils/proc.ts");

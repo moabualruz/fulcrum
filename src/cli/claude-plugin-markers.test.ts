@@ -95,7 +95,7 @@ describe("claude plugin markers", () => {
     const { safeClaudePluginInstall } = await import("./claude-plugin-markers.ts");
     const result = await safeClaudePluginInstall("nope@nope");
     expect(result.ran).toBe(false);
-    expect(result.reason).toContain("no-marker");
+    expect(result.reason).toContain("confirmation required");
     expect(await hasMarker("nope@nope")).toBe(false);
   });
 

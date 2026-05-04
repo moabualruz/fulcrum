@@ -152,6 +152,11 @@ describe("run", () => {
   });
 
   test("--purge removes managed Claude marketplace metadata", async () => {
+    const { writeMarker } = await import("./claude-plugin-markers.ts");
+    await writeMarker({ plugin: "fulcrum@fulcrum", marketplace: "moabualruz/fulcrum", source: "package.fulcrum", operation: "install" });
+    await writeMarker({ plugin: "repomix-mcp@repomix", marketplace: "yamadashy/repomix", source: "package.repomix", operation: "install" });
+    await writeMarker({ plugin: "cloudflare@cloudflare", marketplace: "cloudflare/skills", source: "package.cloudflare", operation: "install" });
+    await writeMarker({ plugin: "caveman@caveman", marketplace: "JuliusBrussee/caveman", source: "package.caveman", operation: "install" });
     await mkdir(join(TMP, ".claude"), { recursive: true });
     await writeFile(join(TMP, ".claude", "settings.json"), JSON.stringify({
       extraKnownMarketplaces: {
