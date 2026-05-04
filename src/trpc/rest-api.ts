@@ -16,10 +16,9 @@ import {
  *   GET  /api/v1/symphony/:identifier   → single run by id
  *   POST /api/v1/symphony/refresh       → re-list runs (trigger refresh)
  */
-export function isPublicApiEnabled(): boolean {
-  const features = (process.env.FULCRUM_FEATURES ?? "").split(",").map((s) => s.trim());
-  return features.includes("public-api");
-}
+
+/** @deprecated Use `isPublicApiEnabled` from `src/api/feature-flags.ts` instead. */
+export { isPublicApiEnabled } from "../api/feature-flags.ts";
 
 export function createSymphonyRestApi(db: ProductDb, orgId: string): Hono {
   const app = new Hono();

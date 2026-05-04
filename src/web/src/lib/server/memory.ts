@@ -1,7 +1,12 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
-import { indexSearchDocument } from "../../../../product-kernel/search.ts";
+/**
+ * Memory actions — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { randomUUID } from "node:crypto";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
+import { indexSearchDocumentOrm } from "./orm-helpers.ts";
 
 export type MemoryScope = "project" | "global" | "task" | "user";
 
@@ -64,18 +69,19 @@ function normalizeRow(row: MemoryRow) {
 }
 
 export async function createMemoryAction(
-  db: ProductDb,
+  em: EntityManager,
   input: CreateMemoryInput,
 ): Promise<{ id: string }> {
-  const id = newUlid();
-  await db.query(
+  const id = randomUUID();
+  const conn = em.getConnection();
+  await conn.execute(
     `INSERT INTO memories (id, org_id, project_id, scope, kind, key, body, source)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
     [id, input.orgId, input.projectId, input.scope, input.kind, input.key, input.body, input.source ?? null],
   );
   const ctx = { orgId: input.orgId, projectId: input.projectId, subjectKind: "memory", subjectId: id } as const;
-  await appendEvent(db, { ...ctx, actor: "system", verb: "created", payload: { key: input.key, scope: input.scope } });
-  await indexSearchDocument(db, {
+  await eventDispatcher.dispatch(em, { ...ctx, actor: "system", verb: "created", payload: { key: input.key, scope: input.scope } });
+  await indexSearchDocumentOrm(em, {
     orgId: input.orgId, projectId: input.projectId, sourceKind: "memory", sourceId: id,
     title: input.key, body: input.body, labels: [input.scope, input.kind],
   });
@@ -83,7 +89,7 @@ export async function createMemoryAction(
 }
 
 export async function updateMemoryAction(
-  db: ProductDb,
+  em: EntityManager,
   input: UpdateMemoryInput,
 ): Promise<{ ok: true }> {
   if (!input.id) throw new Error("updateMemoryAction: id required");
@@ -106,7 +112,8 @@ export async function updateMemoryAction(
   const idIdx = params.length;
   params.push(input.orgId);
   const orgIdx = params.length;
-  const rows = await db.query<MemoryRow>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<MemoryRow[]>(
     `UPDATE memories SET ${sets.join(", ")}
        WHERE id = $${idIdx} AND org_id = $${orgIdx}
      RETURNING id, org_id, project_id, scope, kind, key, body, source, created_at, updated_at`,
@@ -114,11 +121,11 @@ export async function updateMemoryAction(
   );
   const row = rows[0];
   if (!row) throw new Error(`updateMemoryAction: memory not found: ${input.id}`);
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(em, {
     orgId: row.org_id, projectId: row.project_id, actor: "system",
     subjectKind: "memory", subjectId: input.id, verb: "updated", payload: { changed },
   });
-  await indexSearchDocument(db, {
+  await indexSearchDocumentOrm(em, {
     orgId: row.org_id, projectId: row.project_id, sourceKind: "memory", sourceId: input.id,
     title: row.key, body: row.body, labels: [row.scope, row.kind],
   });
@@ -126,21 +133,22 @@ export async function updateMemoryAction(
 }
 
 export async function deleteMemoryAction(
-  db: ProductDb,
+  em: EntityManager,
   id: string,
   orgId: string,
 ): Promise<{ ok: true }> {
-  await db.query(
+  const conn = em.getConnection();
+  await conn.execute(
     `DELETE FROM search_documents WHERE source_kind = 'memory' AND source_id = $1 AND org_id = $2`,
     [id, orgId],
   );
-  const rows = await db.query<{ org_id: string; project_id: string | null }>(
+  const rows = await conn.execute<{ org_id: string; project_id: string | null }[]>(
     `DELETE FROM memories WHERE id = $1 AND org_id = $2 RETURNING org_id, project_id`,
     [id, orgId],
   );
   const row = rows[0];
   if (row) {
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(em, {
       orgId: row.org_id, projectId: row.project_id, actor: "system",
       subjectKind: "memory", subjectId: id, verb: "deleted",
     });
@@ -149,11 +157,12 @@ export async function deleteMemoryAction(
 }
 
 export async function getMemory(
-  db: ProductDb,
+  em: EntityManager,
   id: string,
   orgId: string,
 ): Promise<ReturnType<typeof normalizeRow> | null> {
-  const rows = await db.query<MemoryRow>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<MemoryRow[]>(
     `SELECT id, org_id, project_id, scope, kind, key, body, source, created_at, updated_at
        FROM memories WHERE id = $1 AND org_id = $2`,
     [id, orgId],
@@ -163,7 +172,7 @@ export async function getMemory(
 }
 
 export async function listMemories(
-  db: ProductDb,
+  em: EntityManager,
   input: ListMemoriesInput,
 ): Promise<ReturnType<typeof normalizeRow>[]> {
   const conditions: string[] = ["org_id = $1"];
@@ -186,7 +195,8 @@ export async function listMemories(
   const limitIdx = params.length;
   params.push(offset);
   const offsetIdx = params.length;
-  const rows = await db.query<MemoryRow>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<MemoryRow[]>(
     `SELECT id, org_id, project_id, scope, kind, key, body, source, created_at, updated_at
        FROM memories
       WHERE ${conditions.join(" AND ")}

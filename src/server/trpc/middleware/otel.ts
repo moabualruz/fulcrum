@@ -52,6 +52,9 @@ async function loadOTelApi(): Promise<OTelApiLike | null> {
   }
 
   try {
+    // SEC-03: Dynamic import workaround to avoid bundler static-analysis.
+    // The specifier is hardcoded below — no user input reaches this path.
+    // eslint-disable-next-line no-new-func, @typescript-eslint/no-implied-eval
     const dynamicImport = new Function("specifier", "return import(specifier)") as (
       specifier: string,
     ) => Promise<unknown>;

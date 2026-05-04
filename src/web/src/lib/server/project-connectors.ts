@@ -1,6 +1,11 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
+/**
+ * Project connectors — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { randomUUID } from "node:crypto";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 
 export interface ProjectConnectorRow {
   id: string;
@@ -23,11 +28,11 @@ export interface UpsertConnectorInput {
 }
 
 export async function upsertProjectConnector(
-  db: ProductDb,
+  em: EntityManager,
   input: UpsertConnectorInput,
 ): Promise<{ id: string }> {
-  // Check existing
-  const existing = await db.query<{ id: string }>(
+  const conn = em.getConnection();
+  const existing = await conn.execute<{ id: string }[]>(
     `SELECT id FROM project_connectors WHERE project_id = $1 AND connector_type = $2`,
     [input.projectId, input.connectorType],
   );
@@ -46,12 +51,12 @@ export async function upsertProjectConnector(
     if (sets.length > 0) {
       sets.push("updated_at = now()");
       params.push(id);
-      await db.query(
+      await conn.execute(
         `UPDATE project_connectors SET ${sets.join(", ")} WHERE id = $${params.length}`,
         params,
       );
     }
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(em, {
       orgId: input.orgId,
       projectId: input.projectId,
       actor: "system",
@@ -63,8 +68,8 @@ export async function upsertProjectConnector(
     return { id };
   }
 
-  const id = newUlid();
-  await db.query(
+  const id = randomUUID();
+  await conn.execute(
     `INSERT INTO project_connectors (id, org_id, project_id, connector_type, enabled, config)
      VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
     [
@@ -76,7 +81,7 @@ export async function upsertProjectConnector(
       JSON.stringify(input.config ?? {}),
     ],
   );
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(em, {
     orgId: input.orgId,
     projectId: input.projectId,
     actor: "system",
@@ -89,17 +94,18 @@ export async function upsertProjectConnector(
 }
 
 export async function syncProjectConnector(
-  db: ProductDb,
+  em: EntityManager,
   id: string,
 ): Promise<{ ok: true }> {
-  const rows = await db.query<{ org_id: string; project_id: string; enabled: boolean }>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<{ org_id: string; project_id: string; enabled: boolean }[]>(
     `UPDATE project_connectors SET last_synced_at = now(), updated_at = now() WHERE id = $1
        RETURNING org_id, project_id, enabled`,
     [id],
   );
   if (!rows[0]) throw new Error(`syncProjectConnector: not found: ${id}`);
   if (!rows[0].enabled) throw new Error(`syncProjectConnector: connector not enabled: ${id}`);
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(em, {
     orgId: rows[0].org_id,
     projectId: rows[0].project_id,
     actor: "system",
@@ -111,10 +117,11 @@ export async function syncProjectConnector(
 }
 
 export async function listProjectConnectors(
-  db: ProductDb,
+  em: EntityManager,
   projectId: string,
 ): Promise<ProjectConnectorRow[]> {
-  return db.query<ProjectConnectorRow>(
+  const conn = em.getConnection();
+  return conn.execute<ProjectConnectorRow[]>(
     `SELECT * FROM project_connectors WHERE project_id = $1 ORDER BY connector_type ASC`,
     [projectId],
   );

@@ -243,7 +243,7 @@ describe("P13 TUI surface — tRPC procedures reachable in-process", () => {
   it("runs.list procedure exists on appRouter", async () => {
     const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
     const caller = await createLocalCaller();
-    expect(typeof caller.runs.list).toBe("function");
+    expect(typeof caller.agent_runs.list).toBe("function");
   });
 
   it("artifacts.list procedure exists on appRouter", async () => {

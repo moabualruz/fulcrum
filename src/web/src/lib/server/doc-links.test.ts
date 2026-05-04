@@ -1,10 +1,12 @@
 import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { EntityManager } from "@mikro-orm/postgresql";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { openPglite } from "../../../../product-kernel/db/pglite.ts";
 import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
 import { createLocalOrg } from "../../../../product-kernel/store/repositories.ts";
+import { initOrm } from "../../../../db/mikro-orm.config.ts";
 import { createDocumentAction } from "./documents";
 import { upsertDocLink, getBacklinks } from "./doc-links";
 
@@ -20,53 +22,70 @@ afterEach(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-async function seedDb() {
+async function seedDb(): Promise<{ em: EntityManager; orgId: string; close: () => Promise<void> }> {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
+  const { PGlite } = await import("@electric-sql/pglite");
+  const { vector } = await import("@electric-sql/pglite/vector");
+  const pglite = new PGlite(join(dbDir, "main"), { extensions: { vector } });
+  await pglite.waitReady;
+  const db = {
+    engine: "pglite" as const,
+    async query<T>(sql: string, params: readonly unknown[] = []) {
+      const result = await pglite.query<T>(sql, params as unknown[]);
+      return result.rows;
+    },
+    async exec(sql: string) { await pglite.exec(sql); },
+    async close() { await pglite.close(); },
+  };
   await runMigrations(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  return { db, orgId: org.id };
+  const orm = await initOrm({ pglite });
+  const em = orm.em.fork();
+  return {
+    em, orgId: org.id,
+    async close() { await orm.close(true); await db.close(); },
+  };
 }
 
 describe("doc links", () => {
   test("upsertDocLink creates a link and getBacklinks returns it", async () => {
-    const { db, orgId } = await seedDb();
+    const ctx = await seedDb();
     try {
-      const docA = await createDocumentAction(db, { orgId, projectId: null, kind: "note", title: "A", body: "a" });
-      const docB = await createDocumentAction(db, { orgId, projectId: null, kind: "note", title: "B", body: "links to [[A]]" });
-      await upsertDocLink(db, { orgId, sourceDocId: docB.id, targetDocId: docA.id, linkType: "wikilink" });
-      const backlinks = await getBacklinks(db, docA.id);
+      const docA = await createDocumentAction(ctx.em, { orgId: ctx.orgId, projectId: null, kind: "note", title: "A", body: "a" });
+      const docB = await createDocumentAction(ctx.em, { orgId: ctx.orgId, projectId: null, kind: "note", title: "B", body: "links to [[A]]" });
+      await upsertDocLink(ctx.em, { orgId: ctx.orgId, sourceDocId: docB.id, targetDocId: docA.id, linkType: "wikilink" });
+      const backlinks = await getBacklinks(ctx.em, docA.id);
       expect(backlinks).toHaveLength(1);
       expect(backlinks[0]!.source_doc_id).toBe(docB.id);
       expect(backlinks[0]!.title).toBe("B");
     } finally {
-      await db.close();
+      await ctx.close();
     }
   });
 
   test("upsert is idempotent", async () => {
-    const { db, orgId } = await seedDb();
+    const ctx = await seedDb();
     try {
-      const docA = await createDocumentAction(db, { orgId, projectId: null, kind: "note", title: "A", body: "a" });
-      const docB = await createDocumentAction(db, { orgId, projectId: null, kind: "note", title: "B", body: "b" });
-      await upsertDocLink(db, { orgId, sourceDocId: docB.id, targetDocId: docA.id, linkType: "wikilink" });
-      await upsertDocLink(db, { orgId, sourceDocId: docB.id, targetDocId: docA.id, linkType: "wikilink" });
-      const backlinks = await getBacklinks(db, docA.id);
+      const docA = await createDocumentAction(ctx.em, { orgId: ctx.orgId, projectId: null, kind: "note", title: "A", body: "a" });
+      const docB = await createDocumentAction(ctx.em, { orgId: ctx.orgId, projectId: null, kind: "note", title: "B", body: "b" });
+      await upsertDocLink(ctx.em, { orgId: ctx.orgId, sourceDocId: docB.id, targetDocId: docA.id, linkType: "wikilink" });
+      await upsertDocLink(ctx.em, { orgId: ctx.orgId, sourceDocId: docB.id, targetDocId: docA.id, linkType: "wikilink" });
+      const backlinks = await getBacklinks(ctx.em, docA.id);
       expect(backlinks).toHaveLength(1);
     } finally {
-      await db.close();
+      await ctx.close();
     }
   });
 
   test("getBacklinks returns empty array when no links", async () => {
-    const { db, orgId } = await seedDb();
+    const ctx = await seedDb();
     try {
-      const doc = await createDocumentAction(db, { orgId, projectId: null, kind: "note", title: "Lonely", body: "x" });
-      const backlinks = await getBacklinks(db, doc.id);
+      const doc = await createDocumentAction(ctx.em, { orgId: ctx.orgId, projectId: null, kind: "note", title: "Lonely", body: "x" });
+      const backlinks = await getBacklinks(ctx.em, doc.id);
       expect(backlinks).toEqual([]);
     } finally {
-      await db.close();
+      await ctx.close();
     }
   });
 });

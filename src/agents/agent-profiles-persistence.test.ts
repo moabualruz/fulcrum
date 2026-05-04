@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { chmod, mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -8,6 +8,9 @@ import { AgentProfile } from "../db/entities/sandbox/AgentProfile.ts";
 import { createTestCaller, createTestContainer, createTestOrm, type TestOrm } from "../test-utils/index.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
+
+// SEC-02: Tests use temp script paths — add them to allowlist via env var.
+let testCliPaths: string[] = [];
 
 async function writeVersionScript(dir: string, name: string, exitCode: number): Promise<string> {
   const path = join(dir, name);
@@ -46,6 +49,8 @@ describe("agents.testProfile persistence", () => {
   test("persists lastTestedAt and testPassed=true after a successful version check", async () => {
     const dir = await mkdtemp(join(tmpdir(), "fulcrum-agent-profile-"));
     const cliPath = await writeVersionScript(dir, "agent-ok", 0);
+    testCliPaths.push(cliPath);
+    process.env["FULCRUM_AGENT_CLI_ALLOWLIST"] = testCliPaths.join(",");
     db = await setupProfile("agent-ok", cliPath);
     const caller = await createTestCaller(createTestContainer(db));
 
@@ -60,6 +65,8 @@ describe("agents.testProfile persistence", () => {
   test("persists lastTestedAt and testPassed=false after a failed version check", async () => {
     const dir = await mkdtemp(join(tmpdir(), "fulcrum-agent-profile-"));
     const cliPath = await writeVersionScript(dir, "agent-fail", 7);
+    testCliPaths.push(cliPath);
+    process.env["FULCRUM_AGENT_CLI_ALLOWLIST"] = testCliPaths.join(",");
     db = await setupProfile("agent-fail", cliPath);
     const caller = await createTestCaller(createTestContainer(db));
 

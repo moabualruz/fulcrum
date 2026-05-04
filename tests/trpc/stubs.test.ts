@@ -85,16 +85,16 @@ describe("stub routers — authenticated list() returns []", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("memory.list returns [] for authenticated caller", async () => {
+  it("memories.list returns [] for authenticated caller", async () => {
     const caller = authenticatedCaller();
-    const result = await caller.memory.list();
+    const result = await caller.memories.list();
     expect(Array.isArray(result)).toBe(true);
     expect(result).toHaveLength(0);
   });
 
-  it("runs.list returns [] for authenticated caller", async () => {
+  it("agent_runs.list returns [] for authenticated caller", async () => {
     const caller = authenticatedCaller();
-    const result = await caller.runs.list();
+    const result = await caller.agent_runs.list();
     expect(Array.isArray(result)).toBe(true);
     expect(result).toHaveLength(0);
   });
@@ -144,12 +144,12 @@ describe("stub routers — unauthenticated list() returns UNAUTHORIZED", () => {
   const domains = [
     "tasks",
     "docs",
-    "memory",
-    "runs",
+    "memories",
+    "agent_runs",
     "artifacts",
     "repos",
     "sprints",
-    "notifications",
+    "notify",
     "webhooks",
     "flags",
     "orchestration",

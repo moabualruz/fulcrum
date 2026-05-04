@@ -1,6 +1,22 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import type { EventRow } from "../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
+/**
+ * Audit — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { randomUUID } from "node:crypto";
+
+export interface EventRow {
+  id: string;
+  org_id: string;
+  project_id: string | null;
+  actor: string;
+  subject_kind: string;
+  subject_id: string;
+  verb: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
 
 export interface AuditFilter {
   orgId: string;
@@ -8,8 +24,8 @@ export interface AuditFilter {
   actor?: string;
   subjectKind?: string;
   verb?: string;
-  since?: string; // ISO date
-  until?: string; // ISO date
+  since?: string;
+  until?: string;
 }
 
 export interface AuditQueryResult {
@@ -22,7 +38,7 @@ export interface AuditQueryResult {
  * Default sort: created_at DESC.
  */
 export async function queryAuditEvents(
-  db: ProductDb,
+  em: EntityManager,
   filter: AuditFilter,
   opts: { limit?: number; offset?: number } = {},
 ): Promise<AuditQueryResult> {
@@ -56,8 +72,9 @@ export async function queryAuditEvents(
   }
 
   const where = conditions.join(" AND ");
+  const conn = em.getConnection();
 
-  const countRows = await db.query<{ count: string }>(
+  const countRows = await conn.execute<{ count: string }[]>(
     `SELECT COUNT(*)::text AS count FROM events WHERE ${where}`,
     params,
   );
@@ -66,7 +83,7 @@ export async function queryAuditEvents(
   const limit = opts.limit ?? 50;
   const offset = opts.offset ?? 0;
 
-  const rows = await db.query<EventRow>(
+  const rows = await conn.execute<EventRow[]>(
     `SELECT * FROM events WHERE ${where} ORDER BY created_at DESC, id DESC LIMIT $${idx++} OFFSET $${idx++}`,
     [...params, limit, offset],
   );
@@ -116,11 +133,12 @@ export interface RetentionPolicyRow {
 }
 
 export async function getRetentionPolicy(
-  db: ProductDb,
+  em: EntityManager,
   orgId: string,
   projectId?: string | null,
 ): Promise<RetentionPolicyRow | null> {
-  const rows = await db.query<RetentionPolicyRow>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<RetentionPolicyRow[]>(
     projectId
       ? `SELECT * FROM event_retention_policies WHERE org_id = $1 AND project_id = $2`
       : `SELECT * FROM event_retention_policies WHERE org_id = $1 AND project_id IS NULL`,
@@ -130,29 +148,30 @@ export async function getRetentionPolicy(
 }
 
 export async function upsertRetentionPolicy(
-  db: ProductDb,
+  em: EntityManager,
   orgId: string,
   retainDays: number,
   projectId?: string | null,
 ): Promise<RetentionPolicyRow> {
-  const existing = await getRetentionPolicy(db, orgId, projectId);
+  const conn = em.getConnection();
+  const existing = await getRetentionPolicy(em, orgId, projectId);
   if (existing) {
-    await db.query(
+    await conn.execute(
       `UPDATE event_retention_policies SET retain_days = $1, updated_at = now() WHERE id = $2`,
       [retainDays, existing.id],
     );
-    const rows = await db.query<RetentionPolicyRow>(
+    const rows = await conn.execute<RetentionPolicyRow[]>(
       `SELECT * FROM event_retention_policies WHERE id = $1`,
       [existing.id],
     );
     return rows[0] as RetentionPolicyRow;
   }
-  const id = newUlid();
-  await db.query(
+  const id = randomUUID();
+  await conn.execute(
     `INSERT INTO event_retention_policies (id, org_id, project_id, retain_days) VALUES ($1, $2, $3, $4)`,
     [id, orgId, projectId ?? null, retainDays],
   );
-  const rows = await db.query<RetentionPolicyRow>(
+  const rows = await conn.execute<RetentionPolicyRow[]>(
     `SELECT * FROM event_retention_policies WHERE id = $1`,
     [id],
   );

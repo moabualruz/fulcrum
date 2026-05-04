@@ -9,10 +9,8 @@
 import type { RequestHandler } from "@sveltejs/kit";
 import { json } from "@sveltejs/kit";
 
-export function isPublicApiEnabled(): boolean {
-  const features = (process.env["FULCRUM_FEATURES"] ?? "").split(",").map((f) => f.trim());
-  return features.includes("public-api");
-}
+/** @deprecated Use `isPublicApiEnabled` from `src/api/feature-flags.ts`. */
+export { isPublicApiEnabled } from "../../../../../api/feature-flags.ts";
 
 /** Minimal OpenAPI 3.1 spec with 3+ domain endpoints (tasks, docs, projects). */
 export function buildOpenApiSpec(baseUrl: string) {

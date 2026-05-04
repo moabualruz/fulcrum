@@ -1,6 +1,11 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
+/**
+ * Saved views — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { randomUUID } from "node:crypto";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 
 export type ViewScope = "org" | "project" | "private";
 
@@ -45,22 +50,22 @@ function assertScope(v: unknown, label: string): asserts v is ViewScope {
 }
 
 export async function createSavedView(
-  db: ProductDb,
+  em: EntityManager,
   input: CreateViewInput,
 ): Promise<{ id: string }> {
   const scope = input.scope ?? "project";
   assertScope(scope, "createSavedView");
-  const id = newUlid();
+  const id = randomUUID();
+  const conn = em.getConnection();
 
-  // If setting as default, clear other defaults for this project
   if (input.isDefault) {
-    await db.query(
+    await conn.execute(
       `UPDATE saved_views SET is_default = false WHERE project_id = $1 AND is_default = true`,
       [input.projectId],
     );
   }
 
-  await db.query(
+  await conn.execute(
     `INSERT INTO saved_views (id, org_id, project_id, name, scope, owner_id, filters, sort_by, is_default)
      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)`,
     [
@@ -75,7 +80,7 @@ export async function createSavedView(
       input.isDefault ?? false,
     ],
   );
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(em, {
     orgId: input.orgId,
     projectId: input.projectId,
     actor: "system",
@@ -88,7 +93,7 @@ export async function createSavedView(
 }
 
 export async function updateSavedView(
-  db: ProductDb,
+  em: EntityManager,
   input: UpdateViewInput,
 ): Promise<{ ok: true }> {
   if (!input.id) throw new Error("updateSavedView: id required");
@@ -114,15 +119,15 @@ export async function updateSavedView(
   if (input.isDefault !== undefined) push("is_default", input.isDefault);
   if (changed.length === 0) throw new Error("updateSavedView: no fields to update");
 
-  // If setting as default, clear other defaults first
+  const conn = em.getConnection();
+
   if (input.isDefault) {
-    // Need project_id to scope the clear
-    const viewRows = await db.query<{ project_id: string }>(
+    const viewRows = await conn.execute<{ project_id: string }[]>(
       `SELECT project_id FROM saved_views WHERE id = $1`,
       [input.id],
     );
     if (viewRows[0]) {
-      await db.query(
+      await conn.execute(
         `UPDATE saved_views SET is_default = false WHERE project_id = $1 AND is_default = true AND id != $2`,
         [viewRows[0].project_id, input.id],
       );
@@ -131,13 +136,13 @@ export async function updateSavedView(
 
   sets.push("updated_at = now()");
   params.push(input.id);
-  const rows = await db.query<{ org_id: string; project_id: string }>(
+  const rows = await conn.execute<{ org_id: string; project_id: string }[]>(
     `UPDATE saved_views SET ${sets.join(", ")} WHERE id = $${params.length}
        RETURNING org_id, project_id`,
     params,
   );
   if (!rows[0]) throw new Error(`updateSavedView: not found: ${input.id}`);
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(em, {
     orgId: rows[0].org_id,
     projectId: rows[0].project_id,
     actor: "system",
@@ -150,15 +155,16 @@ export async function updateSavedView(
 }
 
 export async function deleteSavedView(
-  db: ProductDb,
+  em: EntityManager,
   id: string,
 ): Promise<{ ok: true }> {
-  const rows = await db.query<{ org_id: string; project_id: string }>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<{ org_id: string; project_id: string }[]>(
     `DELETE FROM saved_views WHERE id = $1 RETURNING org_id, project_id`,
     [id],
   );
   if (rows[0]) {
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(em, {
       orgId: rows[0].org_id,
       projectId: rows[0].project_id,
       actor: "system",
@@ -171,10 +177,11 @@ export async function deleteSavedView(
 }
 
 export async function listSavedViews(
-  db: ProductDb,
+  em: EntityManager,
   projectId: string,
 ): Promise<SavedViewRow[]> {
-  return db.query<SavedViewRow>(
+  const conn = em.getConnection();
+  return conn.execute<SavedViewRow[]>(
     `SELECT * FROM saved_views WHERE project_id = $1 ORDER BY is_default DESC, name ASC`,
     [projectId],
   );

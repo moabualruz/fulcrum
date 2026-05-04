@@ -1,4 +1,4 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
+import type { EntityManager } from "@mikro-orm/postgresql";
 import { newUlid } from "../../../../product-kernel/ids.ts";
 
 export interface UpsertDocLinkInput {
@@ -22,9 +22,10 @@ interface BacklinkRow {
   link_kind: string | null;
 }
 
-export async function upsertDocLink(db: ProductDb, input: UpsertDocLinkInput): Promise<void> {
+export async function upsertDocLink(em: EntityManager, input: UpsertDocLinkInput): Promise<void> {
   const id = newUlid();
-  await db.query(
+  const conn = em.getConnection();
+  await conn.execute(
     `INSERT INTO doc_links (id, org_id, source_doc_id, target_doc_id, link_type)
      VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (source_doc_id, target_doc_id, link_type) DO NOTHING`,
@@ -33,8 +34,9 @@ export async function upsertDocLink(db: ProductDb, input: UpsertDocLinkInput): P
 }
 
 /** Get all documents linking TO a given document (backlinks). */
-export async function getBacklinks(db: ProductDb, targetDocId: string): Promise<Backlink[]> {
-  const rows = await db.query<BacklinkRow>(
+export async function getBacklinks(em: EntityManager, targetDocId: string): Promise<Backlink[]> {
+  const conn = em.getConnection();
+  const rows = await conn.execute<BacklinkRow[]>(
     `SELECT dl.source_doc_id, dl.from_doc_id, d.title, dl.link_type, dl.link_kind
        FROM doc_links dl
        JOIN documents d ON d.id = COALESCE(dl.source_doc_id, dl.from_doc_id)

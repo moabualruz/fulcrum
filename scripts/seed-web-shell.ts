@@ -12,7 +12,7 @@ import {
   createProject,
   appendEvent,
 } from "../src/product-kernel/store/repositories.ts";
-import { createTaskAction } from "../src/web/src/lib/server/tasks.ts";
+import { createTaskAction } from "../src/services/tasks.ts";
 import { createDocumentAction } from "../src/web/src/lib/server/documents.ts";
 import { newUlid } from "../src/product-kernel/ids.ts";
 

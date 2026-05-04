@@ -1,4 +1,9 @@
-import type { ProductDb, SqlValue } from "../../../../product-kernel/db/types.ts";
+/**
+ * Reports — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
 import { isFeatureEnabled } from "../../../../product-kernel/features.ts";
 
 // ---------- Types ----------
@@ -58,10 +63,11 @@ export interface CfdPoint {
 // ---------- Sprint listing ----------
 
 export async function listSprints(
-  db: ProductDb,
+  em: EntityManager,
   projectId: string,
 ): Promise<Sprint[]> {
-  return db.query<Sprint>(
+  const conn = em.getConnection();
+  return conn.execute<Sprint[]>(
     `SELECT id, name, start_date::text, end_date::text, status
        FROM sprints WHERE project_id = $1 ORDER BY start_date DESC`,
     [projectId],
@@ -71,19 +77,19 @@ export async function listSprints(
 // ---------- Burndown ----------
 
 export async function loadBurndown(
-  db: ProductDb,
+  em: EntityManager,
   projectId: string,
   sprintId: string,
 ): Promise<BurndownPoint[]> {
-  // Get sprint date range + total points
-  const sprints = await db.query<{ start_date: string; end_date: string }>(
+  const conn = em.getConnection();
+  const sprints = await conn.execute<{ start_date: string; end_date: string }[]>(
     `SELECT start_date::text, end_date::text FROM sprints WHERE id = $1 AND project_id = $2`,
     [sprintId, projectId],
   );
   const sprint = sprints[0];
   if (!sprint) return [];
 
-  const totalRows = await db.query<{ total: string }>(
+  const totalRows = await conn.execute<{ total: string }[]>(
     `SELECT coalesce(sum(story_points), 0)::text AS total
        FROM tasks WHERE sprint_id = $1`,
     [sprintId],
@@ -91,21 +97,18 @@ export async function loadBurndown(
   const totalPoints = Number(totalRows[0]?.total ?? 0);
   if (totalPoints === 0) return [];
 
-  // Get daily remaining from metrics_cache
-  const cached = await db.query<{ snapshot_date: string; payload: string | { remaining: number } }>(
+  const cached = await conn.execute<{ snapshot_date: string; payload: string | { remaining: number } }[]>(
     `SELECT snapshot_date::text, payload FROM metrics_cache
        WHERE project_id = $1 AND sprint_id = $2 AND metric_kind = 'burndown'
        ORDER BY snapshot_date`,
     [projectId, sprintId],
   );
 
-  // Build ideal line
   const startDate = new Date(sprint.start_date);
   const endDate = new Date(sprint.end_date);
   const totalDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000));
   const pointsPerDay = totalPoints / totalDays;
 
-  // Build lookup of cached actuals
   const actualMap = new Map<string, number>();
   for (const row of cached) {
     const payload = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
@@ -121,7 +124,6 @@ export async function loadBurndown(
     if (actual >= 0) {
       points.push({ date: dateStr, ideal: Math.round(ideal * 100) / 100, actual });
     } else {
-      // No cached data for this day — only emit ideal line
       points.push({ date: dateStr, ideal: Math.round(ideal * 100) / 100, actual: -1 });
     }
   }
@@ -131,11 +133,12 @@ export async function loadBurndown(
 // ---------- Velocity ----------
 
 export async function loadVelocity(
-  db: ProductDb,
+  em: EntityManager,
   projectId: string,
   windowSize = 3,
 ): Promise<VelocityBar[]> {
-  return db.query<VelocityBar>(
+  const conn = em.getConnection();
+  return conn.execute<VelocityBar[]>(
     `SELECT s.id AS sprint_id, s.name AS sprint_name,
             coalesce(sum(t.story_points), 0)::int AS points
        FROM sprints s
@@ -151,12 +154,11 @@ export async function loadVelocity(
 // ---------- Cycle Time ----------
 
 export async function loadCycleTime(
-  db: ProductDb,
+  em: EntityManager,
   projectId: string,
 ): Promise<CycleTimeStats> {
-  // Cycle time = days between first status_changed to in_progress and status_changed to completed
-  // We compute from events table
-  const rows = await db.query<{ days: string }>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<{ days: string }[]>(
     `WITH started AS (
        SELECT payload->>'task' AS task_id,
               min(created_at) AS started_at
@@ -188,7 +190,6 @@ export async function loadCycleTime(
   const dayValues = rows.map((r) => Number(r.days));
   if (dayValues.length === 0) return { bins: [], p50: 0, p90: 0 };
 
-  // Build histogram bins
   const binMap = new Map<number, number>();
   for (const d of dayValues) {
     binMap.set(d, (binMap.get(d) ?? 0) + 1);
@@ -207,10 +208,11 @@ export async function loadCycleTime(
 // ---------- Throughput ----------
 
 export async function loadThroughput(
-  db: ProductDb,
+  em: EntityManager,
   projectId: string,
 ): Promise<ThroughputPoint[]> {
-  return db.query<ThroughputPoint>(
+  const conn = em.getConnection();
+  return conn.execute<ThroughputPoint[]>(
     `SELECT date_trunc('week', e.created_at)::date::text AS week_start,
             count(DISTINCT e.subject_id)::int AS count
        FROM events e
@@ -227,10 +229,11 @@ export async function loadThroughput(
 // ---------- WIP ----------
 
 export async function loadWip(
-  db: ProductDb,
+  em: EntityManager,
   projectId: string,
 ): Promise<WipPoint[]> {
-  const rows = await db.query<{ snapshot_date: string; payload: string | WipPoint }>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<{ snapshot_date: string; payload: string | WipPoint }[]>(
     `SELECT snapshot_date::text, payload FROM metrics_cache
        WHERE project_id = $1 AND metric_kind = 'wip'
        ORDER BY snapshot_date`,
@@ -250,10 +253,11 @@ export async function loadWip(
 // ---------- CFD ----------
 
 export async function loadCfd(
-  db: ProductDb,
+  em: EntityManager,
   projectId: string,
 ): Promise<CfdPoint[]> {
-  const rows = await db.query<{ snapshot_date: string; payload: string | CfdPoint }>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<{ snapshot_date: string; payload: string | CfdPoint }[]>(
     `SELECT snapshot_date::text, payload FROM metrics_cache
        WHERE project_id = $1 AND metric_kind = 'cfd'
        ORDER BY snapshot_date`,
@@ -285,20 +289,20 @@ export interface ReportsData {
 }
 
 export async function loadReports(
-  db: ProductDb,
+  em: EntityManager,
   projectId: string,
   sprintId?: string,
 ): Promise<ReportsData> {
-  const sprints = await listSprints(db, projectId);
+  const sprints = await listSprints(em, projectId);
   const activeSprint = sprintId ?? sprints.find((s) => s.status === "active")?.id ?? sprints[0]?.id;
 
   const [burndown, velocity, cycleTime, throughput, wip, cfd] = await Promise.all([
-    activeSprint ? loadBurndown(db, projectId, activeSprint) : Promise.resolve([]),
-    loadVelocity(db, projectId),
-    loadCycleTime(db, projectId),
-    loadThroughput(db, projectId),
-    loadWip(db, projectId),
-    loadCfd(db, projectId),
+    activeSprint ? loadBurndown(em, projectId, activeSprint) : Promise.resolve([]),
+    loadVelocity(em, projectId),
+    loadCycleTime(em, projectId),
+    loadThroughput(em, projectId),
+    loadWip(em, projectId),
+    loadCfd(em, projectId),
   ]);
 
   return { sprints, burndown, velocity, cycleTime, throughput, wip, cfd };
@@ -337,23 +341,14 @@ function buildPrompt(input: NarrationInput): string {
   );
 }
 
-/**
- * Generate an AI narrative for a completed sprint.
- *
- * Returns `{ skipped: true }` when flag is OFF.
- * Returns `{ error: "sidecar_unavailable" }` when sidecar is unreachable — never throws.
- * Returns `{ text }` on success.
- */
 export async function generateNarration(
   input: NarrationInput,
   deps: NarrationDeps = {},
 ): Promise<NarrationResult> {
-  // Gate: flag must be ON
   if (!isFeatureEnabled("report-llm-narration")) {
     return { skipped: true };
   }
 
-  // Resolve generate function (real sidecar or test mock)
   let generateFn = deps.generateFn;
   if (!generateFn) {
     const { testGenerate } = await import("./inference-client.ts");

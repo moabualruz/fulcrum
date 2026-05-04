@@ -267,7 +267,7 @@ describe("P14 TUI tRPC — procedures reachable via createLocalCaller", () => {
   it("runs.list procedure exists on appRouter", async () => {
     const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
     const caller = await createLocalCaller();
-    expect(typeof caller.runs.list).toBe("function");
+    expect(typeof caller.agent_runs.list).toBe("function");
   });
 
   it("repos.list procedure exists on appRouter", async () => {

@@ -507,12 +507,12 @@ async function resolveCaller(opts: SkillsRunOptions): Promise<SkillsCaller> {
   const factory = t.createCallerFactory(appRouter);
   const caller = factory(ctx);
   return {
-    list: () => caller.skills.list(),
-    install: (input) => caller.skills.install(input),
-    upgrade: (input) => caller.skills.upgrade(input),
-    uninstall: (input) => caller.skills.uninstall(input),
-    sync: (input) => caller.skills.sync(input),
-    resolveConflict: (input) => caller.skills.resolveConflict(input),
+    list: () => caller.fulcrum_skills.list(),
+    install: (input) => caller.fulcrum_skills.install(input),
+    upgrade: (input) => caller.fulcrum_skills.upgrade(input),
+    uninstall: (input) => caller.fulcrum_skills.uninstall(input),
+    sync: (input) => caller.fulcrum_skills.sync(input),
+    resolveConflict: (input) => caller.fulcrum_skills.resolveConflict(input),
   };
 }
 

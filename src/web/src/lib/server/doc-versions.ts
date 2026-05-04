@@ -1,5 +1,10 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
+/**
+ * Document versions — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { randomUUID } from "node:crypto";
 
 export interface CreateVersionInput {
   docId: string;
@@ -34,8 +39,9 @@ type LegacyDocVersionRow = {
   created_at: Date | string;
 };
 
-async function legacyVersionsTableExists(db: ProductDb): Promise<boolean> {
-  const rows = await db.query<{ exists: boolean }>(
+async function legacyVersionsTableExists(em: EntityManager): Promise<boolean> {
+  const conn = em.getConnection();
+  const rows = await conn.execute<{ exists: boolean }[]>(
     `SELECT EXISTS (
        SELECT 1 FROM information_schema.tables WHERE table_name = 'doc_versions'
      ) AS exists`,
@@ -70,19 +76,20 @@ function legacyToDocVersion(row: LegacyDocVersionRow): DocVersion {
 }
 
 export async function createDocumentVersion(
-  db: ProductDb,
+  em: EntityManager,
   input: CreateVersionInput,
 ): Promise<{ id: string; version: number }> {
-  const id = newUlid();
-  if (await legacyVersionsTableExists(db)) {
-    await db.query(
+  const id = randomUUID();
+  const conn = em.getConnection();
+  if (await legacyVersionsTableExists(em)) {
+    await conn.execute(
       `INSERT INTO doc_versions (id, doc_id, org_id, version_num, snapshot, body_md_snapshot)
        VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
       [id, input.docId, input.orgId, input.version, JSON.stringify(input.frontmatter), input.body],
     );
     return { id, version: input.version };
   }
-  await db.query(
+  await conn.execute(
     `INSERT INTO document_versions (id, doc_id, org_id, version, title, body, frontmatter, author)
      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)`,
     [id, input.docId, input.orgId, input.version, input.title, input.body, JSON.stringify(input.frontmatter), input.author],
@@ -91,16 +98,17 @@ export async function createDocumentVersion(
 }
 
 export async function listDocumentVersions(
-  db: ProductDb,
+  em: EntityManager,
   docId: string,
 ): Promise<DocVersion[]> {
-  const rows = await db.query<DocVersionRow>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<DocVersionRow[]>(
     `SELECT id, doc_id, org_id, version, title, body, frontmatter, author, created_at
        FROM document_versions WHERE doc_id = $1 ORDER BY version DESC`,
     [docId],
   );
-  if (rows.length === 0 && await legacyVersionsTableExists(db)) {
-    const legacyRows = await db.query<LegacyDocVersionRow>(
+  if (rows.length === 0 && await legacyVersionsTableExists(em)) {
+    const legacyRows = await conn.execute<LegacyDocVersionRow[]>(
       `SELECT id, doc_id, org_id, version_num, snapshot, body_md_snapshot, created_at
          FROM doc_versions WHERE doc_id = $1 ORDER BY version_num DESC`,
       [docId],
@@ -114,18 +122,19 @@ export async function listDocumentVersions(
 }
 
 export async function getDocumentVersion(
-  db: ProductDb,
+  em: EntityManager,
   docId: string,
   version: number,
 ): Promise<DocVersion | null> {
-  const rows = await db.query<DocVersionRow>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<DocVersionRow[]>(
     `SELECT id, doc_id, org_id, version, title, body, frontmatter, author, created_at
        FROM document_versions WHERE doc_id = $1 AND version = $2`,
     [docId, version],
   );
   if (rows.length === 0) {
-    if (await legacyVersionsTableExists(db)) {
-      const legacyRows = await db.query<LegacyDocVersionRow>(
+    if (await legacyVersionsTableExists(em)) {
+      const legacyRows = await conn.execute<LegacyDocVersionRow[]>(
         `SELECT id, doc_id, org_id, version_num, snapshot, body_md_snapshot, created_at
            FROM doc_versions WHERE doc_id = $1 AND version_num = $2`,
         [docId, version],
@@ -140,14 +149,15 @@ export async function getDocumentVersion(
 
 /** Restore a document's content from a specific version. */
 export async function restoreDocumentVersion(
-  db: ProductDb,
+  em: EntityManager,
   docId: string,
   orgId: string,
   version: number,
 ): Promise<void> {
-  const ver = await getDocumentVersion(db, docId, version);
+  const ver = await getDocumentVersion(em, docId, version);
   if (!ver) throw new Error(`Version ${version} not found for doc ${docId}`);
-  await db.query(
+  const conn = em.getConnection();
+  await conn.execute(
     `UPDATE documents SET title = $1, body = $2, frontmatter = $3::jsonb, updated_at = now()
        WHERE id = $4 AND org_id = $5`,
     [ver.title, ver.body, JSON.stringify(ver.frontmatter), docId, orgId],
@@ -155,15 +165,16 @@ export async function restoreDocumentVersion(
 }
 
 /** Get the next version number for a document. */
-export async function getNextVersionNumber(db: ProductDb, docId: string): Promise<number> {
-  if (await legacyVersionsTableExists(db)) {
-    const rows = await db.query<{ max_ver: number | null }>(
+export async function getNextVersionNumber(em: EntityManager, docId: string): Promise<number> {
+  const conn = em.getConnection();
+  if (await legacyVersionsTableExists(em)) {
+    const rows = await conn.execute<{ max_ver: number | null }[]>(
       `SELECT MAX(version_num) AS max_ver FROM doc_versions WHERE doc_id = $1`,
       [docId],
     );
     return (rows[0]?.max_ver ?? 0) + 1;
   }
-  const rows = await db.query<{ max_ver: number | null }>(
+  const rows = await conn.execute<{ max_ver: number | null }[]>(
     `SELECT MAX(version) AS max_ver FROM document_versions WHERE doc_id = $1`,
     [docId],
   );
