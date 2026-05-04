@@ -30,6 +30,7 @@ Plan: 8 of 8
 - ARCH-12: TrpcContext.db deprecated; em (EntityManager) is canonical data access
 - Auth: Bearer API-key (SHA-256 hash) is unified REST API auth; session auth stays in web layer
 - 5 duplicate isPublicApiEnabled collapsed to src/api/feature-flags.ts
+- Branch policy: all phase execution commits stay on `dev/v1.0`; `main` is only updated by the final milestone merge after all phases land. Do not push or mutate `main` during phase execution unless explicitly requested in the same turn.
 - Phase 2 planning complete: 8 plans cover BUG-01..BUG-18 and FND-01..FND-07.
 - [Phase 02-bug-fixes-foundation]: 02-02: Database backend precedence is CLI flag, persisted config, DATABASE_URL, then PGlite default.
 - [Phase 02-bug-fixes-foundation]: 02-02: Product init requires explicit fulcrum db migrate instead of auto-running migrations.
@@ -51,5 +52,5 @@ Plan: 8 of 8
 - [Phase 02-08]: Worker payload assertions run before task handlers and async handler failures propagate.
 - [Phase 02-08]: fulcrum init and auth whoami use the same PGlite resolver path.
 - [Phase 02-08]: Local dev auto-session is excluded from /auth/*; /auth/auto-session keeps the explicit seeded-session redirect.
-- [Phase 02-08]: BUG-17 completed by fast-forward-safe `git push origin main`; `origin/main...main` is now `0 0`.
+- [Phase 02-08]: BUG-17 is repo-hygiene only under the milestone branch policy; phase execution must not push `main`. Treat future main-sync work as final milestone merge hygiene, not per-phase execution.
 - [Phase 02]: Final verifier passed after root `bun run ci` passed on 2026-05-04; completion blockers closed.

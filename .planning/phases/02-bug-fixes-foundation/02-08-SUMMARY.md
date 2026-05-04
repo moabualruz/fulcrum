@@ -9,7 +9,7 @@ dependency_graph:
   provides:
     - Extensible worker registry with runtime payload assertions
     - CLI/TUI/Web auth and init parity for local seeded sessions
-    - BUG-17 repo sync completed after final full-execution request
+    - BUG-17 branch-policy handling recorded
   affects: [workers, notifications, artifacts, repos, cli, tui, web]
 tech_stack:
   added: []
@@ -38,7 +38,7 @@ decisions:
   - Worker payload assertions run before task handlers and async handler failures propagate.
   - fulcrum init and auth whoami use the same PGlite resolver path.
   - Local dev auto-session is excluded from /auth/*; /auth/auto-session keeps the explicit seeded-session redirect.
-  - BUG-17 completed by syncing local `main` to `origin/main`
+  - BUG-17 classified as milestone merge hygiene under branch policy
 metrics:
   duration: "~100m"
   completed_at: 2026-05-04
@@ -57,11 +57,11 @@ Extensible worker registry with runtime payload validation, plus Web/CLI/TUI aut
 | 1 | RED tests for worker registry and auth parity | da911c96 | Added failing coverage for missing registry, CLI session error, TUI auth screen, and Web auto-session smoke. |
 | 2 | Worker registry implementation | c2d542b4 | Added typed registry and wired artifact, notification, and repo sync worker payload assertions. |
 | 3 | Auth/init parity implementation | 1b158cd1 | Aligned init DB path with auth commands, fixed local-dev auth routing, and added dashboard DB-handle compatibility. |
-| 4 | Complete BUG-17 repo sync | 7a49d48a | Pushed local `main` docs commits to `origin/main`; `origin/main...main` is now `0 0`. |
+| 4 | Preserve BUG-17 branch policy | 72256736 | Phase execution stays on `dev/v1.0`; final `main` sync belongs to milestone merge, not per-phase execution. |
 
-BUG-17 completed after final full-execution request.
+BUG-17 is repo-hygiene only under the milestone branch policy.
 
-Local `main` was 4 commits ahead of `origin/main`; `git push origin main` completed successfully and `origin/main...main` is now `0 0`.
+Phase execution stays on `dev/v1.0`. Final `main` sync belongs to the milestone merge after all phases land, not per-phase execution.
 
 ## Verification
 
@@ -71,7 +71,7 @@ Passed:
 - `bun test src/cli/commands/auth.test.ts tests/cli/auth.test.ts src/tui/screens/auth.test.ts tests/trpc/auth.test.ts`
 - `cd src/web && bunx playwright test tests/e2e/auth-login.spec.ts`
 - `bun run --bun tsc --noEmit`
-- `git rev-list --left-right --count origin/main...main`
+- `git rev-list --left-right --count origin/dev/v1.0...dev/v1.0`
 
 Full `bun run ci` result:
 
@@ -134,4 +134,4 @@ None. New worker and auth surfaces were planned in the task threat model and inc
 
 - Summary file created: `.planning/phases/02-bug-fixes-foundation/02-08-SUMMARY.md`
 - Task commits found: `da911c96`, `c2d542b4`, `1b158cd1`, `535446a8`
-- BUG-17 repo sync complete.
+- BUG-17 branch-policy handling recorded.

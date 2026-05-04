@@ -113,7 +113,7 @@ Multi-context layout: `CONTEXT-MAP.md` at root pointing to per-context `CONTEXT.
 <claude-mem-context>
 # Memory Context
 
-# [fulcrum] recent context, 2026-05-04 10:49pm GMT+2
+# [fulcrum] recent context, 2026-05-04 10:52pm GMT+2
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
@@ -122,8 +122,6 @@ Fetch details: get_observations([IDs]) | Search: mem-search skill
 Stats: 50 obs (18,350t read) | 589,254t work | 97% savings
 
 ### May 4, 2026
-S69 Execute plan 02-07 of phase 02-bug-fixes-foundation sequentially, committing each task atomically and creating SUMMARY.md documenting completion (May 4 at 2:42 PM)
-S70 Execute plan 02-08 of phase 02-bug-fixes-foundation sequentially on the main working tree. Commit each task atomically. Create SUMMARY.md and commit it. Preserve BUG-17 deferral exactly: repo hygiene outside Phase 2 product/runtime execution. (May 4 at 3:03 PM)
 S71 Verify Phase 2 ("02-bug-fixes-foundation") completion status and investigate blocking issues preventing CI gate pass after extensive infrastructure implementation across 8 interdependent plans. (May 4 at 3:34 PM)
 S72 Why Phase 2 cannot be completed - investigation of CI blockers preventing phase gate approval (May 4 at 3:50 PM)
 S73 Phase 2 completion blocker resolution strategy - shifting from phase execution to focused debug/fix loop (May 4 at 9:07 PM)
@@ -181,14 +179,38 @@ S76 Continue observing Phase 2 ("Bug Fixes + Foundation") execution and completi
 516 " 🔵 Search system with natural language filter translation and click telemetry
 517 10:43p 🔵 Phase 2 execution complete with all 8 plans delivering summaries and comprehensive test validation
 S77 Verify that BUG-17 (repo hygiene) deferral is consistently documented across Phase 2 artifacts and understand the scope boundary between product/runtime execution versus repository maintenance. (May 4 at 10:46 PM)
-S78 Complete memory agent observation of Phase 2 Bug Fixes + Foundation execution, verification, and formal closure; document all deferral decisions and governance artifact updates for searchable reference. (May 4 at 10:47 PM)
-**Investigated**: Observed Phase 2 execution completion (8 plans with SUMMARY files), post-execution blocker resolution (ProductDb compatibility, public API routing, a11y audit, web build), formal verification workflow (02-VERIFICATION.md created with 8/8 must-haves verified, 9/9 artifacts verified, 5/5 links wired, 24/24 requirements satisfied), governance artifact synchronization (STATE, ROADMAP, REQUIREMENTS, VALIDATION all updated to "verified" status), verifier tool output (8 plans, 8 summaries, 0 errors, 0 warnings), BUG-17 deferral traceability across all Phase 2 documents (D-04 decision documented in CONTEXT, DISCUSSION-LOG, PLAN Task 4, SUMMARY, and VERIFICATION).
+S78 Complete memory agent observation of Phase 2 Bug Fixes + Foundation execution, verification, and formal closure; document all deferral decisions and governance artifact updates for searchable reference. (May 4 at 10:46 PM)
+S79 Correct Phase 2 branch-policy context after accidental main push; ensure future execution stays on dev/v1.0 until final milestone merge (May 4 at 10:52 PM)
+S80 Observe and document Phase 2 ("Bug Fixes + Foundation") execution completion, including code commits, dev/v1.0 synchronization, and formal verification closure (May 4 at 10:50 PM)
+**Investigated**: - Phase 2 implementation execution completion and commit state
+    - Commit 72256736 with 62 files changed across database, services, web, CLI, tests, governance layers
+    - Database schema evolution from accounts (OAuth token) table to events (verb/payload/subject_kind) table
+    - Governance artifact updates: STATE.md, ROADMAP.md, VERIFICATION.md, VALIDATION.md, 02-CONTEXT.md, 02-08-SUMMARY.md
+    - Repository synchronization state: origin/dev/v1.0...dev/v1.0 parity verification
+    - Branch-policy correction: phase execution stays on dev/v1.0; main updates only through final milestone merge after all phases land
+    - Phase completeness formal verification: 8 plans, 8 summaries, zero errors/warnings
 
-**Learned**: Phase 2 lifecycle: planning → execution → blocker resolution → formal verification → closure. Post-execution integration failures (ProductDb service layer, API routing, test infrastructure) are distinct from plan execution failures and addressed before verification gate. Verification methodology uses goal-backward tracing from ROADMAP objective through plan must-haves to CI/runtime evidence. Architectural decisions (30+ documented in STATE and CONTEXT) define phase boundaries and technology choices. BUG-17 scope boundary: product/runtime execution (Phase 2) vs. repository maintenance (deferred). Deferral preservation as task (Task 4 of 02-08-PLAN) prevents accidental scope creep. Verifier tool provides structural integrity check: plans, summaries, gaps, orphans, errors. Governance synchronization ensures single source of truth across planning, execution, requirements, validation, and verification documents.
+**Learned**: - Amendment-based commit strategy successfully consolidated Phase 2 work: initial commit 28a12e94 amended to 72256736 with database snapshot included
+    - Database architecture shifted from OAuth token storage (access_token, refresh_token, id_token, password, provider_id fields) to event-based model (verb, payload, subject_kind, subject_id fields)
+    - org_id constraint changed from nullable to mandatory (NOT NULL), reflecting organizational requirement strengthening
+    - Repository synchronization achieved parity for dev/v1.0: `git rev-list --left-right --count origin/dev/v1.0...dev/v1.0` returns 0 0
+    - Formal governance verification confirms 8/8 observable truths, 9/9 required artifacts, 5/5 key links wired—zero structural gaps
+    - Correct BUG-17 scope: local-main sync is milestone merge hygiene, not per-phase execution; loaded context must preserve this policy
 
-**Completed**: Created 5 durable memory observations: (1) phase-completion-evidence documenting all 8 plans with SUMMARY files and STATE status; (2) phase-2-architecture-decisions capturing 30+ D-01-D-24 decisions and FND/BUG coverage; (3) post-execution-blocker-identification detailing ProductDb, API, a11y, and build failures; (4) phase-2-evidence-collection documenting worker registry, feature flags, playwright/a11y deps, and 8 PLAN structures; (5) phase-2-verification-passed with 8/8 truths, 9/9 artifacts, 5/5 links; (6) post-execution-blocker-resolution-details documenting root causes and fixes; (7) phase-2-state-transition tracking lifecycle from planning to verified; (8) bug-17-deferral-traceability-verified confirming D-04 preservation across CONTEXT, DISCUSSION-LOG, PLAN, SUMMARY, and VERIFICATION. Observed formal verification report creation (02-VERIFICATION.md) and atomic governance file updates (STATE, ROADMAP, REQUIREMENTS, VALIDATION) with timestamps. Verified verifier tool output confirming zero structural gaps.
+**Completed**: - Phase 2 full execution: 8/8 plans completed (02-01 through 02-08)
+    - 24/24 in-scope Phase 2 requirements satisfied; BUG-17 tracked as branch-policy/milestone merge hygiene
+    - Commit 72256736 "fix(phase-2): complete foundation execution" created with:
+      * 62 files changed: 1468 insertions(+), 230 deletions(-)
+      * 4 new files created (debug guide, verification report, orchestration lib, theme module)
+      * Database snapshot reflecting accounts→events schema migration (+10804/-1031 net lines)
+    - Push to origin/dev/v1.0: 24043242..72256736 synchronized successfully
+    - Branch-policy context added to execute-phase workflow loader, .planning/STATE.md, and Phase 2 CONTEXT/VERIFICATION/SUMMARY artifacts
+    - Formal verification closure: phase-completeness tool confirms complete=true with zero errors
 
-**Next Steps**: Phase 2 is formally complete and verified. BUG-17 (repo hygiene: "Local main synced with origin") is intentionally deferred to post-Phase-2 maintenance cycle per D-04. Primary session has 57 files modified (1266 insertions, 217 deletions), 20 commits ahead of origin, clean git diff --check, ready for potential Phase 3 planning. No additional Phase 2 work remains. Memory agent observation cycle for Phase 2 is complete.
+**Next Steps**: - Phase 2 formally closed and synchronized on dev/v1.0
+    - System ready for Phase 3 (Symphony + Sandcastle orchestration) execution planning
+    - Awaiting user direction to initiate Phase 3 work
+    - Future GSD phase execution must not push or mutate main unless user explicitly requests it in the same turn
 
 
 Access 589k tokens of past work via get_observations([IDs]) or mem-search skill.

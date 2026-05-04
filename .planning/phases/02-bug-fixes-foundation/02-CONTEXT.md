@@ -18,6 +18,7 @@ This phase resolves the confirmed Phase 2 bug list and installs foundation infra
 - **D-02:** Treat blocker scope broadly: build/test blockers, downstream phase blockers, and user-visible shipped-surface blockers all count.
 - **D-03:** Group work into dependency clusters, not one bug per plan. Example clusters: CI + web typecheck, compiled binary + data path/config, permissions + lint.
 - **D-04:** Defer BUG-17 local main sync/repo hygiene outside Phase 2 product/runtime execution.
+- **D-04a:** Branch policy: Phase work lands on `dev/v1.0`; `main` is updated only by the final milestone merge after all phases land. Do not push or mutate `main` during Phase 2 execution.
 
 ### TDD Evidence
 - **D-05:** Require strict RED to GREEN evidence per bug. Each bug gets a failing test or credible failing repro before the fix.
@@ -105,6 +106,7 @@ This phase resolves the confirmed Phase 2 bug list and installs foundation infra
 - Separate RED commits are required for bug fixes wherever practical.
 - Smoke e2e belongs in default CI; full e2e remains a named explicit command.
 - BUG-17 is intentionally deferred from Phase 2 execution.
+- Loaded context must preserve the branch policy from `.planning/STATE.md`: execute phase commits on `dev/v1.0`; do not push `main` for BUG-17 during phase work.
 
 </specifics>
 
@@ -112,6 +114,7 @@ This phase resolves the confirmed Phase 2 bug list and installs foundation infra
 ## Deferred Ideas
 
 - BUG-17 local main sync/repo hygiene belongs outside Phase 2 product/runtime execution.
+- Final `main` sync belongs to the milestone merge workflow, not Phase 2 execution.
 
 </deferred>
 

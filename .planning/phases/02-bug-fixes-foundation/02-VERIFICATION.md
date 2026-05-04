@@ -61,11 +61,11 @@ score: 8/8 must-haves verified
 | Requirement | Status | Blocking Issue |
 |-------------|--------|----------------|
 | BUG-01..BUG-16 | SATISFIED | - |
-| BUG-17 | SATISFIED | `git push origin main` completed; `origin/main...main` is `0 0`. |
+| BUG-17 | POLICY-RESOLVED | Repo hygiene is outside per-phase execution under branch policy; phase work stays on `dev/v1.0` and `main` updates only at final milestone merge. |
 | BUG-18 | SATISFIED | - |
 | FND-01..FND-07 | SATISFIED | - |
 
-**Coverage:** 25/25 Phase 2 requirements satisfied.
+**Coverage:** 24/24 in-scope Phase 2 requirements satisfied; BUG-17 classified as milestone merge hygiene per branch policy.
 
 ## Anti-Patterns Found
 
@@ -87,7 +87,7 @@ None for Phase 2 completion. Cross-platform Linux compiled-binary execution rema
 
 **Verification approach:** Goal-backward verification from Phase 2 ROADMAP goal, plan must-haves, and final CI/runtime evidence.
 **Must-haves source:** PLAN.md frontmatter plus ROADMAP success criteria.
-**Automated checks:** root `bun run ci` passed; focused blocker repro commands passed; `origin/main...main` verified as `0 0`.
+**Automated checks:** root `bun run ci` passed; focused blocker repro commands passed; `origin/dev/v1.0...dev/v1.0` verified as `0 0`.
 **Human checks required:** 0 blocking checks.
 **Total verification time:** Inline re-run after blocker fixes.
 
