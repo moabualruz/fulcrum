@@ -1,7 +1,11 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
-import { enqueueJob } from "../../../../product-kernel/jobs.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
+/**
+ * Runs (agent dispatch) — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { randomUUID } from "node:crypto";
+import { appendEventOrm, enqueueJobOrm } from "./orm-helpers.ts";
 
 export type RunStatus =
   | "queued"
@@ -34,11 +38,12 @@ interface RunSourceRow {
 }
 
 export async function dispatchRunAction(
-  db: ProductDb,
+  em: EntityManager,
   input: DispatchRunInput,
 ): Promise<{ id: string; task_id: string; agent: string; status: RunStatus }> {
-  const id = newUlid();
-  await db.query(
+  const id = randomUUID();
+  const conn = em.getConnection();
+  await conn.execute(
     `INSERT INTO agent_runs
        (id, org_id, project_id, task_id, agent, model, prompt, status)
      VALUES ($1, $2, $3, $4, $5, $6, $7, 'queued')`,
@@ -53,7 +58,7 @@ export async function dispatchRunAction(
     ],
   );
 
-  await enqueueJob(db, {
+  await enqueueJobOrm(em, {
     orgId: input.orgId,
     projectId: input.projectId ?? null,
     queue: "agent-runs",
@@ -61,7 +66,7 @@ export async function dispatchRunAction(
     payload: { run_id: id },
   });
 
-  await appendEvent(db, {
+  await appendEventOrm(em, {
     orgId: input.orgId,
     projectId: input.projectId ?? null,
     actor: "system",
@@ -75,11 +80,12 @@ export async function dispatchRunAction(
 }
 
 export async function cancelRunAction(
-  db: ProductDb,
+  em: EntityManager,
   id: string,
   orgId: string,
 ): Promise<{ ok: boolean }> {
-  const rows = await db.query<RunScopeRow>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<RunScopeRow[]>(
     `UPDATE agent_runs
         SET status = 'cancelled', ended_at = now()
       WHERE id = $1 AND org_id = $2 AND status IN ('queued', 'running')
@@ -88,7 +94,7 @@ export async function cancelRunAction(
   );
   const row = rows[0];
   if (row) {
-    await appendEvent(db, {
+    await appendEventOrm(em, {
       orgId: row.org_id,
       projectId: row.project_id,
       actor: "system",
@@ -101,11 +107,12 @@ export async function cancelRunAction(
 }
 
 export async function retryRunAction(
-  db: ProductDb,
+  em: EntityManager,
   id: string,
   orgId: string,
 ): Promise<{ id: string }> {
-  const sourceRows = await db.query<RunSourceRow>(
+  const conn = em.getConnection();
+  const sourceRows = await conn.execute<RunSourceRow[]>(
     `SELECT id, org_id, project_id, agent, model, prompt
        FROM agent_runs WHERE id = $1 AND org_id = $2`,
     [id, orgId],
@@ -113,15 +120,23 @@ export async function retryRunAction(
   const source = sourceRows[0];
   if (!source) throw new Error(`retryRunAction: run not found: ${id}`);
 
-  const newId = newUlid();
-  await db.query(
+  const newId = randomUUID();
+  await conn.execute(
     `INSERT INTO agent_runs
        (id, org_id, project_id, agent, model, prompt, status, parent_run_id)
      VALUES ($1, $2, $3, $4, $5, $6, 'queued', $7)`,
-    [newId, source.org_id, source.project_id, source.agent, source.model, source.prompt, id],
+    [
+      newId,
+      source.org_id,
+      source.project_id,
+      source.agent,
+      source.model,
+      source.prompt,
+      id,
+    ],
   );
 
-  await enqueueJob(db, {
+  await enqueueJobOrm(em, {
     orgId: source.org_id,
     projectId: source.project_id,
     queue: "agent-runs",
@@ -129,14 +144,14 @@ export async function retryRunAction(
     payload: { run_id: newId },
   });
 
-  await appendEvent(db, {
+  await appendEventOrm(em, {
     orgId: source.org_id,
     projectId: source.project_id,
     actor: "system",
     subjectKind: "agent_run",
-    subjectId: id,
+    subjectId: newId,
     verb: "retried",
-    payload: { parent: id, retry: newId },
+    payload: { original_run_id: id },
   });
 
   return { id: newId };

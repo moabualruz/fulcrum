@@ -1,5 +1,10 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { createTask, appendEvent } from "../../../../product-kernel/store/repositories.ts";
+/**
+ * Task actions — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { appendEventOrm } from "./orm-helpers.ts";
 
 export type TaskStatus =
   | "pending"
@@ -36,12 +41,29 @@ export interface UpdateTaskInput {
 }
 
 export async function createTaskAction(
-  db: ProductDb,
+  em: EntityManager,
   input: CreateTaskInput,
 ): Promise<{ id: string }> {
   if (input.status !== undefined) assertStatus(input.status, "createTaskAction");
-  const task = await createTask(db, input);
-  return { id: task.id };
+  const id = crypto.randomUUID();
+  const status = input.status ?? "pending";
+  const priority = input.priority ?? 0;
+  const conn = em.getConnection();
+  await conn.execute(
+    `INSERT INTO tasks (id, org_id, project_id, title, description, status, priority)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, input.orgId, input.projectId, input.title, input.description ?? null, status, priority],
+  );
+  await appendEventOrm(em, {
+    orgId: input.orgId,
+    projectId: input.projectId,
+    actor: "system",
+    subjectKind: "task",
+    subjectId: id,
+    verb: "created",
+    payload: { title: input.title },
+  });
+  return { id };
 }
 
 interface TaskScopeRow {
@@ -50,7 +72,7 @@ interface TaskScopeRow {
 }
 
 export async function updateTaskAction(
-  db: ProductDb,
+  em: EntityManager,
   input: UpdateTaskInput,
 ): Promise<{ ok: true }> {
   if (!input.id) throw new Error("updateTaskAction: id is required");
@@ -74,14 +96,14 @@ export async function updateTaskAction(
   if (changed.length === 0) throw new Error("updateTaskAction: no fields to update");
   sets.push(`updated_at = now()`);
   params.push(input.id);
-  const rows = await db.query<TaskScopeRow>(
+  const rows = await conn.execute<TaskScopeRow[]>(
     `UPDATE tasks SET ${sets.join(", ")} WHERE id = $${params.length}
        RETURNING org_id, project_id`,
     params,
   );
   const row = rows[0];
   if (!row) throw new Error(`updateTaskAction: task not found: ${input.id}`);
-  await appendEvent(db, {
+  await appendEventOrm(em, {
     orgId: row.org_id,
     projectId: row.project_id,
     actor: "system",
@@ -94,16 +116,17 @@ export async function updateTaskAction(
 }
 
 export async function deleteTaskAction(
-  db: ProductDb,
+  em: EntityManager,
   id: string,
 ): Promise<{ ok: true }> {
-  const rows = await db.query<TaskScopeRow>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<TaskScopeRow[]>(
     `DELETE FROM tasks WHERE id = $1 RETURNING org_id, project_id`,
     [id],
   );
   const row = rows[0];
   if (row) {
-    await appendEvent(db, {
+    await appendEventOrm(em, {
       orgId: row.org_id,
       projectId: row.project_id,
       actor: "system",
@@ -116,12 +139,13 @@ export async function deleteTaskAction(
 }
 
 export async function moveTaskStatusAction(
-  db: ProductDb,
+  em: EntityManager,
   input: { id: string; from: TaskStatus; to: TaskStatus },
 ): Promise<{ ok: true }> {
   assertStatus(input.from, "moveTaskStatusAction.from");
   assertStatus(input.to, "moveTaskStatusAction.to");
-  const rows = await db.query<TaskScopeRow>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<TaskScopeRow[]>(
     `UPDATE tasks SET status = $1, updated_at = now()
        WHERE id = $2 AND status = $3 RETURNING org_id, project_id`,
     [input.to, input.id, input.from],
@@ -130,7 +154,7 @@ export async function moveTaskStatusAction(
   if (!row) {
     throw new Error(`status conflict: task ${input.id} not in ${input.from}`);
   }
-  await appendEvent(db, {
+  await appendEventOrm(em, {
     orgId: row.org_id,
     projectId: row.project_id,
     actor: "system",

@@ -1,6 +1,11 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
+/**
+ * Agent profiles — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { randomUUID } from "node:crypto";
+import { appendEventOrm } from "./orm-helpers.ts";
 
 export interface AgentProfileRow {
   id: string;
@@ -16,10 +21,11 @@ export interface AgentProfileRow {
 }
 
 export async function listProfiles(
-  db: ProductDb,
+  em: EntityManager,
   orgId: string,
 ): Promise<AgentProfileRow[]> {
-  return db.query<AgentProfileRow>(
+  const conn = em.getConnection();
+  return conn.execute<AgentProfileRow[]>(
     `SELECT id, org_id, name, cli_path, default_flags, auth_env_vars,
             test_passed, last_tested_at, created_at, updated_at
        FROM agent_profiles
@@ -37,12 +43,13 @@ export interface UpsertProfileInput {
 }
 
 export async function upsertProfileAction(
-  db: ProductDb,
+  em: EntityManager,
   orgId: string,
   input: UpsertProfileInput,
 ): Promise<{ id: string }> {
-  const id = newUlid();
-  const rows = await db.query<{ id: string }>(
+  const id = randomUUID();
+  const conn = em.getConnection();
+  const rows = await conn.execute<{ id: string }[]>(
     `INSERT INTO agent_profiles (id, org_id, name, cli_path, default_flags, auth_env_vars)
      VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (org_id, name) DO UPDATE
@@ -57,19 +64,20 @@ export async function upsertProfileAction(
 }
 
 export async function testProfileAction(
-  db: ProductDb,
+  em: EntityManager,
   profileId: string,
   orgId: string,
   passed: boolean,
 ): Promise<{ ok: boolean }> {
-  await db.query(
+  const conn = em.getConnection();
+  await conn.execute(
     `UPDATE agent_profiles
         SET test_passed = $1, last_tested_at = now(), updated_at = now()
       WHERE id = $2 AND org_id = $3`,
     [passed, profileId, orgId],
   );
 
-  await appendEvent(db, {
+  await appendEventOrm(em, {
     orgId,
     actor: "system",
     subjectKind: "agent_profile",
@@ -90,25 +98,29 @@ export interface UpsertProfileSimpleInput {
   name: string;
   cliPath: string;
   defaultFlags?: string;
-  /** Key→value map, stored as auth_env_vars JSON array of "KEY=VALUE" strings */
+  /** Key->value map, stored as auth_env_vars JSON array of "KEY=VALUE" strings */
   authEnv?: Record<string, string>;
 }
 
 /** Upsert a profile with a simpler input shape (used by tests and CLI helpers). */
 export async function upsertProfile(
-  db: ProductDb,
+  em: EntityManager,
   input: UpsertProfileSimpleInput,
 ): Promise<{ id: string }> {
   const authEnvVars = input.authEnv
     ? Object.entries(input.authEnv).map(([k, v]) => `${k}=${v}`)
     : [];
-  return upsertProfileAction(db, input.orgId, {
+  return upsertProfileAction(em, input.orgId, {
     name: input.name,
     cliPath: input.cliPath,
     defaultFlags: input.defaultFlags ?? "",
     authEnvVars,
   });
 }
+
+// ---------------------------------------------------------------------------
+// UI helpers (no DB access)
+// ---------------------------------------------------------------------------
 
 export interface MaskedProfileRow {
   id: string;
@@ -118,7 +130,6 @@ export interface MaskedProfileRow {
   sessions_count: number;
   tested_at: string | null;
   test_passed: boolean | null;
-  /** Key→masked-value map, e.g. { ANTHROPIC_API_KEY: "****1234" } */
   auth_env: Record<string, string>;
 }
 
@@ -134,7 +145,6 @@ export function maskProfile(row: AgentProfileRow): MaskedProfileRow {
     }
     const key = (entry as string).slice(0, eq);
     const val = (entry as string).slice(eq + 1);
-    // Show last 4 chars of the value
     const masked = val.length > 4 ? `****${val.slice(-4)}` : "****";
     auth_env[key] = masked;
   }
@@ -150,10 +160,6 @@ export function maskProfile(row: AgentProfileRow): MaskedProfileRow {
   };
 }
 
-/**
- * Infer capability chips from the agent name.
- * Extend as needed when new agent types are registered.
- */
 function deriveCapabilities(name: string): string[] {
   const n = name.toLowerCase();
   const caps: string[] = [];
@@ -171,15 +177,14 @@ function deriveCapabilities(name: string): string[] {
  * For now, this is a lightweight wrapper that marks a stubbed pass.
  */
 export async function testProfile(
-  db: ProductDb,
+  em: EntityManager,
   orgId: string,
   name: string,
 ): Promise<{ test_passed: boolean }> {
-  const profiles = await listProfiles(db, orgId);
+  const profiles = await listProfiles(em, orgId);
   const profile = profiles.find((p) => p.name === name);
   if (!profile) return { test_passed: false };
-  // Real implementation would shell out; for now mark pass
   const passed = profile.cli_path.length > 0;
-  await testProfileAction(db, profile.id, orgId, passed);
+  await testProfileAction(em, profile.id, orgId, passed);
   return { test_passed: passed };
 }

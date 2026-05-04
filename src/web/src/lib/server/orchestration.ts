@@ -1,4 +1,10 @@
-import type { ProductDb, SqlValue } from "../../../../product-kernel/db/types.ts";
+/**
+ * Orchestration actions — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { randomUUID } from "node:crypto";
 
 // --- Types ---
 
@@ -80,28 +86,27 @@ export interface OrchestrationConfigRow {
 // --- Dashboard loader ---
 
 export async function loadOrchestrationDashboard(
-  db: ProductDb,
+  em: EntityManager,
   orgId: string,
   projectId?: string,
 ): Promise<OrchestrationDashboardData> {
-  // Config for concurrency gauge
-  const configRows = await db.query<OrchestrationConfigRow>(
+  const conn = em.getConnection();
+
+  const configRows = await conn.execute<OrchestrationConfigRow[]>(
     `SELECT * FROM orchestration_config WHERE org_id = $1`,
     [orgId],
   );
   const config = configRows[0];
   const maxConcurrency = config?.max_concurrency ?? 4;
 
-  // Active runs count for concurrency gauge
-  const activeRows = await db.query<{ c: string | number }>(
+  const activeRows = await conn.execute<{ c: string | number }[]>(
     `SELECT count(*)::text AS c FROM agent_runs
        WHERE org_id = $1 AND status = 'running'`,
     [orgId],
   );
   const concurrencyUsed = Number(activeRows[0]?.c ?? 0);
 
-  // Last tick — most recent ended run
-  const lastTickRows = await db.query<{ ended_at: string | Date | null }>(
+  const lastTickRows = await conn.execute<{ ended_at: string | Date | null }[]>(
     `SELECT ended_at FROM agent_runs
        WHERE org_id = $1 AND ended_at IS NOT NULL
        ORDER BY ended_at DESC LIMIT 1`,
@@ -113,14 +118,13 @@ export async function loadOrchestrationDashboard(
         : lastTickRows[0].ended_at)
     : null;
 
-  // Recent dispatches (optionally filtered by project)
   const dispatchParams: unknown[] = projectId
     ? [orgId, projectId]
     : [orgId];
   const dispatchWhere = projectId
     ? `WHERE org_id = $1 AND project_id = $2`
     : `WHERE org_id = $1`;
-  const dispatches = await db.query<DispatchRow>(
+  const dispatches = await conn.execute<DispatchRow[]>(
     `SELECT id, agent, status, symphony_state, orchestration_state,
             NULL::text AS claimed_by,
             started_at, ended_at, project_id
@@ -129,8 +133,7 @@ export async function loadOrchestrationDashboard(
     dispatchParams,
   );
 
-  // Retry queue: failed runs eligible for retry
-  const retryQueue = await db.query<RetryQueueRow>(
+  const retryQueue = await conn.execute<RetryQueueRow[]>(
     `SELECT id, agent, last_error_kind, retry_count, started_at
        FROM agent_runs
        WHERE org_id = $1 AND status = 'failed'
@@ -174,11 +177,12 @@ export interface ProjectRunRow {
 }
 
 export async function loadProjectRuns(
-  db: ProductDb,
+  em: EntityManager,
   orgId: string,
   projectId: string,
 ): Promise<ProjectRunRow[]> {
-  const rows = await db.query<ProjectRunRow>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<ProjectRunRow[]>(
     `SELECT id, agent, model, status, symphony_state, started_at, ended_at,
             last_error_kind, retry_count, workspace_path
        FROM agent_runs
@@ -196,10 +200,11 @@ export async function loadProjectRuns(
 // --- Orchestration config ---
 
 export async function loadOrchestrationConfig(
-  db: ProductDb,
+  em: EntityManager,
   orgId: string,
 ): Promise<OrchestrationConfigRow | null> {
-  const rows = await db.query<OrchestrationConfigRow>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<OrchestrationConfigRow[]>(
     `SELECT * FROM orchestration_config WHERE org_id = $1`,
     [orgId],
   );
@@ -207,7 +212,7 @@ export async function loadOrchestrationConfig(
 }
 
 export async function upsertOrchestrationConfig(
-  db: ProductDb,
+  em: EntityManager,
   orgId: string,
   config: {
     pollIntervalS: number;
@@ -216,7 +221,8 @@ export async function upsertOrchestrationConfig(
     workspaceRoot: string | null;
   },
 ): Promise<OrchestrationConfigRow> {
-  const rows = await db.query<OrchestrationConfigRow>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<OrchestrationConfigRow[]>(
     `INSERT INTO orchestration_config (id, org_id, poll_interval_s, max_concurrency, stall_timeout_s, workspace_root, updated_at)
      VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, now())
      ON CONFLICT (org_id) DO UPDATE SET
@@ -234,11 +240,12 @@ export async function upsertOrchestrationConfig(
 // --- Workflow defs ---
 
 export async function loadWorkflowDef(
-  db: ProductDb,
+  em: EntityManager,
   orgId: string,
   id: string,
 ): Promise<WorkflowDefRow | null> {
-  const rows = await db.query<WorkflowDefRow>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<WorkflowDefRow[]>(
     `SELECT * FROM workflow_defs WHERE id = $1 AND org_id = $2`,
     [id, orgId],
   );
@@ -246,17 +253,18 @@ export async function loadWorkflowDef(
 }
 
 export async function listWorkflowDefs(
-  db: ProductDb,
+  em: EntityManager,
   orgId: string,
 ): Promise<WorkflowDefRow[]> {
-  return db.query<WorkflowDefRow>(
+  const conn = em.getConnection();
+  return conn.execute<WorkflowDefRow[]>(
     `SELECT * FROM workflow_defs WHERE org_id = $1 ORDER BY updated_at DESC`,
     [orgId],
   );
 }
 
 export async function upsertWorkflowDef(
-  db: ProductDb,
+  em: EntityManager,
   orgId: string,
   def: {
     id?: string;
@@ -267,8 +275,9 @@ export async function upsertWorkflowDef(
     promptTemplate: string;
   },
 ): Promise<WorkflowDefRow> {
-  const id = def.id ?? (await import("../../../../product-kernel/ids.ts")).newUlid();
-  const rows = await db.query<WorkflowDefRow>(
+  const id = def.id ?? randomUUID();
+  const conn = em.getConnection();
+  const rows = await conn.execute<WorkflowDefRow[]>(
     `INSERT INTO workflow_defs (id, org_id, project_id, name, description, yaml_config, prompt_template, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, now())
      ON CONFLICT (id) DO UPDATE SET

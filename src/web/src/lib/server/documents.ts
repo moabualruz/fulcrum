@@ -1,7 +1,11 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
-import { indexSearchDocument } from "../../../../product-kernel/search.ts";
+/**
+ * Document actions — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { randomUUID } from "node:crypto";
+import { appendEventOrm, indexSearchDocumentOrm } from "./orm-helpers.ts";
 
 export interface CreateDocumentInput {
   orgId: string;
@@ -38,19 +42,23 @@ function extractLabels(fm: Record<string, unknown> | null | undefined): string[]
 
 
 export async function createDocumentAction(
-  db: ProductDb,
+  em: EntityManager,
   input: CreateDocumentInput,
 ): Promise<{ id: string }> {
   const id = newUlid();
   const fm = input.frontmatter ?? {};
-  await db.query(
+  const conn = em.getConnection();
+  await conn.execute(
     `INSERT INTO documents (id, org_id, project_id, kind, title, body, frontmatter, source_path)
      VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)`,
     [id, input.orgId, input.projectId, input.kind, input.title, input.body, JSON.stringify(fm), input.sourcePath ?? null],
   );
-  const ctx = { orgId: input.orgId, projectId: input.projectId, subjectKind: "document", subjectId: id } as const;
-  await appendEvent(db, { ...ctx, actor: "system", verb: "created", payload: { title: input.title, kind: input.kind } });
-  await indexSearchDocument(db, {
+  await appendEventOrm(em, {
+    orgId: input.orgId, projectId: input.projectId,
+    actor: "system", subjectKind: "document", subjectId: id,
+    verb: "created", payload: { title: input.title, kind: input.kind },
+  });
+  await indexSearchDocumentOrm(em, {
     orgId: input.orgId, projectId: input.projectId, sourceKind: "document", sourceId: id,
     title: input.title, body: input.body, labels: extractLabels(fm),
   });
@@ -58,7 +66,7 @@ export async function createDocumentAction(
 }
 
 export async function updateDocumentAction(
-  db: ProductDb,
+  em: EntityManager,
   input: UpdateDocumentInput,
 ): Promise<{ ok: true }> {
   if (!input.id) throw new Error("updateDocumentAction: id is required");
@@ -80,7 +88,8 @@ export async function updateDocumentAction(
   const idIdx = params.length;
   params.push(input.orgId);
   const orgIdx = params.length;
-  const rows = await db.query<DocRow>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<DocRow[]>(
     `UPDATE documents SET ${sets.join(", ")}
        WHERE id = $${idIdx} AND org_id = $${orgIdx}
      RETURNING org_id, project_id, kind, title, body, frontmatter`,
@@ -88,30 +97,31 @@ export async function updateDocumentAction(
   );
   const row = rows[0];
   if (!row) throw new Error(`updateDocumentAction: document not found: ${input.id}`);
-  await appendEvent(db, {
+  await appendEventOrm(em, {
     orgId: row.org_id, projectId: row.project_id, actor: "system",
     subjectKind: "document", subjectId: input.id, verb: "updated", payload: { changed },
   });
-  await indexSearchDocument(db, {
+  await indexSearchDocumentOrm(em, {
     orgId: row.org_id, projectId: row.project_id, sourceKind: "document", sourceId: input.id,
     title: row.title, body: row.body, labels: extractLabels(row.frontmatter),
   });
   return { ok: true };
 }
 
-export async function deleteDocumentAction(db: ProductDb, id: string, orgId: string): Promise<{ ok: true }> {
-  await db.query(
+export async function deleteDocumentAction(em: EntityManager, id: string, orgId: string): Promise<{ ok: true }> {
+  const conn = em.getConnection();
+  await conn.execute(
     `DELETE FROM search_documents
        WHERE source_kind = 'document' AND source_id = $1 AND org_id = $2`,
     [id, orgId],
   );
-  const rows = await db.query<{ org_id: string; project_id: string | null }>(
+  const rows = await conn.execute<{ org_id: string; project_id: string | null }[]>(
     `DELETE FROM documents WHERE id = $1 AND org_id = $2 RETURNING org_id, project_id`,
     [id, orgId],
   );
   const row = rows[0];
   if (row) {
-    await appendEvent(db, {
+    await appendEventOrm(em, {
       orgId: row.org_id, projectId: row.project_id, actor: "system",
       subjectKind: "document", subjectId: id, verb: "deleted",
     });

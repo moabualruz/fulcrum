@@ -1,6 +1,11 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
+/**
+ * Custom fields — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { randomUUID } from "node:crypto";
+import { appendEventOrm } from "./orm-helpers.ts";
 
 export type FieldType = "text" | "number" | "date" | "select" | "multi_select" | "checkbox";
 
@@ -44,17 +49,18 @@ function assertFieldType(v: unknown, label: string): asserts v is FieldType {
 }
 
 export async function createCustomField(
-  db: ProductDb,
+  em: EntityManager,
   input: CreateFieldInput,
 ): Promise<{ id: string }> {
   assertFieldType(input.fieldType, "createCustomField");
-  const id = newUlid();
-  const maxRows = await db.query<{ mx: number | null }>(
+  const id = randomUUID();
+  const conn = em.getConnection();
+  const maxRows = await conn.execute<{ mx: number | null }[]>(
     `SELECT MAX(sort_order) AS mx FROM custom_fields WHERE project_id = $1`,
     [input.projectId],
   );
   const nextOrder = ((maxRows[0]?.mx as number | null) ?? -1) + 1;
-  await db.query(
+  await conn.execute(
     `INSERT INTO custom_fields (id, org_id, project_id, name, field_type, required, options, sort_order)
      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)`,
     [
@@ -68,7 +74,7 @@ export async function createCustomField(
       nextOrder,
     ],
   );
-  await appendEvent(db, {
+  await appendEventOrm(em, {
     orgId: input.orgId,
     projectId: input.projectId,
     actor: "system",
@@ -81,7 +87,7 @@ export async function createCustomField(
 }
 
 export async function updateCustomField(
-  db: ProductDb,
+  em: EntityManager,
   input: UpdateFieldInput,
 ): Promise<{ ok: true }> {
   if (!input.id) throw new Error("updateCustomField: id required");
@@ -104,13 +110,14 @@ export async function updateCustomField(
   if (changed.length === 0) throw new Error("updateCustomField: no fields to update");
   sets.push("updated_at = now()");
   params.push(input.id);
-  const rows = await db.query<{ org_id: string; project_id: string }>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<{ org_id: string; project_id: string }[]>(
     `UPDATE custom_fields SET ${sets.join(", ")} WHERE id = $${params.length}
        RETURNING org_id, project_id`,
     params,
   );
   if (!rows[0]) throw new Error(`updateCustomField: not found: ${input.id}`);
-  await appendEvent(db, {
+  await appendEventOrm(em, {
     orgId: rows[0].org_id,
     projectId: rows[0].project_id,
     actor: "system",
@@ -123,16 +130,17 @@ export async function updateCustomField(
 }
 
 export async function archiveCustomField(
-  db: ProductDb,
+  em: EntityManager,
   id: string,
 ): Promise<{ ok: true }> {
-  const rows = await db.query<{ org_id: string; project_id: string }>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<{ org_id: string; project_id: string }[]>(
     `UPDATE custom_fields SET archived = true, updated_at = now() WHERE id = $1
        RETURNING org_id, project_id`,
     [id],
   );
   if (!rows[0]) throw new Error(`archiveCustomField: not found: ${id}`);
-  await appendEvent(db, {
+  await appendEventOrm(em, {
     orgId: rows[0].org_id,
     projectId: rows[0].project_id,
     actor: "system",
@@ -144,14 +152,15 @@ export async function archiveCustomField(
 }
 
 export async function listCustomFields(
-  db: ProductDb,
+  em: EntityManager,
   projectId: string,
   includeArchived = false,
 ): Promise<CustomFieldRow[]> {
   const where = includeArchived
     ? `WHERE project_id = $1`
     : `WHERE project_id = $1 AND archived = false`;
-  return db.query<CustomFieldRow>(
+  const conn = em.getConnection();
+  return conn.execute<CustomFieldRow[]>(
     `SELECT * FROM custom_fields ${where} ORDER BY sort_order ASC, created_at ASC`,
     [projectId],
   );

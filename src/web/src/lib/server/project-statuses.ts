@@ -1,6 +1,11 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
+/**
+ * Project statuses — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { randomUUID } from "node:crypto";
+import { appendEventOrm } from "./orm-helpers.ts";
 
 export interface ProjectStatusRow {
   id: string;
@@ -31,21 +36,22 @@ export interface UpdateStatusInput {
 }
 
 export async function createProjectStatus(
-  db: ProductDb,
+  em: EntityManager,
   input: CreateStatusInput,
 ): Promise<{ id: string }> {
-  const id = newUlid();
-  const maxRows = await db.query<{ mx: number | null }>(
+  const id = randomUUID();
+  const conn = em.getConnection();
+  const maxRows = await conn.execute<{ mx: number | null }[]>(
     `SELECT MAX(sort_order) AS mx FROM project_statuses WHERE project_id = $1`,
     [input.projectId],
   );
   const nextOrder = ((maxRows[0]?.mx as number | null) ?? -1) + 1;
-  await db.query(
+  await conn.execute(
     `INSERT INTO project_statuses (id, org_id, project_id, name, color, sort_order, is_final)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
     [id, input.orgId, input.projectId, input.name, input.color ?? "#6b7280", nextOrder, input.isFinal ?? false],
   );
-  await appendEvent(db, {
+  await appendEventOrm(em, {
     orgId: input.orgId,
     projectId: input.projectId,
     actor: "system",
@@ -58,10 +64,9 @@ export async function createProjectStatus(
 }
 
 export async function updateProjectStatus(
-  db: ProductDb,
+  em: EntityManager,
   input: UpdateStatusInput,
 ): Promise<{ ok: true }> {
-  if (!input.id) throw new Error("updateProjectStatus: id required");
   const sets: string[] = [];
   const params: (string | number | boolean | null)[] = [];
   const changed: string[] = [];
@@ -77,13 +82,14 @@ export async function updateProjectStatus(
   if (changed.length === 0) throw new Error("updateProjectStatus: no fields to update");
   sets.push("updated_at = now()");
   params.push(input.id);
-  const rows = await db.query<{ org_id: string; project_id: string }>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<{ org_id: string; project_id: string }[]>(
     `UPDATE project_statuses SET ${sets.join(", ")} WHERE id = $${params.length}
        RETURNING org_id, project_id`,
     params,
   );
   if (!rows[0]) throw new Error(`updateProjectStatus: not found: ${input.id}`);
-  await appendEvent(db, {
+  await appendEventOrm(em, {
     orgId: rows[0].org_id,
     projectId: rows[0].project_id,
     actor: "system",
@@ -96,15 +102,16 @@ export async function updateProjectStatus(
 }
 
 export async function deleteProjectStatus(
-  db: ProductDb,
+  em: EntityManager,
   id: string,
 ): Promise<{ ok: true }> {
-  const rows = await db.query<{ org_id: string; project_id: string }>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<{ org_id: string; project_id: string }[]>(
     `DELETE FROM project_statuses WHERE id = $1 RETURNING org_id, project_id`,
     [id],
   );
   if (rows[0]) {
-    await appendEvent(db, {
+    await appendEventOrm(em, {
       orgId: rows[0].org_id,
       projectId: rows[0].project_id,
       actor: "system",
@@ -117,10 +124,11 @@ export async function deleteProjectStatus(
 }
 
 export async function listProjectStatuses(
-  db: ProductDb,
+  em: EntityManager,
   projectId: string,
 ): Promise<ProjectStatusRow[]> {
-  return db.query<ProjectStatusRow>(
+  const conn = em.getConnection();
+  return conn.execute<ProjectStatusRow[]>(
     `SELECT * FROM project_statuses WHERE project_id = $1 ORDER BY sort_order ASC, created_at ASC`,
     [projectId],
   );

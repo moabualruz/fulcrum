@@ -1,7 +1,12 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
+/**
+ * Task detail — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
 import type { TaskStatus } from "./tasks.ts";
 import { TASK_STATUSES } from "./tasks.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
+import { appendEventOrm } from "./orm-helpers.ts";
 
 export interface TaskDetail {
   id: string;
@@ -54,11 +59,12 @@ function isoStamp(v: string | Date): string {
 }
 
 export async function getTaskDetail(
-  db: ProductDb,
+  em: EntityManager,
   taskId: string,
   orgId: string,
 ): Promise<TaskDetailPayload | null> {
-  const rows = await db.query<TaskDetail>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<TaskDetail[]>(
     `SELECT id, org_id, project_id, parent_id, title, description, status, priority, created_at, updated_at
        FROM tasks WHERE id = $1 AND org_id = $2`,
     [taskId, orgId],
@@ -71,13 +77,13 @@ export async function getTaskDetail(
     updated_at: isoStamp(raw.updated_at as string | Date),
   };
 
-  const subtasks = await db.query<SubtaskRow>(
+  const subtasks = await conn.execute<SubtaskRow[]>(
     `SELECT id, title, status, priority FROM tasks
        WHERE parent_id = $1 ORDER BY priority DESC, created_at ASC, id ASC`,
     [taskId],
   );
 
-  const edges = await db.query<EdgeRow>(
+  const edges = await conn.execute<EdgeRow[]>(
     `SELECT id, from_kind, from_id, to_kind, to_id, rel FROM edges
        WHERE (from_kind = 'task' AND from_id = $1)
           OR (to_kind = 'task' AND to_id = $1)
@@ -85,7 +91,7 @@ export async function getTaskDetail(
     [taskId],
   );
 
-  const eventRows = await db.query<EventRow & { created_at: string | Date }>(
+  const eventRows = await conn.execute<(EventRow & { created_at: string | Date })[]>(
     `SELECT id, actor, subject_kind, subject_id, verb, payload, created_at
        FROM events WHERE subject_kind = 'task' AND subject_id = $1
        ORDER BY created_at DESC, id DESC
@@ -101,7 +107,7 @@ export async function getTaskDetail(
 }
 
 export async function bulkUpdateStatus(
-  db: ProductDb,
+  em: EntityManager,
   ids: string[],
   status: TaskStatus,
   orgId: string,
@@ -110,17 +116,17 @@ export async function bulkUpdateStatus(
   if (!TASK_STATUSES.includes(status)) {
     throw new Error(`bulkUpdateStatus: invalid status ${status}`);
   }
-  // Build parameterized IN clause
+  const conn = em.getConnection();
   const placeholders = ids.map((_, i) => `$${i + 3}`).join(", ");
   const params: (string | number)[] = [status, orgId, ...ids];
-  const result = await db.query<{ id: string }>(
+  const result = await conn.execute<{ id: string }[]>(
     `UPDATE tasks SET status = $1, updated_at = now()
        WHERE org_id = $2 AND id IN (${placeholders})
        RETURNING id`,
     params,
   );
   for (const row of result) {
-    await appendEvent(db, {
+    await appendEventOrm(em, {
       orgId,
       actor: "system",
       subjectKind: "task",
@@ -133,20 +139,21 @@ export async function bulkUpdateStatus(
 }
 
 export async function bulkDeleteTasks(
-  db: ProductDb,
+  em: EntityManager,
   ids: string[],
   orgId: string,
 ): Promise<{ deleted: number }> {
   if (ids.length === 0) return { deleted: 0 };
+  const conn = em.getConnection();
   const placeholders = ids.map((_, i) => `$${i + 2}`).join(", ");
   const params: string[] = [orgId, ...ids];
-  const result = await db.query<{ id: string; project_id: string | null }>(
+  const result = await conn.execute<{ id: string; project_id: string | null }[]>(
     `DELETE FROM tasks WHERE org_id = $1 AND id IN (${placeholders})
        RETURNING id, project_id`,
     params,
   );
   for (const row of result) {
-    await appendEvent(db, {
+    await appendEventOrm(em, {
       orgId,
       projectId: row.project_id,
       actor: "system",

@@ -1,7 +1,9 @@
-import type { ProductDb, SqlValue } from "../../../../product-kernel/db/types.ts";
+/**
+ * Dashboard — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
 
-// Kernel schema uses 'completed' for terminal-success (migration 0001); contract
-// phrases the same idea as "done". Both 'completed' and 'cancelled' = terminal.
+import type { EntityManager } from "@mikro-orm/postgresql";
 
 export interface ProjectTile {
   id: string;
@@ -27,6 +29,8 @@ function toNumber(v: string | number | null | undefined): number {
   return 0;
 }
 
+type SqlValue = string | number | boolean | null;
+
 function projectClause(
   projectId: string | null | undefined,
   paramIndex: number,
@@ -37,7 +41,7 @@ function projectClause(
 }
 
 export async function loadDashboard(
-  db: ProductDb,
+  em: EntityManager,
   orgId: string,
   projectId?: string | null,
 ): Promise<DashboardData> {
@@ -47,42 +51,41 @@ export async function loadDashboard(
   const NOT_DONE = "status NOT IN ('completed','cancelled')";
   const RECENT_LIMIT = 5;
 
-  // counters.projects intentionally ignores projectId: org-wide stat.
   interface TileRow { id: string; name: string; open_tasks: string | number; last_activity: string | Date | null }
 
+  const conn = em.getConnection();
   const [projectsR, openTasksR, docsR, runsR, recentRuns, recentDocs, topTasks, tileRows, unreadR] = await Promise.all([
-    db.query<CountRow>(`SELECT count(*)::text AS c FROM projects WHERE org_id = $1`, [orgId]),
-    db.query<CountRow>(
+    conn.execute<CountRow[]>(`SELECT count(*)::text AS c FROM projects WHERE org_id = $1`, [orgId]),
+    conn.execute<CountRow[]>(
       `SELECT count(*)::text AS c FROM tasks WHERE org_id = $1 AND ${NOT_DONE}${scope.sql}`,
       params,
     ),
-    db.query<CountRow>(
+    conn.execute<CountRow[]>(
       `SELECT count(*)::text AS c FROM documents WHERE org_id = $1${scope.sql}`,
       params,
     ),
-    db.query<CountRow>(
+    conn.execute<CountRow[]>(
       `SELECT count(*)::text AS c FROM agent_runs
          WHERE org_id = $1 AND started_at >= now() - interval '7 days'${scope.sql}`,
       params,
     ),
-    db.query<DashboardData["recentRuns"][number]>(
+    conn.execute<DashboardData["recentRuns"][number][]>(
       `SELECT id, agent, status, started_at, ended_at FROM agent_runs
          WHERE org_id = $1${scope.sql} ORDER BY started_at DESC LIMIT ${RECENT_LIMIT}`,
       params,
     ),
-    db.query<DashboardData["recentDocs"][number]>(
+    conn.execute<DashboardData["recentDocs"][number][]>(
       `SELECT id, title, kind, updated_at FROM documents
          WHERE org_id = $1${scope.sql} ORDER BY updated_at DESC LIMIT ${RECENT_LIMIT}`,
       params,
     ),
-    db.query<DashboardData["topTasks"][number]>(
+    conn.execute<DashboardData["topTasks"][number][]>(
       `SELECT id, title, status, priority, project_id FROM tasks
          WHERE org_id = $1 AND ${NOT_DONE}${scope.sql}
          ORDER BY priority DESC, updated_at DESC LIMIT ${RECENT_LIMIT}`,
       params,
     ),
-    // Project tiles: name + open task count + last activity (most recent event)
-    db.query<TileRow>(
+    conn.execute<TileRow[]>(
       `SELECT p.id, p.name,
               coalesce((SELECT count(*)::text FROM tasks t
                         WHERE t.project_id = p.id AND t.org_id = $1
@@ -93,8 +96,7 @@ export async function loadDashboard(
          ORDER BY p.created_at ASC, p.id ASC`,
       [orgId],
     ),
-    // Unread count: events in the last 24h
-    db.query<CountRow>(
+    conn.execute<CountRow[]>(
       `SELECT count(*)::text AS c FROM events
          WHERE org_id = $1 AND created_at >= now() - interval '24 hours'`,
       [orgId],
