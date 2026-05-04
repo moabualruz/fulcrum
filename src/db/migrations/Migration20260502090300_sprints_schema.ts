@@ -15,8 +15,12 @@ export class Migration20260502090300_sprints_schema extends Migration {
 
   override async up(): Promise<void> {
     this.addSql(
-      `create table if not exists "sprints" ("id" uuid not null default gen_random_uuid(), "org_id" uuid not null, "project_id" uuid not null, "name" varchar(255) not null, "goal" text null, "start_date" date not null, "end_date" date not null, "status" varchar(255) not null default 'planned', "capacity_points" integer null, "created_at" timestamptz not null default now(), constraint "sprints_status_check" check ("status" in ('planned','active','completed')), primary key ("id"))`,
+      `create table if not exists "sprints" ("id" uuid not null default gen_random_uuid(), "org_id" uuid not null, "project_id" uuid not null, "name" varchar(255) not null, "goal" text null, "start_date" date not null, "end_date" date not null, "status" varchar(255) not null default 'planned', "capacity_points" integer null, "closed_at" timestamptz null, "metrics_snapshot" jsonb null, "retro_doc_id" uuid null, "created_at" timestamptz not null default now(), "updated_at" timestamptz not null default now(), constraint "sprints_status_check" check ("status" in ('planned','active','completed')), primary key ("id"))`,
     );
+    this.addSql(`alter table "sprints" add column if not exists "updated_at" timestamptz not null default now()`);
+    this.addSql(`alter table "sprints" add column if not exists "closed_at" timestamptz null`);
+    this.addSql(`alter table "sprints" add column if not exists "metrics_snapshot" jsonb null`);
+    this.addSql(`alter table "sprints" add column if not exists "retro_doc_id" uuid null`);
     this.addSql(
       `do $$ begin if not exists (select 1 from pg_constraint where conname = 'sprints_org_id_foreign') then alter table "sprints" add constraint "sprints_org_id_foreign" foreign key ("org_id") references "orgs" ("id") on delete cascade; end if; end $$`,
     );

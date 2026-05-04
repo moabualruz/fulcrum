@@ -84,14 +84,14 @@ export async function createDocumentVersion(
   if (await legacyVersionsTableExists(em)) {
     await conn.execute(
       `INSERT INTO doc_versions (id, doc_id, org_id, version_num, snapshot, body_md_snapshot)
-       VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
+       VALUES (?, ?, ?, ?, ?::jsonb, ?)`,
       [id, input.docId, input.orgId, input.version, JSON.stringify(input.frontmatter), input.body],
     );
     return { id, version: input.version };
   }
   await conn.execute(
     `INSERT INTO document_versions (id, doc_id, org_id, version, title, body, frontmatter, author)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?)`,
     [id, input.docId, input.orgId, input.version, input.title, input.body, JSON.stringify(input.frontmatter), input.author],
   );
   return { id, version: input.version };
@@ -104,13 +104,13 @@ export async function listDocumentVersions(
   const conn = em.getConnection();
   const rows = await conn.execute<DocVersionRow[]>(
     `SELECT id, doc_id, org_id, version, title, body, frontmatter, author, created_at
-       FROM document_versions WHERE doc_id = $1 ORDER BY version DESC`,
+       FROM document_versions WHERE doc_id = ? ORDER BY version DESC`,
     [docId],
   );
   if (rows.length === 0 && await legacyVersionsTableExists(em)) {
     const legacyRows = await conn.execute<LegacyDocVersionRow[]>(
       `SELECT id, doc_id, org_id, version_num, snapshot, body_md_snapshot, created_at
-         FROM doc_versions WHERE doc_id = $1 ORDER BY version_num DESC`,
+         FROM doc_versions WHERE doc_id = ? ORDER BY version_num DESC`,
       [docId],
     );
     return legacyRows.map(legacyToDocVersion);
@@ -129,14 +129,14 @@ export async function getDocumentVersion(
   const conn = em.getConnection();
   const rows = await conn.execute<DocVersionRow[]>(
     `SELECT id, doc_id, org_id, version, title, body, frontmatter, author, created_at
-       FROM document_versions WHERE doc_id = $1 AND version = $2`,
+       FROM document_versions WHERE doc_id = ? AND version = ?`,
     [docId, version],
   );
   if (rows.length === 0) {
     if (await legacyVersionsTableExists(em)) {
       const legacyRows = await conn.execute<LegacyDocVersionRow[]>(
         `SELECT id, doc_id, org_id, version_num, snapshot, body_md_snapshot, created_at
-           FROM doc_versions WHERE doc_id = $1 AND version_num = $2`,
+           FROM doc_versions WHERE doc_id = ? AND version_num = ?`,
         [docId, version],
       );
       return legacyRows[0] ? legacyToDocVersion(legacyRows[0]) : null;
@@ -158,8 +158,8 @@ export async function restoreDocumentVersion(
   if (!ver) throw new Error(`Version ${version} not found for doc ${docId}`);
   const conn = em.getConnection();
   await conn.execute(
-    `UPDATE documents SET title = $1, body = $2, frontmatter = $3::jsonb, updated_at = now()
-       WHERE id = $4 AND org_id = $5`,
+    `UPDATE documents SET title = ?, body = ?, frontmatter = ?::jsonb, updated_at = now()
+       WHERE id = ? AND org_id = ?`,
     [ver.title, ver.body, JSON.stringify(ver.frontmatter), docId, orgId],
   );
 }
@@ -169,13 +169,13 @@ export async function getNextVersionNumber(em: EntityManager, docId: string): Pr
   const conn = em.getConnection();
   if (await legacyVersionsTableExists(em)) {
     const rows = await conn.execute<{ max_ver: number | null }[]>(
-      `SELECT MAX(version_num) AS max_ver FROM doc_versions WHERE doc_id = $1`,
+      `SELECT MAX(version_num) AS max_ver FROM doc_versions WHERE doc_id = ?`,
       [docId],
     );
     return (rows[0]?.max_ver ?? 0) + 1;
   }
   const rows = await conn.execute<{ max_ver: number | null }[]>(
-    `SELECT MAX(version) AS max_ver FROM document_versions WHERE doc_id = $1`,
+    `SELECT MAX(version) AS max_ver FROM document_versions WHERE doc_id = ?`,
     [docId],
   );
   return (rows[0]?.max_ver ?? 0) + 1;

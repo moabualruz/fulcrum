@@ -92,7 +92,7 @@
     <section class="rounded-md border border-border p-4 lg:col-span-2">
       <h2 class="text-lg font-semibold">Push</h2>
       <form method="POST" action="?/subscribePush" class="mt-4 flex flex-col gap-3">
-        <textarea class="min-h-24 rounded-md border border-border bg-background px-3 py-2 text-sm" name="subscription" placeholder='{"endpoint":"...","keys":{"p256dh":"...","auth":"..."}}'></textarea>
+        <textarea class="min-h-24 rounded-md border border-border bg-background px-3 py-2 text-sm" name="subscription" placeholder={"{\"endpoint\":\"...\",\"keys\":{\"p256dh\":\"...\",\"auth\":\"...\"}}"}></textarea>
         <button class="self-start rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground" type="submit">Subscribe Push</button>
       </form>
     </section>

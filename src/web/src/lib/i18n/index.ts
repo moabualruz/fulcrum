@@ -93,6 +93,22 @@ export function getEnglishKeys(): string[] {
 /** All supported locales. */
 export const SUPPORTED_LOCALES: readonly SupportedLocale[] = ["en", "ar", "fr"];
 
+export function isValidLocale(value: string): value is SupportedLocale {
+  return SUPPORTED_LOCALES.includes(value as SupportedLocale);
+}
+
+export function setLocaleCookie(
+  cookies: { set: (name: string, value: string, options?: Record<string, unknown>) => void },
+  locale: SupportedLocale,
+): void {
+  cookies.set("fulcrum_locale", locale, {
+    path: "/",
+    sameSite: "lax",
+    httpOnly: false,
+    maxAge: 60 * 60 * 24 * 365,
+  });
+}
+
 /** Alias used by layout.server.ts — returns dir attribute for a locale. */
 export function dirForLocale(locale: string, enabled: boolean): "rtl" | "ltr" | undefined {
   if (!enabled) return undefined;

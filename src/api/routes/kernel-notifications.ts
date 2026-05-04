@@ -35,8 +35,8 @@ const listNotificationsRoute = createRoute({
 });
 
 const markReadRoute = createRoute({
-  method: "post",
-  path: "/notifications/{id}/read",
+  method: "patch",
+  path: "/notifications/{id}/mark-read",
   tags: ["notifications"],
   summary: "Mark notification as read",
   request: { params: z.object({ id: z.string() }) },

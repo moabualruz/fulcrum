@@ -40,7 +40,7 @@ export async function getBacklinks(em: EntityManager, targetDocId: string): Prom
     `SELECT dl.source_doc_id, dl.from_doc_id, d.title, dl.link_type, dl.link_kind
        FROM doc_links dl
        JOIN documents d ON d.id = COALESCE(dl.source_doc_id, dl.from_doc_id)
-      WHERE COALESCE(dl.target_doc_id, dl.to_doc_id) = $1
+      WHERE COALESCE(dl.target_doc_id, dl.to_doc_id) = ?
       ORDER BY d.title ASC`,
     [targetDocId],
   );

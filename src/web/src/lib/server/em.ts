@@ -27,7 +27,7 @@ export async function getEm(): Promise<EntityManager> {
 export async function getDefaultOrgIdOrm(em: EntityManager): Promise<string> {
   const conn = em.getConnection();
   const rows = await conn.execute<{ id: string }[]>(
-    `SELECT id FROM orgs WHERE slug = $1`,
+    `SELECT id FROM orgs WHERE slug = ?`,
     ["default"],
   );
   const id = rows[0]?.id;

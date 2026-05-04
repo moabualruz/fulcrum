@@ -27,8 +27,9 @@ export async function createSavedSearch(
   input: CreateSavedSearchInput,
 ): Promise<SavedSearchRow> {
   const id = newUlid();
-  const rows = await db.query<SavedSearchRow>(
-    `INSERT INTO saved_searches (id, org_id, user_id, name, query_json, scope, project_id)
+  await ensureSavedSearchColumns(db);
+  const rows = await db.query<Record<string, unknown>>(
+    `INSERT INTO saved_searches (id, org_id, owner, name, params, scope, project_id)
      VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
      RETURNING *`,
     [
@@ -41,7 +42,7 @@ export async function createSavedSearch(
       input.projectId ?? null,
     ],
   );
-  return rows[0]!;
+  return toSavedSearchRow(rows[0]!);
 }
 
 export interface ListSavedSearchFilters {
@@ -58,13 +59,15 @@ export async function listSavedSearches(
   db: ProductDb,
   filters: ListSavedSearchFilters,
 ): Promise<SavedSearchRow[]> {
-  return db.query<SavedSearchRow>(
+  await ensureSavedSearchColumns(db);
+  const rows = await db.query<Record<string, unknown>>(
     `SELECT * FROM saved_searches
      WHERE org_id = $1
-       AND (user_id = $2 OR scope IN ('project', 'org'))
+       AND (owner = $2 OR scope IN ('project', 'org'))
      ORDER BY created_at DESC`,
     [filters.orgId, filters.userId],
   );
+  return rows.map(toSavedSearchRow);
 }
 
 export async function deleteSavedSearch(
@@ -72,9 +75,31 @@ export async function deleteSavedSearch(
   id: string,
   userId: string,
 ): Promise<boolean> {
+  await ensureSavedSearchColumns(db);
   const rows = await db.query<{ id: string }>(
-    `DELETE FROM saved_searches WHERE id = $1 AND user_id = $2 RETURNING id`,
+    `DELETE FROM saved_searches WHERE id = $1 AND owner = $2 RETURNING id`,
     [id, userId],
   );
   return rows.length > 0;
+}
+
+async function ensureSavedSearchColumns(db: ProductDb): Promise<void> {
+  await db.exec(`
+    ALTER TABLE saved_searches ADD COLUMN IF NOT EXISTS scope text NOT NULL DEFAULT 'private';
+    ALTER TABLE saved_searches ADD COLUMN IF NOT EXISTS project_id text;
+  `);
+}
+
+function toSavedSearchRow(row: Record<string, unknown>): SavedSearchRow {
+  return {
+    id: row.id as string,
+    org_id: row.org_id as string,
+    user_id: row.owner as string,
+    name: row.name as string,
+    query_json: JSON.stringify(row.params ?? {}),
+    scope: row.scope as "private" | "project" | "org",
+    project_id: (row.project_id as string) ?? null,
+    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at as string,
+    updated_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at as string,
+  };
 }

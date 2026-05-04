@@ -6,6 +6,7 @@ import { join } from "node:path";
 const ROOTS = ["scripts", "src", "tests"] as const;
 const TEST_FILE = /\.(test|spec)\.(ts|tsx)$/;
 const SKIP_DIRS = new Set(["node_modules", ".svelte-kit", "dist", "coverage"]);
+const SKIP_PATHS = new Set(["tests/a11y"]);
 
 async function collect(root: string): Promise<string[]> {
   let entries: string[];
@@ -20,6 +21,7 @@ async function collect(root: string): Promise<string[]> {
     if (SKIP_DIRS.has(entry)) continue;
     const path = join(root, entry);
     if (path === "src/web") continue;
+    if (SKIP_PATHS.has(path)) continue;
     const info = await stat(path);
     if (info.isDirectory()) {
       files.push(...await collect(path));

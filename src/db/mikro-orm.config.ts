@@ -14,6 +14,9 @@ import type { MikroORM, Options } from "@mikro-orm/postgresql";
 import { Migrator } from "@mikro-orm/migrations";
 import type { PGlite } from "@electric-sql/pglite";
 import { PGliteKyselyDialect } from "./PGliteKyselyDriver.ts";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { productDbDir } from "../product-kernel/paths.ts";
 import { resolveDatabaseConfig } from "../config/database.ts";
 
 // Entity classes — imported here so all consumers get a consistent list.
@@ -241,7 +244,12 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
   // Local / test: PGlite via PGliteKyselyDialect
   const getPglite = pglite
     ? () => pglite
-    : () => import("@electric-sql/pglite").then(({ PGlite }) => new PGlite());
+    : async () => {
+      const dataDir = join(productDbDir(), "main");
+      await mkdir(dataDir, { recursive: true });
+      const { PGlite } = await import("@electric-sql/pglite");
+      return new PGlite(dataDir);
+    };
 
   const dialect = new PGliteKyselyDialect(getPglite);
 

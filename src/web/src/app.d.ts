@@ -5,9 +5,13 @@ declare global {
 		// interface Error {}
 		interface Locals {
 			activeProjectId: string | null;
-			container?: {
-				get: (token: unknown) => unknown;
-			};
+			session: unknown | null;
+			orgId: string | null;
+			userId?: string | null;
+			locale?: import("$lib/i18n").SupportedLocale;
+			i18nEnabled?: boolean;
+			em: import("@mikro-orm/postgresql").EntityManager | null;
+			container: import("../../../src/di/container.ts").Container | null;
 		}
 		interface PageData {
 			theme?: import("$lib/theme").ThemeSettings;

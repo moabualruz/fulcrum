@@ -31,7 +31,7 @@ const requiredDomains = [
   "inference",
   "invitations",
   "memories",
-  "notifications",
+  "notify",
   "orchestration",
   "orgs",
   "projects",

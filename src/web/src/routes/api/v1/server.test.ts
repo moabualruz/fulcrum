@@ -13,18 +13,18 @@ describe("/api/v1 — isPublicApiEnabled() and buildOpenApiSpec()", () => {
   test("isPublicApiEnabled OFF by default", async () => {
     delete process.env["FULCRUM_FEATURES"];
     const mod = await import(`./+server.ts?t=${Date.now()}`);
-    expect(mod.isPublicApiEnabled()).toBe(false);
+    expect(mod._isPublicApiEnabled()).toBe(false);
   });
 
   test("isPublicApiEnabled ON with FULCRUM_FEATURES=public-api", async () => {
     process.env["FULCRUM_FEATURES"] = "public-api";
     const mod = await import(`./+server.ts?t=${Date.now()}`);
-    expect(mod.isPublicApiEnabled()).toBe(true);
+    expect(mod._isPublicApiEnabled()).toBe(true);
   });
 
   test("buildOpenApiSpec returns valid OpenAPI 3.1 structure", async () => {
     const mod = await import(`./+server.ts?t=${Date.now()}`);
-    const spec = mod.buildOpenApiSpec("http://localhost/api/v1");
+    const spec = mod._buildOpenApiSpec("http://localhost/api/v1");
     expect(spec.openapi).toBe("3.1.0");
     expect(spec.info.title).toBe("Fulcrum API");
     expect(Array.isArray(spec.servers)).toBe(true);
@@ -33,7 +33,7 @@ describe("/api/v1 — isPublicApiEnabled() and buildOpenApiSpec()", () => {
 
   test("buildOpenApiSpec has at least 3 domain endpoints (tasks, docs, projects)", async () => {
     const mod = await import(`./+server.ts?t=${Date.now()}`);
-    const spec = mod.buildOpenApiSpec("http://localhost/api/v1");
+    const spec = mod._buildOpenApiSpec("http://localhost/api/v1");
     const paths = Object.keys(spec.paths);
     const hasTasks = paths.some((p) => p.startsWith("/tasks"));
     const hasDocs = paths.some((p) => p.startsWith("/docs"));

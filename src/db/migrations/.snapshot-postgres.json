@@ -9872,6 +9872,22 @@
           "enumItems": [],
           "mappedType": "integer"
         },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamptz(6)",
@@ -9936,6 +9952,22 @@
           "enumItems": [],
           "mappedType": "uuid"
         },
+        "metrics_snapshot": {
+          "name": "metrics_snapshot",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
+        },
         "name": {
           "name": "name",
           "type": "varchar(255)",
@@ -9984,6 +10016,22 @@
           "enumItems": [],
           "mappedType": "uuid"
         },
+        "retro_doc_id": {
+          "name": "retro_doc_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
         "start_date": {
           "name": "start_date",
           "type": "date",
@@ -10019,6 +10067,22 @@
             "completed"
           ],
           "mappedType": "enum"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": "now()",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
         }
       },
       "indexes": [

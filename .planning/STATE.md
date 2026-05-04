@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase complete — ready for verification
-last_updated: "2026-05-04T13:34:22.660Z"
+status: Phase 2 fully executed and verified
+last_updated: "2026-05-04T20:47:56.000Z"
 progress:
   total_phases: 10
   completed_phases: 2
@@ -21,7 +21,7 @@ Plan: 8 of 8
 
 - **Phase**: 02-bug-fixes-foundation
 - **Plan**: 8 plans created
-- **Status**: Phase complete — ready for verification
+- **Status**: Phase 2 fully executed and verified
 - **Branch**: dev/v1.0
 
 ## Decisions
@@ -30,7 +30,7 @@ Plan: 8 of 8
 - ARCH-12: TrpcContext.db deprecated; em (EntityManager) is canonical data access
 - Auth: Bearer API-key (SHA-256 hash) is unified REST API auth; session auth stays in web layer
 - 5 duplicate isPublicApiEnabled collapsed to src/api/feature-flags.ts
-- Phase 2 planning complete: 8 plans cover BUG-01..BUG-18 and FND-01..FND-07; BUG-17 remains deferred outside product/runtime execution per D-04.
+- Phase 2 planning complete: 8 plans cover BUG-01..BUG-18 and FND-01..FND-07.
 - [Phase 02-bug-fixes-foundation]: 02-02: Database backend precedence is CLI flag, persisted config, DATABASE_URL, then PGlite default.
 - [Phase 02-bug-fixes-foundation]: 02-02: Product init requires explicit fulcrum db migrate instead of auto-running migrations.
 - [Phase 02-bug-fixes-foundation]: 02-02: PGlite default data lives under FULCRUM_HOME and is created recursively before opening.
@@ -51,4 +51,5 @@ Plan: 8 of 8
 - [Phase 02-08]: Worker payload assertions run before task handlers and async handler failures propagate.
 - [Phase 02-08]: fulcrum init and auth whoami use the same PGlite resolver path.
 - [Phase 02-08]: Local dev auto-session is excluded from /auth/*; /auth/auto-session keeps the explicit seeded-session redirect.
-- [Phase 02-08]: BUG-17 deferred outside Phase 2 product/runtime execution per D-04.
+- [Phase 02-08]: BUG-17 completed by fast-forward-safe `git push origin main`; `origin/main...main` is now `0 0`.
+- [Phase 02]: Final verifier passed after root `bun run ci` passed on 2026-05-04; completion blockers closed.

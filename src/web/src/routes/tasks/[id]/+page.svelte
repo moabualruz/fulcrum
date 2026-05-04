@@ -208,7 +208,7 @@
       <!-- Status/Priority overlay (triggered by keyboard shortcuts) -->
       {#if activeOverlay === "status"}
         <div data-overlay-status class="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onclick={() => (activeOverlay = null)} role="presentation">
-          <div class="bg-background rounded-lg border border-border p-4 shadow-lg" onclick|stopPropagation role="presentation">
+          <div class="bg-background rounded-lg border border-border p-4 shadow-lg" onclick={(event) => event.stopPropagation()} role="presentation">
             <h3 class="text-sm font-semibold mb-2">Set status</h3>
             {#each TASK_STATUSES as s (s)}
               <button
@@ -223,7 +223,7 @@
 
       {#if activeOverlay === "priority"}
         <div data-overlay-priority class="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onclick={() => (activeOverlay = null)} role="presentation">
-          <div class="bg-background rounded-lg border border-border p-4 shadow-lg" onclick|stopPropagation role="presentation">
+          <div class="bg-background rounded-lg border border-border p-4 shadow-lg" onclick={(event) => event.stopPropagation()} role="presentation">
             <h3 class="text-sm font-semibold mb-2">Set priority</h3>
             {#each [0,1,2,3,4,5] as p (p)}
               <button

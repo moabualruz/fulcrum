@@ -46,11 +46,42 @@ function assertEm(db: DbHandle) {
   throw new Error("artifacts.ts: EntityManager required — pass em instead of raw ProductDb.");
 }
 
+function isProductDb(db: DbHandle): db is import("../product-kernel/db/types.ts").ProductDb {
+  return "query" in db && typeof (db as { query: unknown }).query === "function";
+}
+
 export async function listArtifacts(
   db: DbHandle,
   orgId: string,
   filter?: ArtifactFilter & { includeArchived?: boolean },
 ): Promise<ArtifactRow[]> {
+  if (isProductDb(db)) {
+    const conditions = ["org_id = $1"];
+    const params: (string | null)[] = [orgId];
+    const push = (condition: string, value: string) => {
+      params.push(value);
+      conditions.push(condition.replace("?", `$${params.length}`));
+    };
+    if (!filter?.includeArchived) conditions.push("(archived = false OR archived IS NULL)");
+    if (filter?.projectId) push("project_id = ?", filter.projectId);
+    if (filter?.runId) push("run_id = ?", filter.runId);
+    if (filter?.taskId) push("task_id = ?", filter.taskId);
+    if (filter?.mime) push("mime = ?", filter.mime);
+    if (filter?.kind) push("kind = ?", filter.kind);
+    const rows = await db.query<ArtifactRow & { created_at: string | Date }>(
+      `SELECT id, org_id, project_id, run_id, task_id, kind, title,
+              body_path, sha256, size, mime, COALESCE(archived, false) AS archived, created_at
+         FROM artifacts
+        WHERE ${conditions.join(" AND ")}
+        ORDER BY created_at DESC, id ASC`,
+      params,
+    );
+    return rows.map((r) => ({
+      ...r,
+      archived: Boolean(r.archived),
+      created_at: isoStamp(r.created_at),
+    }));
+  }
   const em = assertEm(db);
   const conn = em.getConnection();
   const conditions = ["org_id = ?"];
@@ -108,6 +139,18 @@ export async function readArtifactDetail(
   db: DbHandle,
   input: { orgId: string; id: string },
 ): Promise<ArtifactDetail | null> {
+  if (isProductDb(db)) {
+    const rows = await db.query<ArtifactRow & { created_at: string | Date }>(
+      `SELECT id, org_id, project_id, run_id, task_id, kind, title,
+              body_path, sha256, size, mime, COALESCE(archived, false) AS archived, created_at
+         FROM artifacts
+        WHERE id = $1 AND org_id = $2`,
+      [input.id, input.orgId],
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return artifactDetailFromRow(row);
+  }
   const em = assertEm(db);
   const conn = em.getConnection();
   const rows = await conn.execute(
@@ -120,6 +163,10 @@ export async function readArtifactDetail(
   const row = rows[0];
   if (!row) return null;
 
+  return artifactDetailFromRow(row);
+}
+
+async function artifactDetailFromRow(row: ArtifactRow & { created_at: string | Date }): Promise<ArtifactDetail> {
   const rawCreatedAt = row.created_at as string | Date;
   const createdAt = rawCreatedAt instanceof Date ? rawCreatedAt : new Date(rawCreatedAt);
   const retentionDays = 90;

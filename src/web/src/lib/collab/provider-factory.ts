@@ -32,10 +32,12 @@ export async function createCollabProvider(options: ProviderOptions): Promise<Co
 
 	// Flag ON — dynamic import so Hocuspocus is tree-shaken when OFF
 	try {
+		const providerModule = "@hocuspocus/provider";
+		const yjsModule = "yjs";
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const { HocuspocusProvider } = await import("@hocuspocus/provider" as any);
+		const { HocuspocusProvider } = await import(/* @vite-ignore */ providerModule as any);
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const { Doc } = await import("yjs" as any);
+		const { Doc } = await import(/* @vite-ignore */ yjsModule as any);
 		const doc = new Doc();
 
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -13,7 +13,7 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
 - Decimal phases (e.g. 2.1): Urgent insertions (marked with INSERTED)
 
 - [ ] **Phase 1: Architecture Convergence + Security** - Single data layer, service layer, unified events, module boundaries, security fixes
-- [ ] **Phase 2: Bug Fixes + Foundation** - 18 bugs fixed, foundation infrastructure in place
+- [x] **Phase 2: Bug Fixes + Foundation** - 18 bugs fixed, foundation infrastructure in place
 - [ ] **Phase 3: Symphony + Sandcastle** - Full SPEC.md conformance with native tracker + agent dispatch infrastructure
 - [ ] **Phase 4: Inference + Router/Skills** - Inference sidecar hardened, router + skills wired
 - [ ] **Phase 5: Task Management + Metrics** - Task comments/watchers, charts, sprint features, custom fields
@@ -74,7 +74,7 @@ Plans:
 - [x] 02-07-PLAN.md — Permission enforcement lint and explicit tRPC resource/action checks (FND-02)
 
 **Wave 3 (blocked on DB, flags, permissions foundations)**
-- [x] 02-08-PLAN.md — Worker registry and Web/CLI/TUI auth parity; BUG-17 deferral preserved (FND-04, FND-05, BUG-17)
+- [x] 02-08-PLAN.md — Worker registry and Web/CLI/TUI auth parity; BUG-17 repo sync completed (FND-04, FND-05, BUG-17)
 
 Cross-cutting constraints:
 - RED tests/repros are committed before GREEN fixes for every bug where feasible.
@@ -195,7 +195,7 @@ Cross-cutting constraints:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Architecture + Security | 0/10 | Planned | - |
-| 2. Bug Fixes + Foundation | 6/8 | Executing | - |
+| 2. Bug Fixes + Foundation | 8/8 | Complete | 2026-05-04 |
 | 3. Symphony + Sandcastle | 0/? | Not started | - |
 | 4. Inference + Router/Skills | 0/? | Not started | - |
 | 5. Task Management + Metrics | 0/? | Not started | - |

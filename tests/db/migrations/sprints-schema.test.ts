@@ -125,15 +125,19 @@ describe("Sprint migration constraints", () => {
       );
       expect(columns.rows.map((row) => row.column_name)).toEqual([
         "capacity_points",
+        "closed_at",
         "created_at",
         "end_date",
         "goal",
         "id",
+        "metrics_snapshot",
         "name",
         "org_id",
         "project_id",
+        "retro_doc_id",
         "start_date",
         "status",
+        "updated_at",
       ]);
 
       const constraints = await db.pglite.query<{ conname: string }>(

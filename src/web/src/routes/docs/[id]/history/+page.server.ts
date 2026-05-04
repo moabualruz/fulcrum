@@ -33,7 +33,7 @@ export const load = async ({ params, url }: LoadEvent) => {
   const conn = em.getConnection();
   const orgId = await getDefaultOrgIdOrm(em);
   const rows = await conn.execute<{ id: string; title: string }[]>(
-    `SELECT id, title FROM documents WHERE id = $1 AND org_id = $2`,
+    `SELECT id, title FROM documents WHERE id = ? AND org_id = ?`,
     [params.id, orgId],
   );
   if (rows.length === 0) throw error(404, "Document not found");
@@ -66,7 +66,7 @@ export const actions = {
     const orgId = await getDefaultOrgIdOrm(em);
     // Snapshot current state before restore
     const currentRows = await conn.execute<{ title: string; body: string; frontmatter: Record<string, unknown> }[]>(
-      `SELECT title, body, frontmatter FROM documents WHERE id = $1 AND org_id = $2`,
+      `SELECT title, body, frontmatter FROM documents WHERE id = ? AND org_id = ?`,
       [params.id, orgId],
     );
     if (currentRows.length > 0) {

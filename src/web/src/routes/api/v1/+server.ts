@@ -8,12 +8,13 @@
 
 import type { RequestHandler } from "@sveltejs/kit";
 import { json } from "@sveltejs/kit";
+import { isPublicApiEnabled } from "../../../../../api/feature-flags.ts";
 
 /** @deprecated Use `isPublicApiEnabled` from `src/api/feature-flags.ts`. */
-export { isPublicApiEnabled } from "../../../../../api/feature-flags.ts";
+export { isPublicApiEnabled as _isPublicApiEnabled } from "../../../../../api/feature-flags.ts";
 
 /** Minimal OpenAPI 3.1 spec with 3+ domain endpoints (tasks, docs, projects). */
-export function buildOpenApiSpec(baseUrl: string) {
+export function _buildOpenApiSpec(baseUrl: string) {
   return {
     openapi: "3.1.0",
     info: {
@@ -80,7 +81,7 @@ const gate: RequestHandler = ({ url }) => {
   // openapi.json handler
   if (url.pathname === "/api/v1/openapi.json" || url.pathname.endsWith("/openapi.json")) {
     const baseUrl = `${url.protocol}//${url.host}/api/v1`;
-    return json(buildOpenApiSpec(baseUrl));
+    return json(_buildOpenApiSpec(baseUrl));
   }
 
   // Placeholder — real Hono integration would delegate here

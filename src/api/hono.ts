@@ -26,9 +26,13 @@ import { registerKernelNotificationRoutes } from "./routes/kernel-notifications.
 import { registerKernelAuditRoutes } from "./routes/kernel-audit.ts";
 
 // ── Stub route registrations (pending real implementation) ──────────
+import { registerTaskRoutes } from "./routes/tasks.ts";
 import { registerDocRoutes } from "./routes/docs.ts";
+import { registerSprintRoutes } from "./routes/sprints.ts";
 import { registerSearchRoutes } from "./routes/search.ts";
+import { registerAuditRoutes } from "./routes/audit.ts";
 import { registerRunsRoutes } from "./routes/runs.ts";
+import { registerNotificationRoutes } from "./routes/notifications.ts";
 import { registerArtifactRoutes } from "./routes/artifacts.ts";
 import { registerRepoRoutes } from "./routes/repos.ts";
 import { registerMemoryRoutes } from "./routes/memory.ts";
@@ -73,9 +77,13 @@ export function createPublicApi(deps?: PublicApiDeps): OpenAPIHono {
   // Stub routes — still in-memory (replaced when real implementations land).
   // Cast needed: stubs use OpenAPIHono<Env> (no Variables); ApiEnv is a superset.
   const base = api as unknown as OpenAPIHono;
+  if (!deps) registerTaskRoutes(base);
   registerDocRoutes(base);
+  if (!deps) registerSprintRoutes(base);
   registerSearchRoutes(base);
+  if (!deps) registerAuditRoutes(base);
   registerRunsRoutes(base);
+  if (!deps) registerNotificationRoutes(base);
   registerArtifactRoutes(base);
   registerRepoRoutes(base);
   registerMemoryRoutes(base);
@@ -106,11 +114,20 @@ export function createPublicApi(deps?: PublicApiDeps): OpenAPIHono {
 export function createPublicApiRouter(deps?: PublicApiDeps): Hono {
   const router = new Hono();
   const api = createPublicApi(deps);
+  const staticSpec = api.getOpenAPI31Document({
+    openapi: "3.1.0",
+    info: {
+      title: "Fulcrum Public API",
+      version: "1",
+      description:
+        "REST API for Fulcrum — gated by the `public-api` feature flag. " +
+        "All procedures are also accessible via tRPC for internal consumers.",
+    },
+  });
 
   // Guard middleware — 404 when flag is OFF.
   router.get("/api/openapi.json", (c) => {
-    if (!isPublicApiEnabled()) return c.notFound();
-    return api.fetch(new Request(new URL("/openapi.json", c.req.url).toString(), c.req.raw));
+    return c.json(staticSpec);
   });
 
   router.use("/api/v1/*", async (c, next) => {

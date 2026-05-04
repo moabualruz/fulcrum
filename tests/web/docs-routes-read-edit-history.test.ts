@@ -7,7 +7,8 @@ import { openPglite } from "../../src/product-kernel/db/pglite.ts";
 import { runMigrations } from "../../src/product-kernel/db/migrate.ts";
 import { createLocalOrg } from "../../src/product-kernel/store/repositories.ts";
 import { createDocumentAction } from "../../src/web/src/lib/server/documents.ts";
-import { initOrm } from "../../src/db/mikro-orm.config.ts";
+import { __resetDefaultOrmForTest, initOrm } from "../../src/db/mikro-orm.config.ts";
+import { __resetProductDbForTest, closeProductDb } from "../../src/web/src/lib/server/db.ts";
 
 mock.module("$app/forms", () => ({
   enhance: () => ({ destroy() {} }),
@@ -17,13 +18,18 @@ mock.module("$app/forms", () => ({
 
 let scratch: string;
 
-beforeEach(() => {
+beforeEach(async () => {
+  __resetProductDbForTest();
+  await __resetDefaultOrmForTest();
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-doc-routes-"));
   process.env["FULCRUM_HOME"] = scratch;
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await closeProductDb();
+  await __resetDefaultOrmForTest();
   delete process.env["FULCRUM_HOME"];
+  __resetProductDbForTest();
   rmSync(scratch, { recursive: true, force: true });
 });
 
@@ -60,6 +66,11 @@ async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: str
       created_at timestamptz NOT NULL DEFAULT now()
     )`,
   );
+  await db.query(`ALTER TABLE doc_links ADD COLUMN IF NOT EXISTS from_doc_id text REFERENCES documents(id)`);
+  await db.query(`ALTER TABLE doc_links ADD COLUMN IF NOT EXISTS to_doc_id text REFERENCES documents(id)`);
+  await db.query(`ALTER TABLE doc_links ADD COLUMN IF NOT EXISTS to_slug text`);
+  await db.query(`ALTER TABLE doc_links ADD COLUMN IF NOT EXISTS link_kind text NOT NULL DEFAULT 'wikilink'`);
+  await db.query(`ALTER TABLE doc_links ALTER COLUMN id SET DEFAULT gen_random_uuid()`);
   await db.query(
     `CREATE TABLE IF NOT EXISTS doc_versions (
       id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -104,8 +115,8 @@ async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: str
     ],
   );
   await db.query(
-    `INSERT INTO doc_links (org_id, from_doc_id, to_doc_id, to_slug, link_kind)
-      VALUES ($1, $2, $3, $4, 'wikilink')`,
+    `INSERT INTO doc_links (org_id, source_doc_id, target_doc_id, from_doc_id, to_doc_id, to_slug, link_kind)
+      VALUES ($1, $2, $3, $2, $3, $4, 'wikilink')`,
     [org.id, linked.id, created.id, "adr-1"],
   );
   await db.query(

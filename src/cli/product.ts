@@ -1,5 +1,7 @@
 import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { openDatabase, resolveDatabaseConfig } from "../config/database.ts";
+import { openPglite } from "../product-kernel/db/pglite.ts";
 import { runMigrations } from "../product-kernel/db/migrate.ts";
 import {
   createTask,
@@ -19,6 +21,7 @@ import { eventDispatcher } from "../product-kernel/event-dispatcher.ts";
 import { searchProductDocuments } from "../product-kernel/search.ts";
 import { assembleContext } from "../product-kernel/context.ts";
 import type { ProductDb } from "../product-kernel/db/types.ts";
+import { productDbDir } from "../product-kernel/paths.ts";
 
 const HELP = `fulcrum product — local product kernel
 
@@ -43,9 +46,13 @@ const DEFAULT_ORG_SLUG = "default";
 const DEFAULT_ORG_NAME = "Local";
 
 async function openProductDb(): Promise<ProductDb> {
-  const config = resolveDatabaseConfig();
-  if (config.backend === "pglite") await mkdir(config.dataDir, { recursive: true });
-  return openDatabase(config);
+  const legacyDir = productDbDir();
+  const legacyPath = join(legacyDir, "main");
+  if (await Bun.file(join(legacyPath, "PG_VERSION")).exists()) {
+    await mkdir(legacyDir, { recursive: true });
+    return openPglite(legacyPath);
+  }
+  return openDatabase(resolveDatabaseConfig());
 }
 
 async function ensureLocalOrg(db: ProductDb): Promise<{ id: string; slug: string; name: string; created: boolean }> {
@@ -177,6 +184,7 @@ async function runInit(argv: readonly string[]): Promise<void> {
   const json = hasFlag(argv, "json");
   const db = await openProductDb();
   try {
+    await runMigrations(db);
     const org = await ensureLocalOrg(db);
     const result = {
       engine: db.engine,

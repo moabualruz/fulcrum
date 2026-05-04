@@ -44,7 +44,7 @@ export const load = async ({ params }: LoadEvent) => {
   const orgId = await getDefaultOrgIdOrm(em);
   const rows = await conn.execute<DocRow[]>(
     `SELECT id, org_id, project_id, kind, title, body, content_json, frontmatter, updated_at
-       FROM documents WHERE id = $1 AND org_id = $2`,
+       FROM documents WHERE id = ? AND org_id = ?`,
     [params.id, orgId],
   );
   if (rows.length === 0) throw error(404, "Document not found");
@@ -88,7 +88,7 @@ export const actions = {
     // survive the round-trip — issue 15 byte-stability follow-up depends
     // on this.
     const rows = await conn.execute<{ frontmatter: Record<string, unknown> }[]>(
-      `SELECT frontmatter FROM documents WHERE id = $1 AND org_id = $2`,
+      `SELECT frontmatter FROM documents WHERE id = ? AND org_id = ?`,
       [params.id, orgId],
     );
     if (rows.length === 0) throw error(404, "Document not found");

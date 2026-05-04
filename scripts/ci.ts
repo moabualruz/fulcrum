@@ -35,7 +35,7 @@ export const STEPS: Step[] = [
   // Web pipeline runs from the SvelteKit subpackage. svelte-kit + svelte-check
   // catch regressions that the root tsc cannot see because src/web is excluded.
   { name: "web:install", cmd: ["bun", "install", "--frozen-lockfile"], cwd: "src/web", env: { BUN_INSTALL_CACHE_DIR: webInstallCache } },
-  { name: "web:check",   cmd: ["bun", "run", "check"], cwd: "src/web" },
+  { name: "web:check",   cmd: ["bun", "run", "check"], cwd: "src/web", env: { NODE_OPTIONS: "--max-old-space-size=8192" } },
   { name: "web:build",   cmd: ["bun", "run", "build"], cwd: "src/web" },
   // Vitest unit tests for the SvelteKit subpackage — always-on.
   { name: "web:test",    cmd: ["bun", "run", "web:test"], cwd: "src/web" },

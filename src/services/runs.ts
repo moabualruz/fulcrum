@@ -45,10 +45,40 @@ function assertEm(db: DbHandle) {
   throw new Error("runs.ts: EntityManager required — pass em instead of raw ProductDb.");
 }
 
+function isProductDb(db: DbHandle): db is import("../product-kernel/db/types.ts").ProductDb {
+  return "query" in db && typeof (db as { query: unknown }).query === "function";
+}
+
 export async function dispatchRunAction(
   db: DbHandle,
   input: DispatchRunInput,
 ): Promise<{ id: string; task_id: string; agent: string; status: RunStatus }> {
+  if (isProductDb(db)) {
+    const id = newUlid();
+    await db.query(
+      `INSERT INTO agent_runs
+         (id, org_id, project_id, task_id, agent, model, prompt, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'queued')`,
+      [id, input.orgId, input.projectId ?? null, input.taskId, input.agent, input.model ?? null, input.prompt ?? null],
+    );
+    const jobId = newUlid();
+    await db.query(
+      `INSERT INTO jobs
+         (id, org_id, project_id, queue, kind, payload, status, max_attempts, available_at)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, 'queued', $7, $8)`,
+      [jobId, input.orgId, input.projectId ?? null, "agent-runs", "agent_run", JSON.stringify({ run_id: id }), 3, new Date().toISOString()],
+    );
+    await eventDispatcher.dispatch(db, {
+      orgId: input.orgId,
+      projectId: input.projectId ?? null,
+      actor: "system",
+      subjectKind: "agent_run",
+      subjectId: id,
+      verb: "dispatched",
+      payload: { task_id: input.taskId, agent: input.agent },
+    });
+    return { id, task_id: input.taskId, agent: input.agent, status: "queued" };
+  }
   const em = assertEm(db);
   const conn = em.getConnection();
   const id = newUlid();

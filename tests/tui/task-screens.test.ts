@@ -85,7 +85,7 @@ describe("TaskListScreen", () => {
 
     await screen.submitBulkStatus("done");
     expect(bulkUpdates).toEqual([{ ids: ["task-1", "task-4"], status: "done" }]);
-    expect(screen.selectedTaskIds).toEqual(["task-1", "task-4"]);
+    expect(screen.selectedTaskIds).toEqual([]);
     await screen.applyFilter({ status: "done" });
     const doneRows = renderPlain((renderer) => screen.render(renderer));
     expect(doneRows).toContain("Task 1  [done]");

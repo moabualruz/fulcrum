@@ -7,40 +7,7 @@
  */
 
 import { fail, redirect } from "@sveltejs/kit";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-export interface ThemeSettings {
-  accentHue: number;        // 0–360 HSL hue
-  accentSaturation: number; // 0–100 %
-  accentLightness: number;  // 0–100 %
-  radius: number;           // 0–1.5 rem
-  fontFamily: "inter" | "system" | "mono";
-  colorScheme: "light" | "dark" | "auto";
-  compactMode: boolean;
-  animationSpeed: "normal" | "reduced" | "off";
-  preset: "default" | "ocean" | "forest" | "sunset" | "monochrome";
-}
-
-const THEME_DEFAULTS: ThemeSettings = {
-  accentHue: 262,
-  accentSaturation: 83,
-  accentLightness: 58,
-  radius: 0.5,
-  fontFamily: "inter",
-  colorScheme: "auto",
-  compactMode: false,
-  animationSpeed: "normal",
-  preset: "default",
-};
-
-const PRESETS: Record<ThemeSettings["preset"], Partial<ThemeSettings>> = {
-  default:     { accentHue: 262, accentSaturation: 83, accentLightness: 58 },
-  ocean:       { accentHue: 210, accentSaturation: 90, accentLightness: 50 },
-  forest:      { accentHue: 140, accentSaturation: 70, accentLightness: 40 },
-  sunset:      { accentHue: 30,  accentSaturation: 90, accentLightness: 55 },
-  monochrome:  { accentHue: 0,   accentSaturation: 0,  accentLightness: 50 },
-};
+import { THEME_DEFAULTS, type ThemeSettings } from "./theme";
 
 interface RouteLocals {
   session: unknown;

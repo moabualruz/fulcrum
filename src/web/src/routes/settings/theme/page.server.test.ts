@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { THEME_DEFAULTS, PRESETS } from "./+page.server.ts";
+import { THEME_DEFAULTS, PRESETS } from "./theme";
 
 // ── Unit tests for theme defaults and presets ────────────────────────────────
 // The load() and actions() call tRPC internally; we test the exported constants

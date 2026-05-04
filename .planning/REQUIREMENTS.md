@@ -32,8 +32,8 @@
 
 - [x] **BUG-01**: Compiled binary resolves PGlite data path correctly (critical — ENOENT `/$bunfs/root/pglite.data`)
 - [x] **BUG-02**: Claude plugin uninstall gated by ownership markers (critical — prevents removing user-installed plugins)
-- [ ] **BUG-03**: Web type-check passes with correct `bun:test` type handling
-- [ ] **BUG-04**: Root CI includes web checks (`src/web/**` not excluded from tsconfig)
+- [x] **BUG-03**: Web type-check passes with correct `bun:test` type handling
+- [x] **BUG-04**: Root CI includes web checks (`src/web/**` not excluded from tsconfig)
 - [x] **BUG-05**: Frontmatter YAML round-trips byte-stable (patcher approach, not parse/stringify)
 - [x] **BUG-06**: Claude settings cleanup scoped to Fulcrum-owned keys only
 - [x] **BUG-07**: Claude cache/marketplace removals marker-gated
@@ -45,8 +45,8 @@
 - [x] **BUG-13**: JSON/TOML config uses targeted patchers, not whole-file rewrites
 - [x] **BUG-14**: Vendor mirrors do not overwrite top-level skill/command names
 - [x] **BUG-15**: Complexity hotspots (CCN 18-59) refactored below CCN 15 threshold
-- [ ] **BUG-16**: cookie@0.6.0 advisory resolved in web lockfile
-- [ ] **BUG-17**: Local main synced with origin (41 commits ahead)
+- [x] **BUG-16**: cookie@0.6.0 advisory resolved in web lockfile
+- [x] **BUG-17**: Local main synced with origin
 - [x] **BUG-18**: Cmd+K keyboard shortcut bound in web layout (palette component exists but `svelte:window` keydown handler missing)
 
 ### Foundation — Pillar 1 (FND)
@@ -319,8 +319,8 @@
 |-------------|-------|--------|
 | ARCH-01..12 | Phase 1 | Pending |
 | SEC-01..04 | Phase 1 | Pending |
-| BUG-01..18 | Phase 2 | Pending |
-| FND-01..07 | Phase 2 | Pending |
+| BUG-01..18 | Phase 2 | Complete |
+| FND-01..07 | Phase 2 | Complete |
 | SND-01..06 | Phase 3 | Pending |
 | SYM-01..27 | Phase 3 | Pending |
 | INF-01..07 | Phase 4 | Pending |

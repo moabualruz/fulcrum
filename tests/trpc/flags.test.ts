@@ -21,6 +21,7 @@ import { Container } from "@needle-di/core";
 
 import { PGliteKyselyDialect } from "../../src/db/PGliteKyselyDriver.ts";
 import { FeatureFlag } from "../../src/db/entities/auth/FeatureFlag.ts";
+import { FEATURE_FLAGS } from "../../src/flags/registry.ts";
 import { Org } from "../../src/db/entities/auth/Org.ts";
 import { User } from "../../src/db/entities/auth/User.ts";
 import { OrgMember } from "../../src/db/entities/auth/OrgMember.ts";
@@ -247,11 +248,11 @@ describe("flags.list — unauthenticated", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("flags.list — authenticated", () => {
-  it("returns all 22 flags with name, enabled, description fields", async () => {
+  it("returns all registered flags with name, enabled, description fields", async () => {
     const caller = makeCaller(TEST_ADMIN_USER_ID, TEST_ORG_ID);
     const result = await caller.flags.list();
     expect(Array.isArray(result)).toBe(true);
-    expect(result).toHaveLength(22);
+    expect(result).toHaveLength(FEATURE_FLAGS.length);
     for (const item of result) {
       expect(typeof item.name).toBe("string");
       expect(typeof item.enabled).toBe("boolean");

@@ -6,6 +6,7 @@
 import type { DbHandle } from "../product-kernel/store/repositories.ts";
 import { createTask } from "../product-kernel/store/repositories.ts";
 import { eventDispatcher } from "../product-kernel/event-dispatcher.ts";
+import type { ProductDb } from "../product-kernel/db/types.ts";
 
 export type TaskStatus =
   | "pending"
@@ -63,11 +64,56 @@ function assertEm(db: DbHandle) {
   throw new Error("tasks.ts: EntityManager required — pass em instead of raw ProductDb.");
 }
 
+function isProductDb(db: DbHandle): db is ProductDb {
+  return "query" in db && typeof (db as ProductDb).query === "function";
+}
+
 export async function updateTaskAction(
   db: DbHandle,
   input: UpdateTaskInput,
 ): Promise<{ ok: true }> {
   if (!input.id) throw new Error("updateTaskAction: id is required");
+  if (isProductDb(db)) {
+    const sets: string[] = [];
+    const params: (string | number | null)[] = [];
+    const changed: string[] = [];
+    const push = (col: string, val: string | number | null) => {
+      params.push(val);
+      sets.push(`${col} = $${params.length}`);
+      changed.push(col);
+    };
+    if (input.title !== undefined) push("title", input.title);
+    if (input.description !== undefined) push("description", input.description);
+    if (input.status !== undefined) {
+      assertStatus(input.status, "updateTaskAction");
+      push("status", input.status);
+    }
+    if (input.priority !== undefined) push("priority", input.priority);
+    if (input.startDate !== undefined) push("start_date", input.startDate);
+    if (input.dueDate !== undefined) push("due_date", input.dueDate);
+    if (changed.length === 0) throw new Error("updateTaskAction: no fields to update");
+
+    sets.push("updated_at = now()");
+    params.push(input.id);
+    const rows = await db.query<TaskScopeRow>(
+      `UPDATE tasks SET ${sets.join(", ")} WHERE id = $${params.length}
+       RETURNING org_id, project_id`,
+      params,
+    );
+    const row = rows[0];
+    if (!row) throw new Error(`updateTaskAction: task not found: ${input.id}`);
+
+    await eventDispatcher.dispatch(db, {
+      orgId: row.org_id,
+      projectId: row.project_id,
+      actor: "system",
+      subjectKind: "task",
+      subjectId: input.id,
+      verb: "updated",
+      payload: { changed },
+    });
+    return { ok: true };
+  }
   const em = assertEm(db);
   const conn = em.getConnection();
 
@@ -116,6 +162,24 @@ export async function deleteTaskAction(
   db: DbHandle,
   id: string,
 ): Promise<{ ok: true }> {
+  if (isProductDb(db)) {
+    const rows = await db.query<TaskScopeRow>(
+      `DELETE FROM tasks WHERE id = $1 RETURNING org_id, project_id`,
+      [id],
+    );
+    const row = rows[0];
+    if (row) {
+      await eventDispatcher.dispatch(db, {
+        orgId: row.org_id,
+        projectId: row.project_id,
+        actor: "system",
+        subjectKind: "task",
+        subjectId: id,
+        verb: "deleted",
+      });
+    }
+    return { ok: true };
+  }
   const em = assertEm(db);
   const conn = em.getConnection();
   const rows = await conn.execute(

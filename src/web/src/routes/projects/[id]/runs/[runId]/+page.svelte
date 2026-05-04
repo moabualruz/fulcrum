@@ -5,7 +5,7 @@
   import type { PageData } from "./$types";
   import RunStatusBadge from "$lib/components/runs/RunStatusBadge.svelte";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { SYMPHONY_COLORS, type SymphonyState } from "$lib/server/orchestration";
+  import { SYMPHONY_COLORS, type SymphonyState } from "$lib/orchestration";
   import { formatDuration } from "$lib/util/duration";
   import { cn } from "$lib/utils.js";
 

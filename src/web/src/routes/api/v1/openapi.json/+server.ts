@@ -4,15 +4,15 @@
 
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "@sveltejs/kit";
-import { isPublicApiEnabled, buildOpenApiSpec } from "../+server.ts";
+import { _isPublicApiEnabled, _buildOpenApiSpec } from "../+server.ts";
 
 export const GET: RequestHandler = ({ url }) => {
-  if (!isPublicApiEnabled()) {
+  if (!_isPublicApiEnabled()) {
     return new Response(JSON.stringify({ error: "Public API is not enabled" }), {
       status: 404,
       headers: { "content-type": "application/json" },
     });
   }
   const baseUrl = `${url.protocol}//${url.host}/api/v1`;
-  return json(buildOpenApiSpec(baseUrl));
+  return json(_buildOpenApiSpec(baseUrl));
 };

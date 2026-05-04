@@ -145,10 +145,14 @@ export async function listRuns(projectId?: string | null): Promise<RunListing[]>
 export interface SprintListing {
   id: string;
   name: string;
+  goal: string | null;
   status: string;
+  capacity: number | null;
   capacity_points: number | null;
   start_date: string | null;
   end_date: string | null;
+  task_count: number;
+  total_estimate: number;
   updated_at: string;
 }
 
@@ -163,23 +167,58 @@ export interface BacklogTask {
   updated_at: string;
 }
 
-interface RawSprint { id: string; name: string; status: string; capacity_points: number | null; start_date: string | Date | null; end_date: string | Date | null; updated_at: string | Date }
+interface RawSprint { id: string; name: string; goal: string | null; status: string; capacity_points: number | null; start_date: string | Date | null; end_date: string | Date | null; task_count: number | string; total_estimate: number | string | null; updated_at: string | Date }
 interface RawBacklogTask { id: string; title: string; status: string; priority: number; estimate_points: number | null; sprint_id: string | null; project_id: string | null; updated_at: string | Date }
 
 export async function listSprintsForProject(projectId: string): Promise<SprintListing[]> {
   const db = await open();
   try {
     const rows = await db.query<RawSprint>(
-      `SELECT id, name, status, capacity_points, start_date, end_date, updated_at
-         FROM sprints WHERE project_id = $1 ORDER BY created_at DESC, id ASC`,
+      `SELECT s.id, s.name, s.goal, s.status, s.capacity_points, s.start_date, s.end_date, s.updated_at,
+              count(t.id)::text AS task_count,
+              COALESCE(sum(t.estimate_points), 0)::text AS total_estimate
+         FROM sprints s
+         LEFT JOIN tasks t ON t.sprint_id = s.id
+        WHERE s.project_id = $1
+        GROUP BY s.id, s.name, s.goal, s.status, s.capacity_points, s.start_date, s.end_date, s.updated_at, s.created_at
+        ORDER BY s.created_at DESC, s.id ASC`,
       [projectId],
     );
     return rows.map((r) => ({
       ...r,
+      capacity: r.capacity_points,
+      task_count: Number(r.task_count ?? 0),
+      total_estimate: Number(r.total_estimate ?? 0),
       start_date: r.start_date ? isoStampOrNull(r.start_date as string) : null,
       end_date: r.end_date ? isoStampOrNull(r.end_date as string) : null,
       updated_at: isoStamp(r.updated_at),
     }));
+  } finally {
+    await db.close();
+  }
+}
+
+export const listSprints = listSprintsForProject;
+
+export interface VelocityPoint {
+  sprint_id: string;
+  name: string;
+  points: number;
+}
+
+export async function getSprintVelocity(projectId: string): Promise<VelocityPoint[]> {
+  const db = await open();
+  try {
+    const rows = await db.query<{ sprint_id: string; name: string; points: number | string | null }>(
+      `SELECT s.id AS sprint_id, s.name, COALESCE(sum(t.estimate_points), 0)::text AS points
+         FROM sprints s
+         LEFT JOIN tasks t ON t.sprint_id = s.id AND t.status = 'completed'
+        WHERE s.project_id = $1 AND s.status = 'completed'
+        GROUP BY s.id, s.name, s.closed_at, s.updated_at
+        ORDER BY COALESCE(s.closed_at, s.updated_at) ASC, s.id ASC`,
+      [projectId],
+    );
+    return rows.map((row) => ({ sprint_id: row.sprint_id, name: row.name, points: Number(row.points ?? 0) }));
   } finally {
     await db.close();
   }

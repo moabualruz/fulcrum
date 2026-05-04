@@ -1,9 +1,13 @@
 <script lang="ts">
   import type { PageData } from "./$types";
 
-  export let data: PageData;
+  interface Props {
+    data: PageData;
+  }
 
-  $: featureEnabled = data.featureEnabled;
+  let { data }: Props = $props();
+
+  const featureEnabled = $derived(data.featureEnabled);
 </script>
 
 <svelte:head>

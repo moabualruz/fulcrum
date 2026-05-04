@@ -32,7 +32,7 @@
   </div>
   <div class={cn("flex flex-col gap-1.5")}>
     <label for="view-filters" class={cn("text-sm font-medium")}>Filters (JSON)</label>
-    <textarea id="view-filters" name="filters" rows="3" placeholder='{"status": "pending", "priority": "high"}' class={cn("border-input bg-background min-h-16 rounded-md border px-3 py-2 text-sm")}></textarea>
+    <textarea id="view-filters" name="filters" rows="3" placeholder={"{\"status\": \"pending\", \"priority\": \"high\"}"} class={cn("border-input bg-background min-h-16 rounded-md border px-3 py-2 text-sm")}></textarea>
   </div>
   <div class={cn("flex items-center gap-2")}>
     <input id="view-default" name="isDefault" type="checkbox" />

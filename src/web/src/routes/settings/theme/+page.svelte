@@ -1,8 +1,7 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
   import type { PageData, ActionData } from "./$types";
-  import type { ThemeSettings } from "./+page.server.ts";
-  import { THEME_DEFAULTS, PRESETS } from "./+page.server.ts";
+  import { THEME_DEFAULTS, PRESETS, type ThemeSettings } from "./theme";
 
   interface Props {
     data: PageData;

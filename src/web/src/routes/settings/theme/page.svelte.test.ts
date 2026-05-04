@@ -1,6 +1,6 @@
 import type { Component } from "svelte";
 import { beforeAll, describe, expect, mock, test } from "bun:test";
-import { THEME_DEFAULTS, PRESETS } from "./+page.server.ts";
+import { THEME_DEFAULTS, PRESETS } from "./theme";
 import type { ThemeSettings } from "./+page.server.ts";
 
 mock.module("$app/state", () => ({

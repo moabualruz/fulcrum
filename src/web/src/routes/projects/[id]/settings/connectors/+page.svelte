@@ -24,7 +24,7 @@
   </div>
   <div class={cn("flex flex-col gap-1.5")}>
     <label for="connector-config" class={cn("text-sm font-medium")}>Configuration (JSON)</label>
-    <textarea id="connector-config" name="config" rows="3" placeholder='{"host": "jira.example.com", "email": "...", "token": "..."}' class={cn("border-input bg-background min-h-16 rounded-md border px-3 py-2 text-sm")}></textarea>
+    <textarea id="connector-config" name="config" rows="3" placeholder={"{\"host\": \"jira.example.com\", \"email\": \"...\", \"token\": \"...\"}"} class={cn("border-input bg-background min-h-16 rounded-md border px-3 py-2 text-sm")}></textarea>
   </div>
   <div class={cn("flex items-center gap-2")}>
     <input id="connector-enabled" name="enabled" type="checkbox" />

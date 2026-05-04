@@ -4,6 +4,7 @@
  */
 
 import type { EntityManager } from "@mikro-orm/postgresql";
+import type { ProductDb } from "../../../../product-kernel/db/types.ts";
 import { randomUUID } from "node:crypto";
 import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 
@@ -33,6 +34,33 @@ export async function listProfiles(
       ORDER BY name ASC`,
     [orgId],
   );
+}
+
+export async function getProfile(
+  db: EntityManager | ProductDb,
+  orgId: string,
+  name: string,
+): Promise<AgentProfileRow | null> {
+  if ("query" in db && typeof db.query === "function") {
+    const rows = await db.query<AgentProfileRow>(
+      `SELECT id, org_id, name, cli_path, default_flags, auth_env_vars,
+              test_passed, last_tested_at, created_at, updated_at
+         FROM agent_profiles
+        WHERE org_id = $1 AND name = $2
+        LIMIT 1`,
+      [orgId, name],
+    );
+    return rows[0] ?? null;
+  }
+  const rows = await db.getConnection().execute<AgentProfileRow[]>(
+    `SELECT id, org_id, name, cli_path, default_flags, auth_env_vars,
+            test_passed, last_tested_at, created_at, updated_at
+       FROM agent_profiles
+      WHERE org_id = $1 AND name = $2
+      LIMIT 1`,
+    [orgId, name],
+  );
+  return rows[0] ?? null;
 }
 
 export interface UpsertProfileInput {
@@ -187,4 +215,19 @@ export async function testProfile(
   const passed = profile.cli_path.length > 0;
   await testProfileAction(em, profile.id, orgId, passed);
   return { test_passed: passed };
+}
+
+export function paginateLogs(transcript: string, offset = 0, limit = 100): { lines: string[]; nextOffset: number | null } {
+  const lines = transcript.split(/\r?\n/).filter(Boolean);
+  const page = lines.slice(offset, offset + limit);
+  const nextOffset = offset + page.length < lines.length ? offset + page.length : null;
+  return { lines: page, nextOffset };
+}
+
+export async function getWorkspaceDiff(): Promise<string | null> {
+  return null;
+}
+
+export async function listArtifacts(): Promise<unknown[]> {
+  return [];
 }

@@ -51,7 +51,7 @@ export async function createDocumentAction(
   const conn = em.getConnection();
   await conn.execute(
     `INSERT INTO documents (id, org_id, project_id, kind, title, body, frontmatter, source_path)
-     VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?)`,
     [id, input.orgId, input.projectId, input.kind, input.title, input.body, JSON.stringify(fm), input.sourcePath ?? null],
   );
   const ctx = { orgId: input.orgId, projectId: input.projectId, subjectKind: "document", subjectId: id } as const;
@@ -73,7 +73,7 @@ export async function updateDocumentAction(
   const changed: string[] = [];
   const push = (col: string, val: string, cast = "") => {
     params.push(val);
-    sets.push(`${col} = $${params.length}${cast}`);
+    sets.push(`${col} = ?${cast}`);
     changed.push(col);
   };
   if (input.title !== undefined) push("title", input.title);
@@ -83,13 +83,11 @@ export async function updateDocumentAction(
   if (changed.length === 0) throw new Error("updateDocumentAction: no fields to update");
   sets.push(`updated_at = now()`);
   params.push(input.id);
-  const idIdx = params.length;
   params.push(input.orgId);
-  const orgIdx = params.length;
   const conn = em.getConnection();
   const rows = await conn.execute<DocRow[]>(
     `UPDATE documents SET ${sets.join(", ")}
-       WHERE id = $${idIdx} AND org_id = $${orgIdx}
+       WHERE id = ? AND org_id = ?
      RETURNING org_id, project_id, kind, title, body, frontmatter`,
     params,
   );
@@ -110,11 +108,11 @@ export async function deleteDocumentAction(em: EntityManager, id: string, orgId:
   const conn = em.getConnection();
   await conn.execute(
     `DELETE FROM search_documents
-       WHERE source_kind = 'document' AND source_id = $1 AND org_id = $2`,
+       WHERE source_kind = 'document' AND source_id = ? AND org_id = ?`,
     [id, orgId],
   );
   const rows = await conn.execute<{ org_id: string; project_id: string | null }[]>(
-    `DELETE FROM documents WHERE id = $1 AND org_id = $2 RETURNING org_id, project_id`,
+    `DELETE FROM documents WHERE id = ? AND org_id = ? RETURNING org_id, project_id`,
     [id, orgId],
   );
   const row = rows[0];

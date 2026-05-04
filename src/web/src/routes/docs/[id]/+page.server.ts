@@ -39,7 +39,7 @@ async function loadDoc(em: EntityManager, id: string, orgId: string): Promise<{ 
   const conn = em.getConnection();
   const rows = await conn.execute<DocRow[]>(
     `SELECT id, org_id, project_id, kind, title, body, frontmatter, updated_at
-       FROM documents WHERE id = $1 AND org_id = $2`,
+       FROM documents WHERE id = ? AND org_id = ?`,
     [id, orgId],
   );
   if (rows.length === 0) throw error(404, "Document not found");
