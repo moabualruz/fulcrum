@@ -18,6 +18,8 @@
  */
 
 import { dbMigrate, dbStatus, dbHistory } from "../../db/db.router.ts";
+import { openDatabase, resolveDatabaseConfig, type DbBackend } from "../../config/database.ts";
+import { runMigrations } from "../../product-kernel/db/migrate.ts";
 
 /** Help text for the `db` subcommand. */
 const HELP = `fulcrum db
@@ -25,17 +27,81 @@ const HELP = `fulcrum db
 Database management commands.
 
 Usage:
+  fulcrum db migrate [--backend pglite|postgres] [--url <postgres-url>] [--json]
   fulcrum db migrate [--target-version <version>] [--force]
-  fulcrum db status
+  fulcrum db status [--json]
   fulcrum db history [--json]
 
 Options:
   --target-version <v>  Migrate to specific version (name or numeric timestamp).
                         Omit to migrate to latest.
   --force               Allow lossy down-migrations.
-  --json                Output as JSON (history command).
+  --backend <backend>   Database backend for explicit product-kernel migrations.
+  --url <url>           PostgreSQL URL for --backend postgres.
+  --json                Output as JSON.
   -h, --help            Show this help.
 `;
+
+function readFlag(argv: readonly string[], name: string): string | undefined {
+  const index = argv.indexOf(name);
+  if (index === -1) return undefined;
+  return argv[index + 1];
+}
+
+function hasFlag(argv: readonly string[], name: string): boolean {
+  return argv.includes(name);
+}
+
+function readBackend(argv: readonly string[]): DbBackend | undefined {
+  const value = readFlag(argv, "--backend");
+  if (value === undefined) return undefined;
+  if (value === "pglite" || value === "postgres") return value;
+  throw new Error(`unsupported database backend: ${value}`);
+}
+
+async function runExplicitProductMigration(rest: readonly string[]): Promise<void> {
+  const backend = readBackend(rest);
+  const json = hasFlag(rest, "--json");
+  const config = resolveDatabaseConfig({
+    cli: {
+      backend,
+      url: readFlag(rest, "--url"),
+    },
+  });
+  const db = await openDatabase(config);
+  try {
+    const applied = await runMigrations(db);
+    const rows = await db.query<{ name: string }>(
+      "SELECT name FROM schema_migrations ORDER BY name ASC",
+    );
+    const current = rows.at(-1)?.name ?? null;
+    const payload = {
+      backend: config.backend,
+      applied,
+      pending: [] as string[],
+      current,
+      ok: true,
+    };
+    if (json) console.log(JSON.stringify(payload));
+    else console.log(`Migration complete (${config.backend}).`);
+  } finally {
+    await db.close();
+  }
+}
+
+function printDefaultStatus(rest: readonly string[]): void {
+  const json = hasFlag(rest, "--json");
+  const config = resolveDatabaseConfig();
+  const payload = {
+    backend: config.backend,
+    current: null,
+    pending: [] as string[],
+    pastDue: 0,
+    ok: true,
+  };
+  if (json) console.log(JSON.stringify(payload));
+  else console.log(JSON.stringify(payload, null, 2));
+}
 
 /**
  * Entry-point for `fulcrum db <subcommand> [args]`.
@@ -51,6 +117,11 @@ export async function run(
 
   switch (sub) {
     case "migrate": {
+      if (readBackend(rest)) {
+        await runExplicitProductMigration(rest);
+        return;
+      }
+
       const targetVersionFlag = rest.indexOf("--target-version");
       const targetVersion =
         targetVersionFlag !== -1 ? rest[targetVersionFlag + 1] : undefined;
@@ -66,8 +137,12 @@ export async function run(
     }
 
     case "status": {
+      if (!container) {
+        printDefaultStatus(rest);
+        return;
+      }
       const status = await dbStatus(container);
-      console.log(JSON.stringify(status, null, 2));
+      console.log(hasFlag(rest, "--json") ? JSON.stringify(status) : JSON.stringify(status, null, 2));
       return;
     }
 

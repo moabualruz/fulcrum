@@ -1,8 +1,6 @@
 import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
-import { openPglite } from "../product-kernel/db/pglite.ts";
+import { openDatabase, resolveDatabaseConfig } from "../config/database.ts";
 import { runMigrations } from "../product-kernel/db/migrate.ts";
-import { productDbDir } from "../product-kernel/paths.ts";
 import {
   createLocalOrg,
   createTask,
@@ -46,9 +44,9 @@ const DEFAULT_ORG_SLUG = "default";
 const DEFAULT_ORG_NAME = "Local";
 
 async function openProductDb(): Promise<ProductDb> {
-  const dir = productDbDir();
-  await mkdir(dir, { recursive: true });
-  return openPglite(join(dir, "main"));
+  const config = resolveDatabaseConfig();
+  if (config.backend === "pglite") await mkdir(config.dataDir, { recursive: true });
+  return openDatabase(config);
 }
 
 async function ensureLocalOrg(db: ProductDb): Promise<{ id: string; slug: string; name: string; created: boolean }> {
@@ -154,11 +152,10 @@ async function runInit(argv: readonly string[]): Promise<void> {
   const json = hasFlag(argv, "json");
   const db = await openProductDb();
   try {
-    const applied = await runMigrations(db);
     const org = await ensureLocalOrg(db);
     const result = {
       engine: db.engine,
-      schemaApplied: applied,
+      schemaApplied: [],
       org: { id: org.id, slug: org.slug, name: org.name, created: org.created },
     };
     if (json) {
@@ -166,8 +163,9 @@ async function runInit(argv: readonly string[]): Promise<void> {
     } else {
       console.log(`product kernel ready (engine=${result.engine})`);
       console.log(`org=${org.slug} (${org.id})${org.created ? " [created]" : ""}`);
-      if (applied.length > 0) console.log(`migrations: ${applied.join(", ")}`);
     }
+  } catch (error) {
+    throw new Error(`Database schema not initialized. Run fulcrum db migrate. ${(error as Error).message}`);
   } finally {
     await db.close();
   }

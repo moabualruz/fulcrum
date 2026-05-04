@@ -14,6 +14,7 @@ import type { MikroORM, Options } from "@mikro-orm/postgresql";
 import { Migrator } from "@mikro-orm/migrations";
 import type { PGlite } from "@electric-sql/pglite";
 import { PGliteKyselyDialect } from "./PGliteKyselyDriver.ts";
+import { resolveDatabaseConfig } from "../config/database.ts";
 
 // Entity classes — imported here so all consumers get a consistent list.
 // Uses @Entity decorator classes (C7: ES Stage-3 decorators).
@@ -157,10 +158,7 @@ function hasCustomOrmOptions(opts: OrmConfigOptions): boolean {
  */
 export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
   const { pglite, entities = [], debug = false } = opts;
-  const dbUrl = process.env["DATABASE_URL"] ?? "";
-
-  const isSaas =
-    dbUrl.startsWith("postgresql://") || dbUrl.startsWith("postgres://");
+  const database = resolveDatabaseConfig();
 
   // Built-in entities (auth + core + stub domains + migration ledger, decorator classes).
   // Stub entities (Task..SearchDocument, CasbinRule..NotificationRule) carry
@@ -222,11 +220,11 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
 
   const allEntities: Options["entities"] = [...new Set([...builtinEntities, ...entities])];
 
-  if (isSaas) {
+  if (!pglite && database.backend === "postgres") {
     // SaaS: standard PostgreSQL driver
     return {
-      dbName: new URL(dbUrl).pathname.slice(1) || "fulcrum",
-      clientUrl: dbUrl,
+      dbName: new URL(database.url).pathname.slice(1) || "fulcrum",
+      clientUrl: database.url,
       entities: allEntities,
       migrations: {
         path: new URL("./migrations", import.meta.url).pathname,

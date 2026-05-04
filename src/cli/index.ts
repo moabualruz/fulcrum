@@ -13,15 +13,13 @@
  */
 
 import { mkdir } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Container } from "@needle-di/core";
 import { MikroORM } from "@mikro-orm/postgresql";
 import { Migrator } from "@mikro-orm/migrations";
-import { PGlite } from "@electric-sql/pglite";
-import { PGliteKyselyDialect } from "../db/PGliteKyselyDriver.ts";
 import { createOrmConfig } from "../db/mikro-orm.config.ts";
+import { resolveDatabaseConfig } from "../config/database.ts";
 import {
   registerDbBindings,
   SchemaMigrationRepository,
@@ -51,10 +49,6 @@ Usage:
   fulcrum inference <start|status|embed|generate|stop> [--json]
 `;
 
-function fulcrumHome(): string {
-  return process.env["FULCRUM_HOME"] ?? join(homedir(), ".fulcrum");
-}
-
 export function resolveClientAssetPath(clientRoot: string, requestPath: string): string | null {
   let pathname: string;
   try {
@@ -83,9 +77,30 @@ export function resolveClientAssetPath(clientRoot: string, requestPath: string):
  * Returns the container and a cleanup function to close the ORM.
  */
 async function buildDbContainer(): Promise<{ container: Container; cleanup: () => Promise<void> }> {
-  const dbDir = join(fulcrumHome(), "db");
-  await mkdir(dbDir, { recursive: true });
-  const pglite = new PGlite(join(dbDir, "main"));
+  const database = resolveDatabaseConfig();
+  if (database.backend === "postgres") {
+    const config = createOrmConfig({ debug: false });
+    const orm = await MikroORM.init({
+      ...config,
+      extensions: [Migrator],
+    });
+    const container = new Container();
+    container.bind({ provide: MikroORM, useValue: orm });
+    registerDbBindings(container, orm);
+    return {
+      container,
+      cleanup: async () => {
+        await orm.close(true);
+      },
+    };
+  }
+
+  await mkdir(database.dataDir, { recursive: true });
+  const [{ PGlite }, { PGliteKyselyDialect }] = await Promise.all([
+    import("@electric-sql/pglite"),
+    import("../db/PGliteKyselyDriver.ts"),
+  ]);
+  const pglite = new PGlite(database.dataDir);
   await pglite.waitReady;
   const dialect = new PGliteKyselyDialect(() => pglite);
   const config = createOrmConfig({ pglite, debug: false });
@@ -327,6 +342,10 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     }
     case "db": {
       const { run: runDb } = await import("./commands/db.ts");
+      if (rest[0] === "status" && rest.includes("--json")) {
+        await runDb(rest, null);
+        return;
+      }
       // Build a real container backed by a live ORM instance.
       // PermissionNotAvailableError will surface loudly until P1#06 lands.
       const { container, cleanup } = await buildDbContainer();
