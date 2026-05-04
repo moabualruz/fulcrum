@@ -120,6 +120,10 @@ interface DoctorReport {
   skillBudget: SkillBudgetReport;
   skillsCount: number;
   warnings: number;
+  warningsList: Array<{
+    subsystem: string;
+    message: string;
+  }>;
   errors: number;
   verdict: "ok" | "warning" | "error";
 }
@@ -428,6 +432,7 @@ async function probeMcpInitialize(
 async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: DoctorReport; errors: number }> {
   let warnings = 0;
   let errors = 0;
+  const warningsList: DoctorReport["warningsList"] = [];
 
   // Bun and platform
   const bunVersion = Bun.version;
@@ -599,10 +604,11 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
   const packageParity = await buildPackageParityReport(home);
   const productKernel = await buildProductKernelReport();
   if (productKernel.error) {
-    // A PGlite/Postgres failure means a key product surface is offline.
-    // Surface it through the doctor verdict so users see "verdict: error"
-    // instead of the previous silent "ok".
-    errors += 1;
+    warnings += 1;
+    warningsList.push({
+      subsystem: "product-kernel-db",
+      message: productKernel.error,
+    });
   }
   const repos = await buildReposReport(productKernel);
   if (repos.syncErrors > 0 || repos.mirrorDiskGb > 10) {
@@ -772,6 +778,7 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
     skillBudget,
     skillsCount,
     warnings,
+    warningsList,
     errors,
     verdict,
   };
@@ -800,9 +807,18 @@ async function buildPackageParityReport(home: string): Promise<PackageParityRepo
 }
 
 async function buildProductKernelReport(): Promise<DoctorReport["productKernel"]> {
-  const { productDbDir } = await import("../product-kernel/paths.ts");
-  const dir = productDbDir();
-  const dbPath = `${dir}/main`;
+  const { resolveDatabaseConfig } = await import("../config/database.ts");
+  const config = resolveDatabaseConfig();
+  if (config.backend !== "pglite") {
+    return {
+      engine: "absent",
+      dbPath: config.url,
+      schemaApplied: 0,
+      rows: { orgs: 0, projects: 0, documents: 0, tasks: 0, agentRuns: 0 },
+      latestEventAt: null,
+    };
+  }
+  const dbPath = config.dataDir;
   const exists = await Bun.file(`${dbPath}/PG_VERSION`).exists();
   if (!exists) {
     return {

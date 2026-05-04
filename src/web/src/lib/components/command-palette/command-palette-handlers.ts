@@ -3,18 +3,20 @@ import { filterAndSort, type CommandItem } from "./command-palette-filter";
 export type { CommandItem } from "./command-palette-filter";
 
 type OpenChange = (next: boolean) => void;
+type OpenState = boolean | (() => boolean);
 type SelectCommand = (item: CommandItem) => void;
 
-export function makeKeydownHandler(open: boolean, onOpenChange: OpenChange) {
+export function makeKeydownHandler(open: OpenState, onOpenChange: OpenChange) {
   return (event: KeyboardEvent) => {
+    const currentOpen = typeof open === "function" ? open() : open;
     const commandK = event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey);
     if (commandK) {
       event.preventDefault();
-      onOpenChange(!open);
+      onOpenChange(!currentOpen);
       return;
     }
 
-    if (open && event.key === "Escape") {
+    if (currentOpen && event.key === "Escape") {
       event.preventDefault();
       onOpenChange(false);
     }

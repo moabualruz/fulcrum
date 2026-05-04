@@ -55,6 +55,25 @@ async function runDoctorHuman(home: string, extraEnv: Record<string, string | un
   return out;
 }
 
+async function runDbMigrate(home: string, fulcrumHome: string): Promise<void> {
+  const previousHome = process.env["HOME"];
+  const previousFulcrumHome = process.env["FULCRUM_HOME"];
+  process.env["HOME"] = home;
+  process.env["FULCRUM_HOME"] = fulcrumHome;
+  const { openPglite } = await import("../product-kernel/db/pglite.ts");
+  const { runMigrations } = await import("../product-kernel/db/migrate.ts");
+  const db = await openPglite(join(fulcrumHome, "pglite.data"));
+  try {
+    await runMigrations(db);
+  } finally {
+    await db.close();
+    if (previousHome === undefined) delete process.env["HOME"];
+    else process.env["HOME"] = previousHome;
+    if (previousFulcrumHome === undefined) delete process.env["FULCRUM_HOME"];
+    else process.env["FULCRUM_HOME"] = previousFulcrumHome;
+  }
+}
+
 describe("doctor --json piMcpAdapter field", () => {
   test("both false when ~/.pi/agent does not exist", async () => {
     const home = join(TMP, "no-pi");
@@ -660,14 +679,17 @@ describe("doctor --json product kernel section", () => {
     const home = join(TMP, "product-kernel-db-error-warning");
     await mkdir(home, { recursive: true });
     const fulcrumHome = join(home, ".fulcrum");
-    await mkdir(join(fulcrumHome, "state", "product", "db"), { recursive: true });
-    await writeFile(join(fulcrumHome, "state", "product", "db", "main"), "not a directory");
+    const baseline = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const dbDir = join(fulcrumHome, "pglite.data");
+    await mkdir(dbDir, { recursive: true });
+    await writeFile(join(dbDir, "PG_VERSION"), "16\n");
+    await writeFile(join(dbDir, "postgresql.conf"), "broken\n");
 
     const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
     const pk = report["productKernel"] as Record<string, unknown>;
 
     expect(typeof pk["error"]).toBe("string");
-    expect(report["warnings"]).toBe(1);
+    expect(report["warnings"]).toBe((baseline["warnings"] as number) + 1);
     expect(report["errors"]).toBe(0);
     expect(report["verdict"]).toBe("warning");
     expect((report["warningsList"] as Array<Record<string, unknown>>)).toContainEqual(
@@ -681,6 +703,7 @@ describe("doctor --json product kernel section", () => {
     const home = join(TMP, "product-kernel-after-init");
     await mkdir(home, { recursive: true });
     const fulcrumHome = join(home, ".fulcrum");
+    await runDbMigrate(home, fulcrumHome);
     // Run fulcrum product init out-of-band
     const initProc = Bun.spawn(["bun", "src/index.ts", "product", "init", "--json"], {
       cwd: process.cwd(),
@@ -704,6 +727,7 @@ describe("doctor --json repos section", () => {
     const home = join(TMP, "repos-absent");
     await mkdir(home, { recursive: true });
     const fulcrumHome = join(home, ".fulcrum");
+    await runDbMigrate(home, fulcrumHome);
     // Init product kernel so DB exists
     const initProc = Bun.spawn(["bun", "src/index.ts", "product", "init", "--json"], {
       cwd: process.cwd(),
@@ -737,6 +761,7 @@ describe("doctor --json repos section", () => {
     const home = join(TMP, "repos-sync-errors");
     await mkdir(home, { recursive: true });
     const fulcrumHome = join(home, ".fulcrum");
+    await runDbMigrate(home, fulcrumHome);
     // Init product kernel and insert a repo with sync error
     const initProc = Bun.spawn(["bun", "src/index.ts", "product", "init", "--json"], {
       cwd: process.cwd(),
@@ -748,9 +773,8 @@ describe("doctor --json repos section", () => {
     await initProc.exited;
 
     // Insert a repo with error directly via SQL
-    const { productDbDir } = await import("../product-kernel/paths.ts");
     const { openPglite } = await import("../product-kernel/db/pglite.ts");
-    const dbPath = join(fulcrumHome, "state", "product", "db", "main");
+    const dbPath = join(fulcrumHome, "pglite.data");
     const db = await openPglite(dbPath);
     try {
       // Get the default org
@@ -780,6 +804,7 @@ describe("doctor --json repos section", () => {
     const home = join(TMP, "repos-mirror-over-10gb");
     await mkdir(home, { recursive: true });
     const fulcrumHome = join(home, ".fulcrum");
+    await runDbMigrate(home, fulcrumHome);
     const initProc = Bun.spawn(["bun", "src/index.ts", "product", "init", "--json"], {
       cwd: process.cwd(),
       stdout: "pipe",
@@ -789,7 +814,7 @@ describe("doctor --json repos section", () => {
     await new Response(initProc.stdout).text();
     await initProc.exited;
 
-    const dbPath = join(fulcrumHome, "state", "product", "db", "main");
+    const dbPath = join(fulcrumHome, "pglite.data");
     const { openPglite } = await import("../product-kernel/db/pglite.ts");
     const db = await openPglite(dbPath);
     try {
@@ -827,7 +852,7 @@ describe("doctor product-kernel verdict (issue 19)", () => {
     // Seed a corrupt PGlite directory: a stub PG_VERSION file exists so the
     // doctor probe attempts to open it, but the rest of the directory is
     // missing the actual PGlite layout.
-    const dbDir = join(fulcrumHome, "state", "product", "db", "main");
+    const dbDir = join(fulcrumHome, "pglite.data");
     await mkdir(dbDir, { recursive: true });
     await writeFile(join(dbDir, "PG_VERSION"), "16\n");
     await writeFile(join(dbDir, "postgresql.conf"), "this-is-not-a-real-pg-data-dir\n");
@@ -840,7 +865,7 @@ describe("doctor product-kernel verdict (issue 19)", () => {
     // produced rows. Either path must not crash; a recorded error must
     // escalate the verdict away from "ok".
     if (pk["error"]) {
-      expect(verdict).toBe("error");
+      expect(verdict).toBe("warning");
     }
   });
 });

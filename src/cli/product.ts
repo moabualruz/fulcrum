@@ -2,7 +2,6 @@ import { mkdir } from "node:fs/promises";
 import { openDatabase, resolveDatabaseConfig } from "../config/database.ts";
 import { runMigrations } from "../product-kernel/db/migrate.ts";
 import {
-  createLocalOrg,
   createTask,
   updateTask,
   moveTaskToSprint,
@@ -55,7 +54,12 @@ async function ensureLocalOrg(db: ProductDb): Promise<{ id: string; slug: string
     [DEFAULT_ORG_SLUG],
   );
   if (existing[0]) return { ...existing[0], created: false };
-  const org = await createLocalOrg(db, { slug: DEFAULT_ORG_SLUG, name: DEFAULT_ORG_NAME });
+  const rows = await db.query<{ id: string; slug: string; name: string }>(
+    `INSERT INTO orgs (id, slug, name) VALUES ($1, $2, $3) RETURNING id, slug, name`,
+    [crypto.randomUUID(), DEFAULT_ORG_SLUG, DEFAULT_ORG_NAME],
+  );
+  const org = rows[0];
+  if (!org) throw new Error("failed to create local org");
   return { id: org.id, slug: org.slug, name: org.name, created: true };
 }
 
@@ -65,24 +69,46 @@ async function ensureLocalOrg(db: ProductDb): Promise<{ id: string; slug: string
 // `.scratch/migration-review-remediation/issues/16-product-cli-flag-parser.md`:
 // flag values must not be misread as positionals, regardless of order.
 const BOOLEAN_FLAGS = new Set<string>(["--json"]);
+const VALUE_FLAGS = new Set<string>([
+  "--assignee",
+  "--kind",
+  "--limit",
+  "--org-slug",
+  "--project",
+  "--sprint",
+  "--status",
+  "--task",
+  "--title",
+]);
+const KNOWN_FLAGS = new Set<string>([...BOOLEAN_FLAGS, ...VALUE_FLAGS]);
 
-interface ParsedArgs {
+export interface ParsedArgs {
   positionals: string[];
   flags: Record<string, string | true>;
+  passthrough: string[];
 }
 
-function parseProductArgs(argv: readonly string[]): ParsedArgs {
+export function parseProductArgs(argv: readonly string[]): ParsedArgs {
   const positionals: string[] = [];
   const flags: Record<string, string | true> = {};
-  let stopFlags = false;
+  const passthrough: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i] as string;
-    if (stopFlags) { positionals.push(token); continue; }
-    if (token === "--") { stopFlags = true; continue; }
+    if (token === "--") {
+      passthrough.push(...argv.slice(i + 1));
+      break;
+    }
     if (token.startsWith("--")) {
       const eq = token.indexOf("=");
+      const name = eq === -1 ? token : token.slice(0, eq);
+      if (!KNOWN_FLAGS.has(name)) {
+        throw new Error(`unknown flag: ${name}`);
+      }
       if (eq !== -1) {
-        flags[token.slice(0, eq)] = token.slice(eq + 1);
+        if (BOOLEAN_FLAGS.has(name)) {
+          throw new Error(`flag does not take a value: ${name}`);
+        }
+        flags[name] = token.slice(eq + 1);
         continue;
       }
       if (BOOLEAN_FLAGS.has(token)) {
@@ -90,17 +116,16 @@ function parseProductArgs(argv: readonly string[]): ParsedArgs {
         continue;
       }
       const next = argv[i + 1];
-      if (next !== undefined && !next.startsWith("--")) {
-        flags[token] = next;
-        i += 1;
-        continue;
+      if (next === undefined || next.startsWith("--")) {
+        throw new Error(`missing value for flag: ${token}`);
       }
-      flags[token] = true;
+      flags[token] = next;
+      i += 1;
       continue;
     }
     positionals.push(token);
   }
-  return { positionals, flags };
+  return { positionals, flags, passthrough };
 }
 
 function parseFlag(args: readonly string[], name: string): string | undefined {

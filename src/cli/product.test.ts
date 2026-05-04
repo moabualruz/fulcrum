@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { parseProductArgs, run as runProduct } from "./product.ts";
+import { resolveDatabaseConfig } from "../config/database.ts";
 import { openPglite } from "../product-kernel/db/pglite.ts";
 import { runMigrations } from "../product-kernel/db/migrate.ts";
 import { productDbDir } from "../product-kernel/paths.ts";
@@ -41,6 +42,18 @@ function captureStdout(): { lines: string[]; restore: () => void } {
   return { lines, restore: () => { console.log = original; } };
 }
 
+async function migrateCliProductDb(): Promise<void> {
+  const config = resolveDatabaseConfig();
+  if (config.backend !== "pglite") throw new Error("product CLI tests require pglite");
+  const dbPath = config.dataDir;
+  const db = await openPglite(dbPath);
+  try {
+    await runMigrations(db);
+  } finally {
+    await db.close();
+  }
+}
+
 describe("fulcrum product CLI", () => {
   test("product parser preserves mixed positionals, flags, json, and passthrough", () => {
     const parsed = parseProductArgs([
@@ -73,6 +86,7 @@ describe("fulcrum product CLI", () => {
   });
 
   test("product init --json reports engine and creates the local org", async () => {
+    await migrateCliProductDb();
     const cap = captureStdout();
     try {
       await runProduct(["init", "--json"]);
@@ -213,6 +227,7 @@ describe("fulcrum product CLI", () => {
   // ── P14#06: projects/tasks/sprints integration tests ──────────────
 
   test("product projects list --json → Project[] shape; empty org → []", async () => {
+    await migrateCliProductDb();
     const cap = captureStdout();
     try {
       await runProduct(["init", "--json"]); // seed org+migrations

@@ -10,6 +10,7 @@
 	import AppSidebar from "$lib/components/app/AppSidebar.svelte";
 	import AppTopbar from "$lib/components/app/AppTopbar.svelte";
 	import CommandPalette from "$lib/components/command-palette/CommandPalette.svelte";
+	import { makeKeydownHandler } from "$lib/components/command-palette/command-palette-handlers";
 	import * as Sheet from "$lib/components/ui/sheet";
 	import { buttonVariants } from "$lib/components/ui/button";
 	import {
@@ -89,6 +90,8 @@
 </svelte:head>
 
 <ModeWatcher />
+
+<svelte:window onkeydown={makeKeydownHandler(() => paletteOpen, (next) => (paletteOpen = next))} />
 
 <!-- Toast region: aria-live so screen readers announce toasts without overwhelming them -->
 <div
