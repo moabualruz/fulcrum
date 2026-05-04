@@ -1,6 +1,6 @@
 import type { ProductDb } from "../../../../product-kernel/db/types.ts";
 import { newUlid } from "../../../../product-kernel/ids.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 
 export type ViewScope = "org" | "project" | "private";
 
@@ -75,7 +75,7 @@ export async function createSavedView(
       input.isDefault ?? false,
     ],
   );
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: input.orgId,
     projectId: input.projectId,
     actor: "system",
@@ -137,7 +137,7 @@ export async function updateSavedView(
     params,
   );
   if (!rows[0]) throw new Error(`updateSavedView: not found: ${input.id}`);
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: rows[0].org_id,
     projectId: rows[0].project_id,
     actor: "system",
@@ -158,7 +158,7 @@ export async function deleteSavedView(
     [id],
   );
   if (rows[0]) {
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(db, {
       orgId: rows[0].org_id,
       projectId: rows[0].project_id,
       actor: "system",

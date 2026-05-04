@@ -1,6 +1,6 @@
 import type { ProductDb } from "./db/types.ts";
 import { newUlid } from "./ids.ts";
-import { appendEvent } from "./store/repositories.ts";
+import { eventDispatcher } from "./event-dispatcher.ts";
 
 // ---------------------------------------------------------------------------
 // Symphony state type
@@ -138,7 +138,7 @@ export async function cancelRun(db: ProductDb, id: string): Promise<SymphonyRunR
   );
   const run = rows[0] ?? null;
   if (run) {
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(db, {
       orgId: run.org_id,
       projectId: run.project_id,
       actor: "system",
@@ -163,7 +163,7 @@ export async function retryRun(db: ProductDb, id: string): Promise<SymphonyRunRo
   );
   const run = rows[0] ?? null;
   if (run) {
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(db, {
       orgId: run.org_id,
       projectId: run.project_id,
       actor: "system",

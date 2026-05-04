@@ -14,11 +14,11 @@ import {
   listSprints,
   listCustomFields,
   listSavedViews,
-  appendEvent,
   type ProjectRow,
   type TaskRow,
   type SprintRow,
 } from "../product-kernel/store/repositories.ts";
+import { eventDispatcher } from "../product-kernel/event-dispatcher.ts";
 import { searchProductDocuments } from "../product-kernel/search.ts";
 import { assembleContext } from "../product-kernel/context.ts";
 import type { ProductDb } from "../product-kernel/db/types.ts";
@@ -456,7 +456,7 @@ async function runSprintsActivate(argv: readonly string[]): Promise<void> {
       return;
     }
     const sprint = await updateSprint(db, { id: sprintId, status: "active" });
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(db, {
       orgId: sprint.org_id,
       projectId: sprint.project_id,
       actor: "system",
@@ -492,7 +492,7 @@ async function runSprintsComplete(argv: readonly string[]): Promise<void> {
       [sprintId],
     );
     const velocity = Number((completedTasks[0] as { cnt: string }).cnt);
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(db, {
       orgId: sprint.org_id,
       projectId: sprint.project_id,
       actor: "system",

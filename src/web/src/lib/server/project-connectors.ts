@@ -1,6 +1,6 @@
 import type { ProductDb } from "../../../../product-kernel/db/types.ts";
 import { newUlid } from "../../../../product-kernel/ids.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 
 export interface ProjectConnectorRow {
   id: string;
@@ -51,7 +51,7 @@ export async function upsertProjectConnector(
         params,
       );
     }
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(db, {
       orgId: input.orgId,
       projectId: input.projectId,
       actor: "system",
@@ -76,7 +76,7 @@ export async function upsertProjectConnector(
       JSON.stringify(input.config ?? {}),
     ],
   );
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: input.orgId,
     projectId: input.projectId,
     actor: "system",
@@ -99,7 +99,7 @@ export async function syncProjectConnector(
   );
   if (!rows[0]) throw new Error(`syncProjectConnector: not found: ${id}`);
   if (!rows[0].enabled) throw new Error(`syncProjectConnector: connector not enabled: ${id}`);
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: rows[0].org_id,
     projectId: rows[0].project_id,
     actor: "system",

@@ -1,7 +1,7 @@
 import type { ProductDb } from "../../../../product-kernel/db/types.ts";
 import type { TaskStatus } from "./tasks.ts";
 import { TASK_STATUSES } from "./tasks.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 
 export interface TaskDetail {
   id: string;
@@ -120,7 +120,7 @@ export async function bulkUpdateStatus(
     params,
   );
   for (const row of result) {
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(db, {
       orgId,
       actor: "system",
       subjectKind: "task",
@@ -146,7 +146,7 @@ export async function bulkDeleteTasks(
     params,
   );
   for (const row of result) {
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(db, {
       orgId,
       projectId: row.project_id,
       actor: "system",

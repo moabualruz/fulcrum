@@ -1,5 +1,5 @@
 import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 import { enqueueJob } from "../../../../product-kernel/jobs.ts";
 import { newUlid } from "../../../../product-kernel/ids.ts";
 
@@ -61,7 +61,7 @@ export async function dispatchRunAction(
     payload: { run_id: id },
   });
 
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: input.orgId,
     projectId: input.projectId ?? null,
     actor: "system",
@@ -88,7 +88,7 @@ export async function cancelRunAction(
   );
   const row = rows[0];
   if (row) {
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(db, {
       orgId: row.org_id,
       projectId: row.project_id,
       actor: "system",
@@ -129,7 +129,7 @@ export async function retryRunAction(
     payload: { run_id: newId },
   });
 
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: source.org_id,
     projectId: source.project_id,
     actor: "system",

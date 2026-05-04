@@ -1,5 +1,6 @@
 import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { createTask, appendEvent } from "../../../../product-kernel/store/repositories.ts";
+import { createTask } from "../../../../product-kernel/store/repositories.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 
 export type TaskStatus =
   | "pending"
@@ -85,7 +86,7 @@ export async function updateTaskAction(
   );
   const row = rows[0];
   if (!row) throw new Error(`updateTaskAction: task not found: ${input.id}`);
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: row.org_id,
     projectId: row.project_id,
     actor: "system",
@@ -107,7 +108,7 @@ export async function deleteTaskAction(
   );
   const row = rows[0];
   if (row) {
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(db, {
       orgId: row.org_id,
       projectId: row.project_id,
       actor: "system",
@@ -134,7 +135,7 @@ export async function moveTaskStatusAction(
   if (!row) {
     throw new Error(`status conflict: task ${input.id} not in ${input.from}`);
   }
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: row.org_id,
     projectId: row.project_id,
     actor: "system",

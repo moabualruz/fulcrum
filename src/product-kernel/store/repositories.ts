@@ -1,5 +1,6 @@
 import type { ProductDb } from "../db/types.ts";
 import { newUlid } from "../ids.ts";
+import { eventDispatcher } from "../event-dispatcher.ts";
 
 export interface OrgRow {
   id: string;
@@ -79,7 +80,7 @@ export async function createProject(
     `INSERT INTO projects (id, org_id, slug, name, description) VALUES ($1, $2, $3, $4, $5)`,
     [id, input.orgId, input.slug, input.name, input.description ?? null],
   );
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: input.orgId,
     projectId: id,
     actor: "system",
@@ -121,7 +122,7 @@ export async function createTask(
       priority,
     ],
   );
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: input.orgId,
     projectId: input.projectId ?? null,
     actor: "system",
@@ -226,7 +227,7 @@ export async function createSprint(
       input.endDate ?? null,
     ],
   );
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: input.orgId,
     projectId: input.projectId,
     actor: "system",
@@ -309,7 +310,7 @@ export async function addTaskToSprint(
       WHERE id = $2 AND org_id = $3 AND project_id = $4`,
     [sprint.id, task.id, sprint.org_id, sprint.project_id],
   );
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: sprint.org_id,
     projectId: sprint.project_id,
     actor: "system",
@@ -339,7 +340,7 @@ export async function removeTaskFromSprint(
   );
   const task = rows[0];
   if (!task) throw new Error(`task not found in sprint: ${input.taskId}`);
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: sprint.org_id,
     projectId: sprint.project_id,
     actor: "system",
@@ -431,7 +432,7 @@ export async function closeSprint(
   const closed = closedRows[0];
   if (!closed) throw new Error(`sprint already closed: ${sprintId}`);
 
-  const event = await appendEvent(db, {
+  const event = await eventDispatcher.dispatch(db, {
     orgId: closed.org_id,
     projectId: closed.project_id,
     actor: "system",
@@ -558,7 +559,7 @@ export async function updateTask(
   );
   if (rows.length === 0) throw new Error(`task not found: ${input.id}`);
   const task = rows[0] as TaskRow;
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: task.org_id,
     projectId: task.project_id,
     actor: "system",

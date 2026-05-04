@@ -1,6 +1,6 @@
 import type { ProductDb } from "../../../../product-kernel/db/types.ts";
 import { newUlid } from "../../../../product-kernel/ids.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 import { indexSearchDocument } from "../../../../product-kernel/search.ts";
 
 export type MemoryScope = "project" | "global" | "task" | "user";
@@ -74,7 +74,7 @@ export async function createMemoryAction(
     [id, input.orgId, input.projectId, input.scope, input.kind, input.key, input.body, input.source ?? null],
   );
   const ctx = { orgId: input.orgId, projectId: input.projectId, subjectKind: "memory", subjectId: id } as const;
-  await appendEvent(db, { ...ctx, actor: "system", verb: "created", payload: { key: input.key, scope: input.scope } });
+  await eventDispatcher.dispatch(db, { ...ctx, actor: "system", verb: "created", payload: { key: input.key, scope: input.scope } });
   await indexSearchDocument(db, {
     orgId: input.orgId, projectId: input.projectId, sourceKind: "memory", sourceId: id,
     title: input.key, body: input.body, labels: [input.scope, input.kind],
@@ -114,7 +114,7 @@ export async function updateMemoryAction(
   );
   const row = rows[0];
   if (!row) throw new Error(`updateMemoryAction: memory not found: ${input.id}`);
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: row.org_id, projectId: row.project_id, actor: "system",
     subjectKind: "memory", subjectId: input.id, verb: "updated", payload: { changed },
   });
@@ -140,7 +140,7 @@ export async function deleteMemoryAction(
   );
   const row = rows[0];
   if (row) {
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(db, {
       orgId: row.org_id, projectId: row.project_id, actor: "system",
       subjectKind: "memory", subjectId: id, verb: "deleted",
     });

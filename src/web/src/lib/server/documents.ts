@@ -1,6 +1,6 @@
 import type { ProductDb } from "../../../../product-kernel/db/types.ts";
 import { newUlid } from "../../../../product-kernel/ids.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 import { indexSearchDocument } from "../../../../product-kernel/search.ts";
 
 export interface CreateDocumentInput {
@@ -59,7 +59,7 @@ export async function createDocumentAction(
     [id, input.orgId, input.projectId, input.kind, input.title, input.body, JSON.stringify(fm), input.sourcePath ?? null],
   );
   const ctx = { orgId: input.orgId, projectId: input.projectId, subjectKind: "document", subjectId: id } as const;
-  await appendEvent(db, { ...ctx, actor: "system", verb: "created", payload: { title: input.title, kind: input.kind } });
+  await eventDispatcher.dispatch(db, { ...ctx, actor: "system", verb: "created", payload: { title: input.title, kind: input.kind } });
   await indexSearchDocument(db, {
     orgId: input.orgId, projectId: input.projectId, sourceKind: "document", sourceId: id,
     title: input.title, body: input.body, labels: extractLabels(fm),
@@ -98,7 +98,7 @@ export async function updateDocumentAction(
   );
   const row = rows[0];
   if (!row) throw new Error(`updateDocumentAction: document not found: ${input.id}`);
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: row.org_id, projectId: row.project_id, actor: "system",
     subjectKind: "document", subjectId: input.id, verb: "updated", payload: { changed },
   });
@@ -121,7 +121,7 @@ export async function deleteDocumentAction(db: ProductDb, id: string, orgId: str
   );
   const row = rows[0];
   if (row) {
-    await appendEvent(db, {
+    await eventDispatcher.dispatch(db, {
       orgId: row.org_id, projectId: row.project_id, actor: "system",
       subjectKind: "document", subjectId: id, verb: "deleted",
     });

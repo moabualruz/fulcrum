@@ -9,7 +9,7 @@
 import type { ProductDb } from "./db/types.ts";
 import type { InferenceSidecar } from "./inference.ts";
 import { newUlid } from "./ids.ts";
-import { appendEvent } from "./store/repositories.ts";
+import { eventDispatcher } from "./event-dispatcher.ts";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -145,7 +145,7 @@ export async function closeSprint(
     ],
   );
 
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId: sprint.org_id,
     projectId: sprint.project_id ?? undefined,
     actor: "system",

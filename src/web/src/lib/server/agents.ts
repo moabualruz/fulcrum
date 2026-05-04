@@ -1,5 +1,5 @@
 import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { appendEvent } from "../../../../product-kernel/store/repositories.ts";
+import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
 import { newUlid } from "../../../../product-kernel/ids.ts";
 
 export interface AgentProfileRow {
@@ -69,7 +69,7 @@ export async function testProfileAction(
     [passed, profileId, orgId],
   );
 
-  await appendEvent(db, {
+  await eventDispatcher.dispatch(db, {
     orgId,
     actor: "system",
     subjectKind: "agent_profile",
