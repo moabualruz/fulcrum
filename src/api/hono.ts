@@ -70,14 +70,16 @@ export function createPublicApi(deps?: PublicApiDeps): OpenAPIHono {
     registerKernelAuditRoutes(api);
   }
 
-  // Stub routes — still in-memory (replaced when real implementations land)
-  registerDocRoutes(api);
-  registerSearchRoutes(api);
-  registerRunsRoutes(api);
-  registerArtifactRoutes(api);
-  registerRepoRoutes(api);
-  registerMemoryRoutes(api);
-  registerSavedViewRoutes(api);
+  // Stub routes — still in-memory (replaced when real implementations land).
+  // Cast needed: stubs use OpenAPIHono<Env> (no Variables); ApiEnv is a superset.
+  const base = api as unknown as OpenAPIHono;
+  registerDocRoutes(base);
+  registerSearchRoutes(base);
+  registerRunsRoutes(base);
+  registerArtifactRoutes(base);
+  registerRepoRoutes(base);
+  registerMemoryRoutes(base);
+  registerSavedViewRoutes(base);
 
   // OpenAPI 3.1 spec
   api.doc("/openapi.json", {
@@ -91,7 +93,8 @@ export function createPublicApi(deps?: PublicApiDeps): OpenAPIHono {
     },
   });
 
-  return api;
+  // Return as base OpenAPIHono so callers don't need ApiEnv import
+  return api as unknown as OpenAPIHono;
 }
 
 /**
