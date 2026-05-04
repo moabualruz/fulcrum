@@ -6,6 +6,7 @@ import type {
   InferenceModel,
 } from "../../../../../inference/protocol.ts";
 import { INFERENCE_CLIENT_TOKEN } from "../../../../../inference/tokens.ts";
+import { getRoutingConfig } from "../../../../../inference/routing-config.ts";
 import {
   getHealth,
   listModels,
@@ -87,18 +88,46 @@ function backendToPageBackend(backend: InferenceBackendInfo): BackendInfo {
   };
 }
 
-async function loadFromBoundClient(client: InferenceClient): Promise<InferencePageData> {
-  const [health, models, backends] = await Promise.all([
-    client.health(),
-    client.listModels(),
-    client.listBackends(),
-  ]);
+function healthToPageHealth(health: HealthResult): HealthResponse {
   return {
-    health: health as unknown as HealthResponse,
+    status: health.status === "ok" ? "healthy" : health.status === "down" ? "unreachable" : "degraded",
+    backends: health.backends.map((name) => ({ name, status: "healthy", models_loaded: 0 })),
+    cache: {
+      embed_hit_rate: 0,
+      gen_hit_rate: 0,
+      db_size_bytes: 0,
+    },
+  };
+}
+
+function localRouting(): FeatureRouting[] {
+  return Object.entries(getRoutingConfig()).map(([feature, backend]) => ({
+    feature,
+    backend,
+    model: backend,
+  }));
+}
+
+function localExternalLlmEnabled(): boolean {
+  return (process.env["FULCRUM_FEATURES"] ?? "")
+    .split(",")
+    .map((feature) => feature.trim())
+    .includes("external-llm-provider");
+}
+
+async function loadFromBoundClient(client: InferenceClient): Promise<InferencePageData> {
+  const health = await client.health();
+  const [models, backends] = await Promise.all([
+    client.listModels().catch(() => [] as InferenceModel[]),
+    client.listBackends().catch(() => [] as InferenceBackendInfo[]),
+  ]);
+  const pageHealth = healthToPageHealth(health);
+  return {
+    health: pageHealth,
     models: models.map(modelToPageModel),
-    backends: backends.map(backendToPageBackend),
-    routing: [],
-    externalLlmEnabled: false,
+    backends: backends.length > 0 ? backends.map(backendToPageBackend) : pageHealth.backends,
+    routing: localRouting(),
+    externalLlmEnabled: localExternalLlmEnabled(),
     error: null,
   };
 }
@@ -119,6 +148,9 @@ async function loadInferenceData(locals: LocalsLike): Promise<InferencePageData>
   try {
     const client = boundInferenceClient(locals.container);
     if (client) return await loadFromBoundClient(client);
+    if (!process.env["FULCRUM_INFERENCE_URL"]) {
+      return await loadFromBoundClient(new InferenceClient());
+    }
     return await loadFromHttpSidecar();
   } catch (err) {
     return {
