@@ -170,6 +170,10 @@ const PUBLIC_MUTATION_ALLOWLIST = new Set([
   "src/server/trpc/routers/auth.ts:acceptInvite",
 ]);
 
+const PUBLIC_MUTATION_ALLOWLIST_COMMENTS: Record<string, string> = {
+  "src/server/trpc/routers/auth.ts:acceptInvite": "no session required",
+};
+
 type RouterIntrospection = {
   _def: {
     record: Record<string, unknown>;
@@ -264,6 +268,38 @@ function findMutationPermissionViolations(): string[] {
   return violations;
 }
 
+function findProtectedProcedurePermissionViolations(): string[] {
+  const root = new URL("../..", import.meta.url).pathname;
+  const files = [
+    ...sourceFiles(join(root, "src/trpc/routers")),
+    ...sourceFiles(join(root, "src/server/trpc/routers")),
+  ];
+
+  const violations: string[] = [];
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+    const rel = relative(root, file);
+    const matches = source.matchAll(/([A-Za-z_$][\w$]*)\s*:\s*protectedProcedure\b/g);
+
+    for (const match of matches) {
+      const name = match[1] ?? "<unknown>";
+      const start = match.index ?? 0;
+      const chainEnd = source.indexOf("async", start);
+      const chain = source.slice(start, chainEnd === -1 ? start + 500 : chainEnd);
+      const hasExplicitPermission =
+        /\.meta\s*\(\s*permission\s*\(/.test(chain) ||
+        /\bpermissionedProcedure\s*\(/.test(chain) ||
+        /\bwithPermission\s*\(/.test(chain);
+
+      if (!hasExplicitPermission) {
+        violations.push(`${rel}:${name} missing explicit permission`);
+      }
+    }
+  }
+
+  return violations;
+}
+
 afterEach(async () => {
   const otel = await import("../../src/server/trpc/middleware/otel.ts").catch(() => null);
   otel?.setTRPCSpanRecorderForTests(null);
@@ -286,6 +322,22 @@ describe("P13.01 appRouter scaffold", () => {
 
   it("keeps mutation procedures behind assertPermission except explicit public auth flows", () => {
     expect(findMutationPermissionViolations()).toEqual([]);
+  });
+
+  it("requires explicit permission metadata for every protected procedure", () => {
+    expect(findProtectedProcedurePermissionViolations()).toEqual([]);
+  });
+
+  it("documents public mutation allowlist entries as unauthenticated auth flows", () => {
+    const root = new URL("../..", import.meta.url).pathname;
+    for (const [key, reason] of Object.entries(PUBLIC_MUTATION_ALLOWLIST_COMMENTS)) {
+      const [rel, procedure] = key.split(":");
+      if (!rel || !procedure) throw new Error(`invalid allowlist key: ${key}`);
+      const source = readFileSync(join(root, rel), "utf8");
+      const index = source.indexOf(`${procedure}: publicProcedure`);
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(source.slice(Math.max(0, index - 400), index).toLowerCase()).toContain(reason);
+    }
   });
 
   it("keeps tRPC public schemas free of z.any()", () => {

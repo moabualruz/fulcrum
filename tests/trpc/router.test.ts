@@ -11,7 +11,7 @@
  * Per C8: needle-di Container pattern; ctx.container set in context.
  */
 
-import { describe, it, expect } from "bun:test";
+import { afterEach, describe, it, expect } from "bun:test";
 import { TRPCError } from "@trpc/server";
 import { Container } from "@needle-di/core";
 import { z } from "zod";
@@ -29,6 +29,8 @@ import {
 
 const createCaller = t.createCallerFactory(appRouter);
 const LOCAL_ORG_ID = "00000000-0000-0000-0000-000000000001";
+const LOCAL_BYPASS_FLAG = "trpc-permission-local-dev-bypass";
+const previousFeatures = process.env["FULCRUM_FEATURES"];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: build a mock session object that satisfies the TRPCContext shape
@@ -123,6 +125,11 @@ function testCallerForRouter(
     }),
   );
 }
+
+afterEach(() => {
+  if (previousFeatures === undefined) delete process.env["FULCRUM_FEATURES"];
+  else process.env["FULCRUM_FEATURES"] = previousFeatures;
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. UNAUTHORIZED — protected procedure without session
@@ -262,6 +269,50 @@ describe("assertPermission middleware", () => {
 
     expect(error).not.toBeNull();
     expect(error?.code).toBe("FORBIDDEN");
+  });
+
+  it("does not allow local-dev permission bypass unless env feature is enabled", async () => {
+    delete process.env["FULCRUM_FEATURES"];
+    const router = t.router({
+      secure: t.router({
+        update: protectedProcedure.mutation(() => "ok"),
+      }),
+    });
+    const caller = testCallerForRouter(router, casbinContainer([]));
+
+    let error: TRPCError | null = null;
+    try {
+      await caller.secure.update();
+    } catch (e) {
+      if (e instanceof TRPCError) error = e;
+    }
+
+    expect(error).not.toBeNull();
+    expect(error?.code).toBe("FORBIDDEN");
+  });
+
+  it("allows local-dev permission bypass only with env feature and logs the bypass", async () => {
+    process.env["FULCRUM_FEATURES"] = [previousFeatures, LOCAL_BYPASS_FLAG]
+      .filter(Boolean)
+      .join(",");
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => warnings.push(args.map(String).join(" "));
+
+    try {
+      const router = t.router({
+        secure: t.router({
+          update: protectedProcedure.mutation(() => "ok"),
+        }),
+      });
+      const caller = testCallerForRouter(router, casbinContainer([]));
+
+      expect(await caller.secure.update()).toBe("ok");
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    expect(warnings.some((line) => line.includes("permission bypass resource=secure action=update"))).toBe(true);
   });
 
   it("derives casbin resource from nested parent path and action from list leaf", async () => {
