@@ -65,7 +65,7 @@ Plans:
 **Wave 1**
 - [x] 02-01-PLAN.md — CI and web gates: stable root CI, smoke e2e, release-only skills/compress, cookie advisory (BUG-03, BUG-04, BUG-16)
 - [x] 02-02-PLAN.md — Compiled binary + DB backend config: PGlite default, PostgreSQL override, explicit migrate (BUG-01, FND-01)
-- [ ] 02-03-PLAN.md — Installer ownership and package/component parity safety (BUG-02, BUG-06, BUG-07, BUG-08, BUG-10, BUG-11, BUG-14)
+- [x] 02-03-PLAN.md — Installer ownership and package/component parity safety (BUG-02, BUG-06, BUG-07, BUG-08, BUG-10, BUG-11, BUG-14)
 
 **Wave 2 (blocked on relevant Wave 1 foundations)**
 - [ ] 02-04-PLAN.md — Byte-stable frontmatter and targeted JSON/TOML config patchers (BUG-05, BUG-13)
