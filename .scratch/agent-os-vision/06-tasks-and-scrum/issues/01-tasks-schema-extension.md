@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Owner: codex-orchestrator
 Triage: AFK
 Pillar: 06-tasks-and-scrum

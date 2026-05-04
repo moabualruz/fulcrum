@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 ImplRuntime: claude
 LastVerifiedRuntime: codex
 Triage: AFK

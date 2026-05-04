@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 ImplRuntime: claude
 Triage: AFK
 Pillar: 16-web-shell-rebuild

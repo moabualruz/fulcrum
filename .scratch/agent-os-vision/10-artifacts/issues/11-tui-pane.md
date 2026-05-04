@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 ImplRuntime: codex
 Triage: AFK
 Pillar: artifacts

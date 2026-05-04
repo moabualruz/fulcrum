@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [01-foundation-reset/issues/06-trpc-core-router-and-permission-middleware.md]

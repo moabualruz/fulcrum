@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 17-cross-cutting-platform
 Blocked-by: [17-cross-cutting-platform/issues/02-secrets-keyring-and-vault.md]

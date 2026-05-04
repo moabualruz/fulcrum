@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 06-tasks-and-scrum
 Owner: claude-worker-saved-views

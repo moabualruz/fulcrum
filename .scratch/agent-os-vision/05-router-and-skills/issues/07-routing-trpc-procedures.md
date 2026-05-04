@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 05-router-and-skills
 Blocked-by: 05-routing-telemetry, 06-interactive-no-match-prompt-learned-rule

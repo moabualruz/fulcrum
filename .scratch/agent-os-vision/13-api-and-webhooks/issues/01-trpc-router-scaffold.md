@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Owner: codex-orchestrator
 Triage: AFK
 Pillar: api-and-webhooks

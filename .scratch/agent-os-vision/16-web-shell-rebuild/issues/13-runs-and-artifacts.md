@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/01-v0-teardown-and-sveltekit-scaffold.md, 04-sandcastle-wrapper/issues/03-artifacts-edges-migration.md]

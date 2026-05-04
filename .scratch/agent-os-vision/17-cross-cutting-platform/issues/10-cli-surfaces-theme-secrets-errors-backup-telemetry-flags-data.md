@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 17-cross-cutting-platform
 Blocked-by: [17-cross-cutting-platform/issues/04-theme-trpc-and-composable.md, 17-cross-cutting-platform/issues/02-secrets-keyring-and-vault.md, 17-cross-cutting-platform/issues/05-error-crashlog-trpc-and-surfaces.md, 17-cross-cutting-platform/issues/03-backup-restore-trpc.md, 17-cross-cutting-platform/issues/06-telemetry-collector-trpc-and-surfaces.md, 17-cross-cutting-platform/issues/07-feature-flag-rollout-trpc.md, 17-cross-cutting-platform/issues/09-json-import-export-trpc.md, 14-cli-codegen/issues/01-codegen-pipeline.md]

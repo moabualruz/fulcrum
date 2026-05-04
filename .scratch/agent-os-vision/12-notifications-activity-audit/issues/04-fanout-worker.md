@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: notifications-activity-audit
 Blocked-by: [02-rule-engine.md, 03-default-rules-seeding.md]

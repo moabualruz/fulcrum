@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/13-runs-and-artifacts.md, 03-symphony-orchestration/issues/18-web-runs-board.md, 02-inference-sidecar/issues/13-web-inference-settings-page.md]

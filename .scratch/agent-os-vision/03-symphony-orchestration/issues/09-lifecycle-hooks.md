@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 03-symphony-orchestration
 Blocked-by: 07-workspace-management, 08-prompt-template-renderer

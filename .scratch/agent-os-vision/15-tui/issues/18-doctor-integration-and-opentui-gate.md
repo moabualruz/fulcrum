@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: tui
 Blocked-by: [15/issues/01-tui-foundation-launcher.md, 15/issues/02-global-widgets.md, 15/issues/03-theme-engine.md]

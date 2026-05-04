@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: artifacts
 Blocked-by: [06-trpc-procedures.md]

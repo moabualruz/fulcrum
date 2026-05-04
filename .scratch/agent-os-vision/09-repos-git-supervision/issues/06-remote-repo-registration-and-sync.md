@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 09-repos-git-supervision
 Blocked-by: [02-repo-repository-crud, 03-simple-git-wrapper, 05-sync-worker-local]

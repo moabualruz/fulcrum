@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [08-context-bundle-assembler.md, 11-web-memory-browser.md]

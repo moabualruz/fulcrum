@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 07-docs-editor-collab
 Blocked-by: [05-doc-crud-trpc.md]

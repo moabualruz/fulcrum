@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/20-accessibility-audit.md]

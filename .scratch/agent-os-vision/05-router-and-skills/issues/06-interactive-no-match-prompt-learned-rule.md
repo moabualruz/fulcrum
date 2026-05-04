@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Owner: claude-orchestrator
 Triage: AFK
 Pillar: 05-router-and-skills

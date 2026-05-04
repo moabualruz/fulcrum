@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 09-repos-git-supervision
 Blocked-by: [07-trpc-procedures, 01-schema-migration]

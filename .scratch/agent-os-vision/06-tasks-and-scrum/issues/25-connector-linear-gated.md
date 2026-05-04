@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 ImplRuntime: claude
 Triage: AFK
 Pillar: 06-tasks-and-scrum

@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 ImplCommit: f91bef62
 ImplRuntime: claude
 Triage: AFK

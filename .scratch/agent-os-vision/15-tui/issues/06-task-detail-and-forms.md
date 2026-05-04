@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Implemented: 2026-05-03
 Triage: AFK
 Pillar: tui

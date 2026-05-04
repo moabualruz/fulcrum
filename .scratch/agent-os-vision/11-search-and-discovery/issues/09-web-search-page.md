@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: search-and-discovery
 Blocked-by: [05-fts-query-ranking.md, 06-suggest-and-quick-filter.md, 07-saved-searches.md]

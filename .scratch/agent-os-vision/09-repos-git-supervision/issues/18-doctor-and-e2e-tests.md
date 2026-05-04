@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 09-repos-git-supervision
 Blocked-by: [04-local-repo-registration-and-watcher, 05-sync-worker-local, 06-remote-repo-registration-and-sync, 08-cli-verbs, 09-web-repo-list-and-dashboard, 10-web-branches-and-commits, 11-web-file-tree-content-blame, 12-web-project-repos-scoped-view, 13-tui-repos-browser-pane]

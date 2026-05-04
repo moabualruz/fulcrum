@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/09-task-detail-and-bulk-ops.md, 16-web-shell-rebuild/issues/11-doc-tree-reader-editor-history.md, 16-web-shell-rebuild/issues/15-search-facets-inbox-audit.md]

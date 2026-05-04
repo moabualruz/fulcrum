@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 ImplRuntime: claude
 Pillar: 05-router-and-skills

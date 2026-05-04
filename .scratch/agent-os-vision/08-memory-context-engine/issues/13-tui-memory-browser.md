@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [07-trpc-memory-crud-and-search.md]

@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: search-and-discovery
 Blocked-by: [03-indexers-task-doc-memory.md, 04-indexers-run-artifact-repo-sprint.md, 05-fts-query-ranking.md]

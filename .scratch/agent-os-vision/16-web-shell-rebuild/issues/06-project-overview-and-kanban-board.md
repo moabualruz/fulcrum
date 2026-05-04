@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [16-web-shell-rebuild/issues/05-dashboard-and-projects-list.md, 06-tasks-and-scrum/issues/02-task-status-engine.md]

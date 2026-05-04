@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 08-memory-context-engine
 Blocked-by: [04-heuristic-extraction-hook-agent-run.md, 05-heuristic-extraction-hook-doc-save.md]

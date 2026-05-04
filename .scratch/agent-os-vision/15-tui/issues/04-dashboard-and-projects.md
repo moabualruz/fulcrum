@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: tui
 Blocked-by: [15/issues/02-global-widgets.md]

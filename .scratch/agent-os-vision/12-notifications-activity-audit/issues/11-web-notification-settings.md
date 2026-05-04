@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 ImplCommit: unavailable-sandbox-git-index-lock
 ImplRuntime: codex
 Triage: AFK

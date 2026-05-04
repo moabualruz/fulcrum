@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: search-and-discovery
 Blocked-by: [01-schema-migration.md]

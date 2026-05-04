@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 09-repos-git-supervision
 Blocked-by: [07-trpc-procedures, 08-cli-verbs, 09-web-repo-list-and-dashboard, 13-tui-repos-browser-pane]

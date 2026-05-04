@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: 16-web-shell-rebuild
 Blocked-by: [01-foundation-reset/issues/11-web-login-signup-logout-pages.md, 01-foundation-reset/issues/13-passkey-enrollment-and-login-flow.md]

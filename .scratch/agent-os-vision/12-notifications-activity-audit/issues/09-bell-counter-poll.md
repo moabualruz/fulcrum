@@ -1,5 +1,5 @@
 ---
-Status: implemented
+Status: completed
 Triage: AFK
 Pillar: notifications-activity-audit
 Blocked-by: [05-trpc-notify-procedures.md]
