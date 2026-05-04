@@ -30,7 +30,7 @@
 
 ### Bug Fixes (BUG)
 
-- [ ] **BUG-01**: Compiled binary resolves PGlite data path correctly (critical — ENOENT `/$bunfs/root/pglite.data`)
+- [x] **BUG-01**: Compiled binary resolves PGlite data path correctly (critical — ENOENT `/$bunfs/root/pglite.data`)
 - [ ] **BUG-02**: Claude plugin uninstall gated by ownership markers (critical — prevents removing user-installed plugins)
 - [ ] **BUG-03**: Web type-check passes with correct `bun:test` type handling
 - [ ] **BUG-04**: Root CI includes web checks (`src/web/**` not excluded from tsconfig)
@@ -51,7 +51,7 @@
 
 ### Foundation — Pillar 1 (FND)
 
-- [ ] **FND-01**: Migrations run clean on both PGlite and PostgreSQL with CI verification (document PGlite limitations vs PostgreSQL)
+- [x] **FND-01**: Migrations run clean on both PGlite and PostgreSQL with CI verification (document PGlite limitations vs PostgreSQL)
 - [ ] **FND-02**: `assertPermission()` enforced via lint rule on every tRPC procedure
 - [ ] **FND-03**: `tenant_settings` entity exists with per-org configuration
 - [ ] **FND-04**: graphile-worker formally bootstrapped with extensible worker registry (supports job types for pillars 6, 9, 10, 12)
