@@ -4,6 +4,7 @@
  */
 
 import type { EntityManager } from "@mikro-orm/postgresql";
+import type { ProductDb } from "../../../../product-kernel/db/types.ts";
 
 export interface ProjectTile {
   id: string;
@@ -41,7 +42,7 @@ function projectClause(
 }
 
 export async function loadDashboard(
-  em: EntityManager,
+  em: EntityManager | ProductDb,
   orgId: string,
   projectId?: string | null,
 ): Promise<DashboardData> {
@@ -53,7 +54,7 @@ export async function loadDashboard(
 
   interface TileRow { id: string; name: string; open_tasks: string | number; last_activity: string | Date | null }
 
-  const conn = em.getConnection();
+  const conn = queryConnection(em);
   const [projectsR, openTasksR, docsR, runsR, recentRuns, recentDocs, topTasks, tileRows, unreadR] = await Promise.all([
     conn.execute<CountRow[]>(`SELECT count(*)::text AS c FROM projects WHERE org_id = $1`, [orgId]),
     conn.execute<CountRow[]>(
@@ -122,5 +123,19 @@ export async function loadDashboard(
         : null,
     })),
     unreadCount: toNumber(unreadR[0]?.c),
+  };
+}
+
+function queryConnection(em: EntityManager | ProductDb): {
+  execute: <T>(sql: string, params?: SqlValue[]) => Promise<T>;
+} {
+  if ("getConnection" in em && typeof em.getConnection === "function") {
+    return em.getConnection() as {
+      execute: <T>(sql: string, params?: SqlValue[]) => Promise<T>;
+    };
+  }
+
+  return {
+    execute: <T>(sql: string, params: SqlValue[] = []) => (em as ProductDb).query(sql, params) as Promise<T>,
   };
 }

@@ -87,7 +87,7 @@ type CliSession = {
 
 class MissingCliSessionError extends Error {
   constructor() {
-    super("No active CLI session found. Run `fulcrum init` or `fulcrum auth login` before protected auth commands.");
+    super("No active CLI session found. Run fulcrum init or fulcrum auth login before protected auth commands.");
     this.name = "MissingCliSessionError";
   }
 }

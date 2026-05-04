@@ -274,7 +274,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
       // In local/dev mode, auto-create a session so users don't need to log in.
       // Production (SaaS) mode requires real auth via Better-Auth.
-      if (!event.locals.session && !process.env["FULCRUM_REQUIRE_AUTH"]) {
+      if (!event.locals.session && !process.env["FULCRUM_REQUIRE_AUTH"] && !url.pathname.startsWith("/auth")) {
         event.locals.session = {
           id: "local-dev-session",
           userId: "local-admin",
