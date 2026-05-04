@@ -25,7 +25,7 @@ import { getActiveProject } from "./lib/state/active-project.ts";
 import { appRouter } from "../../../src/trpc/router.ts";
 import { createContext } from "../../../src/trpc/context.ts";
 import type { FlagRegistry } from "../../../src/flags/registry.ts";
-import { dirForLocale, isI18nEnabled, normalizeLocale } from "../../../src/i18n/index.ts";
+import { dirForLocale, isI18nEnabled, normalizeLocale } from "$lib/i18n/index.ts";
 
 // Lazy auth initialiser — only wired when ORM is available.
 // Imported dynamically to avoid circular dep issues at SSR preload time.

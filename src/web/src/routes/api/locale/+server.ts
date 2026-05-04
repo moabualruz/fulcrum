@@ -1,6 +1,6 @@
 import { redirect } from "@sveltejs/kit";
 
-import { normalizeLocale } from "../../../../../src/i18n/index.ts";
+import { normalizeLocale } from "$lib/i18n/index.ts";
 
 export async function POST({ locals, request }: { locals: App.Locals; request: Request }): Promise<Response> {
   const form = await request.formData();

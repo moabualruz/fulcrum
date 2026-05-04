@@ -92,3 +92,16 @@ export function getEnglishKeys(): string[] {
 
 /** All supported locales. */
 export const SUPPORTED_LOCALES: readonly SupportedLocale[] = ["en", "ar", "fr"];
+
+/** Alias used by layout.server.ts — returns dir attribute for a locale. */
+export function dirForLocale(locale: string, enabled: boolean): "rtl" | "ltr" | undefined {
+  if (!enabled) return undefined;
+  return getDir(locale);
+}
+
+/** Normalize a locale string to a supported locale, defaulting to "en". */
+export function normalizeLocale(value: string | null | undefined): SupportedLocale {
+  const trimmed = (value ?? "").trim().toLowerCase();
+  if (SUPPORTED_LOCALES.includes(trimmed as SupportedLocale)) return trimmed as SupportedLocale;
+  return "en";
+}

@@ -1,5 +1,5 @@
 import type { LayoutServerLoad } from "./$types";
-import { dirForLocale, isI18nEnabled, normalizeLocale } from "../../../src/i18n/index.ts";
+import { dirForLocale, isI18nEnabled, normalizeLocale } from "$lib/i18n/index.ts";
 import { getThemeCookieValue, normalizeMode, type ThemeSettings } from "../lib/theme";
 import type { KeybindingOverrides } from "../lib/keybindings";
 
