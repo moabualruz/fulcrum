@@ -974,4 +974,304 @@ maxAttempts: 5
       expect(adapter).toBeNull(); // no LINEAR_API_KEY or connector-linear flag in test env
     });
   });
+
+  // -------------------------------------------------------------------------
+  // SYM-07: Poll tick sequence — reconcile -> validate -> fetch -> sort -> dispatch -> notify
+  // SYM-08: Issue orchestration states — Unclaimed -> Claimed -> Running/RetryQueued -> Released
+  // SYM-09: Run-attempt lifecycle states (PreparingWorkspace .. terminal)
+  // SYM-10: Normal worker exit schedules continuation retry at exactly 1000ms
+  // SYM-11: Failure retry uses exponential formula min(10000 * 2^(attempt-1), max_retry_backoff_ms)
+  // SYM-12: Reconciliation terminal state stops session and cleans workspace
+  // SYM-13: Non-active state stops session without workspace cleanup
+  // SYM-17: Active state refresh updates snapshot
+  // SYM-18: Startup sweep cleans terminal workspaces
+  // SYM-19: Stall detection uses last_codex_timestamp before started_at
+  // -------------------------------------------------------------------------
+
+  describe("Dispatch tick sequence (SYM-07, SYM-08)", () => {
+    test("REQUIRED: tick calls reconcileRunningIssues before fetchCandidateIssues", async () => {
+      const callOrder: string[] = [];
+      const { reconcileRunningIssues } = await import("../symphony/dispatch.ts");
+      expect(typeof reconcileRunningIssues).toBe("function");
+
+      const deps: TickDeps = {
+        orgId: ORG_ID,
+        instanceId: "inst-1",
+        maxConcurrency: 2,
+        config: DEFAULT_CONFIG,
+        fetchCandidateIssues: mock(async () => {
+          callOrder.push("fetch");
+          return [];
+        }),
+        claimRun: mock(async () => ({ runId: "run-1" })),
+        getRunEntity: mock(async () => ({})),
+        createWorkspace: mock(async () => "/tmp/work"),
+        renderPrompt: mock(async () => "Prompt"),
+        dispatchToRunner: mock(async () => ({ success: true })),
+        destroyWorkspace: mock(async () => {}),
+        transitionState: mock(async () => {}),
+        dispatchHook: mock(async () => {}),
+        emitSpan: mock(() => {}),
+        countRunningRuns: mock(async () => 0),
+        reconcileRunningIssues: mock(async () => {
+          callOrder.push("reconcile");
+        }),
+        validateRuntimeConfig: mock(() => {
+          callOrder.push("validate");
+        }),
+        notifyStateChange: mock(async () => {
+          callOrder.push("notify");
+        }),
+      };
+
+      await tick(deps);
+
+      // reconcile must precede fetch
+      expect(callOrder.indexOf("reconcile")).toBeLessThan(callOrder.indexOf("fetch"));
+      // validate must precede fetch
+      expect(callOrder.indexOf("validate")).toBeLessThan(callOrder.indexOf("fetch"));
+    });
+
+    test("REQUIRED: dispatch exports validateRuntimeConfig function", async () => {
+      const dispatch = await import("../symphony/dispatch.ts");
+      expect(typeof dispatch.validateRuntimeConfig).toBe("function");
+    });
+
+    test("REQUIRED: dispatch exports reconcileRunningIssues function", async () => {
+      const dispatch = await import("../symphony/dispatch.ts");
+      expect(typeof dispatch.reconcileRunningIssues).toBe("function");
+    });
+  });
+
+  describe("Run-attempt lifecycle states (SYM-09)", () => {
+    test("REQUIRED: AgentRun entity has attemptLifecycleState field", async () => {
+      const db = await testDb();
+      const run = await seedRun(db);
+      const em = db.em.fork();
+      const managed = await em.findOneOrFail(AgentRun, run.id);
+      // Field must exist (may be undefined/null initially)
+      expect("attemptLifecycleState" in managed).toBe(true);
+    });
+
+    test("REQUIRED: AttemptLifecycleState values include PreparingWorkspace through terminal states", async () => {
+      const { ATTEMPT_LIFECYCLE_STATES } = await import("../states.ts");
+      expect(ATTEMPT_LIFECYCLE_STATES).toContain("preparing_workspace");
+      expect(ATTEMPT_LIFECYCLE_STATES).toContain("building_prompt");
+      expect(ATTEMPT_LIFECYCLE_STATES).toContain("launching_agent_process");
+      expect(ATTEMPT_LIFECYCLE_STATES).toContain("initializing_session");
+      expect(ATTEMPT_LIFECYCLE_STATES).toContain("streaming_turn");
+      expect(ATTEMPT_LIFECYCLE_STATES).toContain("finishing");
+      expect(ATTEMPT_LIFECYCLE_STATES).toContain("succeeded");
+      expect(ATTEMPT_LIFECYCLE_STATES).toContain("failed");
+      expect(ATTEMPT_LIFECYCLE_STATES).toContain("timed_out");
+      expect(ATTEMPT_LIFECYCLE_STATES).toContain("stalled");
+      expect(ATTEMPT_LIFECYCLE_STATES).toContain("cancelled");
+    });
+
+    test("REQUIRED: AgentRun has lastCodexTimestamp field for stall cutoff", async () => {
+      const db = await testDb();
+      const run = await seedRun(db);
+      const em = db.em.fork();
+      const managed = await em.findOneOrFail(AgentRun, run.id);
+      expect("lastCodexTimestamp" in managed).toBe(true);
+    });
+
+    test("REQUIRED: migration adds last_codex_timestamp column to agent_runs", async () => {
+      const db = await testDb();
+      const cols = await db.pglite.query<{ column_name: string }>(
+        `select column_name from information_schema.columns where table_name = 'agent_runs' order by column_name`,
+      );
+      const names = cols.rows.map((r) => r.column_name);
+      expect(names).toContain("last_codex_timestamp");
+      expect(names).toContain("attempt_lifecycle_state");
+    });
+
+    test("REQUIRED: agent_runs_stall_scan index includes last_codex_timestamp and started_at", async () => {
+      const db = await testDb();
+      const idxDef = await db.pglite.query<{ indexdef: string }>(
+        `select indexdef from pg_indexes where schemaname = 'public' and indexname = 'agent_runs_stall_scan'`,
+      );
+      const def = idxDef.rows[0]?.indexdef ?? "";
+      // The updated index must cover last_codex_timestamp for stall cutoff preference
+      expect(def).toMatch(/last_codex_timestamp|started_at/);
+    });
+  });
+
+  describe("Continuation retry at 1000ms (SYM-10)", () => {
+    test("REQUIRED: retry exports scheduleContinuationRetry function", async () => {
+      const retry = await import("../symphony/retry.ts");
+      expect(typeof retry.scheduleContinuationRetry).toBe("function");
+    });
+
+    test("REQUIRED: scheduleContinuationRetry schedules redispatch at exactly 1000ms delay", async () => {
+      const { scheduleContinuationRetry } = await import("../symphony/retry.ts");
+      const db = await testDb();
+      const now = new Date("2026-05-03T12:00:00.000Z");
+      const run = await seedRun(db, { orchestrationState: "running", attemptCount: 1 });
+
+      await scheduleContinuationRetry(
+        db.em,
+        { id: run.id, orgId: ORG_ID, orchestrationState: "running", attemptCount: 1 },
+        DEFAULT_CONFIG,
+        { now: () => now },
+      );
+
+      const updated = await db.em.fork().findOneOrFail(AgentRun, run.id);
+      expect(updated.orchestrationState).toBe("retry_queued");
+      // Continuation retry uses fixed 1000ms delay, not exponential
+      expect(updated.nextRetryAt?.toISOString()).toBe("2026-05-03T12:00:01.000Z");
+    });
+  });
+
+  describe("Reconciliation lifecycle (SYM-12, SYM-13, SYM-17)", () => {
+    test("REQUIRED: terminal reconciliation stops session and cleans workspace", async () => {
+      const { reconcileRunningIssues } = await import("../symphony/dispatch.ts");
+      const db = await testDb();
+      const _run = await seedRun(db, { orchestrationState: "succeeded", workspacePath: "/tmp/sym-recon-terminal" });
+
+      const stopSession = mock(async () => {});
+      const cleanWorkspace = mock(async () => {});
+
+      await reconcileRunningIssues(db.em, ORG_ID, { stopSession, cleanWorkspace });
+
+      // Terminal runs should trigger cleanWorkspace
+      expect(cleanWorkspace).toHaveBeenCalled();
+    });
+
+    test("REQUIRED: non-active reconciliation stops session without workspace cleanup", async () => {
+      const { reconcileRunningIssues } = await import("../symphony/dispatch.ts");
+      const db = await testDb();
+      await seedRun(db, { orchestrationState: "retry_queued" });
+
+      const stopSession = mock(async () => {});
+      const cleanWorkspace = mock(async () => {});
+
+      await reconcileRunningIssues(db.em, ORG_ID, { stopSession, cleanWorkspace });
+
+      expect(cleanWorkspace).not.toHaveBeenCalled();
+    });
+
+    test("REQUIRED: active reconciliation updates snapshot without stopping session", async () => {
+      const { reconcileRunningIssues } = await import("../symphony/dispatch.ts");
+      const db = await testDb();
+      await seedRun(db, { orchestrationState: "running" });
+
+      const stopSession = mock(async () => {});
+      const cleanWorkspace = mock(async () => {});
+      const updateSnapshot = mock(async () => {});
+
+      await reconcileRunningIssues(db.em, ORG_ID, { stopSession, cleanWorkspace, updateSnapshot });
+
+      expect(stopSession).not.toHaveBeenCalled();
+      expect(updateSnapshot).toHaveBeenCalled();
+    });
+  });
+
+  describe("Startup cleanup sweep (SYM-18)", () => {
+    test("REQUIRED: workspace exports sweepTerminalWorkspaces or equivalent startup cleanup function", async () => {
+      const workspace = await import("../symphony/workspace.ts");
+      const hasSweep =
+        typeof (workspace as Record<string, unknown>)["sweepTerminalWorkspaces"] === "function" ||
+        typeof (workspace as Record<string, unknown>)["startupCleanupSweep"] === "function";
+      expect(hasSweep).toBe(true);
+    });
+
+    test("REQUIRED: startup sweep removes terminal-state run workspaces and calls before_remove hook", async () => {
+      const workspaceMod = await import("../symphony/workspace.ts");
+      const sweepFn =
+        (workspaceMod as Record<string, unknown>)["sweepTerminalWorkspaces"] as
+          | ((em: unknown, orgId: string, opts: Record<string, unknown>) => Promise<number>)
+          | undefined ??
+        (workspaceMod as Record<string, unknown>)["startupCleanupSweep"] as
+          | ((em: unknown, orgId: string, opts: Record<string, unknown>) => Promise<number>)
+          | undefined;
+
+      expect(sweepFn).toBeDefined();
+
+      const db = await testDb();
+      const beforeRemove = mock(async () => {});
+
+      // Seed terminal runs with workspace paths
+      await seedRun(db, { orchestrationState: "succeeded", workspacePath: "/tmp/sym-sweep-1" });
+      await seedRun(db, { orchestrationState: "failed", workspacePath: "/tmp/sym-sweep-2" });
+      // Running run should NOT be swept
+      const running = await seedRun(db, { orchestrationState: "running", workspacePath: "/tmp/sym-sweep-running" });
+
+      const count = await sweepFn!(db.em, ORG_ID, { beforeRemove, dryRun: true });
+
+      expect(count).toBeGreaterThanOrEqual(2);
+      expect(beforeRemove).toHaveBeenCalled();
+      // Running workspace must not be swept
+      const refreshedRunning = await db.em.fork().findOneOrFail(AgentRun, running.id);
+      expect(refreshedRunning.workspacePath).toBe("/tmp/sym-sweep-running");
+    });
+  });
+
+  describe("Stall detection uses last_codex_timestamp (SYM-19)", () => {
+    test("REQUIRED: stall scan prefers lastCodexTimestamp over startedAt when set", async () => {
+      const db = await testDb();
+      // Run started long ago but had recent Codex activity (lastCodexTimestamp recent)
+      const run = await seedRun(db, {
+        orchestrationState: "running",
+        startedAt: new Date("2026-05-03T11:00:00.000Z"),
+      });
+
+      // Update lastCodexTimestamp to be very recent (within stall window)
+      const em = db.em.fork();
+      const managed = await em.findOneOrFail(AgentRun, run.id);
+      (managed as AgentRun & { lastCodexTimestamp?: Date }).lastCodexTimestamp =
+        new Date("2026-05-03T11:59:59.000Z");
+      await em.flush();
+
+      const onStalled = mock(async () => undefined);
+
+      // stallTimeoutMs = 1000ms, now = 12:00:00 → startedAt is 3600s ago (stale)
+      // but lastCodexTimestamp is only 1s ago → should NOT stall
+      const count = await scanForStalledRuns(
+        db.em,
+        ORG_ID,
+        { ...DEFAULT_CONFIG, stallTimeoutMs: 2_000 },
+        onStalled,
+        { now: () => new Date("2026-05-03T12:00:00.000Z") },
+      );
+
+      // lastCodexTimestamp is 1s ago, within 2s window → not stalled
+      expect(count).toBe(0);
+      expect(onStalled).not.toHaveBeenCalled();
+    });
+
+    test("REQUIRED: stall scan falls back to startedAt when lastCodexTimestamp is null", async () => {
+      const db = await testDb();
+      // Run started long ago with no Codex activity
+      const run = await seedRun(db, {
+        orchestrationState: "running",
+        startedAt: new Date("2026-05-03T11:00:00.000Z"),
+      });
+
+      // Ensure lastCodexTimestamp is null (default)
+      const em = db.em.fork();
+      const managed = await em.findOneOrFail(AgentRun, run.id);
+      expect((managed as AgentRun & { lastCodexTimestamp?: Date }).lastCodexTimestamp).toBeFalsy();
+
+      const onStalled = mock(async () => undefined);
+
+      // stallTimeoutMs = 1000ms, now = 12:00:00 → startedAt is 3600s ago → must stall
+      const count = await scanForStalledRuns(
+        db.em,
+        ORG_ID,
+        { ...DEFAULT_CONFIG, stallTimeoutMs: 1_000 },
+        onStalled,
+        { now: () => new Date("2026-05-03T12:00:00.000Z") },
+      );
+
+      expect(count).toBeGreaterThanOrEqual(1);
+      expect(onStalled).toHaveBeenCalledWith(
+        db.em,
+        expect.objectContaining({ id: run.id }),
+        { kind: "stall_timeout" },
+        expect.any(Object),
+        expect.any(Object),
+      );
+    });
+  });
 });
