@@ -4,7 +4,7 @@ import { openPglite } from "../product-kernel/db/pglite.ts";
 import { runMigrations } from "../product-kernel/db/migrate.ts";
 import { productDbDir } from "../product-kernel/paths.ts";
 import type { ProductDb } from "../product-kernel/db/types.ts";
-import { dispatchRunAction } from "../web/src/lib/server/runs.ts";
+import { dispatchRunAction } from "../services/runs.ts";
 
 const HELP = `fulcrum agent — agent run commands
 

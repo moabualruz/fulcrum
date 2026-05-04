@@ -4,7 +4,7 @@ import { openPglite } from "../product-kernel/db/pglite.ts";
 import { runMigrations } from "../product-kernel/db/migrate.ts";
 import { productDbDir } from "../product-kernel/paths.ts";
 import type { ProductDb } from "../product-kernel/db/types.ts";
-import { listArtifacts, readArtifactDetail } from "../web/src/lib/server/artifacts.ts";
+import { listArtifacts, readArtifactDetail } from "../services/artifacts.ts";
 
 const HELP = `fulcrum artifact — artifact commands
 

@@ -17,7 +17,7 @@ import {
 import {
   updateTaskAction,
   deleteTaskAction,
-} from "../../web/src/lib/server/tasks.ts";
+} from "../../services/tasks.ts";
 import { velocity, burndown } from "../reports.ts";
 import {
   listRules,
