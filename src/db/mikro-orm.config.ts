@@ -28,6 +28,7 @@ import { Invitation } from "./entities/auth/Invitation.ts";
 import { OrgMember } from "./entities/auth/OrgMember.ts";
 import { FeatureFlag } from "./entities/auth/FeatureFlag.ts";
 import { Event } from "./entities/core/Event.ts";
+import { TenantSetting } from "./entities/TenantSetting.ts";
 
 // Tenant-scoped stub entities (P1#03 — composite index decorators land here so
 // later pillars never need a base-table migration).
@@ -86,6 +87,7 @@ export {
   OrgMember,
   FeatureFlag,
   Event,
+  TenantSetting,
   Task,
   TaskStatus,
   Sprint,
@@ -174,6 +176,7 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     OrgMember,
     FeatureFlag,
     Event,
+    TenantSetting,
     Task,
     TaskStatus,
     Sprint,

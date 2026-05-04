@@ -44,4 +44,4 @@ ALTER TABLE metrics_cache ALTER COLUMN org_id DROP NOT NULL;
 ALTER TABLE metrics_cache ALTER COLUMN snapshot_date DROP NOT NULL;
 ALTER TABLE metrics_cache ALTER COLUMN metric_kind SET DEFAULT 'burndown';
 
-CREATE INDEX IF NOT EXISTS metrics_cache_lookup_idx ON metrics_cache (project_id, sprint_id, metric_kind, snapshot_date);
+CREATE INDEX IF NOT EXISTS metrics_cache_scope_idx ON metrics_cache (org_id, project_id, sprint_id, metric_kind, snapshot_date);

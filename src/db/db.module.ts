@@ -37,6 +37,7 @@ import { Invitation } from "./entities/auth/Invitation.ts";
 import { OrgMember } from "./entities/auth/OrgMember.ts";
 import { FeatureFlag } from "./entities/auth/FeatureFlag.ts";
 import { Event } from "./entities/core/Event.ts";
+import { TenantSetting } from "./entities/TenantSetting.ts";
 
 // Stub entities (P1#03 — composite index decorators landed early)
 import { Task } from "./entities/tasks/Task.ts";
@@ -71,6 +72,7 @@ import { InvitationRepository } from "./repositories/auth/InvitationRepository.t
 import { OrgMemberRepository } from "./repositories/auth/OrgMemberRepository.ts";
 import { FeatureFlagRepository } from "./repositories/auth/FeatureFlagRepository.ts";
 import { EventRepository } from "./repositories/core/EventRepository.ts";
+import { TenantSettingRepository } from "./repositories/TenantSettingRepository.ts";
 
 // Stub repositories
 import { TaskRepository } from "./repositories/tasks/TaskRepository.ts";
@@ -110,6 +112,7 @@ export {
   OrgMemberRepository,
   FeatureFlagRepository,
   EventRepository,
+  TenantSettingRepository,
   TaskRepository,
   DocumentRepository,
   DocLinkRepository,
@@ -216,6 +219,11 @@ export function registerDbBindings(
   container.bind({
     provide: EventRepository,
     useFactory: () => em.getRepository(Event) as EventRepository,
+  });
+  container.bind({
+    provide: TenantSettingRepository,
+    useFactory: () =>
+      em.getRepository(TenantSetting) as TenantSettingRepository,
   });
 
   // Stub-tenant repositories (P1#03 — Task, Document, Memory, AgentRun, Artifact,
