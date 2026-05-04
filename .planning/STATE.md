@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-last_updated: "2026-05-04T12:41:22Z"
+last_updated: "2026-05-04T13:06:22.262Z"
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 18
-  completed_plans: 16
-  percent: 89
+  completed_plans: 17
+  percent: 94
 ---
 
 # Planning State
@@ -17,7 +17,7 @@ progress:
 ## Current Position
 
 Phase: 02 (bug-fixes-foundation) — EXECUTING
-Plan: 7 of 8
+Plan: 8 of 8
 
 - **Phase**: 02-bug-fixes-foundation
 - **Plan**: 8 plans created
@@ -45,3 +45,6 @@ Plan: 7 of 8
 - [Phase 02-06]: Tenant settings use a standalone MikroORM entity keyed by orgId and key.
 - [Phase 02-06]: Product-kernel tenant indexes keep org_id as the leading column for tenant-scoped access paths.
 - [Phase 02-06]: TUI feature flags use the canonical registry and shared env parsing.
+- [Phase 02]: Protected tRPC routers use explicit permission metadata as the authorization source of truth; path derivation remains fallback only for migration/test surfaces.
+- [Phase 02]: Local development permission bypass is controlled by the registered trpc-permission-local-dev-bypass feature flag and logs each bypass.
+- [Phase 02]: Default CI now runs a hard trpc:permissions gate before the broad root test suite.

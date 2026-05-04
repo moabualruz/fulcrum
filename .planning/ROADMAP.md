@@ -71,7 +71,7 @@ Plans:
 - [x] 02-04-PLAN.md — Byte-stable frontmatter and targeted JSON/TOML config patchers (BUG-05, BUG-13)
 - [x] 02-05-PLAN.md — Product CLI parser, doctor warnings, complexity hotspots, Cmd+K shortcut (BUG-09, BUG-12, BUG-15, BUG-18)
 - [x] 02-06-PLAN.md — Tenant settings, migration/index verification, canonical flags (FND-01, FND-03, FND-06, FND-07)
-- [ ] 02-07-PLAN.md — Permission enforcement lint and explicit tRPC resource/action checks (FND-02)
+- [x] 02-07-PLAN.md — Permission enforcement lint and explicit tRPC resource/action checks (FND-02)
 
 **Wave 3 (blocked on DB, flags, permissions foundations)**
 - [ ] 02-08-PLAN.md — Worker registry and Web/CLI/TUI auth parity; BUG-17 deferral preserved (FND-04, FND-05, BUG-17)

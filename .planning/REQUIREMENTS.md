@@ -52,7 +52,7 @@
 ### Foundation — Pillar 1 (FND)
 
 - [x] **FND-01**: Migrations run clean on both PGlite and PostgreSQL with CI verification (document PGlite limitations vs PostgreSQL)
-- [ ] **FND-02**: `assertPermission()` enforced via lint rule on every tRPC procedure
+- [x] **FND-02**: `assertPermission()` enforced via lint rule on every tRPC procedure
 - [x] **FND-03**: `tenant_settings` entity exists with per-org configuration
 - [ ] **FND-04**: graphile-worker formally bootstrapped with extensible worker registry (supports job types for pillars 6, 9, 10, 12)
 - [ ] **FND-05**: All three surfaces reach init/auth parity: Web login/auto-session, CLI `fulcrum auth whoami`, TUI auth screen
