@@ -1,207 +1,188 @@
 # Fulcrum
 
-> Local-first CLI Agent OS foundation for keeping Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi CLI aligned across rules, hooks, skills, MCPs, package surfaces, and diagnostics.
+> Local-first Agent OS — project management, agent orchestration, docs, memory, and developer tooling in one platform. Runs entirely on your machine with PGlite. SaaS-ready schema from day one.
 
-Fulcrum is currently the **foundation layer** of the larger Agent OS: it manages the configuration and capability surface that agents load before they work. Repository supervision, task tracking, agent-run history, memory, and artifact tracking are still planned layers; do not build against them yet. See [HANDOVER.md](HANDOVER.md) for the live state snapshot and [AGENTS.md](AGENTS.md) for project rules.
+Fulcrum is a full-stack Agent OS that combines Jira-style task management, Confluence-style docs, agent orchestration (Symphony), inference sidecar, memory/context engine, search, notifications, and developer tooling (CLI + TUI + Web) into a single local-first platform.
 
-## What Ships Today
+## What Ships in v0.2.0
 
-| Area | Current behavior | Primary docs |
-|---|---|---|
-| Install profiles | `minimal` by default, `rules-only`, `full`, and `verify-all` through the component lifecycle engine | [user guide](docs/user-guide.md), [developer guide](docs/developer-guide.md) |
-| Component lifecycle | `fulcrum component list/info/plan/status/install/remove/enable/disable` for rules, policy, hooks, MCPs, skills, and managed packages | [user guide](docs/user-guide.md#component-lifecycle) |
-| Cross-agent rules | Sentinel-splices `rules/AGENTS.md` into each detected agent while preserving user text outside Fulcrum markers | [context](docs/context.md), [agents](docs/agents.md) |
-| Hooks | Eight TypeScript hook recipes behind one `fulcrum hook <name>` binary entrypoint | [hooks](docs/hooks.md), [tool output policy](docs/tool-output-policy.md) |
-| Skills | 29 authored skills, 19 upstream-pinned skills, trigger eval harnesses, and agent-native namespace layouts | [skills](docs/skills.md), [skill smoke test](docs/skill-smoke-test.md) |
-| Managed packages | Official-first install plus package payload mirrors, loadable skill adapters, and native MCP config for Caveman, Repomix, Cloudflare, and Superpowers | [MCP policy](docs/mcp.md), [HANDOVER](HANDOVER.md) |
-| MCP registry | 17 builtin MCP definitions plus package-provided MCPs; config is installed everywhere supported, enablement is policy-controlled | [MCP policy](docs/mcp.md) |
-| Doctor | Agent, component, package parity, MCP, skill-budget, policy, toolchain, and worktree health reporting | [user guide](docs/user-guide.md#doctor) |
+| Pillar | What it does | Surfaces |
+|--------|-------------|----------|
+| **Foundation** (P1) | Auth, orgs, feature flags, schema, migrations | Web, CLI |
+| **Inference Sidecar** (P2) | Embedded ML models, Ollama/LM Studio backends, embeddings | CLI, Web |
+| **Symphony Orchestration** (P3) | Agent dispatch, run lifecycle, retry/stall recovery | Web, CLI, TUI |
+| **Sandcastle Runner** (P4) | Sandboxed agent execution, transcript capture, artifact harvest | CLI |
+| **Router & Skills** (P5) | Routing rules engine, skill marketplace, auto-assign | Web, CLI, TUI |
+| **Tasks & Scrum** (P6) | Kanban boards, sprints, burndown charts, custom fields | Web, CLI, TUI |
+| **Docs & Collab** (P7) | TipTap editor, versioning, comments, templates | Web, CLI, TUI |
+| **Memory & Context** (P8) | Heuristic extraction, BM25 retrieval, context assembly | CLI, Web |
+| **Repos & Git** (P9) | Repository supervision, file browser, commit log | Web, CLI, TUI |
+| **Artifacts** (P10) | Run artifact storage, dedup, lifecycle management | Web, CLI |
+| **Search** (P11) | Full-text search, facets, saved searches, click telemetry | Web, CLI, TUI |
+| **Notifications** (P12) | Rules engine, inbox, audit log, quiet hours, webhooks | Web, CLI, TUI |
+| **API & Webhooks** (P13) | REST API (Hono/OpenAPI), webhook dispatcher, connectors | API, Web |
+| **CLI Codegen** (P14) | Generated commands, completions, doctor orchestrator | CLI |
+| **TUI** (P15) | Full terminal UI with 44 screens, keyboard navigation | TUI |
+| **Web Shell** (P16) | SvelteKit app, dashboard, all settings pages, a11y | Web |
+| **Cross-Cutting** (P17) | Themes, backups, imports/exports, telemetry, secrets | Web, CLI, TUI |
+
+All online features are **shipped but disabled by default** behind `FULCRUM_FEATURES` flags.
+
+## Quick Start
+
+```bash
+# Install
+git clone https://github.com/moabualruz/fulcrum
+cd fulcrum
+bun install
+
+# Run the web app (local dev — no auth required)
+cd src/web && bun run dev
+# → http://localhost:5173
+
+# Or use the CLI
+bun run src/index.ts doctor
+bun run src/index.ts projects list --json
+bun run src/index.ts tasks create --title "My first task" --json
+```
 
 ## Supported Agents
 
+Fulcrum manages configuration for 5 CLI coding agents:
+
 | Agent | Rules | Skills | Hooks | MCP |
 |---|---|---|---|---|
-| Claude Code | `~/.claude/CLAUDE.md` | `fulcrum@fulcrum` plugin | `~/.claude/settings.json` | `claude mcp` / settings |
-| Codex CLI | `~/.codex/AGENTS.md` | global opt-in or project `.codex/skills/fulcrum/` | `~/.codex/hooks.json` | `~/.codex/config.toml` |
-| Gemini CLI | `~/AGENTS.md` imported by `~/.gemini/GEMINI.md` | `fulcrum-skills` extension | `~/.gemini/settings.json` | `settings.json` `mcpServers` |
-| OpenCode | `~/.config/opencode/AGENTS.md` | `~/.config/opencode/skills/fulcrum/` | TypeScript plugin | `opencode.json` |
-| Pi CLI | `~/.pi/agent/AGENTS.md` | `~/.pi/agent/skills/fulcrum/` | TypeScript extension | `pi-mcp-adapter` |
+| Claude Code | `~/.claude/CLAUDE.md` | `fulcrum@fulcrum` plugin | `~/.claude/settings.json` | `claude mcp` |
+| Codex CLI | `~/.codex/AGENTS.md` | `.codex/skills/fulcrum/` | `~/.codex/hooks.json` | `~/.codex/config.toml` |
+| Gemini CLI | `~/AGENTS.md` | `fulcrum-skills` extension | `~/.gemini/settings.json` | `settings.json` |
+| OpenCode | `~/.config/opencode/AGENTS.md` | `~/.config/opencode/skills/` | TypeScript plugin | `opencode.json` |
+| Pi CLI | `~/.pi/agent/AGENTS.md` | `~/.pi/agent/skills/` | TypeScript extension | `pi-mcp-adapter` |
 
-## Install
+## Architecture
 
-From a clone:
-
-```bash
-curl -fsSL https://bun.sh/install | bash
-git clone https://github.com/moabualruz/fulcrum ~/code/fulcrum
-cd ~/code/fulcrum
-bash scripts/install.sh
+```
+┌─────────────────────────────────────────────────────┐
+│                    Surfaces                          │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌────────┐│
+│  │   Web   │  │   CLI   │  │   TUI   │  │  API   ││
+│  │SvelteKit│  │  Bun    │  │ OpenTUI │  │  Hono  ││
+│  └────┬────┘  └────┬────┘  └────┬────┘  └───┬────┘│
+│       └────────────┼───────────┼─────────────┘      │
+│                    │           │                     │
+│              ┌─────┴───────────┴─────┐              │
+│              │     tRPC Router       │              │
+│              │  (shared procedures)  │              │
+│              └───────────┬───────────┘              │
+│                          │                          │
+│  ┌───────────────────────┼───────────────────────┐  │
+│  │              Product Kernel                    │  │
+│  │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ │  │
+│  │  │ Tasks  │ │  Docs  │ │ Memory │ │ Search │ │  │
+│  │  │Sprints │ │TipTap  │ │Context │ │  FTS   │ │  │
+│  │  └────────┘ └────────┘ └────────┘ └────────┘ │  │
+│  │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ │  │
+│  │  │ Repos  │ │Artifact│ │ Events │ │ Notify │ │  │
+│  │  │  Git   │ │Storage │ │ Audit  │ │  Feed  │ │  │
+│  │  └────────┘ └────────┘ └────────┘ └────────┘ │  │
+│  └───────────────────────┬───────────────────────┘  │
+│                          │                          │
+│              ┌───────────┴───────────┐              │
+│              │   PGlite (embedded)   │              │
+│              │   Local-first DB      │              │
+│              └───────────────────────┘              │
+└─────────────────────────────────────────────────────┘
 ```
 
-From a published release:
+## Feature Flags
+
+Online features are gated behind `FULCRUM_FEATURES` (comma-separated):
 
 ```bash
-FULCRUM_RELEASE_TAG=v0.1.0 bash <(curl -fsSL https://raw.githubusercontent.com/moabualruz/fulcrum/main/scripts/install.sh)
+# Enable specific features
+export FULCRUM_FEATURES=i18n,embeddings,experiments
+
+# All available flags
+i18n, embeddings, router-llm, casbin, desktop-app, saas-auth,
+experiments, pwa-offline, real-time-collab-server, public-api,
+export-csv, import-csv, import-linear, import-jira, import-plane,
+telemetry-remote, error-reporting-remote, vault-integration,
+scheduled-backups, skill-marketplace, keyring-macos, keyring-linux,
+keyring-windows, report-llm-narration, notify-webhook
 ```
 
-Useful install variants:
+## CLI Commands
 
 ```bash
-bash scripts/install.sh --profile rules-only
-bash scripts/install.sh --profile full
-bash scripts/install.sh --with-project ~/code/myproject
-bash scripts/install.sh --dry-run --profile full
-```
+# Project management
+fulcrum projects list|create|delete --json
+fulcrum tasks list|create|update|delete --json
+fulcrum sprints list|create|close --json
 
-The default `minimal` profile splices rules, seeds the tool-output policy, registers every builtin MCP, writes disabled config where agents support it, and enables the recommended defaults, DeepWiki and Repomix. Use `--no-default-mcps` when you want registry-only setup without changing enable state. The `full` profile adds hooks, authored skills, non-package-owned upstream skills, Caveman, Repomix, Cloudflare, and Superpowers package setup. Package installs own their bundled skills/MCPs; Repomix MCP is default-enabled, while CLI/skill-covered package MCPs stay disabled unless policy or the user enables them.
+# Docs
+fulcrum docs list|create|update --json
 
-## First Run
+# Search
+fulcrum search "query" --json
 
-```bash
-fulcrum doctor
-fulcrum init ~/code/myproject
-fulcrum component list
-fulcrum component status package.repomix --json
-```
+# Agent operations
+fulcrum agent list|test --json
+fulcrum runs list|logs|cancel --json
+fulcrum inference status|start|stop --json
 
-`fulcrum init` creates project `AGENTS.md`, `.claude/CLAUDE.md` import glue, `.gitignore` entries, and vendor-canonical project integrations where supported: graphify, ast-grep, tavily, and Pi MCP adapter setup. Reindex an existing project with:
-
-```bash
-fulcrum init reindex ~/code/myproject
-```
-
-## Daily Commands
-
-```bash
+# System
 fulcrum doctor --json
-fulcrum install --dry-run
-fulcrum install --profile full --dry-run
-fulcrum uninstall --dry-run
+fulcrum backup --output <path>
+fulcrum restore --input <path>
+fulcrum flags list|set --json
 
-fulcrum component info package.cloudflare
-fulcrum component install package.superpowers --all-agents
-fulcrum component remove package.caveman --all-agents --dry-run
-
-fulcrum hooks list
-fulcrum hooks enable format
-fulcrum hooks disable format
-
-fulcrum skills sync
-fulcrum skills sync --codex-project <repo>
-fulcrum skills upstream
-fulcrum skills list --installed
-
-fulcrum mcp list
-fulcrum mcp enable github --all-agents
-fulcrum mcp disable github --all-agents
+# Data
+fulcrum export --format csv|json --entity tasks
+fulcrum import --format csv|linear|jira|plane --json
 ```
 
-## Package Surface Policy
+## Web App
 
-Fulcrum uses an official-first rule:
+The SvelteKit web app runs at `http://localhost:5173` in dev mode.
 
-1. Use the vendor/native installer when an agent has one.
-2. Mirror the vendor-published package content into nearest native surfaces when an agent does not.
-3. Adapt loadable surfaces into native agent config, not only package cache: `skills/*/SKILL.md` become agent skill paths and package `.mcp.json` entries become native MCP config.
-4. Record unsupported primitives explicitly in `component status` and `doctor`; do not silently omit them.
+**No login required in local/dev mode.** Set `FULCRUM_REQUIRE_AUTH=1` for SaaS mode with Better-Auth.
 
-Managed package parity covers:
+Key pages:
+- `/` — Dashboard with project/task/doc/run metrics
+- `/projects` — Project list and creation
+- `/projects/<id>/board` — Kanban board
+- `/docs` — Document browser and TipTap editor
+- `/search` — Full-text search with facets
+- `/inbox` — Notifications and activity feed
+- `/runs` — Agent run history and logs
+- `/doctor` — Health dashboard (no auth required)
+- `/settings/*` — Theme, flags, secrets, backups, connectors, etc.
 
-- skills
-- rules/context files
-- MCP manifests plus native MCP config
-- commands/prompts
-- agents/subagents
-- hooks
-- tools/scripts
-- manifests and metadata
-- assets/templates/themes/docs
-- unknown runtime files
+## TUI
 
-Generated CLI agent mirrors exclude source-only backups such as `.original.md` and `.backup.md`; project source keeps them.
-
-## Skills
-
-Fulcrum-authored skills keep prefix-free frontmatter names like `jq`, `ruff`, and `subagent-orchestration`. The install mechanism provides the namespace:
-
-```text
-Claude Code: /fulcrum:<name> through fulcrum@fulcrum
-Codex CLI:   ~/.codex/skills/fulcrum/<name>/ or project .codex/skills/fulcrum/<name>/
-Gemini CLI:  ~/.gemini/extensions/fulcrum-skills/skills/<name>/
-OpenCode:    ~/.config/opencode/skills/fulcrum/<name>/
-Pi CLI:      ~/.pi/agent/skills/fulcrum/<name>/
+```bash
+fulcrum tui
 ```
 
-Authored skill list:
-
-```text
-bat biome dart-toolchain difftastic direnv eza flarectl fzf gh git-cliff
-gitleaks google-java-format hyperfine jq just ktlint lizard mise osv-scanner
-pmd ruff sd spotbugs subagent-orchestration usql watchexec xh yq zoxide
-```
-
-## Documentation Map
-
-Start here:
-
-- [User guide](docs/user-guide.md) — install profiles, component lifecycle, daily commands, troubleshooting.
-- [Developer guide](docs/developer-guide.md) — repo layout, architecture, tests, release process.
-- [Handover](HANDOVER.md) — live state, decisions, recent work, outstanding layers.
-- [Contributing](docs/contributing.md) — commit format, compression contract, review expectations.
-
-Core reference:
-
-- [Agents](docs/agents.md) — per-agent paths, hook/MCP/skill differences, known quirks.
-- [Context](docs/context.md) — global/project rules and sentinel splice behavior.
-- [Hooks](docs/hooks.md) — hook event model and recipe catalog.
-- [Tool output policy](docs/tool-output-policy.md) — per-tool output routing tiers.
-- [Capabilities](docs/capabilities.md) — bring-your-own workstation toolchain.
-- [Skills](docs/skills.md) — paths, upstream lockfile, authoring, evals.
-- [MCP policy](docs/mcp.md) — official-first MCP/package policy, auth, builtin catalogue.
-- [Caveman](docs/caveman.md) — output compression setup and source-doc compression.
-- [Product kernel](docs/product-kernel.md) — local PGlite + PostgreSQL kernel, deterministic retrieval, `fulcrum product …` CLI.
-- [Setup smoke test](docs/smoke-test.md) — end-to-end install verification.
-- [Skill smoke test](docs/skill-smoke-test.md) — manual cross-agent skill verification.
-
-Source registries:
-
-- [skills/SOURCES.md](skills/SOURCES.md) — authored skill registry.
-- [skills/upstream.lock](skills/upstream.lock) — pinned upstream skill sources.
-- [rules/AGENTS.md](rules/AGENTS.md) — global Fulcrum behavior block.
-- [src/agents/registry.ts](src/agents/registry.ts) — canonical supported-agent list.
+44 screens covering all features. Keyboard-driven: `j/k` navigate, `Enter` selects, `q` goes back, `Tab` switches panes.
 
 ## Development
 
 ```bash
-bun install
-bun run ci
-bun run src/index.ts doctor
-bun run src/index.ts component list
-bun run build:all
+bun install                  # Install deps
+bun run --bun tsc --noEmit   # Typecheck
+bun run scripts/test-root.ts # Run root tests
+cd src/web && bun run dev    # Dev server
+cd src/web && bun run web:e2e # Playwright e2e tests
 ```
 
-`bun run ci` runs install smoke, typecheck, full Bun tests, five platform builds, skills lint, and compression check.
+## Docs
 
-Release flow:
+- [User Guide](docs/user-guide.md)
+- [Developer Guide](docs/developer-guide.md)
+- [Test Gaps](docs/TEST-GAPS.md) — documented integration/e2e test coverage gaps
+- [HANDOVER](HANDOVER.md) — live state snapshot
+- [AGENTS](AGENTS.md) — project rules for AI agents
 
-```bash
-bun run changelog
-bun run release vX.Y.Z
-bun run release vX.Y.Z --gh
-```
+## License
 
-No GitHub Actions are the source of truth today. Local `bun run ci` and `bun run release` are the gates.
-
-## Planned Layers
-
-Still placeholders:
-
-- repository supervisor
-- task system
-- agent runs
-- context engine
-- memory
-- artifacts
-- generic `fulcrum plugins ...` UX
-
-Managed package lifecycle exists now for known packages. A generic plugin marketplace/translator does not.
+See [LICENSE](LICENSE).
