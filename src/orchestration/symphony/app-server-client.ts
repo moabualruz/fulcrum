@@ -219,7 +219,7 @@ export class CodexAppServerClient {
     });
   }
 
-  private readonly _defaultSpawn: AppServerClientOptions["_spawnFn"] = (cmd, args, options) => {
+  private readonly _defaultSpawn: NonNullable<AppServerClientOptions["_spawnFn"]> = (cmd, args, options) => {
     return nodeSpawn(cmd, args, {
       cwd: options.cwd as string | undefined,
       stdio: ["pipe", "pipe", "pipe"],
