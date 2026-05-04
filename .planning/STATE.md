@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-last_updated: "2026-05-04T12:03:34.231Z"
+last_updated: "2026-05-04T12:20:00.279Z"
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 18
-  completed_plans: 14
-  percent: 78
+  completed_plans: 15
+  percent: 83
 ---
 
 # Planning State
@@ -17,7 +17,7 @@ progress:
 ## Current Position
 
 Phase: 02 (bug-fixes-foundation) — EXECUTING
-Plan: 4 of 8
+Plan: 5 of 8
 
 - **Phase**: 02-bug-fixes-foundation
 - **Plan**: 8 plans created
@@ -39,3 +39,6 @@ Plan: 4 of 8
 - [Phase 02-bug-fixes-foundation]: 02-03: Loadable package skill mirrors preserve existing non-Fulcrum target skills unless Fulcrum mirror metadata permits replacement.
 - [Phase 02-04]: Targeted patchers preserve unowned bytes instead of reserializing whole files.
 - [Phase 02-04]: Config mutation requires explicit Fulcrum ownership markers before changing existing JSON/TOML keys.
+- [Phase 02-05]: Product CLI parsing fails closed on unknown or valueless flags.
+- [Phase 02-05]: Doctor product-kernel DB probe failures are warning-level with subsystem product-kernel-db.
+- [Phase 02-05]: Web Cmd+K/Ctrl+K uses existing CommandPalette controlled state with no visible shortcut UI.

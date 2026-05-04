@@ -38,16 +38,16 @@
 - [x] **BUG-06**: Claude settings cleanup scoped to Fulcrum-owned keys only
 - [x] **BUG-07**: Claude cache/marketplace removals marker-gated
 - [x] **BUG-08**: Agent install does not auto-invoke Claude CLI plugin commands without confirmation
-- [ ] **BUG-09**: Product CLI flag parser handles positional args correctly
+- [x] **BUG-09**: Product CLI flag parser handles positional args correctly
 - [x] **BUG-10**: Component status inspects filesystem, not ledger state
 - [x] **BUG-11**: Package parity validates native roots, not over-trusts
-- [ ] **BUG-12**: Doctor increments warnings on product-kernel DB errors
+- [x] **BUG-12**: Doctor increments warnings on product-kernel DB errors
 - [x] **BUG-13**: JSON/TOML config uses targeted patchers, not whole-file rewrites
 - [x] **BUG-14**: Vendor mirrors do not overwrite top-level skill/command names
-- [ ] **BUG-15**: Complexity hotspots (CCN 18-59) refactored below CCN 15 threshold
+- [x] **BUG-15**: Complexity hotspots (CCN 18-59) refactored below CCN 15 threshold
 - [ ] **BUG-16**: cookie@0.6.0 advisory resolved in web lockfile
 - [ ] **BUG-17**: Local main synced with origin (41 commits ahead)
-- [ ] **BUG-18**: Cmd+K keyboard shortcut bound in web layout (palette component exists but `svelte:window` keydown handler missing)
+- [x] **BUG-18**: Cmd+K keyboard shortcut bound in web layout (palette component exists but `svelte:window` keydown handler missing)
 
 ### Foundation — Pillar 1 (FND)
 
