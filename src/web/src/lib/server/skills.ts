@@ -1,5 +1,10 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
+/**
+ * Skills actions — migrated from raw ProductDb to MikroORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { randomUUID } from "node:crypto";
 
 export interface SkillRow {
   id: string;
@@ -72,35 +77,37 @@ function normalise(row: RawSkillRow): SkillRow {
   };
 }
 
-export async function listSkills(db: ProductDb, orgId: string): Promise<SkillRow[]> {
-  const rows = await db.query<RawSkillRow>(
+export async function listSkills(em: EntityManager, orgId: string): Promise<SkillRow[]> {
+  const conn = em.getConnection();
+  const rows = await conn.execute<RawSkillRow[]>(
     `SELECT * FROM skills WHERE org_id = $1 ORDER BY slug ASC`,
     [orgId],
   );
   return rows.map(normalise);
 }
 
-export async function installSkill(db: ProductDb, input: InstallSkillInput): Promise<SkillRow> {
+export async function installSkill(em: EntityManager, input: InstallSkillInput): Promise<SkillRow> {
   if (!input.slug || input.slug.trim() === "") {
     throw new Error("slug is required");
   }
-  const id = newUlid();
+  const id = randomUUID();
   const source = input.upstreamRepo ? "upstream" : "local";
-  await db.query(
+  const conn = em.getConnection();
+  await conn.execute(
     `INSERT INTO skills (id, org_id, slug, source, upstream_repo)
      VALUES ($1, $2, $3, $4, $5)`,
     [id, input.orgId, input.slug.trim(), source, input.upstreamRepo ?? null],
   );
-  const rows = await db.query<RawSkillRow>(
+  const rows = await conn.execute<RawSkillRow[]>(
     `SELECT * FROM skills WHERE id = $1`,
     [id],
   );
   return normalise(rows[0]!);
 }
 
-export async function upgradeSkill(db: ProductDb, orgId: string, slug: string): Promise<SkillRow> {
-  // Bump version patch component
-  const rows = await db.query<RawSkillRow>(
+export async function upgradeSkill(em: EntityManager, orgId: string, slug: string): Promise<SkillRow> {
+  const conn = em.getConnection();
+  const rows = await conn.execute<RawSkillRow[]>(
     `SELECT * FROM skills WHERE org_id = $1 AND slug = $2`,
     [orgId, slug],
   );
@@ -108,28 +115,29 @@ export async function upgradeSkill(db: ProductDb, orgId: string, slug: string): 
   const current = rows[0]!;
   const parts = current.version.split(".").map(Number);
   const newVersion = `${parts[0]}.${parts[1]}.${parts[2]! + 1}`;
-  await db.query(
+  await conn.execute(
     `UPDATE skills SET version = $1, updated_at = now() WHERE org_id = $2 AND slug = $3`,
     [newVersion, orgId, slug],
   );
-  const updated = await db.query<RawSkillRow>(
+  const updated = await conn.execute<RawSkillRow[]>(
     `SELECT * FROM skills WHERE org_id = $1 AND slug = $2`,
     [orgId, slug],
   );
   return normalise(updated[0]!);
 }
 
-export async function upgradeAllSkills(db: ProductDb, orgId: string): Promise<SkillRow[]> {
-  const skills = await listSkills(db, orgId);
+export async function upgradeAllSkills(em: EntityManager, orgId: string): Promise<SkillRow[]> {
+  const skills = await listSkills(em, orgId);
   const results: SkillRow[] = [];
   for (const skill of skills) {
-    results.push(await upgradeSkill(db, orgId, skill.slug));
+    results.push(await upgradeSkill(em, orgId, skill.slug));
   }
   return results;
 }
 
-export async function uninstallSkill(db: ProductDb, orgId: string, slug: string): Promise<void> {
-  const result = await db.query<{ id: string }>(
+export async function uninstallSkill(em: EntityManager, orgId: string, slug: string): Promise<void> {
+  const conn = em.getConnection();
+  const result = await conn.execute<{ id: string }[]>(
     `DELETE FROM skills WHERE org_id = $1 AND slug = $2 RETURNING id`,
     [orgId, slug],
   );
@@ -137,16 +145,17 @@ export async function uninstallSkill(db: ProductDb, orgId: string, slug: string)
 }
 
 export async function updateEnabledAgents(
-  db: ProductDb,
+  em: EntityManager,
   orgId: string,
   slug: string,
   enabledAgents: string[],
 ): Promise<SkillRow> {
-  await db.query(
+  const conn = em.getConnection();
+  await conn.execute(
     `UPDATE skills SET enabled_agents = $1::jsonb, updated_at = now() WHERE org_id = $2 AND slug = $3`,
     [JSON.stringify(enabledAgents), orgId, slug],
   );
-  const rows = await db.query<RawSkillRow>(
+  const rows = await conn.execute<RawSkillRow[]>(
     `SELECT * FROM skills WHERE org_id = $1 AND slug = $2`,
     [orgId, slug],
   );
@@ -155,10 +164,11 @@ export async function updateEnabledAgents(
 }
 
 export async function resolveConflict(
-  db: ProductDb,
+  em: EntityManager,
   input: ResolveConflictInput,
 ): Promise<SkillRow> {
-  const rows = await db.query<RawSkillRow>(
+  const conn = em.getConnection();
+  const rows = await conn.execute<RawSkillRow[]>(
     `SELECT * FROM skills WHERE org_id = $1 AND slug = $2`,
     [input.orgId, input.slug],
   );
@@ -166,17 +176,16 @@ export async function resolveConflict(
   const skill = normalise(rows[0]!);
   if (!skill.upstream_conflict) throw new Error(`skill '${input.slug}' has no conflict`);
 
-  // Resolution: clear conflict. If use_upstream, update content_hash.
   const newHash = input.resolution === "use_upstream"
     ? `upstream-${Date.now()}`
     : skill.content_hash;
 
-  await db.query(
+  await conn.execute(
     `UPDATE skills SET upstream_conflict = NULL, content_hash = $1, updated_at = now()
      WHERE org_id = $2 AND slug = $3`,
     [newHash, input.orgId, input.slug],
   );
-  const updated = await db.query<RawSkillRow>(
+  const updated = await conn.execute<RawSkillRow[]>(
     `SELECT * FROM skills WHERE org_id = $1 AND slug = $2`,
     [input.orgId, input.slug],
   );
