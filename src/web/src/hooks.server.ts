@@ -22,10 +22,25 @@ import { Container } from "@needle-di/core";
 import type { EntityManager, MikroORM } from "@mikro-orm/postgresql";
 
 import { getActiveProject } from "./lib/state/active-project.ts";
-import { appRouter } from "../../../src/trpc/router.ts";
-import { createContext } from "../../../src/trpc/context.ts";
 import type { FlagRegistry } from "../../../src/flags/registry.ts";
 import { dirForLocale, isI18nEnabled, normalizeLocale } from "$lib/i18n/index.ts";
+
+// Lazy imports — tRPC router + context pull in the full ORM entity graph.
+// Importing eagerly breaks Vite SSR because the entity files use syntax
+// (e.g. Bun-specific APIs, .sql imports) that Vite's transform can't handle.
+let _appRouter: any = null;
+let _createContext: any = null;
+async function getTrpc() {
+  if (!_appRouter) {
+    const mod = await import("../../../src/trpc/router.ts");
+    _appRouter = mod.appRouter;
+  }
+  if (!_createContext) {
+    const mod = await import("../../../src/trpc/context.ts");
+    _createContext = mod.createContext;
+  }
+  return { appRouter: _appRouter, createContext: _createContext };
+}
 
 // Lazy auth initialiser — only wired when ORM is available.
 // Imported dynamically to avoid circular dep issues at SSR preload time.
@@ -226,12 +241,13 @@ export const handle: Handle = async ({ event, resolve }) => {
       // 4. tRPC handler on /api/trpc/**
       //    fetchRequestHandler passes the Request + context to appRouter.
       if (url.pathname.startsWith("/api/trpc")) {
+        const trpc = await getTrpc();
         return await fetchRequestHandler({
           endpoint: "/api/trpc",
           req: request,
-          router: appRouter,
+          router: trpc.appRouter,
           createContext: ({ resHeaders }) =>
-            createContext({
+            trpc.createContext({
               session: sessionState.session,
               orgId: sessionState.orgId,
               userId: sessionState.userId,
