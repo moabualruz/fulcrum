@@ -19,7 +19,8 @@ export class TenantSettingRepository extends EntityRepository<TenantSetting> {
     }
 
     const setting = this.create({ orgId, key, value });
-    await this.getEntityManager().persistAndFlush(setting);
+    this.getEntityManager().persist(setting);
+    await this.getEntityManager().flush();
     return setting;
   }
 
