@@ -113,22 +113,15 @@ Multi-context layout: `CONTEXT-MAP.md` at root pointing to per-context `CONTEXT.
 <claude-mem-context>
 # Memory Context
 
-# [fulcrum] recent context, 2026-05-04 10:52pm GMT+2
+# [fulcrum] recent context, 2026-05-04 11:23pm GMT+2
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (18,350t read) | 589,254t work | 97% savings
+Stats: 50 obs (18,576t read) | 584,593t work | 97% savings
 
 ### May 4, 2026
-S71 Verify Phase 2 ("02-bug-fixes-foundation") completion status and investigate blocking issues preventing CI gate pass after extensive infrastructure implementation across 8 interdependent plans. (May 4 at 3:34 PM)
-S72 Why Phase 2 cannot be completed - investigation of CI blockers preventing phase gate approval (May 4 at 3:50 PM)
-S73 Phase 2 completion blocker resolution strategy - shifting from phase execution to focused debug/fix loop (May 4 at 9:07 PM)
-S74 Execute phase 2 ($gsd-execute-phase 2) - awaiting primary session action (May 4 at 9:08 PM)
-S75 Fix Phase 2 completion blockers: resolve MikroORM EntityManager migration issues, fix public API parity 404s, add @playwright/test, and verify graphile-worker bootstrap so `bun run ci` passes (May 4 at 9:13 PM)
-455 9:37p ✅ Complete test suite validation: 1000+ tests passing across all subsystems and CLI tools
-456 " ✅ Added `updated_at` audit timestamp to sprints table schema
 457 9:38p 🔴 Sprint migration test assertion mismatch on column expectations
 458 " 🔵 doc_links table NOT NULL constraint violations in fixture setup
 459 " 🔵 Product kernel initialization test reveals database state issue
@@ -161,7 +154,6 @@ S75 Fix Phase 2 completion blockers: resolve MikroORM EntityManager migration is
 486 10:02p 🔵 Root test suite completed with 3985/3988 tests passing (1 failure, 2 skips)
 487 10:04p 🔵 Public API OpenAPI spec endpoint behavior mismatch identified
 488 " 🔴 Fixed public API OpenAPI spec endpoint to be discoverable when flag OFF
-S76 Continue observing Phase 2 ("Bug Fixes + Foundation") execution and completion, capturing verification evidence and governance artifact updates to memory for searchable reference. (May 4 at 10:05 PM)
 490 10:05p 🔴 Fixed flaky OpenAPI spec test by caching at router initialization
 491 10:09p 🔵 Phase 2 CI suite executed successfully with comprehensive test coverage
 492 10:12p 🔴 Fixed JavaScript heap out-of-memory crash in web:check CI step
@@ -178,40 +170,26 @@ S76 Continue observing Phase 2 ("Bug Fixes + Foundation") execution and completi
 515 " 🔵 Event subscription system with PGlite bridge and WebSocket polling fallback
 516 " 🔵 Search system with natural language filter translation and click telemetry
 517 10:43p 🔵 Phase 2 execution complete with all 8 plans delivering summaries and comprehensive test validation
-S77 Verify that BUG-17 (repo hygiene) deferral is consistently documented across Phase 2 artifacts and understand the scope boundary between product/runtime execution versus repository maintenance. (May 4 at 10:46 PM)
-S78 Complete memory agent observation of Phase 2 Bug Fixes + Foundation execution, verification, and formal closure; document all deferral decisions and governance artifact updates for searchable reference. (May 4 at 10:46 PM)
-S79 Correct Phase 2 branch-policy context after accidental main push; ensure future execution stays on dev/v1.0 until final milestone merge (May 4 at 10:52 PM)
-S80 Observe and document Phase 2 ("Bug Fixes + Foundation") execution completion, including code commits, dev/v1.0 synchronization, and formal verification closure (May 4 at 10:50 PM)
-**Investigated**: - Phase 2 implementation execution completion and commit state
-    - Commit 72256736 with 62 files changed across database, services, web, CLI, tests, governance layers
-    - Database schema evolution from accounts (OAuth token) table to events (verb/payload/subject_kind) table
-    - Governance artifact updates: STATE.md, ROADMAP.md, VERIFICATION.md, VALIDATION.md, 02-CONTEXT.md, 02-08-SUMMARY.md
-    - Repository synchronization state: origin/dev/v1.0...dev/v1.0 parity verification
-    - Branch-policy correction: phase execution stays on dev/v1.0; main updates only through final milestone merge after all phases land
-    - Phase completeness formal verification: 8 plans, 8 summaries, zero errors/warnings
+S96 GSD Phase 3 Discussion: Test-Driven Development Methodology (Question 2/4 - Conformance Proof) (May 4 at 11:09 PM)
+S97 GSD Phase 3 Discussion: Conformance Documentation Maintenance Strategy (Question 3/4 - Conformance Proof) (May 4 at 11:09 PM)
+S98 GSD Phase 3 Discussion: CI Agent Binary Testing Requirements (Question 4/4 - Final Conformance Proof) (May 4 at 11:09 PM)
+S99 GSD Phase 3 Discussion: Sandcastle Run Record Persistence Requirements (Question 1/4 - Artifact + Session) (May 4 at 11:10 PM)
+S100 GSD Phase 3 Discussion: Artifact Harvest Configuration Strategy (Question 2/4 - Artifact + Session) (May 4 at 11:10 PM)
+S101 GSD Phase 3 Discussion: Session Resume Behavior for Retries (Question 3/4 - Artifact + Session) (May 4 at 11:10 PM)
+S102 GSD Phase 3 Discussion: Token Usage Accounting Strategy (Question 4/4 - Final Artifact + Session) (May 4 at 11:10 PM)
+S103 GSD Phase 3 Discussion Complete: Architecture Decisions Documented and Committed (May 4 at 11:10 PM)
+534 11:12p ✅ Phase 3 Architecture Context and Discussion Log Created
+535 " ✅ Phase 3 Documentation Committed to Repository
+S104 Initialize planning phase for Phase 3 (Symphony + Sandcastle) after successful discuss-phase completion (May 4 at 11:13 PM)
+S105 Initialize Phase 3 (Symphony + Sandcastle) planning after discuss-phase completion; prepare plan-phase workflow and present research decision gate (May 4 at 11:14 PM)
+**Investigated**: Comprehensive review of plan-phase orchestrator (15-step workflow with initialization, research gate, planning, verification, gaps analysis, and auto-advance). Reference materials examined: UI patterns (banners, checkpoints, status symbols), revision loop pattern (Check-Revise-Escalate with max 3 iterations and stall detection), gate prompts (approve-revise-abort, yes-no, scope-confirm, etc.), agent contracts (completion markers for gsd-planner, gsd-plan-checker, gsd-phase-researcher), and gates taxonomy (pre-flight, revision, escalation, abort). Phase 3 artifacts loaded: 03-CONTEXT.md with 22 locked implementation decisions, 03-DISCUSSION-LOG.md audit trail, REQUIREMENTS.md (27 Symphony + 6 Sandcastle + 4 Router/Skills items), ROADMAP entry with TDD conformance suite requirement, and STATE.md showing Phase 2 complete.
 
-**Learned**: - Amendment-based commit strategy successfully consolidated Phase 2 work: initial commit 28a12e94 amended to 72256736 with database snapshot included
-    - Database architecture shifted from OAuth token storage (access_token, refresh_token, id_token, password, provider_id fields) to event-based model (verb, payload, subject_kind, subject_id fields)
-    - org_id constraint changed from nullable to mandatory (NOT NULL), reflecting organizational requirement strengthening
-    - Repository synchronization achieved parity for dev/v1.0: `git rev-list --left-right --count origin/dev/v1.0...dev/v1.0` returns 0 0
-    - Formal governance verification confirms 8/8 observable truths, 9/9 required artifacts, 5/5 key links wired—zero structural gaps
-    - Correct BUG-17 scope: local-main sync is milestone merge hygiene, not per-phase execution; loaded context must preserve this policy
+**Learned**: Plan-phase workflow is a structured 15-step orchestrator that gates research → planning → verification → gaps → auto-advance. Step 5.1 (Standard Research Decision) presents user with explicit research/skip choice. Phase 3 context is comprehensive (22 decisions in 5 categories: Tracker Authority D-01..05, WORKFLOW.md Runtime D-06..09, Dispatch + Sandbox D-10..14, Conformance Proof D-15..18, Artifact + Session D-19..22, plus agent's discretion). Phase 3 requirements span three pillars: Symphony conformance (SYM-01..27 covering WORKFLOW.md, tracker adapter, poll/retry/stall/reconciliation, app-server dispatch, HTTP extension, approval posture, run lifecycle), Sandcastle (SND-01..06 covering noSandbox dispatch, artifact harvest, adapter-swap tests, provider detection, session JSONL, multi-surface dispatch), Router/Skills (RTR-01..04 covering rules-engine matching, learned rules, LLM routing, skill sync). Conformance proof requires RED-first TDD methodology with generated symphny-conformance.md as source of truth.
 
-**Completed**: - Phase 2 full execution: 8/8 plans completed (02-01 through 02-08)
-    - 24/24 in-scope Phase 2 requirements satisfied; BUG-17 tracked as branch-policy/milestone merge hygiene
-    - Commit 72256736 "fix(phase-2): complete foundation execution" created with:
-      * 62 files changed: 1468 insertions(+), 230 deletions(-)
-      * 4 new files created (debug guide, verification report, orchestration lib, theme module)
-      * Database snapshot reflecting accounts→events schema migration (+10804/-1031 net lines)
-    - Push to origin/dev/v1.0: 24043242..72256736 synchronized successfully
-    - Branch-policy context added to execute-phase workflow loader, .planning/STATE.md, and Phase 2 CONTEXT/VERIFICATION/SUMMARY artifacts
-    - Formal verification closure: phase-completeness tool confirms complete=true with zero errors
+**Completed**: Discuss-phase successfully completed (20 questions, 22 documented decisions). Committed 03-CONTEXT.md and 03-DISCUSSION-LOG.md to git (dc8dac58). Phase 2 fully executed and verified (8 plans, 18 total completed plans, 100% progress). Git state: branch dev/v1.0 [ahead 1] with AGENTS.md modified. Current session: loaded plan-phase orchestrator, read all reference materials, validated Phase 3 roadmap entry, loaded init.plan-phase JSON (sonnet researcher, opus planner, sonnet checker; research_enabled=true, plan_checker_enabled=true, commit_docs=true), examined phase directory (03-CONTEXT.md, 03-DISCUSSION-LOG.md), verified no existing plans, confirmed config defaults (all workflow gates unset = defaults active).
 
-**Next Steps**: - Phase 2 formally closed and synchronized on dev/v1.0
-    - System ready for Phase 3 (Symphony + Sandcastle orchestration) execution planning
-    - Awaiting user direction to initiate Phase 3 work
-    - Future GSD phase execution must not push or mutate main unless user explicitly requests it in the same turn
+**Next Steps**: Awaiting user response to research decision gate (Step 5.1): user must reply with `1` (research first) or `2` (skip research) to proceed. Based on response: if `1`, spawn gsd-phase-researcher with CONTEXT.md to investigate Symphony SPEC.md details, orchestration patterns, Sandcastle dispatch mechanisms, and track the returned 03-RESEARCH.md. If `2`, proceed directly to Step 6 (Check Existing Plans) → Step 7 (context paths) → Step 8 (spawn gsd-planner with CONTEXT.md + REQUIREMENTS.md) → planning completion → Step 10 (spawn gsd-plan-checker) → Step 12 revision loop if needed → Step 13 coverage gates → final status. Each major step will display UI banners per references/ui-brand.md patterns. Revision loop uses stall detection (issue count must decrease between iterations, max 3 iterations).
 
 
-Access 589k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 585k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>
