@@ -24,6 +24,14 @@ import type { EntityManager, MikroORM } from "@mikro-orm/postgresql";
 import { getActiveProject } from "./lib/state/active-project.ts";
 import type { FlagRegistry } from "../../../src/flags/registry.ts";
 import { dirForLocale, isI18nEnabled, normalizeLocale } from "$lib/i18n/index.ts";
+import { initProductDb, getProductDb } from "$lib/server/db";
+
+// ─── Startup: initialise PGlite singleton (runs migrations once) ─────────────
+// This top-level await runs when the server module is first loaded, before any
+// request is handled. It replaces the per-request open+migrate pattern.
+await initProductDb().catch((err) => {
+  console.error("[hooks.server] Failed to init ProductDb:", err);
+});
 
 // Lazy imports — tRPC router + context pull in the full ORM entity graph.
 // Importing eagerly breaks Vite SSR because the entity files use syntax
@@ -253,6 +261,7 @@ export const handle: Handle = async ({ event, resolve }) => {
               userId: sessionState.userId,
               em: requestRuntime?.em ?? null,
               container: requestRuntime?.container ?? null,
+              db: getProductDb(),
               responseHeaders: resHeaders,
             }),
         });
