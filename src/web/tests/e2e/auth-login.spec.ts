@@ -22,6 +22,12 @@ if (isPlaywrightCli) {
 		expect(response.status()).toBe(302);
 		expect(response.headers()["location"]).toBe("/auth/login");
 	});
+
+	test("auto-session route preserves seeded login behavior", async ({ page }) => {
+		await page.goto("/auth/auto-session");
+
+		await expect(page).toHaveURL(/\/$/);
+	});
 }
 
 export {};
