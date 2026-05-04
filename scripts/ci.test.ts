@@ -1,5 +1,5 @@
 // Unit tests for scripts/ci.ts STEPS array.
-// Asserts 09.5 requirements: web:test always-on, web:e2e opt-in via FULCRUM_RUN_E2E.
+// Asserts web product gates and smoke e2e stay in root CI.
 //
 // Note: ci.ts guards the runner with `import.meta.main` so importing it here
 // only evaluates the STEPS array without executing any subprocesses.
@@ -26,29 +26,29 @@ describe("ci STEPS — web:test always-on", () => {
   });
 });
 
-describe("ci STEPS — web:e2e opt-in", () => {
+describe("ci STEPS — web:e2e full suite opt-in", () => {
   // Module is evaluated once per process. In this test run FULCRUM_RUN_E2E is
-  // not set to "1", so web:e2e must be absent.
-  it("omits web:e2e when FULCRUM_RUN_E2E is not '1'", () => {
+  // not set to "1", so the full e2e suite must be absent.
+  it("omits full e2e when FULCRUM_RUN_E2E is not '1'", () => {
     const names = STEPS.map((s) => s.name);
-    expect(names).not.toContain("web:e2e");
+    expect(names).not.toContain("web:e2e:full");
   });
 
-  // Verify the conditional logic directly — env "1" → step included.
-  it("conditional produces web:e2e step when env is '1'", () => {
+  // Verify the conditional logic directly — env "1" → full suite step included.
+  it("conditional produces full e2e step when env is '1'", () => {
     const runE2E = "1";
     const steps = runE2E === "1"
-      ? [{ name: "web:e2e", cmd: ["bun", "run", "web:e2e"], cwd: "src/web" }]
+      ? [{ name: "web:e2e:full", cmd: ["bun", "run", "web:e2e:full"], cwd: "src/web" }]
       : [];
-    expect(steps.map((s) => s.name)).toContain("web:e2e");
+    expect(steps.map((s) => s.name)).toContain("web:e2e:full");
     expect(steps[0]!.cwd).toBe("src/web");
-    expect(steps[0]!.cmd).toEqual(["bun", "run", "web:e2e"]);
+    expect(steps[0]!.cmd).toEqual(["bun", "run", "web:e2e:full"]);
   });
 
   it("conditional produces empty array when env is not '1'", () => {
     const runE2E = "";
     const steps = runE2E === "1"
-      ? [{ name: "web:e2e", cmd: ["bun", "run", "web:e2e"], cwd: "src/web" }]
+      ? [{ name: "web:e2e:full", cmd: ["bun", "run", "web:e2e:full"], cwd: "src/web" }]
       : [];
     expect(steps).toHaveLength(0);
   });

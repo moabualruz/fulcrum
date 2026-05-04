@@ -12,7 +12,9 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test": "bun test --conditions=svelte ./src/lib",
 		"web:test": "vitest run",
-		"web:e2e": "playwright test tests/e2e/",
+		"web:e2e": "bun run web:e2e:full",
+		"web:e2e:smoke": "playwright test tests/e2e/_smoke.spec.ts",
+		"web:e2e:full": "playwright test tests/e2e/",
 		"web:a11y": "playwright test tests/a11y/ --project=chromium",
 		"i18n:extract": "bun run src/lib/i18n/extract.ts"
 	},

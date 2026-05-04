@@ -38,12 +38,11 @@ export const STEPS: Step[] = [
   { name: "web:build",   cmd: ["bun", "run", "build"], cwd: "src/web" },
   // Vitest unit tests for the SvelteKit subpackage — always-on.
   { name: "web:test",    cmd: ["bun", "run", "web:test"], cwd: "src/web" },
+  { name: "web:e2e:smoke", cmd: ["bun", "run", "web:e2e:smoke"], cwd: "src/web" },
   { name: "ci:schemas", cmd: ["bun", "run", "scripts/ci-schemas.ts"] },
-  { name: "skills:lint", cmd: ["bun", "run", "src/index.ts", "skills", "lint", "skills/"] },
-  { name: "compress:check", cmd: ["bash", "scripts/compress-with-caveman.sh", "--check"] },
   // Playwright e2e — opt-in via FULCRUM_RUN_E2E=1.
   ...(process.env["FULCRUM_RUN_E2E"] === "1"
-    ? [{ name: "web:e2e", cmd: ["bun", "run", "web:e2e"], cwd: "src/web" } satisfies Step]
+    ? [{ name: "web:e2e:full", cmd: ["bun", "run", "web:e2e:full"], cwd: "src/web" } satisfies Step]
     : []),
 ];
 

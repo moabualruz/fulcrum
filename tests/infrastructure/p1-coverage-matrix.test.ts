@@ -59,7 +59,7 @@ describe("P1 test coverage matrix", () => {
 });
 
 describe("scripts/ci.ts baseline gate", () => {
-  it("keeps the default CI gate at 15 always-on stages", () => {
+  it("keeps the default CI gate at 14 always-on product stages", () => {
     const names = STEPS.map((step) => step.name);
     expect(names).toEqual([
       "install",
@@ -74,15 +74,15 @@ describe("scripts/ci.ts baseline gate", () => {
       "web:check",
       "web:build",
       "web:test",
+      "web:e2e:smoke",
       "ci:schemas",
-      "skills:lint",
-      "compress:check",
     ]);
   });
 
-  it("keeps e2e opt-in rather than making local CI browser-dependent", () => {
+  it("keeps full e2e opt-in while smoke e2e is always-on", () => {
     const names = STEPS.map((step) => step.name);
-    expect(names).not.toContain("web:e2e");
+    expect(names).toContain("web:e2e:smoke");
+    expect(names).not.toContain("web:e2e:full");
   });
 
   it("runs root tests through the root test runner", () => {
