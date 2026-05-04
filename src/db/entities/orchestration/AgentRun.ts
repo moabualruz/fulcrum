@@ -60,7 +60,10 @@ export class AgentRun {
     | "claimedBy"
     | "searchDoc"
     | "attemptLifecycleState"
-    | "lastCodexTimestamp";
+    | "lastCodexTimestamp"
+    | "threadId"
+    | "turnId"
+    | "sessionId";
 
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
@@ -154,6 +157,27 @@ export class AgentRun {
    */
   @Property({ type: "datetime", fieldName: "last_codex_timestamp", nullable: true })
   lastCodexTimestamp?: Date;
+
+  /**
+   * Codex app-server thread_id (SYM-20, SYM-21).
+   * Persisted for session resume via thread/resume.
+   */
+  @Property({ type: "string", fieldName: "thread_id", nullable: true })
+  threadId?: string;
+
+  /**
+   * Codex app-server turn_id (SYM-20).
+   * Latest turn identifier from the app-server protocol.
+   */
+  @Property({ type: "string", fieldName: "turn_id", nullable: true })
+  turnId?: string;
+
+  /**
+   * Codex app-server session_id (SYM-20).
+   * Session identifier for structured log context.
+   */
+  @Property({ type: "string", fieldName: "session_id", nullable: true })
+  sessionId?: string;
 
   @ManyToOne(() => SearchDocument, { fieldName: "search_doc_id", nullable: true })
   searchDoc?: SearchDocument;
