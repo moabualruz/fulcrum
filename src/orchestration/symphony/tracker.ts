@@ -93,6 +93,105 @@ const OCCUPIED_TASK_ORCHESTRATION_STATES = [
   "retry_queued",
 ] satisfies AgentRunOrchestrationState[];
 
+const ACTIVE_ORCHESTRATION_STATES = new Set<AgentRunOrchestrationState>([
+  "claimed",
+  "running",
+]);
+
+const TERMINAL_ORCHESTRATION_STATES = new Set<AgentRunOrchestrationState>([
+  "released",
+  "succeeded",
+  "failed",
+  "timed_out",
+  "stalled",
+  "cancelled",
+]);
+
+// ---------------------------------------------------------------------------
+// refreshRunningIssues (SYM-15)
+// Returns active/non-active/terminal classification for reconciliation.
+// Active = claimed | running
+// Terminal = released | succeeded | failed | timed_out | stalled | cancelled
+// Non-active = everything else (e.g. retry_queued, unclaimed)
+// ---------------------------------------------------------------------------
+
+export interface RunningIssuesSnapshot {
+  active: AgentRunIssue[];
+  nonActive: AgentRunIssue[];
+  terminal: AgentRunIssue[];
+}
+
+export async function refreshRunningIssues(
+  em: EntityManager,
+  orgId: string,
+  limit = 200,
+): Promise<RunningIssuesSnapshot> {
+  const { AgentRun } = await import("../../db/entities/orchestration/AgentRun.ts");
+  const fork = em.fork();
+  const agentRunRepo = fork.getRepository(AgentRun) as AgentRunRepository;
+
+  const runs = await agentRunRepo.find(
+    { org: orgId } as never,
+    {
+      limit,
+      populate: ["task"],
+      orderBy: { startedAt: "asc", id: "asc" },
+    },
+  );
+
+  const issues = AgentRunIssueListSchema.parse(runs.map(toAgentRunIssue));
+
+  const active: AgentRunIssue[] = [];
+  const nonActive: AgentRunIssue[] = [];
+  const terminal: AgentRunIssue[] = [];
+
+  for (const issue of issues) {
+    if (ACTIVE_ORCHESTRATION_STATES.has(issue.orchestrationState)) {
+      active.push(issue);
+    } else if (TERMINAL_ORCHESTRATION_STATES.has(issue.orchestrationState)) {
+      terminal.push(issue);
+    } else {
+      nonActive.push(issue);
+    }
+  }
+
+  return { active, nonActive, terminal };
+}
+
+// ---------------------------------------------------------------------------
+// resolvePerStateConcurrency (SYM-17)
+// Normalizes a user-supplied state→concurrency config map.
+// Ignores invalid state names (empty string, unknown values).
+// ---------------------------------------------------------------------------
+
+const VALID_ORCHESTRATION_STATE_SET = new Set<string>([
+  "unclaimed",
+  "claimed",
+  "running",
+  "retry_queued",
+  "released",
+  "succeeded",
+  "failed",
+  "timed_out",
+  "stalled",
+  "cancelled",
+]);
+
+export function resolvePerStateConcurrency(
+  config: Record<string, number>,
+): Map<AgentRunOrchestrationState, number> {
+  const result = new Map<AgentRunOrchestrationState, number>();
+
+  for (const [state, count] of Object.entries(config)) {
+    if (state.length === 0) continue;
+    if (!VALID_ORCHESTRATION_STATE_SET.has(state)) continue;
+    if (typeof count !== "number" || count < 0) continue;
+    result.set(state as AgentRunOrchestrationState, count);
+  }
+
+  return result;
+}
+
 export function buildCandidateIssuesBaseQuery(
   taskRepo: TaskRepository,
   orgId: string,
