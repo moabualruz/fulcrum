@@ -10,10 +10,12 @@
  */
 import { EventEmitter } from "node:events";
 import type { ProductDb } from "./db/types.ts";
+import type { EntityManager } from "@mikro-orm/postgresql";
 import {
   appendEvent as rawAppendEvent,
   type AppendEventInput,
   type EventRow,
+  type DbHandle,
 } from "./store/repositories.ts";
 
 // ---------------------------------------------------------------------------
@@ -59,7 +61,7 @@ export class EventDispatcher {
    * Single entry point for all event emission.
    * Persists to DB, then publishes to in-memory subscribers.
    */
-  async dispatch(db: ProductDb, input: AppendEventInput): Promise<EventRow> {
+  async dispatch(db: DbHandle, input: AppendEventInput): Promise<EventRow> {
     const event = await rawAppendEvent(db, input);
     this.publish(event);
     return event;

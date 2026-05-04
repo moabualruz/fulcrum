@@ -6,7 +6,7 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
 import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
-import { indexSearchDocument } from "../../../../product-kernel/search.ts";
+import { indexSearchDocumentOrm } from "./orm-helpers.ts";
 
 export type MemoryScope = "project" | "global" | "task" | "user";
 
@@ -81,7 +81,7 @@ export async function createMemoryAction(
   );
   const ctx = { orgId: input.orgId, projectId: input.projectId, subjectKind: "memory", subjectId: id } as const;
   await eventDispatcher.dispatch(em, { ...ctx, actor: "system", verb: "created", payload: { key: input.key, scope: input.scope } });
-  await indexSearchDocument(em, {
+  await indexSearchDocumentOrm(em, {
     orgId: input.orgId, projectId: input.projectId, sourceKind: "memory", sourceId: id,
     title: input.key, body: input.body, labels: [input.scope, input.kind],
   });
@@ -125,7 +125,7 @@ export async function updateMemoryAction(
     orgId: row.org_id, projectId: row.project_id, actor: "system",
     subjectKind: "memory", subjectId: input.id, verb: "updated", payload: { changed },
   });
-  await indexSearchDocument(em, {
+  await indexSearchDocumentOrm(em, {
     orgId: row.org_id, projectId: row.project_id, sourceKind: "memory", sourceId: input.id,
     title: row.key, body: row.body, labels: [row.scope, row.kind],
   });

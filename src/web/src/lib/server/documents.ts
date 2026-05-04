@@ -6,7 +6,7 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { newUlid } from "../../../../product-kernel/ids.ts";
 import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
-import { indexSearchDocument } from "../../../../product-kernel/search.ts";
+import { indexSearchDocumentOrm } from "./orm-helpers.ts";
 
 export interface CreateDocumentInput {
   orgId: string;
@@ -56,7 +56,7 @@ export async function createDocumentAction(
   );
   const ctx = { orgId: input.orgId, projectId: input.projectId, subjectKind: "document", subjectId: id } as const;
   await eventDispatcher.dispatch(em, { ...ctx, actor: "system", verb: "created", payload: { title: input.title, kind: input.kind } });
-  await indexSearchDocument(em, {
+  await indexSearchDocumentOrm(em, {
     orgId: input.orgId, projectId: input.projectId, sourceKind: "document", sourceId: id,
     title: input.title, body: input.body, labels: extractLabels(fm),
   });
@@ -99,7 +99,7 @@ export async function updateDocumentAction(
     orgId: row.org_id, projectId: row.project_id, actor: "system",
     subjectKind: "document", subjectId: input.id, verb: "updated", payload: { changed },
   });
-  await indexSearchDocument(em, {
+  await indexSearchDocumentOrm(em, {
     orgId: row.org_id, projectId: row.project_id, sourceKind: "document", sourceId: input.id,
     title: row.title, body: row.body, labels: extractLabels(row.frontmatter),
   });
