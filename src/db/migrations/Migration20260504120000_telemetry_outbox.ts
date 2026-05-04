@@ -15,6 +15,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260504120000_telemetry_outbox extends Migration {
+  static readonly isLossy = true;
+
   override async up(): Promise<void> {
     this.addSql(
       `create table "telemetry_outbox" (

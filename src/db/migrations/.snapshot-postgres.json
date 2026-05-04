@@ -10376,6 +10376,22 @@
           "enumItems": [],
           "mappedType": "text"
         },
+        "due_date": {
+          "name": "due_date",
+          "type": "date",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "date"
+        },
         "external_id": {
           "name": "external_id",
           "type": "varchar(255)",
@@ -10503,6 +10519,22 @@
           "comment": null,
           "enumItems": [],
           "mappedType": "uuid"
+        },
+        "start_date": {
+          "name": "start_date",
+          "type": "date",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "date"
         },
         "status": {
           "name": "status",
