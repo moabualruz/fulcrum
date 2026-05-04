@@ -57,6 +57,14 @@ export class Event {
   @ManyToOne(() => User, { fieldName: "user_id", nullable: true })
   user?: User;
 
+  /** String actor identifier (e.g. "system", user email). Nullable for pure user-FK events. */
+  @Property({ type: "string", nullable: true })
+  actor?: string;
+
+  /** Project scope — nullable for org-wide events. */
+  @Property({ type: "uuid", fieldName: "project_id", nullable: true })
+  projectId?: string;
+
   /** Action verb: domain.past-tense-noun (e.g. "task.created", "sprint.closed"). */
   @Property({ type: "string" })
   verb!: string;

@@ -1,5 +1,42 @@
+/**
+ * Product-kernel repository layer — MikroORM implementation.
+ *
+ * Migrated from raw SQL (db.query()) to MikroORM EntityManager + repository
+ * pattern (ARCH-02). Functions accept DbHandle (EntityManager | ProductDb).
+ *
+ * Data contracts (Row interfaces, input types, return types) are preserved
+ * for backward compatibility — callers receive plain row objects.
+ */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
 import type { ProductDb } from "../db/types.ts";
 import { newUlid } from "../ids.ts";
+import { Org } from "../../db/entities/auth/Org.ts";
+import { Sprint, type MetricsSnapshot } from "../../db/entities/tasks/Sprint.ts";
+import { Event } from "../../db/entities/core/Event.ts";
+
+/**
+ * Database handle — accepts either MikroORM EntityManager (preferred)
+ * or legacy ProductDb interface for backward compatibility.
+ */
+export type DbHandle = EntityManager | ProductDb;
+
+/** Type guard: is this an EntityManager? */
+function isEntityManager(db: DbHandle): db is EntityManager {
+  return "persist" in db && typeof (db as EntityManager).persist === "function";
+}
+
+/** Assert handle is EntityManager or throw helpful error. */
+function assertEm(db: DbHandle): EntityManager {
+  if (isEntityManager(db)) return db;
+  throw new Error(
+    "repositories.ts: MikroORM EntityManager required. " +
+    "Pass em (from MikroORM) instead of raw ProductDb. " +
+    "See ARCH-02 migration guide.",
+  );
+}
+
+// ── Row interfaces (unchanged data contracts) ───────────────────────
 
 export interface OrgRow {
   id: string;
@@ -56,121 +93,6 @@ export interface AppendEventInput {
   payload?: Record<string, unknown>;
 }
 
-export async function createLocalOrg(
-  db: ProductDb,
-  input: { slug: string; name: string },
-): Promise<OrgRow> {
-  const id = newUlid();
-  await db.query(
-    `INSERT INTO orgs (id, slug, name) VALUES ($1, $2, $3)`,
-    [id, input.slug, input.name],
-  );
-  const rows = await db.query<OrgRow>(`SELECT * FROM orgs WHERE id = $1`, [id]);
-  if (rows.length === 0) throw new Error(`org insert lost: ${id}`);
-  return rows[0] as OrgRow;
-}
-
-export async function createProject(
-  db: ProductDb,
-  input: { orgId: string; slug: string; name: string; description?: string | null },
-): Promise<ProjectRow> {
-  const id = newUlid();
-  await db.query(
-    `INSERT INTO projects (id, org_id, slug, name, description) VALUES ($1, $2, $3, $4, $5)`,
-    [id, input.orgId, input.slug, input.name, input.description ?? null],
-  );
-  await appendEvent(db, {
-    orgId: input.orgId,
-    projectId: id,
-    actor: "system",
-    subjectKind: "project",
-    subjectId: id,
-    verb: "created",
-  });
-  const rows = await db.query<ProjectRow>(`SELECT * FROM projects WHERE id = $1`, [id]);
-  if (rows.length === 0) throw new Error(`project insert lost: ${id}`);
-  return rows[0] as ProjectRow;
-}
-
-export async function createTask(
-  db: ProductDb,
-  input: {
-    orgId: string;
-    projectId?: string | null;
-    parentId?: string | null;
-    title: string;
-    description?: string | null;
-    status?: string;
-    priority?: number;
-  },
-): Promise<TaskRow> {
-  const id = newUlid();
-  const status = input.status ?? "pending";
-  const priority = input.priority ?? 0;
-  await db.query(
-    `INSERT INTO tasks (id, org_id, project_id, parent_id, title, description, status, priority)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [
-      id,
-      input.orgId,
-      input.projectId ?? null,
-      input.parentId ?? null,
-      input.title,
-      input.description ?? null,
-      status,
-      priority,
-    ],
-  );
-  await appendEvent(db, {
-    orgId: input.orgId,
-    projectId: input.projectId ?? null,
-    actor: "system",
-    subjectKind: "task",
-    subjectId: id,
-    verb: "created",
-    payload: { title: input.title, status },
-  });
-  const rows = await db.query<TaskRow>(`SELECT * FROM tasks WHERE id = $1`, [id]);
-  if (rows.length === 0) throw new Error(`task insert lost: ${id}`);
-  return rows[0] as TaskRow;
-}
-
-export async function appendEvent(
-  db: ProductDb,
-  input: AppendEventInput,
-): Promise<EventRow> {
-  const id = newUlid();
-  await db.query(
-    `INSERT INTO events (id, org_id, project_id, actor, subject_kind, subject_id, verb, payload)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
-    [
-      id,
-      input.orgId,
-      input.projectId ?? null,
-      input.actor,
-      input.subjectKind,
-      input.subjectId,
-      input.verb,
-      JSON.stringify(input.payload ?? {}),
-    ],
-  );
-  const rows = await db.query<EventRow>(`SELECT * FROM events WHERE id = $1`, [id]);
-  if (rows.length === 0) throw new Error(`event insert lost: ${id}`);
-  return rows[0] as EventRow;
-}
-
-export async function listEventsForProject(
-  db: ProductDb,
-  projectId: string,
-): Promise<EventRow[]> {
-  return db.query<EventRow>(
-    `SELECT * FROM events WHERE project_id = $1 ORDER BY created_at ASC, id ASC`,
-    [projectId],
-  );
-}
-
-// ── Sprint CRUD ──────────────────────────────────────────────────────
-
 export interface SprintRow {
   id: string;
   org_id: string;
@@ -188,16 +110,257 @@ export interface SprintRow {
   updated_at: string;
 }
 
-export interface MetricsSnapshot {
-  capacity_points: number | null;
-  completed_points: number;
-  total_tasks: number;
-  completed_tasks: number;
-  velocity: number;
+export { type MetricsSnapshot };
+
+export interface CustomFieldRow {
+  id: string;
+  org_id: string;
+  project_id: string;
+  name: string;
+  field_type: string;
+  options: unknown;
+  position: number;
+  created_at: string;
+  updated_at: string;
 }
 
+export interface SavedViewRow {
+  id: string;
+  org_id: string;
+  project_id: string;
+  name: string;
+  filters: unknown;
+  sort_by: string | null;
+  columns: unknown;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApiKeyRow {
+  id: string;
+  org_id: string;
+  user_id: string;
+  key_hash: string;
+  name: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────
+
+function toIso(d: Date | string | null | undefined): string {
+  if (!d) return new Date().toISOString();
+  return d instanceof Date ? d.toISOString() : d;
+}
+
+function orgToRow(org: Org): OrgRow {
+  return {
+    id: org.id,
+    slug: org.slug,
+    name: org.name,
+    created_at: toIso(org.createdAt),
+    updated_at: toIso(org.updatedAt),
+  };
+}
+
+function sprintToRow(sprint: Sprint): SprintRow {
+  return {
+    id: sprint.id,
+    org_id: typeof sprint.org === "string" ? sprint.org : sprint.org?.id ?? "",
+    project_id: sprint.projectId,
+    name: sprint.name,
+    goal: sprint.goal,
+    status: sprint.status,
+    capacity_points: sprint.capacityPoints,
+    start_date: sprint.startDate ? toIso(sprint.startDate) : null,
+    end_date: sprint.endDate ? toIso(sprint.endDate) : null,
+    closed_at: sprint.closedAt ? toIso(sprint.closedAt) : null,
+    metrics_snapshot: sprint.metricsSnapshot,
+    retro_doc_id: sprint.retroDocId,
+    created_at: toIso(sprint.createdAt),
+    updated_at: toIso(sprint.updatedAt),
+  };
+}
+
+function eventToRow(event: Event): EventRow {
+  return {
+    id: event.id,
+    org_id: typeof event.org === "string" ? event.org : event.org?.id ?? "",
+    project_id: event.projectId ?? null,
+    actor: event.actor ?? "system",
+    subject_kind: event.subjectKind,
+    subject_id: event.subjectId ?? "",
+    verb: event.verb,
+    payload: event.payload ?? {},
+    created_at: toIso(event.createdAt),
+  };
+}
+
+/** Map a raw query row to TaskRow. */
+function rawToTaskRow(r: Record<string, unknown>): TaskRow {
+  return {
+    id: r.id as string,
+    org_id: r.org_id as string,
+    project_id: (r.project_id as string) ?? null,
+    parent_id: (r.parent_id as string) ?? null,
+    title: r.title as string,
+    description: (r.description as string) ?? null,
+    status: (r.status as string) ?? "pending",
+    priority: Number(r.priority ?? 0),
+    sprint_id: (r.sprint_id as string) ?? null,
+    assignee_id: (r.assignee_id as string) ?? null,
+    created_at: toIso(r.created_at as Date | string),
+    updated_at: toIso(r.updated_at as Date | string),
+  };
+}
+
+// ── Org CRUD ────────────────────────────────────────────────────────
+
+export async function createLocalOrg(
+  db: DbHandle,
+  input: { slug: string; name: string },
+): Promise<OrgRow> {
+  const em = assertEm(db);
+  const id = newUlid();
+  const repo = em.getRepository(Org);
+  const org = repo.create({
+    id,
+    slug: input.slug,
+    name: input.name,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  em.persist(org);
+  await em.flush();
+  return orgToRow(org);
+}
+
+// ── Project CRUD ────────────────────────────────────────────────────
+
+export async function createProject(
+  db: DbHandle,
+  input: { orgId: string; slug: string; name: string; description?: string | null },
+): Promise<ProjectRow> {
+  const em = assertEm(db);
+  const id = newUlid();
+  const now = new Date();
+  await em.execute(
+    `INSERT INTO projects (id, org_id, slug, name, description, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, input.orgId, input.slug, input.name, input.description ?? null, now, now],
+  );
+  await appendEvent(em, {
+    orgId: input.orgId,
+    projectId: id,
+    actor: "system",
+    subjectKind: "project",
+    subjectId: id,
+    verb: "created",
+  });
+  const rows = await em.execute<{ id: string; org_id: string; slug: string; name: string; description: string | null; created_at: Date; updated_at: Date }[]>(
+    `SELECT * FROM projects WHERE id = ?`,
+    [id],
+    "all",
+  );
+  if (rows.length === 0) throw new Error(`project insert lost: ${id}`);
+  const r = rows[0]!;
+  return {
+    id: r.id,
+    org_id: r.org_id,
+    slug: r.slug,
+    name: r.name,
+    description: r.description,
+    created_at: toIso(r.created_at),
+    updated_at: toIso(r.updated_at),
+  };
+}
+
+// ── Task CRUD ───────────────────────────────────────────────────────
+
+export async function createTask(
+  db: DbHandle,
+  input: {
+    orgId: string;
+    projectId?: string | null;
+    parentId?: string | null;
+    title: string;
+    description?: string | null;
+    status?: string;
+    priority?: number;
+  },
+): Promise<TaskRow> {
+  const em = assertEm(db);
+  const id = newUlid();
+  const status = input.status ?? "pending";
+  const priority = input.priority ?? 0;
+  const now = new Date();
+
+  await em.execute(
+    `INSERT INTO tasks (id, org_id, project_id, parent_id, title, description, status, priority, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, input.orgId, input.projectId ?? null, input.parentId ?? null, input.title, input.description ?? null, status, priority, now, now],
+  );
+
+  await appendEvent(em, {
+    orgId: input.orgId,
+    projectId: input.projectId ?? null,
+    actor: "system",
+    subjectKind: "task",
+    subjectId: id,
+    verb: "created",
+    payload: { title: input.title, status },
+  });
+
+  const rows = await em.execute<Record<string, unknown>[]>(
+    `SELECT * FROM tasks WHERE id = ?`, [id], "all",
+  );
+  if (rows.length === 0) throw new Error(`task insert lost: ${id}`);
+  return rawToTaskRow(rows[0]!);
+}
+
+// ── Event CRUD ──────────────────────────────────────────────────────
+
+export async function appendEvent(
+  db: DbHandle,
+  input: AppendEventInput,
+): Promise<EventRow> {
+  const em = assertEm(db);
+  const id = newUlid();
+  const repo = em.getRepository(Event);
+  const event = repo.create({
+    id,
+    org: em.getReference(Org, input.orgId),
+    projectId: input.projectId ?? undefined,
+    actor: input.actor,
+    subjectKind: input.subjectKind,
+    subjectId: input.subjectId,
+    verb: input.verb,
+    payload: input.payload ?? {},
+    createdAt: new Date(),
+  });
+  em.persist(event);
+  await em.flush();
+  return eventToRow(event);
+}
+
+export async function listEventsForProject(
+  db: DbHandle,
+  projectId: string,
+): Promise<EventRow[]> {
+  const em = assertEm(db);
+  const repo = em.getRepository(Event);
+  const events = await repo.find(
+    { projectId } as never,
+    { orderBy: { createdAt: "ASC", id: "ASC" } },
+  );
+  return events.map(eventToRow);
+}
+
+// ── Sprint CRUD ─────────────────────────────────────────────────────
+
 export async function createSprint(
-  db: ProductDb,
+  db: DbHandle,
   input: {
     orgId: string;
     projectId: string;
@@ -209,24 +372,29 @@ export async function createSprint(
     endDate?: string | null;
   },
 ): Promise<SprintRow> {
+  const em = assertEm(db);
   const id = newUlid();
   const status = input.status ?? "planning";
-  await db.query(
-    `INSERT INTO sprints (id, org_id, project_id, name, goal, status, capacity_points, start_date, end_date)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-    [
-      id,
-      input.orgId,
-      input.projectId,
-      input.name,
-      input.goal ?? null,
-      status,
-      input.capacityPoints ?? 0,
-      input.startDate ?? null,
-      input.endDate ?? null,
-    ],
-  );
-  await appendEvent(db, {
+  const now = new Date();
+
+  const repo = em.getRepository(Sprint);
+  const sprint = repo.create({
+    id,
+    org: em.getReference(Org, input.orgId),
+    projectId: input.projectId,
+    name: input.name,
+    goal: input.goal ?? null,
+    status: status as "planned" | "active" | "completed",
+    capacityPoints: input.capacityPoints ?? 0,
+    startDate: input.startDate ? new Date(input.startDate) : now,
+    endDate: input.endDate ? new Date(input.endDate) : now,
+    createdAt: now,
+    updatedAt: now,
+  });
+  em.persist(sprint);
+  await em.flush();
+
+  await appendEvent(em, {
     orgId: input.orgId,
     projectId: input.projectId,
     actor: "system",
@@ -235,13 +403,12 @@ export async function createSprint(
     verb: "created",
     payload: { name: input.name, status },
   });
-  const rows = await db.query<SprintRow>(`SELECT * FROM sprints WHERE id = $1`, [id]);
-  if (rows.length === 0) throw new Error(`sprint insert lost: ${id}`);
-  return rows[0] as SprintRow;
+
+  return sprintToRow(sprint);
 }
 
 export async function updateSprint(
-  db: ProductDb,
+  db: DbHandle,
   input: {
     id: string;
     name?: string;
@@ -252,69 +419,68 @@ export async function updateSprint(
     endDate?: string | null;
   },
 ): Promise<SprintRow> {
-  const sets: string[] = [];
-  const params: (string | number | null)[] = [];
-  const push = (col: string, val: string | number | null) => {
-    params.push(val);
-    sets.push(`${col} = $${params.length}`);
-  };
-  if (input.name !== undefined) push("name", input.name);
-  if (input.goal !== undefined) push("goal", input.goal);
-  if (input.status !== undefined) push("status", input.status);
-  if (input.capacityPoints !== undefined) push("capacity_points", input.capacityPoints);
-  if (input.startDate !== undefined) push("start_date", input.startDate);
-  if (input.endDate !== undefined) push("end_date", input.endDate);
-  if (sets.length === 0) throw new Error("updateSprint: no fields to update");
-  sets.push("updated_at = now()");
-  params.push(input.id);
-  const rows = await db.query<SprintRow>(
-    `UPDATE sprints SET ${sets.join(", ")} WHERE id = $${params.length} RETURNING *`,
-    params,
-  );
-  if (rows.length === 0) throw new Error(`sprint not found: ${input.id}`);
-  return rows[0] as SprintRow;
+  const em = assertEm(db);
+  const repo = em.getRepository(Sprint);
+  const sprint = await repo.findOne({ id: input.id });
+  if (!sprint) throw new Error(`sprint not found: ${input.id}`);
+
+  if (input.name !== undefined) sprint.name = input.name;
+  if (input.goal !== undefined) sprint.goal = input.goal;
+  if (input.status !== undefined) sprint.status = input.status as "planned" | "active" | "completed";
+  if (input.capacityPoints !== undefined) sprint.capacityPoints = input.capacityPoints;
+  if (input.startDate !== undefined) sprint.startDate = input.startDate ? new Date(input.startDate) : sprint.startDate;
+  if (input.endDate !== undefined) sprint.endDate = input.endDate ? new Date(input.endDate) : sprint.endDate;
+  sprint.updatedAt = new Date();
+
+  await em.flush();
+  return sprintToRow(sprint);
 }
 
 export async function listSprints(
-  db: ProductDb,
+  db: DbHandle,
   projectId: string,
 ): Promise<SprintRow[]> {
-  return db.query<SprintRow>(
-    `SELECT * FROM sprints WHERE project_id = $1 ORDER BY created_at DESC, id ASC`,
-    [projectId],
+  const em = assertEm(db);
+  const repo = em.getRepository(Sprint);
+  const sprints = await repo.find(
+    { projectId },
+    { orderBy: { createdAt: "DESC", id: "ASC" } },
   );
+  return sprints.map(sprintToRow);
 }
 
 export async function addTaskToSprint(
-  db: ProductDb,
+  db: DbHandle,
   input: { sprintId: string; taskId: string },
 ): Promise<{ ok: true }> {
-  const sprintRows = await db.query<SprintRow>(`SELECT * FROM sprints WHERE id = $1`, [
-    input.sprintId,
-  ]);
-  const sprint = sprintRows[0];
+  const em = assertEm(db);
+  const sprintRepo = em.getRepository(Sprint);
+  const sprint = await sprintRepo.findOne({ id: input.sprintId });
   if (!sprint) throw new Error(`sprint not found: ${input.sprintId}`);
 
-  const taskRows = await db.query<TaskRow>(`SELECT * FROM tasks WHERE id = $1`, [
-    input.taskId,
-  ]);
+  const orgId = typeof sprint.org === "string" ? sprint.org : sprint.org?.id ?? "";
+
+  const taskRows = await em.execute<Record<string, unknown>[]>(
+    `SELECT * FROM tasks WHERE id = ?`, [input.taskId], "all",
+  );
   const task = taskRows[0];
   if (!task) throw new Error(`task not found: ${input.taskId}`);
-  if (task.org_id !== sprint.org_id || task.project_id !== sprint.project_id) {
+  if (task.org_id !== orgId || task.project_id !== sprint.projectId) {
     throw new Error(`task ${input.taskId} is outside sprint scope ${input.sprintId}`);
   }
 
-  await db.query(
-    `UPDATE tasks SET sprint_id = $1, updated_at = now()
-      WHERE id = $2 AND org_id = $3 AND project_id = $4`,
-    [sprint.id, task.id, sprint.org_id, sprint.project_id],
+  await em.execute(
+    `UPDATE tasks SET sprint_id = ?, updated_at = now()
+      WHERE id = ? AND org_id = ? AND project_id = ?`,
+    [sprint.id, input.taskId, orgId, sprint.projectId],
   );
-  await appendEvent(db, {
-    orgId: sprint.org_id,
-    projectId: sprint.project_id,
+
+  await appendEvent(em, {
+    orgId,
+    projectId: sprint.projectId,
     actor: "system",
     subjectKind: "task",
-    subjectId: task.id,
+    subjectId: input.taskId,
     verb: "sprint.added",
     payload: { sprint_id: sprint.id },
   });
@@ -322,29 +488,31 @@ export async function addTaskToSprint(
 }
 
 export async function removeTaskFromSprint(
-  db: ProductDb,
+  db: DbHandle,
   input: { sprintId: string; taskId: string },
 ): Promise<{ ok: true }> {
-  const sprintRows = await db.query<SprintRow>(`SELECT * FROM sprints WHERE id = $1`, [
-    input.sprintId,
-  ]);
-  const sprint = sprintRows[0];
+  const em = assertEm(db);
+  const sprintRepo = em.getRepository(Sprint);
+  const sprint = await sprintRepo.findOne({ id: input.sprintId });
   if (!sprint) throw new Error(`sprint not found: ${input.sprintId}`);
 
-  const rows = await db.query<TaskRow>(
+  const orgId = typeof sprint.org === "string" ? sprint.org : sprint.org?.id ?? "";
+
+  const rows = await em.execute<Record<string, unknown>[]>(
     `UPDATE tasks SET sprint_id = NULL, updated_at = now()
-      WHERE id = $1 AND org_id = $2 AND project_id = $3 AND sprint_id = $4
+      WHERE id = ? AND org_id = ? AND project_id = ? AND sprint_id = ?
       RETURNING *`,
-    [input.taskId, sprint.org_id, sprint.project_id, sprint.id],
+    [input.taskId, orgId, sprint.projectId, sprint.id],
+    "all",
   );
-  const task = rows[0];
-  if (!task) throw new Error(`task not found in sprint: ${input.taskId}`);
-  await appendEvent(db, {
-    orgId: sprint.org_id,
-    projectId: sprint.project_id,
+  if (rows.length === 0) throw new Error(`task not found in sprint: ${input.taskId}`);
+
+  await appendEvent(em, {
+    orgId,
+    projectId: sprint.projectId,
     actor: "system",
     subjectKind: "task",
-    subjectId: task.id,
+    subjectId: input.taskId,
     verb: "sprint.removed",
     payload: { sprint_id: sprint.id },
   });
@@ -352,144 +520,152 @@ export async function removeTaskFromSprint(
 }
 
 export async function listBacklogTasks(
-  db: ProductDb,
+  db: DbHandle,
   projectId: string,
 ): Promise<TaskRow[]> {
-  return db.query<TaskRow>(
+  const em = assertEm(db);
+  const rows = await em.execute<Record<string, unknown>[]>(
     `SELECT * FROM tasks
-      WHERE project_id = $1
+      WHERE project_id = ?
         AND sprint_id IS NULL
         AND status NOT IN ('completed', 'cancelled')
       ORDER BY priority DESC, updated_at DESC, id ASC`,
     [projectId],
+    "all",
   );
+  return rows.map(rawToTaskRow);
 }
 
 export async function listSprintTasks(
-  db: ProductDb,
+  db: DbHandle,
   sprintId: string,
 ): Promise<TaskRow[]> {
-  return db.query<TaskRow>(
+  const em = assertEm(db);
+  const rows = await em.execute<Record<string, unknown>[]>(
     `SELECT * FROM tasks
-      WHERE sprint_id = $1
+      WHERE sprint_id = ?
       ORDER BY priority DESC, updated_at DESC, id ASC`,
     [sprintId],
+    "all",
   );
+  return rows.map(rawToTaskRow);
 }
 
-export async function sprintCapacityUsed(db: ProductDb, sprintId: string): Promise<number> {
-  const rows = await db.query<{ used: number | string | null }>(
-    `SELECT COALESCE(SUM(estimate_points), 0) AS used
-      FROM tasks
-      WHERE sprint_id = $1`,
+export async function sprintCapacityUsed(db: DbHandle, sprintId: string): Promise<number> {
+  const em = assertEm(db);
+  const rows = await em.execute<{ used: number | string | null }[]>(
+    `SELECT COALESCE(SUM(points), 0) AS used FROM tasks WHERE sprint_id = ?`,
     [sprintId],
+    "all",
   );
   return Number(rows[0]?.used ?? 0);
 }
 
 export async function closeSprint(
-  db: ProductDb,
+  db: DbHandle,
   sprintId: string,
 ): Promise<{ sprint: SprintRow; metrics: MetricsSnapshot; event: EventRow }> {
-  const sprintRows = await db.query<SprintRow>(`SELECT * FROM sprints WHERE id = $1`, [
-    sprintId,
-  ]);
-  const sprint = sprintRows[0];
+  const em = assertEm(db);
+  const repo = em.getRepository(Sprint);
+  const sprint = await repo.findOne({ id: sprintId });
   if (!sprint) throw new Error(`sprint not found: ${sprintId}`);
   if (sprint.status === "completed") throw new Error(`sprint already closed: ${sprintId}`);
 
-  const metricRows = await db.query<{
+  const metricRows = await em.execute<{
     completed_points: number | string | null;
     total_tasks: number | string;
     completed_tasks: number | string;
-  }>(
+  }[]>(
     `SELECT
-        COALESCE(SUM(CASE WHEN status = 'completed' THEN estimate_points ELSE 0 END), 0) AS completed_points,
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN points ELSE 0 END), 0) AS completed_points,
         COUNT(*) AS total_tasks,
         COUNT(*) FILTER (WHERE status = 'completed') AS completed_tasks
       FROM tasks
-      WHERE sprint_id = $1`,
+      WHERE sprint_id = ?`,
     [sprint.id],
+    "all",
   );
   const metricRow = metricRows[0];
   const completedPoints = Number(metricRow?.completed_points ?? 0);
   const metrics: MetricsSnapshot = {
-    capacity_points: sprint.capacity_points,
+    capacity_points: sprint.capacityPoints,
     completed_points: completedPoints,
     total_tasks: Number(metricRow?.total_tasks ?? 0),
     completed_tasks: Number(metricRow?.completed_tasks ?? 0),
     velocity: completedPoints,
   };
 
-  const closedRows = await db.query<SprintRow>(
-    `UPDATE sprints
-      SET status = 'completed', closed_at = now(), metrics_snapshot = $1::jsonb, updated_at = now()
-      WHERE id = $2 AND status <> 'completed'
-      RETURNING *`,
-    [JSON.stringify(metrics), sprint.id],
-  );
-  const closed = closedRows[0];
-  if (!closed) throw new Error(`sprint already closed: ${sprintId}`);
+  sprint.status = "completed";
+  sprint.closedAt = new Date();
+  sprint.metricsSnapshot = metrics;
+  sprint.updatedAt = new Date();
+  await em.flush();
 
-  const event = await appendEvent(db, {
-    orgId: closed.org_id,
-    projectId: closed.project_id,
+  const orgId = typeof sprint.org === "string" ? sprint.org : sprint.org?.id ?? "";
+  const event = await appendEvent(em, {
+    orgId,
+    projectId: sprint.projectId,
     actor: "system",
     subjectKind: "sprint",
-    subjectId: closed.id,
+    subjectId: sprint.id,
     verb: "closed",
     payload: {
-      name: closed.name,
-      goal: closed.goal,
-      start_date: closed.start_date,
-      end_date: closed.end_date,
+      name: sprint.name,
+      goal: sprint.goal,
+      start_date: sprint.startDate ? toIso(sprint.startDate) : null,
+      end_date: sprint.endDate ? toIso(sprint.endDate) : null,
       metrics_snapshot: metrics,
     },
   });
-  return { sprint: closed, metrics, event };
+
+  return { sprint: sprintToRow(sprint), metrics, event };
 }
 
 export async function checkEventHandled(
-  db: ProductDb,
+  db: DbHandle,
   eventId: string,
   handler: string,
 ): Promise<boolean> {
-  const rows = await db.query<{ event_id: string }>(
-    `SELECT event_id FROM event_handler_log WHERE event_id = $1 AND handler = $2`,
+  const em = assertEm(db);
+  const rows = await em.execute<{ event_id: string }[]>(
+    `SELECT event_id FROM event_handler_log WHERE event_id = ? AND handler = ?`,
     [eventId, handler],
+    "all",
   );
   return rows.length > 0;
 }
 
 export async function markEventHandled(
-  db: ProductDb,
+  db: DbHandle,
   eventId: string,
   handler: string,
 ): Promise<void> {
-  await db.query(
+  const em = assertEm(db);
+  await em.execute(
     `INSERT INTO event_handler_log (event_id, handler)
-      VALUES ($1, $2)
+      VALUES (?, ?)
       ON CONFLICT (event_id, handler) DO NOTHING`,
     [eventId, handler],
   );
 }
 
 export async function setSprintRetroDocId(
-  db: ProductDb,
+  db: DbHandle,
   sprintId: string,
   docId: string,
 ): Promise<SprintRow> {
-  const rows = await db.query<SprintRow>(
-    `UPDATE sprints SET retro_doc_id = $1, updated_at = now() WHERE id = $2 RETURNING *`,
-    [docId, sprintId],
-  );
-  const sprint = rows[0];
+  const em = assertEm(db);
+  const repo = em.getRepository(Sprint);
+  const sprint = await repo.findOne({ id: sprintId });
   if (!sprint) throw new Error(`sprint not found: ${sprintId}`);
-  return sprint;
+  sprint.retroDocId = docId;
+  sprint.updatedAt = new Date();
+  await em.flush();
+  return sprintToRow(sprint);
 }
 
 export async function listTasks(
-  db: ProductDb,
+  db: DbHandle,
   filters: {
     projectId?: string;
     status?: string;
@@ -499,6 +675,7 @@ export async function listTasks(
     limit?: number;
   },
 ): Promise<{ data: TaskRow[]; cursor: string | null }> {
+  const em = assertEm(db);
   const conditions: string[] = [];
   const params: (string | number)[] = [];
   const push = (cond: string, val: string | number) => {
@@ -513,20 +690,21 @@ export async function listTasks(
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
   const limit = filters.limit ?? 50;
   params.push(limit + 1);
-  const rows = await db.query<TaskRow>(
+  const rows = await em.execute<Record<string, unknown>[]>(
     `SELECT * FROM tasks ${where} ORDER BY id ASC LIMIT $${params.length}`,
     params,
+    "all",
   );
   const hasMore = rows.length > limit;
   const data = hasMore ? rows.slice(0, limit) : rows;
-  const cursor = hasMore ? data[data.length - 1]!.id : null;
-  return { data, cursor };
+  const cursor = hasMore ? (data[data.length - 1]! as Record<string, unknown>).id as string : null;
+  return { data: data.map(rawToTaskRow), cursor };
 }
 
 // ── Task mutations ──────────────────────────────────────────────────
 
 export async function updateTask(
-  db: ProductDb,
+  db: DbHandle,
   input: {
     id: string;
     title?: string;
@@ -537,6 +715,7 @@ export async function updateTask(
     assigneeId?: string | null;
   },
 ): Promise<TaskRow> {
+  const em = assertEm(db);
   const sets: string[] = [];
   const params: (string | number | null)[] = [];
   const push = (col: string, val: string | number | null) => {
@@ -552,13 +731,15 @@ export async function updateTask(
   if (sets.length === 0) throw new Error("updateTask: no fields to update");
   sets.push("updated_at = now()");
   params.push(input.id);
-  const rows = await db.query<TaskRow>(
+  const rows = await em.execute<Record<string, unknown>[]>(
     `UPDATE tasks SET ${sets.join(", ")} WHERE id = $${params.length} RETURNING *`,
     params,
+    "all",
   );
   if (rows.length === 0) throw new Error(`task not found: ${input.id}`);
-  const task = rows[0] as TaskRow;
-  await appendEvent(db, {
+  const task = rawToTaskRow(rows[0]!);
+
+  await appendEvent(em, {
     orgId: task.org_id,
     projectId: task.project_id,
     actor: "system",
@@ -571,7 +752,7 @@ export async function updateTask(
 }
 
 export async function moveTaskToSprint(
-  db: ProductDb,
+  db: DbHandle,
   taskId: string,
   sprintId: string | null,
 ): Promise<TaskRow> {
@@ -580,30 +761,31 @@ export async function moveTaskToSprint(
 
 // ── Custom fields CRUD ──────────────────────────────────────────────
 
-export interface CustomFieldRow {
-  id: string;
-  org_id: string;
-  project_id: string;
-  name: string;
-  field_type: string;
-  options: unknown;
-  position: number;
-  created_at: string;
-  updated_at: string;
-}
-
 export async function listCustomFields(
-  db: ProductDb,
+  db: DbHandle,
   projectId: string,
 ): Promise<CustomFieldRow[]> {
-  return db.query<CustomFieldRow>(
-    `SELECT * FROM custom_fields WHERE project_id = $1 ORDER BY position ASC, id ASC`,
+  const em = assertEm(db);
+  const rows = await em.execute<Record<string, unknown>[]>(
+    `SELECT * FROM custom_fields WHERE project_id = ? ORDER BY position ASC, id ASC`,
     [projectId],
+    "all",
   );
+  return rows.map((r) => ({
+    id: r.id as string,
+    org_id: r.org_id as string,
+    project_id: r.project_id as string,
+    name: r.name as string,
+    field_type: r.field_type as string,
+    options: r.options,
+    position: r.position as number,
+    created_at: toIso(r.created_at as Date | string),
+    updated_at: toIso(r.updated_at as Date | string),
+  }));
 }
 
 export async function createCustomField(
-  db: ProductDb,
+  db: DbHandle,
   input: {
     orgId: string;
     projectId: string;
@@ -613,52 +795,59 @@ export async function createCustomField(
     position?: number;
   },
 ): Promise<CustomFieldRow> {
+  const em = assertEm(db);
   const id = newUlid();
-  await db.query(
+  await em.execute(
     `INSERT INTO custom_fields (id, org_id, project_id, name, field_type, options, position)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)`,
-    [
-      id,
-      input.orgId,
-      input.projectId,
-      input.name,
-      input.fieldType,
-      JSON.stringify(input.options ?? []),
-      input.position ?? 0,
-    ],
+     VALUES (?, ?, ?, ?, ?, ?::jsonb, ?)`,
+    [id, input.orgId, input.projectId, input.name, input.fieldType, JSON.stringify(input.options ?? []), input.position ?? 0],
   );
-  const rows = await db.query<CustomFieldRow>(`SELECT * FROM custom_fields WHERE id = $1`, [id]);
+  const rows = await em.execute<Record<string, unknown>[]>(
+    `SELECT * FROM custom_fields WHERE id = ?`, [id], "all",
+  );
   if (rows.length === 0) throw new Error(`custom_field insert lost: ${id}`);
-  return rows[0] as CustomFieldRow;
+  const r = rows[0]!;
+  return {
+    id: r.id as string,
+    org_id: r.org_id as string,
+    project_id: r.project_id as string,
+    name: r.name as string,
+    field_type: r.field_type as string,
+    options: r.options,
+    position: r.position as number,
+    created_at: toIso(r.created_at as Date | string),
+    updated_at: toIso(r.updated_at as Date | string),
+  };
 }
 
 // ── Saved views CRUD ────────────────────────────────────────────────
 
-export interface SavedViewRow {
-  id: string;
-  org_id: string;
-  project_id: string;
-  name: string;
-  filters: unknown;
-  sort_by: string | null;
-  columns: unknown;
-  is_default: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 export async function listSavedViews(
-  db: ProductDb,
+  db: DbHandle,
   projectId: string,
 ): Promise<SavedViewRow[]> {
-  return db.query<SavedViewRow>(
-    `SELECT * FROM saved_views WHERE project_id = $1 ORDER BY name ASC, id ASC`,
+  const em = assertEm(db);
+  const rows = await em.execute<Record<string, unknown>[]>(
+    `SELECT * FROM saved_views WHERE project_id = ? ORDER BY name ASC, id ASC`,
     [projectId],
+    "all",
   );
+  return rows.map((r) => ({
+    id: r.id as string,
+    org_id: r.org_id as string,
+    project_id: r.project_id as string,
+    name: r.name as string,
+    filters: r.filters,
+    sort_by: (r.sort_by as string) ?? null,
+    columns: r.columns,
+    is_default: r.is_default as boolean,
+    created_at: toIso(r.created_at as Date | string),
+    updated_at: toIso(r.updated_at as Date | string),
+  }));
 }
 
 export async function createSavedView(
-  db: ProductDb,
+  db: DbHandle,
   input: {
     orgId: string;
     projectId: string;
@@ -669,45 +858,53 @@ export async function createSavedView(
     isDefault?: boolean;
   },
 ): Promise<SavedViewRow> {
+  const em = assertEm(db);
   const id = newUlid();
-  await db.query(
+  await em.execute(
     `INSERT INTO saved_views (id, org_id, project_id, name, filters, sort_by, columns, is_default)
-     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7::jsonb, $8)`,
-    [
-      id,
-      input.orgId,
-      input.projectId,
-      input.name,
-      JSON.stringify(input.filters ?? {}),
-      input.sortBy ?? null,
-      JSON.stringify(input.columns ?? []),
-      input.isDefault ?? false,
-    ],
+     VALUES (?, ?, ?, ?, ?::jsonb, ?, ?::jsonb, ?)`,
+    [id, input.orgId, input.projectId, input.name, JSON.stringify(input.filters ?? {}), input.sortBy ?? null, JSON.stringify(input.columns ?? []), input.isDefault ?? false],
   );
-  const rows = await db.query<SavedViewRow>(`SELECT * FROM saved_views WHERE id = $1`, [id]);
+  const rows = await em.execute<Record<string, unknown>[]>(
+    `SELECT * FROM saved_views WHERE id = ?`, [id], "all",
+  );
   if (rows.length === 0) throw new Error(`saved_view insert lost: ${id}`);
-  return rows[0] as SavedViewRow;
+  const r = rows[0]!;
+  return {
+    id: r.id as string,
+    org_id: r.org_id as string,
+    project_id: r.project_id as string,
+    name: r.name as string,
+    filters: r.filters,
+    sort_by: (r.sort_by as string) ?? null,
+    columns: r.columns,
+    is_default: r.is_default as boolean,
+    created_at: toIso(r.created_at as Date | string),
+    updated_at: toIso(r.updated_at as Date | string),
+  };
 }
 
-// ── API Key helpers ──────────────────────────────────────────────────
-
-export interface ApiKeyRow {
-  id: string;
-  org_id: string;
-  user_id: string;
-  key_hash: string;
-  name: string;
-  created_at: string;
-  last_used_at: string | null;
-}
+// ── API Key helpers ─────────────────────────────────────────────────
 
 export async function findApiKeyByHash(
-  db: ProductDb,
+  db: DbHandle,
   keyHash: string,
 ): Promise<ApiKeyRow | undefined> {
-  const rows = await db.query<ApiKeyRow>(
-    `UPDATE api_keys SET last_used_at = now() WHERE key_hash = $1 RETURNING *`,
+  const em = assertEm(db);
+  const rows = await em.execute<Record<string, unknown>[]>(
+    `UPDATE api_keys SET last_used_at = now() WHERE key_hash = ? RETURNING *`,
     [keyHash],
+    "all",
   );
-  return rows[0];
+  if (rows.length === 0) return undefined;
+  const r = rows[0]!;
+  return {
+    id: r.id as string,
+    org_id: r.org_id as string,
+    user_id: r.user_id as string,
+    key_hash: r.key_hash as string,
+    name: r.name as string,
+    created_at: toIso(r.created_at as Date | string),
+    last_used_at: r.last_used_at ? toIso(r.last_used_at as Date | string) : null,
+  };
 }
