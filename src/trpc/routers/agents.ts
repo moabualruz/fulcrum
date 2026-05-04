@@ -10,6 +10,33 @@ import { getProfile, listProfiles } from "../../agents/registry.ts";
 import { AgentProfileSchema } from "../../agents/types.ts";
 import { AgentProfile as AgentProfileEntity } from "../../db/entities/sandbox/AgentProfile.ts";
 
+// ─── SEC-02: CLI binary allowlist ────────────────────────────────────────────
+// Only binaries registered in the agent profile registry may be spawned.
+// This prevents arbitrary command execution via DB-stored cliPath values.
+
+// In test/dev, FULCRUM_AGENT_CLI_ALLOWLIST (comma-separated) extends the list.
+
+function getAllowedCliPaths(): Set<string> {
+  const registered = listProfiles().map((p) => p.cliPath);
+  const envExtras = (process.env["FULCRUM_AGENT_CLI_ALLOWLIST"] ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return new Set([...registered, ...envExtras]);
+}
+
+function assertCliPathAllowed(cliPath: string): void {
+  const allowed = getAllowedCliPaths();
+  // Allow exact match OR basename match (e.g. "/usr/bin/claude" matches "claude").
+  const basename = cliPath.split("/").pop() ?? cliPath;
+  if (!allowed.has(cliPath) && !allowed.has(basename)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `CLI path '${cliPath}' is not in the allowed agent binary list. Allowed: ${[...allowed].join(", ")}`,
+    });
+  }
+}
+
 export const agentsRouter = t.router({
   listProfiles: publicProcedure
     .output(z.array(AgentProfileSchema))
@@ -48,6 +75,10 @@ export const agentsRouter = t.router({
       }
 
       const cliPath = profile.cliPath ?? input.name;
+
+      // SEC-02: Validate cliPath against allowlist before spawning.
+      assertCliPathAllowed(cliPath);
+
       const proc = Bun.spawn([cliPath, "--version"], {
         stdout: "ignore",
         stderr: "ignore",
