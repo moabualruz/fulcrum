@@ -8,6 +8,7 @@ import {
 import { OptionalProps } from "@mikro-orm/core";
 
 import { Org } from "../auth/Org.ts";
+import { SprintRepository } from "../../repositories/tasks/SprintRepository.ts";
 import type { SprintStatusValue } from "./schemas.ts";
 
 export enum SprintStatus {
@@ -16,7 +17,15 @@ export enum SprintStatus {
   completed = "completed",
 }
 
-@Entity({ tableName: "sprints" })
+export interface MetricsSnapshot {
+  capacity_points: number | null;
+  completed_points: number;
+  total_tasks: number;
+  completed_tasks: number;
+  velocity: number;
+}
+
+@Entity({ tableName: "sprints", repository: () => SprintRepository })
 @Index({
   name: "sprints_org_project_status",
   properties: ["org", "projectId", "status"],
@@ -31,7 +40,11 @@ export class Sprint {
     | "goal"
     | "status"
     | "capacityPoints"
-    | "createdAt";
+    | "createdAt"
+    | "updatedAt"
+    | "closedAt"
+    | "metricsSnapshot"
+    | "retroDocId";
 
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
@@ -68,6 +81,18 @@ export class Sprint {
   @Property({ type: "integer", fieldName: "capacity_points", nullable: true })
   capacityPoints: number | null = null;
 
+  @Property({ type: "datetime", fieldName: "closed_at", nullable: true })
+  closedAt: Date | null = null;
+
+  @Property({ type: "json", fieldName: "metrics_snapshot", nullable: true })
+  metricsSnapshot: MetricsSnapshot | null = null;
+
+  @Property({ type: "string", fieldName: "retro_doc_id", nullable: true })
+  retroDocId: string | null = null;
+
   @Property({ type: "datetime", fieldName: "created_at", defaultRaw: "now()" })
   createdAt!: Date;
+
+  @Property({ type: "datetime", fieldName: "updated_at", defaultRaw: "now()" })
+  updatedAt!: Date;
 }
