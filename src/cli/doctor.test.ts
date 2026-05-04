@@ -656,6 +656,27 @@ describe("doctor --json product kernel section", () => {
     expect(rows["orgs"]).toBe(0);
   });
 
+  test("increments warning count when product-kernel DB check returns an error", async () => {
+    const home = join(TMP, "product-kernel-db-error-warning");
+    await mkdir(home, { recursive: true });
+    const fulcrumHome = join(home, ".fulcrum");
+    await mkdir(join(fulcrumHome, "state", "product", "db"), { recursive: true });
+    await writeFile(join(fulcrumHome, "state", "product", "db", "main"), "not a directory");
+
+    const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
+    const pk = report["productKernel"] as Record<string, unknown>;
+
+    expect(typeof pk["error"]).toBe("string");
+    expect(report["warnings"]).toBe(1);
+    expect(report["errors"]).toBe(0);
+    expect(report["verdict"]).toBe("warning");
+    expect((report["warningsList"] as Array<Record<string, unknown>>)).toContainEqual(
+      expect.objectContaining({
+        subsystem: "product-kernel-db",
+      }),
+    );
+  });
+
   test("reports product kernel rows after fulcrum product init", async () => {
     const home = join(TMP, "product-kernel-after-init");
     await mkdir(home, { recursive: true });

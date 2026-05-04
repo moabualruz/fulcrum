@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { run as runProduct } from "./product.ts";
+import { parseProductArgs, run as runProduct } from "./product.ts";
 import { openPglite } from "../product-kernel/db/pglite.ts";
 import { runMigrations } from "../product-kernel/db/migrate.ts";
 import { productDbDir } from "../product-kernel/paths.ts";
@@ -42,6 +42,36 @@ function captureStdout(): { lines: string[]; restore: () => void } {
 }
 
 describe("fulcrum product CLI", () => {
+  test("product parser preserves mixed positionals, flags, json, and passthrough", () => {
+    const parsed = parseProductArgs([
+      "task-1",
+      "--status=done",
+      "--json",
+      "--project",
+      "alpha",
+      "task-2",
+      "--",
+      "--literal",
+      "tail",
+    ]);
+
+    expect(parsed).toEqual({
+      positionals: ["task-1", "task-2"],
+      flags: {
+        "--status": "done",
+        "--json": true,
+        "--project": "alpha",
+      },
+      passthrough: ["--literal", "tail"],
+    });
+  });
+
+  test("product parser rejects unknown flags before swallowing positionals", () => {
+    expect(() => parseProductArgs(["task-1", "--bogus", "task-2"])).toThrow(
+      "unknown flag: --bogus",
+    );
+  });
+
   test("product init --json reports engine and creates the local org", async () => {
     const cap = captureStdout();
     try {

@@ -7,6 +7,15 @@ if (isPlaywrightCli) {
 		await page.goto("/");
 		await expect(page).toHaveTitle(/Fulcrum/i);
 	});
+
+	test("Cmd+K opens command palette, focuses input, and Escape closes it", async ({ page }) => {
+		await page.goto("/");
+		await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
+		await expect(page.locator("[data-command-palette][data-state='open']")).toBeVisible();
+		await expect(page.locator("[data-command-palette-input]")).toBeFocused();
+		await page.keyboard.press("Escape");
+		await expect(page.locator("[data-command-palette][data-state='open']")).toHaveCount(0);
+	});
 }
 
 export {};

@@ -32,6 +32,20 @@ const ITEMS: CommandItem[] = [
 ];
 
 describe("makeKeydownHandler", () => {
+  test("uses fresh open state for repeated command toggles", () => {
+    let open = false;
+    const changes: boolean[] = [];
+    const handler = makeKeydownHandler(() => open, (next) => {
+      open = next;
+      changes.push(next);
+    });
+
+    handler(keyEvent({ key: "k", metaKey: true }).event);
+    handler(keyEvent({ key: "k", ctrlKey: true }).event);
+
+    expect(changes).toEqual([true, false]);
+  });
+
   test("cmd+K toggles open state and prevents default", () => {
     const changes: boolean[] = [];
     const { event, prevented } = keyEvent({ key: "k", metaKey: true });
@@ -58,6 +72,16 @@ describe("makeKeydownHandler", () => {
     makeKeydownHandler(true, (next) => changes.push(next))(event);
 
     expect(changes).toEqual([false]);
+  });
+
+  test("Escape does not prevent default while closed", () => {
+    const changes: boolean[] = [];
+    const { event, prevented } = keyEvent({ key: "Escape" });
+
+    makeKeydownHandler(false, (next) => changes.push(next))(event);
+
+    expect(changes).toEqual([]);
+    expect(prevented()).toBe(false);
   });
 });
 
