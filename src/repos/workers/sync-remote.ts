@@ -10,12 +10,16 @@ import {
   type GitCommit,
   type GitFileTreeEntry,
 } from "../git.ts";
+import type { WorkerRegistry } from "../../workers/registry.ts";
+import { assertRecordPayload, assertStringField } from "../../workers/registry.ts";
 import type {
   RepoSyncBranchInput,
   RepoSyncCommitInput,
   RepoSyncFileInput,
   RepoSyncStateInput,
 } from "./sync-local.ts";
+
+export const REPO_SYNC_REMOTE_TASK = "repo.sync.remote";
 
 export interface RepoSyncRemotePayload {
   repoId: string;
@@ -199,7 +203,20 @@ export async function enqueueRepoSyncRemote(
   queue: RepoSyncRemoteQueue,
   repoId: string,
 ): Promise<void> {
-  await queue.addJob("repo.sync.remote", { repoId }, { jobKey: `repo.sync.remote:${repoId}` });
+  await queue.addJob(REPO_SYNC_REMOTE_TASK, { repoId }, { jobKey: `${REPO_SYNC_REMOTE_TASK}:${repoId}` });
+}
+
+export function assertRepoSyncRemotePayload(payload: unknown): asserts payload is RepoSyncRemotePayload {
+  assertRecordPayload(payload, REPO_SYNC_REMOTE_TASK);
+  assertStringField(payload, "repoId", REPO_SYNC_REMOTE_TASK);
+}
+
+export function registerRepoSyncRemoteWorkerTask(
+  registry: WorkerRegistry,
+  repositories: RepoSyncRemoteRepositories,
+  options: RepoSyncRemoteOptions = {},
+): void {
+  registry.registerTask(REPO_SYNC_REMOTE_TASK, assertRepoSyncRemotePayload, createRepoSyncRemoteTask(repositories, options));
 }
 
 export function createRepoLruWarmupTask(

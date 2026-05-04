@@ -8,6 +8,10 @@ import {
   type GitFileTreeEntry,
   type GitStatus,
 } from "../git.ts";
+import type { WorkerRegistry } from "../../workers/registry.ts";
+import { assertRecordPayload, assertStringField } from "../../workers/registry.ts";
+
+export const REPO_SYNC_LOCAL_TASK = "repo.sync.local";
 
 export interface RepoSyncLocalPayload {
   repoId: string;
@@ -212,7 +216,19 @@ export async function enqueueRepoSyncLocal(
   queue: RepoSyncLocalQueue,
   repoId: string,
 ): Promise<void> {
-  await queue.addJob("repo.sync.local", { repoId }, { jobKey: `repo.sync.local:${repoId}` });
+  await queue.addJob(REPO_SYNC_LOCAL_TASK, { repoId }, { jobKey: `${REPO_SYNC_LOCAL_TASK}:${repoId}` });
+}
+
+export function assertRepoSyncLocalPayload(payload: unknown): asserts payload is RepoSyncLocalPayload {
+  assertRecordPayload(payload, REPO_SYNC_LOCAL_TASK);
+  assertStringField(payload, "repoId", REPO_SYNC_LOCAL_TASK);
+}
+
+export function registerRepoSyncLocalWorkerTask(
+  registry: WorkerRegistry,
+  repositories: RepoSyncLocalRepositories,
+): void {
+  registry.registerTask(REPO_SYNC_LOCAL_TASK, assertRepoSyncLocalPayload, createRepoSyncLocalTask(repositories));
 }
 
 function toBranchInput(branch: GitBranch): RepoSyncBranchInput {

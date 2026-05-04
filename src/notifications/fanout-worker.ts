@@ -6,6 +6,10 @@ import {
   type RuleMatch,
 } from "./rule-engine.ts";
 import { DeliveryStatus } from "../db/entities/notifications/index.ts";
+import type { WorkerRegistry } from "../workers/registry.ts";
+import { assertRecordPayload, assertStringField } from "../workers/registry.ts";
+
+export const NOTIFY_FANOUT_TASK = "notify-fan-out";
 
 export interface NotifyFanoutPayload {
   eventId: string;
@@ -95,7 +99,20 @@ export async function enqueueNotifyFanout(
   queue: NotifyFanoutQueue,
   eventId: string,
 ): Promise<void> {
-  await queue.addJob("notify-fan-out", { eventId });
+  await queue.addJob(NOTIFY_FANOUT_TASK, { eventId });
+}
+
+export function assertNotifyFanoutPayload(payload: unknown): asserts payload is NotifyFanoutPayload {
+  assertRecordPayload(payload, NOTIFY_FANOUT_TASK);
+  assertStringField(payload, "eventId", NOTIFY_FANOUT_TASK);
+}
+
+export function registerNotifyFanoutWorkerTask(
+  registry: WorkerRegistry,
+  repositories: NotifyFanoutRepositories,
+  options: NotifyFanoutOptions = {},
+): void {
+  registry.registerTask(NOTIFY_FANOUT_TASK, assertNotifyFanoutPayload, createNotifyFanoutTask(repositories, options));
 }
 
 async function enqueueDeliveryOrQuietRetry(
