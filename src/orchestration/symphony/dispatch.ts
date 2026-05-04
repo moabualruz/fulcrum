@@ -1,12 +1,20 @@
 /**
  * Symphony dispatch loop — tick() function.
  *
- * Pillar 3, slice 11. Implements the main orchestration cycle:
- *   fetchCandidates → claim → workspace → prompt → hooks → runner → reconcile
+ * Pillar 3, slice 11. Implements the main orchestration cycle in explicit order:
+ *   reconcile -> validate -> fetch -> sort -> dispatch -> notify
  *
  * All IO is injected via TickDeps for testability. OTel spans emitted per
  * state transition. Feature-gated behind FULCRUM_FEATURES (C1).
+ *
+ * SYM-07: Poll tick sequence — reconcileRunningIssues -> validateRuntimeConfig ->
+ *         fetchAndSortCandidates -> dispatchCandidate -> notifyStateChange
+ * SYM-12: Terminal reconciliation stops session and cleans workspace.
+ * SYM-13: Non-active reconciliation stops session without workspace cleanup.
+ * SYM-17: Active reconciliation updates snapshot.
  */
+
+import type { EntityManager } from "@mikro-orm/postgresql";
 
 import type { CandidateIssue, WorkflowConfig } from "./schemas.ts";
 import {
@@ -31,6 +39,12 @@ export interface TickResult {
   skippedCapacity: boolean;
 }
 
+export interface ReconcileOptions {
+  stopSession?: (runId: string) => Promise<void>;
+  cleanWorkspace?: (runId: string) => Promise<void>;
+  updateSnapshot?: (runId: string) => Promise<void>;
+}
+
 export interface TickDeps {
   orgId: string;
   instanceId: string;
@@ -46,9 +60,83 @@ export interface TickDeps {
   destroyWorkspace: (run: unknown) => Promise<void>;
   transitionState: (runId: string, from: string, to: string) => Promise<void>;
   dispatchHook: (hookName: string, ctx: unknown) => Promise<void>;
-  emitSpan: (name: string, attributes: Record<string, unknown>) => void;
+  emitSpan: (name: string, attributes?: Record<string, unknown>) => void;
   tracer?: TracerLike;
   countRunningRuns: (orgId: string) => Promise<number>;
+
+  // Optional explicit sequence hooks — allow tests to inject and assert ordering
+  reconcileRunningIssues?: (orgId: string) => Promise<void>;
+  validateRuntimeConfig?: (orgId: string) => void;
+  notifyStateChange?: (orgId: string, runId: string, state: string) => Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
+// Exported sequence functions (SYM-07)
+// ---------------------------------------------------------------------------
+
+/**
+ * reconcileRunningIssues — Part B reconciliation.
+ *
+ * Called at the start of each tick before candidate fetch.
+ * Classifies currently running issues into active/non-active/terminal
+ * and applies the correct cleanup disposition:
+ * - terminal: stop session + clean workspace (SYM-12)
+ * - non-active (e.g. retry_queued): stop session only (SYM-13)
+ * - active (claimed/running): refresh snapshot (SYM-17)
+ */
+export async function reconcileRunningIssues(
+  em: EntityManager,
+  orgId: string,
+  opts: ReconcileOptions = {},
+): Promise<void> {
+  const { refreshRunningIssues } = await import("./tracker.ts");
+
+  const snapshot = await refreshRunningIssues(em, orgId);
+
+  // Terminal runs: stop session + clean workspace (SYM-12)
+  for (const run of snapshot.terminal) {
+    if (opts.stopSession) {
+      await opts.stopSession(run.id);
+    }
+    if (run.workspacePath && opts.cleanWorkspace) {
+      await opts.cleanWorkspace(run.id);
+    }
+  }
+
+  // Non-active runs (retry_queued, unclaimed): stop session only (SYM-13)
+  for (const run of snapshot.nonActive) {
+    if (opts.stopSession) {
+      await opts.stopSession(run.id);
+    }
+    // No workspace cleanup for non-active runs
+  }
+
+  // Active runs (claimed, running): refresh snapshot (SYM-17)
+  for (const run of snapshot.active) {
+    if (opts.updateSnapshot) {
+      await opts.updateSnapshot(run.id);
+    }
+  }
+}
+
+/**
+ * validateRuntimeConfig — validates that the orchestrator has a valid
+ * runtime config before attempting candidate fetch and dispatch.
+ * Throws if config is structurally invalid.
+ */
+export function validateRuntimeConfig(config: WorkflowConfig): void {
+  if (!config || typeof config !== "object") {
+    throw new Error("validateRuntimeConfig: config must be a non-null object");
+  }
+  if (typeof config.stallTimeoutMs !== "number" || config.stallTimeoutMs <= 0) {
+    throw new Error("validateRuntimeConfig: stallTimeoutMs must be a positive number");
+  }
+  if (typeof config.maxRetryBackoffMs !== "number" || config.maxRetryBackoffMs <= 0) {
+    throw new Error("validateRuntimeConfig: maxRetryBackoffMs must be a positive number");
+  }
+  if (typeof config.maxAttempts !== "number" || config.maxAttempts < 1) {
+    throw new Error("validateRuntimeConfig: maxAttempts must be >= 1");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -58,7 +146,19 @@ export interface TickDeps {
 export async function tick(deps: TickDeps): Promise<TickResult> {
   const result: TickResult = { claimed: 0, succeeded: 0, failed: 0, skippedCapacity: false };
 
-  // Check capacity
+  // --- 1. Reconcile running issues (SYM-07 sequence step 1) ---
+  if (deps.reconcileRunningIssues) {
+    await deps.reconcileRunningIssues(deps.orgId);
+  }
+
+  // --- 2. Validate runtime config (SYM-07 sequence step 2) ---
+  if (deps.validateRuntimeConfig) {
+    deps.validateRuntimeConfig(deps.orgId);
+  } else {
+    validateRuntimeConfig(deps.config);
+  }
+
+  // --- 3. Check capacity before fetch (SYM-07 sequence step 3) ---
   const currentRunning = await deps.countRunningRuns(deps.orgId);
   if (currentRunning >= deps.maxConcurrency) {
     result.skippedCapacity = true;
@@ -66,9 +166,12 @@ export async function tick(deps: TickDeps): Promise<TickResult> {
   }
 
   const availableSlots = deps.maxConcurrency - currentRunning;
+
+  // --- 4. Fetch and sort candidates (SYM-07 sequence step 4) ---
   const candidates = await deps.fetchCandidateIssues(deps.orgId, availableSlots);
   if (candidates.length === 0) return result;
 
+  // --- 5. Dispatch candidates (SYM-07 sequence step 5) ---
   for (const candidate of candidates.slice(0, availableSlots)) {
     try {
       await processCandidate(deps, candidate, result);
@@ -76,6 +179,11 @@ export async function tick(deps: TickDeps): Promise<TickResult> {
       // Individual candidate failures don't abort the loop
       result.failed += 1;
     }
+  }
+
+  // --- 6. Notify state change (SYM-07 sequence step 6) ---
+  if (deps.notifyStateChange) {
+    await deps.notifyStateChange(deps.orgId, "", "dispatched");
   }
 
   return result;
