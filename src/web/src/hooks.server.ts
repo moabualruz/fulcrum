@@ -263,7 +263,19 @@ export const handle: Handle = async ({ event, resolve }) => {
       event.locals.session = sessionState.session;
       event.locals.orgId = sessionState.orgId;
 
-      // Auth guard lives after hydration so valid sessions can reach app routes.
+      // In local/dev mode, auto-create a session so users don't need to log in.
+      // Production (SaaS) mode requires real auth via Better-Auth.
+      if (!event.locals.session && !process.env["FULCRUM_REQUIRE_AUTH"]) {
+        event.locals.session = {
+          id: "local-dev-session",
+          userId: "local-admin",
+          expiresAt: new Date(Date.now() + 86400000),
+        } as App.Locals["session"];
+        event.locals.orgId = "default";
+        event.locals.userId = "local-admin";
+      }
+
+      // Auth guard — only active when FULCRUM_REQUIRE_AUTH is set (SaaS mode).
       if (
         !event.locals.session &&
         !url.pathname.startsWith("/auth") &&
