@@ -1,4 +1,5 @@
 import type { ProductDb, SqlValue } from "./types.ts";
+import { mkdir } from "node:fs/promises";
 
 export function isCompiledBunBinary(): boolean {
   // `bun build --compile` mounts the embedded module graph at /$bunfs/.
@@ -11,6 +12,7 @@ export function isCompiledBunBinary(): boolean {
 }
 
 export async function openPglite(dataDir: string): Promise<ProductDb> {
+  await mkdir(dataDir, { recursive: true });
   const { PGlite } = await import("@electric-sql/pglite");
   const { vector } = await import("@electric-sql/pglite/vector");
   const db = new PGlite(dataDir, { extensions: { vector } });
