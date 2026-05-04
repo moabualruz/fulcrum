@@ -47,6 +47,10 @@ export const FEATURE_FLAGS = [
   "session-resume",
   "telemetry-remote",
   "error-reporting-remote",
+  "desktop-app",
+  "experiments",
+  "scheduled-backups",
+  "skill-marketplace",
 ] as const;
 
 /** Union type of all registered feature flag names. */
@@ -81,7 +85,30 @@ export const FLAG_DESCRIPTIONS: Record<FeatureFlagName, string> = {
   "session-resume": "Enable session resumption on retry runs (claude-code profile only); passes prior transcript to sandcastle.",
   "telemetry-remote": "Enable remote telemetry batch POST to FULCRUM_TELEMETRY_ENDPOINT (HMAC-signed, outbox-queued, graphile-worker flushed).",
   "error-reporting-remote": "Enable remote crash reporting: new ErrorLog entries are POSTed (scrubbed + HMAC-signed) to FULCRUM_ERROR_REPORT_ENDPOINT.",
+  "desktop-app": "Enable Tauri desktop integration surfaces and desktop IPC checks.",
+  "experiments": "Enable experimental product surfaces gated from default local-first flows.",
+  "scheduled-backups": "Enable scheduled local and remote backup tasks.",
+  "skill-marketplace": "Enable skill marketplace client and publisher commands.",
 };
+
+const featureFlagSet = new Set<string>(FEATURE_FLAGS);
+
+export function isRegisteredFeatureFlag(flag: string): flag is FeatureFlagName {
+  return featureFlagSet.has(flag);
+}
+
+export function parseEnvFeatureFlags(): Set<FeatureFlagName> {
+  const flags = new Set<FeatureFlagName>();
+  for (const token of (process.env["FULCRUM_FEATURES"] ?? "").split(",")) {
+    const flag = token.trim();
+    if (isRegisteredFeatureFlag(flag)) flags.add(flag);
+  }
+  return flags;
+}
+
+export function isEnvFeatureEnabled(flag: FeatureFlagName): boolean {
+  return parseEnvFeatureFlags().has(flag);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Cache entry type
@@ -235,11 +262,7 @@ export class FlagRegistry {
     }
 
     // 2. FULCRUM_FEATURES env var
-    const envFlags = (process.env["FULCRUM_FEATURES"] ?? "")
-      .split(",")
-      .map((f) => f.trim())
-      .filter(Boolean);
-    if (envFlags.includes(flag)) {
+    if (isEnvFeatureEnabled(flag)) {
       return true;
     }
 

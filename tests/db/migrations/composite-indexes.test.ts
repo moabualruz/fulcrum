@@ -52,9 +52,10 @@ import { join } from "node:path";
 const WELL_KNOWN_ORG_ID = "00000000-0000-0000-0000-000000000001";
 
 let orm: MikroORM;
+let pglite: PGlite;
 
 beforeAll(async () => {
-  const pglite = new PGlite();
+  pglite = new PGlite();
   const dialect = new PGliteKyselyDialect(() => pglite);
 
   orm = await MikroORM.init({
@@ -99,6 +100,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (orm) await orm.close(true);
+  if (pglite) await pglite.close();
 });
 
 interface StubSpec {

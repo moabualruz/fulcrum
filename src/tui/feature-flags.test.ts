@@ -106,11 +106,12 @@ describe("feature-flags", () => {
   });
 
   describe("KNOWN_FLAGS", () => {
-    test("contains all four gated features", () => {
+    test("contains canonical gated features", () => {
       expect(KNOWN_FLAGS).toContain("desktop-app");
       expect(KNOWN_FLAGS).toContain("experiments");
       expect(KNOWN_FLAGS).toContain("casbin-policies");
       expect(KNOWN_FLAGS).toContain("scheduled-backups");
+      expect(KNOWN_FLAGS).toContain("public-api");
     });
   });
 });

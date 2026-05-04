@@ -76,7 +76,7 @@ beforeEach(async () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("FEATURE_FLAGS constant", () => {
-  it("contains all 22 registered flags", () => {
+  it("contains all registered flags", () => {
     const expected: FeatureFlagName[] = [
       "router-llm",
       "embeddings",
@@ -100,8 +100,14 @@ describe("FEATURE_FLAGS constant", () => {
       "search-click-telemetry",
       "token-tracking",
       "session-resume",
+      "telemetry-remote",
+      "error-reporting-remote",
+      "desktop-app",
+      "experiments",
+      "scheduled-backups",
+      "skill-marketplace",
     ];
-    expect(FEATURE_FLAGS).toHaveLength(22);
+    expect(FEATURE_FLAGS).toHaveLength(expected.length);
     for (const flag of expected) {
       expect(FEATURE_FLAGS).toContain(flag);
     }
