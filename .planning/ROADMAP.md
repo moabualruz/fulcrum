@@ -12,7 +12,7 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
 - Integer phases (1, 2, 3, ...): Planned milestone work
 - Decimal phases (e.g. 2.1): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Architecture Convergence + Security** - Single data layer, service layer, unified events, module boundaries, security fixes
+- [x] **Phase 1: Architecture Convergence + Security** - Single data layer, service layer, unified events, module boundaries, security fixes
 - [x] **Phase 2: Bug Fixes + Foundation** - 18 bugs fixed, foundation infrastructure in place
 - [ ] **Phase 3: Symphony + Sandcastle** - Full SPEC.md conformance with native tracker + agent dispatch infrastructure
 - [ ] **Phase 4: Inference + Router/Skills** - Inference sidecar hardened, router + skills wired
@@ -38,16 +38,16 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
   5. AppRouter: zero stubs, zero duplicate mounts, zero cross-boundary imports
 **Plans:** 10 plans
 Plans:
-- [ ] 01-01-PLAN.md — Router cleanup: remove stub routers + duplicate mount aliases (ARCH-07, ARCH-08)
-- [ ] 01-02-PLAN.md — Security fixes: cliPath allowlist, webhook encryption, semgrep/gitleaks (SEC-01..04)
-- [ ] 01-03-PLAN.md — DDL removal: move ALTER TABLE from handlers to migrations (ARCH-11)
-- [ ] 01-04-PLAN.md — PGlite connection pool: singleton startup init (ARCH-10)
-- [ ] 01-05-PLAN.md — Product-kernel raw SQL migration to MikroORM repositories (ARCH-02)
-- [ ] 01-06-PLAN.md — Web server raw SQL migration: 17 files, ~120 db.query() calls (ARCH-01, ARCH-02)
-- [ ] 01-07-PLAN.md — Service layer extraction: TaskService, DocService, SprintService (ARCH-03)
-- [ ] 01-08-PLAN.md — Event unification: single EventDispatcher, remove appendEvent + RoutingEventBus (ARCH-04)
-- [ ] 01-09-PLAN.md — Module boundaries: fix layering violations, barrel exports, lint enforcement (ARCH-05, ARCH-06)
-- [ ] 01-10-PLAN.md — API consolidation + TrpcContext cleanup (ARCH-09, ARCH-12)
+- [x] 01-01-PLAN.md — Router cleanup: remove stub routers + duplicate mount aliases (ARCH-07, ARCH-08)
+- [x] 01-02-PLAN.md — Security fixes: cliPath allowlist, webhook encryption, semgrep/gitleaks (SEC-01..04)
+- [x] 01-03-PLAN.md — DDL removal: move ALTER TABLE from handlers to migrations (ARCH-11)
+- [x] 01-04-PLAN.md — PGlite connection pool: singleton startup init (ARCH-10)
+- [x] 01-05-PLAN.md — Product-kernel raw SQL migration to MikroORM repositories (ARCH-02)
+- [x] 01-06-PLAN.md — Web server raw SQL migration: 17 files, ~120 db.query() calls (ARCH-01, ARCH-02)
+- [x] 01-07-PLAN.md — Service layer extraction: TaskService, DocService, SprintService (ARCH-03)
+- [x] 01-08-PLAN.md — Event unification: single EventDispatcher, remove appendEvent + RoutingEventBus (ARCH-04)
+- [x] 01-09-PLAN.md — Module boundaries: fix layering violations, barrel exports, lint enforcement (ARCH-05, ARCH-06)
+- [x] 01-10-PLAN.md — API consolidation + TrpcContext cleanup (ARCH-09, ARCH-12)
 
 ### Phase 2: Bug Fixes + Foundation
 **Goal**: All 18 confirmed bugs resolved and foundation infrastructure in place
@@ -196,7 +196,7 @@ Cross-cutting constraints:
 |-------|----------------|--------|-----------|
 | 1. Architecture + Security | 0/10 | Planned | - |
 | 2. Bug Fixes + Foundation | 8/8 | Complete | 2026-05-04 |
-| 3. Symphony + Sandcastle | 0/? | Not started | - |
+| 3. Symphony + Sandcastle | 2/6 | In Progress|  |
 | 4. Inference + Router/Skills | 0/? | Not started | - |
 | 5. Task Management + Metrics | 0/? | Not started | - |
 | 6. Documents + Memory + Search | 0/? | Not started | - |
