@@ -1,6 +1,32 @@
 # Test Gaps — Integration & E2E
 
-Audit date: 2026-05-04. Covers all pillars (P1-P17).
+Audit date: 2026-05-04. Updated after live dev-server debugging session.
+Covers all pillars (P1-P17).
+
+## Infrastructure (CI-blocking — highest priority)
+
+These gaps caused actual production-path failures found during manual testing:
+
+- [ ] **Migration compatibility** — no test runs all `src/product-kernel/db/migrations/*.sql` files through PGlite in alphabetical order and verifies zero errors. Today's bug: two migrations created the same table with different columns; `CREATE TABLE IF NOT EXISTS` skipped the second, then `CREATE INDEX` on missing column crashed. Would catch: duplicate table definitions, ALTER TABLE PGlite incompatibilities, column naming conflicts across migration files.
+- [ ] **Dev server smoke** — no test starts `vite dev`, waits for ready, hits `/` and `/doctor` with curl, asserts HTTP 200. Today's bugs: SSR SyntaxError from eager tRPC import, exported non-SvelteKit symbols causing 500s, missing default org. Would catch: any SSR import failure, any route load crash.
+- [ ] **SvelteKit export validation** — no test scans `+page.server.ts` files for exports not in the SvelteKit allowed set (`load`, `actions`, `prerender`, `csr`, `ssr`, `trailingSlash`, `config`, `entries`, `_`-prefixed). Today's bug: 12 routes exported helper functions/constants → SvelteKit rejected them as invalid → 500.
+- [ ] **Auth bypass in dev mode** — no test verifies that routes are accessible without login when `FULCRUM_REQUIRE_AUTH` is unset, and that they redirect to `/auth/login` when it IS set. Today's bug: all routes required login in dev mode.
+- [ ] **Default org seeding** — no test verifies that `openProductDb()` creates a default org if none exists. Today's bug: fresh PGlite DB had no org → every page.server.ts load function threw "default org not found".
+- [ ] **Feature flag gating consistency** — no test verifies that every `FULCRUM_FEATURES=X` flag correctly hides/shows its gated route. Gate review found `/api/openapi.json` was exposed without the `public-api` flag check.
+
+## TUI (integration tests with FakeTTY needed)
+
+- [ ] **Screen render smoke** — no test renders every TUI screen with FakeTTY and asserts no crash. Many screens have unchecked acceptance criteria.
+- [ ] **Keyboard navigation round-trip** — no test exercises Tab/arrow/Enter across all screens in sequence. Gate review found: sprint close overlay has no keyboard handler (F04), doc history 'h' key is dead (F03), memory browser 'g' vs 'G' mismatch (F02).
+- [ ] **Bulk operations** — no test for bulk status update → selection cleared → re-render. Gate review found selected set leaked after bulk update (F01).
+- [ ] **Feature flag screens** — no test verifies gated TUI screens (i18n, embeddings, desktop, experiments) show "Feature disabled" banner when flag OFF.
+
+## Inference Sidecar (integration tests needed)
+
+- [ ] **Sidecar lifecycle** — no test starts/stops the inference sidecar and verifies health endpoint responds.
+- [ ] **Model pull progress** — no test verifies pullModel yields real-time progress events (gate review found it buffers all events, CF-02).
+- [ ] **Backend switching** — no test switches between embedded/ollama/lm-studio/openai-compatible backends and verifies routing.
+- [ ] **Feature flag bypass** — no test verifies OpenAI-compatible backend respects `external-llm-provider` flag (gate review found it was bypassed, CF-01 — fixed).
 
 ## Web Routes (Playwright needed)
 
@@ -57,6 +83,12 @@ Existing tRPC tests: audit, auth, backup, credentials, customFields, docs-*, err
 - [ ] `search` router — no tRPC integration test for search-across-entities procedure
 - [ ] REST API v1 (`/api/v1/*`) — unit test exists but no integration test against real server with auth headers
 - [ ] Product-kernel PGlite queries — `openProductDb` + `runMigrations` not tested with real PGlite in web context (only product-kernel unit tests)
+- [ ] `sprints.close` — no integration test for `next-sprint` disposition (gate review found it was a no-op, F2 — fixed)
+- [ ] `sprints.close` event — no test verifies `metrics_snapshot.id` is non-empty in the persisted event (gate review found empty UUID, F1 — fixed)
+- [ ] Hybrid search params — no integration test with `embedQuery` provided to verify FTS WHERE clause params match (gate review found params/SQL mismatch, F1 — fixed)
+- [ ] `docs.tree` / `docs.move` — procedures missing entirely from docs router (gate review C, spec gap — not yet implemented)
+- [ ] `docs.create` template application — no test verifies org-default template body is applied on create (gate review C, spec gap)
+- [ ] Webhook retry timing — no test verifies retries are separated by actual backoff delays (gate review found all 5 attempts fire synchronously, F-003)
 
 ## CLI (Integration tests with real commands needed)
 
@@ -95,3 +127,23 @@ Only one cross-surface e2e exists: `tests/e2e/notifications-audit-pipeline.test.
 - [ ] Multi-project routing: configure routing rules -> incoming task auto-assigned to correct project based on rules
 - [ ] Sprint planning: create sprint -> assign tasks -> sprint board shows capacity -> complete sprint -> burndown report accurate
 - [ ] Repo integration: register repo -> commits sync -> file browser works -> commit detail shows diff -> linked tasks cross-referenced
+
+## Gate Review Findings (bugs found without test coverage)
+
+Bugs found by gate reviewers that had zero test coverage. Each should have a regression test:
+
+| ID | File | Bug | Fixed? |
+|----|------|-----|--------|
+| CF-01 | `src/inference/backends/client.ts:97` | OpenAI backend flag bypass — `flagEnabled` always `true` | ✅ |
+| CF-02 | `src/inference/client.ts:222` | pullModel buffers all progress before yielding | architectural |
+| CF-03 | `src/orchestration/symphony/dispatch.ts:95` | Double state transition after claimRun | open |
+| CF-04 | `src/orchestration/sandbox-runner.ts:310` | Token cap vs COMPLETE ordering ambiguity | open |
+| F1-B | `src/server/trpc/routers/sprints.ts:294` | Sprint metrics ID empty before flush | ✅ |
+| F2-B | `src/server/trpc/routers/sprints.ts:268` | next-sprint disposition no-op | ✅ |
+| F1-D | `src/search/query.ts:360` | Hybrid search params/SQL mismatch | ✅ |
+| F-001 | `src/product-kernel/db/migrations/0004_notifications.sql` | PGlite ALTER TABLE incompatibility | ✅ |
+| F-002 | `src/api/hono.ts:94` | /api/openapi.json unguarded by flag | ✅ |
+| F01 | `src/tui/screens/task-list.ts:142` | Bulk selection not cleared | ✅ |
+| F03 | `src/tui/screens/docs-reader-editor.ts:66` | Doc history 'h' key dead | ✅ |
+| F04 | `src/tui/screens/sprints.ts:201` | Sprint close overlay no keyboard handler | ✅ |
+| F06 | `src/web/src/routes/settings/secrets/+page.server.ts:46` | Misleading sha256 prefix on base64 | ✅ |
