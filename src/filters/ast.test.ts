@@ -321,7 +321,7 @@ describe("SavedViewQuery round-trip (TSK-13)", () => {
     const reloaded = SavedViewQuerySchema.parse(JSON.parse(JSON.stringify(original)));
     expect(reloaded.filters).toHaveLength(9);
     reloaded.filters.forEach((f, i) => {
-      expect(f.op).toBe(ops[i].op);
+      expect(f.op).toBe(ops[i]!.op);
     });
     // All 9 compile without throwing
     const compiled = compileSavedViewQuery(reloaded) as { $and: unknown[] };
@@ -409,8 +409,8 @@ describe("custom field reference filters (D-72, TSK-13)", () => {
     };
     const reloaded = SavedViewQuerySchema.parse(JSON.parse(JSON.stringify(original)));
     expect(reloaded.filters).toHaveLength(2);
-    expect(reloaded.filters[0].field).toBe("custom_fields.priority_score");
-    expect(reloaded.filters[1].field).toBe("custom_fields.team_tag");
+    expect(reloaded.filters[0]!.field).toBe("custom_fields.priority_score");
+    expect(reloaded.filters[1]!.field).toBe("custom_fields.team_tag");
 
     // Compiled output includes both custom field conditions
     const compiled = compileSavedViewQuery(reloaded) as { $and: unknown[] };

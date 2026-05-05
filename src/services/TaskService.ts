@@ -173,6 +173,10 @@ export class TaskService {
   }
 
   async bulkUpdate(ctx: TaskContext, ids: string[], patch: BulkTaskPatch): Promise<{ updated: number }> {
+    // D-75: hard cap at 200 tasks per bulk operation
+    if (ids.length > 200) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Bulk operations are limited to 200 tasks at a time." });
+    }
     const repo = this.repo();
     await repo.getEntityManager().transactional(async (txEm) => {
       const txRepo = txEm.getRepository(Task) as TaskRepository;
@@ -197,6 +201,10 @@ export class TaskService {
   }
 
   async bulkDelete(ctx: TaskContext, ids: string[]): Promise<{ deleted: number }> {
+    // D-75: hard cap at 200 tasks per bulk operation
+    if (ids.length > 200) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Bulk operations are limited to 200 tasks at a time." });
+    }
     const repo = this.repo();
     await repo.getEntityManager().transactional(async (txEm) => {
       const txRepo = txEm.getRepository(Task) as TaskRepository;

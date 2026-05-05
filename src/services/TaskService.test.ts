@@ -40,51 +40,49 @@ function makeTask(overrides: Partial<Task> = {}): Task {
   } as unknown as Task;
 }
 
-function makeMockEm(tasks: Task[]): EntityManager {
-  const persisted: Task[] = [];
-  const flushed: Task[] = [];
-  let flushedCount = 0;
-
-  const txEm: Partial<EntityManager> = {
-    getRepository: vi.fn(() => ({
-      find: vi.fn(async (filter: Record<string, unknown>) => {
-        const idsFilter = (filter as any).id?.$in as string[] | undefined;
-        if (idsFilter) {
-          return tasks.filter((t) => idsFilter.includes(t.id));
-        }
-        return tasks;
-      }),
-      get: vi.fn(async ({ id }: { orgId: string; id: string }) =>
-        tasks.find((t) => t.id === id) ?? null
-      ),
-      getEntityManager: vi.fn(() => txEm),
-    })) as never,
-    persist: vi.fn((t: Task) => { persisted.push(t); return txEm as never; }),
-    flush: vi.fn(async () => { flushedCount++; flushed.push(...persisted); }),
-  };
-
-  const mockEm: Partial<EntityManager> = {
-    getRepository: vi.fn(() => ({
-      find: vi.fn(async (filter: Record<string, unknown>) => {
-        const idsFilter = (filter as any).id?.$in as string[] | undefined;
-        if (idsFilter) {
-          return tasks.filter((t) => idsFilter.includes(t.id));
-        }
-        return tasks;
-      }),
-      get: vi.fn(async ({ id }: { orgId: string; id: string }) =>
-        tasks.find((t) => t.id === id) ?? null
-      ),
-      getEntityManager: vi.fn(() => mockEm),
-    })) as never,
-    persist: vi.fn((t: Task) => { persisted.push(t); return mockEm as never; }),
-    flush: vi.fn(async () => { flushedCount++; flushed.push(...persisted); }),
-    transactional: vi.fn(async (cb: (em: EntityManager) => Promise<void>) => {
-      await cb(txEm as EntityManager);
+function makeMockRepo(tasks: Task[], selfEm: () => unknown) {
+  return {
+    find: vi.fn(async (filter: Record<string, unknown>) => {
+      const idsFilter = (filter as Record<string, Record<string, string[]>>).id?.$in;
+      if (idsFilter) {
+        return tasks.filter((t) => idsFilter.includes(t.id));
+      }
+      return tasks;
     }),
+    get: vi.fn(async ({ id }: { orgId: string; id: string }) =>
+      tasks.find((t) => t.id === id) ?? null
+    ),
+    getEntityManager: vi.fn(() => selfEm()),
   };
+}
 
-  return mockEm as EntityManager;
+function makeMockEm(tasks: Task[]): EntityManager {
+  // Forward references so txEm/mockEm can reference themselves
+  const txEmBox: { em: unknown } = { em: null };
+  const mockEmBox: { em: unknown } = { em: null };
+
+  const txEm = {
+    getRepository: vi.fn(() => makeMockRepo(tasks, () => txEmBox.em)),
+    persist: vi.fn(),
+    flush: vi.fn(async () => {}),
+    getReference: vi.fn((_Entity: unknown, id: string) => ({ id })) as unknown as EntityManager["getReference"],
+    create: vi.fn((_Entity: unknown, data: unknown) => data) as unknown as EntityManager["create"],
+  } as unknown as EntityManager;
+  txEmBox.em = txEm;
+
+  const mockEm = {
+    getRepository: vi.fn(() => makeMockRepo(tasks, () => mockEmBox.em)),
+    persist: vi.fn(),
+    flush: vi.fn(async () => {}),
+    getReference: vi.fn((_Entity: unknown, id: string) => ({ id })) as unknown as EntityManager["getReference"],
+    create: vi.fn((_Entity: unknown, data: unknown) => data) as unknown as EntityManager["create"],
+    transactional: vi.fn(async (cb: (em: EntityManager) => Promise<void>) => {
+      await cb(txEm);
+    }),
+  } as unknown as EntityManager;
+  mockEmBox.em = mockEm;
+
+  return mockEm;
 }
 
 // ── TSK-11: Bulk operations ────────────────────────────────────────────────
@@ -346,9 +344,9 @@ describe("Task priority ordering (D-80)", () => {
       { id: "t3", priority: PRIORITY_ORDER.Medium },
     ];
     const sorted = [...tasks].sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999));
-    expect(sorted[0].id).toBe("t2"); // Urgent (0)
-    expect(sorted[1].id).toBe("t3"); // Medium (2)
-    expect(sorted[2].id).toBe("t1"); // Low (3)
+    expect(sorted[0]!.id).toBe("t2"); // Urgent (0)
+    expect(sorted[1]!.id).toBe("t3"); // Medium (2)
+    expect(sorted[2]!.id).toBe("t1"); // Low (3)
   });
 
   it("null priority sorts last (no priority)", () => {
@@ -357,8 +355,8 @@ describe("Task priority ordering (D-80)", () => {
       { id: "t2", priority: 0 },
     ];
     const sorted = [...tasks].sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999));
-    expect(sorted[0].id).toBe("t2");
-    expect(sorted[1].id).toBe("t1");
+    expect(sorted[0]!.id).toBe("t2");
+    expect(sorted[1]!.id).toBe("t1");
   });
 
   it("task priority field accepts integer values 0-4", () => {
