@@ -16,17 +16,17 @@ const binaryTuiEntrypoint: DoctorCheckDef = {
   subsystem: SUBSYSTEM,
   run: async () => {
     const { exists } = await import("../../utils/proc.ts");
-    const devEntry = `${process.cwd()}/src/tui/app.ts`;
+    const devEntry = `${process.cwd()}/src/tui/index.ts`;
     if (await exists(devEntry)) {
-      return { status: "ok", message: "TUI entrypoint src/tui/app.ts exists" };
+      return { status: "ok", message: "TUI entrypoint src/tui/index.ts exists" };
     }
-    const distEntry = `${process.cwd()}/dist/tui/app.js`;
+    const distEntry = `${process.cwd()}/dist/tui/index.js`;
     if (await exists(distEntry)) {
       return { status: "ok", message: `TUI entrypoint compiled at ${distEntry}` };
     }
     return {
       status: "fail",
-      message: "TUI entrypoint not found (src/tui/app.ts and dist/tui/app.js missing)",
+      message: "TUI entrypoint not found (src/tui/index.ts and dist/tui/index.js missing)",
       recovery: "run: bun run build:all",
     };
   },

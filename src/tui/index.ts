@@ -2,11 +2,8 @@
  * TUI application root — `fulcrum tui` entry-point.
  *
  * Architecture:
- *   - Keyboard-first, ANSI-rendered terminal UI using picocolors.
- *   - OpenTUI is the target renderer, but this repo does not yet carry
- *     @opentui/core in package.json. This foundation keeps the existing
- *     ANSI renderer so router/input/error/caller behavior is testable before
- *     the renderer swap is gated.
+ *   - Keyboard-first terminal UI rendered through the OpenTUI adapter at
+ *     runtime and through FakeTTY-compatible output in tests.
  *   - All screens are headless-testable via FakeTTY injection.
  *   - In-process tRPC caller: zero HTTP — shares needle-di container with CLI.
  *
@@ -31,6 +28,7 @@ import type { Session as BetterAuthSession } from "better-auth";
 import type { TuiOutput, TuiInput } from "./testing/fake-tty.ts";
 import { StdoutOutput } from "./testing/fake-tty.ts";
 import { Renderer, c } from "./renderer.ts";
+import { createFulcrumTuiRenderer, type FulcrumTuiRenderer } from "./opentui/adapter.ts";
 import { AuthScreen } from "./screens/auth.ts";
 import type { AuthInfo } from "./screens/auth.ts";
 import { FlagsScreen } from "./screens/flags.ts";
@@ -38,6 +36,7 @@ import type { FlagItem } from "./screens/flags.ts";
 import { NewDocScreen } from "./screens/new-doc.ts";
 import { RoutingRulesScreen } from "./screens/routing-rules.ts";
 import type { TuiRoutingRule, TuiEnrichedDecision } from "./screens/routing-rules.ts";
+import { RunsScreen, RunDetailScreen, type TuiRun } from "./screens/runs.ts";
 import { NotificationsScreen } from "./screens/notifications.ts";
 import { ActivityFeedScreen } from "./screens/activity.ts";
 import { NotificationRulesScreen } from "./screens/notification-rules.ts";
@@ -50,6 +49,7 @@ import { ENTITY_MANAGER_TOKEN, registerDbBindings } from "../db/db.module.ts";
 import type { InferenceModel, ModelPullProgress } from "../inference/protocol.ts";
 import type { KeybindingMap, KeybindingAction } from "../keybindings/index.ts";
 import type { TuiTheme } from "./theme/index.ts";
+import type { SubscriptionBridge } from "./subscriptions.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -74,8 +74,22 @@ export interface TuiCaller {
     set: (input: { flag: string; enabled: boolean }) => Promise<{ ok: boolean }>;
   };
   tasks?: {
-    list: () => Promise<Array<{ id: string; orgId: string | null }>>;
+    list: () => Promise<Array<{ id: string; orgId: string | null; title?: string; status?: string }>>;
+    update?: (input: { id: string; status: string }) => Promise<unknown>;
+    create?: (input: { title: string; status: string }) => Promise<unknown>;
   };
+  projects?: { list: () => Promise<unknown[]> };
+  sprints?: { list: () => Promise<unknown[]> };
+  agent_runs?: {
+    list: () => Promise<TuiRun[]>;
+    get: (input: { id: string }) => Promise<TuiRun>;
+    create: (input: { projectId: string; taskId: string; agent: string }) => Promise<TuiRun>;
+    cancel: (input: { id: string }) => Promise<{ ok: boolean }>;
+  };
+  runsSubscriptions?: SubscriptionBridge;
+  repos?: { list: () => Promise<unknown[]> };
+  memories?: { list: (input?: Record<string, unknown>) => Promise<unknown[]>; promote: (input: { id: string }) => Promise<unknown> };
+  search?: { query: (input: Record<string, unknown>) => Promise<unknown[]>; suggest?: (input: Record<string, unknown>) => Promise<unknown> };
   inference?: {
     health: () => Promise<{
       status: string;
@@ -189,6 +203,9 @@ export interface TuiAppOptions {
 
   /** Resolved TUI theme contract (Pillar 17). Exposed via `app.theme`. */
   theme?: TuiTheme;
+
+  /** Runtime OpenTUI adapter created by launchTui; omitted in FakeTTY tests. */
+  openTuiRenderer?: FulcrumTuiRenderer;
 }
 
 /** Map keybinding action → semantic TuiAction handler key. */
@@ -197,11 +214,33 @@ const KEYBINDING_TO_TUI_ACTION: Partial<Record<KeybindingAction, TuiAction>> = {
   "doc.create": "CreateItem",
 };
 
+const COMMAND_PALETTE_ACTIONS = [
+  "Create task",
+  "Create doc",
+  "Search",
+  "Dispatch run",
+  "Settings",
+] as const;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Screen enum
 // ─────────────────────────────────────────────────────────────────────────────
 
 type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "inbox" | "activity" | "notification-rules" | "audit" | "artifacts" | "routing-rules";
+type DomainScreen =
+  | "projects"
+  | "tasks"
+  | "sprints"
+  | "docs"
+  | "memory"
+  | "runs"
+  | "repos"
+  | "search"
+  | "skills"
+  | "components"
+  | "doctor";
+
+type TuiScreen = Screen | DomainScreen;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Navigation entries
@@ -209,23 +248,32 @@ type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "inbox" | "ac
 
 interface NavEntry {
   label: string;
-  screen: Screen;
+  screen: TuiScreen;
 }
 
 const NAV_ENTRIES: NavEntry[] = [
-  { label: "Inbox", screen: "inbox" },
-  { label: "Activity", screen: "activity" },
+  { label: "Projects", screen: "projects" },
+  { label: "Tasks", screen: "tasks" },
+  { label: "Sprints", screen: "sprints" },
+  { label: "Docs", screen: "docs" },
+  { label: "Memory", screen: "memory" },
+  { label: "Runs", screen: "runs" },
+  { label: "Repos", screen: "repos" },
+  { label: "Artifacts", screen: "artifacts" },
+  { label: "Search", screen: "search" },
+  { label: "Notifications", screen: "inbox" },
+  { label: "Notification Rules", screen: "notification-rules" },
+  { label: "Skills", screen: "skills" },
+  { label: "Routing", screen: "routing-rules" },
+  { label: "Routing/Skills", screen: "routing-rules" },
+  { label: "Inference", screen: "inference" },
+  { label: "Components", screen: "components" },
+  { label: "Doctor", screen: "doctor" },
+  { label: "Doctor/Settings", screen: "doctor" },
   { label: "Auth", screen: "auth" },
   { label: "Feature Flags", screen: "flags" },
-  { label: "Notification Rules", screen: "notification-rules" },
+  { label: "Activity", screen: "activity" },
   { label: "Audit", screen: "audit" },
-  { label: "Artifacts", screen: "artifacts" },
-  { label: "Inference", screen: "inference" },
-  { label: "Routing Rules", screen: "routing-rules" },
-  { label: "Dashboard (Pillar 3)", screen: "nav" },
-  { label: "Tasks (Pillar 4)", screen: "nav" },
-  { label: "Docs (Pillar 7)", screen: "nav" },
-  { label: "Memory (Pillar 8)", screen: "nav" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -243,11 +291,16 @@ export class TuiApp {
   private readonly crashLog: TuiCrashLog;
   private readonly keybindings: KeybindingMap | null;
   private readonly _theme: TuiTheme | null;
+  private readonly openTuiRenderer: FulcrumTuiRenderer | null;
   private keyHandler: ((key: string) => void) | null = null;
 
   private currentScreen: Screen = "nav";
+  private domainScreen: DomainScreen | null = null;
   private currentPath: string | null = null;
   private navCursor = 0;
+  private paletteOpen = false;
+  private domainRows: string[] = [];
+  private domainError: string | null = null;
   private statusInfo: { email: string; orgId: string } | null = null;
   private inferenceInfo: { status: string; tone: "green" | "yellow" | "red" } = {
     status: "down",
@@ -279,6 +332,8 @@ export class TuiApp {
   private notificationRulesScreen: NotificationRulesScreen | null = null;
   private auditLogScreen: AuditLogScreen | null = null;
   private artifactsScreen: ArtifactsScreen | null = null;
+  private runsScreen: RunsScreen | null = null;
+  private runDetailScreen: RunDetailScreen | null = null;
 
   constructor(opts: TuiAppOptions) {
     const out = opts.output ?? new StdoutOutput();
@@ -301,6 +356,7 @@ export class TuiApp {
     this.crashLog = opts.crashLog ?? new JsonlCrashLog();
     this.keybindings = opts.keybindings ?? null;
     this._theme = opts.theme ?? null;
+    this.openTuiRenderer = opts.openTuiRenderer ?? null;
   }
 
   /** Resolved theme contract (Pillar 17), if injected. */
@@ -355,7 +411,9 @@ export class TuiApp {
       this.input.off("keypress", this.keyHandler);
       this.keyHandler = null;
     }
+    this.runDetailScreen?.dispose();
     this.renderer.showCursor();
+    void this.openTuiRenderer?.dispose();
   }
 
   /** Whether the TUI is currently running. */
@@ -500,6 +558,9 @@ export class TuiApp {
           this.routingRulesScreen?.render(this.renderer);
           break;
       }
+      if (this.domainScreen && this.currentScreen === "nav") {
+        this._renderDomainScreen(this.domainScreen);
+      }
     } catch (error) {
       this.renderer.clearScreen();
       this.renderer.writeln(c.bold("TUI error"));
@@ -519,20 +580,71 @@ export class TuiApp {
   private _renderNav(): void {
     const r = this.renderer;
     r.writeln();
-    r.writeln(c.bold("  Fulcrum Settings"));
+    r.writeln(c.bold("  Fulcrum TUI"));
     r.separator();
     r.writeln();
+    r.writeln(c.bold("  Domain nav"));
 
     for (let i = 0; i < NAV_ENTRIES.length; i++) {
       const entry = NAV_ENTRIES[i];
       if (!entry) continue;
-      const isOwned = entry.screen === "nav" && entry.label.includes("Pillar");
-      const label = isOwned ? c.dim(entry.label) : entry.label;
-      r.navItem(label, i === this.navCursor);
+      r.navItem(entry.label, i === this.navCursor);
     }
 
     r.writeln();
-    r.writeln(c.dim("  j/k navigate  Enter open  q quit"));
+    r.writeln(c.bold("  Detail / log pane"));
+    const selected = NAV_ENTRIES[this.navCursor];
+    r.writeln(`  ${selected?.label ?? "No domain"} ready. Use Enter to open, / for command palette.`);
+    r.writeln();
+    r.writeln(c.bold("  Status footer"));
+    r.writeln(c.dim("  j/k or arrows navigate  Enter open  Esc back  / commands  q quit"));
+    this._renderCommandPalette();
+  }
+
+  private _renderCommandPalette(): void {
+    if (!this.paletteOpen) {
+      this.renderer.writeln(c.dim(`  Command palette: /  ${COMMAND_PALETTE_ACTIONS.join(" | ")}`));
+      return;
+    }
+    this.renderer.writeln();
+    this.renderer.writeln(c.bold("  Command palette"));
+    for (const action of COMMAND_PALETTE_ACTIONS) this.renderer.writeln(`  - ${action}`);
+  }
+
+  private _renderDomainScreen(screen: DomainScreen): void {
+    const r = this.renderer;
+    r.writeln();
+    r.writeln(c.bold(`  ${domainTitle(screen)}`));
+    r.separator();
+
+    if (screen === "runs") {
+      r.writeln(c.bold("  Run list"));
+      this.runsScreen?.render(r);
+      r.writeln();
+      r.writeln(c.bold("  Transcript / log"));
+      this.runDetailScreen?.render(r);
+      r.writeln();
+      r.writeln(c.bold("  Status footer"));
+      const run = this.currentRunForFooter;
+      r.writeln(c.dim(run ? `  state:${run.status}  duration:live  agent:${run.agent}` : "  no active run"));
+      return;
+    }
+
+    r.writeln(c.bold("  Detail / log pane"));
+    if (this.domainError) {
+      r.writeln(c.red(`  ${this.domainError}`));
+    } else if (this.domainRows.length === 0) {
+      r.writeln(c.dim(`  No ${domainTitle(screen).toLowerCase()} records.`));
+    } else {
+      for (const row of this.domainRows) r.writeln(`  ${row}`);
+    }
+    r.writeln();
+    r.writeln(c.bold("  Status footer"));
+    r.writeln(c.dim("  Esc back  / commands  q root quit"));
+  }
+
+  private get currentRunForFooter(): TuiRun | null {
+    return this.runDetailScreen?.currentRun ?? null;
   }
 
   private _renderAuth(): void {
@@ -685,6 +797,21 @@ export class TuiApp {
       return;
     }
 
+    if (this.domainScreen) {
+      if (key === "q" || key === "\x1b") {
+        this.domainScreen = null;
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      if (key === "/") {
+        this.paletteOpen = !this.paletteOpen;
+        await this._renderCurrentScreen();
+        return;
+      }
+      return;
+    }
+
     if (this.currentScreen === "new-doc" && this.newDocScreen) {
       const consumed = await this.newDocScreen.handleKey(key);
       if (!consumed) return;
@@ -804,6 +931,16 @@ export class TuiApp {
       await this._renderCurrentScreen();
       return;
     }
+    if (key === "\x1b") {
+      this.paletteOpen = false;
+      await this._renderCurrentScreen();
+      return;
+    }
+    if (key === "/") {
+      this.paletteOpen = !this.paletteOpen;
+      await this._renderCurrentScreen();
+      return;
+    }
     if (key === "n") {
       await this._openNewDoc();
       return;
@@ -856,17 +993,22 @@ export class TuiApp {
     const entry = NAV_ENTRIES[this.navCursor];
     if (!entry) return;
 
-    // Stub entries (owned by later pillars)
-    if (entry.screen === "nav") {
-      this.renderer.writeln(c.yellow(`  Owned by a later pillar — not yet implemented.`));
-      return;
-    }
-
     await this._navigate(entry.screen);
   }
 
-  private async _navigate(screen: Screen): Promise<void> {
+  private async _navigate(screen: TuiScreen): Promise<void> {
     this.currentPath = null;
+    this.domainScreen = null;
+    this.currentScreen = "nav";
+    this.paletteOpen = false;
+
+    if (isDomainScreen(screen)) {
+      this.domainScreen = screen;
+      await this._loadDomainRows(screen);
+      await this._renderCurrentScreen();
+      return;
+    }
+
     this.currentScreen = screen;
 
     if (screen === "auth") {
@@ -982,13 +1124,60 @@ export class TuiApp {
     await this._renderCurrentScreen();
   }
 
+  private async _loadDomainRows(screen: DomainScreen): Promise<void> {
+    this.domainRows = [];
+    this.domainError = null;
+    try {
+      if (screen === "runs" && this.caller.agent_runs) {
+        const runs = await this.caller.agent_runs.list();
+        this.domainRows = runs.map((run) => `${run.id}  ${run.agent}  ${run.status}  ${run.taskTitle ?? ""}`);
+        this.runsScreen = new RunsScreen({ caller: { agent_runs: this.caller.agent_runs } });
+        await this.runsScreen.load();
+        const firstRun = runs[0];
+        if (firstRun) {
+          this.runDetailScreen?.dispose();
+          this.runDetailScreen = new RunDetailScreen({
+            runId: firstRun.id,
+            caller: { agent_runs: this.caller.agent_runs },
+            subscriptions: this.caller.runsSubscriptions,
+          });
+          await this.runDetailScreen.load();
+        }
+        return;
+      }
+
+      const rows = await this._listDomainRows(screen);
+      this.domainRows = rows.map(formatDomainRow);
+    } catch (error) {
+      this.domainError = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  private async _listDomainRows(screen: DomainScreen): Promise<unknown[]> {
+    if (screen === "projects") return await this.caller.projects?.list() ?? [];
+    if (screen === "tasks") return await this.caller.tasks?.list() ?? [];
+    if (screen === "sprints") return await this.caller.sprints?.list() ?? [];
+    if (screen === "repos") return await this.caller.repos?.list() ?? [];
+    if (screen === "memory") return await this.caller.memories?.list({}) ?? [];
+    if (screen === "search") return await this.caller.search?.query({ q: "", limit: 10 }) ?? [];
+    if (screen === "docs") return [];
+    if (screen === "skills") return [];
+    if (screen === "components") return [];
+    if (screen === "doctor") return [];
+    return [];
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Headless helpers (for tests)
   // ─────────────────────────────────────────────────────────────────────────
 
   /** Navigate to a screen directly (for tests — bypasses keyboard). */
-  async navigateTo(screen: Screen): Promise<void> {
+  async navigateTo(screen: TuiScreen): Promise<void> {
     await this._navigate(screen);
+  }
+
+  async renderForTest(): Promise<void> {
+    await this._renderCurrentScreen();
   }
 
   async pullInferenceModel(modelId: string): Promise<void> {
@@ -1212,7 +1401,76 @@ async function resolveActiveTuiSession(em: EntityManager | null): Promise<TuiCli
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function launchTui(opts: TuiAppOptions): Promise<TuiApp> {
+  if (!opts.output) {
+    const openTuiRenderer = await createFulcrumTuiRenderer({ testMode: false });
+    const app = new TuiApp({
+      ...opts,
+      output: new OpenTuiOutput(openTuiRenderer),
+      openTuiRenderer,
+    });
+    await app.mount();
+    return app;
+  }
+
   const app = new TuiApp(opts);
   await app.mount();
   return app;
+}
+
+class OpenTuiOutput implements TuiOutput {
+  private buffer = "";
+
+  readonly isTTY = true;
+  readonly columns = process.stdout.columns ?? 120;
+  readonly rows = process.stdout.rows ?? 32;
+
+  constructor(private readonly adapter: FulcrumTuiRenderer) {}
+
+  write(data: string): void {
+    if (data.includes("\x1b[2J\x1b[H")) this.buffer = "";
+    this.buffer += data;
+    this.adapter.render(this.buffer);
+  }
+}
+
+function isDomainScreen(screen: TuiScreen): screen is DomainScreen {
+  return [
+    "projects",
+    "tasks",
+    "sprints",
+    "docs",
+    "memory",
+    "runs",
+    "repos",
+    "search",
+    "skills",
+    "components",
+    "doctor",
+  ].includes(screen);
+}
+
+function domainTitle(screen: DomainScreen): string {
+  const titles: Record<DomainScreen, string> = {
+    projects: "Projects",
+    tasks: "Tasks",
+    sprints: "Sprints",
+    docs: "Docs",
+    memory: "Memory",
+    runs: "Runs",
+    repos: "Repos",
+    search: "Search",
+    skills: "Skills",
+    components: "Components",
+    doctor: "Doctor/Settings",
+  };
+  return titles[screen];
+}
+
+function formatDomainRow(row: unknown): string {
+  if (!row || typeof row !== "object") return String(row);
+  const record = row as Record<string, unknown>;
+  const primary = record["name"] ?? record["title"] ?? record["slug"] ?? record["id"] ?? "item";
+  const status = record["status"] ? `  [${String(record["status"])}]` : "";
+  const id = record["id"] && record["id"] !== primary ? `  ${String(record["id"])}` : "";
+  return `${String(primary)}${status}${id}`;
 }

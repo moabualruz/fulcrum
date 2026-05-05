@@ -125,6 +125,7 @@ export interface RunDetailScreenOptions {
       cancel: (input: { id: string }) => Promise<{ ok: boolean }>;
     };
   };
+  /** caller subscription path: TuiCaller.runsSubscriptions -> EventBus-backed runsSubscriptions. */
   subscriptions?: SubscriptionBridge;
 }
 
@@ -147,6 +148,10 @@ export class RunDetailScreen {
     this.subscribeOnce();
   }
 
+  get currentRun(): TuiRun | null {
+    return this.run;
+  }
+
   render(renderer: Renderer): void {
     renderer.writeln();
     renderer.writeln(c.bold(`  Run › ${this.run?.id ?? this.opts.runId}`));
@@ -158,14 +163,14 @@ export class RunDetailScreen {
       return;
     }
 
-    renderer.writeln(`  ${statusBadge(this.run.status)} ${this.run.agent}  ${this.run.projectName ?? "no project"}  ${this.run.taskTitle ?? ""}`);
+    renderer.writeln(`  ${statusBadge(this.run.status)} agent:${this.run.agent}  ${this.run.projectName ?? "no project"}  ${this.run.taskTitle ?? ""}`);
     if (isCompletedStatus(this.run.status)) {
       renderer.writeln();
       renderer.writeln(c.green("  Run completed"));
     }
 
     renderer.writeln();
-    renderer.writeln(c.bold("  Live log"));
+    renderer.writeln(c.bold("  Transcript / log"));
     for (const line of this.logLines) renderer.writeln(`  ${line}`);
     renderer.writeln();
     renderer.writeln(c.dim("  x cancel  q back"));

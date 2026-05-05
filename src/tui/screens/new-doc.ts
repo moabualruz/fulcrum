@@ -13,8 +13,8 @@
 
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
-import { DOC_TYPES } from "../../db/entities/docs/enums.ts";
 import type { DocTemplateRow } from "../../docs/doc-template-service.ts";
+import { TUI_DOC_TYPES } from "./docs-types.ts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,7 +37,7 @@ export class NewDocScreen {
   private templates: Map<string, DocTemplateRow> = new Map();
   private phase: Phase = "pick-type";
   private typeCursor = 0;
-  private selectedType: string = DOC_TYPES[0];
+  private selectedType: string = TUI_DOC_TYPES[0];
   private bodyBuffer = "";
   private loadError: string | null = null;
 
@@ -52,7 +52,7 @@ export class NewDocScreen {
     for (const row of rows) {
       this.templates.set(row.docType, row);
     }
-    this.selectedType = DOC_TYPES[0];
+    this.selectedType = TUI_DOC_TYPES[0];
     this.bodyBuffer = this.templates.get(this.selectedType)?.bodyTemplate ?? "";
     this.typeCursor = 0;
   }
@@ -63,7 +63,7 @@ export class NewDocScreen {
     this.templates.clear();
     this.phase = "pick-type";
     this.typeCursor = 0;
-    this.selectedType = DOC_TYPES[0];
+    this.selectedType = TUI_DOC_TYPES[0];
     this.bodyBuffer = "";
   }
 
@@ -83,8 +83,8 @@ export class NewDocScreen {
     } else if (this.phase === "pick-type") {
       r.writeln(c.dim("  Select doc type:"));
       r.writeln();
-      for (let i = 0; i < DOC_TYPES.length; i++) {
-        const dt = DOC_TYPES[i];
+      for (let i = 0; i < TUI_DOC_TYPES.length; i++) {
+        const dt = TUI_DOC_TYPES[i];
         if (!dt) continue;
         const selected = i === this.typeCursor;
         const prefix = selected ? c.bold("> ") : "  ";
@@ -120,7 +120,7 @@ export class NewDocScreen {
 
     if (this.phase === "pick-type") {
       if (key === "j" || key === "\x1b[B") {
-        this.typeCursor = Math.min(this.typeCursor + 1, DOC_TYPES.length - 1);
+        this.typeCursor = Math.min(this.typeCursor + 1, TUI_DOC_TYPES.length - 1);
         return true;
       }
       if (key === "k" || key === "\x1b[A") {
@@ -128,7 +128,7 @@ export class NewDocScreen {
         return true;
       }
       if (key === "\r" || key === "\n" || key === " ") {
-        this.selectedType = DOC_TYPES[this.typeCursor] ?? DOC_TYPES[0];
+        this.selectedType = TUI_DOC_TYPES[this.typeCursor] ?? TUI_DOC_TYPES[0];
         this.bodyBuffer = this.templates.get(this.selectedType)?.bodyTemplate ?? "";
         this.phase = "edit-body";
         return true;

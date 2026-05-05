@@ -1,12 +1,12 @@
-import type { DocType, Scope } from "../../db/entities/docs/enums.ts";
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
+import type { TuiDocScope, TuiDocType } from "./docs-types.ts";
 
 export interface DocsReaderEditorDoc {
   id: string;
   title: string;
-  docType: DocType | string;
-  scope: Scope | string;
+  docType: TuiDocType | string;
+  scope: TuiDocScope | string;
   projectId?: string | null;
   parentId?: string | null;
   body: string;

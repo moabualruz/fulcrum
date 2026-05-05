@@ -1,15 +1,15 @@
-import { DOC_TYPES, type DocType, type Scope } from "../../db/entities/docs/enums.ts";
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
+import { TUI_DOC_TYPES, type TuiDocScope, type TuiDocType } from "./docs-types.ts";
 
 export interface DocsTreeItem {
   id: string;
   title: string;
   slug?: string;
-  scope: Scope | string;
+  scope: TuiDocScope | string;
   projectId?: string | null;
   parentId?: string | null;
-  docType: DocType | string;
+  docType: TuiDocType | string;
   updatedAt?: string;
 }
 
@@ -18,8 +18,8 @@ export interface DocsTreeScreenOptions {
   caller: {
     docs: {
       list: (input?: Record<string, unknown>) => Promise<DocsTreeItem[]>;
-      tree?: (input: { scope: Scope; projectId?: string }) => Promise<DocsTreeItem[]>;
-      create: (input: { title: string; docType: DocType; scope: Scope; projectId?: string }) => Promise<DocsTreeItem>;
+      tree?: (input: { scope: TuiDocScope; projectId?: string }) => Promise<DocsTreeItem[]>;
+      create: (input: { title: string; docType: TuiDocType; scope: TuiDocScope; projectId?: string }) => Promise<DocsTreeItem>;
       delete?: (input: { id: string; hard: false }) => Promise<unknown>;
     };
   };
@@ -34,7 +34,7 @@ export class DocsTreeScreen {
   private mode: Mode = "tree";
   private typeCursor = 0;
   private readonly expanded = new Set<string>();
-  private scope: Scope = "project";
+  private scope: TuiDocScope = "project";
 
   constructor(private readonly opts: DocsTreeScreenOptions) {}
 
@@ -52,8 +52,8 @@ export class DocsTreeScreen {
     if (this.mode === "new-type") {
       renderer.writeln(c.bold("  New doc type"));
       renderer.writeln();
-      for (let i = 0; i < DOC_TYPES.length; i++) {
-        const docType = DOC_TYPES[i]!;
+      for (let i = 0; i < TUI_DOC_TYPES.length; i++) {
+        const docType = TUI_DOC_TYPES[i]!;
         const selected = i === this.typeCursor;
         renderer.writeln(`  ${selected ? c.inverse("> " + docType) : "  " + docType}`);
       }
@@ -64,7 +64,7 @@ export class DocsTreeScreen {
 
     if (this.mode === "new-title") {
       renderer.writeln(c.bold("  New doc title"));
-      renderer.writeln(c.dim(`  Type: ${DOC_TYPES[this.typeCursor] ?? DOC_TYPES[0]}`));
+      renderer.writeln(c.dim(`  Type: ${TUI_DOC_TYPES[this.typeCursor] ?? TUI_DOC_TYPES[0]}`));
       renderer.writeln();
       renderer.writeln(c.dim("  submitNewDocTitle(title) in headless tests"));
       return;
@@ -91,7 +91,7 @@ export class DocsTreeScreen {
         return true;
       }
       if (key === "j" || key === "\x1b[B") {
-        this.typeCursor = Math.min(this.typeCursor + 1, DOC_TYPES.length - 1);
+        this.typeCursor = Math.min(this.typeCursor + 1, TUI_DOC_TYPES.length - 1);
         return true;
       }
       if (key === "k" || key === "\x1b[A") {
@@ -164,7 +164,7 @@ export class DocsTreeScreen {
   }
 
   async submitNewDocTitle(title: string): Promise<void> {
-    const docType = DOC_TYPES[this.typeCursor] ?? DOC_TYPES[0];
+    const docType = TUI_DOC_TYPES[this.typeCursor] ?? TUI_DOC_TYPES[0];
     const input = {
       title,
       docType,
@@ -181,7 +181,7 @@ export class DocsTreeScreen {
     return [...this.rowsFor("project"), ...this.rowsFor("global")];
   }
 
-  private renderTree(renderer: Renderer, scope: Scope): void {
+  private renderTree(renderer: Renderer, scope: TuiDocScope): void {
     const rows = this.rowsFor(scope);
     if (rows.length === 0) {
       renderer.writeln(c.dim("    No docs"));
@@ -199,7 +199,7 @@ export class DocsTreeScreen {
     }
   }
 
-  private rowsFor(scope: Scope): Array<{ doc: DocsTreeItem; depth: number }> {
+  private rowsFor(scope: TuiDocScope): Array<{ doc: DocsTreeItem; depth: number }> {
     const roots = this.docs
       .filter((doc) => doc.scope === scope && !doc.parentId && (scope === "global" || !this.opts.projectId || doc.projectId === this.opts.projectId))
       .sort(compareDocs);
