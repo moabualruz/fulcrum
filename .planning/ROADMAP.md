@@ -109,7 +109,7 @@ Cross-cutting constraints:
 Plans:
 **Wave 1**
 - [x] 04-01-PLAN.md — Wave 0 validation scaffolds for static proof, embeddings, router evals, MCP, and lock gates (completed 2026-05-05)
-- [ ] 04-02-PLAN.md — Embedding model metadata and 384-dimension write/read/search enforcement
+- [x] 04-02-PLAN.md — Embedding model metadata and 384-dimension write/read/search enforcement
 
 **Wave 2**
 - [ ] 04-03-PLAN.md — Inference backend health, CLI, tRPC, doctor, and static proof command

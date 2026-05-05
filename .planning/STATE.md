@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Executing Phase 04
-last_updated: "2026-05-05T03:06:11Z"
+status: Ready to execute
+last_updated: "2026-05-05T05:19:30+02:00"
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 33
-  completed_plans: 25
-  percent: 76
+  completed_plans: 26
+  percent: 79
 ---
 
 # Planning State
@@ -17,11 +17,11 @@ progress:
 ## Current Position
 
 Phase: 04 (inference-router-skills) — EXECUTING
-Plan: 2 of 8
+Plan: 3 of 8
 
 - **Phase**: 04-inference-router-skills
-- **Plan**: 04-01 completed
-- **Status**: Wave 0 validation scaffolds complete
+- **Plan**: 04-02 completed
+- **Status**: Embedding dimension enforcement wired across all paths
 - **Branch**: gsd/phase-04-inference-router-skills
 
 ## Decisions
@@ -73,3 +73,4 @@ Plan: 2 of 8
 - [Phase 04-01]: MCP descriptors use deterministic tool manifest hash (sorted tool names, SHA-256 hex)
 - [Phase 04-01]: Lock enforcement returns exact expected/actual SHA for mismatch/missing/ok states; override audit includes slug, overriddenBy, action, reason, previous hashes
 - [Phase 04-01]: Static build proof exits 1 with linuxProof:"missing" on macOS without Docker; INF-02 cannot close until Docker or native Linux is available
+- [Phase 04-02]: assertEmbeddingDimension is the single dimension-validation function for all embedding paths; write/search/score all validate before operating per D-05/D-06/D-07
