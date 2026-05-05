@@ -9,6 +9,9 @@ import {
   FulcrumSkill,
   SkillSource,
   SkillVersion,
+  SkillConflict,
+  SkillConflictKind,
+  SkillConflictStatus,
 } from "../db/entities/skills/index.ts";
 import { initOrm } from "../db/mikro-orm.config.ts";
 import { parseKernelMarkdown } from "../product-kernel/markdown.ts";
@@ -315,14 +318,19 @@ export async function syncUpstream(
 
         if (!clean) {
           const localContent = await readInstalledSkillContent(slug, agents) ?? "";
-          lock[slug] = {
-            ...lockEntry,
-            upstream_conflict: await unifiedDiff(
-              slug,
-              localContent,
-              upstreamContent,
-            ),
-          };
+          // Create structured SkillConflict artifact with kind=upstream_conflict
+          // instead of inline conflict diff in lock entry (D-22, D-23).
+          const em = ormHandle.orm.em.fork();
+          em.create(SkillConflict, {
+            slug,
+            kind: SkillConflictKind.UpstreamConflict,
+            status: SkillConflictStatus.Open,
+            localHash: sha256(localContent),
+            upstreamHash: upstreamHash,
+            baseHash: lockEntry.hash,
+            suggestedResolution: `Local content differs from upstream. Options: resolve locally, accept upstream (loses local edits), or edit manually.`,
+          });
+          await em.flush();
           result.conflicts.push(slug);
           continue;
         }
