@@ -121,16 +121,16 @@
 
 ### Tasks + Sprints — Pillar 6 (TSK)
 
-- [ ] **TSK-01**: task_comments entity with CRUD (create, list, delete, resolve)
-- [ ] **TSK-02**: task_watchers entity with subscribe/unsubscribe
-- [ ] **TSK-03**: Burndown chart renders from events log using LayerChart (install + integrate)
+- [x] **TSK-01**: task_comments entity with CRUD (create, list, delete, resolve)
+- [x] **TSK-02**: task_watchers entity with subscribe/unsubscribe
+- [x] **TSK-03**: Burndown chart renders from events log using LayerChart (install + integrate)
 - [ ] **TSK-04**: Velocity rollup chart functional
 - [ ] **TSK-05**: Cycle time + throughput + WIP + CFD reports
-- [ ] **TSK-06**: metrics_cache rollup worker (graphile-worker job) with invalidation
-- [ ] **TSK-07**: Sprint capacity preview with capacity math
-- [ ] **TSK-08**: Sprint retrospective notes field on Sprint entity
-- [ ] **TSK-09**: Gantt view renders task timeline with dependencies
-- [ ] **TSK-10**: Calendar view renders tasks by due date
+- [x] **TSK-06**: metrics_cache rollup worker (graphile-worker job) with invalidation
+- [x] **TSK-07**: Sprint capacity preview with capacity math
+- [x] **TSK-08**: Sprint retrospective notes field on Sprint entity
+- [x] **TSK-09**: Gantt view renders task timeline with dependencies
+- [x] **TSK-10**: Calendar view renders tasks by due date
 - [ ] **TSK-11**: Bulk operations tested with 50+ tasks
 - [ ] **TSK-12**: Custom field engine all 8 types verified end-to-end (already implemented — verification only)
 - [ ] **TSK-13**: Saved view filter AST round-trips and renders correctly

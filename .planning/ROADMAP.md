@@ -136,17 +136,17 @@ Plans:
   3. Sprint capacity + retrospective notes; Gantt + calendar views render
   4. Bulk ops handle 50+ tasks; custom fields all 9 types verified; saved view filters round-trip
   5. Task CRUD + sprint management functional on Web, CLI, and TUI (per TSK-14 parity definition)
-**Plans:** 15 plans
+**Plans:** 6/16 plans executed
 Plans:
 
 **Wave 1 — Schema Foundation (parallel)**
-- [ ] 05-01-PLAN.md — Dependencies install + migration + entity extensions (HIGH-01/02/05 fixes)
+- [x] 05-01-PLAN.md — Dependencies install + migration + entity extensions (HIGH-01/02/05 fixes)
 - [x] 05-02-PLAN.md — New entities: TaskComment, TaskWatcher, CommentReaction, TaskRelationship, ProjectAutomation, FieldDependencyRule, YjsSnapshot
 
 **Wave 2 — Core Services (parallel, no shared files)**
-- [ ] 05-03-PLAN.md — CommentService + watchers + commentsRouter + team mentions (D-100 fix)
-- [ ] 05-04-PLAN.md — WorkflowService + RelationshipService + CRUD + cycle detection (HIGH-04 fix)
-- [ ] 05-05-PLAN.md — ReportService + metrics rollup worker + reportsRouter (workspace scope)
+- [x] 05-03-PLAN.md — CommentService + watchers + commentsRouter + team mentions (D-100 fix)
+- [x] 05-04-PLAN.md — WorkflowService + RelationshipService + CRUD + cycle detection (HIGH-04 fix)
+- [x] 05-05-PLAN.md — ReportService + metrics rollup worker + reportsRouter (workspace scope)
 
 **Wave 3 — Integration (sequential, owns shared files per HIGH-06)**
 - [ ] 05-06-PLAN.md — Mount all routers in AppRouter + extend TaskService + AutomationService + SprintService extensions
@@ -245,7 +245,7 @@ Plans:
 | 2. Bug Fixes + Foundation | 8/8 | Complete | 2026-05-04 |
 | 3. Symphony + Sandcastle | 6/6 | Complete   | 2026-05-05 |
 | 4. Inference + Router/Skills | 8/8 | Complete | 2026-05-05 |
-| 5. Task Management + Metrics | 0/15 | Planned | - |
+| 5. Task Management + Metrics | 6/16 | In Progress|  |
 | 6. Documents + Memory + Search | 0/? | Not started | - |
 | 7. Repos + Artifacts + Notifications | 0/? | Not started | - |
 | 8. Surface Delivery | 0/? | Not started | - |
