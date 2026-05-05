@@ -16,7 +16,7 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
 - [x] **Phase 2: Bug Fixes + Foundation** - 18 bugs fixed, foundation infrastructure in place
 - [x] **Phase 3: Symphony + Sandcastle** - Full SPEC.md conformance with native tracker + agent dispatch infrastructure (completed 2026-05-05)
 - [x] **Phase 4: Inference + Router/Skills** - Inference sidecar hardened, router + skills wired (completed 2026-05-05)
-- [ ] **Phase 5: Task Management + Metrics** - Task comments/watchers, charts, sprint features, custom fields
+- [x] **Phase 5: Task Management + Metrics** - Task comments/watchers, charts, sprint features, custom fields (completed 2026-05-05)
 - [ ] **Phase 6: Documents + Memory + Search** - Editor verification, memory engine, unified search, Cmd+K
 - [ ] **Phase 7: Repos + Artifacts + Notifications** - Git sync, artifact pipeline, notification delivery
 - [ ] **Phase 8: Surface Delivery** - CLI wiring, TUI rewrite, Web completion, API surface
@@ -136,7 +136,7 @@ Plans:
   3. Sprint capacity + retrospective notes; Gantt + calendar views render
   4. Bulk ops handle 50+ tasks; custom fields all 9 types verified; saved view filters round-trip
   5. Task CRUD + sprint management functional on Web, CLI, and TUI (per TSK-14 parity definition)
-**Plans:** 15/16 plans executed
+**Plans:** 16/16 plans complete
 Plans:
 
 **Wave 1 — Schema Foundation (parallel)**
@@ -164,7 +164,7 @@ Plans:
 
 **Wave 6 — Parity + Final (parallel)**
 - [x] 05-14-PLAN.md — CLI report subcommand + task relate + TUI ASCII charts (TSK-14)
-- [ ] 05-15-PLAN.md — Workflow editor + automation rules UI + sprint report card + CI gate
+- [x] 05-15-PLAN.md — Workflow editor + automation rules UI + sprint report card + CI gate
 
 **UI hint**: yes
 
@@ -245,7 +245,7 @@ Plans:
 | 2. Bug Fixes + Foundation | 8/8 | Complete | 2026-05-04 |
 | 3. Symphony + Sandcastle | 6/6 | Complete   | 2026-05-05 |
 | 4. Inference + Router/Skills | 8/8 | Complete | 2026-05-05 |
-| 5. Task Management + Metrics | 15/16 | In Progress|  |
+| 5. Task Management + Metrics | 16/16 | Complete   | 2026-05-05 |
 | 6. Documents + Memory + Search | 0/? | Not started | - |
 | 7. Repos + Artifacts + Notifications | 0/? | Not started | - |
 | 8. Surface Delivery | 0/? | Not started | - |
