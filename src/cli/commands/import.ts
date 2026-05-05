@@ -187,7 +187,7 @@ function parseCsv(filePath: string): ImportedTask[] {
       const header = headers[i]!;
       const field = CSV_COLUMN_MAP[header];
       if (field && values[i]) {
-        (task as Record<string, string>)[field] = values[i]!.trim();
+        (task as unknown as Record<string, string>)[field] = values[i]!.trim();
       }
     }
     if (task.title) tasks.push(task);
@@ -231,5 +231,5 @@ async function resolveCaller(opts: ImportRunOptions): Promise<Required<ImportRun
 
   const ctx = createContext({ session: null as never, orgId: "", userId: "", em, container });
   const factory = t.createCallerFactory(appRouter);
-  return factory(ctx) as Required<ImportRunOptions>["caller"];
+  return factory(ctx) as unknown as Required<ImportRunOptions>["caller"];
 }

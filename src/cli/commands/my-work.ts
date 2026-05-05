@@ -146,5 +146,5 @@ async function resolveCaller(opts: MyWorkRunOptions): Promise<Required<MyWorkRun
 
   const ctx = createContext({ session: null as never, orgId: "", userId: "", em, container });
   const factory = t.createCallerFactory(appRouter);
-  return factory(ctx) as Required<MyWorkRunOptions>["caller"];
+  return factory(ctx) as unknown as Required<MyWorkRunOptions>["caller"];
 }

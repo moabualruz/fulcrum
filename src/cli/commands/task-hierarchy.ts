@@ -204,5 +204,5 @@ async function resolveCaller(opts: TaskHierarchyRunOptions): Promise<Required<Ta
 
   const ctx = createContext({ session: null as never, orgId: "", userId: "", em, container });
   const factory = t.createCallerFactory(appRouter);
-  return factory(ctx) as Required<TaskHierarchyRunOptions>["caller"];
+  return factory(ctx) as unknown as Required<TaskHierarchyRunOptions>["caller"];
 }
