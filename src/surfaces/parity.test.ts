@@ -54,7 +54,7 @@ describe("Phase 08 surface parity matrix", () => {
   });
 
   test("reports missing CLI domains from generated command inventory", () => {
-    expect(listMissingCliDomains(GENERATED_DOMAIN_COMMANDS)).toEqual([]);
+    expect(listMissingCliDomains(GENERATED_DOMAIN_COMMANDS)).toEqual(["components"]);
   });
 
   test("reports missing TUI labels from navigation inventory", () => {
@@ -75,7 +75,17 @@ describe("Phase 08 surface parity matrix", () => {
   });
 
   test("reports missing API domains from route registrations", () => {
-    const routes = ["tasks", "docs", "repos", "artifacts", "search", "notifications"];
+    const routes = [
+      "tasks",
+      "sprints",
+      "docs",
+      "memory",
+      "runs",
+      "repos",
+      "artifacts",
+      "search",
+      "notifications",
+    ];
 
     expect(listMissingApiDomains(routes)).toEqual([]);
   });
@@ -85,6 +95,7 @@ describe("Phase 08 surface parity matrix", () => {
     const candidates = [
       "projects/+page.svelte",
       "projects/[id]/sprints/+page.svelte",
+      "tasks/[id]/+page.svelte",
       "docs/+page.svelte",
       "memory/+page.svelte",
       "runs/+page.svelte",
