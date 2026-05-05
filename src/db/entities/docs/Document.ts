@@ -59,7 +59,9 @@ export class Document {
     | "archived"
     | "externalId"
     | "embedding"
-    | "updatedAt";
+    | "updatedAt"
+    | "title"
+    | "contextSummary";
 
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
@@ -117,4 +119,10 @@ export class Document {
 
   @Property({ type: "datetime", fieldName: "updated_at", defaultRaw: "now()" })
   updatedAt!: Date;
+
+  @Property({ type: "string", nullable: true })
+  title?: string | null;
+
+  @Property({ type: "json", nullable: true, fieldName: "context_summary" })
+  contextSummary?: { headings: string[]; wikilinks: string[]; mentions: string[] } | null;
 }
