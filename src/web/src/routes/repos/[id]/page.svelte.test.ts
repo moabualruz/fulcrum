@@ -13,13 +13,13 @@ mock.module("$app/forms", () => ({
 
 type RepoDetail = {
   id: string;
-  name: string;
   slug: string;
-  kind: "local" | "remote";
-  currentBranch: string | null;
-  syncStatus: "idle" | "syncing" | "error";
+  branch: string | null;
+  dirty: boolean;
+  health: "healthy" | "stale" | "failed";
   lastSyncAt: string | null;
-  syncError: string | null;
+  lastSyncError: string | null;
+  path: string;
 };
 
 type PageProps = {
@@ -29,15 +29,17 @@ type PageProps = {
       data:
         | Promise<{
             repo: RepoDetail;
-            commits: Array<{ sha: string; subject: string; author: string | null; committedAt: string | null }>;
-            openTaskCount: number;
-            recentRunCount: number;
+            branches: Array<{ name: string; isCurrent?: boolean; sha?: string | null }>;
+            commits: Array<{ sha: string; message?: string | null; author?: string | null; committedAt: string }>;
+            files: Array<{ path: string; kind: string; size?: number | null }>;
+            syncLog: Array<{ status: string; message?: string | null; createdAt: string }>;
           }>
         | {
             repo: RepoDetail;
-            commits: Array<{ sha: string; subject: string; author: string | null; committedAt: string | null }>;
-            openTaskCount: number;
-            recentRunCount: number;
+            branches: Array<{ name: string; isCurrent?: boolean; sha?: string | null }>;
+            commits: Array<{ sha: string; message?: string | null; author?: string | null; committedAt: string }>;
+            files: Array<{ path: string; kind: string; size?: number | null }>;
+            syncLog: Array<{ status: string; message?: string | null; createdAt: string }>;
           };
     };
   };
@@ -46,19 +48,20 @@ type PageProps = {
 const PAYLOAD = {
   repo: {
     id: "11111111-1111-4111-8111-111111111111",
-    name: "Fulcrum",
     slug: "fulcrum",
-    kind: "local" as const,
-    currentBranch: "feature/repos",
-    syncStatus: "error" as const,
+    branch: "feature/repos",
+    dirty: true,
+    health: "failed" as const,
     lastSyncAt: "2026-05-03T10:00:00.000Z",
-    syncError: "git fetch failed",
+    lastSyncError: "git fetch failed",
+    path: "/workspace/fulcrum",
   },
+  branches: [{ name: "feature/repos", isCurrent: true, sha: "abcdef1" }],
   commits: [
-    { sha: "abcdef1", subject: "feat: repo dashboard", author: "M", committedAt: "2026-05-03T10:00:00.000Z" },
+    { sha: "abcdef1", message: "feat: repo dashboard", author: "M", committedAt: "2026-05-03T10:00:00.000Z" },
   ],
-  openTaskCount: 3,
-  recentRunCount: 2,
+  files: [{ path: "src/index.ts", kind: "file", size: 123 }],
+  syncLog: [{ status: "failed", message: "git fetch failed", createdAt: "2026-05-03T10:00:00.000Z" }],
 };
 
 describe("/repos/[id] +page.svelte", () => {
@@ -85,23 +88,28 @@ describe("/repos/[id] +page.svelte", () => {
       props: { data: { activeProjectId: null, streamed: { data: PAYLOAD } } },
     });
     expect(body).toContain("data-repo-detail-header");
-    expect(body).toContain("Fulcrum");
+    expect(body).toContain("fulcrum");
     expect(body).toContain("feature/repos");
     expect(body).toContain("data-current-branch");
-    expect(body).toContain("data-sync-status");
+    expect(body).toContain("data-repo-health");
     expect(body).toContain("data-sync-error");
     expect(body).toContain("data-sync-now");
   });
 
-  test("renders commits and dashboard count panels", () => {
+  test("renders branch, commit, file, and sync-log slices without mismatched empty states", () => {
     const { body } = render(Page, {
       props: { data: { activeProjectId: null, streamed: { data: PAYLOAD } } },
     });
+    expect(body).toContain("data-repo-branches");
+    expect(body).toContain("feature/repos");
     expect(body).toContain("data-recent-commits");
     expect(body).toContain("abcdef1");
     expect(body).toContain("feat: repo dashboard");
-    expect(body).toContain("data-open-task-count");
-    expect(body).toContain('href="/tasks?repo=11111111-1111-4111-8111-111111111111"');
-    expect(body).toContain("data-recent-run-count");
+    expect(body).toContain("data-repo-files");
+    expect(body).toContain("src/index.ts");
+    expect(body).toContain("data-sync-log");
+    expect(body).toContain("git fetch failed");
+    expect(body).not.toContain("No branches found.");
+    expect(body).not.toContain("No commits found.");
   });
 });

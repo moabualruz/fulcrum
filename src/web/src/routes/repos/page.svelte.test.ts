@@ -13,14 +13,15 @@ mock.module("$app/forms", () => ({
 
 type RepoListItem = {
   id: string;
-  name: string;
   slug: string;
-  kind: "local" | "remote";
-  syncStatus: "idle" | "syncing" | "error";
+  branch: string | null;
+  dirty: boolean;
   lastSyncAt: string | null;
-  currentBranch: string | null;
+  recentCommit: string | null;
+  openTaskCount: number;
+  health: "healthy" | "stale" | "failed";
   remoteUrl: string | null;
-  localPath: string | null;
+  path: string;
 };
 
 type PageProps = {
@@ -33,8 +34,8 @@ type PageProps = {
 };
 
 const REPOS: RepoListItem[] = [
-  { id: "11111111-1111-4111-8111-111111111111", name: "Fulcrum", slug: "fulcrum", kind: "local", syncStatus: "idle", lastSyncAt: "2026-05-03T10:00:00.000Z", currentBranch: "main", remoteUrl: null, localPath: "/workspace/fulcrum" },
-  { id: "22222222-2222-4222-8222-222222222222", name: "Remote UI", slug: "remote-ui", kind: "remote", syncStatus: "syncing", lastSyncAt: null, currentBranch: "main", remoteUrl: "https://example.test/ui.git", localPath: null },
+  { id: "11111111-1111-4111-8111-111111111111", slug: "fulcrum", branch: "main", dirty: false, lastSyncAt: "2026-05-03T10:00:00.000Z", recentCommit: "abcdef1 feat: repos", openTaskCount: 3, health: "healthy", remoteUrl: null, path: "/workspace/fulcrum" },
+  { id: "22222222-2222-4222-8222-222222222222", slug: "remote-ui", branch: "main", dirty: true, lastSyncAt: null, recentCommit: null, openTaskCount: 0, health: "stale", remoteUrl: "https://example.test/ui.git", path: "/workspace/ui" },
 ];
 
 describe("/repos +page.svelte", () => {
@@ -56,14 +57,18 @@ describe("/repos +page.svelte", () => {
     expect(body).toContain('data-kind="list"');
   });
 
-  test("renders repo rows with kind and sync badges", () => {
+  test("renders repo rows with shared dashboard fields", () => {
     const { body } = render(Page, {
       props: { data: { activeProjectId: null, streamed: { data: { repos: REPOS } } } },
     });
     expect(body.match(/data-repo-row/g) ?? []).toHaveLength(2);
-    expect(body).toContain("Fulcrum");
-    expect(body).toContain("data-repo-kind");
-    expect(body).toContain("data-sync-status");
+    expect(body).toContain("fulcrum");
+    expect(body).toContain("data-current-branch");
+    expect(body).toContain("data-dirty-state");
+    expect(body).toContain("data-last-sync");
+    expect(body).toContain("data-recent-commit");
+    expect(body).toContain("data-open-task-count");
+    expect(body).toContain("data-repo-health");
     expect(body).toContain('href="/repos/11111111-1111-4111-8111-111111111111"');
   });
 
