@@ -35,3 +35,12 @@ export {
   type TaskDependencies,
   type ExternalTaskId,
 } from "./schemas.ts";
+export { TaskComment } from "./TaskComment.ts";
+export { TaskWatcher } from "./TaskWatcher.ts";
+export { CommentReaction } from "./CommentReaction.ts";
+export { TaskRelationship } from "./TaskRelationship.ts";
+export { ProjectAutomation } from "./ProjectAutomation.ts";
+export { FieldDependencyRule } from "./FieldDependencyRule.ts";
+export { YjsSnapshot } from "./YjsSnapshot.ts";
+export { TaskTemplate } from "./TaskTemplate.ts";
+export { TaskRecurrenceRule } from "./TaskRecurrenceRule.ts";
