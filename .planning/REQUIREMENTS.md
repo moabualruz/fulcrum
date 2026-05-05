@@ -124,8 +124,8 @@
 - [x] **TSK-01**: task_comments entity with CRUD (create, list, delete, resolve)
 - [x] **TSK-02**: task_watchers entity with subscribe/unsubscribe
 - [x] **TSK-03**: Burndown chart renders from events log using LayerChart (install + integrate)
-- [ ] **TSK-04**: Velocity rollup chart functional
-- [ ] **TSK-05**: Cycle time + throughput + WIP + CFD reports
+- [x] **TSK-04**: Velocity rollup chart functional
+- [x] **TSK-05**: Cycle time + throughput + WIP + CFD reports
 - [x] **TSK-06**: metrics_cache rollup worker (graphile-worker job) with invalidation
 - [x] **TSK-07**: Sprint capacity preview with capacity math
 - [x] **TSK-08**: Sprint retrospective notes field on Sprint entity

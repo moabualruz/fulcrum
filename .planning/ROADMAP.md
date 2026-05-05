@@ -149,12 +149,12 @@ Plans:
 - [x] 05-05-PLAN.md — ReportService + metrics rollup worker + reportsRouter (workspace scope)
 
 **Wave 3 — Integration (sequential, owns shared files per HIGH-06)**
-- [ ] 05-06-PLAN.md — Mount all routers in AppRouter + extend TaskService + AutomationService + SprintService extensions
+- [x] 05-06-PLAN.md — Mount all routers in AppRouter + extend TaskService + AutomationService + SprintService extensions
 
 **Wave 4 — Web UI (parallel)**
-- [ ] 05-07-PLAN.md — Task detail panel + comments + activity feed + watchers + dual mentions (D-101)
-- [ ] 05-08-PLAN.md — Board (DnD, swimlanes, WIP, blocked badges) + TanStack list view
-- [ ] 05-09-PLAN.md — Reports dashboard + 8 LayerChart components + Monte Carlo forecast
+- [x] 05-07-PLAN.md — Task detail panel + comments + activity feed + watchers + dual mentions (D-101)
+- [x] 05-08-PLAN.md — Board (DnD, swimlanes, WIP, blocked badges) + TanStack list view
+- [x] 05-09-PLAN.md — Reports dashboard + 8 LayerChart components + Monte Carlo forecast
 - [ ] 05-10-PLAN.md — Gantt (SVAR + critical path + slack) + Calendar (@event-calendar)
 
 **Wave 5 — Advanced Features (parallel)**
