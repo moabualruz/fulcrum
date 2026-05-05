@@ -70,3 +70,19 @@
 - Novu Docs: `https://docs.novu.co/platform/integrations/push/push-webhook`
 - Sentry Docs: `https://docs.sentry.io/hosted/learn/notifications/`
 - Sentry API Docs: `https://docs.sentry.io/api/alerts/`
+
+---
+
+## Deep Competitive Addendum (2026-05-05)
+
+See `.planning/phases/07-repos-artifacts-notifications/07-RESEARCH-COMPETITIVE-DEEPDIVE.md` for detailed competitive and dependency research.
+
+### Decisions upgraded by deep research
+
+- Artifact lifecycle must include provenance/integrity fields (`sha256`, `sourcePath`, `harvestedAt`, `producerKind`, `runId`, `edgeId`) and GitHub-style attestation-ready metadata, not just preview/download.
+- Retention policy must support GitLab-style exceptions: `keep_latest_per_ref`, pinned artifacts, forever project default, scratch 90d default.
+- Notification feed must distinguish `unseen`, `seen`, `read`, and `archived`; bell count must not be raw event count.
+- Notification delivery must support `immediate`, `digest`, and `delayed` rule modes to prevent notification fatigue.
+- Webhook delivery must expose Linear-style retry schedule: immediate, +1m, +1h, +6h, then permanent failure.
+- Webhook signatures use exact headers: `X-Fulcrum-Event`, `X-Fulcrum-Delivery`, `X-Fulcrum-Timestamp`, `X-Fulcrum-Signature`.
+- Dependency recommendations: adopt `nodemailer@8.0.7`; adopt `web-push@3.6.7` if real push implemented; conditionally adopt `chokidar@5.0.0`; consider `file-type@22.0.1` and `mime-types@3.0.2` for safe preview/download; defer `@novu/*`, `@octokit/rest`, `isomorphic-git`, and `ntfy` runtime adoption.

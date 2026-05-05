@@ -162,3 +162,36 @@ Requirements: REP-01..07, ART-01..06, NTF-01..09 (22 total).
 
 *Phase: 7-Repos + Artifacts + Notifications*
 *Context gathered: 2026-05-05*
+
+---
+
+<deep_research_addendum>
+## Deep Competitive Research Decisions (added 2026-05-05)
+
+### Artifact Provenance + Retention
+- **D-27:** Artifact detail must include integrity/provenance fields: `sha256`, `sourcePath`, `sourceGlob`, `harvestedAt`, `producerKind`, `producerId`, `runId`, `edgeId`, and `previewKind`. This matches GitHub artifact attestation/digest direction without implementing full Sigstore/SLSA in v1.
+- **D-28:** Retention policy must support GitLab-style exceptions: `keep_latest_per_ref`, pinned artifacts, project default forever, scratch default 90 days. Pruner must skip pinned/latest-kept artifacts.
+- **D-29:** Artifact preview must use MIME sniffing (`file-type@22.0.1` if existing logic insufficient) plus `mime-types@3.0.2` for content-type headers. Do not trust extension/user-provided MIME for inline preview.
+
+### Notification Feed + Workflow Quality
+- **D-30:** Notification state must distinguish `unseen`, `seen`, `read`, and `archived`, following Knock-style feed semantics. Bell count defaults to unseen/unread notification rows, never raw event rows.
+- **D-31:** Notification rules support delivery modes: `immediate`, `digest`, and `delayed`. Default noisy repo/artifact rules should use a 300-second digest window unless marked critical.
+- **D-32:** If in-app notification is read before delayed email/push fires, skip non-critical external delivery. This mirrors Novu/Knock delay/digest anti-fatigue patterns.
+- **D-33:** Critical rules can bypass digest and optionally quiet hours; normal rules respect user channel preferences and quiet hours.
+
+### Webhook + Delivery State
+- **D-34:** Webhook signatures use exact headers: `X-Fulcrum-Event`, `X-Fulcrum-Delivery`, `X-Fulcrum-Timestamp`, `X-Fulcrum-Signature`. Signature value is `sha256=<hex_hmac_sha256(timestamp + "." + rawBody)>`.
+- **D-35:** Default webhook retry schedule matches Linear-style operational expectations: immediate, +1 minute, +1 hour, +6 hours, then permanent failure.
+- **D-36:** Delivery attempt records must expose provider, status, attempt count, next/last attempt, response status, response excerpt, error code/message, duration, and idempotency key.
+
+### Dependency Decisions
+- **D-37:** Add `nodemailer@8.0.7` for SMTP delivery when NTF-04 is implemented.
+- **D-38:** Add `web-push@3.6.7` for real browser push if VAPID-based push is implemented; otherwise create degraded push provider with missing-config delivery status.
+- **D-39:** Add `chokidar@5.0.0` only if existing `fs.watch` path cannot satisfy REP-01 2-second SLA in tests.
+- **D-40:** Do not adopt Novu/Knock/Courier runtime dependencies in v1; copy workflow/feed/preference patterns while preserving Fulcrum local-first DB ownership.
+- **D-41:** Do not replace existing `src/repos/git.ts` with `simple-git` or `isomorphic-git` in Phase 7. Use current wrapper; revisit only if command parsing becomes fragile.
+
+### Canonical Deep Research Ref
+- `.planning/phases/07-repos-artifacts-notifications/07-RESEARCH-COMPETITIVE-DEEPDIVE.md` — detailed competitive matrix, dependency table, exact event/signature/retry shapes.
+
+</deep_research_addendum>
