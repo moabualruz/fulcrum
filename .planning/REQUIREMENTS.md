@@ -115,9 +115,9 @@
 - [x] **RTR-03**: LLM routing gate off by default, functional when enabled
 - [x] **RTR-04**: Upstream skill sync diffs and auto-merges
 - [x] **RTR-05**: MCP servers available as virtual skills
-- [ ] **RTR-06**: Web routing rules editor functional
+- [x] **RTR-06**: Web routing rules editor functional
 - [x] **RTR-07**: `skills.lock.json` SHA-256 pins validated on install
-- [ ] **RTR-08**: All three surfaces show routing config: Web (routing editor), CLI (`fulcrum routing`), TUI (routing-rules screen)
+- [x] **RTR-08**: All three surfaces show routing config: Web (routing editor), CLI (`fulcrum routing`), TUI (routing-rules screen)
 
 ### Tasks + Sprints — Pillar 6 (TSK)
 

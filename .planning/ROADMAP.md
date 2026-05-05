@@ -119,7 +119,7 @@ Plans:
 - [x] 04-04-PLAN.md — Router decision service, disabled learned drafts, conflicts, audit, and LLM fallback safety
 
 **Wave 4**
-- [ ] 04-06-PLAN.md — Routing/skills tRPC plus CLI/TUI parity
+- [x] 04-06-PLAN.md — Routing/skills tRPC plus CLI/TUI parity
 - [ ] 04-07-PLAN.md — Web routing editor and inference backend status UI
 
 **Wave 5**

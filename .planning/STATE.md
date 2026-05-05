@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-last_updated: "2026-05-05T04:15:52.749Z"
+last_updated: "2026-05-05T04:36:54.403Z"
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 33
-  completed_plans: 29
-  percent: 88
+  completed_plans: 30
+  percent: 91
 ---
 
 # Planning State
@@ -17,7 +17,7 @@ progress:
 ## Current Position
 
 Phase: 04 (inference-router-skills) — EXECUTING
-Plan: 5 of 8
+Plan: 6 of 8
 
 - **Phase**: 04-inference-router-skills
 - **Plan**: 04-05 completed
@@ -83,3 +83,4 @@ Plan: 5 of 8
 - [Phase 04-05]: SkillConflict entity stores structured conflict records with kind/status enums instead of inline unified diffs in lock file
 - [Phase 04-05]: verifySkillLock() returns state object (ok/sha_mismatch/missing) instead of throwing — callers handle fail-closed behavior
 - [Phase 04-05]: upstream_conflict enum string kept in lock.ts SkillsLockEntry schema for backward compat with existing lock files
+- [Phase 04-06]: Enriched output schema at tRPC layer, not service layer — keeps service lean while API returns explainable routing results (D-26)
