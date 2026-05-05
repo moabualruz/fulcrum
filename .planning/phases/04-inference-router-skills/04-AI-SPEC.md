@@ -25,32 +25,80 @@ Phase 4 builds Fulcrum's local-first AI infrastructure: model-agnostic inference
 
 > Researched by `gsd-domain-researcher`. Grounds the evaluation strategy in domain expert knowledge.
 
-**Industry Vertical:** <!-- developer tooling / AI agent orchestration -->
+**Industry Vertical:** Developer tooling / local-first AI agent orchestration / self-hosted agent operations
 
-**User Population:** <!-- local-first Fulcrum operators, developers, and agents using routing/skills/inference surfaces -->
+**User Population:** Fulcrum operators, senior developers, platform maintainers, and coding agents using Web/CLI/TUI routing, skills, MCP descriptors, and inference surfaces.
 
-**Stakes Level:** <!-- Medium | High -->
+**Stakes Level:** High
 
-**Output Consequence:** <!-- routing decisions dispatch agent work; embedding outputs affect retrieval/search; lock decisions affect installed skills/tools -->
+**Output Consequence:** Routing decisions determine which agent/profile/tool path handles repository work; embedding outputs affect memory/search/context retrieval; backend health controls whether local or external inference is trusted; skill/MCP lock outcomes determine which executable capabilities are exposed to agents and operators.
 
 ### What Domain Experts Evaluate Against
 
-<!-- Domain-specific rubric ingredients — in practitioner language, not AI jargon -->
-<!-- Format: Dimension / Good (expert accepts) / Bad (expert flags) / Stakes / Source -->
+Dimension: Route decision traceability
+Good (domain expert would accept): Route test output shows the matched rule or draft, task facts used, confidence, LLM backend when used, conflict state when applicable, and a concise reason for no-match or abstain.
+Bad (domain expert would flag): Route output only says "matched" or "recommended" without rule ID, facts, backend, confidence, or evidence needed to reproduce the decision.
+Stakes: Critical
+Source: AI agent production observability practice and Microsoft agent orchestration guidance emphasize coordination overhead, tool gates, and human-in-the-loop gates for sensitive actions.
+
+Dimension: Tool and skill supply-chain safety
+Good (domain expert would accept): `skills.lock.json` mismatches fail closed per skill, exact expected/actual SHA values are shown, MCP virtual skills are descriptor-only, and conflict overrides require explicit operator action plus audit record.
+Bad (domain expert would flag): A changed skill or MCP descriptor remains available because the UI hides the hash mismatch, auto-resolves local edits, or lets a model activate/invoke an unreviewed tool.
+Stakes: Critical
+Source: OWASP MCP Top 10 and OWASP LLM Top 10 identify MCP tool poisoning, software supply-chain attacks, command injection, excessive agency, and sensitive information disclosure as agentic-system risks.
+
+Dimension: Inference backend health honesty
+Good (domain expert would accept): Each configured backend reports typed states such as running, stopped, degraded, or unavailable with probe result, reason, model name, and whether real embed/generate calls passed.
+Bad (domain expert would flag): Doctor/status shows a backend as available because config exists, while real model calls fail, external providers are unreachable, or embedded sidecar startup errors are hidden.
+Stakes: High
+Source: Production AI operations guidance treats performance monitoring, availability, and anomaly logs as part of trustworthy AI system operation; Phase 4 requirements INF-03 through INF-05 require functional status and real model calls.
+
+Dimension: Embedding dimension integrity
+Good (domain expert would accept): Model metadata, schema migration, entity definitions, write path, and search path all agree on vector dimension; dimension changes fail closed until migration and reindex proof exists.
+Bad (domain expert would flag): The system accepts mixed 1536/384 vectors, pads/truncates vectors silently, or lets retrieval run after model dimension changed without reindex status.
+Stakes: Critical
+Source: OWASP LLM Top 10 includes vector and embedding weakness; Phase 4 requirements INF-01, INF-06, MEM-01, and decisions D-05 through D-08 make dimension agreement and round-trip retrieval proof mandatory.
+
+Dimension: Operator trust across surfaces
+Good (domain expert would accept): Web, CLI, and TUI expose the same routing CRUD, dry-run validation, learned draft approval/delete, backend status, lock mismatch, and override semantics through shared service behavior.
+Bad (domain expert would flag): CLI permits a route save that Web rejects, TUI hides a lock conflict, or one surface bypasses audit/service validation paths.
+Stakes: High
+Source: Fulcrum architecture requirements require tRPC/service/repository ownership and three-surface parity; SOC 2-style audit readiness depends on consistent controls, change logs, and evidence trails over time.
 
 ### Known Failure Modes in This Domain
 
-<!-- Domain-specific failure modes from research — not generic hallucination, but how it manifests here -->
+- Wrong-tool or wrong-route selection: agent chooses the wrong skill, profile, or route because rule precedence, no-match handling, or LLM fallback is opaque; production agent debugging literature treats wrong tool selection as a routing/policy failure, not a model-quality issue.
+- Tool poisoning and descriptor trust leakage: MCP tool descriptions, parameters, defaults, enum values, or server descriptors carry malicious instructions or misleading capability claims that influence an agent while remaining invisible to the operator.
+- Silent backend degradation: configured inference backends appear healthy from configuration alone while real embed/generate calls fail, causing route tests, draft generation, or embeddings to degrade without clear operator evidence.
+- Vector/schema drift: embedding model changes from 1536 to 384 dimensions, or another configured dimension, while stored schema/search code remains stale; retrieval then fails, returns distorted results, or mixes incompatible vectors.
+- Unreviewed learned behavior activation: no-match cases produce learned rules that overlap active rules or carry weak evidence, then become active without review, conflict display, or audit trail.
 
 ### Regulatory / Compliance Context
 
-<!-- Relevant regulations or constraints — or "None identified" if genuinely none apply -->
+No sector-specific regulation such as HIPAA, FCA, or PCI applies to this deployment context unless Fulcrum is later used inside a regulated customer environment. Directly relevant constraints are security and audit-control frameworks for developer platforms:
+
+- NIST AI RMF: voluntary risk-management baseline for trustworthy AI systems, especially validity/reliability, safety, security/resilience, transparency, accountability, and monitoring.
+- OWASP Top 10 for LLM Applications and OWASP MCP Top 10: relevant for prompt injection, sensitive information disclosure, supply-chain vulnerabilities, excessive agency, vector/embedding weakness, tool poisoning, and command injection.
+- SOC 2 / ISO 27001 readiness: not a product requirement here, but enterprise operators will expect access/change logs, control evidence, tamper-resistant audit records, retention policy, and reproducible evidence for routing, lock overrides, backend health, and skill sync decisions.
 
 ### Domain Expert Roles for Evaluation
 
 | Role | Responsibility |
 |------|---------------|
-| <!-- e.g., Senior practitioner --> | <!-- Dataset labeling / rubric calibration / production sampling --> |
+| Senior developer / Fulcrum operator | Label reference route cases, calibrate good/bad routing explanations, review no-match and abstain examples. |
+| Platform/security engineer | Review MCP descriptor handling, skill lock mismatch behavior, override audit payloads, and supply-chain threat cases. |
+| Inference/runtime maintainer | Validate backend health semantics, real model-call gates, sidecar status, static build proof, and degraded-state UX. |
+| Search/memory maintainer | Validate embedding dimension migration, round-trip write/search proof, reindex failure behavior, and retrieval regression cases. |
+| Product owner / workflow maintainer | Sample production routing decisions, approve rubric changes, and verify three-surface operator trust expectations. |
+
+### Research Sources
+- NIST AI Risk Management Framework: https://www.nist.gov/itl/ai-risk-management-framework
+- OWASP Top 10 for Large Language Model Applications: https://owasp.org/www-project-top-10-for-large-language-model-applications
+- OWASP MCP Top 10: https://owasp.org/www-project-mcp-top-10/
+- Microsoft Azure Architecture Center, AI agent orchestration patterns: https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns
+- "When Agents Fail to Act: A Diagnostic Framework for Tool Invocation Reliability in Multi-Agent LLM Systems": https://arxiv.org/abs/2601.16280
+- "Model Context Protocol Threat Modeling and Analyzing Vulnerabilities to Prompt Injection with Tool Poisoning": https://arxiv.org/abs/2603.22489
+- "Breaking the Protocol: Security Analysis of the Model Context Protocol Specification and Prompt Injection Vulnerabilities in Tool-Integrated LLM Agents": https://arxiv.org/abs/2601.17549
 
 ---
 
@@ -58,7 +106,7 @@ Phase 4 builds Fulcrum's local-first AI infrastructure: model-agnostic inference
 
 **Selected Framework:** LangGraph TypeScript
 
-**Version:** <!-- Pin the version during planning from package metadata or official docs -->
+**Version:** `@langchain/langgraph@1.2.9` with `@langchain/core@1.1.44` and provider adapters pinned per backend.
 
 **Rationale:**
 LangGraph TypeScript fits Phase 4 because the system needs deterministic, auditable, stateful routing control across CLI/Web/TUI, disabled learned drafts, conflict states, LLM fallback gates, MCP virtual skills, and explicit persistence through Fulcrum's existing tRPC/service/MikroORM paths. It is model-agnostic and TypeScript-compatible, aligning with Fulcrum's local-first and provider-flexible constraints.
@@ -82,55 +130,304 @@ LangGraph TypeScript fits Phase 4 because the system needs deterministic, audita
 
 ### Installation
 ```bash
-# Install command(s)
+bun add @langchain/langgraph @langchain/core
+
+# Optional provider adapters; install only configured backends.
+bun add @langchain/openai @langchain/ollama
+
+# Optional persistent checkpointer if LangGraph checkpoint history must outlive process memory.
+bun add @langchain/langgraph-checkpoint-postgres pg
 ```
 
 ### Core Imports
 ```ts
-// Key imports for this use case
+import { Annotation, END, MemorySaver, START, StateGraph } from "@langchain/langgraph";
+import { z } from "zod";
 ```
 
 ### Entry Point Pattern
 ```ts
-// Minimal working example for this system type
+import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
+import { z } from "zod";
+
+const RouteRecommendation = z.object({
+  action: z.enum(["recommend", "abstain", "draft_rule"]),
+  routeId: z.string().nullable(),
+  confidence: z.number().min(0).max(1),
+  reasons: z.array(z.string()),
+  proposedRule: z
+    .object({
+      name: z.string(),
+      conditions: z.record(z.string(), z.unknown()),
+      actions: z.record(z.string(), z.unknown()),
+    })
+    .nullable(),
+});
+
+const RouterState = Annotation.Root({
+  taskId: Annotation<string>(),
+  inputMode: Annotation<"task_facts" | "task_plus_history" | "full_context">(),
+  facts: Annotation<Record<string, unknown>>(),
+  contextBundle: Annotation<string | undefined>(),
+  matchedRuleId: Annotation<string | undefined>(),
+  llm: Annotation<z.infer<typeof RouteRecommendation> | undefined>(),
+  evidence: Annotation<string[]>({
+    reducer: (left, right) => left.concat(right),
+    default: () => [],
+  }),
+});
+
+const routerSystemPrompt =
+  "Return only a structured routing recommendation. Never activate learned rules.";
+
+async function findActiveRoutingRule(facts: Record<string, unknown>) {
+  return facts.command === "fulcrum skills sync" ? "skill-sync" : undefined;
+}
+
+function getConfiguredRouterModel(_: { temperature: number; maxTokens: number }) {
+  return {
+    withStructuredOutput: (
+      schema: typeof RouteRecommendation,
+      _options?: { name: string },
+    ) => ({
+      async invoke(): Promise<z.infer<typeof RouteRecommendation>> {
+        return schema.parse({
+          action: "abstain",
+          routeId: null,
+          confidence: 0.4,
+          reasons: ["demo model abstained"],
+          proposedRule: null,
+        });
+      },
+    }),
+  };
+}
+
+function buildRouterInput(state: typeof RouterState.State) {
+  return JSON.stringify({
+    inputMode: state.inputMode,
+    facts: state.facts,
+    contextBundle: state.contextBundle,
+  });
+}
+
+async function createDisabledLearnedDraft(_: {
+  taskId: string;
+  evidence: string[];
+  proposedRule: z.infer<typeof RouteRecommendation>["proposedRule"];
+}) {
+  return undefined;
+}
+
+async function deterministicRules(state: typeof RouterState.State) {
+  const matchedRuleId = await findActiveRoutingRule(state.facts);
+  return matchedRuleId
+    ? { matchedRuleId, evidence: [`matched active rule ${matchedRuleId}`] }
+    : { evidence: ["no active rule matched"] };
+}
+
+function shouldUseLlm(state: typeof RouterState.State) {
+  return state.matchedRuleId ? "finish" : "llm_gate";
+}
+
+async function llmGate(state: typeof RouterState.State) {
+  const model = getConfiguredRouterModel({
+    temperature: 0,
+    maxTokens: 500,
+  });
+  const structured = model.withStructuredOutput(RouteRecommendation, {
+    name: "route_recommendation",
+  });
+  const llm = await structured.invoke([
+    { role: "system", content: routerSystemPrompt },
+    { role: "user", content: buildRouterInput(state) },
+  ]);
+  return {
+    llm,
+    evidence: [`llm ${llm.action} confidence=${llm.confidence}`],
+  };
+}
+
+async function persistDecision(state: typeof RouterState.State) {
+  if (state.llm?.action === "draft_rule" && state.llm.confidence >= 0.75) {
+    await createDisabledLearnedDraft({
+      taskId: state.taskId,
+      evidence: state.evidence,
+      proposedRule: state.llm.proposedRule,
+    });
+  }
+  return {};
+}
+
+export const routingGraph = new StateGraph(RouterState)
+  .addNode("deterministic_rules", deterministicRules)
+  .addNode("llm_gate", llmGate)
+  .addNode("persist_decision", persistDecision)
+  .addEdge(START, "deterministic_rules")
+  .addConditionalEdges("deterministic_rules", shouldUseLlm, {
+    finish: "persist_decision",
+    llm_gate: "llm_gate",
+  })
+  .addEdge("llm_gate", "persist_decision")
+  .addEdge("persist_decision", END)
+  .compile();
+
+await routingGraph.invoke({
+  taskId: "task_123",
+  inputMode: "full_context",
+  facts: { command: "fulcrum skills sync", surface: "cli" },
+});
 ```
 
 ### Key Abstractions
-<!-- Framework-specific concepts the developer must understand before coding -->
 | Concept | What It Is | When You Use It |
 |---------|-----------|-----------------|
-| | | |
+| `StateGraph` | Typed graph of async nodes and edges. | Model Phase 4 routing as deterministic rules, LLM fallback, draft persistence, and audit evidence steps. |
+| `Annotation.Root` | State schema plus reducers/defaults. | Keep routing facts, context scope, matched rule, confidence, and evidence typed across nodes. |
+| Conditional edges | Runtime branch function returning next node label. | Stop after deterministic match; call LLM only for no-match cases and configured fallback. |
+| `compile()` runnable | Builds invokable graph compatible with LangChain runnable APIs. | Export graph from service module and call it from existing tRPC/service paths. |
+| Checkpointers | Persist graph snapshots by `thread_id`; `MemorySaver` for tests, Postgres/SQLite adapters for durable runs. | Use only if Fulcrum needs replay/time-travel for routing decisions beyond MikroORM audit tables. |
 
 ### Common Pitfalls
-<!-- Gotchas specific to this framework and system type — from docs, issues, and community reports -->
-1.
-2.
-3.
+1. `MemorySaver` is development/test storage, not production persistence. If compiled with `MemorySaver`, process restart loses graph snapshots; Fulcrum's durable source of truth should stay MikroORM/audit tables unless a Postgres checkpointer is deliberately added.
+2. Checkpointing depends on `config.configurable.thread_id`. GitHub issues show null `thread_id` failures with PostgresSaver when callers omit config; if Fulcrum enables checkpointers, tRPC/CLI/TUI must pass stable `thread_id` values such as `routing:${taskId}`.
+3. `.withStructuredOutput()` validates shape but provider behavior varies. LangChainJS issues report malformed nested arrays and no automatic retry on schema validation failures; wrap structured calls with explicit retry and evidence logging.
+4. Streaming and structured output do not compose cleanly for every provider. Use streaming for operator-facing progress text; use awaited `.invoke()` for route/draft schemas that must validate before persistence.
+5. Zod version/type interactions have caused LangGraphJS schema extraction and TypeScript deep-instantiation failures in issues. Fulcrum already uses `zod@4.4.2`; pin it and keep graph state schemas shallow rather than deeply nested recursive objects.
 
 ### Recommended Project Structure
 ```
-project/
-├── # Framework-specific folder layout
+src/router/
+├── graph.ts                 # LangGraph StateGraph, state annotations, edge wiring
+├── graph-state.ts           # Zod schemas and TypeScript state types
+├── graph-prompts.ts         # System prompts and compact input builders
+├── llm-fallback.ts          # Existing provider-agnostic model adapter integration
+├── rules-engine.ts          # Existing deterministic routing logic
+├── learned-drafts.ts        # Disabled draft/conflict persistence helpers
+└── graph.test.ts            # No-match, conflict, abstain, retry, and evidence tests
+
+src/server/trpc/routers/routing.ts
+src/cli/routing.ts
+src/tui/screens/routing.ts
 ```
+
+### Sources
+- LangGraphJS docs via Context7: `https://github.com/langchain-ai/langgraphjs`, topics `StateGraph`, `Annotation`, `compile`, `MemorySaver`, persistence, Postgres checkpointer.
+- LangChain JavaScript docs via Context7: `https://docs.langchain.com/oss/javascript`, topics structured output with Zod, provider chat models, `maxTokens`.
+- LangSmith docs via Context7: `https://docs.smith.langchain.com`, topics TypeScript tracing and `LANGSMITH_TRACING`.
+- Package metadata checked with `bun info`: `@langchain/langgraph@1.2.9`, `@langchain/core@1.1.44`, `@langchain/openai@1.4.5`.
+- GitHub issue references used for pitfalls: `langchain-ai/langgraphjs#545`, `langchain-ai/langgraphjs#939`, `langchain-ai/langgraphjs#1453`, `langchain-ai/langchainjs#7643`, `langchain-ai/langchainjs#9426`.
 
 ---
 
 ## 4. Implementation Guidance
 
 **Model Configuration:**
-<!-- Which model(s), temperature, max tokens, and other key parameters -->
+Use Fulcrum's existing model-agnostic inference router rather than binding LangGraph to one provider. The default logical model is `router-small`, mapped by configuration to embedded/Ollama/LM Studio/OpenAI-compatible backends. Recommended runtime parameters:
+
+- Routing classification/fallback: `temperature: 0`, `maxTokens: 500`, structured output required, confidence threshold `0.75`, abstain threshold `< 0.55`.
+- Draft rule explanation: `temperature: 0.1`, `maxTokens: 900`, structured output required.
+- Summarisation/compaction: `temperature: 0`, `maxTokens: 700`.
+- Provider adapters: wrap backend calls behind Fulcrum's inference service; LangGraph nodes receive `getConfiguredRouterModel()` instead of importing provider-specific models directly.
 
 **Core Pattern:**
-<!-- The primary implementation pattern for this system type in this framework -->
+Keep LangGraph inside the router service boundary. Web/CLI/TUI call tRPC; tRPC calls service; service invokes graph; graph nodes call existing rules, inference, repositories, audit, and feature-flag APIs.
+
+```ts
+import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
+import { z } from "zod";
+
+export const RoutingDecision = z.object({
+  status: z.enum(["matched", "recommended", "abstained", "draft_created", "conflict"]),
+  routeId: z.string().nullable(),
+  draftId: z.string().nullable(),
+  confidence: z.number().min(0).max(1),
+  backend: z.string().nullable(),
+  evidence: z.array(z.string()),
+});
+
+const RoutingState = Annotation.Root({
+  requestId: Annotation<string>(),
+  taskFacts: Annotation<Record<string, unknown>>(),
+  inputMode: Annotation<"task_facts" | "task_plus_history" | "full_context">(),
+  contextBundle: Annotation<string | undefined>(),
+  decision: Annotation<z.infer<typeof RoutingDecision> | undefined>(),
+  evidence: Annotation<string[]>({
+    reducer: (left, right) => left.concat(right),
+    default: () => [],
+  }),
+});
+
+const graph = new StateGraph(RoutingState)
+  .addNode("rules", async (state) => {
+    const match = await routingRuleRepository.findFirstActiveMatch(state.taskFacts);
+    return match
+      ? {
+          decision: {
+            status: "matched",
+            routeId: match.id,
+            draftId: null,
+            confidence: 1,
+            backend: null,
+            evidence: [`matched rule ${match.id}`],
+          },
+          evidence: [`matched rule ${match.id}`],
+        }
+      : { evidence: ["no active rule matched"] };
+  })
+  .addNode("llm", async (state) => {
+    const model = inferenceModelFactory.routerModel({ temperature: 0, maxTokens: 500 });
+    const structured = model.withStructuredOutput(RoutingDecision, { name: "routing_decision" });
+    const decision = await invokeWithZodRetry(structured, buildRoutingMessages(state));
+    return { decision, evidence: decision.evidence };
+  })
+  .addNode("persist", async (state) => {
+    const decision = RoutingDecision.parse(state.decision);
+    await routingAuditRepository.record({
+      requestId: state.requestId,
+      decision,
+      evidence: state.evidence,
+    });
+    return {};
+  })
+  .addEdge(START, "rules")
+  .addConditionalEdges("rules", (state) => {
+    if (state.decision?.status === "matched") return "persist";
+    return isFeatureEnabled("router-llm") ? "llm" : "persist";
+  }, {
+    persist: "persist",
+    llm: "llm",
+  })
+  .addEdge("llm", "persist")
+  .addEdge("persist", END)
+  .compile();
+```
 
 **Tool Use:**
-<!-- Tools/integrations needed and how to configure them -->
+Do not expose arbitrary LangGraph tool execution in Phase 4. This phase needs controlled service calls:
+
+- Deterministic routing tool: existing `rules-engine.ts`, no model call.
+- Inference tool: Fulcrum inference service adapter that can hit embedded, Ollama, LM Studio, or OpenAI-compatible backends.
+- Persistence tools: MikroORM repositories for routing decisions, learned drafts, conflicts, skill locks, and audit records.
+- MCP virtual skill tool: descriptor reader only; invocation remains in agent/MCP runtime per D-18.
+- Tracing: prefer local audit/event rows. LangSmith can be used only as optional developer tracing with `LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY`, and `LANGSMITH_PROJECT=fulcrum-phase-04`; no hosted tracing required for local-first operation.
 
 **State Management:**
-<!-- How state is persisted, retrieved, and updated -->
+LangGraph state is transient orchestration state unless checkpointing is explicitly enabled. Durable product state remains Fulcrum-owned:
+
+- Routing rules, learned drafts, conflicts, approvals, and deletes: MikroORM entities under `src/db/entities/router/`.
+- Skill lock and sync outcomes: existing skill repositories/artifacts, with exact expected/actual SHA in audit payloads.
+- Inference backend health: typed degraded state stored/reported through existing inference lifecycle/status service.
+- Graph replay: optional checkpointer only for test/debug. If enabled, use stable `thread_id` and store graph checkpoint IDs beside Fulcrum audit records.
 
 **Context Window Strategy:**
-<!-- How to manage context limits for this system type -->
+Implement three explicit input modes from D-15:
+
+- `task_facts`: smallest and default for deterministic tests; only structured facts used by rules.
+- `task_plus_history`: facts plus last N routing decisions/drafts for same repository/workspace.
+- `full_context`: default configured LLM routing mode; use existing context assembler and secret-handling guarantees.
+
+Before LLM fallback, build a bounded context envelope: task facts first, active candidate rule summaries second, recent routing history third, context bundle last. Truncate by section budget, not raw character count. If required sections exceed budget, abstain with evidence instead of dropping facts silently.
 
 ---
 
@@ -140,27 +437,78 @@ project/
 
 ### Structured Outputs with Zod
 
-<!-- TypeScript system: use Zod rather than Pydantic. Include output schema, parser, retry logic on validation failure. -->
-
 ```ts
-// Zod output model for this system type
+import { z } from "zod";
+
+export const LearnedRouteDraft = z.object({
+  decision: z.enum(["recommend_route", "abstain", "create_disabled_draft"]),
+  confidence: z.number().min(0).max(1),
+  routeId: z.string().nullable(),
+  noMatchReason: z.string(),
+  proposedConditions: z.record(z.string(), z.unknown()).nullable(),
+  proposedActions: z.record(z.string(), z.unknown()).nullable(),
+  conflictingRuleIds: z.array(z.string()).default([]),
+  evidence: z.array(z.string()).min(1),
+});
+
+type LearnedRouteDraft = z.infer<typeof LearnedRouteDraft>;
+
+async function invokeWithZodRetry(
+  structuredModel: { invoke(input: unknown): Promise<unknown> },
+  input: unknown,
+): Promise<LearnedRouteDraft> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return LearnedRouteDraft.parse(await structuredModel.invoke(input));
+    } catch (error) {
+      lastError = error;
+      await routingAuditRepository.recordValidationFailure({
+        attempt,
+        schema: "LearnedRouteDraft",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  throw new Error(`routing structured output failed after 3 attempts: ${String(lastError)}`);
+}
 ```
+
+LangChain/LangGraph integration: call `model.withStructuredOutput(LearnedRouteDraft, { name: "learned_route_draft" })` inside the LangGraph LLM node, then still run `LearnedRouteDraft.parse()` before persistence. Retry three times for parse/schema errors. Log attempt number, provider/backend, model name, input mode, schema name, and parse error. Surface failure as `abstained` with evidence for operator-visible routing tests; do not create drafts from invalid output.
 
 ### Async-First Design
 
-<!-- How async is handled in this framework, the one common mistake, and when to stream vs. await -->
+LangGraph TypeScript nodes can be `async` functions, and `graph.invoke()` returns a promise. Fulcrum service methods should stay async end-to-end: tRPC mutation/query -> service -> graph -> repository/inference calls. Common mistake: mixing fire-and-forget persistence inside nodes. Every audit, draft, lock override, and backend probe write must be awaited before the graph returns.
+
+Use streaming only for operator UX such as "probing backend", "testing rules", or "LLM fallback running". Use awaited `.invoke()` for routing decisions and learned drafts because Zod validation, confidence thresholds, conflict checks, and audit writes must complete before Web/CLI/TUI display final state.
 
 ### Prompt Engineering Discipline
 
-<!-- System vs. user prompt separation, few-shot guidance, token budget strategy -->
+System prompt owns invariant policy: never activate learned rules, abstain below threshold, preserve SHA mismatch failures, and report evidence. User prompt owns request-specific facts/context only. Do not concatenate system policy into user content.
+
+Few-shot examples should be inline for stable policy boundaries: deterministic match, no-match draft, overlap conflict, low-confidence abstain, unavailable backend. Use dynamic retrieval only for examples from Fulcrum's approved eval corpus, never from arbitrary local project content. Set `maxTokens` on every model call: 500 for routing decisions, 900 for draft explanation, 700 for summarisation.
 
 ### Context Window Management
 
-<!-- Strategy specific to this system type: routing facts / recent decisions / full context bundle modes -->
+Hybrid Phase 4 has routing, inference, embeddings, MCP descriptors, and skill locks in one workflow. Keep context segmented:
+
+- Routing: facts, active rule summaries, recent decisions, context bundle.
+- Embeddings: model name, dimension, schema dimension, migration/reindex state.
+- Skills/MCP: descriptor hash, expected SHA, actual SHA, local/base/upstream hashes.
+- Backend health: backend kind, configured/enabled state, probe result, degraded reason.
+
+For `full_context`, summarise large context bundles before LLM fallback and preserve source refs. If summary loses required routing facts, abstain. For conversational/multi-step operator sessions, store compact decision summaries in Fulcrum audit history rather than LangGraph message history. For autonomous routing loops, cap iterations to deterministic rules -> optional LLM -> persist; no unbounded agent loop.
 
 ### Cost and Latency Budget
 
-<!-- Per-call cost estimate, caching strategy, sub-task model routing -->
+Most route tests should cost zero model calls: deterministic rules first, exact-match cache second, LLM fallback last. Budget target:
+
+- Static rule match: <50 ms, no model cost.
+- Cached LLM route for identical task facts/context hash: <100 ms, no model cost.
+- Local Ollama/LM Studio fallback: 1-5 s target, no per-token hosted cost.
+- OpenAI-compatible hosted fallback: one call capped at 500 output tokens; estimate and log cost from configured provider pricing when available.
+
+Cache by normalized task facts, input mode, active rule set hash, prompt version, model/backend, and context hash. Use cheaper/local models for classification, routing, and summarisation. Reserve larger hosted models only for draft-rule explanation when local backend confidence/eval quality fails threshold. Track p50/p95 latency, token counts, cache hit rate, abstain rate, and draft promotion rate.
 
 ---
 
@@ -170,31 +518,61 @@ project/
 
 | Dimension | Rubric (Pass/Fail or 1-5) | Measurement Approach | Priority |
 |-----------|--------------------------|---------------------|----------|
-| | | Code / LLM Judge / Human | Critical / High / Medium |
+| Embedding dimension integrity (INF-01, INF-06) | PASS: schema migrations, entities, model metadata, write path, and search path all use configured dimension; default fastembed writes `vector(384)` and paraphrase retrieval cosine is `>= 0.9` without padding/truncation. FAIL: any `vector(1536)` Phase 4 storage reference remains, mixed dimensions are accepted, model dimension changes without migration/reindex proof, or search coerces vectors. | Code: migration/entity/spec scan, Zod/config validation, real embed write/read/search test, cosine threshold. | Critical |
+| Backend health honesty and real-call readiness (INF-03, INF-04, INF-05, INF-07) | PASS: every configured backend reports typed `running`/`stopped`/`degraded`/`unavailable` state with probe reason, model name, and real embed/generate result; auto-spawn first flag caller starts embedded sidecar and external backends are probed only. FAIL: config presence is treated as health, doctor hides real-call failure, or unavailable configured backend appears usable. | Code: backend contract tests, doctor/status JSON snapshot tests, real model smoke tests for configured backends, auto-spawn integration test. | Critical |
+| Static binary proof (INF-02) | PASS: automated macOS and Linux static build proof runs repeatably and records binary path/version/target; missing platform proof blocks phase close. FAIL: manual build notes, host-only proof, or runtime-only tests without static artifact validation. | Code: build script assertions and CI/local gate artifact checks. | High |
+| Route correctness and traceability (RTR-01, RTR-02, RTR-03, RTR-08) | PASS: route test output shows matched rule or disabled draft, facts used, confidence, backend when LLM used, conflict state, no-match/abstain reason, and audit event; deterministic rule matches expected route before LLM fallback. FAIL: output says only "matched", LLM forces low-confidence route, learned rule activates directly, or evidence lacks rule ID/facts/backend/confidence. | Code for route outcome/schema/audit; LLM Judge for explanation clarity and abstention rationale; Human calibration by Fulcrum operator. | Critical |
+| Learned draft safety and conflict handling (RTR-02, RTR-03) | PASS: no-match learning stores disabled review-needed draft with task facts, no-match reason, proposed conditions/actions, source, confidence, model/backend, and active-rule conflict IDs when overlapping. FAIL: draft is active on creation, overlap is hidden, missing evidence persists, or low confidence creates actionable route. | Code: repository/service tests, conflict detector fixtures, audit payload validation; Human review for edge conflicts. | Critical |
+| Skill/MCP supply-chain safety (RTR-04, RTR-05, RTR-07) | PASS: `skills.lock.json` SHA-256 mismatches fail closed per skill with expected/actual SHA; safe upstream diffs auto-merge only when local unchanged; local edits produce structured conflict artifacts; MCP virtual skills are descriptor-only with pinned server/tool manifest metadata. FAIL: tampered skill remains available, inline conflict markers are written to `SKILL.md`, model can invoke descriptor-only MCP skill, or override lacks audit record. | Code: hash validation, sync fixtures, descriptor schema tests, override audit tests. | Critical |
+| Three-surface parity and schema round-trip (RTR-06, RTR-08) | PASS: Web, CLI, and TUI list/test/create/update/delete routing rules and drafts through shared service/tRPC behavior; structured builder and raw JSON round-trip; strict validation plus dry-run blocks invalid saves consistently. FAIL: one surface bypasses validation, permits a save another rejects, hides conflict/lock state, or serializes rule JSON lossy. | Code: shared service tests, CLI `--json` snapshots, TUI/Web integration tests, schema round-trip fixtures. | High |
+| Safety guardrails and task completion (Hybrid required) | PASS: catastrophic states fail closed while still completing safe parts of task: lock mismatch disables affected skill only, invalid vectors block write/search only, unavailable configured backend degrades with reason, low-confidence LLM abstains, and operator can inspect next action. FAIL: system proceeds silently after unsafe signal, blocks unrelated safe capabilities, or leaves operator without actionable evidence. | Code for guards/state transitions; LLM Judge for operator-facing rationale; Human sampling for high-stakes cases. | Critical |
 
 ### Eval Tooling
 
-**Primary Tool:** <!-- e.g., Promptfoo + Arize Phoenix -->
+**Primary Tool:** Promptfoo for CI prompt/schema regression plus Arize Phoenix for local-first tracing/observability. No existing Langfuse/LangSmith/Arize/Phoenix/Braintrust/Promptfoo/RAGAS stack was detected in TypeScript/Python/TOML/JSON sources, so default to Phoenix because it is open-source, self-hostable, and OpenTelemetry-friendly. RAGAS is not primary for this phase because retrieval quality is limited to deterministic embedding round-trip/search proof, not open-ended RAG answer generation.
 
 **Setup:**
 ```bash
-# Install and configure
+bun add -d promptfoo @opentelemetry/api @opentelemetry/sdk-trace-node
+python -m pip install arize-phoenix opentelemetry-sdk
+```
+
+Phoenix local tracing bootstrap for developer runs:
+
+```python
+# pip install arize-phoenix opentelemetry-sdk
+import phoenix as px
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+
+px.launch_app()  # http://localhost:6006
+provider = TracerProvider()
+trace.set_tracer_provider(provider)
+# Instrument: LangChainInstrumentor().instrument() when LangGraph router nodes are enabled.
 ```
 
 **CI/CD Integration:**
 ```bash
-# Command to run evals in CI/CD pipeline
+bun test src/inference src/router src/skills src/server/trpc/routers/inference.ts src/server/trpc/routers/routing.ts src/server/trpc/routers/skills.ts
+bunx promptfoo eval --config evals/phase-04-router.promptfooconfig.yaml
+bun run ci
 ```
 
 ### Reference Dataset
 
-**Size:** <!-- e.g., 20 examples to start -->
+**Size:** 20 labeled examples before production use; 10 minimum may unblock early implementation, but phase close requires all 20.
 
 **Composition:**
-<!-- What scenario types the dataset covers: critical paths, edge cases, failure modes -->
+- 4 deterministic routing matches covering simple task facts, full-context mode, rule precedence, and dry-run save.
+- 3 no-match learned draft cases covering disabled draft creation, evidence payload, and delete/approve lifecycle.
+- 3 conflict/overlap cases covering active-rule overlap, conflict state display, and edit/delete requirement.
+- 3 LLM fallback cases covering recommend, low-confidence abstain, and malformed structured output retry/fail-closed.
+- 3 inference/embedding cases covering `vector(384)` write/search, paraphrase cosine `>= 0.9`, and dimension-change fail-closed.
+- 2 skill sync/lock cases covering SHA mismatch fail-closed and local-edit conflict artifact.
+- 2 MCP virtual skill cases covering descriptor visibility and no direct invocation path.
 
 **Labeling:**
-<!-- Who labels examples and how (domain expert, LLM judge with calibration, etc.) -->
+Senior developer/Fulcrum operator labels expected route outcomes and explanations. Platform/security engineer labels lock/MCP cases. Inference/search maintainer labels backend and embedding cases. LLM judge allowed only for explanation clarity and abstention rationale after calibration against at least 10 human-labeled examples with target agreement `>= 0.7`; deterministic gates remain code-owned.
 
 ---
 
@@ -204,28 +582,45 @@ project/
 
 | Guardrail | Trigger | Intervention |
 |-----------|---------|--------------|
-| | | Block / Escalate / Flag |
+| Skill lock fail-closed | Expected SHA-256 differs from actual `SKILL.md` or MCP descriptor/tool manifest hash. | Block affected skill/descriptor, show expected/actual SHA, require explicit override with audit record. |
+| Embedding dimension fail-closed | Vector length differs from configured model/schema dimension, or model dimension changes without migration/reindex proof. | Block embedding write/search path, mark embedding subsystem degraded, emit migration/reindex requirement. |
+| Backend health gate | Configured/enabled backend fails real embed/generate probe or sidecar startup. | Mark backend `degraded`/`unavailable`, exclude from routing/model selection, surface probe reason in status/doctor. |
+| Router confidence and activation gate | LLM fallback confidence below threshold, malformed structured output after retries, or learned rule proposed. | Abstain with evidence; create disabled draft only when schema/confidence/conflict checks pass; never activate automatically. |
+| Route rule validation gate | Invalid JSON, invalid conditions/actions, failed dry-run, or cross-surface schema mismatch on save. | Reject save and return validation errors; no partial persistence. |
+| MCP descriptor-only gate | Virtual MCP skill selected for direct invocation inside Fulcrum surfaces. | Block invocation; show descriptor-only state and agent/MCP runtime handoff requirement. |
 
 ### Offline (Flywheel)
 
 | Metric | Sampling Strategy | Action on Degradation |
 |--------|------------------|----------------------|
-| | | |
+| Route explanation quality | Sample 20% of LLM fallback decisions plus all abstains/conflicts for LLM judge; human-review 10 examples/week until judge calibrated. | Tighten prompt/schema, add examples to Promptfoo corpus, or lower confidence trust for affected backend. |
+| Wrong/noisy learned drafts | Sample all promoted drafts and 25% of deleted drafts. | Update conflict detector/rule precedence tests; add negative fixtures for overlapping drafts. |
+| Backend reliability drift | Batch daily configured-backend probe summaries by backend/model. | Mark flaky backend degraded by default, require operator re-enable after passing real-call suite. |
+| Embedding retrieval regression | Run nightly/reference paraphrase and hard-negative corpus. | Block embedding model change, require reindex/migration proof before re-enable. |
+| Surface parity drift | Sample route CRUD/test flows across Web/CLI/TUI after service/schema changes. | Add failing parity snapshot/integration test before implementation continues. |
+| Lock override patterns | Review all lock mismatch overrides and conflict overrides weekly. | Escalate repeated overrides to security review; add stricter warnings or ownership checks. |
 
 ---
 
 ## 7. Production Monitoring
 
-**Tracing Tool:** <!-- e.g., Arize Phoenix self-hosted -->
+**Tracing Tool:** Arize Phoenix self-hosted/local developer instance via OpenTelemetry spans, plus Fulcrum audit/event rows as durable source of truth. Phoenix traces are optional operational visibility; audit rows are required for route decisions, lock overrides, backend probes, learned draft lifecycle, and MCP descriptor changes.
 
 **Key Metrics to Track:**
-<!-- 3-5 metrics that will be monitored in production -->
+- Routing: deterministic match rate, LLM fallback rate, abstain rate, draft-created/promoted/deleted rate, conflict rate, invalid-save rate.
+- Safety: lock mismatch count, override count, MCP descriptor hash mismatch count, direct-invocation block count.
+- Inference: backend state counts, real-call success rate, p50/p95 probe latency, sidecar start failures, auto-spawn success rate.
+- Embeddings: vector dimension rejection count, cosine acceptance pass rate, search round-trip latency, reindex-required state duration.
+- Surface parity: Web/CLI/TUI route CRUD/test success rate, schema round-trip failures, dry-run validation failures by surface.
+- Cost/latency: model calls per route test, token counts, cache hit rate, p50/p95 route latency.
 
 **Alert Thresholds:**
-<!-- When to page/alert -->
+- Critical: any skill lock mismatch with affected skill still available; any vector dimension mismatch accepted; any learned rule active without approval audit; any configured backend marked healthy after failed real call.
+- High: LLM fallback abstain rate `> 30%` over 50 route tests; conflict rate `> 20%` of learned drafts; route p95 `> 5s` for local backend fallback; sidecar auto-spawn failure rate `> 5%`.
+- Medium: prompt/schema retry rate `> 10%`, route explanation judge pass rate `< 90%` after calibration, Web/CLI/TUI parity regression in nightly samples, backend probe p95 `> 2s`.
 
 **Smart Sampling Strategy:**
-<!-- How to select interactions for human review — signal-based filters -->
+Always sample lock overrides, MCP descriptor changes, learned draft promotions, dimension-change attempts, backend degraded transitions, and LLM abstains. Weight additional samples toward low confidence (`0.55-0.75`), long latency, schema retries, conflicts, route saves via raw JSON, full-context routing mode, and any case where one surface reports a different status than another. Keep human review small and high-signal: 10-20 sampled decisions/week during rollout, then reduce only after four consecutive weeks without Critical/High findings.
 
 ---
 
@@ -233,17 +628,17 @@ project/
 
 - [x] System type classified
 - [x] Critical failure modes identified (≥ 3)
-- [ ] Domain context researched (Section 1b: vertical, stakes, expert criteria, failure modes)
-- [ ] Regulatory/compliance context identified or explicitly noted as none
-- [ ] Domain expert roles defined for evaluation involvement
+- [x] Domain context researched (Section 1b: vertical, stakes, expert criteria, failure modes)
+- [x] Regulatory/compliance context identified or explicitly noted as none
+- [x] Domain expert roles defined for evaluation involvement
 - [x] Framework selected with rationale documented
 - [x] Alternatives considered and ruled out
-- [ ] Framework quick reference written (install, imports, pattern, pitfalls)
-- [ ] AI systems best practices written (Section 4b: structured outputs, async, prompt discipline, context)
-- [ ] Evaluation dimensions grounded in domain rubric ingredients
-- [ ] Each eval dimension has a concrete rubric (Good/Bad in domain language)
-- [ ] Eval tooling selected — Arize Phoenix default confirmed or override noted
-- [ ] Reference dataset spec written (size ≥ 10, composition + labeling defined)
-- [ ] CI/CD eval integration specified
-- [ ] Online guardrails defined
-- [ ] Production monitoring configured (tracing tool + sampling strategy)
+- [x] Framework quick reference written (install, imports, pattern, pitfalls)
+- [x] AI systems best practices written (Section 4b: structured outputs, async, prompt discipline, context)
+- [x] Evaluation dimensions grounded in domain rubric ingredients
+- [x] Each eval dimension has a concrete rubric (Good/Bad in domain language)
+- [x] Eval tooling selected — Arize Phoenix default confirmed or override noted
+- [x] Reference dataset spec written (size ≥ 10, composition + labeling defined)
+- [x] CI/CD eval integration specified
+- [x] Online guardrails defined
+- [x] Production monitoring configured (tracing tool + sampling strategy)
