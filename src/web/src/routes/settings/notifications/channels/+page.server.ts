@@ -81,8 +81,16 @@ function maskSecret(secret: string): string {
 
 export async function load(event: LoadEvent) {
   requireSession(event);
-  const channels = await trpcQuery(event, "notify.channels.list");
-  return { channels: Array.isArray(channels) ? channels : [] };
+  const [channels, rules, quietHours] = await Promise.all([
+    trpcQuery(event, "notify.channels.list"),
+    trpcQuery(event, "notify.rules.list"),
+    trpcQuery(event, "notify.quietHours.get"),
+  ]);
+  return {
+    channels: Array.isArray(channels) ? channels : [],
+    rules: Array.isArray(rules) ? rules : [],
+    quietHours,
+  };
 }
 
 export const actions = {

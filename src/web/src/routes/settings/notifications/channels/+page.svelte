@@ -7,6 +7,13 @@
   }
 
   let { data, form }: Props = $props();
+
+  const quietHours = $derived(data.quietHours as null | {
+    tz: string;
+    startHour: number;
+    endHour: number;
+    daysOfWeek: number[];
+  });
 </script>
 
 <svelte:head>
@@ -49,6 +56,33 @@
         {/each}
       </tbody>
     </table>
+  </section>
+
+  <section data-notification-rule-state class="grid gap-4 md:grid-cols-2">
+    <div class="rounded-md border border-border p-4">
+      <h2 class="text-lg font-semibold">Rules</h2>
+      <p class="mt-1 text-sm text-muted-foreground">{data.rules.length} configured</p>
+      {#if data.rules.length > 0}
+        <ul class="mt-3 divide-y divide-border text-sm">
+          {#each data.rules as rule (rule.id)}
+            <li class="flex items-center justify-between gap-3 py-2">
+              <span>{rule.name}</span>
+              <span class="text-muted-foreground">{rule.deliveryMode ?? "immediate"} / {rule.channels.join(", ")}</span>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
+    <div class="rounded-md border border-border p-4">
+      <h2 class="text-lg font-semibold">Quiet Hours</h2>
+      {#if quietHours}
+        <p class="mt-1 text-sm text-muted-foreground">
+          {quietHours.startHour}:00-{quietHours.endHour}:00 {quietHours.tz}
+        </p>
+      {:else}
+        <p class="mt-1 text-sm text-muted-foreground">Not configured</p>
+      {/if}
+    </div>
   </section>
 
   <div class="grid gap-4 lg:grid-cols-2">

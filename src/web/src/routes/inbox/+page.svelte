@@ -106,9 +106,9 @@
         {#each data.notifications as n (n.id)}
           <li
             data-notification={n.id}
-            class={cn("flex items-start gap-3 p-3", n.read_at === null ? "bg-accent/30" : "")}
+            class={cn("flex items-start gap-3 p-3", n.readAt === null ? "bg-accent/30" : "")}
           >
-            {#if n.read_at === null}
+            {#if n.readAt === null}
               <span
                 data-unread-dot
                 aria-label="Unread"
@@ -120,12 +120,12 @@
             {/if}
             <div>
               <p class={cn("text-sm font-medium")}>
-                <span data-notification-actor>{n.actor}</span>
-                {" "}<span data-notification-verb>{n.verb}</span>
-                {" "}<span data-notification-subject>{n.subject_kind}:{n.subject_id}</span>
+                <span data-notification-actor>{n.title}</span>
+                {" "}<span data-notification-verb>{n.body}</span>
+                {" "}<span data-notification-subject>{n.entityKind}:{n.entityId}</span>
               </p>
               <p class={cn("mt-0.5 text-xs text-muted-foreground")} data-notification-time>
-                {formatDate(n.created_at)}
+                {formatDate(n.createdAt)}
               </p>
             </div>
           </li>

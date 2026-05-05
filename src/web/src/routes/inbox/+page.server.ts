@@ -1,17 +1,29 @@
-import type { ServerLoad, Actions } from "@sveltejs/kit";
-import { openProductDb } from "$lib/server/db";
+import { redirect, type Actions, type ServerLoad } from "@sveltejs/kit";
+
+interface SessionEvent {
+  locals: { session?: unknown };
+  fetch: typeof fetch;
+  request: { headers: { get(name: string): string | null } };
+  url: URL;
+}
+
+interface ActionEvent extends SessionEvent {
+  request: SessionEvent["request"] & { formData(): Promise<FormData> };
+}
 
 export interface NotificationRow {
   id: string;
-  org_id: string;
-  recipient: string;
-  event_id: string | null;
-  subject_kind: string;
-  subject_id: string;
-  verb: string;
-  actor: string;
-  read_at: string | null;
-  created_at: string;
+  orgId: string;
+  userId: string;
+  ruleId: string | null;
+  eventId: string;
+  title: string;
+  body: string;
+  entityKind: string;
+  entityId: string;
+  read: boolean;
+  readAt: string | null;
+  createdAt: string;
 }
 
 export interface ActivityRow {
@@ -36,86 +48,101 @@ export interface InboxData {
 
 const PAGE_SIZE = 20;
 
-async function defaultOrgId(db: ReturnType<typeof openProductDb> extends Promise<infer T> ? T : never): Promise<string | null> {
-  const rows = await (db as { query: <T>(sql: string, params?: unknown[]) => Promise<T[]> }).query<{ id: string }>(
-    `SELECT id FROM orgs WHERE slug = $1`,
-    ["default"],
-  );
-  return rows[0]?.id ?? null;
+function baseUrl(url: URL): string {
+  return `${url.protocol}//${url.host}`;
 }
 
-export const load: ServerLoad = async ({ url }) => {
-  const activityPageRaw = parseInt(url.searchParams.get("activity_page") ?? "1", 10);
+function unwrapTrpcData(body: unknown): unknown {
+  return (
+    (body as { result?: { data?: { json?: unknown } } })?.result?.data?.json ??
+    (body as { result?: { data?: unknown } })?.result?.data ??
+    body
+  );
+}
+
+function extractTrpcError(body: unknown): string {
+  const error = (body as { error?: { json?: { message?: string }; message?: string } })?.error;
+  return error?.json?.message ?? error?.message ?? "Request failed";
+}
+
+async function trpcQuery(event: SessionEvent, procedure: string, input: unknown): Promise<unknown> {
+  const encodedInput = encodeURIComponent(JSON.stringify(input));
+  const response = await event.fetch(`${baseUrl(event.url)}/api/trpc/${procedure}?input=${encodedInput}`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "content-type": "application/json",
+      cookie: event.request.headers.get("cookie") ?? "",
+    },
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(extractTrpcError(body));
+  return unwrapTrpcData(body);
+}
+
+async function trpcMutation(event: ActionEvent, procedure: string, input: unknown): Promise<unknown> {
+  const response = await event.fetch(`${baseUrl(event.url)}/api/trpc/${procedure}`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "content-type": "application/json",
+      cookie: event.request.headers.get("cookie") ?? "",
+    },
+    body: JSON.stringify({ json: input }),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(extractTrpcError(body));
+  return unwrapTrpcData(body);
+}
+
+function normalizeNotification(row: Record<string, unknown>): NotificationRow {
+  return {
+    id: String(row["id"]),
+    orgId: String(row["orgId"]),
+    userId: String(row["userId"]),
+    ruleId: row["ruleId"] === null ? null : String(row["ruleId"]),
+    eventId: String(row["eventId"]),
+    title: String(row["title"] ?? ""),
+    body: String(row["body"] ?? ""),
+    entityKind: String(row["entityKind"] ?? "event"),
+    entityId: String(row["entityId"] ?? row["eventId"] ?? ""),
+    read: row["read"] === true,
+    readAt: row["readAt"] ? String(row["readAt"]) : null,
+    createdAt: String(row["createdAt"]),
+  };
+}
+
+export const load: ServerLoad = async (event) => {
+  const sessionEvent = event as SessionEvent;
+  if (!sessionEvent.locals.session) throw redirect(302, "/auth/login");
+
+  const activityPageRaw = parseInt(sessionEvent.url.searchParams.get("activity_page") ?? "1", 10);
   const activityPage = Number.isNaN(activityPageRaw) || activityPageRaw < 1 ? 1 : activityPageRaw;
-  const offset = (activityPage - 1) * PAGE_SIZE;
 
-  const db = await openProductDb();
-  try {
-    const orgId = await defaultOrgId(db as never);
-    if (!orgId) {
-      return {
-        notifications: [],
-        unreadCount: 0,
-        activity: [],
-        activityPage: 1,
-        activityTotal: 0,
-      } satisfies InboxData;
-    }
+  const [unreadResult, listResult] = await Promise.all([
+    trpcQuery(sessionEvent, "notify.unreadCount", {}),
+    trpcQuery(sessionEvent, "notify.list", { limit: 50, offset: 0 }),
+  ]);
 
-    const notifications = await db.query<NotificationRow>(
-      `SELECT id, org_id, recipient, event_id, subject_kind, subject_id, verb, actor, read_at, created_at
-         FROM notifications
-        WHERE org_id = $1 AND recipient = $2
-        ORDER BY created_at DESC
-        LIMIT 100`,
-      [orgId, "local"],
-    );
+  const count = Number((unreadResult as { count?: unknown })?.count ?? 0);
+  const items = Array.isArray((listResult as { items?: unknown })?.items)
+    ? ((listResult as { items: Record<string, unknown>[] }).items)
+    : [];
 
-    const unreadCount = notifications.filter((n) => n.read_at === null).length;
-
-    const activityCountRows = await db.query<{ count: string }>(
-      `SELECT COUNT(*)::text AS count FROM events WHERE org_id = $1 AND actor = $2`,
-      [orgId, "local"],
-    );
-    const activityTotal = parseInt(activityCountRows[0]?.count ?? "0", 10);
-
-    const activity = await db.query<ActivityRow>(
-      `SELECT id, org_id, project_id, actor, subject_kind, subject_id, verb, payload, created_at
-         FROM events
-        WHERE org_id = $1 AND actor = $2
-        ORDER BY created_at DESC
-        LIMIT $3 OFFSET $4`,
-      [orgId, "local", PAGE_SIZE, offset],
-    );
-
-    return {
-      notifications,
-      unreadCount,
-      activity,
-      activityPage,
-      activityTotal,
-    } satisfies InboxData;
-  } finally {
-    await db.close();
-  }
+  return {
+    notifications: items.map(normalizeNotification),
+    unreadCount: Math.max(0, count),
+    activity: [],
+    activityPage,
+    activityTotal: 0,
+  } satisfies InboxData;
 };
 
 export const actions: Actions = {
-  markAllRead: async () => {
-    const db = await openProductDb();
-    try {
-      const rows = await db.query<{ id: string }>(`SELECT id FROM orgs WHERE slug = $1`, ["default"]);
-      const orgId = rows[0]?.id;
-      if (!orgId) return { error: "no org" };
-
-      await db.query(
-        `UPDATE notifications SET read_at = now()
-          WHERE org_id = $1 AND recipient = $2 AND read_at IS NULL`,
-        [orgId, "local"],
-      );
-      return { markedRead: true };
-    } finally {
-      await db.close();
-    }
+  markAllRead: async (event) => {
+    const actionEvent = event as ActionEvent;
+    if (!actionEvent.locals.session) throw redirect(302, "/auth/login");
+    await trpcMutation(actionEvent, "notify.markAllRead", {});
+    return { markedRead: true };
   },
 };

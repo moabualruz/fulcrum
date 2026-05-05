@@ -5,6 +5,7 @@ import { permissionedProcedure } from "../middleware.ts";
 import { t } from "../trpc.ts";
 import {
   ChannelNameSchema,
+  DeliveryModeSchema,
   IdInputSchema,
   ListNotificationsInputSchema,
   MuteInputSchema,
@@ -16,6 +17,8 @@ import {
 
 type EntityManager = import("@mikro-orm/postgresql").EntityManager;
 type AuthCtx = { em: EntityManager | null; orgId: string; userId: string };
+type NotificationCountRow = { orgId?: string; org?: string | { id?: string }; userId: string; readAt: Date | null };
+type NotificationReadRow = { readAt: Date | null };
 
 const CHANNELS = [
   { name: "in-app", enabled: true, configurable: false },
@@ -56,6 +59,10 @@ const NotificationRuleOutputSchema = z.object({
   eventPattern: z.record(z.string(), z.unknown()),
   channels: z.array(ChannelNameSchema),
   enabled: z.boolean(),
+  deliveryMode: DeliveryModeSchema,
+  digestWindowSeconds: z.number().int().nullable(),
+  delaySeconds: z.number().int().nullable(),
+  critical: z.boolean(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -78,6 +85,19 @@ const QuietHoursOutputSchema = z.object({
   endHour: z.number().int().min(0).max(23),
   daysOfWeek: z.array(z.number().int().min(0).max(6)),
 });
+
+export function calculateUnreadNotificationCount(
+  rows: readonly NotificationCountRow[],
+  scope: { orgId: string; userId: string },
+): number {
+  return rows.filter((row) => notificationOrgId(row) === scope.orgId && row.userId === scope.userId && row.readAt === null).length;
+}
+
+export function markNotificationRead(row: NotificationReadRow, now = new Date()): boolean {
+  if (row.readAt !== null) return false;
+  row.readAt = now;
+  return true;
+}
 
 function requireEm(ctx: AuthCtx): EntityManager {
   if (!ctx.em) {
@@ -115,6 +135,7 @@ function notificationToOutput(row: any) {
 }
 
 function ruleToOutput(row: any) {
+  const timing = ruleTiming(row.eventPattern ?? {});
   return {
     id: row.id,
     orgId: row.org?.id ?? row.org,
@@ -125,6 +146,10 @@ function ruleToOutput(row: any) {
     eventPattern: row.eventPattern ?? {},
     channels: row.channels ?? [],
     enabled: row.enabled,
+    deliveryMode: timing.deliveryMode,
+    digestWindowSeconds: timing.digestWindowSeconds,
+    delaySeconds: timing.delaySeconds,
+    critical: timing.critical,
     createdAt: row.createdAt ?? new Date(0),
     updatedAt: row.updatedAt ?? new Date(0),
   };
@@ -156,6 +181,44 @@ function quietHoursToOutput(row: any) {
 async function findOrgRef(em: EntityManager, orgId: string) {
   const Org = await orgClass();
   return em.findOneOrFail(Org, { id: orgId });
+}
+
+function notificationOrgId(row: NotificationCountRow): string | undefined {
+  return typeof row.org === "object" ? row.org.id : row.org ?? row.orgId;
+}
+
+function ruleTiming(pattern: Record<string, unknown>) {
+  const deliveryMode = DeliveryModeSchema.catch("immediate").parse(pattern["deliveryMode"]);
+  return {
+    deliveryMode,
+    digestWindowSeconds: typeof pattern["digestWindowSeconds"] === "number" ? pattern["digestWindowSeconds"] : null,
+    delaySeconds: typeof pattern["delaySeconds"] === "number" ? pattern["delaySeconds"] : null,
+    critical: pattern["critical"] === true,
+  };
+}
+
+function withRuleTiming(
+  pattern: Record<string, unknown>,
+  input: {
+    deliveryMode?: "immediate" | "digest" | "delayed";
+    digestWindowSeconds?: number | null;
+    delaySeconds?: number | null;
+    critical?: boolean;
+  },
+): Record<string, unknown> {
+  const next = { ...pattern };
+  if (input.deliveryMode !== undefined) next["deliveryMode"] = input.deliveryMode;
+  if (input.digestWindowSeconds !== undefined) {
+    if (input.digestWindowSeconds === null) delete next["digestWindowSeconds"];
+    else next["digestWindowSeconds"] = input.digestWindowSeconds;
+  }
+  if (input.delaySeconds !== undefined) {
+    if (input.delaySeconds === null) delete next["delaySeconds"];
+    else next["delaySeconds"] = input.delaySeconds;
+  }
+  if (input.critical !== undefined) next["critical"] = input.critical;
+  if (next["deliveryMode"] === "digest" && next["digestWindowSeconds"] === undefined) next["digestWindowSeconds"] = 300;
+  return next;
 }
 
 export const notificationsRouter = t.router({
@@ -207,7 +270,7 @@ export const notificationsRouter = t.router({
       if (!row) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Notification not found." });
       }
-      if (!(row as any).readAt) (row as any).readAt = new Date();
+      markNotificationRead(row as any);
       await em.flush();
       return notificationToOutput(row);
     }),
@@ -317,13 +380,14 @@ export const notificationsRouter = t.router({
         const em = requireEm(ctx);
         const { NotificationRule } = await entities();
         const now = new Date();
-        const row = em.create(NotificationRule, {
+      const eventPattern = withRuleTiming(input.eventPattern, input);
+      const row = em.create(NotificationRule, {
           org: await findOrgRef(em, ctx.orgId),
           userId: ctx.userId,
           name: input.name,
           subjectKind: input.subjectKind ?? null,
           active: input.enabled,
-          eventPattern: input.eventPattern,
+          eventPattern,
           channels: input.channels,
           enabled: input.enabled,
           createdAt: now,
@@ -351,6 +415,14 @@ export const notificationsRouter = t.router({
         if (input.name !== undefined) (row as any).name = input.name;
         if (input.subjectKind !== undefined) (row as any).subjectKind = input.subjectKind;
         if (input.eventPattern !== undefined) (row as any).eventPattern = input.eventPattern;
+        if (
+          input.deliveryMode !== undefined ||
+          input.digestWindowSeconds !== undefined ||
+          input.delaySeconds !== undefined ||
+          input.critical !== undefined
+        ) {
+          (row as any).eventPattern = withRuleTiming((row as any).eventPattern ?? {}, input);
+        }
         if (input.channels !== undefined) (row as any).channels = input.channels;
         if (input.enabled !== undefined) {
           (row as any).enabled = input.enabled;

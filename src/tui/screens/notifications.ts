@@ -18,10 +18,15 @@ export interface TuiNotification {
 export interface NotificationsScreenOptions {
   caller: {
     notify: {
+      unreadCount?: () => Promise<{ count: number }>;
       list: (input: { tab?: NotificationTab; unread?: boolean; limit?: number; offset?: number }) =>
         Promise<TuiNotification[] | { items: TuiNotification[] }>;
       markRead: (input: { id: string }) => Promise<unknown>;
-      mute: (input: { sourceKind: string; sourceId: string }) => Promise<unknown>;
+      markAllRead?: () => Promise<{ count: number }>;
+      mute: (input: { sourceKind: string; sourceId: string; subjectKind?: string; subjectId?: string }) => Promise<unknown>;
+      rules?: {
+        list: () => Promise<Array<{ id: string; name: string; enabled: boolean; channels: string[] }>>;
+      };
     };
   };
   subscriptions?: SubscriptionBridge;
@@ -32,6 +37,7 @@ export interface NotificationsScreenOptions {
 export class NotificationsScreen {
   private tab: NotificationTab = "for-you";
   private notifications: TuiNotification[] = [];
+  private rules: Array<{ id: string; name: string; enabled: boolean; channels: string[] }> = [];
   private cursor = 0;
   private bellCount: number;
   private subscriptions: TuiSubscription[] = [];
@@ -50,6 +56,10 @@ export class NotificationsScreen {
     renderer.writeln(c.bold("  Inbox"));
     renderer.separator();
     renderer.writeln(`  Bell: ${this.bellCount}`);
+    if (this.rules.length > 0) {
+      const enabledRules = this.rules.filter((rule) => rule.enabled).length;
+      renderer.writeln(`  Rules: ${enabledRules}/${this.rules.length} enabled`);
+    }
     renderer.writeln(`  ${this.tab === "for-you" ? "[For you]" : "For you"}  ${this.tab === "all" ? "[All]" : "All"}`);
     renderer.writeln();
 
@@ -65,7 +75,7 @@ export class NotificationsScreen {
     }
 
     renderer.writeln();
-    renderer.writeln(c.dim("  Tab switch  R read  M mute  Enter open  q back"));
+    renderer.writeln(c.dim("  Tab switch  R read  A all read  M mute  Enter open  q back"));
   }
 
   async handleKey(key: string): Promise<boolean> {
@@ -84,10 +94,20 @@ export class NotificationsScreen {
       return true;
     }
 
+    if (key === "A") {
+      if (!this.opts.caller.notify.markAllRead) return false;
+      await this.opts.caller.notify.markAllRead();
+      for (const notification of this.notifications) notification.read = true;
+      this.bellCount = 0;
+      return true;
+    }
+
     if (key === "M") {
       const notification = this.selectedNotification;
       if (!notification) return false;
-      await this.opts.caller.notify.mute({ sourceKind: subjectKind(notification), sourceId: subjectId(notification) });
+      const kind = subjectKind(notification);
+      const id = subjectId(notification);
+      await this.opts.caller.notify.mute({ sourceKind: kind, sourceId: id });
       return true;
     }
 
@@ -128,6 +148,13 @@ export class NotificationsScreen {
       offset: 0,
     });
     this.notifications = Array.isArray(result) ? result : result.items;
+    if (this.opts.caller.notify.unreadCount) {
+      const unread = await this.opts.caller.notify.unreadCount();
+      this.bellCount = Math.max(0, unread.count);
+    }
+    if (this.opts.caller.notify.rules?.list) {
+      this.rules = await this.opts.caller.notify.rules.list();
+    }
     this.cursor = Math.min(this.cursor, Math.max(0, this.notifications.length - 1));
   }
 

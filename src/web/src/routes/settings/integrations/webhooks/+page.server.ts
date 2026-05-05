@@ -1,70 +1,95 @@
-/**
- * /settings/integrations/webhooks — outbound webhook subscription management.
- *
- * Gated by FULCRUM_FEATURES=notify-webhook (C1, default OFF).
- * Flag OFF → 404. Flag ON → list/create webhook subscriptions + delivery log.
- */
+import { error, fail, redirect, type Actions, type ServerLoad } from "@sveltejs/kit";
 
-import { error, fail, redirect } from "@sveltejs/kit";
-import type { Actions, PageServerLoad } from "./$types";
+interface RouteEvent {
+  locals: { session?: unknown };
+  fetch: typeof fetch;
+  request: {
+    headers: { get(name: string): string | null };
+    formData(): Promise<FormData>;
+  };
+  url: URL;
+}
+
+interface LoadEvent extends Omit<RouteEvent, "request"> {
+  request: { headers: { get(name: string): string | null } };
+}
 
 function isNotifyWebhookEnabled(): boolean {
   const features = (process.env["FULCRUM_FEATURES"] ?? "").split(",").map((f) => f.trim());
   return features.includes("notify-webhook");
 }
 
-export interface WebhookSubscription {
-  id: string;
-  url: string;
-  eventPattern: string;
-  signingSecret: string;
-  createdAt: string;
+function baseUrl(url: URL): string {
+  return `${url.protocol}//${url.host}`;
 }
 
-export interface WebhookDelivery {
-  id: string;
-  subscriptionId: string;
-  event: string;
-  status: "success" | "failure" | "pending";
-  responseCode: number | null;
-  deliveredAt: string;
+function unwrapTrpcData(body: unknown): unknown {
+  return (
+    (body as { result?: { data?: { json?: unknown } } })?.result?.data?.json ??
+    (body as { result?: { data?: unknown } })?.result?.data ??
+    body
+  );
 }
 
-/** In-memory stub store for subscriptions (replaced by DB in production). */
-const _subscriptions: WebhookSubscription[] = [];
-const _deliveries: WebhookDelivery[] = [];
-
-function getSubscriptions(): WebhookSubscription[] {
-  return _subscriptions;
+function extractTrpcError(body: unknown): string {
+  const errorBody = (body as { error?: { json?: { message?: string }; message?: string } })?.error;
+  return errorBody?.json?.message ?? errorBody?.message ?? "Request failed";
 }
 
-function addSubscription(sub: WebhookSubscription): void {
-  _subscriptions.push(sub);
+async function trpcQuery(event: LoadEvent, procedure: string): Promise<unknown> {
+  const response = await event.fetch(`${baseUrl(event.url)}/api/trpc/${procedure}?input=%7B%7D`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "content-type": "application/json",
+      cookie: event.request.headers.get("cookie") ?? "",
+    },
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(extractTrpcError(body));
+  return unwrapTrpcData(body);
 }
 
-function getDeliveries(): WebhookDelivery[] {
-  return _deliveries;
+async function trpcMutation(event: RouteEvent, procedure: string, input: unknown): Promise<unknown> {
+  const response = await event.fetch(`${baseUrl(event.url)}/api/trpc/${procedure}`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "content-type": "application/json",
+      cookie: event.request.headers.get("cookie") ?? "",
+    },
+    body: JSON.stringify({ json: input }),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(extractTrpcError(body));
+  return unwrapTrpcData(body);
 }
 
-export const load: PageServerLoad = async ({ locals }) => {
-  if (!locals.session) {
-    throw redirect(302, "/auth/login");
-  }
-  if (!isNotifyWebhookEnabled()) {
-    throw error(404, "Webhook feature is not enabled");
-  }
+export const load: ServerLoad = async (event) => {
+  const loadEvent = event as LoadEvent;
+  if (!loadEvent.locals.session) throw redirect(302, "/auth/login");
+  if (!isNotifyWebhookEnabled()) throw error(404, "Webhook feature is not enabled");
+
+  const [rules, channels] = await Promise.all([
+    trpcQuery(loadEvent, "notify.rules.list"),
+    trpcQuery(loadEvent, "notify.channels.list"),
+  ]);
   return {
-    subscriptions: getSubscriptions(),
-    deliveries: getDeliveries(),
+    subscriptions: Array.isArray(rules)
+      ? rules.filter((rule) => Array.isArray(rule.channels) && rule.channels.includes("webhook"))
+      : [],
+    deliveries: [],
+    channels: Array.isArray(channels) ? channels : [],
   };
 };
 
 export const actions: Actions = {
-  create: async ({ locals, request }) => {
-    if (!locals.session) throw redirect(302, "/auth/login");
+  create: async (event) => {
+    const routeEvent = event as RouteEvent;
+    if (!routeEvent.locals.session) throw redirect(302, "/auth/login");
     if (!isNotifyWebhookEnabled()) throw error(404, "Webhook feature is not enabled");
 
-    const form = await request.formData();
+    const form = await routeEvent.request.formData();
     const url = String(form.get("url") ?? "").trim();
     const eventPattern = String(form.get("eventPattern") ?? "").trim();
     const signingSecret = String(form.get("signingSecret") ?? "").trim();
@@ -78,14 +103,22 @@ export const actions: Actions = {
       return fail(400, { createError: "URL must be a valid URL" });
     }
 
-    const sub: WebhookSubscription = {
-      id: crypto.randomUUID(),
-      url,
-      eventPattern,
-      signingSecret: signingSecret || crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-    };
-    addSubscription(sub);
-    return { ok: true, id: sub.id };
+    try {
+      await trpcMutation(routeEvent, "notify.channels.config", {
+        channel: "webhook",
+        enabled: true,
+        url,
+        secret: signingSecret || crypto.randomUUID(),
+      });
+      const rule = await trpcMutation(routeEvent, "notify.rules.create", {
+        name: `Webhook ${eventPattern}`,
+        eventPattern: { eventType: eventPattern, deliveryMode: "immediate" },
+        channels: ["webhook"],
+        enabled: true,
+      });
+      return { ok: true, id: (rule as { id?: string }).id };
+    } catch (cause) {
+      return fail(400, { createError: String((cause as Error).message ?? cause) });
+    }
   },
 };

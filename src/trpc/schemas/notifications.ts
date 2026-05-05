@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const ChannelNameSchema = z.enum(["in-app", "email", "slack", "discord", "webhook", "push"]);
+export const DeliveryModeSchema = z.enum(["immediate", "digest", "delayed"]);
 
 export const IdInputSchema = z.object({
   id: z.string().uuid().describe("Notification identifier."),
@@ -27,6 +28,10 @@ export const NotificationRuleCreateInputSchema = z.object({
   eventPattern: z.record(z.string(), z.unknown()).describe("Event pattern matcher."),
   channels: z.array(ChannelNameSchema).min(1).default(["in-app"]).describe("Delivery channels."),
   enabled: z.boolean().default(true).describe("Whether rule is active."),
+  deliveryMode: DeliveryModeSchema.default("immediate").describe("Delivery timing mode."),
+  digestWindowSeconds: z.number().int().min(60).max(86_400).optional().describe("Digest aggregation window."),
+  delaySeconds: z.number().int().min(1).max(86_400).optional().describe("Delayed delivery offset."),
+  critical: z.boolean().default(false).describe("Whether the rule is critical."),
 });
 
 export const NotificationRuleUpdateInputSchema = z.object({
@@ -36,6 +41,10 @@ export const NotificationRuleUpdateInputSchema = z.object({
   eventPattern: z.record(z.string(), z.unknown()).optional().describe("Event pattern matcher."),
   channels: z.array(ChannelNameSchema).min(1).optional().describe("Delivery channels."),
   enabled: z.boolean().optional().describe("Whether rule is active."),
+  deliveryMode: DeliveryModeSchema.optional().describe("Delivery timing mode."),
+  digestWindowSeconds: z.number().int().min(60).max(86_400).nullable().optional().describe("Digest aggregation window."),
+  delaySeconds: z.number().int().min(1).max(86_400).nullable().optional().describe("Delayed delivery offset."),
+  critical: z.boolean().optional().describe("Whether the rule is critical."),
 });
 
 export const QuietHoursSetInputSchema = z.object({
@@ -46,3 +55,4 @@ export const QuietHoursSetInputSchema = z.object({
 });
 
 export type NotificationChannel = z.infer<typeof ChannelNameSchema>;
+export type NotificationDeliveryMode = z.infer<typeof DeliveryModeSchema>;
