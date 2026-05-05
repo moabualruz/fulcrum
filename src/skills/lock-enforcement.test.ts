@@ -1,5 +1,5 @@
 /**
- * Wave 0: skill lock fail-closed gate (RTR-07).
+ * Skill lock fail-closed gate (RTR-07).
  *
  * Tests that `skills.lock.json` SHA-256 mismatch:
  * - Returns `status: "sha_mismatch"` and `available: false` for the
@@ -7,24 +7,18 @@
  * - Exposes exact `expectedSha256` and `actualSha256` values
  * - Renders the skill unavailable until override with audit payload
  *
- * RED phase — stub lock implementation.  GREEN phase connects production
- * imports from src/skills/lock.ts and src/skills/loader.ts.
+ * RED phase — imports from production modules (may not fully exist yet).
  */
 
 import { describe, it, expect } from "bun:test";
 
-// ── Shared types ───────────────────────────────────────────────────────
+// ── RED: imports from production modules ───────────────────────────────
+import { verifySkillLock } from "../skills/lock.ts";
 
-export interface LockVerificationResult {
-  slug: string;
-  status: "ok" | "sha_mismatch" | "missing" | "error";
-  available: boolean;
-  expectedSha256: string;
-  actualSha256: string | null;
-  reason: string | null;
-}
+// ── SHA-256 helper (shared across skills modules) ──────────────────────
+import { sha256Hex } from "./mcp-virtual-skills.ts";
 
-export interface LockOverrideAudit {
+interface LockOverrideAudit {
   slug: string;
   overriddenBy: string;
   overriddenAt: string;
@@ -32,43 +26,6 @@ export interface LockOverrideAudit {
   previousActualSha256: string | null;
   action: "accept" | "reinstall" | "remove";
   reason: string;
-}
-
-// ── Helpers — full GREEN implementation ─────────────────────────────────
-
-function computeSha256(content: string): string {
-  return sha256Hex(content);
-}
-
-function verifySkillLock(
-  slug: string,
-  expectedSha256: string,
-  actualContent: string | null,
-): LockVerificationResult {
-  if (actualContent === null) {
-    return {
-      slug,
-      status: "missing",
-      available: false,
-      expectedSha256,
-      actualSha256: null,
-      reason: `skill "${slug}" has no installed content`,
-    };
-  }
-
-  const actualSha256 = computeSha256(actualContent);
-  const matches = actualSha256 === expectedSha256;
-
-  return {
-    slug,
-    status: matches ? "ok" : "sha_mismatch",
-    available: matches,
-    expectedSha256,
-    actualSha256,
-    reason: matches
-      ? null
-      : `SHA mismatch for "${slug}": expected ${expectedSha256}, got ${actualSha256}`,
-  };
 }
 
 function overrideLockMismatch(params: {
@@ -90,14 +47,6 @@ function overrideLockMismatch(params: {
   };
 }
 
-// ── Helpers (shared with production) ───────────────────────────────────
-
-/** SHA-256 hex digest (same as src/skills/loader.ts). */
-import { createHash } from "node:crypto";
-export function sha256Hex(input: string): string {
-  return createHash("sha256").update(input, "utf8").digest("hex");
-}
-
 const SAMPLE_SKILL_CONTENT = `# Test Skill
 
 A sample skill for lock enforcement tests.
@@ -115,7 +64,6 @@ const TAMPERED_HASH = sha256Hex(TAMPERED_SKILL_CONTENT);
 
 describe("skill lock enforcement - SHA mismatch (RTR-07)", () => {
   it("returns sha_mismatch when actual content hash differs from expected", () => {
-    // Content was tampered — expected hash no longer matches.
     const result = verifySkillLock("test-skill", SAMPLE_EXPECTED_HASH, TAMPERED_SKILL_CONTENT);
 
     expect(result.status).toBe("sha_mismatch");
@@ -126,7 +74,6 @@ describe("skill lock enforcement - SHA mismatch (RTR-07)", () => {
   });
 
   it("returns ok when hashes match", () => {
-    // Content intact — expected hash matches.
     const result = verifySkillLock("test-skill", SAMPLE_EXPECTED_HASH, SAMPLE_SKILL_CONTENT);
 
     expect(result.status).toBe("ok");
@@ -145,13 +92,11 @@ describe("skill lock enforcement - SHA mismatch (RTR-07)", () => {
   });
 
   it("exposes exact expected and actual SHA values", () => {
-    const expected = "a".repeat(64); // fake expected hash
-    const actual = "b".repeat(64); // fake actual hash
+    const expected = "a".repeat(64);
+    const actual = "b".repeat(64);
     const result = verifySkillLock("sha-demo", expected, `content-with-hash-${actual}`);
 
     expect(result.expectedSha256).toBe(expected);
-    // actualSha256 will be the hash of content-with-hash-${actual}, NOT "b".repeat(64)
-    // This test just verifies the field exists and differs.
     expect(result.actualSha256).not.toBeNull();
     expect(result.expectedSha256).not.toBe(result.actualSha256);
   });
