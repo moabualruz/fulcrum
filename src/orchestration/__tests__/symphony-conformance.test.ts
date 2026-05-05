@@ -1295,10 +1295,9 @@ maxAttempts: 5
     test("REQUIRED: orchestration router exports dispatchRun procedure", async () => {
       const { orchestrationRouter } = await import("../../trpc/routers/orchestration.ts");
       // The router must contain dispatchRun as a callable procedure
-      expect(typeof (orchestrationRouter as Record<string, unknown>)["_def"]).toBe("object");
-      const def = (orchestrationRouter as Record<string, { _def?: { procedures?: Record<string, unknown> } }>)["_def"];
-      // Check procedure exists in router definition
-      const procedures = def?.procedures ?? {};
+      // Check procedure exists by inspecting the router's internal definition
+      const routerAny = orchestrationRouter as unknown as { _def: { procedures: Record<string, unknown> } };
+      const procedures = routerAny._def?.procedures ?? {};
       expect(Object.keys(procedures)).toContain("dispatchRun");
     });
 
@@ -1343,10 +1342,9 @@ maxAttempts: 5
         // Seed a task so we have a valid taskId
         const task = await seedTask(db);
 
-        const result = await (caller as Record<string, (input: unknown) => Promise<unknown>>)["dispatchRun"]({
-          taskId: task.id,
-          orgId: ORG_ID,
-        });
+        // Use type-safe access via unknown cast
+        const dispatchRun = (caller as unknown as { dispatchRun: (input: { taskId: string; orgId?: string }) => Promise<{ runId: string; state: string; agent: string; sandboxMode: string }> })["dispatchRun"];
+        const result = await dispatchRun({ taskId: task.id, orgId: ORG_ID });
 
         expect(result).toHaveProperty("runId");
         expect(result).toHaveProperty("state");
@@ -1386,10 +1384,9 @@ maxAttempts: 5
 
         const task = await seedTask(db);
 
-        await (caller as Record<string, (input: unknown) => Promise<unknown>>)["dispatchRun"]({
-          taskId: task.id,
-          orgId: ORG_ID,
-        });
+        // Use type-safe access via unknown cast
+        const dispatchRun = (caller as unknown as { dispatchRun: (input: { taskId: string; orgId?: string }) => Promise<unknown> })["dispatchRun"];
+        await dispatchRun({ taskId: task.id, orgId: ORG_ID });
 
         // Verify agent_runs row was created
         const runs = await db.em.fork().find(AgentRun, { task: task.id } as never);

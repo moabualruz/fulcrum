@@ -105,8 +105,8 @@ export async function createHttpServer(opts: HttpServerOptions): Promise<HttpSer
   });
 
   return {
-    host: server.hostname,
-    port: server.port,
+    host: server.hostname ?? host,
+    port: server.port ?? port,
     stop: () => server.stop(true),
   };
 }
