@@ -113,75 +113,75 @@ Multi-context layout: `CONTEXT-MAP.md` at root pointing to per-context `CONTEXT.
 <claude-mem-context>
 # Memory Context
 
-# [fulcrum] recent context, 2026-05-05 10:18am GMT+2
+# [fulcrum] recent context, 2026-05-05 11:36am GMT+2
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (35,257t read) | 1,136,585t work | 97% savings
+Stats: 50 obs (21,118t read) | 612,521t work | 97% savings
 
 ### May 5, 2026
-S171 Continue Phase 5 (Task Management + Metrics) context enhancement; rewrite CONTEXT.md with competitive research and validated library selections. User identified three issues with the approach: deleted vs updated decisions, removed code context, overly aggressive deferred list. (May 5 at 7:47 AM)
-S172 Finalize Phase 5 Task Management + Metrics CONTEXT.md planning document by promoting 7 high-value scope features from deferred to in-scope, consolidating 111+ architectural decisions, and verifying persistent file state. (May 5 at 7:58 AM)
-S173 Continue observing Phase 5 (Task Management + Metrics) primary session as it moves from research completion into planning/implementation phases. Document entity schema decisions, service layer design, tRPC router implementations, and component architecture. (May 5 at 8:00 AM)
-769 8:20a 🔵 Phase 5 Task Management + Metrics comprehensive research completed and committed
-770 8:21a 🔵 Phase 5 deep-research agent completed comprehensive codebase analysis and gap assessment
-771 8:25a 🟣 Phase 05 UI Design Contract Generated
-S174 gsd-plan-phase 5 — Initialize Phase 5 (task-management-metrics) planning with context, research, and validation documents (May 5 at 8:32 AM)
-776 8:34a 🔵 Phase 5 (task-management-metrics) initialization state and gate status
-777 8:35a ✅ Phase 5 VALIDATION.md document created with test infrastructure and task verification map
-S175 Revise Phase 05 planning documents to resolve blocker and warning issues identified by the plan checker (5 blockers, 4 warnings) (May 5 at 8:36 AM)
-778 8:37a 🔵 Task entity missing six columns required by Phase 5 and existing code
-779 " 🔵 MetricsCache entity schema incomplete for two-layer analytics architecture
-780 " 🔵 Architectural antipatterns in service layer: inline DDL and raw SQL mutations
-781 " 🔵 WorkerRegistry in-process pattern confirmed; graphile-worker not installed
-782 " 🔵 Event emission and tRPC delegation patterns established and proven
-783 8:54a ⚖️ Phase 05 Plans 09-10: Chart Dashboard & Timeline Infrastructure Architecture
-784 8:56a ⚖️ Plan 11: Filtering, Bulk Operations, and Custom Field Verification Architecture
-785 8:57a ⚖️ Plan 12: Keyboard-First UX with tinykeys and Field Dependency Rules
-786 8:58a ⚖️ Plan 13: Real-Time Collaboration, Portfolio Dashboard, and Complete Chart Suite
-787 8:59a ⚖️ Plan 14: Three-Surface Parity via CLI Reports, TUI ASCII Charts, and Shared tRPC
-788 9:00a ⚖️ Plan 15: Final Sprint/Workflow/Automation UI and Phase 05 Completion Checkpoint
-789 9:09a ⚖️ Two-layer analytics architecture for task metrics—design and implementation plan
-790 9:10a ⚖️ Sprint management extensions and event-driven automation engine—design and implementation plan
-791 9:13a ⚖️ Board and list UI components for competitive task management—design and implementation plan
-792 9:14a ⚖️ Reports visualization layer with LayerChart components and tRPC migration—design and implementation plan
-793 9:16a ⚖️ Gantt and calendar timeline views with critical path analysis—design and implementation plan
-794 9:17a ⚖️ Filter builder, saved views, bulk operations, and custom field verification—design and implementation plan
-795 9:18a ⚖️ Real-time collaboration with Yjs, y-websocket server, portfolio dashboard, and remaining analytics charts—design and implementation plan
-796 9:20a ⚖️ Phase 05 final components and CI verification gate—closing plan for task management and metrics
-S176 Continue Phase 5 planning from context compaction. Complete comprehensive audit of Phase 3/4 implementation gaps that affect Phase 5 task management. Write consolidated Phase 5 plan based on research and gap findings. (May 5 at 9:22 AM)
-798 9:25a ✅ Phase 4 Milestone Completed
 S177 Peer review Phase 5 planning artifacts (15 plans, 111 decisions, 5 waves) for the Fulcrum Task Management + Metrics project; synthesize findings into structured review document (May 5 at 9:26 AM)
-799 9:32a ⚖️ Established deep research workflow before implementation decisions
-800 " ⚖️ Research outputs must persist to disk files, not conversation-only memory
-801 " ⚖️ Implementation decisions require specificity and competitive parity, not generic descriptions
-802 " ⚖️ Phase research must include codebase-specific integration mapping
-803 9:33a ✅ Codified research and decision-making rules into project governance
-804 9:34a 🔵 Confirmed multi-persona peer review tool and Phase 5 artifacts ready
-805 " 🔵 Phase 5 planning artifacts systematically reviewed with decision coverage gaps discovered
-806 9:35a 🔵 Phase 5 peer review drilling into plan-by-plan task breakdown and acceptance criteria
-807 9:37a 🔵 Phase 5 peer review completed with NO-GO verdict and 18 actionable findings
-808 " 🔵 Phase 5 Peer Review Identifies 18 Critical Planning Gaps and Architectural Conflicts
 S178 Peer review Phase 5 planning artifacts (Task Management + Metrics) with comprehensive quality gates; also distribute research enforcement rules to all agent platforms; capture Phase 3/4 gap audit findings (May 5 at 9:39 AM)
-809 9:39a 🔵 Phase 5 Peer Review Complete: Full Analysis Delivered with NO-GO Verdict and 18 Findings
-810 9:44a ✅ Phase 5 Peer Review Document Successfully Written to Disk
-811 " ✅ Agent Behavioral Rules Updated to Enforce Deep Research and Integration Documentation
-812 9:45a ✅ Deep Research Behavioral Rules Successfully Distributed to All Agent Platforms
 S179 Clarify whether Gemini uses GEMINI.md, AGENTS.md, or both for configuration/documentation (May 5 at 9:46 AM)
-813 9:55a 🔵 GEMINI.md references AGENTS.md for documentation
 S180 Peer-review Phase 5 planning artifacts (Task Management + Metrics) for the Fulcrum project, reading all 15 plan files plus context/research/gap audit, and writing findings to 05-REVIEWS.md with focus on executability, dependency correctness, decision coverage, architectural risks, and wave parallelism. (May 5 at 9:55 AM)
-814 9:57a 🔵 Phase 5 peer review identifies 6 blocking HIGH-severity issues and comprehensive feature scope
-815 10:00a ✅ Phase 5 Plan 01 refined with consolidated migration tasks and blocking issue resolutions
-816 10:02a ✅ Phase 5 Plan 02 updated to include YjsSnapshot entity (HIGH-05 fix) and consolidate tasks
-817 10:03a ✅ Phase 5 Plan 03 refactored to remove HIGH-06 same-file conflict; adds D-100 team mention resolution
-818 10:09a ⚖️ Phase 5 Plan 10: Gantt/Calendar architecture refactored to extract critical path algorithm
-819 10:11a ⚖️ Phase 5 Plan 11: Filter and bulk actions consolidated under tasks domain; custom field types increased to 9
-820 " ⚖️ Phase 5 Plan 12: Keyboard shortcuts extracted to pure module; field dependencies split client/server; components reorganized
-821 10:12a ⚖️ Phase 5 Plan 13: Yjs server extracted with auth/persistence; portfolio dashboard and analytics simplified to 4 key charts
-822 10:13a ⚖️ Phase 5 Plan 14: CLI and TUI scope simplified; task-relate extracted; ASCII chart component isolated
-823 10:14a ⚖️ Phase 5 Plan 15: Final completion plan dramatically scoped down; autonomous execution with deferred UAT
+S181 Initial greeting - session just started (May 5 at 9:55 AM)
+S182 Continue from previous session context: Complete Phase 05 planning reviews with focus on test-driven development (Nyquist compliance), ensuring all 10 test files are properly scoped and synchronized across Plan 00 (RED stubs) and Plan 10 (implementation/GREEN). (May 5 at 10:18 AM)
+832 10:33a 🔵 Phase 05 Wave 0 planning review expanded test scope to 10 files; cross-plan consistency applied
+833 10:34a ✅ Plan 10 Task 2 updated to include CalendarView.test.ts; task renamed to include GREEN test responsibility
+S183 Verify whether task management plans include nested comments and threaded reply support (May 5 at 10:34 AM)
+S184 Investigate whether task management plans document nested comments, threading, and task hierarchy — and identify gaps between requirements (CONTEXT.md D-01) and implementation plans (May 5 at 10:56 AM)
+834 10:58a 🔵 Task hierarchy, threading, and workflow requirements confirmed in CONTEXT.md and RESEARCH.md
+835 10:59a 🔵 Task entity already implements parent_id for hierarchy, contradicting plan gaps
+836 " 🔵 Project entity not yet integrated into MikroORM entity graph
+S185 Continue Phase 05 task-management-metrics planning from previous session and create summary documents for completed planning phases (May 5 at 10:59 AM)
+837 11:02a ✅ Plan 01 updated with task_type enum and methodology configuration columns
+838 " ✅ Plan 01 extended with enum constants and Task.taskType property for hierarchy and methodology
+839 " ✅ Plan 01 acceptance criteria updated to include task type, methodology, and enum constants
+840 11:03a ✅ Plan 03 (CommentService) extended with nested comment threading methods
+S186 Competitive feature gap analysis for Phase 5 task-management-metrics plans — identify what Linear, Jira, Asana, Plane, ClickUp, GitHub, and Notion have that Fulcrum Phase 5 is missing or handles weakly (May 5 at 11:09 AM)
+841 11:23a ⚖️ Documented 12 competitive gap features (D-112–D-123) for task management system
+842 " ✅ Added 4 new deferred feature items to planning context
+843 " ✅ Added 3 new columns to tasks table migration for Phase 5 features
+844 11:24a ✅ Added 3 new columns to projects table migration for D-112 and D-117 features
+845 " ✅ Added 2 new tables (task_templates, task_recurrence_rules), pg_trgm extension, and 4 strategic indexes to migration plan
+846 " ✅ Added 5 new acceptance criteria to Phase 5 migration plan
+847 " ✅ Added 2 new entity classes (TaskTemplate, TaskRecurrenceRule) to Phase 5 entity plan
+848 11:25a ✅ Documented complete MikroORM entity specifications for TaskTemplate and TaskRecurrenceRule
+849 " ✅ Added barrel exports for TaskTemplate and TaskRecurrenceRule entities
+850 " ✅ Added 6 new service files to Phase 5 Plan 04 (Services & Business Logic)
+851 11:26a ✅ Documented 13 new service methods in Plan 04 for D-115, D-116, D-122, D-123 features
+852 " ✅ Documented detailed implementation specs for RelationshipService enhancements and TemplateService/RecurrenceService
+853 11:27a ✅ Documented TRPC router definitions for D-115 templates, D-116 recurrence, D-122/D-123 relationships
+854 " ✅ Added templatesRouter and recurrenceRouter imports to Plan 06 (Router Assembly)
+855 " ✅ Mounted templatesRouter and recurrenceRouter in Plan 06 AppRouter
+856 " ✅ Added task ID badge display to TaskDetailPanel section 1 in Plan 07 (UI Components)
+857 11:28a ✅ Added estimation scale picker to TaskDetailPanel section 2 status/metadata bar in Plan 07
+858 " ✅ Added 3 new TaskDetailPanel sections for D-114, D-116, D-123 features in Plan 07
+859 " ✅ Added D-112 task ID display to TaskCard compact and comfortable modes in Plan 08
+860 " ✅ Added quick-create column header button and My Work view toggle to Plan 08 board features
+861 " ✅ Added "My Work" quick filter to Plan 11 QuickFilters component
+862 " ✅ Added "Include archived" toggle and "Export" button to Plan 11 filter toolbar
+863 11:29a ✅ Documented Archive bulk action implementation in Plan 11 BulkBar
+864 " ✅ Added QuickCreateForm.svelte to Plan 12 files_modified for D-113 quick-create component
+865 " ✅ Annotated C key keyboard binding to reference D-113 QuickCreateForm callback in Plan 12
+866 " ✅ Documented comprehensive QuickCreateForm component specification for D-113 in Plan 12
+867 " ✅ Added task ID search capability to Cmd+K CommandPalette in Plan 12
+868 11:30a ✅ Added 3 new CLI command files to Plan 14 for D-119, D-120, D-121 features
+869 " ✅ Added 7 new CLI command behaviors to Plan 14 for competitive gap features
+870 " ✅ Documented comprehensive CLI command implementations for D-119, D-120, D-121, D-112, D-114 in Plan 14
+871 11:31a ✅ Added 3 TUI enhancements for D-112, D-119, D-114 to Plan 14
+872 " ✅ Added RecurrenceConfig and import settings page to Plan 15 files_modified
+873 " ✅ Documented import settings page and RecurrenceConfig component specifications in Plan 15
+874 " 🔵 Verified comprehensive integration of 12 competitive gap features (D-112–D-123) across all Phase 5 planning documents
+875 11:32a ✅ Committed all Phase 5 planning document enrichments with 12 competitive gap features to version control
+876 " 🔵 Phase 5 enrichment task completed: 12 competitive gap features integrated across all planning documents
+879 11:35a 🔵 Phase 5 Planning: 15-Plan Structure with 6-Wave Dependency DAG
+880 " 🔵 HIGH Blocker Resolution Pattern: Explicit Fixes Across All 6 Plans
+881 " 🔵 Three-Surface Parity Implementation: Shared tRPC Service Layer (D-84)
+882 " 🔵 Methodology Gating Pattern: Scrum/Kanban/None Adapts All Surfaces Consistently
+883 " 🔵 Task Hierarchy Implementation: Four-Level Type System with Parent Pointers
 
-Access 1137k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 613k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

@@ -259,7 +259,7 @@
   });
 </script>
 
-<section data-task-board data-project-id={projectId} class="flex h-full flex-col gap-3">
+<section data-task-board data-testid="kanban-board" data-project-id={projectId} class="flex h-full flex-col gap-3">
   <!-- Toolbar -->
   <div class="flex flex-wrap items-center gap-2">
     <!-- My Work toggle -->
@@ -348,6 +348,7 @@
           {@const overLimit = column.wipLimit != null && column.items.length > column.wipLimit}
           <div
             data-board-column
+            data-testid="kanban-column"
             data-column-id={column.id}
             class="flex w-64 shrink-0 flex-col gap-2"
           >

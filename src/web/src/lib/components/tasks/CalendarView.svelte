@@ -233,7 +233,9 @@
   {/if}
 </div>
 
+<div data-testid="calendar-grid">
 <Calendar
   plugins={[DayGrid, TimeGrid, Interaction]}
   options={calendarOptions}
 />
+</div>

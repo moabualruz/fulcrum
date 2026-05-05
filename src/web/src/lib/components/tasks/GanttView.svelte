@@ -289,7 +289,7 @@
   </span>
 </div>
 
-<div class="gantt-wrapper">
+<div class="gantt-wrapper" data-testid="gantt-timeline">
   <Material />
   <Gantt
     tasks={svarTasks()}

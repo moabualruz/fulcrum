@@ -19,7 +19,7 @@ test.describe("Phase 05 — Task Detail", () => {
   test("comments tab shows comment list", async ({ page, fulcrumHome }) => {
     const { seedProject, seedTask } = fulcrumHome;
     const proj = await seedProject("comments-test", "Comments Test");
-    await seedTask({ projectId: proj.id, title: "Commented Task", status: "todo" });
+    await seedTask({ projectId: proj.id, title: "Commented Task", status: "pending" });
 
     await page.goto(`/projects/${proj.id}/board`);
     await page.locator("[data-testid='task-card']").first().click();
@@ -32,7 +32,7 @@ test.describe("Phase 05 — Task Detail", () => {
   test("can submit a new comment", async ({ page, fulcrumHome }) => {
     const { seedProject, seedTask } = fulcrumHome;
     const proj = await seedProject("new-comment-test", "New Comment Test");
-    await seedTask({ projectId: proj.id, title: "Commentable Task", status: "todo" });
+    await seedTask({ projectId: proj.id, title: "Commentable Task", status: "pending" });
 
     await page.goto(`/projects/${proj.id}/board`);
     await page.locator("[data-testid='task-card']").first().click();

@@ -81,6 +81,7 @@
 <!-- min-h-11 = 44px (touch compliance) -->
 <div
   data-task-card
+  data-testid="task-card"
   data-task-id={task.id}
   data-density={density}
   role="button"

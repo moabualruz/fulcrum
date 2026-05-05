@@ -75,6 +75,7 @@
     role="dialog"
     aria-modal="true"
     aria-label="Keyboard shortcuts"
+    data-testid="keyboard-help-overlay"
     class={cn("fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4")}
     onclick={handleBackdrop}
     onkeydown={handleKeydown}

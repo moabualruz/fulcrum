@@ -314,12 +314,12 @@
   {:else if comments.length === 0}
     <div class="task-comments__empty">No comments yet. Start the conversation.</div>
   {:else}
-    <ul class="task-comments__list">
+    <ul class="task-comments__list" data-testid="comment-list">
       {#each comments as comment (comment.id)}
         {@const isResolved = comment.resolvedAt != null}
         {@const isExpanded = expandedResolved.has(comment.id)}
 
-        <li class="task-comments__comment" data-resolved={isResolved}>
+        <li class="task-comments__comment" data-testid="comment-item" data-resolved={isResolved}>
           {#if isResolved && !isExpanded}
             <button
               class="task-comments__resolved-header"
@@ -522,7 +522,7 @@
 
   <!-- New comment editor -->
   <div class="task-comments__new-comment">
-    <div class="task-comments__editor-wrapper">
+    <div class="task-comments__editor-wrapper" data-testid="comment-input">
       {#if editor}
         <EditorContent {editor} />
       {:else}
@@ -532,6 +532,7 @@
     <div class="task-comments__editor-actions">
       <button
         class="task-comments__submit-btn"
+        data-testid="comment-submit"
         disabled={submitting || isEmptyDoc(editorContent)}
         onclick={() => submitComment(editorContent)}
         type="button"

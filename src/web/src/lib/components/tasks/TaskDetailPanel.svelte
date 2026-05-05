@@ -320,6 +320,7 @@
         {:else}
           <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
           <h1
+            data-testid="task-detail-title"
             class="task-detail-panel__title"
             onclick={() => { editingTitle = true; titleDraft = task?.title ?? ""; }}
             onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { editingTitle = true; } }}
@@ -339,6 +340,7 @@
         <div class="task-detail-panel__meta-item">
           <span class="task-detail-panel__meta-label">Status</span>
           <span
+            data-testid="task-detail-status"
             class="task-detail-panel__status-badge"
             style="background: {STATUS_COLORS[task.status ?? ''] ?? '#94a3b8'}20; color: {STATUS_COLORS[task.status ?? ''] ?? '#94a3b8'}; border-color: {STATUS_COLORS[task.status ?? ''] ?? '#94a3b8'}40"
           >
@@ -412,7 +414,7 @@
       <!-- SECTION 3: Description (TipTap placeholder — full collab wiring in Plan 13) -->
       <section class="task-detail-panel__section">
         <h2 class="task-detail-panel__section-title">Description</h2>
-        <div class="task-detail-panel__description">
+        <div class="task-detail-panel__description" data-testid="task-detail-description">
           {#if task.descriptionText}
             <p>{task.descriptionText}</p>
           {:else}
@@ -532,6 +534,7 @@
           <button
             class="task-detail-panel__tab"
             class:active={activeTab === "comments"}
+            data-testid="tab-comments"
             role="tab"
             aria-selected={activeTab === "comments"}
             onclick={() => { activeTab = "comments"; }}

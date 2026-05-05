@@ -4,11 +4,11 @@ test.describe("Phase 05 — Task Views", () => {
   test("kanban board view renders columns for each status", async ({ page, fulcrumHome }) => {
     const { seedProject, seedTask } = fulcrumHome;
     const proj = await seedProject("views-test", "Views Test");
-    await seedTask({ projectId: proj.id, title: "Task Backlog", status: "backlog" });
-    await seedTask({ projectId: proj.id, title: "Task Todo", status: "todo" });
+    await seedTask({ projectId: proj.id, title: "Task Pending", status: "pending" });
     await seedTask({ projectId: proj.id, title: "Task In Progress", status: "in_progress" });
-    await seedTask({ projectId: proj.id, title: "Task In Review", status: "in_review" });
-    await seedTask({ projectId: proj.id, title: "Task Done", status: "done" });
+    await seedTask({ projectId: proj.id, title: "Task Blocked", status: "blocked" });
+    await seedTask({ projectId: proj.id, title: "Task Completed", status: "completed" });
+    await seedTask({ projectId: proj.id, title: "Task Cancelled", status: "cancelled" });
 
     await page.goto(`/projects/${proj.id}/board`);
     await expect(page.locator("[data-testid='kanban-board']")).toBeVisible();
@@ -20,9 +20,9 @@ test.describe("Phase 05 — Task Views", () => {
   test("list view renders table with task rows", async ({ page, fulcrumHome }) => {
     const { seedProject, seedTask } = fulcrumHome;
     const proj = await seedProject("list-test", "List Test");
-    await seedTask({ projectId: proj.id, title: "List Task A", status: "todo" });
+    await seedTask({ projectId: proj.id, title: "List Task A", status: "pending" });
     await seedTask({ projectId: proj.id, title: "List Task B", status: "in_progress" });
-    await seedTask({ projectId: proj.id, title: "List Task C", status: "done" });
+    await seedTask({ projectId: proj.id, title: "List Task C", status: "completed" });
 
     await page.goto(`/projects/${proj.id}/list`);
     await expect(page.locator("[data-testid='task-list-table']")).toBeVisible();
@@ -32,7 +32,7 @@ test.describe("Phase 05 — Task Views", () => {
   test("gantt view renders timeline", async ({ page, fulcrumHome }) => {
     const { seedProject, seedTask } = fulcrumHome;
     const proj = await seedProject("gantt-test", "Gantt Test");
-    await seedTask({ projectId: proj.id, title: "Gantt Task 1", status: "todo" });
+    await seedTask({ projectId: proj.id, title: "Gantt Task 1", status: "pending" });
     await seedTask({ projectId: proj.id, title: "Gantt Task 2", status: "in_progress" });
 
     await page.goto(`/projects/${proj.id}/gantt`);
@@ -42,7 +42,7 @@ test.describe("Phase 05 — Task Views", () => {
   test("calendar view renders calendar grid", async ({ page, fulcrumHome }) => {
     const { seedProject, seedTask } = fulcrumHome;
     const proj = await seedProject("cal-test", "Calendar Test");
-    await seedTask({ projectId: proj.id, title: "Calendar Task", status: "todo" });
+    await seedTask({ projectId: proj.id, title: "Calendar Task", status: "pending" });
 
     await page.goto(`/projects/${proj.id}/calendar`);
     await expect(page.locator("[data-testid='calendar-grid']")).toBeVisible();

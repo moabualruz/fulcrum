@@ -294,7 +294,7 @@
   }
 </script>
 
-<section data-task-list-view data-project-id={projectId} class="flex h-full flex-col gap-3">
+<section data-task-list-view data-testid="task-list-table" data-project-id={projectId} class="flex h-full flex-col gap-3">
   <!-- Toolbar -->
   <div class="flex flex-wrap items-center gap-2">
     <!-- Column visibility (D-15) -->
@@ -368,6 +368,7 @@
             {@const row = rows[vRow.index]}
             <tr
               data-task-row
+              data-testid="task-row"
               data-task-id={row.original.id}
               data-index={vRow.index}
               class={cn(
