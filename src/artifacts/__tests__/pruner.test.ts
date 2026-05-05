@@ -139,7 +139,9 @@ describe("pruneArtifacts", () => {
           throw new Error("unused");
         },
         exists: async () => true,
-        delete: async (path: string) => calls.push(`delete:${path}`),
+          delete: async (path: string) => {
+            calls.push(`delete:${path}`);
+          },
       },
     };
 
