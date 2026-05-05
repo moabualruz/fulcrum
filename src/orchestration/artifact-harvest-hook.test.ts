@@ -60,6 +60,43 @@ describe("matchArtifactGlob", () => {
   });
 });
 
+describe("DEFAULT_ARTIFACT_GLOB — configured vs default", () => {
+  test("DEFAULT_ARTIFACT_GLOB is a non-empty string", () => {
+    expect(typeof DEFAULT_ARTIFACT_GLOB).toBe("string");
+    expect(DEFAULT_ARTIFACT_GLOB.length).toBeGreaterThan(0);
+  });
+
+  test("configured glob overrides DEFAULT_ARTIFACT_GLOB when provided", async () => {
+    const worktree = await mkdtemp(join(tmpdir(), "configured-glob-"));
+    await writeFile(join(worktree, "report.html"), "<html/>");
+    await mkdir(join(worktree, "dist"), { recursive: true });
+    await writeFile(join(worktree, "dist", "bundle.js"), "code");
+
+    // Only *.html should match — not the dist/ default
+    const configuredGlob = "*.html";
+    const matches = await matchArtifactGlob(worktree, configuredGlob);
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toContain("report.html");
+  });
+
+  test("DEFAULT_ARTIFACT_GLOB catches dist/**, build/**, *.patch, *.diff", async () => {
+    const worktree = await mkdtemp(join(tmpdir(), "default-glob-"));
+    await mkdir(join(worktree, "dist"), { recursive: true });
+    await mkdir(join(worktree, "build"), { recursive: true });
+    await writeFile(join(worktree, "dist", "out.js"), "js");
+    await writeFile(join(worktree, "build", "out.wasm"), "wasm");
+    await writeFile(join(worktree, "changes.patch"), "patch");
+    await writeFile(join(worktree, "workspace.diff"), "diff");
+
+    const matches = await matchArtifactGlob(worktree, DEFAULT_ARTIFACT_GLOB);
+    const bases = matches.map((m) => m.split("/").pop()!).sort();
+    expect(bases).toContain("out.js");
+    expect(bases).toContain("out.wasm");
+    expect(bases).toContain("changes.patch");
+    expect(bases).toContain("workspace.diff");
+  });
+});
+
 describe("extractArtifacts", () => {
   let worktree: string;
   let workspaceRoot: string;

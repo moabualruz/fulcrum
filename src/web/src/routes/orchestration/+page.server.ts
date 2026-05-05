@@ -37,6 +37,23 @@ export const load: PageServerLoad = ({ url, locals }) => {
 };
 
 export const actions: Actions = {
+  dispatch: async ({ request }) => {
+    const form = await request.formData();
+    const taskId = (form.get("task_id") as string | null) ?? "";
+    if (!taskId) return { success: false, message: "task_id required" };
+    // Dispatch via canonical tRPC path — no raw SQL
+    // Import is deferred to avoid server-side bundling issues
+    const { createLocalCaller } = await import("$lib/server/trpc-caller");
+    try {
+      const caller = await createLocalCaller();
+      const result = await caller.orchestration.dispatchRun({ taskId });
+      return actionOk(`Dispatched run ${result.runId} (${result.state})`);
+    } catch (err) {
+      const msg = (err as Error).message ?? "Dispatch failed";
+      return { success: false, message: msg };
+    }
+  },
+
   cancel: async ({ request }) => {
     const form = await request.formData();
     const id = (form.get("run_id") as string | null) ?? "";

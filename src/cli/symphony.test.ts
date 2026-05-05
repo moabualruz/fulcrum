@@ -35,6 +35,7 @@ function stubCaller(overrides: Partial<SymphonyCaller> = {}): SymphonyCaller {
     cancelRun: async () => ({ success: true }),
     retryRun: async () => ({ success: true }),
     syncDaily: async () => ({ synced: 3, errors: 0 }),
+    dispatchRun: async () => ({ runId: "r-stub", state: "unclaimed", agent: "codex", sandboxMode: "noSandbox" }),
     ...overrides,
   };
 }

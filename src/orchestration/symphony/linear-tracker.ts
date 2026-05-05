@@ -1,9 +1,13 @@
 /**
  * Linear-backed Symphony tracker adapter.
  *
+ * INGEST-ONLY in Phase 3 (D-04): Linear is a task ingestion/update path
+ * only. Symphony dispatch uses the native Fulcrum tracker exclusively.
+ * External dispatch-capable adapter parity is deferred to a future version (D-05).
+ *
  * Gated behind FULCRUM_FEATURES=connector-linear (C1/C2).
  * Wraps LinearConnector to implement TrackerAdapter interface.
- * Bidirectional sync: Linear issues → CandidateIssue shape;
+ * Bidirectional sync: Linear issues → CandidateIssue shape (ingest-only);
  * Fulcrum task state changes → Linear issue state updates.
  * Conflict strategy: last-write-wins with updatedAt comparison.
  *

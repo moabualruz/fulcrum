@@ -111,4 +111,25 @@ describe("/doctor +page.server.ts", () => {
     const memory = checks.find((c: { subsystem: string }) => c.subsystem === "memory");
     expect(memory?.status).toBe("ok");
   });
+
+  test("sandcastle check: sandbox-docker flag with absent docker yields fail/warn status", async () => {
+    // Set sandbox-docker flag but docker is unavailable in CI
+    const origFeatures = process.env["FULCRUM_FEATURES"];
+    process.env["FULCRUM_FEATURES"] = "sandbox-docker";
+    // The check calls commandExists internally; in CI docker is absent → error status
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 10}`);
+    const checks = await mod.runAll();
+    const sandcastle = checks.find((c: { subsystem: string }) => c.subsystem === "sandcastle");
+    // Status is fail when sandbox-docker is enabled but docker daemon is absent
+    expect(sandcastle?.status).toMatch(/fail|warn/);
+    // Must mention sandbox-docker in the message or recovery
+    const combined = `${sandcastle?.message ?? ""} ${sandcastle?.recovery ?? ""}`;
+    expect(combined).toContain("sandbox-docker");
+    // Restore
+    if (origFeatures === undefined) {
+      delete process.env["FULCRUM_FEATURES"];
+    } else {
+      process.env["FULCRUM_FEATURES"] = origFeatures;
+    }
+  });
 });

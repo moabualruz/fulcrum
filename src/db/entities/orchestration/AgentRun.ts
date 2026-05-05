@@ -24,10 +24,10 @@ import { Org } from "../auth/Org.ts";
 import { Task } from "../tasks/Task.ts";
 import { SearchDocument } from "../search/SearchDocument.ts";
 import { AgentRunRepository } from "../../repositories/orchestration/AgentRunRepository.ts";
-import type { AgentRunOrchestrationState } from "./states.ts";
+import type { AgentRunOrchestrationState, AttemptLifecycleState } from "./states.ts";
 
 export { AGENT_RUN_ORCHESTRATION_STATES } from "./states.ts";
-export type { AgentRunOrchestrationState } from "./states.ts";
+export type { AgentRunOrchestrationState, AttemptLifecycleState } from "./states.ts";
 
 @Entity({ tableName: "agent_runs", repository: () => AgentRunRepository })
 @Index({
@@ -58,7 +58,12 @@ export class AgentRun {
     | "agentVersion"
     | "transcriptTruncated"
     | "claimedBy"
-    | "searchDoc";
+    | "searchDoc"
+    | "attemptLifecycleState"
+    | "lastCodexTimestamp"
+    | "threadId"
+    | "turnId"
+    | "sessionId";
 
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
@@ -134,6 +139,45 @@ export class AgentRun {
 
   @Property({ type: "string", fieldName: "claimed_by", nullable: true })
   claimedBy?: string;
+
+  /**
+   * Run-attempt lifecycle state (SYM-09).
+   * Tracks internal progress within a single attempt, distinct from orchestration state.
+   * Values: preparing_workspace | building_prompt | launching_agent_process |
+   *         initializing_session | streaming_turn | finishing |
+   *         succeeded | failed | timed_out | stalled | cancelled
+   */
+  @Property({ type: "string", fieldName: "attempt_lifecycle_state", nullable: true })
+  attemptLifecycleState?: AttemptLifecycleState;
+
+  /**
+   * Last Codex app-server event timestamp (SYM-19).
+   * Used as the primary stall cutoff reference; stall scanner falls back
+   * to startedAt when this is null (no Codex events received yet).
+   */
+  @Property({ type: "datetime", fieldName: "last_codex_timestamp", nullable: true })
+  lastCodexTimestamp?: Date;
+
+  /**
+   * Codex app-server thread_id (SYM-20, SYM-21).
+   * Persisted for session resume via thread/resume.
+   */
+  @Property({ type: "string", fieldName: "thread_id", nullable: true })
+  threadId?: string;
+
+  /**
+   * Codex app-server turn_id (SYM-20).
+   * Latest turn identifier from the app-server protocol.
+   */
+  @Property({ type: "string", fieldName: "turn_id", nullable: true })
+  turnId?: string;
+
+  /**
+   * Codex app-server session_id (SYM-20).
+   * Session identifier for structured log context.
+   */
+  @Property({ type: "string", fieldName: "session_id", nullable: true })
+  sessionId?: string;
 
   @ManyToOne(() => SearchDocument, { fieldName: "search_doc_id", nullable: true })
   searchDoc?: SearchDocument;

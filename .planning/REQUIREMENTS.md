@@ -71,42 +71,42 @@
 
 ### Symphony Orchestration — Pillar 3 (SYM)
 
-- [ ] **SYM-01**: Workflow path selection supports explicit runtime path and cwd default (`WORKFLOW.md`)
-- [ ] **SYM-02**: `WORKFLOW.md` loader with YAML front matter + prompt body split
-- [ ] **SYM-03**: Typed config layer with defaults and `$VAR` env resolution + `~` path expansion
-- [ ] **SYM-04**: Dynamic `WORKFLOW.md` watch/reload/re-apply — invalid reload keeps last good config + emits error
-- [ ] **SYM-05**: Fulcrum native tracker adapter implements all 3 REQUIRED operations with full Issue model (all 12 fields including description, branch_name, url, labels, blocked_by as `{id, identifier, state}` objects)
-- [ ] **SYM-06**: External tracker adapters (Linear, GitHub Issues) available as ingest-only connectors
-- [ ] **SYM-07**: Poll loop tick sequence: reconcile → validate → fetch → sort → dispatch → notify
-- [ ] **SYM-08**: Issue orchestration states match spec §7.1: Unclaimed → Claimed → Running/RetryQueued → Released
-- [ ] **SYM-09**: Multi-turn continuation: normal worker exit → 1000ms fixed-delay continuation retry → re-check tracker state → re-dispatch on same thread if still active
-- [ ] **SYM-10**: Failure-driven retry: `min(10000 * 2^(attempt-1), max_retry_backoff_ms)` with configurable cap
-- [ ] **SYM-11**: Stall detection checks `last_codex_timestamp` first (if any event seen), falls back to `started_at`. Kills worker + queues retry.
-- [ ] **SYM-12**: Workspace safety: cwd == workspace_path enforced before agent launch, path inside root, key sanitized `[A-Za-z0-9._-]`
-- [ ] **SYM-13**: All 4 lifecycle hooks (after_create, before_run, after_run, before_remove) with timeout config
-- [ ] **SYM-14**: Strict prompt rendering — unknown variables/filters MUST fail. `issue` object includes all 12 normalized fields.
-- [ ] **SYM-15**: Candidate sorting: priority asc → created_at oldest → identifier lexicographic (not UUID)
-- [ ] **SYM-16**: Blocker rule: Todo state (specifically) with non-terminal blockers = ineligible
-- [ ] **SYM-17**: Per-state concurrency limits via `max_concurrent_agents_by_state` config
-- [ ] **SYM-18**: Reconciliation Part B: per-tick tracker state refresh for running issues — terminal → stop + cleanup, non-active → stop, active → update snapshot
-- [ ] **SYM-19**: Startup terminal workspace cleanup sweep
-- [ ] **SYM-20**: Coding-agent app-server subprocess client — JSON line protocol, session startup, thread/turn ID extraction, read/turn timeouts
-- [ ] **SYM-21**: Codex launch command config (`codex.command`, default `codex app-server`)
-- [ ] **SYM-22**: Structured logs with `issue_id`, `issue_identifier`, and `session_id` on every log entry
-- [ ] **SYM-23**: Token accounting — cumulative totals from `thread/tokenUsage/updated`, no double-counting, keyed by thread_id
-- [ ] **SYM-24**: Conformance tests pass for all §17.1-17.7 categories
-- [ ] **SYM-25**: HTTP server extension (GET /, /api/v1/state, /api/v1/<issue>, POST /api/v1/refresh)
-- [ ] **SYM-26**: Approval/sandbox posture documented per §10.5 REQUIRED
-- [ ] **SYM-27**: Run attempt lifecycle states implemented: PreparingWorkspace → BuildingPrompt → LaunchingAgentProcess → InitializingSession → StreamingTurn → Finishing → terminal
+- [x] **SYM-01**: Workflow path selection supports explicit runtime path and cwd default (`WORKFLOW.md`)
+- [x] **SYM-02**: `WORKFLOW.md` loader with YAML front matter + prompt body split
+- [x] **SYM-03**: Typed config layer with defaults and `$VAR` env resolution + `~` path expansion
+- [x] **SYM-04**: Dynamic `WORKFLOW.md` watch/reload/re-apply — invalid reload keeps last good config + emits error
+- [x] **SYM-05**: Fulcrum native tracker adapter implements all 3 REQUIRED operations with full Issue model (all 12 fields including description, branch_name, url, labels, blocked_by as `{id, identifier, state}` objects)
+- [x] **SYM-06**: External tracker adapters (Linear, GitHub Issues) available as ingest-only connectors
+- [x] **SYM-07**: Poll loop tick sequence: reconcile → validate → fetch → sort → dispatch → notify
+- [x] **SYM-08**: Issue orchestration states match spec §7.1: Unclaimed → Claimed → Running/RetryQueued → Released
+- [x] **SYM-09**: Multi-turn continuation: normal worker exit → 1000ms fixed-delay continuation retry → re-check tracker state → re-dispatch on same thread if still active
+- [x] **SYM-10**: Failure-driven retry: `min(10000 * 2^(attempt-1), max_retry_backoff_ms)` with configurable cap
+- [x] **SYM-11**: Stall detection checks `last_codex_timestamp` first (if any event seen), falls back to `started_at`. Kills worker + queues retry.
+- [x] **SYM-12**: Workspace safety: cwd == workspace_path enforced before agent launch, path inside root, key sanitized `[A-Za-z0-9._-]`
+- [x] **SYM-13**: All 4 lifecycle hooks (after_create, before_run, after_run, before_remove) with timeout config
+- [x] **SYM-14**: Strict prompt rendering — unknown variables/filters MUST fail. `issue` object includes all 12 normalized fields.
+- [x] **SYM-15**: Candidate sorting: priority asc → created_at oldest → identifier lexicographic (not UUID)
+- [x] **SYM-16**: Blocker rule: Todo state (specifically) with non-terminal blockers = ineligible
+- [x] **SYM-17**: Per-state concurrency limits via `max_concurrent_agents_by_state` config
+- [x] **SYM-18**: Reconciliation Part B: per-tick tracker state refresh for running issues — terminal → stop + cleanup, non-active → stop, active → update snapshot
+- [x] **SYM-19**: Startup terminal workspace cleanup sweep
+- [x] **SYM-20**: Coding-agent app-server subprocess client — JSON line protocol, session startup, thread/turn ID extraction, read/turn timeouts
+- [x] **SYM-21**: Codex launch command config (`codex.command`, default `codex app-server`)
+- [x] **SYM-22**: Structured logs with `issue_id`, `issue_identifier`, and `session_id` on every log entry
+- [x] **SYM-23**: Token accounting — cumulative totals from `thread/tokenUsage/updated`, no double-counting, keyed by thread_id
+- [x] **SYM-24**: Conformance tests pass for all §17.1-17.7 categories
+- [x] **SYM-25**: HTTP server extension (GET /, /api/v1/state, /api/v1/<issue>, POST /api/v1/refresh)
+- [x] **SYM-26**: Approval/sandbox posture documented per §10.5 REQUIRED
+- [x] **SYM-27**: Run attempt lifecycle states implemented: PreparingWorkspace → BuildingPrompt → LaunchingAgentProcess → InitializingSession → StreamingTurn → Finishing → terminal
 
 ### Sandcastle — Pillar 4 (SND)
 
-- [ ] **SND-01**: noSandbox + claudeCode dispatches task and writes agent_runs row end-to-end
-- [ ] **SND-02**: Artifact harvest via copyFileOut produces artifact entity from sandbox output
-- [ ] **SND-03**: Adapter-swap test: AgentRun interface unchanged across providers
-- [ ] **SND-04**: Doctor warns if Docker absent when sandbox-docker flag enabled
-- [ ] **SND-05**: Session JSONL capture and resumeSession tested
-- [ ] **SND-06**: Web + CLI + TUI can all dispatch agent runs
+- [x] **SND-01**: noSandbox + claudeCode dispatches task and writes agent_runs row end-to-end
+- [x] **SND-02**: Artifact harvest via copyFileOut produces artifact entity from sandbox output
+- [x] **SND-03**: Adapter-swap test: AgentRun interface unchanged across providers
+- [x] **SND-04**: Doctor warns if Docker absent when sandbox-docker flag enabled
+- [x] **SND-05**: Session JSONL capture and resumeSession tested
+- [x] **SND-06**: Web + CLI + TUI can all dispatch agent runs
 
 ### Router + Skills — Pillar 5 (RTR)
 

@@ -7,6 +7,7 @@ import type { EventRepository } from "../../db/repositories/core/EventRepository
 export const DEFAULT_HOOK_TIMEOUT_MS = 60_000;
 
 export type LifecycleHookName =
+  | "after_create"
   | "before_run"
   | "after_run"
   | "before_remove"
@@ -35,6 +36,7 @@ export type LifecycleHooks = Partial<Record<LifecycleHookName, LifecycleHook>>;
 
 export interface LifecycleHookTimeoutConfig {
   hooks_timeout_ms?: number;
+  after_create_timeout_ms?: number;
   before_run_timeout_ms?: number;
   after_run_timeout_ms?: number;
   before_remove_timeout_ms?: number;

@@ -2,22 +2,22 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-last_updated: "2026-05-04T21:22:44.628Z"
+status: Phase complete — ready for verification
+last_updated: "2026-05-05T00:52:08.945Z"
 progress:
   total_phases: 10
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 24
-  completed_plans: 18
-  percent: 75
+  completed_plans: 24
+  percent: 100
 ---
 
 # Planning State
 
 ## Current Position
 
-Phase: 02 (bug-fixes-foundation) — COMPLETE
-Plan: 8 of 8
+Phase: 03 (symphony-sandcastle) — COMPLETE
+Plan: 6 of 6 (all complete)
 
 - **Phase**: 02-bug-fixes-foundation
 - **Plan**: 8 plans created
@@ -54,3 +54,16 @@ Plan: 8 of 8
 - [Phase 02-08]: Local dev auto-session is excluded from /auth/*; /auth/auto-session keeps the explicit seeded-session redirect.
 - [Phase 02-08]: BUG-17 is repo-hygiene only under the milestone branch policy; phase execution must not push `main`. Treat future main-sync work as final milestone merge hygiene, not per-phase execution.
 - [Phase 02]: Final verifier passed after root `bun run ci` passed on 2026-05-04; completion blockers closed.
+- [Phase ?]: SymphonyIssueSchema labels normalize lowercase via Zod transform (03-02)
+- [Phase ?]: TrackerBlockerResolutionError thrown on any unresolved blocker ID before candidate filtering (03-02)
+- [Phase ?]: [Phase 03-02]: External trackers are ingest-only; native Fulcrum tracker is sole Symphony dispatch source (D-04)
+- [Phase ?]: [Phase 03-02]: identifier and branch_name use task.id stable stub until Pillar 6 named identifiers land
+- [Phase 03-04]: Response ID matching in CodexAppServerClient accepts any response carrying thread.id data (single in-flight request per process)
+- [Phase 03-04]: TokenUsageAggregator.updateCumulative() replaces stored total per thread_id — no double-counting (D-22)
+- [Phase 03-04]: logSymphonyEvent() catches all sink errors — observability must not crash orchestration (§17.6)
+- [Phase 03-05]: resolveAgentRunConfig merges WORKFLOW.md override fields over AgentProfile defaults; UnknownAgentError for unsupported agent names; Codex default (D-10, D-11)
+- [Phase 03-05]: session-resume result exposes resumeVia and capability — unsupported profiles cannot silently pretend resume happened (D-21)
+- [Phase 03-05]: doctor checkSandcastle() calls sandboxProviderDoctorChecks(); errors name the missing provider flag (e.g. sandbox-docker); runAll exported for test reuse
+- [Phase 03-06]: HTTP server binds 127.0.0.1 by default; port:0 uses ephemeral binding; wraps createHttpApiRoutes (SYM-25)
+- [Phase 03-06]: dispatchRun tRPC procedure creates AgentRun via MikroORM EM; sandboxMode 'noSandbox' is human alias for DB value 'host' (D-12)
+- [Phase 03-06]: CLI SymphonyCaller.dispatchRun required; 'runs dispatch <taskId>' added; TUI dispatch() optional in caller interface; Web dispatch action uses tRPC local caller (SND-06)

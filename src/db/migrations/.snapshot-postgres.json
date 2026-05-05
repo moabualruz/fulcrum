@@ -611,6 +611,22 @@
           "enumItems": [],
           "mappedType": "integer"
         },
+        "attempt_lifecycle_state": {
+          "name": "attempt_lifecycle_state",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
         "claimed_by": {
           "name": "claimed_by",
           "type": "varchar(255)",
@@ -674,6 +690,22 @@
           "comment": null,
           "enumItems": [],
           "mappedType": "integer"
+        },
+        "last_codex_timestamp": {
+          "name": "last_codex_timestamp",
+          "type": "timestamptz(6)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
         },
         "last_error_kind": {
           "name": "last_error_kind",
@@ -786,6 +818,22 @@
           "enumItems": [],
           "mappedType": "uuid"
         },
+        "session_id": {
+          "name": "session_id",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
         "started_at": {
           "name": "started_at",
           "type": "timestamptz(6)",
@@ -834,6 +882,22 @@
           "enumItems": [],
           "mappedType": "uuid"
         },
+        "thread_id": {
+          "name": "thread_id",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
         "token_used": {
           "name": "token_used",
           "type": "int",
@@ -881,6 +945,22 @@
           "comment": null,
           "enumItems": [],
           "mappedType": "boolean"
+        },
+        "turn_id": {
+          "name": "turn_id",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
         },
         "workspace_diff_path": {
           "name": "workspace_diff_path",
@@ -967,6 +1047,7 @@
           "columnNames": [
             "org_id",
             "orchestration_state",
+            "last_codex_timestamp",
             "started_at"
           ],
           "composite": true,
@@ -974,7 +1055,7 @@
           "keyName": "agent_runs_stall_scan",
           "primary": false,
           "unique": false,
-          "expression": "CREATE INDEX agent_runs_stall_scan ON public.agent_runs USING btree (org_id, orchestration_state, started_at) WHERE ((orchestration_state)::text = 'running'::text)"
+          "expression": "CREATE INDEX agent_runs_stall_scan ON public.agent_runs USING btree (org_id, orchestration_state, last_codex_timestamp, started_at) WHERE ((orchestration_state)::text = 'running'::text)"
         },
         {
           "columnNames": [
@@ -989,6 +1070,12 @@
         }
       ],
       "checks": [
+        {
+          "name": "agent_runs_attempt_lifecycle_state_check",
+          "expression": "attempt_lifecycle_state IS NULL) OR ((attempt_lifecycle_state = ANY (ARRAY['preparing_workspace'::character varying, 'building_prompt'::character varying, 'launching_agent_process'::character varying, 'initializing_session'::character varying, 'streaming_turn'::character varying, 'finishing'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'timed_out'::character varying, 'stalled'::character varying, 'cancelled'::character varying][]))",
+          "definition": "CHECK (((attempt_lifecycle_state IS NULL) OR ((attempt_lifecycle_state)::text = ANY ((ARRAY['preparing_workspace'::character varying, 'building_prompt'::character varying, 'launching_agent_process'::character varying, 'initializing_session'::character varying, 'streaming_turn'::character varying, 'finishing'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'timed_out'::character varying, 'stalled'::character varying, 'cancelled'::character varying])::text[]))))",
+          "columnName": "attempt_lifecycle_state"
+        },
         {
           "name": "agent_runs_claimed_task_id_check",
           "expression": "(orchestration_state <> 'claimed'::text) OR (task_id IS NOT NULL)",

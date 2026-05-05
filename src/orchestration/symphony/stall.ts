@@ -52,16 +52,30 @@ export async function scanForStalledRuns(
     "../../db/entities/orchestration/AgentRun.ts"
   );
   const now = opts.now?.() ?? new Date();
-  const startedBefore = new Date(now.getTime() - config.stallTimeoutMs);
+  const cutoff = new Date(now.getTime() - config.stallTimeoutMs);
   const fork = em.fork();
 
+  // DB-level filter on startedAt (preserves index usage + existing test contract).
+  // This is the broad net: all runs whose startedAt predates the cutoff.
   const runs = await fork.find(AgentRun, {
     org: orgId,
     orchestrationState: "running",
-    startedAt: { $lt: startedBefore },
+    startedAt: { $lt: cutoff },
   } as never);
 
-  for (const run of runs) {
+  // In-process refinement for lastCodexTimestamp (SYM-19):
+  // If lastCodexTimestamp is set and is more recent than the cutoff,
+  // the run has had recent Codex activity and is NOT stalled.
+  const stalledRuns = (runs as AgentRun[]).filter((run) => {
+    const lastCodex = (run as AgentRun & { lastCodexTimestamp?: Date }).lastCodexTimestamp;
+    if (lastCodex && lastCodex >= cutoff) {
+      // Run has recent Codex activity — not stalled
+      return false;
+    }
+    return true;
+  });
+
+  for (const run of stalledRuns) {
     await onStalled(
       em,
       toRunRef(run as AgentRun, orgId),
@@ -71,7 +85,7 @@ export async function scanForStalledRuns(
     );
   }
 
-  return runs.length;
+  return stalledRuns.length;
 }
 
 export function startStallScanner(
