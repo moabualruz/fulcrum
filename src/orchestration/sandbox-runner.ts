@@ -18,6 +18,8 @@ import {
   extractArtifacts,
   DEFAULT_ARTIFACT_GLOB,
 } from "./artifact-harvest-hook.ts";
+
+export { DEFAULT_ARTIFACT_GLOB };
 import {
   harvestArtifacts,
   type HarvestArtifactDeps,
