@@ -5,6 +5,7 @@ import type {
   RepoSyncRemoteQueue,
   RepoSyncRemoteRepositories,
 } from "../repos/workers/sync-remote.ts";
+import type { NotificationDeliveryRepositories, NotificationDeliveryWorkerOptions } from "../notifications/delivery-worker.ts";
 
 export interface QueueTaskDefinition<TPayload = unknown> {
   name: string;
@@ -32,6 +33,13 @@ export interface RepoWorkerBootstrapDeps {
   registerCron?: (cron: CronDefinition) => void;
 }
 
+export interface NotificationWorkerBootstrapDeps {
+  registry: WorkerRegistry;
+  repositories: NotificationDeliveryRepositories;
+  options?: NotificationDeliveryWorkerOptions;
+  registerCron?: (cron: CronDefinition) => void;
+}
+
 export function defineTask<TPayload>(
   definition: QueueTaskDefinition<TPayload>,
 ): QueueTaskDefinition<TPayload> {
@@ -55,4 +63,14 @@ export async function registerRepoWorkerBootstrap(deps: RepoWorkerBootstrapDeps)
   remote.registerRepoSyncRemoteWorkerTask(deps.registry, deps.remoteRepositories, deps.remoteOptions);
   remote.registerRepoLruWarmupWorkerTask(deps.registry, deps.remoteRepositories, deps.remoteQueue);
   deps.registerCron?.(remote.REPO_LRU_WARMUP_CRON);
+}
+
+export async function registerNotificationWorkerBootstrap(deps: NotificationWorkerBootstrapDeps): Promise<void> {
+  const [delivery, retry] = await Promise.all([
+    import("../notifications/delivery-worker.ts"),
+    import("../notifications/delivery-retry.ts"),
+  ]);
+
+  delivery.registerNotificationDeliveryWorkerTasks(deps.registry, deps.repositories, deps.options);
+  deps.registerCron?.(retry.NOTIFICATION_DELIVERY_RETRY_CRON);
 }
