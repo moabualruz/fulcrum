@@ -27,7 +27,11 @@ export class MetricsCache {
     | "pointsCompleted"
     | "pointsRemaining"
     | "wipCount"
-    | "updatedAt";
+    | "updatedAt"
+    | "scopeType"
+    | "pointsTotal"
+    | "tasksTotal"
+    | "statusCounts";
 
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
@@ -70,4 +74,17 @@ export class MetricsCache {
     onUpdate: () => new Date(),
   })
   updatedAt!: Date;
+
+  // Phase 5 columns added by Migration20260505100000 (HIGH-01 fix)
+  @Property({ type: "string", fieldName: "scope_type", default: "sprint" })
+  scopeType: "sprint" | "project" | "epic" | "workspace" = "sprint";
+
+  @Property({ type: "integer", fieldName: "points_total", default: 0 })
+  pointsTotal: number = 0;
+
+  @Property({ type: "integer", fieldName: "tasks_total", default: 0 })
+  tasksTotal: number = 0;
+
+  @Property({ type: "json", fieldName: "status_counts", nullable: true })
+  statusCounts: Record<string, number> | null = null;
 }

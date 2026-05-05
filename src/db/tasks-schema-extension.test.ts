@@ -93,10 +93,11 @@ describe("tasks schema extension", () => {
       "started",
     );
     expect(taskEntities.TASK_STATUS_CATEGORIES).toEqual([
+      "backlog",
       "unstarted",
       "started",
       "completed",
-      "cancelled",
+      "canceled",
     ]);
     expect(taskEntities.TaskStatus).toBeDefined();
 

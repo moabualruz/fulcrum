@@ -90,7 +90,17 @@ export class Task {
     | "dependencies"
     | "externalId"
     | "repo"
-    | "deletedAt";
+    | "deletedAt"
+    | "dueDate"
+    | "startDate"
+    | "startedAt"
+    | "assigneeId"
+    | "labels"
+    | "projectId"
+    | "taskType"
+    | "sequenceNumber"
+    | "archivedAt"
+    | "templateId";
 
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
@@ -180,4 +190,35 @@ export class Task {
 
   @Property({ type: "datetime", fieldName: "deleted_at", nullable: true })
   deletedAt: Date | null = null;
+
+  // Phase 5 columns added by Migration20260505100000
+  @Property({ type: "date", fieldName: "due_date", nullable: true })
+  dueDate: Date | null = null;
+
+  @Property({ type: "date", fieldName: "start_date", nullable: true })
+  startDate: Date | null = null;
+
+  @Property({ type: "datetime", fieldName: "started_at", nullable: true })
+  startedAt: Date | null = null;
+
+  @Property({ type: "uuid", fieldName: "assignee_id", nullable: true })
+  assigneeId: string | null = null;
+
+  @Property({ type: "array", fieldName: "labels", default: [] })
+  labels: string[] = [];
+
+  @Property({ type: "uuid", fieldName: "project_id", nullable: true })
+  projectId: string | null = null;
+
+  @Property({ type: "string", fieldName: "task_type", default: "task" })
+  taskType: string = "task";
+
+  @Property({ type: "integer", fieldName: "sequence_number", nullable: true })
+  sequenceNumber: number | null = null;
+
+  @Property({ type: "datetime", fieldName: "archived_at", nullable: true })
+  archivedAt: Date | null = null;
+
+  @Property({ type: "uuid", fieldName: "template_id", nullable: true })
+  templateId: string | null = null;
 }

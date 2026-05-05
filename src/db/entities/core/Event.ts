@@ -83,4 +83,14 @@ export class Event {
 
   @Property({ type: "datetime", fieldName: "created_at", defaultRaw: "now()" })
   createdAt!: Date;
+
+  // Phase 5 columns added by Migration20260505100000 — field-level change tracking
+  @Property({ type: "string", fieldName: "field_name", nullable: true })
+  fieldName?: string;
+
+  @Property({ type: "json", fieldName: "from_value", nullable: true })
+  fromValue?: unknown;
+
+  @Property({ type: "json", fieldName: "to_value", nullable: true })
+  toValue?: unknown;
 }

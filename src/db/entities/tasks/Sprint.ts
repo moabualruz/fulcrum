@@ -44,7 +44,9 @@ export class Sprint {
     | "updatedAt"
     | "closedAt"
     | "metricsSnapshot"
-    | "retroDocId";
+    | "retroDocId"
+    | "retrospectiveNotes"
+    | "closedSummary";
 
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
@@ -95,4 +97,11 @@ export class Sprint {
 
   @Property({ type: "datetime", fieldName: "updated_at", defaultRaw: "now()" })
   updatedAt!: Date;
+
+  // Phase 5 columns added by Migration20260505100000
+  @Property({ type: "json", fieldName: "retrospective_notes", nullable: true })
+  retrospectiveNotes: object | null = null;
+
+  @Property({ type: "json", fieldName: "closed_summary", nullable: true })
+  closedSummary: object | null = null;
 }
