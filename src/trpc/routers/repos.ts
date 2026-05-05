@@ -9,49 +9,32 @@ import { Event } from "../../db/entities/core/Event.ts";
 import { Org } from "../../db/entities/auth/Org.ts";
 import { Repo } from "../../db/entities/repos/Repo.ts";
 import { RepoRepository } from "../../db/repositories/repos/RepoRepository.ts";
+import { REPO_SYNC_LOCAL_TASK } from "../../repos/workers/sync-local.ts";
+import { REPO_SYNC_REMOTE_TASK } from "../../repos/workers/sync-remote.ts";
 import { permissionedProcedure } from "../middleware.ts";
 import { t } from "../trpc.ts";
-
-const RepoOutputSchema = z.object({
-  id: z.uuid(),
-  orgId: z.string().regex(/^[0-9a-fA-F-]{36}$/),
-  name: z.string(),
-  slug: z.string(),
-  kind: z.enum(["local", "remote"]),
-  localPath: z.string().nullable(),
-  remoteUrl: z.string().nullable(),
-  defaultBranch: z.string().nullable(),
-  currentBranch: z.string().nullable(),
-  lastSyncAt: z.date().nullable(),
-  syncStatus: z.string(),
-  lastTouchedAt: z.date().nullable(),
-  archived: z.boolean(),
-});
-
-const ListReposInputSchema = z.object({
-  includeArchived: z.boolean().optional(),
-}).optional();
-
-const RepoIdInputSchema = z.object({
-  id: z.uuid(),
-});
-
-const RegisterRepoInputSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("local"),
-    path: z.string().trim().min(1),
-    name: z.string().trim().min(1).optional(),
-    slug: z.string().trim().min(1).optional(),
-  }),
-  z.object({
-    kind: z.literal("remote"),
-    url: z.string().trim().min(1),
-    name: z.string().trim().min(1).optional(),
-    slug: z.string().trim().min(1).optional(),
-  }),
-]);
+import {
+  ListReposInputSchema,
+  RegisterRepoInputSchema,
+  RepoIdInputSchema,
+  RepoSchema as RepoOutputSchema,
+  RepoStatusResultSchema,
+  RepoSyncResultSchema,
+  SyncRepoInputSchema,
+  type RepoStatusResult,
+  type RepoSyncResult,
+} from "../schemas/repos.ts";
 
 type RepoOutput = z.infer<typeof RepoOutputSchema>;
+type RepoSyncTaskName = typeof REPO_SYNC_LOCAL_TASK | typeof REPO_SYNC_REMOTE_TASK;
+
+interface RepoTaskQueue {
+  addJob(
+    name: RepoSyncTaskName,
+    payload: { repoId: string },
+    options: { jobKey: string },
+  ): Promise<unknown>;
+}
 
 function serializeRepo(repo: Repo): RepoOutput {
   return {
@@ -89,6 +72,25 @@ function resolveRepoRepository(ctx: {
   });
 }
 
+function resolveRepoTaskQueue(ctx: {
+  container: Container | null;
+}): RepoTaskQueue {
+  const token = "repoSyncQueue";
+  const container = ctx.container as unknown as {
+    has(token: unknown): boolean;
+    get(token: unknown): unknown;
+  } | null;
+  if (container?.has(token)) {
+    const queue = container.get(token) as Partial<RepoTaskQueue>;
+    if (typeof queue.addJob === "function") return queue as RepoTaskQueue;
+  }
+
+  throw new TRPCError({
+    code: "INTERNAL_SERVER_ERROR",
+    message: "Repo sync queue could not be resolved.",
+  });
+}
+
 function slugFromRemoteUrl(url: string): string {
   const withoutTrailingSlash = url.replace(/\/$/, "");
   const lastSegment = withoutTrailingSlash.split(/[/:]/).filter(Boolean).at(-1) ?? "repo";
@@ -115,6 +117,45 @@ async function emitRepoEvent(ctx: {
     createdAt: new Date(),
   });
   ctx.em.persist(event);
+}
+
+export async function createRepoTask(input: {
+  queue: RepoTaskQueue;
+  repoId: string;
+  taskName: RepoSyncTaskName;
+}): Promise<RepoSyncResult> {
+  const jobKey = `${input.taskName}:${input.repoId}`;
+  await input.queue.addJob(input.taskName, { repoId: input.repoId }, { jobKey });
+  return {
+    repoId: input.repoId,
+    status: "queued",
+    taskName: input.taskName,
+    jobKey,
+  };
+}
+
+function repoSyncTaskName(repo: Repo): RepoSyncTaskName {
+  return repo.kind === "local" ? REPO_SYNC_LOCAL_TASK : REPO_SYNC_REMOTE_TASK;
+}
+
+function statusFromRepo(repo: Repo): RepoStatusResult["status"] {
+  if (repo.syncStatus === "error" || repo.syncStatus === "failed") return "failed";
+  if (repo.syncStatus === "syncing" || repo.syncStatus === "running") return "running";
+  if (!repo.lastSyncAt) return "stale";
+
+  const staleAfterMs = 30 * 60 * 1_000;
+  return Date.now() - repo.lastSyncAt.getTime() > staleAfterMs ? "stale" : "synced";
+}
+
+function serializeRepoStatus(repo: Repo): RepoStatusResult {
+  return {
+    repoId: repo.id,
+    orgId: repo.org.id,
+    status: statusFromRepo(repo),
+    syncStatus: repo.syncStatus,
+    lastSyncAt: repo.lastSyncAt ?? null,
+    lastTouchedAt: repo.lastTouchedAt ?? null,
+  };
 }
 
 export const reposRouter = t.router({
@@ -189,6 +230,42 @@ export const reposRouter = t.router({
       });
       await repo.getEntityManager().flush();
       return serializeRepo(found);
+    }),
+
+  syncRepo: permissionedProcedure({ resource: "repos", action: "sync" })
+    .input(SyncRepoInputSchema)
+    .output(RepoSyncResultSchema.nullable())
+    .mutation(async ({ ctx, input }) => {
+      const repo = resolveRepoRepository(ctx);
+      const found = await repo.get({ orgId: ctx.orgId, id: input.repoId });
+      if (!found) return null;
+
+      const result = await createRepoTask({
+        queue: resolveRepoTaskQueue(ctx),
+        repoId: found.id,
+        taskName: repoSyncTaskName(found),
+      });
+      await repo.update({
+        orgId: ctx.orgId,
+        id: found.id,
+        syncStatus: "syncing",
+      });
+      await emitRepoEvent(ctx, {
+        verb: "repo.sync.requested",
+        repoId: found.id,
+        payload: { kind: found.kind, taskName: result.taskName, jobKey: result.jobKey },
+      });
+      await repo.getEntityManager().flush();
+      return result;
+    }),
+
+  statusRepo: permissionedProcedure({ resource: "repos", action: "status" })
+    .input(SyncRepoInputSchema)
+    .output(RepoStatusResultSchema.nullable())
+    .query(async ({ ctx, input }) => {
+      const repo = resolveRepoRepository(ctx);
+      const found = await repo.get({ orgId: ctx.orgId, id: input.repoId });
+      return found ? serializeRepoStatus(found) : null;
     }),
 
   unregister: permissionedProcedure({ resource: "repos", action: "unregister" })
