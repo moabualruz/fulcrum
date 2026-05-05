@@ -55,6 +55,7 @@ function makeContainer(): Container {
         vectors: texts.map(() => [0.1, 0.2, 0.3]),
         model: "BAAI/bge-small-en-v1.5",
         cached: false,
+        dimensions: 3,
       }),
       generate: async () => generateResult,
       classify: async () => [
@@ -398,6 +399,7 @@ describe("inference tRPC router", () => {
           vectors: texts.map(() => [0.4, 0.5, 0.6]),
           model: "class-token-model",
           cached: true,
+          dimensions: 3,
         }),
         generate: async () => generateResult,
         classify: async () => [{ label: "bug", score: 1 }],
@@ -425,6 +427,7 @@ describe("inference tRPC router", () => {
       vectors: [[0.4, 0.5, 0.6]],
       model: "class-token-model",
       cached: true,
+      dimensions: 3,
     });
     await expect(caller.inference.generate({ prompt: "The capital of France is" }))
       .resolves.toEqual(generateResult);

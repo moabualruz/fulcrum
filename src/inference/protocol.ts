@@ -37,6 +37,7 @@ export const EmbedResultSchema = z.object({
   vectors: z.array(z.array(z.number())),
   model: z.string(),
   cached: z.boolean(),
+  dimensions: z.number(),
 });
 
 export const GenerateOptionsSchema = z.object({
