@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 04
-last_updated: "2026-05-05T02:52:16.525Z"
+last_updated: "2026-05-05T03:06:11Z"
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 33
-  completed_plans: 24
-  percent: 73
+  completed_plans: 25
+  percent: 76
 ---
 
 # Planning State
@@ -17,12 +17,12 @@ progress:
 ## Current Position
 
 Phase: 04 (inference-router-skills) — EXECUTING
-Plan: 1 of 8
+Plan: 2 of 8
 
-- **Phase**: 02-bug-fixes-foundation
-- **Plan**: 8 plans created
-- **Status**: Phase 2 fully executed and verified
-- **Branch**: dev/v1.0
+- **Phase**: 04-inference-router-skills
+- **Plan**: 04-01 completed
+- **Status**: Wave 0 validation scaffolds complete
+- **Branch**: gsd/phase-04-inference-router-skills
 
 ## Decisions
 
@@ -67,3 +67,9 @@ Plan: 1 of 8
 - [Phase 03-06]: HTTP server binds 127.0.0.1 by default; port:0 uses ephemeral binding; wraps createHttpApiRoutes (SYM-25)
 - [Phase 03-06]: dispatchRun tRPC procedure creates AgentRun via MikroORM EM; sandboxMode 'noSandbox' is human alias for DB value 'host' (D-12)
 - [Phase 03-06]: CLI SymphonyCaller.dispatchRun required; 'runs dispatch <taskId>' added; TUI dispatch() optional in caller interface; Web dispatch action uses tRPC local caller (SND-06)
+- [Phase 04-01]: assertEmbeddingDimension validates vector length against expected=384; throws 'embedding dimension mismatch expected=<N> actual=<M>' — defined in test file, exported for later extraction to model-metadata.ts
+- [Phase 04-01]: Backend probes use 2s timeout; unconfigured backends return unconfigured state without network calls; embedded backend probes Unix socket (matching lifecycle.ts)
+- [Phase 04-01]: Learned draft status auto-detected from matchingActiveRuleIds: empty→review_needed, non-empty→conflict (D-12 compliance)
+- [Phase 04-01]: MCP descriptors use deterministic tool manifest hash (sorted tool names, SHA-256 hex)
+- [Phase 04-01]: Lock enforcement returns exact expected/actual SHA for mismatch/missing/ok states; override audit includes slug, overriddenBy, action, reason, previous hashes
+- [Phase 04-01]: Static build proof exits 1 with linuxProof:"missing" on macOS without Docker; INF-02 cannot close until Docker or native Linux is available

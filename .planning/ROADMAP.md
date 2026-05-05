@@ -108,7 +108,7 @@ Cross-cutting constraints:
 **Plans:** 8 plans
 Plans:
 **Wave 1**
-- [ ] 04-01-PLAN.md — Wave 0 validation scaffolds for static proof, embeddings, router evals, MCP, and lock gates
+- [x] 04-01-PLAN.md — Wave 0 validation scaffolds for static proof, embeddings, router evals, MCP, and lock gates (completed 2026-05-05)
 - [ ] 04-02-PLAN.md — Embedding model metadata and 384-dimension write/read/search enforcement
 
 **Wave 2**
@@ -215,7 +215,7 @@ Plans:
 | 1. Architecture + Security | 0/10 | Planned | - |
 | 2. Bug Fixes + Foundation | 8/8 | Complete | 2026-05-04 |
 | 3. Symphony + Sandcastle | 6/6 | Complete   | 2026-05-05 |
-| 4. Inference + Router/Skills | 0/? | Not started | - |
+| 4. Inference + Router/Skills | 1/8 | In Progress | - |
 | 5. Task Management + Metrics | 0/? | Not started | - |
 | 6. Documents + Memory + Search | 0/? | Not started | - |
 | 7. Repos + Artifacts + Notifications | 0/? | Not started | - |
