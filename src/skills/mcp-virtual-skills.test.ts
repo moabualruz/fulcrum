@@ -1,5 +1,5 @@
 /**
- * Wave 0: MCP virtual skill descriptor gate (RTR-05).
+ * MCP virtual skill descriptor gate (RTR-05).
  *
  * Tests that MCP servers appear as first-class virtual skills with:
  * - source: "mcp"
@@ -7,92 +7,19 @@
  * - descriptorSha256 — SHA-256 of the pinned registry descriptor
  * - toolManifestHash — hash of the tool manifest (tools/list response)
  *
- * RED phase — stub types.  GREEN phase connects production imports.
+ * RED phase — imports from production modules (not yet created).
  */
 
 import { describe, it, expect } from "bun:test";
-import { createHash } from "node:crypto";
 
-// ── Shared types (pattern from RESEARCH.md §Pattern 4) ─────────────────
-
-export interface McpVirtualSkillDescriptor {
-  source: "mcp";
-  slug: string;
-  serverName: string;
-  commandOrUrl: string;
-  description: string;
-  vendor: string;
-  toolNames: readonly string[];
-  descriptorSha256: string;
-  toolManifestHash: string;
-  invokableByFulcrum: false;
-}
-
-export interface McpToolManifestEntry {
-  name: string;
-  title: string | null;
-  description: string | null;
-  inputSchema: Record<string, unknown>;
-  outputSchema: Record<string, unknown> | null;
-}
-
-// ── Helpers — full GREEN implementation ─────────────────────────────────
-
-function computeToolManifestHash(tools: readonly McpToolManifestEntry[]): string {
-  const normalized = [...tools]
-    .map((t) => ({
-      name: t.name,
-      title: t.title ?? null,
-      description: t.description ?? null,
-      inputSchema: t.inputSchema,
-      outputSchema: t.outputSchema ?? null,
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  return sha256Hex(JSON.stringify(normalized));
-}
-
-function computeDescriptorSha256(descriptor: string): string {
-  return sha256Hex(descriptor);
-}
-
-function createMcpVirtualSkill(params: {
-  serverName: string;
-  commandOrUrl: string;
-  description: string;
-  vendor: string;
-  toolNames: readonly string[];
-  tools: readonly McpToolManifestEntry[];
-}): McpVirtualSkillDescriptor {
-  const descriptor = JSON.stringify({
-    serverName: params.serverName,
-    commandOrUrl: params.commandOrUrl,
-    description: params.description,
-    vendor: params.vendor,
-    toolNames: [...params.toolNames].sort(),
-  });
-
-  const manifestHash = computeToolManifestHash(params.tools);
-
-  return {
-    source: "mcp",
-    slug: `mcp-${params.serverName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-    serverName: params.serverName,
-    commandOrUrl: params.commandOrUrl,
-    description: params.description,
-    vendor: params.vendor,
-    toolNames: params.toolNames,
-    descriptorSha256: computeDescriptorSha256(descriptor),
-    toolManifestHash: manifestHash,
-    invokableByFulcrum: false,
-  };
-}
-
-// ── Helpers (shared with production code) ──────────────────────────────
-
-/** Deterministic SHA-256 hex digest of a JSON-sorted tool manifest. */
-export function sha256Hex(input: string): string {
-  return createHash("sha256").update(input, "utf8").digest("hex");
-}
+// ── RED: imports from production modules that do not yet exist ─────────
+import {
+  type McpVirtualSkillDescriptor,
+  type McpToolManifestEntry,
+  computeToolManifestHash,
+  computeDescriptorSha256,
+  createMcpVirtualSkill,
+} from "./mcp-virtual-skills.ts";
 
 // ── Tests ──────────────────────────────────────────────────────────────
 
@@ -155,24 +82,18 @@ describe("MCP virtual skills - descriptor shape (RTR-05)", () => {
     const hashA = computeToolManifestHash(toolsA);
     const hashB = computeToolManifestHash(toolsB);
 
-    // Same input must produce same hash, different inputs different hashes.
     expect(hashA).toMatch(/^[a-f0-9]{64}$/);
     expect(hashB).toMatch(/^[a-f0-9]{64}$/);
     expect(hashA).not.toBe(hashB);
   });
 
   it("produces deterministic descriptor hash", () => {
-    const descriptorA = JSON.stringify({ serverName: "gh", vendor: "github" });
-    const descriptorB = JSON.stringify({ serverName: "pw", vendor: "microsoft" });
-
-    const hashA = computeDescriptorSha256(descriptorA);
-    const hashB = computeDescriptorSha256(descriptorB);
+    const hashA = computeDescriptorSha256(JSON.stringify({ serverName: "gh", vendor: "github" }));
+    const hashB = computeDescriptorSha256(JSON.stringify({ serverName: "pw", vendor: "microsoft" }));
 
     expect(hashA).toMatch(/^[a-f0-9]{64}$/);
     expect(hashB).toMatch(/^[a-f0-9]{64}$/);
     expect(hashA).not.toBe(hashB);
-
-    // Same input must be deterministic.
-    expect(computeDescriptorSha256(descriptorA)).toBe(hashA);
+    expect(computeDescriptorSha256(JSON.stringify({ serverName: "gh", vendor: "github" }))).toBe(hashA);
   });
 });
