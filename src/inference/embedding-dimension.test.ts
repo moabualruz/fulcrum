@@ -1,34 +1,14 @@
 /**
- * Wave 0: embedding dimension fail-closed gate (INF-01, INF-06).
+ * Embedding model metadata contract (INF-01, INF-06).
  *
- * RED phase — references assertEmbeddingDimension that is not yet imported
- * from an implementation module.  This file is the gate: when the underlying
- * dimension guard is absent the suite fails, which is the desired RED
- * outcome.  The GREEN phase will resolve the import.
- *
- * Once the implementation exists:
- *   import { assertEmbeddingDimension } from "./model-metadata.ts";
+ * Asserts model-metadata-driven dimension enforcement.  Imports from
+ * model-metadata.ts — the RED phase fails when the module is absent,
+ * GREEN phase resolves it.
  */
 
 import { describe, it, expect } from "bun:test";
 import { execSync } from "node:child_process";
-
-// ---------------------------------------------------------------------------
-// assertEmbeddingDimension — dimension-safe embedding gate.
-//
-// Pattern from 04-PATTERNS.md §Pattern 2 / 04-RESEARCH.md:
-//   Validate vector length against configured model metadata before
-//   persistence and before query.  Fail closed, never coerce.
-// ---------------------------------------------------------------------------
-/** @returns `void`; throws if `vector.length !== expected`. */
-export function assertEmbeddingDimension(vector: readonly number[], expected: number): void {
-  if (vector.length !== expected) {
-    throw new Error(
-      `embedding dimension mismatch expected=${expected} actual=${vector.length}`,
-    );
-  }
-}
-// ---------------------------------------------------------------------------
+import { assertEmbeddingDimension } from "./model-metadata.ts";
 
 describe("embedding dimension guard", () => {
   it("accepts vectors whose length matches expected=384", () => {
