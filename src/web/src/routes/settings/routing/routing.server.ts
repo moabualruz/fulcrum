@@ -1,7 +1,17 @@
 import { fail, redirect } from "@sveltejs/kit";
 import { z } from "zod";
 
-import type { RoutingDecisionRow, RoutingRuleRow } from "./routing.types";
+import type { DraftRow, EnrichedDecisionRow, LlmGateConfig, RoutingDecisionRow, RoutingRuleRow } from "./routing.types";
+
+function getLlmGateConfig(): LlmGateConfig {
+  const features = (process.env["FULCRUM_FEATURES"] ?? "").split(",").map((f) => f.trim());
+  const enabled = features.includes("router-llm");
+  const rawMode = process.env["FULCRUM_LLM_INPUT_MODE"];
+  const inputMode = rawMode === "task_facts" || rawMode === "task_plus_history" || rawMode === "full_context"
+    ? rawMode
+    : "full_context";
+  return { enabled, inputMode };
+}
 
 interface RouteLocals {
   session: unknown;
@@ -105,10 +115,13 @@ export async function loadRoutingPage(event: RoutingLoadEvent, projectId: string
   const origin = baseUrl(event.url);
   const cookie = event.request.headers.get("cookie") ?? "";
 
+  const llmGateConfig = getLlmGateConfig();
+
   if (projectId) {
-    const [projectRules, allRules] = await Promise.all([
+    const [projectRules, allRules, drafts] = await Promise.all([
       trpcGet(event.fetch, origin, "routing.list", { projectId }, cookie),
       trpcGet(event.fetch, origin, "routing.list", {}, cookie),
+      trpcGet(event.fetch, origin, "routing.drafts.list", {}, cookie).catch(() => []),
     ]);
     return {
       projectId,
@@ -116,14 +129,21 @@ export async function loadRoutingPage(event: RoutingLoadEvent, projectId: string
       inheritedRules: Array.isArray(allRules)
         ? (allRules as RoutingRuleRow[]).filter((rule) => rule.projectId === null)
         : [],
+      drafts: Array.isArray(drafts) ? (drafts as DraftRow[]) : [],
+      llmGateConfig,
     };
   }
 
-  const rules = await trpcGet(event.fetch, origin, "routing.list", {}, cookie);
+  const [rules, drafts] = await Promise.all([
+    trpcGet(event.fetch, origin, "routing.list", {}, cookie),
+    trpcGet(event.fetch, origin, "routing.drafts.list", {}, cookie).catch(() => []),
+  ]);
   return {
     projectId: null,
     rules: Array.isArray(rules) ? (rules as RoutingRuleRow[]).filter((rule) => rule.projectId === null) : [],
     inheritedRules: [],
+    drafts: Array.isArray(drafts) ? (drafts as DraftRow[]) : [],
+    llmGateConfig,
   };
 }
 
@@ -236,6 +256,125 @@ export function routingActions(projectIdFromParams?: (event: RoutingActionEvent)
         id: String(form.get("id") ?? ""),
       }, event.request.headers.get("cookie") ?? "");
       return { ok: true };
+    },
+
+    // ── New enriched test action (calls routing.test) ────────────────────
+
+    test: async (event: RoutingActionEvent) => {
+      requireSession(event);
+      const form = await event.request.formData();
+      try {
+        const result = await trpcPost(
+          event.fetch,
+          baseUrl(event.url),
+          "routing.test",
+          { taskId: String(form.get("taskId") ?? "") },
+          event.request.headers.get("cookie") ?? "",
+        );
+        return { ok: true, testResult: result as EnrichedDecisionRow };
+      } catch (error) {
+        return fail(400, { testError: String((error as Error).message ?? error) });
+      }
+    },
+
+    // ── Draft actions (proxy to routing.drafts.* tRPC procedures) ────────
+
+    draftList: async (event: RoutingActionEvent) => {
+      requireSession(event);
+      const origin = baseUrl(event.url);
+      const cookie = event.request.headers.get("cookie") ?? "";
+      try {
+        const drafts = await trpcGet(event.fetch, origin, "routing.drafts.list", {}, cookie);
+        return { ok: true, drafts: (drafts ?? []) as DraftRow[] };
+      } catch (error) {
+        return fail(400, { draftError: String((error as Error).message ?? error) });
+      }
+    },
+
+    draftApprove: async (event: RoutingActionEvent) => {
+      requireSession(event);
+      const form = await event.request.formData();
+      try {
+        await trpcPost(
+          event.fetch,
+          baseUrl(event.url),
+          "routing.drafts.approve",
+          { draftId: String(form.get("draftId") ?? "") },
+          event.request.headers.get("cookie") ?? "",
+        );
+        return { ok: true };
+      } catch (error) {
+        return fail(400, { draftError: String((error as Error).message ?? error) });
+      }
+    },
+
+    draftDelete: async (event: RoutingActionEvent) => {
+      requireSession(event);
+      const form = await event.request.formData();
+      try {
+        await trpcPost(
+          event.fetch,
+          baseUrl(event.url),
+          "routing.drafts.delete",
+          { draftId: String(form.get("draftId") ?? "") },
+          event.request.headers.get("cookie") ?? "",
+        );
+        return { ok: true };
+      } catch (error) {
+        return fail(400, { draftError: String((error as Error).message ?? error) });
+      }
+    },
+
+    draftUpdate: async (event: RoutingActionEvent) => {
+      requireSession(event);
+      const form = await event.request.formData();
+      const input: Record<string, unknown> = {
+        draftId: String(form.get("draftId") ?? ""),
+      };
+      const conditionsEntry = form.get("conditionsJson");
+      if (conditionsEntry && String(conditionsEntry).trim()) {
+        input["conditionsJson"] = JSON.parse(String(conditionsEntry));
+      }
+      const actionAgent = String(form.get("actionAgent") ?? "").trim();
+      if (actionAgent) input["actionAgent"] = actionAgent;
+      try {
+        await trpcPost(
+          event.fetch,
+          baseUrl(event.url),
+          "routing.drafts.update",
+          input,
+          event.request.headers.get("cookie") ?? "",
+        );
+        return { ok: true };
+      } catch (error) {
+        return fail(400, { draftError: String((error as Error).message ?? error) });
+      }
+    },
+
+    // ── LLM gate config action (proxies to routing.config.updateLlmGate) ──
+
+    updateLlmGate: async (event: RoutingActionEvent) => {
+      requireSession(event);
+      const form = await event.request.formData();
+      const input: Record<string, unknown> = {};
+      const enabledStr = String(form.get("enabled") ?? "");
+      if (enabledStr === "true" || enabledStr === "false") {
+        input["enabled"] = enabledStr === "true";
+      }
+      const inputMode = String(form.get("inputMode") ?? "").trim();
+      if (inputMode) input["inputMode"] = inputMode;
+      try {
+        await trpcPost(
+          event.fetch,
+          baseUrl(event.url),
+          "routing.config.updateLlmGate",
+          input,
+          event.request.headers.get("cookie") ?? "",
+        );
+        return { ok: true };
+      } catch (error) {
+        return fail(400, { llmGateError: String((error as Error).message ?? error) });
+      }
     },
   };
 }

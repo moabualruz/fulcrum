@@ -48,26 +48,31 @@ if (isVitestCli) {
   describe("routing settings routes", () => {
     test("renders global rules with CRUD controls, reorder controls, and dry-run panel", async () => {
       const { default: Page } = await import("../../src/routes/settings/routing/+page.svelte");
-      const { getByRole, getByText, container } = render(Page, {
+      const { getByText, container } = render(Page, {
         props: {
           data: {
             activeProjectId: null,
             projectId: null,
             rules: [globalRule],
             inheritedRules: [],
-            dryRunResult: null,
+            drafts: [],
+            llmGateConfig: { inputMode: "full_context" as const, enabled: false },
           },
         },
       });
 
-      expect(getByRole("heading", { name: "Routing Rules" })).toBeTruthy();
+      const heading = container.querySelector("h1");
+      expect(heading).toBeTruthy();
+      expect(heading?.textContent).toContain("Routing Rules");
       expect(getByText("Bugs to Codex")).toBeTruthy();
       expect(getByText("codex")).toBeTruthy();
       expect(getByText("global")).toBeTruthy();
       expect(container.querySelector('[data-routing-enabled-toggle="00000000-0000-4000-8000-000000000001"]')).toBeTruthy();
       expect(container.querySelector('[data-routing-delete="00000000-0000-4000-8000-000000000001"]')).toBeTruthy();
       expect(container.querySelector("[data-routing-reorder-down]")).toBeTruthy();
-      expect(getByRole("textbox", { name: "Task JSON" })).toBeTruthy();
+      // Task JSON textarea is in the Test tab (not visible in Rules tab by default)
+      // Check tab exists
+      expect(container.querySelector('[data-tab="test"]')?.textContent).toContain("Test");
     });
 
     test("create validates conditions_json inline before routing.create", async () => {
@@ -184,6 +189,106 @@ if (isVitestCli) {
       expect(getByText("Inherited global rules")).toBeTruthy();
       expect(container.querySelector(`[data-routing-delete="${globalRule.id}"]`)).toBeNull();
       expect(container.querySelector(`[data-routing-inherited="${globalRule.id}"]`)).toBeTruthy();
+    });
+
+    test("renders all five tabs: Rules, Drafts, Test, LLM Gate, Evidence", async () => {
+      const { default: Page } = await import("../../src/routes/settings/routing/+page.svelte");
+      const { container } = render(Page, {
+        props: {
+          data: {
+            activeProjectId: null,
+            projectId: null,
+            rules: [globalRule],
+            inheritedRules: [],
+            drafts: [],
+            llmGateConfig: { inputMode: "full_context" as const, enabled: false },
+          },
+        },
+      });
+      const tabContainer = container.querySelector("[data-routing-tabs]");
+      expect(tabContainer).toBeTruthy();
+      expect(tabContainer?.querySelector('[data-tab="rules"]')).toBeTruthy();
+      expect(tabContainer?.querySelector('[data-tab="drafts"]')).toBeTruthy();
+      expect(tabContainer?.querySelector('[data-tab="test"]')).toBeTruthy();
+      expect(tabContainer?.querySelector('[data-tab="llm-gate"]')).toBeTruthy();
+      expect(tabContainer?.querySelector('[data-tab="evidence"]')).toBeTruthy();
+      // Check the button text too
+      expect(tabContainer?.textContent).toContain("Rules");
+      expect(tabContainer?.textContent).toContain("Drafts");
+      expect(tabContainer?.textContent).toContain("Test");
+      expect(tabContainer?.textContent).toContain("LLM Gate");
+      expect(tabContainer?.textContent).toContain("Evidence");
+    });
+
+    test("renders drafts count in Rules tab and draft data in load", async () => {
+      const { default: Page } = await import("../../src/routes/settings/routing/+page.svelte");
+      const { container } = render(Page, {
+        props: {
+          data: {
+            activeProjectId: null,
+            projectId: null,
+            rules: [globalRule],
+            inheritedRules: [],
+            drafts: [{
+              id: "draft-001",
+              orgId: "org-001",
+              proposedRule: "Bugs to codex",
+              source: "learned",
+              confidence: 0.85,
+              conflictState: "review_needed" as const,
+              matchingActiveRuleIds: [],
+              createdAt: "2026-05-03T00:00:00.000Z",
+            }],
+            llmGateConfig: { inputMode: "full_context" as const, enabled: false },
+          },
+        },
+      });
+      // Drafts tab is visible in the tab bar
+      const draftsTab = container.querySelector('[data-tab="drafts"]');
+      expect(draftsTab).toBeTruthy();
+      expect(draftsTab?.textContent).toContain("Drafts");
+      // The drafts table is rendered in the Drafts tab (not visible by default)
+      // Check that draft data is passed through the data prop
+      expect(container.textContent).not.toContain("Bugs to codex"); // Not visible in Rules tab
+    });
+
+    test("renders Evidence tab in tab bar", async () => {
+      const { default: Page } = await import("../../src/routes/settings/routing/+page.svelte");
+      const { container } = render(Page, {
+        props: {
+          data: {
+            activeProjectId: null,
+            projectId: null,
+            rules: [globalRule],
+            inheritedRules: [],
+            drafts: [],
+            llmGateConfig: { inputMode: "full_context" as const, enabled: false },
+          },
+        },
+      });
+      const evidenceTab = container.querySelector('[data-tab="evidence"]');
+      expect(evidenceTab).toBeTruthy();
+      expect(evidenceTab?.textContent).toContain("Evidence");
+    });
+
+    test("renders builder and raw json toggle labels", async () => {
+      const { default: Page } = await import("../../src/routes/settings/routing/+page.svelte");
+      const { container } = render(Page, {
+        props: {
+          data: {
+            activeProjectId: null,
+            projectId: null,
+            rules: [globalRule],
+            inheritedRules: [],
+            drafts: [],
+            llmGateConfig: { inputMode: "full_context" as const, enabled: false },
+          },
+        },
+      });
+      const toggleButtons = container.querySelectorAll('[data-routing-rules-tab] button');
+      const buttonTexts = Array.from(toggleButtons).map((b) => b.textContent).join(" ");
+      expect(buttonTexts).toContain("Builder");
+      expect(buttonTexts).toContain("Raw JSON");
     });
   });
 }

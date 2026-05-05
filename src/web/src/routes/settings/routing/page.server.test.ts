@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { RoutingRuleRow } from "./routing.types";
+import type { DraftRow, EnrichedDecisionRow, LlmGateConfig, RoutingRuleRow } from "./routing.types";
 
 // Tests for routing.server.ts / +page.server.ts.
 // We exercise loadRoutingPage() and the CRUD/dryRun actions via controlled
@@ -147,6 +147,127 @@ describe("routing actions.delete()", () => {
     const fd = new FormData();
     fd.set("id", "rule-001");
     const result = await mod.actions.delete({
+      ...BASE_LOAD_EVENT,
+      fetch: fakeOkFetch({ ok: true }),
+      request: { headers: { get: () => null }, formData: async () => fd },
+    });
+    expect(result).toMatchObject({ ok: true });
+  });
+});
+
+describe("routing actions.test() — enriched test output", () => {
+  test("calls routing.test and returns enriched decision", async () => {
+    const mod = await import(`./+page.server.ts?t=${Date.now() + 8}`);
+    const enriched: EnrichedDecisionRow = {
+      status: "matched",
+      matchedRuleId: "rule-001",
+      draftId: null,
+      factsUsed: { task: { kind: "bug" } },
+      confidence: 1.0,
+      backend: null,
+      model: null,
+      whyUnmatched: null,
+      evidence: ["matched rule rule-001"],
+    };
+    const fd = new FormData();
+    fd.set("taskId", "task-001");
+    const result = await mod.actions.test({
+      ...BASE_LOAD_EVENT,
+      fetch: fakeOkFetch(enriched),
+      request: { headers: { get: () => null }, formData: async () => fd },
+    });
+    expect(result).toMatchObject({ ok: true, testResult: enriched });
+  });
+
+  test("returns testError on tRPC failure", async () => {
+    const mod = await import(`./+page.server.ts?t=${Date.now() + 9}`);
+    const fd = new FormData();
+    fd.set("taskId", "task-001");
+    const result = await mod.actions.test({
+      ...BASE_LOAD_EVENT,
+      fetch: fakeFail(404, "Task not found"),
+      request: { headers: { get: () => null }, formData: async () => fd },
+    });
+    expect(result).toMatchObject({ data: { testError: expect.any(String) } });
+  });
+});
+
+describe("routing actions.draftList()", () => {
+  test("calls routing.drafts.list and returns drafts array", async () => {
+    const mod = await import(`./+page.server.ts?t=${Date.now() + 10}`);
+    const drafts: DraftRow[] = [
+      {
+        id: "draft-001",
+        orgId: "org-001",
+        proposedRule: "Assign bugs to codex",
+        source: "learned",
+        confidence: 0.85,
+        conflictState: "review_needed",
+        matchingActiveRuleIds: [],
+        createdAt: new Date("2024-01-01").toISOString(),
+      },
+    ];
+    const fd = new FormData();
+    const result = await mod.actions.draftList({
+      ...BASE_LOAD_EVENT,
+      fetch: fakeOkFetch(drafts),
+      request: { headers: { get: () => null }, formData: async () => fd },
+    });
+    expect(result).toMatchObject({ ok: true, drafts });
+  });
+});
+
+describe("routing actions.draftApprove()", () => {
+  test("calls routing.drafts.approve and returns ok", async () => {
+    const mod = await import(`./+page.server.ts?t=${Date.now() + 11}`);
+    const fd = new FormData();
+    fd.set("draftId", "draft-001");
+    const result = await mod.actions.draftApprove({
+      ...BASE_LOAD_EVENT,
+      fetch: fakeOkFetch({ ok: true }),
+      request: { headers: { get: () => null }, formData: async () => fd },
+    });
+    expect(result).toMatchObject({ ok: true });
+  });
+});
+
+describe("routing actions.draftDelete()", () => {
+  test("calls routing.drafts.delete and returns ok", async () => {
+    const mod = await import(`./+page.server.ts?t=${Date.now() + 12}`);
+    const fd = new FormData();
+    fd.set("draftId", "draft-001");
+    const result = await mod.actions.draftDelete({
+      ...BASE_LOAD_EVENT,
+      fetch: fakeOkFetch({ ok: true }),
+      request: { headers: { get: () => null }, formData: async () => fd },
+    });
+    expect(result).toMatchObject({ ok: true });
+  });
+});
+
+describe("routing actions.draftUpdate()", () => {
+  test("calls routing.drafts.update and returns ok", async () => {
+    const mod = await import(`./+page.server.ts?t=${Date.now() + 13}`);
+    const fd = new FormData();
+    fd.set("draftId", "draft-001");
+    fd.set("conditionsJson", JSON.stringify({ all: [] }));
+    fd.set("actionAgent", "claude");
+    const result = await mod.actions.draftUpdate({
+      ...BASE_LOAD_EVENT,
+      fetch: fakeOkFetch({ ok: true }),
+      request: { headers: { get: () => null }, formData: async () => fd },
+    });
+    expect(result).toMatchObject({ ok: true });
+  });
+});
+
+describe("routing actions.updateLlmGate()", () => {
+  test("calls routing.config.updateLlmGate and returns ok", async () => {
+    const mod = await import(`./+page.server.ts?t=${Date.now() + 14}`);
+    const fd = new FormData();
+    fd.set("enabled", "true");
+    fd.set("inputMode", "task_facts");
+    const result = await mod.actions.updateLlmGate({
       ...BASE_LOAD_EVENT,
       fetch: fakeOkFetch({ ok: true }),
       request: { headers: { get: () => null }, formData: async () => fd },
