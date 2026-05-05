@@ -43,22 +43,31 @@ function makeGlobalMemory(overrides: Partial<Memory> = {}): Memory {
 // Shared mock repo factory
 // ---------------------------------------------------------------------------
 
-function makeMockRepo(memories: Memory[] = []): MemoryRepository {
+interface MockEm {
+  persistAndFlush: ReturnType<typeof mock>;
+  removeAndFlush: ReturnType<typeof mock>;
+  flush: ReturnType<typeof mock>;
+  nativeUpdate: ReturnType<typeof mock>;
+}
+
+function makeMockRepo(memories: Memory[] = []): MemoryRepository & { _em: MockEm } {
+  const em: MockEm = {
+    persistAndFlush: mock(async () => {}),
+    removeAndFlush: mock(async () => {}),
+    flush: mock(async () => {}),
+    nativeUpdate: mock(async () => 1),
+  };
   const repo = {
+    _em: em,
     searchProjectAndGlobal: mock(async () => memories),
     find: mock(async () => memories),
     findOne: mock(async (filter: Record<string, unknown>) => {
       const id = (filter as { id?: string }).id ?? (filter as { where?: { id: string } }).where?.id;
       return memories.find((m) => m.id === id) ?? null;
     }),
-    create: mock((data: Partial<Memory>) => ({ ...data, id: "new-mem-id" } as Memory)),
-    getEntityManager: mock(() => ({
-      persistAndFlush: mock(async () => {}),
-      removeAndFlush: mock(async () => {}),
-      flush: mock(async () => {}),
-      nativeUpdate: mock(async () => 1),
-    })),
-  } as unknown as MemoryRepository;
+    create: mock((data: Partial<Memory>) => ({ ...data, id: "new-mem-id", body: (data as Record<string, unknown>).body, importance: (data as Record<string, unknown>).importance } as Memory)),
+    getEntityManager: mock(() => em),
+  } as unknown as MemoryRepository & { _em: MockEm };
   return repo;
 }
 
@@ -101,8 +110,7 @@ describe("MemoryService", () => {
     test("sets global=true and preserves original projectId", async () => {
       const mem = makeMemory({ id: "mem-1", projectId: "proj-1", global: false });
       const repo = makeMockRepo([mem]);
-      const em = repo.getEntityManager();
-      const nativeUpdate = em.nativeUpdate as ReturnType<typeof mock>;
+      const nativeUpdate = repo._em.nativeUpdate;
       const service = new MemoryService(repo);
 
       await service.promote("mem-1", "org-1");
@@ -137,8 +145,7 @@ describe("MemoryService", () => {
   describe("create()", () => {
     test("persists memory with correct fields", async () => {
       const repo = makeMockRepo();
-      const em = repo.getEntityManager();
-      const persistAndFlush = em.persistAndFlush as ReturnType<typeof mock>;
+      const persistAndFlush = repo._em.persistAndFlush;
       const service = new MemoryService(repo);
 
       const result = await service.create("org-1", {
