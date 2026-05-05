@@ -19,7 +19,7 @@ class FakeWatchBackend implements WatchBackend {
 
   watch(_path: string, onEvent: (event: RepoWatchEvent, path: string) => void): WatchHandle {
     this.onEvent = onEvent;
-    return { close() {} };
+    return { stop() {} };
   }
 
   emit(event: RepoWatchEvent, path: string): void {
@@ -40,11 +40,15 @@ function localRepo(overrides: Partial<WatchableRepo> = {}): WatchableRepo {
 
 function createQueue(fail = false): JobQueue & { jobs: Array<{ name: string; payload: Record<string, unknown> }> } {
   const jobs: Array<{ name: string; payload: Record<string, unknown> }> = [];
+  let failed = false;
   return {
     jobs,
     async enqueue(name, payload) {
+      if (fail && !failed) {
+        failed = true;
+        throw new Error("queue unavailable");
+      }
       jobs.push({ name, payload });
-      if (fail) throw new Error("queue unavailable");
     },
   };
 }

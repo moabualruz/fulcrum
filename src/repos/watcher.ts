@@ -1,11 +1,12 @@
 import { watch, type FSWatcher } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 export type RepoWatchEvent = "add" | "change" | "unlink";
 
 export interface WatchHandle {
-  close(): Promise<void> | void;
+  stop?(): Promise<void> | void;
+  close?(): Promise<void> | void;
 }
 
 export interface WatchBackend {
@@ -18,6 +19,10 @@ export interface WatchBackend {
 
 export interface JobQueue {
   enqueue(name: string, payload: Record<string, unknown>): Promise<void> | void;
+}
+
+export interface RepoWatcherLogger {
+  warn(message: string, context?: Record<string, unknown>): void;
 }
 
 export interface WatchableRepo {
@@ -35,6 +40,7 @@ export interface LocalRepoSource {
 export interface RepoWatcherOptions {
   backend?: WatchBackend;
   debounceMs?: number;
+  logger?: RepoWatcherLogger;
 }
 
 class NodeFsWatchHandle implements WatchHandle {
@@ -43,7 +49,7 @@ class NodeFsWatchHandle implements WatchHandle {
     private readonly interval: Timer,
   ) {}
 
-  async close(): Promise<void> {
+  async stop(): Promise<void> {
     this.watcher.close();
     clearInterval(this.interval);
   }
@@ -120,9 +126,14 @@ export function createWatchBackend(kind: "chokidar" | "parcel" = "chokidar"): Wa
 
 export class RepoWatcher {
   private handle: WatchHandle | null = null;
-  private debounceTimer: Timer | null = null;
+  private readonly pendingEvents = new Map<string, {
+    timer: Timer;
+    payload: RepoWatchPayload;
+    inFlight: boolean;
+  }>();
   private readonly backend: WatchBackend;
   private readonly debounceMs: number;
+  private readonly logger: RepoWatcherLogger;
 
   constructor(
     private readonly repo: WatchableRepo,
@@ -130,7 +141,8 @@ export class RepoWatcher {
     options: RepoWatcherOptions = {},
   ) {
     this.backend = options.backend ?? createWatchBackend(process.env["FULCRUM_REPO_WATCHER_BACKEND"] === "parcel" ? "parcel" : "chokidar");
-    this.debounceMs = options.debounceMs ?? 300;
+    this.debounceMs = options.debounceMs ?? 250;
+    this.logger = options.logger ?? { warn() {} };
   }
 
   get active(): boolean {
@@ -141,30 +153,84 @@ export class RepoWatcher {
     if (this.handle) return;
     if (this.repo.kind !== "local" || !this.repo.localPath || this.repo.archived) return;
 
-    this.handle = await this.backend.watch(this.repo.localPath, (event) => {
+    const root = resolve(this.repo.localPath);
+    this.handle = await this.backend.watch(root, (event, filename) => {
       if (event === "add" || event === "change" || event === "unlink") {
-        this.scheduleSync();
+        const safeFilename = this.safeRelativePath(root, filename);
+        if (!safeFilename) return;
+        this.scheduleSync({ repoId: this.repo.id, filename: safeFilename, eventType: event });
       }
     });
   }
 
   async stop(): Promise<void> {
-    if (this.debounceTimer) {
-      clearTimeout(this.debounceTimer);
-      this.debounceTimer = null;
+    for (const event of this.pendingEvents.values()) {
+      clearTimeout(event.timer);
     }
+    this.pendingEvents.clear();
     const handle = this.handle;
     this.handle = null;
-    await handle?.close();
+    if (handle?.stop) await handle.stop();
+    else await handle?.close?.();
   }
 
-  private scheduleSync(): void {
-    if (this.debounceTimer) clearTimeout(this.debounceTimer);
-    this.debounceTimer = setTimeout(async () => {
-      this.debounceTimer = null;
-      await this.queue.enqueue("repo.sync.local", { repoId: this.repo.id });
-    }, this.debounceMs);
+  private scheduleSync(payload: RepoWatchPayload): void {
+    const key = payload.filename;
+    const existing = this.pendingEvents.get(key);
+    if (existing) {
+      clearTimeout(existing.timer);
+      existing.payload = payload;
+      existing.timer = setTimeout(() => void this.flushSync(key), this.debounceMs);
+      return;
+    }
+
+    this.pendingEvents.set(key, {
+      payload,
+      inFlight: false,
+      timer: setTimeout(() => void this.flushSync(key), this.debounceMs),
+    });
   }
+
+  private async flushSync(key: string): Promise<void> {
+    const event = this.pendingEvents.get(key);
+    if (!event || event.inFlight) return;
+    event.inFlight = true;
+    try {
+      await this.queue.enqueue("repo.sync.local", event.payload);
+      this.pendingEvents.delete(key);
+    } catch {
+      await this.queue.enqueue("repo.sync.local", { ...event.payload, retryable: true });
+      this.pendingEvents.delete(key);
+    }
+  }
+
+  private safeRelativePath(root: string, filename: string): string | null {
+    if (!filename || filename.includes("\0")) {
+      this.logger.warn("ignored repo watcher event outside registered root", {
+        repoId: this.repo.id,
+        filename,
+      });
+      return null;
+    }
+
+    const absolute = resolve(root, filename);
+    if (absolute !== root && !absolute.startsWith(`${root}/`)) {
+      this.logger.warn("ignored repo watcher event outside registered root", {
+        repoId: this.repo.id,
+        filename,
+      });
+      return null;
+    }
+
+    return absolute === root ? "." : absolute.slice(root.length + 1);
+  }
+}
+
+export interface RepoWatchPayload {
+  [key: string]: string;
+  repoId: string;
+  filename: string;
+  eventType: RepoWatchEvent;
 }
 
 export class WatcherRegistry {

@@ -20,6 +20,8 @@ import type {
 } from "./sync-local.ts";
 
 export const REPO_SYNC_REMOTE_TASK = "repo.sync.remote";
+export const REPO_LRU_WARMUP_TASK = "repo.lru.warmup";
+export const REPO_LRU_WARMUP_LIMIT = 5;
 
 export interface RepoSyncRemotePayload {
   repoId: string;
@@ -35,11 +37,18 @@ export interface RepoSyncRemoteRepo {
   syncStatus: string;
 }
 
+export interface RepoWarmupCandidate {
+  id: string;
+  lastAccessedAt?: Date | string | number | null;
+  lastTouchedAt?: Date | string | number | null;
+  failureCount?: number | null;
+}
+
 export interface RepoSyncRemoteRepositories {
   repoRepo: {
     findRemoteById(id: string): Promise<RepoSyncRemoteRepo | null>;
     updateSyncState(input: RepoSyncStateInput): Promise<unknown>;
-    listRecentlyTouchedRemote(limit: number): Promise<Array<{ id: string }>>;
+    listRecentlyTouchedRemote(limit: number): Promise<RepoWarmupCandidate[]>;
   };
   branches: {
     upsertBulk(input: {
@@ -224,11 +233,23 @@ export function createRepoLruWarmupTask(
   queue: RepoSyncRemoteQueue,
 ): RepoLruWarmupTask {
   return async () => {
-    const repos = await repositories.repoRepo.listRecentlyTouchedRemote(5);
+    const repos = selectTopRemoteReposForWarmup(
+      await repositories.repoRepo.listRecentlyTouchedRemote(REPO_LRU_WARMUP_LIMIT),
+      REPO_LRU_WARMUP_LIMIT,
+    );
     for (const repo of repos) {
       await enqueueRepoSyncRemote(queue, repo.id);
     }
   };
+}
+
+export function selectTopRemoteReposForWarmup(
+  repos: RepoWarmupCandidate[],
+  limit = REPO_LRU_WARMUP_LIMIT,
+): RepoWarmupCandidate[] {
+  return [...repos]
+    .sort((left, right) => warmupScore(right) - warmupScore(left))
+    .slice(0, Math.max(0, limit));
 }
 
 export function resolveRemoteMirrorPath(root: string, orgSlug: string, repoSlug: string): string {
@@ -268,6 +289,18 @@ function safePathSegment(value: string): string {
     .replace(/[^a-z0-9._-]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return slug || "repo";
+}
+
+function warmupScore(repo: RepoWarmupCandidate): number {
+  const accessed = timestamp(repo.lastAccessedAt ?? repo.lastTouchedAt);
+  const failures = Math.max(0, repo.failureCount ?? 0);
+  return accessed - failures * 60 * 60 * 1_000;
+}
+
+function timestamp(value: Date | string | number | null | undefined): number {
+  if (!value) return 0;
+  const time = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
 }
 
 function errorMessage(error: unknown): string {
