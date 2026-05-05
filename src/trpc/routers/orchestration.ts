@@ -432,7 +432,15 @@ export const orchestrationRouter = router({
 
       // Resolve agent name — default to codex (D-10)
       const agentName = input.agentName ?? "codex";
-      const sandboxMode = input.sandboxMode ?? "noSandbox";
+      // sandboxMode in DB is 'host'|'docker'|'podman'; 'noSandbox' is the human-facing
+      // alias for 'host' (D-12). Map input or default to 'host'.
+      const rawSandbox = input.sandboxMode ?? "noSandbox";
+      const dbSandboxMode: "host" | "docker" | "podman" =
+        rawSandbox === "docker" ? "docker" :
+        rawSandbox === "podman" ? "podman" :
+        "host";
+      // The API surface returns the human-readable name (noSandbox for host)
+      const sandboxMode = dbSandboxMode === "host" ? "noSandbox" : dbSandboxMode;
 
       // Verify task exists and belongs to this org
       const task = await fork.findOne(Task, { id: input.taskId } as never);
@@ -449,10 +457,9 @@ export const orchestrationRouter = router({
         task: fork.getReference(Task, input.taskId),
         orchestrationState: "unclaimed",
         agentName,
-        sandboxMode,
+        sandboxMode: dbSandboxMode,
         attemptCount: 0,
         workspacePath: null,
-        ...(input.projectId ? {} : {}),
       });
       fork.persist(run);
       await fork.flush();

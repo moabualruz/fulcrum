@@ -113,83 +113,100 @@ Multi-context layout: `CONTEXT-MAP.md` at root pointing to per-context `CONTEXT.
 <claude-mem-context>
 # Memory Context
 
-# [fulcrum] recent context, 2026-05-04 11:23pm GMT+2
+# [fulcrum] recent context, 2026-05-05 3:18am GMT+2
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (18,576t read) | 584,593t work | 97% savings
+Stats: 50 obs (18,499t read) | 241,023t work | 92% savings
 
-### May 4, 2026
-457 9:38p 🔴 Sprint migration test assertion mismatch on column expectations
-458 " 🔵 doc_links table NOT NULL constraint violations in fixture setup
-459 " 🔵 Product kernel initialization test reveals database state issue
-460 " 🔵 Test suite results: 14 pass, 5 fail across sprint and doc routes
-461 " 🔴 Fixed sprint schema test assertion and doc_links fixture NOT NULL constraint
-462 " 🔵 Sprint schema test now passes, but doc routes fail due to missing orgs table
-463 9:39p 🔵 Doc route test fixture reveals orgs table missing from migration set
-464 " 🔵 Production db setup calls ensureDefaultOrg after migrations, test fixture doesn't
-465 " 🔵 ensureDefaultOrg is private function in db.ts, test needs different initialization approach
-466 " 🔵 ensureDefaultOrg creates orgs table entry; runMigrations creates schema but not default org
-467 9:40p ✅ Updated test fixture to use production db singleton initialization functions
-468 " 🔵 Test cleanup functions added but core issue remains: test doesn't seed default org
-469 " 🔵 Orgs table IS created by initial migration, but not seeded with default org
-470 " 🔵 Doc routes use MikroORM (getDefaultOrgIdOrm) but test fixture uses raw SQL (createLocalOrg)
-471 9:41p 🔵 Both ORM and raw SQL paths require default org in orgs table
-472 " ✅ Updated ORM to use persistent PGlite storage via productDbDir
-473 " 🔵 ORM now finds orgs table but fails to pass query parameters
-474 9:42p 🔵 Systemic parameter binding failure in ORM connection.execute across all doc route queries
-477 9:43p 🔵 Test Phase 2 Execution Complete — All Tests Passing
-475 9:48p 🔵 Database migration suite and core infrastructure tests passing
-476 9:49p 🔵 Comprehensive test suite across core subsystems passing
-478 9:50p 🔵 Test Phase 2 Completion — Web Layer Test Failures Identified
-479 " 🔵 Test suite execution completed with 2205 passing tests across all domains
-480 9:51p 🔵 Root-level test execution running successfully with passing test results
-481 " 🔵 CI Pipeline Phase 2 Core Infrastructure Tests — All Passing
-483 9:55p 🔵 Root test suite continues with search and indexing tests passing
-482 9:56p 🔵 CLI Infrastructure Complete — All 15+ Domains with Deterministic Codegen
-484 9:57p 🔵 Root test suite running connectors and Symphony HTTP API tests with all passing
-485 9:59p 🔵 Root test suite CLI commands and orchestration tests all passing
-486 10:02p 🔵 Root test suite completed with 3985/3988 tests passing (1 failure, 2 skips)
-487 10:04p 🔵 Public API OpenAPI spec endpoint behavior mismatch identified
-488 " 🔴 Fixed public API OpenAPI spec endpoint to be discoverable when flag OFF
-490 10:05p 🔴 Fixed flaky OpenAPI spec test by caching at router initialization
-491 10:09p 🔵 Phase 2 CI suite executed successfully with comprehensive test coverage
-492 10:12p 🔴 Fixed JavaScript heap out-of-memory crash in web:check CI step
-505 10:39p 🔵 Symphony orchestration conformance suite fully validated
-506 " 🔵 Complete database schema initialized with 42+ migrations applied
-507 " 🔵 Fulcrum hook integration validated across 5 agent CLIs
-508 " 🔵 Fulcrum diagnostic tooling (doctor command) fully functional
-509 " 🔵 Package surface discovery validates all supported package types and runtime assets
-510 " 🔵 CLI template and documentation systems operational
-511 10:41p 🔵 MCP registry with 17 built-in servers and multi-agent integration
-512 " 🔵 Product kernel system with task and sprint management
-513 " 🔵 Component executor with hook, MCP registry, rules, and policy application
-514 " 🔵 Orchestration claim-lock implements strict mutual exclusion for task assignment
-515 " 🔵 Event subscription system with PGlite bridge and WebSocket polling fallback
-516 " 🔵 Search system with natural language filter translation and click telemetry
-517 10:43p 🔵 Phase 2 execution complete with all 8 plans delivering summaries and comprehensive test validation
-S96 GSD Phase 3 Discussion: Test-Driven Development Methodology (Question 2/4 - Conformance Proof) (May 4 at 11:09 PM)
-S97 GSD Phase 3 Discussion: Conformance Documentation Maintenance Strategy (Question 3/4 - Conformance Proof) (May 4 at 11:09 PM)
-S98 GSD Phase 3 Discussion: CI Agent Binary Testing Requirements (Question 4/4 - Final Conformance Proof) (May 4 at 11:09 PM)
-S99 GSD Phase 3 Discussion: Sandcastle Run Record Persistence Requirements (Question 1/4 - Artifact + Session) (May 4 at 11:10 PM)
-S100 GSD Phase 3 Discussion: Artifact Harvest Configuration Strategy (Question 2/4 - Artifact + Session) (May 4 at 11:10 PM)
-S101 GSD Phase 3 Discussion: Session Resume Behavior for Retries (Question 3/4 - Artifact + Session) (May 4 at 11:10 PM)
-S102 GSD Phase 3 Discussion: Token Usage Accounting Strategy (Question 4/4 - Final Artifact + Session) (May 4 at 11:10 PM)
-S103 GSD Phase 3 Discussion Complete: Architecture Decisions Documented and Committed (May 4 at 11:10 PM)
-534 11:12p ✅ Phase 3 Architecture Context and Discussion Log Created
-535 " ✅ Phase 3 Documentation Committed to Repository
-S104 Initialize planning phase for Phase 3 (Symphony + Sandcastle) after successful discuss-phase completion (May 4 at 11:13 PM)
-S105 Initialize Phase 3 (Symphony + Sandcastle) planning after discuss-phase completion; prepare plan-phase workflow and present research decision gate (May 4 at 11:14 PM)
-**Investigated**: Comprehensive review of plan-phase orchestrator (15-step workflow with initialization, research gate, planning, verification, gaps analysis, and auto-advance). Reference materials examined: UI patterns (banners, checkpoints, status symbols), revision loop pattern (Check-Revise-Escalate with max 3 iterations and stall detection), gate prompts (approve-revise-abort, yes-no, scope-confirm, etc.), agent contracts (completion markers for gsd-planner, gsd-plan-checker, gsd-phase-researcher), and gates taxonomy (pre-flight, revision, escalation, abort). Phase 3 artifacts loaded: 03-CONTEXT.md with 22 locked implementation decisions, 03-DISCUSSION-LOG.md audit trail, REQUIREMENTS.md (27 Symphony + 6 Sandcastle + 4 Router/Skills items), ROADMAP entry with TDD conformance suite requirement, and STATE.md showing Phase 2 complete.
+### May 5, 2026
+638 2:28a 🔵 Detailed test failures reveal specific dispatchRun integration gaps across all surfaces
+639 " ✅ dispatchRun tRPC mutation committed to phase-03 branch
+640 2:29a ✅ Added dispatchRun method to SymphonyCaller CLI interface
+641 " ✅ CLI help text updated with runs dispatch command documentation
+642 " ✅ Added dispatch case to cmdRuns command router
+643 " 🟣 Implemented cmdRunsDispatch CLI command handler
+644 " ✅ Updated stubCaller to include dispatchRun stub implementation
+645 " 🟣 Added dispatch server action to Web orchestration page
+646 2:30a ✅ Added dispatch method to TUI OrchestrationScreen caller interface
+647 " 🟣 Implemented dispatch method in TUI OrchestrationScreen class
+648 " 🔵 Symphony conformance tests show significant progress: 78 pass, 2 fail (down from 73/7)
+649 2:31a 🔵 Remaining 2 test failures are both tRPC-specific implementation issues
+650 " 🔵 tRPC dispatchRun endpoint encounters database execution error (PGLite)
+651 2:32a 🔵 tRPC dispatchRun fails database check constraint: agent_runs_sandbox_mode_check rejects "noSandbox"
+652 " 🔵 Schema mismatch: dispatchRun uses "noSandbox" but constraint requires "host"|"docker"|"podman"
+653 " 🔴 Fixed sandboxMode database constraint violation in dispatchRun tRPC mutation
+654 2:33a 🔴 Refined sandboxMode fix: persist database-valid value instead of API name
+655 " 🔵 Symphony conformance tests: 80/80 PASSING — dispatchRun fully integrated and validated
+656 " ✅ Phase 3 dispatchRun integration committed: CLI, TUI, Web surfaces unified on SND-06
+657 " 🔵 Post-commit validation: symphony conformance tests remain 80/80 passing
+658 2:34a 🔵 Orchestration router unit tests: 8/8 passing — tRPC dispatchRun validated
+659 " 🔵 CLI symphony module tests: 17/17 passing — dispatch command implementation validated
+660 " 🔵 Web orchestration page server tests: 4/4 passing — dispatch form action validated
+661 " 🔵 TypeScript type checking errors in CI: dispatchRun interface incompatibility
+662 " 🔴 Fixed TypeScript type errors in HTTP server nullability
+664 2:40a 🔵 CI pipeline web:check task crashes with SIGABRT abort signal
+665 2:51a 🔴 Resolved TypeScript errors in symphony orchestration and http-server
+666 " 🟣 Phase 03-06 HTTP extension and dispatch parity completed with 4 auto-fixed bugs
+667 2:52a ⚖️ Phase 03-06 complete and ready for verification; Phase 03 fully delivered
+668 " ✅ Phase 03 symphony-sandcastle marked COMPLETE in STATE.md with architectural decisions recorded
+669 2:58a 🔵 Symphony Phase 3 Conformance Requirements (SYM-09 through SYM-19)
+670 " 🔵 Lifecycle Hooks Implementation and Retry Mechanics in Symphony
+671 " 🔵 Lifecycle Hook Interface Definition and Agent Communication
+672 " 🔵 Symphony Dispatch Flow and Workspace Path Validation
+673 " 🔵 SYM-19 Stall Detection: lastCodexTimestamp Preference and Fallback Logic
+674 2:59a 🔵 Workflow Definition Schema Supports after_create Hook
+675 " 🔵 SYM-12 and Workspace Lifecycle Hooks from OpenAI Symphony SPEC
+676 " 🔵 SYM-12 Workspace CWD Enforcement in app-server-client and Dispatch State Machine
+677 " 🔵 Dispatch Integration in Web and TUI Orchestration Interfaces
+678 " 🔵 Official SYM-12 and SYM-13 Requirements from REQUIREMENTS.md
+679 " 🔵 SYM-12 Path Validation Gap: assertWorkspacePathInOrgRoot Called Only During Cleanup, Not Before Launch
+680 3:00a 🔵 Phase 3 Completion Status and SYM-09 through SYM-13, SYM-19 Requirements
+681 " 🔵 Phase 3 Success Criteria and SYM Requirement Mapping
+682 " 🔵 Conformance Test Coverage Map for SYM-09 through SYM-19
+683 " 🔵 Phase 3 Verification Report Generated: 31/33 SYM Requirements Verified, 2 Blockers Identified
+684 3:02a 🔵 Phase 3 Verification Agent Completed: 2 Specific Implementation Gaps Confirmed
+S142 Complete Area 6 checkpoint and initiate Area 7 (Three-surface routing UX) Question 1/4 — finalize skill sync decisions, then begin discussion on routing config CRUD parity across Web/CLI/TUI. (May 5 at 3:10 AM)
+687 3:10a 🟣 Symphony Orchestration: SYM-09 through SYM-13 + SYM-19 implementation complete
+S143 Progress Area 7 (Three-surface routing UX) Question 2/4 — determine route testing/preview UX: explainable result detail, simple result, or debug-only detail with verbose flag. (May 5 at 3:10 AM)
+S144 Progress Area 7 (Three-surface routing UX) Question 3/4 — determine rule authoring model: structured builder with JSON escape hatch, raw JSON only, or natural language generation. (May 5 at 3:10 AM)
+S145 Complete Area 7 (Three-surface routing UX) Question 4/4 — determine rule validation gate before save: strict validation with dry-run, save disabled draft, or save anything with late disabling. (May 5 at 3:11 AM)
+688 3:11a 🔵 All orchestration tests pass: 196/196 across 8 test files
+689 " 🔵 SYM-12 + SYM-13 implementation verification via code inspection
+S147 Phase 4 Discussion Completion: Capture all 7 gray areas (Inference, Embedding, Router Learning, LLM Gate, MCP, Skill Sync, Surface UX) with locked decisions across 28 Q&A pairs (May 5 at 3:11 AM)
+S146 Phase 03 gap closure: verify and complete remaining Symphony Orchestration (SYM) requirements — specifically SYM-12 (workspace safety), SYM-13 (lifecycle hooks), and related items. (May 5 at 3:11 AM)
+S148 Complete Phase 03 verification: confirm all 33 Symphony + Sandcastle conformance requirements met, with specific focus on closing SYM-12 (workspace safety) and SYM-13 (lifecycle hooks) gaps. (May 5 at 3:11 AM)
+690 3:12a 🔵 SYM-12 + SYM-13 implementation verified with line-by-line evidence
+S149 Phase 4 discussion completion and context documentation: 7 areas with 28 locked decisions ready for downstream planning agents (May 5 at 3:13 AM)
+S150 Phase 4 Context Documentation: Complete discussion-to-documentation transition for Inference + Router/Skills phase with all 28 locked decisions (May 5 at 3:14 AM)
+S151 Continue Phase 4 planning without asking questions; transition from discussion phase (complete) to planning phase. System background operations detected AI-SPEC gate for Phase 4 (Inference + Router/Skills) (May 5 at 3:15 AM)
+**Investigated**: • Plan-phase workflow documentation (steps 1-15+) loaded and examined
+    • Phase 4 initialization queried: found=true, has_context=true, has_research=false, has_plans=false
+    • UI brand patterns and project instructions reviewed
+    • Phase 4 scope: 04-CONTEXT.md exists with 28 locked decisions across 7 discussion areas
+    • AI-SPEC gate (step 4.5) triggered: Phase 4 contains AI/inference keywords (detected from phase goal/scope)
+    • Init config: planner_model=opus, researcher_model=sonnet, checker_model=sonnet, commit_docs=true
 
-**Learned**: Plan-phase workflow is a structured 15-step orchestrator that gates research → planning → verification → gaps → auto-advance. Step 5.1 (Standard Research Decision) presents user with explicit research/skip choice. Phase 3 context is comprehensive (22 decisions in 5 categories: Tracker Authority D-01..05, WORKFLOW.md Runtime D-06..09, Dispatch + Sandbox D-10..14, Conformance Proof D-15..18, Artifact + Session D-19..22, plus agent's discretion). Phase 3 requirements span three pillars: Symphony conformance (SYM-01..27 covering WORKFLOW.md, tracker adapter, poll/retry/stall/reconciliation, app-server dispatch, HTTP extension, approval posture, run lifecycle), Sandcastle (SND-01..06 covering noSandbox dispatch, artifact harvest, adapter-swap tests, provider detection, session JSONL, multi-surface dispatch), Router/Skills (RTR-01..04 covering rules-engine matching, learned rules, LLM routing, skill sync). Conformance proof requires RED-first TDD methodology with generated symphny-conformance.md as source of truth.
+**Learned**: • Phase 4 discussion is complete with canonical CONTEXT.md and DISCUSSION-LOG.md committed (hash 6db5635f)
+    • All 28 locked decisions (D-01 through D-28) organized into 7 decision areas with implementation details
+    • Plan-phase workflow includes non-blocking AI-SPEC gate: detects AI keywords, suggests running gsd-ai-integration-phase for framework/eval strategy
+    • Gate is non-blocking — planning can proceed with existing CONTEXT.md; AI-SPEC would be optional enrichment
+    • System workflows support chunked planning mode, validation strategy (Nyquist), security threat model gate, UI design contract gate, schema push detection
 
-**Completed**: Discuss-phase successfully completed (20 questions, 22 documented decisions). Committed 03-CONTEXT.md and 03-DISCUSSION-LOG.md to git (dc8dac58). Phase 2 fully executed and verified (8 plans, 18 total completed plans, 100% progress). Git state: branch dev/v1.0 [ahead 1] with AGENTS.md modified. Current session: loaded plan-phase orchestrator, read all reference materials, validated Phase 3 roadmap entry, loaded init.plan-phase JSON (sonnet researcher, opus planner, sonnet checker; research_enabled=true, plan_checker_enabled=true, commit_docs=true), examined phase directory (03-CONTEXT.md, 03-DISCUSSION-LOG.md), verified no existing plans, confirmed config defaults (all workflow gates unset = defaults active).
+**Completed**: • Phase 4 discussion phase: 100% complete with CONTEXT.md and DISCUSSION-LOG.md
+    • Phase directory prepared: .planning/phases/04-inference-router-skills/
+    • State.md confirms 3/3 phases ready
+    • System loaded plan-phase workflow templates and UI brand patterns
+    • Skill invocation attempt (gsd-plan-phase) failed (skill not registered); system is reading workflows in preparation for orchestrator-style invocation
 
-**Next Steps**: Awaiting user response to research decision gate (Step 5.1): user must reply with `1` (research first) or `2` (skip research) to proceed. Based on response: if `1`, spawn gsd-phase-researcher with CONTEXT.md to investigate Symphony SPEC.md details, orchestration patterns, Sandcastle dispatch mechanisms, and track the returned 03-RESEARCH.md. If `2`, proceed directly to Step 6 (Check Existing Plans) → Step 7 (context paths) → Step 8 (spawn gsd-planner with CONTEXT.md + REQUIREMENTS.md) → planning completion → Step 10 (spawn gsd-plan-checker) → Step 12 revision loop if needed → Step 13 coverage gates → final status. Each major step will display UI banners per references/ui-brand.md patterns. Revision loop uses stall detection (issue count must decrease between iterations, max 3 iterations).
+**Next Steps**: System has arrived at AI-SPEC gate (step 4.5 of plan-phase workflow). Gate decision pending:
+    Option 1: **Continue without AI-SPEC** — proceed to research/planning phases using existing CONTEXT.md (non-blocking path)
+    Option 2: **Stop and run gsd-ai-integration-phase 4 first** — generate AI-SPEC (framework selection, eval strategy) before planning
+    
+    Current recommendation: Option 1 (continue). Rationale: All architectural decisions locked in CONTEXT.md; AI-SPEC would add eval design but core design is captured; non-blocking gate allows proceeding. Next action: confirm decision, then transition to research phase (step 5 of plan-phase workflow).
 
 
-Access 585k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 241k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>
