@@ -21,6 +21,7 @@ import {
   updateSavedSearch,
 } from "../../search/saved-searches.ts";
 import { SearchQueryService } from "../../search/query-service.ts";
+import { SnapshotService } from "../../search/snapshot-service.ts";
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -130,6 +131,26 @@ export const searchRouter = t.router({
     .input(SavedSearchDeleteInputSchema)
     .output(z.object({ ok: z.literal(true) }))
     .mutation(({ ctx, input }) => deleteSavedSearch(ctx, input)),
+
+  /**
+   * snapshot — returns serialized Orama JSON snapshot for SSR hydration.
+   * T-06-15: only documents belonging to the authenticated org are included.
+   */
+  snapshot: permissionedProcedure({ resource: "search", action: "query" })
+    .input(z.object({}))
+    .output(z.object({ snapshot: z.string() }))
+    .query(async ({ ctx }) => {
+      const orgId = ctx.orgId;
+      if (!orgId) return { snapshot: "" };
+
+      const svc =
+        (ctx.container?.get(SnapshotService) as SnapshotService | undefined) ??
+        (ctx.db ? new SnapshotService(ctx.db) : null);
+      if (!svc) return { snapshot: "" };
+
+      const snapshot = await svc.buildSnapshot(orgId);
+      return { snapshot };
+    }),
 
   /**
    * recordClick — write search click telemetry row.
