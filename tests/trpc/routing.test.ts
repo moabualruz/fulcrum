@@ -154,12 +154,20 @@ describe("routing tRPC router", () => {
 
       const decision = await caller.routing.test({ taskId: task.id });
 
-      expect(decision).toEqual({
-        ruleId: rule.id,
-        source: "rule",
-        agent: "codex",
+      // Enriched response schema (D-26)
+      expect(decision).toMatchObject({
+        status: "matched",
+        matchedRuleId: rule.id,
         confidence: 1,
+        factsUsed: {
+          task: {
+            kind: "bug",
+          },
+        },
       });
+      expect(decision).toHaveProperty("evidence");
+      expect(decision).toHaveProperty("backend");
+      expect(decision).toHaveProperty("whyUnmatched");
       expect(await em.count(Event, { org: ORG_ID, verb: "routed", subjectId: task.id })).toBe(1);
     } finally {
       await db.close();
@@ -188,12 +196,15 @@ describe("routing tRPC router", () => {
         },
       });
 
-      expect(decision).toEqual({
-        ruleId: rule.id,
-        source: "rule",
-        agent: "claude-code",
+      // Enriched response schema (D-26)
+      expect(decision).toMatchObject({
+        status: "matched",
+        matchedRuleId: rule.id,
         confidence: 1,
       });
+      expect(decision).toHaveProperty("evidence");
+      expect(decision).toHaveProperty("backend");
+      expect(decision).toHaveProperty("whyUnmatched");
       expect(await em.count(Event, { org: ORG_ID, verb: "routed" })).toBe(0);
     } finally {
       await db.close();
