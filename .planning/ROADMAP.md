@@ -196,7 +196,7 @@ Cross-cutting constraints:
 |-------|----------------|--------|-----------|
 | 1. Architecture + Security | 0/10 | Planned | - |
 | 2. Bug Fixes + Foundation | 8/8 | Complete | 2026-05-04 |
-| 3. Symphony + Sandcastle | 4/6 | In Progress|  |
+| 3. Symphony + Sandcastle | 5/6 | In Progress|  |
 | 4. Inference + Router/Skills | 0/? | Not started | - |
 | 5. Task Management + Metrics | 0/? | Not started | - |
 | 6. Documents + Memory + Search | 0/? | Not started | - |

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-last_updated: "2026-05-05T00:09:30Z"
+last_updated: "2026-05-05T00:22:00Z"
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 24
-  completed_plans: 22
-  percent: 92
+  completed_plans: 23
+  percent: 96
 ---
 
 # Planning State
@@ -17,7 +17,7 @@ progress:
 ## Current Position
 
 Phase: 03 (symphony-sandcastle) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 
 - **Phase**: 02-bug-fixes-foundation
 - **Plan**: 8 plans created
@@ -61,3 +61,6 @@ Plan: 5 of 6
 - [Phase 03-04]: Response ID matching in CodexAppServerClient accepts any response carrying thread.id data (single in-flight request per process)
 - [Phase 03-04]: TokenUsageAggregator.updateCumulative() replaces stored total per thread_id — no double-counting (D-22)
 - [Phase 03-04]: logSymphonyEvent() catches all sink errors — observability must not crash orchestration (§17.6)
+- [Phase 03-05]: resolveAgentRunConfig merges WORKFLOW.md override fields over AgentProfile defaults; UnknownAgentError for unsupported agent names; Codex default (D-10, D-11)
+- [Phase 03-05]: session-resume result exposes resumeVia and capability — unsupported profiles cannot silently pretend resume happened (D-21)
+- [Phase 03-05]: doctor checkSandcastle() calls sandboxProviderDoctorChecks(); errors name the missing provider flag (e.g. sandbox-docker); runAll exported for test reuse

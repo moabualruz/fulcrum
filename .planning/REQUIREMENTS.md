@@ -101,12 +101,12 @@
 
 ### Sandcastle — Pillar 4 (SND)
 
-- [ ] **SND-01**: noSandbox + claudeCode dispatches task and writes agent_runs row end-to-end
-- [ ] **SND-02**: Artifact harvest via copyFileOut produces artifact entity from sandbox output
-- [ ] **SND-03**: Adapter-swap test: AgentRun interface unchanged across providers
-- [ ] **SND-04**: Doctor warns if Docker absent when sandbox-docker flag enabled
-- [ ] **SND-05**: Session JSONL capture and resumeSession tested
-- [ ] **SND-06**: Web + CLI + TUI can all dispatch agent runs
+- [x] **SND-01**: noSandbox + claudeCode dispatches task and writes agent_runs row end-to-end
+- [x] **SND-02**: Artifact harvest via copyFileOut produces artifact entity from sandbox output
+- [x] **SND-03**: Adapter-swap test: AgentRun interface unchanged across providers
+- [x] **SND-04**: Doctor warns if Docker absent when sandbox-docker flag enabled
+- [x] **SND-05**: Session JSONL capture and resumeSession tested
+- [x] **SND-06**: Web + CLI + TUI can all dispatch agent runs
 
 ### Router + Skills — Pillar 5 (RTR)
 
