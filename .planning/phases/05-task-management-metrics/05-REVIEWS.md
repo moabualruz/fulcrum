@@ -1,402 +1,750 @@
-# Phase 5 Peer Review
+---
+phase: 05
+reviewers: [gemini, codex]
+reviewed_at: 2026-05-05T11:30:00Z
+plans_reviewed: [05-00, 05-01, 05-02, 05-03, 05-04, 05-05, 05-06, 05-07, 05-08, 05-09, 05-10, 05-11, 05-12, 05-13, 05-14, 05-15]
+---
 
-## Executive Summary
+# Cross-AI Plan Review — Phase 5
 
-Finding count: **HIGH 6, MEDIUM 8, LOW 4.**
+## Gemini Review
 
-Overall quality is high-density and mostly executable, but Phase 5 is not ready for autonomous parallel execution. Biggest blockers: schema/service contradictions around workspace analytics and workflow config, missing server-side field dependency enforcement, missing relationship CRUD despite multiple downstream consumers, and unsafe same-wave file conflicts. Fix dependency declarations and schema holes before execution starts; otherwise agents will produce locally plausible files that fail integration.
+This review covers 16 implementation plans (00–15) across 7 waves for Phase 5. The phase aim is to bring the Task pillar to competitive parity with Linear/Jira through advanced analytics, workflow automation, and real-time collaboration.
 
 ---
 
-## Critical Findings (HIGH severity)
+## 05-00-PLAN.md: RED Test Stubs
+**Summary:** Initializes the TDD cycle by creating 10 RED failing test stubs across backend (bun:test) and frontend (vitest) environments, ensuring Nyquist compliance.
 
-### HIGH-01: Workspace reports accepted by router but excluded by MetricsCache.scopeType schema
+**Strengths:**
+- Strong discipline in establishing failure states before implementation.
+- Covers critical paths like Comment CRUD, Report compute, and Chart rendering.
 
-**Affected Plans:** 05-01, 05-05, 05-09, 05-13
+**Concerns:**
+- **LOW:** Ensure test names match requirement IDs (TSK-XX) exactly for automated traceability.
 
-**Description:** CONTEXT requires workspace-level report scope, and reportsRouter accepts `workspace`, but `MetricsCache.scopeType` and migration check constraints only allow `sprint|project|epic`. Workspace portfolio/cross-project reports cannot persist/query snapshots through the declared two-layer model.
+**Suggestions:**
+- Add a specific test case for "cross-org isolation" in the CommentService stub to catch IDOR risks early.
 
-**Evidence:** `05-CONTEXT.md:173-176` says portfolio rollups reuse `metrics_snapshots` with `scope_type: 'workspace'`. `05-01-PLAN.md:191-192` and `05-01-PLAN.md:269` constrain scope to `('sprint','project','epic')`. `05-05-PLAN.md:297` defines `ScopeSchema` with `workspace`.
-
-**Recommended Fix:** Add `workspace` to `MetricsCache.scopeType` TypeScript union and migration check constraint, or change D-95/ReportService to aggregate workspace on read without snapshot rows. Align all three plans.
-
----
-
-### HIGH-02: WorkflowService expects projects.workflow_config column, but Plan 01 migration never adds it
-
-**Affected Plans:** 05-01, 05-04, 05-15
-
-**Description:** Plan 04 depends on a `workflow_config` jsonb column on projects, but Plan 01 migration only alters tasks, sprints, metrics_cache, events, task_statuses, and creates six new tables. Workflow editor and transition persistence will fail at runtime.
-
-**Evidence:** `05-04-PLAN.md:107-112` instructs `getTransitionGraph` and `updateTransitions` to read/write `project.workflow_config`. `05-01-PLAN.md:267-278` enumerates all migration DDL sections and does not alter `projects`.
-
-**Recommended Fix:** Add `workflow_config jsonb` to Plan 01 migration/entities if Project entity exists, or store workflow transitions in a dedicated entity/table and update Plans 04/15 accordingly.
+**Risk Assessment: LOW.** Pure boilerplate with no architectural risk.
 
 ---
 
-### HIGH-03: Field dependency rules lack server-side required-field validation
+## 05-01-PLAN.md: Schema Foundation
+**Summary:** The heavy-lifter plan that installs 14 packages and runs a comprehensive migration extending 5 tables and adding 9 new ones.
 
-**Affected Plans:** 05-02, 05-12, 05-11
+**Strengths:**
+- Directly addresses `HIGH-01`, `HIGH-02`, and `HIGH-05` architecture blockers in Wave 1.
+- Implements MIT license verification for all new dependencies (D-88).
 
-**Description:** D-111 requires client-side evaluation plus server validation for required-field rules on save. Plans create the entity and UI config, but no TaskService/tRPC save-path validation task exists. This leaves a definite data integrity/security gap: clients can bypass required conditional fields.
+**Concerns:**
+- **MEDIUM:** The migration is very large. While `addSql` uses `if not exists`, a failure in the middle of 9 `CREATE TABLE` statements in PGlite might leave the schema in an inconsistent state if transactions aren't handled per-statement.
+- **LOW:** Standardizing on US spelling `canceled` (D-22) is good, but ensure existing UI labels are updated globally to avoid "cancelled/canceled" drift.
 
-**Evidence:** `05-CONTEXT.md:199-202` says "Server validates required-field rules on save." `05-12-PLAN.md:36-41` scopes the work to shortcuts, command palette, overlay, and field dependency configuration UI. `05-12-PLAN.md:83-90` touches only `+layout.svelte` and UI components. `05-11-PLAN.md:182-190` modifies `TaskService.bulkUpdate` only for bulk events, not field dependency validation.
+**Suggestions:**
+- Consider splitting this into two migrations: one for table extensions and one for new tables, to reduce the failure surface.
 
-**Recommended Fix:** Add a backend task to validate `field_dependency_rules` in TaskService create/update/bulkUpdate and corresponding tRPC tests for direct API bypass.
-
----
-
-### HIGH-04: TaskRelationship has entity only — no CRUD/service/router surface for Gantt/CLI/reports/blockers
-
-**Affected Plans:** 05-02, 05-03, 05-05, 05-10, 05-14
-
-**Description:** Plan 02 creates `TaskRelationship`, but no service/router procedures are planned for creating/listing/deleting relationships. Downstream plans call or assume relationships via `tasks.list({ includeRelationships: true })`, CLI `task relate`, blocked-item reports, Gantt dependency arrows, and tracker `isBlocked`.
-
-**Evidence:** `05-02-PLAN.md:137-142` only defines the entity. `05-10-PLAN.md:142-158` fetches `trpc.tasks.list.query({ projectId, includeRelationships: true })` and maps `relationships`. `05-14-PLAN.md:115-120` adds `fulcrum task relate <task-id> blocks <other-id>`. `05-05-PLAN.md:230-232` requires `getBlockedItems` from `TaskRelationship`.
-
-**Recommended Fix:** Add relationship methods to TaskService and tasksRouter in Wave 2, including create/delete/list, org-scoped validation, cycle/duplicate checks, and tests. Update dependencies for plans 05, 10, 14.
+**Risk Assessment: MEDIUM.** Success is critical for all subsequent waves.
 
 ---
 
-### HIGH-05: YjsSnapshot entity appears in Wave 4 with no migration or ORM registration
+## 05-02-PLAN.md: New Entities
+**Summary:** Creates 9 MikroORM entity classes using Stage-3 decorators, providing the typed foundation for the service layer.
 
-**Affected Plans:** 05-01, 05-13
+**Strengths:**
+- Consistent use of explicit `type` properties (D-111).
+- Includes the `YjsSnapshot` entity in Wave 1 (fixing `HIGH-05` early).
 
-**Description:** Plan 13 creates `YjsSnapshot` table/entity in Wave 4, but Phase 5 migration is fixed in Wave 1 and creates only six tables. No migration, barrel export, or ORM registration is specified for `yjs_snapshots`, so persistence can compile as a file but fail at DB/runtime.
+**Concerns:**
+- **LOW:** `TaskRecurrenceRule` contains template data; ensure the size of this JSONB column is monitored if tasks grow very large.
 
-**Evidence:** `05-13-PLAN.md:100-117` creates `src/db/entities/tasks/YjsSnapshot.ts` with table `yjs_snapshots`. `05-01-PLAN.md:271-276` lists the only new tables: comments, watchers, reactions, relationships, automations, field dependency rules. `05-02-PLAN.md:156-164` updates the barrel for six entities only.
+**Suggestions:**
+- Add `@Index` to `targetTaskId` in `TaskRelationship` to optimize "Blocked By" reverse queries (D-123).
 
-**Recommended Fix:** Move `YjsSnapshot` entity and migration DDL to Wave 1/Plan 01/02, or defer Yjs persistence. Add index/barrel/ORM registration and migration ACs.
-
----
-
-### HIGH-06: Wave 2 unsafe same-file conflicts across routers/index.ts and TaskService.ts
-
-**Affected Plans:** 05-03, 05-04, 05-05, 05-06
-
-**Description:** Wave 2 contains four autonomous plans that all modify `src/server/trpc/routers/index.ts`; Plans 03 and 04 also both modify `src/services/TaskService.ts`. This violates safe parallelism and will create merge conflicts or order-dependent service behavior.
-
-**Evidence:** `05-03-PLAN.md:8-14`, `05-04-PLAN.md:8-12`, `05-05-PLAN.md:8-13`, and `05-06-PLAN.md:8-12` all include `src/server/trpc/routers/index.ts`. `05-03-PLAN.md:265-268` changes TaskService auto-subscribe; `05-04-PLAN.md:155-160` changes TaskService transition validation/events.
-
-**Recommended Fix:** Split router mounting and TaskService integration into a sequential integration plan after service/router files exist, or assign one Wave 2 owner for shared files.
+**Risk Assessment: LOW.** Standard boilerplate.
 
 ---
 
-## Significant Findings (MEDIUM severity)
+## 05-03-PLAN.md: Comment Service
+**Summary:** Implements Comment/Watcher/Reaction logic, including the high-value "Team Mention" expansion feature.
 
-### MEDIUM-01: Plan 06 depends on CommentService but does not declare Plan 03
+**Strengths:**
+- Recursive `extractMentions` supports both Users and Teams (D-100).
+- Implements GitHub-style threaded replies (D-01).
 
-**Affected Plans:** 05-03, 05-06
+**Concerns:**
+- **MEDIUM:** Infinite recursion risk in `getThreaded` if a circular parent/child relationship is somehow introduced (though DB constraints should prevent this).
+- **LOW:** Watcher auto-subscribe on `@mention` could lead to notification fatigue (Phase 7 concern, but worth noting now).
 
-**Description:** Automation actions call `CommentService`, but Plan 06 depends only on [01, 02]. In parallel Wave 2 execution, Plan 06 can run before CommentService/commentsRouter exist.
+**Suggestions:**
+- Set a hard limit on thread depth (e.g., 5 levels) in the service layer regardless of UI flattening.
 
-**Evidence:** `05-06-PLAN.md:6` declares `depends_on: [01, 02]`. `05-06-PLAN.md:237-243` includes `add_comment` and `subscribe_watcher` actions via `CommentService`. CommentService is created in `05-03-PLAN.md:171-225`.
-
-**Recommended Fix:** Add dependency `03` to Plan 06, or move automation comment/watcher actions to a later integration plan.
-
----
-
-### MEDIUM-02: Plan 08 uses sprint capacity but lacks dependency on Plan 06
-
-**Affected Plans:** 05-06, 05-08
-
-**Description:** Plan 08 builds `SprintCapacityBar` and sprint planning UI, but depends only on Plan 03. Its data source/method `getCapacityPreview` is created in Plan 06.
-
-**Evidence:** `05-08-PLAN.md:6` declares `depends_on: [03]`. `05-08-PLAN.md:161-166` renders assigned/capacity utilization. `05-06-PLAN.md:155-160` creates `SprintService.getCapacityPreview`.
-
-**Recommended Fix:** Add dependency `06` to Plan 08 or make Plan 08 purely presentational with explicit mock props and defer wiring.
+**Risk Assessment: LOW.** Standard service logic.
 
 ---
 
-### MEDIUM-03: Team mentions decision only partially covered
+## 05-04-PLAN.md: Workflow & Relationship Services
+**Summary:** Delivers the workflow transition engine and the blocking relationship manager with cycle detection.
 
-**Affected Plans:** 05-03, 05-07
+**Strengths:**
+- Cycle detection (DFS with depth 50) resolves `HIGH-04` blocking gap.
+- Methodology-aware defaults (Scrum/Kanban/None) provide instant project value.
 
-**Description:** D-100 requires `@team-name` resolving to a team and subscribing all team members. Plans cover user mentions and UI suggestion sources, but CommentService extraction only returns user IDs.
+**Concerns:**
+- **LOW:** `markAsDuplicate` auto-closes the source task; ensure this doesn't bypass mandatory "Reason for Close" custom fields if they exist.
 
-**Evidence:** `05-CONTEXT.md:184-186` defines team mention behavior. `05-03-PLAN.md:150-157` tests user IDs from TipTap mention nodes. `05-03-PLAN.md:202-203` defines `extractMentions(...): string[]` extracting `attrs.id` as user IDs. `05-07-PLAN.md` references D-101 but not D-100 in its task/service behavior.
+**Suggestions:**
+- In `checkCycle`, cache the results of previous traversals if a bulk operation is checking 50+ tasks at once.
 
-**Recommended Fix:** Add team mention parsing type discriminator, team lookup, member expansion, and tests for watcher auto-subscribe for teams.
-
----
-
-### MEDIUM-04: Label groups and priority system lack concrete backend model
-
-**Affected Plans:** 05-01, 05-08, 05-11, 05-14
-
-**Description:** D-79/D-80 define label groups and priority levels, but plans mostly use `Task.labels: string[]` and UI pickers. There is no label entity/group schema, no color persistence, and no priority enum/check constraints.
-
-**Evidence:** `05-CONTEXT.md:151-153` requires scoped labels with colors/groups and five priority levels. `05-01-PLAN.md:171-172` adds labels as `string[]`. `05-11-PLAN.md:168-172` adds UI pickers but no data model.
-
-**Recommended Fix:** Either explicitly defer label groups/color and priority metadata, or add label/priority schema/service tasks and tests.
+**Risk Assessment: LOW.**
 
 ---
 
-### MEDIUM-05: D-78 custom field visibility across surfaces is partial
+## 05-05-PLAN.md: Report Service & Metrics Worker
+**Summary:** Implements the two-layer analytics model (Events + Snapshots) and replaces legacy raw SQL.
 
-**Affected Plans:** 05-07, 05-08, 05-11
+**Strengths:**
+- Addresses `ARCH-01` and `HIGH-01` by moving reports to tRPC and adding workspace scope.
+- CSV export (D-54) is a vital power-user feature.
 
-**Description:** D-78 requires custom fields in list columns, task detail panel, filter builder, bulk edit, and board cards. Plans cover list/filter tests and mention task detail sections, but bulk edit does not include custom fields and board cards do not show up to two custom field values.
+**Concerns:**
+- **MEDIUM:** Worker load. A flood of task updates (e.g., during a bulk edit) will trigger 50+ metrics rollup jobs.
+- **LOW:** Cycle time calculation from Layer 1 events requires precise "started" to "completed" stamps.
 
-**Evidence:** `05-CONTEXT.md:147-149` defines D-78. `05-08-PLAN.md:139-149` includes custom field list columns. `05-11-PLAN.md:167-176` bulk actions omit custom field edits. `05-08-PLAN.md:90-94` TaskCard comfortable mode lists labels/points/assignee/priority, not custom fields.
+**Suggestions:**
+- **Performance:** Implement job debouncing in `metrics-rollup.ts`: only one job per `(scopeId, scopeType)` should be in the queue at any time.
 
-**Recommended Fix:** Add custom field display slots to TaskCard, custom fields section wiring in TaskDetailPanel, and a bulk custom-field action.
-
----
-
-### MEDIUM-06: Acceptance criteria rely on grep and can pass broken implementations
-
-**Affected Plans:** 05-05, 05-09, 05-10, 05-13, 05-15
-
-**Description:** Many ACs verify strings/files rather than behavior. This is not enough for chart rendering, dynamic imports, critical path, Yjs auth/persistence, or sprint close flows.
-
-**Evidence:** `05-10-PLAN.md:190-198` accepts Gantt by grep for `Gantt`, `dependency`, `critical`, `slack`. `05-13-PLAN.md:144-152` accepts Yjs persistence by grep for `WebSocketServer`, `encodeStateAsUpdate`, `docName`. `05-15-PLAN.md:141-151` accepts sprint/workflow/automation UI by grep for data attributes and words.
-
-**Recommended Fix:** Add command-verifiable tests: component render tests for charts/Gantt/calendar, pure critical path unit tests, yjs persistence/auth unit tests, and route/server integration tests.
+**Risk Assessment: MEDIUM.** Performance of analytics queries on large event logs is the primary risk.
 
 ---
 
-### MEDIUM-07: `autonomous: false` final plan conflicts with autonomous execution contract
+## 05-06-PLAN.md: Integration & Automation
+**Summary:** The "Shared File Owner" plan that mounts all routers and extends core Task/Sprint services.
 
-**Affected Plans:** 05-15
+**Strengths:**
+- Solves `HIGH-06` same-file conflict by centralizing edits to `router.ts` and `TaskService.ts`.
+- Implements rule-based automation with cycle detection (D-91).
 
-**Description:** User asks autonomous agents to execute plans, but Plan 15 has `autonomous: false` and a blocking human-verify checkpoint. That may be intentional, but it conflicts with "plans executable by autonomous agent without ambiguity" for the final wave.
+**Concerns:**
+- **MEDIUM:** `TaskService` is growing significantly. The inline field dependency validation (D-111) is added here to avoid circular imports, but it adds to the service's "God Object" status.
+- **LOW:** Ensure `AutomationService` cycle detection uses a persistent key (like `originatingEventId`) to track chains accurately.
 
-**Evidence:** `05-15-PLAN.md:17` sets `autonomous: false`. `05-15-PLAN.md:224-238` has a blocking `checkpoint:human-verify` requiring user approval.
+**Suggestions:**
+- Add a "Dry Run" mode to `AutomationService` to help users test complex chains.
 
-**Recommended Fix:** Mark Plan 15 as a manual verification plan, or split automated completion from human UAT so autonomous execution can finish without blocking.
-
----
-
-### MEDIUM-08: Yjs WebSocket endpoint hardcodes localhost
-
-**Affected Plans:** 05-13
-
-**Description:** Collaboration client connects to `ws://localhost:1234`, which works only in local dev and bypasses deployment/proxy/config concerns. It also weakens auth review because origin/session handling is not represented in client config.
-
-**Evidence:** `05-13-PLAN.md:166-172` hardcodes `new WebsocketProvider("ws://localhost:1234", ...)`. `05-13-PLAN.md:134` requires validating WebSocket upgrade against session auth.
-
-**Recommended Fix:** Use configured public/private WebSocket URL from environment/runtime config, same-origin default, and add tests for auth rejection.
+**Risk Assessment: MEDIUM.** High complexity in `AutomationService` logic.
 
 ---
 
-## Minor Findings (LOW severity)
+## 05-07-PLAN.md: Task Detail Panel
+**Summary:** Delivers the central task interaction surface with rich text, mentions, and activity feeds.
 
-### LOW-01: Plan 01 dependency count says 14 packages but command installs 13 web + 1 root + shadcn components
+**Strengths:**
+- Linear-style side panel (D-16) preserves view context.
+- Dual mention suggestion source (Users + Teams) is a major UX win.
 
-**Affected Plans:** 05-01
+**Concerns:**
+- **LOW:** J/K navigation (D-18) must ensure that any unsaved changes in the TipTap editor are prompted or auto-saved to prevent data loss.
 
-**Description:** Wording is slightly ambiguous. Must-have says "All 14 new npm packages," while Task 1 also installs shadcn components via `npx`, which are source additions rather than npm deps.
+**Suggestions:**
+- Implement "Draft" persistence in LocalStorage for the comment composer.
 
-**Evidence:** `05-01-PLAN.md:28` says 14 packages. `05-01-PLAN.md:100-115` installs 13 web packages plus `asciichart`; `05-01-PLAN.md:117-121` adds shadcn components.
-
-**Recommended Fix:** Clarify "14 npm packages plus shadcn component files."
-
----
-
-### LOW-02: Custom field type count inconsistent after adding checkbox
-
-**Affected Plans:** 05-01, 05-11
-
-**Description:** Research says existing 8 types include `json` not `checkbox`, while Plan 01 says add checkbox as 9th type, and Plan 11 still says all 8 types.
-
-**Evidence:** `05-RESEARCH.md:109-110` notes 8 existing types include `json` not `checkbox`. `05-01-PLAN.md:228` says add `checkbox` as 9th type. `05-11-PLAN.md:192-205` says verify all 8 types including checkbox.
-
-**Recommended Fix:** Decide whether Phase 5 verifies 8 required types excluding `json`, or 9 supported types including legacy `json`; update ACs.
+**Risk Assessment: LOW.**
 
 ---
 
-### LOW-03: Some verification commands use brittle grep semantics
+## 05-08-PLAN.md: Board & List Views
+**Summary:** Implements the primary Kanban board (DnD, Swimlanes) and List view (Virtual scroll).
 
-**Affected Plans:** 05-02, 05-06, 05-14
+**Strengths:**
+- TanStack Table/Virtual (D-14) allows the app to scale to 10k+ tasks.
+- Methodology-aware UI (D-10) correctly hides/shows features based on Scrum/Kanban choice.
 
-**Description:** Several ACs use `grep -vc` as "not found" checks, which counts non-matching lines and can pass even when forbidden text exists.
+**Concerns:**
+- **MEDIUM:** DnD complexity. Dragging between swimlanes (grouped by Assignee) AND columns (Status) requires careful state management in `svelte-dnd-action`.
 
-**Evidence:** `05-06-PLAN.md:202` uses `grep -vc "ensureTaskProjectColumn"`. `05-14-PLAN.md:189` uses `grep -vc "mock\|stub\|placeholder\|TODO"`.
+**Suggestions:**
+- Ensure "Blocked" cards (D-20) are visually distinct even in compact mode.
 
-**Recommended Fix:** Use `! rg "pattern" file` for absence checks.
-
----
-
-### LOW-04: Plan 13 says y-websocket starts alongside Hono but defers startup wiring
-
-**Affected Plans:** 05-13, 05-15
-
-**Description:** Plan 13 `done` claims server starts alongside Hono, but action explicitly exports function only and defers wiring. Plan 15 does not touch server startup.
-
-**Evidence:** `05-13-PLAN.md:137-139` says wiring will be done later and "for now, export the function." `05-13-PLAN.md:153` says "server starts alongside Hono."
-
-**Recommended Fix:** Add startup wiring to Plan 13/15 or change done criterion to "server function implemented but not started."
+**Risk Assessment: MEDIUM.** UI state complexity with DnD + Virtualization.
 
 ---
 
-## Decision Coverage Audit
+## 05-09-PLAN.md: Reports Dashboard
+**Summary:** Creates 8 LayerChart components and rewrites the reports page to use tRPC.
 
-| Decision# | Decision Summary | Mapped Plan(s) | Status |
-|---|---|---|---|
-| D-01 | Flat comments with threaded replies | 02, 03, 07 | covered |
-| D-02 | Comment TipTap JSON with mention/task-list/placeholder | 01, 02, 03, 07 | covered |
-| D-03 | Resolve/unresolve comments | 02, 03, 07 | covered |
-| D-04 | Emoji reactions | 02, 03, 07 | covered |
-| D-05 | Activity feed field-change diffs | 01, 03, 04, 07 | covered |
-| D-06 | Mentions auto-subscribe watcher | 03 | partial |
-| D-07 | task_watchers source field | 02, 03, 07 | covered |
-| D-08 | Creator/assignee/mention auto-subscribe | 03 | covered |
-| D-09 | Watcher CRUD only, notifications deferred | 02, 03, 07 | covered |
-| D-10 | Board DnD via svelte-dnd-action | 08 | covered |
-| D-11 | Board grouping/swimlanes | 08 | covered |
-| D-12 | WIP limits | 08 | covered |
-| D-13 | Card density toggle | 08 | covered |
-| D-14 | TanStack list with virtual scroll | 08 | covered |
-| D-15 | Column customization persisted in SavedView | 08, 11 | covered |
-| D-16 | Right side task panel | 07 | covered |
-| D-17 | Task panel sections | 07 | covered |
-| D-18 | J/K/Esc panel navigation | 07, 12 | covered |
-| D-19 | Task relationships entity | 02, 03, 10, 14 | partial |
-| D-20 | Blocked badge and soft done warning | 08, 03 | partial |
-| D-21 | Gantt arrows and board chain tooltip | 02, 10, 08 | partial |
-| D-22 | Five status categories | 01, 04, 15 | covered |
-| D-23 | Custom statuses per project | 04, 15 | partial |
-| D-24 | Hard transition rules | 04, 15 | partial |
-| D-25 | Status auto-actions | 04 | covered |
-| D-26 | Backlog tray sprint planning | 08 | covered |
-| D-27 | Sprint capacity preview | 06, 08 | covered |
-| D-28 | Sprint close disposition | 06, 15 | covered |
-| D-29 | Retrospective notes and frozen report | 06, 15 | covered |
-| D-30 | Sprint comparison velocity | 09, 15 | covered |
-| D-31 | Task event log | 01, 05 | covered |
-| D-32 | Daily snapshots | 01, 05 | partial |
-| D-33 | Metrics rollup worker | 05 | covered |
-| D-34 | Extend Event field-change columns | 01, 03, 04, 05 | covered |
-| D-35 | Burndown | 05, 09 | covered |
-| D-36 | Burnup | 05, 09 | covered |
-| D-37 | Velocity | 05, 09 | covered |
-| D-38 | Sprint report card | 15 | covered |
-| D-39 | CFD | 05, 09 | covered |
-| D-40 | Cycle time scatter | 05, 09 | covered |
-| D-41 | Lead time | 05, 13 | covered |
-| D-42 | Throughput | 05, 09 | covered |
-| D-43 | WIP over time | 05, 09 | covered |
-| D-44 | Age of open items | 13 | covered |
-| D-45 | Progress rollup | 05, 13 | covered |
-| D-46 | Scope tracking | 05, 13 | covered |
-| D-47 | Deadline risk | 05, 15 | covered |
-| D-48 | Workload distribution | 05, 13 | covered |
-| D-49 | Capacity utilization | 05, 13 | covered |
-| D-50 | Stale issues | 05, 15 | covered |
-| D-51 | Blocked items | 05, 15 | covered |
-| D-52 | Reopened rate | 05, 15 | covered |
-| D-53 | Project and workspace report scopes | 05, 09, 13 | partial |
-| D-54 | CSV export for every report | 05, 14 | covered |
-| D-55 | Report date range picker | 05, 09 | covered |
-| D-56 | LayerChart primary library | 01, 09, 13, 15 | covered |
-| D-57 | Client-only chart imports | 09, 13, 15 | covered |
-| D-58 | Chart color tokens | 09 | covered |
-| D-59 | Chart tooltip/drilldown | 09, 13 | partial |
-| D-60 | SVAR Gantt | 01, 10 | covered |
-| D-61 | Gantt grouping and arrows | 10 | covered |
-| D-62 | Gantt click opens detail panel | 10 | covered |
-| D-63 | Event Calendar | 01, 10 | covered |
-| D-64 | Calendar due dates/overdue | 10 | covered |
-| D-65 | Sprint overlay | 10 | covered |
-| D-66 | Command palette | 12 | covered |
-| D-67 | Keyboard shortcuts | 12 | covered |
-| D-68 | Shortcut help overlay | 12 | covered |
-| D-69 | Visual filter builder | 11 | covered |
-| D-70 | SavedView stores AST/view config | 11 | covered |
-| D-71 | Quick filters | 11 | covered |
-| D-72 | Filter AST verification | 11 | covered |
-| D-73 | Multi-select UX | 11 | covered |
-| D-74 | Bulk action toolbar actions | 11 | covered |
-| D-75 | Transaction and max 200 | 11 | partial |
-| D-76 | Bulk consolidated events | 11 | covered |
-| D-77 | Custom field verification only | 01, 11 | covered |
-| D-78 | Custom fields visible across surfaces | 07, 08, 11 | partial |
-| D-79 | Labels with color/groups | 01, 08, 11, 14 | partial |
-| D-80 | Priority levels | 08, 11, 14 | partial |
-| D-81 | Web parity | 07-13, 15 | covered |
-| D-82 | CLI parity | 14 | covered |
-| D-83 | TUI ASCII reports | 14 | covered |
-| D-84 | Shared service/tRPC layer | 03-06, 14 | covered |
-| D-85 | New web deps | 01 | covered |
-| D-86 | TipTap extension deps | 01 | covered |
-| D-87 | TUI asciichart dep | 01 | covered |
-| D-88 | MIT licenses | 01 | gap |
-| D-89 | Automation rules | 02, 06, 15 | covered |
-| D-90 | Project automation entity | 02, 06 | covered |
-| D-91 | Automation EventBus/cycle detection | 06 | covered |
-| D-92 | Automation templates | 02, 06, 15 | covered |
-| D-93 | Portfolio table | 13 | covered |
-| D-94 | Portfolio rollup from snapshots | 13 | partial |
-| D-95 | Cross-project reports via workspace scope | 05, 13 | partial |
-| D-96 | Resource allocation | 13 | covered |
-| D-97 | Collaboration cursors | 01, 13 | covered |
-| D-98 | y-websocket + persistence | 13 | partial |
-| D-99 | Presence indicators | 13 | covered |
-| D-100 | Team mentions subscribe all members | 03, 07 | gap |
-| D-101 | Dual suggestion sources users/teams | 07 | partial |
-| D-102 | Critical path topo sort | 10 | covered |
-| D-103 | Recalculate/cache critical path | 10 | partial |
-| D-104 | Slack/buffer visualization | 10 | covered |
-| D-105 | Monte Carlo simulation | 09 | covered |
-| D-106 | Forecast fan chart | 09 | partial |
-| D-107 | Forecast per sprint/epic/milestone | 09 | partial |
-| D-108 | Client-side computation | 09 | covered |
-| D-109 | Field dependency rules entity | 02, 12 | covered |
-| D-110 | Example dependent fields | 12 | covered |
-| D-111 | Client eval + server required validation | 12 | partial |
+**Strengths:**
+- Monte Carlo forecasting (D-105) provides professional-grade project prediction.
+- SSR guards (Pitfall 4) ensure build stability.
 
-**Hard gaps (no coverage):** D-88, D-100.
+**Concerns:**
+- **LOW:** Ensure `LayerChart` color tokens (`--chart-1..8`) have sufficient contrast in both light and dark modes.
 
-**Partials requiring explicit AC/task strengthening:** D-06, D-19, D-20, D-21, D-23, D-24, D-32, D-53, D-59, D-75, D-78, D-79, D-80, D-94, D-95, D-98, D-101, D-103, D-106, D-107, D-111.
+**Suggestions:**
+- Add a "Snapshot Time" to each chart card so users know exactly how recent the data is (D-33 latency).
+
+**Risk Assessment: LOW.**
 
 ---
 
-## Wave Structure Analysis
+## 05-10-PLAN.md: Gantt & Calendar
+**Summary:** Replaces custom SVG/DOM views with specialized libraries (@svar/gantt and @event-calendar).
 
-### Wave 1 — Plans 05-01, 05-02
+**Strengths:**
+- Inclusion of a pure TypeScript `CriticalPath.ts` module (D-102) makes the logic unit-testable.
+- Dependency arrows in Gantt provide high-level planning visibility.
 
-Same-file conflicts: none.
+**Concerns:**
+- **MEDIUM:** Svelte 5 compatibility. Both libraries are "Svelte 5 ready," but real-world usage with Runes mode and DnD needs thorough verification.
+- **LOW:** Ensure `event-calendar` respects the `archived_at` filter.
 
-Analysis: Correct parallel split by schema/deps vs entity files. Missing: YjsSnapshot and `projects.workflow_config` are absent from Wave 1 schema/entity work (see HIGH-02, HIGH-05). Both must be absorbed into Wave 1 before later waves proceed.
+**Suggestions:**
+- Cache the critical path result in a Svelte store to avoid re-computation on every hover/re-render.
 
-### Wave 2 — Plans 05-03, 05-04, 05-05, 05-06
-
-Same-file conflicts: `src/server/trpc/routers/index.ts` modified in all four plans; `src/services/TaskService.ts` modified in 05-03 and 05-04.
-
-Analysis: **Not safe for parallel execution.** Split shared router mounting and TaskService integrations into one ordered integration plan, or serialise these plans. Plan 06 also needs Plan 03 dependency added (see MEDIUM-01). Relationship CRUD for HIGH-04 should land here.
-
-### Wave 3 — Plans 05-07, 05-08, 05-09, 05-10
-
-Same-file conflicts: none declared.
-
-Analysis: Mostly parallel-safe by file ownership. Missing dependency: 05-08 needs 05-06 for capacity data (see MEDIUM-02). 05-10 needs relationship CRUD from a fixed Wave 2 (see HIGH-04).
-
-### Wave 4 — Plans 05-11, 05-12, 05-13
-
-Same-file conflicts: none declared.
-
-Analysis: Parallel-safe by files. 05-12 server validation must be backend work, not just UI (HIGH-03). 05-13 creates `yjs_snapshots` table too late for Phase 5 migration wave (HIGH-05).
-
-### Wave 5 — Plans 05-14, 05-15
-
-Same-file conflicts: none declared.
-
-Analysis: 05-14 can likely run in parallel with portions of 05-15, but 05-15 depends on 14 and includes final CI/human verification. Keep final verification last. Plan 15 `autonomous: false` should be marked explicitly as UAT/manual rather than implementation (MEDIUM-07).
+**Risk Assessment: MEDIUM.** Risk lies in third-party library integration.
 
 ---
 
-## Verdict
+## 05-11-PLAN.md: Advanced Filters & Bulk Ops
+**Summary:** Power-user wave delivering the Linear-style filter builder and 50+ task bulk operations.
 
-**NO-GO with conditions.**
+**Strengths:**
+- Verified AST round-trip (TSK-13) ensures saved views are durable.
+- Transactional bulk updates (D-75) prevent partial state on failure.
 
-Blocking issues that must be resolved before Phase 5 execution begins:
+**Concerns:**
+- **LOW:** The "Select All" checkbox should clarify if it selects "Visible" vs. "All tasks in project."
 
-1. **HIGH-01** — Add `workspace` to MetricsCache.scopeType schema or redesign workspace report query path.
-2. **HIGH-02** — Add `projects.workflow_config` column to Plan 01 migration, or redesign workflow persistence.
-3. **HIGH-03** — Add server-side field dependency validation task to TaskService (Wave 2 or 4 backend plan).
-4. **HIGH-04** — Add TaskRelationship CRUD/service/router surface in Wave 2.
-5. **HIGH-05** — Add YjsSnapshot migration/ORM registration to Wave 1, or explicitly defer Yjs persistence.
-6. **HIGH-06** — Restructure Wave 2 to eliminate same-file conflicts (routers/index.ts, TaskService.ts).
+**Suggestions:**
+- Add a keyboard shortcut `Shift+A` to select all tasks in the current filtered view.
 
-After these six fixes, plans are close to executable. Medium/low issues can be addressed as targeted plan amendments before agent execution starts.
+**Risk Assessment: LOW.**
+
+---
+
+## 05-12-PLAN.md: Keyboard & Commands
+**Summary:** Implements the command palette (Cmd+K) and all remaining keyboard shortcuts.
+
+**Strengths:**
+- `tinykeys` (D-67) is a lightweight, reliable choice for chords.
+- Duplicate detection on title (D-118) reduces task rot during creation.
+
+**Concerns:**
+- **LOW:** Fuzzy search in Command Palette must prioritize "Exact Task ID" (FUL-42) over title matches.
+
+**Suggestions:**
+- Add "Recent Tasks" to the empty-state of the command palette for even faster access.
+
+**Risk Assessment: LOW.**
+
+---
+
+## 05-13-PLAN.md: Collaboration & Portfolio
+**Summary:** The infrastructure-heavy wave delivering the Yjs WebSocket server and Portfolio visibility.
+
+**Strengths:**
+- Auth-protected WebSocket upgrade (D-98) prevents unauthorized CRDT access.
+- Resource allocation view (D-96) is essential for organization-level planning.
+
+**Concerns:**
+- **HIGH:** Yjs Server Scalability. Running the WebSocket server in-process alongside Hono is fine for local-first but will require a standalone process/scaling strategy for SaaS.
+- **MEDIUM:** DB Bloat. Frequent Yjs snapshots can grow the `yjs_snapshots` table quickly.
+
+**Suggestions:**
+- **Optimization:** Only snapshot when the document becomes "idle" (no updates for 30s) or on user disconnect.
+- **Env Config:** Ensure `FULCRUM_YJS_URL` is correctly documented for Docker/Production environments.
+
+**Risk Assessment: HIGH.** Real-time infrastructure and cross-project data aggregation are the most complex parts of Phase 5.
+
+---
+
+## 05-14-PLAN.md: Three-Surface Parity
+**Summary:** Bridges the gap between Web, CLI, and TUI. Adds ASCII charts and threaded comments to terminal surfaces.
+
+**Strengths:**
+- `fulcrum report` (D-82) makes analytics data pipeline-friendly.
+- TUI ASCII charts (D-87) maintain the "Agent OS" feel in the terminal.
+
+**Concerns:**
+- **LOW:** Ensure `asciichart` output respects terminal width and doesn't wrap/break the TUI layout.
+
+**Suggestions:**
+- Use a `NO_COLOR` check to provide monochrome ASCII charts for users with limited terminal support.
+
+**Risk Assessment: LOW.**
+
+---
+
+## 05-15-PLAN.md: Final UI & CI Gate
+**Summary:** Completion wave delivering the Workflow editor and Automation UI. Runs the final `bun run ci` gate.
+
+**Strengths:**
+- Visual Workflow Editor (D-24) provides Jira-grade control with Linear-grade UX.
+- Automation templates (D-92) reduce the "Blank Slate" problem for users.
+
+**Concerns:**
+- **LOW:** `MEDIUM-07` fix: human UAT is deferred. Ensure that "Success Criteria" are clearly printable from the CLI for the user to verify manually.
+
+**Suggestions:**
+- Add a "Project Health Check" button that verifies if all tasks follow the current workflow rules (for retroactively applied rules).
+
+**Risk Assessment: LOW.**
+
+---
+
+## Overall Phase Risk: MEDIUM
+The plans are exceptionally detailed and strictly follow the project's architecture (`ARCH-XX`). The primary risks are **Yjs infrastructure stability** (Plan 13) and **Third-party UI library integration with Svelte 5** (Plan 10). The decision to centralize shared file ownership in Plan 06 is an excellent mitigation for development-time conflicts.
+
+**Phase Success Verdict: GO.** The plans comprehensively cover TSK-01 through TSK-14 and satisfy all 123 CONTEXT decisions.
+
+---
+
+## Codex Review
+
+## 05-00-PLAN.md
+**Summary:** Wave 0 enforces Nyquist-compliant RED state by creating 10 failing test stubs (6 backend + 4 frontend) before implementation. This is a strong sequencing control step, but test quality and exact scaffolding consistency need tightening.
+
+### Strengths
+- Explicitly maps each stub to a requirement ID.
+- Uses `bun:test`/`vitest` split matching surface ownership.
+- Includes clear fail-fast assertions (`expect(true).toBe(false)`).
+
+### Concerns
+- **HIGH:** Frontend actions say “3 frontend files” but execution list includes 4 files; mismatch can create execution drift.
+- **MEDIUM:** Stubs are minimal and may pass formatting/lint but not enforce test intent (e.g., no structured test names in some cases).
+- **MEDIUM:** Verification commands do not assert file count/content (only existence via `ls`/`rg`), so stub contract may silently miss required assertions.
+- **LOW:** No requirement to add test imports/types that mirror real test harness setup (e.g., jsdom for Svelte render tests).
+
+### Suggestions
+- Normalize file count to exactly 10 in narrative and tasks.
+- Add explicit checklist assertions per file for required test names.
+- In Wave 0, enforce lint/format and test-framework compatibility checks in verification.
+
+### Risk Assessment
+**MEDIUM** — good scaffold intent, moderate process risk from verification gaps and inconsistent file-counting language.
+
+---
+
+## 05-01-PLAN.md
+**Summary:** This is the schema foundation plan, but it is the highest-risk plan because it introduces major DB/API drift across ORM entities, migration DDL, and package footprint in one step.
+
+### Strengths
+- Comprehensive migration scope aligned to features.
+- Strongly enforces required fields and defaults for workspace metrics + workflow/project settings.
+- Adds explicit HIGH-01/02/05 fixes early.
+
+### Concerns
+- **HIGH:** Adds `14` packages in acceptance text but says “13 web + 1 root”; potential counting mismatch and dependency governance ambiguity.
+- **HIGH:** Raw migration SQL is extensive with multiple new FKs/indexes likely to fail on existing data without backfill/reorder strategy.
+- **HIGH:** `task_type` enum/check in migration and service/filters may conflict with existing status/category assumptions if dual naming (Todo vs Unstarted) not reconciled consistently first.
+- **MEDIUM:** Installing TipTap versions at exact patch (`3.22.5`) without lockfile/compatibility verification can introduce peer dependency friction.
+- **MEDIUM:** `pg_trgm` extension may require elevated privileges on some PostgreSQL SaaS environments.
+- **MEDIUM:** No explicit data migration for existing rows (e.g., labels/text defaults, methodology defaults).
+
+### Suggestions
+- Add pre-migration smoke script: backup + validation queries for all FK target tables and nullability hazards.
+- Clarify exact package count and split install commands with lockfile verification.
+- Add compatibility matrix for `TaskStatus` naming conversions between existing and new statuses.
+- Add migration rollback notes for production runbook.
+
+### Risk Assessment
+**HIGH** — core schema changes drive downstream breakage if sequencing and compatibility checks are not strict.
+
+---
+
+## 05-02-PLAN.md
+**Summary:** Creates nine new MikroORM entities and wires barrel exports. This is solid and necessary but has several import/dependency assumptions that can trip compile/runtime if not validated early.
+
+### Strengths
+- Explicit entity list aligned with migration tables.
+- Correct emphasis on MikroORM decorators, PK defaults, and barrel exports.
+- Includes YjsSnapshot as wave-1 requirement.
+
+### Concerns
+- **HIGH:** `Project` and `Team` entity references are implied but not guaranteed to be available for all `ManyToOne` relations in current entity layer.
+- **MEDIUM:** `OptionalProps` completeness is underspecified for JSON/blob fields and defaults; inconsistency can cause runtime partial hydration bugs.
+- **MEDIUM:** No explicit registration strategy for ORM discovery if non-folder-based entity discovery is used.
+- **LOW:** `source_task_id`/`target_task_id` for relations should likely be constrained via composite indexes beyond unique constraint for query efficiency.
+
+### Suggestions
+- Add compile-time verification for `src/db/mikro-orm.config.ts` entity registration and import paths.
+- Add explicit DB index verification list for relationship lookup-heavy queries.
+
+### Risk Assessment
+**MEDIUM** — model integrity is good, risk is moderate because of entity graph assumptions.
+
+---
+
+## 05-03-PLAN.md
+**Summary:** Introduces comment/watchers/reactions service and router. Functionally rich and well-scoped, but parsing/permission/cascade complexity and transactionality need stricter guarantees.
+
+### Strengths
+- Explicit D-100 team mention support and team/user discriminator in parser.
+- Good service-router separation and tRPC thin delegation concept.
+- Includes comment threading behavior and watcher idempotency.
+
+### Concerns
+- **HIGH:** Mention extraction from TipTap JSON can be brittle without schema validation and sanitization before persistence.
+- **HIGH:** Delete cascade semantics for comment trees depend on DB `ON DELETE CASCADE`; if not configured uniformly, reply cleanup may fail.
+- **MEDIUM:** Team expansion requires team membership model query contracts not defined in plan (no explicit entity/service reference).
+- **MEDIUM:** Auto-subscribe from mention parsing can create excessive side effects without dedupe/backpressure.
+- **LOW:** Error taxonomy for permission checks and duplicate-watcher writes not defined.
+
+### Suggestions
+- Define TipTap schema validator and safe parser boundaries.
+- Add explicit transaction wrapper for create/delete/update flows.
+- Add service-level dedupe cache for watcher subscription bursts.
+- Include tests for malformed TipTap payload and stale team/member references.
+
+### Risk Assessment
+**HIGH** — user-generated data, notifications, and cascading comments require stronger correctness controls.
+
+---
+
+## 05-04-PLAN.md
+**Summary:** Implements workflow validation and task relationship logic including cycle detection. Correctly identifies HIGH-04 dependency but risks algorithmic and permission edge cases.
+
+### Strengths
+- Graph-based workflow read/write mapped to workflow_config and methodology defaults.
+- Explicit DFS cycle detection for blocks edges.
+- Includes duplicate/relationship handling and recurrence/templating scaffolding.
+
+### Concerns
+- **HIGH:** Workflow transition model defaults are inconsistent with entities requiring 5-category status names; explicit state-machine mapping may need migration/alignment.
+- **HIGH:** Cycle detection depth cap at 50 may silently skip very deep real DAGs without reporting; better to cap via node count and return diagnostic.
+- **HIGH:** Template/recurrence services are large features mixed in same plan and can become unstable if done without service partitioning tests.
+- **MEDIUM:** `TaskRelationship` cycle logic across projects/org boundaries relies on task existence checks; race conditions under concurrent writes possible.
+- **MEDIUM:** Mark-as-duplicate auto-close/transfer-watchers action needs explicit event emission and audit policy in scope.
+
+### Suggestions
+- Add canonical status transition matrix tests for all methodology modes.
+- Treat workflow graph updates as optimistic-lock/ETag style operation.
+- Split recurrence/template services into separate follow-on tasks or dedicated validation steps.
+
+### Risk Assessment
+**HIGH** — core lifecycle logic here affects many features; requires tighter invariants and concurrency-safe logic.
+
+---
+
+## 05-05-PLAN.md
+**Summary:** Builds analytics stack and reports router; necessary for TSK-03..06 and workspace scope, but report correctness, performance, and contract drift are high-risk.
+
+### Strengths
+- Good end-to-end model: raw events + snapshot cache separation.
+- Explicit workspace scope inclusion and CSV export.
+- Includes worker trigger and tests for rollup/upsert behavior.
+
+### Concerns
+- **HIGH:** Scope aggregation across project vs workspace can double-count if both rows exist; query precedence is unspecified.
+- **HIGH:** Throughput/cycle-time from event entities are sensitive to timezone normalization and status vocabulary consistency.
+- **MEDIUM:** Worker fan-out/debounce requirement exists but not explicitly specified in handler contract; backpressure risk for high-frequency events.
+- **MEDIUM:** `getCycleTime` and `getLeadTime` based on events can produce outliers if events missing; fallback strategy unspecified.
+- **LOW:** Tests likely under-specify correctness for empty/no-event tasks and null `dateRange`.
+
+### Suggestions
+- Add explicit metric grain, UTC date handling, and dedup rules for event streams.
+- Add idempotency keying for rollup writes.
+- Define workspace aggregation precedence: workspace snapshot row wins vs derived sum of project rows.
+
+### Risk Assessment
+**HIGH** — analytics correctness errors are hard to detect later and can invalidate charts/decisions.
+
+---
+
+## 05-06-PLAN.md
+**Summary:** High-impact integration plan owning `router.ts` and `TaskService.ts` is the correct architectural move for conflict control, but it also concentrates risk across many cross-cutting concerns.
+
+### Strengths
+- Explicit HIGH-06 conflict resolution by isolating shared files.
+- Connects workflows/comments/relationships/reporting automation into app router.
+- Extends task transitions, watcher behavior, field dependency, and sprint ops.
+
+### Concerns
+- **HIGH:** `TaskService` now depends on multiple services (CommentService, WorkflowService, FieldDependencyRule), creating potential circular dependency and import load/order risks.
+- **HIGH:** Field dependency validation inline in TaskService with no abstraction may become unmaintainable once service grows.
+- **MEDIUM:** `ensureTaskProjectColumn` removal without audit may break any other legacy callers assuming function.
+- **MEDIUM:** Mounting many routers in AppRouter may break route typing and hydration if not sorted and exported correctly.
+- **LOW:** Automations route added in task 2 only after task 1 may create temporary compile windows if parallel toolchain runs tasks separately.
+
+### Suggestions
+- Add explicit service constructor interface boundaries to prevent circular imports.
+- Move field-dependency checks to dedicated helper called by TaskService but in same file now acceptable with TODO boundary.
+- Add migration-backed integration tests that instantiate app router and run one end-to-end mutation path.
+
+### Risk Assessment
+**HIGH** — central-file ownership is correct but high blast radius; errors here break entire application.
+
+---
+
+## 05-07-PLAN.md
+**Summary:** Builds rich task detail interactions and task-centric UI surfaces. Feature-complete intent is strong, but data-contract and cross-surface parity for mention/thread UX need stronger API guarantees.
+
+### Strengths
+- Comprehensive UI composition for comment/activity/watchers/custom fields/dependencies.
+- Good dual-source mention handling and keyboard UX requirements.
+- Uses tRPC queries exclusively (good boundary alignment).
+
+### Concerns
+- **MEDIUM:** Threaded comment rendering with TipTap JSON formatting can be expensive per render and may regress performance on long threads.
+- **MEDIUM:** MentionSuggestion API for users/teams needs paginated/abortable search to avoid UI jank.
+- **MEDIUM:** Activity feed relies on field-change events; if `fieldName/from/to` not reliably populated, UI can show blanks.
+- **LOW:** Recurrence popover in task detail referenced, but Plan 07 has no dedicated Recurrence component file ownership in this plan.
+
+### Suggestions
+- Add virtualized rendering or pagination for comments+activity in large tasks.
+- Define explicit event payload schema shared across backend and UI for audit fields.
+- Add a11y/accessibility checks for keyboard nav/aria in panel.
+
+### Risk Assessment
+**MEDIUM** — mostly implementation depth risk; contract coupling with backend fields is the key risk.
+
+---
+
+## 05-08-PLAN.md
+**Summary:** Introduces board/list/sprint-planning surfaces with DnD and virtualized tables. This is feature-critical but very large UI complexity with performance and state consistency caveats.
+
+### Strengths
+- Covers all requested UX axes: DnD, grouping, WIP, density, custom fields.
+- Mentions methodology-aware rendering and sprint planning integration.
+- Uses dedicated virtualized table and table column customization.
+
+### Concerns
+- **HIGH:** `svelte-dnd-action` across statuses + TanStack virtual table can create drag-state desync if not modeled with immutable snapshots.
+- **HIGH:** `trpc.tasks.update` called on every drag event can overwhelm API if not debounced/batched.
+- **MEDIUM:** Grouping columns with swimlanes requires heavy derived computations; no explicit memoization or caching strategy.
+- **LOW:** "max 3 indent levels then flatten" for subtasks appears in comments component but not explicitly here; cross-feature consistency not guaranteed.
+
+### Suggestions
+- Add drag update queue + optimistic rollback strategy.
+- Define a canonical mapping from methodology to column schemas to avoid duplicated status sets.
+- Add perf benchmarks for 10k+ tasks in board/list.
+
+### Risk Assessment
+**HIGH** — user-facing complexity and high interaction frequency increase risk of state churn and regressions.
+
+---
+
+## 05-09-PLAN.md
+**Summary:** Analytics UI is comprehensive (8 charts + Monte Carlo), but complexity and SSR integration risks are high given chart libraries and date/hover behavior requirements.
+
+### Strengths
+- Proper move away from raw SQL reports.
+- SSR guard requirement addresses common SSR/client library pitfall.
+- Includes tooltips, scope/date controls, forecast capabilities.
+
+### Concerns
+- **HIGH:** LayerChart usage with `#if browser` and dynamic import semantics need exact implementation consistency; mismatches can fail SSR builds.
+- **HIGH:** Monte Carlo forecast in-chart can become nondeterministic/performance-heavy without fixed iterations/time budget enforcement.
+- **MEDIUM:** Color semantics (exact palette) and tooltip assertions in tests are hard to enforce with current shallow tests.
+- **LOW:** +page migration removing server DB access requires robust tRPC load pattern adaptation for SvelteKit server/client boundaries.
+
+### Suggestions
+- Add deterministic forecast seeding and bounded runtime budget (e.g., max 120ms for 1000 iterations).
+- Add contract tests for report endpoints feeding each chart component with empty/sparse datasets.
+- Include route-level loading state and error boundaries for missing report scopes.
+
+### Risk Assessment
+**HIGH** — chart and SSR behavior is often brittle; needs stricter technical guardrails.
+
+---
+
+## 05-10-PLAN.md
+**Summary:** Adds Gantt and Calendar views and critical path algorithm. Architectural intent is good, but algorithm/test/runtime coupling is high.
+
+### Strengths
+- Clean separation: pure `computeCriticalPath.ts` + UI adapter.
+- Explicit DnD + method hooks for task detail panel integration.
+- Adds sprint overlay and overdue highlighting in calendar.
+
+### Concerns
+- **HIGH:** Gantt integration with `@svar/gantt-svelte` may require significant data adaptation and may not support full task dependency semantics out of the box.
+- **HIGH:** Critical path computed on client can be heavy; cached reactive store requires invalidation strategy under frequent updates.
+- **MEDIUM:** Calendar and Gantt tests relying only on rendered HTML may pass despite functional defects.
+- **MEDIUM:** Drag-to-reschedule across timezone boundaries likely to introduce off-by-one date bugs.
+
+### Suggestions
+- Add unit tests for cycle/non-cycle graph and slack edge cases in critical path module.
+- Define canonical date encoding for task start/due with timezone policy.
+- Implement task detail open event via strongly typed callback and null-safe project/task guards.
+
+### Risk Assessment
+**HIGH** — algorithmic feature with heavy third-party integration and real-time interactions.
+
+---
+
+## 05-11-PLAN.md
+**Summary:** Adds filtering, bulk operations, and custom-field coverage; very impactful for productivity but can destabilize data validation and permission boundaries.
+
+### Strengths
+- Covers filter AST round-trip and saved-view persistence requirements.
+- Enforces 200-task bulk cap and event emission per changed field.
+- Explicitly includes all 9 custom field types and label/priority model checks.
+
+### Concerns
+- **HIGH:** AST round-trip involving SavedView persistence likely needs schema migration/versioning for backward compatibility.
+- **HIGH:** 50+ bulk updates as single transaction can lock rows and impact concurrent users without batching/backoff.
+- **MEDIUM:** UI-side filter building across custom-field operators can diverge from backend parser semantics.
+- **MEDIUM:** Label model “grouped JSON objects” is non-normalized; concurrent updates to labels can conflict without merge strategy.
+- **LOW:** QuickFilters and FilterBuilder interaction contract not clearly defined (single source of filter truth).
+
+### Suggestions
+- Add server-side validation of AST operator+field/type compatibility before execution.
+- Add optimistic concurrency or batched writes for bulk updates.
+- Add conflict-resolution strategy for task.labels JSON arrays (replace vs merge behavior).
+- Define canonical serialized AST version field.
+
+### Risk Assessment
+**HIGH** — data mutation-heavy features with complex filters are high risk for correctness and performance regressions.
+
+---
+
+## 05-12-PLAN.md
+**Summary:** Adds UX keyboard, command palette, and field-dependency logic. Good product value, but command search/security and dependency evaluation coupling need tighter constraints.
+
+### Strengths
+- Good user-centric input UX with Cmd+K + help overlay.
+- Adds both client-side and server-side dependency validation.
+- Recognizes that client validation can be bypassed and adds server counterpart.
+
+### Concerns
+- **HIGH:** Command palette search can expose unauthorized entities unless strict org/project filtering is guaranteed at query source.
+- **MEDIUM:** tinykeys global binding in root layout can conflict with component-local shortcuts unless scoped/unbound carefully.
+- **MEDIUM:** Field dependency evaluation logic duplicated client/server; risk of behavioral divergence.
+- **LOW:** `QuickCreateForm` in this plan overlaps task/detail plans and Plan 14 task-hierarchy inputs (potential duplicate implementations).
+
+### Suggestions
+- Add explicit “permission-aware suggestion source” contract for command search and task query.
+- Introduce shared dependency evaluation utility module to reduce drift.
+- Add shortcut namespace and context-aware enable/disable (e.g., inputs/textarea).
+
+### Risk Assessment
+**MEDIUM** — broad UX changes with cross-surface security and consistency implications.
+
+---
+
+## 05-13-PLAN.md
+**Summary:** Realtime collaboration and portfolio analytics are meaningful but materially increase infra/security scope; sequencing and server lifecycle coupling are critical.
+
+### Strengths
+- Correctly prioritizes env-configured Yjs URL and persistence path.
+- Adds presence, collaboration fallback, and portfolio scope charts.
+- Extends reports via workspace aggregation parity.
+
+### Concerns
+- **HIGH:** Yjs WebSocket authentication on upgrade path is complex and easy to regress without robust integration tests.
+- **HIGH:** Running Yjs server alongside Hono with shared DB lifecycle and shutdown hooks is operationally risky without clear lifecycle contract.
+- **MEDIUM:** Portfolio metrics depend on report snapshots; if snapshots stale, charts mislead and can’t be trusted for SLA decisions.
+- **LOW:** Critical collaboration UX (cursors/editor sync) depends on exact TipTap+Yjs extension interop versions; no version pinning strategy stated.
+
+### Suggestions
+- Add explicit startup/shutdown integration points with CI smoke boot test.
+- Add health endpoint/check for Yjs availability and graceful degradation.
+- Add snapshot freshness metadata to portfolio charts.
+
+### Risk Assessment
+**HIGH** — real-time infra/security plus analytics correctness compounds risk.
+
+---
+
+## 05-14-PLAN.md
+**Summary:** Final parity plan for CLI/TUI command coverage is necessary, but scope breadth is huge and overlaps with prior web-centric plans.
+
+### Strengths
+- Explicit parity goals across CLI + TUI for reports, hierarchy, relationships, comments.
+- Uses shared tRPC layer for data access rather than raw DB calls.
+- Includes ASCII charts and methodology-aware TUI rendering.
+
+### Concerns
+- **HIGH:** Plan tries to introduce many CLI commands (`import/export/my-work/archive/relate/comment/task/project`) likely beyond direct WIP scope of this phase milestone if not previously implemented service endpoints exist.
+- **HIGH:** Argument parsing complexity (especially identifier parsing `FUL-42`) and recursive hierarchy rendering are non-trivial and likely to break edge cases.
+- **MEDIUM:** Mock/stub/TODO scan check insufficient; runtime quality depends on behavior tests not just grep.
+- **MEDIUM:** Task tree recursion in CLI across deep hierarchies requires cycle protection.
+
+### Suggestions
+- Split CLI plan into sub-waves or defer import/export if service primitives are not yet stable.
+- Add identifier resolver service (`resolveTaskIdentifier`) before CLI surface to centralize parsing.
+- Add TUI tests (at least unit tests for icon/type rendering and command handling state transitions).
+
+### Risk Assessment
+**HIGH** — broad command surface and multiple new command lines at once make regression probability high.
+
+---
+
+## 05-15-PLAN.md
+**Summary:** Finalization plan is appropriate for release readiness but overly broad with mixed UI, import wizard, and full CI dependency; execution needs strict sequencing and rollback criteria.
+
+### Strengths
+- Completes critical last-mile surfaces (workflow editor, automation management, sprint report card).
+- Clear tie-back to methodology and shared service layer.
+- Uses `bun run ci` as final gate.
+
+### Concerns
+- **HIGH:** Plan depends on many previous deliverables; if any upstream API shape drifts, this plan will fail at integration level.
+- **MEDIUM:** Settings pages/import wizard plus report card in same plan may collide with unresolved CLI/TUI parity expectations and inflate debugging surface.
+- **LOW:** No explicit fallback/error states for workflow graph save failures, automation action failures, and recurrence config conflicts.
+
+### Suggestions
+- Add milestone gate before Plan 15: all 05-00..05-14 summaries/tests must exist and pass specific contract checks.
+- Add “feature switches” for workflow editor/automation import if back-end actions unavailable.
+- Include rollback/partial-enable strategy for failed automation execution.
+
+### Risk Assessment
+**MEDIUM** — final gating is correct, but consolidation risk is high if prior contracts are not fully aligned.
+
+---
+
+## Cross-Plan Global Review Notes
+### Strengths overall
+- Requirements traceability is unusually explicit with requirement IDs.
+- Risk controls are present (HIGH-* fixes, wave designations, summary artifacts).
+- Strong bias toward service-first + tRPC-only business logic.
+- Good attention to three-surface parity in end-of-phase plans.
+
+### High-level concerns
+- **HIGH:** Task hierarchy (`epic/task/subtask/bug`) consistency is defined in many places but appears partially distributed; must enforce centrally in schema + service + CLI/TUI output early.
+- **HIGH:** Methodology gating (`scrum/kanban/none`) is pervasive but transition state defaults and UI behavior rely on many implicit mappings (risk of drift).
+- **MEDIUM:** Security filtering appears mostly stated, but explicit org-scoping for command palette/CLI imports/portfolio/report queries should be mandated everywhere.
+- **MEDIUM:** Dependency ordering is good in docs but some features appear referenced before implementation hooks exist (e.g., recurrence config UI using trpc routes not yet guaranteed).
+- **MEDIUM:** Several verification steps are structural (exists/grep) rather than behavioral for critical logic.
+
+### Suggested phase-level improvements
+1. Add a formal contract sheet per service/router method before coding (inputs, outputs, errors, org scopes).
+2. Add two mandatory integration tests per wave: one shared service path + one cross-surface happy path.
+3. Introduce migration/runtime checklist for status enums and workflow defaults before UI-heavy waves.
+4. Add explicit CI stage for “parity assertions” to compare web/CLI/TUI supported operation IDs.
+5. Enforce no raw SQL remaining outside migration scripts in this phase.
+
+### Overall Risk Assessment
+**OVERALL: HIGH**.  
+Plan set is comprehensive and structurally organized, but the combined blast radius across schema, service, analytics, UI, CLI, and TUI in one phase is large with many high-risk integrations. The biggest vulnerabilities are schema migration compatibility, waveform-dependent status/workflow consistency, and three-surface parity drift.
+
+---
+
+## Consensus Summary
+
+### Agreed Strengths
+- Architecture discipline: all peer-review HIGH blockers (01-06) addressed in Wave 1-3
+- Methodology-aware system (scrum/kanban/none) adds immediate project value
+- Cycle detection in RelationshipService prevents circular dependency bugs
+- TDD stubs (Wave 0) establish failure-first verification baseline
+- Three-surface parity consistently maintained across Web/CLI/TUI
+- MIT license verification (D-88) for governance compliance
+
+### Agreed Concerns (shared by 2+ reviewers)
+- **HIGH: Migration complexity** — 9 new tables + 10 column extensions in single migration. Risk of FK constraint failures on existing data without backfill strategy. Consider splitting into sub-migrations or adding explicit ordering.
+- **HIGH: Yjs scalability** — In-process WebSocket server alongside Hono is local-first only. SaaS deployment needs standalone process or horizontal scaling strategy.
+- **HIGH: task_type enum conflicts** — New `task_type` check constraint may conflict with existing status/category assumptions if naming (Todo vs Unstarted) not reconciled.
+- **MEDIUM: pg_trgm extension privileges** — Some PostgreSQL SaaS (Neon, Supabase) may restrict `CREATE EXTENSION`. Need conditional/fallback strategy.
+- **MEDIUM: Verification commands weak** — Multiple plans use `ls`/`rg` file-existence checks instead of behavioral tests. Stubs pass lint but don't enforce intent.
+- **MEDIUM: Dependency count mismatch** — "14 packages" vs "13 web + 1 root" creates ambiguity. Count should include shadcn source components or explicitly exclude them.
+
+### Divergent Views
+- **Gemini:** Focused on Plan 13 (Yjs/portfolio) as highest risk. Rated it HIGH.
+- **Codex:** Focused on Plan 01 (migration) as highest risk. Concerned about data integrity on ALTER TABLE operations with existing rows.
+- **Overall:** Both rate Phase 5 as HIGH complexity but achievable with the current wave structure.
+
+### Verdict
+**GO with conditions.** The plans are executable if:
+1. Migration split strategy is documented (or backfill script added)
+2. Yjs deployment strategy is decided (in-process for dev, standalone for prod)
+3. pg_trgm fallback is added (graceful degradation if extension unavailable)
