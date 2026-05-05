@@ -15,11 +15,20 @@ export interface TuiOrchestratorStatus {
   leaderId?: string | null;
 }
 
+export interface TuiDispatchResult {
+  runId: string;
+  state: string;
+  agent: string;
+  sandboxMode: string;
+}
+
 export interface OrchestrationScreenOptions {
   caller: {
     orchestration: {
       status: () => Promise<TuiOrchestratorStatus>;
       list: () => Promise<TuiOrchestrationRun[]>;
+      /** Dispatch a run for a task through the canonical orchestration procedure. */
+      dispatch?: (input: { taskId: string; agentName?: string; sandboxMode?: string }) => Promise<TuiDispatchResult>;
     };
   };
   subscriptions?: SubscriptionBridge;
@@ -70,6 +79,15 @@ export class OrchestrationScreen {
 
     renderer.writeln();
     renderer.writeln(c.dim("  subscription orchestration.onStateChange  q back"));
+  }
+
+  /**
+   * Dispatch a run for the given task through canonical tRPC dispatch procedure (SND-06).
+   * Returns the dispatch result or null when dispatch is not available in the caller.
+   */
+  async dispatch(taskId: string, opts: { agentName?: string; sandboxMode?: string } = {}): Promise<TuiDispatchResult | null> {
+    if (!this.opts.caller.orchestration.dispatch) return null;
+    return this.opts.caller.orchestration.dispatch({ taskId, ...opts });
   }
 
   dispose(): void {

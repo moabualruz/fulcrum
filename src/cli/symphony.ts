@@ -9,6 +9,15 @@
 /* Types                                                               */
 /* ------------------------------------------------------------------ */
 
+export interface DispatchResult {
+  runId: string;
+  state: string;
+  agent: string;
+  sandboxMode: string;
+  transcriptPath?: string | null;
+  artifactCount?: number;
+}
+
 export interface SymphonyCaller {
   getOrchestratorStatus: () => Promise<{ running: number; queued: number; stalled: number }>;
   listRuns: (input: { state?: string; projectId?: string; limit?: number }) => Promise<RunRow[]>;
@@ -16,6 +25,12 @@ export interface SymphonyCaller {
   cancelRun: (input: { runId: string }) => Promise<{ success: boolean }>;
   retryRun: (input: { runId: string }) => Promise<{ success: boolean }>;
   syncDaily: () => Promise<{ synced: number; errors: number }>;
+  dispatchRun: (input: {
+    taskId: string;
+    agentName?: string;
+    workflowPath?: string;
+    sandboxMode?: string;
+  }) => Promise<DispatchResult>;
 }
 
 export interface RunRow {
@@ -62,6 +77,7 @@ Usage:
   fulcrum symphony runs show <runId> [--json] [--verbose]
   fulcrum symphony runs cancel <runId> [--json]
   fulcrum symphony runs retry <runId> [--json]
+  fulcrum symphony runs dispatch <taskId> [--agent <name>] [--workflow <path>] [--sandbox <mode>] [--json]
   fulcrum symphony conformance [--verbose] [--json]
 
 Options:
@@ -159,6 +175,8 @@ async function cmdRuns(argv: readonly string[], opts: ResolvedOpts): Promise<voi
       return cmdRunsCancel(rest, opts);
     case "retry":
       return cmdRunsRetry(rest, opts);
+    case "dispatch":
+      return cmdRunsDispatch(rest, opts);
     case "help":
     case "--help":
     case "-h":
@@ -271,6 +289,33 @@ async function cmdRunsRetry(argv: readonly string[], opts: ResolvedOpts): Promis
   print(result.success ? `Retrying run ${runId}` : `Failed to retry run ${runId}`);
 }
 
+async function cmdRunsDispatch(argv: readonly string[], opts: ResolvedOpts): Promise<void> {
+  const { print, printErr, exit, caller } = opts;
+  const taskId = argv.find((a) => !a.startsWith("-"));
+  const json = argv.includes("--json");
+  const agentName = readFlag(argv, "--agent") ?? undefined;
+  const workflowPath = readFlag(argv, "--workflow") ?? undefined;
+  const sandboxMode = readFlag(argv, "--sandbox") ?? undefined;
+
+  if (!taskId) {
+    printErr("fulcrum symphony runs dispatch: missing <taskId>");
+    exit(2);
+    return;
+  }
+
+  const result = await caller.dispatchRun({ taskId, agentName, workflowPath, sandboxMode });
+
+  if (json) {
+    print(JSON.stringify(result));
+    return;
+  }
+
+  print(`Dispatched run ${result.runId}`);
+  print(`  State:    ${result.state}`);
+  print(`  Agent:    ${result.agent}`);
+  print(`  Sandbox:  ${result.sandboxMode}`);
+}
+
 /* ------------------------------------------------------------------ */
 /* conformance                                                         */
 /* ------------------------------------------------------------------ */
@@ -325,6 +370,7 @@ export function stubCaller(): SymphonyCaller {
     cancelRun: async () => ({ success: false }),
     retryRun: async () => ({ success: false }),
     syncDaily: async () => ({ synced: 0, errors: 0 }),
+    dispatchRun: async () => ({ runId: "", state: "unclaimed", agent: "codex", sandboxMode: "noSandbox" }),
   };
 }
 
