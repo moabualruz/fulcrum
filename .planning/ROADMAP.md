@@ -123,7 +123,7 @@ Plans:
 - [x] 04-07-PLAN.md — Web routing editor and inference backend status UI
 
 **Wave 5**
-- [ ] 04-08-PLAN.md — Root wiring, LangGraph boundary guard, parity tests, and final verification gates
+- [x] 04-08-PLAN.md — Root wiring, LangGraph boundary guard, parity tests, and final verification gates
 
 ### Phase 5: Task Management + Metrics
 **Goal**: Task pillar feature-complete with comments, watchers, charts, sprint features
@@ -215,7 +215,7 @@ Plans:
 | 1. Architecture + Security | 0/10 | Planned | - |
 | 2. Bug Fixes + Foundation | 8/8 | Complete | 2026-05-04 |
 | 3. Symphony + Sandcastle | 6/6 | Complete   | 2026-05-05 |
-| 4. Inference + Router/Skills | 1/8 | In Progress | - |
+| 4. Inference + Router/Skills | 8/8 | Complete | 2026-05-05 |
 | 5. Task Management + Metrics | 0/? | Not started | - |
 | 6. Documents + Memory + Search | 0/? | Not started | - |
 | 7. Repos + Artifacts + Notifications | 0/? | Not started | - |

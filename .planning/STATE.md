@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-last_updated: "2026-05-05T04:51:48Z"
+last_updated: "2026-05-05T05:05:02.711Z"
 progress:
   total_phases: 10
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 33
-  completed_plans: 31
-  percent: 94
+  completed_plans: 32
+  percent: 97
 ---
 
 # Planning State
@@ -17,11 +17,11 @@ progress:
 ## Current Position
 
 Phase: 04 (inference-router-skills) — EXECUTING
-Plan: 7 of 8
+Plan: 8 of 8
 
 - **Phase**: 04-inference-router-skills
-- **Plan**: 04-07 completed
-- **Status**: Five-tab Web routing editor with drafts/test/LLM gate/evidence, inference backend status rows with probe states and dimension mismatch banner
+- **Plan**: 04-08 completed
+- **Status**: Phase 4 COMPLETE — all 8 plans delivered. Root wiring verified, LangGraph boundary enforced, 234 tests passing, all 15 INF/RTR requirements met
 - **Branch**: gsd/phase-04-inference-router-skills
 
 ## Decisions
@@ -86,3 +86,6 @@ Plan: 7 of 8
 - [Phase 04-06]: Enriched output schema at tRPC layer, not service layer — keeps service lean while API returns explainable routing results (D-26)
 - [Phase 04-07]: LLM gate config read from process.env in server action (no tRPC getter needed) — simpler than adding shared tRPC procedure; config derived from env vars
 - [Phase 04-07]: Backend status rows constructed in inference load function via mapBackendsToStatusRows() — keeps data-shaping in server layer, provides robust defaults for all four backends even when sidecar is down
+- [Phase 04-08]: Root wiring verification tests added as verification-only TDD — existing canonical mounts confirmed correct (no duplicate aliases)
+- [Phase 04-08]: LangGraph/LangChain boundary enforcement via test — zero imports in agents/orchestration/CLI boundaries per AI-SPEC adoption boundary
+- [Phase 04-08]: Three-surface parity tests unified: Web vitest (8/8), CLI (49 tests), TUI (parity labels + inference backend states)
