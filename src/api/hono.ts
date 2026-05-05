@@ -5,7 +5,7 @@
  *   - product-kernel/api/router.ts → real task/sprint/report/notification/audit routes
  *   - product-kernel/api/search-api.ts → real search routes
  *   - trpc/rest-api.ts → symphony orchestration routes
- *   - src/api/routes/* → remaining stub routes (docs, runs, artifacts, repos, memory, saved-views)
+ *   - src/api/routes/* → route adapters for docs, runs, artifacts, repos, memory, saved-views
  *
  * Auth: Bearer API-key (SHA-256 hash lookup) via src/api/auth.ts.
  * Feature gate: FULCRUM_FEATURES=public-api (OFF → 404).
@@ -25,7 +25,6 @@ import { registerKernelReportRoutes } from "./routes/kernel-reports.ts";
 import { registerKernelNotificationRoutes } from "./routes/kernel-notifications.ts";
 import { registerKernelAuditRoutes } from "./routes/kernel-audit.ts";
 
-// ── Stub route registrations (pending real implementation) ──────────
 import { registerTaskRoutes } from "./routes/tasks.ts";
 import { registerDocRoutes } from "./routes/docs.ts";
 import { registerSprintRoutes } from "./routes/sprints.ts";
@@ -42,13 +41,14 @@ import { registerSavedViewRoutes } from "./routes/saved-views.ts";
 
 export interface PublicApiDeps {
   db: ProductDb;
+  trpc?: unknown;
 }
 
 /**
  * createPublicApi — builds the inner /api/v1 Hono app with OpenAPI 3.1 support.
  *
- * When `deps` provided: mounts real routes backed by ProductDb.
- * When omitted: mounts stub routes only (for tests / static spec generation).
+ * When `deps` provided: mounts authenticated routes backed by ProductDb/services.
+ * When omitted: mounts route metadata for tests/static spec generation.
  */
 export function createPublicApi(deps?: PublicApiDeps): OpenAPIHono {
   const api = new OpenAPIHono<ApiEnv>();
@@ -57,6 +57,7 @@ export function createPublicApi(deps?: PublicApiDeps): OpenAPIHono {
     // Inject DB into Hono context for all routes
     api.use("*", async (c, next) => {
       c.set("db", deps.db);
+      if (deps.trpc) c.set("trpc", deps.trpc);
       return next();
     });
 
@@ -74,8 +75,7 @@ export function createPublicApi(deps?: PublicApiDeps): OpenAPIHono {
     registerKernelAuditRoutes(api);
   }
 
-  // Stub routes — still in-memory (replaced when real implementations land).
-  // Cast needed: stubs use OpenAPIHono<Env> (no Variables); ApiEnv is a superset.
+  // Cast needed: legacy route modules use OpenAPIHono<Env>; ApiEnv is a superset.
   const base = api as unknown as OpenAPIHono;
   if (!deps) registerTaskRoutes(base);
   registerDocRoutes(base);

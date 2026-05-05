@@ -1,5 +1,4 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
-import type { Context } from "hono";
 
 const MemoryKindSchema = z.enum([
   "note",
@@ -50,21 +49,21 @@ const PatchMemoryBodySchema = z.object({
 
 const MemoryListQuerySchema = z.object({
   projectId: z.string().uuid().optional(),
-  global: z.string().optional(),
+  global: z.coerce.boolean().optional(),
   kind: MemoryKindSchema.optional(),
   tags: z.string().optional(),
   importance: MemoryImportanceSchema.optional(),
-  archived: z.string().optional(),
+  archived: z.coerce.boolean().optional(),
   source: MemorySourceSchema.optional(),
-  limit: z.string().optional(),
-  offset: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
 });
 
 const MemoryIdParamSchema = z.object({ id: z.string().uuid() });
 const DeleteQuerySchema = z.object({ confirm: z.string().optional() });
 const ContextPreviewQuerySchema = z.object({
   taskId: z.string().min(1),
-  budget: z.string().optional(),
+  budget: z.coerce.number().int().positive().optional(),
 });
 
 const ErrorSchema = z.object({
@@ -74,22 +73,6 @@ const ErrorSchema = z.object({
 }).openapi("MemoryRestError");
 
 const DeleteMemoryResultSchema = z.object({ deleted: z.literal(true) }).openapi("DeleteMemoryResult");
-const ContextPreviewSchema = z.object({
-  procedure: z.literal("context.preview"),
-  input: z.object({
-    taskId: z.string(),
-    budget: z.number().int().positive().optional(),
-  }),
-  bundle: z.object({
-    taskId: z.string(),
-    tokenBudget: z.number().int(),
-    tokenCount: z.number().int(),
-    slices: z.record(z.string(), z.object({
-      content: z.string(),
-      tokenCount: z.number().int(),
-    })),
-  }),
-}).openapi("ContextPreview");
 
 const listRoute = createRoute({
   method: "get",
@@ -135,7 +118,7 @@ const patchRoute = createRoute({
   summary: "Update a memory",
   request: {
     params: MemoryIdParamSchema,
-    body: { content: { "application/json": { schema: z.unknown() } } },
+    body: { content: { "application/json": { schema: PatchMemoryBodySchema } } },
   },
   responses: {
     200: { content: { "application/json": { schema: MemorySchema } }, description: "Updated memory" },
@@ -159,7 +142,7 @@ const deleteRoute = createRoute({
   },
 });
 
-function actionRoute(path: "/memory/{id}/promote" | "/memory/{id}/archive" | "/memory/{id}/restore", summary: string) {
+function unsupportedActionRoute(path: "/memory/{id}/promote" | "/memory/{id}/archive" | "/memory/{id}/restore", summary: string) {
   return createRoute({
     method: "post",
     path,
@@ -167,16 +150,14 @@ function actionRoute(path: "/memory/{id}/promote" | "/memory/{id}/archive" | "/m
     summary,
     request: { params: MemoryIdParamSchema },
     responses: {
-      200: { content: { "application/json": { schema: MemorySchema } }, description: "Updated memory" },
-      401: { content: { "application/json": { schema: ErrorSchema } }, description: "Unauthorized" },
-      404: { content: { "application/json": { schema: ErrorSchema } }, description: "Not found" },
+      501: { content: { "application/json": { schema: ErrorSchema } }, description: "Operation unavailable" },
     },
   });
 }
 
-const promoteRoute = actionRoute("/memory/{id}/promote", "Promote a memory");
-const archiveRoute = actionRoute("/memory/{id}/archive", "Archive a memory");
-const restoreRoute = actionRoute("/memory/{id}/restore", "Restore a memory");
+const promoteRoute = unsupportedActionRoute("/memory/{id}/promote", "Promote a memory");
+const archiveRoute = unsupportedActionRoute("/memory/{id}/archive", "Archive a memory");
+const restoreRoute = unsupportedActionRoute("/memory/{id}/restore", "Restore a memory");
 
 const contextPreviewRoute = createRoute({
   method: "get",
@@ -185,176 +166,79 @@ const contextPreviewRoute = createRoute({
   summary: "Preview assembled context for a task",
   request: { query: ContextPreviewQuerySchema },
   responses: {
-    200: { content: { "application/json": { schema: ContextPreviewSchema } }, description: "Context preview" },
-    401: { content: { "application/json": { schema: ErrorSchema } }, description: "Unauthorized" },
+    501: { content: { "application/json": { schema: ErrorSchema } }, description: "Operation unavailable" },
   },
 });
 
-type MemoryRow = z.infer<typeof MemorySchema>;
-type RouteContext = Context & {
-  req: Context["req"] & {
-    valid(target: "json" | "param" | "query"): any;
+type MemoryCaller = {
+  memories: {
+    list(input: unknown): Promise<unknown>;
+    create(input: unknown): Promise<unknown>;
+    get(input: unknown): Promise<unknown>;
+    update(input: unknown): Promise<unknown>;
+    delete(input: unknown): Promise<unknown>;
   };
 };
 
-function extractOrgId(auth: string | null): string | null {
-  if (!auth) return null;
-  const token = auth.replace(/^Bearer\s+/, "");
-  if (token.startsWith("test-jwt:")) return token.slice("test-jwt:".length);
-  return null;
-}
-
-function authOrg(c: Context): string | Response {
-  const orgId = extractOrgId(c.req.header("Authorization") ?? null);
-  if (!orgId) {
-    return c.json({ error: "Authentication required", code: "UNAUTHORIZED" }, 401);
-  }
-  return orgId;
-}
-
-function makeMemory(input: z.infer<typeof CreateMemoryBodySchema>, orgId: string): MemoryRow {
-  const now = new Date().toISOString();
-  return {
-    id: crypto.randomUUID(),
-    orgId,
-    projectId: input.projectId ?? null,
-    global: input.global ?? false,
-    kind: input.kind ?? "note",
-    body: input.body,
-    tags: input.tags ?? [],
-    importance: input.importance ?? "medium",
-    source: "manual",
-    sourceRef: input.sourceRef ?? {},
-    createdAt: now,
-    updatedAt: now,
-    archived: false,
-  };
-}
-
-function byCallerOrg(store: Map<string, MemoryRow>, orgId: string): MemoryRow[] {
-  return [...store.values()].filter((memory) => memory.orgId === orgId);
-}
-
-function findForCaller(store: Map<string, MemoryRow>, id: string, orgId: string): MemoryRow | null {
-  const memory = store.get(id);
-  return memory?.orgId === orgId ? memory : null;
-}
-
 export function registerMemoryRoutes(api: OpenAPIHono): void {
-  const store = new Map<string, MemoryRow>();
-  // Hono's typed-response union is narrower than shared error responders.
   const openapi = api.openapi.bind(api) as (...args: unknown[]) => void;
 
-  openapi(listRoute, (c: RouteContext) => {
-    const orgId = authOrg(c);
-    if (orgId instanceof Response) return orgId;
-    return c.json(byCallerOrg(store, orgId), 200);
+  openapi(listRoute, async (c) => {
+    const query = c.req.valid("query");
+    const tags = typeof query.tags === "string" && query.tags.length > 0
+      ? query.tags.split(",").map((tag) => tag.trim()).filter(Boolean)
+      : undefined;
+    const memories = await getMemoryCaller(c).memories.list({ ...query, tags });
+    return c.json(z.array(MemorySchema).parse(toJsonDates(memories)), 200);
   });
 
-  openapi(createMemoryRoute, (c: RouteContext) => {
-    const orgId = authOrg(c);
-    if (orgId instanceof Response) return orgId;
-    const memory = makeMemory(c.req.valid("json"), orgId);
-    store.set(memory.id, memory);
-    return c.json(memory, 201);
+  openapi(createMemoryRoute, async (c) => {
+    const memory = await getMemoryCaller(c).memories.create(c.req.valid("json"));
+    return c.json(MemorySchema.parse(toJsonDates(memory)), 201);
   });
 
-  openapi(getRoute, (c: RouteContext) => {
-    const orgId = authOrg(c);
-    if (orgId instanceof Response) return orgId;
-    const memory = findForCaller(store, c.req.valid("param").id, orgId);
-    if (!memory) return c.json({ error: "Memory not found", code: "NOT_FOUND" }, 404);
-    return c.json(memory, 200);
+  openapi(getRoute, async (c) => {
+    const memory = await getMemoryCaller(c).memories.get({ id: c.req.valid("param").id });
+    return c.json(MemorySchema.parse(toJsonDates(memory)), 200);
   });
 
-  openapi(patchRoute, async (c: RouteContext) => {
-    const orgId = authOrg(c);
-    if (orgId instanceof Response) return orgId;
-    const memory = findForCaller(store, c.req.valid("param").id, orgId);
-    if (!memory) return c.json({ error: "Memory not found", code: "NOT_FOUND" }, 404);
-
-    const parsed = PatchMemoryBodySchema.safeParse(await c.req.json());
-    if (!parsed.success) {
-      return c.json({
-        error: "Validation failed",
-        code: "VALIDATION_ERROR",
-        details: z.treeifyError(parsed.error),
-      }, 422);
-    }
-
-    Object.assign(memory, {
-      ...("body" in parsed.data ? { body: parsed.data.body } : {}),
-      ...("tags" in parsed.data ? { tags: parsed.data.tags } : {}),
-      ...("importance" in parsed.data ? { importance: parsed.data.importance } : {}),
-      updatedAt: new Date().toISOString(),
+  openapi(patchRoute, async (c) => {
+    const memory = await getMemoryCaller(c).memories.update({
+      id: c.req.valid("param").id,
+      ...c.req.valid("json"),
     });
-    return c.json(memory, 200);
+    return c.json(MemorySchema.parse(toJsonDates(memory)), 200);
   });
 
-  openapi(deleteRoute, (c: RouteContext) => {
-    const orgId = authOrg(c);
-    if (orgId instanceof Response) return orgId;
-    const { id } = c.req.valid("param");
+  openapi(deleteRoute, async (c) => {
     if (c.req.valid("query").confirm !== "true") {
       return c.json({ error: "DELETE requires confirm=true", code: "CONFIRM_REQUIRED" }, 400);
     }
-    const memory = findForCaller(store, id, orgId);
-    if (!memory) return c.json({ error: "Memory not found", code: "NOT_FOUND" }, 404);
-    store.delete(id);
-    return c.json({ deleted: true as const }, 200);
+    const result = await getMemoryCaller(c).memories.delete({ id: c.req.valid("param").id });
+    return c.json(DeleteMemoryResultSchema.parse(result), 200);
   });
 
-  openapi(promoteRoute, (c: RouteContext) => {
-    const orgId = authOrg(c);
-    if (orgId instanceof Response) return orgId;
-    const memory = findForCaller(store, c.req.valid("param").id, orgId);
-    if (!memory) return c.json({ error: "Memory not found", code: "NOT_FOUND" }, 404);
-    memory.global = true;
-    memory.importance = "high";
-    memory.updatedAt = new Date().toISOString();
-    return c.json(memory, 200);
-  });
+  openapi(promoteRoute, (c) => unavailable(c));
+  openapi(archiveRoute, (c) => unavailable(c));
+  openapi(restoreRoute, (c) => unavailable(c));
+  openapi(contextPreviewRoute, (c) => unavailable(c));
+}
 
-  openapi(archiveRoute, (c: RouteContext) => {
-    const orgId = authOrg(c);
-    if (orgId instanceof Response) return orgId;
-    const memory = findForCaller(store, c.req.valid("param").id, orgId);
-    if (!memory) return c.json({ error: "Memory not found", code: "NOT_FOUND" }, 404);
-    memory.archived = true;
-    memory.updatedAt = new Date().toISOString();
-    return c.json(memory, 200);
-  });
+function getMemoryCaller(c: { get(key: string): unknown }): MemoryCaller {
+  const trpc = c.get("trpc") as MemoryCaller | undefined;
+  if (!trpc?.memories) {
+    throw new Error("Memory routes require a tRPC caller in Hono context.");
+  }
+  return trpc;
+}
 
-  openapi(restoreRoute, (c: RouteContext) => {
-    const orgId = authOrg(c);
-    if (orgId instanceof Response) return orgId;
-    const memory = findForCaller(store, c.req.valid("param").id, orgId);
-    if (!memory) return c.json({ error: "Memory not found", code: "NOT_FOUND" }, 404);
-    memory.archived = false;
-    memory.updatedAt = new Date().toISOString();
-    return c.json(memory, 200);
-  });
+function unavailable(c: { json(body: unknown, status: 501): Response }): Response {
+  return c.json({
+    error: "Operation is not exposed by the current tRPC contract.",
+    code: "NOT_IMPLEMENTED",
+  }, 501);
+}
 
-  openapi(contextPreviewRoute, (c: RouteContext) => {
-    const orgId = authOrg(c);
-    if (orgId instanceof Response) return orgId;
-    const { taskId, budget } = c.req.valid("query");
-    const tokenBudget = budget ? Number.parseInt(budget, 10) : 8192;
-    return c.json({
-      procedure: "context.preview" as const,
-      input: { taskId, ...(budget ? { budget: tokenBudget } : {}) },
-      bundle: {
-        taskId,
-        tokenBudget,
-        tokenCount: 0,
-        slices: {
-          memories: { content: "", tokenCount: 0 },
-          linkedDocs: { content: "", tokenCount: 0 },
-          recentRuns: { content: "", tokenCount: 0 },
-          repoState: { content: "", tokenCount: 0 },
-          skillPrompts: { content: "", tokenCount: 0 },
-        },
-      },
-    }, 200);
-  });
+function toJsonDates(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value));
 }

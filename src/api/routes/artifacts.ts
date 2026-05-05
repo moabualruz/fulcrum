@@ -1,57 +1,59 @@
-/**
- * P13#06 — REST routes for the artifacts domain.
- * GET /artifacts → artifacts.list tRPC (stub; Pillar 3 replaces).
- */
-
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 
-// ── Schemas ──────────────────────────────────────────────────────────────────
+import {
+  ArtifactSchema as TrpcArtifactSchema,
+  ListArtifactsInputSchema,
+} from "../../trpc/schemas/artifacts.ts";
 
-const ArtifactSchema = z
-  .object({
-    id: z.string().uuid(),
-    orgId: z.string().uuid(),
-    runId: z.string().uuid(),
-    name: z.string(),
-    mimeType: z.string(),
-    sizeBytes: z.number().int().nonnegative(),
-    createdAt: z.string().datetime(),
-  })
-  .openapi("Artifact");
-
-// ── Stub store ────────────────────────────────────────────────────────────────
-
-const FIXED_ORG = "11111111-1111-4111-8111-111111111111";
-
-const STUB_ARTIFACTS: z.infer<typeof ArtifactSchema>[] = [
-  {
-    id: "a1000000-0000-4000-8000-000000000001",
-    orgId: FIXED_ORG,
-    runId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-    name: "output.txt",
-    mimeType: "text/plain",
-    sizeBytes: 1024,
-    createdAt: "2026-01-10T08:05:00.000Z",
-  },
-];
-
-// ── Routes ────────────────────────────────────────────────────────────────────
+const ArtifactResponseSchema = TrpcArtifactSchema.extend({
+  createdAt: z.string().datetime(),
+  retentionUntil: z.union([z.string().datetime(), z.null()]),
+}).openapi("Artifact");
 
 const listRoute = createRoute({
   method: "get",
   path: "/artifacts",
   tags: ["artifacts"],
   summary: "List artifacts",
+  request: {
+    query: z.object({
+      projectId: z.string().uuid().optional(),
+      runId: z.string().uuid().optional(),
+      taskId: z.string().uuid().optional(),
+      archived: z.coerce.boolean().optional(),
+      mime: z.string().optional(),
+    }),
+  },
   responses: {
     200: {
-      content: { "application/json": { schema: z.array(ArtifactSchema) } },
+      content: { "application/json": { schema: z.array(ArtifactResponseSchema) } },
       description: "Artifacts",
     },
   },
 });
 
+type ArtifactsCaller = {
+  artifacts: {
+    list(input: z.infer<typeof ListArtifactsInputSchema>): Promise<unknown>;
+  };
+};
+
 export function registerArtifactRoutes(api: OpenAPIHono): void {
-  api.openapi(listRoute, (c) => {
-    return c.json(STUB_ARTIFACTS, 200);
+  api.openapi(listRoute, async (c) => {
+    const input = ListArtifactsInputSchema.parse(c.req.valid("query"));
+    const artifacts = await getArtifactsCaller(c).artifacts.list(input);
+    return c.json(z.array(ArtifactResponseSchema).parse(toJsonDates(artifacts)), 200);
   });
+}
+
+function getArtifactsCaller(c: { get(key: string): unknown }): ArtifactsCaller {
+  const trpc = c.get("trpc") as ArtifactsCaller | undefined;
+  if (!trpc?.artifacts) {
+    throw new Error("Artifact routes require a tRPC caller in Hono context.");
+  }
+  return trpc;
+}
+
+function toJsonDates(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value));
 }

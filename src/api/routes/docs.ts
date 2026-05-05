@@ -1,76 +1,33 @@
-/**
- * P13#05 — REST routes for the docs domain.
- *
- * C2 decision: doc_type defaults to "note" on create.
- * Pillar 7 replaces stub store with real DocumentRepository.
- */
-
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 
-// ── Schemas ──────────────────────────────────────────────────────────────────
+const DocTypeSchema = z.enum(["page", "wiki", "note", "template"]).openapi("DocType");
 
-const DocTypeSchema = z
-  .enum(["page", "wiki", "note", "template"])
-  .openapi("DocType");
+const DocSchema = z.object({
+  id: z.string().uuid(),
+  orgId: z.string().uuid(),
+  title: z.string(),
+  slug: z.string().optional(),
+  type: DocTypeSchema.optional(),
+  docType: DocTypeSchema.optional(),
+  createdAt: z.string().datetime().optional(),
+  updatedAt: z.string().datetime().optional(),
+}).openapi("Doc");
 
-const DocSchema = z
-  .object({
-    id: z.string().uuid(),
-    orgId: z.string().uuid(),
-    title: z.string(),
-    type: DocTypeSchema,
-    createdAt: z.string().datetime(),
-  })
-  .openapi("Doc");
+const CreateDocBodySchema = z.object({
+  title: z.string().min(1),
+  type: DocTypeSchema.default("note"),
+  bodyMd: z.string().optional(),
+}).openapi("CreateDocBody");
 
-const CreateDocBodySchema = z
-  .object({
-    orgId: z.string().uuid(),
-    title: z.string().min(1),
-    type: DocTypeSchema.default("note"),
-  })
-  .openapi("CreateDocBody");
-
-const PatchDocBodySchema = z
-  .object({
-    title: z.string().min(1).optional(),
-    type: DocTypeSchema.optional(),
-  })
-  .openapi("PatchDocBody");
+const PatchDocBodySchema = z.object({
+  title: z.string().min(1).optional(),
+  type: DocTypeSchema.optional(),
+  bodyMd: z.string().optional(),
+}).openapi("PatchDocBody");
 
 const DocIdParamSchema = z.object({ id: z.string().uuid() });
 
-const ErrorSchema = z
-  .object({ error: z.string(), code: z.string() })
-  .openapi("RestError");
-
-// ── In-memory stub store ─────────────────────────────────────────────────────
-
-const FIXED_ORG = "11111111-1111-4111-8111-111111111111";
-
-function makeStubStore(): Map<string, z.infer<typeof DocSchema>> {
-  return new Map([
-    [
-      "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-      {
-        id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-        orgId: FIXED_ORG,
-        title: "Stub doc",
-        type: "note" as const,
-        createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
-      },
-    ],
-  ]);
-}
-
-function extractOrgId(auth: string | null): string | null {
-  if (!auth) return null;
-  const token = auth.replace(/^Bearer\s+/, "");
-  if (token.startsWith("test-jwt:")) return token.slice("test-jwt:".length);
-  return null;
-}
-
-// ── Routes ───────────────────────────────────────────────────────────────────
+const ErrorSchema = z.object({ error: z.string(), code: z.string() }).openapi("RestError");
 
 const listRoute = createRoute({
   method: "get",
@@ -101,7 +58,6 @@ const getRoute = createRoute({
   request: { params: DocIdParamSchema },
   responses: {
     200: { content: { "application/json": { schema: DocSchema } }, description: "Doc" },
-    403: { content: { "application/json": { schema: ErrorSchema } }, description: "Forbidden" },
     404: { content: { "application/json": { schema: ErrorSchema } }, description: "Not found" },
   },
 });
@@ -117,7 +73,6 @@ const patchRoute = createRoute({
   },
   responses: {
     200: { content: { "application/json": { schema: DocSchema } }, description: "Updated doc" },
-    403: { content: { "application/json": { schema: ErrorSchema } }, description: "Forbidden" },
     404: { content: { "application/json": { schema: ErrorSchema } }, description: "Not found" },
   },
 });
@@ -130,59 +85,77 @@ const deleteRoute = createRoute({
   request: { params: DocIdParamSchema },
   responses: {
     204: { description: "Deleted" },
-    403: { content: { "application/json": { schema: ErrorSchema } }, description: "Forbidden" },
     404: { content: { "application/json": { schema: ErrorSchema } }, description: "Not found" },
   },
 });
 
-export function registerDocRoutes(api: OpenAPIHono): void {
-  const store = makeStubStore();
+type DocsCaller = {
+  docs: {
+    list(input?: unknown): Promise<unknown>;
+    create(input: unknown): Promise<unknown>;
+    get(input: unknown): Promise<unknown>;
+    update(input: unknown): Promise<unknown>;
+    delete(input: unknown): Promise<unknown>;
+  };
+};
 
-  api.openapi(listRoute, (c) => {
-    return c.json([...store.values()], 200);
+export function registerDocRoutes(api: OpenAPIHono): void {
+  api.openapi(listRoute, async (c) => {
+    const docs = await getDocsCaller(c).docs.list({});
+    return c.json(toJsonDates(docs), 200);
   });
 
   api.openapi(createRoute_, async (c) => {
     const body = c.req.valid("json");
-    const doc: z.infer<typeof DocSchema> = {
-      id: crypto.randomUUID(),
-      orgId: body.orgId,
+    const doc = await getDocsCaller(c).docs.create({
       title: body.title,
-      type: body.type,
-      createdAt: new Date().toISOString(),
-    };
-    store.set(doc.id, doc);
-    return c.json(doc, 201);
+      docType: body.type,
+      bodyMd: body.bodyMd,
+    });
+    return c.json(normalizeDoc(doc), 201);
   });
 
-  api.openapi(getRoute, (c) => {
-    const { id } = c.req.valid("param");
-    const callerOrg = extractOrgId(c.req.header("Authorization") ?? null);
-    const doc = store.get(id);
+  api.openapi(getRoute, async (c) => {
+    const doc = await getDocsCaller(c).docs.get({ id: c.req.valid("param").id });
     if (!doc) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
-    if (callerOrg !== doc.orgId) return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
-    return c.json(doc, 200);
+    return c.json(normalizeDoc(doc), 200);
   });
 
   api.openapi(patchRoute, async (c) => {
-    const { id } = c.req.valid("param");
-    const callerOrg = extractOrgId(c.req.header("Authorization") ?? null);
-    const doc = store.get(id);
+    const body = c.req.valid("json");
+    const doc = await getDocsCaller(c).docs.update({
+      id: c.req.valid("param").id,
+      title: body.title,
+      docType: body.type,
+      bodyMd: body.bodyMd,
+    });
     if (!doc) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
-    if (callerOrg !== doc.orgId) return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
-    const patch = c.req.valid("json");
-    const updated = { ...doc, ...patch };
-    store.set(id, updated);
-    return c.json(updated, 200);
+    return c.json(normalizeDoc(doc), 200);
   });
 
-  api.openapi(deleteRoute, (c) => {
-    const { id } = c.req.valid("param");
-    const callerOrg = extractOrgId(c.req.header("Authorization") ?? null);
-    const doc = store.get(id);
+  api.openapi(deleteRoute, async (c) => {
+    const doc = await getDocsCaller(c).docs.delete({ id: c.req.valid("param").id });
     if (!doc) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
-    if (callerOrg !== doc.orgId) return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
-    store.delete(id);
     return new Response(null, { status: 204 });
   });
+}
+
+function getDocsCaller(c: { get(key: string): unknown }): DocsCaller {
+  const trpc = c.get("trpc") as DocsCaller | undefined;
+  if (!trpc?.docs) {
+    throw new Error("Doc routes require a tRPC caller in Hono context.");
+  }
+  return trpc;
+}
+
+function normalizeDoc(value: unknown): unknown {
+  const doc = toJsonDates(value) as Record<string, unknown>;
+  return {
+    ...doc,
+    type: doc["type"] ?? doc["docType"],
+  };
+}
+
+function toJsonDates(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value));
 }
