@@ -54,6 +54,8 @@
     "yaml": "2.8.3",
     "yjs": "13.6.30",
     "zod": "4.4.2",
-    "zustand": "5.0.12"
+    "zustand": "5.0.12",
+    "@opentui/core": "0.2.2",
+    "@opentui/solid": "0.2.2"
   }
 }
