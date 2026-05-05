@@ -7,6 +7,9 @@ import { Task } from "../db/entities/tasks/Task.ts";
 import { type TaskDependencies } from "../db/entities/tasks/schemas.ts";
 import { TaskRepository } from "../db/repositories/tasks/TaskRepository.ts";
 import { tipTapDocToText, type TipTapJson } from "../db/tasks-rich-text.ts";
+import { FieldDependencyRule } from "../db/entities/tasks/FieldDependencyRule.ts";
+import { WorkflowService } from "./WorkflowService.ts";
+import { CommentService } from "./CommentService.ts";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -103,10 +106,64 @@ export class TaskService {
     status?: string | null;
     priority?: number | null;
     points?: number | null;
+    assigneeId?: string | null;
+    projectId?: string | null;
   }): Promise<TaskOutput | null> {
     const repo = this.repo();
+
+    // Fetch current task to determine field changes
+    const current = await repo.get({ orgId, id: input.id });
+    if (!current) return null;
+
+    // D-24: Transition validation — only when status changes and projectId is known
+    if (input.status !== undefined && input.status !== current.status) {
+      const projectId = input.projectId ?? current.projectId;
+      if (projectId) {
+        const wfService = new WorkflowService(this.em);
+        const result = await wfService.validateTransition(orgId, projectId, current.status ?? "", input.status ?? "");
+        if (!result.allowed) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: result.reason ?? `Transition from '${current.status}' to '${input.status}' is not allowed.`,
+          });
+        }
+      }
+    }
+
+    // D-25: startedAt — set when entering a 'started'-category status
+    const STARTED_STATUSES = new Set(["in_progress", "started", "active"]);
+    const isStartingNow =
+      input.status !== undefined &&
+      input.status !== current.status &&
+      STARTED_STATUSES.has(input.status ?? "") &&
+      !current.startedAt;
+
     const task = await repo.update({ orgId, ...input });
-    return task ? serializeTask(task) : null;
+    if (!task) return null;
+
+    if (isStartingNow) {
+      task.startedAt = new Date();
+      this.em.persist(task);
+      await this.em.flush();
+    }
+
+    // D-08: Watcher auto-subscribe on assignee change
+    if (input.assigneeId !== undefined && input.assigneeId !== current.assigneeId && input.assigneeId) {
+      try {
+        const commentService = new CommentService(this.em);
+        await commentService.subscribe(orgId, task.id, input.assigneeId, "assign");
+      } catch {
+        // Non-fatal: watcher subscription is best-effort
+      }
+    }
+
+    // HIGH-03: Inline field dependency validation
+    if (input.projectId ?? current.projectId) {
+      const projectId = (input.projectId ?? current.projectId)!;
+      await validateFieldDependencies(this.em, orgId, projectId, task);
+    }
+
+    return serializeTask(task);
   }
 
   async delete(orgId: string, id: string): Promise<TaskOutput | null> {
@@ -130,7 +187,6 @@ export class TaskService {
         });
       }
       if (patch.projectId !== undefined) {
-        await txEm.getConnection().execute(`alter table tasks add column if not exists project_id uuid`);
         await txEm.getConnection().execute(
           `update tasks set project_id = ?, updated_at = now() where org_id = ? and id in (${ids.map(() => "?").join(", ")})`,
           [patch.projectId, ctx.orgId, ...ids],
@@ -365,6 +421,38 @@ function dependenciesForTask(taskId: string, edges: Map<string, Set<string>>): T
     if (to.has(taskId)) blockedBy.push(from);
   }
   return { blocks, blocked_by: normalizedUnique(blockedBy) };
+}
+
+// HIGH-03: Inline field dependency validation (FieldDependencyService created later in Plan 12)
+async function validateFieldDependencies(
+  em: EntityManager,
+  orgId: string,
+  projectId: string,
+  task: Task,
+): Promise<void> {
+  const rules = await em.find(FieldDependencyRule, {
+    org: orgId,
+    projectId,
+    action: "require",
+  } as never);
+
+  const missingFields: string[] = [];
+  for (const rule of rules) {
+    const sourceValue = task.customFields?.[rule.sourceFieldId];
+    if (String(sourceValue) === rule.sourceValue) {
+      const targetValue = task.customFields?.[rule.targetFieldId];
+      if (targetValue === undefined || targetValue === null || targetValue === "") {
+        missingFields.push(rule.targetFieldId);
+      }
+    }
+  }
+
+  if (missingFields.length > 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Required fields missing due to dependency rules: ${missingFields.join(", ")}`,
+    });
+  }
 }
 
 async function emitTaskEvent(ctx: {

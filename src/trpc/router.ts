@@ -33,6 +33,11 @@ import { reposRouter } from "./routers/repos.ts";
 import { credentialsRouter } from "../secrets/credentials-router.ts";
 import { reportsRouter } from "./routers/reports.ts";
 import { webhooksRouter } from "./routers/webhooks.ts";
+import { commentsRouter } from "../server/trpc/routers/comments.ts";
+import { workflowsRouter } from "../server/trpc/routers/workflows.ts";
+import { relationshipsRouter } from "../server/trpc/routers/relationships.ts";
+import { templatesRouter } from "../server/trpc/routers/templates.ts";
+import { recurrenceRouter } from "../server/trpc/routers/recurrence.ts";
 import {
   runsSubscriptionRouter,
   notifySubscriptionRouter,
@@ -109,6 +114,11 @@ export const appRouter = t.router({
   doctor: doctorRouter,
   invitations: invitationsRouter,
   reports: reportsRouter,
+  comments: commentsRouter,
+  workflows: workflowsRouter,
+  relationships: relationshipsRouter,
+  templates: templatesRouter,
+  recurrence: recurrenceRouter,
   credentials: credentialsRouter,
 
   db: dbRouter,

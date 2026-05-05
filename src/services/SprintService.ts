@@ -241,11 +241,44 @@ export class SprintService {
     };
   }
 
+  // D-27: Capacity preview — sum story_points of tasks in sprint vs capacity budget
+  async getCapacityPreview(orgId: string, sprintId: string): Promise<{
+    assigned: number;
+    capacity: number | null;
+    percentage: number | null;
+  }> {
+    const sprint = await findSprint(this.em, orgId, sprintId);
+    if (!sprint) throw new TRPCError({ code: "NOT_FOUND", message: "Sprint not found." });
+
+    const rows = await this.em.getConnection().execute(
+      `select coalesce(sum(points), 0) as total_points from tasks where org_id = ? and sprint_id = ? and deleted_at is null`,
+      [orgId, sprintId],
+    ) as Array<{ total_points: number }>;
+
+    const assigned = Number(rows[0]?.total_points ?? 0);
+    const capacity = sprint.capacityPoints ?? null;
+    const percentage = capacity && capacity > 0 ? (assigned / capacity) * 100 : null;
+
+    return { assigned, capacity, percentage };
+  }
+
+  // D-29: Save retrospective notes + summary
+  async saveRetrospective(orgId: string, sprintId: string, notes: string, summary?: string): Promise<SprintOutput | null> {
+    const sprint = await findSprint(this.em, orgId, sprintId);
+    if (!sprint) return null;
+
+    sprint.retrospectiveNotes = { notes };
+    if (summary !== undefined) {
+      sprint.closedSummary = { ...(sprint.closedSummary as Record<string, unknown> ?? {}), summary };
+    }
+    await this.em.flush();
+    return serializeSprint(sprint);
+  }
+
   async addTask(orgId: string, sprintId: string, taskId: string): Promise<{ moved: true }> {
     const sprint = await findSprint(this.em, orgId, sprintId);
     if (!sprint) throw new TRPCError({ code: "NOT_FOUND", message: "Sprint not found." });
     await assertTaskInOrg(this.em, orgId, taskId);
-    await ensureTaskProjectColumn(this.em);
     await this.em.getConnection().execute(
       `update tasks set sprint_id = ?, project_id = ?, updated_at = now() where org_id = ? and id = ?`,
       [sprint.id, sprint.projectId, orgId, taskId],
@@ -316,6 +349,3 @@ async function assertTaskInOrg(em: EntityManager, orgId: string, taskId: string)
   }
 }
 
-async function ensureTaskProjectColumn(em: EntityManager): Promise<void> {
-  await em.getConnection().execute(`alter table tasks add column if not exists project_id uuid`);
-}
