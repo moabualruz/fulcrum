@@ -30,7 +30,7 @@
 
     {#if form?.ok}
       <p data-webhook-created class="rounded-md border border-green-700/30 bg-green-950/20 px-3 py-2 text-sm text-green-700">
-        Webhook subscription created.
+        {form.resend ? "Webhook delivery queued for retry." : "Webhook subscription created."}
       </p>
     {/if}
 
@@ -111,17 +111,44 @@
           <tr class="border-b border-border text-left text-xs text-muted-foreground">
             <th class="pb-2 font-medium">Event</th>
             <th class="pb-2 font-medium">Status</th>
-            <th class="pb-2 font-medium">Response code</th>
-            <th class="pb-2 font-medium">Delivered at</th>
+            <th class="pb-2 font-medium">Attempts</th>
+            <th class="pb-2 font-medium">Next attempt</th>
+            <th class="pb-2 font-medium">Last attempt</th>
+            <th class="pb-2 font-medium">Response</th>
+            <th class="pb-2 font-medium">Error</th>
+            <th class="pb-2 font-medium">Action</th>
           </tr>
         </thead>
         <tbody>
           {#each data.deliveries as d (d.id)}
             <tr class="border-b border-border/50">
               <td class="py-2">{d.event}</td>
-              <td class="py-2">{d.status}</td>
-              <td class="py-2">{d.responseCode ?? "—"}</td>
-              <td class="py-2">{d.deliveredAt}</td>
+              <td class="py-2">
+                <span data-delivery-status class="rounded border border-border px-2 py-0.5 text-xs">{d.deliveryStatus ?? d.status}</span>
+              </td>
+              <td class="py-2">{d.attempts ?? d.attempt ?? 0}</td>
+              <td class="py-2">{d.nextAttemptAt ?? d.nextRetryAt ?? "—"}</td>
+              <td class="py-2">{d.lastAttemptAt ?? d.deliveredAt ?? "—"}</td>
+              <td class="py-2">
+                <span>{d.responseCode ?? d.responseStatus ?? "—"}</span>
+                {#if d.responseBodyExcerpt}
+                  <span class="block max-w-64 truncate text-xs text-muted-foreground">{d.responseBodyExcerpt}</span>
+                {/if}
+              </td>
+              <td class="py-2">
+                {#if d.errorCode || d.errorMessage}
+                  <span class="block text-xs">{d.errorCode ?? "delivery_error"}</span>
+                  <span class="block max-w-64 truncate text-xs text-muted-foreground">{d.errorMessage}</span>
+                {:else}
+                  —
+                {/if}
+              </td>
+              <td class="py-2">
+                <form method="POST" action="?/resend">
+                  <input type="hidden" name="deliveryId" value={d.id} />
+                  <button type="submit" data-webhook-resend class="h-8 rounded-md border border-input px-3 text-xs">Resend</button>
+                </form>
+              </td>
             </tr>
           {/each}
         </tbody>

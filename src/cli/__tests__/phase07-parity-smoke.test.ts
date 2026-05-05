@@ -82,7 +82,9 @@ describe("phase 07 cross-surface parity smoke", () => {
           list: async () => notifications,
           markRead: async () => ({ ok: true }),
           mute: async () => ({ ok: true }),
-          rules: async () => [],
+          rules: {
+            list: async () => [],
+          },
         },
       },
     });
@@ -92,7 +94,7 @@ describe("phase 07 cross-surface parity smoke", () => {
     screen.render({
       writeln: (line = "") => rendered.push(line),
       separator: () => rendered.push("---"),
-    });
+    } as never);
 
     expect(rendered.join("\n")).toContain("[unread] Artifact delivered");
     expect(rendered.join("\n")).toContain("Bell: 1");

@@ -55,6 +55,41 @@ describe("/settings/integrations/webhooks — isNotifyWebhookEnabled()", () => {
     expect(Array.isArray(r.deliveries)).toBe(true);
   });
 
+  test("mapWebhookDeliveries returns debug metadata without secrets", async () => {
+    const mod = await import(`./+page.server.ts?t=${Date.now()}`);
+    const rows = mod.mapWebhookDeliveries([
+      {
+        id: "delivery-1",
+        eventType: "artifact.created",
+        status: "retrying",
+        attempt: 2,
+        responseCode: 503,
+        responseBodyExcerpt: "service unavailable",
+        error: "HTTP 503",
+        nextRetryAt: "2026-05-05T12:01:00.000Z",
+        createdAt: "2026-05-05T12:00:00.000Z",
+        signingSecret: "webhook-secret",
+        smtpPassword: "smtp-secret",
+        vapidPrivateKey: "push-secret",
+      },
+    ]);
+
+    expect(rows[0]).toMatchObject({
+      id: "delivery-1",
+      event: "artifact.created",
+      deliveryStatus: "retrying",
+      attempts: 2,
+      responseCode: 503,
+      responseBodyExcerpt: "service unavailable",
+      errorCode: "delivery_error",
+      errorMessage: "HTTP 503",
+      nextRetryAt: "2026-05-05T12:01:00.000Z",
+    });
+    expect(JSON.stringify(rows)).not.toContain("webhook-secret");
+    expect(JSON.stringify(rows)).not.toContain("smtp-secret");
+    expect(JSON.stringify(rows)).not.toContain("push-secret");
+  });
+
   test("addSubscription / getSubscriptions round-trip", async () => {
     const mod = await import(`./+page.server.ts?t=${Date.now()}`);
     const before = mod.getSubscriptions().length;
