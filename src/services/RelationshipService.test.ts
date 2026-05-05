@@ -5,7 +5,7 @@
  * Covers HIGH-04 gap: full CRUD + cycle detection.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "bun:test";
 import { RelationshipService } from "./RelationshipService.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ function makeRelationship(src: string, tgt: string, type = "blocks") {
 function makeMockEm(overrides: Partial<Record<string, any>> = {}): any {
   const findOne = vi.fn();
   const find = vi.fn().mockResolvedValue([]);
-  const create = vi.fn().mockImplementation((_, data) => ({ id: `new-${Date.now()}`, ...data }));
+  const create = vi.fn().mockImplementation((_: unknown, data: Record<string, unknown>) => ({ id: `new-${Date.now()}`, ...data }));
   const persistAndFlush = vi.fn().mockResolvedValue(undefined);
   const removeAndFlush = vi.fn().mockResolvedValue(undefined);
   const flush = vi.fn().mockResolvedValue(undefined);

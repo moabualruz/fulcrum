@@ -63,7 +63,8 @@ export class TemplateService {
       createdBy,
     } as never);
 
-    await this.em.persistAndFlush(template);
+    this.em.persist(template);
+    await this.em.flush();
     return this.serialize(template);
   }
 

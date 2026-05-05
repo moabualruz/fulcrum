@@ -192,12 +192,12 @@ export class ReportService {
     });
     if (rows.length === 0) return [];
 
-    const pointsTotal = (rows[0] as Record<string, number>)["pointsTotal"] ?? 0;
+    const pointsTotal = (rows[0] as unknown as Record<string, number>)["pointsTotal"] ?? 0;
     const totalDays = Math.max(1, rows.length - 1);
     const pointsPerDay = pointsTotal / totalDays;
 
     return rows.map((row, i) => {
-      const r = row as Record<string, unknown>;
+      const r = row as unknown as Record<string, unknown>;
       return {
         date: dateStr(r["date"] as Date),
         remaining: (r["pointsRemaining"] as number) ?? 0,
@@ -217,7 +217,7 @@ export class ReportService {
       orderBy: { date: "ASC" },
     });
     return rows.map((row) => {
-      const r = row as Record<string, unknown>;
+      const r = row as unknown as Record<string, unknown>;
       return {
         date: dateStr(r["date"] as Date),
         completed: (r["pointsCompleted"] as number) ?? 0,
@@ -237,10 +237,10 @@ export class ReportService {
       orderBy: { date: "ASC" },
     });
     return rows.map((row) => {
-      const r = row as Record<string, unknown>;
+      const r = row as unknown as Record<string, unknown>;
       return {
         date: dateStr(r["date"] as Date),
-        statusCounts: (r["statusCounts"] as Record<string, number>) ?? {},
+        statusCounts: (r["statusCounts"] as unknown as Record<string, number>) ?? {},
       };
     });
   }
@@ -256,7 +256,7 @@ export class ReportService {
       orderBy: { date: "ASC" },
     });
     return rows.map((row) => {
-      const r = row as Record<string, unknown>;
+      const r = row as unknown as Record<string, unknown>;
       return {
         date: dateStr(r["date"] as Date),
         wip: (r["wipCount"] as number) ?? 0,
@@ -287,12 +287,12 @@ export class ReportService {
     if (rows.length === 0) return [];
 
     const totalCompleted = rows.reduce((sum, row) => {
-      return sum + (((row as Record<string, unknown>)["pointsCompleted"] as number) ?? 0);
+      return sum + (((row as unknown as Record<string, unknown>)["pointsCompleted"] as number) ?? 0);
     }, 0);
     const average = Math.round(totalCompleted / rows.length);
 
     return rows.map((row) => {
-      const r = row as Record<string, unknown>;
+      const r = row as unknown as Record<string, unknown>;
       return {
         sprintId: (r["scopeId"] as string) ?? "",
         sprintName: (r["sprintName"] as string) ?? undefined,
@@ -317,7 +317,7 @@ export class ReportService {
     let pointsCompleted = 0;
 
     for (const row of rows) {
-      const r = row as Record<string, unknown>;
+      const r = row as unknown as Record<string, unknown>;
       tasksTotal += (r["tasksTotal"] as number) ?? 0;
       tasksCompleted += (r["tasksCompleted"] as number) ?? 0;
       pointsTotal += (r["pointsTotal"] as number) ?? 0;
@@ -350,10 +350,10 @@ export class ReportService {
     // Group events by taskId
     const byTask = new Map<string, Array<{ toValue: string; at: Date }>>();
     for (const ev of events) {
-      const e = ev as Record<string, unknown>;
+      const e = ev as unknown as Record<string, unknown>;
       const taskId = e["subjectId"] as string;
       if (!taskId) continue;
-      const payload = (e["payload"] as Record<string, unknown>) ?? {};
+      const payload = (e["payload"] as unknown as Record<string, unknown>) ?? {};
       const toValue = (payload["to_value"] as string) ?? "";
       const at = e["createdAt"] as Date;
       if (!byTask.has(taskId)) byTask.set(taskId, []);
@@ -390,10 +390,10 @@ export class ReportService {
 
     const byTask = new Map<string, { createdAt?: Date; completedAt?: Date }>();
     for (const ev of events) {
-      const e = ev as Record<string, unknown>;
+      const e = ev as unknown as Record<string, unknown>;
       const taskId = e["subjectId"] as string;
       if (!taskId) continue;
-      const payload = (e["payload"] as Record<string, unknown>) ?? {};
+      const payload = (e["payload"] as unknown as Record<string, unknown>) ?? {};
       const toValue = (payload["to_value"] as string) ?? "";
       const verb = e["verb"] as string;
 
@@ -434,8 +434,8 @@ export class ReportService {
     // Count completed tasks per week
     const weekCounts = new Map<string, number>();
     for (const ev of events) {
-      const e = ev as Record<string, unknown>;
-      const payload = (e["payload"] as Record<string, unknown>) ?? {};
+      const e = ev as unknown as Record<string, unknown>;
+      const payload = (e["payload"] as unknown as Record<string, unknown>) ?? {};
       const toValue = (payload["to_value"] as string) ?? "";
       if (!DONE_STATUSES.has(toValue.toLowerCase())) continue;
 
@@ -474,10 +474,10 @@ export class ReportService {
     // Track last status per task
     const lastStatus = new Map<string, { status: string; at: Date }>();
     for (const ev of events) {
-      const e = ev as Record<string, unknown>;
+      const e = ev as unknown as Record<string, unknown>;
       const taskId = e["subjectId"] as string;
       if (!taskId) continue;
-      const payload = (e["payload"] as Record<string, unknown>) ?? {};
+      const payload = (e["payload"] as unknown as Record<string, unknown>) ?? {};
       const toValue = (payload["to_value"] as string) ?? "";
       lastStatus.set(taskId, { status: toValue, at: e["createdAt"] as Date });
     }
@@ -508,7 +508,7 @@ export class ReportService {
     // Last activity per task
     const lastActivity = new Map<string, Date>();
     for (const ev of events) {
-      const e = ev as Record<string, unknown>;
+      const e = ev as unknown as Record<string, unknown>;
       const taskId = e["subjectId"] as string;
       if (!taskId) continue;
       const at = e["createdAt"] as Date;

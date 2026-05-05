@@ -4,18 +4,25 @@
  * Uses a mock EntityManager; no real DB required.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "bun:test";
 import { WorkflowService } from "./WorkflowService.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeProject(overrides: Record<string, unknown> = {}) {
+type ProjectOverrides = {
+  workflowConfig?: Record<string, unknown> | null;
+  methodology?: string;
+  enabledTaskTypes?: string[] | null;
+  [key: string]: unknown;
+};
+
+function makeProject(overrides: ProjectOverrides = {}) {
   return {
     id: "proj-1",
     org: { id: "org-1" },
-    workflowConfig: null,
+    workflowConfig: null as Record<string, unknown> | null,
     methodology: "kanban" as const,
-    enabledTaskTypes: ["epic", "task", "subtask", "bug"],
+    enabledTaskTypes: ["epic", "task", "subtask", "bug"] as string[] | null,
     ...overrides,
   };
 }
@@ -112,7 +119,7 @@ describe("WorkflowService", () => {
       const em = makeMockEm(project);
       const svc = new WorkflowService(em);
       await svc.updateMethodology("org-1", "proj-1", "scrum", true);
-      const transitions = project.workflowConfig?.transitions;
+      const transitions = project.workflowConfig?.['transitions'] as Record<string, string[]> | undefined;
       expect(transitions).toBeDefined();
       // Should be the scrum defaults, not the old kanban config
       expect(transitions!["Backlog"]).toContain("Todo");

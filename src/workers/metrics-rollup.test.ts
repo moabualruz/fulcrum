@@ -55,7 +55,7 @@ describe("metrics-rollup worker", () => {
       makeMockTask({ id: "task-3", status: "in_progress", points: 2 }),
     ];
     const em = makeMockEm(tasks);
-    const payload = { scope_type: "project", scope_id: "proj-1", org_id: "org-1" };
+    const payload = { scope_type: "project" as const, scope_id: "proj-1", org_id: "org-1" };
 
     await metricsRollupJob.handler(payload, { em: em as never });
 
@@ -71,7 +71,7 @@ describe("metrics-rollup worker", () => {
 
   it("handles empty project gracefully", async () => {
     const em = makeMockEm([]);
-    const payload = { scope_type: "project", scope_id: "proj-empty", org_id: "org-1" };
+    const payload = { scope_type: "project" as const, scope_id: "proj-empty", org_id: "org-1" };
 
     await metricsRollupJob.handler(payload, { em: em as never });
 
@@ -88,7 +88,7 @@ describe("metrics-rollup worker", () => {
       makeMockTask({ id: "task-3", status: "todo" }),
     ];
     const em = makeMockEm(tasks);
-    const payload = { scope_type: "project", scope_id: "proj-1", org_id: "org-1" };
+    const payload = { scope_type: "project" as const, scope_id: "proj-1", org_id: "org-1" };
 
     await metricsRollupJob.handler(payload, { em: em as never });
 
@@ -107,7 +107,7 @@ describe("metrics-rollup worker", () => {
       wipCount: 0,
     };
     const em = makeMockEm(tasks, existingCache);
-    const payload = { scope_type: "project", scope_id: "proj-1", org_id: "org-1" };
+    const payload = { scope_type: "project" as const, scope_id: "proj-1", org_id: "org-1" };
 
     await metricsRollupJob.handler(payload, { em: em as never });
 
@@ -125,7 +125,7 @@ describe("metrics-rollup worker", () => {
       makeMockTask({ id: "task-2", status: "todo", points: 5 }),
     ];
     const em = makeMockEm(tasks);
-    const payload = { scope_type: "workspace", scope_id: "ws-1", org_id: "org-1" };
+    const payload = { scope_type: "workspace" as const, scope_id: "ws-1", org_id: "org-1" };
 
     await metricsRollupJob.handler(payload, { em: em as never });
 
@@ -142,7 +142,7 @@ describe("metrics-rollup worker", () => {
 
   it("payload assertion rejects missing org_id", () => {
     expect(() => {
-      metricsRollupJob.assertPayload({ scope_type: "project", scope_id: "proj-1" });
+      metricsRollupJob.assertPayload({ scope_type: "project" as const, scope_id: "proj-1" });
     }).toThrow();
   });
 

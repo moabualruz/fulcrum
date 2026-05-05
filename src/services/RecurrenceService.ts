@@ -132,7 +132,8 @@ export class RecurrenceService {
       nextRunAt: calculateNextRunAt(config),
     } as never);
 
-    await this.em.persistAndFlush(rule);
+    this.em.persist(rule);
+    await this.em.flush();
     return this.serialize(rule);
   }
 

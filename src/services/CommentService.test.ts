@@ -343,7 +343,7 @@ describe("CommentService - subscribe idempotency", () => {
     const { service } = makeService();
     await service.subscribe(ORG_ID, TASK_ID, USER_A, "assign");
     const watchers = await service.listWatchers(ORG_ID, TASK_ID);
-    expect(watchers[0].source).toBe("assign");
+    expect(watchers[0]!.source).toBe("assign");
   });
 });
 
@@ -357,16 +357,16 @@ describe("CommentService - getThreaded", () => {
     const tree = await service.getThreaded(ORG_ID, TASK_ID);
     // Exactly 1 root (the parent)
     expect(tree).toHaveLength(1);
-    expect(tree[0].id).toBe(parent.id);
-    expect(tree[0].replies).toHaveLength(1);
-    expect(tree[0].replies![0].parentCommentId).toBe(parent.id);
+    expect(tree[0]!.id).toBe(parent.id);
+    expect(tree[0]!.replies).toHaveLength(1);
+    expect(tree[0]!.replies![0]!.parentCommentId).toBe(parent.id);
   });
 
   it("top-level comments have empty replies array", async () => {
     const { service } = makeService();
     await service.createComment(ORG_ID, TASK_ID, USER_A, { type: "doc", content: [] });
     const tree = await service.getThreaded(ORG_ID, TASK_ID);
-    expect(tree[0].replies).toEqual([]);
+    expect(tree[0]!.replies).toEqual([]);
   });
 });
 

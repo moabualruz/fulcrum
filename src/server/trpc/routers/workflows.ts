@@ -33,7 +33,7 @@ export const workflowsRouter = t.router({
   updateTransitions: permissionedProcedure({ resource: "workflows", action: "update" })
     .input(z.object({
       projectId: z.string().uuid(),
-      transitions: z.record(z.array(z.string())),
+      transitions: z.record(z.string(), z.array(z.string())),
     }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.em) throw new Error("No entity manager");

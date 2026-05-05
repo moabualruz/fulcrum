@@ -23,7 +23,7 @@ export const templatesRouter = t.router({
     .input(z.object({
       projectId: z.string().uuid().optional(),
       name: z.string().min(1),
-      templateData: z.record(z.unknown()),
+      templateData: z.record(z.string(), z.unknown()),
       description: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -42,7 +42,7 @@ export const templatesRouter = t.router({
   apply: permissionedProcedure({ resource: "tasks", action: "list" })
     .input(z.object({
       templateId: z.string().uuid(),
-      overrides: z.record(z.unknown()).optional(),
+      overrides: z.record(z.string(), z.unknown()).optional(),
     }))
     .query(async ({ ctx, input }) => {
       if (!ctx.em) throw new Error("No entity manager");

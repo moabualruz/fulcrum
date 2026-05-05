@@ -142,7 +142,8 @@ export class RelationshipService {
       createdBy,
     } as never);
 
-    await this.em.persistAndFlush(rel);
+    this.em.persist(rel);
+    await this.em.flush();
     return this.serialize(rel);
   }
 
@@ -229,7 +230,8 @@ export class RelationshipService {
       createdBy: sourceTaskId, // system action — use sourceTaskId as actor reference
     } as never);
 
-    await this.em.persistAndFlush(rel);
+    this.em.persist(rel);
+    await this.em.flush();
 
     // Auto-close: set source task to a canceled-category status
     if (opts.autoClose) {
@@ -259,7 +261,8 @@ export class RelationshipService {
             userId: watcher.userId,
             source: "duplicate_merge",
           } as never);
-          await this.em.persistAndFlush(newWatcher);
+          this.em.persist(newWatcher);
+    await this.em.flush();
         }
       }
     }

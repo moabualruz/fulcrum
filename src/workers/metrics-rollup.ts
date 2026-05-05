@@ -101,7 +101,7 @@ async function computeSnapshot(
   const statusCounts: Record<string, number> = {};
 
   for (const task of tasks) {
-    const t = task as Record<string, unknown>;
+    const t = task as unknown as Record<string, unknown>;
     const status = t["status"] as string | null;
     const points = (t["points"] as number | null) ?? 0;
     const normalStatus = normalizeStatus(status);
@@ -138,7 +138,7 @@ function assertMetricsRollupPayload(
   if (typeof payload !== "object" || payload === null) {
     throw new Error("metrics_rollup payload must be an object");
   }
-  const p = payload as Record<string, unknown>;
+  const p = payload as unknown as Record<string, unknown>;
   assertStringField(p, "scope_type", "metrics_rollup");
   assertStringField(p, "org_id", "metrics_rollup");
   // scope_id is required for non-workspace scopes
@@ -169,7 +169,7 @@ async function handleMetricsRollup(
     existingWhere["scopeId"] = scope_id;
   }
 
-  let row = await em.findOne(MetricsCache, existingWhere as never) as Record<string, unknown> | null;
+  let row = await em.findOne(MetricsCache, existingWhere as never) as unknown as Record<string, unknown> | null;
 
   if (row) {
     // Update existing row
@@ -201,7 +201,8 @@ async function handleMetricsRollup(
     };
   }
 
-  await em.persistAndFlush(row as never);
+  em.persist(row as never);
+  await em.flush();
 }
 
 // ── Exported job ───────────────────────────────────────────────────

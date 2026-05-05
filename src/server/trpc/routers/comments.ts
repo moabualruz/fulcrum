@@ -57,7 +57,7 @@ export const commentsRouter = t.router({
     .input(
       z.object({
         taskId: z.string().uuid(),
-        body: z.record(z.unknown()),
+        body: z.record(z.string(), z.unknown()),
         parentCommentId: z.string().uuid().optional(),
       }),
     )

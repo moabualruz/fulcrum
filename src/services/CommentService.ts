@@ -199,7 +199,8 @@ export class CommentService {
         userId,
         source,
       });
-      await this.em.persistAndFlush(watcher);
+      this.em.persist(watcher);
+    await this.em.flush();
     } catch (err: unknown) {
       // Unique constraint violation → already watching, silently ignore
       if (
@@ -219,7 +220,8 @@ export class CommentService {
   async unsubscribe(orgId: string, taskId: string, userId: string): Promise<void> {
     const watcher = await this.em.findOne(TaskWatcher, { taskId, userId });
     if (watcher) {
-      await this.em.removeAndFlush(watcher);
+      this.em.remove(watcher);
+    await this.em.flush();
     }
   }
 
@@ -273,7 +275,8 @@ export class CommentService {
       body,
       parentCommentId: parentCommentId ?? null,
     });
-    await this.em.persistAndFlush(comment);
+    this.em.persist(comment);
+    await this.em.flush();
 
     // Auto-subscribe author
     await this.subscribe(orgId, taskId, authorId, "create");
@@ -364,10 +367,12 @@ export class CommentService {
       org: orgId,
     });
     for (const reply of replies) {
-      await this.em.removeAndFlush(reply);
+      this.em.remove(reply);
+    await this.em.flush();
     }
 
-    await this.em.removeAndFlush(comment);
+    this.em.remove(comment);
+    await this.em.flush();
   }
 
   async resolveComment(
@@ -417,7 +422,8 @@ export class CommentService {
         userId,
         emoji,
       });
-      await this.em.persistAndFlush(reaction);
+      this.em.persist(reaction);
+    await this.em.flush();
       return serializeReaction(reaction);
     } catch (err: unknown) {
       if (
@@ -443,7 +449,8 @@ export class CommentService {
       emoji,
     });
     if (reaction) {
-      await this.em.removeAndFlush(reaction);
+      this.em.remove(reaction);
+    await this.em.flush();
     }
   }
 }
