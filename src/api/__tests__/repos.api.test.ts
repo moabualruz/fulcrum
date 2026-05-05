@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { OpenAPIHono } from "@hono/zod-openapi";
 
 import { registerRepoRoutes } from "../routes/repos.ts";
+import type { ApiEnv } from "../auth.ts";
 import {
   ListReposInputSchema,
   SyncRepoInputSchema,
@@ -19,7 +20,12 @@ function createApp(caller: {
     statusRepo: (input: unknown) => Promise<unknown>;
   };
 }) {
-  const app = new OpenAPIHono();
+  type TestEnv = ApiEnv & {
+    Variables: ApiEnv["Variables"] & {
+      trpc: typeof caller;
+    };
+  };
+  const app = new OpenAPIHono<TestEnv>();
   app.use("*", async (c, next) => {
     c.set("orgId", ORG_ID);
     c.set("userId", USER_ID);
