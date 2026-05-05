@@ -10,7 +10,6 @@ import { z } from "zod";
 
 import { t } from "../trpc.ts";
 import { permissionedProcedure } from "../middleware.ts";
-import { EmptyInputSchema, StubRowSchema } from "./stub-helpers.ts";
 import {
   createSavedSearch,
   deleteSavedSearch,
@@ -21,23 +20,96 @@ import {
   SavedSearchUpdateInputSchema,
   updateSavedSearch,
 } from "../../search/saved-searches.ts";
+import { SearchQueryService } from "../../search/query-service.ts";
+
+// ── Schemas ───────────────────────────────────────────────────────────────────
+
+const SearchFiltersSchema = z.object({
+  kinds: z.array(z.string()).optional(),
+  projectIds: z.array(z.string()).optional(),
+  statuses: z.array(z.string()).optional(),
+  dateRange: z
+    .object({
+      from: z.string().optional(),
+      to: z.string().optional(),
+    })
+    .optional(),
+});
+
+/** T-06-09: max limit=100 enforced in schema */
+const SearchQueryInputSchema = z.object({
+  term: z.string().default(""),
+  filters: SearchFiltersSchema.optional(),
+  facets: z.boolean().optional(),
+  limit: z.number().int().min(1).max(100).optional().default(20),
+  offset: z.number().int().min(0).optional().default(0),
+});
+
+const SearchResultSchema = z.object({
+  id: z.string(),
+  entityKind: z.string(),
+  entityId: z.string(),
+  title: z.string().nullable(),
+  body: z.string().nullable(),
+  labels: z.array(z.string()).nullable(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
+  projectId: z.string().nullable(),
+  status: z.string().nullable(),
+  rank: z.number(),
+  snippet: z.string(),
+});
+
+const SearchQueryOutputSchema = z.object({
+  results: z.array(SearchResultSchema),
+  total: z.number(),
+  facets: z.record(z.string(), z.record(z.string(), z.number())).optional(),
+});
+
+// ── Router ────────────────────────────────────────────────────────────────────
 
 export const searchRouter = t.router({
-  /** query — stub; Pillar 12 replaces with real implementation. */
+  /** query — real FTS implementation using SearchQueryService. */
   query: permissionedProcedure({ resource: "search", action: "query" })
-    .input(z.object({ q: z.string().default("") }))
-    .output(z.array(StubRowSchema))
-    .query(() => []),
+    .input(SearchQueryInputSchema)
+    .output(SearchQueryOutputSchema)
+    .query(async ({ ctx, input }) => {
+      const orgId = ctx.orgId;
+      if (!orgId) return { results: [], total: 0 };
 
-  /** suggest — stub; Pillar 12 replaces with real implementation. */
+      // Prefer container-injected service; fall back to direct construction via deprecated db
+      const svc =
+        (ctx.container?.get(SearchQueryService) as SearchQueryService | undefined) ??
+        (ctx.db ? new SearchQueryService(ctx.db) : null);
+      if (!svc) return { results: [], total: 0 };
+
+      return svc.query(orgId, input);
+    }),
+
+  /** suggest — ILIKE autocomplete for Cmd+K and CLI. */
   suggest: permissionedProcedure({ resource: "search", action: "suggest" })
-    .input(z.object({ q: z.string().default("") }))
-    .output(z.array(z.string()))
-    .query(() => []),
+    .input(
+      z.object({
+        term: z.string().default(""),
+        limit: z.number().int().min(1).max(50).optional().default(10),
+      }),
+    )
+    .output(z.object({ suggestions: z.array(z.string()) }))
+    .query(async ({ ctx, input }) => {
+      const orgId = ctx.orgId;
+      if (!orgId) return { suggestions: [] };
+
+      const svc =
+        (ctx.container?.get(SearchQueryService) as SearchQueryService | undefined) ??
+        (ctx.db ? new SearchQueryService(ctx.db) : null);
+      if (!svc) return { suggestions: [] };
+
+      const suggestions = await svc.suggest(orgId, input.term, input.limit);
+      return { suggestions };
+    }),
 
   /** savedList — real: returns saved searches for the org. */
   savedList: permissionedProcedure({ resource: "search", action: "savedList" })
-    .input(EmptyInputSchema)
+    .input(z.object({}))
     .output(z.array(SavedSearchOutputSchema))
     .query(({ ctx }) => listSavedSearches(ctx)),
 
