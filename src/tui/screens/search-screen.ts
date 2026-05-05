@@ -6,10 +6,25 @@
  * behind FULCRUM_FEATURES=embeddings.  When OFF: "Semantic" toggle chip
  * hidden, all queries use mode='fts'.  When ON: chip visible; selecting
  * toggles mode to 'hybrid'.
+ *
+ * Wired to tRPC search.query and search.suggest procedures.
  */
 
 import { isEnabled } from "../../flags/index.ts";
 import type { SearchMode, SearchOptions, SearchResult } from "../types.ts";
+
+/** tRPC caller shape for search procedures. */
+export interface SearchTrpcCaller {
+  search: {
+    query: (input: {
+      q: string;
+      kind?: string;
+      project?: string;
+      limit?: number;
+    }) => Promise<SearchResult[]>;
+    suggest: (input: { partial: string; kind?: string }) => Promise<unknown>;
+  };
+}
 
 export interface FilterChipsState {
   /** Chip tokens always shown (e.g. All, Project, Task, Doc). */

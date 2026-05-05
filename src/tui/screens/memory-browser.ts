@@ -34,6 +34,18 @@ interface MemoryCaller {
   }) => Promise<TuiMemory | unknown>;
 }
 
+/**
+ * tRPC caller shape for memory procedures via the `memories` router key.
+ * Procedures: memories.list, memories.promote, memories.search (optional).
+ */
+export interface MemoryTrpcCaller {
+  memories: {
+    list: (input?: Record<string, unknown>) => Promise<TuiMemory[]>;
+    promote: (input: { id: string }) => Promise<unknown>;
+    search?: (input: Record<string, unknown>) => Promise<TuiMemory[]>;
+  };
+}
+
 export interface MemoryBrowserScreenOptions {
   projectId?: string;
   searchDebounceMs?: number;
