@@ -204,5 +204,6 @@ async function resolveCaller(opts: TaskHierarchyRunOptions): Promise<Required<Ta
 
   const ctx = createContext({ session: null as never, orgId: "", userId: "", em, container });
   const factory = t.createCallerFactory(appRouter);
-  return factory(ctx) as unknown as Required<TaskHierarchyRunOptions>["caller"];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return factory(ctx) as any as Required<TaskHierarchyRunOptions>["caller"];
 }

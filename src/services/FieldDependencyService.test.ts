@@ -43,7 +43,7 @@ function makeMockEm(rules: ReturnType<typeof makeRule>[] = [makeRule()]) {
   const create = vi.fn((_cls: unknown, data: unknown) => ({ ...data as object, id: "new-rule-1", createdAt: new Date() }));
 
   return {
-    em: { persist, remove, flush, findOne, find, getReference, create } as unknown as Parameters<typeof FieldDependencyService["prototype"]["constructor"]>[0],
+    em: { persist, remove, flush, findOne, find, getReference, create } as unknown as ConstructorParameters<typeof FieldDependencyService>[0],
     persist,
     remove,
     flush,
