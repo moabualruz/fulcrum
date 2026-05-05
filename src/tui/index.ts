@@ -36,6 +36,8 @@ import type { AuthInfo } from "./screens/auth.ts";
 import { FlagsScreen } from "./screens/flags.ts";
 import type { FlagItem } from "./screens/flags.ts";
 import { NewDocScreen } from "./screens/new-doc.ts";
+import { RoutingRulesScreen } from "./screens/routing-rules.ts";
+import type { TuiRoutingRule, TuiEnrichedDecision } from "./screens/routing-rules.ts";
 import { NotificationsScreen } from "./screens/notifications.ts";
 import { ActivityFeedScreen } from "./screens/activity.ts";
 import { NotificationRulesScreen } from "./screens/notification-rules.ts";
@@ -135,6 +137,20 @@ export interface TuiCaller {
     archive: (input: { id: string }) => Promise<{ ok: boolean; id: string }>;
     delete: (input: { id: string }) => Promise<{ ok: boolean; id: string }>;
   };
+  routing?: {
+    list: (input?: Record<string, unknown>) => Promise<TuiRoutingRule[]>;
+    create: (input: Record<string, unknown>) => Promise<TuiRoutingRule>;
+    update: (input: Record<string, unknown>) => Promise<TuiRoutingRule | null>;
+    delete: (input: { id: string }) => Promise<{ ok: boolean }>;
+    test: (input: { taskId: string }) => Promise<TuiEnrichedDecision | null>;
+    dryRun: (input: { taskJson: Record<string, unknown> }) => Promise<TuiEnrichedDecision | null>;
+    drafts: {
+      list: (input?: Record<string, unknown>) => Promise<TuiEnrichedDecision[]>;
+      approve: (input: { draftId: string }) => Promise<{ ok: boolean }>;
+      delete: (input: { draftId: string }) => Promise<{ ok: boolean }>;
+      update: (input: Record<string, unknown>) => Promise<{ ok: boolean }>;
+    };
+  };
 }
 
 export type TuiAction = "CreateItem";
@@ -185,7 +201,7 @@ const KEYBINDING_TO_TUI_ACTION: Partial<Record<KeybindingAction, TuiAction>> = {
 // Screen enum
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "inbox" | "activity" | "notification-rules" | "audit" | "artifacts";
+type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "inbox" | "activity" | "notification-rules" | "audit" | "artifacts" | "routing-rules";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Navigation entries
@@ -205,6 +221,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { label: "Audit", screen: "audit" },
   { label: "Artifacts", screen: "artifacts" },
   { label: "Inference", screen: "inference" },
+  { label: "Routing Rules", screen: "routing-rules" },
   { label: "Dashboard (Pillar 3)", screen: "nav" },
   { label: "Tasks (Pillar 4)", screen: "nav" },
   { label: "Docs (Pillar 7)", screen: "nav" },
@@ -256,6 +273,7 @@ export class TuiApp {
   private authScreen: AuthScreen | null = null;
   private flagsScreen: FlagsScreen | null = null;
   private newDocScreen: NewDocScreen | null = null;
+  private routingRulesScreen: RoutingRulesScreen | null = null;
   private notificationsScreen: NotificationsScreen | null = null;
   private activityScreen: ActivityFeedScreen | null = null;
   private notificationRulesScreen: NotificationRulesScreen | null = null;
@@ -477,6 +495,9 @@ export class TuiApp {
           break;
         case "artifacts":
           this.artifactsScreen?.render(this.renderer);
+          break;
+        case "routing-rules":
+          this.routingRulesScreen?.render(this.renderer);
           break;
       }
     } catch (error) {
@@ -738,6 +759,19 @@ export class TuiApp {
       return;
     }
 
+    if (this.currentScreen === "routing-rules") {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      const consumed = this.routingRulesScreen
+        ? await this.routingRulesScreen.handleKey(key)
+        : false;
+      if (consumed) await this._renderCurrentScreen();
+      return;
+    }
+
     // Nav screen
     if (this.currentScreen === "nav") {
       await this._handleNavKey(key);
@@ -932,6 +966,19 @@ export class TuiApp {
       await this.artifactsScreen?.load();
     }
 
+    if (screen === "routing-rules") {
+      const routingCaller = this.caller.routing;
+      if (routingCaller) {
+        this.routingRulesScreen = new RoutingRulesScreen({
+          caller: { routing: routingCaller },
+          projectId: null,
+        });
+        await this.routingRulesScreen.load();
+      } else {
+        this.routingRulesScreen = null;
+      }
+    }
+
     await this._renderCurrentScreen();
   }
 
@@ -1051,6 +1098,7 @@ function enrichTuiCaller(caller: TuiCaller, em: EntityManager | null): TuiCaller
     tasks: caller.tasks,
     inference: caller.inference,
     docs: caller.docs,
+    routing: caller.routing,
     auth: {
       whoami: async () => {
         const whoami = await caller.auth.whoami();
