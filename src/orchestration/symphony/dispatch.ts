@@ -219,9 +219,11 @@ async function processCandidate(
   deps.emitSpan("symphony.run", { org_id: deps.orgId, run_id: runId, from_state: "claimed", to_state: "running" });
 
   const workspacePath = await deps.createWorkspace(run);
-  const prompt = await deps.renderPrompt(run);
 
-  // Hooks + dispatch
+  // SYM-13: after_create fires on new workspace creation
+  await deps.dispatchHook("after_create", { run, workspacePath });
+
+  const prompt = await deps.renderPrompt(run);
   await deps.dispatchHook("before_run", { run, workspacePath, prompt });
 
   try {

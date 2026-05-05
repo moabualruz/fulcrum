@@ -27,7 +27,7 @@ import {
   fetchIssueStatesByIds,
 } from "../symphony/tracker.ts";
 import { scanForStalledRuns } from "../symphony/stall.ts";
-import { sanitizeWorkspaceKey, workspaceRoot } from "../symphony/workspace.ts";
+import { sanitizeWorkspaceKey, workspaceRoot, createWorkspace, assertWorkspacePathInOrgRoot } from "../symphony/workspace.ts";
 import { tick, type TickDeps } from "../symphony/dispatch.ts";
 import {
   loadWorkflowRuntime,
@@ -52,6 +52,7 @@ import type {
   CandidateIssue,
   WorkflowConfig,
 } from "../symphony/schemas.ts";
+import type { LifecycleHookName } from "../symphony/hooks.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
 const CONFORMANCE_TEST_PATH =
@@ -320,6 +321,7 @@ maxAttempts: 5
     expect(calls).toEqual(expect.arrayContaining([
       "unclaimed->claimed",
       "claimed->running",
+      "after_create",
       "before_run",
       "after_run",
       "running->succeeded",
@@ -328,6 +330,10 @@ maxAttempts: 5
       "symphony.release",
       "destroy",
     ]));
+    // SYM-13: after_create must come before before_run
+    const afterCreateIdx = calls.indexOf("after_create");
+    const beforeRunIdx = calls.indexOf("before_run");
+    expect(afterCreateIdx).toBeLessThan(beforeRunIdx);
   });
 
   test("REQUIRED: dispatch loop skips candidate fetch when global capacity is exhausted", async () => {
@@ -1549,6 +1555,92 @@ maxAttempts: 5
         expect.any(Object),
         expect.any(Object),
       );
+    });
+  });
+
+  describe("§10.2 SYM-12: pre-launch workspace path validation", () => {
+    test("REQUIRED: assertWorkspacePathInOrgRoot rejects path outside org root", () => {
+      const root = "/tmp/test-workspaces";
+      expect(() =>
+        assertWorkspacePathInOrgRoot("/tmp/evil-escape", "org-1", root),
+      ).toThrow("Workspace path outside org root");
+    });
+
+    test("REQUIRED: assertWorkspacePathInOrgRoot accepts path inside org root", () => {
+      const root = "/tmp/test-workspaces";
+      expect(() =>
+        assertWorkspacePathInOrgRoot(
+          join("/tmp/test-workspaces", "org-1", "my-workspace"),
+          "org-1",
+          root,
+        ),
+      ).not.toThrow();
+    });
+
+    test("REQUIRED: createWorkspace rejects pre-set workspacePath outside org root", async () => {
+      const fakeRun = {
+        id: "run-outside",
+        workspacePath: "/tmp/evil-escape",
+        org: { id: "org-1" },
+        task: { id: "task-1" },
+      } as unknown as InstanceType<typeof AgentRun>;
+
+      await expect(
+        createWorkspace(fakeRun, { root: "/tmp/test-workspaces" }),
+      ).rejects.toThrow("Workspace path outside org root");
+    });
+  });
+
+  describe("§10.3 SYM-13: after_create lifecycle hook", () => {
+    test("REQUIRED: after_create is a valid LifecycleHookName", () => {
+      const hookName: LifecycleHookName = "after_create";
+      expect(hookName).toBe("after_create");
+    });
+
+    test("REQUIRED: after_create dispatched between createWorkspace and before_run in tick", async () => {
+      const calls: string[] = [];
+      const deps: TickDeps = {
+        orgId: ORG_ID,
+        instanceId: "instance-1",
+        maxConcurrency: 5,
+        config: DEFAULT_CONFIG,
+        fetchCandidateIssues: mock(async () => [{
+          id: "task-1",
+          identifier: "T-1",
+          title: "Test",
+          state: "ready",
+          status: "ready" as const,
+          priority: 1,
+          createdAt: new Date(),
+          blockedByIds: [] as string[],
+          workflowId: null,
+        }]),
+        claimRun: mock(async () => ({ runId: "run-1" })),
+        getRunEntity: mock(async () => ({ id: "run-1", attemptCount: 0 })),
+        createWorkspace: mock(async () => {
+          calls.push("createWorkspace");
+          return "/tmp/ws";
+        }),
+        renderPrompt: mock(async () => "Prompt"),
+        dispatchToRunner: mock(async () => ({ success: true })),
+        destroyWorkspace: mock(async () => {}),
+        transitionState: mock(async () => {}),
+        dispatchHook: mock(async (hookName: string) => {
+          calls.push(hookName);
+        }),
+        emitSpan: mock(() => {}),
+        countRunningRuns: mock(async () => 0),
+      };
+
+      await tick(deps);
+
+      expect(calls).toContain("after_create");
+      expect(calls).toContain("before_run");
+      const createIdx = calls.indexOf("createWorkspace");
+      const afterCreateIdx = calls.indexOf("after_create");
+      const beforeRunIdx = calls.indexOf("before_run");
+      expect(createIdx).toBeLessThan(afterCreateIdx);
+      expect(afterCreateIdx).toBeLessThan(beforeRunIdx);
     });
   });
 });

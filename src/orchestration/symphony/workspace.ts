@@ -85,6 +85,7 @@ export async function createWorkspace(
   opts: CreateWorkspaceOptions = {},
 ): Promise<string> {
   if (run.workspacePath) {
+    assertWorkspacePathInOrgRoot(run.workspacePath, run.org.id, opts.root);
     await mkdir(run.workspacePath, { recursive: true });
     return run.workspacePath;
   }
@@ -98,6 +99,7 @@ export async function createWorkspace(
   });
   const workspacePath = join(orgRoot, key);
 
+  assertWorkspacePathInOrgRoot(workspacePath, orgId, opts.root);
   await mkdir(workspacePath, { recursive: true });
   run.workspacePath = workspacePath;
 
@@ -140,7 +142,7 @@ export async function destroyWorkspace(
   }
 }
 
-function assertWorkspacePathInOrgRoot(
+export function assertWorkspacePathInOrgRoot(
   workspacePath: string,
   orgId: string,
   root?: string,
@@ -153,7 +155,7 @@ function assertWorkspacePathInOrgRoot(
     return;
   }
 
-  throw new Error(`Refusing to remove workspace outside org root: ${workspacePath}`);
+  throw new Error(`Workspace path outside org root: ${workspacePath}`);
 }
 
 export async function getWorkspacePath(
