@@ -54,16 +54,18 @@ Exceptions:
 
 ## Typography
 
+Declared type scale — 4 sizes, 2 weights:
+
 | Role | Size | Weight | Line Height | Usage |
 |------|------|--------|-------------|-------|
 | Body | 14px | 400 | 1.5 | Search results body snippet, memory list rows, comment text |
-| Label | 12px | 500 | 1.4 | Facet chip labels, badge text, toolbar button labels, tree node meta |
+| Label | 12px | 400 | 1.4 | Facet chip labels, badge text, toolbar button labels, tree node meta |
 | Heading | 20px | 600 | 1.3 | Panel headings, doc title in version timeline, section headers |
 | Display | 28px | 600 | 1.2 | Doc title in editor header, page-level empty state heading |
 
 Font: `Inter Variable` — use `font-sans` Tailwind alias (maps to `--font-sans`).
 
-Editor body text (TipTap content area): 16px / 400 / 1.6 — override for reading comfort inside editor canvas only.
+Prose-content exception (scoped to `.ProseMirror` only — not a system token): 16px / 400 / 1.6 — applied via scoped CSS override inside the TipTap editor canvas for reading comfort. Not a declared type scale size.
 
 ---
 
@@ -166,7 +168,7 @@ Dark mode: tokens already defined in `.dark {}` block in `app.css` — use same 
 - Layout: left panel (facets, 240px fixed) + right panel (results, flex-1)
 - Search input: full-width at top, 48px height, `search` lucide prefix icon, clears on Escape
 - Facet chips: horizontal row below search input; active chip uses `--primary` fill; inactive uses `--secondary`
-- Result row: 72px height; title (16px/600) + snippet (14px/400/muted) + kind badge + timestamp
+- Result row: 72px height; title (14px/600) + snippet (14px/400/muted) + kind badge + timestamp
 - Match highlight: `--primary` text color on matched terms in title and snippet (not background highlight)
 - Empty state: centered illustration (none — use icon only), heading "No results", body "Try different keywords or adjust filters"
 - Results tabs: All / Docs / Tasks / Memories / Runs / Artifacts — tabs component, count badge per tab
@@ -175,7 +177,7 @@ Dark mode: tokens already defined in `.dark {}` block in `app.css` — use same 
 ### Cmd+K Palette (extension)
 
 - Sections: "Navigation" / "Create" / "Bulk Actions" (context-dependent) / "Search Results"
-- Section header: 12px/500/muted-foreground, 8px top padding
+- Section header: 12px/400/muted-foreground, 8px top padding
 - Command item height: 44px; keyboard highlight: `--secondary` background
 - Search results section: appears below commands when input has 2+ chars; separated by `separator` component
 - Bulk actions section: only visible when `selectedTaskIds.length > 0` (reads from Svelte store)
