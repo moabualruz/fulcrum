@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * phase-04-static-build-proof.ts — INF-02 / D-03 cross-platform static binary
+ * static-build-proof.ts — INF-02 / D-03 cross-platform static binary
  * proof.
  *
  * Requirements:
@@ -8,7 +8,7 @@
  *   - On macOS (darwin): proves the darwin-arm64 host artifact.
  *   - On Linux: proves native Linux build + smoke.
  *   - On other hosts: proves Linux via the pinned Docker builder
- *     (scripts/phase-04-linux-builder.Dockerfile).
+ *     (scripts/linux-builder.Dockerfile).
  *   - Smoke-tests produced binaries with --help / --version.
  *   - Verifies artifact metadata contains `darwin-arm64` and `linux-x64`.
  *   - Exits 1 unless BOTH macOS and Linux targets pass.
@@ -142,7 +142,7 @@ async function main(): Promise<ProofOutput> {
       const dockerOk = await $`docker info`.nothrow().quiet().then((p) => p.exitCode);
       if (dockerOk === 0) {
         linuxProof = "docker";
-        builder = "scripts/phase-04-linux-builder.Dockerfile";
+        builder = "scripts/linux-builder.Dockerfile";
       } else {
         linuxProof = "missing";
         builder = null;

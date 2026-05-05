@@ -1,4 +1,4 @@
-# phase-04-linux-builder.Dockerfile
+# linux-builder.Dockerfile
 #
 # Pinned Rust Linux builder image for cross-platform static build proof
 # (INF-02 / D-03).  Produces linux-x64 artifacts on non-Linux hosts when
@@ -11,7 +11,7 @@
 FROM rust:1.83.0-bookworm
 
 LABEL vendor="fulcrum" \
-      purpose="phase-04-static-build-proof" \
+      purpose="static-build-proof" \
       target="linux-x64"
 
 # Install system deps needed by Bun's compile chain and Rust std lib.
@@ -39,4 +39,4 @@ RUN --mount=type=cache,target=/root/.cargo/registry \
     cd inference && cargo fetch 2>/dev/null; true
 
 # Default entrypoint: run the static build proof.
-CMD ["bun", "run", "scripts/phase-04-static-build-proof.ts"]
+CMD ["bun", "run", "scripts/static-build-proof.ts"]

@@ -1,6 +1,6 @@
 /**
  * llm-fallback-mock.ts — Mock LLM fallback provider for promptfoo eval
- * (phase-04-router.promptfooconfig.yaml).
+ * (router-llm-eval.promptfooconfig.yaml).
  *
  * Returns structured routing responses that exercise the eval cases.
  * This is a test fixture, not production code.
