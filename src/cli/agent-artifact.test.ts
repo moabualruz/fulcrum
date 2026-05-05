@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { run as runAgent } from "./agent.ts";
 import { run as runArtifact } from "./artifact.ts";
+import { run as runArtifacts, type ArtifactsClient } from "./artifacts.ts";
 import { openPglite } from "../product-kernel/db/pglite.ts";
 import { runMigrations } from "../product-kernel/db/migrate.ts";
 import { productDbDir } from "../product-kernel/paths.ts";
@@ -97,5 +98,19 @@ describe("fulcrum agent/artifact CLI", () => {
     expect(payload).toHaveLength(1);
     expect(payload[0].id).toBe(artifactId);
     expect(payload[0].preview).toBe("cli artifact");
+  });
+
+  test("artifact delete --hard requires explicit confirmation path", async () => {
+    const calls: Array<{ id: string; hard: boolean; confirm?: boolean }> = [];
+    const client = {
+      delete: async (input: { id: string; hard: boolean; confirm?: boolean }) => {
+        calls.push(input);
+        return { ok: true, id: input.id };
+      },
+    } as unknown as ArtifactsClient;
+
+    await runArtifacts(["delete", "artifact-1", "--hard", "--json"], client);
+
+    expect(calls[0]).toEqual({ id: "artifact-1", hard: true, confirm: true });
   });
 });
