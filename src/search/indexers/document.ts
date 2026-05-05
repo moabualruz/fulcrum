@@ -15,6 +15,8 @@ interface DocumentRow {
   doc_type?: string | null;
   kind?: string | null;
   scope?: string | null;
+  status?: string | null;
+  updated_at?: string | Date | null;
   frontmatter?: Record<string, unknown>;
 }
 
@@ -48,6 +50,8 @@ export class DocumentIndexer extends SearchIndexHook {
       columns.has("content_json") ? "content_json" : "'{}'::jsonb AS content_json",
       columns.has("doc_type") ? "doc_type" : "kind AS doc_type",
       columns.has("scope") ? "scope" : "'project'::text AS scope",
+      columns.has("status") ? "status" : "NULL::text AS status",
+      columns.has("updated_at") ? "updated_at" : "NULL::timestamptz AS updated_at",
     ];
     const rows = await this.db.query<DocumentRow>(
       `SELECT id, org_id, project_id, title, body, frontmatter, kind, ${optionalSelects.join(", ")}
@@ -70,6 +74,8 @@ export class DocumentIndexer extends SearchIndexHook {
         doc_type: doc.doc_type ?? doc.kind ?? null,
         scope: doc.scope ?? "project",
       },
+      status: doc.status ?? null,
+      updatedAt: doc.updated_at ? new Date(doc.updated_at) : undefined,
     };
   }
 

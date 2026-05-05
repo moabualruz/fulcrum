@@ -31,6 +31,9 @@ export interface SearchDocumentInput {
   body: string;
   labels?: readonly string[];
   metadata?: Record<string, unknown>;
+  /** Expanded columns — populated by Phase 06 indexers */
+  status?: string | null;
+  updatedAt?: Date | null;
 }
 
 export interface IndexerHook {
