@@ -112,17 +112,22 @@ describe("embeddings gate", () => {
   test("hybrid search ranks paraphrase above keyword-absent", async () => {
     const db = await freshDb("hybrid");
     try {
+      // Helper: pad short vector to 384 dims (D-05: default fastembed=384)
+      function pad384(v: number[]): number[] {
+        return [...v, ...Array(384 - v.length).fill(0)];
+      }
+
       const sidecar = createMockSidecar({
         // Deterministic embeddings: paraphrase gets high cosine with query,
         // keyword match gets low cosine
         embed: async (text: string) => {
           if (text.includes("authentication") || text.includes("auth")) {
-            return [1, 0, 0, 0, 0, 0, 0, 0]; // "auth" direction
+            return pad384([1, 0, 0, 0, 0, 0, 0, 0]); // "auth" direction
           }
           if (text.includes("deploy") || text.includes("shipping")) {
-            return [0, 1, 0, 0, 0, 0, 0, 0]; // "deploy" direction
+            return pad384([0, 1, 0, 0, 0, 0, 0, 0]); // "deploy" direction
           }
-          return [0.5, 0.5, 0, 0, 0, 0, 0, 0]; // generic
+          return pad384([0.5, 0.5, 0, 0, 0, 0, 0, 0]); // generic
         },
       });
       const org = await createLocalOrg(db, { slug: "o", name: "O" });

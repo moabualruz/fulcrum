@@ -9,6 +9,7 @@
  * embeddings are available; falls back to ILIKE when OFF.
  */
 
+import { assertEmbeddingDimension } from "../inference/model-metadata.ts";
 import type { ProductDb } from "./db/types.ts";
 import type { InferenceSidecar } from "./inference.ts";
 import { enqueueJob } from "./jobs.ts";
@@ -43,6 +44,7 @@ export async function handleEmbedTaskJob(
   if (!task) return; // task deleted between enqueue and run
   const text = [task.title, task.description].filter(Boolean).join(" ");
   const embedding = await sidecar.embed(text);
+  assertEmbeddingDimension(embedding);
   await db.query(`UPDATE tasks SET embedding = $1::jsonb WHERE id = $2`, [
     JSON.stringify(embedding),
     taskId,
@@ -82,6 +84,7 @@ export async function searchTasks(
 
   // Get query embedding
   const queryEmbed = await opts.sidecar.embed(opts.text);
+  assertEmbeddingDimension(queryEmbed);
 
   // Get BM25 hits from search_documents for tasks in this project
   const bm25Rows = await db.query<{

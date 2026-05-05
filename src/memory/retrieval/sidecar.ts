@@ -2,8 +2,11 @@
  * Sidecar embed() call — wraps Pillar 2 embedding service.
  *
  * embedQuerySafe returns null when sidecar is unavailable (flag on but
- * service down). Caller falls back to FTS-only scoring; warning logged.
+ * service down) or returns wrong-dimension vectors.
+ * Caller falls back to FTS-only scoring; warning logged.
  */
+
+import { assertEmbeddingDimension } from "../../inference/model-metadata.ts";
 
 const SIDECAR_URL = process.env["FULCRUM_SIDECAR_URL"] ?? "http://127.0.0.1:8384";
 const EMBED_TIMEOUT_MS = 5_000;
@@ -40,6 +43,14 @@ export async function embedQuerySafe(query: string): Promise<number[] | null> {
 
     if (!Array.isArray(data.embedding) || data.embedding.length === 0) {
       console.warn("[retriever] sidecar returned invalid embedding; falling back to FTS-only");
+      return null;
+    }
+
+    // Validate dimension — fail closed on mismatch per D-07
+    try {
+      assertEmbeddingDimension(data.embedding);
+    } catch {
+      console.warn(`[retriever] sidecar returned ${data.embedding.length}-dim embedding (expected 384); falling back to FTS-only`);
       return null;
     }
 

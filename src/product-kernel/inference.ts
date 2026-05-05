@@ -53,7 +53,7 @@ export function createMockSidecar(overrides?: {
       if (overrides?.embed) return overrides.embed(text);
       // Return a deterministic fake embedding (normalized unit vector dimension 8 for tests)
       const hash = simpleHash(text);
-      return Array.from({ length: 8 }, (_, i) => Math.sin(hash + i));
+      return Array.from({ length: 384 }, (_, i) => Math.sin(hash + i));
     },
     async narrate(prompt: string): Promise<string> {
       calls.push({ method: "narrate", args: [prompt] });
