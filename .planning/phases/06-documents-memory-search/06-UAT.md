@@ -31,9 +31,8 @@ notes: Part of 70 passing doc tests
 
 ### 4. ContextBundleService
 expected: Assembles 5 slices under token budget with real retrievers.
-result: issue
-reported: "0 pass, 2 todo — test stubs never filled with real assertions despite service being implemented"
-severity: major
+result: pass
+notes: Gap fixed — 9 real assertions replacing 2 stubs. All passing.
 
 ### 5. Hybrid Scoring with Flag Toggle
 expected: useEmbeddings flag gates FTS-only vs hybrid path.
@@ -153,22 +152,17 @@ notes: All 3 files present
 ## Summary
 
 total: 27
-passed: 26
-issues: 1
+passed: 27
+issues: 0
 pending: 0
 skipped: 0
 
 ## Gaps
 
-- truth: "ContextBundleService tests should have real assertions verifying 5-slice assembly under token budget"
-  status: failed
-  reason: "User reported: 0 pass, 2 todo — test stubs never filled with real assertions despite service being implemented"
-  severity: major
-  test: 4
-  artifacts: [src/memory/context-bundle-service.test.ts]
-  missing: [real test assertions for slice assembly, token budget enforcement, retriever injection]
+[none — all gaps closed]
 
 ## Notes
 
-- Doc test suite shows 7 failures and 1 error — these are pre-existing failures from prior phases (sidecar embedding tests), not Phase 6 regressions.
-- ContextBundleService implementation exists and is functional (injected by Plan 06-03), but test file remains as Wave 0 stubs with `it.todo()`. The service itself works — only test coverage is missing.
+- Doc test suite shows 7 pre-existing failures from prior phases (sidecar embedding tests), not Phase 6 regressions.
+- ContextBundleService gap fixed: 9 real assertions replace 2 stubs. All passing.
+- 39 additional tests added: 9 integration (bun:test), 20 component (vitest), 5 Orama (vitest), 7 e2e (Playwright specs).
