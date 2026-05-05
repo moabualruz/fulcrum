@@ -158,9 +158,9 @@ Plans:
 - [x] 05-10-PLAN.md — Gantt (SVAR + critical path + slack) + Calendar (@event-calendar)
 
 **Wave 5 — Advanced Features (parallel)**
-- [ ] 05-11-PLAN.md — Filter builder + saved views + bulk ops (50+) + custom fields verification (9 types)
+- [x] 05-11-PLAN.md — Filter builder + saved views + bulk ops (50+) + custom fields verification (9 types)
 - [x] 05-12-PLAN.md — Keyboard shortcuts + command palette + field dependencies (client + server validation)
-- [ ] 05-13-PLAN.md — Real-time collaboration (Yjs with auth/persistence) + portfolio dashboard
+- [x] 05-13-PLAN.md — Real-time collaboration (Yjs with auth/persistence) + portfolio dashboard
 
 **Wave 6 — Parity + Final (parallel)**
 - [ ] 05-14-PLAN.md — CLI report subcommand + task relate + TUI ASCII charts (TSK-14)

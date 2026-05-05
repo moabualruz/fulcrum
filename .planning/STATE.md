@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-last_updated: "2026-05-05T11:14:34.447Z"
+last_updated: "2026-05-05T11:20:00.331Z"
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 49
-  completed_plans: 44
-  percent: 90
+  completed_plans: 46
+  percent: 94
 ---
 
 # Planning State
@@ -17,7 +17,7 @@ progress:
 ## Current Position
 
 Phase: 05 (task-management-metrics) — EXECUTING
-Plan: 5 of 16
+Plan: 6 of 16
 
 - **Phase**: 04-inference-router-skills
 - **Plan**: 04-08 completed
@@ -89,3 +89,5 @@ Plan: 5 of 16
 - [Phase 04-08]: Root wiring verification tests added as verification-only TDD — existing canonical mounts confirmed correct (no duplicate aliases)
 - [Phase 04-08]: LangGraph/LangChain boundary enforcement via test — zero imports in agents/orchestration/CLI boundaries per AI-SPEC adoption boundary
 - [Phase 04-08]: Three-surface parity tests unified: Web vitest (8/8), CLI (49 tests), TUI (parity labels + inference backend states)
+- [Phase ?]: Yjs WS server from scratch
+- [Phase ?]: handleConnection returns Promise<void> for async auth
