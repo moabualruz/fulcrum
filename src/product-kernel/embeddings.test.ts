@@ -186,6 +186,32 @@ describe("embeddings gate", () => {
     }
   });
 
+  test("handleEmbedTaskJob rejects wrong-dimension embedding from sidecar", async () => {
+    const db = await freshDb("dim-reject-job");
+    try {
+      const sidecar = createMockSidecar({
+        embed: async () => [1, 2, 3], // 3-dim instead of 384
+      });
+      const org = await createLocalOrg(db, { slug: "o", name: "O" });
+      const project = await createProject(db, {
+        orgId: org.id,
+        slug: "p",
+        name: "P",
+      });
+      const task = await createTask(db, {
+        orgId: org.id,
+        projectId: project.id,
+        title: "Test",
+      });
+
+      await expect(handleEmbedTaskJob(db, sidecar, task.id)).rejects.toThrow(
+        "embedding dimension mismatch",
+      );
+    } finally {
+      await db.close();
+    }
+  });
+
   test("fallback ILIKE search when embeddings OFF", async () => {
     const db = await freshDb("ilike");
     try {
