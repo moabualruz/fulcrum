@@ -7,7 +7,7 @@
 <domain>
 ## Phase Boundary
 
-Make the task pillar **competitive with Linear/Plane** as the UX benchmark and **Jira/Shortcut** as the analytics benchmark. Phase delivers: comments with @mentions and resolve, watchers, full board/list UX (swimlanes, grouping, inline edit, drag-and-drop), Gantt timeline with dependency arrows and drag-to-reschedule, calendar with drag-to-change-date, comprehensive reporting suite (sprint reports, flow metrics, project/epic rollups, team workload, quality/health reports), bulk operations at scale, custom field verification, saved view filter builder, keyboard-first UX with command palette, and three-surface parity. All backed by a two-layer data model (event log + daily snapshots) powering near-real-time analytics.
+Make the task pillar **competitive with Linear/Plane** as the UX benchmark and **Jira/Shortcut** as the analytics benchmark. Phase delivers: comments with @mentions (users + teams) and resolve, watchers, full board/list UX (swimlanes, grouping, inline edit, drag-and-drop), Gantt timeline with dependency arrows, drag-to-reschedule, and critical path highlighting, calendar with drag-to-change-date, comprehensive reporting suite (sprint reports, flow metrics, project/epic rollups, team workload, quality/health, portfolio/cross-project), workflow engine with transition rules and automation, real-time collaboration cursors in task descriptions, field dependencies, Monte Carlo forecasting, bulk operations at scale, custom field verification, saved view filter builder, keyboard-first UX with command palette, and three-surface parity. All backed by a two-layer data model (event log + daily snapshots) powering near-real-time analytics.
 
 </domain>
 
@@ -48,7 +48,7 @@ Make the task pillar **competitive with Linear/Plane** as the UX benchmark and *
 ### Workflow & Status Engine
 - **D-22:** Status categories: `backlog`, `unstarted`, `started`, `completed`, `canceled` — matching Linear's proven 5-category model. Custom statuses map to one of these categories.
 - **D-23:** Custom statuses per project — each project defines its own status set within the 5 categories. Default set: Backlog, Todo, In Progress, In Review, Done, Canceled.
-- **D-24:** No hard transition constraints in v1 (any status can move to any status). Soft warnings only (e.g., "This task has unresolved blockers"). Hard workflow rules deferred to v2.
+- **D-24:** **Hard transition rules per workflow.** Each project workflow defines allowed transitions as a directed graph (e.g., Todo→In Progress allowed, Todo→Done blocked). Transition violations show error with explanation of required path. Configurable per-project in workflow settings. Matches Jira's workflow scheme model — only platform with true transition guards.
 - **D-25:** Auto-actions on status change via EventBus: when task moves to `completed` → auto-resolve linked blocking relationships; when task moves to `started` → auto-set `startedAt` timestamp (for cycle time calculation).
 
 ### Sprint/Cycle Management
@@ -159,10 +159,47 @@ Make the task pillar **competitive with Linear/Plane** as the UX benchmark and *
 - **D-84:** All surfaces share service layer (`TaskService`, `SprintService`, `ReportService`) via tRPC. Zero business logic duplication.
 
 ### Dependencies to Install
-- **D-85:** New npm packages for `apps/web`: `layerchart`, `@svar/gantt-svelte`, `@event-calendar/core`, `tinykeys`, `@tanstack/svelte-table`, `@tanstack/svelte-virtual`.
-- **D-86:** Existing packages to extend: `svelte-dnd-action` (already in deps or add), `@tiptap/extension-mention`, `@tiptap/extension-task-list`, `@tiptap/extension-placeholder`.
+- **D-85:** New npm packages for `apps/web`: `layerchart`, `@svar/gantt-svelte`, `@event-calendar/core`, `tinykeys`, `@tanstack/svelte-table`, `@tanstack/svelte-virtual`, `yjs`, `y-websocket`.
+- **D-86:** Existing packages to extend: `svelte-dnd-action` (already in deps or add), `@tiptap/extension-mention`, `@tiptap/extension-task-list`, `@tiptap/extension-placeholder`, `@tiptap/extension-collaboration`, `@tiptap/extension-collaboration-cursor`.
 - **D-87:** TUI: `asciichart` for ASCII chart rendering.
 - **D-88:** All deps MIT licensed. No proprietary runtime dependencies.
+
+### Automation Engine
+- **D-89:** Rule-based automation system: `when <trigger> [if <condition>] then <action>`. Triggers: status change, assignee change, label added/removed, priority change, due date passed, task created, comment added. Conditions: field equals/contains/in-list. Actions: set status, set assignee, add/remove label, set priority, move to sprint, add comment, subscribe watcher.
+- **D-90:** Automations scoped per project. Stored in `project_automations` entity: `(id, project_id, name, trigger_type, trigger_config: jsonb, condition: jsonb | null, action_type, action_config: jsonb, enabled: boolean, execution_count: number)`.
+- **D-91:** Automation execution via EventBus listener — when event matches a trigger, evaluate condition, execute action. Actions that mutate tasks fire their own events (can chain automations). Cycle detection: max 5 chained executions per originating event, then halt with warning log.
+- **D-92:** Automation templates for common patterns: "Auto-assign reviewer when status = In Review", "Add 'stale' label when no activity for 14 days", "Move to Done when all subtasks completed", "Notify watchers when priority changed to Urgent".
+
+### Portfolio / Cross-Project Dashboard
+- **D-93:** Workspace-level portfolio view: all projects in a table showing name, progress (% done), active sprint summary, overdue count, health status (green/amber/red based on velocity trend).
+- **D-94:** Portfolio progress rollup computed from `metrics_snapshots` aggregated across projects. Same two-layer data model — no separate portfolio tables.
+- **D-95:** Cross-project reports reuse the same report components (burndown, velocity, CFD, workload) but with `scope_type: 'workspace'` filter. One implementation, multiple scopes.
+- **D-96:** Resource allocation view: stacked bar per team member showing task distribution across projects. Identifies over-allocation (>100% capacity across projects).
+
+### Real-Time Collaboration
+- **D-97:** Real-time collaboration cursors in task description editor via TipTap `@tiptap/extension-collaboration` (Yjs CRDT) + `@tiptap/extension-collaboration-cursor`. Shows other users' cursor positions and selections with name labels.
+- **D-98:** Yjs backend via `y-websocket` server running alongside Hono. Persistence via Yjs document snapshots stored in PostgreSQL. No external service dependency.
+- **D-99:** Presence indicators on task detail panel — show avatar dots for users currently viewing the same task. Lightweight: WebSocket heartbeat, not full CRDT for non-editor fields.
+
+### Comment @Mention for Teams
+- **D-100:** @mentions support both individual users and teams. `@team-name` resolves to team entity, renders as team badge. All team members receive watcher auto-subscribe (per D-08 pattern).
+- **D-101:** TipTap mention extension configured with two suggestion sources: users (from org members) and teams (from org teams). Suggestion popup shows both with type indicator icon.
+
+### Critical Path in Gantt
+- **D-102:** Critical path calculation: longest chain of dependent tasks from project start to end. Highlighted in Gantt as red/bold task bars + red dependency arrows. Uses topological sort on `task_relationships` where type = `blocks`.
+- **D-103:** Critical path recalculated on dependency change, duration change, or schedule change. Cached per project in `metrics_snapshots` with `scope_type: 'project'`.
+- **D-104:** Slack/buffer visualization: non-critical tasks show float (how much they can slip without affecting critical path) as lighter-colored extension on Gantt bar.
+
+### Monte Carlo Forecasting
+- **D-105:** Monte Carlo simulation using historical throughput data (tasks completed per day, last 30/60/90 days). Runs 1000 iterations sampling from throughput distribution. Outputs: probability of completing N remaining items by target date at p50/p75/p85/p95.
+- **D-106:** Forecast chart: fan chart showing probability cone over time. X = date, Y = remaining items. Bands at p50 (dark), p75, p85, p95 (lightest). LayerChart area chart with multiple opacity-layered series.
+- **D-107:** Forecast available per sprint and per epic/milestone. Answers: "When will this sprint/epic likely be done?" with confidence intervals. Displayed as card in reports section.
+- **D-108:** Forecast computation runs client-side (pure math, no server round-trip needed). Input: remaining count + throughput array from tRPC query. Monte Carlo in ~10ms for 1000 iterations.
+
+### Field Dependencies
+- **D-109:** Conditional field visibility: `field_dependency_rules` entity `(id, project_id, source_field_id, source_value, target_field_id, action: 'show' | 'hide' | 'require')`. When source field matches value → show/hide/require target field.
+- **D-110:** Example: when "Type" custom field = "Bug" → show "Severity" and "Steps to Reproduce" fields; when "Type" = "Feature" → show "Design Link" field. Matches ClickUp's task-type field sets.
+- **D-111:** Dependency rules evaluated client-side for instant UX. Rules loaded with project config, cached. Server validates required-field rules on save.
 
 ### Claude's Discretion
 - Exact chart component composition (LayerChart primitives per chart type)
@@ -238,17 +275,20 @@ Make the task pillar **competitive with Linear/Plane** as the UX benchmark and *
 - shadcn-svelte + Bits UI for all UI components.
 
 ### Integration Points
-- New entities → migrations: `task_comments`, `task_watchers`, `task_relationships`, `comment_reactions`, `task_events` (or extend `Event`)
-- `MetricsCache` extension → migration for new snapshot columns
-- `Sprint` entity → migration for `retrospectiveNotes`, `closedSummary` jsonb
-- New npm deps → `apps/web/package.json`
-- New tRPC routers: `reports.ts`, `comments.ts`
-- New service: `ReportService` for analytics queries
-- Gantt/Calendar/Reports → new routes in `apps/web/src/routes/`
-- Command palette → root layout component
+- New entities → migrations: `task_comments`, `task_watchers`, `task_relationships`, `comment_reactions`, `task_events` (or extend `Event`), `project_automations`, `workflow_transitions`, `field_dependency_rules`
+- `MetricsCache` extension → migration for new snapshot columns (scope_type, status_counts jsonb, points_total, tasks_total)
+- `Sprint` entity → migration for `retrospectiveNotes` (TipTap JSON), `closedSummary` (jsonb with carried/added/removed counts)
+- `Task` entity → `startedAt` timestamp for cycle time, verify `assignee`, `labels`, `priority` fields exist
+- New npm deps → `apps/web/package.json`: layerchart, @svar/gantt-svelte, @event-calendar/core, tinykeys, @tanstack/svelte-table, @tanstack/svelte-virtual, @tiptap/extension-mention, @tiptap/extension-task-list, @tiptap/extension-collaboration, @tiptap/extension-collaboration-cursor, y-websocket, yjs
+- New tRPC routers: `reports.ts`, `comments.ts`, `automations.ts`, `workflows.ts`
+- New services: `ReportService` (analytics queries), `AutomationService` (rule evaluation + execution), `WorkflowService` (transition validation)
+- MetricsCache rollup → graphile-worker job definition in `src/db/entities/jobs/` or worker config
+- Gantt/Calendar/Reports/Portfolio → new routes in `apps/web/src/routes/`
+- Command palette → root layout component (shadcn-svelte Command)
 - Keyboard shortcuts → root layout `onMount` with `tinykeys`
-- TUI ASCII charts → new render module in TUI
-- CLI reports → new subcommand in CLI
+- Collaboration → y-websocket server alongside Hono, Yjs doc persistence in PostgreSQL
+- TUI ASCII charts → new render module in TUI via `asciichart`
+- CLI reports → new subcommand `fulcrum report` in CLI
 
 </code_context>
 
@@ -272,20 +312,12 @@ Make the task pillar **competitive with Linear/Plane** as the UX benchmark and *
 <deferred>
 ## Deferred Ideas
 
-- Hard workflow transition rules (can't skip statuses) — v2
-- Automation engine (when X → do Y beyond status-change auto-actions) — v2
 - Time tracking / time entries / timesheets — v2
 - Custom dashboard builder (widget-based, drag-to-compose) — v2
-- Portfolio/cross-project dashboard — v2
 - Scheduled email report delivery — v2
-- Real-time collaboration cursors in task description — v2
 - Multi-assignee per task — v2 (v1 = single assignee + watchers)
-- Comment @mention for teams (not just users) — v2
 - Notification delivery from watchers (Phase 7 — NTF pillar scope)
 - Chart export to PNG/PDF — v2
-- Critical path highlighting in Gantt — v2
-- Monte Carlo forecasting from throughput data — v2
-- Field dependencies (show field X when field Y = Z) — v2
 
 </deferred>
 
