@@ -136,7 +136,7 @@ Plans:
   3. Sprint capacity + retrospective notes; Gantt + calendar views render
   4. Bulk ops handle 50+ tasks; custom fields all 9 types verified; saved view filters round-trip
   5. Task CRUD + sprint management functional on Web, CLI, and TUI (per TSK-14 parity definition)
-**Plans:** 12/16 plans executed
+**Plans:** 15/16 plans executed
 Plans:
 
 **Wave 1 — Schema Foundation (parallel)**
@@ -163,7 +163,7 @@ Plans:
 - [x] 05-13-PLAN.md — Real-time collaboration (Yjs with auth/persistence) + portfolio dashboard
 
 **Wave 6 — Parity + Final (parallel)**
-- [ ] 05-14-PLAN.md — CLI report subcommand + task relate + TUI ASCII charts (TSK-14)
+- [x] 05-14-PLAN.md — CLI report subcommand + task relate + TUI ASCII charts (TSK-14)
 - [ ] 05-15-PLAN.md — Workflow editor + automation rules UI + sprint report card + CI gate
 
 **UI hint**: yes
@@ -245,7 +245,7 @@ Plans:
 | 2. Bug Fixes + Foundation | 8/8 | Complete | 2026-05-04 |
 | 3. Symphony + Sandcastle | 6/6 | Complete   | 2026-05-05 |
 | 4. Inference + Router/Skills | 8/8 | Complete | 2026-05-05 |
-| 5. Task Management + Metrics | 12/16 | In Progress|  |
+| 5. Task Management + Metrics | 15/16 | In Progress|  |
 | 6. Documents + Memory + Search | 0/? | Not started | - |
 | 7. Repos + Artifacts + Notifications | 0/? | Not started | - |
 | 8. Surface Delivery | 0/? | Not started | - |

@@ -134,7 +134,7 @@
 - [ ] **TSK-11**: Bulk operations tested with 50+ tasks
 - [ ] **TSK-12**: Custom field engine all 8 types verified end-to-end (already implemented — verification only)
 - [x] **TSK-13**: Saved view filter AST round-trips and renders correctly
-- [ ] **TSK-14**: Three-surface parity: Web (board+list+calendar+Gantt+reports), CLI (task CRUD+sprint CRUD+`--json`), TUI (task-board+task-list+sprints+reports with ASCII charts)
+- [x] **TSK-14**: Three-surface parity: Web (board+list+calendar+Gantt+reports), CLI (task CRUD+sprint CRUD+`--json`), TUI (task-board+task-list+sprints+reports with ASCII charts)
 
 ### Docs + Editor — Pillar 7 (DOC)
 
