@@ -35,6 +35,7 @@ Usage:
   fulcrum mcp disable <name> [--agent <id> ...] [--all-agents]
                                      Disable server and remove from agents.
   fulcrum component list [--json]    List Fulcrum components.
+  fulcrum components status [--json] Show component lifecycle status.
   fulcrum component info <id> [--json]
                                      Show component details and surfaces.
   fulcrum component plan <install|remove|enable|disable> <component> [--agent <id>] [--all-agents] [--json]
@@ -46,7 +47,8 @@ Usage:
   fulcrum web
   fulcrum tui
   fulcrum inference <start|status|embed|generate|stop> [--json]
-  fulcrum projects|tasks|credentials|webhooks|repos|docs|runs|notify|audit|connectors
+  fulcrum projects|tasks|sprints|memory|search|artifacts|credentials|webhooks|repos|docs|runs|notify|audit|connectors
+  fulcrum completion --shell <bash|zsh|fish|powershell>
   fulcrum product init [--json]      Initialise the local product kernel (PGlite + migrations).
   fulcrum product projects list [--json]
                                      List product-kernel projects.
@@ -109,8 +111,8 @@ async function main() {
       return;
     }
     case "doctor": {
-      const { run: runDoctor } = await import("./cli/doctor.ts");
-      await runDoctor(rest);
+      const { run } = await import("./cli/index.ts");
+      await run([cmd, ...rest]);
       return;
     }
     case "compress": {
@@ -151,6 +153,12 @@ async function main() {
     case "tui":
     case "inference":
     case "agents":
+    case "projects":
+    case "tasks":
+    case "sprints":
+    case "memory":
+    case "search":
+    case "artifacts":
     case "repos":
     case "docs":
     case "symphony":
@@ -158,7 +166,9 @@ async function main() {
     case "notify":
     case "audit":
     case "webhooks":
-    case "connectors": {
+    case "connectors":
+    case "components":
+    case "completion": {
       const { run } = await import("./cli/index.ts");
       await run([cmd, ...rest]);
       return;

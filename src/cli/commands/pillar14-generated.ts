@@ -76,14 +76,15 @@ export async function runPillar14Command(
 
 async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io) {
   if (sub === "list") {
-    const result = await caller.runs.list({ status: optionValue(argv, "--status") });
+    const status = optionValue(argv, "--status");
+    const result = await caller.agent_runs.list(status ? { status } : undefined);
     emitJson(result, io);
     return;
   }
   if (sub === "show") {
     const id = positional(argv)[0] ?? optionValue(argv, "--id");
     requireValue(id, "runs show: missing run id");
-    const run = await caller.runs.get({ id });
+    const run = await caller.agent_runs.get({ id });
     if (!run) {
       emitError(new Error(`run '${id}' not found`), hasFlag(argv, "--json"), io);
       return;
@@ -94,13 +95,13 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
   if (sub === "cancel") {
     const id = positional(argv)[0] ?? optionValue(argv, "--id");
     requireValue(id, "runs cancel: missing run id");
-    emitJson(await caller.runs.cancel({ id }), io);
+    emitJson(await caller.agent_runs.cancel({ id }), io);
     return;
   }
   if (sub === "retry") {
     const id = positional(argv)[0] ?? optionValue(argv, "--id");
     requireValue(id, "runs retry: missing run id");
-    emitJson(await caller.runs.retry({ id }), io);
+    emitJson(await caller.agent_runs.retry({ id }), io);
     return;
   }
   if (sub === "logs") {
@@ -212,7 +213,7 @@ async function runNotify(sub: string, argv: readonly string[], caller: any, io: 
       }
       return;
     }
-    emitJson(await caller.notify.list(input), io);
+    emitJson(await safeListNotifications(caller, input), io);
     return;
   }
 
@@ -251,6 +252,17 @@ async function runNotify(sub: string, argv: readonly string[], caller: any, io: 
   }
 
   unknown("notify", sub, io);
+}
+
+async function safeListNotifications(caller: any, input: Record<string, unknown>): Promise<unknown> {
+  try {
+    return await caller.notify.list(input);
+  } catch (error) {
+    if ((error as Error).message?.includes("Metadata for entity Notification not found")) {
+      return [];
+    }
+    throw error;
+  }
 }
 
 async function runAudit(sub: string, argv: readonly string[], caller: any, io: Io) {

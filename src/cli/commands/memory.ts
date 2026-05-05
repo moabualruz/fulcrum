@@ -11,7 +11,7 @@ import {
 type MemoryRow = Record<string, unknown>;
 
 type MemoryCaller = {
-  memory: {
+  memories: {
     list: (input?: Record<string, unknown>) => Promise<MemoryRow[]>;
     get: (input: { id: string }) => Promise<MemoryRow>;
     create: (input: Record<string, unknown>) => Promise<MemoryRow>;
@@ -67,42 +67,42 @@ export async function run(
     case "list":
       return withErrors("list", runOpts, async () => {
         const caller = await resolveCaller(runOpts);
-        const result = await caller.memory.list(parseListInput(rest));
+        const result = await caller.memories.list(parseListInput(rest));
         printOutput(result, rest, print, formatRows);
       });
     case "get":
       return withErrors("get", runOpts, async () => {
         const id = requireArg(rest, 0, "get", "<id>");
         const caller = await resolveCaller(runOpts);
-        const result = await caller.memory.get({ id });
+        const result = await caller.memories.get({ id });
         printOutput(result, rest, print, formatRow);
       });
     case "add":
       return withErrors("add", runOpts, async () => {
         const body = requireArg(rest, 0, "add", "<text>");
         const caller = await resolveCaller(runOpts);
-        const result = await caller.memory.create({ body, ...parseCreateInput(rest.slice(1)) });
+        const result = await caller.memories.create({ body, ...parseCreateInput(rest.slice(1)) });
         printOutput(result, rest, print, formatRow);
       });
     case "delete":
       return withErrors("delete", runOpts, async () => {
         const id = requireArg(rest, 0, "delete", "<id>");
         const caller = await resolveCaller(runOpts);
-        const result = await caller.memory.delete({ id });
+        const result = await caller.memories.delete({ id });
         printOutput(result, rest, print, () => `Deleted memory ${id}.`);
       });
     case "search":
       return withErrors("search", runOpts, async () => {
         const query = requireArg(rest, 0, "search", "<query>");
         const caller = await resolveCaller(runOpts);
-        const result = await caller.memory.search({ query, ...parseSearchInput(rest.slice(1)) });
+        const result = await caller.memories.search({ term: query, ...parseSearchInput(rest.slice(1)) });
         printOutput(result, rest, print, formatRows);
       });
     case "promote":
       return withErrors("promote", runOpts, async () => {
         const id = requireArg(rest, 0, "promote", "<id>");
         const caller = await resolveCaller(runOpts);
-        const result = await caller.memory.promote({ id });
+        const result = await caller.memories.promote({ id });
         printOutput(result, rest, print, () => `Promoted memory ${id}.`);
       });
     case "digest":

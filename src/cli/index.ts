@@ -31,6 +31,9 @@ const HELP = `fulcrum
 Usage:
   fulcrum init
   fulcrum auth <whoami|invite|login|logout> [options]
+  fulcrum projects <list|stats> [--json]
+  fulcrum tasks <list|get|create|update|delete> [--json]
+  fulcrum sprints <list|get|create|update|delete|add-task|remove-task> [--json]
   fulcrum flags <list|set> [options]
   fulcrum routing rules <list|add|edit|delete> [options]
   fulcrum routing <assign|simulate> [options]
@@ -40,6 +43,12 @@ Usage:
   fulcrum agents <list|profile|test> [--json]
   fulcrum runs <list|show|cancel|retry|logs> [--json]
   fulcrum notify list [--unread] [--json|--watch]
+  fulcrum memory <list|get|add|delete|search|promote> [--json]
+  fulcrum search query <query> [--json]
+  fulcrum artifacts <list|show|download|archive|unarchive|delete> [--json]
+  fulcrum components status [--json]
+  fulcrum doctor [--json]
+  fulcrum completion --shell <bash|zsh|fish|powershell>
   fulcrum audit <query|export> [--json]
   fulcrum webhooks <list|test> [--json]
   fulcrum connectors <enable|sync> <id> [--json]
@@ -260,6 +269,54 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       await runAgents(rest);
       return;
     }
+    case "projects": {
+      const { run: runProjects } = await import("./commands/projects.ts");
+      const [sub = "help"] = rest;
+      if (sub === "help" || sub === "--help" || sub === "-h") {
+        await runProjects(rest);
+        return;
+      }
+
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runProjects(rest, { container });
+      } finally {
+        await cleanup();
+      }
+      return;
+    }
+    case "tasks": {
+      const { run: runTasks } = await import("./commands/tasks.ts");
+      const [sub = "help"] = rest;
+      if (sub === "help" || sub === "--help" || sub === "-h") {
+        await runTasks(rest);
+        return;
+      }
+
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runTasks(rest, { container });
+      } finally {
+        await cleanup();
+      }
+      return;
+    }
+    case "sprints": {
+      const { run: runSprints } = await import("./commands/sprints.ts");
+      const [sub = "help"] = rest;
+      if (sub === "help" || sub === "--help" || sub === "-h") {
+        await runSprints(rest);
+        return;
+      }
+
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runSprints(rest, { container });
+      } finally {
+        await cleanup();
+      }
+      return;
+    }
     case "auth": {
       const { run: runAuth } = await import("./commands/auth.ts");
       const [sub = "help"] = rest;
@@ -340,6 +397,54 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       }
       return;
     }
+    case "memory": {
+      const { run: runMemory } = await import("./commands/memory.ts");
+      const [sub = "help"] = rest;
+      if (sub === "help" || sub === "--help" || sub === "-h") {
+        await runMemory(rest);
+        return;
+      }
+
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runMemory(rest, { container });
+      } finally {
+        await cleanup();
+      }
+      return;
+    }
+    case "search": {
+      const { run: runSearch } = await import("./commands/search.ts");
+      const [sub = "help"] = rest;
+      if (sub === "help" || sub === "--help" || sub === "-h") {
+        await runSearch(rest);
+        return;
+      }
+
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runSearch(rest, { container });
+      } finally {
+        await cleanup();
+      }
+      return;
+    }
+    case "artifacts": {
+      const { run: runArtifacts } = await import("./commands/artifacts.ts");
+      const [sub = "help"] = rest;
+      if (sub === "help" || sub === "--help" || sub === "-h") {
+        await runArtifacts(rest);
+        return;
+      }
+
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runArtifacts(rest, { container });
+      } finally {
+        await cleanup();
+      }
+      return;
+    }
     case "db": {
       const { run: runDb } = await import("./commands/db.ts");
       if (rest[0] === "status" && rest.includes("--json")) {
@@ -390,6 +495,33 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       } finally {
         await cleanup();
       }
+      return;
+    }
+    case "components":
+    case "component": {
+      const { run: runComponent } = await import("./component.ts");
+      await runComponent(rest);
+      return;
+    }
+    case "doctor": {
+      const { run: runDoctor } = await import("./commands/doctor.ts");
+      const helpOnly = rest.includes("--help") || rest.includes("-h") || rest[0] === "help";
+      if (helpOnly) {
+        await runDoctor(rest);
+        return;
+      }
+
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runDoctor(rest, { container });
+      } finally {
+        await cleanup();
+      }
+      return;
+    }
+    case "completion": {
+      const { run: runCompletion } = await import("./completion.ts");
+      await runCompletion(rest);
       return;
     }
     case "web":

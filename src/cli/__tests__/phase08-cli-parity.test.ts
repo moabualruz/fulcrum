@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { readFile } from "node:fs/promises";
 
 import { listMissingCliDomains } from "../../surfaces/parity.ts";
@@ -55,14 +58,26 @@ const JSON_COMMANDS = [
 ] as const;
 
 async function runCli(command: string): Promise<CliResult> {
+  const home = await mkdtemp(join(tmpdir(), "fulcrum-phase08-cli-"));
+  try {
+    if (!command.startsWith("fulcrum completion ")) {
+      await runCliWithHome("fulcrum init", home);
+    }
+    return await runCliWithHome(command, home);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+}
+
+async function runCliWithHome(command: string, home: string): Promise<CliResult> {
   const [, ...args] = command.split(" ");
   const proc = Bun.spawn(["bun", "src/index.ts", ...args], {
     stdout: "pipe",
     stderr: "pipe",
     env: {
       ...process.env,
-      FULCRUM_HOME: `${process.cwd()}/.scratch/phase08-cli-parity`,
-      FULCRUM_PERMISSION_LOCAL_DEV_BYPASS: "true",
+      FULCRUM_HOME: home,
+      FULCRUM_FEATURES: "trpc-permission-local-dev-bypass",
     },
   });
   const [stdout, stderr, exitCode] = await Promise.all([
@@ -92,5 +107,5 @@ describe("Phase 08 CLI JSON parity", () => {
       expect(result.stdout).toContain("fulcrum");
       expect(result.stdout.length).toBeGreaterThan(50);
     }
-  });
+  }, 20_000);
 });

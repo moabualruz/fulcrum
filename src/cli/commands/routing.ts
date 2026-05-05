@@ -507,12 +507,16 @@ async function resolveCaller(opts: RoutingRunOptions): Promise<RoutingCaller> {
 function buildCliContext(container: Container | null): { container: Container; em: EntityManager } {
   if (container) {
     try {
-      const em = container.get(ENTITY_MANAGER_TOKEN);
-      return { container, em };
+      const orm = container.get(MikroORM);
+      const em = container.get(ENTITY_MANAGER_TOKEN).fork();
+      const requestContainer = new Container();
+      requestContainer.bind({ provide: MikroORM, useValue: orm });
+      registerDbBindings(requestContainer, orm, em);
+      return { container: requestContainer, em };
     } catch {
       const orm = container.get(MikroORM);
       registerDbBindings(container, orm);
-      return { container, em: container.get(ENTITY_MANAGER_TOKEN) };
+      return { container, em: container.get(ENTITY_MANAGER_TOKEN).fork() };
     }
   }
 
@@ -524,7 +528,7 @@ function buildCliContext(container: Container | null): { container: Container; e
 
 async function resolveActiveCliSession(em: EntityManager): Promise<Record<string, unknown> | null> {
   const rows = await em.getConnection().execute(
-    "select s.*, u.active_organization_id from session s join \"user\" u on u.id = s.user_id order by s.created_at desc limit 1",
+    "select s.* from sessions s join users u on u.id = s.user_id order by s.created_at desc limit 1",
   ) as Array<Record<string, unknown>>;
   const row = rows[0];
   if (!row) return null;

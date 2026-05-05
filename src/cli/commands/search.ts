@@ -51,6 +51,7 @@ Search commands.
 
 Usage:
   fulcrum search <query> [--kind <kind>] [--project <id>] [--status <status>] [--assignee <id|me>] [--tag <tag>] [--date-range <ISO>/<ISO>] [--author <id>] [--limit <n>] [--offset <n>] [--semantic] [--json]
+  fulcrum search query <query> [--kind <kind>] [--project <id>] [--status <status>] [--assignee <id|me>] [--tag <tag>] [--date-range <ISO>/<ISO>] [--author <id>] [--limit <n>] [--offset <n>] [--semantic] [--json]
   fulcrum search suggest <partial> [--kind <kind>] [--json]
   fulcrum search saved list [--project <id>] [--json]
   fulcrum search saved create --name <name> --query-json <json> [--json]
@@ -80,6 +81,8 @@ export async function run(
   const [first = "help", ...rest] = argv;
 
   switch (first) {
+    case "query":
+      return runQuery(rest, resolved);
     case "suggest":
       return runSuggest(rest, resolved);
     case "saved":
