@@ -14,6 +14,7 @@ import {
   FULCRUM_TIMESTAMP_HEADER,
   deliverWebhookNotification,
 } from "../delivery-handlers/webhook.ts";
+import type { NotificationDeliveryLike } from "../delivery-handlers/webhook.ts";
 import { evaluateQuietHours } from "../quiet-hours.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-00000000000a";
@@ -151,7 +152,7 @@ describe("notification delivery worker", () => {
       quiet: true,
       status: "held-quiet-hours",
     });
-    expect(quiet.nextAttemptAt?.toISOString()).toBe("2026-05-06T07:00:00.000Z");
+    expect((quiet.nextAttemptAt as Date | null)?.toISOString()).toBe("2026-05-06T07:00:00.000Z");
 
     const deliveries = [
       deliveryRow({
@@ -190,11 +191,13 @@ describe("notification delivery worker", () => {
       attemptCount: 1,
       errorCode: "missing_config",
     });
-    expect(delivery.lastAttemptAt?.toISOString()).toBe("2026-05-05T12:00:00.000Z");
+    expect((delivery.lastAttemptAt as Date | null)?.toISOString()).toBe("2026-05-05T12:00:00.000Z");
   });
 });
 
-function deliveryRow(overrides: Record<string, unknown> = {}) {
+type TestDelivery = NotificationDeliveryLike & Record<string, unknown>;
+
+function deliveryRow(overrides: Record<string, unknown> = {}): TestDelivery {
   return {
     id: DELIVERY_ID,
     orgId: ORG_ID,
@@ -220,18 +223,18 @@ function deliveryRow(overrides: Record<string, unknown> = {}) {
 }
 
 function createDeliveryRepos(
-  deliveries: Array<Record<string, unknown>>,
+  deliveries: TestDelivery[],
   jobs: unknown[],
 ): NotificationDeliveryRepositories {
   return {
     deliveryRepo: {
       async findOneOrFail(id) {
-        const delivery = deliveries.find((row) => row["id"] === id);
+        const delivery = deliveries.find((row) => row.id === id);
         if (!delivery) throw new Error(`missing delivery ${id}`);
         return delivery;
       },
       async findDueHeld(now) {
-        return deliveries.filter((row) => row["status"] === "held-quiet-hours" && row["nextAttemptAt"] <= now);
+        return deliveries.filter((row) => row.status === "held-quiet-hours" && row["nextAttemptAt"] instanceof Date && row["nextAttemptAt"] <= now);
       },
       async update(delivery, patch) {
         Object.assign(delivery, patch);

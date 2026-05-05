@@ -11,6 +11,10 @@ import { decrypt } from "../secrets/vault.ts";
 
 export const WEBHOOK_SIGNATURE_HEADER = "X-Fulcrum-Signature-256";
 export const WEBHOOK_DELIVERY_ID_HEADER = "X-Fulcrum-Delivery-Id";
+export const FULCRUM_EVENT_HEADER = "X-Fulcrum-Event";
+export const FULCRUM_DELIVERY_HEADER = "X-Fulcrum-Delivery";
+export const FULCRUM_TIMESTAMP_HEADER = "X-Fulcrum-Timestamp";
+export const FULCRUM_SIGNATURE_HEADER = "X-Fulcrum-Signature";
 export const WEBHOOK_MAX_ATTEMPTS = 5;
 export const WEBHOOK_MAX_BACKOFF_MS = 32_000;
 
@@ -144,13 +148,30 @@ async function deliverWithRetry(input: {
   }
 }
 
-function buildWebhookHeaders(deliveryId: string, secret: string | null, body: string): Headers {
+export function buildWebhookHeaders(
+  deliveryId: string,
+  secret: string | null,
+  body: string,
+  eventType = "webhook.event",
+  now: Date = new Date(),
+): Headers {
+  const timestamp = String(Math.floor(now.getTime() / 1000));
   const headers = new Headers({
     "Content-Type": "application/json",
     [WEBHOOK_DELIVERY_ID_HEADER]: deliveryId,
+    [FULCRUM_EVENT_HEADER]: eventType,
+    [FULCRUM_DELIVERY_HEADER]: deliveryId,
+    [FULCRUM_TIMESTAMP_HEADER]: timestamp,
   });
-  if (secret) headers.set(WEBHOOK_SIGNATURE_HEADER, signWebhookPayload(secret, body));
+  if (secret) {
+    headers.set(WEBHOOK_SIGNATURE_HEADER, signWebhookPayload(secret, body));
+    headers.set(FULCRUM_SIGNATURE_HEADER, signFulcrumWebhookPayload(secret, timestamp, body));
+  }
   return headers;
+}
+
+export function signFulcrumWebhookPayload(secret: string, timestamp: string, rawBody: string): string {
+  return `sha256=${createHmac("sha256", secret).update(`${timestamp}.${rawBody}`).digest("hex")}`;
 }
 
 function backoffMsForAttempt(attempt: number): number {
