@@ -44,10 +44,10 @@ created: 2026-05-05
 | 07-04-01 | 04 | 2 | REP-04, REP-05, REP-06 | T-07-REP-* | REST/tRPC repo paths enforce org scope | router/CLI | `bun test src/trpc/routers/repos.test.ts src/cli/commands/repos.test.ts` | W0 | pending |
 | 07-05-01 | 05 | 3 | REP-07 | T-07-REP-* | Web/CLI/TUI read same repo fields | parity | `bun test src/tui/repos-browser.test.ts src/cli/commands/repos.test.ts` | W0 | pending |
 | 07-06-01 | 06 | 3 | ART-01, ART-02, ART-05 | T-07-ART-* | artifact edges/search scoped by org/run | integration | `bun test src/artifacts/__tests__/harvest-search.test.ts` | W0 | pending |
-| 07-07-01 | 07 | 3 | NTF-01 | T-07-NTF-* | events fan out once and respect mutes/rules | integration | `bun test src/notifications/__tests__/fanout.test.ts` | W0 | pending |
-| 07-08-01 | 08 | 4 | NTF-04, NTF-05, NTF-06 | T-07-NTF-* | SMTP/webhook/push workers record attempts and retry safely | integration | `bun test src/notifications/__tests__/delivery-worker.test.ts` | W0 | pending |
-| 07-09-01 | 09 | 4 | NTF-02, NTF-03, NTF-07, NTF-08 | T-07-NTF-* | unread count uses Notification rows only | router/UI/CLI | `bun test src/trpc/routers/notifications.test.ts src/web/src/routes/settings/notifications/page.server.test.ts` | W0 | pending |
-| 07-10-01 | 10 | 5 | ART-06, NTF-09 | T-07-FINAL-* | download/delete org scoped; webhook secrets masked | security/parity | `bun test src/artifacts/__tests__/phase07-security.test.ts src/cli/__tests__/phase07-parity-smoke.test.ts` | W0 | pending |
+| 07-07-01 | 07 | 4 | NTF-01 | T-07-NTF-* | events fan out once and respect mutes/rules | integration | `bun test src/notifications/__tests__/fanout.test.ts` | W0 | pending |
+| 07-08-01 | 08 | 5 | NTF-04, NTF-05, NTF-06 | T-07-NTF-* | SMTP/webhook/push workers record attempts and retry safely | integration | `bun test src/notifications/__tests__/delivery-worker.test.ts` | W0 | pending |
+| 07-09-01 | 09 | 5 | NTF-02, NTF-03, NTF-07, NTF-08 | T-07-NTF-* | unread count uses Notification rows only | router/UI/CLI | `bun test src/trpc/routers/notifications.test.ts src/web/src/routes/settings/notifications/page.server.test.ts` | W0 | pending |
+| 07-10-01 | 10 | 6 | ART-06, NTF-09 | T-07-FINAL-* | download/delete org scoped; webhook secrets masked | security/parity | `bun test src/artifacts/__tests__/phase07-security.test.ts src/cli/__tests__/phase07-parity-smoke.test.ts` | W0 | pending |
 
 ---
 
