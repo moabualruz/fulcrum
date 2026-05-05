@@ -113,100 +113,75 @@ Multi-context layout: `CONTEXT-MAP.md` at root pointing to per-context `CONTEXT.
 <claude-mem-context>
 # Memory Context
 
-# [fulcrum] recent context, 2026-05-05 3:18am GMT+2
+# [fulcrum] recent context, 2026-05-05 10:18am GMT+2
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (18,499t read) | 241,023t work | 92% savings
+Stats: 50 obs (35,257t read) | 1,136,585t work | 97% savings
 
 ### May 5, 2026
-638 2:28a 🔵 Detailed test failures reveal specific dispatchRun integration gaps across all surfaces
-639 " ✅ dispatchRun tRPC mutation committed to phase-03 branch
-640 2:29a ✅ Added dispatchRun method to SymphonyCaller CLI interface
-641 " ✅ CLI help text updated with runs dispatch command documentation
-642 " ✅ Added dispatch case to cmdRuns command router
-643 " 🟣 Implemented cmdRunsDispatch CLI command handler
-644 " ✅ Updated stubCaller to include dispatchRun stub implementation
-645 " 🟣 Added dispatch server action to Web orchestration page
-646 2:30a ✅ Added dispatch method to TUI OrchestrationScreen caller interface
-647 " 🟣 Implemented dispatch method in TUI OrchestrationScreen class
-648 " 🔵 Symphony conformance tests show significant progress: 78 pass, 2 fail (down from 73/7)
-649 2:31a 🔵 Remaining 2 test failures are both tRPC-specific implementation issues
-650 " 🔵 tRPC dispatchRun endpoint encounters database execution error (PGLite)
-651 2:32a 🔵 tRPC dispatchRun fails database check constraint: agent_runs_sandbox_mode_check rejects "noSandbox"
-652 " 🔵 Schema mismatch: dispatchRun uses "noSandbox" but constraint requires "host"|"docker"|"podman"
-653 " 🔴 Fixed sandboxMode database constraint violation in dispatchRun tRPC mutation
-654 2:33a 🔴 Refined sandboxMode fix: persist database-valid value instead of API name
-655 " 🔵 Symphony conformance tests: 80/80 PASSING — dispatchRun fully integrated and validated
-656 " ✅ Phase 3 dispatchRun integration committed: CLI, TUI, Web surfaces unified on SND-06
-657 " 🔵 Post-commit validation: symphony conformance tests remain 80/80 passing
-658 2:34a 🔵 Orchestration router unit tests: 8/8 passing — tRPC dispatchRun validated
-659 " 🔵 CLI symphony module tests: 17/17 passing — dispatch command implementation validated
-660 " 🔵 Web orchestration page server tests: 4/4 passing — dispatch form action validated
-661 " 🔵 TypeScript type checking errors in CI: dispatchRun interface incompatibility
-662 " 🔴 Fixed TypeScript type errors in HTTP server nullability
-664 2:40a 🔵 CI pipeline web:check task crashes with SIGABRT abort signal
-665 2:51a 🔴 Resolved TypeScript errors in symphony orchestration and http-server
-666 " 🟣 Phase 03-06 HTTP extension and dispatch parity completed with 4 auto-fixed bugs
-667 2:52a ⚖️ Phase 03-06 complete and ready for verification; Phase 03 fully delivered
-668 " ✅ Phase 03 symphony-sandcastle marked COMPLETE in STATE.md with architectural decisions recorded
-669 2:58a 🔵 Symphony Phase 3 Conformance Requirements (SYM-09 through SYM-19)
-670 " 🔵 Lifecycle Hooks Implementation and Retry Mechanics in Symphony
-671 " 🔵 Lifecycle Hook Interface Definition and Agent Communication
-672 " 🔵 Symphony Dispatch Flow and Workspace Path Validation
-673 " 🔵 SYM-19 Stall Detection: lastCodexTimestamp Preference and Fallback Logic
-674 2:59a 🔵 Workflow Definition Schema Supports after_create Hook
-675 " 🔵 SYM-12 and Workspace Lifecycle Hooks from OpenAI Symphony SPEC
-676 " 🔵 SYM-12 Workspace CWD Enforcement in app-server-client and Dispatch State Machine
-677 " 🔵 Dispatch Integration in Web and TUI Orchestration Interfaces
-678 " 🔵 Official SYM-12 and SYM-13 Requirements from REQUIREMENTS.md
-679 " 🔵 SYM-12 Path Validation Gap: assertWorkspacePathInOrgRoot Called Only During Cleanup, Not Before Launch
-680 3:00a 🔵 Phase 3 Completion Status and SYM-09 through SYM-13, SYM-19 Requirements
-681 " 🔵 Phase 3 Success Criteria and SYM Requirement Mapping
-682 " 🔵 Conformance Test Coverage Map for SYM-09 through SYM-19
-683 " 🔵 Phase 3 Verification Report Generated: 31/33 SYM Requirements Verified, 2 Blockers Identified
-684 3:02a 🔵 Phase 3 Verification Agent Completed: 2 Specific Implementation Gaps Confirmed
-S142 Complete Area 6 checkpoint and initiate Area 7 (Three-surface routing UX) Question 1/4 — finalize skill sync decisions, then begin discussion on routing config CRUD parity across Web/CLI/TUI. (May 5 at 3:10 AM)
-687 3:10a 🟣 Symphony Orchestration: SYM-09 through SYM-13 + SYM-19 implementation complete
-S143 Progress Area 7 (Three-surface routing UX) Question 2/4 — determine route testing/preview UX: explainable result detail, simple result, or debug-only detail with verbose flag. (May 5 at 3:10 AM)
-S144 Progress Area 7 (Three-surface routing UX) Question 3/4 — determine rule authoring model: structured builder with JSON escape hatch, raw JSON only, or natural language generation. (May 5 at 3:10 AM)
-S145 Complete Area 7 (Three-surface routing UX) Question 4/4 — determine rule validation gate before save: strict validation with dry-run, save disabled draft, or save anything with late disabling. (May 5 at 3:11 AM)
-688 3:11a 🔵 All orchestration tests pass: 196/196 across 8 test files
-689 " 🔵 SYM-12 + SYM-13 implementation verification via code inspection
-S147 Phase 4 Discussion Completion: Capture all 7 gray areas (Inference, Embedding, Router Learning, LLM Gate, MCP, Skill Sync, Surface UX) with locked decisions across 28 Q&A pairs (May 5 at 3:11 AM)
-S146 Phase 03 gap closure: verify and complete remaining Symphony Orchestration (SYM) requirements — specifically SYM-12 (workspace safety), SYM-13 (lifecycle hooks), and related items. (May 5 at 3:11 AM)
-S148 Complete Phase 03 verification: confirm all 33 Symphony + Sandcastle conformance requirements met, with specific focus on closing SYM-12 (workspace safety) and SYM-13 (lifecycle hooks) gaps. (May 5 at 3:11 AM)
-690 3:12a 🔵 SYM-12 + SYM-13 implementation verified with line-by-line evidence
-S149 Phase 4 discussion completion and context documentation: 7 areas with 28 locked decisions ready for downstream planning agents (May 5 at 3:13 AM)
-S150 Phase 4 Context Documentation: Complete discussion-to-documentation transition for Inference + Router/Skills phase with all 28 locked decisions (May 5 at 3:14 AM)
-S151 Continue Phase 4 planning without asking questions; transition from discussion phase (complete) to planning phase. System background operations detected AI-SPEC gate for Phase 4 (Inference + Router/Skills) (May 5 at 3:15 AM)
-**Investigated**: • Plan-phase workflow documentation (steps 1-15+) loaded and examined
-    • Phase 4 initialization queried: found=true, has_context=true, has_research=false, has_plans=false
-    • UI brand patterns and project instructions reviewed
-    • Phase 4 scope: 04-CONTEXT.md exists with 28 locked decisions across 7 discussion areas
-    • AI-SPEC gate (step 4.5) triggered: Phase 4 contains AI/inference keywords (detected from phase goal/scope)
-    • Init config: planner_model=opus, researcher_model=sonnet, checker_model=sonnet, commit_docs=true
+S171 Continue Phase 5 (Task Management + Metrics) context enhancement; rewrite CONTEXT.md with competitive research and validated library selections. User identified three issues with the approach: deleted vs updated decisions, removed code context, overly aggressive deferred list. (May 5 at 7:47 AM)
+S172 Finalize Phase 5 Task Management + Metrics CONTEXT.md planning document by promoting 7 high-value scope features from deferred to in-scope, consolidating 111+ architectural decisions, and verifying persistent file state. (May 5 at 7:58 AM)
+S173 Continue observing Phase 5 (Task Management + Metrics) primary session as it moves from research completion into planning/implementation phases. Document entity schema decisions, service layer design, tRPC router implementations, and component architecture. (May 5 at 8:00 AM)
+769 8:20a 🔵 Phase 5 Task Management + Metrics comprehensive research completed and committed
+770 8:21a 🔵 Phase 5 deep-research agent completed comprehensive codebase analysis and gap assessment
+771 8:25a 🟣 Phase 05 UI Design Contract Generated
+S174 gsd-plan-phase 5 — Initialize Phase 5 (task-management-metrics) planning with context, research, and validation documents (May 5 at 8:32 AM)
+776 8:34a 🔵 Phase 5 (task-management-metrics) initialization state and gate status
+777 8:35a ✅ Phase 5 VALIDATION.md document created with test infrastructure and task verification map
+S175 Revise Phase 05 planning documents to resolve blocker and warning issues identified by the plan checker (5 blockers, 4 warnings) (May 5 at 8:36 AM)
+778 8:37a 🔵 Task entity missing six columns required by Phase 5 and existing code
+779 " 🔵 MetricsCache entity schema incomplete for two-layer analytics architecture
+780 " 🔵 Architectural antipatterns in service layer: inline DDL and raw SQL mutations
+781 " 🔵 WorkerRegistry in-process pattern confirmed; graphile-worker not installed
+782 " 🔵 Event emission and tRPC delegation patterns established and proven
+783 8:54a ⚖️ Phase 05 Plans 09-10: Chart Dashboard & Timeline Infrastructure Architecture
+784 8:56a ⚖️ Plan 11: Filtering, Bulk Operations, and Custom Field Verification Architecture
+785 8:57a ⚖️ Plan 12: Keyboard-First UX with tinykeys and Field Dependency Rules
+786 8:58a ⚖️ Plan 13: Real-Time Collaboration, Portfolio Dashboard, and Complete Chart Suite
+787 8:59a ⚖️ Plan 14: Three-Surface Parity via CLI Reports, TUI ASCII Charts, and Shared tRPC
+788 9:00a ⚖️ Plan 15: Final Sprint/Workflow/Automation UI and Phase 05 Completion Checkpoint
+789 9:09a ⚖️ Two-layer analytics architecture for task metrics—design and implementation plan
+790 9:10a ⚖️ Sprint management extensions and event-driven automation engine—design and implementation plan
+791 9:13a ⚖️ Board and list UI components for competitive task management—design and implementation plan
+792 9:14a ⚖️ Reports visualization layer with LayerChart components and tRPC migration—design and implementation plan
+793 9:16a ⚖️ Gantt and calendar timeline views with critical path analysis—design and implementation plan
+794 9:17a ⚖️ Filter builder, saved views, bulk operations, and custom field verification—design and implementation plan
+795 9:18a ⚖️ Real-time collaboration with Yjs, y-websocket server, portfolio dashboard, and remaining analytics charts—design and implementation plan
+796 9:20a ⚖️ Phase 05 final components and CI verification gate—closing plan for task management and metrics
+S176 Continue Phase 5 planning from context compaction. Complete comprehensive audit of Phase 3/4 implementation gaps that affect Phase 5 task management. Write consolidated Phase 5 plan based on research and gap findings. (May 5 at 9:22 AM)
+798 9:25a ✅ Phase 4 Milestone Completed
+S177 Peer review Phase 5 planning artifacts (15 plans, 111 decisions, 5 waves) for the Fulcrum Task Management + Metrics project; synthesize findings into structured review document (May 5 at 9:26 AM)
+799 9:32a ⚖️ Established deep research workflow before implementation decisions
+800 " ⚖️ Research outputs must persist to disk files, not conversation-only memory
+801 " ⚖️ Implementation decisions require specificity and competitive parity, not generic descriptions
+802 " ⚖️ Phase research must include codebase-specific integration mapping
+803 9:33a ✅ Codified research and decision-making rules into project governance
+804 9:34a 🔵 Confirmed multi-persona peer review tool and Phase 5 artifacts ready
+805 " 🔵 Phase 5 planning artifacts systematically reviewed with decision coverage gaps discovered
+806 9:35a 🔵 Phase 5 peer review drilling into plan-by-plan task breakdown and acceptance criteria
+807 9:37a 🔵 Phase 5 peer review completed with NO-GO verdict and 18 actionable findings
+808 " 🔵 Phase 5 Peer Review Identifies 18 Critical Planning Gaps and Architectural Conflicts
+S178 Peer review Phase 5 planning artifacts (Task Management + Metrics) with comprehensive quality gates; also distribute research enforcement rules to all agent platforms; capture Phase 3/4 gap audit findings (May 5 at 9:39 AM)
+809 9:39a 🔵 Phase 5 Peer Review Complete: Full Analysis Delivered with NO-GO Verdict and 18 Findings
+810 9:44a ✅ Phase 5 Peer Review Document Successfully Written to Disk
+811 " ✅ Agent Behavioral Rules Updated to Enforce Deep Research and Integration Documentation
+812 9:45a ✅ Deep Research Behavioral Rules Successfully Distributed to All Agent Platforms
+S179 Clarify whether Gemini uses GEMINI.md, AGENTS.md, or both for configuration/documentation (May 5 at 9:46 AM)
+813 9:55a 🔵 GEMINI.md references AGENTS.md for documentation
+S180 Peer-review Phase 5 planning artifacts (Task Management + Metrics) for the Fulcrum project, reading all 15 plan files plus context/research/gap audit, and writing findings to 05-REVIEWS.md with focus on executability, dependency correctness, decision coverage, architectural risks, and wave parallelism. (May 5 at 9:55 AM)
+814 9:57a 🔵 Phase 5 peer review identifies 6 blocking HIGH-severity issues and comprehensive feature scope
+815 10:00a ✅ Phase 5 Plan 01 refined with consolidated migration tasks and blocking issue resolutions
+816 10:02a ✅ Phase 5 Plan 02 updated to include YjsSnapshot entity (HIGH-05 fix) and consolidate tasks
+817 10:03a ✅ Phase 5 Plan 03 refactored to remove HIGH-06 same-file conflict; adds D-100 team mention resolution
+818 10:09a ⚖️ Phase 5 Plan 10: Gantt/Calendar architecture refactored to extract critical path algorithm
+819 10:11a ⚖️ Phase 5 Plan 11: Filter and bulk actions consolidated under tasks domain; custom field types increased to 9
+820 " ⚖️ Phase 5 Plan 12: Keyboard shortcuts extracted to pure module; field dependencies split client/server; components reorganized
+821 10:12a ⚖️ Phase 5 Plan 13: Yjs server extracted with auth/persistence; portfolio dashboard and analytics simplified to 4 key charts
+822 10:13a ⚖️ Phase 5 Plan 14: CLI and TUI scope simplified; task-relate extracted; ASCII chart component isolated
+823 10:14a ⚖️ Phase 5 Plan 15: Final completion plan dramatically scoped down; autonomous execution with deferred UAT
 
-**Learned**: • Phase 4 discussion is complete with canonical CONTEXT.md and DISCUSSION-LOG.md committed (hash 6db5635f)
-    • All 28 locked decisions (D-01 through D-28) organized into 7 decision areas with implementation details
-    • Plan-phase workflow includes non-blocking AI-SPEC gate: detects AI keywords, suggests running gsd-ai-integration-phase for framework/eval strategy
-    • Gate is non-blocking — planning can proceed with existing CONTEXT.md; AI-SPEC would be optional enrichment
-    • System workflows support chunked planning mode, validation strategy (Nyquist), security threat model gate, UI design contract gate, schema push detection
-
-**Completed**: • Phase 4 discussion phase: 100% complete with CONTEXT.md and DISCUSSION-LOG.md
-    • Phase directory prepared: .planning/phases/04-inference-router-skills/
-    • State.md confirms 3/3 phases ready
-    • System loaded plan-phase workflow templates and UI brand patterns
-    • Skill invocation attempt (gsd-plan-phase) failed (skill not registered); system is reading workflows in preparation for orchestrator-style invocation
-
-**Next Steps**: System has arrived at AI-SPEC gate (step 4.5 of plan-phase workflow). Gate decision pending:
-    Option 1: **Continue without AI-SPEC** — proceed to research/planning phases using existing CONTEXT.md (non-blocking path)
-    Option 2: **Stop and run gsd-ai-integration-phase 4 first** — generate AI-SPEC (framework selection, eval strategy) before planning
-    
-    Current recommendation: Option 1 (continue). Rationale: All architectural decisions locked in CONTEXT.md; AI-SPEC would add eval design but core design is captured; non-blocking gate allows proceeding. Next action: confirm decision, then transition to research phase (step 5 of plan-phase workflow).
-
-
-Access 241k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 1137k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>
