@@ -251,10 +251,12 @@ export const skillsRouter = t.router({
 
         // Update the lock entry with the override hash
         if (lock[input.slug]) {
+          const existing = lock[input.slug] ?? { version: "0.0.0", hash: "", installedAt: new Date().toISOString(), enabled_agents: [] };
           lock[input.slug] = {
-            ...lock[input.slug],
+            version: existing.version,
             hash: input.actualSha256,
             installedAt: new Date().toISOString(),
+            enabled_agents: existing.enabled_agents,
           };
         } else {
           lock[input.slug] = {
@@ -287,7 +289,7 @@ export const skillsRouter = t.router({
                   auditNote: input.auditNote ?? null,
                 },
               } as never);
-              await (auditEm.getRepository(Event) as EventRepository).save(event);
+              await auditEm.flush();
             }
           } catch {
             // Audit is best-effort

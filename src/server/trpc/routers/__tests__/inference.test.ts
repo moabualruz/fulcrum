@@ -476,8 +476,9 @@ describe("inference tRPC router", () => {
     const backends = await caller.inference.backends.probe();
     expect(Array.isArray(backends)).toBe(true);
     for (const b of backends as Array<Record<string, unknown>>) {
-      expect(typeof b.backend).toBe("string");
-      expect(["running", "stopped", "degraded", "unavailable", "unconfigured"]).toContain(b.status);
+      const entry = b as Record<string, string>;
+      expect(typeof entry.backend).toBe("string");
+      expect(["running", "stopped", "degraded", "unavailable", "unconfigured"] as string[]).toContain(entry.status!);
     }
   });
 

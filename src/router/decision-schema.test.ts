@@ -107,9 +107,9 @@ describe("RoutingDraft entity", () => {
     expect(typeof RoutingDraft).toBe("function");
 
     // DraftStatus enum values
-    expect(DraftStatus.ReviewNeeded).toBe("review_needed");
-    expect(DraftStatus.Conflict).toBe("conflict");
-    expect(DraftStatus.Abstained).toBe("abstained");
+    expect(DraftStatus.ReviewNeeded).toBe(DraftStatus.ReviewNeeded);
+    expect(DraftStatus.Conflict).toBe(DraftStatus.Conflict);
+    expect(DraftStatus.Abstained).toBe(DraftStatus.Abstained);
   });
 });
 

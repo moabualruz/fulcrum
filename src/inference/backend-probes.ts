@@ -13,6 +13,8 @@ import type {
   BackendId,
   BackendProbeResult,
 } from "./backends/types.ts";
+
+export type { BackendHealth };
 import { getEmbeddingModelMetadata } from "./model-metadata.ts";
 
 // ── Probe helpers ─────────────────────────────────────────────────────────
@@ -147,7 +149,7 @@ const BACKEND_URLS: Record<BackendId, () => string> = {
 };
 
 const BACKEND_MODELS: Record<BackendId, () => string> = {
-  embedded: () => getEmbeddingModelMetadata().model,
+  embedded: () => getEmbeddingModelMetadata().modelId,
   ollama: () => process.env["OLLAMA_MODEL"] ?? "llama3.2",
   "lm-studio": () => process.env["LM_STUDIO_MODEL"] ?? "local-model",
   "openai-compatible": () => process.env["FULCRUM_INFERENCE_MODEL"] ?? "gpt-4o-mini",
@@ -214,7 +216,6 @@ async function probeBackend(id: BackendId): Promise<BackendHealth> {
       const conn = await Bun.connect({
         socket: { data: () => {}, open: () => {}, close: () => {}, drain: () => {} },
         unix: socketPath,
-        timeout: 1,
       });
       conn.end();
     } catch {

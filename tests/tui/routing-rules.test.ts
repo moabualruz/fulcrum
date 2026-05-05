@@ -5,7 +5,7 @@ import {
   RoutingRulesScreen,
   type RoutingRuleFormInput,
   type RoutingRulesScreenOptions,
-  type TuiRoutingDecision,
+  type TuiEnrichedDecision,
   type TuiRoutingRule,
 } from "../../src/tui/screens/routing-rules.ts";
 import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
@@ -36,12 +36,17 @@ function rule(overrides: Partial<TuiRoutingRule> = {}): TuiRoutingRule {
   };
 }
 
-function decision(overrides: Partial<TuiRoutingDecision> = {}): TuiRoutingDecision {
+function decision(overrides: Partial<TuiEnrichedDecision> = {}): TuiEnrichedDecision {
   return {
-    ruleId: RULE_ID,
-    source: "rule",
-    agent: "codex",
+    status: "matched",
+    matchedRuleId: RULE_ID,
+    draftId: null,
+    factsUsed: {},
     confidence: 1,
+    backend: null,
+    model: null,
+    whyUnmatched: null,
+    evidence: [],
     ...overrides,
   };
 }
@@ -85,9 +90,19 @@ function fakeCaller(): RoutingRulesScreenOptions["caller"] & { calls: Array<{ pr
         if (index >= 0) rows.splice(index, 1);
         return { ok: true as const };
       },
+      test: async (input: { taskId: string }) => {
+        calls.push({ procedure: "routing.test", input });
+        return decision();
+      },
       dryRun: async (input: { taskJson: Record<string, unknown> }) => {
         calls.push({ procedure: "routing.dryRun", input });
-        return decision({ agent: "claude-code", source: "rule" });
+        return decision();
+      },
+      drafts: {
+        list: async () => { calls.push({ procedure: "routing.drafts.list", input: {} }); return []; },
+        approve: async (input: { draftId: string }) => { calls.push({ procedure: "routing.drafts.approve", input }); return { ok: true as const }; },
+        delete: async (input: { draftId: string }) => { calls.push({ procedure: "routing.drafts.delete", input }); return { ok: true as const }; },
+        update: async (input: Record<string, unknown>) => { calls.push({ procedure: "routing.drafts.update", input }); return { ok: true as const }; },
       },
     },
   };

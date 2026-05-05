@@ -50,7 +50,7 @@ function parseFeatureFlags(): string[] {
   return raw
     .split(",")
     .map((s) => s.trim().split(":")[0])
-    .filter(Boolean);
+    .filter((s): s is string => s !== undefined && s !== "");
 }
 
 /** Check whether a feature is enabled in the env flag. */
@@ -154,7 +154,6 @@ async function probeEmbedded(): Promise<BackendProbeResult> {
       const conn = await Bun.connect({
         socket: { data: () => {}, open: () => {}, close: () => {}, drain: () => {} },
         unix: socket,
-        timeout: 1,
       });
       conn.end();
       state = "running";

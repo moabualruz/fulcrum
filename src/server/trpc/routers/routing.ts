@@ -255,10 +255,13 @@ function enrichDecision(
     return {
       status: "no_match",
       matchedRuleId: null,
+      draftId: null,
       confidence: 0,
-      factsUsed: taskFacts as Record<string, unknown>,
+      factsUsed: taskFacts as unknown as Record<string, unknown>,
       evidence: ["no-match: routing returned null"],
       whyUnmatched: "No routing decision was produced.",
+      backend: null,
+      model: null,
     };
   }
 
@@ -268,8 +271,9 @@ function enrichDecision(
   return {
     status,
     matchedRuleId: decision.ruleId,
+    draftId: null,
     confidence: decision.confidence,
-    factsUsed: taskFacts as Record<string, unknown>,
+    factsUsed: taskFacts as unknown as Record<string, unknown>,
     evidence: isMatched
       ? [`matched rule ${decision.ruleId} with agent=${decision.agent} source=${decision.source} confidence=${decision.confidence}`]
       : [`no-match: confidence=${decision.confidence}`],
@@ -496,7 +500,7 @@ export const routingRouter = t.router({
               subjectId: ctx.orgId,
               metadata: input as Record<string, unknown>,
             } as never);
-            await eventRepo.save(event);
+            await em.flush();
           }
         } catch {
           // Audit event is best-effort — routing must not fail on audit failure

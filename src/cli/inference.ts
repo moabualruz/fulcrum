@@ -225,7 +225,7 @@ async function runStatus(
     const lines = [`inference ${health.status}`];
     if (backends) {
       for (const b of backends) {
-        const bits = [b.backend, b.status];
+        const bits: string[] = [b.backend, b.status];
         if (b.reason) bits.push(`reason=${b.reason}`);
         lines.push(`  ${bits.join(" ")}`);
       }

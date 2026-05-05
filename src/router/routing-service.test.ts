@@ -111,7 +111,7 @@ describe("RoutingService", () => {
       evaluateRuleMatch: async () => ({ ruleId: "rule-01", agent: "codex" }),
     });
     const result = await service.testRoute({
-      taskFacts: { task: { kind: "bug" } },
+      taskFacts: { task: { kind: "bug", priority: "high", tags: [], title: "test" } },
       inputMode: "full_context",
       orgId: "00000000-0000-4000-8000-000000000001",
     });
@@ -128,7 +128,7 @@ describe("RoutingService", () => {
       });
       // LLM fallback with no sidecar configured → returns null → abstained
       const result = await service.testRoute({
-        taskFacts: { task: { kind: "unknown" } },
+        taskFacts: { task: { kind: "unknown", priority: "low", tags: [], title: "test" } },
         inputMode: "task_facts",
         orgId: "00000000-0000-4000-8000-000000000001",
       });

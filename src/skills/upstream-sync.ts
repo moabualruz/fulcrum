@@ -329,6 +329,8 @@ export async function syncUpstream(
             upstreamHash: upstreamHash,
             baseHash: lockEntry.hash,
             suggestedResolution: `Local content differs from upstream. Options: resolve locally, accept upstream (loses local edits), or edit manually.`,
+            createdAt: new Date(),
+            updatedAt: new Date(),
           });
           await em.flush();
           result.conflicts.push(slug);

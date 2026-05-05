@@ -79,13 +79,16 @@ describe("skills registry tRPC procedures", () => {
       const caller = callerFor(em);
 
       // Create a real SkillConflict to override
-      const { SkillConflict, SkillConflictKind } = await import("../../../../db/entities/skills/SkillConflict.ts");
+      const { SkillConflict, SkillConflictKind, SkillConflictStatus } = await import("../../../../db/entities/skills/SkillConflict.ts");
       const conflict = em.create(SkillConflict, {
         slug: "test-skill",
         kind: SkillConflictKind.UpstreamConflict,
+        status: SkillConflictStatus.Open,
         localHash: "a".repeat(64),
         upstreamHash: "b".repeat(64),
         baseHash: "c".repeat(64),
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
       await em.flush();
 

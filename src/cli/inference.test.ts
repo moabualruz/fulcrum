@@ -253,7 +253,7 @@ describe("fulcrum inference CLI", () => {
       ...generateCap.opts,
       client: {
         call: async () => health,
-        embed: async () => ({ vectors: [[0.1]], model: "local", cached: false }),
+        embed: async () => ({ vectors: [[0.1]], model: "local", cached: false, dimensions: 1 }),
         generate: async () => ({ text: "Hi", model: "local", tokens: 2 }),
       },
     });
@@ -380,7 +380,7 @@ describe("fulcrum inference CLI", () => {
       caller: {
         inference: {
           health: async () => health,
-          embed: async () => ({ vectors: [[0.1]], model: "m", cached: false }),
+          embed: async () => ({ vectors: [[0.1]], model: "m", cached: false, dimensions: 1 }),
           generate: async () => ({ text: "x", model: "m", tokens: 1 }),
           config: {
             get: async () => ({ embeddings: "ollama", "router-llm": "embedded" }),
@@ -404,7 +404,7 @@ describe("fulcrum inference CLI", () => {
       caller: {
         inference: {
           health: async () => health,
-          embed: async () => ({ vectors: [[0.1]], model: "m", cached: false }),
+          embed: async () => ({ vectors: [[0.1]], model: "m", cached: false, dimensions: 1 }),
           generate: async () => ({ text: "x", model: "m", tokens: 1 }),
           config: {
             get: async () => ({ embeddings: "ollama" }),
@@ -426,7 +426,7 @@ describe("fulcrum inference CLI", () => {
       caller: {
         inference: {
           health: async () => health,
-          embed: async () => ({ vectors: [[0.1]], model: "m", cached: false }),
+          embed: async () => ({ vectors: [[0.1]], model: "m", cached: false, dimensions: 1 }),
           generate: async () => ({ text: "x", model: "m", tokens: 1 }),
           config: {
             get: async () => ({}),

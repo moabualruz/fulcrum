@@ -127,7 +127,7 @@ export class RoutingService {
         confidence: 1,
         matchedRuleId: match.ruleId,
         draftId: null,
-        factsUsed: input.taskFacts as Record<string, unknown>,
+        factsUsed: input.taskFacts as unknown as Record<string, unknown>,
         evidence: [`matched rule ${match.ruleId} with agent=${match.agent}`],
       });
     }
@@ -144,7 +144,7 @@ export class RoutingService {
         confidence: 0,
         matchedRuleId: null,
         draftId: null,
-        factsUsed: input.taskFacts as Record<string, unknown>,
+        factsUsed: input.taskFacts as unknown as Record<string, unknown>,
         evidence: ["no-match: confidence=0"],
       });
     }
@@ -161,7 +161,7 @@ export class RoutingService {
         confidence: llmResult?.confidence ?? 0,
         matchedRuleId: null,
         draftId: null,
-        factsUsed: input.taskFacts as Record<string, unknown>,
+        factsUsed: input.taskFacts as unknown as Record<string, unknown>,
         evidence: [
           `llm-fallback: confidence=${llmResult?.confidence ?? 0} (below abstain threshold ${ABSTAIN_THRESHOLD})`,
         ],
@@ -174,7 +174,7 @@ export class RoutingService {
       confidence: llmResult.confidence,
       matchedRuleId: llmResult.ruleId,
       draftId: null,
-      factsUsed: input.taskFacts as Record<string, unknown>,
+      factsUsed: input.taskFacts as unknown as Record<string, unknown>,
       evidence: [
         `llm-recommended: agent=${llmResult.agent} confidence=${llmResult.confidence}`,
       ],
