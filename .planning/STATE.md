@@ -2,22 +2,22 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-last_updated: "2026-05-05T00:22:00Z"
+status: Phase complete — ready for verification
+last_updated: "2026-05-05T00:52:08.945Z"
 progress:
   total_phases: 10
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 24
-  completed_plans: 23
-  percent: 96
+  completed_plans: 24
+  percent: 100
 ---
 
 # Planning State
 
 ## Current Position
 
-Phase: 03 (symphony-sandcastle) — EXECUTING
-Plan: 6 of 6
+Phase: 03 (symphony-sandcastle) — COMPLETE
+Plan: 6 of 6 (all complete)
 
 - **Phase**: 02-bug-fixes-foundation
 - **Plan**: 8 plans created
@@ -64,3 +64,6 @@ Plan: 6 of 6
 - [Phase 03-05]: resolveAgentRunConfig merges WORKFLOW.md override fields over AgentProfile defaults; UnknownAgentError for unsupported agent names; Codex default (D-10, D-11)
 - [Phase 03-05]: session-resume result exposes resumeVia and capability — unsupported profiles cannot silently pretend resume happened (D-21)
 - [Phase 03-05]: doctor checkSandcastle() calls sandboxProviderDoctorChecks(); errors name the missing provider flag (e.g. sandbox-docker); runAll exported for test reuse
+- [Phase 03-06]: HTTP server binds 127.0.0.1 by default; port:0 uses ephemeral binding; wraps createHttpApiRoutes (SYM-25)
+- [Phase 03-06]: dispatchRun tRPC procedure creates AgentRun via MikroORM EM; sandboxMode 'noSandbox' is human alias for DB value 'host' (D-12)
+- [Phase 03-06]: CLI SymphonyCaller.dispatchRun required; 'runs dispatch <taskId>' added; TUI dispatch() optional in caller interface; Web dispatch action uses tRPC local caller (SND-06)
