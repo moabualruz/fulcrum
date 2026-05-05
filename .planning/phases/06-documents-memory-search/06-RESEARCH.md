@@ -578,27 +578,21 @@ const results = await search(db, {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Document.title column**
-   - What we know: `Document` entity has no `title` property in the MikroORM entity definition
-   - What's unclear: Does the `documents` table have a `title` column added by a prior migration? The search indexer fetches `title` from a SQL query — how?
-   - Recommendation: Check `DocumentIndexer.buildDocument()` SQL query — it selects `title`. Verify the DB column exists; if missing, add in Phase 6 migration.
+1. **Document.title column** — RESOLVED
+   - Verified: `Document` entity has no `title` property and no prior migration adds it. The search indexer derives title from frontmatter or bodyMd first line.
+   - Resolution: Plan 01 migration adds `title varchar NULL` to `documents` table. Plan 01 Task 1 adds `title` property to Document entity alongside `contextSummary`.
 
-2. **Saved searches migration scope**
-   - What we know: `saved-searches.ts` uses raw SQL + DDL. Must be replaced.
-   - What's unclear: Does a `SavedSearch` MikroORM entity exist? The `saved_searches` table exists (referenced in SQL) but no entity file was found.
-   - Recommendation: Create `SavedSearch` MikroORM entity + migration in Wave 0.
+2. **Saved searches migration scope** — RESOLVED
+   - Verified: No `SavedSearch` MikroORM entity exists. `src/product-kernel/saved-searches.ts` uses raw SQL with `ensureSavedSearchColumns()` DDL.
+   - Resolution: Plan 04 Task 2 creates `SavedSearch` MikroORM entity (`src/db/entities/search/SavedSearch.ts`) with fields matching `SavedSearchRow` interface, and includes migration DDL. The tRPC router uses the entity.
 
-3. **ContextBundleService token counting library**
-   - What we know: D-25 says "token counting via tiktoken-equivalent". No token counting utility found in codebase.
-   - What's unclear: Use `tiktoken` npm package, `gpt-tokenizer`, or chars/4 approximation?
-   - Recommendation: Verify no existing token counter in codebase; if absent, use `gpt-tokenizer` (pure JS, no WASM) for `cl100k_base` encoding.
+3. **ContextBundleService token counting library** — RESOLVED
+   - Resolution: Use `Math.ceil(text.length / 4)` chars/4 approximation. No external dependency needed. Sufficient for greedy-fill budget enforcement.
 
-4. **Mermaid SSR compatibility**
-   - What we know: Mermaid 11.x requires DOM; SvelteKit can SSR TipTap pages.
-   - What's unclear: Does the doc editor page disable SSR? Mermaid must not run during SSR.
-   - Recommendation: Wrap Mermaid NodeView in `browser` guard (`import { browser } from '$app/environment'`).
+4. **Mermaid SSR compatibility** — RESOLVED
+   - Resolution: Wrap Mermaid NodeView render in `{#if browser}` Svelte guard using `import { browser } from "$app/environment"`. Standard SvelteKit pattern. SSR renders `<pre>` placeholder with raw source.
 
 ---
 
