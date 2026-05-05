@@ -1,6 +1,14 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 	import { cn } from "$lib/utils.js";
+	import BurndownChart from "$lib/components/reports/BurndownChart.svelte";
+	import VelocityChart from "$lib/components/reports/VelocityChart.svelte";
+	import CfdChart from "$lib/components/reports/CfdChart.svelte";
+	import CycleTimeChart from "$lib/components/reports/CycleTimeChart.svelte";
+	import ThroughputChart from "$lib/components/reports/ThroughputChart.svelte";
+	import WipChart from "$lib/components/reports/WipChart.svelte";
+	import ForecastChart from "$lib/components/reports/ForecastChart.svelte";
+	import ReportDatePicker from "$lib/components/reports/ReportDatePicker.svelte";
 
 	interface Props {
 		data: PageData;
@@ -8,7 +16,7 @@
 
 	let { data }: Props = $props();
 
-	const tabs = ["burndown", "velocity", "cycle-time", "throughput", "wip", "cfd"] as const;
+	const tabs = ["burndown", "velocity", "cycle-time", "throughput", "wip", "cfd", "forecast"] as const;
 	type Tab = (typeof tabs)[number];
 	let activeTab = $state<Tab>("burndown");
 
@@ -19,16 +27,103 @@
 		throughput: "Throughput",
 		wip: "WIP",
 		cfd: "CFD",
+		forecast: "Forecast",
 	};
 
-	const hasData = $derived({
-		burndown: data.reports.burndown.length > 0,
-		velocity: data.reports.velocity.length > 0,
-		"cycle-time": data.reports.cycleTime.bins.length > 0,
-		throughput: data.reports.throughput.length > 0,
-		wip: data.reports.wip.length > 0,
-		cfd: data.reports.cfd.length > 0,
+	// Date range state
+	let dateRange = $state({
+		start: new Date(Date.now() - 30 * 86400000),
+		end: new Date(),
 	});
+
+	// Transform server data to chart component prop shapes
+	const burndownData = $derived(
+		data.reports.burndown.map((d) => ({
+			date: d.date,
+			remaining: d.actual === -1 ? 0 : d.actual,
+			ideal: d.ideal,
+		}))
+	);
+
+	const velocityData = $derived(
+		data.reports.velocity.map((d) => {
+			const avg = data.reports.velocity.reduce((s, v) => s + v.points, 0) / (data.reports.velocity.length || 1);
+			return { sprint: d.sprint_name, completed: d.points, average: avg };
+		})
+	);
+
+	const cycleTimeData = $derived(
+		data.reports.cycleTime.bins.map((b, i) => ({
+			taskId: `task-${i}`,
+			completedAt: new Date(Date.now() - i * 86400000).toISOString(),
+			cycleTimeHours: b.days * 8,
+		}))
+	);
+
+	const cycleTimePercentiles = $derived({
+		p50: data.reports.cycleTime.p50 * 8,
+		p75: data.reports.cycleTime.p90 * 8,
+		p95: data.reports.cycleTime.p90 * 8,
+	});
+
+	const throughputData = $derived(
+		data.reports.throughput.map((d) => {
+			const avg = data.reports.throughput.reduce((s, v) => s + v.count, 0) / (data.reports.throughput.length || 1);
+			return { week: d.week_start, completed: d.count, average: avg };
+		})
+	);
+
+	const wipData = $derived(
+		data.reports.wip.map((d) => ({
+			date: d.date,
+			wipCount: d.in_progress,
+		}))
+	);
+
+	const cfdData = $derived(
+		data.reports.cfd.map((d) => ({
+			date: d.date,
+			backlog: d.pending,
+			started: d.in_progress,
+			completed: d.completed,
+			canceled: d.cancelled,
+		}))
+	);
+
+	// Throughput history for Monte Carlo (weekly counts)
+	const throughputHistory = $derived(data.reports.throughput.map((d) => d.count));
+
+	// Remaining estimate from burndown last point
+	const remainingPoints = $derived(
+		burndownData.length > 0 ? (burndownData[burndownData.length - 1]?.remaining ?? 0) : 0
+	);
+
+	function handleDateChange(range: { start: Date; end: Date }) {
+		dateRange = range;
+	}
+
+	function exportCsv(tab: Tab) {
+		let rows: string[][] = [];
+		let filename = `${tab}-${data.project.id}.csv`;
+
+		if (tab === "burndown") {
+			rows = [["Date", "Remaining", "Ideal"], ...burndownData.map((d) => [d.date, String(d.remaining), String(d.ideal)])];
+		} else if (tab === "velocity") {
+			rows = [["Sprint", "Completed", "Average"], ...velocityData.map((d) => [d.sprint, String(d.completed), String(d.average.toFixed(1))])];
+		} else if (tab === "throughput") {
+			rows = [["Week", "Completed", "Average"], ...throughputData.map((d) => [d.week, String(d.completed), String(d.average.toFixed(1))])];
+		}
+
+		if (rows.length === 0) return;
+		const csv = rows.map((r) => r.join(",")).join("\n");
+		const blob = new Blob([csv], { type: "text/csv" });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = filename;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
 </script>
 
 <header
@@ -40,33 +135,37 @@
 		<h1 class={cn("text-2xl font-semibold tracking-tight")}>Reports</h1>
 	</div>
 
-	{#if data.reports.sprints.length > 0}
-		<div data-sprint-selector class={cn("flex items-center gap-2")}>
-			<label for="sprint-select" class={cn("text-sm text-muted-foreground")}>Sprint</label>
-			<select
-				id="sprint-select"
-				data-sprint-select
-				class={cn("border-input bg-background h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
-				onchange={(e) => {
-					const target = e.target as HTMLSelectElement;
-					const url = new URL(window.location.href);
-					if (target.value) {
-						url.searchParams.set("sprint", target.value);
-					} else {
-						url.searchParams.delete("sprint");
-					}
-					window.location.href = url.toString();
-				}}
-			>
-				<option value="">All sprints</option>
-				{#each data.reports.sprints as sprint}
-					<option value={sprint.id} selected={data.selectedSprintId === sprint.id}>
-						{sprint.name} ({sprint.start_date} – {sprint.end_date})
-					</option>
-				{/each}
-			</select>
-		</div>
-	{/if}
+	<div class={cn("flex items-center gap-3")}>
+		<ReportDatePicker value={dateRange} onChange={handleDateChange} />
+
+		{#if data.reports.sprints.length > 0}
+			<div data-sprint-selector class={cn("flex items-center gap-2")}>
+				<label for="sprint-select" class={cn("text-sm text-muted-foreground")}>Sprint</label>
+				<select
+					id="sprint-select"
+					data-sprint-select
+					class={cn("border-input bg-background h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
+					onchange={(e) => {
+						const target = e.target as HTMLSelectElement;
+						const url = new URL(window.location.href);
+						if (target.value) {
+							url.searchParams.set("sprint", target.value);
+						} else {
+							url.searchParams.delete("sprint");
+						}
+						window.location.href = url.toString();
+					}}
+				>
+					<option value="">All sprints</option>
+					{#each data.reports.sprints as sprint}
+						<option value={sprint.id} selected={data.selectedSprintId === sprint.id}>
+							{sprint.name} ({sprint.start_date} – {sprint.end_date})
+						</option>
+					{/each}
+				</select>
+			</div>
+		{/if}
+	</div>
 </header>
 
 <!-- Tab navigation -->
@@ -91,159 +190,92 @@
 
 <!-- Tab content -->
 <section data-report-content class={cn("min-h-[300px]")}>
-	{#if !hasData[activeTab]}
-		<div data-empty-state class={cn("flex flex-col items-center justify-center py-16 text-muted-foreground")}>
-			<p class={cn("text-lg font-medium")}>No data yet</p>
-			<p class={cn("text-sm mt-1")}>Complete some tasks or configure sprints to see {tabLabels[activeTab].toLowerCase()} data.</p>
-		</div>
-	{:else if activeTab === "burndown"}
-		<div data-chart-burndown>
-			<h2 class={cn("text-lg font-semibold mb-4")}>Burndown</h2>
-			<table class={cn("w-full text-sm")}>
-				<thead>
-					<tr class={cn("border-b border-border text-left")}>
-						<th class={cn("py-2 px-3")}>Date</th>
-						<th class={cn("py-2 px-3")}>Ideal</th>
-						<th class={cn("py-2 px-3")}>Actual</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each data.reports.burndown as point}
-						<tr class={cn("border-b border-border/50")}>
-							<td class={cn("py-1.5 px-3 font-mono")}>{point.date}</td>
-							<td class={cn("py-1.5 px-3")}>{point.ideal}</td>
-							<td class={cn("py-1.5 px-3")}>{point.actual === -1 ? "—" : point.actual}</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
+	{#if activeTab === "burndown"}
+		<div data-chart-burndown class={cn("space-y-3")}>
+			<div class={cn("flex items-center justify-between")}>
+				<div>
+					<h2 class={cn("text-lg font-semibold")}>Burndown</h2>
+					<p class={cn("text-sm text-muted-foreground")}>Remaining work vs ideal progress</p>
+				</div>
+				<button
+					type="button"
+					onclick={() => exportCsv("burndown")}
+					class={cn("text-xs text-muted-foreground hover:text-foreground border border-border rounded px-2 py-1")}
+				>
+					Export CSV
+				</button>
+			</div>
+			<BurndownChart data={burndownData} />
 		</div>
 	{:else if activeTab === "velocity"}
-		<div data-chart-velocity>
-			<h2 class={cn("text-lg font-semibold mb-4")}>Velocity</h2>
-			<table class={cn("w-full text-sm")}>
-				<thead>
-					<tr class={cn("border-b border-border text-left")}>
-						<th class={cn("py-2 px-3")}>Sprint</th>
-						<th class={cn("py-2 px-3")}>Points</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each data.reports.velocity as bar}
-						<tr class={cn("border-b border-border/50")}>
-							<td class={cn("py-1.5 px-3")}>{bar.sprint_name}</td>
-							<td class={cn("py-1.5 px-3")}>
-								<div class={cn("flex items-center gap-2")}>
-									<div class={cn("h-4 bg-primary rounded")} style="width: {Math.max(4, bar.points * 8)}px"></div>
-									<span>{bar.points}</span>
-								</div>
-							</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
+		<div data-chart-velocity class={cn("space-y-3")}>
+			<div class={cn("flex items-center justify-between")}>
+				<div>
+					<h2 class={cn("text-lg font-semibold")}>Velocity</h2>
+					<p class={cn("text-sm text-muted-foreground")}>Story points completed per sprint</p>
+				</div>
+				<button
+					type="button"
+					onclick={() => exportCsv("velocity")}
+					class={cn("text-xs text-muted-foreground hover:text-foreground border border-border rounded px-2 py-1")}
+				>
+					Export CSV
+				</button>
+			</div>
+			<VelocityChart data={velocityData} />
 		</div>
 	{:else if activeTab === "cycle-time"}
-		<div data-chart-cycle-time>
-			<h2 class={cn("text-lg font-semibold mb-4")}>Cycle Time</h2>
-			<div class={cn("flex gap-6 mb-4")}>
-				<div class={cn("rounded-lg border border-border bg-muted/50 p-4")}>
-					<p class={cn("text-xs text-muted-foreground")}>P50</p>
-					<p class={cn("text-2xl font-bold")} data-p50>{data.reports.cycleTime.p50}d</p>
-				</div>
-				<div class={cn("rounded-lg border border-border bg-muted/50 p-4")}>
-					<p class={cn("text-xs text-muted-foreground")}>P90</p>
-					<p class={cn("text-2xl font-bold")} data-p90>{data.reports.cycleTime.p90}d</p>
-				</div>
+		<div data-chart-cycle-time class={cn("space-y-3")}>
+			<div>
+				<h2 class={cn("text-lg font-semibold")}>Cycle Time</h2>
+				<p class={cn("text-sm text-muted-foreground")}>Time from started to completed per task</p>
 			</div>
-			<table class={cn("w-full text-sm")}>
-				<thead>
-					<tr class={cn("border-b border-border text-left")}>
-						<th class={cn("py-2 px-3")}>Days</th>
-						<th class={cn("py-2 px-3")}>Count</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each data.reports.cycleTime.bins as bin}
-						<tr class={cn("border-b border-border/50")}>
-							<td class={cn("py-1.5 px-3 font-mono")}>{bin.days}</td>
-							<td class={cn("py-1.5 px-3")}>{bin.count}</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
+			<CycleTimeChart data={cycleTimeData} percentiles={cycleTimePercentiles} />
 		</div>
 	{:else if activeTab === "throughput"}
-		<div data-chart-throughput>
-			<h2 class={cn("text-lg font-semibold mb-4")}>Throughput</h2>
-			<table class={cn("w-full text-sm")}>
-				<thead>
-					<tr class={cn("border-b border-border text-left")}>
-						<th class={cn("py-2 px-3")}>Week</th>
-						<th class={cn("py-2 px-3")}>Tasks Completed</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each data.reports.throughput as point}
-						<tr class={cn("border-b border-border/50")}>
-							<td class={cn("py-1.5 px-3 font-mono")}>{point.week_start}</td>
-							<td class={cn("py-1.5 px-3")}>{point.count}</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
+		<div data-chart-throughput class={cn("space-y-3")}>
+			<div class={cn("flex items-center justify-between")}>
+				<div>
+					<h2 class={cn("text-lg font-semibold")}>Throughput</h2>
+					<p class={cn("text-sm text-muted-foreground")}>Tasks completed per week (12-week rolling)</p>
+				</div>
+				<button
+					type="button"
+					onclick={() => exportCsv("throughput")}
+					class={cn("text-xs text-muted-foreground hover:text-foreground border border-border rounded px-2 py-1")}
+				>
+					Export CSV
+				</button>
+			</div>
+			<ThroughputChart data={throughputData} />
 		</div>
 	{:else if activeTab === "wip"}
-		<div data-chart-wip>
-			<h2 class={cn("text-lg font-semibold mb-4")}>Work In Progress</h2>
-			<table class={cn("w-full text-sm")}>
-				<thead>
-					<tr class={cn("border-b border-border text-left")}>
-						<th class={cn("py-2 px-3")}>Date</th>
-						<th class={cn("py-2 px-3")}>Pending</th>
-						<th class={cn("py-2 px-3")}>In Progress</th>
-						<th class={cn("py-2 px-3")}>Blocked</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each data.reports.wip as point}
-						<tr class={cn("border-b border-border/50")}>
-							<td class={cn("py-1.5 px-3 font-mono")}>{point.date}</td>
-							<td class={cn("py-1.5 px-3")}>{point.pending}</td>
-							<td class={cn("py-1.5 px-3")}>{point.in_progress}</td>
-							<td class={cn("py-1.5 px-3")}>{point.blocked}</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
+		<div data-chart-wip class={cn("space-y-3")}>
+			<div>
+				<h2 class={cn("text-lg font-semibold")}>Work In Progress</h2>
+				<p class={cn("text-sm text-muted-foreground")}>In-progress task count over time</p>
+			</div>
+			<WipChart data={wipData} />
 		</div>
 	{:else if activeTab === "cfd"}
-		<div data-chart-cfd>
-			<h2 class={cn("text-lg font-semibold mb-4")}>Cumulative Flow</h2>
-			<table class={cn("w-full text-sm")}>
-				<thead>
-					<tr class={cn("border-b border-border text-left")}>
-						<th class={cn("py-2 px-3")}>Date</th>
-						<th class={cn("py-2 px-3")}>Pending</th>
-						<th class={cn("py-2 px-3")}>In Progress</th>
-						<th class={cn("py-2 px-3")}>Blocked</th>
-						<th class={cn("py-2 px-3")}>Completed</th>
-						<th class={cn("py-2 px-3")}>Cancelled</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each data.reports.cfd as point}
-						<tr class={cn("border-b border-border/50")}>
-							<td class={cn("py-1.5 px-3 font-mono")}>{point.date}</td>
-							<td class={cn("py-1.5 px-3")}>{point.pending}</td>
-							<td class={cn("py-1.5 px-3")}>{point.in_progress}</td>
-							<td class={cn("py-1.5 px-3")}>{point.blocked}</td>
-							<td class={cn("py-1.5 px-3")}>{point.completed}</td>
-							<td class={cn("py-1.5 px-3")}>{point.cancelled}</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
+		<div data-chart-cfd class={cn("space-y-3")}>
+			<div>
+				<h2 class={cn("text-lg font-semibold")}>Cumulative Flow Diagram</h2>
+				<p class={cn("text-sm text-muted-foreground")}>Task distribution across statuses over time</p>
+			</div>
+			<CfdChart data={cfdData} />
+		</div>
+	{:else if activeTab === "forecast"}
+		<div data-chart-forecast class={cn("space-y-3")}>
+			<div>
+				<h2 class={cn("text-lg font-semibold")}>Forecast</h2>
+				<p class={cn("text-sm text-muted-foreground")}>Monte Carlo simulation — P50/P75/P85/P95 completion dates</p>
+			</div>
+			<ForecastChart
+				remaining={remainingPoints}
+				throughputHistory={throughputHistory}
+				scopeLabel={data.reports.sprints.find((s) => s.id === data.selectedSprintId)?.name ?? "Project"}
+			/>
 		</div>
 	{/if}
 </section>

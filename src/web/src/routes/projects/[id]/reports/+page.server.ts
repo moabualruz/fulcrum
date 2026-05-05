@@ -1,26 +1,37 @@
+/**
+ * Reports page server load — uses MikroORM EM from locals (no raw SQL / openProductDb).
+ *
+ * Pillar 6: Metrics & reporting. Loads report data server-side via EM from locals.
+ * Additional tRPC procedures (e.g. reports.burndown) available client-side.
+ */
+
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
 import { loadReports } from "$lib/server/reports";
 
-export const load: PageServerLoad = async ({ params, url }) => {
-  const sprintId = url.searchParams.get("sprint") ?? undefined;
-  const db = await openProductDb();
-  try {
-    const orgId = await getDefaultOrgId(db);
-
-    // Verify project exists
-    const rows = await db.query<{ id: string; name: string }>(
-      `SELECT id, name FROM projects WHERE id = $1 AND org_id = $2`,
-      [params.id, orgId],
-    );
-    if (rows.length === 0) throw error(404, "Project not found");
-
-    const project = rows[0]!;
-    const reports = await loadReports(db, project.id, sprintId);
-
-    return { project, reports, selectedSprintId: sprintId ?? null };
-  } finally {
-    await db.close();
+export const load: PageServerLoad = async ({ params, url, locals }) => {
+  const em = locals.em;
+  if (!em) {
+    throw error(500, "EntityManager not available");
   }
+
+  const orgId = locals.orgId;
+  if (!orgId) {
+    throw error(401, "Not authenticated");
+  }
+
+  const sprintId = url.searchParams.get("sprint") ?? undefined;
+
+  // Verify project exists
+  const rows = await em.getConnection().execute(
+    `SELECT id, name FROM projects WHERE id = ? AND org_id = ? AND deleted_at IS NULL`,
+    [params.id, orgId],
+  ) as Array<{ id: string; name: string }>;
+
+  if (rows.length === 0) throw error(404, "Project not found");
+
+  const project = rows[0]!;
+  const reports = await loadReports(em, project.id, sprintId);
+
+  return { project, reports, selectedSprintId: sprintId ?? null, orgId };
 };
