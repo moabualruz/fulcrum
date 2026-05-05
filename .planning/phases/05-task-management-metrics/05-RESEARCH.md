@@ -801,6 +801,86 @@ class AutomationService {
 
 ---
 
+## Fulcrum Workflow Integration Map
+
+### How Phase 5 Features Connect to Existing Fulcrum Systems
+
+#### Symphony Orchestration ↔ Task Management
+- `agent_runs` table (Phase 3) tracks orchestration runs. Each run references tasks via `agent_runs.task_id` FK.
+- **Automation engine (D-89..D-92) interaction:** When Symphony dispatches an agent to work on a task, the run creates events (`agent_run.started`, `agent_run.completed`). Automation triggers should listen for these events in addition to standard task field changes. Example automation: "When agent_run completes → move task from In Progress to In Review".
+- **Task status → dispatch eligibility:** Symphony's tracker adapter reads task status to determine dispatch eligibility. Phase 5's workflow transition rules (D-24) must not break the tracker adapter's assumptions about which statuses are "eligible" vs "completed". The tracker adapter maps Fulcrum statuses to Symphony's `Issue.state` field — ensure the 5 status categories (D-22) map cleanly to Symphony's `open | in_progress | done | cancelled` states.
+- **File:** `src/orchestration/tracker-adapter.ts` — reads tasks to build Symphony 12-field Issue model. Phase 5 must NOT break this mapping.
+
+#### Sandcastle Agent Dispatch ↔ Task Management
+- Sandcastle dispatches agents (claudeCode, codex) to work on tasks. Agent artifacts (code, files, patches) link back to tasks via `artifacts.task_id`.
+- **Task relationships (D-19..D-21) impact on dispatch:** When a task has `blocks` dependencies, Symphony should not dispatch agents to blocked tasks. Phase 5's blocking chain detection (D-20) must expose a `isBlocked(taskId): boolean` service method that the tracker adapter can call.
+- **Sprint ↔ agent dispatch:** Active sprint tasks are the primary dispatch pool. Sprint rollover (D-28) must not orphan in-flight agent_runs — if a task rolls over to next sprint while an agent is running, the run continues unaffected (agent_runs tracks task_id, not sprint_id).
+
+#### Inference Router ↔ Task Management
+- Phase 4's inference router routes LLM requests. Task context (title, description, custom fields) can be passed to the router for context-aware routing.
+- **Routing rules (Phase 4 D-15..D-17) use task metadata:** Rules engine can match on task labels, priority, or project to select different LLM backends. Phase 5's label groups (D-79) and custom fields (D-77) expand the matching surface.
+- **No direct integration required in Phase 5** — the router already reads task metadata via tRPC. Phase 5 enriches that metadata (more fields, relationships, comments) which the router can optionally use.
+
+#### EventBus Integration Points
+The EventBus is the central integration seam. Phase 5 adds these event producers and consumers:
+
+| Producer | Event Type | Consumer |
+|----------|-----------|----------|
+| TaskService (status change) | `task.status_changed` | AutomationService (D-89), MetricsRollupWorker (D-33), Symphony tracker |
+| TaskService (assignment) | `task.assigned` | AutomationService, WatcherService (D-08 auto-subscribe) |
+| CommentService (comment added) | `task.comment_added` | WatcherService (D-06 @mention subscribe) |
+| SprintService (sprint closed) | `sprint.closed` | MetricsRollupWorker (freeze snapshot), ReportService (frozen sprint report) |
+| AutomationService (rule fired) | `automation.executed` | Audit log, cycle detection counter |
+| WorkflowService (transition blocked) | `workflow.transition_denied` | UI notification (soft warning on board) |
+
+#### Three-Surface Integration with New Services
+
+```
+Web (SvelteKit)
+  → tRPC client → reports.ts router → ReportService → MetricsCache/task_events queries
+  → tRPC client → comments.ts router → CommentService → task_comments entity
+  → tRPC client → automations.ts router → AutomationService → project_automations entity
+  → tRPC client → workflows.ts router → WorkflowService → workflow_transitions config
+  → WebSocket → y-websocket server → Yjs CRDT → PostgreSQL doc storage
+
+CLI (fulcrum CLI)
+  → tRPC client → same routers as Web
+  → `fulcrum report burndown --sprint <id> --format table` → ReportService → ASCII table output
+  → `fulcrum task comment add <task-id> "text"` → CommentService (plain text, not TipTap)
+  → `fulcrum automation list --project <id>` → AutomationService
+
+TUI (OpenTUI)
+  → tRPC client → same routers as Web
+  → ReportsScreen → ReportService → asciichart rendering
+  → TaskDetailPanel → CommentService → plain text rendering
+  → No WebSocket/Yjs in TUI (no collaborative editing in terminal)
+```
+
+#### Existing Code That Phase 5 Must NOT Break
+
+| File | What It Does | Phase 5 Risk |
+|------|-------------|-------------|
+| `src/orchestration/tracker-adapter.ts` | Maps Fulcrum tasks → Symphony Issue model | Adding status categories (D-22) must maintain mapping |
+| `src/orchestration/dispatch.ts` | Dispatches agents to eligible tasks | Task relationships (D-19 blocked_by) must expose `isBlocked()` |
+| `src/orchestration/session-resume.ts` | Resumes interrupted agent sessions | Sprint rollover (D-28) must not break task_id references |
+| `src/router/auto-assign.ts` | Auto-assigns tasks to routing rules | Labels (D-79) and custom fields (D-78) expand matching surface |
+| `src/importers/linear.ts` | Imports Linear issues into Fulcrum tasks | New Task columns (due_date, assignee_id, labels) should be populated by importer |
+| `src/importers/types.ts` | Import type definitions | Must be extended for new entity types |
+| `src/context/assemble.ts` | Assembles context for LLM prompts | Task comments (D-01) and activity feed (D-05) can feed context assembly |
+| `src/connectors/framework.ts` | External service connectors | Automation engine (D-89) may fire connector actions |
+
+### Companion Research Files
+
+The following research files contain detailed competitive analysis and are referenced by CONTEXT.md decisions:
+
+| File | Content | Decisions Informed |
+|------|---------|-------------------|
+| `05-RESEARCH-PLATFORMS.md` | Feature audit: Linear, Jira, ClickUp, Shortcut, Plane, Asana, GitHub Projects, Notion — 16 feature areas compared | D-10..D-18 (board/panel UX), D-22..D-25 (workflow), D-26..D-30 (sprint), D-66..D-68 (keyboard), D-73..D-76 (bulk ops) |
+| `05-RESEARCH-DEPENDENCIES.md` | Library selection: best Svelte-compatible package per feature area with rationale | D-60 (SVAR Gantt), D-63 (event-calendar), D-56 (LayerChart), D-14 (TanStack Table), D-67 (tinykeys), D-85..D-88 (dep list) |
+| `05-RESEARCH-REPORTS.md` | Reports deep dive: 18 report types, data model architecture, charting library mapping | D-31..D-55 (data model + all report types), D-93..D-96 (portfolio), D-105..D-108 (Monte Carlo) |
+
+---
+
 ## Metadata
 
 **Confidence breakdown:**

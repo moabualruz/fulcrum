@@ -241,12 +241,11 @@ Make the task pillar **competitive with Linear/Plane** as the UX benchmark and *
 - `src/db/repositories/tasks/TaskRepository.ts` — Task data access
 - `src/db/tasks-rich-text.ts` — TipTap JSON ↔ plain text
 
-### Competitive Research (for reference, not for agents to read)
-- Linear: keyboard-first UX benchmark, cmd-K, side panel, cycles, Insights analytics
-- Jira: workflow engine, sprint analytics, CFD, epic burndown — most complete reports
-- ClickUp: feature breadth, bulk ops, Gantt, custom fields, dashboard builder
-- Shortcut: best native CFD, iteration analytics
-- Plane: open source reference, Gantt, multi-level subtasks
+### Research Files (downstream agents SHOULD read relevant sections)
+- `.planning/phases/05-task-management-metrics/05-RESEARCH.md` — Fulcrum codebase integration research: entity audits, patterns, pitfalls, code examples, workflow integration map
+- `.planning/phases/05-task-management-metrics/05-RESEARCH-PLATFORMS.md` — Feature audit: Linear, Jira, ClickUp, Shortcut, Plane, Asana, GitHub Projects, Notion (16 areas)
+- `.planning/phases/05-task-management-metrics/05-RESEARCH-DEPENDENCIES.md` — Library selection per feature area with rationale and compatibility notes
+- `.planning/phases/05-task-management-metrics/05-RESEARCH-REPORTS.md` — 18 report types, two-layer data model architecture, LayerChart component mapping
 
 </canonical_refs>
 
