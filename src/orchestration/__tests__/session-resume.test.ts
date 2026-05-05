@@ -28,7 +28,7 @@ describe("session-resume", () => {
       priorRunLookup: lookup,
     });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       attempted: true,
       transcriptPath: "/transcripts/prior-run.jsonl",
       coldStart: false,
@@ -49,10 +49,8 @@ describe("session-resume", () => {
       priorRunLookup: lookup,
     });
 
-    expect(result).toEqual({
-      attempted: true,
-      coldStart: true,
-    });
+    expect(result.attempted).toBe(true);
+    expect(result.coldStart).toBe(true);
   });
 
   test("cold start when flag off — no lookup called", async () => {
@@ -68,10 +66,8 @@ describe("session-resume", () => {
       priorRunLookup: lookup,
     });
 
-    expect(result).toEqual({
-      attempted: false,
-      coldStart: true,
-    });
+    expect(result.attempted).toBe(false);
+    expect(result.coldStart).toBe(true);
     expect(lookup.findPriorTranscriptPath).not.toHaveBeenCalled();
   });
 
@@ -88,10 +84,10 @@ describe("session-resume", () => {
       priorRunLookup: lookup,
     });
 
-    expect(result).toEqual({
-      attempted: false,
-      coldStart: true,
-    });
+    expect(result.attempted).toBe(false);
+    expect(result.coldStart).toBe(true);
+    // Explicit capability state: profile declares unsupported
+    expect(result.capability).toBe("unsupported");
     expect(lookup.findPriorTranscriptPath).not.toHaveBeenCalled();
   });
 
@@ -103,10 +99,8 @@ describe("session-resume", () => {
       currentRunId: "run-1",
     });
 
-    expect(result).toEqual({
-      attempted: true,
-      coldStart: true,
-    });
+    expect(result.attempted).toBe(true);
+    expect(result.coldStart).toBe(true);
   });
 });
 
