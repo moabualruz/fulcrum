@@ -1,6 +1,6 @@
 import { assertEmbeddingDimension, DEFAULT_EMBEDDING_DIMENSION } from "../../inference/model-metadata.ts";
 import type { MemoryImportance } from "../../db/entities/memory/enums.ts";
-import { cosineSimilarity, hybridScore } from "./hybrid-scoring.ts";
+import { cosineSimilarity, hybridScore, normalizeBm25 } from "./hybrid-scoring.ts";
 
 const DEFAULT_K1 = 1.5;
 const DEFAULT_B = 0.75;
@@ -227,7 +227,8 @@ export function rankMemoryMatchesHybrid<TMemory extends HybridMemoryRankInput>(
 
   const ranked = tokenized.map(({ memory }, i) => {
     const cosine = cosineSimilarity(queryEmbedding as number[], memory.embedding);
-    const hybridBase = hybridScore(bm25Scores[i] ?? 0, maxBm25, cosine);
+    const normalizedBm25 = normalizeBm25(bm25Scores[i] ?? 0, maxBm25);
+    const hybridBase = hybridScore(normalizedBm25, cosine, { useEmbeddings: true });
     const recencyBoost = recencyBoostForDate(memory.createdAt, now);
     const importanceBoost_ = importanceBoostFor(memory.importance);
     const score = hybridBase + recencyBoost + importanceBoost_;

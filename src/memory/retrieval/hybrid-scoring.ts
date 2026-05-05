@@ -1,15 +1,19 @@
 /**
- * Hybrid scoring — gated by FULCRUM_FEATURES=embeddings.
+ * Hybrid scoring — gated by FULCRUM_FEATURES=embeddings (D-26).
  *
- * Formula: score = 0.6 * normalize(bm25) + 0.4 * cosine(queryEmbed, memoryEmbed)
- * Recency and importance boosts remain additive on top.
+ * Weights updated per D-26:
+ *   FTS_WEIGHT    = 0.3  (was 0.6)
+ *   COSINE_WEIGHT = 0.7  (was 0.4)
+ *
+ * When useEmbeddings=false: returns FTS score only (weight 1.0), cosine ignored.
+ * When useEmbeddings=true:  returns 0.3 * normalize(bm25) + 0.7 * cosine.
  *
  * normalize(bm25) = bm25 / max(bm25) within result set; 0 when max is 0.
  * Cosine similarity: dot(a,b) / (|a| * |b|); 0 when either vector is zero-length.
  */
 
-const BM25_WEIGHT = 0.6;
-const COSINE_WEIGHT = 0.4;
+export const FTS_WEIGHT = 0.3;
+export const COSINE_WEIGHT = 0.7;
 
 export function cosineSimilarity(a: readonly number[], b: readonly number[]): number {
   if (a.length === 0 || b.length === 0) return 0;
@@ -37,10 +41,21 @@ export function normalizeBm25(score: number, maxScore: number): number {
   return score / maxScore;
 }
 
+/**
+ * Hybrid score with embeddings flag gate.
+ *
+ * @param ftsScore   - Normalized BM25/FTS score in [0, 1]
+ * @param cosineScore - Cosine similarity in [0, 1]
+ * @param options.useEmbeddings - When false, returns ftsScore only (FTS-only path)
+ */
 export function hybridScore(
-  bm25: number,
-  maxBm25: number,
-  cosine: number,
+  ftsScore: number,
+  cosineScore: number,
+  options: { useEmbeddings: boolean },
 ): number {
-  return BM25_WEIGHT * normalizeBm25(bm25, maxBm25) + COSINE_WEIGHT * cosine;
+  if (!options.useEmbeddings) {
+    // FTS-only path: no embeddings computed for this tenant
+    return ftsScore;
+  }
+  return FTS_WEIGHT * ftsScore + COSINE_WEIGHT * cosineScore;
 }
