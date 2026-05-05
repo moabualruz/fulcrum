@@ -15,13 +15,26 @@ export class Migration20260505100000_phase5_schema_extensions extends Migration 
   static isLossy = false;
 
   override async up(): Promise<void> {
+    // ── projects base table ──────────────────────────────────────────────────
+    // Fresh test databases may not have the product-kernel projects table yet.
+    this.addSql(`
+      create table if not exists "projects" (
+        "id" uuid not null default gen_random_uuid(),
+        "org_id" uuid not null references "orgs" ("id") on delete cascade,
+        "name" text not null default 'Untitled project',
+        "created_at" timestamptz not null default now(),
+        "updated_at" timestamptz not null default now(),
+        primary key ("id")
+      )
+    `);
+
     // ── tasks table extensions ────────────────────────────────────────────────
     this.addSql(`alter table "tasks" add column if not exists "due_date" date null`);
     this.addSql(`alter table "tasks" add column if not exists "start_date" date null`);
     this.addSql(`alter table "tasks" add column if not exists "started_at" timestamptz null`);
     this.addSql(`alter table "tasks" add column if not exists "assignee_id" uuid null`);
     this.addSql(`alter table "tasks" add column if not exists "labels" text[] not null default '{}'`);
-    this.addSql(`alter table "tasks" add column if not exists "project_id" uuid null references "projects" ("id") on delete set null`);
+    this.addSql(`alter table "tasks" add column if not exists "project_id" uuid null`);
     this.addSql(`alter table "tasks" add column if not exists "task_type" varchar(32) not null default 'task'`);
     this.addSql(`alter table "tasks" add column if not exists "sequence_number" integer null`);
     this.addSql(`alter table "tasks" add column if not exists "archived_at" timestamptz null`);
@@ -36,9 +49,6 @@ export class Migration20260505100000_phase5_schema_extensions extends Migration 
     this.addSql(`alter table "tasks" add constraint "tasks_task_type_check" check ("task_type" in ('epic','task','subtask','bug'))`);
 
     // Indexes on tasks
-    this.addSql(
-      `create unique index if not exists "projects_org_key" on "projects" ("org_id", "key") where "key" is not null`,
-    );
     this.addSql(
       `create unique index if not exists "tasks_project_sequence" on "tasks" ("project_id", "sequence_number") where "sequence_number" is not null`,
     );
@@ -60,6 +70,17 @@ export class Migration20260505100000_phase5_schema_extensions extends Migration 
     // methodology check constraint
     this.addSql(`alter table "projects" drop constraint if exists "projects_methodology_check"`);
     this.addSql(`alter table "projects" add constraint "projects_methodology_check" check ("methodology" in ('scrum','kanban','none'))`);
+    this.addSql(
+      `create unique index if not exists "projects_org_key" on "projects" ("org_id", "key") where "key" is not null`,
+    );
+    this.addSql(`
+      do $$
+      begin
+        if not exists (select 1 from pg_constraint where conname = 'tasks_project_id_foreign') then
+          alter table "tasks" add constraint "tasks_project_id_foreign" foreign key ("project_id") references "projects" ("id") on delete set null;
+        end if;
+      end $$
+    `);
 
     // ── sprints table extensions ──────────────────────────────────────────────
     this.addSql(`alter table "sprints" add column if not exists "retrospective_notes" jsonb null`);
@@ -87,7 +108,7 @@ export class Migration20260505100000_phase5_schema_extensions extends Migration 
       do $$
       begin
         create extension if not exists pg_trgm;
-      exception when insufficient_privilege or undefined_file then
+      exception when insufficient_privilege or undefined_file or feature_not_supported then
         raise warning 'pg_trgm extension unavailable — duplicate detection will use ILIKE fallback';
       end $$;
     `);

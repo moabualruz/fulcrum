@@ -92,7 +92,7 @@ Cross-cutting constraints:
   3. Dynamic WORKFLOW.md reload functional; stall detection checks last_codex_timestamp first
   4. noSandbox + claudeCode dispatches task end-to-end, harvests artifacts
   5. HTTP server extension responds at all 4 endpoints; approval posture documented
-**Plans:** 7 plans (6 complete + 1 gap closure)
+**Plans:** 7 plans (7 complete)
 Plans:
 
 **Wave 1**
@@ -110,7 +110,7 @@ Plans:
 - [x] 03-06-PLAN.md — HTTP extension server, dispatchRun tRPC, CLI/TUI/Web dispatch surfaces (SYM-25..27, SND-06)
 
 **Gap Closure**
-- [ ] 03-07-PLAN.md — SYM-12 + SYM-13 gap closure
+- [x] 03-07-PLAN.md — SYM-12 + SYM-13 gap closure
 
 ### Phase 4: Inference + Router/Skills
 **Goal**: Inference sidecar hardened, router + skills fully wired across surfaces
@@ -300,7 +300,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Architecture + Security | 10/10 | Complete | 2026-05-04 |
 | 2. Bug Fixes + Foundation | 8/8 | Complete | 2026-05-04 |
-| 3. Symphony + Sandcastle | 6/7 | Complete (1 gap closure pending) | 2026-05-05 |
+| 3. Symphony + Sandcastle | 7/7 | Complete | 2026-05-05 |
 | 4. Inference + Router/Skills | 8/8 | Complete | 2026-05-05 |
 | 5. Task Management + Metrics | 16/16 | Complete   | 2026-05-05 |
 | 6. Documents + Memory + Search | 10/10 | Complete   | 2026-05-05 |

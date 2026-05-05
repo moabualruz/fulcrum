@@ -126,6 +126,7 @@ describe("Sprint migration constraints", () => {
       expect(columns.rows.map((row) => row.column_name)).toEqual([
         "capacity_points",
         "closed_at",
+        "closed_summary",
         "created_at",
         "end_date",
         "goal",
@@ -135,6 +136,7 @@ describe("Sprint migration constraints", () => {
         "org_id",
         "project_id",
         "retro_doc_id",
+        "retrospective_notes",
         "start_date",
         "status",
         "updated_at",

@@ -68,7 +68,7 @@ export class SearchDocument {
   @Property({ type: "json", nullable: true })
   metadata?: Record<string, unknown>;
 
-  @Property({ nullable: true })
+  @Property({ type: "datetime", nullable: true })
   updatedAt?: Date;
 
   @Property({ type: "string", fieldName: "project_id", nullable: true })

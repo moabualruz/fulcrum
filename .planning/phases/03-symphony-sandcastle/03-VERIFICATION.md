@@ -1,42 +1,18 @@
 ---
 phase: 03-symphony-sandcastle
-verified: 2026-05-05T01:00:00Z
-status: gaps_found
-score: 30/33 must-haves verified
+verified: 2026-05-05T22:04:55Z
+status: verified
+score: 33/33 must-haves verified
 overrides_applied: 0
-gaps:
-  - truth: "All 4 lifecycle hooks (after_create, before_run, after_run, before_remove) with timeout config"
-    status: failed
-    reason: "hooks.ts LifecycleHookName type defines before_run | after_run | before_remove | on_failure | on_cancel — after_create is absent from the type and from dispatchLifecycleHook dispatch logic. after_create appears only as a string field in workflow-runtime.ts WorkflowHooksSchema but is never dispatched by the hooks engine."
-    artifacts:
-      - path: "src/orchestration/symphony/hooks.ts"
-        issue: "LifecycleHookName union missing after_create; only before_run | after_run | before_remove | on_failure | on_cancel defined"
-      - path: "src/orchestration/symphony/workflow-runtime.ts"
-        issue: "WorkflowHooksSchema declares after_create: z.string().optional() but no downstream dispatch caller"
-    missing:
-      - "Add after_create to LifecycleHookName type in hooks.ts"
-      - "Dispatch after_create hook in createWorkspace or dispatch.ts when created_now=true (per SPEC §10.3)"
-      - "Add conformance test asserting after_create is called only on new workspace creation"
-
-  - truth: "Workspace safety: cwd == workspace_path enforced before agent launch, path inside root, key sanitized [A-Za-z0-9._-]"
-    status: partial
-    reason: "Key sanitization ([A-Za-z0-9._-]) is implemented and tested. app-server-client sets cwd=workspacePath correctly. assertWorkspacePathInOrgRoot exists in workspace.ts but is only called inside destroyWorkspace — NOT called before agent launch in createWorkspace or dispatchCandidate. The pre-launch path-inside-root guard required by SPEC §10.2 (cwd == workspace_path enforced before agent launch) is absent."
-    artifacts:
-      - path: "src/orchestration/symphony/workspace.ts"
-        issue: "assertWorkspacePathInOrgRoot only called in destroyWorkspace (line 120), not in createWorkspace or before agent launch"
-      - path: "src/orchestration/symphony/dispatch.ts"
-        issue: "dispatchCandidate calls createWorkspace then dispatchToRunner with no path-inside-root assertion between them"
-    missing:
-      - "Call assertWorkspacePathInOrgRoot (or equivalent) in createWorkspace after computing workspacePath, before mkdir"
-      - "Add conformance test: workspace path outside org root throws before agent launch"
+gaps: []
 ---
 
 # Phase 03: Symphony + Sandcastle Verification Report
 
 **Phase Goal:** Symphony orchestrator + Sandcastle run contract — workflow runtime, native tracker, orchestrator lifecycle, Codex JSONL client, sandbox providers, HTTP API, CLI/TUI/Web dispatch parity
-**Verified:** 2026-05-05T01:00:00Z
-**Status:** gaps_found
-**Re-verification:** No — initial verification
+**Verified:** 2026-05-05T22:04:55Z
+**Status:** verified
+**Re-verification:** Yes — gap closure verified by `bun test src/orchestration/__tests__/symphony-conformance.test.ts` (85 pass, 0 fail)
 
 ## Goal Achievement
 
@@ -55,8 +31,8 @@ gaps:
 | 9 | Run-attempt lifecycle states PreparingWorkspace→terminal (SYM-09) | VERIFIED | ATTEMPT_LIFECYCLE_STATES in states.ts; AgentRun.attemptLifecycleState; migration confirmed |
 | 10 | Continuation retry at 1000ms fixed delay (SYM-10) | VERIFIED | scheduleContinuationRetry in retry.ts; conformance test asserts nextRetryAt == now+1000ms |
 | 11 | Failure retry exponential formula min(10000*2^(attempt-1), cap) (SYM-11) | VERIFIED | calcRetryDelay + scheduleRetry in retry.ts; conformance test asserts [10000,20000,80000,300000] |
-| 12 | Workspace safety: cwd==workspace_path before launch, path inside root, key sanitized (SYM-12) | PARTIAL | sanitizeWorkspaceKey and key sanitization work; cwd set via workspacePath in app-server-client; BUT assertWorkspacePathInOrgRoot not called before launch — only on destroy |
-| 13 | All 4 lifecycle hooks after_create/before_run/after_run/before_remove with timeout (SYM-13) | FAILED | hooks.ts LifecycleHookName missing after_create; dispatch.ts never calls after_create; SPEC §10.3 requires it on new workspace creation |
+| 12 | Workspace safety: cwd==workspace_path before launch, path inside root, key sanitized (SYM-12) | VERIFIED | `createWorkspace` calls `assertWorkspacePathInOrgRoot` before mkdir; conformance tests cover inside/outside paths and pre-set unsafe workspace rejection |
+| 13 | All 4 lifecycle hooks after_create/before_run/after_run/before_remove with timeout (SYM-13) | VERIFIED | `LifecycleHookName` includes `after_create`; `dispatchCandidate` dispatches `after_create` between workspace creation and `before_run`; conformance tests cover ordering |
 | 14 | Strict prompt rendering unknown variables fail (SYM-14) | VERIFIED | UnknownVariableError via strict Liquid renderer; tests pass |
 | 15 | Candidate sorting priority asc→created_at oldest→identifier lexicographic (SYM-15) | VERIFIED | fetchSymphonyIssues sorts correctly; conformance tests pass |
 | 16 | Blocker rule: Todo state with non-terminal blockers = ineligible (SYM-16) | VERIFIED | tracker.ts filters based on blocker terminal status; tests pass |
@@ -78,7 +54,7 @@ gaps:
 | 32 | Session JSONL capture and resumeSession (SND-05) | VERIFIED | session-resume.ts exposes resumeVia: thread/resume | transcript-path | unsupported |
 | 33 | Web + CLI + TUI can all dispatch agent runs through canonical tRPC path (SND-06) | VERIFIED | dispatchRun in orchestration.ts; CLI symphony.ts runs dispatch; TUI dispatch(); Web +page.server.ts action |
 
-**Score:** 31/33 truths verified (SYM-12 partial, SYM-13 failed)
+**Score:** 33/33 truths verified
 
 ### Required Artifacts
 
@@ -90,8 +66,8 @@ gaps:
 | `src/orchestration/symphony/dispatch.ts` | VERIFIED | reconcileRunningIssues, validateRuntimeConfig, dispatchCandidate sequence |
 | `src/orchestration/symphony/retry.ts` | VERIFIED | scheduleContinuationRetry, scheduleRetry, calcRetryDelay |
 | `src/orchestration/symphony/stall.ts` | VERIFIED | scanForStalledRuns with lastCodexTimestamp override |
-| `src/orchestration/symphony/workspace.ts` | PARTIAL | sanitizeWorkspaceKey, createWorkspace, sweepTerminalWorkspaces — but assertWorkspacePathInOrgRoot not called pre-launch |
-| `src/orchestration/symphony/hooks.ts` | PARTIAL | before_run/after_run/before_remove/on_failure/on_cancel — after_create MISSING from type and dispatch |
+| `src/orchestration/symphony/workspace.ts` | VERIFIED | sanitizeWorkspaceKey, createWorkspace with pre-mkdir root assertion, sweepTerminalWorkspaces |
+| `src/orchestration/symphony/hooks.ts` | VERIFIED | after_create/before_run/after_run/before_remove/on_failure/on_cancel lifecycle hooks with timeout config |
 | `src/orchestration/symphony/app-server-protocol.ts` | VERIFIED | parseMessage, thread/tokenUsage/updated, all protocol schemas |
 | `src/orchestration/symphony/app-server-client.ts` | VERIFIED | CodexAppServerClient, bash -lc spawn, thread/start, thread/resume |
 | `src/orchestration/symphony/http-server.ts` | VERIFIED | 127.0.0.1 default, /api/v1/state, /api/v1/refresh |
@@ -105,7 +81,7 @@ gaps:
 | `src/tui/screens/orchestration.ts` | VERIFIED | dispatch() method via caller abstraction |
 | `src/web/src/routes/orchestration/+page.server.ts` | VERIFIED | dispatch action calls tRPC dispatchRun |
 | `src/db/entities/orchestration/AgentRun.ts` | VERIFIED | attemptLifecycleState, lastCodexTimestamp, threadId fields |
-| `src/orchestration/__tests__/symphony-conformance.test.ts` | VERIFIED | 80 tests covering §17.1-17.7 |
+| `src/orchestration/__tests__/symphony-conformance.test.ts` | VERIFIED | 85 tests covering §17.1-17.7 plus SYM-12/SYM-13 gap closure |
 | `docs/symphony-conformance.md` | VERIFIED | Generated; contains workflow path selection, reload, approval/sandbox posture |
 | `scripts/ci.ts` | VERIFIED | symphony:conformance stage present |
 
@@ -120,8 +96,8 @@ gaps:
 | `TUI orchestration.ts` | `tRPC dispatchRun` | caller.orchestration.dispatch | VERIFIED |
 | `Web +page.server.ts` | `tRPC dispatchRun` | caller.orchestration.dispatchRun | VERIFIED |
 | `http-server.ts` | `createHttpApiRoutes` | product-kernel/symphony/http-api.ts | VERIFIED |
-| `hooks.ts dispatchLifecycleHook` | `after_create hook` | LifecycleHookName | FAILED — after_create not in type |
-| `workspace.ts createWorkspace` | `assertWorkspacePathInOrgRoot` | pre-launch path check | FAILED — only called in destroyWorkspace |
+| `hooks.ts dispatchLifecycleHook` | `after_create hook` | LifecycleHookName | VERIFIED |
+| `workspace.ts createWorkspace` | `assertWorkspacePathInOrgRoot` | pre-launch path check | VERIFIED |
 
 ### Data-Flow Trace (Level 4)
 
@@ -151,8 +127,8 @@ Step 7b: SKIPPED — requires running server/real Codex binary. No runnable entr
 | SYM-09 | 03-03 | SATISFIED | AttemptLifecycleState + entity field |
 | SYM-10 | 03-03 | SATISFIED | scheduleContinuationRetry 1000ms |
 | SYM-11 | 03-03 | SATISFIED | calcRetryDelay exponential formula verified |
-| SYM-12 | 03-03 | PARTIAL | Key sanitized, cwd set — pre-launch path-inside-root assertion missing |
-| SYM-13 | 03-03 | BLOCKED | after_create not in LifecycleHookName; not dispatched on workspace creation |
+| SYM-12 | 03-07 | SATISFIED | Pre-launch path-inside-root assertion before mkdir; unsafe pre-set workspace path rejected |
+| SYM-13 | 03-07 | SATISFIED | after_create hook name, timeout config, and dispatch ordering implemented |
 | SYM-14 | 03-01 | SATISFIED | strict Liquid renderer UnknownVariableError |
 | SYM-15 | 03-02 | SATISFIED | fetchSymphonyIssues sort order |
 | SYM-16 | 03-02 | SATISFIED | blocker terminal check |
@@ -178,8 +154,7 @@ Step 7b: SKIPPED — requires running server/real Codex binary. No runnable entr
 
 | File | Pattern | Severity | Impact |
 |------|---------|----------|--------|
-| `src/orchestration/symphony/workflow-runtime.ts:78` | `after_create: z.string().optional()` declared in schema but no downstream hook dispatch | WARNING | after_create silently no-ops at runtime; schema creates false expectation |
-| REQUIREMENTS.md lines 82-86,92 | 6 requirements marked `[ ]` unchecked despite implementation existing (SYM-09,10,11,12,13,19) | INFO | Stale checkbox state; SYM-09/10/11/19 are actually implemented and tested; SYM-12/13 are real gaps |
+| None | No open Phase 03 conformance anti-patterns after 03-07 gap closure | INFO | 85 conformance tests pass |
 
 ### Human Verification Required
 
@@ -187,17 +162,9 @@ None — all checkable items verified programmatically.
 
 ### Gaps Summary
 
-Two blockers prevent full SYM-01..27 conformance:
-
-**BLOCKER 1 — SYM-13: after_create hook not implemented.**
-The SPEC §10.3 requires after_create to run only on new workspace creation (created_now=true). The workflow-runtime schema accepts the config field but `hooks.ts` LifecycleHookName type excludes after_create entirely — it cannot be dispatched. Fix: add after_create to LifecycleHookName, call it from dispatch flow after createWorkspace when workspace was newly created.
-
-**BLOCKER 2 — SYM-12: Pre-launch path-inside-root assertion absent.**
-SPEC §10.2 requires cwd==workspace_path enforced BEFORE agent launch and path must be inside org root. `assertWorkspacePathInOrgRoot` exists but is only called in destroyWorkspace. createWorkspace computes the path inside orgRoot by construction but never asserts it. Fix: call assertWorkspacePathInOrgRoot inside createWorkspace after computing workspacePath, before mkdir; add conformance test for out-of-root path rejection.
-
-**Note on REQUIREMENTS.md checkbox state:** SYM-09, SYM-10, SYM-11, and SYM-19 are marked `[ ]` in REQUIREMENTS.md but implementations and tests are fully present and passing. These checkboxes appear to be stale documentation rather than implementation gaps. The actual implementation gaps are only SYM-12 and SYM-13.
+No remaining Phase 03 conformance gaps. SYM-12 and SYM-13 were closed by 03-07 and verified with 85 passing conformance tests.
 
 ---
 
-_Verified: 2026-05-05T01:00:00Z_
+_Verified: 2026-05-05T22:04:55Z_
 _Verifier: Claude (gsd-verifier)_
