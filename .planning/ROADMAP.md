@@ -15,7 +15,7 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
 - [x] **Phase 1: Architecture Convergence + Security** - Single data layer, service layer, unified events, module boundaries, security fixes
 - [x] **Phase 2: Bug Fixes + Foundation** - 18 bugs fixed, foundation infrastructure in place
 - [x] **Phase 3: Symphony + Sandcastle** - Full SPEC.md conformance with native tracker + agent dispatch infrastructure (completed 2026-05-05)
-- [ ] **Phase 4: Inference + Router/Skills** - Inference sidecar hardened, router + skills wired
+- [x] **Phase 4: Inference + Router/Skills** - Inference sidecar hardened, router + skills wired (completed 2026-05-05)
 - [ ] **Phase 5: Task Management + Metrics** - Task comments/watchers, charts, sprint features, custom fields
 - [ ] **Phase 6: Documents + Memory + Search** - Editor verification, memory engine, unified search, Cmd+K
 - [ ] **Phase 7: Repos + Artifacts + Notifications** - Git sync, artifact pipeline, notification delivery
