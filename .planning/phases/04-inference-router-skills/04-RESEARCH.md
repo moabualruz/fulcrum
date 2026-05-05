@@ -414,17 +414,17 @@ CREATE INDEX IF NOT EXISTS doc_embeddings_hnsw
 |---|-------|---------|---------------|
 | A1 | UI wording like "Run MCP skill" would indicate descriptor/invocation confusion. | Common Pitfalls | Low; validation can inspect final UI copy. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Linux static proof path**
    - What we know: INF-02 requires automated macOS + Linux proof; local Rust toolchain exists, but Docker/cross were not found. [VERIFIED: 04-CONTEXT.md, command probes]
-   - What's unclear: whether planner should install `cross`, use a remote builder, or add a script that runs in CI-like Linux environment. [ASSUMED]
-   - Recommendation: add a Wave 0 environment/toolchain task before implementation. [VERIFIED: command probes]
+   - Decision: Phase 4 plans must implement a repeatable Linux proof path, not a fail-closed placeholder. Use a Linux builder path that can run locally when Docker is available and on native Linux without Docker. The proof script should support: native Linux build/smoke when `process.platform === "linux"`; otherwise Docker-backed Linux build/smoke using a pinned Rust Linux builder image. If neither path is available, the task remains incomplete and INF-02 cannot close. [RESOLVED]
+   - Planning consequence: add concrete Wave 0/build task for `scripts/phase-04-static-build-proof.ts` and any supporting Dockerfile/script. Final verification must require macOS and Linux proof passing with artifact path/version/target output. [RESOLVED]
 
 2. **Fastembed major upgrade**
    - What we know: repo uses `fastembed = "4"` and crates.io latest is 5.13.4. [VERIFIED: Cargo.toml, crates.io search]
-   - What's unclear: whether v5 API/runtime changes are worth taking in Phase 4. [ASSUMED]
-   - Recommendation: keep v4 unless real-call tests expose a blocker; do not mix upgrade with acceptance hardening. [ASSUMED]
+   - Decision: keep `fastembed = "4"` for Phase 4 acceptance hardening. Do not combine a major dependency upgrade with embedding dimension/schema/routing work unless real-call tests expose a blocker that cannot be fixed on v4. [RESOLVED]
+   - Planning consequence: include real fastembed call and cosine proof against current v4; any v5 upgrade becomes separate follow-up unless required to pass INF-05/INF-06. [RESOLVED]
 
 ## Environment Availability
 
