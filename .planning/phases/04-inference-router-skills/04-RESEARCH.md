@@ -419,7 +419,7 @@ CREATE INDEX IF NOT EXISTS doc_embeddings_hnsw
 1. **Linux static proof path**
    - What we know: INF-02 requires automated macOS + Linux proof; local Rust toolchain exists, but Docker/cross were not found. [VERIFIED: 04-CONTEXT.md, command probes]
    - Decision: Phase 4 plans must implement a repeatable Linux proof path, not a fail-closed placeholder. Use a Linux builder path that can run locally when Docker is available and on native Linux without Docker. The proof script should support: native Linux build/smoke when `process.platform === "linux"`; otherwise Docker-backed Linux build/smoke using a pinned Rust Linux builder image. If neither path is available, the task remains incomplete and INF-02 cannot close. [RESOLVED]
-   - Planning consequence: add concrete Wave 0/build task for `scripts/phase-04-static-build-proof.ts` and any supporting Dockerfile/script. Final verification must require macOS and Linux proof passing with artifact path/version/target output. [RESOLVED]
+   - Planning consequence: add concrete Wave 0/build task for `scripts/static-build-proof.ts` and any supporting Dockerfile/script. Final verification must require macOS and Linux proof passing with artifact path/version/target output. [RESOLVED]
 
 2. **Fastembed major upgrade**
    - What we know: repo uses `fastembed = "4"` and crates.io latest is 5.13.4. [VERIFIED: Cargo.toml, crates.io search]
@@ -487,8 +487,8 @@ CREATE INDEX IF NOT EXISTS doc_embeddings_hnsw
 - [ ] `src/inference/embedding-dimension.test.ts` — covers INF-01/INF-06 model metadata + write/read/search.
 - [ ] `src/skills/mcp-virtual-skills.test.ts` — covers RTR-05 descriptor-only registry.
 - [ ] `src/skills/lock-enforcement.test.ts` — covers RTR-07 expected/actual fail-closed.
-- [ ] `scripts/phase-04-static-build-proof.ts` — covers INF-02 platform proof.
-- [ ] `evals/phase-04-router.promptfooconfig.yaml` — covers AI-SPEC LLM fallback evals.
+- [ ] `scripts/static-build-proof.ts` — covers INF-02 platform proof.
+- [ ] `evals/router-llm-eval.promptfooconfig.yaml` — covers AI-SPEC LLM fallback evals.
 
 ## Security Domain
 

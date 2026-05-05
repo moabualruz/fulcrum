@@ -78,6 +78,10 @@ import { FeatureFlagRollout } from "./entities/platform/FeatureFlagRollout.ts";
 // Skills registry entities (P5#02).
 import { FulcrumSkill } from "./entities/skills/FulcrumSkill.ts";
 import { SkillVersion } from "./entities/skills/SkillVersion.ts";
+import { McpVirtualSkill } from "./entities/skills/McpVirtualSkill.ts";
+import { SkillConflict } from "./entities/skills/SkillConflict.ts";
+import { RoutingDraft } from "./entities/router/RoutingDraft.ts";
+import { RoutingAudit } from "./entities/router/RoutingAudit.ts";
 
 export {
   SchemaMigration,
@@ -133,6 +137,10 @@ export {
   FeatureFlagRollout,
   FulcrumSkill,
   SkillVersion,
+  McpVirtualSkill,
+  SkillConflict,
+  RoutingDraft,
+  RoutingAudit,
 };
 
 /** Allowed options for createOrmConfig(). */
@@ -222,6 +230,10 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     FeatureFlagRollout,
     FulcrumSkill,
     SkillVersion,
+    McpVirtualSkill,
+    SkillConflict,
+    RoutingDraft,
+    RoutingAudit,
   ];
 
   const allEntities: Options["entities"] = [...new Set([...builtinEntities, ...entities])];

@@ -55,6 +55,7 @@ function makeContainer(): Container {
         vectors: texts.map(() => [0.1, 0.2, 0.3]),
         model: "BAAI/bge-small-en-v1.5",
         cached: false,
+        dimensions: 3,
       }),
       generate: async () => generateResult,
       classify: async () => [
@@ -398,6 +399,7 @@ describe("inference tRPC router", () => {
           vectors: texts.map(() => [0.4, 0.5, 0.6]),
           model: "class-token-model",
           cached: true,
+          dimensions: 3,
         }),
         generate: async () => generateResult,
         classify: async () => [{ label: "bug", score: 1 }],
@@ -425,6 +427,7 @@ describe("inference tRPC router", () => {
       vectors: [[0.4, 0.5, 0.6]],
       model: "class-token-model",
       cached: true,
+      dimensions: 3,
     });
     await expect(caller.inference.generate({ prompt: "The capital of France is" }))
       .resolves.toEqual(generateResult);
@@ -464,6 +467,19 @@ describe("inference tRPC router", () => {
         `inference-server binary not found: ${missingServer}`,
       );
     });
+  });
+
+  test("backend.probe returns BackendHealth array with backend and status fields", async () => {
+    const container = makeContainer();
+    const caller = createCaller(container);
+
+    const backends = await caller.inference.backends.probe();
+    expect(Array.isArray(backends)).toBe(true);
+    for (const b of backends as Array<Record<string, unknown>>) {
+      const entry = b as Record<string, string>;
+      expect(typeof entry.backend).toBe("string");
+      expect(["running", "stopped", "degraded", "unavailable", "unconfigured"] as string[]).toContain(entry.status!);
+    }
   });
 
   test("empty containers use backend defaults and default client fallback", async () => {

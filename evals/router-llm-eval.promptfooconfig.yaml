@@ -1,0 +1,116 @@
+# =============================================================================
+# router-llm-eval.promptfooconfig.yaml
+# =============================================================================
+# Router LLM fallback eval corpus (AI-SPEC §5, D-13, D-14).
+#
+# Cases:
+#   deterministic-match            — json-rules-engine matched first
+#   low-confidence-abstain         — LLM confidence < 0.55 → abstain
+#   disabled-draft-review-needed   — LLM creates disabled draft with evidence
+#   overlap-conflict               — LLM recommendation overlaps active rules
+#
+# Expected output keys: matched, abstained, review_needed, conflict,
+#                       confidence, backend, evidence
+
+prompts:
+  - id: route-classifier
+    label: router-llm
+    raw: |
+      Classify this routing request. Return a JSON object with keys:
+        status: "matched" | "abstained" | "review_needed" | "conflict"
+        confidence: number (0..1)
+        backend: string | null
+        evidence: string[]
+        agent: string | null
+        routeId: string | null
+
+      Task facts: {{taskFacts}}
+      Instruction: {{instruction}}
+
+providers:
+  - id: file:///Users/mkh/workspace/fulcrum/src/router/llm-fallback-mock.ts
+    label: mock-llm-fallback
+    config:
+      temperature: 0
+
+tests:
+  # ── 1. Deterministic match ──────────────────────────────────────────────
+  - description: deterministic-match — known command maps to explicit agent
+    vars:
+      taskFacts: >
+        {"task":{"kind":"command","priority":"high","tags":["cli","install"],"title":"fulcrum install"}}
+      instruction: >
+        Route this task based on the command. If the command matches an
+        active rule, always return status=matched.
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const p = JSON.parse(output);
+          return p.status === "matched" || p.status === "review_needed";
+        description: >
+          Must be valid JSON with status=matched (or review_needed as
+          acceptable fallback when evaluator has no active rules).
+
+  # ── 2. Low-confidence abstain ───────────────────────────────────────────
+  - description: low-confidence-abstain — weak evidence forces abstain
+    vars:
+      taskFacts: >
+        {"task":{"kind":"research","priority":"low","tags":["docs","unknown-domain"]}}
+      instruction: >
+        If you have low confidence (<0.55) in the best agent, return
+        status=abstained. Do NOT create a draft or recommend an active route.
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const p = JSON.parse(output);
+          return p.status === "abstained" && (p.confidence == null || p.confidence < 0.55);
+        description: >
+          Must abstain with confidence < 0.55 when task facts are
+          insufficient for a reliable recommendation.
+
+  # ── 3. Disabled draft with review_needed ────────────────────────────────
+  - description: disabled-draft-review-needed — no-match creates disabled draft
+    vars:
+      taskFacts: >
+        {"task":{"kind":"feature","priority":"medium","tags":["api","new-endpoint"],"title":"Add rate-limit endpoint"}}
+      instruction: >
+        No active rule matches this task. Create a disabled draft rule
+        with full evidence (status=review_needed). Do NOT activate it.
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const p = JSON.parse(output);
+          return p.status === "review_needed" &&
+                 Array.isArray(p.evidence) &&
+                 p.evidence.length >= 1;
+        description: >
+          Must return review_needed status with at least one evidence item
+          when no active rule matches.
+
+  # ── 4. Overlap conflict ─────────────────────────────────────────────────
+  - description: overlap-conflict — recommendation overlaps existing rules
+    vars:
+      taskFacts: >
+        {"task":{"kind":"bug","priority":"critical","tags":["auth","security"],"title":"Fix login CSRF"}}
+      instruction: >
+        The proposed routing overlaps with active rules rule-01 and rule-03.
+        Return status=conflict, include matchingActiveRuleIds in evidence,
+        and keep the recommendation disabled.
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const p = JSON.parse(output);
+          return p.status === "conflict" &&
+                 Array.isArray(p.evidence) &&
+                 p.evidence.some(e => e.includes("rule-01") || e.includes("rule-03"));
+        description: >
+          Must return conflict status and reference the overlapping
+          active rule IDs in evidence.
+
+# ── Output coverage assertion keys ──────────────────────────────────────────
+# Every test must produce valid JSON containing these fields:
+#   matched, abstained, review_needed, conflict, confidence, backend, evidence

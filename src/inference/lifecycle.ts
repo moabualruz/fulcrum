@@ -10,6 +10,7 @@ import {
   InferenceResponseSchema,
   encodeJsonRpcFrame,
 } from "./protocol.ts";
+import { getRoutingConfig } from "./routing-config.ts";
 
 export interface InferenceRunning {
   pid: number;
@@ -267,6 +268,23 @@ const defaultLifecycle = new InferenceLifecycle();
 
 export function ensureRunning(): Promise<InferenceRunning> {
   return defaultLifecycle.ensureRunning();
+}
+
+/**
+ * Ensure the embedded sidecar is running, but only if the routing config
+ * selects "embedded" for embeddings or router-llm. External backends are
+ * probed only — never auto-spawned (D-01, D-02).
+ */
+export async function ensureRunningIfEmbedded(): Promise<InferenceRunning | null> {
+  const config = getRoutingConfig();
+  const embedBackend = config["embeddings"];
+  const llmBackend = config["router-llm"];
+  const needsEmbedded = embedBackend === "embedded" || llmBackend === "embedded";
+
+  if (needsEmbedded) {
+    return defaultLifecycle.ensureRunning();
+  }
+  return null;
 }
 
 export function status(): Promise<InferenceStatus> {

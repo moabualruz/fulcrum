@@ -30,14 +30,36 @@ type RoutingDecision = {
   confidence: number | null;
 };
 
+// Enriched decision for draft views (D-26)
+type RoutingEnrichedDecision = {
+  status: string;
+  matchedRuleId: string | null;
+  draftId: string | null;
+  factsUsed: JsonRecord;
+  confidence: number | null;
+  backend: string | null;
+  model: string | null;
+  whyUnmatched: string | null;
+  evidence: string[];
+};
+
 type RoutingCaller = {
   routing: {
     list: (input?: JsonRecord) => Promise<RoutingRuleRow[]>;
     create: (input: JsonRecord) => Promise<RoutingRuleRow>;
     update: (input: JsonRecord) => Promise<RoutingRuleRow | null>;
     delete: (input: { id: string }) => Promise<{ ok: true }>;
-    test: (input: { taskId: string }) => Promise<RoutingDecision | null>;
-    dryRun: (input: { taskJson: JsonRecord }) => Promise<RoutingDecision | null>;
+    test: (input: { taskId: string }) => Promise<RoutingEnrichedDecision | null>;
+    dryRun: (input: { taskJson: JsonRecord }) => Promise<RoutingEnrichedDecision | null>;
+    drafts: {
+      list: (input?: JsonRecord) => Promise<RoutingEnrichedDecision[]>;
+      approve: (input: { draftId: string }) => Promise<{ ok: boolean }>;
+      delete: (input: { draftId: string }) => Promise<{ ok: boolean }>;
+      update: (input: JsonRecord) => Promise<{ ok: boolean }>;
+    };
+    config: {
+      updateLlmGate: (input: JsonRecord) => Promise<{ ok: boolean }>;
+    };
   };
 };
 
@@ -60,6 +82,14 @@ Usage:
   fulcrum routing rules delete <id> [--json]
   fulcrum routing assign <task-id> [--json]
   fulcrum routing simulate --task-json <json|@file.json> [--json]
+
+  fulcrum routing drafts list [--status <review_needed|conflict|abstained>] [--json]
+  fulcrum routing drafts approve <draft-id> [--json]
+  fulcrum routing drafts update <draft-id> [--conditions <json>] [--action-agent <n>] [--json]
+  fulcrum routing drafts delete <draft-id> [--json]
+
+  fulcrum routing llm-gate get [--json]
+  fulcrum routing llm-gate set --input-mode <task_facts|task_plus_history|full_context> [--enabled <true|false>] [--json]
 
 Aliases:
   create=add, update=edit, test=assign, dry-run=simulate
@@ -133,6 +163,101 @@ export async function run(
     return;
   }
 
+  // ── Drafts scope (D-25) ─────────────────────────────────────────────
+
+  if (scope === "drafts") {
+    const [verb = "help", ...args] = rest;
+    switch (verb) {
+      case "list":
+        return withErrors("drafts list", runOpts, async () => {
+          const caller = await resolveCaller(runOpts);
+          const result = await caller.routing.drafts.list(compact({
+            status: flagValue(args, "--status"),
+          }));
+          printOutput(result, args, print, formatDrafts);
+        });
+      case "approve":
+        return withErrors("drafts approve", runOpts, async () => {
+          const draftId = requireArg(args, 0, "drafts approve", "<draft-id>");
+          const caller = await resolveCaller(runOpts);
+          const result = await caller.routing.drafts.approve({ draftId });
+          printOutput(result, args, print, () => `Approved draft ${draftId}.`);
+        });
+      case "update":
+        return withErrors("drafts update", runOpts, async () => {
+          const draftId = requireArg(args, 0, "drafts update", "<draft-id>");
+          const conditions = await optionalJsonFlag(args, "--conditions");
+          const actionAgent = flagValue(args, "--action-agent");
+          const caller = await resolveCaller(runOpts);
+          const result = await caller.routing.drafts.update(compact({
+            draftId,
+            conditionsJson: conditions,
+            actionAgent,
+          }));
+          printOutput(result, args, print, () => `Updated draft ${draftId}.`);
+        });
+      case "delete":
+        return withErrors("drafts delete", runOpts, async () => {
+          const draftId = requireArg(args, 0, "drafts delete", "<draft-id>");
+          const caller = await resolveCaller(runOpts);
+          const result = await caller.routing.drafts.delete({ draftId });
+          printOutput(result, args, print, () => `Deleted draft ${draftId}.`);
+        });
+      case "help":
+      case "--help":
+      case "-h":
+        print(HELP);
+        return;
+      default:
+        printErr(`fulcrum routing drafts: unknown command '${verb}'`);
+        printErr(HELP);
+        exit(2);
+    }
+    return;
+  }
+
+  // ── LLM gate scope (D-15, D-16) ─────────────────────────────────────
+
+  if (scope === "llm-gate") {
+    const [verb = "help", ...args] = rest;
+    switch (verb) {
+      case "get":
+        return withErrors("llm-gate get", runOpts, async () => {
+          const features = (process.env["FULCRUM_FEATURES"] ?? "").split(",").map((f) => f.trim());
+          const enabled = features.includes("router-llm");
+          const inputMode = process.env["FULCRUM_LLM_INPUT_MODE"] ?? "full_context";
+          const gateInfo = { enabled, inputMode, labels: [] as string[] };
+          if (!enabled) gateInfo.labels.push("unavailable");
+          printOutput(gateInfo, args, print, (value) => {
+            const info = value as { enabled: boolean; inputMode: string };
+            return `LLM gate: ${info.enabled ? "enabled" : "disabled"} (input mode: ${info.inputMode})`;
+          });
+        });
+      case "set":
+        return withErrors("llm-gate set", runOpts, async () => {
+          const inputMode = flagValue(args, "--input-mode") as "task_facts" | "task_plus_history" | "full_context" | undefined;
+          const enabledRaw = flagValue(args, "--enabled");
+          const enabled = enabledRaw === "true" ? true : enabledRaw === "false" ? false : undefined;
+          const caller = await resolveCaller(runOpts);
+          const result = await caller.routing.config.updateLlmGate(compact({
+            inputMode,
+            enabled,
+          }));
+          printOutput(result, args, print, () => "LLM gate updated.");
+        });
+      case "help":
+      case "--help":
+      case "-h":
+        print(HELP);
+        return;
+      default:
+        printErr(`fulcrum routing llm-gate: unknown command '${verb}'`);
+        printErr(HELP);
+        exit(2);
+    }
+    return;
+  }
+
   switch (scope) {
     case "assign":
     case "test":
@@ -156,7 +281,7 @@ async function runAssign(
     const taskId = requireArg(argv, 0, command, "<task-id>");
     const caller = await resolveCaller(opts);
     const result = await caller.routing.test({ taskId });
-    printOutput(result, argv, opts.print, formatDecision);
+    printOutput(result, argv, opts.print, formatEnrichedDecision);
   });
 }
 
@@ -170,7 +295,7 @@ async function runSimulate(
     const taskJson = await parseJsonReference(raw, "--task-json");
     const caller = await resolveCaller(opts);
     const result = await caller.routing.dryRun({ taskJson });
-    printOutput(result, argv, opts.print, formatDecision);
+    printOutput(result, argv, opts.print, formatEnrichedDecision);
   });
 }
 
@@ -294,6 +419,35 @@ function formatDecision(value: unknown): string {
     `source: ${decision.source}`,
     `ruleId: ${decision.ruleId ?? ""}`,
     `confidence: ${decision.confidence ?? ""}`,
+  ].join("\n");
+}
+
+function formatEnrichedDecision(value: unknown): string {
+  const decision = value as RoutingEnrichedDecision | null;
+  if (!decision) return "No routing decision.";
+  const labels: string[] = [];
+  if (decision.status === "no_match" || decision.status === "abstained") labels.push("abstained");
+  if (decision.backend === null && decision.status === "no_match") labels.push("unavailable");
+  return [
+    `status: ${decision.status}`,
+    `confidence: ${decision.confidence ?? ""}`,
+    ...(decision.matchedRuleId ? [`ruleId: ${decision.matchedRuleId}`] : []),
+    ...(decision.draftId ? [`draftId: ${decision.draftId}`] : []),
+    ...(decision.backend ? [`backend: ${decision.backend}`] : []),
+    ...(decision.model ? [`model: ${decision.model}`] : []),
+    ...(decision.whyUnmatched ? [`why: ${decision.whyUnmatched}`] : []),
+    ...(labels.length > 0 ? [`labels: ${labels.join(",")}`] : []),
+  ].join("\n");
+}
+
+function formatDrafts(value: unknown): string {
+  const drafts = Array.isArray(value) ? value as RoutingEnrichedDecision[] : [];
+  if (drafts.length === 0) return "No drafts found.";
+  return [
+    "DRAFT ID  STATUS  CONFIDENCE  MATCHED RULE",
+    ...drafts.map((d) =>
+      `${d.draftId ?? ""}  ${d.status}  ${d.confidence ?? ""}  ${d.matchedRuleId ?? ""}`
+    ),
   ].join("\n");
 }
 

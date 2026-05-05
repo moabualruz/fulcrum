@@ -1,3 +1,4 @@
+import { assertEmbeddingDimension, DEFAULT_EMBEDDING_DIMENSION } from "../../inference/model-metadata.ts";
 import type { MemoryImportance } from "../../db/entities/memory/enums.ts";
 import { cosineSimilarity, hybridScore } from "./hybrid-scoring.ts";
 
@@ -200,6 +201,12 @@ export function rankMemoryMatchesHybrid<TMemory extends HybridMemoryRankInput>(
   queryEmbedding: readonly number[],
   options: RankHybridOptions = {},
 ): HybridRankedMemoryMatch<TMemory>[] {
+  // Validate dimensions before scoring — fail closed per D-07
+  assertEmbeddingDimension(queryEmbedding as number[], DEFAULT_EMBEDDING_DIMENSION);
+  for (const mem of memories) {
+    assertEmbeddingDimension(mem.embedding, DEFAULT_EMBEDDING_DIMENSION);
+  }
+
   const queryTerms = tokenize(query);
   const now = options.now ?? new Date();
   const k1 = options.k1 ?? DEFAULT_K1;

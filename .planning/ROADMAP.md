@@ -108,22 +108,22 @@ Cross-cutting constraints:
 **Plans:** 8 plans
 Plans:
 **Wave 1**
-- [ ] 04-01-PLAN.md — Wave 0 validation scaffolds for static proof, embeddings, router evals, MCP, and lock gates
-- [ ] 04-02-PLAN.md — Embedding model metadata and 384-dimension write/read/search enforcement
+- [x] 04-01-PLAN.md — Wave 0 validation scaffolds for static proof, embeddings, router evals, MCP, and lock gates (completed 2026-05-05)
+- [x] 04-02-PLAN.md — Embedding model metadata and 384-dimension write/read/search enforcement
 
 **Wave 2**
-- [ ] 04-03-PLAN.md — Inference backend health, CLI, tRPC, doctor, and static proof command
-- [ ] 04-05-PLAN.md — MCP virtual skills plus skill lock/sync fail-closed supply-chain controls
+- [x] 04-03-PLAN.md — Inference backend health, CLI, tRPC, doctor, and static proof command (completed 2026-05-05)
+- [x] 04-05-PLAN.md — MCP virtual skills plus skill lock/sync fail-closed supply-chain controls
 
 **Wave 3**
-- [ ] 04-04-PLAN.md — Router decision service, disabled learned drafts, conflicts, audit, and LLM fallback safety
+- [x] 04-04-PLAN.md — Router decision service, disabled learned drafts, conflicts, audit, and LLM fallback safety
 
 **Wave 4**
-- [ ] 04-06-PLAN.md — Routing/skills tRPC plus CLI/TUI parity
-- [ ] 04-07-PLAN.md — Web routing editor and inference backend status UI
+- [x] 04-06-PLAN.md — Routing/skills tRPC plus CLI/TUI parity
+- [x] 04-07-PLAN.md — Web routing editor and inference backend status UI
 
 **Wave 5**
-- [ ] 04-08-PLAN.md — Root wiring, LangGraph boundary guard, parity tests, and final verification gates
+- [x] 04-08-PLAN.md — Root wiring, LangGraph boundary guard, parity tests, and final verification gates
 
 ### Phase 5: Task Management + Metrics
 **Goal**: Task pillar feature-complete with comments, watchers, charts, sprint features
@@ -215,7 +215,7 @@ Plans:
 | 1. Architecture + Security | 0/10 | Planned | - |
 | 2. Bug Fixes + Foundation | 8/8 | Complete | 2026-05-04 |
 | 3. Symphony + Sandcastle | 6/6 | Complete   | 2026-05-05 |
-| 4. Inference + Router/Skills | 0/? | Not started | - |
+| 4. Inference + Router/Skills | 8/8 | Complete | 2026-05-05 |
 | 5. Task Management + Metrics | 0/? | Not started | - |
 | 6. Documents + Memory + Search | 0/? | Not started | - |
 | 7. Repos + Artifacts + Notifications | 0/? | Not started | - |

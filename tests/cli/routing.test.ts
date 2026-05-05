@@ -15,11 +15,16 @@ type RoutingRule = {
   updatedAt: string;
 };
 
-type RoutingDecision = {
-  ruleId: string | null;
-  source: "explicit" | "rule" | "learned" | "llm-fallback" | "manual";
-  agent: string;
+type RoutingEnrichedDecision = {
+  status: string;
+  matchedRuleId: string | null;
+  draftId: string | null;
+  factsUsed: Record<string, unknown>;
   confidence: number | null;
+  backend: string | null;
+  model: string | null;
+  whyUnmatched: string | null;
+  evidence: string[];
 };
 
 type RoutingCaller = {
@@ -28,8 +33,17 @@ type RoutingCaller = {
     create: (input: Record<string, unknown>) => Promise<RoutingRule>;
     update: (input: Record<string, unknown>) => Promise<RoutingRule | null>;
     delete: (input: { id: string }) => Promise<{ ok: true }>;
-    test: (input: { taskId: string }) => Promise<RoutingDecision | null>;
-    dryRun: (input: { taskJson: Record<string, unknown> }) => Promise<RoutingDecision | null>;
+    test: (input: { taskId: string }) => Promise<RoutingEnrichedDecision | null>;
+    dryRun: (input: { taskJson: Record<string, unknown> }) => Promise<RoutingEnrichedDecision | null>;
+    drafts: {
+      list: (input?: Record<string, unknown>) => Promise<RoutingEnrichedDecision[]>;
+      approve: (input: { draftId: string }) => Promise<{ ok: boolean }>;
+      delete: (input: { draftId: string }) => Promise<{ ok: boolean }>;
+      update: (input: Record<string, unknown>) => Promise<{ ok: boolean }>;
+    };
+    config: {
+      updateLlmGate: (input: Record<string, unknown>) => Promise<{ ok: boolean }>;
+    };
   };
 };
 
@@ -86,11 +100,20 @@ function fakeCaller(): RoutingCaller & { calls: Array<{ procedure: string; input
       },
       test: async (input) => {
         calls.push({ procedure: "routing.test", input });
-        return { ruleId: RULE_ID, source: "rule", agent: "codex", confidence: 1 };
+        return { status: "matched", matchedRuleId: RULE_ID, draftId: null, factsUsed: {}, confidence: 1, backend: null, model: null, whyUnmatched: null, evidence: ["matched"] };
       },
       dryRun: async (input) => {
         calls.push({ procedure: "routing.dryRun", input });
-        return { ruleId: RULE_ID, source: "rule", agent: "codex", confidence: 1 };
+        return { status: "matched", matchedRuleId: RULE_ID, draftId: null, factsUsed: {}, confidence: 1, backend: null, model: null, whyUnmatched: null, evidence: ["matched"] };
+      },
+      drafts: {
+        list: async (input) => { calls.push({ procedure: "routing.drafts.list", input }); return []; },
+        approve: async (input) => { calls.push({ procedure: "routing.drafts.approve", input }); return { ok: true }; },
+        delete: async (input) => { calls.push({ procedure: "routing.drafts.delete", input }); return { ok: true }; },
+        update: async (input) => { calls.push({ procedure: "routing.drafts.update", input }); return { ok: true }; },
+      },
+      config: {
+        updateLlmGate: async (input) => { calls.push({ procedure: "routing.config.updateLlmGate", input }); return { ok: true }; },
       },
     },
   };
@@ -206,7 +229,7 @@ describe("routing rules CLI", () => {
     expect(stdout.join("\n")).toContain(`Deleted routing rule ${RULE_ID}.`);
   });
 
-  test("assign maps to routing.test and prints decision", async () => {
+  test("assign maps to routing.test and prints enriched decision", async () => {
     const { caller, stdout, exitCode } = await runRouting(["assign", TASK_ID]);
 
     expect(exitCode).toBeUndefined();
@@ -214,8 +237,8 @@ describe("routing rules CLI", () => {
       procedure: "routing.test",
       input: { taskId: TASK_ID },
     });
-    expect(stdout.join("\n")).toContain("agent: codex");
-    expect(stdout.join("\n")).toContain("source: rule");
+    expect(stdout.join("\n")).toContain("status: matched");
+    expect(stdout.join("\n")).toContain("confidence: 1");
   });
 
   test("simulate maps to routing.dryRun and prints JSON decision", async () => {
@@ -232,7 +255,9 @@ describe("routing rules CLI", () => {
       procedure: "routing.dryRun",
       input: { taskJson: { title: "Fix auth", kind: "bug", priority: "high", tags: ["auth"] } },
     });
-    expect(JSON.parse(stdout[0]!).agent).toBe("codex");
+    const parsed = JSON.parse(stdout[0]!);
+    expect(parsed.status).toBe("matched");
+    expect(parsed.matchedRuleId).toBe(RULE_ID);
   });
 
   test("invalid conditions JSON exits before tRPC call", async () => {

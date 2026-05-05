@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import type { InferenceClient } from "../../../inference/client.ts";
+import type { BackendHealth } from "../../../inference/backends/types.ts";
 import {
   BackendSchema,
   ClassifyResultSchema,
@@ -215,6 +216,27 @@ const SetProviderInputSchema = z.object({
   key: z.string().min(1),
 });
 
+const BackendProbeResultSchema = z.object({
+  ok: z.boolean(),
+  model: z.string().optional(),
+  dimensions: z.number().optional(),
+  error: z.string().optional(),
+  durationMs: z.number().optional(),
+});
+
+const BackendHealthSchema = z.object({
+  backend: z.enum(["embedded", "ollama", "lm-studio", "openai-compatible"]),
+  configured: z.boolean(),
+  enabled: z.boolean(),
+  status: z.enum(["running", "stopped", "degraded", "unavailable", "unconfigured"]),
+  reason: z.string().nullable(),
+  model: z.string().nullable(),
+  embedProbe: BackendProbeResultSchema.nullable(),
+  generateProbe: BackendProbeResultSchema.nullable(),
+  dimensions: z.number().nullable(),
+  lastChecked: z.string().nullable(),
+});
+
 export const inferenceRouter = t.router({
   health: publicProcedure
     .output(HealthResultSchema)
@@ -301,6 +323,13 @@ export const inferenceRouter = t.router({
         const client = await resolveBoundClient(ctx);
         if (client) return client.listBackends();
         return defaultBackends(ctx);
+      }),
+
+    probe: publicProcedure
+      .output(z.array(BackendHealthSchema))
+      .query(async () => {
+        const { probeConfiguredBackends } = await import("../../../inference/backend-probes.ts");
+        return probeConfiguredBackends() as Promise<BackendHealth[]>;
       }),
   }),
 

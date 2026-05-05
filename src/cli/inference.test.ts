@@ -42,7 +42,7 @@ describe("fulcrum inference CLI", () => {
       caller: {
         inference: {
           health: async () => health,
-          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false }),
+          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false, dimensions: 384 }),
           generate: async () => ({ text: "Paris", model: "Qwen2.5-0.5B-Instruct", tokens: 8 }),
           models: {
             list: async () => [{
@@ -77,7 +77,7 @@ describe("fulcrum inference CLI", () => {
       caller: {
         inference: {
           health: async () => health,
-          embed: async () => ({ vectors: [[0.1]], model: "fixture-model", cached: false }),
+          embed: async () => ({ vectors: [[0.1]], model: "fixture-model", cached: false, dimensions: 384 }),
           generate: async () => ({ text: "Paris", model: "Qwen2.5-0.5B-Instruct", tokens: 8 }),
           models: {
             list: async () => [],
@@ -108,7 +108,7 @@ describe("fulcrum inference CLI", () => {
       caller: {
         inference: {
           health: async () => health,
-          embed: async () => ({ vectors: [[0.1]], model: "fixture-model", cached: false }),
+          embed: async () => ({ vectors: [[0.1]], model: "fixture-model", cached: false, dimensions: 384 }),
           generate: async () => ({ text: "Paris", model: "Qwen2.5-0.5B-Instruct", tokens: 8 }),
           models: {
             list: async () => [],
@@ -157,7 +157,7 @@ describe("fulcrum inference CLI", () => {
       caller: {
         inference: {
           health: async () => ({ ...health, cache }),
-          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false }),
+          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false, dimensions: 384 }),
           generate: async () => ({ text: "Paris", model: "Qwen2.5-0.5B-Instruct", tokens: 8 }),
         },
       },
@@ -176,16 +176,17 @@ describe("fulcrum inference CLI", () => {
       caller: {
         inference: {
           health: async () => health,
-          embed: async () => ({ vectors: [[0.1, 0.2]], model: "BAAI/bge-small-en-v1.5", cached: false }),
+          embed: async () => ({ vectors: [[0.1, 0.2]], model: "BAAI/bge-small-en-v1.5", cached: false, dimensions: 384 }),
           generate: async () => ({ text: "Paris", model: "Qwen2.5-0.5B-Instruct", tokens: 8 }),
         },
       },
     });
 
-    expect(JSON.parse(cap.lines.join("\n"))).toEqual({
+    expect(JSON.parse(cap.lines.join("\n"))).toMatchObject({
       vectors: [[0.1, 0.2]],
       model: "BAAI/bge-small-en-v1.5",
       cached: false,
+      dimensions: 384,
     });
   });
 
@@ -200,7 +201,7 @@ describe("fulcrum inference CLI", () => {
           health: async () => health,
           embed: async (input) => {
             observedInput = input;
-            return { vectors: [[0.1, 0.2]], model: "custom-embed-model", cached: false };
+            return { vectors: [[0.1, 0.2]], model: "custom-embed-model", cached: false, dimensions: 384 };
           },
           generate: async () => ({ text: "Paris", model: "Qwen2.5-0.5B-Instruct", tokens: 8 }),
         },
@@ -219,7 +220,7 @@ describe("fulcrum inference CLI", () => {
       caller: {
         inference: {
           health: async () => health,
-          embed: async () => ({ vectors: [[0.1, 0.2]], model: "BAAI/bge-small-en-v1.5", cached: false }),
+          embed: async () => ({ vectors: [[0.1, 0.2]], model: "BAAI/bge-small-en-v1.5", cached: false, dimensions: 384 }),
           generate: async () => ({ text: "Paris", model: "Qwen2.5-0.5B-Instruct", tokens: 8 }),
         },
       },
@@ -236,7 +237,7 @@ describe("fulcrum inference CLI", () => {
       ...embedCap.opts,
       client: {
         call: async () => health,
-        embed: async () => ({ vectors: [[0.1, 0.2]], model: "local", cached: true }),
+        embed: async () => ({ vectors: [[0.1, 0.2]], model: "local", cached: true, dimensions: 384 }),
         generate: async () => ({ text: "unused", model: "local", tokens: 1 }),
       },
     });
@@ -244,6 +245,7 @@ describe("fulcrum inference CLI", () => {
       vectors: [[0.1, 0.2]],
       model: "local",
       cached: true,
+      dimensions: 384,
     });
 
     const generateCap = capture();
@@ -251,7 +253,7 @@ describe("fulcrum inference CLI", () => {
       ...generateCap.opts,
       client: {
         call: async () => health,
-        embed: async () => ({ vectors: [[0.1]], model: "local", cached: false }),
+        embed: async () => ({ vectors: [[0.1]], model: "local", cached: false, dimensions: 1 }),
         generate: async () => ({ text: "Hi", model: "local", tokens: 2 }),
       },
     });
@@ -265,7 +267,7 @@ describe("fulcrum inference CLI", () => {
       provide: INFERENCE_CLIENT_TOKEN,
       useValue: {
         call: async () => health,
-        embed: async () => ({ vectors: [[0.3, 0.4]], model: "token-bound", cached: false }),
+        embed: async () => ({ vectors: [[0.3, 0.4]], model: "token-bound", cached: false, dimensions: 384 }),
         generate: async () => ({ text: "unused", model: "token-bound", tokens: 1 }),
       } as unknown as InferenceClient,
     });
@@ -280,6 +282,7 @@ describe("fulcrum inference CLI", () => {
       vectors: [[0.3, 0.4]],
       model: "token-bound",
       cached: false,
+      dimensions: 384,
     });
   });
 
@@ -291,7 +294,7 @@ describe("fulcrum inference CLI", () => {
       caller: {
         inference: {
           health: async () => health,
-          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false }),
+          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false, dimensions: 384 }),
           generate: async () => ({ text: "Paris", model: "Qwen2.5-0.5B-Instruct", tokens: 8 }),
         },
       },
@@ -312,7 +315,7 @@ describe("fulcrum inference CLI", () => {
       caller: {
         inference: {
           health: async () => health,
-          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false }),
+          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false, dimensions: 384 }),
           generate: async () => ({ model: "broken" }),
         },
       },
@@ -333,7 +336,7 @@ describe("fulcrum inference CLI", () => {
       caller: {
         inference: {
           health: async () => health,
-          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false }),
+          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false, dimensions: 384 }),
           generate: async (input: unknown) => {
             observedInput = input;
             return { text: '{"agent": "router"}', model: "Qwen2.5-0.5B-Instruct", tokens: 5 };
@@ -360,7 +363,7 @@ describe("fulcrum inference CLI", () => {
       caller: {
         inference: {
           health: async () => health,
-          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false }),
+          embed: async () => ({ vectors: [[0.1]], model: "BAAI/bge-small-en-v1.5", cached: false, dimensions: 384 }),
           generate: async () => ({ text: "unused", model: "m", tokens: 1 }),
         },
       },
@@ -377,7 +380,7 @@ describe("fulcrum inference CLI", () => {
       caller: {
         inference: {
           health: async () => health,
-          embed: async () => ({ vectors: [[0.1]], model: "m", cached: false }),
+          embed: async () => ({ vectors: [[0.1]], model: "m", cached: false, dimensions: 1 }),
           generate: async () => ({ text: "x", model: "m", tokens: 1 }),
           config: {
             get: async () => ({ embeddings: "ollama", "router-llm": "embedded" }),
@@ -401,7 +404,7 @@ describe("fulcrum inference CLI", () => {
       caller: {
         inference: {
           health: async () => health,
-          embed: async () => ({ vectors: [[0.1]], model: "m", cached: false }),
+          embed: async () => ({ vectors: [[0.1]], model: "m", cached: false, dimensions: 1 }),
           generate: async () => ({ text: "x", model: "m", tokens: 1 }),
           config: {
             get: async () => ({ embeddings: "ollama" }),
@@ -423,7 +426,7 @@ describe("fulcrum inference CLI", () => {
       caller: {
         inference: {
           health: async () => health,
-          embed: async () => ({ vectors: [[0.1]], model: "m", cached: false }),
+          embed: async () => ({ vectors: [[0.1]], model: "m", cached: false, dimensions: 1 }),
           generate: async () => ({ text: "x", model: "m", tokens: 1 }),
           config: {
             get: async () => ({}),

@@ -43,6 +43,7 @@ describe("embed operation", () => {
       ],
       model: "BAAI/bge-small-en-v1.5",
       cached: false,
+      dimensions: 2,
     });
   });
 

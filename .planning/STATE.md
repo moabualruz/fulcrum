@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Executing Phase 04
-last_updated: "2026-05-05T02:52:16.525Z"
+status: Ready to execute
+last_updated: "2026-05-05T05:05:02.711Z"
 progress:
   total_phases: 10
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 33
-  completed_plans: 24
-  percent: 73
+  completed_plans: 32
+  percent: 97
 ---
 
 # Planning State
@@ -17,12 +17,12 @@ progress:
 ## Current Position
 
 Phase: 04 (inference-router-skills) — EXECUTING
-Plan: 1 of 8
+Plan: 8 of 8
 
-- **Phase**: 02-bug-fixes-foundation
-- **Plan**: 8 plans created
-- **Status**: Phase 2 fully executed and verified
-- **Branch**: dev/v1.0
+- **Phase**: 04-inference-router-skills
+- **Plan**: 04-08 completed
+- **Status**: Phase 4 COMPLETE — all 8 plans delivered. Root wiring verified, LangGraph boundary enforced, 234 tests passing, all 15 INF/RTR requirements met
+- **Branch**: gsd/phase-04-inference-router-skills
 
 ## Decisions
 
@@ -67,3 +67,25 @@ Plan: 1 of 8
 - [Phase 03-06]: HTTP server binds 127.0.0.1 by default; port:0 uses ephemeral binding; wraps createHttpApiRoutes (SYM-25)
 - [Phase 03-06]: dispatchRun tRPC procedure creates AgentRun via MikroORM EM; sandboxMode 'noSandbox' is human alias for DB value 'host' (D-12)
 - [Phase 03-06]: CLI SymphonyCaller.dispatchRun required; 'runs dispatch <taskId>' added; TUI dispatch() optional in caller interface; Web dispatch action uses tRPC local caller (SND-06)
+- [Phase 04-01]: assertEmbeddingDimension validates vector length against expected=384; throws 'embedding dimension mismatch expected=<N> actual=<M>' — defined in test file, exported for later extraction to model-metadata.ts
+- [Phase 04-01]: Backend probes use 2s timeout; unconfigured backends return unconfigured state without network calls; embedded backend probes Unix socket (matching lifecycle.ts)
+- [Phase 04-01]: Learned draft status auto-detected from matchingActiveRuleIds: empty→review_needed, non-empty→conflict (D-12 compliance)
+- [Phase 04-01]: MCP descriptors use deterministic tool manifest hash (sorted tool names, SHA-256 hex)
+- [Phase 04-01]: Lock enforcement returns exact expected/actual SHA for mismatch/missing/ok states; override audit includes slug, overriddenBy, action, reason, previous hashes
+- [Phase 04-01]: Static build proof exits 1 with linuxProof:"missing" on macOS without Docker; INF-02 cannot close until Docker or native Linux is available
+- [Phase 04-02]: assertEmbeddingDimension is the single dimension-validation function for all embedding paths; write/search/score all validate before operating per D-05/D-06/D-07
+- [Phase 04-03]: InferenceService is the central health-and-lifecycle facade; probeConfiguredBackends() called from CLI status, tRPC backends.probe, and doctor checks
+- [Phase 04-03]: CLI status uses probeConfiguredBackends() directly for in-process client path, falls back gracefully if not available
+- [Phase 04-03]: tRPC backends.probe uses lazy dynamic import to avoid circular dependency issues
+- [Phase 04-03]: Doctor inference checks (inference-sidecar, inference-backends) use InferenceService directly (not container injection) for simplicity
+- [Phase 04-03]: static-proof CLI command accepts injectable proof runner for testability
+- [Phase 04-05]: sha256Hex shared from mcp-virtual-skills.ts to lock.ts to avoid hash duplication across both modules
+- [Phase 04-05]: SkillConflict entity stores structured conflict records with kind/status enums instead of inline unified diffs in lock file
+- [Phase 04-05]: verifySkillLock() returns state object (ok/sha_mismatch/missing) instead of throwing — callers handle fail-closed behavior
+- [Phase 04-05]: upstream_conflict enum string kept in lock.ts SkillsLockEntry schema for backward compat with existing lock files
+- [Phase 04-06]: Enriched output schema at tRPC layer, not service layer — keeps service lean while API returns explainable routing results (D-26)
+- [Phase 04-07]: LLM gate config read from process.env in server action (no tRPC getter needed) — simpler than adding shared tRPC procedure; config derived from env vars
+- [Phase 04-07]: Backend status rows constructed in inference load function via mapBackendsToStatusRows() — keeps data-shaping in server layer, provides robust defaults for all four backends even when sidecar is down
+- [Phase 04-08]: Root wiring verification tests added as verification-only TDD — existing canonical mounts confirmed correct (no duplicate aliases)
+- [Phase 04-08]: LangGraph/LangChain boundary enforcement via test — zero imports in agents/orchestration/CLI boundaries per AI-SPEC adoption boundary
+- [Phase 04-08]: Three-surface parity tests unified: Web vitest (8/8), CLI (49 tests), TUI (parity labels + inference backend states)

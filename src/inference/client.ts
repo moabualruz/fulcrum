@@ -1,6 +1,7 @@
 import { injectable as Injectable } from "@needle-di/core";
 import net from "node:net";
 
+import { assertEmbeddingDimension, getEmbeddingModelMetadata } from "./model-metadata.ts";
 import { InferenceLifecycle, type InferenceRunning } from "./lifecycle.ts";
 import {
   BackendSchema,
@@ -32,6 +33,7 @@ export interface EmbeddingResponse {
   vector: number[];
   model?: string;
   cached?: boolean;
+  dimensions?: number;
 }
 
 export interface InferenceLifecycleLike {
@@ -136,18 +138,25 @@ function normalizeEmbedResult(result: unknown): EmbedResult {
     : Array.isArray(raw.vector)
       ? [raw.vector]
       : undefined;
+  const firstVector: number[] = Array.isArray(vectors) && vectors.length > 0 && Array.isArray(vectors[0])
+    ? vectors[0] as number[]
+    : [];
   return EmbedResultSchema.parse({
     vectors,
     model: raw.model ?? "embedded",
     cached: raw.cached ?? false,
+    dimensions: firstVector.length,
   });
 }
 
 function vectorFromEmbedResult(result: EmbedResult): EmbeddingResponse {
+  const vector = result.vectors[0] ?? [];
+  assertEmbeddingDimension(vector);
   return {
-    vector: result.vectors[0] ?? [],
+    vector,
     model: result.model,
     cached: result.cached,
+    dimensions: result.dimensions,
   };
 }
 

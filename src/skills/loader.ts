@@ -24,6 +24,7 @@ import { parseKernelMarkdown } from "../product-kernel/markdown.ts";
 import {
   readSkillsLockFile,
   skillsLockPath,
+  verifySkillLock,
   writeSkillsLockFile,
 } from "./lock.ts";
 
@@ -145,8 +146,11 @@ async function assertInstalledHashes(
     const path = await installedSkillPath(agent, slug);
     const content = await readIfExists(path);
     if (content === null) continue;
-    if (sha256(content) !== expectedHash) {
-      throw new Error(`Skill ${slug} hash mismatch at ${path}`);
+    const result = verifySkillLock(slug, expectedHash, content);
+    if (result.status !== "ok") {
+      throw new Error(
+        `Skill ${slug} hash mismatch at ${path}: expected=${result.expectedSha256} actual=${result.actualSha256} available=${result.available}`,
+      );
     }
   }
 }

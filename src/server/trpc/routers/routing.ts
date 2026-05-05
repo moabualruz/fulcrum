@@ -39,7 +39,61 @@ const RoutingRuleOutputSchema = z.object({
   updatedAt: z.date(),
 });
 
-const RoutingDecisionOutputSchema = z.object({
+// ── Enriched test/dryRun output (RTR-02, D-26) ──────────────────────────
+
+const RoutingResultStatusEnum = z.enum([
+  "matched",
+  "no_match",
+  "recommended",
+  "draft_created",
+  "conflict",
+  "abstained",
+]);
+
+const RoutingEnrichedOutputSchema = z.object({
+  status: RoutingResultStatusEnum,
+  matchedRuleId: z.string().nullable(),
+  draftId: z.string().nullable().default(null),
+  factsUsed: z.record(z.string(), z.unknown()).default({}),
+  confidence: z.number().nullable(),
+  backend: z.string().nullable().default(null),
+  model: z.string().nullable().default(null),
+  whyUnmatched: z.string().nullable().default(null),
+  evidence: z.array(z.string()).default([]),
+});
+
+// ── Draft procedures schemas (D-25, D-28) ───────────────────────────────
+
+const DraftListInputSchema = z.object({
+  orgId: UuidLikeSchema.optional(),
+  status: z.string().optional(),
+}).optional();
+
+const DraftApproveInputSchema = z.object({
+  draftId: UuidLikeSchema,
+});
+
+const DraftDeleteInputSchema = z.object({
+  draftId: UuidLikeSchema,
+});
+
+const DraftUpdateInputSchema = z.object({
+  draftId: UuidLikeSchema,
+  conditionsJson: ConditionsSchema.optional(),
+  actionAgent: z.string().optional(),
+  actionSkillSet: z.array(z.string()).optional(),
+});
+
+// ── LLM gate config schemas (D-15, D-16) ────────────────────────────────
+
+const LlmGateUpdateSchema = z.object({
+  inputMode: z.enum(["task_facts", "task_plus_history", "full_context"]).optional(),
+  enabled: z.boolean().optional(),
+});
+
+// ── Old decision output (backward compat for list/get) ──────────────────
+
+const OldRoutingDecisionOutputSchema = z.object({
   ruleId: UuidLikeSchema.nullable(),
   source: z.enum(["explicit", "rule", "learned", "llm-fallback", "manual"]),
   agent: z.string(),
@@ -63,6 +117,7 @@ const CreateInputSchema = z.object({
   priority: z.number().int().default(100),
   enabled: z.boolean().default(true),
   source: RoutingRuleSourceSchema.default(RoutingRuleSource.Manual),
+  dryRunId: z.string().uuid().optional(),
 });
 
 const UpdateInputSchema = z.object({
@@ -75,6 +130,7 @@ const UpdateInputSchema = z.object({
   priority: z.number().int().optional(),
   enabled: z.boolean().optional(),
   source: RoutingRuleSourceSchema.optional(),
+  dryRunId: z.string().uuid().optional(),
 });
 
 const TaskJsonSchema = z.object({
@@ -91,6 +147,7 @@ const DryRunInputSchema = z.object({ taskJson: TaskJsonSchema });
 
 type EntityManager = import("@mikro-orm/postgresql").EntityManager;
 type RoutingRuleOutput = z.infer<typeof RoutingRuleOutputSchema>;
+type RoutingEnrichedOutput = z.infer<typeof RoutingEnrichedOutputSchema>;
 
 function requireEntityManager(ctx: { em: EntityManager | null }): EntityManager {
   if (!ctx.em) {
@@ -186,6 +243,56 @@ function taskFactsFromJson(taskJson: z.infer<typeof TaskJsonSchema>): TaskFacts 
   };
 }
 
+/**
+ * Enrich a RoutingDecision into the enriched output schema.
+ * Uses autoAssign result and task facts to populate all fields.
+ */
+function enrichDecision(
+  decision: RoutingDecision | null,
+  taskFacts: TaskFacts,
+): RoutingEnrichedOutput {
+  if (!decision) {
+    return {
+      status: "no_match",
+      matchedRuleId: null,
+      draftId: null,
+      confidence: 0,
+      factsUsed: taskFacts as unknown as Record<string, unknown>,
+      evidence: ["no-match: routing returned null"],
+      whyUnmatched: "No routing decision was produced.",
+      backend: null,
+      model: null,
+    };
+  }
+
+  const isMatched = decision.ruleId !== null && decision.source !== "manual";
+  const status = isMatched ? "matched" as const : "no_match" as const;
+
+  return {
+    status,
+    matchedRuleId: decision.ruleId,
+    draftId: null,
+    confidence: decision.confidence,
+    factsUsed: taskFacts as unknown as Record<string, unknown>,
+    evidence: isMatched
+      ? [`matched rule ${decision.ruleId} with agent=${decision.agent} source=${decision.source} confidence=${decision.confidence}`]
+      : [`no-match: confidence=${decision.confidence}`],
+    whyUnmatched: isMatched
+      ? null
+      : `No matching rule found. Task kind=${taskFacts.task.kind} priority=${taskFacts.task.priority}.`,
+    backend: null,
+    model: null,
+  };
+}
+
+/** Check if a feature flag is enabled in FULCRUM_FEATURES. */
+function isFeatureEnabled(flag: string): boolean {
+  return (process.env["FULCRUM_FEATURES"] ?? "")
+    .split(",")
+    .map((f) => f.trim())
+    .includes(flag);
+}
+
 export const routingRouter = t.router({
   list: permissionedProcedure({ resource: "routing", action: "list" })
     .input(ListInputSchema)
@@ -272,10 +379,12 @@ export const routingRouter = t.router({
       return { ok: true as const };
     }),
 
+  // ── Enriched test/dryRun (D-26) ──────────────────────────────────────
+
   test: permissionedProcedure({ resource: "routing", action: "test" })
     .input(TestInputSchema)
-    .output(RoutingDecisionOutputSchema.nullable())
-    .mutation(async ({ ctx, input }): Promise<RoutingDecision | null> => {
+    .output(RoutingEnrichedOutputSchema)
+    .mutation(async ({ ctx, input }): Promise<RoutingEnrichedOutput> => {
       const em = requireEntityManager(ctx);
       configureRouting(em);
       const task = await em.findOne(Task, { id: input.taskId, org: ctx.orgId });
@@ -283,28 +392,123 @@ export const routingRouter = t.router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Task not found." });
       }
 
-      return autoAssign({
+      const taskFacts = taskFactsFromTask(task);
+      const decision = await autoAssign({
         taskId: task.id,
-        taskFacts: taskFactsFromTask(task),
+        taskFacts,
         orgId: ctx.orgId,
       });
+
+      return enrichDecision(decision, taskFacts);
     }),
 
   dryRun: permissionedProcedure({ resource: "routing", action: "dryRun" })
     .input(DryRunInputSchema)
-    .output(RoutingDecisionOutputSchema.nullable())
-    .query(async ({ ctx, input }): Promise<RoutingDecision | null> => {
+    .output(RoutingEnrichedOutputSchema)
+    .query(async ({ ctx, input }): Promise<RoutingEnrichedOutput> => {
       const em = requireEntityManager(ctx);
       configureRouting(em);
 
-      return autoAssign({
+      const taskFacts = taskFactsFromJson(input.taskJson);
+      const decision = await autoAssign({
         agentOverride: input.taskJson.agentOverride,
-        taskFacts: taskFactsFromJson(input.taskJson),
+        taskFacts,
         orgId: ctx.orgId,
         projectId: input.taskJson.projectId,
         dryRun: true,
       });
+
+      return enrichDecision(decision, taskFacts);
     }),
+
+  // ── Draft procedures (D-25, D-28) ─────────────────────────────────────
+
+  drafts: t.router({
+    list: permissionedProcedure({ resource: "routing", action: "list" })
+      .input(DraftListInputSchema)
+      .output(z.array(RoutingEnrichedOutputSchema))
+      .query(async () => {
+        // Stub: returns empty array until draft persistence is connected
+        // via RoutingDraft entity and RoutingService.createDraftFromNoMatch
+        return [];
+      }),
+
+    approve: permissionedProcedure({ resource: "routing", action: "create" })
+      .input(DraftApproveInputSchema)
+      .output(z.object({ ok: z.literal(true) }))
+      .mutation(async () => {
+        // Stub: approve delegates to RoutingService.approveDraft
+        // which is currently a no-op stub awaiting MikroORM connection
+        return { ok: true as const };
+      }),
+
+    delete: permissionedProcedure({ resource: "routing", action: "delete" })
+      .input(DraftDeleteInputSchema)
+      .output(z.object({ ok: z.literal(true) }))
+      .mutation(async () => {
+        // Stub: delete delegates to RoutingService.deleteDraft
+        // which is currently a no-op stub awaiting MikroORM connection
+        return { ok: true as const };
+      }),
+
+    update: permissionedProcedure({ resource: "routing", action: "update" })
+      .input(DraftUpdateInputSchema)
+      .output(z.object({ ok: z.literal(true) }))
+      .mutation(async () => {
+        // Stub: update modifies draft conditions/actions
+        // Connected in follow-up plan when persistence is wired
+        return { ok: true as const };
+      }),
+  }),
+
+  // ── LLM gate config procedures (D-15, D-16) ───────────────────────────
+
+  config: t.router({
+    updateLlmGate: permissionedProcedure({ resource: "routing", action: "update" })
+      .input(LlmGateUpdateSchema)
+      .output(z.object({ ok: z.literal(true) }))
+      .mutation(async ({ ctx, input }): Promise<{ ok: true }> => {
+        const em = requireEntityManager(ctx);
+
+        // Update FULCRUM_FEATURES env for router-llm toggle
+        if (input.enabled !== undefined) {
+          const currentFlags = (process.env["FULCRUM_FEATURES"] ?? "")
+            .split(",")
+            .map((f) => f.trim())
+            .filter((f) => f.length > 0 && f !== "router-llm");
+
+          if (input.enabled) {
+            currentFlags.push("router-llm");
+          }
+
+          process.env["FULCRUM_FEATURES"] = currentFlags.join(",");
+        }
+
+        // Update input mode via env (routing service reads from config)
+        if (input.inputMode !== undefined) {
+          process.env["FULCRUM_LLM_INPUT_MODE"] = input.inputMode;
+        }
+
+        // Log audit event
+        try {
+          const eventRepo = eventRepository(em);
+          const org = await em.findOne(Org, { id: ctx.orgId });
+          if (org) {
+            const event = em.create(Event, {
+              org,
+              verb: "llm_gate_updated",
+              subjectId: ctx.orgId,
+              metadata: input as Record<string, unknown>,
+            } as never);
+            await em.flush();
+          }
+        } catch {
+          // Audit event is best-effort — routing must not fail on audit failure
+        }
+
+        return { ok: true as const };
+      }),
+  }),
 });
 
 export type RoutingRouter = typeof routingRouter;

@@ -84,6 +84,31 @@ export type InferenceFeature =
   | "classify"
   | "tokenize";
 
+// ── Backend health / probe types ──────────────────────────────────────
+
+/** Result of a single probe call (embed or generate). */
+export interface BackendProbeResult {
+  ok: boolean;
+  model?: string;
+  dimensions?: number;
+  error?: string;
+  durationMs?: number;
+}
+
+/** Per-backend health state for surfaces (CLI, tRPC, doctor). */
+export interface BackendHealth {
+  readonly backend: BackendId;
+  readonly configured: boolean;
+  readonly enabled: boolean;
+  readonly status: "running" | "stopped" | "degraded" | "unavailable" | "unconfigured";
+  readonly reason: string | null;
+  readonly model: string | null;
+  readonly embedProbe: BackendProbeResult | null;
+  readonly generateProbe: BackendProbeResult | null;
+  readonly dimensions: number | null;
+  readonly lastChecked: string | null;
+}
+
 // ── Backend interface ──────────────────────────────────────────────────
 
 export interface InferenceBackend {

@@ -112,17 +112,22 @@ describe("embeddings gate", () => {
   test("hybrid search ranks paraphrase above keyword-absent", async () => {
     const db = await freshDb("hybrid");
     try {
+      // Helper: pad short vector to 384 dims (D-05: default fastembed=384)
+      function pad384(v: number[]): number[] {
+        return [...v, ...Array(384 - v.length).fill(0)];
+      }
+
       const sidecar = createMockSidecar({
         // Deterministic embeddings: paraphrase gets high cosine with query,
         // keyword match gets low cosine
         embed: async (text: string) => {
           if (text.includes("authentication") || text.includes("auth")) {
-            return [1, 0, 0, 0, 0, 0, 0, 0]; // "auth" direction
+            return pad384([1, 0, 0, 0, 0, 0, 0, 0]); // "auth" direction
           }
           if (text.includes("deploy") || text.includes("shipping")) {
-            return [0, 1, 0, 0, 0, 0, 0, 0]; // "deploy" direction
+            return pad384([0, 1, 0, 0, 0, 0, 0, 0]); // "deploy" direction
           }
-          return [0.5, 0.5, 0, 0, 0, 0, 0, 0]; // generic
+          return pad384([0.5, 0.5, 0, 0, 0, 0, 0, 0]); // generic
         },
       });
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
@@ -181,6 +186,32 @@ describe("embeddings gate", () => {
       expect(hits.length).toBeGreaterThan(0);
       // taskA (auth paraphrase) should be first
       expect(hits[0]!.id).toBe(taskA.id);
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("handleEmbedTaskJob rejects wrong-dimension embedding from sidecar", async () => {
+    const db = await freshDb("dim-reject-job");
+    try {
+      const sidecar = createMockSidecar({
+        embed: async () => [1, 2, 3], // 3-dim instead of 384
+      });
+      const org = await createLocalOrg(db, { slug: "o", name: "O" });
+      const project = await createProject(db, {
+        orgId: org.id,
+        slug: "p",
+        name: "P",
+      });
+      const task = await createTask(db, {
+        orgId: org.id,
+        projectId: project.id,
+        title: "Test",
+      });
+
+      await expect(handleEmbedTaskJob(db, sidecar, task.id)).rejects.toThrow(
+        "embedding dimension mismatch",
+      );
     } finally {
       await db.close();
     }
