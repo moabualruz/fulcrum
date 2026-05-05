@@ -1,0 +1,150 @@
+/**
+ * fulcrum my-work — show tasks assigned to current user.
+ *
+ * Usage:
+ *   fulcrum my-work [--format json|table]
+ *   fulcrum my-work --json
+ *
+ * Groups output: OVERDUE, DUE TODAY, THIS WEEK, LATER
+ * Each row: task ID (FUL-42), title, project name, due date, priority icon
+ */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyFn = (...args: any[]) => Promise<any>;
+
+export interface MyWorkRunOptions {
+  caller?: {
+    tasks: {
+      myWork: AnyFn;
+    };
+  };
+  print?: (line: string) => void;
+  printErr?: (line: string) => void;
+  exit?: (code: number) => void;
+}
+
+interface WorkTask {
+  id: string;
+  identifier?: string;
+  title: string;
+  projectName?: string;
+  dueDate?: string | null;
+  priority?: string;
+  status?: string;
+}
+
+const PRIORITY_ICONS: Record<string, string> = {
+  urgent: "🔴",
+  high: "🟠",
+  medium: "🟡",
+  low: "🔵",
+  none: "⚪",
+};
+
+const HELP = `fulcrum my-work
+
+Show tasks assigned to you.
+
+Usage:
+  fulcrum my-work [--format json|table]
+  fulcrum my-work --json
+
+Groups: OVERDUE, DUE TODAY, THIS WEEK, LATER
+`;
+
+export async function run(argv: readonly string[], opts: MyWorkRunOptions = {}): Promise<void> {
+  const { print = console.log, printErr = console.error, exit = process.exit } = opts;
+
+  if (argv.includes("--help") || argv.includes("-h")) {
+    print(HELP);
+    return;
+  }
+
+  const jsonMode = argv.includes("--json");
+  const formatIdx = argv.indexOf("--format");
+  const format = jsonMode ? "json" : (formatIdx >= 0 ? (argv[formatIdx + 1] ?? "table") : "table");
+
+  try {
+    const caller = await resolveCaller(opts);
+    const tasks: WorkTask[] = await caller.tasks.myWork({});
+
+    if (format === "json") {
+      print(JSON.stringify(tasks, null, 2));
+      return;
+    }
+
+    if (tasks.length === 0) {
+      print("No tasks assigned to you.");
+      return;
+    }
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekEnd = new Date(today);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+
+    const groups: Record<string, WorkTask[]> = {
+      "OVERDUE": [],
+      "DUE TODAY": [],
+      "THIS WEEK": [],
+      "LATER": [],
+    };
+
+    for (const task of tasks) {
+      if (!task.dueDate) {
+        groups["LATER"]!.push(task);
+        continue;
+      }
+      const due = new Date(task.dueDate);
+      const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+      if (dueDay < today) {
+        groups["OVERDUE"]!.push(task);
+      } else if (dueDay.getTime() === today.getTime()) {
+        groups["DUE TODAY"]!.push(task);
+      } else if (dueDay <= weekEnd) {
+        groups["THIS WEEK"]!.push(task);
+      } else {
+        groups["LATER"]!.push(task);
+      }
+    }
+
+    print("\nMy Work");
+    print("─".repeat(70));
+
+    for (const [group, groupTasks] of Object.entries(groups)) {
+      if (groupTasks.length === 0) continue;
+      print(`\n  ${group} (${groupTasks.length})`);
+      for (const task of groupTasks) {
+        const id = (task.identifier ?? task.id).padEnd(10);
+        const priority = PRIORITY_ICONS[task.priority ?? "none"] ?? "⚪";
+        const project = task.projectName ? ` [${task.projectName}]` : "";
+        const due = task.dueDate ? ` ${task.dueDate}` : "";
+        print(`    ${priority} ${id} ${task.title}${project}${due}`);
+      }
+    }
+  } catch (err) {
+    printErr(`fulcrum my-work: ${(err as Error).message}`);
+    exit(1);
+  }
+}
+
+async function resolveCaller(opts: MyWorkRunOptions): Promise<Required<MyWorkRunOptions>["caller"]> {
+  if (opts.caller) return opts.caller;
+
+  const { t } = await import("../../trpc/trpc.ts");
+  const { appRouter } = await import("../../trpc/router.ts");
+  const { createContext } = await import("../../trpc/context.ts");
+  const { MikroORM } = await import("@mikro-orm/postgresql");
+  const { Container } = await import("@needle-di/core");
+  const { registerDbBindings } = await import("../../db/db.module.ts");
+
+  const orm = new MikroORM({} as never);
+  const container = new Container();
+  container.bind({ provide: MikroORM, useValue: orm });
+  const em = orm.em.fork();
+  registerDbBindings(container, orm, em);
+
+  const ctx = createContext({ session: null as never, orgId: "", userId: "", em, container });
+  const factory = t.createCallerFactory(appRouter);
+  return factory(ctx) as Required<MyWorkRunOptions>["caller"];
+}
