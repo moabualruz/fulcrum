@@ -149,7 +149,7 @@
 - [ ] **DOC-09**: context_summary extraction on save (headings + wikilinks + mentions for Pillar 8)
 - [ ] **DOC-10**: Read-only render via remark + unified + shiki + DOMPurify verified
 - [ ] **DOC-11**: doc_comments entity with anchored comments, threading, resolve (vision Pillar 7 schema)
-- [ ] **DOC-12**: Three-surface parity: Web (editor+sidebar+history+comments), CLI (doc CRUD+versions+`--json`), TUI (docs-tree+reader-editor)
+- [x] **DOC-12**: Three-surface parity: Web (editor+sidebar+history+comments), CLI (doc CRUD+versions+`--json`), TUI (docs-tree+reader-editor)
 
 ### Memory + Context — Pillar 8 (MEM)
 
@@ -160,7 +160,7 @@
 - [ ] **MEM-05**: Embeddings flag toggles hybrid scoring path verified
 - [ ] **MEM-06**: Memory promotion (project → global) via Web UI + CLI
 - [ ] **MEM-07**: Web memory browser functional
-- [ ] **MEM-08**: TUI memory search functional
+- [x] **MEM-08**: TUI memory search functional
 - [ ] **MEM-09**: Repo state snapshot fed to context bundle (connect Pillar 9 → Pillar 8)
 
 ### Repos + Git — Pillar 9 (REP)
@@ -192,7 +192,7 @@
 - [ ] **SRC-06**: Saved search round-trips (create, load, delete)
 - [ ] **SRC-07**: Cmd+K palette opens on keyboard shortcut, dispatches 10+ commands (consolidates WEB-05)
 - [ ] **SRC-08**: REST API search returns real results (replace hardcoded data)
-- [ ] **SRC-09**: Three-surface parity: Web (search page+facets+saved), CLI (query+suggest+saved+`--json`), TUI (search screen+facet chips)
+- [x] **SRC-09**: Three-surface parity: Web (search page+facets+saved), CLI (query+suggest+saved+`--json`), TUI (search screen+facet chips)
 
 ### Notifications — Pillar 12 (NTF)
 

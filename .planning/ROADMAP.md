@@ -17,7 +17,7 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
 - [x] **Phase 3: Symphony + Sandcastle** - Full SPEC.md conformance with native tracker + agent dispatch infrastructure (completed 2026-05-05)
 - [x] **Phase 4: Inference + Router/Skills** - Inference sidecar hardened, router + skills wired (completed 2026-05-05)
 - [x] **Phase 5: Task Management + Metrics** - Task comments/watchers, charts, sprint features, custom fields (completed 2026-05-05)
-- [ ] **Phase 6: Documents + Memory + Search** - Editor verification, memory engine, unified search, Cmd+K
+- [x] **Phase 6: Documents + Memory + Search** - Editor verification, memory engine, unified search, Cmd+K (completed 2026-05-05)
 - [ ] **Phase 7: Repos + Artifacts + Notifications** - Git sync, artifact pipeline, notification delivery
 - [ ] **Phase 8: Surface Delivery** - CLI wiring, TUI rewrite, Web completion, API surface
 - [ ] **Phase 9: Cross-Cutting + Testing** - i18n, theming, accessibility, telemetry, backup, comprehensive test coverage
@@ -96,22 +96,22 @@ Cross-cutting constraints:
 Plans:
 
 **Wave 1 (parallel — schema + services)**
-- [ ] 06-01-PLAN.md — Packages install + SearchDocument expansion + migration (SRC-01, DOC-09)
-- [ ] 06-02-PLAN.md — applyDelta fix + ContextSummaryExtractor (DOC-06, DOC-09)
-- [ ] 06-03-PLAN.md — ContextBundleService + hybrid scoring weights (MEM-04, MEM-05, MEM-01)
+- [x] 06-01-PLAN.md — Packages install + SearchDocument expansion + migration (SRC-01, DOC-09)
+- [x] 06-02-PLAN.md — applyDelta fix + ContextSummaryExtractor (DOC-06, DOC-09)
+- [x] 06-03-PLAN.md — ContextBundleService + hybrid scoring weights (MEM-04, MEM-05, MEM-01)
 
 **Wave 2 (parallel — backend wiring)**
-- [ ] 06-04-PLAN.md — SearchQueryService + tRPC/REST + indexer expansion + saved searches (SRC-02, SRC-03, SRC-05, SRC-06, SRC-08)
-- [ ] 06-05-PLAN.md — TipTap editor + KaTeX + Mermaid + toolbar presets + documents/comments tRPC (DOC-01..04, DOC-07..08, DOC-10, DOC-11)
-- [ ] 06-06-PLAN.md — MemoryService + memories tRPC router (MEM-02, MEM-03, MEM-06, MEM-07)
+- [x] 06-04-PLAN.md — SearchQueryService + tRPC/REST + indexer expansion + saved searches (SRC-02, SRC-03, SRC-05, SRC-06, SRC-08)
+- [x] 06-05-PLAN.md — TipTap editor + KaTeX + Mermaid + toolbar presets + documents/comments tRPC (DOC-01..04, DOC-07..08, DOC-10, DOC-11)
+- [x] 06-06-PLAN.md — MemoryService + memories tRPC router (MEM-02, MEM-03, MEM-06, MEM-07)
 
 **Wave 3 (parallel — frontend UI)**
-- [ ] 06-07-PLAN.md — Orama client index + Cmd/K palette extension (SRC-04, SRC-05, SRC-07)
-- [ ] 06-08-PLAN.md — DocVersionTimeline + DocCommentPanel + DocsSidebar (DOC-05, DOC-06, DOC-11)
-- [ ] 06-09-PLAN.md — MemoryBrowser + SearchPage + facets + saved searches UI (MEM-07, SRC-05, SRC-06)
+- [x] 06-07-PLAN.md — Orama client index + Cmd/K palette extension (SRC-04, SRC-05, SRC-07)
+- [x] 06-08-PLAN.md — DocVersionTimeline + DocCommentPanel + DocsSidebar (DOC-05, DOC-06, DOC-11)
+- [x] 06-09-PLAN.md — MemoryBrowser + SearchPage + facets + saved searches UI (MEM-07, SRC-05, SRC-06)
 
 **Wave 4 (sequential — parity)**
-- [ ] 06-10-PLAN.md — CLI + TUI wiring + AppRouter mounts (DOC-12, MEM-08, MEM-09, SRC-09)
+- [x] 06-10-PLAN.md — CLI + TUI wiring + AppRouter mounts (DOC-12, MEM-08, MEM-09, SRC-09)
 
 ### Phase 4: Inference + Router/Skills
 **Goal**: Inference sidecar hardened, router + skills fully wired across surfaces
@@ -198,7 +198,7 @@ Plans:
   3. SearchDocument fully populated; search tRPC endpoint exposed; unified FTS across all entity kinds
   4. Orama in-browser < 100ms at 10k items; Cmd+K dispatches 10+ commands with keyboard shortcut
   5. All three surfaces at parity per DOC-12, MEM-09, SRC-09 definitions
-**Plans:** 10 plans
+**Plans:** 10/10 plans complete
 Plans:
 
 **Wave 1 (parallel — schema + services)**
@@ -360,7 +360,7 @@ Plans:
 | 3. Symphony + Sandcastle | 6/6 | Complete   | 2026-05-05 |
 | 4. Inference + Router/Skills | 8/8 | Complete | 2026-05-05 |
 | 5. Task Management + Metrics | 16/16 | Complete   | 2026-05-05 |
-| 6. Documents + Memory + Search | 0/? | Not started | - |
+| 6. Documents + Memory + Search | 10/10 | Complete   | 2026-05-05 |
 | 7. Repos + Artifacts + Notifications | 0/? | Not started | - |
 | 8. Surface Delivery | 0/? | Not started | - |
 | 9. Cross-Cutting + Testing | 0/? | Not started | - |
