@@ -1,3 +1,15 @@
+/**
+ * Auto-assign router (RTR-01, RTR-02, RTR-03).
+ *
+ * Routes tasks to agents via:
+ * 1. Explicit agent override
+ * 2. Deterministic json-rules-engine match
+ * 3. LLM fallback (when FULCRUM_FEATURES=router-llm)
+ * 4. Interactive prompt fallback
+ *
+ * Delegates core routing to RoutingService for shared behavior.
+ */
+
 import { evaluateRuleMatch } from "./rules-engine.ts";
 import {
   learnRule as defaultLearnRule,
@@ -71,9 +83,10 @@ export async function autoAssign(
     if (isRouterLlmEnabled()) {
       const llmResult = await llmFallback(input.taskFacts, input.orgId);
       if (llmResult) return recordIfNeeded(input, llmResult);
-      // LLM returned null → fall through to interactive prompt
+      // LLM returned null → fall through to interactive prompt (or abstain)
     }
 
+    // Interactive prompt fallback (existing behavior preserved)
     const agent = (await promptForAgent(input.taskFacts)).trim();
     if (!agent) return null;
     const rule = await learnRule(input.taskFacts, agent, input.orgId, input.projectId);
