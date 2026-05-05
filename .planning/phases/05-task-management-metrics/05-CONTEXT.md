@@ -208,6 +208,20 @@ Make the task pillar **competitive with Linear/Plane** as the UX benchmark and *
 - Sprint report card layout and responsive breakpoints
 - Gantt zoom level defaults and interaction details beyond drag-to-reschedule
 
+
+### Competitive Gap Features (from 05-RESEARCH-GAPS.md)
+- **D-112:** **Task ID System (PROJ-123).** `projects.key` (TEXT, org-unique, e.g. 'FUL'), `projects.task_sequence` (INTEGER, auto-increment in transaction), `tasks.sequence_number` (INTEGER, project-unique). Computed identifier: `${project.key}-${task.sequence_number}` (e.g., FUL-42). Displayed in all views (board cards, list rows, detail panel, CLI, TUI). Searchable by ID in Cmd+K. URL routing: `/projects/[id]/tasks/[key]-[seq]`. Atomic sequence via `UPDATE projects SET task_sequence = task_sequence + 1 ... RETURNING`.
+- **D-113:** **Quick-Create UX.** `C` key anywhere triggers `QuickCreateTask` Svelte component — focused inline form (Linear's #1 UX differentiator). Pre-fills: current project, sprint (if scrum view), status (from board column). Fields: title (required), type, assignee, priority, labels. `Enter` creates, `Esc` cancels, `Tab` cycles. Template picker dropdown (uses D-115). Duplicate detection: on title blur, query pg_trgm `similarity > 0.3`, show suggestions.
+- **D-114:** **Archive / Soft-Delete.** Three states: Active (default), Archived (`archived_at IS NOT NULL` — hidden, restorable), Deleted (`deleted_at` — 30-day purge). Default views exclude archived. "Include archived" filter toggle. Bulk archive from board/list selection. Archive != status completion.
+- **D-115:** **Task Templates.** `task_templates` table: org-scoped or project-scoped. `template_data` JSONB: title_prefix, description (TipTap), status, priority, labels, subtasks, custom_fields. Selectable from quick-create dropdown and task creation modal. Default templates: Bug Report, Feature Request, Incident, Spike, Design Review.
+- **D-116:** **Recurring Tasks.** `task_recurrence_rules` table with `trigger_type` (schedule|on_complete), `cron_expression`, bounds (`start_date`, `end_date`, `max_occurrences`). Powered by existing graphile-worker crontab feature (D-33). Recurrence config in task detail panel (repeat icon → config popover). Copies: title, description, assignee, labels, priority, subtasks. Gets new ID.
+- **D-117:** **Estimation Scales.** `projects.estimation_scale` JSONB: `{type: "linear"|"fibonacci"|"tshirt"|"hours"|"none", values: [...]}`. Default: Linear 1-5 (existing points field). Detail panel shows scale-appropriate picker. Velocity normalization: T-shirt → numeric mapping configurable. ALL scales store as integer internally.
+- **D-118:** **Duplicate Detection.** `pg_trgm` extension for fuzzy title matching. During quick-create: on title blur, query similar tasks (score > 0.3). Mark as duplicate: creates `duplicate_of` relationship + auto-closes duplicate + transfers watchers.
+- **D-119:** **My Work View.** Pre-built system SavedView (not notification inbox). Sections: Overdue, Due Today, This Week, Assigned to Me, Watching. Default landing page for logged-in user. TUI + CLI: `fulcrum my-work` command. Route: `/my-work`.
+- **D-120:** **CSV/JSON Export.** Extends D-54 with CLI/TUI surface. `fulcrum export tasks --project <id> --format csv|json` — bulk export. Web: "Export" button in filter/saved view toolbar. Background job for >1000 rows.
+- **D-121:** **Import from Competitors.** Extends existing `src/importers/linear.ts` pattern. Add: Jira CSV, GitHub Issues, Trello JSON, generic CSV. Import UI: settings page, pick source, map fields, preview, confirm. Dedup via `externalId` field (existing). CLI: `fulcrum import <source> --project <id> [--dry-run]`.
+- **D-122:** **Auto-Close on Duplicate.** When `duplicate_of` relationship created: auto-set duplicate task status → 'canceled'. Transfer watchers from closed duplicate to target task. EventBus trigger: `relationship.created` where type='duplicate_of'.
+- **D-123:** **Blocked-By Reverse Query.** `RelationshipService.listBlockedBy(taskId)` — tasks that THIS task blocks. UI: detail panel shows "Blocking N tasks" section. Board: "Blocked" badge shows count of upstream blockers. CLI: `fulcrum task blocked <taskId>` shows full dependency chain.
 </decisions>
 
 <canonical_refs>
@@ -317,6 +331,10 @@ Make the task pillar **competitive with Linear/Plane** as the UX benchmark and *
 - Multi-assignee per task — v2 (v1 = single assignee + watchers)
 - Notification delivery from watchers (Phase 7 — NTF pillar scope)
 - Chart export to PNG/PDF — v2
+- Goals / OKRs — v2 (requires mature portfolio dashboard)
+- Task creation from Email/Slack — Phase 7 (requires inbound email infra)
+- Task merge (combine two tasks) — v1.5 (complex edge cases)
+- Form-based templates (public intake forms) — v2
 
 </deferred>
 
