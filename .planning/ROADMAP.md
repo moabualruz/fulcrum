@@ -92,26 +92,25 @@ Cross-cutting constraints:
   3. Dynamic WORKFLOW.md reload functional; stall detection checks last_codex_timestamp first
   4. noSandbox + claudeCode dispatches task end-to-end, harvests artifacts
   5. HTTP server extension responds at all 4 endpoints; approval posture documented
-**Plans:** 10 plans
+**Plans:** 7 plans (6 complete + 1 gap closure)
 Plans:
 
-**Wave 1 (parallel — schema + services)**
-- [x] 06-01-PLAN.md — Packages install + SearchDocument expansion + migration (SRC-01, DOC-09)
-- [x] 06-02-PLAN.md — applyDelta fix + ContextSummaryExtractor (DOC-06, DOC-09)
-- [x] 06-03-PLAN.md — ContextBundleService + hybrid scoring weights (MEM-04, MEM-05, MEM-01)
+**Wave 1**
+- [x] 03-01-PLAN.md — WORKFLOW.md runtime loader with strict YAML/body split, typed expansion, app-server config (SYM-01..05)
+- [x] 03-02-PLAN.md — Zod-enforced 12-field Symphony Issue, blocker resolution, native tracker adapter (SYM-06..11)
 
-**Wave 2 (parallel — backend wiring)**
-- [x] 06-04-PLAN.md — SearchQueryService + tRPC/REST + indexer expansion + saved searches (SRC-02, SRC-03, SRC-05, SRC-06, SRC-08)
-- [x] 06-05-PLAN.md — TipTap editor + KaTeX + Mermaid + toolbar presets + documents/comments tRPC (DOC-01..04, DOC-07..08, DOC-10, DOC-11)
-- [x] 06-06-PLAN.md — MemoryService + memories tRPC router (MEM-02, MEM-03, MEM-06, MEM-07)
+**Wave 2**
+- [x] 03-03-PLAN.md — Run-attempt lifecycle, stall detection, continuation retry, token accounting (SYM-14..20)
+- [x] 03-04-PLAN.md — Codex app-server JSONL client, bash spawn, thread start/resume (SND-01..04)
 
-**Wave 3 (parallel — frontend UI)**
-- [x] 06-07-PLAN.md — Orama client index + Cmd/K palette extension (SRC-04, SRC-05, SRC-07)
-- [x] 06-08-PLAN.md — DocVersionTimeline + DocCommentPanel + DocsSidebar (DOC-05, DOC-06, DOC-11)
-- [x] 06-09-PLAN.md — MemoryBrowser + SearchPage + facets + saved searches UI (MEM-07, SRC-05, SRC-06)
+**Wave 3**
+- [x] 03-05-PLAN.md — Agent profile resolution, WORKFLOW.md overrides, adapter-swap contract, doctor checks (SYM-21..24, SND-05)
 
-**Wave 4 (sequential — parity)**
-- [x] 06-10-PLAN.md — CLI + TUI wiring + AppRouter mounts (DOC-12, MEM-08, MEM-09, SRC-09)
+**Wave 4**
+- [x] 03-06-PLAN.md — HTTP extension server, dispatchRun tRPC, CLI/TUI/Web dispatch surfaces (SYM-25..27, SND-06)
+
+**Gap Closure**
+- [ ] 03-07-PLAN.md — SYM-12 + SYM-13 gap closure
 
 ### Phase 4: Inference + Router/Skills
 **Goal**: Inference sidecar hardened, router + skills fully wired across surfaces
@@ -202,22 +201,22 @@ Plans:
 Plans:
 
 **Wave 1 (parallel — schema + services)**
-- [ ] 06-01-PLAN.md — Packages install + SearchDocument expansion + migration (SRC-01, DOC-09)
-- [ ] 06-02-PLAN.md — applyDelta fix + ContextSummaryExtractor (DOC-06, DOC-09)
-- [ ] 06-03-PLAN.md — ContextBundleService + hybrid scoring weights (MEM-04, MEM-05, MEM-01)
+- [x] 06-01-PLAN.md — Packages install + SearchDocument expansion + migration (SRC-01, DOC-09)
+- [x] 06-02-PLAN.md — applyDelta fix + ContextSummaryExtractor (DOC-06, DOC-09)
+- [x] 06-03-PLAN.md — ContextBundleService + hybrid scoring weights (MEM-04, MEM-05, MEM-01)
 
 **Wave 2 (parallel — backend wiring)**
-- [ ] 06-04-PLAN.md — SearchQueryService + tRPC/REST + indexer expansion + saved searches (SRC-02, SRC-03, SRC-05, SRC-06, SRC-08)
-- [ ] 06-05-PLAN.md — TipTap editor + KaTeX + Mermaid + toolbar presets + documents/comments tRPC (DOC-01..04, DOC-07..08, DOC-10, DOC-11)
-- [ ] 06-06-PLAN.md — MemoryService + memories tRPC router (MEM-02, MEM-03, MEM-06, MEM-07)
+- [x] 06-04-PLAN.md — SearchQueryService + tRPC/REST + indexer expansion + saved searches (SRC-02, SRC-03, SRC-05, SRC-06, SRC-08)
+- [x] 06-05-PLAN.md — TipTap editor + KaTeX + Mermaid + toolbar presets + documents/comments tRPC (DOC-01..04, DOC-07..08, DOC-10, DOC-11)
+- [x] 06-06-PLAN.md — MemoryService + memories tRPC router (MEM-02, MEM-03, MEM-06, MEM-07)
 
 **Wave 3 (parallel — frontend UI)**
-- [ ] 06-07-PLAN.md — Orama client index + Cmd/K palette extension (SRC-04, SRC-05, SRC-07)
-- [ ] 06-08-PLAN.md — DocVersionTimeline + DocCommentPanel + DocsSidebar (DOC-05, DOC-06, DOC-11)
-- [ ] 06-09-PLAN.md — MemoryBrowser + SearchPage + facets + saved searches UI (MEM-07, SRC-05, SRC-06)
+- [x] 06-07-PLAN.md — Orama client index + Cmd/K palette extension (SRC-04, SRC-05, SRC-07)
+- [x] 06-08-PLAN.md — DocVersionTimeline + DocCommentPanel + DocsSidebar (DOC-05, DOC-06, DOC-11)
+- [x] 06-09-PLAN.md — MemoryBrowser + SearchPage + facets + saved searches UI (MEM-07, SRC-05, SRC-06)
 
 **Wave 4 (sequential — parity)**
-- [ ] 06-10-PLAN.md — CLI + TUI wiring + AppRouter mounts (DOC-12, MEM-08, MEM-09, SRC-09)
+- [x] 06-10-PLAN.md — CLI + TUI wiring + AppRouter mounts (DOC-12, MEM-08, MEM-09, SRC-09)
 **UI hint**: yes
 
 ### Phase 7: Repos + Artifacts + Notifications
@@ -231,27 +230,7 @@ Plans:
   3. Delivery workers process SMTP + webhook + push; bell counts unread notifications; quiet hours retry scheduler
   4. Notification rules CRUD in web; CLI notifications wired
   5. All three surfaces at parity per REP-07, ART-06, NTF-09 definitions
-**Plans:** 10 plans
-Plans:
-
-**Wave 1 (parallel — schema + services)**
-- [ ] 06-01-PLAN.md — Packages install + SearchDocument expansion + migration (SRC-01, DOC-09)
-- [ ] 06-02-PLAN.md — applyDelta fix + ContextSummaryExtractor (DOC-06, DOC-09)
-- [ ] 06-03-PLAN.md — ContextBundleService + hybrid scoring weights (MEM-04, MEM-05, MEM-01)
-
-**Wave 2 (parallel — backend wiring)**
-- [ ] 06-04-PLAN.md — SearchQueryService + tRPC/REST + indexer expansion + saved searches (SRC-02, SRC-03, SRC-05, SRC-06, SRC-08)
-- [ ] 06-05-PLAN.md — TipTap editor + KaTeX + Mermaid + toolbar presets + documents/comments tRPC (DOC-01..04, DOC-07..08, DOC-10, DOC-11)
-- [ ] 06-06-PLAN.md — MemoryService + memories tRPC router (MEM-02, MEM-03, MEM-06, MEM-07)
-
-**Wave 3 (parallel — frontend UI)**
-- [ ] 06-07-PLAN.md — Orama client index + Cmd/K palette extension (SRC-04, SRC-05, SRC-07)
-- [ ] 06-08-PLAN.md — DocVersionTimeline + DocCommentPanel + DocsSidebar (DOC-05, DOC-06, DOC-11)
-- [ ] 06-09-PLAN.md — MemoryBrowser + SearchPage + facets + saved searches UI (MEM-07, SRC-05, SRC-06)
-
-**Wave 4 (sequential — parity)**
-- [ ] 06-10-PLAN.md — CLI + TUI wiring + AppRouter mounts (DOC-12, MEM-08, MEM-09, SRC-09)
-**UI hint**: yes
+**Plans:** TBD
 
 ### Phase 8: Surface Delivery
 **Goal**: CLI fully wired, TUI rewritten on OpenTUI, Web complete, API surface validated
@@ -264,26 +243,7 @@ Plans:
   3. shadcn-svelte verified; LayerChart, DnD, TipTap confirmed; Playwright covers 14 journeys
   4. Single REST API with valid OpenAPI spec; rate limiting; every procedure Zod-tested
   5. Dead code removed: `app.ts` in TUI, stub routers, generated stubs replaced with real implementations
-**Plans:** 10 plans
-Plans:
-
-**Wave 1 (parallel — schema + services)**
-- [ ] 06-01-PLAN.md — Packages install + SearchDocument expansion + migration (SRC-01, DOC-09)
-- [ ] 06-02-PLAN.md — applyDelta fix + ContextSummaryExtractor (DOC-06, DOC-09)
-- [ ] 06-03-PLAN.md — ContextBundleService + hybrid scoring weights (MEM-04, MEM-05, MEM-01)
-
-**Wave 2 (parallel — backend wiring)**
-- [ ] 06-04-PLAN.md — SearchQueryService + tRPC/REST + indexer expansion + saved searches (SRC-02, SRC-03, SRC-05, SRC-06, SRC-08)
-- [ ] 06-05-PLAN.md — TipTap editor + KaTeX + Mermaid + toolbar presets + documents/comments tRPC (DOC-01..04, DOC-07..08, DOC-10, DOC-11)
-- [ ] 06-06-PLAN.md — MemoryService + memories tRPC router (MEM-02, MEM-03, MEM-06, MEM-07)
-
-**Wave 3 (parallel — frontend UI)**
-- [ ] 06-07-PLAN.md — Orama client index + Cmd/K palette extension (SRC-04, SRC-05, SRC-07)
-- [ ] 06-08-PLAN.md — DocVersionTimeline + DocCommentPanel + DocsSidebar (DOC-05, DOC-06, DOC-11)
-- [ ] 06-09-PLAN.md — MemoryBrowser + SearchPage + facets + saved searches UI (MEM-07, SRC-05, SRC-06)
-
-**Wave 4 (sequential — parity)**
-- [ ] 06-10-PLAN.md — CLI + TUI wiring + AppRouter mounts (DOC-12, MEM-08, MEM-09, SRC-09)
+**Plans:** TBD
 **UI hint**: yes
 
 ### Phase 9: Cross-Cutting + Testing
@@ -297,27 +257,7 @@ Plans:
   3. Backup/restore + import/export + migration downgrade + graceful shutdown
   4. Coverage threshold 80% enforced in CI; Symphony conformance green; gate regression tests pass
   5. TDD evidence: every phase has RED→GREEN commit pairs in git history
-**Plans:** 10 plans
-Plans:
-
-**Wave 1 (parallel — schema + services)**
-- [ ] 06-01-PLAN.md — Packages install + SearchDocument expansion + migration (SRC-01, DOC-09)
-- [ ] 06-02-PLAN.md — applyDelta fix + ContextSummaryExtractor (DOC-06, DOC-09)
-- [ ] 06-03-PLAN.md — ContextBundleService + hybrid scoring weights (MEM-04, MEM-05, MEM-01)
-
-**Wave 2 (parallel — backend wiring)**
-- [ ] 06-04-PLAN.md — SearchQueryService + tRPC/REST + indexer expansion + saved searches (SRC-02, SRC-03, SRC-05, SRC-06, SRC-08)
-- [ ] 06-05-PLAN.md — TipTap editor + KaTeX + Mermaid + toolbar presets + documents/comments tRPC (DOC-01..04, DOC-07..08, DOC-10, DOC-11)
-- [ ] 06-06-PLAN.md — MemoryService + memories tRPC router (MEM-02, MEM-03, MEM-06, MEM-07)
-
-**Wave 3 (parallel — frontend UI)**
-- [ ] 06-07-PLAN.md — Orama client index + Cmd/K palette extension (SRC-04, SRC-05, SRC-07)
-- [ ] 06-08-PLAN.md — DocVersionTimeline + DocCommentPanel + DocsSidebar (DOC-05, DOC-06, DOC-11)
-- [ ] 06-09-PLAN.md — MemoryBrowser + SearchPage + facets + saved searches UI (MEM-07, SRC-05, SRC-06)
-
-**Wave 4 (sequential — parity)**
-- [ ] 06-10-PLAN.md — CLI + TUI wiring + AppRouter mounts (DOC-12, MEM-08, MEM-09, SRC-09)
-**UI hint**: yes
+**Plans:** TBD
 
 ### Phase 10: SaaS Hardening
 **Goal**: Multi-tenant SaaS validated
@@ -330,26 +270,7 @@ Plans:
   3. EventBus injectable; graphile-worker advisory locks coordinate cross-instance
   4. Connection pooling configured + verified under load
   5. Full integration test suite green against PostgreSQL
-**Plans:** 10 plans
-Plans:
-
-**Wave 1 (parallel — schema + services)**
-- [ ] 06-01-PLAN.md — Packages install + SearchDocument expansion + migration (SRC-01, DOC-09)
-- [ ] 06-02-PLAN.md — applyDelta fix + ContextSummaryExtractor (DOC-06, DOC-09)
-- [ ] 06-03-PLAN.md — ContextBundleService + hybrid scoring weights (MEM-04, MEM-05, MEM-01)
-
-**Wave 2 (parallel — backend wiring)**
-- [ ] 06-04-PLAN.md — SearchQueryService + tRPC/REST + indexer expansion + saved searches (SRC-02, SRC-03, SRC-05, SRC-06, SRC-08)
-- [ ] 06-05-PLAN.md — TipTap editor + KaTeX + Mermaid + toolbar presets + documents/comments tRPC (DOC-01..04, DOC-07..08, DOC-10, DOC-11)
-- [ ] 06-06-PLAN.md — MemoryService + memories tRPC router (MEM-02, MEM-03, MEM-06, MEM-07)
-
-**Wave 3 (parallel — frontend UI)**
-- [ ] 06-07-PLAN.md — Orama client index + Cmd/K palette extension (SRC-04, SRC-05, SRC-07)
-- [ ] 06-08-PLAN.md — DocVersionTimeline + DocCommentPanel + DocsSidebar (DOC-05, DOC-06, DOC-11)
-- [ ] 06-09-PLAN.md — MemoryBrowser + SearchPage + facets + saved searches UI (MEM-07, SRC-05, SRC-06)
-
-**Wave 4 (sequential — parity)**
-- [ ] 06-10-PLAN.md — CLI + TUI wiring + AppRouter mounts (DOC-12, MEM-08, MEM-09, SRC-09)
+**Plans:** TBD
 
 ## Progress
 
@@ -357,7 +278,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Architecture + Security | 10/10 | Complete | 2026-05-04 |
 | 2. Bug Fixes + Foundation | 8/8 | Complete | 2026-05-04 |
-| 3. Symphony + Sandcastle | 6/6 | Complete   | 2026-05-05 |
+| 3. Symphony + Sandcastle | 6/7 | Complete (1 gap closure pending) | 2026-05-05 |
 | 4. Inference + Router/Skills | 8/8 | Complete | 2026-05-05 |
 | 5. Task Management + Metrics | 16/16 | Complete   | 2026-05-05 |
 | 6. Documents + Memory + Search | 10/10 | Complete   | 2026-05-05 |
@@ -368,4 +289,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-05-04*
-*Last corrected: 2026-05-05 after Phase 5 peer review revision*
+*Last corrected: 2026-05-05 — fixed Phase 6 plan lists erroneously duplicated into Phases 3/7/8/9/10; restored Phase 3 real plans*
