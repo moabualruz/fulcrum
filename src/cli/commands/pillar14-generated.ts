@@ -23,7 +23,7 @@ type Io = Required<Pick<Pillar14RunOptions, "print" | "printErr" | "exit">>;
 
 const HELP: Record<Pillar14Domain, string> = {
   runs: "fulcrum runs <list|show|cancel|retry|logs|attach> [--json]",
-  notify: "fulcrum notify list [--unread] [--json|--watch]",
+  notify: "fulcrum notify <list|mark-read|mark-all-read|mute|watch> [--unread] [--json]",
   audit: "fulcrum audit <query|export> [--json]",
   webhooks: "fulcrum webhooks <list|test> [--json]",
   connectors: "fulcrum connectors <enable|sync> <id> [--json]",
@@ -204,15 +204,53 @@ function resolveLogPath(run: Record<string, unknown>): string | null {
 }
 
 async function runNotify(sub: string, argv: readonly string[], caller: any, io: Io) {
-  if (sub !== "list") return unknown("notify", sub, io);
-  const input = { unread: hasFlag(argv, "--unread") || undefined };
-  if (hasFlag(argv, "--watch")) {
+  if (sub === "list") {
+    const input = { unread: hasFlag(argv, "--unread") || undefined };
+    if (hasFlag(argv, "--watch")) {
+      for await (const event of caller.notify.watch(input)) {
+        emitJson(event, io);
+      }
+      return;
+    }
+    emitJson(await caller.notify.list(input), io);
+    return;
+  }
+
+  if (sub === "watch") {
+    const input = { unread: hasFlag(argv, "--unread") || undefined };
     for await (const event of caller.notify.watch(input)) {
       emitJson(event, io);
     }
     return;
   }
-  emitJson(await caller.notify.list(input), io);
+
+  if (sub === "mark-read") {
+    const id = positional(argv)[0] ?? optionValue(argv, "--id");
+    requireValue(id, "notify mark-read: missing --id");
+    emitJson(await caller.notify.markRead({ id }), io);
+    return;
+  }
+
+  if (sub === "mark-all-read") {
+    emitJson(await caller.notify.markAllRead(), io);
+    return;
+  }
+
+  if (sub === "mute") {
+    const subjectKind = optionValue(argv, "--subject-kind") ?? positional(argv)[0];
+    const subjectId = optionValue(argv, "--subject-id") ?? positional(argv)[1];
+    requireValue(subjectKind, "notify mute: missing --subject-kind");
+    requireValue(subjectId, "notify mute: missing --subject-id");
+    const mutedUntilRaw = optionValue(argv, "--muted-until");
+    emitJson(await caller.notify.mute({
+      subjectKind,
+      subjectId,
+      mutedUntil: mutedUntilRaw ? new Date(mutedUntilRaw) : undefined,
+    }), io);
+    return;
+  }
+
+  unknown("notify", sub, io);
 }
 
 async function runAudit(sub: string, argv: readonly string[], caller: any, io: Io) {
