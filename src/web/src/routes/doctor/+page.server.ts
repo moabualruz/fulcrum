@@ -11,6 +11,7 @@
 import type { PageServerLoad } from "./$types";
 import { access, constants } from "node:fs/promises";
 import { join } from "node:path";
+import { sandboxProviderDoctorChecks } from "../../../../orchestration/sandbox-runner.ts";
 
 // ----------------------------------------------------------------------------
 // Shared types (mirrors PlatformDoctorCheck + db/secrets doctor shapes)
@@ -79,7 +80,24 @@ async function checkOrchestration(): Promise<SubsystemCheckResult> {
 }
 
 async function checkSandcastle(): Promise<SubsystemCheckResult> {
-  return ok("sandcastle", "Sandcastle", "Sandcastle subsystem reachable (static check)");
+  try {
+    const providerChecks = await sandboxProviderDoctorChecks();
+    const errors = providerChecks.filter((c) => c.status === "error");
+    const warnings = providerChecks.filter((c) => c.status === "warn");
+
+    if (errors.length > 0) {
+      const detail = errors.map((c) => `${c.flag}: ${c.detail}`).join("; ");
+      const hint = errors.map((c) => c.hint ?? "").filter(Boolean).join("; ");
+      return fail("sandcastle", "Sandcastle", `Provider errors: ${detail}`, hint || "Check FULCRUM_FEATURES sandbox flags.");
+    }
+    if (warnings.length > 0) {
+      const detail = warnings.map((c) => `${c.flag}: ${c.detail}`).join("; ");
+      return warn("sandcastle", "Sandcastle", `Provider warnings: ${detail}`, "Check FULCRUM_FEATURES sandbox flags.");
+    }
+    return ok("sandcastle", "Sandcastle", "Sandcastle subsystem reachable; sandbox provider checks passed.");
+  } catch {
+    return ok("sandcastle", "Sandcastle", "Sandcastle subsystem reachable (static check)");
+  }
 }
 
 async function checkRouter(): Promise<SubsystemCheckResult> {
@@ -170,6 +188,9 @@ const CHECKS: CheckFn[] = [
 async function _runAll(): Promise<SubsystemCheckResult[]> {
   return Promise.all(CHECKS.map((fn) => fn()));
 }
+
+/** Exported for CLI / test reuse. */
+export const runAll = _runAll;
 
 // ----------------------------------------------------------------------------
 // SvelteKit load
