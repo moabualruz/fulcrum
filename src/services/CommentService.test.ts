@@ -96,6 +96,22 @@ class MockEntityManager {
     }
   }
 
+  persist(entity: Entity): void {
+    const tableName =
+      (entity as { __tableName__?: string }).__tableName__ ??
+      this.pendingEntity?.tableName ??
+      "Unknown";
+    this.pendingEntity = null;
+    this.table(tableName).push(entity);
+  }
+
+  remove(entity: Entity): void {
+    for (const [, rows] of this.store) {
+      const idx = rows.indexOf(entity);
+      if (idx !== -1) { rows.splice(idx, 1); return; }
+    }
+  }
+
   async flush(): Promise<void> {
     // no-op for in-memory
   }
