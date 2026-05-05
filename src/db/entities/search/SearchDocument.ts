@@ -32,8 +32,12 @@ import { VectorType } from "../../types/VectorType.ts";
   name: "idx_search_documents_org_subject",
   properties: ["org", "entityKind", "entityId"],
 })
+@Index({
+  name: "search_documents_fts",
+  expression: `CREATE INDEX IF NOT EXISTS "search_documents_fts" ON "search_documents" USING GIN (to_tsvector('english', coalesce(title,'') || ' ' || coalesce(body,'')))`,
+})
 export class SearchDocument {
-  [OptionalProps]?: "embedding";
+  [OptionalProps]?: "embedding" | "title" | "body" | "labels" | "metadata" | "updatedAt" | "projectId" | "status";
 
   @PrimaryKey({ type: "uuid", defaultRaw: "gen_random_uuid()" })
   id!: string;
@@ -51,4 +55,25 @@ export class SearchDocument {
 
   @Property({ type: VectorType, length: 384, nullable: true })
   embedding?: number[];
+
+  @Property({ type: "string", nullable: true })
+  title?: string;
+
+  @Property({ type: "text", nullable: true })
+  body?: string;
+
+  @Property({ type: "array", nullable: true })
+  labels?: string[];
+
+  @Property({ type: "json", nullable: true })
+  metadata?: Record<string, unknown>;
+
+  @Property({ nullable: true })
+  updatedAt?: Date;
+
+  @Property({ type: "string", fieldName: "project_id", nullable: true })
+  projectId?: string | null;
+
+  @Property({ type: "string", nullable: true })
+  status?: string | null;
 }
