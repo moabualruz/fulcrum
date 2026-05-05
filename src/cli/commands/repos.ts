@@ -183,7 +183,7 @@ async function runSync(
 }
 
 async function runRepoMutation(
-  verb: "sync" | "unregister",
+  verb: "unregister",
   argv: readonly string[],
   opts: Required<Pick<ReposRunOptions, "print" | "printErr" | "exit">> & ReposRunOptions,
 ): Promise<void> {
