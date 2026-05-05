@@ -136,7 +136,7 @@ describe("artifact harvest to edge/search contract", () => {
     expect(searchDocs[0]).toMatchObject({
       title: "report.md",
       mime: "text/markdown",
-      sizeBytes: BigInt(23),
+      sizeBytes: BigInt(24),
       runId: RUN_ID,
       projectId: PROJECT_ID,
       artifactKind: "artifact",

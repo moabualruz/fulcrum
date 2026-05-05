@@ -7,9 +7,18 @@
 
 import { copyFile, mkdir, readdir, stat } from "node:fs/promises";
 import { join, basename, relative } from "node:path";
+import { ARTIFACT_RUN_EDGE_KIND } from "../artifacts/harvest.ts";
 
 // Default artifact glob: dist/**, build/**, *.patch, *.diff
 export const DEFAULT_ARTIFACT_GLOB = "dist/**,build/**,*.patch,*.diff";
+export const RUN_ARTIFACT_EDGE_KIND = ARTIFACT_RUN_EDGE_KIND;
+
+export interface ArtifactHarvestHookOutput {
+  runId: string;
+  extractedDir: string;
+  sourceGlob: string;
+  edgeKind: typeof RUN_ARTIFACT_EDGE_KIND;
+}
 
 /**
  * Match files in worktree against a comma-separated glob pattern string.
@@ -51,6 +60,19 @@ export async function extractArtifacts(
   }
 
   return extractedDir;
+}
+
+export function artifactHarvestHookOutput(
+  runId: string,
+  extractedDir: string,
+  sourceGlob = DEFAULT_ARTIFACT_GLOB,
+): ArtifactHarvestHookOutput {
+  return {
+    runId,
+    extractedDir,
+    sourceGlob,
+    edgeKind: RUN_ARTIFACT_EDGE_KIND,
+  };
 }
 
 // ---------------------------------------------------------------------------

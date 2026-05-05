@@ -14,6 +14,7 @@ export interface HarvestArtifactsInput {
   extractedDir: string;
   orgSlug: string;
   projectSlug?: string | null;
+  sourceGlob?: string | null;
   deps: HarvestArtifactDeps;
 }
 
@@ -64,6 +65,13 @@ interface SearchDocumentRepositoryLike {
     artifact: ArtifactLike;
     title: string;
     body: string;
+    mime: string | null;
+    sizeBytes: bigint;
+    runId: string;
+    projectId: string | null;
+    artifactKind: string;
+    orgId: string;
+    metadata: Record<string, unknown>;
   }) => Promise<unknown> | unknown;
 }
 
@@ -86,9 +94,26 @@ interface AgentRunRepositoryLike {
   findOneOrFail?: (where: unknown) => Promise<unknown> | unknown;
 }
 
+export const ARTIFACT_RUN_EDGE_KIND = "produced";
+export const ARTIFACT_RUN_REVERSE_EDGE_KIND = "generated_by";
+export const ARTIFACT_KIND = "artifact";
+export const SUPPORTED_INLINE_PREVIEW_MIME = [
+  "image/png",
+  "text/plain",
+  "text/markdown",
+  "text/javascript",
+  "application/javascript",
+  "application/json",
+] as const;
+
+export type ArtifactPreviewKind = "image" | "text" | "markdown" | "code" | "download";
+
 export async function harvestArtifacts(input: HarvestArtifactsInput): Promise<HarvestArtifactsResult> {
   const storageBackend = input.deps.storageBackend ?? new LocalFsBackend();
   const run = await findRun(input.deps.agentRunRepository, input.runId);
+  const org = orgFromRun(run);
+  const orgId = idFromObject(org);
+  const projectId = projectIdFromRun(run);
   const retentionUntil = await input.deps.projectRepository?.retentionUntil?.({
     orgSlug: input.orgSlug,
     projectSlug: input.projectSlug,
@@ -98,6 +123,7 @@ export async function harvestArtifacts(input: HarvestArtifactsInput): Promise<Ha
   for (const sourcePath of await listFiles(input.extractedDir)) {
     const filename = path.basename(sourcePath);
     const [checksumSha256, fileStat] = await Promise.all([sha256File(sourcePath), stat(sourcePath)]);
+    const sourceRelativePath = path.relative(input.extractedDir, sourcePath);
     const duplicate = await findDuplicate(input.deps.artifactRepository, {
       runId: input.runId,
       filename,
@@ -109,6 +135,18 @@ export async function harvestArtifacts(input: HarvestArtifactsInput): Promise<Ha
     }
 
     const mime = sniffMime(filename);
+    const previewKind = previewKindForArtifact({ mime, filename });
+    const metadataJson = artifactMetadata({
+      checksumSha256,
+      sourcePath: sourceRelativePath,
+      sourceGlob: input.sourceGlob ?? null,
+      harvestedAt: new Date(),
+      producerKind: "agent_run",
+      producerId: input.runId,
+      runId: input.runId,
+      edgeId: null,
+      previewKind,
+    });
     const stored = await storageBackend.put({
       orgSlug: input.orgSlug,
       projectSlug: input.projectSlug,
@@ -116,7 +154,6 @@ export async function harvestArtifacts(input: HarvestArtifactsInput): Promise<Ha
       filename,
       source: sourcePath,
     });
-    const org = orgFromRun(run);
     const artifact = await input.deps.artifactRepository.create({
       org,
       run,
@@ -126,7 +163,15 @@ export async function harvestArtifacts(input: HarvestArtifactsInput): Promise<Ha
       path: stored.relativePath,
       checksumSha256,
       retentionUntil,
-      metadataJson: {},
+      artifactKind: ARTIFACT_KIND,
+      sourcePath: sourceRelativePath,
+      sourceGlob: input.sourceGlob ?? null,
+      harvestedAt: metadataJson.harvestedAt,
+      producerKind: "agent_run",
+      producerId: input.runId,
+      runId: input.runId,
+      projectId,
+      metadataJson,
     });
 
     await input.deps.edgeRepository.createMany([
@@ -136,7 +181,9 @@ export async function harvestArtifacts(input: HarvestArtifactsInput): Promise<Ha
         fromId: artifact.id,
         toKind: "agent_run",
         toId: input.runId,
-        kind: "generated_by",
+        artifactId: artifact.id,
+        runId: input.runId,
+        kind: ARTIFACT_RUN_REVERSE_EDGE_KIND,
       },
       {
         org,
@@ -144,7 +191,9 @@ export async function harvestArtifacts(input: HarvestArtifactsInput): Promise<Ha
         fromId: input.runId,
         toKind: "artifact",
         toId: artifact.id,
-        kind: "produced",
+        artifactId: artifact.id,
+        runId: input.runId,
+        kind: ARTIFACT_RUN_EDGE_KIND,
       },
     ]);
     await input.deps.searchDocumentRepository.upsertArtifactPreview({
@@ -152,6 +201,20 @@ export async function harvestArtifacts(input: HarvestArtifactsInput): Promise<Ha
       artifact,
       title: filename,
       body: await previewBody(sourcePath, mime, filename),
+      mime,
+      sizeBytes: BigInt(fileStat.size),
+      runId: input.runId,
+      projectId,
+      artifactKind: ARTIFACT_KIND,
+      orgId,
+      metadata: {
+        ...metadataJson,
+        sha256: checksumSha256,
+        sizeBytes: BigInt(fileStat.size).toString(),
+        mime,
+        projectId,
+        artifactId: artifact.id,
+      },
     });
     await input.deps.eventRepository.recordArtifactHarvested({ org, run, artifact });
     artifacts.push(artifact);
@@ -185,8 +248,19 @@ function sniffMime(filename: string): string {
   return lookup(filename) || "application/octet-stream";
 }
 
+export function previewKindForArtifact(input: { mime?: string | null; filename?: string | null }): ArtifactPreviewKind {
+  const mime = input.mime ?? "application/octet-stream";
+  const filename = input.filename ?? "";
+  if (mime === "image/png") return "image";
+  if (mime === "text/markdown" || path.extname(filename) === ".md") return "markdown";
+  if (isCodeMime(mime) || isCodeFilename(filename)) return "code";
+  if (isTextMime(mime) || isTextFilename(filename)) return "text";
+  return "download";
+}
+
 async function previewBody(filePath: string, mime: string, filename: string): Promise<string> {
-  if (!isTextMime(mime) && !isTextFilename(filename)) return "";
+  const previewKind = previewKindForArtifact({ mime, filename });
+  if (previewKind !== "text" && previewKind !== "markdown" && previewKind !== "code") return "";
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of createReadStream(filePath, { highWaterMark: 2048 })) {
@@ -202,10 +276,18 @@ function isTextMime(mime: string): boolean {
   return mime.startsWith("text/") || mime === "application/json" || mime.endsWith("+json");
 }
 
+function isCodeMime(mime: string): boolean {
+  return mime === "application/javascript" || mime === "text/javascript" || mime.endsWith("+xml");
+}
+
 function isTextFilename(filename: string): boolean {
   return [".ts", ".tsx", ".js", ".jsx", ".json", ".md", ".txt", ".toml", ".yaml", ".yml"].includes(
     path.extname(filename),
   );
+}
+
+function isCodeFilename(filename: string): boolean {
+  return [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".css", ".html", ".xml"].includes(path.extname(filename));
 }
 
 async function findRun(repository: AgentRunRepositoryLike | undefined, runId: string): Promise<unknown> {
@@ -214,6 +296,18 @@ async function findRun(repository: AgentRunRepositoryLike | undefined, runId: st
 
 function orgFromRun(run: unknown): unknown {
   return typeof run === "object" && run !== null && "org" in run ? run.org : undefined;
+}
+
+function idFromObject(value: unknown): string {
+  if (typeof value === "object" && value !== null && "id" in value && typeof value.id === "string") {
+    return value.id;
+  }
+  return "";
+}
+
+function projectIdFromRun(run: unknown): string | null {
+  if (typeof run !== "object" || run === null || !("project" in run)) return null;
+  return idFromObject(run.project) || null;
 }
 
 async function findDuplicate(
@@ -226,4 +320,34 @@ async function findDuplicate(
     filename: input.filename,
     checksumSha256: input.checksumSha256,
   });
+}
+
+function artifactMetadata(input: {
+  checksumSha256: string;
+  sourcePath: string;
+  sourceGlob: string | null;
+  harvestedAt: Date;
+  producerKind: string;
+  producerId: string;
+  runId: string;
+  edgeId: string | null;
+  previewKind: ArtifactPreviewKind;
+}): Record<string, unknown> {
+  return {
+    sha256: input.checksumSha256,
+    sourcePath: input.sourcePath,
+    sourceGlob: input.sourceGlob,
+    harvestedAt: input.harvestedAt.toISOString(),
+    producerKind: input.producerKind,
+    producerId: input.producerId,
+    runId: input.runId,
+    edgeId: input.edgeId,
+    previewKind: input.previewKind,
+    attestation: {
+      subjectDigest: input.checksumSha256,
+      predicateType: null,
+      issuer: null,
+      signedAt: null,
+    },
+  };
 }
