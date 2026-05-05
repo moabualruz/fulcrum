@@ -15,6 +15,15 @@ import { cosineSimilarity } from "../../../memory/retrieval/hybrid-scoring.ts";
 @injectable()
 export class DocumentRepository extends EntityRepository<Document> {
   /**
+   * Fetch context summaries for a project — used by ContextBundleService slice 2 (D-25).
+   * Returns documents with context_summary populated, ordered by updatedAt DESC.
+   * Stub: full filtering added when Pillar 7 domain logic lands.
+   */
+  async getContextSummariesForProject(projectId: string): Promise<Document[]> {
+    return this.find({ projectId } as never, { orderBy: { updatedAt: "DESC" } as never });
+  }
+
+  /**
    * Re-rank linked docs by cosine similarity to a query embedding.
    * Used by assembler slice 2 when wikilinks > 5; gated on embeddings flag.
    * Docs without embeddings sort to end, preserving original order among themselves.

@@ -23,7 +23,36 @@ export const MEMORY_IMPORTANCE_BOOSTS = {
 
 @injectable()
 export class MemoryRepository extends EntityRepository<Memory> {
-  async searchProjectAndGlobal(opts: NormalizedRetrieverOpts): Promise<Memory[]> {
+  /**
+   * Overload 1: simple (orgId, projectId) signature for ContextBundleService (D-25).
+   * Returns recent project + global memories without FTS ranking (empty-query path).
+   */
+  searchProjectAndGlobal(orgId: string, projectId: string): Promise<Memory[]>;
+  /**
+   * Overload 2: full opts signature used by Retriever for ranked search.
+   */
+  searchProjectAndGlobal(opts: NormalizedRetrieverOpts): Promise<Memory[]>;
+  async searchProjectAndGlobal(
+    optsOrOrgId: NormalizedRetrieverOpts | string,
+    projectId?: string,
+  ): Promise<Memory[]> {
+    // Normalise: if first arg is a string, build minimal opts for bundle assembly
+    const opts: NormalizedRetrieverOpts =
+      typeof optsOrOrgId === "string"
+        ? {
+            orgId: optsOrOrgId,
+            projectId: projectId ?? null,
+            query: "",
+            topK: 20,
+            includeArchived: false,
+            kinds: undefined,
+          }
+        : optsOrOrgId;
+
+    return this._searchProjectAndGlobal(opts);
+  }
+
+  private async _searchProjectAndGlobal(opts: NormalizedRetrieverOpts): Promise<Memory[]> {
     const candidates = opts.query.trim() === ""
       ? await this.emptyQueryCandidates(opts)
       : await this.ftsCandidates(opts);
