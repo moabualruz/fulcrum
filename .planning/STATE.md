@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-last_updated: "2026-05-05T04:36:54.403Z"
+last_updated: "2026-05-05T04:51:48Z"
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 33
-  completed_plans: 30
-  percent: 91
+  completed_plans: 31
+  percent: 94
 ---
 
 # Planning State
@@ -17,11 +17,11 @@ progress:
 ## Current Position
 
 Phase: 04 (inference-router-skills) — EXECUTING
-Plan: 6 of 8
+Plan: 7 of 8
 
 - **Phase**: 04-inference-router-skills
-- **Plan**: 04-05 completed
-- **Status**: MCP virtual skill descriptors, lock fail-closed with per-skill SHA state, structured SkillConflict entities, and registry service
+- **Plan**: 04-07 completed
+- **Status**: Five-tab Web routing editor with drafts/test/LLM gate/evidence, inference backend status rows with probe states and dimension mismatch banner
 - **Branch**: gsd/phase-04-inference-router-skills
 
 ## Decisions
@@ -84,3 +84,5 @@ Plan: 6 of 8
 - [Phase 04-05]: verifySkillLock() returns state object (ok/sha_mismatch/missing) instead of throwing — callers handle fail-closed behavior
 - [Phase 04-05]: upstream_conflict enum string kept in lock.ts SkillsLockEntry schema for backward compat with existing lock files
 - [Phase 04-06]: Enriched output schema at tRPC layer, not service layer — keeps service lean while API returns explainable routing results (D-26)
+- [Phase 04-07]: LLM gate config read from process.env in server action (no tRPC getter needed) — simpler than adding shared tRPC procedure; config derived from env vars
+- [Phase 04-07]: Backend status rows constructed in inference load function via mapBackendsToStatusRows() — keeps data-shaping in server layer, provides robust defaults for all four backends even when sidecar is down

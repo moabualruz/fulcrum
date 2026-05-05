@@ -120,7 +120,7 @@ Plans:
 
 **Wave 4**
 - [x] 04-06-PLAN.md — Routing/skills tRPC plus CLI/TUI parity
-- [ ] 04-07-PLAN.md — Web routing editor and inference backend status UI
+- [x] 04-07-PLAN.md — Web routing editor and inference backend status UI
 
 **Wave 5**
 - [ ] 04-08-PLAN.md — Root wiring, LangGraph boundary guard, parity tests, and final verification gates
