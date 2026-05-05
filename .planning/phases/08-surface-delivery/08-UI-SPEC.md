@@ -7,6 +7,24 @@
 
 UI work in Phase 08 is completion and parity verification. Do not redesign the product. Use existing shadcn-svelte/Bits UI patterns and existing route layout.
 
+## Huashu-Design Gate
+
+Use `$huashu-design` as a focused design gate, not as a broad redesign workflow.
+
+Relevant nested references:
+
+- `/Users/mkh/.agents/skills/huashu-design/references/workflow.md` — Junior Designer workflow: assumptions/placeholders first, show early, then refine.
+- `/Users/mkh/.agents/skills/huashu-design/references/design-context.md` — extract exact design context from existing codebase before high-fidelity UI decisions.
+- `/Users/mkh/.agents/skills/huashu-design/references/critique-guide.md` — 5-axis expert review: philosophy alignment, visual hierarchy, craft, functionality, originality.
+- `/Users/mkh/.agents/skills/huashu-design/references/verification.md` — Playwright/browser screenshot and console-error validation.
+
+Apply it at two moments:
+
+1. **Before TUI rewrite (`08-05`)**: create or review an HTML/TUI composition prototype for navigation, live run monitor, status footer, and density. This is a design-direction gate for OpenTUI layout.
+2. **Before Web UAT finalization (`08-06`)**: run expert review on existing Web routes to catch hierarchy, density, craft, and anti-AI-slop issues. Do not redesign routes unless review finds blocking usability/craft problems.
+
+Skip Huashu animation/video/export paths. Phase 08 needs product-surface UX review, not motion graphics.
+
 ## Web Contract
 
 - Keep dense operational surfaces: route pages should prioritize tables, lists, forms, status badges, filters, split panes, and detail pages.
