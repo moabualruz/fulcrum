@@ -141,7 +141,7 @@ Plans:
 
 **Wave 1 — Schema Foundation (parallel)**
 - [ ] 05-01-PLAN.md — Dependencies install + migration + entity extensions (HIGH-01/02/05 fixes)
-- [ ] 05-02-PLAN.md — New entities: TaskComment, TaskWatcher, CommentReaction, TaskRelationship, ProjectAutomation, FieldDependencyRule, YjsSnapshot
+- [x] 05-02-PLAN.md — New entities: TaskComment, TaskWatcher, CommentReaction, TaskRelationship, ProjectAutomation, FieldDependencyRule, YjsSnapshot
 
 **Wave 2 — Core Services (parallel, no shared files)**
 - [ ] 05-03-PLAN.md — CommentService + watchers + commentsRouter + team mentions (D-100 fix)
