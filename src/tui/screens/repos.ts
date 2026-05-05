@@ -3,19 +3,34 @@ import { c } from "../renderer.ts";
 
 export interface RepoListItem {
   id: string;
-  name: string;
   slug: string;
+  name?: string;
+  branch?: string | null;
+  dirty?: boolean;
+  lastSyncAt?: string | Date | null;
+  openTaskCount?: number;
+  health?: string;
+  recentCommit?: string | null;
+  path?: string | null;
   supervisionMode?: string | null;
   lastSyncedAt?: string | Date | null;
   branchCount?: number | null;
+}
+
+export interface RepoSyncResult {
+  repoId: string;
+  status: "queued";
+  taskName: string;
+  jobKey: string;
 }
 
 export interface ReposScreenOptions {
   caller: {
     repos: {
       list: () => Promise<RepoListItem[]>;
-      sync: (input: { id: string }) => Promise<Partial<RepoListItem> & { id: string }>;
-      register: (input: { name: string; path: string }) => Promise<RepoListItem>;
+      sync?: (input: { id: string }) => Promise<Partial<RepoListItem> & { id: string }>;
+      syncRepo?: (input: { repoId: string }) => Promise<RepoSyncResult | null>;
+      register?: (input: { name: string; path: string }) => Promise<RepoListItem>;
     };
   };
   onOpenRepo?: (id: string) => void;
@@ -50,8 +65,12 @@ export class ReposScreen {
       for (const repo of this.visibleRepos) {
         const index = this.repos.indexOf(repo);
         const prefix = index === this.cursor ? c.bold("> ") : "  ";
+        const dirty = repo.dirty ? "dirty" : "clean";
+        const branch = repo.branch ?? "no-branch";
+        const tasks = repo.openTaskCount ?? 0;
+        const health = repo.health ?? repo.supervisionMode ?? "unknown";
         renderer.writeln(
-          `${prefix}${repo.name}  ${c.dim(repo.slug)}  ${repo.supervisionMode ?? "manual"}  ${formatSynced(repo.lastSyncedAt)}  branches ${repo.branchCount ?? 0}`,
+          `${prefix}${repo.name ?? repo.slug}  ${c.dim(repo.slug)}  ${branch}  ${dirty}  ${formatSynced(repo.lastSyncAt ?? repo.lastSyncedAt)}  tasks ${tasks}  ${health}`,
         );
       }
     }
@@ -103,6 +122,7 @@ export class ReposScreen {
     const name = input.name.trim();
     const path = input.path.trim();
     if (!name || !path) return;
+    if (!this.opts.caller.repos.register) return;
     const repo = await this.opts.caller.repos.register({ name, path });
     this.repos = [...this.repos, repo];
     this.cursor = this.repos.length - 1;
@@ -118,8 +138,19 @@ export class ReposScreen {
   private async syncCurrent(): Promise<void> {
     const repo = this.repos[this.cursor];
     if (!repo) return;
-    const updated = await this.opts.caller.repos.sync({ id: repo.id });
-    this.repos = this.repos.map((item) => (item.id === repo.id ? { ...item, ...updated } : item));
+    if (this.opts.caller.repos.syncRepo) {
+      const queued = await this.opts.caller.repos.syncRepo({ repoId: repo.id });
+      if (!queued) return;
+      this.repos = this.repos.map((item) => (
+        item.id === repo.id ? { ...item, health: queued.status, supervisionMode: queued.status } : item
+      ));
+      return;
+    }
+
+    if (this.opts.caller.repos.sync) {
+      const updated = await this.opts.caller.repos.sync({ id: repo.id });
+      this.repos = this.repos.map((item) => (item.id === repo.id ? { ...item, ...updated } : item));
+    }
   }
 
   private keepCursorVisible(): void {

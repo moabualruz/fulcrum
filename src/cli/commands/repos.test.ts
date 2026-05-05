@@ -37,7 +37,7 @@ function fakeCaller() {
       },
       syncRepo: async (input: unknown) => {
         calls.push(["syncRepo", input]);
-        return { repoId: ROW.id, status: "queued", taskName: "repo.sync.local", jobKey: `repo.sync.local:${ROW.id}` };
+        return { repoId: ROW.id, status: "queued" as const, taskName: "repo.sync.local", jobKey: `repo.sync.local:${ROW.id}` };
       },
       unregister: async (input: unknown) => {
         calls.push(["unregister", input]);
