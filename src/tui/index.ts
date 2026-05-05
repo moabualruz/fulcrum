@@ -982,7 +982,7 @@ export class TuiApp {
         this.newDocScreen.setLoadError(error);
       }
     } else {
-      // docs caller not available — render placeholder
+      // docs caller not available: render error state.
       this.newDocScreen = null;
     }
 
