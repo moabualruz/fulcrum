@@ -12,12 +12,14 @@ import { ARTIFACT_RUN_EDGE_KIND } from "../artifacts/harvest.ts";
 // Default artifact glob: dist/**, build/**, *.patch, *.diff
 export const DEFAULT_ARTIFACT_GLOB = "dist/**,build/**,*.patch,*.diff";
 export const RUN_ARTIFACT_EDGE_KIND = ARTIFACT_RUN_EDGE_KIND;
+export const ARTIFACT_CREATED_EVENT_TYPE = "artifact.created";
 
 export interface ArtifactHarvestHookOutput {
   runId: string;
   extractedDir: string;
   sourceGlob: string;
   edgeKind: typeof RUN_ARTIFACT_EDGE_KIND;
+  eventType: typeof ARTIFACT_CREATED_EVENT_TYPE;
 }
 
 /**
@@ -72,6 +74,7 @@ export function artifactHarvestHookOutput(
     extractedDir,
     sourceGlob,
     edgeKind: RUN_ARTIFACT_EDGE_KIND,
+    eventType: ARTIFACT_CREATED_EVENT_TYPE,
   };
 }
 

@@ -11,6 +11,7 @@ import {
 import type { WorkerRegistry } from "../../workers/registry.ts";
 import { assertRecordPayload, assertStringField } from "../../workers/registry.ts";
 import { defineQueue, defineTask } from "../../queue/index.ts";
+import { enqueueNotifyFanout, type NotifyFanoutQueue } from "../../notifications/fanout-worker.ts";
 
 export const REPO_SYNC_LOCAL_TASK = "repo.sync.local";
 export const repoSyncLocalTaskDefinition = defineTask<RepoSyncLocalPayload>({
@@ -78,13 +79,18 @@ export interface RepoSyncLocalRepositories {
   };
   events: {
     insert(input: {
+      id?: string;
+      eventType?: "repo.sync.completed" | "repo.sync.failed";
       orgId: string;
-      verb: "repo.sync.failed";
+      projectId?: string | null;
+      actorUserId?: string | null;
+      verb: "repo.sync.completed" | "repo.sync.failed";
       subjectKind: "repo";
       subjectId: string;
       payload: Record<string, unknown>;
     }): Promise<unknown>;
   };
+  fanoutQueue?: NotifyFanoutQueue;
   git?: RepoSyncGitClient;
 }
 
@@ -153,9 +159,12 @@ export async function syncLocalRepo(
     syncStatus: "syncing",
   });
 
+  const startedAt = performance.now();
+  let status: GitStatus | undefined;
+  let commitCount = 0;
   try {
     const git = repositories.git ?? defaultGit;
-    const status = await git.getStatus(repo.localPath);
+    status = await git.getStatus(repo.localPath);
     await repositories.repoRepo.updateSyncState({
       repoId: repo.id,
       orgId: repo.orgId,
@@ -171,6 +180,7 @@ export async function syncLocalRepo(
     });
 
     const commits = await git.getCommitLog(repo.localPath, { maxCount: 200, offset: 0 });
+    commitCount = commits.length;
     await repositories.commits.upsertBulk({
       orgId: repo.orgId,
       repoId: repo.id,
@@ -199,21 +209,14 @@ export async function syncLocalRepo(
       lastSyncAt: now,
       lastTouchedAt: now,
     });
+    await emitRepoSyncEvent(repositories, repo, "repo.sync.completed", status, commitCount, startedAt);
   } catch (error) {
     await repositories.repoRepo.updateSyncState({
       repoId: repo.id,
       orgId: repo.orgId,
       syncStatus: "error",
     });
-    await repositories.events.insert({
-      orgId: repo.orgId,
-      verb: "repo.sync.failed",
-      subjectKind: "repo",
-      subjectId: repo.id,
-      payload: {
-        message: errorMessage(error),
-      },
-    });
+    await emitRepoSyncEvent(repositories, repo, "repo.sync.failed", status, commitCount, startedAt, error);
     throw error;
   }
 }
@@ -261,6 +264,48 @@ function toFileInput(file: GitFileTreeEntry): RepoSyncFileInput {
     kind: file.kind,
     size: file.sizeBytes,
   };
+}
+
+async function emitRepoSyncEvent(
+  repositories: RepoSyncLocalRepositories,
+  repo: RepoSyncLocalRepo,
+  eventType: "repo.sync.completed" | "repo.sync.failed",
+  status: GitStatus | undefined,
+  commitCount: number,
+  startedAt: number,
+  error?: unknown,
+): Promise<void> {
+  const eventId = crypto.randomUUID();
+  const event = await repositories.events.insert({
+    id: eventId,
+    eventType,
+    orgId: repo.orgId,
+    projectId: repo.projectId ?? null,
+    actorUserId: null,
+    verb: eventType,
+    subjectKind: "repo",
+    subjectId: repo.id,
+    payload: {
+      branch: status?.branch ?? "unknown",
+      ahead: status?.ahead ?? 0,
+      behind: status?.behind ?? 0,
+      dirty: status?.dirty ?? false,
+      commitCount,
+      syncLatencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+      ...(error ? { message: errorMessage(error) } : {}),
+    },
+  });
+  if (repositories.fanoutQueue) {
+    await enqueueNotifyFanout(repositories.fanoutQueue, eventIdFromInsertResult(event) ?? eventId);
+  }
+}
+
+function eventIdFromInsertResult(value: unknown): string | undefined {
+  if (typeof value === "object" && value !== null && "id" in value) {
+    const id = (value as { id?: unknown }).id;
+    return typeof id === "string" ? id : undefined;
+  }
+  return undefined;
 }
 
 function errorMessage(error: unknown): string {

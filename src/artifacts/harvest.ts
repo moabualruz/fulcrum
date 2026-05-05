@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 
 import { LocalFsBackend, type StorageBackend } from "./storage.ts";
+import { enqueueNotifyFanout, type NotifyFanoutQueue } from "../notifications/fanout-worker.ts";
 
 const require = createRequire(import.meta.url);
 const { lookup } = require("mime-types") as { lookup: (filename: string) => string | false };
@@ -24,6 +25,7 @@ export interface HarvestArtifactDeps {
   edgeRepository: EdgeRepositoryLike;
   searchDocumentRepository: SearchDocumentRepositoryLike;
   eventRepository: EventRepositoryLike;
+  notificationQueue?: NotifyFanoutQueue;
   projectRepository?: ProjectRepositoryLike;
   agentRunRepository?: AgentRunRepositoryLike;
 }
@@ -77,9 +79,16 @@ interface SearchDocumentRepositoryLike {
 
 interface EventRepositoryLike {
   recordArtifactHarvested: (input: {
+    id: string;
     org?: unknown;
     run?: unknown;
     artifact: ArtifactLike;
+    eventType: "artifact.created";
+    orgId: string;
+    projectId: string | null;
+    subjectKind: "artifact";
+    subjectId: string;
+    payload: Record<string, unknown>;
   }) => Promise<unknown> | unknown;
 }
 
@@ -216,7 +225,22 @@ export async function harvestArtifacts(input: HarvestArtifactsInput): Promise<Ha
         artifactId: artifact.id,
       },
     });
-    await input.deps.eventRepository.recordArtifactHarvested({ org, run, artifact });
+    const eventId = crypto.randomUUID();
+    const event = await input.deps.eventRepository.recordArtifactHarvested({
+      id: eventId,
+      org,
+      run,
+      artifact,
+      eventType: "artifact.created",
+      orgId,
+      projectId,
+      subjectKind: "artifact",
+      subjectId: artifact.id,
+      payload: artifactCreatedPayload(artifact, input.runId, mime, fileStat.size, checksumSha256, previewKind),
+    });
+    if (input.deps.notificationQueue) {
+      await enqueueNotifyFanout(input.deps.notificationQueue, eventIdFromInsertResult(event) ?? eventId);
+    }
     artifacts.push(artifact);
   }
 
@@ -350,4 +374,31 @@ function artifactMetadata(input: {
       signedAt: null,
     },
   };
+}
+
+function artifactCreatedPayload(
+  artifact: ArtifactLike,
+  runId: string,
+  mime: string,
+  sizeBytes: number,
+  sha256: string,
+  previewKind: ArtifactPreviewKind,
+): Record<string, unknown> {
+  return {
+    artifactId: artifact.id,
+    runId,
+    kind: ARTIFACT_KIND,
+    mime,
+    sizeBytes,
+    sha256,
+    previewKind,
+  };
+}
+
+function eventIdFromInsertResult(value: unknown): string | undefined {
+  if (typeof value === "object" && value !== null && "id" in value) {
+    const id = (value as { id?: unknown }).id;
+    if (typeof id === "string" && id.length > 0) return id;
+  }
+  return undefined;
 }
