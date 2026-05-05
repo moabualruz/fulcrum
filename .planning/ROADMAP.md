@@ -136,7 +136,7 @@ Plans:
   3. Sprint capacity + retrospective notes; Gantt + calendar views render
   4. Bulk ops handle 50+ tasks; custom fields all 9 types verified; saved view filters round-trip
   5. Task CRUD + sprint management functional on Web, CLI, and TUI (per TSK-14 parity definition)
-**Plans:** 6/16 plans executed
+**Plans:** 12/16 plans executed
 Plans:
 
 **Wave 1 — Schema Foundation (parallel)**
@@ -155,11 +155,11 @@ Plans:
 - [x] 05-07-PLAN.md — Task detail panel + comments + activity feed + watchers + dual mentions (D-101)
 - [x] 05-08-PLAN.md — Board (DnD, swimlanes, WIP, blocked badges) + TanStack list view
 - [x] 05-09-PLAN.md — Reports dashboard + 8 LayerChart components + Monte Carlo forecast
-- [ ] 05-10-PLAN.md — Gantt (SVAR + critical path + slack) + Calendar (@event-calendar)
+- [x] 05-10-PLAN.md — Gantt (SVAR + critical path + slack) + Calendar (@event-calendar)
 
 **Wave 5 — Advanced Features (parallel)**
 - [ ] 05-11-PLAN.md — Filter builder + saved views + bulk ops (50+) + custom fields verification (9 types)
-- [ ] 05-12-PLAN.md — Keyboard shortcuts + command palette + field dependencies (client + server validation)
+- [x] 05-12-PLAN.md — Keyboard shortcuts + command palette + field dependencies (client + server validation)
 - [ ] 05-13-PLAN.md — Real-time collaboration (Yjs with auth/persistence) + portfolio dashboard
 
 **Wave 6 — Parity + Final (parallel)**
@@ -245,7 +245,7 @@ Plans:
 | 2. Bug Fixes + Foundation | 8/8 | Complete | 2026-05-04 |
 | 3. Symphony + Sandcastle | 6/6 | Complete   | 2026-05-05 |
 | 4. Inference + Router/Skills | 8/8 | Complete | 2026-05-05 |
-| 5. Task Management + Metrics | 6/16 | In Progress|  |
+| 5. Task Management + Metrics | 12/16 | In Progress|  |
 | 6. Documents + Memory + Search | 0/? | Not started | - |
 | 7. Repos + Artifacts + Notifications | 0/? | Not started | - |
 | 8. Surface Delivery | 0/? | Not started | - |
