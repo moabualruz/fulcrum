@@ -14,7 +14,7 @@
  * Safety (T-06-06): greedy fill stops at slice budget; total hard cap = TOTAL_TOKEN_BUDGET.
  */
 
-import { injectable as Injectable, inject as Inject } from "@needle-di/core";
+import { injectable as Injectable } from "@needle-di/core";
 import type { MemoryRepository } from "@/db/repositories/memory/MemoryRepository";
 import type { DocumentRepository } from "@/db/repositories/docs/DocumentRepository";
 import type { AgentRunRepository } from "@/db/repositories/orchestration/AgentRunRepository";
@@ -70,9 +70,9 @@ function estimateTokens(text: string): number {
 @Injectable()
 export class ContextBundleService {
   constructor(
-    @Inject("MemoryRepository") private readonly memoryRepo: MemoryRepository,
-    @Inject("DocumentRepository") private readonly documentRepo: DocumentRepository,
-    @Inject("AgentRunRepository") private readonly agentRunRepo: AgentRunRepository,
+    private readonly memoryRepo: MemoryRepository,
+    private readonly documentRepo: DocumentRepository,
+    private readonly agentRunRepo: AgentRunRepository,
   ) {}
 
   async assemble(ctx: BundleContext): Promise<ContextBundle> {

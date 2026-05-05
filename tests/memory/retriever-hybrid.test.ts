@@ -55,16 +55,16 @@ describe("hybridScore", () => {
     const bm25 = 8;
     const maxBm25 = 10;
     const cosine = 0.9;
-    const expected = 0.6 * (8 / 10) + 0.4 * 0.9;
-    expect(hybridScore(bm25, maxBm25, cosine)).toBeCloseTo(expected, 6);
+    const expected = 0.3 * (bm25 / maxBm25) + 0.7 * cosine;
+    expect(hybridScore(normalizeBm25(bm25, maxBm25), cosine, { useEmbeddings: true })).toBeCloseTo(expected, 6);
   });
 
   test("pure BM25 (cosine=0) weights at 0.6", () => {
-    expect(hybridScore(10, 10, 0)).toBeCloseTo(0.6, 6);
+    expect(hybridScore(normalizeBm25(10, 10), 0, { useEmbeddings: true })).toBeCloseTo(0.3, 6);
   });
 
   test("pure cosine (bm25=0) weights at 0.4", () => {
-    expect(hybridScore(0, 10, 1)).toBeCloseTo(0.4, 6);
+    expect(hybridScore(normalizeBm25(0, 10), 1, { useEmbeddings: true })).toBeCloseTo(0.7, 6);
   });
 });
 
@@ -72,16 +72,16 @@ describe("rankMemoryMatchesHybrid", () => {
   test("hybrid re-ranks differently from FTS-only for ≥3/10 queries", () => {
     // 10 memories: some with high BM25 but low cosine, vice versa
     const memories: HybridMemoryRankInput[] = [
-      hmem("a", "alpha beta gamma delta", [1, 0, 0]),
-      hmem("b", "alpha beta", [0.9, 0.3, 0.1]),
-      hmem("c", "alpha", [0.95, 0.5, 0.2]),
-      hmem("d", "alpha beta gamma", [0.1, 0.1, 0.1]),
-      hmem("e", "alpha beta gamma delta epsilon", [0.5, 0.8, 0.3]),
-      hmem("f", "alpha", [0.99, 0.99, 0.01]),
-      hmem("g", "alpha beta gamma delta epsilon zeta", [0.2, 0.1, 0.05]),
-      hmem("h", "alpha beta", [0.7, 0.7, 0.5]),
-      hmem("i", "alpha", [0.8, 0.9, 0.7]),
-      hmem("j", "alpha beta gamma", [0.6, 0.6, 0.6]),
+      hmem("a", "alpha beta gamma delta", embedding([1, 0, 0])),
+      hmem("b", "alpha beta", embedding([0.9, 0.3, 0.1])),
+      hmem("c", "alpha", embedding([0.95, 0.5, 0.2])),
+      hmem("d", "alpha beta gamma", embedding([0.1, 0.1, 0.1])),
+      hmem("e", "alpha beta gamma delta epsilon", embedding([0.5, 0.8, 0.3])),
+      hmem("f", "alpha", embedding([0.99, 0.99, 0.01])),
+      hmem("g", "alpha beta gamma delta epsilon zeta", embedding([0.2, 0.1, 0.05])),
+      hmem("h", "alpha beta", embedding([0.7, 0.7, 0.5])),
+      hmem("i", "alpha", embedding([0.8, 0.9, 0.7])),
+      hmem("j", "alpha beta gamma", embedding([0.6, 0.6, 0.6])),
     ];
 
     const queries = [
@@ -89,7 +89,7 @@ describe("rankMemoryMatchesHybrid", () => {
       "alpha beta", "gamma delta", "alpha gamma", "beta delta", "zeta",
     ];
 
-    const queryEmbed = [0.85, 0.7, 0.4];
+    const queryEmbed = embedding([0.85, 0.7, 0.4]);
 
     let diffCount = 0;
     for (const query of queries) {
@@ -112,10 +112,10 @@ describe("rankMemoryMatchesHybrid", () => {
     const rows = rankMemoryMatchesHybrid(
       "marker",
       [
-        hmem("old-high", "marker", [0.5, 0.5, 0.5], { importance: "high", createdAt: daysAgo(30) }),
-        hmem("fresh-med", "marker", [0.5, 0.5, 0.5], { importance: "medium", createdAt: daysAgo(0) }),
+        hmem("old-high", "marker", embedding([0.5, 0.5, 0.5]), { importance: "high", createdAt: daysAgo(30) }),
+        hmem("fresh-med", "marker", embedding([0.5, 0.5, 0.5]), { importance: "medium", createdAt: daysAgo(0) }),
       ],
-      [0.5, 0.5, 0.5],
+      embedding([0.5, 0.5, 0.5]),
       { now: NOW },
     );
 
@@ -129,10 +129,10 @@ describe("rankMemoryMatchesHybrid", () => {
   });
 
   test("query embed cached in bundle blob structure", () => {
-    const queryEmbed = [0.1, 0.2, 0.3];
+    const queryEmbed = embedding([0.1, 0.2, 0.3]);
     const rows = rankMemoryMatchesHybrid(
       "test",
-      [hmem("x", "test query", [0.1, 0.2, 0.3])],
+      [hmem("x", "test query", embedding([0.1, 0.2, 0.3]))],
       queryEmbed,
       { now: NOW },
     );
@@ -181,6 +181,10 @@ function hmem(
     embedding,
     ...overrides,
   };
+}
+
+function embedding(values: number[]): number[] {
+  return [...values, ...Array.from({ length: 384 - values.length }, () => 0)];
 }
 
 function daysAgo(days: number): Date {

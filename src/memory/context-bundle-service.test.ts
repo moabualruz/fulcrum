@@ -3,8 +3,12 @@ import {
   ContextBundleService,
   TOTAL_TOKEN_BUDGET,
   SLICE_BUDGETS,
-  type ContextBundle,
 } from "./context-bundle-service.ts";
+
+type MemoryItem = { id: string; body: string; projectId: string | null; global: boolean };
+type DocItem = { id: string; title: string; contextSummary: { headings: string[]; wikilinks: string[] } };
+type RunItem = { id: string; taskId: string; status: string; tokensUsed: number };
+type TokenItem = MemoryItem | DocItem | RunItem | { id: string; body: string };
 
 function makeMockRepo() {
   return {
@@ -93,16 +97,18 @@ describe("ContextBundleService", () => {
   });
 
   test("greedy fill respects token budget per slice", async () => {
-    const bigItems = Array.from({ length: 100 }, (_, i) => ({
+    const bigItems: MemoryItem[] = Array.from({ length: 100 }, (_, i) => ({
       id: `item-${i}`,
       body: "x".repeat(200),
+      projectId: "p1",
+      global: false,
     }));
     memRepo.searchProjectAndGlobal = mock(() => Promise.resolve(bigItems));
 
     const bundle = await svc.assemble({ orgId: "org-1", projectId: "p1" });
     const memoriesBudget = Math.floor(TOTAL_TOKEN_BUDGET * SLICE_BUDGETS.memories);
     const totalTokens = bundle.memories.reduce(
-      (sum, item) => sum + Math.ceil(JSON.stringify(item).length / 4),
+      (sum: number, item) => sum + Math.ceil(JSON.stringify(item).length / 4),
       0,
     );
     expect(totalTokens).toBeLessThanOrEqual(memoriesBudget);
@@ -121,22 +127,39 @@ describe("ContextBundleService", () => {
   });
 
   test("total bundle size stays under TOTAL_TOKEN_BUDGET", async () => {
-    const bigItems = Array.from({ length: 200 }, (_, i) => ({
+    const memoryItems: MemoryItem[] = Array.from({ length: 200 }, (_, i) => ({
       id: `big-${i}`,
       body: "y".repeat(500),
+      projectId: "p1",
+      global: false,
     }));
-    memRepo.searchProjectAndGlobal = mock(() => Promise.resolve(bigItems));
-    docRepo.getContextSummariesForProject = mock(() => Promise.resolve(bigItems));
-    runRepo.getRecentForProject = mock(() => Promise.resolve(bigItems));
+    const docItems: DocItem[] = memoryItems.map((item) => ({
+      id: item.id,
+      title: item.body,
+      contextSummary: { headings: [item.body], wikilinks: [] },
+    }));
+    const runItems: RunItem[] = memoryItems.map((item) => ({
+      id: item.id,
+      taskId: item.id,
+      status: item.body,
+      tokensUsed: 500,
+    }));
+    memRepo.searchProjectAndGlobal = mock(() => Promise.resolve(memoryItems));
+    docRepo.getContextSummariesForProject = mock(() => Promise.resolve(docItems));
+    runRepo.getRecentForProject = mock(() => Promise.resolve(runItems));
 
     const bundle = await svc.assemble({ orgId: "org-1", projectId: "p1" });
-    const totalTokens = [
+    const bundleItems = [
       ...bundle.memories,
       ...bundle.linkedDocs,
       ...bundle.recentRuns,
       ...bundle.repoState,
       ...bundle.skillPrompts,
-    ].reduce((sum, item) => sum + Math.ceil(JSON.stringify(item).length / 4), 0);
+    ] as TokenItem[];
+    const totalTokens = bundleItems.reduce(
+      (sum, item) => sum + Math.ceil(JSON.stringify(item).length / 4),
+      0,
+    );
 
     expect(totalTokens).toBeLessThanOrEqual(TOTAL_TOKEN_BUDGET);
   });

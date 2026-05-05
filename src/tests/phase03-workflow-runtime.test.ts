@@ -22,7 +22,7 @@ describe("Phase 03: Workflow Runtime — Orchestrator Lifecycle", () => {
   // --- State Machine ---
 
   test("AGENT_RUN_ORCHESTRATION_STATES contains expected terminal states", () => {
-    const terminals = ["succeeded", "failed", "timed_out", "cancelled"];
+    const terminals: AgentRunOrchestrationState[] = ["succeeded", "failed", "timed_out", "cancelled"];
     for (const t of terminals) {
       expect(AGENT_RUN_ORCHESTRATION_STATES).toContain(t);
     }

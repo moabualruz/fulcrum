@@ -74,7 +74,7 @@ export const docCommentsRouter = t.router({
         docId: z.string().uuid(),
         bodyMd: z.string().min(1).max(10_000),
         /** Serialized anchor range (e.g. {from, to} or {nodeId, offset}) */
-        anchorRange: z.record(z.unknown()).optional(),
+        anchorRange: z.record(z.string(), z.unknown()).optional(),
         /** Parent comment id for threading */
         parentCommentId: z.string().uuid().optional(),
       }),
@@ -96,7 +96,8 @@ export const docCommentsRouter = t.router({
         resolved: false,
       } as never) as DocComment;
 
-      await em.persistAndFlush(comment as never);
+      em.persist(comment as never);
+      await em.flush();
       return comment;
     }),
 
@@ -107,7 +108,7 @@ export const docCommentsRouter = t.router({
       const em = getEm(ctx);
       const comment = await resolveComment(ctx, input.id);
 
-      (comment as Record<string, unknown>)["resolved"] = true;
+      (comment as unknown as Record<string, unknown>)["resolved"] = true;
       await em.flush();
       return { id: input.id, resolved: true };
     }),
@@ -119,7 +120,8 @@ export const docCommentsRouter = t.router({
       const em = getEm(ctx);
       const comment = await resolveComment(ctx, input.id);
 
-      await em.removeAndFlush(comment as never);
+      em.remove(comment as never);
+      await em.flush();
       return { id: input.id, deleted: true };
     }),
 });

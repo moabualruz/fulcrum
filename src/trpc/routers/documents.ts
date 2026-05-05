@@ -28,9 +28,9 @@ const DocTypeSchema = z.enum([
   "spec", "adr", "wiki", "runbook", "meeting", "postmortem", "rfc", "note", "scratch",
 ]);
 
-const ContentJsonSchema = z.record(z.unknown());
+const ContentJsonSchema = z.record(z.string(), z.unknown());
 
-const FrontmatterSchema = z.record(z.unknown()).optional();
+const FrontmatterSchema = z.record(z.string(), z.unknown()).optional();
 
 // ---------------------------------------------------------------------------
 // Dependency helpers
@@ -143,7 +143,8 @@ export const documentsRouter = t.router({
         bodyMd: "",
       } as never) as Document;
 
-      await em.persistAndFlush(doc as never);
+      em.persist(doc as never);
+      await em.flush();
       return doc;
     }),
 
@@ -161,18 +162,18 @@ export const documentsRouter = t.router({
       const em = getEm(ctx);
       const doc = await resolveDoc(ctx, input.id);
 
-      if (input.title !== undefined) (doc as Record<string, unknown>)["title"] = input.title;
-      if (input.frontmatter !== undefined) (doc as Record<string, unknown>)["frontmatter"] = input.frontmatter;
+      if (input.title !== undefined) (doc as unknown as Record<string, unknown>)["title"] = input.title;
+      if (input.frontmatter !== undefined) (doc as unknown as Record<string, unknown>)["frontmatter"] = input.frontmatter;
 
       if (input.contentJson !== undefined) {
-        (doc as Record<string, unknown>)["contentJson"] = input.contentJson;
+        (doc as unknown as Record<string, unknown>)["contentJson"] = input.contentJson;
 
         // Extract plain text from ProseMirror JSON → run ContextSummaryExtractor
         const bodyMd = jsonToText(input.contentJson);
-        (doc as Record<string, unknown>)["bodyMd"] = bodyMd;
+        (doc as unknown as Record<string, unknown>)["bodyMd"] = bodyMd;
 
         const extractor = new ContextSummaryExtractor();
-        (doc as Record<string, unknown>)["contextSummary"] = extractor.extractSummary(bodyMd);
+        (doc as unknown as Record<string, unknown>)["contextSummary"] = extractor.extractSummary(bodyMd);
 
         // Sync wikilinks → doc_links table (T-06-10: structured JSON, not raw HTML)
         await syncDocWikilinks(em, requireOrg(ctx), doc, input.contentJson);
@@ -196,9 +197,9 @@ export const documentsRouter = t.router({
       const doc = await resolveDoc(ctx, input.id);
 
       if (input.parentId !== undefined) {
-        (doc as Record<string, unknown>)["parent"] = input.parentId;
+        (doc as unknown as Record<string, unknown>)["parent"] = input.parentId;
       }
-      (doc as Record<string, unknown>)["sortPosition"] = input.sortPosition;
+      (doc as unknown as Record<string, unknown>)["sortPosition"] = input.sortPosition;
 
       await em.flush();
       return doc;
@@ -211,7 +212,7 @@ export const documentsRouter = t.router({
       const em = getEm(ctx);
       const doc = await resolveDoc(ctx, input.id);
 
-      (doc as Record<string, unknown>)["archived"] = true;
+      (doc as unknown as Record<string, unknown>)["archived"] = true;
       await em.flush();
       return { id: input.id, archived: true };
     }),

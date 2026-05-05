@@ -3,26 +3,30 @@
  * These tests run against a mock ProductDb.
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { SearchQueryService } from "./query-service.ts";
 import type { ProductDb } from "../product-kernel/db/types.ts";
 
 function makeDb(rows: Record<string, unknown>[] = []): ProductDb {
   return {
-    query: vi.fn().mockResolvedValue(rows),
+    query: mock(() => Promise.resolve(rows)),
   } as unknown as ProductDb;
+}
+
+function queryCalls(db: ProductDb): unknown[][] {
+  return (db.query as unknown as { mock: { calls: unknown[][] } }).mock.calls;
 }
 
 describe("SearchQueryService", () => {
   let svc: SearchQueryService;
 
   describe("query() — empty term", () => {
-    it("returns empty results without hitting DB when term is blank", async () => {
+    test("returns empty results without hitting DB when term is blank", async () => {
       const db = makeDb([{ id: "1" }]);
       svc = new SearchQueryService(db);
       const result = await svc.query("org1", { term: "   " });
       expect(result).toEqual({ results: [], total: 0 });
-      expect((db.query as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+      expect(db.query).not.toHaveBeenCalled();
     });
   });
 
@@ -48,7 +52,7 @@ describe("SearchQueryService", () => {
       svc = new SearchQueryService(db);
     });
 
-    it("Test 1: returns results with rank field from ts_rank", async () => {
+    test("Test 1: returns results with rank field from ts_rank", async () => {
       const db = makeDb(fakeRows);
       svc = new SearchQueryService(db);
       const result = await svc.query("org1", { term: "test" });
@@ -57,25 +61,26 @@ describe("SearchQueryService", () => {
       expect(result.results[0]!.rank).toBeGreaterThanOrEqual(0);
     });
 
-    it("Test 2: filters by entityKind when kinds filter is provided", async () => {
+    test("Test 2: filters by entityKind when kinds filter is provided", async () => {
       const db = makeDb(fakeRows);
       svc = new SearchQueryService(db);
       const result = await svc.query("org1", { term: "test", filters: { kinds: ["doc"] } });
       expect(result.results).toHaveLength(1);
       // ensure SQL was called with kinds filter (check db.query was called)
-      expect((db.query as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
-      const sql: string = (db.query as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(db.query).toHaveBeenCalled();
+      const sql = queryCalls(db)[0]?.[0] as string;
       expect(sql).toMatch(/entity_kind/i);
     });
 
-    it("Test 3: returns facetCounts when facets=true", async () => {
+    test("Test 3: returns facetCounts when facets=true", async () => {
       // First call returns main results, subsequent calls return facet aggregates
+      const query = mock()
+        .mockResolvedValueOnce(fakeRows)
+        .mockResolvedValueOnce([{ value: "doc", count: "1" }])
+        .mockResolvedValueOnce([{ value: "p1", count: "1" }])
+        .mockResolvedValueOnce([]);
       const db = {
-        query: vi.fn()
-          .mockResolvedValueOnce(fakeRows)
-          .mockResolvedValueOnce([{ value: "doc", count: "1" }])
-          .mockResolvedValueOnce([{ value: "p1", count: "1" }])
-          .mockResolvedValueOnce([]),
+        query,
       } as unknown as ProductDb;
       svc = new SearchQueryService(db);
       const result = await svc.query("org1", { term: "test", facets: true });
@@ -85,7 +90,7 @@ describe("SearchQueryService", () => {
       expect(result.facets).toHaveProperty("status");
     });
 
-    it("Test 4: empty term returns empty results without DB scan", async () => {
+    test("Test 4: empty term returns empty results without DB scan", async () => {
       const db = makeDb();
       svc = new SearchQueryService(db);
       const result = await svc.query("org1", { term: "" });
@@ -93,12 +98,12 @@ describe("SearchQueryService", () => {
       expect(result.total).toBe(0);
     });
 
-    it("Test 5: respects limit and offset for pagination", async () => {
+    test("Test 5: respects limit and offset for pagination", async () => {
       const db = makeDb(fakeRows);
       svc = new SearchQueryService(db);
       await svc.query("org1", { term: "test", limit: 10, offset: 5 });
-      const sql: string = (db.query as ReturnType<typeof vi.fn>).mock.calls[0][0];
-      const params: unknown[] = (db.query as ReturnType<typeof vi.fn>).mock.calls[0][1];
+      const sql = queryCalls(db)[0]?.[0] as string;
+      const params = queryCalls(db)[0]?.[1] as unknown[];
       expect(sql).toMatch(/LIMIT/i);
       expect(sql).toMatch(/OFFSET/i);
       expect(params).toContain(10);

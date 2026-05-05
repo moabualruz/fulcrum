@@ -31,7 +31,7 @@ describe("applyDelta", () => {
       ops: [{ path: [], value: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "World" }] }] } }],
     };
     const result = applyDelta(baseDoc, delta, schema);
-    expect(result).toEqual(delta.ops[0].value);
+    expect(result).toEqual(delta.ops[0]!.value);
   });
 
   it("Test 2: delta with steps format reconstructs doc from base + steps", () => {

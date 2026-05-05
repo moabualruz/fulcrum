@@ -7,8 +7,6 @@
  */
 
 import { injectable as Injectable } from "@needle-di/core";
-import { create, insert } from "@orama/orama";
-import { persist } from "@orama/plugin-data-persistence";
 import type { ProductDb } from "../product-kernel/db/types.ts";
 
 const SCHEMA = {
@@ -28,6 +26,10 @@ export class SnapshotService {
   /** Build and serialize an Orama index from all search_documents for the org. */
   async buildSnapshot(orgId: string): Promise<string> {
     const rows = await this.fetchDocuments(orgId);
+    const [{ create, insert }, { persist }] = await Promise.all([
+      dynamicImport<OramaModule>("@orama/orama"),
+      dynamicImport<OramaPersistenceModule>("@orama/plugin-data-persistence"),
+    ]);
     const oramaDb = await create({ schema: SCHEMA });
 
     for (const row of rows) {
@@ -42,7 +44,7 @@ export class SnapshotService {
       });
     }
 
-    return persist(oramaDb, "json") as unknown as string;
+    return persist(oramaDb, "json");
   }
 
   private async fetchDocuments(orgId: string): Promise<SearchRow[]> {
@@ -60,6 +62,19 @@ export class SnapshotService {
       return [];
     }
   }
+}
+
+const dynamicImport = new Function("specifier", "return import(specifier)") as <T>(
+  specifier: string,
+) => Promise<T>;
+
+interface OramaModule {
+  create(options: { schema: typeof SCHEMA }): Promise<unknown>;
+  insert(db: unknown, document: Record<string, unknown>): Promise<void>;
+}
+
+interface OramaPersistenceModule {
+  persist(db: unknown, format: "json"): Promise<string>;
 }
 
 interface SearchRow {

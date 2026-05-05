@@ -47,24 +47,28 @@ describe("SprintService - capacity", () => {
 
 describe("SprintService - retrospective", () => {
   it("saves retrospective notes and summary", async () => {
-    const sprint = makeSprint();
+    const sprint = makeSprint({ retrospectiveNotes: null as unknown as Record<string, string> });
     const em = makeMockEm(sprint);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const svc = new SprintService(em as any);
     const result = await svc.saveRetrospective("org-1", "sprint-1", "Great sprint", "Velocity up");
     expect(em.flush).toHaveBeenCalled();
     expect(result).not.toBeNull();
-    expect((sprint.retrospectiveNotes as Record<string, string>)?.notes).toBe("Great sprint");
+    expect((sprint.retrospectiveNotes as unknown as Record<string, string>)?.notes).toBe("Great sprint");
   });
 
   it("closes sprint with rollover disposition", async () => {
-    const sprint = makeSprint({ status: "active", closedSummary: null });
+    const sprint = makeSprint({
+      status: "active",
+      closedSummary: null as unknown as Record<string, string>,
+      retrospectiveNotes: null as unknown as Record<string, string>,
+    });
     const em = makeMockEm(sprint);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const svc = new SprintService(em as any);
     const result = await svc.saveRetrospective("org-1", "sprint-1", "Rollover notes", "closed");
     expect(result).not.toBeNull();
     expect(em.flush).toHaveBeenCalled();
-    expect((sprint.retrospectiveNotes as Record<string, string>)?.notes).toBe("Rollover notes");
+    expect((sprint.retrospectiveNotes as unknown as Record<string, string>)?.notes).toBe("Rollover notes");
   });
 });

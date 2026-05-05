@@ -123,7 +123,8 @@ export const docVersionsRouter = t.router({
         restoreOf: input.versionId,
       } as never) as DocVersion;
 
-      await em.persistAndFlush(newVersion as never);
+      em.persist(newVersion as never);
+      await em.flush();
 
       return {
         id: newVersion.id,

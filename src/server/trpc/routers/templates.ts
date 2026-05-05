@@ -39,7 +39,7 @@ export const templatesRouter = t.router({
       );
     }),
 
-  apply: permissionedProcedure({ resource: "tasks", action: "list" })
+  applyTemplate: permissionedProcedure({ resource: "tasks", action: "list" })
     .input(z.object({
       templateId: z.string().uuid(),
       overrides: z.record(z.string(), z.unknown()).optional(),

@@ -47,7 +47,14 @@ describe("RoutingDecisionResultSchema", () => {
   });
 
   test("all six status values parse correctly", () => {
-    const statuses = ["matched", "no_match", "recommended", "draft_created", "conflict", "abstained"];
+    const statuses: RoutingDecisionResult["status"][] = [
+      "matched",
+      "no_match",
+      "recommended",
+      "draft_created",
+      "conflict",
+      "abstained",
+    ];
     for (const s of statuses) {
       expect(RoutingResultStatus.parse(s)).toBe(s);
     }
@@ -140,7 +147,7 @@ describe("LLM fallback", () => {
   test("returns null when no sidecar configured", async () => {
     configureLlmFallback({ sidecarClient: null });
     // Without FULCRUM_FEATURES=router-llm, fallback is gated off
-    const result = await llmFallback({ kind: "bug" }, "org-1");
+    const result = await llmFallback({ task: { kind: "bug", priority: "medium", tags: [], title: "Bug" } }, "org-1");
     expect(result).toBeNull();
   });
 
@@ -154,7 +161,7 @@ describe("LLM fallback", () => {
     const origEnv = process.env["FULCRUM_FEATURES"];
     process.env["FULCRUM_FEATURES"] = "router-llm";
     try {
-      const result = await llmFallback({ kind: "bug" }, "org-1");
+      const result = await llmFallback({ task: { kind: "bug", priority: "medium", tags: [], title: "Bug" } }, "org-1");
       expect(result).toBeNull();
     } finally {
       if (origEnv === undefined) delete process.env["FULCRUM_FEATURES"];
@@ -171,7 +178,7 @@ describe("LLM fallback", () => {
     const origEnv = process.env["FULCRUM_FEATURES"];
     process.env["FULCRUM_FEATURES"] = "router-llm";
     try {
-      const result = await llmFallback({ kind: "bug" }, "org-1");
+      const result = await llmFallback({ task: { kind: "bug", priority: "medium", tags: [], title: "Bug" } }, "org-1");
       expect(result).toBeNull();
     } finally {
       if (origEnv === undefined) delete process.env["FULCRUM_FEATURES"];
@@ -188,7 +195,7 @@ describe("LLM fallback", () => {
     const origEnv = process.env["FULCRUM_FEATURES"];
     process.env["FULCRUM_FEATURES"] = "router-llm";
     try {
-      const result = await llmFallback({ kind: "bug" }, "org-1");
+      const result = await llmFallback({ task: { kind: "bug", priority: "medium", tags: [], title: "Bug" } }, "org-1");
       expect(result).not.toBeNull();
       expect(result!.agent).toBe("codex");
       expect(result!.confidence).toBe(0.8);

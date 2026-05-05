@@ -177,16 +177,16 @@ describe("stub routers — unauthenticated list() returns UNAUTHORIZED", () => {
 describe("search.query stub", () => {
   it("returns [] for authenticated caller with query string", async () => {
     const caller = authenticatedCaller();
-    const result = await caller.search.query({ q: "test query" });
-    expect(Array.isArray(result)).toBe(true);
-    expect(result).toHaveLength(0);
+    const result = await caller.search.query({ term: "test query" });
+    expect(result.results).toEqual([]);
+    expect(result.total).toBe(0);
   });
 
   it("returns UNAUTHORIZED for unauthenticated caller", async () => {
     const caller = unauthenticatedCaller();
     let error: TRPCError | null = null;
     try {
-      await caller.search.query({ q: "test query" });
+      await caller.search.query({ term: "test query" });
     } catch (e) {
       if (e instanceof TRPCError) error = e;
     }

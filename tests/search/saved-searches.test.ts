@@ -91,8 +91,8 @@ describe("P11#07 saved searches", () => {
 
     expect(created.viewType).toBe("search");
     expect(created.createdById).toBe(testDb.seed.userId);
-    expect((await owner.search.savedList()).map((view) => view.id)).toContain(created.id);
-    expect((await member.search.savedList()).map((view) => view.id)).not.toContain(created.id);
+    expect((await owner.search.savedList({})).map((view) => view.id)).toContain(created.id);
+    expect((await member.search.savedList({})).map((view) => view.id)).not.toContain(created.id);
   });
 
   test("project and org saved searches are visible to org members", async () => {
@@ -112,7 +112,7 @@ describe("P11#07 saved searches", () => {
       queryJson: { text: "org", filters: {}, facets: {} },
     });
 
-    expect((await member.search.savedList()).map((view) => view.id).sort()).toEqual(
+    expect((await member.search.savedList({})).map((view) => view.id).sort()).toEqual(
       [org.id, project.id].sort(),
     );
   });
@@ -156,7 +156,7 @@ describe("P11#07 saved searches", () => {
 
     await owner.search.savedDelete({ id: created.id });
 
-    expect((await owner.search.savedList()).map((view) => view.id)).not.toContain(created.id);
+    expect((await owner.search.savedList({})).map((view) => view.id)).not.toContain(created.id);
   });
 
   test("view_type constraint accepts search and still rejects wrong types", async () => {

@@ -122,8 +122,9 @@ export class MemoryService {
       source: data.source ?? "manual",
       tags: data.tags ?? [],
       sourceRef: data.sourceRef ?? {},
-    } as Partial<Memory>);
-    await em.persistAndFlush(memory);
+    } as never);
+    em.persist(memory as never);
+    await em.flush();
     return memory;
   }
 
