@@ -47,6 +47,23 @@
     showConfirmDelete = false;
     window.location.reload();
   }
+
+  function retentionLabel(artifact: { archived?: boolean; retentionStatus?: string; retentionDaysRemaining?: number }) {
+    if (artifact.archived) return "archived";
+    if (artifact.retentionStatus) return artifact.retentionStatus;
+    if (typeof artifact.retentionDaysRemaining === "number") return `${artifact.retentionDaysRemaining}d`;
+    return "active";
+  }
+
+  function previewLabel(artifact: { mime?: string | null; title?: string; filename?: string }) {
+    const mime = artifact.mime ?? "";
+    const name = artifact.title ?? artifact.filename ?? "";
+    if (mime === "image/png") return "image";
+    if (mime === "text/markdown" || name.endsWith(".md")) return "markdown";
+    if (mime.startsWith("text/")) return "text";
+    if (mime === "application/json" || mime === "application/javascript" || name.match(/\.(ts|tsx|js|jsx|css|html)$/)) return "code";
+    return "download";
+  }
 </script>
 
 <header
@@ -175,8 +192,12 @@
             <th class={cn("pb-2 font-medium")}>Title</th>
             <th class={cn("pb-2 font-medium")}>Kind</th>
             <th class={cn("pb-2 font-medium")}>MIME</th>
+            <th class={cn("pb-2 font-medium")}>Run</th>
+            <th class={cn("pb-2 font-medium")}>Preview</th>
+            <th class={cn("pb-2 font-medium")}>Retention</th>
             <th class={cn("pb-2 font-medium text-right")}>Size</th>
             <th class={cn("pb-2 font-medium")}>Created</th>
+            <th class={cn("pb-2 font-medium")}>Download</th>
           </tr>
         </thead>
         <tbody>
@@ -199,8 +220,18 @@
               </td>
               <td class={cn("py-2")}>{artifact.kind}</td>
               <td class={cn("py-2")}>{artifact.mime ?? "—"}</td>
+              <td class={cn("py-2")}>
+                {#if artifact.run_id}
+                  <a data-artifact-run-link href="/runs/{artifact.run_id}" class={cn("text-primary underline-offset-4 hover:underline")}>run</a>
+                {:else}
+                  —
+                {/if}
+              </td>
+              <td data-artifact-preview-kind={previewLabel(artifact)} class={cn("py-2")}>{previewLabel(artifact)}</td>
+              <td data-artifact-retention-status class={cn("py-2")}>{retentionLabel(artifact)}</td>
               <td class={cn("py-2 text-right")}>{artifact.size != null ? artifact.size.toLocaleString() : "—"}</td>
               <td class={cn("py-2")}>{artifact.created_at.slice(0, 10)}</td>
+              <td class={cn("py-2")}><a href="/artifacts/{artifact.id}/download" class={cn("text-primary underline-offset-4 hover:underline")}>Download</a></td>
             </tr>
           {/each}
         </tbody>

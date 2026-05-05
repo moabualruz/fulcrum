@@ -10,8 +10,13 @@ export interface TuiArtifact {
   taskId?: string | null;
   docId?: string | null;
   type?: string | null;
+  kind?: string | null;
   path: string;
   sizeBytes?: number | string | bigint | null;
+  archived?: boolean;
+  pruned?: boolean;
+  retentionStatus?: string | null;
+  previewKind?: string | null;
   createdAt?: string | Date | null;
 }
 
@@ -27,6 +32,8 @@ export interface TuiArtifactFilters {
   runId?: string;
   taskId?: string;
   mime?: string;
+  kind?: string;
+  archived?: boolean;
 }
 
 export interface ArtifactsScreenOptions {
@@ -80,13 +87,16 @@ export class ArtifactsScreen {
         const pointer = index === this.cursor ? c.bold(">") : " ";
         const checked = this.selectedIds.has(artifact.id) ? "[x]" : "[ ]";
         renderer.writeln(
-          `${pointer} ${checked} ${displayName(artifact)}  [${mimeBadge(artifact)}]  ${attachmentBadge(artifact)}  ${formatBytes(artifact.sizeBytes)}`,
+          `${pointer} ${checked} ${displayName(artifact)}  [${mimeBadge(artifact)}]  ${attachmentBadge(artifact)}  ${retentionBadge(artifact)}  preview:${previewBadge(artifact)}  ${formatBytes(artifact.sizeBytes)}`,
         );
       }
     }
 
     renderer.writeln();
     renderer.writeln(c.bold("  Preview"));
+    if (this.selectedArtifact) {
+      renderer.writeln(`  ${previewSummary(this.selectedArtifact)}`);
+    }
     for (const line of this.previewLines) renderer.writeln(`  ${line}`);
 
     renderer.writeln();
@@ -118,7 +128,7 @@ export class ArtifactsScreen {
     if (this.overlay === "filter") {
       renderer.writeln();
       renderer.writeln(c.bold("  Filter artifacts"));
-      renderer.writeln(c.dim("  MIME / project / run / task filters"));
+      renderer.writeln(c.dim("  MIME / kind / project / archive / run filters"));
     }
 
     if (this.overlay === "detail") {
@@ -292,6 +302,27 @@ function attachmentBadge(artifact: TuiArtifact): string {
   if (artifact.runId) return `run:${artifact.runId}`;
   if (artifact.docId) return `doc:${artifact.docId}`;
   return "unattached";
+}
+
+function retentionBadge(artifact: TuiArtifact): string {
+  if (artifact.pruned) return "pruned";
+  if (artifact.archived) return "archived";
+  return artifact.retentionStatus ?? "active";
+}
+
+function previewBadge(artifact: TuiArtifact): string {
+  if (artifact.previewKind) return artifact.previewKind;
+  const mime = artifact.mime ?? "";
+  const name = displayName(artifact);
+  if (mime === "image/png") return "image";
+  if (mime === "text/markdown" || name.endsWith(".md")) return "markdown";
+  if (mime.startsWith("text/")) return "text";
+  if (mime === "application/json" || mime === "application/javascript" || name.match(/\.(ts|tsx|js|jsx|css|html)$/)) return "code";
+  return "download";
+}
+
+function previewSummary(artifact: TuiArtifact): string {
+  return `preview=${previewBadge(artifact)} retention=${retentionBadge(artifact)} run=${artifact.runId ?? "-"} kind=${artifact.kind ?? artifact.type ?? "artifact"}`;
 }
 
 function formatBytes(sizeBytes?: number | string | bigint | null): string {

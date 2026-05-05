@@ -7,6 +7,8 @@ import {
   ArchiveArtifactOutputSchema,
   ArtifactIdInputSchema,
   ArtifactSchema,
+  type ArtifactPreviewKind,
+  type ArtifactRetentionStatus,
   DeleteArtifactInputSchema,
   DeleteArtifactOutputSchema,
   DownloadArtifactOutputSchema,
@@ -34,6 +36,7 @@ type ArtifactRecord = {
   checksumSha256?: string | null;
   metadataJson?: Record<string, unknown> | null;
   archived?: boolean;
+  pruned?: boolean;
   retentionUntil?: Date | null;
   createdAt?: Date;
 };
@@ -117,9 +120,20 @@ function toArtifact(record: ArtifactRecord): Artifact {
     sizeBytes: stringifyBytes(record.sizeBytes),
     path: record.path ?? record.id,
     checksumSha256: record.checksumSha256 ?? null,
+    digest: digestOf(record),
     metadataJson: record.metadataJson ?? {},
     archived: record.archived ?? false,
+    pruned: record.pruned ?? Boolean(record.metadataJson?.["prunedAt"]),
+    retentionStatus: retentionStatusOf(record),
     retentionUntil: record.retentionUntil ?? null,
+    previewKind: previewKindOf(record),
+    sourcePath: stringOrNull(record.metadataJson?.["sourcePath"]),
+    sourceGlob: stringOrNull(record.metadataJson?.["sourceGlob"]),
+    harvestedAt: stringOrNull(record.metadataJson?.["harvestedAt"]),
+    producerKind: stringOrNull(record.metadataJson?.["producerKind"]),
+    producerId: stringOrNull(record.metadataJson?.["producerId"]),
+    edgeId: stringOrNull(record.metadataJson?.["edgeId"]),
+    attestation: attestationOf(record.metadataJson?.["attestation"]),
     createdAt: record.createdAt ?? new Date(0),
   });
 }
@@ -128,6 +142,48 @@ function stringifyBytes(value: ArtifactRecord["sizeBytes"]): string {
   if (typeof value === "bigint") return value.toString();
   if (typeof value === "number") return String(value);
   return value ?? "0";
+}
+
+function digestOf(record: ArtifactRecord): string | null {
+  return stringOrNull(record.metadataJson?.["sha256"]) ?? record.checksumSha256 ?? null;
+}
+
+function retentionStatusOf(record: ArtifactRecord): ArtifactRetentionStatus {
+  if (record.pruned || record.metadataJson?.["prunedAt"]) return "pruned";
+  if (record.archived) return "archived";
+  if (!record.retentionUntil) return "forever";
+  return new Date(record.retentionUntil).getTime() < Date.now() ? "expired" : "active";
+}
+
+function previewKindOf(record: ArtifactRecord): ArtifactPreviewKind {
+  const metadataKind = stringOrNull(record.metadataJson?.["previewKind"]);
+  if (metadataKind === "image" || metadataKind === "text" || metadataKind === "markdown" || metadataKind === "code") {
+    return metadataKind;
+  }
+  const mime = record.mime ?? "";
+  const filename = record.filename ?? record.name ?? "";
+  if (mime === "image/png") return "image";
+  if (mime === "text/markdown" || filename.endsWith(".md")) return "markdown";
+  if (mime.startsWith("text/")) return "text";
+  if (mime === "application/json" || mime === "application/javascript" || filename.match(/\.(ts|tsx|js|jsx|css|html)$/)) {
+    return "code";
+  }
+  return "download";
+}
+
+function stringOrNull(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function attestationOf(value: unknown): Artifact["attestation"] {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  return {
+    subjectDigest: stringOrNull(record["subjectDigest"]),
+    predicateType: stringOrNull(record["predicateType"]),
+    issuer: stringOrNull(record["issuer"]),
+    signedAt: stringOrNull(record["signedAt"]),
+  };
 }
 
 async function findArtifact(ctx: TRPCContext, id: string): Promise<ArtifactRecord> {

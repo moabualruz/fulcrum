@@ -20,6 +20,15 @@ export const ArtifactTypeSchema = z.enum([
 const UuidSchema = z.string().uuid();
 
 const BigIntStringSchema = z.string().regex(/^\d+$/);
+export const ArtifactPreviewKindSchema = z.enum(["image", "text", "markdown", "code", "download"]);
+export const ArtifactRetentionStatusSchema = z.enum(["active", "expired", "archived", "pruned", "forever"]);
+
+export const ArtifactAttestationSchema = z.object({
+  subjectDigest: z.string().nullable(),
+  predicateType: z.string().nullable(),
+  issuer: z.string().nullable(),
+  signedAt: z.string().nullable(),
+}).nullable();
 
 /** Artifact output schema shared by tRPC, CLI, and TUI. */
 export const ArtifactSchema = z.object({
@@ -33,9 +42,20 @@ export const ArtifactSchema = z.object({
   sizeBytes: BigIntStringSchema.describe("File size in bytes, serialized as a decimal string."),
   path: z.string().min(1).describe("Storage backend path."),
   checksumSha256: z.string().min(1).nullable().describe("SHA-256 checksum, when known."),
+  digest: z.string().min(1).nullable().default(null).describe("Digest shown to users."),
   metadataJson: z.record(z.string(), z.unknown()).describe("Artifact metadata."),
   archived: z.boolean().describe("Whether the artifact is archived."),
+  pruned: z.boolean().default(false).describe("Whether artifact blob was pruned."),
+  retentionStatus: ArtifactRetentionStatusSchema.default("active").describe("Retention lifecycle state."),
   retentionUntil: z.date().nullable().describe("Retention deadline, when configured."),
+  previewKind: ArtifactPreviewKindSchema.default("download").describe("Inline preview mode."),
+  sourcePath: z.string().nullable().default(null).describe("Original harvested source path."),
+  sourceGlob: z.string().nullable().default(null).describe("Harvest glob that selected the artifact."),
+  harvestedAt: z.string().nullable().default(null).describe("Harvest timestamp."),
+  producerKind: z.string().nullable().default(null).describe("Producer kind, usually agent_run."),
+  producerId: UuidSchema.nullable().default(null).describe("Producer identifier."),
+  edgeId: UuidSchema.nullable().default(null).describe("Run-artifact edge identifier when available."),
+  attestation: ArtifactAttestationSchema.default(null).describe("Attestation-ready metadata."),
   createdAt: z.date().describe("Timestamp when the artifact was created."),
 });
 
@@ -98,5 +118,7 @@ export const ArchiveArtifactOutputSchema = z.object({
 
 export type Artifact = z.infer<typeof ArtifactSchema>;
 export type ArtifactType = z.infer<typeof ArtifactTypeSchema>;
+export type ArtifactPreviewKind = z.infer<typeof ArtifactPreviewKindSchema>;
+export type ArtifactRetentionStatus = z.infer<typeof ArtifactRetentionStatusSchema>;
 export type ListArtifactsInput = z.infer<typeof ListArtifactsInputSchema>;
 export type UploadArtifactInput = z.infer<typeof UploadArtifactInputSchema>;

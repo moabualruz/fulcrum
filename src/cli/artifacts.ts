@@ -171,7 +171,9 @@ export async function run(argv: readonly string[], client: ArtifactsClient): Pro
           console.log("no artifacts");
         } else {
           for (const r of rows) {
-            console.log(`${r.id}\t${r.filename}\t${r.sizeBytes}B\t${r.archived ? "archived" : "active"}`);
+            console.log(
+              `${r.id}\t${r.filename}\t${r.sizeBytes}B\t${r.archived ? "archived" : r.retentionStatus}\t${r.previewKind}\trun:${r.runId ?? "-"}`,
+            );
           }
         }
       });
@@ -187,6 +189,10 @@ export async function run(argv: readonly string[], client: ArtifactsClient): Pro
         console.log(`mime:     ${artifact.mime ?? "unknown"}`);
         console.log(`size:     ${artifact.sizeBytes}B`);
         console.log(`archived: ${artifact.archived}`);
+        console.log(`retention:${artifact.retentionStatus}${artifact.pruned ? " (pruned)" : ""}`);
+        console.log(`preview:  ${artifact.previewKind === "download" ? "download only" : `inline ${artifact.previewKind}`}`);
+        console.log(`run:      ${artifact.runId ?? "none"}`);
+        console.log(`digest:   ${artifact.digest ?? artifact.checksumSha256 ?? "unknown"}`);
         console.log(`path:     ${artifact.path}`);
       });
       return;
@@ -227,7 +233,8 @@ export async function run(argv: readonly string[], client: ArtifactsClient): Pro
       const result = await client.download({ id });
       await writeFile(outPath, result.bytes);
       output(json, { artifact: result.artifact, path: outPath }, () => {
-        console.log(`downloaded: ${result.artifact.filename} → ${outPath} (${result.bytes.length}B)`);
+        console.log(`downloaded: ${result.artifact.filename} -> ${outPath} (${result.bytes.length}B)`);
+        console.log(`digest: ${result.artifact.digest ?? result.artifact.checksumSha256 ?? "unknown"}`);
       });
       return;
     }
@@ -242,7 +249,7 @@ export async function run(argv: readonly string[], client: ArtifactsClient): Pro
       }
       const result = await client.attach({ id, target });
       output(json, result, () => {
-        console.log(`attached ${id} → ${target.kind}:${target.id}`);
+        console.log(`attached ${id} -> ${target.kind}:${target.id}`);
       });
       return;
     }
@@ -257,7 +264,7 @@ export async function run(argv: readonly string[], client: ArtifactsClient): Pro
       }
       const result = await client.detach({ id, target });
       output(json, result, () => {
-        console.log(`detached ${id} ← ${target.kind}:${target.id}`);
+        console.log(`detached ${id} <- ${target.kind}:${target.id}`);
       });
       return;
     }
