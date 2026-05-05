@@ -36,7 +36,7 @@ export interface ArtifactsClient {
   detach(input: { id: string; target: { kind: "task" | "run" | "doc"; id: string } }): Promise<{ ok: true }>;
   archive(input: { id: string }): Promise<{ ok: true; id: string }>;
   unarchive(input: { id: string }): Promise<{ ok: true; id: string }>;
-  delete(input: { id: string; hard: boolean }): Promise<{ ok: true; id: string }>;
+  delete(input: { id: string; hard: boolean; confirm?: boolean }): Promise<{ ok: true; id: string }>;
   prune(input: {
     dryRun?: boolean;
     projectId?: string;
@@ -290,7 +290,7 @@ export async function run(argv: readonly string[], client: ArtifactsClient): Pro
     case "delete": {
       const id = requirePositional(positionals, "id");
       const hard = hasFlag(flags, "hard");
-      const result = await client.delete({ id, hard });
+      const result = await client.delete({ id, hard, ...(hard ? { confirm: true } : {}) });
       output(json, result, () => {
         console.log(`${hard ? "hard-" : ""}deleted: ${result.id}`);
       });

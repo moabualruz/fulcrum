@@ -43,6 +43,22 @@ export interface CreateStorageBackendOptions extends LocalFsBackendOptions {
   s3Enabled?: boolean;
 }
 
+export type DeleteArtifactResult =
+  | { ok: true; id: string; mode: "soft" | "hard" }
+  | { ok: false; reason: "not_found" | "confirmation_required" };
+
+export interface DeleteArtifactInput {
+  artifact: {
+    id: string;
+    orgId: string;
+    archived?: boolean | null;
+    bodyPath?: string | null;
+  } | null;
+  callerOrgId: string;
+  hard: boolean;
+  confirm?: boolean;
+}
+
 export class ArtifactStorageFullError extends Error {
   readonly code = "ARTIFACT_DISK_FULL" as const;
 
@@ -131,8 +147,7 @@ export class LocalFsBackend implements StorageBackend {
 
   private absolutePath(relativePath: string): string {
     const absolutePath = path.resolve(this.root, relativePath);
-    const rootWithSep = this.root.endsWith(path.sep) ? this.root : `${this.root}${path.sep}`;
-    if (absolutePath !== this.root && !absolutePath.startsWith(rootWithSep)) {
+    if (!isSubPath(this.root, absolutePath)) {
       throw new Error(`Artifact path escapes store root: ${relativePath}`);
     }
     return absolutePath;
@@ -148,6 +163,36 @@ export function createStorageBackend(
     throw new Error("S3 artifact storage is gated and not enabled in this build.");
   }
   return new LocalFsBackend(options);
+}
+
+export function isSubPath(root: string, candidate: string): boolean {
+  const resolvedRoot = path.resolve(root);
+  const resolvedCandidate = path.resolve(candidate);
+  const rootWithSep = resolvedRoot.endsWith(path.sep) ? resolvedRoot : `${resolvedRoot}${path.sep}`;
+  return resolvedCandidate === resolvedRoot || resolvedCandidate.startsWith(rootWithSep);
+}
+
+export function assertArtifactPathInRoot(root: string, candidate: string): string {
+  const resolved = path.resolve(candidate);
+  if (!isSubPath(root, resolved)) {
+    throw new Error(`Artifact path escapes store root: ${candidate}`);
+  }
+  return resolved;
+}
+
+export async function deleteArtifact(input: DeleteArtifactInput): Promise<DeleteArtifactResult> {
+  const artifact = input.artifact;
+  if (!artifact || artifact.orgId !== input.callerOrgId) {
+    return { ok: false, reason: "not_found" };
+  }
+  if (input.hard && !input.confirm) {
+    return { ok: false, reason: "confirmation_required" };
+  }
+  return {
+    ok: true,
+    id: artifact.id,
+    mode: input.hard ? "hard" : "soft",
+  };
 }
 
 async function defaultOpenWriteStream(absolutePath: string): Promise<Writable> {
