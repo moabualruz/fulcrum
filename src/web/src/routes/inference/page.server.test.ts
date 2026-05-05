@@ -37,6 +37,10 @@ describe("/inference +page.server.ts load()", () => {
     expect(payload.running).toBe(false);
     expect(payload.models).toEqual([]);
     expect(payload.health).toBeNull();
+    expect(payload.backendRows).toHaveLength(4);
+    expect(payload.backendRows[0].name).toBe("Embedded");
+    expect(payload.backendRows[0].status).toBe("stopped");
+    expect(payload.backendRows[0].action).toBe("start");
   });
 
   test("returns running=true when sidecar healthy", async () => {
@@ -65,6 +69,32 @@ describe("/inference +page.server.ts load()", () => {
     expect(payload.models).toHaveLength(1);
     expect(payload.models[0]?.id).toBe("bge-small-en-v1.5");
     expect(payload.health?.status).toBe("healthy");
+    expect(payload.backendRows).toHaveLength(4);
+    expect(payload.backendRows[0].status).toBe("running");
+    expect(payload.backendRows[1].name).toBe("Ollama");
+    expect(payload.backendRows[1].status).toBe("unconfigured");
+    expect(payload.backendRows[2].name).toBe("LM Studio");
+    expect(payload.backendRows[2].status).toBe("unconfigured");
+    expect(payload.backendRows[3].name).toBe("OpenAI-compatible");
+    expect(payload.backendRows[3].status).toBe("unconfigured");
+  });
+
+  test("backendRows includes degraded status for embedded", async () => {
+    mock.module("$lib/server/inference-client", () => ({
+      getHealth: async () => ({
+        status: "degraded",
+        backends: [{ name: "embedded", status: "degraded", models_loaded: 0 }],
+        cache: { embed_hit_rate: 0, gen_hit_rate: 0, db_size_bytes: 0 },
+      }),
+      listModels: async () => [],
+    }));
+
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
+    const result = await mod.load({} as Parameters<typeof mod.load>[0]);
+    const payload = await streamedData<InferenceDashboardData>(result);
+
+    expect(payload.backendRows[0].status).toBe("degraded");
+    expect(payload.backendRows[0].reason).not.toBeNull();
   });
 
   test("setBackend action returns ok", async () => {

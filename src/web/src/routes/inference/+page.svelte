@@ -3,6 +3,7 @@
   import { browser } from "$app/environment";
   import { enhance } from "$app/forms";
   import type { PageData } from "./$types";
+  import type { BackendStatusRow } from "./+page.server";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import { cn } from "$lib/utils.js";
   import { buttonVariants } from "$lib/components/ui/button";
@@ -38,6 +39,13 @@
 
   function statusLabel(running: boolean): string {
     return running ? "Running" : "Stopped";
+  }
+
+  function backendStatusColor(status: BackendStatusRow["status"]): string {
+    if (status === "running" || status === "ok") return "bg-green-500";
+    if (status === "degraded") return "bg-yellow-500";
+    if (status === "unavailable" || status === "fail") return "bg-red-500";
+    return "bg-gray-400";
   }
 
   function formatBytes(bytes: number): string {
@@ -77,6 +85,11 @@
     } finally {
       pullActive[modelId] = false;
     }
+  }
+
+  // Dimension mismatch detection
+  function hasDimensionMismatch(rows: BackendStatusRow[]): boolean {
+    return rows.some((r) => r.status === "degraded" && r.reason?.includes("dimension"));
   }
 </script>
 
@@ -125,6 +138,107 @@
       <span class={cn("text-sm text-destructive")}>{payload.error}</span>
     {/if}
   </section>
+
+  <!-- Backend status rows -->
+  <section data-backend-status class={cn("mb-6")}>
+    <h2 class={cn("text-lg font-semibold mb-3")}>Backend Status</h2>
+    {#if payload.backendRows && payload.backendRows.length > 0}
+      <div class={cn("overflow-x-auto rounded-md border border-border")}>
+        <table data-backend-status-table class={cn("w-full min-w-[800px] text-sm")}>
+          <thead class={cn("border-b border-border bg-muted/50")}>
+            <tr>
+              <th class={cn("px-4 py-2 text-left font-medium")}>Backend</th>
+              <th class={cn("px-4 py-2 text-left font-medium")}>Status</th>
+              <th class={cn("px-4 py-2 text-left font-medium")}>Reason</th>
+              <th class={cn("px-4 py-2 text-left font-medium")}>Model</th>
+              <th class={cn("px-4 py-2 text-left font-medium")}>Embed</th>
+              <th class={cn("px-4 py-2 text-left font-medium")}>Generate</th>
+              <th class={cn("px-4 py-2 text-left font-medium")}>Dimensions</th>
+              <th class={cn("px-4 py-2 text-left font-medium")}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each payload.backendRows as row}
+              <tr data-backend-row data-backend-name={row.name.toLowerCase().replace(/[^a-z0-9]/g, "-")} class={cn("border-b border-border last:border-0")}>
+                <td class={cn("px-4 py-3 font-medium")}>{row.name}</td>
+                <td class={cn("px-4 py-3")}>
+                  <div class={cn("flex items-center gap-2")}>
+                    <span class={cn("inline-block h-2.5 w-2.5 rounded-full", backendStatusColor(row.status))}></span>
+                    <span data-backend-status-label>{row.status}</span>
+                  </div>
+                </td>
+                <td class={cn("px-4 py-3 text-xs")}>
+                  {#if row.reason}
+                    <span class={cn("text-muted-foreground")}>{row.reason}</span>
+                  {:else}
+                    <span class={cn("text-muted-foreground")}>—</span>
+                  {/if}
+                </td>
+                <td class={cn("px-4 py-3 text-xs font-mono")}>
+                  {row.model ?? <span class={cn("text-muted-foreground")}>—</span>}
+                </td>
+                <td class={cn("px-4 py-3")}>
+                  {#if row.embedProbe === "ok"}
+                    <span class={cn("text-green-600")}>OK</span>
+                  {:else if row.embedProbe === "fail"}
+                    <span class={cn("text-destructive")}>Fail</span>
+                  {:else if row.embedProbe === "untested"}
+                    <span class={cn("text-muted-foreground")}>Untested</span>
+                  {:else}
+                    <span class={cn("text-muted-foreground")}>—</span>
+                  {/if}
+                </td>
+                <td class={cn("px-4 py-3")}>
+                  {#if row.generateProbe === "ok"}
+                    <span class={cn("text-green-600")}>OK</span>
+                  {:else if row.generateProbe === "fail"}
+                    <span class={cn("text-destructive")}>Fail</span>
+                  {:else if row.generateProbe === "untested"}
+                    <span class={cn("text-muted-foreground")}>Untested</span>
+                  {:else}
+                    <span class={cn("text-muted-foreground")}>—</span>
+                  {/if}
+                </td>
+                <td class={cn("px-4 py-3 text-xs")}>
+                  {row.dimensions ?? <span class={cn("text-muted-foreground")}>—</span>}
+                </td>
+                <td class={cn("px-4 py-3")}>
+                  {#if row.action === "start"}
+                    <form method="POST" action="?/start" use:enhance>
+                      <button
+                        type="submit"
+                        data-start-backend={row.name.toLowerCase()}
+                        class={cn(buttonVariants({ variant: "default", size: "sm" }))}
+                      >Start</button>
+                    </form>
+                  {:else if row.action === "probe"}
+                    <button
+                      type="button"
+                      data-probe-backend={row.name.toLowerCase()}
+                      class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                    >Probe</button>
+                  {:else}
+                    <span class={cn("text-xs text-muted-foreground")}>—</span>
+                  {/if}
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {:else}
+      <div class={cn("rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground")}>
+        Backend status unavailable
+      </div>
+    {/if}
+  </section>
+
+  <!-- Dimension mismatch banner -->
+  {#if hasDimensionMismatch(payload.backendRows)}
+    <div data-dimension-mismatch-banner class={cn("mb-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm dark:border-amber-800 dark:bg-amber-950/30")}>
+      <p class={cn("font-medium text-amber-800 dark:text-amber-400")}>Embedding dimensions do not match. Writes and search are blocked until migration or reindex completes.</p>
+    </div>
+  {/if}
 
   <!-- Model list -->
   <section data-inference-models class={cn("mb-6")}>
