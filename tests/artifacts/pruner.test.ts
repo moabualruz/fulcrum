@@ -31,6 +31,7 @@ describe("pruneArtifacts", () => {
       bytesFreed: 12n,
       candidates: [artifactRepository.rows[0]!],
       hardDeleteCandidates: [],
+      skipped: [],
       confirmationRequired: false,
     });
     expect(storageBackend.deleted).toEqual(["acme/run/out.txt"]);
@@ -221,6 +222,7 @@ function emptyResult() {
     bytesFreed: 0n,
     candidates: [],
     hardDeleteCandidates: [],
+    skipped: [],
     confirmationRequired: false,
   };
 }

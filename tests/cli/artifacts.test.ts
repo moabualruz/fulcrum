@@ -34,9 +34,20 @@ function fakeArtifact(overrides: Partial<z.infer<typeof ArtifactSchema>> = {}): 
     sizeBytes: "1024",
     path: "/store/report.pdf",
     checksumSha256: "abc123",
+    digest: null,
     metadataJson: {},
     archived: false,
+    pruned: false,
+    retentionStatus: "active",
     retentionUntil: null,
+    previewKind: "download",
+    sourcePath: null,
+    sourceGlob: null,
+    harvestedAt: null,
+    producerKind: null,
+    producerId: null,
+    edgeId: null,
+    attestation: null,
     createdAt: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
   };
@@ -366,7 +377,7 @@ describe("artifacts delete", () => {
     const out = captureOutput();
     try {
       await run(["delete", "art-id", "--hard", "--json"], client);
-      expect(client.delete).toHaveBeenCalledWith({ id: "art-id", hard: true });
+      expect(client.delete).toHaveBeenCalledWith({ id: "art-id", hard: true, confirm: true });
     } finally {
       out.restore();
     }

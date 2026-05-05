@@ -35,6 +35,7 @@ function policy(overrides: Partial<ArtifactRetentionPolicyInput>): ArtifactReten
   return {
     orgId: "org-1",
     projectId: "project-1",
+    scopeKind: "project",
     artifactKind: "scratch",
     retentionDays: 90,
     keepLatestPerRef: true,
