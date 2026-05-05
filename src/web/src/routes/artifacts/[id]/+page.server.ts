@@ -2,7 +2,7 @@ import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { openProductDb, getDefaultOrgId } from "$lib/server/db";
 import { deleteArtifactAction, readArtifactDetail } from "$lib/server/artifacts";
-import { deleteArtifact } from "../../../../../../artifacts/storage.ts";
+import { deleteArtifact } from "../../../../../artifacts/storage.ts";
 
 export const load: PageServerLoad = ({ params }) => {
   return {

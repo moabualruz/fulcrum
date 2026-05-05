@@ -1,6 +1,6 @@
 import type { Actions, PageServerLoad } from "./$types";
 import { actionOk } from "$lib/feedback/action-result";
-import { getRepoDashboard } from "../../../../../repos/dashboard.ts";
+import { getRepoDashboard } from "../../../../repos/dashboard.ts";
 
 const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
 
