@@ -45,10 +45,11 @@ describe("InferenceClient", () => {
     const result = await client.embed(["hello"], { model: "custom-embed-model" });
 
     expect(observedParams).toEqual({ texts: ["hello"], model: "custom-embed-model" });
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       vectors: [[0.1, 0.2, 0.3]],
       model: "custom-embed-model",
       cached: true,
+      dimensions: expect.any(Number),
     });
   });
 

@@ -169,20 +169,27 @@ describe("Task 2 — CLI static-proof", () => {
 
   test("static-proof --json dispatches and returns JSON output", async () => {
     const cap = capture();
-    // When no caller or lifecycle is available, static-proof should
-    // either print help/error or dispatch — at minimum not crash.
+    const mockProofOutput = JSON.stringify({
+      ok: false,
+      targets: ["darwin-arm64", "linux-x64"],
+      artifacts: [{ path: "/tmp/fulcrum-darwin-arm64", target: "darwin-arm64", sizeBytes: 12345 }],
+      linuxProof: "missing",
+      builder: null,
+      versions: {},
+      smoke: [],
+      reason: "test mode — no build",
+    });
     await run(["static-proof", "--json"], {
       ...cap.opts,
-      lifecycle: {
-        status: async () => ({ status: "ok" as const, socketPath: "/tmp/test.sock" }),
-        stop: async () => ({ status: "stopped" as const, socketPath: "/tmp/test.sock", socketRemoved: true, pidFileRemoved: true }),
-      } as never,
+      staticProof: async () => mockProofOutput,
     });
-    // The command should produce JSON output (even if it contains error/fallback)
+    // The command should produce JSON output
     expect(cap.lines.length).toBeGreaterThan(0);
     // The output must be valid JSON
-    const lastLine = cap.lines[cap.lines.length - 1]!;
-    expect(() => JSON.parse(lastLine)).not.toThrow();
+    const payload = JSON.parse(cap.lines[cap.lines.length - 1]!);
+    expect(payload).toHaveProperty("targets");
+    expect(payload).toHaveProperty("artifacts");
+    expect(payload).toHaveProperty("linuxProof");
   });
 });
 

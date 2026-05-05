@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import type { InferenceClient } from "../../../inference/client.ts";
+import type { BackendHealth } from "../../../inference/backends/types.ts";
 import {
   BackendSchema,
   ClassifyResultSchema,
@@ -301,6 +302,13 @@ export const inferenceRouter = t.router({
         const client = await resolveBoundClient(ctx);
         if (client) return client.listBackends();
         return defaultBackends(ctx);
+      }),
+
+    probe: publicProcedure
+      .output(z.any())
+      .query(async () => {
+        const { probeConfiguredBackends } = await import("../../../inference/backend-probes.ts");
+        return probeConfiguredBackends() as Promise<BackendHealth[]>;
       }),
   }),
 

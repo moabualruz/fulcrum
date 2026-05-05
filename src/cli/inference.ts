@@ -20,6 +20,7 @@ import {
   type TokenizeResult,
 } from "../inference/protocol.ts";
 import { INFERENCE_CLIENT_TOKEN } from "../inference/tokens.ts";
+import type { BackendHealth } from "../inference/backends/types.ts";
 
 const HELP = `fulcrum inference
 
@@ -37,6 +38,7 @@ Usage:
   fulcrum inference config set <feature> <backend>
   fulcrum inference config set-provider --url <url> --key <key>
   fulcrum inference config test-provider [--json]
+  fulcrum inference static-proof [--json]
   fulcrum inference stop [--json]
 `;
 
@@ -72,6 +74,9 @@ interface InferenceCliCaller {
       get(): Promise<unknown>;
       set(input: { feature: string; backend: string }): Promise<unknown>;
     };
+    backends?: {
+      probe(): Promise<BackendHealth[]>;
+    };
   };
 }
 
@@ -95,6 +100,8 @@ export interface InferenceRunOptions {
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
+  /** Hook for static-proof — defaults to running scripts/static-build-proof.ts. */
+  staticProof?: () => Promise<string>;
 }
 
 function hasFlag(argv: readonly string[], flag: string): boolean {
@@ -152,6 +159,9 @@ export async function run(argv: readonly string[], opts: InferenceRunOptions = {
       case "config":
         await runConfig(rest, { ...opts, print });
         return;
+      case "static-proof":
+        await runStaticProof(rest, { ...opts, print });
+        return;
       case "stop":
         await runStop(rest, { ...opts, print });
         return;
@@ -197,10 +207,32 @@ async function runStatus(
     ? await opts.caller.inference.health()
     : await resolveServices(opts).client.call("health", {});
 
-  if (json) {
-    opts.print(JSON.stringify(health));
+  let backends: BackendHealth[] | undefined;
+  if (opts.caller?.inference.backends) {
+    backends = await opts.caller.inference.backends.probe();
   } else {
-    opts.print(`inference ${health.status} backends=${health.backends.join(",")}`);
+    try {
+      const { probeConfiguredBackends: probe } = await import("../inference/backend-probes.ts");
+      backends = await probe();
+    } catch {
+      // Non-fatal: backends not available from this context
+    }
+  }
+
+  if (json) {
+    opts.print(JSON.stringify({ ...health, backends }));
+  } else {
+    const lines = [`inference ${health.status}`];
+    if (backends) {
+      for (const b of backends) {
+        const bits = [b.backend, b.status];
+        if (b.reason) bits.push(`reason=${b.reason}`);
+        lines.push(`  ${bits.join(" ")}`);
+      }
+    } else {
+      lines[0] = `inference ${health.status} backends=${health.backends.join(",")}`;
+    }
+    opts.print(lines.join("\n"));
   }
 }
 
@@ -716,5 +748,39 @@ async function runStop(
     const pid = stopped.pid ? `pid=${stopped.pid} ` : "";
     const socket = stopped.socketRemoved ? "socket removed" : "socket still present";
     opts.print(`inference ${stopped.status} ${pid}${socket}`);
+  }
+}
+
+async function runStaticProof(
+  argv: readonly string[],
+  opts: InferenceRunOptions & { print: (line: string) => void },
+): Promise<void> {
+  const json = hasFlag(argv, "json");
+
+  let output: string;
+  if (opts.staticProof) {
+    output = await opts.staticProof();
+  } else {
+    const proc = Bun.spawn(["bun", "run", "scripts/static-build-proof.ts"], {
+      stdout: "pipe",
+      stderr: "inherit",
+    });
+    output = await new Response(proc.stdout).text();
+    const exitCode = await proc.exited;
+    if (json) {
+      opts.print(output.trim());
+    } else {
+      opts.print(output.trim());
+    }
+    if (exitCode !== 0 && opts.exit) {
+      opts.exit(exitCode);
+    }
+    return;
+  }
+
+  if (json) {
+    opts.print(output.trim());
+  } else {
+    opts.print(output.trim());
   }
 }
