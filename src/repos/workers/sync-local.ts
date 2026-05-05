@@ -10,8 +10,14 @@ import {
 } from "../git.ts";
 import type { WorkerRegistry } from "../../workers/registry.ts";
 import { assertRecordPayload, assertStringField } from "../../workers/registry.ts";
+import { defineQueue, defineTask } from "../../queue/index.ts";
 
 export const REPO_SYNC_LOCAL_TASK = "repo.sync.local";
+export const repoSyncLocalTaskDefinition = defineTask<RepoSyncLocalPayload>({
+  name: REPO_SYNC_LOCAL_TASK,
+  assertPayload: assertRepoSyncLocalPayload,
+});
+export const repoSyncLocalQueueDefinition = defineQueue(REPO_SYNC_LOCAL_TASK, repoSyncLocalTaskDefinition);
 
 export interface RepoSyncLocalPayload {
   repoId: string;

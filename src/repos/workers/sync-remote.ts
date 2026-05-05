@@ -12,6 +12,7 @@ import {
 } from "../git.ts";
 import type { WorkerRegistry } from "../../workers/registry.ts";
 import { assertRecordPayload, assertStringField } from "../../workers/registry.ts";
+import { defineQueue, defineTask, type CronDefinition } from "../../queue/index.ts";
 import type {
   RepoSyncBranchInput,
   RepoSyncCommitInput,
@@ -22,6 +23,22 @@ import type {
 export const REPO_SYNC_REMOTE_TASK = "repo.sync.remote";
 export const REPO_LRU_WARMUP_TASK = "repo.lru.warmup";
 export const REPO_LRU_WARMUP_LIMIT = 5;
+export const REPO_LRU_WARMUP_INTERVAL_MS = 5 * 60 * 1_000;
+export const REPO_LRU_WARMUP_CRON: CronDefinition = {
+  name: REPO_LRU_WARMUP_TASK,
+  taskName: REPO_LRU_WARMUP_TASK,
+  intervalMs: REPO_LRU_WARMUP_INTERVAL_MS,
+};
+export const repoSyncRemoteTaskDefinition = defineTask<RepoSyncRemotePayload>({
+  name: REPO_SYNC_REMOTE_TASK,
+  assertPayload: assertRepoSyncRemotePayload,
+});
+export const repoSyncRemoteQueueDefinition = defineQueue(REPO_SYNC_REMOTE_TASK, repoSyncRemoteTaskDefinition);
+export const repoLruWarmupTaskDefinition = defineTask<Record<string, never>>({
+  name: REPO_LRU_WARMUP_TASK,
+  assertPayload: assertRepoLruWarmupPayload,
+});
+export const repoLruWarmupQueueDefinition = defineQueue(REPO_LRU_WARMUP_TASK, repoLruWarmupTaskDefinition);
 
 export interface RepoSyncRemotePayload {
   repoId: string;
@@ -226,6 +243,19 @@ export function registerRepoSyncRemoteWorkerTask(
   options: RepoSyncRemoteOptions = {},
 ): void {
   registry.registerTask(REPO_SYNC_REMOTE_TASK, assertRepoSyncRemotePayload, createRepoSyncRemoteTask(repositories, options));
+}
+
+export function assertRepoLruWarmupPayload(payload: unknown): asserts payload is Record<string, never> {
+  if (payload === undefined) return;
+  assertRecordPayload(payload, REPO_LRU_WARMUP_TASK);
+}
+
+export function registerRepoLruWarmupWorkerTask(
+  registry: WorkerRegistry,
+  repositories: RepoSyncRemoteRepositories,
+  queue: RepoSyncRemoteQueue,
+): void {
+  registry.registerTask(REPO_LRU_WARMUP_TASK, assertRepoLruWarmupPayload, createRepoLruWarmupTask(repositories, queue));
 }
 
 export function createRepoLruWarmupTask(
