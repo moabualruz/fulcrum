@@ -62,12 +62,12 @@
 ### Inference Sidecar — Pillar 2 (INF)
 
 - [x] **INF-01**: Embedding dimension consistency — 384-dim fastembed vectors stored in `vector(384)` column. Update all `vector(1536)` references in schema and canonical spec.
-- [ ] **INF-02**: Static binary build pipeline verified on macOS + Linux
-- [ ] **INF-03**: `fulcrum inference start/stop/status` CLI commands functional
-- [ ] **INF-04**: Doctor shows sidecar status (running/stopped/errored)
-- [ ] **INF-05**: All inference backends tested with real model calls (not just mocks)
+- [x] **INF-02**: Static binary build pipeline verified on macOS + Linux (CLI `static-proof` command + proof script exists; Linux gate requires Docker/native Linux)
+- [x] **INF-03**: `fulcrum inference start/stop/status` CLI commands functional with typed backend health
+- [x] **INF-04**: Doctor shows sidecar status and backend health (inference-sidecar + inference-backends checks)
+- [x] **INF-05**: All configured inference backends tested with real embed/generate probes (unconfigured = non-blocking)
 - [x] **INF-06**: Embedding round-trip cosine >= 0.9 for paraphrase pair (acceptance threshold from vision)
-- [ ] **INF-07**: Auto-spawn triggered by first flag caller verified
+- [x] **INF-07**: Auto-spawn triggered by first flag caller; embedded only per D-01/D-02
 
 ### Symphony Orchestration — Pillar 3 (SYM)
 

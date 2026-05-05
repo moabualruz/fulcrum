@@ -112,7 +112,7 @@ Plans:
 - [x] 04-02-PLAN.md — Embedding model metadata and 384-dimension write/read/search enforcement
 
 **Wave 2**
-- [ ] 04-03-PLAN.md — Inference backend health, CLI, tRPC, doctor, and static proof command
+- [x] 04-03-PLAN.md — Inference backend health, CLI, tRPC, doctor, and static proof command (completed 2026-05-05)
 - [ ] 04-05-PLAN.md — MCP virtual skills plus skill lock/sync fail-closed supply-chain controls
 
 **Wave 3**
