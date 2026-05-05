@@ -17,6 +17,7 @@ import { Hono } from "hono";
 import type { ProductDb } from "../product-kernel/db/types.ts";
 import { isPublicApiEnabled } from "./feature-flags.ts";
 import { apiKeyAuth, type ApiEnv } from "./auth.ts";
+import { rateLimit } from "./rate-limit.ts";
 
 // ── Real route registrations (from product-kernel) ──────────────────
 import { registerKernelTaskRoutes } from "./routes/kernel-tasks.ts";
@@ -66,7 +67,11 @@ export function createPublicApi(deps?: PublicApiDeps): OpenAPIHono {
       if (c.req.path === "/openapi.json") return next();
       return apiKeyAuth()(c, next);
     });
+  }
 
+  api.use("*", rateLimit());
+
+  if (deps) {
     // Real routes — backed by ProductDb + services
     registerKernelTaskRoutes(api);
     registerKernelSprintRoutes(api);

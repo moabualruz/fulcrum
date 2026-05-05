@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { Hono } from "hono";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { createPublicApi, createPublicApiRouter } from "../hono.ts";
+import { rateLimit } from "../rate-limit.ts";
 import { listMissingApiDomains } from "../../surfaces/parity.ts";
 
 const API_ROUTE_MODULES = {
@@ -64,13 +66,37 @@ describe("Phase 08 REST API parity inventory", () => {
     process.env["FULCRUM_FEATURES"] = "public-api";
     const api = createPublicApiRouter();
 
-    const response = await api.request("/api/v1/docs", {
+    const response = await api.request("/api/v1/search?q=fulcrum", {
       headers: { Authorization: "Bearer test-jwt:11111111-1111-4111-8111-111111111111" },
     });
 
     expect(response.headers.get("X-RateLimit-Limit")).toBeTruthy();
     expect(response.headers.get("X-RateLimit-Remaining")).toBeTruthy();
     expect(response.headers.get("X-RateLimit-Reset")).toBeTruthy();
+  });
+
+  test("rate limiter keeps one bucket per caller identity and returns RATE_LIMITED", async () => {
+    const store = new Map();
+    const app = new Hono();
+    app.use("*", async (c, next) => {
+      c.set("userId", "user-1");
+      c.set("orgId", "org-1");
+      return next();
+    });
+    app.use("*", rateLimit({ limit: 2, windowMs: 60_000, now: () => 1_700_000_000_000, store }));
+    app.get("/limited", (c) => c.json({ ok: true }));
+
+    const first = await app.request("/limited");
+    const second = await app.request("/limited");
+    const third = await app.request("/limited");
+
+    expect(first.headers.get("X-RateLimit-Remaining")).toBe("1");
+    expect(second.headers.get("X-RateLimit-Remaining")).toBe("0");
+    expect(third.status).toBe(429);
+    expect(await third.json()).toEqual({
+      error: { code: "RATE_LIMITED", message: "rate limit exceeded" },
+    });
+    expect(store.size).toBe(1);
   });
 
   test("Phase 5-7 route modules are service-backed, not in-memory stubs", async () => {
