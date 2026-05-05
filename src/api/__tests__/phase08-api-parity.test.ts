@@ -41,6 +41,38 @@ describe("Phase 08 REST API parity inventory", () => {
     expect((await compat.json()).openapi).toBe("3.1.0");
   });
 
+  test("OpenAPI 3.1 document includes every Phase 08 public domain path", async () => {
+    process.env["FULCRUM_FEATURES"] = "public-api";
+    const api = createPublicApiRouter();
+
+    const response = await api.request("/api/v1/openapi.json");
+    const spec = await response.json();
+    const paths = Object.keys(spec.paths ?? {});
+
+    expect(spec.openapi).toBe("3.1.0");
+    expect(paths).toContain("/tasks");
+    expect(paths).toContain("/docs");
+    expect(paths).toContain("/search");
+    expect(paths).toContain("/runs");
+    expect(paths).toContain("/repos");
+    expect(paths).toContain("/artifacts");
+    expect(paths).toContain("/memory");
+    expect(paths).toContain("/notifications");
+  });
+
+  test("authenticated API responses include standard rate-limit headers", async () => {
+    process.env["FULCRUM_FEATURES"] = "public-api";
+    const api = createPublicApiRouter();
+
+    const response = await api.request("/api/v1/docs", {
+      headers: { Authorization: "Bearer test-jwt:11111111-1111-4111-8111-111111111111" },
+    });
+
+    expect(response.headers.get("X-RateLimit-Limit")).toBeTruthy();
+    expect(response.headers.get("X-RateLimit-Remaining")).toBeTruthy();
+    expect(response.headers.get("X-RateLimit-Reset")).toBeTruthy();
+  });
+
   test("Phase 5-7 route modules are service-backed, not in-memory stubs", async () => {
     const routesRoot = new URL("../routes/", import.meta.url).pathname;
     const stubbed: string[] = [];
