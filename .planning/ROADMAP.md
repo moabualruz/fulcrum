@@ -116,7 +116,7 @@ Plans:
 - [x] 04-05-PLAN.md — MCP virtual skills plus skill lock/sync fail-closed supply-chain controls
 
 **Wave 3**
-- [ ] 04-04-PLAN.md — Router decision service, disabled learned drafts, conflicts, audit, and LLM fallback safety
+- [x] 04-04-PLAN.md — Router decision service, disabled learned drafts, conflicts, audit, and LLM fallback safety
 
 **Wave 4**
 - [ ] 04-06-PLAN.md — Routing/skills tRPC plus CLI/TUI parity

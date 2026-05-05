@@ -110,9 +110,9 @@
 
 ### Router + Skills — Pillar 5 (RTR)
 
-- [ ] **RTR-01**: Rules-engine routes matching task in unit test
-- [ ] **RTR-02**: No-match path stores learned rule in DB
-- [ ] **RTR-03**: LLM routing gate off by default, functional when enabled
+- [x] **RTR-01**: Rules-engine routes matching task in unit test
+- [x] **RTR-02**: No-match path stores learned rule in DB
+- [x] **RTR-03**: LLM routing gate off by default, functional when enabled
 - [x] **RTR-04**: Upstream skill sync diffs and auto-merges
 - [x] **RTR-05**: MCP servers available as virtual skills
 - [ ] **RTR-06**: Web routing rules editor functional
