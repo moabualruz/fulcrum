@@ -108,4 +108,10 @@ describe("Phase 08 CLI JSON parity", () => {
       expect(result.stdout.length).toBeGreaterThan(50);
     }
   }, 20_000);
+
+  test("completion rejects unsupported shells", async () => {
+    const result = await runCli("fulcrum completion --shell elvish");
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("bash|zsh|fish|powershell");
+  });
 });
