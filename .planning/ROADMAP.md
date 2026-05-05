@@ -18,7 +18,7 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
 - [x] **Phase 4: Inference + Router/Skills** - Inference sidecar hardened, router + skills wired (completed 2026-05-05)
 - [x] **Phase 5: Task Management + Metrics** - Task comments/watchers, charts, sprint features, custom fields (completed 2026-05-05)
 - [x] **Phase 6: Documents + Memory + Search** - Editor verification, memory engine, unified search, Cmd+K (completed 2026-05-05)
-- [ ] **Phase 7: Repos + Artifacts + Notifications** - Git sync, artifact pipeline, notification delivery
+- [x] **Phase 7: Repos + Artifacts + Notifications** - Git sync, artifact pipeline, notification delivery
 - [ ] **Phase 8: Surface Delivery** - CLI wiring, TUI rewrite, Web completion, API surface
 - [ ] **Phase 9: Cross-Cutting + Testing** - i18n, theming, accessibility, telemetry, backup, comprehensive test coverage
 - [ ] **Phase 10: SaaS Hardening** - Multi-org isolation, PostgreSQL pooling, job coordination
@@ -230,7 +230,29 @@ Plans:
   3. Delivery workers process SMTP + webhook + push; bell counts unread notifications; quiet hours retry scheduler
   4. Notification rules CRUD in web; CLI notifications wired
   5. All three surfaces at parity per REP-07, ART-06, NTF-09 definitions
-**Plans:** TBD
+**Plans:** 10 completed
+
+**Wave 1 (parallel — foundations)**
+- [x] 07-01-PLAN.md — watcher SLA, queue-backed sync workers, LRU warm-cache cron (REP-01..03)
+- [x] 07-02-PLAN.md — repo dashboard projection models and health fields (REP-04)
+- [x] 07-03-PLAN.md — artifact retention policy entity, migration, idempotent pruner cron (ART-03..04)
+
+**Wave 2 (sequential — repo APIs)**
+- [x] 07-04-PLAN.md — repos REST/tRPC wiring through canonical service path (REP-05..06)
+
+**Wave 3 (parallel — surfaces + artifact graph)**
+- [x] 07-05-PLAN.md — repo CLI/Web/TUI parity and JSON support (REP-07)
+- [x] 07-06-PLAN.md — artifact harvest edges, search indexing, preview/download surfaces (ART-01, ART-02, ART-05)
+
+**Wave 4 (sequential — fanout)**
+- [x] 07-07-PLAN.md — repo/artifact domain event notification fanout and rule engine (NTF-01)
+
+**Wave 5 (parallel — delivery + notification controls)**
+- [x] 07-08-PLAN.md — SMTP/webhook/push delivery, HMAC, retry, quiet hours (NTF-04..06)
+- [x] 07-09-PLAN.md — unread source of truth, rules/settings UX, notify CLI/TUI parity (NTF-02, NTF-03, NTF-07, NTF-08)
+
+**Wave 6 (sequential — final hardening)**
+- [x] 07-10-PLAN.md — artifact authZ/path safety, webhook debug UI, parity smoke (ART-06, NTF-09)
 
 ### Phase 8: Surface Delivery
 **Goal**: CLI fully wired, TUI rewritten on OpenTUI, Web complete, API surface validated
