@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, vi } from "bun:test";
 
 // Minimal mock for EntityManager
-function makeEm(automations: object[] = []): unknown {
+function makeEm(automations: object[] = []): Record<string, ReturnType<typeof vi.fn>> {
   return {
     find: vi.fn().mockResolvedValue(automations),
     findOne: vi.fn().mockResolvedValue(null),
@@ -61,7 +61,7 @@ describe("AutomationService", () => {
       await service.evaluate(event, "org-1", "proj-1");
 
       // Should have queried enabled automations for project
-      expect((em as ReturnType<typeof makeEm>).find).toHaveBeenCalled();
+      expect(em.find).toHaveBeenCalled();
     });
 
     it("halts at cycle depth 5 and does not throw", async () => {
@@ -120,7 +120,6 @@ describe("AutomationService", () => {
 
       // em.find was called but no update should have been executed (no flush on task update)
       // The action should not fire — executionCount stays 0
-      const flushCalls = (em as ReturnType<typeof makeEm>).flush as ReturnType<typeof vi.fn>;
       // flush may not be called if condition fails
       expect(automation.executionCount).toBe(0);
     });

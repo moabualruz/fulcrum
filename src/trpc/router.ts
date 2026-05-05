@@ -38,6 +38,7 @@ import { workflowsRouter } from "../server/trpc/routers/workflows.ts";
 import { relationshipsRouter } from "../server/trpc/routers/relationships.ts";
 import { templatesRouter } from "../server/trpc/routers/templates.ts";
 import { recurrenceRouter } from "../server/trpc/routers/recurrence.ts";
+import { automationsRouter } from "../server/trpc/routers/automations.ts";
 import {
   runsSubscriptionRouter,
   notifySubscriptionRouter,
@@ -119,6 +120,7 @@ export const appRouter = t.router({
   relationships: relationshipsRouter,
   templates: templatesRouter,
   recurrence: recurrenceRouter,
+  automations: automationsRouter,
   credentials: credentialsRouter,
 
   db: dbRouter,
