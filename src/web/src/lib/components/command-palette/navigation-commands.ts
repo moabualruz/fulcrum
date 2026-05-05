@@ -1,0 +1,169 @@
+/**
+ * Command definitions for Cmd+K palette.
+ *
+ * D-20/D-21/D-22: navigation, creation, and bulk action commands.
+ * Bulk commands require items in selectedTaskIds store to appear.
+ */
+
+import { goto } from "$app/navigation";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface PaletteCommand {
+  id: string;
+  label: string;
+  section: "Navigation" | "Create" | "Bulk Actions";
+  icon: string;
+  action?: () => void | Promise<void>;
+  /** When true, command only shows when selectedTaskIds has entries */
+  requiresSelection?: boolean;
+}
+
+// ── Navigation commands ───────────────────────────────────────────────────────
+
+export const NAVIGATION_COMMANDS: PaletteCommand[] = [
+  {
+    id: "nav-home",
+    label: "Go to Dashboard",
+    section: "Navigation",
+    icon: "home",
+    action: () => goto("/"),
+  },
+  {
+    id: "nav-projects",
+    label: "Go to Projects",
+    section: "Navigation",
+    icon: "folder",
+    action: () => goto("/projects"),
+  },
+  {
+    id: "nav-docs",
+    label: "Go to Documents",
+    section: "Navigation",
+    icon: "file-text",
+    action: () => goto("/docs"),
+  },
+  {
+    id: "nav-tasks",
+    label: "Go to Tasks",
+    section: "Navigation",
+    icon: "check-square",
+    action: () => goto("/tasks"),
+  },
+  {
+    id: "nav-search",
+    label: "Go to Search",
+    section: "Navigation",
+    icon: "search",
+    action: () => goto("/search"),
+  },
+  {
+    id: "nav-memory",
+    label: "Go to Memory",
+    section: "Navigation",
+    icon: "brain",
+    action: () => goto("/memory"),
+  },
+  {
+    id: "nav-boards",
+    label: "Go to Boards",
+    section: "Navigation",
+    icon: "layout",
+    action: () => goto("/boards"),
+  },
+  {
+    id: "nav-runs",
+    label: "Go to Agent Runs",
+    section: "Navigation",
+    icon: "activity",
+    action: () => goto("/runs"),
+  },
+];
+
+// ── Creation commands ─────────────────────────────────────────────────────────
+
+export const CREATION_COMMANDS: PaletteCommand[] = [
+  {
+    id: "create-task",
+    label: "New Task",
+    section: "Create",
+    icon: "plus-square",
+    action: () => goto("/tasks/new"),
+  },
+  {
+    id: "create-doc",
+    label: "New Document",
+    section: "Create",
+    icon: "file-plus",
+    action: () => goto("/docs/new"),
+  },
+  {
+    id: "create-sprint",
+    label: "New Sprint",
+    section: "Create",
+    icon: "zap",
+    action: () => goto("/sprints/new"),
+  },
+  {
+    id: "create-memory",
+    label: "New Memory",
+    section: "Create",
+    icon: "brain",
+    action: () => goto("/memory/new"),
+  },
+];
+
+// ── Bulk action commands ──────────────────────────────────────────────────────
+
+export const BULK_COMMANDS: PaletteCommand[] = [
+  {
+    id: "bulk-assign",
+    label: "Assign Selected",
+    section: "Bulk Actions",
+    icon: "user-plus",
+    requiresSelection: true,
+  },
+  {
+    id: "bulk-status",
+    label: "Change Status",
+    section: "Bulk Actions",
+    icon: "circle",
+    requiresSelection: true,
+  },
+  {
+    id: "bulk-move",
+    label: "Move to Project",
+    section: "Bulk Actions",
+    icon: "move",
+    requiresSelection: true,
+  },
+  {
+    id: "bulk-label",
+    label: "Add Label",
+    section: "Bulk Actions",
+    icon: "tag",
+    requiresSelection: true,
+  },
+  {
+    id: "bulk-sprint",
+    label: "Move to Sprint",
+    section: "Bulk Actions",
+    icon: "zap",
+    requiresSelection: true,
+  },
+  {
+    id: "bulk-delete",
+    label: "Delete Selected",
+    section: "Bulk Actions",
+    icon: "trash-2",
+    requiresSelection: true,
+  },
+];
+
+// ── All commands (non-bulk, for static display) ───────────────────────────────
+
+export const ALL_COMMANDS: PaletteCommand[] = [
+  ...NAVIGATION_COMMANDS,
+  ...CREATION_COMMANDS,
+  ...BULK_COMMANDS,
+];
