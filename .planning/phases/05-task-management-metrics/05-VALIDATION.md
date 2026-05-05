@@ -2,8 +2,8 @@
 phase: 5
 slug: task-management-metrics
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true  # 05-00-PLAN.md creates all 9 RED stubs
 created: 2026-05-05
 ---
 
