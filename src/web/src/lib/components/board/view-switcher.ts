@@ -1,4 +1,4 @@
-export const PROJECT_VIEWS = ["board", "table", "calendar", "timeline", "list"] as const;
+export const PROJECT_VIEWS = ["board", "table", "calendar", "gantt", "timeline", "list"] as const;
 export type ProjectView = (typeof PROJECT_VIEWS)[number];
 
 const STORAGE_KEY = "fulcrum:last-project-view";
