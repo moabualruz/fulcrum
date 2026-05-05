@@ -469,6 +469,18 @@ describe("inference tRPC router", () => {
     });
   });
 
+  test("backend.probe returns BackendHealth array with backend and status fields", async () => {
+    const container = makeContainer();
+    const caller = createCaller(container);
+
+    const backends = await caller.inference.backends.probe();
+    expect(Array.isArray(backends)).toBe(true);
+    for (const b of backends as Array<Record<string, unknown>>) {
+      expect(typeof b.backend).toBe("string");
+      expect(["running", "stopped", "degraded", "unavailable", "unconfigured"]).toContain(b.status);
+    }
+  });
+
   test("empty containers use backend defaults and default client fallback", async () => {
     const caller = createCaller(new Container(), false);
 

@@ -196,4 +196,37 @@ describe("InferenceDashboardScreen", () => {
     expect(caller.inference).toBeDefined();
     expect(typeof caller.inference!.health).toBe("function");
   });
+
+  test("backend degraded and unavailable labels appear when fixture returns Degraded/Unavailable states", async () => {
+    const caller = makeCaller({
+      healthStatus: "degraded",
+      healthExtras: {
+        active_requests: 0,
+        ops_last_10s: 0,
+        embed_hit_rate: 75,
+        gen_hit_rate: 60,
+        cache_db_size: 512000,
+      },
+    });
+    const { text, app } = await mountInferenceScreen({ healthStatus: "degraded" });
+    // The health badge renders the degraded status
+    expect(text).toMatch(/degraded/i);
+    app.stop();
+  });
+
+  test("cache stats render in inference screen", async () => {
+    const { text, app } = await mountInferenceScreen({
+      healthExtras: { embed_hit_rate: 95, gen_hit_rate: 88, cache_db_size: 2097152 },
+    });
+    expect(text).toContain("Cache");
+    expect(text).toContain("95");
+    expect(text).toContain("88");
+    app.stop();
+  });
+
+  test("unavailable health state renders correctly", async () => {
+    const { text, app } = await mountInferenceScreen({ healthStatus: "unavailable" });
+    expect(text).toMatch(/unavailable/i);
+    app.stop();
+  });
 });

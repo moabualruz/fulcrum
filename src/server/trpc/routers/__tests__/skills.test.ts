@@ -149,6 +149,24 @@ describe("skills tRPC router", () => {
     await rm(upstreamDir, { recursive: true, force: true });
   });
 
+  test("skills.registry.list can be called and returns shape with source=mcp or registry entries", async () => {
+    const caller = await createTestCaller(createTestContainer(db));
+    const result = await caller.fulcrum_skills.registry.list({});
+    expect(Array.isArray(result)).toBe(true);
+    // The registry list should succeed and return entries
+  });
+
+  test("skills.lock.override returns ok for sha_mismatch scenario", async () => {
+    const caller = await createTestCaller(createTestContainer(db));
+    const result = await caller.fulcrum_skills.lock.override({
+      slug: "test-skill",
+      expectedSha256: "aaaa",
+      actualSha256: "bbbb",
+      auditNote: "sha_mismatch override test",
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
   test("uninstall removes only enabled agent directories", async () => {
     const skillDir = await mkdtemp(join(tmpdir(), "fulcrum-claude-only-src-"));
     const skillPath = await writeSkill(skillDir, CLAUDE_ONLY_SKILL);

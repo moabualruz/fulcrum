@@ -66,6 +66,22 @@ describe("routing tRPC drafts procedures", () => {
     }
   });
 
+  test("drafts.approve returns ok for review_needed draft", async () => {
+    const db = await createTestOrm();
+    try {
+      const em = db.em.fork();
+      const caller = callerFor(em);
+
+      const drafts = await (caller.routing as unknown as Record<string, unknown>).drafts as {
+        approve: (input: { draftId: string }) => Promise<{ ok: boolean }>;
+      };
+      const result = await drafts.approve({ draftId: DRAFT_ID });
+      expect(result).toEqual({ ok: true });
+    } finally {
+      await db.close();
+    }
+  });
+
   test("drafts.approve requires permissionedProcedure and returns ok", async () => {
     const db = await createTestOrm();
     try {
@@ -77,6 +93,22 @@ describe("routing tRPC drafts procedures", () => {
       };
       const result = await drafts.approve({ draftId: DRAFT_ID });
       expect(result).toHaveProperty("ok");
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("drafts.delete returns ok for conflict draft (conflict delete with sha_mismatch scenario)", async () => {
+    const db = await createTestOrm();
+    try {
+      const em = db.em.fork();
+      const caller = callerFor(em);
+
+      const drafts = await (caller.routing as unknown as Record<string, unknown>).drafts as {
+        delete: (input: { draftId: string }) => Promise<{ ok: boolean }>;
+      };
+      const result = await drafts.delete({ draftId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" });
+      expect(result).toEqual({ ok: true });
     } finally {
       await db.close();
     }
