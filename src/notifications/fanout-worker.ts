@@ -13,6 +13,7 @@ export const NOTIFY_FANOUT_TASK = "notify-fan-out";
 
 export interface NotifyFanoutPayload {
   eventId: string;
+  internalQueueToken?: string;
 }
 
 export interface NotifyFanoutQueue {
@@ -40,6 +41,13 @@ export interface NotifyFanoutRepositories {
     upsertFromMatch(match: RuleMatch, event: NotificationEventLike): Promise<unknown>;
   };
   notificationDeliveryRepo?: {
+    upsertFromMatch?(
+      match: RuleMatch,
+      event: NotificationEventLike,
+      channel: NotificationChannel,
+      notification: unknown,
+      status: DeliveryStatus.Pending | "held-quiet-hours",
+    ): Promise<unknown>;
     create(data: Record<string, unknown>): Promise<unknown>;
   };
   notificationQuietHoursRepo: {
@@ -50,6 +58,7 @@ export interface NotifyFanoutRepositories {
 
 export interface NotifyFanoutOptions {
   now?: Date;
+  internalQueueToken?: string;
 }
 
 export type NotifyFanoutTask = (payload: NotifyFanoutPayload) => Promise<void>;
@@ -66,9 +75,11 @@ export async function notifyFanout(
   repositories: NotifyFanoutRepositories,
   options: NotifyFanoutOptions = {},
 ): Promise<void> {
+  assertInternalQueueToken(payload, options);
   const event = await repositories.eventRepo.findOneOrFail(payload.eventId);
   const orgId = eventOrgId(event);
   if (!orgId) throw new Error(`notify-fan-out event ${payload.eventId} has no orgId`);
+  assertCanonicalEvent(event);
 
   const matches = await evaluateRules(event, { orgId, now: options.now }, evaluationRepositories(repositories));
   const now = options.now ?? new Date();
@@ -79,7 +90,6 @@ export async function notifyFanout(
       : undefined;
 
     for (const channel of match.channels) {
-      if (channel === "in-app") continue;
       await enqueueDeliveryOrQuietRetry(repositories, match, event, channel, notification, now);
     }
   }
@@ -98,13 +108,33 @@ function evaluationRepositories(
 export async function enqueueNotifyFanout(
   queue: NotifyFanoutQueue,
   eventId: string,
+  internalQueueToken?: string,
 ): Promise<void> {
-  await queue.addJob(NOTIFY_FANOUT_TASK, { eventId });
+  await queue.addJob(NOTIFY_FANOUT_TASK, {
+    eventId,
+    ...(internalQueueToken ? { internalQueueToken } : {}),
+  });
 }
 
 export function assertNotifyFanoutPayload(payload: unknown): asserts payload is NotifyFanoutPayload {
   assertRecordPayload(payload, NOTIFY_FANOUT_TASK);
   assertStringField(payload, "eventId", NOTIFY_FANOUT_TASK);
+}
+
+function assertInternalQueueToken(payload: NotifyFanoutPayload, options: NotifyFanoutOptions): void {
+  if (!options.internalQueueToken) return;
+  if (payload.internalQueueToken !== options.internalQueueToken) {
+    throw new Error(`${NOTIFY_FANOUT_TASK} invalid internal queue token`);
+  }
+}
+
+function assertCanonicalEvent(event: NotificationEventLike): void {
+  const eventType = event.eventType ?? event.verb;
+  if (!eventType) throw new Error(`notify-fan-out event ${event.id} has no eventType`);
+  if (!event.subjectKind) throw new Error(`notify-fan-out event ${event.id} has no subjectKind`);
+  if (event.subjectId == null || event.subjectId === "") {
+    throw new Error(`notify-fan-out event ${event.id} has no subjectId`);
+  }
 }
 
 export function registerNotifyFanoutWorkerTask(
@@ -119,10 +149,16 @@ async function enqueueDeliveryOrQuietRetry(
   repositories: NotifyFanoutRepositories,
   match: RuleMatch,
   event: NotificationEventLike,
-  channel: Exclude<NotificationChannel, "in-app">,
+  channel: NotificationChannel,
   notification: unknown,
   now: Date,
 ): Promise<void> {
+  if (channel === "in-app") {
+    if (!repositories.notificationDeliveryRepo?.upsertFromMatch) return;
+    await createDelivery(repositories, match, event, channel, notification, DeliveryStatus.Pending);
+    return;
+  }
+
   const quietHours = await repositories.notificationQuietHoursRepo.findOne({
     orgId: eventOrgId(event),
     userId: match.userId,
@@ -143,11 +179,15 @@ async function createDelivery(
   repositories: NotifyFanoutRepositories,
   match: RuleMatch,
   event: NotificationEventLike,
-  channel: Exclude<NotificationChannel, "in-app">,
+  channel: NotificationChannel,
   notification: unknown,
   status: DeliveryStatus.Pending | "held-quiet-hours",
 ): Promise<void> {
   if (!repositories.notificationDeliveryRepo) return;
+  if (repositories.notificationDeliveryRepo.upsertFromMatch) {
+    await repositories.notificationDeliveryRepo.upsertFromMatch(match, event, channel, notification, status);
+    return;
+  }
   await repositories.notificationDeliveryRepo.create({
     orgId: eventOrgId(event),
     ruleId: match.rule.id,
@@ -156,13 +196,19 @@ async function createDelivery(
     channel,
     status,
     attemptCount: 0,
+    idempotencyKey: deliveryIdempotencyKey(match, event, channel),
     payload: {
       eventId: event.id,
+      eventType: event.verb,
       subjectKind: event.subjectKind,
       subjectId: event.subjectId ?? null,
       verb: event.verb,
     },
   });
+}
+
+function deliveryIdempotencyKey(match: RuleMatch, event: NotificationEventLike, channel: NotificationChannel): string {
+  return `${event.id}:${match.rule.id}:${match.userId}:${channel}`;
 }
 
 function deliveryPayload(

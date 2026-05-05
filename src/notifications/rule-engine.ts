@@ -15,6 +15,7 @@ export type NotificationChannel =
 
 export interface NotificationEventLike {
   id: string;
+  eventType?: string;
   orgId?: string;
   org?: { id?: string } | string;
   verb: string;
@@ -117,7 +118,7 @@ export class NotificationRuleEngine {
       const ruleOrgId = scopedOrgId(rule);
       if (ruleOrgId && ruleOrgId !== ctx.orgId) continue;
       if (rule.enabled === false || rule.active === false || !rule.userId) continue;
-      if (!matchesPattern(rule, event)) continue;
+      if (!matchEvent(rule, event)) continue;
       if (await isMuted(repositories, ctx.orgId, rule.userId, event, now)) continue;
 
       const channels = await enabledChannels(rule.channels, repositories, {
@@ -146,13 +147,16 @@ export class NotificationRuleEngine {
 
 injectable()(NotificationRuleEngine);
 
-function matchesPattern(rule: NotificationRuleLike, event: NotificationEventLike): boolean {
+export function matchEvent(rule: NotificationRuleLike, event: NotificationEventLike): boolean {
   const pattern = rule.eventPattern ?? {};
+  const eventType = pattern["event_type"] ?? pattern["eventType"];
+  if (typeof eventType === "string" && eventType !== eventTypeOf(event)) return false;
+
   const subjectKind = pattern["subject_kind"];
   if (typeof subjectKind === "string" && subjectKind !== event.subjectKind) return false;
 
   const verb = pattern["verb"];
-  if (typeof verb === "string" && verb !== event.verb) return false;
+  if (typeof verb === "string" && verb !== eventTypeOf(event)) return false;
 
   const projectId = pattern["project_id"];
   if (projectId !== undefined && projectId !== payloadAt(event.payload, "project_id")) return false;
@@ -168,6 +172,10 @@ function matchesPattern(rule: NotificationRuleLike, event: NotificationEventLike
     const expected = entry.value === "$current_user_id" ? rule.userId : entry.value;
     return payloadAt(event.payload, entry.path) === expected;
   });
+}
+
+function eventTypeOf(event: NotificationEventLike): string {
+  return event.eventType ?? event.verb;
 }
 
 async function enabledChannels(

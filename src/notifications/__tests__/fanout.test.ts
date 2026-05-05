@@ -50,7 +50,7 @@ function createFanoutRepos(event: Record<string, unknown>, rules: NotificationRu
   const repos: NotifyFanoutRepositories = {
     eventRepo: {
       async findOneOrFail(id) {
-        expect(id).toBe(event.id);
+        expect(id).toBe(event.id as string);
         return event as never;
       },
     },
@@ -82,6 +82,25 @@ function createFanoutRepos(event: Record<string, unknown>, rules: NotificationRu
       },
     },
     notificationDeliveryRepo: {
+      async upsertFromMatch(match, matchedEvent, channel, notification, status) {
+        const key = `${matchedEvent.id}:${match.rule.id}:${match.userId}:${channel}`;
+        const existing = deliveries.find((row) => row["idempotencyKey"] === key);
+        if (existing) return existing;
+        const row = {
+          id: crypto.randomUUID(),
+          idempotencyKey: key,
+          orgId: ORG_ID,
+          ruleId: match.rule.id,
+          notificationId: notification && typeof notification === "object" && "id" in notification ? notification.id : null,
+          userId: match.userId,
+          channel,
+          status,
+          attemptCount: 0,
+          payload: { eventId: matchedEvent.id, eventType: matchedEvent.verb },
+        };
+        deliveries.push(row);
+        return row;
+      },
       async create(data) {
         const row = { id: crypto.randomUUID(), ...data };
         deliveries.push(row);
@@ -276,14 +295,21 @@ function createHarvestDeps(
   return {
     storageBackend: {
       async put() {
-        return { relativePath: "runs/report.txt" };
+        return { relativePath: "runs/report.txt", absolutePath: "/tmp/runs/report.txt" };
+      },
+      async get() {
+        return new Uint8Array();
+      },
+      async delete() {},
+      async exists() {
+        return true;
       },
     },
     artifactRepository: {
       async findDuplicate() {
         return stored;
       },
-      async create(input) {
+      async create(input: Record<string, unknown>) {
         stored = {
           id: ARTIFACT_ID,
           filename: input["filename"] as string,
@@ -299,7 +325,7 @@ function createHarvestDeps(
     edgeRepository: { async createMany() {} },
     searchDocumentRepository: { async upsertArtifactPreview() {} },
     eventRepository: {
-      async recordArtifactHarvested({ artifact }) {
+      async recordArtifactHarvested({ artifact }: { artifact: ArtifactLike }) {
         const event = {
           id: crypto.randomUUID(),
           eventType: "artifact.created",
@@ -332,5 +358,5 @@ function createHarvestDeps(
         return { id: RUN_ID, org: { id: ORG_ID }, project: { id: PROJECT_ID } };
       },
     },
-  } as HarvestArtifactDeps;
+  } as unknown as HarvestArtifactDeps;
 }
