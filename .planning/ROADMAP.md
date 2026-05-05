@@ -134,35 +134,37 @@ Plans:
   1. task_comments + task_watchers entities with CRUD verified
   2. Burndown, velocity, cycle time, throughput, WIP, CFD render from real data via LayerChart
   3. Sprint capacity + retrospective notes; Gantt + calendar views render
-  4. Bulk ops handle 50+ tasks; custom fields all 8 types verified; saved view filters round-trip
+  4. Bulk ops handle 50+ tasks; custom fields all 9 types verified; saved view filters round-trip
   5. Task CRUD + sprint management functional on Web, CLI, and TUI (per TSK-14 parity definition)
 **Plans:** 15 plans
 Plans:
 
-**Wave 1 — Schema Foundation**
-- [ ] 05-01-PLAN.md — Dependencies install + migration + entity extensions (Task, Sprint, MetricsCache, Event)
-- [ ] 05-02-PLAN.md — New entities (TaskComment, TaskWatcher, CommentReaction, TaskRelationship, ProjectAutomation, FieldDependencyRule)
+**Wave 1 — Schema Foundation (parallel)**
+- [ ] 05-01-PLAN.md — Dependencies install + migration + entity extensions (HIGH-01/02/05 fixes)
+- [ ] 05-02-PLAN.md — New entities: TaskComment, TaskWatcher, CommentReaction, TaskRelationship, ProjectAutomation, FieldDependencyRule, YjsSnapshot
 
-**Wave 2 — Core Services**
-- [ ] 05-03-PLAN.md — CommentService + watchers + commentsRouter (TSK-01, TSK-02)
-- [ ] 05-04-PLAN.md — WorkflowService + status engine + transition rules (D-22..D-25)
-- [ ] 05-05-PLAN.md — ReportService + metrics rollup worker + reportsRouter (TSK-03..TSK-06)
-- [ ] 05-06-PLAN.md — Sprint extensions (capacity, retro, rollover) + AutomationService (TSK-07, TSK-08, D-89..D-92)
+**Wave 2 — Core Services (parallel, no shared files)**
+- [ ] 05-03-PLAN.md — CommentService + watchers + commentsRouter + team mentions (D-100 fix)
+- [ ] 05-04-PLAN.md — WorkflowService + RelationshipService + CRUD + cycle detection (HIGH-04 fix)
+- [ ] 05-05-PLAN.md — ReportService + metrics rollup worker + reportsRouter (workspace scope)
 
-**Wave 3 — Web UI Core**
-- [ ] 05-07-PLAN.md — Task detail panel + comments + activity feed + watchers (D-01..D-18)
-- [ ] 05-08-PLAN.md — Board enhancements (DnD, swimlanes, WIP) + TanStack list view (D-10..D-15)
-- [ ] 05-09-PLAN.md — Reports dashboard + 8 LayerChart components + page migration (TSK-03..TSK-05)
-- [ ] 05-10-PLAN.md — Gantt (SVAR) + Calendar (@event-calendar) + critical path (TSK-09, TSK-10)
+**Wave 3 — Integration (sequential, owns shared files per HIGH-06)**
+- [ ] 05-06-PLAN.md — Mount all routers in AppRouter + extend TaskService + AutomationService + SprintService extensions
 
-**Wave 4 — Advanced Features**
-- [ ] 05-11-PLAN.md — Filter builder + saved views + bulk ops + custom fields verification (TSK-11..TSK-13)
-- [ ] 05-12-PLAN.md — Keyboard shortcuts + command palette + field dependencies (D-66..D-68, D-109..D-111)
-- [ ] 05-13-PLAN.md — Real-time collaboration (Yjs) + portfolio dashboard (D-93..D-99)
+**Wave 4 — Web UI (parallel)**
+- [ ] 05-07-PLAN.md — Task detail panel + comments + activity feed + watchers + dual mentions (D-101)
+- [ ] 05-08-PLAN.md — Board (DnD, swimlanes, WIP, blocked badges) + TanStack list view
+- [ ] 05-09-PLAN.md — Reports dashboard + 8 LayerChart components + Monte Carlo forecast
+- [ ] 05-10-PLAN.md — Gantt (SVAR + critical path + slack) + Calendar (@event-calendar)
 
-**Wave 5 — Parity + Verification**
-- [ ] 05-14-PLAN.md — CLI report subcommand + TUI ASCII charts (TSK-14, D-82..D-84)
-- [ ] 05-15-PLAN.md — Sprint/workflow/automation UI + final verification checkpoint
+**Wave 5 — Advanced Features (parallel)**
+- [ ] 05-11-PLAN.md — Filter builder + saved views + bulk ops (50+) + custom fields verification (9 types)
+- [ ] 05-12-PLAN.md — Keyboard shortcuts + command palette + field dependencies (client + server validation)
+- [ ] 05-13-PLAN.md — Real-time collaboration (Yjs with auth/persistence) + portfolio dashboard
+
+**Wave 6 — Parity + Final (parallel)**
+- [ ] 05-14-PLAN.md — CLI report subcommand + task relate + TUI ASCII charts (TSK-14)
+- [ ] 05-15-PLAN.md — Workflow editor + automation rules UI + sprint report card + CI gate
 
 **UI hint**: yes
 
@@ -239,7 +241,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Architecture + Security | 0/10 | Planned | - |
+| 1. Architecture + Security | 10/10 | Complete | 2026-05-04 |
 | 2. Bug Fixes + Foundation | 8/8 | Complete | 2026-05-04 |
 | 3. Symphony + Sandcastle | 6/6 | Complete   | 2026-05-05 |
 | 4. Inference + Router/Skills | 8/8 | Complete | 2026-05-05 |
@@ -252,4 +254,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-05-04*
-*Last corrected: 2026-05-04 after Wave 2 audit*
+*Last corrected: 2026-05-05 after Phase 5 peer review revision*
