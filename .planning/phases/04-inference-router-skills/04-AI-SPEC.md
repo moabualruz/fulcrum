@@ -111,6 +111,11 @@ No sector-specific regulation such as HIPAA, FCA, or PCI applies to this deploym
 **Rationale:**
 LangGraph TypeScript fits Phase 4 because the system needs deterministic, auditable, stateful routing control across CLI/Web/TUI, disabled learned drafts, conflict states, LLM fallback gates, MCP virtual skills, and explicit persistence through Fulcrum's existing tRPC/service/MikroORM paths. It is model-agnostic and TypeScript-compatible, aligning with Fulcrum's local-first and provider-flexible constraints.
 
+**Adoption Boundary:**
+LangGraph may be added as a runtime dependency when it reduces router-state code, improves branching/replay/trace features, or makes the LLM fallback/draft/conflict flow easier to test. It must not affect CLI agent usability, agent invocation semantics, or Fulcrum's existing agent profile model. Fulcrum remains the product orchestrator and persistence owner; LangGraph is an internal router-service implementation detail.
+
+LangGraph/LangChain model integrations may also be used to avoid bespoke LLM adapter code for local and remote providers, including Ollama, OpenAI-compatible endpoints, and other supported chat model APIs. The constraint is that Fulcrum's configuration, backend parity, health/degraded-state reporting, and feature flags remain the source of truth; LangChain adapters are implementation plumbing behind Fulcrum's inference service, not a separate provider policy layer.
+
 **Alternatives Considered:**
 
 | Framework | Ruled Out Because |
@@ -330,8 +335,12 @@ Use Fulcrum's existing model-agnostic inference router rather than binding LangG
 - Summarisation/compaction: `temperature: 0`, `maxTokens: 700`.
 - Provider adapters: wrap backend calls behind Fulcrum's inference service; LangGraph nodes receive `getConfiguredRouterModel()` instead of importing provider-specific models directly.
 
+When LangChain already provides a maintained adapter for a configured local or remote LLM backend, prefer reusing it over writing a custom client, provided the adapter can satisfy Fulcrum's typed health checks, timeout behavior, structured-output needs, and local-first defaults. If an adapter cannot expose the required health/probe evidence or model metadata, wrap it with a Fulcrum adapter that adds those guarantees.
+
 **Core Pattern:**
 Keep LangGraph inside the router service boundary. Web/CLI/TUI call tRPC; tRPC calls service; service invokes graph; graph nodes call existing rules, inference, repositories, audit, and feature-flag APIs.
+
+The CLI agent experience must remain unchanged: `claude`, `codex`, `gemini`, `opencode`, `pi`, and future profiles continue to be launched/configured through Fulcrum's agent profile and Symphony/Sandcastle paths. LangGraph must never become a new CLI-agent runtime, user-facing command requirement, or dependency for agents to remain usable. If LangGraph is present, only the routing service knows about it.
 
 ```ts
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
