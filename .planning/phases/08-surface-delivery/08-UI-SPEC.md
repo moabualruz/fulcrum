@@ -66,6 +66,28 @@ Skip Huashu animation/video/export paths. Phase 08 needs product-surface UX revi
   - metadata/status footer
   - updates through subscription/EventBus path when available
 
+### Huashu-Design Gate: TUI Composition Findings
+
+**Assumptions:** Fulcrum TUI is for repeated operator use inside active repositories. It must be keyboard-first, dense, low-decoration, and optimized for scanning operational state. It must avoid hero, marketing, and card-heavy composition.
+
+**Existing vocabulary extracted from code:** status bars (`Renderer.statusBar`), inverse selected nav rows (`Renderer.navItem`), section separators, compact `j/k` and arrow hints, domain screen labels (`Projects`, `Tasks`, `Docs`, `Memory`, `Runs`, `Repos`, `Artifacts`, `Search`, `Notifications`, `Routing/Skills`, `Doctor/Settings`), and live logs from `RunsScreen`/`RunDetailScreen`.
+
+**Target composition:** one persistent domain nav rail, one list/table pane, one detail/log pane, and one persistent status footer. Runs use a left run list and a right transcript/log pane; other domains use the same list/detail grammar with empty and error states.
+
+**Huashu critique score:**
+- Philosophy alignment: 8/10 — terminal-native operational density matches Fulcrum's local-first Agent OS direction.
+- Visual hierarchy: 8/10 — domain nav, selected row, list/table pane, detail/log pane, and status footer create clear scanning order.
+- Craft: 7/10 — acceptable when spacing stays on a compact 2-space terminal grid and all hints remain stable across screens.
+- Functionality: 8/10 — every visible region maps to operator tasks: navigate, inspect, act, monitor.
+- Originality: 7/10 — follows opencode/OpenTUI terminal app pattern without copying decorative web dashboard tropes.
+
+**Implementation rules from gate:**
+- Tests must assert domain nav, detail/log pane, and status footer text.
+- Navigation keys must include `j`, `k`, arrow up/down, `Enter`, `Escape`, `/`, and root-only `q`.
+- Run monitor must show `Run list`, `Transcript / log`, and status footer metadata.
+- Command palette must expose `Create task`, `Create doc`, `Search`, `Dispatch run`, and `Settings`.
+- Do not introduce decorative hero panels, nested cards, gradient ornaments, or explanatory marketing text.
+
 ## CLI Contract
 
 - Human output: concise tables/summaries.
