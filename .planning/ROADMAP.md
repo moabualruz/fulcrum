@@ -136,7 +136,34 @@ Plans:
   3. Sprint capacity + retrospective notes; Gantt + calendar views render
   4. Bulk ops handle 50+ tasks; custom fields all 8 types verified; saved view filters round-trip
   5. Task CRUD + sprint management functional on Web, CLI, and TUI (per TSK-14 parity definition)
-**Plans**: TBD
+**Plans:** 15 plans
+Plans:
+
+**Wave 1 — Schema Foundation**
+- [ ] 05-01-PLAN.md — Dependencies install + migration + entity extensions (Task, Sprint, MetricsCache, Event)
+- [ ] 05-02-PLAN.md — New entities (TaskComment, TaskWatcher, CommentReaction, TaskRelationship, ProjectAutomation, FieldDependencyRule)
+
+**Wave 2 — Core Services**
+- [ ] 05-03-PLAN.md — CommentService + watchers + commentsRouter (TSK-01, TSK-02)
+- [ ] 05-04-PLAN.md — WorkflowService + status engine + transition rules (D-22..D-25)
+- [ ] 05-05-PLAN.md — ReportService + metrics rollup worker + reportsRouter (TSK-03..TSK-06)
+- [ ] 05-06-PLAN.md — Sprint extensions (capacity, retro, rollover) + AutomationService (TSK-07, TSK-08, D-89..D-92)
+
+**Wave 3 — Web UI Core**
+- [ ] 05-07-PLAN.md — Task detail panel + comments + activity feed + watchers (D-01..D-18)
+- [ ] 05-08-PLAN.md — Board enhancements (DnD, swimlanes, WIP) + TanStack list view (D-10..D-15)
+- [ ] 05-09-PLAN.md — Reports dashboard + 8 LayerChart components + page migration (TSK-03..TSK-05)
+- [ ] 05-10-PLAN.md — Gantt (SVAR) + Calendar (@event-calendar) + critical path (TSK-09, TSK-10)
+
+**Wave 4 — Advanced Features**
+- [ ] 05-11-PLAN.md — Filter builder + saved views + bulk ops + custom fields verification (TSK-11..TSK-13)
+- [ ] 05-12-PLAN.md — Keyboard shortcuts + command palette + field dependencies (D-66..D-68, D-109..D-111)
+- [ ] 05-13-PLAN.md — Real-time collaboration (Yjs) + portfolio dashboard (D-93..D-99)
+
+**Wave 5 — Parity + Verification**
+- [ ] 05-14-PLAN.md — CLI report subcommand + TUI ASCII charts (TSK-14, D-82..D-84)
+- [ ] 05-15-PLAN.md — Sprint/workflow/automation UI + final verification checkpoint
+
 **UI hint**: yes
 
 ### Phase 6: Documents + Memory + Search
@@ -216,7 +243,7 @@ Plans:
 | 2. Bug Fixes + Foundation | 8/8 | Complete | 2026-05-04 |
 | 3. Symphony + Sandcastle | 6/6 | Complete   | 2026-05-05 |
 | 4. Inference + Router/Skills | 8/8 | Complete | 2026-05-05 |
-| 5. Task Management + Metrics | 0/? | Not started | - |
+| 5. Task Management + Metrics | 0/15 | Planned | - |
 | 6. Documents + Memory + Search | 0/? | Not started | - |
 | 7. Repos + Artifacts + Notifications | 0/? | Not started | - |
 | 8. Surface Delivery | 0/? | Not started | - |
