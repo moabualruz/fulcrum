@@ -110,17 +110,19 @@ Plans:
 **Wave 1**
 - [ ] 04-01-PLAN.md — Wave 0 validation scaffolds for static proof, embeddings, router evals, MCP, and lock gates
 - [ ] 04-02-PLAN.md — Embedding model metadata and 384-dimension write/read/search enforcement
+
+**Wave 2**
 - [ ] 04-03-PLAN.md — Inference backend health, CLI, tRPC, doctor, and static proof command
 - [ ] 04-05-PLAN.md — MCP virtual skills plus skill lock/sync fail-closed supply-chain controls
 
-**Wave 2**
+**Wave 3**
 - [ ] 04-04-PLAN.md — Router decision service, disabled learned drafts, conflicts, audit, and LLM fallback safety
 
-**Wave 3**
+**Wave 4**
 - [ ] 04-06-PLAN.md — Routing/skills tRPC plus CLI/TUI parity
 - [ ] 04-07-PLAN.md — Web routing editor and inference backend status UI
 
-**Wave 4**
+**Wave 5**
 - [ ] 04-08-PLAN.md — Root wiring, LangGraph boundary guard, parity tests, and final verification gates
 
 ### Phase 5: Task Management + Metrics
