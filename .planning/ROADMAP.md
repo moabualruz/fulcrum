@@ -113,7 +113,7 @@ Plans:
 
 **Wave 2**
 - [x] 04-03-PLAN.md — Inference backend health, CLI, tRPC, doctor, and static proof command (completed 2026-05-05)
-- [ ] 04-05-PLAN.md — MCP virtual skills plus skill lock/sync fail-closed supply-chain controls
+- [x] 04-05-PLAN.md — MCP virtual skills plus skill lock/sync fail-closed supply-chain controls
 
 **Wave 3**
 - [ ] 04-04-PLAN.md — Router decision service, disabled learned drafts, conflicts, audit, and LLM fallback safety

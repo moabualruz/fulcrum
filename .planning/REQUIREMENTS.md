@@ -113,10 +113,10 @@
 - [ ] **RTR-01**: Rules-engine routes matching task in unit test
 - [ ] **RTR-02**: No-match path stores learned rule in DB
 - [ ] **RTR-03**: LLM routing gate off by default, functional when enabled
-- [ ] **RTR-04**: Upstream skill sync diffs and auto-merges
-- [ ] **RTR-05**: MCP servers available as virtual skills
+- [x] **RTR-04**: Upstream skill sync diffs and auto-merges
+- [x] **RTR-05**: MCP servers available as virtual skills
 - [ ] **RTR-06**: Web routing rules editor functional
-- [ ] **RTR-07**: `skills.lock.json` SHA-256 pins validated on install
+- [x] **RTR-07**: `skills.lock.json` SHA-256 pins validated on install
 - [ ] **RTR-08**: All three surfaces show routing config: Web (routing editor), CLI (`fulcrum routing`), TUI (routing-rules screen)
 
 ### Tasks + Sprints — Pillar 6 (TSK)

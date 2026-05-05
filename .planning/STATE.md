@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-last_updated: "2026-05-05T05:39:00+02:00"
+last_updated: "2026-05-05T04:05:15.000Z"
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 33
-  completed_plans: 27
-  percent: 82
+  completed_plans: 28
+  percent: 85
 ---
 
 # Planning State
@@ -17,11 +17,11 @@ progress:
 ## Current Position
 
 Phase: 04 (inference-router-skills) — EXECUTING
-Plan: 3 of 8
+Plan: 4 of 8
 
 - **Phase**: 04-inference-router-skills
-- **Plan**: 04-03 completed
-- **Status**: Backend health lifecycle with real-call probes wired across CLI/tRPC/doctor
+- **Plan**: 04-05 completed
+- **Status**: MCP virtual skill descriptors, lock fail-closed with per-skill SHA state, structured SkillConflict entities, and registry service
 - **Branch**: gsd/phase-04-inference-router-skills
 
 ## Decisions
@@ -79,3 +79,7 @@ Plan: 3 of 8
 - [Phase 04-03]: tRPC backends.probe uses lazy dynamic import to avoid circular dependency issues
 - [Phase 04-03]: Doctor inference checks (inference-sidecar, inference-backends) use InferenceService directly (not container injection) for simplicity
 - [Phase 04-03]: static-proof CLI command accepts injectable proof runner for testability
+- [Phase 04-05]: sha256Hex shared from mcp-virtual-skills.ts to lock.ts to avoid hash duplication across both modules
+- [Phase 04-05]: SkillConflict entity stores structured conflict records with kind/status enums instead of inline unified diffs in lock file
+- [Phase 04-05]: verifySkillLock() returns state object (ok/sha_mismatch/missing) instead of throwing — callers handle fail-closed behavior
+- [Phase 04-05]: upstream_conflict enum string kept in lock.ts SkillsLockEntry schema for backward compat with existing lock files
