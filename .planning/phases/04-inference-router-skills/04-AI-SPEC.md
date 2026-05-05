@@ -563,7 +563,7 @@ trace.set_tracer_provider(provider)
 **CI/CD Integration:**
 ```bash
 bun test src/inference src/router src/skills src/server/trpc/routers/inference.ts src/server/trpc/routers/routing.ts src/server/trpc/routers/skills.ts
-bunx promptfoo eval --config evals/phase-04-router.promptfooconfig.yaml
+bunx promptfoo eval --config evals/router-llm-eval.promptfooconfig.yaml
 bun run ci
 ```
 

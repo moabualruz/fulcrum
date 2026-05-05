@@ -16,7 +16,7 @@
 | `src/cli/inference.ts` | controller | request-response | `src/cli/inference.ts` | exact-modify |
 | `src/server/trpc/routers/inference.ts` | route | request-response | `src/server/trpc/routers/inference.ts` | exact-modify |
 | `src/doctor/checks/inference.ts` | service | request-response | `src/inference/lifecycle.ts` | role-match |
-| `scripts/phase-04-static-build-proof.ts` | utility | batch | `scripts/build-all.ts` | role-match |
+| `scripts/static-build-proof.ts` | utility | batch | `scripts/build-all.ts` | role-match |
 | `src/router/service.ts` | service | request-response | `src/router/auto-assign.ts` | role-match |
 | `src/router/decision-schema.ts` | utility | transform | `src/router/types.ts`, `src/server/trpc/routers/routing.ts` | role-match |
 | `src/router/learned-drafts.ts` | service | CRUD | `src/router/no-match-prompt.ts`, `src/router/auto-assign.ts` | role-match |
@@ -32,7 +32,7 @@
 | `src/skills/upstream-sync.ts` | service | file-I/O | `src/skills/upstream-sync.ts` | exact-modify |
 | `src/server/trpc/routers/skills.ts` | route | request-response | `src/server/trpc/routers/skills.ts` | exact-modify |
 | `src/db/entities/router/*Draft*.ts`, `src/db/entities/skills/*Conflict*.ts`, migrations | model/migration | CRUD | `RoutingRule.ts`, `FulcrumSkill.ts`, existing migrations | role-match |
-| `evals/phase-04-router.promptfooconfig.yaml` | test | batch | none | no analog |
+| `evals/router-llm-eval.promptfooconfig.yaml` | test | batch | none | no analog |
 
 ## Pattern Assignments
 
@@ -638,8 +638,8 @@ export const MCP_COMPONENTS: readonly ComponentSpec[] = BUILTIN_MCPS.map(({ name
 | File | Role | Data Flow | Reason |
 |------|------|-----------|--------|
 | `src/router/graph.ts` | service | event-driven | No LangGraph/StateGraph code exists. Use AI-SPEC pattern and keep graph internal/optional. |
-| `evals/phase-04-router.promptfooconfig.yaml` | test | batch | No promptfoo config exists. Use RESEARCH dataset/eval contract. |
-| `scripts/phase-04-static-build-proof.ts` | utility | batch | `scripts/build-all.ts` is only partial analog; no cross-platform static proof script exists. |
+| `evals/router-llm-eval.promptfooconfig.yaml` | test | batch | No promptfoo config exists. Use RESEARCH dataset/eval contract. |
+| `scripts/static-build-proof.ts` | utility | batch | `scripts/build-all.ts` is only partial analog; no cross-platform static proof script exists. |
 
 ## Metadata
 

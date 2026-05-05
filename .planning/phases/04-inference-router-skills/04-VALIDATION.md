@@ -18,7 +18,7 @@ created: 2026-05-05
 | Property | Value |
 |----------|-------|
 | **Framework** | `bun:test`, Rust `cargo test`, Promptfoo evals, local smoke scripts |
-| **Config file** | `package.json`, `inference/Cargo.toml`, planned `evals/phase-04-router.promptfooconfig.yaml` |
+| **Config file** | `package.json`, `inference/Cargo.toml`, planned `evals/router-llm-eval.promptfooconfig.yaml` |
 | **Quick run command** | `bun test src/inference src/router src/skills src/server/trpc/routers/inference.ts src/server/trpc/routers/routing.ts src/server/trpc/routers/skills.ts` |
 | **Full suite command** | `bun run ci` plus Rust inference smoke and Phase 4 eval corpus |
 | **Estimated runtime** | ~120-600 seconds, depending on real model downloads/probes |
@@ -47,7 +47,7 @@ created: 2026-05-05
 | 04-INF-07 | TBD | TBD | INF-07 | — | First flag caller auto-spawns embedded sidecar only; external backends probed only | integration | `bun test src/inference src/server/trpc/routers/__tests__/inference.test.ts` | ✅ | ⬜ pending |
 | 04-RTR-01 | TBD | TBD | RTR-01 | — | Deterministic rule match returns expected route before LLM fallback | unit | `bun test src/router/rules-engine.test.ts src/router/auto-assign.test.ts` | ✅ | ⬜ pending |
 | 04-RTR-02 | TBD | TBD | RTR-02 | T-04-UNREVIEWED-DRAFT | No-match learning stores disabled draft with evidence, never active rule | unit + repository | `bun test src/router src/server/trpc/routers/routing*` | ✅ | ⬜ pending |
-| 04-RTR-03 | TBD | TBD | RTR-03 | T-04-LLM-ROUTE | LLM fallback is off by default; when enabled, low confidence abstains and high confidence creates disabled draft only | unit + eval | `bun test src/router/llm-fallback.test.ts && bunx promptfoo eval --config evals/phase-04-router.promptfooconfig.yaml` | ❌ W0 | ⬜ pending |
+| 04-RTR-03 | TBD | TBD | RTR-03 | T-04-LLM-ROUTE | LLM fallback is off by default; when enabled, low confidence abstains and high confidence creates disabled draft only | unit + eval | `bun test src/router/llm-fallback.test.ts && bunx promptfoo eval --config evals/router-llm-eval.promptfooconfig.yaml` | ❌ W0 | ⬜ pending |
 | 04-RTR-04 | TBD | TBD | RTR-04 | T-04-SKILL-SYNC | Safe upstream diffs auto-merge only when local unchanged; conflicts produce structured artifact | unit | `bun test src/skills/upstream-sync* src/skills/lock*` | ✅ | ⬜ pending |
 | 04-RTR-05 | TBD | TBD | RTR-05 | T-04-MCP-POISON | MCP virtual skills are descriptors only; no direct invocation path | unit + surface | `bun test src/skills src/cli/mcp-cmd.test.ts` | ✅ | ⬜ pending |
 | 04-RTR-06 | TBD | TBD | RTR-06 | — | Web routing editor supports explainable tests, drafts, conflict state, structured builder, raw JSON escape hatch | web unit/integration | `cd src/web && bun run web:test -- routing` | ❌ W0 | ⬜ pending |
@@ -60,7 +60,7 @@ created: 2026-05-05
 
 ## Wave 0 Requirements
 
-- [ ] `evals/phase-04-router.promptfooconfig.yaml` — Promptfoo eval corpus for LLM fallback explanation/abstention quality.
+- [ ] `evals/router-llm-eval.promptfooconfig.yaml` — Promptfoo eval corpus for LLM fallback explanation/abstention quality.
 - [ ] Web routing tests — focused web test file or suite selector for routing editor behavior.
 - [ ] Static build proof script/gate — macOS + Linux proof path, with explicit handling when `cross`/Docker/Linux builder unavailable.
 - [ ] Embedding dimension inventory test — scan/schema test proving no stale `vector(1536)` storage references remain and model metadata drives expected dimension.

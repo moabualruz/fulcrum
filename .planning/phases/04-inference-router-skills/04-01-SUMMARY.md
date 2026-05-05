@@ -27,11 +27,11 @@ tech-stack:
 
 key-files:
   created:
-    - scripts/phase-04-static-build-proof.ts
-    - scripts/phase-04-linux-builder.Dockerfile
+    - scripts/static-build-proof.ts
+    - scripts/linux-builder.Dockerfile
     - src/inference/embedding-dimension.test.ts
     - src/inference/backend-real-calls.test.ts
-    - evals/phase-04-router.promptfooconfig.yaml
+    - evals/router-llm-eval.promptfooconfig.yaml
     - src/router/learned-drafts.test.ts
     - src/skills/mcp-virtual-skills.test.ts
     - src/skills/lock-enforcement.test.ts
@@ -70,10 +70,10 @@ completed: 2026-05-05
 ## Accomplishments
 
 - **INF-01/06 gate:** `embedding-dimension.test.ts` — `assertEmbeddingDimension` fail-closed guard with 384-dim validation, mismatch throw, and stale `vector(1536)` scan
-- **INF-02 gate:** `phase-04-static-build-proof.ts` + `phase-04-linux-builder.Dockerfile` — cross-platform build proof with native/docker/missing fallback, artifact metadata, smoke testing, and JSON output proto
+- **INF-02 gate:** `static-build-proof.ts` + `linux-builder.Dockerfile` — cross-platform build proof with native/docker/missing fallback, artifact metadata, smoke testing, and JSON output proto
 - **INF-05 gate:** `backend-real-calls.test.ts` — typed backend probes for embedded/ollama/lm-studio/openai-compatible with configured/unconfigured state detection via FULCRUM_FEATURES and config env
 - **RTR-02/03 gate:** `learned-drafts.test.ts` — disabled draft creation with review_needed/conflict auto-detection, full evidence fields, low-confidence abstain at 0.55 threshold
-- **RTR-02/03 gate:** `phase-04-router.promptfooconfig.yaml` — 4 labeled promptfoo eval cases (deterministic-match, low-confidence-abstain, disabled-draft, overlap-conflict) with JSON structural assertions
+- **RTR-02/03 gate:** `router-llm-eval.promptfooconfig.yaml` — 4 labeled promptfoo eval cases (deterministic-match, low-confidence-abstain, disabled-draft, overlap-conflict) with JSON structural assertions
 - **RTR-05 gate:** `mcp-virtual-skills.test.ts` — descriptor-only MCP skills with source=mcp, invokableByFulcrum=false, deterministic descriptor/tool-manifest SHA-256 hashes
 - **RTR-07 gate:** `lock-enforcement.test.ts` — SHA mismatch fail-closed with exact expected/actual SHA exposure, override audit payload with accept/reinstall/remove actions
 
@@ -89,7 +89,7 @@ Each task was committed atomically with TDD RED/GREEN cycle:
 2. **Task 2: RTR-02/03/05/07 gates** — `c09abc14`
    - RED: 15/15 tests fail (draft/mcp/lock stubs)
    - GREEN: 15/15 tests pass (production implementations)
-   - Files: `learned-drafts.test.ts`, `mcp-virtual-skills.test.ts`, `lock-enforcement.test.ts`, `phase-04-router.promptfooconfig.yaml`
+   - Files: `learned-drafts.test.ts`, `mcp-virtual-skills.test.ts`, `lock-enforcement.test.ts`, `router-llm-eval.promptfooconfig.yaml`
 
 3. **Refactor: promptfoo fixes** — `23458b91`
    - Fix provider path resolution (absolute `file:///` path)
@@ -101,11 +101,11 @@ Each task was committed atomically with TDD RED/GREEN cycle:
 
 ## Files Created
 
-- `scripts/phase-04-static-build-proof.ts` — Cross-platform static build proof script (INF-02)
-- `scripts/phase-04-linux-builder.Dockerfile` — Pinned Rust Linux builder (1.83.0-bookworm + Bun 1.3.13)
+- `scripts/static-build-proof.ts` — Cross-platform static build proof script (INF-02)
+- `scripts/linux-builder.Dockerfile` — Pinned Rust Linux builder (1.83.0-bookworm + Bun 1.3.13)
 - `src/inference/embedding-dimension.test.ts` — Embedding dimension fail-closed gate (INF-01/06)
 - `src/inference/backend-real-calls.test.ts` — Backend real-call probe tests (INF-05)
-- `evals/phase-04-router.promptfooconfig.yaml` — Router LLM fallback eval corpus (RTR-02/03)
+- `evals/router-llm-eval.promptfooconfig.yaml` — Router LLM fallback eval corpus (RTR-02/03)
 - `src/router/learned-drafts.test.ts` — Disabled draft/conflict/abstain tests (RTR-02/03)
 - `src/skills/mcp-virtual-skills.test.ts` — MCP descriptor-only skill tests (RTR-05)
 - `src/skills/lock-enforcement.test.ts` — Skill lock SHA mismatch fail-closed tests (RTR-07)
