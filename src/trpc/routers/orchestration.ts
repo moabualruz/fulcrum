@@ -392,6 +392,80 @@ export const orchestrationRouter = router({
     .query(async ({ input, ctx }) => {
       return getSymphonyDriftReport(requireDb(ctx), requireOrgId(ctx), input.staleMinutes);
     }),
+
+  // ---------------------------------------------------------------------------
+  // dispatchRun — SND-06, SYM-25
+  // Creates or updates an agent_runs row and queues the run for dispatch.
+  // Uses MikroORM EM path (ARCH-12), not product-kernel raw SQL.
+  // Protected by permissionedProcedure with explicit resource/action metadata.
+  // ---------------------------------------------------------------------------
+  dispatchRun: permissionedProcedure({ resource: "orchestration", action: "dispatchRun" })
+    .input(
+      z.object({
+        taskId: z.string(),
+        orgId: z.string().optional(),
+        agentName: z.string().optional(),
+        workflowPath: z.string().optional(),
+        sandboxMode: z.string().optional(),
+        projectId: z.string().optional(),
+      }),
+    )
+    .output(
+      z.object({
+        runId: z.string(),
+        state: z.string(),
+        agent: z.string(),
+        sandboxMode: z.string(),
+        transcriptPath: z.string().nullable().optional(),
+        artifactCount: z.number().optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const em = requireEm(ctx);
+      const orgId = inputOrgId(ctx, input.orgId);
+
+      const { AgentRun } = await import("../../db/entities/orchestration/AgentRun.ts");
+      const { Task } = await import("../../db/entities/tasks/Task.ts");
+      const { Org } = await import("../../db/entities/auth/Org.ts");
+
+      const fork = em.fork();
+
+      // Resolve agent name — default to codex (D-10)
+      const agentName = input.agentName ?? "codex";
+      const sandboxMode = input.sandboxMode ?? "noSandbox";
+
+      // Verify task exists and belongs to this org
+      const task = await fork.findOne(Task, { id: input.taskId } as never);
+      if (!task) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `Task '${input.taskId}' not found`,
+        });
+      }
+
+      // Create AgentRun row (D-19: full run records persist)
+      const run = fork.create(AgentRun, {
+        org: fork.getReference(Org, orgId),
+        task: fork.getReference(Task, input.taskId),
+        orchestrationState: "unclaimed",
+        agentName,
+        sandboxMode,
+        attemptCount: 0,
+        workspacePath: null,
+        ...(input.projectId ? {} : {}),
+      });
+      fork.persist(run);
+      await fork.flush();
+
+      return {
+        runId: run.id,
+        state: run.orchestrationState ?? "unclaimed",
+        agent: agentName,
+        sandboxMode,
+        transcriptPath: run.transcriptPath ?? null,
+        artifactCount: 0,
+      };
+    }),
 });
 
 export type OrchestrationRouter = typeof orchestrationRouter;
