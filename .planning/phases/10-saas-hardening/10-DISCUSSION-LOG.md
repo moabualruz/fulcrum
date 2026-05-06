@@ -125,7 +125,7 @@ what other deferred items from all other phases there is we should include them 
 | Reopen every future/v2 idea in project handover | Would exceed source-phase explicit deferrals and mix aspirational roadmap with closure | |
 
 **User's choice:** Include all prior deferred items in Phase 10.
-**Notes:** Added `10-RESEARCH-DEFERRED-CLOSURE.md`, CLOSURE-01..18 mapping, and plans 10-10..10-13.
+**Notes:** Added `10-RESEARCH-DEFERRED-CLOSURE.md`, CLOSURE-01..18 mapping, and initial plans 10-10..10-13. Convergence cycle 1 later split closure execution across plans 10-10..10-18.
 
 ## Huashu UI/UX Recheck
 

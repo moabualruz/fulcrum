@@ -23,7 +23,7 @@ Planner must implement SAS-01..06 and CLOSURE-01..18 as one milestone closure pr
 - EventBus becomes injectable with local and PostgreSQL NOTIFY adapters.
 - `graphile-worker` becomes the PostgreSQL-backed worker adapter.
 - Real PostgreSQL integration tests use `@testcontainers/postgresql@11.6.0` or `FULCRUM_TEST_DATABASE_URL`.
-- Deferred Phases 2-9 items are imported into CLOSURE requirements and plans 10-10..10-13.
+- Deferred Phases 2-9 items are imported into CLOSURE requirements and plans 10-10..10-18.
 - `$huashu-design` is a mandatory product-surface gate for Web, CLI, and TUI, recorded in `10-UI-SPEC.md`.
 - Hosted/cloud integrations are config-gated adapters. Local PGlite mode must remain green with no external secrets.
 
@@ -38,6 +38,7 @@ Phase 10 cannot pass with PGlite-only tests. Validation requires:
 - Two-worker graphile-worker coordination tests.
 - PostgreSQL migration up/down and CI integration stage.
 - Closure product feature tests for task/time/goals/reports/search/docs.
+- Connector, enterprise-hardening, CLI-formatting, operations, Huashu, and final UAT tests split across plans 10-14..10-18.
 - Closure integration tests for Slack/Discord/email/tracker/billing/attestation/observability adapters.
 - Huashu Web/CLI/TUI source/snapshot/FakeTTY tests.
 - Final parity matrix covering SAS-01..06 and CLOSURE-01..18.

@@ -53,10 +53,15 @@ created: 2026-05-06
 | 10-07-01 | 07 | 3 | SAS-02,SAS-04 | T10-07-01 | CLI commands use shared caller paths and support `--json`. | integration | `bun test tests/postgres/cli-saas.test.ts` | W0 | pending |
 | 10-08-01 | 08 | 3 | SAS-02,SAS-04 | T10-08-01 | TUI commands/screens use shared caller paths and preserve parity. | integration | `bun test tests/postgres/tui-saas.test.ts` | W0 | pending |
 | 10-09-01 | 09 | 4 | SAS-01..06 | T10-09-01 | CI exercises all SaaS hardening contracts against PostgreSQL. | ci | `bun run ci` | W0 | pending |
-| 10-10-01 | 10 | 5 | CLOSURE-01,CLOSURE-02,CLOSURE-04,CLOSURE-05 | T10-10-01 | Foundational deferred items are closed or recorded as environment blockers without public stubs. | integration | `bun test tests/cli/auth-session.test.ts tests/context/repo-state-bundle.test.ts tests/platform/static-proof.test.ts tests/trpc/app-router-scaffold.test.ts` | W0 | pending |
-| 10-11-01 | 11 | 6 | CLOSURE-06..13 | T10-11-01 | Product deferred features are tenant-scoped and surface-parity complete. | integration | `bun test tests/closure/product-features.test.ts tests/closure/product-surface-parity.test.ts tests/search/meilisearch-adapter.test.ts tests/search/ai-qa.test.ts` | W0 | pending |
-| 10-12-01 | 12 | 7 | CLOSURE-03,CLOSURE-13..17 | T10-12-01 | External/hosted adapters are config-gated, authenticated, and local-first safe. | integration | `bun test tests/closure/integrations.test.ts tests/closure/notification-workflows.test.ts tests/closure/enterprise-hardening.test.ts tests/cli/formatting.test.ts` | W0 | pending |
-| 10-13-01 | 13 | 8 | CLOSURE-16,CLOSURE-18 | T10-13-01 | Huashu Web/CLI/TUI design gates and final parity matrix pass. | ui/integration | `bun test tests/web/phase10-huashu-routes.test.ts tests/cli/phase10-huashu-cli.test.ts tests/tui/phase10-huashu-tui.test.ts tests/platform/phase10-parity-matrix.test.ts` | W0 | pending |
+| 10-10-01 | 10 | 5 | CLOSURE-01,CLOSURE-02,CLOSURE-04,CLOSURE-05 | T10-10-01 | Foundational deferred items are closed or recorded as evidence/blockers without public stubs or final UAT writes. | integration | `bun test tests/cli/auth-session.test.ts tests/context/repo-state-bundle.test.ts tests/platform/static-proof.test.ts tests/trpc/app-router-scaffold.test.ts` | W0 | pending |
+| 10-11-01 | 11 | 6 | CLOSURE-06,CLOSURE-07 | T10-11-01 | Docs/search closure features are tenant-scoped, deterministic, and optional-adapter safe. | integration | `bun test tests/closure/docs-search.test.ts tests/search/meilisearch-adapter.test.ts tests/search/ai-qa.test.ts tests/closure/product-surface-parity.test.ts` | W0 | pending |
+| 10-12-01 | 12 | 6 | CLOSURE-08,CLOSURE-11,CLOSURE-13 | T10-12-01 | Task/time closure features preserve Phase 5 semantics and surface parity. | integration | `bun test tests/closure/task-time-features.test.ts tests/closure/product-surface-parity.test.ts tests/postgres/tenant-isolation.test.ts` | W0 | pending |
+| 10-13-01 | 13 | 7 | CLOSURE-09,CLOSURE-10,CLOSURE-12,CLOSURE-13 | T10-13-01 | Goals/reports/dashboards coordinate jobs and expose parity across surfaces. | integration | `bun test tests/closure/goals-reports.test.ts tests/closure/product-surface-parity.test.ts tests/workers/registry.test.ts` | W0 | pending |
+| 10-14-01 | 14 | 7 | CLOSURE-03,CLOSURE-13,CLOSURE-14 | T10-14-01 | Connector intake/dispatch and notification workflows are signed, gated, and parity-tested. | integration | `bun test tests/closure/integrations.test.ts tests/closure/notification-workflows.test.ts` | W0 | pending |
+| 10-15-01 | 15 | 8 | CLOSURE-15,CLOSURE-16,CLOSURE-17 | T10-15-01 | Enterprise adapters are local-first gated and never expose secrets. | integration | `bun test tests/closure/enterprise-hardening.test.ts tests/closure/product-surface-parity.test.ts` | W0 | pending |
+| 10-16-01 | 16 | 8 | CLOSURE-16 | T10-16-01 | CLI framework and formatting decisions preserve JSON automation and closure parity. | integration | `bun test tests/cli/formatting.test.ts tests/closure/product-surface-parity.test.ts` | W0 | pending |
+| 10-17-01 | 17 | 9 | SAS-01,SAS-02,SAS-03,SAS-05,SAS-06,CLOSURE-17 | T10-17-01 | Deployment, migration, backup/restore, and cross-process operations are proven. | integration | `bun test tests/postgres/operations.test.ts tests/platform/deployment-smoke.test.ts tests/db/migration-downgrade.test.ts` | W0 | pending |
+| 10-18-01 | 18 | 10 | SAS-01..06,CLOSURE-01..18 | T10-18-01 | Huashu gates, parity matrix, and final UAT cover every requirement after all implementation plans. | ui/integration | `bun test tests/web/phase10-huashu-routes.test.ts tests/cli/phase10-huashu-cli.test.ts tests/tui/phase10-huashu-tui.test.ts tests/platform/phase10-parity-matrix.test.ts && bun run ci` | W0 | pending |
 
 *Status: pending · green · red · flaky*
 
@@ -73,11 +78,15 @@ created: 2026-05-06
 - [ ] `tests/postgres/cli-saas.test.ts` — CLI JSON parity for org/status/audit commands.
 - [ ] `tests/postgres/tui-saas.test.ts` — TUI parity smoke tests through shared service/caller boundaries.
 - [ ] `tests/web/org-settings.spec.ts` — Web organization settings e2e and accessibility coverage.
-- [ ] `tests/closure/product-features.test.ts` — closure product features.
+- [ ] `tests/closure/docs-search.test.ts` — named document tags and docs/search closure.
+- [ ] `tests/closure/task-time-features.test.ts` — time entries, multi-assignee, task merge, form templates.
+- [ ] `tests/closure/goals-reports.test.ts` — goals, dashboards, scheduled reports, chart export.
 - [ ] `tests/closure/product-surface-parity.test.ts` — closure Web/CLI/TUI/API parity.
 - [ ] `tests/closure/integrations.test.ts` — Slack/Discord/email/external tracker adapters.
 - [ ] `tests/closure/notification-workflows.test.ts` — workflow designer and channel gates.
 - [ ] `tests/closure/enterprise-hardening.test.ts` — billing, quotas, attestation, SIEM, OTel, encryption verification.
+- [ ] `tests/postgres/operations.test.ts` — PGlite-to-PostgreSQL migration, backup/restore, migration locks.
+- [ ] `tests/platform/deployment-smoke.test.ts` — production-style health, EventBus, worker smoke.
 - [ ] `tests/web/phase10-huashu-routes.test.ts` — Huashu Web operational-route gate.
 - [ ] `tests/cli/phase10-huashu-cli.test.ts` — CLI information hierarchy and formatting gate.
 - [ ] `tests/tui/phase10-huashu-tui.test.ts` — TUI keyboard/plain-text gate.

@@ -231,7 +231,7 @@ Phase 10 is the milestone closure phase after local-first product completion. It
 <deferred>
 ## Deferred Ideas
 
-- None from prior phases remain unassigned. Prior deferred items are imported into CLOSURE-01..CLOSURE-18 and plans 10-10..10-13.
+- None from prior phases remain unassigned. Prior deferred items are imported into CLOSURE-01..CLOSURE-18 and plans 10-10..10-18.
 - Still intentionally out of Phase 10 unless the user adds new requirements: replacing Better Auth with Clerk/Auth0/WorkOS, multi-region tenant placement, and separate database/schema per tenant.
 
 </deferred>

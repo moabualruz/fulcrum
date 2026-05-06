@@ -299,7 +299,7 @@ Plans:
   6. CLOSURE-01..18 implemented or proven already closed with UAT evidence
   7. Web/CLI/TUI/API parity matrix covers every SAS and CLOSURE requirement
   8. `$huashu-design` Web/CLI/TUI design gate passes with recorded scores
-**Plans:** Complete — 10-00 through 10-13 planned. Canonical evidence: `.planning/phases/10-saas-hardening/10-CONTEXT.md`, `10-RESEARCH-DEFERRED-CLOSURE.md`, `10-UI-SPEC.md`.
+**Plans:** Complete — 10-00 through 10-18 planned. Canonical evidence: `.planning/phases/10-saas-hardening/10-CONTEXT.md`, `10-RESEARCH-DEFERRED-CLOSURE.md`, `10-UI-SPEC.md`.
 
 ## Progress
 
@@ -314,7 +314,7 @@ Plans:
 | 7. Repos + Artifacts + Notifications | 10/10 | Complete | 2026-05-05 |
 | 8. Surface Delivery | 7/7 | Complete | 2026-05-06 |
 | 9. Cross-Cutting + Testing | 10/10 | Complete | 2026-05-06 |
-| 10. SaaS Hardening + Milestone Closure | 0/14 | Planned | - |
+| 10. SaaS Hardening + Milestone Closure | 0/19 | Planned | - |
 
 ---
 *Roadmap created: 2026-05-04*

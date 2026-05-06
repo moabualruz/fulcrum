@@ -9,22 +9,22 @@
 |---|---|---|---|
 | CLOSURE-01 | Phase 2 `02-CONTEXT.md` | BUG-17 local main sync/repo hygiene and final milestone merge readiness | Plan 10-10: repo hygiene report, merge readiness checks, no push to `main` without user request |
 | CLOSURE-02 | Phase 2 `02-08-SUMMARY.md` | CLI interactive `login` and `logout` stubs | Plan 10-10: real session lifecycle or remove public stub surface |
-| CLOSURE-03 | Phase 3 `03-CONTEXT.md` | External tracker dispatch parity for Linear/GitHub Issues | Plan 10-12: dispatch-capable adapters or explicit disabled ingest-only state |
+| CLOSURE-03 | Phase 3 `03-CONTEXT.md` | External tracker dispatch parity for Linear/GitHub Issues | Plan 10-14: dispatch-capable adapters or explicit disabled ingest-only state |
 | CLOSURE-04 | Phase 4 summaries | INF-02 Linux static proof and `z.any()` public schema gap | Plan 10-10: Docker/native Linux proof gate and public schema cleanup |
 | CLOSURE-05 | Phase 6 `06-CONTEXT.md` | MEM-09 repo-state context bundle placeholder | Plan 10-10: use Phase 7 repo state in context bundles |
 | CLOSURE-06 | Phase 6 `06-CONTEXT.md` | Named document version tags | Plan 10-11: git-like tags for doc versions |
 | CLOSURE-07 | Phase 6 `06-CONTEXT.md` | AI-powered search/Q&A and optional Meilisearch backend | Plan 10-11: deterministic optional adapter plus gated Q&A, PGlite/Orama default |
-| CLOSURE-08 | Phase 5 `05-CONTEXT.md` | Time tracking/time entries/timesheets | Plan 10-11: task time-entry model and Web/CLI/TUI parity |
-| CLOSURE-09 | Phase 5 `05-CONTEXT.md` | Custom dashboard builder | Plan 10-11: widget dashboard builder with saved layout |
-| CLOSURE-10 | Phase 5 `05-CONTEXT.md` | Scheduled email report delivery | Plan 10-11: graphile-worker schedule + notification delivery |
-| CLOSURE-11 | Phase 5 `05-CONTEXT.md` | Multi-assignee per task | Plan 10-11: assignment join table plus watcher compatibility |
-| CLOSURE-12 | Phase 5 `05-CONTEXT.md` | Chart export to PNG/PDF | Plan 10-11: report export workers and CLI/Web/TUI status |
-| CLOSURE-13 | Phase 5 `05-CONTEXT.md` and `05-RESEARCH-GAPS.md` | Goals/OKRs, task merge, form-based templates, Email/Slack task creation | Plan 10-11 and 10-12: task/product closure features plus inbound channel adapters |
-| CLOSURE-14 | Phase 7 `07-CONTEXT.md` | Notification workflow designer UI and Slack/Discord channels | Plan 10-12: workflow designer plus `@slack/bolt`/`discord.js` gated adapters |
-| CLOSURE-15 | Phase 7 research/context | General binary/media previews, artifact signing/attestation, hosted repo cache, ntfy connector | Plan 10-12: preview pipeline, `sigstore`, remote cache, `ntfy` |
-| CLOSURE-16 | Phase 8 `08-CONTEXT.md` | CLI framework migration, `--jq`, `--template`, Web design polish, hosted API gateway/tier billing | Plan 10-12 and 10-13: CLI decision/gates, billing/API gateway, Huashu Web/CLI/TUI gate |
-| CLOSURE-17 | Phase 9 `09-CONTEXT.md` | Optional Sentry/Datadog/OTel, theme builder, representative l10n, SIEM export, encryption verification | Plan 10-12: local-first gated adapters and vault verification |
-| CLOSURE-18 | Phase 8/9 UI specs | Final Web/CLI/TUI system design review | Plan 10-13: Huashu review score gates and source tests |
+| CLOSURE-08 | Phase 5 `05-CONTEXT.md` | Time tracking/time entries/timesheets | Plan 10-12: task time-entry model and Web/CLI/TUI parity |
+| CLOSURE-09 | Phase 5 `05-CONTEXT.md` | Custom dashboard builder | Plan 10-13: widget dashboard builder with saved layout |
+| CLOSURE-10 | Phase 5 `05-CONTEXT.md` | Scheduled email report delivery | Plan 10-13: graphile-worker schedule + notification delivery |
+| CLOSURE-11 | Phase 5 `05-CONTEXT.md` | Multi-assignee per task | Plan 10-12: assignment join table plus watcher compatibility |
+| CLOSURE-12 | Phase 5 `05-CONTEXT.md` | Chart export to PNG/PDF | Plan 10-13: report export workers and CLI/Web/TUI status |
+| CLOSURE-13 | Phase 5 `05-CONTEXT.md` and `05-RESEARCH-GAPS.md` | Goals/OKRs, task merge, form-based templates, Email/Slack task creation | Plans 10-12, 10-13, and 10-14: task/product closure features plus inbound channel adapters |
+| CLOSURE-14 | Phase 7 `07-CONTEXT.md` | Notification workflow designer UI and Slack/Discord channels | Plan 10-14: workflow designer plus `@slack/bolt`/`discord.js` gated adapters |
+| CLOSURE-15 | Phase 7 research/context | General binary/media previews, artifact signing/attestation, hosted repo cache, ntfy connector | Plan 10-15: preview pipeline, `sigstore`, remote cache, `ntfy` |
+| CLOSURE-16 | Phase 8 `08-CONTEXT.md` | CLI framework migration, `--jq`, `--template`, Web design polish, hosted API gateway/tier billing | Plans 10-15, 10-16, and 10-18: billing/API gateway, CLI decision/gates, Huashu Web/CLI/TUI gate |
+| CLOSURE-17 | Phase 9 `09-CONTEXT.md` | Optional Sentry/Datadog/OTel, theme builder, representative l10n, SIEM export, encryption verification | Plans 10-15 and 10-17: local-first gated adapters, vault verification, and operations proof |
+| CLOSURE-18 | Phase 8/9 UI specs | Final Web/CLI/TUI system design review | Plan 10-18: Huashu review score gates, source tests, parity matrix, and final UAT |
 
 ## Platform Patterns
 

@@ -79,5 +79,5 @@ Fulcrum Phase 10 is a closure/hardening phase for an operational Agent OS. Inter
 
 ## Acceptance
 
-- `10-13-PLAN.md` implements this UI spec through source tests, Playwright/a11y tests, CLI snapshots, and TUI FakeTTY tests.
+- `10-18-PLAN.md` implements this UI spec through source tests, Playwright/a11y tests, CLI snapshots, and TUI FakeTTY tests after all closure implementation plans complete.
 - Phase 10 UAT records Huashu score evidence for Web, CLI, and TUI.
