@@ -2,13 +2,13 @@ import { TRPCError } from "@trpc/server";
 import { readFile, writeFile } from "node:fs/promises";
 import { z } from "zod";
 
+import { exportableColumns as filterExportableColumns, redactExportRow } from "../../../data/export-redaction.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 
 const FORMAT = "fulcrum.json-export.v1" as const;
 const SCHEMA_VERSION = 1 as const;
 const FULCRUM_VERSION = "0.1.0";
-const CREDENTIAL_SECRET_COLUMNS = new Set(["encrypted_value"]);
 
 const JsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
   z.union([
@@ -140,13 +140,13 @@ async function columnsForTable(em: EntityManager, table: string): Promise<{
 }
 
 function exportableColumns(table: string, columns: string[]): string[] {
-  if (table !== "credentials") return columns;
-  return columns.filter((column) => !CREDENTIAL_SECRET_COLUMNS.has(column));
+  return filterExportableColumns(columns);
 }
 
 function redactRow(table: string, row: Record<string, unknown>): Record<string, unknown> {
-  if (table !== "credentials") return row;
-  return { ...row, redacted: true };
+  const redacted = redactExportRow(row);
+  if (table !== "credentials") return redacted;
+  return { ...redacted, redacted: true };
 }
 
 async function createManifest(em: EntityManager): Promise<ImportManifest> {

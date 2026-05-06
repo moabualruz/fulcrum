@@ -101,6 +101,9 @@ describe("JSON import/export tRPC procedures", () => {
       expect(manifest.tasks.map((row: { id: string }) => row.id)).toEqual([task.id]);
       expect(result.json).not.toContain("plaintext-secret");
       expect(manifest.credentials[0]).not.toHaveProperty("encrypted_value");
+      expect(manifest.credentials[0]).not.toHaveProperty("token");
+      expect(manifest.credentials[0]).not.toHaveProperty("secret");
+      expect(manifest.credentials[0]).not.toHaveProperty("password");
       expect(manifest.credentials[0]).toMatchObject({
         id: "00000000-0000-4000-8000-000000000099",
         name: "openai",
@@ -150,6 +153,7 @@ describe("JSON import/export tRPC procedures", () => {
         onConflict: "update",
       });
       expect(dryRun).toMatchObject({ ok: true, imported: 0, updated: 0, skipped: 0, errors: 0 });
+      expect(await caller.tasks.list()).toHaveLength(1);
       expect((await caller.tasks.get({ id: created.id }))?.title).toBe("Before import");
 
       const firstRun = await caller.dataImport.run({ importId: path, onConflict: "update" });

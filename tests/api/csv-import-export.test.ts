@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { createPublicApiRouter } from "../../src/api/hono.ts";
+import { exportGenericCsv } from "../../src/connectors/csv.ts";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -101,5 +102,28 @@ describe("P13#14 CSV import/export for tasks", () => {
         columns: ["title"],
       },
     });
+  });
+
+  it("redacts credential-like CSV columns with the shared export policy", () => {
+    const csv = exportGenericCsv(
+      [
+        {
+          id: "cred-1",
+          name: "openai",
+          encrypted_value: "ciphertext",
+          token: "tok-secret",
+          secret: "raw-secret",
+          password: "pw-secret",
+        },
+      ],
+      ["id", "name", "encrypted_value", "token", "secret", "password"],
+    );
+
+    expect(csv.split("\n")[0]).toBe("id,name");
+    expect(csv).toContain("openai");
+    expect(csv).not.toContain("ciphertext");
+    expect(csv).not.toContain("tok-secret");
+    expect(csv).not.toContain("raw-secret");
+    expect(csv).not.toContain("pw-secret");
   });
 });

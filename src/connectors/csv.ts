@@ -1,3 +1,5 @@
+import { exportableColumns } from "../data/export-redaction.ts";
+
 export type CsvEntity = "tasks";
 
 export interface CsvTask {
@@ -33,15 +35,25 @@ export class CsvValidationError extends Error {
 const TASK_HEADERS = ["id", "external_id", "title", "status", "created_at"];
 
 export function exportTasksCsv(tasks: CsvTask[]): string {
-  const rows = [TASK_HEADERS, ...tasks.map((task) => [
-    task.id,
-    task.externalId ?? "",
-    task.title,
-    task.status,
-    task.createdAt,
-  ])];
+  return exportGenericCsv(
+    tasks.map((task) => ({
+      id: task.id,
+      external_id: task.externalId ?? "",
+      title: task.title,
+      status: task.status,
+      created_at: task.createdAt,
+    })),
+    TASK_HEADERS,
+  );
+}
 
-  return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
+export function exportGenericCsv(rows: Array<Record<string, unknown>>, headers: string[]): string {
+  const selectedHeaders = exportableColumns(headers);
+  const csvRows = [
+    selectedHeaders,
+    ...rows.map((row) => selectedHeaders.map((header) => row[header] ?? "")),
+  ];
+  return csvRows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
 }
 
 export function importTasksCsv(
@@ -88,9 +100,10 @@ export function importTasksCsv(
   return result;
 }
 
-function escapeCsvCell(value: string): string {
-  if (!/[",\n\r]/.test(value)) return value;
-  return `"${value.replaceAll("\"", "\"\"")}"`;
+function escapeCsvCell(value: unknown): string {
+  const cell = String(value);
+  if (!/[",\n\r]/.test(cell)) return cell;
+  return `"${cell.replaceAll("\"", "\"\"")}"`;
 }
 
 function parseCsv(csv: string): string[][] {
