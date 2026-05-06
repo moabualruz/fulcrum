@@ -19,7 +19,7 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
 - [x] **Phase 5: Task Management + Metrics** - Task comments/watchers, charts, sprint features, custom fields (completed 2026-05-05)
 - [x] **Phase 6: Documents + Memory + Search** - Editor verification, memory engine, unified search, Cmd+K (completed 2026-05-05)
 - [x] **Phase 7: Repos + Artifacts + Notifications** - Git sync, artifact pipeline, notification delivery
-- [ ] **Phase 8: Surface Delivery** - CLI wiring, TUI rewrite, Web completion, API surface
+- [x] **Phase 8: Surface Delivery** - CLI wiring, TUI rewrite, Web completion, API surface
 - [ ] **Phase 9: Cross-Cutting + Testing** - i18n, theming, accessibility, telemetry, backup, comprehensive test coverage
 - [ ] **Phase 10: SaaS Hardening** - Multi-org isolation, PostgreSQL pooling, job coordination
 
@@ -306,11 +306,11 @@ Plans:
 | 4. Inference + Router/Skills | 8/8 | Complete | 2026-05-05 |
 | 5. Task Management + Metrics | 16/16 | Complete   | 2026-05-05 |
 | 6. Documents + Memory + Search | 10/10 | Complete   | 2026-05-05 |
-| 7. Repos + Artifacts + Notifications | 0/? | Not started | - |
-| 8. Surface Delivery | 0/? | Not started | - |
+| 7. Repos + Artifacts + Notifications | 10/10 | Complete | 2026-05-05 |
+| 8. Surface Delivery | 7/7 | Complete | 2026-05-06 |
 | 9. Cross-Cutting + Testing | 0/? | Not started | - |
 | 10. SaaS Hardening | 0/? | Not started | - |
 
 ---
 *Roadmap created: 2026-05-04*
-*Last corrected: 2026-05-05 — fixed Phase 6 plan lists erroneously duplicated into Phases 3/7/8/9/10; restored Phase 3 real plans*
+*Last corrected: 2026-05-06 — marked Phase 7/8 progress rows complete after verified execution*
