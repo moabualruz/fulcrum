@@ -2,18 +2,18 @@
  * Unified auth middleware for the public REST API.
  * Supports Bearer API-key auth (SHA-256 hash lookup).
  *
- * Consolidated from product-kernel/api/router.ts authMiddleware.
  */
 
 import type { Context, Next } from "hono";
-import type { ProductDb } from "../product-kernel/db/types.ts";
-import { findApiKeyByHash } from "../product-kernel/store/repositories.ts";
+import type { ApiKeyLookup, PublicApiApplication } from "./application.ts";
 
 // ── Types ────────────────────────────────────────────────────────────
 
 export interface ApiEnv {
   Variables: {
-    db: ProductDb;
+    db: unknown;
+    apiAuth: ApiKeyLookup;
+    application: PublicApiApplication;
     orgId: string;
     userId: string;
     trpc?: unknown;
@@ -38,13 +38,13 @@ async function hashKey(key: string): Promise<string> {
  */
 export function apiKeyAuth() {
   return async (c: Context, next: Next) => {
-    const db: ProductDb = c.get("db");
+    const apiAuth = c.get("apiAuth") as ApiKeyLookup | undefined;
     const authHeader = c.req.header("Authorization");
 
     if (authHeader?.startsWith("Bearer ")) {
       const token = authHeader.slice(7);
       const keyHash = await hashKey(token);
-      const apiKey = await findApiKeyByHash(db, keyHash);
+      const apiKey = await apiAuth?.findApiKeyByHash(keyHash);
       if (!apiKey) {
         return c.json({ error: "invalid API key" }, 401);
       }

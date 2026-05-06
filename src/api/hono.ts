@@ -1,11 +1,7 @@
 /**
  * Unified public REST API — single Hono entry point.
  *
- * Consolidates all API surfaces (ARCH-09):
- *   - product-kernel/api/router.ts → real task/sprint/report/notification/audit routes
- *   - product-kernel/api/search-api.ts → real search routes
- *   - trpc/rest-api.ts → symphony orchestration routes
- *   - src/api/routes/* → route adapters for docs, runs, artifacts, repos, memory, saved-views
+ * Consolidates REST/OpenAPI routes under one adapter.
  *
  * Auth: Bearer API-key (SHA-256 hash lookup) via src/api/auth.ts.
  * Feature gate: FULCRUM_FEATURES=public-api (OFF → 404).
@@ -14,12 +10,15 @@
 
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Hono } from "hono";
-import type { ProductDb } from "../product-kernel/db/types.ts";
 import { isPublicApiEnabled } from "./feature-flags.ts";
 import { apiKeyAuth, type ApiEnv } from "./auth.ts";
 import { rateLimit } from "./rate-limit.ts";
+import {
+  emptyPublicApiApplication,
+  type ApiKeyLookup,
+  type PublicApiApplication,
+} from "./application.ts";
 
-// ── Real route registrations (from product-kernel) ──────────────────
 import { registerKernelTaskRoutes } from "./routes/kernel-tasks.ts";
 import { registerKernelSprintRoutes } from "./routes/kernel-sprints.ts";
 import { registerKernelReportRoutes } from "./routes/kernel-reports.ts";
@@ -41,7 +40,9 @@ import { registerSavedViewRoutes } from "./routes/saved-views.ts";
 // ── Factory ─────────────────────────────────────────────────────────
 
 export interface PublicApiDeps {
-  db: ProductDb;
+  db?: unknown;
+  apiAuth?: ApiKeyLookup;
+  application?: PublicApiApplication;
   trpc?: unknown;
 }
 
@@ -55,9 +56,10 @@ export function createPublicApi(deps?: PublicApiDeps): OpenAPIHono {
   const api = new OpenAPIHono<ApiEnv>();
 
   if (deps) {
-    // Inject DB into Hono context for all routes
     api.use("*", async (c, next) => {
-      c.set("db", deps.db);
+      if (deps.db) c.set("db", deps.db);
+      c.set("application", deps.application ?? emptyPublicApiApplication);
+      if (deps.apiAuth) c.set("apiAuth", deps.apiAuth);
       if (deps.trpc) c.set("trpc", deps.trpc);
       return next();
     });
@@ -72,12 +74,11 @@ export function createPublicApi(deps?: PublicApiDeps): OpenAPIHono {
   api.use("*", rateLimit());
 
   if (deps) {
-    // Real routes — backed by ProductDb + services
     registerKernelTaskRoutes(api);
-    registerKernelSprintRoutes(api);
-    registerKernelReportRoutes(api);
-    registerKernelNotificationRoutes(api);
-    registerKernelAuditRoutes(api);
+    registerKernelSprintRoutes(api, { application: deps.application?.sprints });
+    registerKernelReportRoutes(api, { application: deps.application?.reports });
+    registerKernelNotificationRoutes(api, { application: deps.application?.notifications });
+    registerKernelAuditRoutes(api, { application: deps.application?.audit });
   }
 
   // Cast needed: legacy route modules use OpenAPIHono<Env>; ApiEnv is a superset.

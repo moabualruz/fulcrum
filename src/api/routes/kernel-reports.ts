@@ -1,25 +1,28 @@
-/**
- * Real report routes — burndown + velocity from product-kernel.
- */
-
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
+import type { KernelReportApplication } from "../application.ts";
 import type { ApiEnv } from "../auth.ts";
-import { velocity, burndown } from "../../product-kernel/reports.ts";
-import * as S from "../../product-kernel/api/schemas.ts";
+
+const ErrorResponse = z.object({ error: z.string() });
+const ReportResponse = z.object({ data: z.array(z.unknown()) });
 
 const burndownRoute = createRoute({
   method: "get",
   path: "/reports/burndown",
   tags: ["reports"],
   summary: "Burndown chart data",
-  request: { query: S.BurndownQuery },
+  request: {
+    query: z.object({
+      project_id: z.string(),
+      sprint_id: z.string().optional(),
+    }),
+  },
   responses: {
     200: {
-      content: { "application/json": { schema: z.object({ data: z.array(S.BurndownRow) }) } },
+      content: { "application/json": { schema: ReportResponse } },
       description: "Burndown chart data",
     },
     401: {
-      content: { "application/json": { schema: S.ErrorResponse } },
+      content: { "application/json": { schema: ErrorResponse } },
       description: "Unauthorized",
     },
   },
@@ -30,31 +33,47 @@ const velocityRoute = createRoute({
   path: "/reports/velocity",
   tags: ["reports"],
   summary: "Sprint velocity report",
-  request: { query: S.VelocityQuery },
+  request: { query: z.object({ project_id: z.string() }) },
   responses: {
     200: {
-      content: { "application/json": { schema: z.object({ data: z.array(S.VelocityRow) }) } },
+      content: { "application/json": { schema: ReportResponse } },
       description: "Velocity report",
     },
     401: {
-      content: { "application/json": { schema: S.ErrorResponse } },
+      content: { "application/json": { schema: ErrorResponse } },
       description: "Unauthorized",
     },
   },
 });
 
-export function registerKernelReportRoutes(api: OpenAPIHono<ApiEnv>): void {
+export function registerKernelReportRoutes(
+  api: OpenAPIHono<ApiEnv>,
+  options: { application?: KernelReportApplication } = {},
+): void {
   api.openapi(burndownRoute, async (c) => {
-    const db = c.get("db");
+    const application = options.application ?? c.get("application")?.reports;
     const { project_id, sprint_id } = c.req.valid("query");
-    const data = await burndown(db, project_id, sprint_id);
-    return c.json({ data }, 200);
+    if (!application) return c.json({ data: [] }, 200);
+    return c.json(
+      await application.burndown({
+        orgId: c.get("orgId"),
+        projectId: project_id,
+        sprintId: sprint_id,
+      }) as never,
+      200,
+    );
   });
 
   api.openapi(velocityRoute, async (c) => {
-    const db = c.get("db");
+    const application = options.application ?? c.get("application")?.reports;
     const { project_id } = c.req.valid("query");
-    const data = await velocity(db, project_id);
-    return c.json({ data }, 200);
+    if (!application) return c.json({ data: [] }, 200);
+    return c.json(
+      await application.velocity({
+        orgId: c.get("orgId"),
+        projectId: project_id,
+      }) as never,
+      200,
+    );
   });
 }

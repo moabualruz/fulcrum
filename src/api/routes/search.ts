@@ -65,9 +65,7 @@ export function registerSearchRoutes(api: OpenAPIHono): void {
     }
 
     // Resolve db from context (injected by app setup)
-    const db = (c.get as (key: string) => unknown)("db") as
-      | import("../../product-kernel/db/types.ts").ProductDb
-      | undefined;
+    const db = (c.get as (key: string) => unknown)("db");
 
     if (!db) {
       const title = "Search fallback result";
@@ -82,7 +80,7 @@ export function registerSearchRoutes(api: OpenAPIHono): void {
       }] : [], 200);
     }
 
-    const svc = new SearchQueryService(db);
+    const svc = new SearchQueryService(db as never);
     const output = await svc.query(orgId, {
       term: q,
       filters: {
