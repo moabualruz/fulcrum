@@ -1,9 +1,9 @@
-/**
- * Dashboard — migrated from raw ProductDb to MikroORM EntityManager.
- * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
- */
-
 import type { EntityManager } from "@mikro-orm/postgresql";
+
+import { Project } from "../../../../db/entities/tasks/Project.ts";
+import { listDocs } from "../../../../application/docs/queries.ts";
+import { listRuns } from "../../../../application/runs/queries.ts";
+import { listTasks } from "../../../../application/tasks/queries.ts";
 
 export interface ProjectTile {
   id: string;
@@ -21,123 +21,71 @@ export interface DashboardData {
   unreadCount: number;
 }
 
-interface CountRow { c: string | number }
-
-function toNumber(v: string | number | null | undefined): number {
-  if (typeof v === "number") return v;
-  if (typeof v === "string") return Number.parseInt(v, 10);
-  return 0;
-}
-
-type SqlValue = string | number | boolean | null;
-type QueryableDb = {
-  query: <T>(sql: string, params?: SqlValue[]) => Promise<T>;
-};
-
-function projectClause(
-  projectId: string | null | undefined,
-  paramIndex: number,
-): { sql: string; param: SqlValue | undefined } {
-  if (projectId === undefined) return { sql: "", param: undefined };
-  if (projectId === null) return { sql: " AND project_id IS NULL", param: undefined };
-  return { sql: ` AND project_id = $${paramIndex}`, param: projectId };
+function isoStamp(value: Date): string {
+  return value.toISOString();
 }
 
 export async function loadDashboard(
-  em: EntityManager | QueryableDb,
+  em: EntityManager,
   orgId: string,
   projectId?: string | null,
 ): Promise<DashboardData> {
-  const scope = projectClause(projectId, 2);
-  const params: SqlValue[] = [orgId];
-  if (scope.param !== undefined) params.push(scope.param);
-  const NOT_DONE = "status NOT IN ('completed','cancelled')";
-  const RECENT_LIMIT = 5;
-
-  interface TileRow { id: string; name: string; open_tasks: string | number; last_activity: string | Date | null }
-
-  const conn = queryConnection(em);
-  const [projectsR, openTasksR, docsR, runsR, recentRuns, recentDocs, topTasks, tileRows, unreadR] = await Promise.all([
-    conn.execute<CountRow[]>(`SELECT count(*)::text AS c FROM projects WHERE org_id = $1`, [orgId]),
-    conn.execute<CountRow[]>(
-      `SELECT count(*)::text AS c FROM tasks WHERE org_id = $1 AND ${NOT_DONE}${scope.sql}`,
-      params,
-    ),
-    conn.execute<CountRow[]>(
-      `SELECT count(*)::text AS c FROM documents WHERE org_id = $1${scope.sql}`,
-      params,
-    ),
-    conn.execute<CountRow[]>(
-      `SELECT count(*)::text AS c FROM agent_runs
-         WHERE org_id = $1 AND started_at >= now() - interval '7 days'${scope.sql}`,
-      params,
-    ),
-    conn.execute<DashboardData["recentRuns"][number][]>(
-      `SELECT id, agent, status, started_at, ended_at FROM agent_runs
-         WHERE org_id = $1${scope.sql} ORDER BY started_at DESC LIMIT ${RECENT_LIMIT}`,
-      params,
-    ),
-    conn.execute<DashboardData["recentDocs"][number][]>(
-      `SELECT id, title, kind, updated_at FROM documents
-         WHERE org_id = $1${scope.sql} ORDER BY updated_at DESC LIMIT ${RECENT_LIMIT}`,
-      params,
-    ),
-    conn.execute<DashboardData["topTasks"][number][]>(
-      `SELECT id, title, status, priority, project_id FROM tasks
-         WHERE org_id = $1 AND ${NOT_DONE}${scope.sql}
-         ORDER BY priority DESC, updated_at DESC LIMIT ${RECENT_LIMIT}`,
-      params,
-    ),
-    conn.execute<TileRow[]>(
-      `SELECT p.id, p.name,
-              coalesce((SELECT count(*)::text FROM tasks t
-                        WHERE t.project_id = p.id AND t.org_id = $1
-                          AND t.status NOT IN ('completed','cancelled')), '0') AS open_tasks,
-              (SELECT max(e.created_at) FROM events e
-               WHERE e.project_id = p.id AND e.org_id = $1) AS last_activity
-         FROM projects p WHERE p.org_id = $1
-         ORDER BY p.created_at ASC, p.id ASC`,
-      [orgId],
-    ),
-    conn.execute<CountRow[]>(
-      `SELECT count(*)::text AS c FROM events
-         WHERE org_id = $1 AND created_at >= now() - interval '24 hours'`,
-      [orgId],
-    ),
+  const ctx = { orgId, userId: null, projectId };
+  const [projects, docs, runs, tasks] = await Promise.all([
+    em.find(Project, { org: orgId } as never, { orderBy: { createdAt: "ASC", id: "ASC" } }),
+    listDocs(em, ctx),
+    listRuns(em, ctx),
+    listTasks(em, ctx, {}),
   ]);
+
+  const visibleTasks = projectId === undefined
+    ? tasks
+    : tasks.filter((task) => task.projectId === projectId);
+  const visibleDocs = projectId === undefined
+    ? docs
+    : docs.filter((doc) => doc.projectId === projectId);
+
+  const openTasks = visibleTasks.filter((task) => !["completed", "cancelled"].includes(task.status ?? ""));
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const runsLast7d = runs.filter((run) => run.createdAt.getTime() >= sevenDaysAgo).length;
 
   return {
     counters: {
-      projects: toNumber(projectsR[0]?.c),
-      openTasks: toNumber(openTasksR[0]?.c),
-      docs: toNumber(docsR[0]?.c),
-      runsLast7d: toNumber(runsR[0]?.c),
+      projects: projects.length,
+      openTasks: openTasks.length,
+      docs: visibleDocs.length,
+      runsLast7d,
     },
-    recentRuns,
-    recentDocs,
-    topTasks,
-    projectTiles: tileRows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      openTasks: toNumber(r.open_tasks),
-      lastActivity: r.last_activity
-        ? (r.last_activity instanceof Date ? r.last_activity.toISOString() : String(r.last_activity))
-        : null,
+    recentRuns: runs.slice(0, 5).map((run) => ({
+      id: run.id,
+      agent: run.agentName ?? "",
+      status: run.status ?? "",
+      started_at: isoStamp(run.createdAt),
+      ended_at: null,
     })),
-    unreadCount: toNumber(unreadR[0]?.c),
-  };
-}
-
-function queryConnection(em: EntityManager | QueryableDb): {
-  execute: <T>(sql: string, params?: SqlValue[]) => Promise<T>;
-} {
-  if ("getConnection" in em && typeof em.getConnection === "function") {
-    return em.getConnection() as {
-      execute: <T>(sql: string, params?: SqlValue[]) => Promise<T>;
-    };
-  }
-
-  return {
-    execute: <T>(sql: string, params: SqlValue[] = []) => (em as QueryableDb).query<T>(sql, params),
+    recentDocs: visibleDocs.slice(0, 5).map((doc) => ({
+      id: doc.id,
+      title: doc.title,
+      kind: "document",
+      updated_at: isoStamp(doc.updatedAt),
+    })),
+    topTasks: openTasks
+      .slice()
+      .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0) || b.updatedAt.getTime() - a.updatedAt.getTime())
+      .slice(0, 5)
+      .map((task) => ({
+        id: task.id,
+        title: task.title,
+        status: task.status ?? "",
+        priority: task.priority ?? 0,
+        project_id: task.projectId,
+      })),
+    projectTiles: projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      openTasks: openTasks.filter((task) => task.projectId === project.id).length,
+      lastActivity: null,
+    })),
+    unreadCount: 0,
   };
 }

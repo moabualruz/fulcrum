@@ -1,14 +1,14 @@
 import { fail } from "@sveltejs/kit";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
-import { listBoardTasks } from "$lib/product-queries";
-import { openProductDb } from "$lib/server/db";
 import {
-  createTaskAction,
-  updateTaskAction,
-  deleteTaskAction,
-  moveTaskStatusAction,
-} from "$lib/server/tasks";
+  bulkDelete,
+  bulkUpdate,
+  createTask,
+  deleteTask,
+  updateTask,
+} from "../../../../application/tasks/commands.ts";
+import { listTasks } from "../../../../application/tasks/queries.ts";
 import {
   BoardCreateSchema,
   BoardDeleteSchema,
@@ -16,13 +16,13 @@ import {
   BoardUpdateSchema,
 } from "$lib/server/boards.schema";
 import { BulkStatusSchema, BulkDeleteSchema } from "$lib/server/task-bulk.schema";
-import { bulkUpdateStatus, bulkDeleteTasks } from "$lib/server/task-detail";
 import { actionOk, actionFail } from "$lib/feedback/action-result";
+import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
 
 // Inherit `activeProjectId` from the root layout-data so the optional
 // project scoping is consistent with `/projects` and `/docs`. Tests for the
 // route load do not always supply `parent`; guard for legacy callers.
-export const load: PageServerLoad = async ({ url, parent }) => {
+export const load: PageServerLoad = async ({ url, parent, locals }) => {
   const parentData =
     typeof parent === "function"
       ? await parent()
@@ -32,7 +32,23 @@ export const load: PageServerLoad = async ({ url, parent }) => {
     project,
     activeProjectId: parentData.activeProjectId ?? null,
     streamed: {
-      data: (async () => ({ tasks: await listBoardTasks(project || null) }))(),
+      data: (async () => {
+        const em = locals.em ?? await getEm();
+        const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+        const tasks = await listTasks(em, { orgId, userId: null, projectId: project || null }, {});
+        return {
+          tasks: tasks
+            .filter((task) => !project || task.projectId === project)
+            .map((task) => ({
+              id: task.id,
+              title: task.title,
+              status: task.status ?? "pending",
+              priority: task.priority ?? 0,
+              project_id: task.projectId,
+              updated_at: task.updatedAt.toISOString(),
+            })),
+        };
+      })(),
     },
   };
 };
@@ -45,16 +61,8 @@ function fdToRecord(fd: FormData): Record<string, string | null> {
   return out;
 }
 
-async function defaultOrgId(db: Awaited<ReturnType<typeof openProductDb>>): Promise<string | null> {
-  const rows = await db.query<{ id: string }>(
-    `SELECT id FROM orgs WHERE slug = $1`,
-    ["default"],
-  );
-  return rows[0]?.id ?? null;
-}
-
 export const actions: Actions = {
-  create: async ({ request }) => {
+  create: async ({ request, locals }) => {
     const fd = await request.formData();
     const raw = fdToRecord(fd);
     const priorityFromFd = fd.get("priority");
@@ -65,24 +73,20 @@ export const actions: Actions = {
     if (priorityFromFd != null) candidate["priority"] = Number(priorityFromFd);
     const parsed = v.safeParse(BoardCreateSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const db = await openProductDb();
-    try {
-      const orgId = await defaultOrgId(db);
-      if (!orgId) return fail(500, actionFail("no-org"));
-      const created = await createTaskAction(db, {
-        orgId,
-        projectId: parsed.output.projectId ?? null,
-        title: parsed.output.title,
-        status: parsed.output.status,
-      });
-      void created;
-      return actionOk("Task created");
-    } finally {
-      await db.close();
-    }
+    const em = locals.em ?? await getEm();
+    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+    const created = await createTask(em, {
+      orgId, userId: null,
+      projectId: parsed.output.projectId ?? null,
+    }, {
+      title: parsed.output.title,
+      status: parsed.output.status,
+    });
+    void created;
+    return actionOk("Task created");
   },
 
-  update: async ({ request }) => {
+  update: async ({ request, locals }) => {
     const fd = await request.formData();
     const raw = fdToRecord(fd);
     const candidate: Record<string, unknown> = { ...raw };
@@ -92,80 +96,66 @@ export const actions: Actions = {
     if (candidate["description"] === "") candidate["description"] = null;
     const parsed = v.safeParse(BoardUpdateSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const db = await openProductDb();
+    const em = locals.em ?? await getEm();
+    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
     try {
-      await updateTaskAction(db, parsed.output);
+      const { id, ...input } = parsed.output;
+      await updateTask(em, { orgId, userId: null }, id, input);
       return actionOk("Task updated");
     } catch (err) {
       return fail(400, actionFail((err as Error).message));
-    } finally {
-      await db.close();
     }
   },
 
-  delete: async ({ request }) => {
+  delete: async ({ request, locals }) => {
     const fd = await request.formData();
     const parsed = v.safeParse(BoardDeleteSchema, fdToRecord(fd));
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const db = await openProductDb();
-    try {
-      await deleteTaskAction(db, parsed.output.id);
-      return actionOk("Task deleted");
-    } finally {
-      await db.close();
-    }
+    const em = locals.em ?? await getEm();
+    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+    await deleteTask(em, { orgId, userId: null }, parsed.output.id);
+    return actionOk("Task deleted");
   },
 
-  bulkStatus: async ({ request }) => {
+  bulkStatus: async ({ request, locals }) => {
     const fd = await request.formData();
     const raw = fdToRecord(fd);
     const parsed = v.safeParse(BulkStatusSchema, raw);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
     const ids = parsed.output.ids.split(",").filter(Boolean);
     if (ids.length === 0) return fail(400, actionFail("no ids"));
-    const db = await openProductDb();
-    try {
-      const orgId = await defaultOrgId(db);
-      if (!orgId) return fail(500, actionFail("no-org"));
-      const result = await bulkUpdateStatus(db, ids, parsed.output.status, orgId);
-      return actionOk(`${result.updated} task(s) updated`);
-    } finally {
-      await db.close();
-    }
+    const em = locals.em ?? await getEm();
+    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+    const result = await bulkUpdate(em, { orgId, userId: null }, ids, { status: parsed.output.status });
+    return actionOk(`${result.updated} task(s) updated`);
   },
 
-  bulkDelete: async ({ request }) => {
+  bulkDelete: async ({ request, locals }) => {
     const fd = await request.formData();
     const raw = fdToRecord(fd);
     const parsed = v.safeParse(BulkDeleteSchema, raw);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
     const ids = parsed.output.ids.split(",").filter(Boolean);
     if (ids.length === 0) return fail(400, actionFail("no ids"));
-    const db = await openProductDb();
-    try {
-      const orgId = await defaultOrgId(db);
-      if (!orgId) return fail(500, actionFail("no-org"));
-      const result = await bulkDeleteTasks(db, ids, orgId);
-      return actionOk(`${result.deleted} task(s) deleted`);
-    } finally {
-      await db.close();
-    }
+    const em = locals.em ?? await getEm();
+    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+    const result = await bulkDelete(em, { orgId, userId: null }, ids);
+    return actionOk(`${result.deleted} task(s) deleted`);
   },
 
-  move: async ({ request }) => {
+  move: async ({ request, locals }) => {
     const fd = await request.formData();
     const parsed = v.safeParse(BoardMoveSchema, fdToRecord(fd));
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const db = await openProductDb();
+    const em = locals.em ?? await getEm();
+    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
     try {
-      await moveTaskStatusAction(db, parsed.output);
+      await updateTask(em, { orgId, userId: null }, parsed.output.id, { status: parsed.output.status });
       return actionOk("Task moved");
     } catch (err) {
       const msg = (err as Error).message;
       if (msg.startsWith("status conflict")) return fail(409, actionFail(msg));
       return fail(400, actionFail(msg));
-    } finally {
-      await db.close();
     }
   },
 };

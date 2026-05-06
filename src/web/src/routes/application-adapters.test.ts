@@ -8,7 +8,8 @@ const webRoot = join(routesRoot, "..");
 type Surface = {
   name: string;
   file: string;
-  applicationModule: string;
+  applicationModule: string | null;
+  helperModule?: string;
   keys: string[];
 };
 
@@ -16,13 +17,15 @@ const SURFACES: Surface[] = [
   {
     name: "dashboard",
     file: "+page.server.ts",
-    applicationModule: "application/dashboard/queries",
+    applicationModule: null,
+    helperModule: "$lib/server/dashboard",
     keys: ["activeProjectId", "streamed", "dashboard"],
   },
   {
     name: "projects",
     file: "projects/+page.server.ts",
-    applicationModule: "application/projects/queries",
+    applicationModule: null,
+    helperModule: "$lib/product-queries",
     keys: ["activeProjectId", "streamed", "data", "projects"],
   },
   {
@@ -81,7 +84,12 @@ describe("web route application adapters", () => {
   for (const surface of SURFACES) {
     test(`${surface.name} loader uses application query module and preserves page data keys`, () => {
       const text = source(surface.file);
-      expect(text).toContain(surface.applicationModule);
+      if (surface.applicationModule) {
+        expect(text).toContain(surface.applicationModule);
+      }
+      if (surface.helperModule) {
+        expect(text).toContain(surface.helperModule);
+      }
       expect(text).not.toMatch(/openProductDb|getProductDb|OrmProductDb|ProductDb/);
       expect(text).not.toMatch(/\.(query|execute)\(/);
 
@@ -93,6 +101,15 @@ describe("web route application adapters", () => {
 
   test("web product query helpers no longer own raw data access", () => {
     const text = readFileSync(join(webRoot, "lib/product-queries.ts"), "utf8");
+    expect(text).not.toMatch(/openProductDb|getProductDb|OrmProductDb|ProductDb/);
+    expect(text).not.toMatch(/\.(query|execute)\(/);
+  });
+
+  test("dashboard helper composes ORM/application queries without raw handles", () => {
+    const text = readFileSync(join(webRoot, "lib/server/dashboard.ts"), "utf8");
+    expect(text).toContain("application/docs/queries");
+    expect(text).toContain("application/runs/queries");
+    expect(text).toContain("application/tasks/queries");
     expect(text).not.toMatch(/openProductDb|getProductDb|OrmProductDb|ProductDb/);
     expect(text).not.toMatch(/\.(query|execute)\(/);
   });

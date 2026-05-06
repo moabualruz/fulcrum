@@ -1,23 +1,25 @@
 import { error, fail } from "@sveltejs/kit";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
-import { getTaskDetail } from "$lib/server/task-detail";
-import { updateTaskAction, deleteTaskAction } from "$lib/server/tasks";
+import { deleteTask, updateTask } from "../../../../../application/tasks/commands.ts";
+import { getTask, listChildren } from "../../../../../application/tasks/queries.ts";
 import { actionOk, actionFail } from "$lib/feedback/action-result";
+import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
 
-export const load: PageServerLoad = ({ params }) => {
+export const load: PageServerLoad = ({ params, locals }) => {
   return {
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const em = locals.em ?? await getEm();
+        const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
         try {
-          const orgId = await getDefaultOrgId(db);
-          const detail = await getTaskDetail(db, params.id, orgId);
-          if (!detail) throw error(404, "Task not found");
-          return detail;
-        } finally {
-          await db.close();
+          const ctx = { orgId, userId: null, projectId: locals?.activeProjectId ?? null };
+          const task = await getTask(em, ctx, params.id);
+          const children = await listChildren(em, ctx, params.id);
+          return { task, children };
+        } catch (err) {
+          if ((err as Error).message.includes("not found")) throw error(404, "Task not found");
+          throw err;
         }
       })(),
     },
@@ -46,7 +48,7 @@ function fdToRecord(fd: FormData): Record<string, string | null> {
 }
 
 export const actions: Actions = {
-  update: async ({ request, params }) => {
+  update: async ({ request, params, locals }) => {
     const fd = await request.formData();
     const raw = fdToRecord(fd);
     const candidate: Record<string, unknown> = { ...raw, id: params.id };
@@ -56,41 +58,42 @@ export const actions: Actions = {
     if (candidate["description"] === "") candidate["description"] = null;
     const parsed = v.safeParse(UpdateFieldSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const db = await openProductDb();
+    const em = locals.em ?? await getEm();
+    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
     try {
-      await updateTaskAction(db, parsed.output);
+      const { id: _id, ...input } = parsed.output;
+      await updateTask(em, { orgId, userId: null, projectId: locals?.activeProjectId ?? null }, params.id, input);
       return actionOk("Task updated");
     } catch (err) {
       return fail(400, actionFail((err as Error).message));
-    } finally {
-      await db.close();
     }
   },
 
-  delete: async ({ params }) => {
-    const db = await openProductDb();
-    try {
-      await deleteTaskAction(db, params.id);
-      return actionOk("Task deleted");
-    } finally {
-      await db.close();
-    }
+  delete: async ({ params, locals }) => {
+    const em = locals.em ?? await getEm();
+    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+    await deleteTask(em, { orgId, userId: null, projectId: locals?.activeProjectId ?? null }, params.id);
+    return actionOk("Task deleted");
   },
 
-  autosave: async ({ request, params }) => {
+  autosave: async ({ request, params, locals }) => {
     const fd = await request.formData();
     const raw = fdToRecord(fd);
     const candidate = { id: params.id, description: raw["description"] ?? null };
     const parsed = v.safeParse(UpdateDescriptionSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const db = await openProductDb();
+    const em = locals.em ?? await getEm();
+    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
     try {
-      await updateTaskAction(db, { id: parsed.output.id, description: parsed.output.description });
+      await updateTask(
+        em,
+        { orgId, userId: null, projectId: locals?.activeProjectId ?? null },
+        params.id,
+        { description: parsed.output.description },
+      );
       return actionOk("Saved");
     } catch (err) {
       return fail(400, actionFail((err as Error).message));
-    } finally {
-      await db.close();
     }
   },
 };

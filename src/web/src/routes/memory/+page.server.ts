@@ -1,7 +1,8 @@
 import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { memoryApplicationScope } from "../../../../application/memory/queries.ts";
 import { listMemories, createMemoryAction, type MemoryScope, MEMORY_SCOPES } from "$lib/server/memory";
+import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
 
 export const load: PageServerLoad = ({ url, locals }) => {
   const activeProjectId = locals?.activeProjectId ?? null;
@@ -13,19 +14,16 @@ export const load: PageServerLoad = ({ url, locals }) => {
     kind,
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
-        try {
-          const orgId = await getDefaultOrgId(db);
-          const memories = await listMemories(db, {
-            orgId,
-            scope: scope && MEMORY_SCOPES.includes(scope as MemoryScope) ? scope as MemoryScope : undefined,
-            kind: kind || undefined,
-            projectId: activeProjectId,
-          });
-          return { memories };
-        } finally {
-          await db.close();
-        }
+        const em = locals.em ?? await getEm();
+        const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+        const ctx = memoryApplicationScope({ orgId, userId: null, projectId: activeProjectId });
+        const memories = await listMemories(em, {
+          orgId: ctx.orgId,
+          scope: scope && MEMORY_SCOPES.includes(scope as MemoryScope) ? scope as MemoryScope : undefined,
+          kind: kind || undefined,
+          projectId: ctx.projectId,
+        });
+        return { memories };
       })(),
     },
   };
@@ -42,21 +40,18 @@ export const actions: Actions = {
     if (!body) return fail(400, { error: "Body is required" });
     if (!MEMORY_SCOPES.includes(scope as MemoryScope)) return fail(400, { error: "Invalid scope" });
 
-    const db = await openProductDb();
-    try {
-      const orgId = await getDefaultOrgId(db);
-      const projectId = locals?.activeProjectId ?? null;
-      const { id } = await createMemoryAction(db, {
-        orgId,
-        projectId: scope === "global" ? null : projectId,
-        scope: scope as MemoryScope,
-        kind,
-        key,
-        body,
-      });
-      return { success: true, id };
-    } finally {
-      await db.close();
-    }
+    const em = locals.em ?? await getEm();
+    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+    const projectId = locals?.activeProjectId ?? null;
+    const ctx = memoryApplicationScope({ orgId, userId: null, projectId });
+    const { id } = await createMemoryAction(em, {
+      orgId: ctx.orgId,
+      projectId: scope === "global" ? null : ctx.projectId ?? null,
+      scope: scope as MemoryScope,
+      kind,
+      key,
+      body,
+    });
+    return { success: true, id };
   },
 };

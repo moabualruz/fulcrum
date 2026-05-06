@@ -1,6 +1,8 @@
 import { redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { dispatchRun } from "../../../../application/runs/commands.ts";
+import { listRuns } from "../../../../application/runs/queries.ts";
+import { listTasks } from "../../../../application/tasks/queries.ts";
 import {
   applyRunsFilters,
   type RunRange,
@@ -8,19 +10,8 @@ import {
   type RunsFilterState,
 } from "$lib/components/runs/runs-filters";
 import type { RunStatus } from "$lib/server/runs";
-import { dispatchRunAction } from "$lib/server/runs";
-
-interface RawRow {
-  id: string;
-  agent: string;
-  model: string | null;
-  status: string;
-  project_id: string | null;
-  started_at: string | Date;
-  ended_at: string | Date | null;
-  sandbox_mode: string | null;
-  iteration_count: number | null;
-}
+import { listProjects } from "$lib/product-queries";
+import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
 
 interface ProjectOption {
   id: string;
@@ -45,25 +36,6 @@ const VALID_RANGE = new Set<RunRange>(["24h", "7d", "30d", "all"]);
 
 function isoStamp(value: string | Date): string {
   return value instanceof Date ? value.toISOString() : value;
-}
-
-async function listRunRows(db: Awaited<ReturnType<typeof openProductDb>>): Promise<RawRow[]> {
-  try {
-    return await db.query<RawRow>(
-      `SELECT id, agent, model, status, project_id, started_at, ended_at,
-              sandbox_mode, iteration_count
-         FROM agent_runs
-        ORDER BY started_at DESC, id ASC`,
-    );
-  } catch (err) {
-    if ((err as { code?: string }).code !== "42703") throw err;
-    const rows = await db.query<Omit<RawRow, "sandbox_mode" | "iteration_count">>(
-      `SELECT id, agent, model, status, project_id, started_at, ended_at
-         FROM agent_runs
-        ORDER BY started_at DESC, id ASC`,
-    );
-    return rows.map((row) => ({ ...row, sandbox_mode: null, iteration_count: null }));
-  }
 }
 
 export const load: PageServerLoad = ({ url, locals }) => {
@@ -93,43 +65,27 @@ export const load: PageServerLoad = ({ url, locals }) => {
     filter,
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
-        let rows: RawRow[];
-        let projects: ProjectOption[];
-        let tasks: TaskOption[];
-        try {
-          const orgRows = await db.query<{ id: string }>(
-            `SELECT id FROM orgs WHERE slug = $1`,
-            ["default"],
-          );
-          const orgId = orgRows[0]?.id;
-          if (!orgId) {
-            return { runs: [], projects: [], tasks: [] };
-          }
-          rows = await listRunRows(db);
-          projects = await db.query<ProjectOption>(
-            `SELECT id, name FROM projects WHERE org_id = $1 ORDER BY name ASC, id ASC`,
-            [orgId],
-          );
-          tasks = await db.query<TaskOption>(
-            `SELECT id, project_id, title FROM tasks
-              WHERE org_id = $1 AND status IN ('pending', 'in_progress', 'blocked')
-              ORDER BY updated_at DESC, id ASC`,
-            [orgId],
-          );
-        } finally {
-          await db.close();
-        }
+        const em = locals.em ?? await getEm();
+        const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+        const [rows, projects, tasks] = await Promise.all([
+          listRuns(em, { orgId, userId: null, projectId: locals?.activeProjectId ?? null }),
+          listProjects(),
+          listTasks(em, { orgId, userId: null, projectId: locals?.activeProjectId ?? null }, {}),
+        ]);
+        const projectOptions: ProjectOption[] = projects.map((project) => ({ id: project.id, name: project.name }));
+        const taskOptions: TaskOption[] = tasks
+          .filter((task) => ["pending", "in_progress", "blocked"].includes(task.status ?? ""))
+          .map((task) => ({ id: task.id, project_id: task.projectId, title: task.title }));
         const normalised: RunRow[] = rows.map((r) => ({
           id: r.id,
-          agent: r.agent,
-          model: r.model,
-          status: r.status as RunStatus,
-          project_id: r.project_id,
-          started_at: isoStamp(r.started_at),
-          ended_at: r.ended_at === null ? null : isoStamp(r.ended_at),
-          sandbox_mode: r.sandbox_mode,
-          iteration_count: r.iteration_count,
+          agent: r.agentName ?? "",
+          model: null,
+          status: (r.status ?? "queued") as RunStatus,
+          project_id: null,
+          started_at: isoStamp(r.createdAt),
+          ended_at: null,
+          sandbox_mode: null,
+          iteration_count: null,
         }));
         const filterState: RunsFilterState = {
           range,
@@ -137,29 +93,24 @@ export const load: PageServerLoad = ({ url, locals }) => {
           ...(status ? { status } : {}),
           ...(projectRaw !== undefined ? { project: projectRaw } : {}),
         };
-        return { runs: applyRunsFilters(normalised, filterState), projects, tasks };
+        return { runs: applyRunsFilters(normalised, filterState), projects: projectOptions, tasks: taskOptions };
       })(),
     },
   };
 };
 
 export const actions: Actions = {
-  dispatch: async ({ request }) => {
+  dispatch: async ({ request, locals }) => {
     const form = await request.formData();
     const taskId = String(form.get("taskId") ?? "");
     const projectId = String(form.get("projectId") ?? "") || null;
     const agent = String(form.get("agent") ?? "codex");
     if (!taskId) throw redirect(303, "/runs");
 
-    const db = await openProductDb();
-    let id: string;
-    try {
-      const orgId = await getDefaultOrgId(db);
-      const result = await dispatchRunAction(db, { orgId, projectId, taskId, agent });
-      id = result.id;
-    } finally {
-      await db.close();
-    }
+    const em = locals.em ?? await getEm();
+    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+    const result = await dispatchRun(em, { orgId, userId: null, projectId }, { agentName: agent, prompt: taskId });
+    const id = result.id;
     throw redirect(303, `/runs/${id}`);
   },
 };
