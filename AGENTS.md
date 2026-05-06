@@ -113,45 +113,18 @@ Multi-context layout: `CONTEXT-MAP.md` at root pointing to per-context `CONTEXT.
 <claude-mem-context>
 # Memory Context
 
-# [fulcrum] recent context, 2026-05-06 11:12am GMT+2
+# [fulcrum] recent context, 2026-05-06 12:42pm GMT+2
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (17,557t read) | 799,725t work | 98% savings
+Stats: 50 obs (27,766t read) | 1,174,807t work | 98% savings
 
 ### May 6, 2026
-1640 3:53a 🔵 Interactive CLI Flows with Non-Interactive Mode (Exit Code 7)
-1641 " 🔵 Skills Management with Conflict Resolution and Cron Scheduling
-1647 3:54a 🔵 Symphony Candidate Eligibility Based on Blocker Terminal State
-1648 " 🔵 Token Tracking and Cap Enforcement in Agent Runs
-1649 " 🔵 Session Resume with Codex Thread/Resume and Transcript-Path Fallback
-1650 " 🔵 Transcript Capture with Size Enforcement and Truncation Detection
-1651 " 🔵 Phase 08 REST API with OpenAPI 3.1 and Rate Limiting Headers
-1652 " 🔵 Sprint Closure Event Handler with Graceful Degradation
-1653 " 🔵 Feature-Gated Importers with Field Mapping (Linear, Jira, Plane)
-1654 " 🔵 Notification System: Fanout, Bell Counter, and Multi-Channel Delivery
-1655 " 🔵 Migration Reversibility with Partial Indexes and Orchestration State Validation
-1656 " 🔵 Agent Runs Symphony Columns with Cross-Org Protection and Cascade Delete
-1657 " 🔵 Custom Field Definition Schema with Per-Type Config Validation
-1658 " 🔵 Sprint Schema with One-Active-Per-Project Constraint and Cascade Delete
-1659 " 🔵 Memory Entity with PRD Core Properties and Five Indexes
-1660 " 🔵 Memory Schema Idempotent on File-Backed PGlite with Round-Trip CRUD
-1661 " 🔵 Artifact and Edge Schema with Organization-Scoped Indexing
-1662 " 🔵 Events Backfill Migration with Composite DESC Indexes and Null-Org Default
-1663 " 🔵 Documents Schema with Comprehensive FK Deletion Behavior and Enum Constraints
-1664 3:55a 🔵 Cross-Org Data Isolation Across Document Relationships
-1665 " 🔵 Pillar 17 Cross-Cutting Platform: Credentials, Telemetry, Errors, Experiments, Feature Flags
-1666 " 🔵 Inference Backends with Multiple Implementations (Embedded, Ollama, LmStudio, OpenAI)
-1667 " 🔵 Phase 08 Test Suite Completion: 4616 Pass, 2 Skip, 7 Todo, 0 Fail
-1668 " 🔵 OpenTUI Cross-Platform Binary Build Dependency Resolution Issue
-1669 3:56a 🔵 OpenTUI Platform Binary Import Resolution and Cross-Compilation Workaround
-1670 8:57a ⚖️ Phase 10 SaaS Hardening + Milestone Closure achieves final convergence review verdict
 1671 10:13a 🔵 Web dashboard architecture uses async-streamed loaders with product kernel queries
 1672 " 🔵 Seed script populates local product DB with demo projects, tasks, docs, and agent runs
 1673 " 🔵 Product kernel schema defines core entities with event dispatch and search indexing integration
-1674 " 🔵 Document and task service layers dispatch events and index search on create/update/delete
 1675 10:14a 🔵 Web shell uses singleton PGlite connection pattern for zero per-request DB overhead
 1676 " 🔴 Runtime schema mismatch: code queries nonexistent "sandbox_mode" column
 1677 " 🔵 Multiple Svelte reactivity warnings indicate state management anti-patterns in components
@@ -163,15 +136,6 @@ Stats: 50 obs (17,557t read) | 799,725t work | 98% savings
 1683 " 🔵 Migration system is consistently used across CLI, web shell, and tests via centralized runMigrations API
 1684 " 🔴 Migration 0009_agent_runs_sandcastle_compat.sql successfully applied to product DB; sandbox_mode and iteration_count columns now exist
 1686 " 🔴 Web shell /runs page now returns HTTP 200; schema mismatch resolved
-S289 Transition from Phase 10 feature implementation to strategic integration failure audit and architecture remediation planning (May 6 at 10:20 AM)
-S290 Refine architecture recommendation from "NestJS vs keep SvelteKit" to "unified data manipulation layer is non-negotiable" with specific boundary requirements and dependency rules (May 6 at 10:38 AM)
-S291 Define API architecture strategy: how tRPC and REST/Hono should be structured as thin adapters over unified application services, with hard boundary rule preventing direct DB access from surface code (May 6 at 10:41 AM)
-S292 Analyze Hono vs NestJS framework choice and define decision-making process for backend architecture; defer framework selection until after unified application layer is established and validated through a spike (May 6 at 10:44 AM)
-S293 Continue from previous session: Execute 6 audit documents (A-F) and establish unified data manipulation layer architecture enforcement (May 6 at 10:45 AM)
-S294 Organize and execute the 6 audit documents (A-F) needed to resolve architectural problems discovered in Phase 10 before resuming feature work (May 6 at 10:47 AM)
-S295 Continue from previous session: Execute Phase 9.5 (Architecture/Data-Layer Remediation + Full Interface Integration Fix) as urgent blocker before Phase 10 can proceed. Establish comprehensive plan for unified data manipulation layer, research backend architecture alternatives, and define spike vertical slice implementation. (May 6 at 10:49 AM)
-S296 Phase 9.5 remediation planning: Create execution plan for 6 audits (A-F) based on completed research; plan the consolidated codebase analysis before implementation begins (May 6 at 10:54 AM)
-S297 Phase 9.5 Execution Planning: Full Architecture Overhaul with Feature Preservation Mandate and Gray Area Research Framework (May 6 at 10:59 AM)
 1687 11:06a 🔵 Data Access Layer Consolidation: EntityManager + needle-di Repositories
 1688 " 🔵 Authentication & Authorization: Session-Based with Casbin ABAC Gate
 1689 " 🔵 Public REST API: Unified Hono Entry Point (ARCH-09)
@@ -181,15 +145,51 @@ S297 Phase 9.5 Execution Planning: Full Architecture Overhaul with Feature Prese
 1693 " ⚖️ Phase 9.5 Acceptance Criteria: Vertical-Slice Rollout with Test & Performance Gates
 1694 11:09a ✅ Phase 9.5 Research Complete: 25 Gray Areas Resolved, 3 Wizard Questions Remain
 1695 " ✅ Phase 9.5 Research Ready for Wizard Input: 3 Decision Points Formulated
-S298 Phase 9.5 Gray Area Resolution Research: investigate architecture patterns online and in codebase, document findings, and prepare wizard questions for remaining decisions (May 6 at 11:09 AM)
-**Investigated**: 25 gray areas spanning backend frameworks (NestJS, Elysia, Fastify, Express, Koa, hapi, GraphQL, Encore.ts, Effect Platform), data access patterns (EntityManager, repositories, needle-di), application layer structure, authorization boundaries, error taxonomy, event/notification architecture, migration consolidation, test strategy, and rollout approach. External sources: official docs for Bun, Hono, NestJS, Elysia, Fastify, MikroORM, tRPC. Project evidence: 1679 lines of grep results on architecture terms; examination of src/trpc/context.ts, src/trpc/middleware.ts, src/db/db.module.ts, src/api/hono.ts, src/product-kernel/event-dispatcher.ts, and notification/rule-engine implementation.
+1696 11:12a ⚖️ Phase 9.5 User Decisions Locked: Paper First, Strict Allowlist, Tiered Mandatory
+1697 11:44a 🔵 Phase 9.5 Architecture Audit: Direct DB Access and Integration Gaps Mapped
+1698 11:51a ⚖️ Phase 9.5 Architecture: Gray Area Resolutions Documented (25 Decisions)
+1699 11:53a 🔵 Yjs Not Present; Realtime Built on EventBus + PGlite LISTEN/NOTIFY Bridge
+1700 " 🔵 Yjs Document Collab Already Implemented; Feature-Gated Behind FULCRUM_FEATURES
+1701 11:56a ✅ Phase 9.5 Context Consolidated: 57 Architecture Decisions Documented
+1702 " ✅ Phase 9.5 Discussion Log: Decisions Captured Across 2 Sessions + 7 Gap Resolutions
+1703 11:59a 🔵 Codebase Data Access Inventory: 52 Web Routes, 80+ Entities, 16 Legacy Domains, 25+ Direct DB Imports
+1704 12:01p ✅ Phase 9.5 CONTEXT.md Enriched: Violation Inventory + Domain Module Mapping Added
+1705 12:02p ✅ Phase 9.5 Discussion Output: Planning Docs + Code Modifications Staged (20 files, 466 insertions)
+1706 12:05p 🔵 Graphify Knowledge Graph Built: 9623 Nodes, 22284 Edges, 520 Communities
+1707 " ✅ Codebase Knowledge Graph Archived: graph.json (9623 nodes, 22284 links) + GRAPH_REPORT.md Stored in .planning/graphs/
+1708 12:16p 🔵 Codebase Mapper Agent Architecture and Parallel Execution Strategy
+1711 12:18p 🔵 Stub CRUD routers with empty implementations in tRPC layer
+1712 " 🔵 Mixed data access patterns: ProductDb (raw SQL) vs EntityManager coexistence
+1713 " 🔵 Extensive feature flag gating of unimplemented domains and connectors
+1714 " 🔵 Unimplemented test cases and skipped test suite areas
+1715 " 🔵 Database migration system complexity and compatibility concerns
+1716 " 🔵 HTML sanitization and markdown rendering fragmentation across surfaces
+1717 " 🔵 Credential encryption and secret management via local keyring fallback
+1709 12:19p 🔵 Mapper Agent Execution: Concerns Analysis Complete, Multi-Agent Orchestration
+1710 " 🔵 Quality Mapper Agent Completion: Conventions and Testing Analysis
+1718 12:20p 🔵 Tech Stack Mapper Agent Completion: Stack and Integrations Analysis
+1719 12:21p 🔵 Architecture Mapper Agent Completion: All Codebase Documents Updated
+1720 12:22p ✅ Codebase Mapping Documents Updated: 1,739 Lines Across 7 Files
+1721 " ✅ Codebase Mapping Committed to dev/v1.0 Branch
+1722 " ✅ Codebase Mapping Workflow Complete: Ancillary Changes in config.json and AGENTS.md
+S315 Deep audit of Phases 1-10: inventory code structure (CLI/TUI/Web/API), verify Phase 1-9 completion claims against current codebase, identify gaps for Phase 9.5 remediation (May 6 at 12:24 PM)
+S316 Analyze Fulcrum codebase for coding conventions and testing patterns; document findings in CONVENTIONS.md and TESTING.md at .planning/codebase/ using 2026-05-06 date placeholder (May 6 at 12:25 PM)
+S317 Comprehensive multi-phase audit (Phases 1-9) of completion claims vs actual code state, followed by Phase 9.5 gap analysis and planning preparation (May 6 at 12:25 PM)
+S318 Complete multi-phase audit synthesis (Phases 1-9) and present comprehensive gap analysis for Phase 9.5 planning decision (May 6 at 12:26 PM)
+S319 Codebase architecture and directory structure analysis—generate ARCHITECTURE.md and STRUCTURE.md documents in .planning/codebase/ with 2026-05-06 analysis date (May 6 at 12:26 PM)
+S320 Complete cross-phase audit (Phases 1-9) synthesis and integrate findings into Phase 9.5 specification and context documentation (May 6 at 12:29 PM)
+S321 Analyze Fulcrum codebase for technology stack and external integrations; write STACK.md and INTEGRATIONS.md to .planning/codebase/ using 2026-05-06 as date placeholder (May 6 at 12:31 PM)
+S322 Complete cross-phase audit synthesis and establish comprehensive Phase 9.5 specification, context, gap analysis, and UAT baseline documentation (May 6 at 12:32 PM)
+S323 Complete comprehensive cross-phase audit of Phases 1-9 and synthesize findings into Phase 9.5 specification documents, preparing documentation for implementation planning with subsequent `/gsd-plan-phase 9.5` invocation. (May 6 at 12:33 PM)
+S324 Operationalize Phase 9.5 implementation readiness: design tiered CI infrastructure, codify TDD policy as phase constraints, and verify infrastructure execution targets are met. (May 6 at 12:42 PM)
+**Investigated**: Examined existing CI pipeline structure in scripts/ci.ts (21 sequential steps, soft-fail semantics, summary reporting). Analyzed current monolithic execution model (~5 min full run). Identified need to support granular developer feedback loops without abandoning rigor at phase gates. Reviewed Phase 9.5 documentation foundation (24 requirements, 71 decisions, 285 test specs) for integration points.
 
-**Learned**: Current architecture consolidates around MikroORM EntityManager with needle-di dependency injection; tRPC and Hono REST are thin adapters; ProductDb deprecated, retained only for legacy orchestration pending migration; authorization handled by assertPermission middleware with two phases (session check + optional casbin ABAC); EventDispatcher provides unified event entry point; NotificationRuleEngine matches events to delivery channels (in-app, email, push, webhook); existing infrastructure already supports the proposed application-layer boundary pattern.
+**Learned**: CI orchestrator uses typed Step objects with optional soft/cwd/env fields and child_process spawning. Soft failures allow pipeline continuation without blocking (e.g., missing caveman compiler). Pending file detection via stderr pattern matching suggests artifact compression system. Phase 9.5 UAT baseline (6 test layers, 91 files) requires integration into existing orchestration without creating monolithic runtime bottleneck. TDD policy enforcement demands git-log verification of test-first discipline, not post-facto test existence checks.
 
-**Completed**: Created 09.5-GRAY-AREA-RESOLUTIONS.md documenting 25 resolved decisions (G-001 through G-025) with rationale for each: keep Hono+tRPC as thin adapters, build src/application/<domain>/ layer with commands/queries/services/schemas/errors/DTOs, needle-di for DI, commands own transactions, authorization at application entrypoint, unified error taxonomy, outbox pattern for events, MikroORM-only migrations, product-kernel deprecated, vertical-slice rollout, performance gates, security threat model. Updated ROADMAP.md, 09.5-CONTEXT.md, and 09.5-DISCUSSION-LOG.md with artifact references. Audit directory created with web routes, CLI/TUI files, DB access patterns, and E2E analysis.
+**Completed**: Refactored scripts/ci.ts: 21 steps reorganized from flat array into ALL_STEPS with tier (quick/unit/integration/e2e/full) and domain (application/web/cli/tui/api/all) metadata. STEPS now derived via filtering: tierIncludes(tier) && domainIncludes(domain). Tier order is cumulative (quick ⊂ unit ⊂ integration ⊂ e2e ⊂ full). Added CONTEXT.md decisions D-72→D-78: D-72-75 strict TDD (RED→GREEN→REFACTOR, 9-step test order per domain), D-76-78 CI tier strategy with timing targets and domain focus. Updated SPEC.md from 22 to 24 locked requirements: R-23 (strict TDD with git-log acceptance), R-24 (tiered CI with timing SLOs <15s quick, <45s unit). Added cross-reference table entries for R-23/R-24. Expanded acceptance criteria checklist from 24 to 29 items, including TDD evidence + tier timing + domain filtering + full CI gate. Committed e243f371 (3 files, 105 insertions). Verified `bun run ci --tier=quick` achieves 8.3s (install 0s + typecheck 8.3s), passes R-24 acceptance criterion (<15s).
 
-**Next Steps**: User must answer three wizard questions about risk appetite before Phase 9.5 implementation planning can proceed: (1) Backend spike policy (Paper First recommended vs. Spike Nest+Elysia vs. Spike One), (2) ProductDb shim allowance during migration (Strict Allowlist recommended vs. Hard Fail Now vs. Loose Transition), (3) Playwright E2E gate placement (Tiered Mandatory recommended vs. Full Normal CI vs. Release Full). After user provides choices, session can run /gsd-plan-phase 9.5 to generate implementation plans based on research and decisions.
+**Next Steps**: Phase 9.5 documentation and infrastructure complete and committed. All 24 requirements locked with falsifiable acceptance criteria. Full cross-reference traceability: ROADMAP SC → SPEC R → CONTEXT D → scripts/ci.ts → UAT-BASELINE. Tiered CI architecture operationalized and tested. TDD policy codified and binding. Ready for implementation planning phase: `/gsd-plan-phase 9.5` to begin task breakdown, resource allocation, and vertical-slice rollout (tasks domain first).
 
 
-Access 800k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 1175k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>
