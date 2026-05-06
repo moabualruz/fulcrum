@@ -17,6 +17,7 @@ export async function createNotification(em: EntityManager, ctx: AppContext, inp
         subjectKind: input.entityKind,
         subjectId: input.entityId,
         payload: {},
+        createdAt: new Date(),
       });
     txEm.persist(event);
     await txEm.flush();

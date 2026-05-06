@@ -10,7 +10,7 @@ export async function setTenantSetting(em: EntityManager, ctx: AppContext, input
   if (!input.key) throw new AppValidationError("Tenant setting key is required.");
   return await em.transactional(async (txEm) => {
     let row = await txEm.findOne(FeatureFlag, { orgId: ctx.orgId, flag: input.key, userId: null });
-    row ??= txEm.create(FeatureFlag, { orgId: ctx.orgId, userId: null, flag: input.key, enabled: false });
+    row ??= txEm.create(FeatureFlag, { orgId: ctx.orgId, userId: null, flag: input.key, enabled: false, createdAt: new Date() });
     row.enabled = Boolean((input.value as { enabled?: unknown })?.enabled ?? input.value);
     txEm.persist(row);
     await txEm.flush();
