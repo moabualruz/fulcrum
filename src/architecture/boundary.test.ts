@@ -8,6 +8,22 @@ const INTERFACE_ROOTS = [
   "src/router",
 ];
 
+const RUNTIME_ADAPTER_ROOTS = [
+  "src/web/src/routes",
+  "src/web/src/lib/server",
+  "src/api/routes",
+  "src/trpc",
+];
+
+const EXPECTED_RUNTIME_DIRECT_ACCESS_FILES = [
+  "src/web/src/routes/api/repos/[id]/tree/+server.ts",
+  "src/web/src/routes/orchestration/+page.server.ts",
+  "src/web/src/routes/audit/export/+server.ts",
+  "src/web/src/lib/server/db.ts",
+  "src/trpc/context.ts",
+  "src/trpc/routers/orchestration.ts",
+];
+
 const NON_WEB_INVENTORY_ROOTS = [
   "src/config",
   "src/db",
@@ -199,6 +215,13 @@ async function violations(roots: readonly string[], pattern: RegExp): Promise<st
 describe("Phase 9.5 interface boundary", () => {
   test("interfaces do not import product-kernel or open ProductDb/PGlite directly", async () => {
     expect(await violations(INTERFACE_ROOTS, FORBIDDEN_INTERFACE_ACCESS)).toEqual([]);
+  });
+
+  test("web API tRPC runtime adapters do not import product-kernel or open ProductDb/PGlite directly", async () => {
+    const found = await violations(RUNTIME_ADAPTER_ROOTS, FORBIDDEN_INTERFACE_ACCESS);
+    expect(found.length, "runtime direct-access inventory should start non-empty before GREEN rewires").toBeGreaterThan(0);
+    expect(EXPECTED_RUNTIME_DIRECT_ACCESS_FILES.every((file) => found.includes(file))).toBe(true);
+    expect(found).toEqual([]);
   });
 
   test("non-web ProductDb inventory has exact infrastructure allowlists by category", async () => {

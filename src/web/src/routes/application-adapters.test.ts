@@ -78,6 +78,9 @@ const SURFACES: Surface[] = [
 ];
 
 const RUNTIME_SURFACES: RuntimeSurface[] = [
+  { name: "repo tree API", file: "api/repos/[id]/tree/+server.ts" },
+  { name: "orchestration settings", file: "orchestration/+page.server.ts" },
+  { name: "audit export", file: "audit/export/+server.ts" },
   { name: "runs detail", file: "runs/[id]/+page.server.ts" },
   { name: "run artifacts", file: "runs/[id]/artifacts/+page.server.ts" },
   { name: "CSV export/import", file: "api/data/export-csv/+server.ts" },
