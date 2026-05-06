@@ -30,12 +30,13 @@ function diffHtml(fromBody: string, toBody: string): string {
 
 export const load = async ({ params, url }: LoadEvent) => {
   const em = await getEm();
-  const conn = em.getConnection();
   const orgId = await getDefaultOrgIdOrm(em);
-  const rows = await conn.execute<{ id: string; title: string }[]>(
-    `SELECT id, title FROM documents WHERE id = ? AND org_id = ?`,
-    [params.id, orgId],
-  );
+  const rows = await em.getKysely<any>()
+    .selectFrom("documents")
+    .select(["id", "title"])
+    .where("id", "=", params.id)
+    .where("org_id", "=", orgId)
+    .execute() as Array<{ id: string; title: string }>;
   if (rows.length === 0) throw error(404, "Document not found");
   const doc = rows[0]!;
   const versions = await listDocumentVersions(em, params.id);
@@ -62,13 +63,14 @@ export const actions = {
     const version = Number(versionStr);
     if (!version || version < 1) return fail(400, { error: "Invalid version" });
     const em = await getEm();
-    const conn = em.getConnection();
     const orgId = await getDefaultOrgIdOrm(em);
     // Snapshot current state before restore
-    const currentRows = await conn.execute<{ title: string; body: string; frontmatter: Record<string, unknown> }[]>(
-      `SELECT title, body, frontmatter FROM documents WHERE id = ? AND org_id = ?`,
-      [params.id, orgId],
-    );
+    const currentRows = await em.getKysely<any>()
+      .selectFrom("documents")
+      .select(["title", "body_md as body", "frontmatter"])
+      .where("id", "=", params.id)
+      .where("org_id", "=", orgId)
+      .execute() as Array<{ title: string; body: string; frontmatter: Record<string, unknown> }>;
     if (currentRows.length > 0) {
       const cur = currentRows[0]!;
       const nextVer = await getNextVersionNumber(em, params.id);

@@ -36,12 +36,12 @@ async function loadDoc(em: EntityManager, id: string, orgId: string): Promise<{ 
   frontmatter: Record<string, unknown>;
   updated_at: string;
 } }> {
-  const conn = em.getConnection();
-  const rows = await conn.execute<DocRow[]>(
-    `SELECT id, org_id, project_id, kind, title, body, frontmatter, updated_at
-       FROM documents WHERE id = ? AND org_id = ?`,
-    [id, orgId],
-  );
+  const rows = await em.getKysely<any>()
+    .selectFrom("documents")
+    .select(["id", "org_id", "project_id", "doc_type as kind", "title", "body_md as body", "frontmatter", "updated_at"])
+    .where("id", "=", id)
+    .where("org_id", "=", orgId)
+    .execute() as DocRow[];
   if (rows.length === 0) throw error(404, "Document not found");
   const row = rows[0]!;
   return {

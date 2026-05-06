@@ -22,11 +22,13 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
 
   const sprintId = url.searchParams.get("sprint") ?? undefined;
 
-  // Verify project exists
-  const rows = await em.getConnection().execute(
-    `SELECT id, name FROM projects WHERE id = ? AND org_id = ? AND deleted_at IS NULL`,
-    [params.id, orgId],
-  ) as Array<{ id: string; name: string }>;
+  const rows = await em.getKysely<any>()
+    .selectFrom("projects")
+    .select(["id", "name"])
+    .where("id", "=", params.id)
+    .where("org_id", "=", orgId)
+    .where("deleted_at", "is", null)
+    .execute() as Array<{ id: string; name: string }>;
 
   if (rows.length === 0) throw error(404, "Project not found");
 

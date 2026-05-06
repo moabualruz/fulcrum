@@ -40,13 +40,13 @@ function extractLabels(fm: Record<string, unknown>): string[] {
 
 export const load = async ({ params }: LoadEvent) => {
   const em = await getEm();
-  const conn = em.getConnection();
   const orgId = await getDefaultOrgIdOrm(em);
-  const rows = await conn.execute<DocRow[]>(
-    `SELECT id, org_id, project_id, kind, title, body, content_json, frontmatter, updated_at
-       FROM documents WHERE id = ? AND org_id = ?`,
-    [params.id, orgId],
-  );
+  const rows = await em.getKysely<any>()
+    .selectFrom("documents")
+    .select(["id", "org_id", "project_id", "doc_type as kind", "title", "body_md as body", "content_json", "frontmatter", "updated_at"])
+    .where("id", "=", params.id)
+    .where("org_id", "=", orgId)
+    .execute() as DocRow[];
   if (rows.length === 0) throw error(404, "Document not found");
   const row = rows[0]!;
   const doc = {
@@ -81,16 +81,17 @@ export const actions = {
     const form = await superValidate(request, valibot(DocumentFormSchema));
     if (!form.valid) return fail(400, { form });
     const em = await getEm();
-    const conn = em.getConnection();
     const orgId = await getDefaultOrgIdOrm(em);
     // Re-read current frontmatter so non-form keys (e.g. `id`, `status`,
     // anything 04.2's `readFrontmatterForm` would route to `rawFrontmatter`)
     // survive the round-trip — issue 15 byte-stability follow-up depends
     // on this.
-    const rows = await conn.execute<{ frontmatter: Record<string, unknown> }[]>(
-      `SELECT frontmatter FROM documents WHERE id = ? AND org_id = ?`,
-      [params.id, orgId],
-    );
+    const rows = await em.getKysely<any>()
+      .selectFrom("documents")
+      .select(["frontmatter"])
+      .where("id", "=", params.id)
+      .where("org_id", "=", orgId)
+      .execute() as Array<{ frontmatter: Record<string, unknown> }>;
     if (rows.length === 0) throw error(404, "Document not found");
     const rawFm = rows[0]?.frontmatter ?? {};
     const labels = parseLabels(form.data.labels ?? "");
