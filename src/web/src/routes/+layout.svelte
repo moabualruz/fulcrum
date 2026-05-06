@@ -61,11 +61,21 @@
 		{ id: "projects", label: "Projects",   href: "/projects" },
 		{ id: "docs",     label: "Documents",  href: "/docs" },
 		{ id: "boards",   label: "Boards",     href: "/boards" },
+		{ id: "agents",   label: "Agents",     href: "/agents" },
 		{ id: "runs",     label: "Agent runs", href: "/runs" },
+		{ id: "artifacts", label: "Artifacts", href: "/artifacts" },
+		{ id: "repos",    label: "Repositories", href: "/repos" },
 		{ id: "memory",   label: "Memory",     href: "/memory" },
 		{ id: "context",  label: "Context",    href: "/context/preview" },
+		{ id: "orchestration", label: "Orchestration", href: "/orchestration" },
+		{ id: "audit",    label: "Audit",      href: "/audit" },
 		{ id: "search",   label: "Search",     href: "/search" },
+		{ id: "doctor",   label: "Doctor",     href: "/doctor" },
 		{ id: "inference", label: "Inference Settings", href: "/settings/inference" },
+		{ id: "skills",   label: "Skills Settings", href: "/settings/skills" },
+		{ id: "notifications", label: "Notification Settings", href: "/settings/notifications" },
+		{ id: "workflow-settings", label: "Workflow Settings", href: "/settings/orchestration" },
+		{ id: "data-settings", label: "Data Settings", href: "/settings/data" },
 	];
 
 	$effect(() => {

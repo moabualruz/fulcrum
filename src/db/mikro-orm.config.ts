@@ -277,6 +277,8 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     migrations: {
       path: new URL("./migrations", import.meta.url).pathname,
       pathTs: new URL("./migrations", import.meta.url).pathname,
+      transactional: false,
+      allOrNothing: false,
     },
     extensions: [Migrator],
     debug,

@@ -28,12 +28,15 @@ function isEntityManager(db: DbHandle): db is EntityManager {
 }
 
 function isProductDb(db: DbHandle): db is ProductDb {
-  return "query" in db && typeof (db as ProductDb).query === "function";
+  return !("em" in db) && "query" in db && typeof (db as ProductDb).query === "function";
 }
 
 /** Assert handle is EntityManager or throw helpful error. */
 function assertEm(db: DbHandle): EntityManager {
   if (isEntityManager(db)) return db;
+  if ("em" in db && isEntityManager((db as { em: DbHandle }).em)) {
+    return (db as { em: EntityManager }).em;
+  }
   throw new Error(
     "repositories.ts: MikroORM EntityManager required. " +
     "Pass em (from MikroORM) instead of raw ProductDb. " +

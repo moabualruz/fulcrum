@@ -21,6 +21,7 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
 - [x] **Phase 7: Repos + Artifacts + Notifications** - Git sync, artifact pipeline, notification delivery
 - [x] **Phase 8: Surface Delivery** - CLI wiring, TUI rewrite, Web completion, API surface
 - [x] **Phase 9: Cross-Cutting + Testing** - i18n, theming, accessibility, telemetry, backup, comprehensive test coverage (completed 2026-05-06)
+- [ ] **Phase 9.5: Full Architecture Overhaul + Integration Preservation** (INSERTED) - Deep research all gray areas, overhaul architecture, implement one unified data manipulation layer, remove interface logic duplication, repair web/CLI/TUI/API integration, preserve every feature/logic/benefit, and replace fake tests with real Playwright + integration gates
 - [ ] **Phase 10: SaaS Hardening + Milestone Closure** - Multi-org isolation, PostgreSQL pooling, job coordination, all deferred item closure, Huashu Web/CLI/TUI UX gate
 
 ## Phase Details
@@ -285,9 +286,41 @@ Plans:
 **Plans:** Complete — 09-00 through 09-09 delivered. Canonical evidence: `.planning/phases/09-cross-cutting-testing/09-UAT.md`.
 **Verification**: `bun run ci` passed all 20 stages: root tests, root coverage, migration downgrade, graceful shutdown, build, web tests, web coverage, web accessibility, Playwright smoke, and schema checks. Web coverage lines: 92.41%. Web accessibility: 19 passed / 3 skipped.
 
+### Phase 9.5: Full Architecture Overhaul + Integration Preservation (INSERTED)
+
+**Goal:** Stop Phase 10 feature work until Fulcrum receives a full architecture overhaul that preserves every existing feature/logic/benefit while establishing one unified data manipulation layer and genuinely integrating all implemented features across Web, CLI, TUI, API/tRPC, services, ORM, migrations, navigation, actions, and real tests. This phase includes deep research, gray-area resolution, implementation fixes, cleanup, and verification. It is not research-only.
+**Requirements**: ARCH-REMED-01..12, DATA-01..08, API-DEC-01..06, IFACE-01..08, E2E-01..08
+**Depends on:** Phase 9
+**TDD**: RED first: module-boundary tests, raw DB access tests, Playwright smoke that fails on SSR 500/global error, full Playwright journeys, CLI integration, TUI integration, service/ORM integration, migration tests. GREEN only after architecture and wiring are repaired.
+**Success Criteria**:
+  1. One data manipulation layer: Web/CLI/TUI/API/tRPC call application commands/queries; only application layer uses ORM repositories/EntityManager.
+  2. Zero business logic repetition between interfaces; interfaces only parse input, call application services, render/serialize result, and map errors.
+  3. One ORM and one migration authority; no runtime `openPglite`, `runMigrations`, product-kernel SQL stores, or direct DB `.query()` from interface folders.
+  4. Backend/API framework decision completed with deep research using Paper First policy: keep Hono REST/OpenAPI plus tRPC as thin adapters unless the application-layer design fails a concrete check requiring a runnable NestJS/Elysia spike.
+  5. No feature/logic/benefit lost: every move/delete has replacement mapping, test proof, and migration note.
+  6. Web route/navigation/action inventory repaired: no orphan feature pages, stale primary nav, stale command palette, dead forms, or unconfigured route services.
+  7. CLI and TUI parity repaired for all shipped feature workflows; same data and same application services as web/API.
+  8. Playwright E2E is real and mandatory using Tiered Mandatory policy: normal CI hard-fails smoke/critical journeys, and full Playwright workflows gate Phase 9.5 acceptance and release/closure.
+  9. Phase 10 remains blocked until Phase 9.5 verification passes.
+**Plans:** 0 plans — plan after research + inventories are written.
+
+Artifacts:
+- `.planning/INTEGRATION-FAILURE-AUDIT.md`
+- `.planning/audit/`
+- `.planning/phases/09.5-architecture-data-layer-remediation-full-interface-fix/09.5-CONTEXT.md`
+- `.planning/phases/09.5-architecture-data-layer-remediation-full-interface-fix/09.5-RESEARCH.md`
+- `.planning/phases/09.5-architecture-data-layer-remediation-full-interface-fix/09.5-CODEBASE-REUSE-RESEARCH.md`
+- `.planning/phases/09.5-architecture-data-layer-remediation-full-interface-fix/09.5-GRAY-AREAS.md`
+- `.planning/phases/09.5-architecture-data-layer-remediation-full-interface-fix/09.5-GRAY-AREA-RESOLUTIONS.md`
+- `.planning/phases/09.5-architecture-data-layer-remediation-full-interface-fix/09.5-DISCUSSION-LOG.md`
+- `.planning/phases/09.5-architecture-data-layer-remediation-full-interface-fix/09.5-UI-SPEC.md`
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 9.5 after research/inventory completion)
+
 ### Phase 10: SaaS Hardening + Milestone Closure
 **Goal**: Multi-tenant SaaS validated and all prior deferred items closed
-**Depends on**: Phase 9
+**Depends on**: Phase 9.5
 **Requirements**: SAS-01..06, CLOSURE-01..18
 **TDD**: Integration tests against PostgreSQL plus closure feature, integration, and Huashu UI/UX parity tests
 **Success Criteria**:

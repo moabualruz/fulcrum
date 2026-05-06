@@ -1,0 +1,37 @@
+src/web/tests/e2e/user-journey.spec.ts:20:const isPlaywrightCli = process.argv.some((arg) =>
+src/web/tests/e2e/user-journey.spec.ts:24:if (isPlaywrightCli) {
+src/web/tests/e2e/auth-login.spec.ts:1:const isPlaywrightCli = process.argv.some((argument) =>
+src/web/tests/e2e/auth-login.spec.ts:5:if (isPlaywrightCli) {
+src/web/tests/e2e/artifacts-e2e.spec.ts:14:const isPlaywrightCli = process.argv.some((arg) => arg.includes("playwright"));
+src/web/tests/e2e/artifacts-e2e.spec.ts:16:if (isPlaywrightCli) {
+src/web/tests/e2e/phase05-reports.spec.ts:10:    await expect(page.locator("[data-testid='report-tab']")).toHaveCount(await page.locator("[data-testid='report-tab']").count());
+src/web/tests/e2e/perf-budgets.spec.ts:20:const maybeTest = ENABLED ? test : test.skip;
+src/web/tests/e2e/_smoke.spec.ts:1:const isPlaywrightCli = process.argv.some((argument) => argument.includes("playwright"));
+src/web/tests/e2e/_smoke.spec.ts:3:if (isPlaywrightCli) {
+src/web/tests/e2e/phase06-docs-memory-search.spec.ts:11:const isPlaywrightCli = process.argv.some((arg) => arg.includes("playwright"));
+src/web/tests/e2e/phase06-docs-memory-search.spec.ts:13:if (isPlaywrightCli) {
+src/web/tests/e2e/tiptap-baseline.spec.ts:1:const isPlaywrightCli = process.argv.some((argument) =>
+src/web/tests/e2e/tiptap-baseline.spec.ts:5:if (isPlaywrightCli) {
+src/web/tests/e2e/routing-settings.spec.ts:1:const isPlaywrightCli = process.argv.some((arg) => arg.includes("playwright"));
+src/web/tests/e2e/routing-settings.spec.ts:3:if (isPlaywrightCli) {
+src/web/tests/e2e/phase08-surface-delivery.spec.ts:6:  test.skip((response?.status() ?? 200) >= 500, `${path} SSR failed in isolated service setup: ${reason}`);
+src/web/tests/e2e/phase08-surface-delivery.spec.ts:7:  test.skip(page.url().includes("/auth/login"), `${path} requires an authenticated session in isolated service setup.`);
+src/web/tests/e2e/phase08-surface-delivery.spec.ts:10:  test.skip((await shell.count()) === 0, `${path} client shell did not render in isolated service setup: ${reason}`);
+src/web/tests/e2e/phase08-surface-delivery.spec.ts:16:  test.skip((await locator.count()) === 0, reason);
+src/web/tests/e2e/search-e2e.spec.ts:10:const isPlaywrightCli = process.argv.some((arg) => arg.includes("playwright"));
+src/web/tests/e2e/search-e2e.spec.ts:12:if (isPlaywrightCli) {
+src/web/tests/e2e/phase09-accessibility.spec.ts:6:  test.skip((response?.status() ?? 200) >= 500, `${path} SSR failed in isolated service setup: ${reason}`);
+src/web/tests/e2e/phase09-accessibility.spec.ts:7:  test.skip(page.url().includes("/auth/login"), `${path} requires authenticated session in isolated service setup.`);
+src/web/tests/e2e/phase09-accessibility.spec.ts:20:    test.skip((await darkMode.count()) === 0, "dark mode radio unavailable in isolated setup");
+src/web/tests/e2e/phase09-accessibility.spec.ts:30:    test.skip((await kindFilter.count()) === 0, "audit filter unavailable in isolated setup");
+src/web/tests/e2e/_fixtures.spec.ts:16:const isPlaywrightCli = process.argv.some((arg) =>
+src/web/tests/e2e/_fixtures.spec.ts:20:if (isPlaywrightCli) {
+src/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts:10:const isPlaywrightCli = process.argv.some((arg) => arg.includes("playwright"));
+src/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts:12:if (isPlaywrightCli) {
+src/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts:18:      test.skip((response?.status() ?? 200) >= 500, "Repos page SSR is blocked by unconfigured dashboard service in isolated E2E.");
+src/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts:37:      test.skip((response?.status() ?? 200) >= 500, "Artifact detail SSR is blocked by product-kernel/web artifact store mismatch in isolated E2E.");
+src/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts:39:      test.skip((await title.count()) === 0, "Artifact detail did not render a title in isolated E2E.");
+src/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts:40:      test.skip((await title.textContent()) === "Internal Error", "Artifact detail rendered global error page in isolated E2E.");
+src/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts:47:      test.skip((inboxResponse?.status() ?? 200) >= 500, "Inbox SSR is blocked by existing tRPC template router reserved-word error.");
+src/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts:51:      test.skip((webhooksResponse?.status() ?? 200) >= 500, "Webhook settings SSR is unavailable in isolated E2E.");
+src/web/tests/e2e/phase05-task-views.spec.ts:15:    await expect(page.locator("[data-testid='kanban-column']")).toHaveCount(await page.locator("[data-testid='kanban-column']").count());

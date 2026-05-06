@@ -3,8 +3,8 @@ import { describe, expect, test } from "bun:test";
 import { LUCIDE_ICONS, NAV_ITEMS, type NavItem } from "./nav-items.ts";
 
 describe("NAV_ITEMS surface", () => {
-  test("declares exactly 7 items", () => {
-    expect(NAV_ITEMS).toHaveLength(7);
+  test("declares feature-complete primary surface", () => {
+    expect(NAV_ITEMS.length).toBeGreaterThanOrEqual(18);
   });
 
   test("exposes hrefs in declared order", () => {
@@ -15,8 +15,19 @@ describe("NAV_ITEMS surface", () => {
       "/boards",
       "/agents",
       "/runs",
+      "/artifacts",
+      "/repos",
+      "/memory",
+      "/context/preview",
+      "/orchestration",
+      "/audit",
       "/search",
+      "/doctor",
       "/settings/inference",
+      "/settings/skills",
+      "/settings/notifications",
+      "/settings/orchestration",
+      "/settings/data",
     ]);
   });
 
@@ -28,8 +39,19 @@ describe("NAV_ITEMS surface", () => {
       "Board",
       "Agents",
       "Runs",
+      "Artifacts",
+      "Repos",
+      "Memory",
+      "Context",
+      "Orchestration",
+      "Audit",
       "Search",
+      "Doctor",
       "Inference",
+      "Skills",
+      "Notifications",
+      "Workflow Settings",
+      "Data",
     ]);
   });
 
@@ -46,10 +68,21 @@ describe("NAV_ITEMS surface", () => {
       ["/projects", "Folder"],
       ["/docs", "FileText"],
       ["/boards", "Kanban"],
-      ["/agents", "Bot"],
+      ["/agents", "Activity"],
       ["/runs", "Activity"],
+      ["/artifacts", "FileText"],
+      ["/repos", "Folder"],
+      ["/memory", "FileText"],
+      ["/context/preview", "FileText"],
+      ["/orchestration", "Kanban"],
+      ["/audit", "FileText"],
       ["/search", "Search"],
+      ["/doctor", "Activity"],
       ["/settings/inference", "Settings"],
+      ["/settings/skills", "Settings"],
+      ["/settings/notifications", "Settings"],
+      ["/settings/orchestration", "Settings"],
+      ["/settings/data", "Settings"],
     ];
     for (const [href, iconName] of pairs) {
       const entry = NAV_ITEMS.find((i) => i.href === href);

@@ -2,7 +2,8 @@ import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { openProductDb, getDefaultOrgId } from "$lib/server/db";
 import { cancelRunAction, retryRunAction, type RunStatus } from "$lib/server/runs";
-import { listArtifacts, getWorkspaceDiff, paginateLogs } from "$lib/server/agents";
+import { getWorkspaceDiff, paginateLogs } from "$lib/server/agents";
+import { listArtifacts } from "$lib/server/artifacts";
 import { actionOk } from "$lib/feedback/action-result";
 
 interface AgentRunDetail {
@@ -79,7 +80,11 @@ export const load: PageServerLoad = ({ params, locals }) => {
           const diff = await getWorkspaceDiff(db, orgId, params.id);
 
           // Artifacts
-          const artifacts = await listArtifacts(db, orgId, params.id);
+          const artifacts = (await listArtifacts(db, orgId, { runId: params.id }))
+            .map((artifact) => ({
+              ...artifact,
+              downloadHref: `/artifacts/${artifact.id}/download`,
+            }));
 
           const eventRows = await db.query<EventRow>(
             `SELECT * FROM events

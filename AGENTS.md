@@ -113,75 +113,83 @@ Multi-context layout: `CONTEXT-MAP.md` at root pointing to per-context `CONTEXT.
 <claude-mem-context>
 # Memory Context
 
-# [fulcrum] recent context, 2026-05-05 11:36am GMT+2
+# [fulcrum] recent context, 2026-05-06 11:12am GMT+2
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (21,118t read) | 612,521t work | 97% savings
+Stats: 50 obs (17,557t read) | 799,725t work | 98% savings
 
-### May 5, 2026
-S177 Peer review Phase 5 planning artifacts (15 plans, 111 decisions, 5 waves) for the Fulcrum Task Management + Metrics project; synthesize findings into structured review document (May 5 at 9:26 AM)
-S178 Peer review Phase 5 planning artifacts (Task Management + Metrics) with comprehensive quality gates; also distribute research enforcement rules to all agent platforms; capture Phase 3/4 gap audit findings (May 5 at 9:39 AM)
-S179 Clarify whether Gemini uses GEMINI.md, AGENTS.md, or both for configuration/documentation (May 5 at 9:46 AM)
-S180 Peer-review Phase 5 planning artifacts (Task Management + Metrics) for the Fulcrum project, reading all 15 plan files plus context/research/gap audit, and writing findings to 05-REVIEWS.md with focus on executability, dependency correctness, decision coverage, architectural risks, and wave parallelism. (May 5 at 9:55 AM)
-S181 Initial greeting - session just started (May 5 at 9:55 AM)
-S182 Continue from previous session context: Complete Phase 05 planning reviews with focus on test-driven development (Nyquist compliance), ensuring all 10 test files are properly scoped and synchronized across Plan 00 (RED stubs) and Plan 10 (implementation/GREEN). (May 5 at 10:18 AM)
-832 10:33a 🔵 Phase 05 Wave 0 planning review expanded test scope to 10 files; cross-plan consistency applied
-833 10:34a ✅ Plan 10 Task 2 updated to include CalendarView.test.ts; task renamed to include GREEN test responsibility
-S183 Verify whether task management plans include nested comments and threaded reply support (May 5 at 10:34 AM)
-S184 Investigate whether task management plans document nested comments, threading, and task hierarchy — and identify gaps between requirements (CONTEXT.md D-01) and implementation plans (May 5 at 10:56 AM)
-834 10:58a 🔵 Task hierarchy, threading, and workflow requirements confirmed in CONTEXT.md and RESEARCH.md
-835 10:59a 🔵 Task entity already implements parent_id for hierarchy, contradicting plan gaps
-836 " 🔵 Project entity not yet integrated into MikroORM entity graph
-S185 Continue Phase 05 task-management-metrics planning from previous session and create summary documents for completed planning phases (May 5 at 10:59 AM)
-837 11:02a ✅ Plan 01 updated with task_type enum and methodology configuration columns
-838 " ✅ Plan 01 extended with enum constants and Task.taskType property for hierarchy and methodology
-839 " ✅ Plan 01 acceptance criteria updated to include task type, methodology, and enum constants
-840 11:03a ✅ Plan 03 (CommentService) extended with nested comment threading methods
-S186 Competitive feature gap analysis for Phase 5 task-management-metrics plans — identify what Linear, Jira, Asana, Plane, ClickUp, GitHub, and Notion have that Fulcrum Phase 5 is missing or handles weakly (May 5 at 11:09 AM)
-841 11:23a ⚖️ Documented 12 competitive gap features (D-112–D-123) for task management system
-842 " ✅ Added 4 new deferred feature items to planning context
-843 " ✅ Added 3 new columns to tasks table migration for Phase 5 features
-844 11:24a ✅ Added 3 new columns to projects table migration for D-112 and D-117 features
-845 " ✅ Added 2 new tables (task_templates, task_recurrence_rules), pg_trgm extension, and 4 strategic indexes to migration plan
-846 " ✅ Added 5 new acceptance criteria to Phase 5 migration plan
-847 " ✅ Added 2 new entity classes (TaskTemplate, TaskRecurrenceRule) to Phase 5 entity plan
-848 11:25a ✅ Documented complete MikroORM entity specifications for TaskTemplate and TaskRecurrenceRule
-849 " ✅ Added barrel exports for TaskTemplate and TaskRecurrenceRule entities
-850 " ✅ Added 6 new service files to Phase 5 Plan 04 (Services & Business Logic)
-851 11:26a ✅ Documented 13 new service methods in Plan 04 for D-115, D-116, D-122, D-123 features
-852 " ✅ Documented detailed implementation specs for RelationshipService enhancements and TemplateService/RecurrenceService
-853 11:27a ✅ Documented TRPC router definitions for D-115 templates, D-116 recurrence, D-122/D-123 relationships
-854 " ✅ Added templatesRouter and recurrenceRouter imports to Plan 06 (Router Assembly)
-855 " ✅ Mounted templatesRouter and recurrenceRouter in Plan 06 AppRouter
-856 " ✅ Added task ID badge display to TaskDetailPanel section 1 in Plan 07 (UI Components)
-857 11:28a ✅ Added estimation scale picker to TaskDetailPanel section 2 status/metadata bar in Plan 07
-858 " ✅ Added 3 new TaskDetailPanel sections for D-114, D-116, D-123 features in Plan 07
-859 " ✅ Added D-112 task ID display to TaskCard compact and comfortable modes in Plan 08
-860 " ✅ Added quick-create column header button and My Work view toggle to Plan 08 board features
-861 " ✅ Added "My Work" quick filter to Plan 11 QuickFilters component
-862 " ✅ Added "Include archived" toggle and "Export" button to Plan 11 filter toolbar
-863 11:29a ✅ Documented Archive bulk action implementation in Plan 11 BulkBar
-864 " ✅ Added QuickCreateForm.svelte to Plan 12 files_modified for D-113 quick-create component
-865 " ✅ Annotated C key keyboard binding to reference D-113 QuickCreateForm callback in Plan 12
-866 " ✅ Documented comprehensive QuickCreateForm component specification for D-113 in Plan 12
-867 " ✅ Added task ID search capability to Cmd+K CommandPalette in Plan 12
-868 11:30a ✅ Added 3 new CLI command files to Plan 14 for D-119, D-120, D-121 features
-869 " ✅ Added 7 new CLI command behaviors to Plan 14 for competitive gap features
-870 " ✅ Documented comprehensive CLI command implementations for D-119, D-120, D-121, D-112, D-114 in Plan 14
-871 11:31a ✅ Added 3 TUI enhancements for D-112, D-119, D-114 to Plan 14
-872 " ✅ Added RecurrenceConfig and import settings page to Plan 15 files_modified
-873 " ✅ Documented import settings page and RecurrenceConfig component specifications in Plan 15
-874 " 🔵 Verified comprehensive integration of 12 competitive gap features (D-112–D-123) across all Phase 5 planning documents
-875 11:32a ✅ Committed all Phase 5 planning document enrichments with 12 competitive gap features to version control
-876 " 🔵 Phase 5 enrichment task completed: 12 competitive gap features integrated across all planning documents
-879 11:35a 🔵 Phase 5 Planning: 15-Plan Structure with 6-Wave Dependency DAG
-880 " 🔵 HIGH Blocker Resolution Pattern: Explicit Fixes Across All 6 Plans
-881 " 🔵 Three-Surface Parity Implementation: Shared tRPC Service Layer (D-84)
-882 " 🔵 Methodology Gating Pattern: Scrum/Kanban/None Adapts All Surfaces Consistently
-883 " 🔵 Task Hierarchy Implementation: Four-Level Type System with Parent Pointers
+### May 6, 2026
+1640 3:53a 🔵 Interactive CLI Flows with Non-Interactive Mode (Exit Code 7)
+1641 " 🔵 Skills Management with Conflict Resolution and Cron Scheduling
+1647 3:54a 🔵 Symphony Candidate Eligibility Based on Blocker Terminal State
+1648 " 🔵 Token Tracking and Cap Enforcement in Agent Runs
+1649 " 🔵 Session Resume with Codex Thread/Resume and Transcript-Path Fallback
+1650 " 🔵 Transcript Capture with Size Enforcement and Truncation Detection
+1651 " 🔵 Phase 08 REST API with OpenAPI 3.1 and Rate Limiting Headers
+1652 " 🔵 Sprint Closure Event Handler with Graceful Degradation
+1653 " 🔵 Feature-Gated Importers with Field Mapping (Linear, Jira, Plane)
+1654 " 🔵 Notification System: Fanout, Bell Counter, and Multi-Channel Delivery
+1655 " 🔵 Migration Reversibility with Partial Indexes and Orchestration State Validation
+1656 " 🔵 Agent Runs Symphony Columns with Cross-Org Protection and Cascade Delete
+1657 " 🔵 Custom Field Definition Schema with Per-Type Config Validation
+1658 " 🔵 Sprint Schema with One-Active-Per-Project Constraint and Cascade Delete
+1659 " 🔵 Memory Entity with PRD Core Properties and Five Indexes
+1660 " 🔵 Memory Schema Idempotent on File-Backed PGlite with Round-Trip CRUD
+1661 " 🔵 Artifact and Edge Schema with Organization-Scoped Indexing
+1662 " 🔵 Events Backfill Migration with Composite DESC Indexes and Null-Org Default
+1663 " 🔵 Documents Schema with Comprehensive FK Deletion Behavior and Enum Constraints
+1664 3:55a 🔵 Cross-Org Data Isolation Across Document Relationships
+1665 " 🔵 Pillar 17 Cross-Cutting Platform: Credentials, Telemetry, Errors, Experiments, Feature Flags
+1666 " 🔵 Inference Backends with Multiple Implementations (Embedded, Ollama, LmStudio, OpenAI)
+1667 " 🔵 Phase 08 Test Suite Completion: 4616 Pass, 2 Skip, 7 Todo, 0 Fail
+1668 " 🔵 OpenTUI Cross-Platform Binary Build Dependency Resolution Issue
+1669 3:56a 🔵 OpenTUI Platform Binary Import Resolution and Cross-Compilation Workaround
+1670 8:57a ⚖️ Phase 10 SaaS Hardening + Milestone Closure achieves final convergence review verdict
+1671 10:13a 🔵 Web dashboard architecture uses async-streamed loaders with product kernel queries
+1672 " 🔵 Seed script populates local product DB with demo projects, tasks, docs, and agent runs
+1673 " 🔵 Product kernel schema defines core entities with event dispatch and search indexing integration
+1674 " 🔵 Document and task service layers dispatch events and index search on create/update/delete
+1675 10:14a 🔵 Web shell uses singleton PGlite connection pattern for zero per-request DB overhead
+1676 " 🔴 Runtime schema mismatch: code queries nonexistent "sandbox_mode" column
+1677 " 🔵 Multiple Svelte reactivity warnings indicate state management anti-patterns in components
+1678 " 🔵 Vite cannot analyze dynamic import in migrator-service.ts; build warning
+1679 " 🔵 Schema mismatch: sandbox_mode column defined in MikroORM migration but not product-kernel schema
+1680 " 🔵 GET /runs directly queries sandbox_mode and iteration_count columns that don't exist in product-kernel schema
+1681 " 🔵 Web shell code references 18 agent_runs columns only defined in MikroORM migrations, not product-kernel
+1682 10:15a 🔴 Added product-kernel migration to bridge schema gap between web code and product-kernel DB
+1683 " 🔵 Migration system is consistently used across CLI, web shell, and tests via centralized runMigrations API
+1684 " 🔴 Migration 0009_agent_runs_sandcastle_compat.sql successfully applied to product DB; sandbox_mode and iteration_count columns now exist
+1686 " 🔴 Web shell /runs page now returns HTTP 200; schema mismatch resolved
+S289 Transition from Phase 10 feature implementation to strategic integration failure audit and architecture remediation planning (May 6 at 10:20 AM)
+S290 Refine architecture recommendation from "NestJS vs keep SvelteKit" to "unified data manipulation layer is non-negotiable" with specific boundary requirements and dependency rules (May 6 at 10:38 AM)
+S291 Define API architecture strategy: how tRPC and REST/Hono should be structured as thin adapters over unified application services, with hard boundary rule preventing direct DB access from surface code (May 6 at 10:41 AM)
+S292 Analyze Hono vs NestJS framework choice and define decision-making process for backend architecture; defer framework selection until after unified application layer is established and validated through a spike (May 6 at 10:44 AM)
+S293 Continue from previous session: Execute 6 audit documents (A-F) and establish unified data manipulation layer architecture enforcement (May 6 at 10:45 AM)
+S294 Organize and execute the 6 audit documents (A-F) needed to resolve architectural problems discovered in Phase 10 before resuming feature work (May 6 at 10:47 AM)
+S295 Continue from previous session: Execute Phase 9.5 (Architecture/Data-Layer Remediation + Full Interface Integration Fix) as urgent blocker before Phase 10 can proceed. Establish comprehensive plan for unified data manipulation layer, research backend architecture alternatives, and define spike vertical slice implementation. (May 6 at 10:49 AM)
+S296 Phase 9.5 remediation planning: Create execution plan for 6 audits (A-F) based on completed research; plan the consolidated codebase analysis before implementation begins (May 6 at 10:54 AM)
+S297 Phase 9.5 Execution Planning: Full Architecture Overhaul with Feature Preservation Mandate and Gray Area Research Framework (May 6 at 10:59 AM)
+1687 11:06a 🔵 Data Access Layer Consolidation: EntityManager + needle-di Repositories
+1688 " 🔵 Authentication & Authorization: Session-Based with Casbin ABAC Gate
+1689 " 🔵 Public REST API: Unified Hono Entry Point (ARCH-09)
+1690 " 🔵 Event Dispatcher & Notification System: Persist-Publish Architecture (ARCH-04)
+1691 11:08a ⚖️ Phase 9.5 Architectural Framework & Application Layer: Reject NestJS/Elysia, Build Explicit Application Boundary
+1692 " ⚖️ Application Layer Boundaries: Authorization, Validation, Events, Errors
+1693 " ⚖️ Phase 9.5 Acceptance Criteria: Vertical-Slice Rollout with Test & Performance Gates
+1694 11:09a ✅ Phase 9.5 Research Complete: 25 Gray Areas Resolved, 3 Wizard Questions Remain
+1695 " ✅ Phase 9.5 Research Ready for Wizard Input: 3 Decision Points Formulated
+S298 Phase 9.5 Gray Area Resolution Research: investigate architecture patterns online and in codebase, document findings, and prepare wizard questions for remaining decisions (May 6 at 11:09 AM)
+**Investigated**: 25 gray areas spanning backend frameworks (NestJS, Elysia, Fastify, Express, Koa, hapi, GraphQL, Encore.ts, Effect Platform), data access patterns (EntityManager, repositories, needle-di), application layer structure, authorization boundaries, error taxonomy, event/notification architecture, migration consolidation, test strategy, and rollout approach. External sources: official docs for Bun, Hono, NestJS, Elysia, Fastify, MikroORM, tRPC. Project evidence: 1679 lines of grep results on architecture terms; examination of src/trpc/context.ts, src/trpc/middleware.ts, src/db/db.module.ts, src/api/hono.ts, src/product-kernel/event-dispatcher.ts, and notification/rule-engine implementation.
 
-Access 613k tokens of past work via get_observations([IDs]) or mem-search skill.
+**Learned**: Current architecture consolidates around MikroORM EntityManager with needle-di dependency injection; tRPC and Hono REST are thin adapters; ProductDb deprecated, retained only for legacy orchestration pending migration; authorization handled by assertPermission middleware with two phases (session check + optional casbin ABAC); EventDispatcher provides unified event entry point; NotificationRuleEngine matches events to delivery channels (in-app, email, push, webhook); existing infrastructure already supports the proposed application-layer boundary pattern.
+
+**Completed**: Created 09.5-GRAY-AREA-RESOLUTIONS.md documenting 25 resolved decisions (G-001 through G-025) with rationale for each: keep Hono+tRPC as thin adapters, build src/application/<domain>/ layer with commands/queries/services/schemas/errors/DTOs, needle-di for DI, commands own transactions, authorization at application entrypoint, unified error taxonomy, outbox pattern for events, MikroORM-only migrations, product-kernel deprecated, vertical-slice rollout, performance gates, security threat model. Updated ROADMAP.md, 09.5-CONTEXT.md, and 09.5-DISCUSSION-LOG.md with artifact references. Audit directory created with web routes, CLI/TUI files, DB access patterns, and E2E analysis.
+
+**Next Steps**: User must answer three wizard questions about risk appetite before Phase 9.5 implementation planning can proceed: (1) Backend spike policy (Paper First recommended vs. Spike Nest+Elysia vs. Spike One), (2) ProductDb shim allowance during migration (Strict Allowlist recommended vs. Hard Fail Now vs. Loose Transition), (3) Playwright E2E gate placement (Tiered Mandatory recommended vs. Full Normal CI vs. Release Full). After user provides choices, session can run /gsd-plan-phase 9.5 to generate implementation plans based on research and decisions.
+
+
+Access 800k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

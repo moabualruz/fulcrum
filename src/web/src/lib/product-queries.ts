@@ -1,8 +1,4 @@
-import { join } from "node:path";
-import { openPglite } from "../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../product-kernel/db/migrate.ts";
-import { productDbDir } from "../../../product-kernel/paths.ts";
-import type { ProductDb } from "../../../product-kernel/db/types.ts";
+import { openProductDb, type OrmProductDb } from "$lib/server/db";
 
 export interface ProjectListing {
   id: string;
@@ -37,10 +33,8 @@ export interface RunListing {
   ended_at: string | null;
 }
 
-async function open(): Promise<ProductDb> {
-  const db = await openPglite(join(productDbDir(), "main"));
-  await runMigrations(db);
-  return db;
+async function open(): Promise<OrmProductDb> {
+  return openProductDb();
 }
 
 function isoStamp(value: string | Date): string {

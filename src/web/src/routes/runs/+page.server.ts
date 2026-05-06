@@ -47,6 +47,25 @@ function isoStamp(value: string | Date): string {
   return value instanceof Date ? value.toISOString() : value;
 }
 
+async function listRunRows(db: Awaited<ReturnType<typeof openProductDb>>): Promise<RawRow[]> {
+  try {
+    return await db.query<RawRow>(
+      `SELECT id, agent, model, status, project_id, started_at, ended_at,
+              sandbox_mode, iteration_count
+         FROM agent_runs
+        ORDER BY started_at DESC, id ASC`,
+    );
+  } catch (err) {
+    if ((err as { code?: string }).code !== "42703") throw err;
+    const rows = await db.query<Omit<RawRow, "sandbox_mode" | "iteration_count">>(
+      `SELECT id, agent, model, status, project_id, started_at, ended_at
+         FROM agent_runs
+        ORDER BY started_at DESC, id ASC`,
+    );
+    return rows.map((row) => ({ ...row, sandbox_mode: null, iteration_count: null }));
+  }
+}
+
 export const load: PageServerLoad = ({ url, locals }) => {
   const agent = (url.searchParams.get("agent") ?? "").trim();
   const statusRaw = (url.searchParams.get("status") ?? "").trim();
@@ -87,12 +106,7 @@ export const load: PageServerLoad = ({ url, locals }) => {
           if (!orgId) {
             return { runs: [], projects: [], tasks: [] };
           }
-          rows = await db.query<RawRow>(
-            `SELECT id, agent, model, status, project_id, started_at, ended_at,
-                    sandbox_mode, iteration_count
-               FROM agent_runs
-              ORDER BY started_at DESC, id ASC`,
-          );
+          rows = await listRunRows(db);
           projects = await db.query<ProjectOption>(
             `SELECT id, name FROM projects WHERE org_id = $1 ORDER BY name ASC, id ASC`,
             [orgId],

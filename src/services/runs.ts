@@ -42,11 +42,17 @@ function assertEm(db: DbHandle) {
   if ("persist" in db && typeof (db as { persist: unknown }).persist === "function") {
     return db as import("@mikro-orm/postgresql").EntityManager;
   }
+  if ("em" in db) {
+    const em = (db as { em?: unknown }).em;
+    if (em && typeof (em as { persist?: unknown }).persist === "function") {
+      return em as import("@mikro-orm/postgresql").EntityManager;
+    }
+  }
   throw new Error("runs.ts: EntityManager required — pass em instead of raw ProductDb.");
 }
 
 function isProductDb(db: DbHandle): db is import("../product-kernel/db/types.ts").ProductDb {
-  return "query" in db && typeof (db as { query: unknown }).query === "function";
+  return !("em" in db) && "query" in db && typeof (db as { query: unknown }).query === "function";
 }
 
 export async function dispatchRunAction(

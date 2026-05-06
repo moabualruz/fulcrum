@@ -4,7 +4,6 @@
  */
 
 import type { EntityManager } from "@mikro-orm/postgresql";
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
 
 export interface ProjectTile {
   id: string;
@@ -31,6 +30,9 @@ function toNumber(v: string | number | null | undefined): number {
 }
 
 type SqlValue = string | number | boolean | null;
+type QueryableDb = {
+  query: <T>(sql: string, params?: SqlValue[]) => Promise<T>;
+};
 
 function projectClause(
   projectId: string | null | undefined,
@@ -42,7 +44,7 @@ function projectClause(
 }
 
 export async function loadDashboard(
-  em: EntityManager | ProductDb,
+  em: EntityManager | QueryableDb,
   orgId: string,
   projectId?: string | null,
 ): Promise<DashboardData> {
@@ -126,7 +128,7 @@ export async function loadDashboard(
   };
 }
 
-function queryConnection(em: EntityManager | ProductDb): {
+function queryConnection(em: EntityManager | QueryableDb): {
   execute: <T>(sql: string, params?: SqlValue[]) => Promise<T>;
 } {
   if ("getConnection" in em && typeof em.getConnection === "function") {
@@ -136,6 +138,6 @@ function queryConnection(em: EntityManager | ProductDb): {
   }
 
   return {
-    execute: <T>(sql: string, params: SqlValue[] = []) => (em as ProductDb).query(sql, params) as Promise<T>,
+    execute: <T>(sql: string, params: SqlValue[] = []) => (em as QueryableDb).query<T>(sql, params),
   };
 }

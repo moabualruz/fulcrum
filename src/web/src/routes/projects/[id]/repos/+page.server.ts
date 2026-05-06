@@ -1,14 +1,13 @@
 import { basename, resolve } from "node:path";
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "../../../../lib/server/db";
+import { openProductDb, getDefaultOrgId, type OrmProductDb } from "../../../../lib/server/db";
 import {
   listReposForProject,
   linkRepoToProject,
   type RepoRow,
 } from "../../../../../../product-kernel/store/repositories.ts";
 import { newUlid } from "../../../../../../product-kernel/ids.ts";
-import type { ProductDb } from "../../../../../../product-kernel/db/types.ts";
 
 export interface ProjectRepoCard {
   id: string;
@@ -27,16 +26,6 @@ interface ProjectRow {
   id: string;
   slug: string;
   name: string;
-}
-
-interface TaskCountRow {
-  repo_id: string | null;
-  cnt: number | string;
-}
-
-function iso(value: string | Date | null): string | null {
-  if (value === null) return null;
-  return value instanceof Date ? value.toISOString() : value;
 }
 
 function toCard(row: RepoRow, _openTasks: number): ProjectRepoCard {
@@ -87,7 +76,7 @@ function slugFromRemoteUrl(url: string): string {
 }
 
 async function insertRepo(
-  db: ProductDb,
+  db: OrmProductDb,
   form: FormData,
   projectId: string,
 ): Promise<void> {

@@ -6,18 +6,10 @@ import type { RequestHandler } from "@sveltejs/kit";
 import { join } from "node:path";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { getDefaultOrgId, openProductDb } from "$lib/server/db";
 import { isFeatureEnabled } from "../../../../../../data/features.ts";
 import { importCsv } from "../../../../../../data/csv-import.ts";
-import { openPglite } from "../../../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../../../product-kernel/db/migrate.ts";
-import { productDbDir } from "../../../../../../product-kernel/paths.ts";
-import {
-  createLocalOrg,
-  createTask,
-} from "../../../../../../product-kernel/store/repositories.ts";
-
-const DEFAULT_ORG_SLUG = "default";
-const DEFAULT_ORG_NAME = "Local";
+import { createTask } from "../../../../../../product-kernel/store/repositories.ts";
 
 function jsonError(msg: string, status = 400): Response {
   return new Response(JSON.stringify({ error: msg }), {
@@ -70,36 +62,23 @@ export const POST: RequestHandler = async ({ request }) => {
       return jsonError((err as Error).message);
     }
 
-    // Write valid records to DB
-    const dbDir = productDbDir();
-    const db = await openPglite(join(dbDir, "main"));
-    await runMigrations(db);
-
-    const existingOrg = await db.query<{ id: string }>(
-      `SELECT id FROM orgs WHERE slug = $1`,
-      [DEFAULT_ORG_SLUG],
-    );
-    let orgId: string;
-    if (existingOrg[0]) {
-      orgId = existingOrg[0].id;
-    } else {
-      const org = await createLocalOrg(db, {
-        slug: DEFAULT_ORG_SLUG,
-        name: DEFAULT_ORG_NAME,
-      });
-      orgId = org.id;
-    }
+    const db = await openProductDb();
+    const orgId = await getDefaultOrgId(db);
 
     let written = 0;
-    for (const record of parsed.records) {
-      await createTask(db, {
-        orgId,
-        title: record["title"] as string,
-        status: record["status"] ?? "pending",
-        description: record["description"] ?? null,
-        priority: record["priority"] ? Number(record["priority"]) : 0,
-      });
-      written++;
+    try {
+      for (const record of parsed.records) {
+        await createTask(db, {
+          orgId,
+          title: record["title"] as string,
+          status: record["status"] ?? "pending",
+          description: record["description"] ?? null,
+          priority: record["priority"] ? Number(record["priority"]) : 0,
+        });
+        written++;
+      }
+    } finally {
+      await db.close();
     }
 
     await rm(dir, { recursive: true, force: true });

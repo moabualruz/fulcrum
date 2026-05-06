@@ -5,11 +5,9 @@ import type { RequestHandler } from "@sveltejs/kit";
 import { join } from "node:path";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { openProductDb } from "$lib/server/db";
 import { isFeatureEnabled } from "../../../../../../data/features.ts";
 import { exportTasksToCsv } from "../../../../../../data/csv-export.ts";
-import { openPglite } from "../../../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../../../product-kernel/db/migrate.ts";
-import { productDbDir } from "../../../../../../product-kernel/paths.ts";
 import type { TaskRow } from "../../../../../../product-kernel/store/repositories.ts";
 
 function jsonError(msg: string, status = 400): Response {
@@ -29,11 +27,9 @@ export const GET: RequestHandler = async ({ url }) => {
     return jsonError(`Unknown entity: ${entity}`);
   }
 
-  const dbDir = productDbDir();
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
-
+  const db = await openProductDb();
   const rows = await db.query<TaskRow>(`SELECT * FROM tasks ORDER BY created_at`);
+  await db.close();
 
   // Write to tmp file then stream back
   const dir = await mkdtemp(join(tmpdir(), "fulcrum-export-"));
