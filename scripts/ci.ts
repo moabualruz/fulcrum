@@ -42,34 +42,71 @@ export function envForStep(step: Step): NodeJS.ProcessEnv {
 type CiTier = "quick" | "unit" | "integration" | "e2e" | "full";
 type CiDomain = "application" | "web" | "cli" | "tui" | "api" | "all";
 
-const tierArg = process.argv.find(a => a.startsWith("--tier="))?.split("=")[1] as CiTier | undefined ?? "full";
-const domainArg = process.argv.find(a => a.startsWith("--domain="))?.split("=")[1] as CiDomain | undefined ?? "all";
+const VALID_TIERS = new Set<CiTier>(["quick", "unit", "integration", "e2e", "full"]);
+const VALID_DOMAINS = new Set<CiDomain>(["application", "web", "cli", "tui", "api", "all"]);
+
+function readFlag(name: string): string | undefined {
+  const inline = process.argv.find((arg) => arg.startsWith(`--${name}=`));
+  if (inline) return inline.split("=")[1];
+  const index = process.argv.indexOf(`--${name}`);
+  if (index >= 0) return process.argv[index + 1];
+  return undefined;
+}
+
+function parseTier(raw = "full"): CiTier {
+  if (VALID_TIERS.has(raw as CiTier)) return raw as CiTier;
+  throw new Error(`invalid --tier=${raw}; expected quick|unit|integration|e2e|full`);
+}
+
+function parseDomain(raw = "all"): CiDomain {
+  if (VALID_DOMAINS.has(raw as CiDomain)) return raw as CiDomain;
+  throw new Error(`invalid --domain=${raw}; expected application|web|cli|tui|api`);
+}
+
+const tierArg = parseTier(readFlag("tier"));
+const domainArg = parseDomain(readFlag("domain"));
 
 const TIER_ORDER: CiTier[] = ["quick", "unit", "integration", "e2e", "full"];
 function tierIncludes(step: CiTier): boolean {
   return TIER_ORDER.indexOf(tierArg) >= TIER_ORDER.indexOf(step);
 }
 
-function domainIncludes(step: CiDomain | "all"): boolean {
+function domainIncludes(step: TieredStep): boolean {
   if (domainArg === "all") return true;
-  if (step === "all") return true;
-  return domainArg === step;
+  if (step.always) return true;
+  return domainArg === step.domain;
 }
 
 export interface TieredStep extends Step {
   tier: CiTier;
   domain: CiDomain | "all";
+  always?: boolean;
 }
+
+const QUICK_TYPECHECK_SCRIPT = `
+import { spawnSync } from "node:child_process";
+import { rmSync, writeFileSync } from "node:fs";
+const path = ".tmp-tsconfig-ci-quick-" + process.pid + ".json";
+writeFileSync(path, JSON.stringify({
+  extends: "./tsconfig.json",
+  include: ["src/**/*.ts"],
+  exclude: ["node_modules", "dist", "src/web/**", "**/*.test.ts", "**/*.spec.ts", "**/__tests__/**"],
+}));
+const result = spawnSync("bun", ["run", "--bun", "tsc", "--noEmit", "-p", path], { stdio: "inherit" });
+rmSync(path, { force: true });
+process.exit(result.status ?? 1);
+`;
 
 export const ALL_STEPS: TieredStep[] = [
   // ── T0: Quick (~10s) — typecheck + boundaries ──
-  { name: "install",          cmd: ["bun", "install", "--frozen-lockfile"], tier: "quick", domain: "all" },
-  { name: "typecheck",        cmd: ["bun", "run", "--bun", "tsc", "--noEmit"], tier: "quick", domain: "all" },
+  { name: "install",          cmd: ["bun", "install", "--frozen-lockfile"], tier: "quick", domain: "all", always: true },
+  { name: "typecheck",        cmd: ["bun", "-e", QUICK_TYPECHECK_SCRIPT], tier: "quick", domain: "all", always: true },
 
   // ── T1: Unit (~30s) — fast unit tests, no DB ──
   { name: "symphony:lock",    cmd: ["bun", "test", "tests/symphony/spec-lock.test.ts"], tier: "unit", domain: "all" },
   { name: "symphony:conformance", cmd: ["bun", "test", "src/orchestration/__tests__/symphony-conformance.test.ts"], tier: "unit", domain: "all" },
   { name: "trpc:permissions", cmd: ["bun", "test", "tests/trpc/app-router-scaffold.test.ts", "tests/trpc/router.test.ts"], tier: "unit", domain: "api" },
+  { name: "application:unit",  cmd: ["bun", "test", "src/application"], tier: "unit", domain: "application" },
   { name: "test",             cmd: ["bun", "run", "scripts/test-root.ts"], tier: "unit", domain: "all" },
   { name: "license-audit",    cmd: ["bun", "run", "scripts/license-audit.ts"], tier: "unit", domain: "all" },
   { name: "ci:codegen",       cmd: ["bun", "run", "scripts/ci/codegen.ts"], tier: "unit", domain: "all" },
@@ -92,11 +129,14 @@ export const ALL_STEPS: TieredStep[] = [
   ...(process.env["FULCRUM_RUN_E2E"] === "1"
     ? [{ name: "web:e2e:full", cmd: ["bun", "run", "web:e2e:full"], cwd: "src/web", env: hostHome ? { HOME: hostHome } : undefined, tier: "e2e", domain: "web" } satisfies TieredStep]
     : []),
+
+  // ── Phase 9.5 architecture closure gates ──
+  { name: "architecture:red", cmd: ["bun", "test", "src/architecture"], tier: "full", domain: "all" },
 ];
 
 export const STEPS: Step[] = ALL_STEPS
   .filter(s => tierIncludes(s.tier))
-  .filter(s => domainIncludes(s.domain));
+  .filter(s => domainIncludes(s));
 
 interface Result { step: string; ok: boolean; soft?: boolean; skipped?: boolean; pending?: number; ms: number; }
 
