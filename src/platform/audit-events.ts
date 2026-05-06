@@ -24,12 +24,16 @@ import { z } from "zod";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const SUBJECT_KINDS = [
+  "user_setting",
+  "theme",
   "credential",
   "backup",
   "telemetry_event",
   "feature_flag",
   "experiment",
   "error_log",
+  "migration",
+  "system",
 ] as const;
 export type SubjectKind = (typeof SUBJECT_KINDS)[number];
 
@@ -46,6 +50,9 @@ export const VERBS = [
   "disabled",
   "exported",
   "imported",
+  "restored",
+  "downgraded",
+  "shutdown.completed",
 ] as const;
 export type Verb = (typeof VERBS)[number];
 
@@ -53,8 +60,57 @@ export type Verb = (typeof VERBS)[number];
 // Per-event-type payload schemas  (NO plaintext secret values)
 // ─────────────────────────────────────────────────────────────────────────────
 
+const FORBIDDEN_PAYLOAD_KEYS = new Set([
+  "value",
+  "secret",
+  "token",
+  "password",
+  "apiKey",
+  "api_key",
+  "encrypted_value",
+]);
+
+function rejectForbiddenPayloadKeys(payload: unknown, ctx: z.RefinementCtx, path: Array<string | number> = []): void {
+  if (!payload || typeof payload !== "object") return;
+  if (Array.isArray(payload)) {
+    payload.forEach((item, index) => rejectForbiddenPayloadKeys(item, ctx, [...path, index]));
+    return;
+  }
+
+  for (const [key, value] of Object.entries(payload as Record<string, unknown>)) {
+    const nextPath = [...path, key];
+    if (FORBIDDEN_PAYLOAD_KEYS.has(key)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: nextPath,
+        message: `audit payload must not contain secret-like key '${key}'`,
+      });
+    }
+    rejectForbiddenPayloadKeys(value, ctx, nextPath);
+  }
+}
+
+function auditPayloadSchema<T extends z.ZodRawShape>(shape: T): z.ZodEffects<z.ZodObject<T, "strict">> {
+  return z.object(shape).strict().superRefine((payload, ctx) => {
+    rejectForbiddenPayloadKeys(payload, ctx);
+  });
+}
+
+/** user_setting.updated */
+export const UserSettingUpdatedPayloadSchema = auditPayloadSchema({
+  key: z.string(),
+  projectId: z.string().optional(),
+});
+
+/** theme.updated */
+export const ThemeUpdatedPayloadSchema = auditPayloadSchema({
+  key: z.string(),
+  oldTheme: z.string().optional(),
+  newTheme: z.string().optional(),
+});
+
 /** credential.set / credential.created */
-export const CredentialSetPayloadSchema = z.object({
+export const CredentialSetPayloadSchema = auditPayloadSchema({
   name: z.string(),
   algo: z.string().optional(),
   kdf: z.string().optional(),
@@ -63,40 +119,40 @@ export const CredentialSetPayloadSchema = z.object({
 });
 
 /** credential.rotate */
-export const CredentialRotatePayloadSchema = z.object({
+export const CredentialRotatePayloadSchema = auditPayloadSchema({
   name: z.string(),
   rotatedAt: z.string(), // ISO-8601
 });
 
 /** credential.archive */
-export const CredentialArchivePayloadSchema = z.object({
+export const CredentialArchivePayloadSchema = auditPayloadSchema({
   name: z.string(),
 });
 
 /** credential.deleted */
-export const CredentialDeletePayloadSchema = z.object({
+export const CredentialDeletePayloadSchema = auditPayloadSchema({
   name: z.string(),
 });
 
 /** backup.create */
-export const BackupCreatePayloadSchema = z.object({
+export const BackupCreatePayloadSchema = auditPayloadSchema({
   format: z.string().optional(),
   entityCounts: z.record(z.string(), z.number()).optional(),
   durationMs: z.number().optional(),
 });
 
 /** telemetry_event.opted_in / opted_out */
-export const TelemetryOptPayloadSchema = z.object({
+export const TelemetryOptPayloadSchema = auditPayloadSchema({
   optedIn: z.boolean(),
 });
 
 /** telemetry_event.purged */
-export const TelemetryPurgePayloadSchema = z.object({
+export const TelemetryPurgePayloadSchema = auditPayloadSchema({
   deleted: z.number().int().nonnegative(),
 });
 
 /** feature_flag.enabled / feature_flag.disabled */
-export const FlagSetPayloadSchema = z.object({
+export const FlagSetPayloadSchema = auditPayloadSchema({
   flag: z.string(),
   enabled: z.boolean(),
   orgId: z.string().optional(),
@@ -104,29 +160,40 @@ export const FlagSetPayloadSchema = z.object({
 });
 
 /** experiment.created */
-export const ExperimentCreatePayloadSchema = z.object({
+export const ExperimentCreatePayloadSchema = auditPayloadSchema({
   experimentId: z.string(),
   name: z.string().optional(),
 });
 
 /** error_log.created */
-export const ErrorLogCreatePayloadSchema = z.object({
+export const ErrorLogCreatePayloadSchema = auditPayloadSchema({
   kind: z.string().optional(),
   message: z.string().optional(),
 });
 
 /** dataExport.create */
-export const DataExportCreatePayloadSchema = z.object({
+export const DataExportCreatePayloadSchema = auditPayloadSchema({
   format: z.string().optional(),
   entityCounts: z.record(z.string(), z.number()).optional(),
   durationMs: z.number().optional(),
 });
 
 /** dataImport.run */
-export const DataImportRunPayloadSchema = z.object({
+export const DataImportRunPayloadSchema = auditPayloadSchema({
   importId: z.string().optional(),
   entityCounts: z.record(z.string(), z.number()).optional(),
   durationMs: z.number().optional(),
+});
+
+/** migration.downgraded */
+export const MigrationDowngradedPayloadSchema = auditPayloadSchema({
+  migration: z.string(),
+});
+
+/** system.shutdown.completed */
+export const SystemShutdownCompletedPayloadSchema = auditPayloadSchema({
+  signal: z.string(),
+  completed: z.array(z.string()),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -135,12 +202,15 @@ export const DataImportRunPayloadSchema = z.object({
 
 /** Maps `${subjectKind}.${verb}` → Zod schema for that payload. */
 const PAYLOAD_SCHEMA_REGISTRY = new Map<string, z.ZodTypeAny>([
+  ["user_setting.updated", UserSettingUpdatedPayloadSchema],
+  ["theme.updated", ThemeUpdatedPayloadSchema],
   ["credential.created", CredentialSetPayloadSchema],
   ["credential.updated", CredentialSetPayloadSchema],
   ["credential.rotated", CredentialRotatePayloadSchema],
   ["credential.archived", CredentialArchivePayloadSchema],
   ["credential.deleted", CredentialDeletePayloadSchema],
   ["backup.created", BackupCreatePayloadSchema],
+  ["backup.restored", BackupCreatePayloadSchema],
   ["telemetry_event.opted_in", TelemetryOptPayloadSchema],
   ["telemetry_event.opted_out", TelemetryOptPayloadSchema],
   ["telemetry_event.purged", TelemetryPurgePayloadSchema],
@@ -150,6 +220,8 @@ const PAYLOAD_SCHEMA_REGISTRY = new Map<string, z.ZodTypeAny>([
   ["error_log.created", ErrorLogCreatePayloadSchema],
   ["backup.exported", DataExportCreatePayloadSchema],
   ["backup.imported", DataImportRunPayloadSchema],
+  ["migration.downgraded", MigrationDowngradedPayloadSchema],
+  ["system.shutdown.completed", SystemShutdownCompletedPayloadSchema],
 ]);
 
 export function getPayloadSchema(

@@ -8,6 +8,10 @@ import { t } from "../../src/trpc/trpc.ts";
 import { Event } from "../../src/db/entities/core/Event.ts";
 import { Org } from "../../src/db/entities/auth/Org.ts";
 import { User } from "../../src/db/entities/auth/User.ts";
+import {
+  getPayloadSchema,
+  isPayloadSchemaRegistered,
+} from "../../src/platform/audit-events.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 
@@ -230,6 +234,56 @@ describe("audit tRPC router", () => {
       expect(rows).toContainEqual(updated);
     } finally {
       await db.close();
+    }
+  });
+});
+
+describe("Phase 09 audit event registry", () => {
+  const requiredKeys = [
+    "user_setting.updated",
+    "theme.updated",
+    "telemetry_event.opted_in",
+    "telemetry_event.opted_out",
+    "telemetry_event.purged",
+    "error_log.created",
+    "backup.created",
+    "backup.restored",
+    "backup.exported",
+    "backup.imported",
+    "credential.created",
+    "credential.updated",
+    "credential.rotated",
+    "credential.deleted",
+    "migration.downgraded",
+    "system.shutdown.completed",
+  ];
+
+  const forbiddenKeys = [
+    "value",
+    "secret",
+    "token",
+    "password",
+    "apiKey",
+    "api_key",
+    "encrypted_value",
+  ];
+
+  test("registers exact Phase 09 audit keys", () => {
+    for (const key of requiredKeys) {
+      const [subjectKind, ...verbParts] = key.split(".");
+      expect(isPayloadSchemaRegistered(subjectKind!, verbParts.join("."))).toBe(true);
+    }
+  });
+
+  test("registered payload schemas reject secret-like keys", () => {
+    for (const key of requiredKeys) {
+      const [subjectKind, ...verbParts] = key.split(".");
+      const schema = getPayloadSchema(subjectKind!, verbParts.join("."));
+      expect(schema, key).toBeDefined();
+
+      for (const forbiddenKey of forbiddenKeys) {
+        expect(() => schema!.parse({ [forbiddenKey]: "plaintext" }), `${key}.${forbiddenKey}`).toThrow();
+      }
     }
   });
 });
