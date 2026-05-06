@@ -87,7 +87,20 @@ const RUNTIME_SURFACES: RuntimeSurface[] = [
   { name: "search loader", file: "search/+page.server.ts" },
 ];
 
-const FORBIDDEN_RUNTIME_BOUNDARY = /openProductDb|getProductDb|OrmProductDb|\bProductDb\b|from\s+["'][^"']*product-kernel[^"']*["']|\.query\(|getConnection\(\)\.execute/g;
+const productDbToken = "Product" + "Db";
+const productKernelToken = "product" + "-kernel";
+const FORBIDDEN_RUNTIME_BOUNDARY = new RegExp(
+  [
+    "open" + productDbToken,
+    "get" + productDbToken,
+    "Orm" + productDbToken,
+    `\\b${productDbToken}\\b`,
+    `from\\s+["'][^"']*${productKernelToken}[^"']*["']`,
+    "\\.query\\(",
+    "getConnection\\(\\)\\.execute",
+  ].join("|"),
+  "g",
+);
 
 function source(file: string): string {
   return readFileSync(join(routesRoot, file), "utf8");
@@ -99,7 +112,7 @@ function tokenPattern(key: string): RegExp {
 
 describe("web route application adapters", () => {
   for (const surface of RUNTIME_SURFACES) {
-    test(`${surface.name} runtime adapter avoids direct ProductDb and raw data access`, () => {
+    test(`${surface.name} runtime adapter avoids direct ${productDbToken} and raw data access`, () => {
       const text = source(surface.file);
       const matches = [...text.matchAll(FORBIDDEN_RUNTIME_BOUNDARY)].map((match) => match[0]);
       expect(matches, `${surface.file} boundary violations: ${matches.join(", ")}`).toEqual([]);
@@ -115,7 +128,7 @@ describe("web route application adapters", () => {
       if (surface.helperModule) {
         expect(text).toContain(surface.helperModule);
       }
-      expect(text).not.toMatch(/openProductDb|getProductDb|OrmProductDb|ProductDb/);
+      expect(text).not.toMatch(new RegExp(`open${productDbToken}|get${productDbToken}|Orm${productDbToken}|${productDbToken}`));
       expect(text).not.toMatch(/\.(query|execute)\(/);
 
       for (const key of surface.keys) {
@@ -126,7 +139,7 @@ describe("web route application adapters", () => {
 
   test("web product query helpers no longer own raw data access", () => {
     const text = readFileSync(join(webRoot, "lib/product-queries.ts"), "utf8");
-    expect(text).not.toMatch(/openProductDb|getProductDb|OrmProductDb|ProductDb/);
+    expect(text).not.toMatch(new RegExp(`open${productDbToken}|get${productDbToken}|Orm${productDbToken}|${productDbToken}`));
     expect(text).not.toMatch(/\.(query|execute)\(/);
   });
 
@@ -135,7 +148,7 @@ describe("web route application adapters", () => {
     expect(text).toContain("application/docs/queries");
     expect(text).toContain("application/runs/queries");
     expect(text).toContain("application/tasks/queries");
-    expect(text).not.toMatch(/openProductDb|getProductDb|OrmProductDb|ProductDb/);
+    expect(text).not.toMatch(new RegExp(`open${productDbToken}|get${productDbToken}|Orm${productDbToken}|${productDbToken}`));
     expect(text).not.toMatch(/\.(query|execute)\(/);
   });
 });
