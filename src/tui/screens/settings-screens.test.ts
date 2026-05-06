@@ -1,17 +1,4 @@
-import { describe, expect, test, beforeAll, afterAll } from "bun:test";
-import { openPglite } from "../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../../product-kernel/store/repositories.ts";
-import {
-  upsertTenantSetting,
-  createConnectorRun,
-  completeConnectorRun,
-  listConnectorRuns,
-  createCredential,
-  listCredentials,
-  deleteCredential,
-} from "../../product-kernel/store/settings-connectors-credentials.ts";
-import type { ProductDb } from "../../product-kernel/db/types.ts";
+import { describe, expect, test } from "bun:test";
 import {
   buildSettingsScreenData,
   renderConnectorsScreen,
@@ -24,22 +11,6 @@ import {
   maskCredentialValue,
   type DoctorCheckResult,
 } from "./settings-screens.ts";
-
-let db: ProductDb;
-let orgId: string;
-
-beforeAll(async () => {
-  db = await openPglite("memory://test-tui-screens");
-  await runMigrations(db);
-  const org = await createLocalOrg(db, { slug: "tui-test", name: "TUI Test" });
-  orgId = org.id;
-});
-
-afterAll(async () => {
-  await db.close();
-});
-
-// --- Connectors Screen ---
 
 describe("ConnectorsScreen", () => {
   test("data comes from caller fixture", async () => {
@@ -58,13 +29,9 @@ describe("ConnectorsScreen", () => {
     expect(data.credentials[0]?.key).toBe("TOKEN");
   });
 
-  test("renders enabled connectors with last sync", async () => {
-    const run = await createConnectorRun(db, { orgId, kind: "github" });
-    await completeConnectorRun(db, run.id, { status: "succeeded", recordsSynced: 10 });
-
-    const runs = await listConnectorRuns(db, orgId, "github", 10);
+  test("renders enabled connectors with last sync", () => {
     const output = renderConnectorsScreen([
-      { kind: "github", enabled: true, runs },
+      { kind: "github", enabled: true, runs: [{ kind: "github", status: "succeeded", startedAt: "2026-05-01", recordsSynced: 10 }] },
     ]);
 
     expect(output).toContain("github");
@@ -72,17 +39,14 @@ describe("ConnectorsScreen", () => {
     expect(output).toContain("10");
   });
 
-  test("shows 's' sync hint and run log", async () => {
-    const runs = await listConnectorRuns(db, orgId, "github", 10);
+  test("shows 's' sync hint and run log", () => {
     const output = renderConnectorsScreen([
-      { kind: "github", enabled: true, runs },
+      { kind: "github", enabled: true, runs: [{ kind: "github", status: "succeeded", startedAt: "2026-05-01", recordsSynced: 10 }] },
     ]);
     expect(output).toContain("[s] Sync");
     expect(output).toContain("Run Log");
   });
 });
-
-// --- Theme Screen ---
 
 describe("ThemeScreen", () => {
   test("has 5 built-in presets", () => {
@@ -102,18 +66,14 @@ describe("ThemeScreen", () => {
   });
 });
 
-// --- Secrets Screen ---
-
 describe("SecretsScreen", () => {
   test("masks credential values", () => {
     expect(maskCredentialValue("supersecret")).toBe("•••• redacted");
     expect(maskCredentialValue("")).toBe("•••• redacted");
   });
 
-  test("renders masked list with add/delete hints", async () => {
-    await createCredential(db, { orgId, key: "API_KEY", encryptedValue: "enc:abc" });
-    const creds = await listCredentials(db, orgId);
-    const output = renderSecretsScreen(creds);
+  test("renders masked list with add/delete hints", () => {
+    const output = renderSecretsScreen([{ key: "API_KEY", encryptedValue: "enc:abc" }]);
 
     expect(output).toContain("API_KEY");
     expect(output).toContain("••••");
@@ -123,8 +83,6 @@ describe("SecretsScreen", () => {
     expect(output).toContain("[d] Delete");
   });
 });
-
-// --- Backups Screen ---
 
 describe("BackupsScreen", () => {
   test("renders backup and restore hints", () => {
@@ -138,8 +96,6 @@ describe("BackupsScreen", () => {
     expect(output).toContain("/tmp/fulcrum-backup.tar.gz");
   });
 });
-
-// --- Doctor Screen ---
 
 describe("DoctorScreen", () => {
   test("renders check rows with status icons", () => {

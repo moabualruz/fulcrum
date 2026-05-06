@@ -3,14 +3,53 @@
  * No terminal I/O; consumed by OpenTUI component tree and tests.
  */
 
-import type { ConnectorRunRow, CredentialRow } from "../../product-kernel/store/settings-connectors-credentials.ts";
+export interface ConnectorRunSummary {
+  kind: string;
+  status: string;
+  startedAt?: string | null;
+  started_at?: string | null;
+  recordsSynced?: number;
+  records_synced?: number;
+  error?: string | null;
+}
+
+export interface CredentialSummary {
+  key: string;
+  encryptedValue?: string;
+  encrypted_value?: string;
+}
+
+export interface SettingsScreenCaller {
+  connectors: {
+    list: () => Promise<Array<{ kind: string; enabled: boolean; lastSyncAt?: string | null }>>;
+    runs?: { list: (input: { kind: string }) => Promise<ConnectorRunSummary[]> };
+  };
+  credentials?: {
+    list: () => Promise<CredentialSummary[]>;
+  };
+}
+
+export async function buildSettingsScreenData(caller: SettingsScreenCaller): Promise<{
+  connectors: ConnectorCard[];
+  credentials: CredentialSummary[];
+}> {
+  const connectors = await caller.connectors.list();
+  return {
+    connectors: await Promise.all(connectors.map(async (connector) => ({
+      kind: connector.kind,
+      enabled: connector.enabled,
+      runs: await caller.connectors.runs?.list({ kind: connector.kind }) ?? [],
+    }))),
+    credentials: await caller.credentials?.list() ?? [],
+  };
+}
 
 // --- Connectors Screen ---
 
 export interface ConnectorCard {
   kind: string;
   enabled: boolean;
-  runs: ConnectorRunRow[];
+  runs: ConnectorRunSummary[];
 }
 
 export function renderConnectorsScreen(connectors: ConnectorCard[]): string {
@@ -18,9 +57,9 @@ export function renderConnectorsScreen(connectors: ConnectorCard[]): string {
 
   for (const c of connectors) {
     const lastRun = c.runs[0];
-    const syncAt = lastRun ? lastRun.started_at : "never";
+    const syncAt = lastRun ? startedAt(lastRun) : "never";
     const syncStatus = lastRun ? lastRun.status : "—";
-    const syncedCount = lastRun ? String(lastRun.records_synced) : "0";
+    const syncedCount = lastRun ? String(recordsSynced(lastRun)) : "0";
 
     lines.push(`  ${c.kind}  ${c.enabled ? "ON" : "OFF"}  last-sync: ${syncAt}  status: ${syncStatus}  records: ${syncedCount}`);
   }
@@ -29,7 +68,7 @@ export function renderConnectorsScreen(connectors: ConnectorCard[]): string {
   lines.push("─── Run Log ───");
   for (const c of connectors) {
     for (const run of c.runs.slice(0, 10)) {
-      lines.push(`  ${run.kind}  ${run.status}  ${run.started_at}  ${run.records_synced} records  ${run.error ?? ""}`);
+      lines.push(`  ${run.kind}  ${run.status}  ${startedAt(run)}  ${recordsSynced(run)} records  ${run.error ?? ""}`);
     }
   }
 
@@ -90,20 +129,28 @@ export function maskCredentialValue(_value: string): string {
   return "•••• redacted";
 }
 
-export function renderSecretsScreen(credentials: CredentialRow[]): string {
+export function renderSecretsScreen(credentials: CredentialSummary[]): string {
   const lines: string[] = ["═══ Secrets ═══", ""];
 
   if (credentials.length === 0) {
     lines.push("  No secrets configured.");
   } else {
     for (const c of credentials) {
-      lines.push(`  ${c.key}  ${maskCredentialValue(c.encrypted_value)}`);
+      lines.push(`  ${c.key}  ${maskCredentialValue(c.encryptedValue ?? c.encrypted_value ?? "")}`);
     }
   }
 
   lines.push("");
   lines.push("[a] Add  [d] Delete  [q] Back");
   return lines.join("\n");
+}
+
+function startedAt(run: ConnectorRunSummary): string {
+  return run.startedAt ?? run.started_at ?? "unknown";
+}
+
+function recordsSynced(run: ConnectorRunSummary): number {
+  return run.recordsSynced ?? run.records_synced ?? 0;
 }
 
 // --- Backups Screen ---

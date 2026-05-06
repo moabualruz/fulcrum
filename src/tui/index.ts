@@ -1250,7 +1250,7 @@ export async function buildCaller(
   const factory = t.createCallerFactory(appRouter);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const caller = factory(ctx) as any;
-  return enrichTuiCaller(caller, tuiContext.em);
+  return enrichTuiCaller(caller);
 }
 
 export async function buildTelemetrySink(
@@ -1263,11 +1263,8 @@ export async function buildTelemetrySink(
   try {
     const { Org, User } = await import("../db/entities/auth/index.ts");
     const orgId = session.activeOrganizationId ?? session.orgId;
-    const [org, user] = await Promise.all([
-      tuiContext.em.findOne(Org, { id: orgId } as never),
-      tuiContext.em.findOne(User, { id: session.userId } as never),
-    ]);
-    if (!org) return new NullTelemetrySink();
+    const org = tuiContext.em.getReference(Org, orgId);
+    const user = tuiContext.em.getReference(User, session.userId);
     return new DbTelemetrySink({ em: tuiContext.em, org, user });
   } catch {
     return new NullTelemetrySink();
@@ -1281,8 +1278,9 @@ function authProvidersFromEnv(): string[] {
   return providers;
 }
 
-function enrichTuiCaller(caller: TuiCaller, em: EntityManager | null): TuiCaller {
+function enrichTuiCaller(caller: TuiCaller): TuiCaller {
   return {
+    ...caller,
     flags: caller.flags,
     tasks: caller.tasks,
     inference: caller.inference,
@@ -1291,33 +1289,15 @@ function enrichTuiCaller(caller: TuiCaller, em: EntityManager | null): TuiCaller
     auth: {
       whoami: async () => {
         const whoami = await caller.auth.whoami();
-        if (!em) {
-          return {
-            ...whoami,
-            orgName: whoami.orgId,
-            passkeyCount: 0,
-            saasAuthEnabled: false,
-            authProviders: [],
-          };
-        }
-
-        const [{ Org, Account }, flags] = await Promise.all([
-          import("../db/mikro-orm.config.ts"),
-          caller.flags.list().catch(() => []),
-        ]);
-        const org = await em.findOne(Org, { id: whoami.orgId } as never);
-        const passkeyCount = await em.count(Account, {
-          providerId: "passkey",
-          userId: whoami.userId,
-        } as never);
+        const flags = await caller.flags.list().catch(() => []);
         const saasAuthEnabled = flags.some((flag) => flag.name === "saas-auth" && flag.enabled);
 
         return {
           ...whoami,
-          orgName: org?.name ?? whoami.orgId,
-          passkeyCount,
+          orgName: whoami.orgName ?? whoami.orgId,
+          passkeyCount: whoami.passkeyCount ?? 0,
           saasAuthEnabled,
-          authProviders: saasAuthEnabled ? authProvidersFromEnv() : [],
+          authProviders: whoami.authProviders ?? (saasAuthEnabled ? authProvidersFromEnv() : []),
         };
       },
     },
@@ -1370,8 +1350,7 @@ async function resolveActiveTuiSession(em: EntityManager | null): Promise<TuiCli
   const now = new Date();
 
   try {
-    const session = await em.findOne(
-      Session,
+    const session = await em.getRepository(Session).findOne(
       { expiresAt: { $gt: now } },
       { orderBy: { createdAt: "DESC" } },
     );
