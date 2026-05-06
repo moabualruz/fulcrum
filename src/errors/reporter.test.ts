@@ -183,6 +183,31 @@ describe("enqueueErrorReport", () => {
     const [, jobPayload] = enqueue.mock.calls[0]!;
     const bodyStr = JSON.stringify(jobPayload.payload);
     expect(verifySignature(bodyStr, jobPayload.signature, secret)).toBe(true);
+    expect(jobPayload.headers["X-Fulcrum-Signature"]).toBe(jobPayload.signature);
+  });
+
+  test("payload omits file contents and common credential keys", () => {
+    const payload = buildReportPayload({
+      id: "entry-pii",
+      errorMessage: "boom",
+      occurredAt: new Date("2026-05-06T00:00:00Z"),
+      context: {
+        user_id: "user-1",
+        org_id: "org-1",
+        email: "user@example.com",
+        token: "tok",
+        secret: "secret",
+        password: "pw",
+        api_key: "key",
+        fileContents: "private file body",
+      },
+    });
+
+    const json = JSON.stringify(payload);
+    expect(json).not.toContain("user-1");
+    expect(json).not.toContain("org-1");
+    expect(json).not.toContain("user@example.com");
+    expect(json).not.toContain("private file body");
   });
 
   test("flag ON, no endpoint: skips enqueue gracefully", async () => {

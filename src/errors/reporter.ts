@@ -46,6 +46,9 @@ export interface ErrorReportJob {
   payload: ErrorReportPayload;
   endpoint: string;
   signature: string;
+  headers: {
+    "X-Fulcrum-Signature": string;
+  };
 }
 
 /** Options for enqueueErrorReport. */
@@ -165,6 +168,9 @@ export async function enqueueErrorReport(
     payload,
     endpoint: opts.endpoint,
     signature,
+    headers: {
+      "X-Fulcrum-Signature": signature,
+    },
   };
 
   await opts.enqueueJob("errors:report", job);
