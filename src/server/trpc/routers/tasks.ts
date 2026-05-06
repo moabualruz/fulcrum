@@ -1,123 +1,74 @@
+import type { EntityManager } from "@mikro-orm/postgresql";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { Task } from "../../../db/entities/tasks/Task.ts";
-import { DependenciesSchema } from "../../../db/entities/tasks/schemas.ts";
-import { TaskRepository } from "../../../db/repositories/tasks/TaskRepository.ts";
-import { type TipTapJson } from "../../../db/tasks-rich-text.ts";
+import {
+  bulkDelete,
+  bulkUpdate,
+  createTask,
+  deleteTask,
+  setDependencies,
+  setParent,
+  updateTask,
+} from "../../../application/tasks/commands.ts";
+import { getTask, listChildren, listTasks } from "../../../application/tasks/queries.ts";
+import {
+  BulkDeleteOutputSchema,
+  BulkUpdateOutputSchema,
+  BulkUpdateTasksInputSchema,
+  CreateTaskInputSchema,
+  ListTasksInputSchema,
+  SetDependenciesInputSchema,
+  SetParentInputSchema,
+  TaskDtoSchema,
+  TaskIdInputSchema,
+  TaskIdsInputSchema,
+  TaskRelationIdInputSchema,
+  UpdateTaskInputSchema,
+} from "../../../application/tasks/schema.ts";
+import type { AppContext } from "../../../application/tasks/types.ts";
+import { appErrorToTrpcError } from "../../../application/error-mapping.ts";
+import { AppError } from "../../../application/errors.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
-import { TaskService, normalizedUnique } from "../../../services/TaskService.ts";
 
-// ── Schemas ────────────────────────────────────────────────────────
+const taskApplication = {
+  createTask,
+  updateTask,
+  deleteTask,
+  bulkUpdate,
+  bulkDelete,
+  setParent,
+  setDependencies,
+  listTasks,
+  getTask,
+  listChildren,
+};
 
-const TipTapContentSchema: z.ZodType<TipTapJson> = z.lazy(() =>
-  z.object({
-    type: z.string().optional(),
-    text: z.string().optional(),
-    content: z.array(TipTapContentSchema).optional(),
-  }).catchall(z.unknown()),
-);
-
-const TaskOutputSchema = z.object({
-  id: z.uuid(),
-  orgId: z.string().regex(/^[0-9a-fA-F-]{36}$/),
-  title: z.string(),
-  description: z.string().nullable(),
-  descriptionText: z.string(),
-  tiptapContent: TipTapContentSchema,
-  status: z.string().nullable(),
-  priority: z.number().int().nullable(),
-  points: z.number().int().nullable(),
-  parentId: z.uuid().nullable(),
-  dependencies: DependenciesSchema,
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  deletedAt: z.date().nullable(),
-});
-
-const ListTasksInputSchema = z.object({
-  includeDeleted: z.boolean().optional(),
-}).optional();
-
-const TaskIdInputSchema = z.object({ id: z.uuid() });
-
-const TaskIdsInputSchema = z.object({
-  ids: z.array(z.uuid()).min(1).max(500).transform(normalizedUnique),
-});
-
-const TaskRelationIdInputSchema = z.object({ taskId: z.uuid() });
-
-const SetParentInputSchema = TaskRelationIdInputSchema.extend({
-  parentId: z.uuid().nullable(),
-});
-
-const SetDependenciesInputSchema = TaskRelationIdInputSchema.extend({
-  dependencies: DependenciesSchema,
-});
-
-const CreateTaskInputSchema = z.object({
-  title: z.string().trim().min(1),
-  description: z.string().nullable().optional(),
-  descriptionText: z.string().optional(),
-  tiptapContent: TipTapContentSchema.optional(),
-  status: z.string().trim().min(1).nullable().optional(),
-  priority: z.number().int().nullable().optional(),
-  points: z.number().int().nonnegative().nullable().optional(),
-});
-
-const UpdateTaskInputSchema = TaskIdInputSchema.extend({
-  title: z.string().trim().min(1).optional(),
-  description: z.string().nullable().optional(),
-  descriptionText: z.string().optional(),
-  tiptapContent: TipTapContentSchema.optional(),
-  status: z.string().trim().min(1).nullable().optional(),
-  priority: z.number().int().nullable().optional(),
-  points: z.number().int().nonnegative().nullable().optional(),
-});
-
-const BulkTaskPatchSchema = z.object({
-  title: z.string().trim().min(1).optional(),
-  description: z.string().nullable().optional(),
-  descriptionText: z.string().optional(),
-  tiptapContent: TipTapContentSchema.optional(),
-  status: z.string().trim().min(1).nullable().optional(),
-  priority: z.number().int().nullable().optional(),
-  points: z.number().int().nonnegative().nullable().optional(),
-  assignee: z.string().trim().min(1).nullable().optional(),
-  label: z.string().trim().min(1).nullable().optional(),
-  sprintId: z.uuid().nullable().optional(),
-  projectId: z.uuid().nullable().optional(),
-}).refine((patch) => Object.keys(patch).length > 0, {
-  message: "Bulk update patch must include at least one field.",
-});
-
-const BulkUpdateTasksInputSchema = TaskIdsInputSchema.extend({
-  patch: BulkTaskPatchSchema,
-});
-
-const BulkUpdateOutputSchema = z.object({ updated: z.number().int().nonnegative() });
-const BulkDeleteOutputSchema = z.object({ deleted: z.number().int().nonnegative() });
+export function __setTaskApplicationForTest(overrides: Partial<typeof taskApplication>): () => void {
+  const previous = { ...taskApplication };
+  Object.assign(taskApplication, overrides);
+  return () => Object.assign(taskApplication, previous);
+}
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-function resolveService(ctx: {
-  container: import("@needle-di/core").Container | null;
-  em: import("@mikro-orm/postgresql").EntityManager | null;
-}): TaskService {
-  if (ctx.em) return new TaskService(ctx.em);
-  if (ctx.container?.has(TaskRepository)) {
-    const repo = ctx.container.get(TaskRepository);
-    return new TaskService(repo.getEntityManager() as import("@mikro-orm/postgresql").EntityManager);
-  }
-  throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "TaskService could not be resolved." });
+function requireEntityManager(ctx: { em: EntityManager | null }): EntityManager {
+  if (ctx.em) return ctx.em;
+  throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "EntityManager could not be resolved." });
 }
 
-function hasEm(ctx: {
-  container: import("@needle-di/core").Container | null;
-  em: import("@mikro-orm/postgresql").EntityManager | null;
-}): boolean {
-  return Boolean(ctx.em || ctx.container?.has(TaskRepository));
+function appContext(ctx: { orgId: string; userId: string }): AppContext {
+  return { orgId: ctx.orgId, userId: ctx.userId, projectId: null };
+}
+
+async function mapAppError<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AppError) throw appErrorToTrpcError(error);
+    throw error;
+  }
 }
 
 // ── Router (thin delegation layer) ─────────────────────────────────
@@ -125,74 +76,75 @@ function hasEm(ctx: {
 export const tasksRouter = t.router({
   list: permissionedProcedure({ resource: "tasks", action: "list" })
     .input(ListTasksInputSchema)
-    .output(z.array(TaskOutputSchema))
+    .output(z.array(TaskDtoSchema))
     .query(async ({ ctx, input }) => {
-      if (!hasEm(ctx)) return [];
-      return resolveService(ctx).list(ctx.orgId, input?.includeDeleted ?? false);
+      return mapAppError(() => taskApplication.listTasks(requireEntityManager(ctx), appContext(ctx), input ?? {}));
     }),
 
   get: permissionedProcedure({ resource: "tasks", action: "get" })
     .input(TaskIdInputSchema)
-    .output(TaskOutputSchema.nullable())
+    .output(TaskDtoSchema)
     .query(async ({ ctx, input }) => {
-      if (!hasEm(ctx)) return null;
-      return resolveService(ctx).get(ctx.orgId, input.id);
+      return mapAppError(() => taskApplication.getTask(requireEntityManager(ctx), appContext(ctx), input.id));
     }),
 
   create: permissionedProcedure({ resource: "tasks", action: "create" })
     .input(CreateTaskInputSchema)
-    .output(TaskOutputSchema)
+    .output(TaskDtoSchema)
     .mutation(async ({ ctx, input }) => {
-      return resolveService(ctx).create(ctx.orgId, input);
+      return mapAppError(() => taskApplication.createTask(requireEntityManager(ctx), appContext(ctx), input));
     }),
 
   update: permissionedProcedure({ resource: "tasks", action: "update" })
     .input(UpdateTaskInputSchema)
-    .output(TaskOutputSchema.nullable())
+    .output(TaskDtoSchema)
     .mutation(async ({ ctx, input }) => {
-      return resolveService(ctx).update(ctx.orgId, input);
+      const { id, ...patch } = input;
+      return mapAppError(() => taskApplication.updateTask(requireEntityManager(ctx), appContext(ctx), id, patch));
     }),
 
   delete: permissionedProcedure({ resource: "tasks", action: "delete" })
     .input(TaskIdInputSchema)
-    .output(TaskOutputSchema.nullable())
+    .output(TaskDtoSchema)
     .mutation(async ({ ctx, input }) => {
-      return resolveService(ctx).delete(ctx.orgId, input.id);
+      return mapAppError(() => taskApplication.deleteTask(requireEntityManager(ctx), appContext(ctx), input.id));
     }),
 
   bulkUpdate: permissionedProcedure({ resource: "tasks", action: "bulkUpdate" })
     .input(BulkUpdateTasksInputSchema)
     .output(BulkUpdateOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      return resolveService(ctx).bulkUpdate(ctx, input.ids, input.patch);
+      return mapAppError(() => taskApplication.bulkUpdate(requireEntityManager(ctx), appContext(ctx), input.ids, input.patch));
     }),
 
   bulkDelete: permissionedProcedure({ resource: "tasks", action: "bulkDelete" })
     .input(TaskIdsInputSchema)
     .output(BulkDeleteOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      return resolveService(ctx).bulkDelete(ctx, input.ids);
+      return mapAppError(() => taskApplication.bulkDelete(requireEntityManager(ctx), appContext(ctx), input.ids));
     }),
 
   setParent: permissionedProcedure({ resource: "tasks", action: "setParent" })
     .input(SetParentInputSchema)
-    .output(TaskOutputSchema.nullable())
+    .output(TaskDtoSchema)
     .mutation(async ({ ctx, input }) => {
-      return resolveService(ctx).setParent(ctx, input.taskId, input.parentId);
+      return mapAppError(() => taskApplication.setParent(requireEntityManager(ctx), appContext(ctx), input.taskId, input.parentId));
     }),
 
   listChildren: permissionedProcedure({ resource: "tasks", action: "listChildren" })
     .input(TaskRelationIdInputSchema)
-    .output(z.array(TaskOutputSchema))
+    .output(z.array(TaskDtoSchema))
     .query(async ({ ctx, input }) => {
-      return resolveService(ctx).listChildren(ctx.orgId, input.taskId);
+      return mapAppError(() => taskApplication.listChildren(requireEntityManager(ctx), appContext(ctx), input.taskId));
     }),
 
   setDependencies: permissionedProcedure({ resource: "tasks", action: "setDependencies" })
     .input(SetDependenciesInputSchema)
-    .output(TaskOutputSchema.nullable())
+    .output(TaskDtoSchema)
     .mutation(async ({ ctx, input }) => {
-      return resolveService(ctx).setDependencies(ctx, input.taskId, input.dependencies);
+      return mapAppError(() =>
+        taskApplication.setDependencies(requireEntityManager(ctx), appContext(ctx), input.taskId, input.dependencies)
+      );
     }),
 });
 

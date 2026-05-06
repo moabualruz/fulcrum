@@ -21,6 +21,8 @@
 import { Container, InjectionToken } from "@needle-di/core";
 import type { MikroORM, EntityManager } from "@mikro-orm/postgresql";
 import { FlagRegistry } from "../flags/registry.ts";
+import * as taskCommands from "../application/tasks/commands.ts";
+import * as taskQueries from "../application/tasks/queries.ts";
 
 // P1#19 — MigratorService + SchemaMigration ledger
 import { SchemaMigration } from "./entities/SchemaMigration.ts";
@@ -140,6 +142,14 @@ export const ENTITY_MANAGER_TOKEN = new InjectionToken<EntityManager>(
   "EntityManager",
 );
 
+export const APPLICATION_TASK_COMMANDS_TOKEN = new InjectionToken<typeof taskCommands>(
+  "ApplicationTaskCommands",
+);
+
+export const APPLICATION_TASK_QUERIES_TOKEN = new InjectionToken<typeof taskQueries>(
+  "ApplicationTaskQueries",
+);
+
 export interface DbBindingOptions {
   flagRegistry?: FlagRegistry;
 }
@@ -170,6 +180,14 @@ export function registerDbBindings(
   container.bind({
     provide: ENTITY_MANAGER_TOKEN,
     useValue: em,
+  });
+  container.bind({
+    provide: APPLICATION_TASK_COMMANDS_TOKEN,
+    useValue: taskCommands,
+  });
+  container.bind({
+    provide: APPLICATION_TASK_QUERIES_TOKEN,
+    useValue: taskQueries,
   });
 
   // Auth repositories — bind custom subclass as injectable token.

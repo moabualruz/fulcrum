@@ -1,10 +1,8 @@
-import { describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 import { OpenAPIHono } from "@hono/zod-openapi";
 
 import type { ApiEnv } from "../auth.ts";
 import type { AppContext, TaskDto } from "../../application/tasks/types.ts";
-import type * as taskCommandsModule from "../../application/tasks/commands.ts";
-import type * as taskQueriesModule from "../../application/tasks/queries.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
 const USER_ID = "00000000-0000-0000-0000-000000000010";
@@ -32,22 +30,23 @@ const taskDto: TaskDto = {
 
 const createTask = mock(async () => taskDto);
 const listTasks = mock(async () => [taskDto]);
+let restoreApplication: (() => void) | null = null;
 
-mock.module("../../application/tasks/commands.ts", () => ({
-  createTask,
-} satisfies Partial<typeof taskCommandsModule>));
-
-mock.module("../../application/tasks/queries.ts", () => ({
-  listTasks,
-} satisfies Partial<typeof taskQueriesModule>));
+afterEach(() => {
+  restoreApplication?.();
+  restoreApplication = null;
+  createTask.mockClear();
+  listTasks.mockClear();
+});
 
 async function app() {
-  const { registerKernelTaskRoutes } = await import("./kernel-tasks.ts");
+  const { __setKernelTaskApplicationForTest, registerKernelTaskRoutes } = await import("./kernel-tasks.ts");
+  restoreApplication = __setKernelTaskApplicationForTest({ createTask, listTasks });
   const api = new OpenAPIHono<ApiEnv>();
   api.use("*", async (c, next) => {
     c.set("orgId", ORG_ID);
     c.set("userId", USER_ID);
-    c.set("db", { marker: "legacy-db" } as never);
+    c.set("db", { transactional: async () => undefined } as never);
     return next();
   });
   registerKernelTaskRoutes(api);
@@ -65,7 +64,7 @@ describe("kernel task REST adapter", () => {
 
     expect(response.status).toBe(201);
     expect(createTask).toHaveBeenCalledTimes(1);
-    const [, appCtx, input] = createTask.mock.calls[0] as [unknown, AppContext, Record<string, unknown>];
+    const [, appCtx, input] = createTask.mock.calls[0] as unknown as [unknown, AppContext, Record<string, unknown>];
     expect(appCtx).toMatchObject({ orgId: ORG_ID, userId: USER_ID });
     expect(input).toMatchObject({ title: "REST adapter task", status: "todo" });
   });
@@ -78,7 +77,7 @@ describe("kernel task REST adapter", () => {
     expect(response.status).toBe(200);
     expect(body).toEqual([expect.objectContaining({ id: TASK_ID, title: "REST adapter task" })]);
     expect(listTasks).toHaveBeenCalledTimes(1);
-    const [, appCtx] = listTasks.mock.calls[0] as [unknown, AppContext];
+    const [, appCtx] = listTasks.mock.calls[0] as unknown as [unknown, AppContext];
     expect(appCtx).toMatchObject({ orgId: ORG_ID, userId: USER_ID });
   });
 });

@@ -1,10 +1,8 @@
-import { describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import { createContext } from "../../../trpc/context.ts";
 import { t } from "../../../trpc/trpc.ts";
 import type { AppContext, TaskDto } from "../../../application/tasks/types.ts";
-import type * as taskCommandsModule from "../../../application/tasks/commands.ts";
-import type * as taskQueriesModule from "../../../application/tasks/queries.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
 const USER_ID = "00000000-0000-0000-0000-000000000010";
@@ -32,26 +30,18 @@ const taskDto: TaskDto = {
 
 const createTask = mock(async () => taskDto);
 const listTasks = mock(async () => [taskDto]);
+let restoreApplication: (() => void) | null = null;
 
-mock.module("../../../application/tasks/commands.ts", () => ({
-  createTask,
-  updateTask: mock(async () => taskDto),
-  deleteTask: mock(async () => taskDto),
-  bulkUpdate: mock(async () => ({ updated: 1 })),
-  bulkDelete: mock(async () => ({ deleted: 1 })),
-  setParent: mock(async () => taskDto),
-  setDependencies: mock(async () => taskDto),
-  normalizedUnique: (ids: string[]) => [...new Set(ids)].sort(),
-} satisfies Partial<typeof taskCommandsModule>));
-
-mock.module("../../../application/tasks/queries.ts", () => ({
-  listTasks,
-  getTask: mock(async () => taskDto),
-  listChildren: mock(async () => [taskDto]),
-} satisfies Partial<typeof taskQueriesModule>));
+afterEach(() => {
+  restoreApplication?.();
+  restoreApplication = null;
+  createTask.mockClear();
+  listTasks.mockClear();
+});
 
 async function caller() {
-  const { tasksRouter } = await import("./tasks.ts");
+  const { __setTaskApplicationForTest, tasksRouter } = await import("./tasks.ts");
+  restoreApplication = __setTaskApplicationForTest({ createTask, listTasks });
   const createCaller = t.createCallerFactory(tasksRouter);
   const em = { marker: "adapter-em" } as never;
   return createCaller(createContext({
@@ -80,7 +70,7 @@ describe("tasks tRPC adapter", () => {
     await trpc.create({ title: "Adapter task", status: "todo" });
 
     expect(createTask).toHaveBeenCalledTimes(1);
-    const [, appCtx, input] = createTask.mock.calls[0] as [unknown, AppContext, Record<string, unknown>];
+    const [, appCtx, input] = createTask.mock.calls[0] as unknown as [unknown, AppContext, Record<string, unknown>];
     expect(appCtx).toMatchObject({ orgId: ORG_ID, userId: USER_ID });
     expect(input).toMatchObject({ title: "Adapter task", status: "todo" });
   });
@@ -91,7 +81,7 @@ describe("tasks tRPC adapter", () => {
 
     expect(rows).toHaveLength(1);
     expect(listTasks).toHaveBeenCalledTimes(1);
-    const [, appCtx] = listTasks.mock.calls[0] as [unknown, AppContext];
+    const [, appCtx] = listTasks.mock.calls[0] as unknown as [unknown, AppContext];
     expect(appCtx).toMatchObject({ orgId: ORG_ID, userId: USER_ID });
   });
 });
