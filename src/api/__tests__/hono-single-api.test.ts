@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 
 import { createPublicApiRouter } from "../hono.ts";
@@ -26,7 +26,17 @@ describe("single Hono API surface", () => {
 
   test("unified API does not mount the deprecated product-kernel router", () => {
     const source = readFileSync("src/api/hono.ts", "utf8");
+    expect(existsSync("src/product-kernel/api/router.ts")).toBe(false);
     expect(source).not.toContain("product-kernel/api/router");
     expect(source).not.toContain("createUnifiedApi");
+  });
+
+  test("kernel API routes are registered through application-backed Hono modules", () => {
+    const source = readFileSync("src/api/hono.ts", "utf8");
+    expect(source).toContain("registerKernelTaskRoutes");
+    expect(source).toContain("registerKernelSprintRoutes");
+    expect(source).toContain("registerKernelNotificationRoutes");
+    expect(source).toContain("registerKernelAuditRoutes");
+    expect(source).toContain("deps.application");
   });
 });

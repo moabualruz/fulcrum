@@ -49,7 +49,7 @@ export interface PublicApiDeps {
 /**
  * createPublicApi — builds the inner /api/v1 Hono app with OpenAPI 3.1 support.
  *
- * When `deps` provided: mounts authenticated routes backed by ProductDb/services.
+ * When `deps` provided: mounts authenticated routes backed by application delegates.
  * When omitted: mounts route metadata for tests/static spec generation.
  */
 export function createPublicApi(deps?: PublicApiDeps): OpenAPIHono {
