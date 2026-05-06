@@ -8,8 +8,8 @@
  * — stable across same query.
  */
 
-import type { ProductDb } from "../product-kernel/db/types.ts";
-import { newUlid } from "../product-kernel/ids.ts";
+import type { SqlExecutor } from "../db/sql.ts";
+import { newUlid } from "../shared/ids.ts";
 
 export interface RecordClickInput {
   orgId: string;
@@ -45,7 +45,7 @@ export async function computeQueryHash(
  * Caller is responsible for checking feature flag before calling.
  */
 export async function recordSearchClick(
-  db: ProductDb,
+  db: SqlExecutor,
   input: RecordClickInput,
 ): Promise<void> {
   const id = newUlid();

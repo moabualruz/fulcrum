@@ -4,7 +4,7 @@
 
 import { isCollabEnabled } from "./feature-flag.ts";
 
-/** Minimal DB interface for collab persistence — satisfied by ProductDb. */
+/** Minimal SQL interface for collab persistence. */
 export interface CollabDb {
   query<T>(sql: string, params?: unknown[]): Promise<T[]>;
 }

@@ -1,6 +1,6 @@
-import type { ProductDb } from "../../product-kernel/db/types.ts";
+import type { SqlExecutor } from "../../db/sql.ts";
 
-export async function tableColumns(db: ProductDb, tableName: string): Promise<Set<string>> {
+export async function tableColumns(db: SqlExecutor, tableName: string): Promise<Set<string>> {
   const rows = await db.query<{ column_name: string }>(
     `SELECT column_name
        FROM information_schema.columns

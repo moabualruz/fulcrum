@@ -6,8 +6,8 @@
  * (org_id, external_id), sync-log bookkeeping, and flag guards.
  */
 
-import type { ProductDb } from "../product-kernel/db/types.ts";
-import { newUlid } from "../product-kernel/ids.ts";
+import type { SqlExecutor } from "../db/sql.ts";
+import { newUlid } from "../shared/ids.ts";
 
 // ---------------------------------------------------------------------------
 // UpsertTaskInput — the shape each connector's fetch() returns per item
@@ -73,7 +73,7 @@ export interface SyncLogRow {
 }
 
 async function writeSyncLog(
-  db: ProductDb,
+  db: SqlExecutor,
   orgId: string,
   connector: string,
   status: "running" | "succeeded" | "failed",
@@ -99,7 +99,7 @@ async function writeSyncLog(
 // ---------------------------------------------------------------------------
 
 async function ensureLabel(
-  db: ProductDb,
+  db: SqlExecutor,
   orgId: string,
   projectId: string | null,
   name: string,
@@ -118,7 +118,7 @@ async function ensureLabel(
 }
 
 async function setTaskLabels(
-  db: ProductDb,
+  db: SqlExecutor,
   taskId: string,
   labelIds: string[],
 ): Promise<void> {
@@ -136,7 +136,7 @@ async function setTaskLabels(
 // ---------------------------------------------------------------------------
 
 async function ensureSprint(
-  db: ProductDb,
+  db: SqlExecutor,
   orgId: string,
   projectId: string | null,
   input: {
@@ -210,7 +210,7 @@ export interface SyncResult {
 }
 
 export async function runConnectorJob(
-  db: ProductDb,
+  db: SqlExecutor,
   connector: ConnectorBase,
   orgId: string,
   projectId?: string | null,
@@ -350,7 +350,7 @@ export interface ConnectorHealthRow {
 }
 
 export async function doctorConnectorCheck(
-  db: ProductDb,
+  db: SqlExecutor,
   orgId: string,
 ): Promise<ConnectorHealthRow[]> {
   return db.query<ConnectorHealthRow>(

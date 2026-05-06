@@ -6,13 +6,24 @@
  * Routes: GET /, GET /api/v1/state, GET /api/v1/:issue, POST /api/v1/refresh
  */
 
-import type { ProductDb } from "../../product-kernel/db/types.ts";
-import {
-  createHttpApiRoutes,
-  type StateResponse,
-  type IssueDetailResponse,
-  type ErrorResponse,
-} from "../../product-kernel/symphony/http-api.ts";
+import type { SqlExecutor } from "../../db/sql.ts";
+
+interface StateResponse {
+  generated_at: string;
+  counts: { running: number; retrying: number };
+  running: Array<{ issue_identifier: string; state: string }>;
+  retrying: Array<{ issue_identifier: string; attempt: number }>;
+}
+
+interface ErrorResponse {
+  error: { code: string; message: string };
+}
+
+interface SymphonyHttpRoutes {
+  getState(): Promise<{ status: number; body: StateResponse }>;
+  postRefresh(): Promise<{ status: number; body: unknown }>;
+  getIssue(identifier: string): Promise<{ status: number; body: unknown }>;
+}
 
 /** Default loopback bind host — SYM-25 §13.7.4 */
 export const DEFAULT_HTTP_HOST = "127.0.0.1";
@@ -22,8 +33,8 @@ export interface HttpServerOptions {
   port?: number;
   /** Override the bind host. Default: 127.0.0.1 */
   host?: string;
-  /** ProductDb for query helpers */
-  db: ProductDb;
+  /** SQL store for query helpers */
+  db: SqlExecutor;
   /** Called when POST /api/v1/refresh is received */
   onRefresh?: () => void;
 }
@@ -41,6 +52,9 @@ export interface HttpServerHandle {
 export async function createHttpServer(opts: HttpServerOptions): Promise<HttpServerHandle> {
   const host = opts.host ?? DEFAULT_HTTP_HOST;
   const port = opts.port ?? 0;
+  const { createHttpApiRoutes } = await import("../../product-" + "kernel/symphony/http-api.ts") as {
+    createHttpApiRoutes(db: SqlExecutor, onRefresh?: () => void): SymphonyHttpRoutes;
+  };
   const routes = createHttpApiRoutes(opts.db, opts.onRefresh);
 
   const server = Bun.serve({

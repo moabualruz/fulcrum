@@ -39,17 +39,6 @@ const NON_WEB_INVENTORY_ROOTS = [
   "src/infrastructure/doctor",
 ];
 
-const EXPECTED_NON_WEB_LEGACY_REPRESENTATIVES = [
-  "src/config/database.ts",
-  "src/search/query-service.ts",
-  "src/services/tasks.ts",
-  "src/connectors/framework.ts",
-  "src/docs/doc-embedder.ts",
-  "src/collab/server.ts",
-  "src/doctor/checks/api.ts",
-  "src/orchestration/symphony/http-server.ts",
-] as const;
-
 const LEGACY_DB_TERMS = [
   `open${"Pglite"}`,
   `open${"Product"}${"Db"}`,
@@ -133,9 +122,6 @@ describe("Phase 9.5 interface boundary", () => {
 
   test("non-web code does not import product-kernel or expose legacy database names", async () => {
     const found = await violations(NON_WEB_INVENTORY_ROOTS, FORBIDDEN_INTERFACE_ACCESS);
-    for (const representative of EXPECTED_NON_WEB_LEGACY_REPRESENTATIVES) {
-      expect(found).toContain(representative);
-    }
     expect(found).toEqual([]);
   });
 

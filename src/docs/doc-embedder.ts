@@ -10,7 +10,7 @@
  * When feature flag OFF: no sidecar call, embedding stays NULL.
  */
 
-import type { ProductDb } from "../product-kernel/db/types.ts";
+import type { SqlExecutor } from "../db/sql.ts";
 import type { InferenceClient } from "../inference/client.ts";
 
 /** Check if "embeddings" feature is enabled via FULCRUM_FEATURES env var. */
@@ -39,7 +39,7 @@ export interface EmbedDocumentInput {
  * On failure: logs warning, does not throw, does not modify embedding.
  */
 export async function embedDocument(
-  db: ProductDb,
+  db: SqlExecutor,
   client: InferenceClient,
   input: EmbedDocumentInput,
 ): Promise<void> {
@@ -60,7 +60,7 @@ export async function embedDocument(
  * Returns immediately.
  */
 export function triggerEmbedding(
-  db: ProductDb,
+  db: SqlExecutor,
   client: InferenceClient | null,
   input: EmbedDocumentInput,
   logger: { warn: (msg: string, err?: unknown) => void } = console,

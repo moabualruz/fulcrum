@@ -1,10 +1,10 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { ProductDb } from "../product-kernel/db/types.ts";
+import type { SqlExecutor } from "./sql.ts";
 
 const MIGRATIONS_DIR = new URL("../product-kernel/db/migrations/", import.meta.url).pathname;
 
-export async function applyProductMigrations(db: ProductDb): Promise<readonly string[]> {
+export async function applyProductMigrations(db: SqlExecutor): Promise<readonly string[]> {
   await db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       name text PRIMARY KEY,

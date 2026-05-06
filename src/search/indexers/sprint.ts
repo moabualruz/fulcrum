@@ -1,6 +1,6 @@
 import { injectable as Injectable } from "@needle-di/core";
 
-import type { ProductDb } from "../../product-kernel/db/types.ts";
+import type { SqlExecutor } from "../../db/sql.ts";
 import { SearchIndexHook, type SearchDocumentInput } from "./base.ts";
 import { tableColumns } from "./entity-helpers.ts";
 
@@ -17,7 +17,7 @@ interface SprintRow {
 export class SprintIndexer extends SearchIndexHook {
   override readonly kind = "sprint";
 
-  constructor(db: ProductDb) {
+  constructor(db: SqlExecutor) {
     super(db);
   }
 

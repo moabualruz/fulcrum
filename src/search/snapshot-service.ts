@@ -7,11 +7,11 @@
  */
 
 import { injectable as Injectable } from "@needle-di/core";
-import type { ProductDb } from "../product-kernel/db/types.ts";
+import type { SqlExecutor } from "../db/sql.ts";
 
 @Injectable()
 export class SnapshotService {
-  constructor(private readonly db: ProductDb) {}
+  constructor(private readonly db: SqlExecutor) {}
 
   /** Build and serialize an Orama index from all search_documents for the org. */
   async buildSnapshot(orgId: string): Promise<string> {

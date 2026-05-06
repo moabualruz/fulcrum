@@ -1,4 +1,4 @@
-import type { ProductDb, SqlValue } from "../product-kernel/db/types.ts";
+import type { SqlExecutor, SqlValue } from "../db/sql.ts";
 import { createSearchBackend } from "./backend.ts";
 import {
   type EmbedText,
@@ -260,7 +260,7 @@ function hybridResultsSql(where: Where, originalWhere: Where, nowParamIndex: num
 }
 
 async function facetCount(
-  db: ProductDb,
+  db: SqlExecutor,
   where: Where,
   selector: string,
 ): Promise<Record<string, number>> {
@@ -334,7 +334,7 @@ function normalizeHybridRow(
 }
 
 async function queryHybridSearchDocuments(
-  db: ProductDb,
+  db: SqlExecutor,
   input: SearchQueryInput,
   where: Where,
 ): Promise<SearchQueryOutput> {
@@ -398,7 +398,7 @@ async function queryHybridSearchDocuments(
 }
 
 export async function queryPgliteSearchDocuments(
-  db: ProductDb,
+  db: SqlExecutor,
   input: SearchQueryInput,
 ): Promise<SearchQueryOutput> {
   const where = buildWhere(input);
@@ -445,7 +445,7 @@ export async function queryPgliteSearchDocuments(
 }
 
 export async function querySearchDocuments(
-  db: ProductDb,
+  db: SqlExecutor,
   input: SearchQueryInput,
 ): Promise<SearchQueryOutput> {
   return createSearchBackend(db).query(input);

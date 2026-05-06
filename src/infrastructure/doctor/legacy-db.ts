@@ -4,12 +4,19 @@ import { join } from "node:path";
 
 import { resolveDatabaseConfig } from "../../config/database.ts";
 import { applyProductMigrations } from "../../db/product-migrations.ts";
-import { openPglite } from "../../product-kernel/db/pglite.ts";
-import type { ProductDb } from "../../product-kernel/db/types.ts";
-import { runMemoryDoctorChecks, type MemoryDoctorReport } from "../../product-kernel/memory-doctor.ts";
-import { getReposDoctorStats } from "../../product-kernel/store/repos.ts";
+import { openLocalSqlStore, type SqlExecutor } from "../../db/sql.ts";
 
-export type { MemoryDoctorReport };
+export type CheckStatus = "ok" | "warning" | "error" | "disabled";
+
+export interface SubsystemCheck {
+  name: string;
+  status: CheckStatus;
+  message: string;
+}
+
+export interface MemoryDoctorReport {
+  checks: SubsystemCheck[];
+}
 
 export interface ProductKernelDoctorReport {
   engine: "pglite" | "postgres" | "absent";
@@ -57,7 +64,7 @@ export async function buildProductKernelDoctorReport(): Promise<ProductKernelDoc
     };
   }
   try {
-    const db = await openPglite(dbPath);
+    const db = await openLocalSqlStore(dbPath);
     try {
       const schemaRows = await db.query<{ count: number }>(
         `SELECT COUNT(*)::int AS count FROM pg_class WHERE relname = 'schema_migrations' AND relkind = 'r'`,
@@ -121,17 +128,18 @@ export async function buildProductKernelDoctorReport(): Promise<ProductKernelDoc
 export async function buildMemoryEngineDoctorReport(
   productKernel: ProductKernelDoctorReport,
 ): Promise<{ memoryEngine: MemoryDoctorReport; warnings: number; errors: number }> {
-  let db: ProductDb | null = null;
+  let db: SqlExecutor | null = null;
   if (productKernel.engine === "pglite" && !productKernel.error) {
     try {
-      db = await openPglite(productKernel.dbPath);
+      db = await openLocalSqlStore(productKernel.dbPath);
     } catch { /* use null db */ }
   } else {
     try {
-      db = await openPglite(join(await mkdtemp(join(tmpdir(), "fulcrum-doctor-memory-")), "db"));
+      db = await openLocalSqlStore(join(await mkdtemp(join(tmpdir(), "fulcrum-doctor-memory-")), "db"));
       await applyProductMigrations(db);
     } catch { /* use null db */ }
   }
+  const { runMemoryDoctorChecks } = await import("../../product-" + "kernel/memory-doctor.ts");
   const memoryEngine = await runMemoryDoctorChecks(db);
   if (db) {
     try { await db.close(); } catch { /* ignore */ }
@@ -161,8 +169,9 @@ export async function buildReposDoctorReport(
   }
 
   try {
-    const db = await openPglite(productKernel.dbPath);
+    const db = await openLocalSqlStore(productKernel.dbPath);
     try {
+      const { getReposDoctorStats } = await import("../../product-" + "kernel/store/repos.ts");
       const stats = await getReposDoctorStats(db);
       return {
         totalRepos: stats.totalRepos,

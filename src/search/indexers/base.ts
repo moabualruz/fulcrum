@@ -1,8 +1,7 @@
 import { injectable as Injectable } from "@needle-di/core";
 
-import { enqueueJob } from "../../product-kernel/jobs.ts";
-import { newUlid } from "../../product-kernel/ids.ts";
-import type { ProductDb } from "../../product-kernel/db/types.ts";
+import { newUlid } from "../../shared/ids.ts";
+import type { SqlExecutor, SqlValue } from "../../db/sql.ts";
 import {
   type EmbedText,
   embeddingText,
@@ -51,12 +50,41 @@ function toPostgresTextArray(values: readonly string[]): string {
   return `{${values.map((value) => `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(",")}}`;
 }
 
+async function enqueueSearchJob(
+  db: SqlExecutor,
+  input: {
+    orgId: string;
+    projectId?: string | null;
+    queue: string;
+    kind: string;
+    payload?: Record<string, unknown>;
+    maxAttempts?: number;
+    availableAt?: Date;
+  },
+): Promise<void> {
+  await db.query(
+    `INSERT INTO jobs
+       (id, org_id, project_id, queue, kind, payload, status, max_attempts, available_at)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, 'queued', $7, $8)`,
+    [
+      newUlid(),
+      input.orgId,
+      input.projectId ?? null,
+      input.queue,
+      input.kind,
+      JSON.stringify(input.payload ?? {}),
+      input.maxAttempts ?? 3,
+      (input.availableAt ?? new Date()).toISOString(),
+    ] satisfies SqlValue[],
+  );
+}
+
 @Injectable()
 export class SearchIndexHook implements IndexerHook {
   readonly kind: SearchIndexKind | string = "unknown";
 
   constructor(
-    protected readonly db: ProductDb,
+    protected readonly db: SqlExecutor,
     private readonly options: SearchIndexHookOptions = {},
   ) {}
 
@@ -172,7 +200,7 @@ export class IndexerRegistry {
   }
 
   async bulkReindex(
-    db: ProductDb,
+    db: SqlExecutor,
     orgId: string,
     kind: SearchIndexKind | string,
   ): Promise<{ queued: number }> {
@@ -183,7 +211,7 @@ export class IndexerRegistry {
 
     const entityIds = await indexer.listEntityIds(orgId);
     for (const entityId of entityIds) {
-      await enqueueJob(db, {
+      await enqueueSearchJob(db, {
         orgId,
         queue: "search",
         kind: "search.upsert",

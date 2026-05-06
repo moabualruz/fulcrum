@@ -1,6 +1,6 @@
 import { injectable as Injectable } from "@needle-di/core";
 
-import type { ProductDb } from "../../product-kernel/db/types.ts";
+import type { SqlExecutor } from "../../db/sql.ts";
 import { SearchIndexHook, type SearchDocumentInput } from "./base.ts";
 import { tableColumns, tagsFromUnknown, textFromUnknown } from "./entity-helpers.ts";
 
@@ -39,7 +39,7 @@ export function stripDocumentMarkdown(markdown: string): string {
 export class DocumentIndexer extends SearchIndexHook {
   override readonly kind = "doc";
 
-  constructor(db: ProductDb) {
+  constructor(db: SqlExecutor) {
     super(db);
   }
 

@@ -1,4 +1,4 @@
-import type { ProductDb, SqlValue } from "../product-kernel/db/types.ts";
+import type { SqlExecutor, SqlValue } from "../db/sql.ts";
 import type { SearchIndexKind } from "./indexers/base.ts";
 
 export interface SearchSuggestInput {
@@ -16,7 +16,7 @@ function escapeLike(value: string): string {
 }
 
 export async function suggestSearchDocuments(
-  db: ProductDb,
+  db: SqlExecutor,
   input: SearchSuggestInput,
 ): Promise<SearchSuggestOutput> {
   const prefix = input.prefix.trim();

@@ -3,7 +3,7 @@
 // webhook-dispatcher, pending-delivery-backlog, connector-reachability,
 // connector-run-health.
 
-import type { ProductDb } from "../../product-kernel/db/types.ts";
+import type { SqlExecutor } from "../../db/sql.ts";
 
 // ---------------------------------------------------------------------------
 // Zod-compatible shape (no Zod dep — plain TS interface + runtime validator)
@@ -40,7 +40,7 @@ export interface ApiDoctorConfig {
   /** Optional: function to validate Zod schemas compile */
   checkZodSchemas?: () => Promise<{ ok: boolean; error?: string }>;
   /** Optional: product DB for backlog queries */
-  db?: ProductDb;
+  db?: SqlExecutor;
   /** Optional: function to check REST surface */
   checkRestSurface?: () => Promise<{ ok: boolean; status?: number; error?: string }>;
   /** Optional: function to check webhook dispatcher job registration */

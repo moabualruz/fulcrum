@@ -1,4 +1,4 @@
-import type { ProductDb } from "../product-kernel/db/types.ts";
+import type { SqlExecutor } from "../db/sql.ts";
 import type { SearchDocumentInput } from "./indexers/base.ts";
 import {
   queryPgliteSearchDocuments,
@@ -23,7 +23,7 @@ export function isMeilisearchEnabled(): boolean {
 }
 
 export class PGliteBackend implements SearchBackend {
-  constructor(private readonly db: ProductDb) {}
+  constructor(private readonly db: SqlExecutor) {}
 
   query(input: SearchQueryInput): Promise<SearchQueryOutput> {
     return queryPgliteSearchDocuments(this.db, input);
@@ -32,7 +32,7 @@ export class PGliteBackend implements SearchBackend {
 
 export class MeilisearchBackend implements SearchBackend {
   constructor(
-    private readonly db: ProductDb,
+    private readonly db: SqlExecutor,
     private readonly options: { url?: string; key?: string } = {},
   ) {}
 
@@ -64,7 +64,7 @@ export class MeilisearchBackend implements SearchBackend {
   }
 }
 
-export function createSearchBackend(db: ProductDb): SearchBackend {
+export function createSearchBackend(db: SqlExecutor): SearchBackend {
   if (!isMeilisearchEnabled()) {
     return new PGliteBackend(db);
   }

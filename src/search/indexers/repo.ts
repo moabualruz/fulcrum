@@ -1,6 +1,6 @@
 import { injectable as Injectable } from "@needle-di/core";
 
-import type { ProductDb } from "../../product-kernel/db/types.ts";
+import type { SqlExecutor } from "../../db/sql.ts";
 import { SearchIndexHook, type SearchDocumentInput } from "./base.ts";
 import { tableColumns } from "./entity-helpers.ts";
 
@@ -20,7 +20,7 @@ interface RepoRow {
 export class RepoIndexer extends SearchIndexHook {
   override readonly kind = "repo";
 
-  constructor(db: ProductDb) {
+  constructor(db: SqlExecutor) {
     super(db);
   }
 

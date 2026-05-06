@@ -1,4 +1,4 @@
-import type { ProductDb } from "../product-kernel/db/types.ts";
+import type { SqlExecutor } from "../db/sql.ts";
 
 export const EMBEDDINGS_FEATURE = "embeddings";
 
@@ -46,7 +46,7 @@ export function cosineSimilarity(left: readonly number[], right: readonly number
   return Math.max(0, dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm)));
 }
 
-export async function ensureEmbeddingIndex(db: ProductDb): Promise<void> {
+export async function ensureEmbeddingIndex(db: SqlExecutor): Promise<void> {
   if (!isEmbeddingsEnabled() || db.engine !== "postgres") return;
   await db.exec(
     `CREATE INDEX IF NOT EXISTS sd_embedding_ivf

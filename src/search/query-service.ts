@@ -7,7 +7,7 @@
  */
 
 import { injectable as Injectable } from "@needle-di/core";
-import type { ProductDb } from "../product-kernel/db/types.ts";
+import type { SqlExecutor } from "../db/sql.ts";
 
 export interface SearchQueryInput {
   term: string;
@@ -63,7 +63,7 @@ interface FacetRow {
 
 @Injectable()
 export class SearchQueryService {
-  constructor(private readonly db: ProductDb) {}
+  constructor(private readonly db: SqlExecutor) {}
 
   async query(orgId: string, input: SearchQueryInput): Promise<SearchQueryOutput> {
     const { term, filters, facets = false, limit = 20, offset = 0 } = input;

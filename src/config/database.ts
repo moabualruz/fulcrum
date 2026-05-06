@@ -1,9 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { openPglite } from "../product-kernel/db/pglite.ts";
-import { openPostgres } from "../product-kernel/db/postgres.ts";
-import type { ProductDb } from "../product-kernel/db/types.ts";
+import { openLocalSqlStore, openPostgresSqlStore, type SqlExecutor } from "../db/sql.ts";
 
 export type DbBackend = "pglite" | "postgres";
 
@@ -78,8 +76,8 @@ export function resolveDatabaseConfig(input: DatabaseConfigInput = {}): Resolved
 
 export async function openDatabase(
   config: ResolvedDatabaseConfig = resolveDatabaseConfig(),
-): Promise<ProductDb> {
-  if (config.backend === "postgres") return openPostgres(config.url);
+): Promise<SqlExecutor> {
+  if (config.backend === "postgres") return openPostgresSqlStore(config.url);
   await mkdir(config.dataDir, { recursive: true });
-  return openPglite(config.dataDir);
+  return openLocalSqlStore(config.dataDir);
 }

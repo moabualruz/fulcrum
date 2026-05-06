@@ -9,7 +9,7 @@
  * Follows the same pattern as api.ts doctor checks.
  */
 
-import type { ProductDb } from "../../product-kernel/db/types.ts";
+import type { SqlExecutor } from "../../db/sql.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,7 +36,7 @@ export interface DoctorRoutingCheck {
 
 export interface RoutingDoctorConfig {
   /** Product DB handle for routing_rules table check. */
-  db?: ProductDb;
+  db?: SqlExecutor;
 
   /** Override: check whether routing_rules table exists. */
   checkRoutingRulesTable?: () => Promise<boolean>;
