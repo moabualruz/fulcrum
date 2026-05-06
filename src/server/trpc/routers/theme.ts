@@ -27,6 +27,32 @@ export type RawThemeSetting = {
   value: string;
 };
 
+const LegacyThemeSettingsSchema = z.object({
+  accentHue: z.number().min(0).max(360),
+  accentSaturation: z.number().min(0).max(100),
+  accentLightness: z.number().min(0).max(100),
+  radius: z.number().min(0).max(1.5),
+  fontFamily: z.enum(["inter", "system", "mono"]),
+  colorScheme: z.enum(["light", "dark", "auto"]),
+  compactMode: z.boolean(),
+  animationSpeed: z.enum(["normal", "reduced", "off"]),
+  preset: z.enum(["default", "ocean", "forest", "sunset", "monochrome"]),
+});
+
+type LegacyThemeSettings = z.infer<typeof LegacyThemeSettingsSchema>;
+
+const LEGACY_THEME_DEFAULTS: LegacyThemeSettings = {
+  accentHue: 262,
+  accentSaturation: 83,
+  accentLightness: 58,
+  radius: 0.5,
+  fontFamily: "inter",
+  colorScheme: "auto",
+  compactMode: false,
+  animationSpeed: "normal",
+  preset: "default",
+};
+
 export abstract class ThemeSettingsRepository {
   abstract listThemeSettings(orgId: string, userId: string): Promise<RawThemeSetting[]>;
   abstract upsertThemeSetting(orgId: string, userId: string, key: string, value: string): Promise<void>;
@@ -102,6 +128,30 @@ async function readThemeMap(ctx: AuthenticatedContext): Promise<Map<ThemeKey, st
   return values;
 }
 
+async function readRawThemeMap(ctx: AuthenticatedContext): Promise<Map<string, string>> {
+  const repo = repoFromContext(ctx);
+  const overrides = await repo.listThemeSettings(ctx.orgId, ctx.userId);
+  return new Map(overrides.map((item) => [item.key, item.value]));
+}
+
+function legacyKey(key: keyof LegacyThemeSettings): string {
+  return `theme.web.${key}`;
+}
+
+function legacyThemeSettings(overrides: Map<string, string>): LegacyThemeSettings {
+  return {
+    accentHue: Number(overrides.get(legacyKey("accentHue")) ?? LEGACY_THEME_DEFAULTS.accentHue),
+    accentSaturation: Number(overrides.get(legacyKey("accentSaturation")) ?? LEGACY_THEME_DEFAULTS.accentSaturation),
+    accentLightness: Number(overrides.get(legacyKey("accentLightness")) ?? LEGACY_THEME_DEFAULTS.accentLightness),
+    radius: Number(overrides.get(legacyKey("radius")) ?? LEGACY_THEME_DEFAULTS.radius),
+    fontFamily: (overrides.get(legacyKey("fontFamily")) ?? LEGACY_THEME_DEFAULTS.fontFamily) as LegacyThemeSettings["fontFamily"],
+    colorScheme: (overrides.get(legacyKey("colorScheme")) ?? LEGACY_THEME_DEFAULTS.colorScheme) as LegacyThemeSettings["colorScheme"],
+    compactMode: (overrides.get(legacyKey("compactMode")) ?? String(LEGACY_THEME_DEFAULTS.compactMode)) === "true",
+    animationSpeed: (overrides.get(legacyKey("animationSpeed")) ?? LEGACY_THEME_DEFAULTS.animationSpeed) as LegacyThemeSettings["animationSpeed"],
+    preset: (overrides.get(legacyKey("preset")) ?? LEGACY_THEME_DEFAULTS.preset) as LegacyThemeSettings["preset"],
+  };
+}
+
 function themeSetting(key: ThemeKey, overrides: Map<ThemeKey, string>): ThemeSetting {
   const defaultValue = THEME_DEFAULTS[key];
   return {
@@ -112,6 +162,21 @@ function themeSetting(key: ThemeKey, overrides: Map<ThemeKey, string>): ThemeSet
 }
 
 export const themeRouter = t.router({
+  get: permissionedProcedure({ resource: "theme", action: "getTheme" })
+    .output(LegacyThemeSettingsSchema)
+    .query(async ({ ctx }) => legacyThemeSettings(await readRawThemeMap(ctx))),
+
+  update: permissionedProcedure({ resource: "theme", action: "setTheme" })
+    .input(LegacyThemeSettingsSchema)
+    .output(LegacyThemeSettingsSchema)
+    .mutation(async ({ ctx, input }) => {
+      const repo = repoFromContext(ctx);
+      for (const [key, value] of Object.entries(input) as Array<[keyof LegacyThemeSettings, LegacyThemeSettings[keyof LegacyThemeSettings]]>) {
+        await repo.upsertThemeSetting(ctx.orgId, ctx.userId, legacyKey(key), String(value));
+      }
+      return input;
+    }),
+
   listThemes: permissionedProcedure({ resource: "theme", action: "listThemes" })
     .output(z.array(ThemeSettingSchema))
     .query(async ({ ctx }) => {

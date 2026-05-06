@@ -98,4 +98,32 @@ describe("theme tRPC router", () => {
 
     expect(error?.code).toBe("BAD_REQUEST");
   });
+
+  test("legacy web get/update procedures persist theme settings", async () => {
+    const c = caller();
+
+    await c.theme.update({
+      accentHue: 217,
+      accentSaturation: 91,
+      accentLightness: 60,
+      radius: 0.75,
+      fontFamily: "system",
+      colorScheme: "dark",
+      compactMode: true,
+      animationSpeed: "reduced",
+      preset: "ocean",
+    });
+
+    expect(await c.theme.get()).toMatchObject({
+      accentHue: 217,
+      accentSaturation: 91,
+      accentLightness: 60,
+      radius: 0.75,
+      fontFamily: "system",
+      colorScheme: "dark",
+      compactMode: true,
+      animationSpeed: "reduced",
+      preset: "ocean",
+    });
+  });
 });
