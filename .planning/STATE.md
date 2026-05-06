@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-last_updated: "2026-05-06T21:46:57.287Z"
+last_updated: "2026-05-06T22:10:16.995Z"
 progress:
   total_phases: 11
   completed_phases: 8
   total_plans: 124
-  completed_plans: 100
+  completed_plans: 101
   percent: 81
 ---
 
@@ -17,7 +17,7 @@ progress:
 ## Current Position
 
 Phase: 09.5 (architecture-data-layer-remediation-full-interface-fix) — EXECUTING
-Plan: 3 of 14
+Plan: 4 of 14
 
 - **Phase**: 09-cross-cutting-testing
 - **Plan**: 10 of 10 completed
@@ -94,3 +94,5 @@ Plan: 3 of 14
 - [Phase 09.5]: Doctor legacy database probes live in src/infrastructure/doctor/legacy-db.ts, not CLI interface files. — Keeps CLI interface free of ProductDb/PGlite imports while preserving doctor health checks.
 - [Phase 09.5]: TUI telemetry persists through src/application/telemetry/commands.ts. — Keeps TUI rendering code from direct EntityManager persist/flush calls.
 - [Phase 09.5]: Non-web compatibility debt is tracked with exact allowlists while global ProductDb removal remains broader phase work. — Prevents broad regex exceptions and makes residual boundary debt reviewable by file and rationale.
+- [Phase 09.5-architecture-data-layer-remediation-full-interface-fix]: 09.5-15 centralized low-level legacy store access behind neutral test-support helpers instead of direct product-kernel imports in tests. — Completes fixture boundary closure without weakening tests.
+- [Phase 09.5-architecture-data-layer-remediation-full-interface-fix]: 09.5-15 used application ORM/PGlite fixture seeding for Phase 9.5 Playwright tests while preserving real journeys. — Keeps E2E coverage real and avoids reintroducing skip helpers.
