@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -65,6 +65,16 @@ const DEFAULT_CONFIG: WorkflowConfig = {
 };
 
 const dbs: TestOrm[] = [];
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
+}
 
 afterEach(async () => {
   while (dbs.length > 0) {
@@ -1196,20 +1206,52 @@ maxAttempts: 5
 
       const db = await testDb();
       const beforeRemove = mock(async () => {});
+      const scratchRoot = join(tmpdir(), `fulcrum-sym-sweep-${randomUUID()}`);
+      const orgRoot = join(scratchRoot, ORG_ID);
+      const terminalSucceededPath = join(orgRoot, "succeeded");
+      const terminalFailedPath = join(orgRoot, "failed");
+      const terminalDryRunPath = join(orgRoot, "dry-run");
+      const runningPath = join(orgRoot, "running");
 
-      // Seed terminal runs with workspace paths
-      await seedRun(db, { orchestrationState: "succeeded", workspacePath: "/tmp/sym-sweep-1" });
-      await seedRun(db, { orchestrationState: "failed", workspacePath: "/tmp/sym-sweep-2" });
-      // Running run should NOT be swept
-      const running = await seedRun(db, { orchestrationState: "running", workspacePath: "/tmp/sym-sweep-running" });
+      await mkdir(terminalSucceededPath, { recursive: true });
+      await mkdir(terminalFailedPath, { recursive: true });
+      await mkdir(terminalDryRunPath, { recursive: true });
+      await mkdir(runningPath, { recursive: true });
 
-      const count = await sweepFn!(db.em, ORG_ID, { beforeRemove, dryRun: true });
+      const succeeded = await seedRun(db, { orchestrationState: "succeeded", workspacePath: terminalSucceededPath });
+      const failed = await seedRun(db, { orchestrationState: "failed", workspacePath: terminalFailedPath });
+      const dryRunTerminal = await seedRun(db, { orchestrationState: "cancelled", workspacePath: terminalDryRunPath });
+      const running = await seedRun(db, { orchestrationState: "running", workspacePath: runningPath });
 
-      expect(count).toBeGreaterThanOrEqual(2);
-      expect(beforeRemove).toHaveBeenCalled();
-      // Running workspace must not be swept
+      const dryRunCount = await sweepFn!(db.em, ORG_ID, { beforeRemove, dryRun: true, root: scratchRoot });
+      expect(dryRunCount).toBe(3);
+      expect(await pathExists(terminalSucceededPath)).toBe(true);
+      expect(await pathExists(terminalFailedPath)).toBe(true);
+      expect(await pathExists(terminalDryRunPath)).toBe(true);
+      expect(await pathExists(runningPath)).toBe(true);
+
+      const count = await sweepFn!(db.em, ORG_ID, { beforeRemove, root: scratchRoot });
+      expect(count).toBe(3);
+      expect(beforeRemove).toHaveBeenCalledTimes(6);
+      expect(beforeRemove.mock.calls.map(([run]) => run.id).sort()).toEqual([
+        dryRunTerminal.id,
+        dryRunTerminal.id,
+        failed.id,
+        failed.id,
+        succeeded.id,
+        succeeded.id,
+      ].sort());
+      expect(await pathExists(terminalSucceededPath)).toBe(false);
+      expect(await pathExists(terminalFailedPath)).toBe(false);
+      expect(await pathExists(terminalDryRunPath)).toBe(false);
+      expect(await pathExists(runningPath)).toBe(true);
+
       const refreshedRunning = await db.em.fork().findOneOrFail(AgentRun, running.id);
-      expect(refreshedRunning.workspacePath).toBe("/tmp/sym-sweep-running");
+      expect(refreshedRunning.workspacePath).toBe(runningPath);
+      const refreshedSucceeded = await db.em.fork().findOneOrFail(AgentRun, succeeded.id);
+      expect(refreshedSucceeded.workspacePath).toBeNull();
+
+      await rm(scratchRoot, { recursive: true, force: true });
     });
   });
 
