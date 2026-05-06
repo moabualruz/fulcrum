@@ -21,6 +21,16 @@ export class Migration20260502090000_tasks_schema_extension extends Migration {
       `alter table "tasks" add column if not exists "tiptap_content" jsonb not null default '{"type":"doc","content":[{"type":"paragraph"}]}'::jsonb`,
     );
     this.addSql(`alter table "tasks" add column if not exists "deleted_at" timestamptz null`);
+    this.addSql(`alter table "tasks" add column if not exists "due_date" date null`);
+    this.addSql(`alter table "tasks" add column if not exists "start_date" date null`);
+    this.addSql(`alter table "tasks" add column if not exists "started_at" timestamptz null`);
+    this.addSql(`alter table "tasks" add column if not exists "assignee_id" uuid null`);
+    this.addSql(`alter table "tasks" add column if not exists "labels" text[] not null default '{}'`);
+    this.addSql(`alter table "tasks" add column if not exists "project_id" uuid null`);
+    this.addSql(`alter table "tasks" add column if not exists "task_type" varchar(255) not null default 'task'`);
+    this.addSql(`alter table "tasks" add column if not exists "sequence_number" integer null`);
+    this.addSql(`alter table "tasks" add column if not exists "archived_at" timestamptz null`);
+    this.addSql(`alter table "tasks" add column if not exists "template_id" uuid null`);
     this.addSql(`alter table "tasks" add column "sprint_id" uuid null`);
     this.addSql(
       `alter table "tasks" add column "custom_fields" jsonb not null default '{}'::jsonb`,
@@ -82,6 +92,16 @@ export class Migration20260502090000_tasks_schema_extension extends Migration {
     this.addSql(`alter table "tasks" drop column if exists "points"`);
     this.addSql(`alter table "tasks" drop column if exists "custom_fields"`);
     this.addSql(`alter table "tasks" drop column if exists "sprint_id"`);
+    this.addSql(`alter table "tasks" drop column if exists "template_id"`);
+    this.addSql(`alter table "tasks" drop column if exists "archived_at"`);
+    this.addSql(`alter table "tasks" drop column if exists "sequence_number"`);
+    this.addSql(`alter table "tasks" drop column if exists "task_type"`);
+    this.addSql(`alter table "tasks" drop column if exists "project_id"`);
+    this.addSql(`alter table "tasks" drop column if exists "labels"`);
+    this.addSql(`alter table "tasks" drop column if exists "assignee_id"`);
+    this.addSql(`alter table "tasks" drop column if exists "started_at"`);
+    this.addSql(`alter table "tasks" drop column if exists "start_date"`);
+    this.addSql(`alter table "tasks" drop column if exists "due_date"`);
     this.addSql(`alter table "tasks" drop column if exists "deleted_at"`);
     this.addSql(`alter table "tasks" drop column if exists "tiptap_content"`);
     this.addSql(`alter table "tasks" drop column if exists "description"`);

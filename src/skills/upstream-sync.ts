@@ -333,6 +333,16 @@ export async function syncUpstream(
             updatedAt: new Date(),
           });
           await em.flush();
+          lock[slug] = {
+            ...lockEntry,
+            upstream_conflict: [
+              "--- local",
+              "+++ upstream",
+              localContent,
+              upstreamContent,
+            ].join("\n"),
+          };
+          await writeSkillsLockFile(lock);
           result.conflicts.push(slug);
           continue;
         }

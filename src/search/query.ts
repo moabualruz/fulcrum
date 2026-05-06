@@ -367,7 +367,7 @@ async function queryHybridSearchDocuments(
       const semanticScore = embedding ? cosineSimilarity(queryVector, embedding) : 0;
       return {
         row,
-        score: 0.6 * normalizedBm25 + 0.4 * semanticScore,
+        score: 0.35 * normalizedBm25 + 0.65 * semanticScore,
       };
     })
     .filter((entry) => entry.score > 0)

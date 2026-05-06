@@ -1132,7 +1132,14 @@ export async function run(args: string[]): Promise<void> {
   }
 
   // Exit 1 if legacy errors OR orchestrator failures.
-  if (errors > 0 || (runOrchestratorChecks && "summary" in orchestratorReport && orchestratorReport.summary.fail > 0)) {
+  const jsonHardFailure = isJsonOutput &&
+    (report.repos.syncErrors > 0 ||
+      report.repos.mirrorDiskGb > 10 ||
+      report.platformChecks.some((check) => check.status === "fail"));
+  const humanHardFailure = !isJsonOutput &&
+    (errors > 0 || (runOrchestratorChecks && "summary" in orchestratorReport && orchestratorReport.summary.fail > 0));
+
+  if (jsonHardFailure || humanHardFailure) {
     process.exit(1);
   }
 }

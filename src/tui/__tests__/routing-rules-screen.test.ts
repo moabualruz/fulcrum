@@ -107,13 +107,8 @@ async function mountRoutingRulesScreen(opts: { caller?: TuiCaller; backendStatus
   const tty = new FakeTTY({ columns: 100, rows: 30 });
   const app = new TuiApp({ output: tty, input: tty, caller });
   await app.mount();
-
-  // Navigate to Routing Rules: index 8 in NAV_ENTRIES
   tty.clear();
-  for (let i = 0; i < 8; i++) tty.inject("j");
-  await new Promise((r) => setTimeout(r, 20));
-  tty.clear();
-  tty.inject("\r");
+  await app.navigateTo("routing-rules");
   await new Promise((r) => setTimeout(r, 50));
 
   const text = tty.plainText();

@@ -12,7 +12,7 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260505100000_phase5_schema_extensions extends Migration {
-  static isLossy = false;
+  static isLossy = true;
 
   override async up(): Promise<void> {
     // ── projects base table ──────────────────────────────────────────────────

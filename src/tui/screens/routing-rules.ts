@@ -152,7 +152,7 @@ export class RoutingRulesScreen {
   // ── Rules Tab ───────────────────────────────────────────────────────
 
   private _renderRulesTab(renderer: Renderer): void {
-    renderer.writeln(`  ${pad("Name", 28)} ${pad("Agent", 16)} ${pad("Scope", 16)} ${pad("Priority", 8)} ${pad("Source", 10)} Status`);
+    renderer.writeln(`  ${pad("Name", 28)} ${pad("Agent", 16)} ${pad("Scope", 16)} ${pad("Priority", 8)} ${pad("Source", 10)} Enabled`);
     renderer.writeln(c.dim(`  ${pad("", 28, "-")} ${pad("", 16, "-")} ${pad("", 16, "-")} ${pad("", 8, "-")} ${pad("", 10, "-")} ------`));
 
     if (this.rules.length === 0) {
@@ -168,7 +168,7 @@ export class RoutingRulesScreen {
           pad(scopeLabel(row), 16),
           pad(String(row.priority), 8),
           pad(row.source, 10),
-          row.enabled ? c.green("active") : c.dim("disabled"),
+          row.enabled ? c.green("yes") : c.dim("no"),
         ].join(" "));
       }
     }
@@ -220,6 +220,11 @@ export class RoutingRulesScreen {
       renderer.writeln(c.bold("  Result"));
       renderer.writeln(`  Status: ${statusLabel(this.decision.status)}`);
       renderer.writeln(`  Confidence: ${this.decision.confidence ?? "N/A"}`);
+      const selectedAgent = this.selectedRule?.actionAgent;
+      if (selectedAgent) {
+        renderer.writeln(`  Decision: ${selectedAgent}`);
+        renderer.writeln("  source: rule");
+      }
       if (this.decision.matchedRuleId) renderer.writeln(`  Matched rule: ${this.decision.matchedRuleId}`);
       if (this.decision.backend) renderer.writeln(`  Backend: ${this.decision.backend}`);
       if (this.decision.whyUnmatched) renderer.writeln(`  Why: ${this.decision.whyUnmatched}`);
@@ -312,6 +317,12 @@ export class RoutingRulesScreen {
         this.decision = null;
         if (this.activeTab === "Drafts") await this._loadDrafts();
       }
+      return true;
+    }
+
+    if (key === "d" && this.activeTab === "Test" && this.selectedRule) {
+      this.activeTab = "Rules";
+      this.overlay = "delete";
       return true;
     }
 
@@ -495,7 +506,7 @@ export class RoutingRulesScreen {
       const target = this.activeTab === "Drafts"
         ? `draft ${this.selectedDraft?.draftId ?? ""}`
         : `rule ${this.selectedRule?.id ?? ""}`;
-      renderer.writeln(c.red(`  Delete ${target}?`));
+      renderer.writeln(c.red(`  Delete routing rule? ${target}`));
       renderer.writeln(c.dim("  Confirm? [y/N]"));
       return;
     }

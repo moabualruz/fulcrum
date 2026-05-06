@@ -216,7 +216,7 @@ describe("local repo registration and watcher", () => {
     expect(backend.handles).toHaveLength(2);
   });
 
-  test("debounces filesystem events and enqueues repo.sync.local with repoId", async () => {
+  test("debounces filesystem events and enqueues repo.sync.local with latest event metadata", async () => {
     const queue = new MemoryQueue();
     const backend = new ManualBackend();
     const watcher = new RepoWatcher(
@@ -231,7 +231,10 @@ describe("local repo registration and watcher", () => {
     backend.emit("unlink");
 
     await waitFor(() => queue.jobs.length === 1);
-    expect(queue.jobs).toEqual([{ name: "repo.sync.local", payload: { repoId: "repo-1" } }]);
+    expect(queue.jobs).toEqual([{
+      name: "repo.sync.local",
+      payload: { repoId: "repo-1", eventType: "unlink", filename: "README.md" },
+    }]);
   });
 
   test("remove stops the watcher and archives the repo", async () => {
@@ -288,7 +291,10 @@ describe("local repo registration and watcher", () => {
 
     await waitFor(() => queue.jobs.length === 1);
     expect(backend.kind).toBe("parcel");
-    expect(queue.jobs[0]).toEqual({ name: "repo.sync.local", payload: { repoId: "repo-parcel" } });
+    expect(queue.jobs[0]).toEqual({
+      name: "repo.sync.local",
+      payload: { repoId: "repo-parcel", eventType: "change", filename: "README.md" },
+    });
   });
 
   test("watcher count stays bounded across add/remove cycles", async () => {

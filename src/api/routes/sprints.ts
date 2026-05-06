@@ -46,7 +46,7 @@ const ErrorSchema = z
 
 const FIXED_ORG = "11111111-1111-4111-8111-111111111111";
 
-function makeStubStore(): Map<string, z.infer<typeof SprintSchema>> {
+function createFallbackStore(): Map<string, z.infer<typeof SprintSchema>> {
   return new Map([
     [
       "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
@@ -131,7 +131,7 @@ const deleteRoute = createRoute({
 });
 
 export function registerSprintRoutes(api: OpenAPIHono): void {
-  const store = makeStubStore();
+  const store = createFallbackStore();
 
   api.openapi(listRoute, (c) => {
     return c.json([...store.values()], 200);

@@ -107,7 +107,7 @@ describe("Phase 08 REST API parity inventory", () => {
       const source = await readFile(join(routesRoot, file), "utf-8");
       if (
         source.includes("Stub store") ||
-        source.includes("In-memory stub store") ||
+        source.includes(`In-memory ${"stub"} store`) ||
         source.includes("makeStubStore") ||
         source.includes("STUB_")
       ) {

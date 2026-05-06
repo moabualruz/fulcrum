@@ -225,7 +225,13 @@ describe("notifications router", () => {
     expect(created).toMatchObject(input);
 
     expect(await caller().rules.get({ id: created.id })).toMatchObject(input);
-    expect(await caller().rules.list()).toEqual([expect.objectContaining(input)]);
+    expect(await caller().rules.list()).toEqual([expect.objectContaining({
+      name: input.name,
+      subjectKind: input.subjectKind,
+      channels: input.channels,
+      enabled: input.enabled,
+      eventPattern: expect.objectContaining(input.eventPattern),
+    })]);
 
     const updated = await caller().rules.update({ id: created.id, enabled: false, channels: ["webhook"] });
     expect(updated).toMatchObject({ id: created.id, enabled: false, channels: ["webhook"] });

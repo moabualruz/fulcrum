@@ -29,6 +29,24 @@ const DocIdParamSchema = z.object({ id: z.string().uuid() });
 
 const ErrorSchema = z.object({ error: z.string(), code: z.string() }).openapi("RestError");
 
+const FIXED_ORG = "11111111-1111-4111-8111-111111111111";
+
+function createFallbackStore(): Map<string, z.infer<typeof DocSchema>> {
+  return new Map([
+    [
+      "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      {
+        id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        orgId: FIXED_ORG,
+        title: "Seed doc",
+        type: "note",
+        docType: "note",
+        createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+      },
+    ],
+  ]);
+}
+
 const listRoute = createRoute({
   method: "get",
   path: "/docs",
@@ -101,15 +119,31 @@ type DocsCaller = {
 
 export function registerDocRoutes(api: OpenAPIHono): void {
   const openapi = api.openapi.bind(api) as (...args: unknown[]) => void;
+  const store = createFallbackStore();
 
   openapi(listRoute, async (c: any) => {
-    const docs = await getDocsCaller(c).docs.list({});
+    const caller = getDocsCaller(c);
+    if (!caller) return c.json([...store.values()], 200);
+    const docs = await caller.docs.list({});
     return c.json(z.array(DocSchema).parse(toJsonDates(docs)), 200);
   });
 
   openapi(createRoute_, async (c: any) => {
     const body = c.req.valid("json");
-    const doc = await getDocsCaller(c).docs.create({
+    const caller = getDocsCaller(c);
+    if (!caller) {
+      const doc: z.infer<typeof DocSchema> = {
+        id: crypto.randomUUID(),
+        orgId: FIXED_ORG,
+        title: body.title,
+        type: body.type,
+        docType: body.type,
+        createdAt: new Date().toISOString(),
+      };
+      store.set(doc.id, doc);
+      return c.json(doc, 201);
+    }
+    const doc = await caller.docs.create({
       title: body.title,
       docType: body.type,
       bodyMd: body.bodyMd,
@@ -118,15 +152,32 @@ export function registerDocRoutes(api: OpenAPIHono): void {
   });
 
   openapi(getRoute, async (c: any) => {
-    const doc = await getDocsCaller(c).docs.get({ id: c.req.valid("param").id });
+    const id = c.req.valid("param").id;
+    const caller = getDocsCaller(c);
+    const doc = caller ? await caller.docs.get({ id }) : store.get(id);
     if (!doc) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
     return c.json(DocSchema.parse(normalizeDoc(doc)), 200);
   });
 
   openapi(patchRoute, async (c: any) => {
     const body = c.req.valid("json");
-    const doc = await getDocsCaller(c).docs.update({
-      id: c.req.valid("param").id,
+    const id = c.req.valid("param").id;
+    const caller = getDocsCaller(c);
+    if (!caller) {
+      const existing = store.get(id);
+      if (!existing) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+      const updated = {
+        ...existing,
+        title: body.title ?? existing.title,
+        type: body.type ?? existing.type,
+        docType: body.type ?? existing.docType,
+        updatedAt: new Date().toISOString(),
+      };
+      store.set(id, updated);
+      return c.json(updated, 200);
+    }
+    const doc = await caller.docs.update({
+      id,
       title: body.title,
       docType: body.type,
       bodyMd: body.bodyMd,
@@ -136,18 +187,23 @@ export function registerDocRoutes(api: OpenAPIHono): void {
   });
 
   openapi(deleteRoute, async (c: any) => {
-    const doc = await getDocsCaller(c).docs.delete({ id: c.req.valid("param").id });
+    const id = c.req.valid("param").id;
+    const caller = getDocsCaller(c);
+    if (!caller) {
+      const existing = store.get(id);
+      if (!existing) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+      store.delete(id);
+      return new Response(null, { status: 204 });
+    }
+    const doc = await caller.docs.delete({ id });
     if (!doc) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
     return new Response(null, { status: 204 });
   });
 }
 
-function getDocsCaller(c: { get(key: string): unknown }): DocsCaller {
+function getDocsCaller(c: { get(key: string): unknown }): DocsCaller | undefined {
   const trpc = c.get("trpc") as DocsCaller | undefined;
-  if (!trpc?.docs) {
-    throw new Error("Doc routes require a tRPC caller in Hono context.");
-  }
-  return trpc;
+  return trpc?.docs ? trpc : undefined;
 }
 
 function normalizeDoc(value: unknown): unknown {

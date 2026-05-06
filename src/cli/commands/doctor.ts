@@ -63,7 +63,7 @@ export async function run(argv: readonly string[], opts: DoctorRunOptions = {}):
 
 async function resolveCaller(opts: DoctorRunOptions): Promise<DoctorCaller> {
   if (opts.caller) return opts.caller;
-  return await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as DoctorCaller;
+  return await createLocalCaller({ container: opts.container, requireSession: false }) as unknown as DoctorCaller;
 }
 
 function printOutput(value: unknown, argv: readonly string[], print: (line: string) => void): void {

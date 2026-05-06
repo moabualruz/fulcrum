@@ -1,6 +1,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260506001 extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     // SearchDocument expansion
     this.addSql(`ALTER TABLE "search_documents" ADD COLUMN IF NOT EXISTS "title" varchar NULL`);

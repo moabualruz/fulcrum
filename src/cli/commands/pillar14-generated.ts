@@ -75,16 +75,17 @@ export async function runPillar14Command(
 }
 
 async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io) {
+  const runsCaller = caller.agent_runs ?? caller.runs;
   if (sub === "list") {
     const status = optionValue(argv, "--status");
-    const result = await caller.agent_runs.list(status ? { status } : undefined);
+    const result = await runsCaller.list(status ? { status } : undefined);
     emitJson(result, io);
     return;
   }
   if (sub === "show") {
     const id = positional(argv)[0] ?? optionValue(argv, "--id");
     requireValue(id, "runs show: missing run id");
-    const run = await caller.agent_runs.get({ id });
+    const run = await runsCaller.get({ id });
     if (!run) {
       emitError(new Error(`run '${id}' not found`), hasFlag(argv, "--json"), io);
       return;
@@ -95,13 +96,13 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
   if (sub === "cancel") {
     const id = positional(argv)[0] ?? optionValue(argv, "--id");
     requireValue(id, "runs cancel: missing run id");
-    emitJson(await caller.agent_runs.cancel({ id }), io);
+    emitJson(await runsCaller.cancel({ id }), io);
     return;
   }
   if (sub === "retry") {
     const id = positional(argv)[0] ?? optionValue(argv, "--id");
     requireValue(id, "runs retry: missing run id");
-    emitJson(await caller.agent_runs.retry({ id }), io);
+    emitJson(await runsCaller.retry({ id }), io);
     return;
   }
   if (sub === "logs") {

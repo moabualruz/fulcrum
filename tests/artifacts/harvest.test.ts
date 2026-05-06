@@ -71,29 +71,31 @@ describe("harvestArtifacts", () => {
       expect(await readFile(join(storeRoot, artifact!.path))).toEqual(source);
     }
 
-    expect(deps.edgeRepository.created).toContainEqual({
+    expect(deps.edgeRepository.created).toContainEqual(expect.objectContaining({
       org: deps.org,
       fromKind: "artifact",
       fromId: byName["program.ts"]!.id,
       toKind: "agent_run",
       toId: deps.run.id,
       kind: "generated_by",
-    });
-    expect(deps.edgeRepository.created).toContainEqual({
+    }));
+    expect(deps.edgeRepository.created).toContainEqual(expect.objectContaining({
       org: deps.org,
       fromKind: "agent_run",
       fromId: deps.run.id,
       toKind: "artifact",
       toId: byName["program.ts"]!.id,
       kind: "produced",
-    });
+    }));
     const programArtifact = byName["program.ts"]!;
-    expect(deps.searchDocumentRepository.upserts).toContainEqual({
+    expect(deps.searchDocumentRepository.upserts).toContainEqual(expect.objectContaining({
       org: deps.org,
       artifact: programArtifact,
       title: "program.ts",
       body: "export const value = 1;\n",
-    });
+      mime: "video/mp2t",
+      runId: deps.run.id,
+    }));
     expect(deps.searchDocumentRepository.upserts.find((item) => item.title === "image.png")?.body).toBe("");
   });
 

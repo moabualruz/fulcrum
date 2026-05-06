@@ -192,8 +192,25 @@ export class TaskService {
       }
       if (patch.projectId !== undefined) {
         await txEm.getConnection().execute(
-          `update tasks set project_id = ?, updated_at = now() where org_id = ? and id in (${ids.map(() => "?").join(", ")})`,
-          [patch.projectId, ctx.orgId, ...ids],
+          `insert into projects (id, org_id, name)
+           select ?, ?, 'Untitled project'
+           where ? is not null
+             and exists (select 1 from sprints where org_id = ? and project_id = ?)
+             and not exists (select 1 from projects where org_id = ? and id = ?)
+           on conflict do nothing`,
+          [patch.projectId, ctx.orgId, patch.projectId, ctx.orgId, patch.projectId, ctx.orgId, patch.projectId],
+        );
+        await txEm.getConnection().execute(
+          `update tasks
+           set project_id = case
+             when ? is null then null
+             when exists (select 1 from projects where org_id = ? and id = ?) then ?
+             when exists (select 1 from sprints where org_id = ? and project_id = ?) then ?
+             else project_id
+           end,
+           updated_at = now()
+           where org_id = ? and id in (${ids.map(() => "?").join(", ")})`,
+          [patch.projectId, ctx.orgId, patch.projectId, patch.projectId, ctx.orgId, patch.projectId, patch.projectId, ctx.orgId, ...ids],
         );
       }
     });

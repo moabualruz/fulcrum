@@ -1,6 +1,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260507001 extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     this.addSql(`
       create table if not exists "artifact_retention_policies" (

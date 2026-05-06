@@ -85,6 +85,6 @@ export class MetricsCache {
   @Property({ type: "integer", fieldName: "tasks_total", default: 0 })
   tasksTotal: number = 0;
 
-  @Property({ type: "json", fieldName: "status_counts", nullable: true })
-  statusCounts: Record<string, number> | null = null;
+  @Property({ type: "json", fieldName: "status_counts", defaultRaw: "'{}'::jsonb", returning: false })
+  statusCounts: Record<string, number> = {};
 }

@@ -92,9 +92,13 @@ describe("MetricsCache migration constraints", () => {
         "id",
         "points_completed",
         "points_remaining",
+        "points_total",
         "project_id",
+        "scope_type",
         "sprint_id",
         "started_count",
+        "status_counts",
+        "tasks_total",
         "updated_at",
         "wip_count",
       ]);

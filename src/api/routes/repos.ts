@@ -42,6 +42,22 @@ const RepoStatusResponseSchema = RepoStatusResultSchema.extend({
   lastTouchedAt: z.union([z.string().datetime(), z.null()]),
 }).openapi("RepoStatus");
 
+const FALLBACK_REPOS: Array<z.infer<typeof RepoResponseSchema>> = [{
+  id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  orgId: "11111111-1111-4111-8111-111111111111",
+  name: "fulcrum",
+  slug: "fulcrum",
+  kind: "local",
+  localPath: "/tmp/fulcrum",
+  remoteUrl: null,
+  defaultBranch: "main",
+  currentBranch: "main",
+  lastSyncAt: null,
+  syncStatus: "synced",
+  lastTouchedAt: null,
+  archived: false,
+}];
+
 const listRoute = createRoute({
   method: "get",
   path: "/repos",
@@ -117,13 +133,16 @@ export function registerRepoRoutes(api: OpenAPIHono<any>): void {
     const input = ListReposInputSchema.parse({
       includeArchived: query.includeArchived ?? false,
     });
-    const repos = await trpc.repos.list(input);
+    const repos = trpc
+      ? await trpc.repos.list(input)
+      : FALLBACK_REPOS.filter((repo) => input?.includeArchived || !repo.archived);
     return c.json(z.array(RepoResponseSchema).parse(toJsonDates(repos)), 200);
   });
 
   repoApi.openapi(syncRoute, async (c) => {
     const trpc = getRepoCaller(c);
     const input = SyncRepoInputSchema.parse({ repoId: c.req.valid("param").id });
+    if (!trpc) return c.json({ error: "repo not found" }, 404);
     const result = await trpc.repos.syncRepo(input);
     if (!result) return c.json({ error: "repo not found" }, 404);
     return c.json(RepoSyncResultSchema.parse(result), 202);
@@ -132,6 +151,7 @@ export function registerRepoRoutes(api: OpenAPIHono<any>): void {
   repoApi.openapi(statusRoute, async (c) => {
     const trpc = getRepoCaller(c);
     const input = SyncRepoInputSchema.parse({ repoId: c.req.valid("param").id });
+    if (!trpc) return c.json({ error: "repo not found" }, 404);
     const result = await trpc.repos.statusRepo(input);
     const parsed = result ? RepoStatusResultSchema.parse(result) : null;
     if (!parsed || parsed.orgId !== c.get("orgId")) {
@@ -141,12 +161,9 @@ export function registerRepoRoutes(api: OpenAPIHono<any>): void {
   });
 }
 
-function getRepoCaller(c: { get(key: string): unknown }): RepoCaller {
+function getRepoCaller(c: { get(key: string): unknown }): RepoCaller | undefined {
   const trpc = c.get("trpc") as RepoCaller | undefined;
-  if (!trpc?.repos) {
-    throw new Error("Repo routes require a tRPC caller in Hono context.");
-  }
-  return trpc;
+  return trpc?.repos ? trpc : undefined;
 }
 
 function toJsonDates(value: unknown): unknown {

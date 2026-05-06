@@ -68,9 +68,10 @@ export class ReposScreen {
         const dirty = repo.dirty ? "dirty" : "clean";
         const branch = repo.branch ?? "no-branch";
         const tasks = repo.openTaskCount ?? 0;
+        const branches = repo.branchCount ?? 0;
         const health = repo.health ?? repo.supervisionMode ?? "unknown";
         renderer.writeln(
-          `${prefix}${repo.name ?? repo.slug}  ${c.dim(repo.slug)}  ${branch}  ${dirty}  ${formatSynced(repo.lastSyncAt ?? repo.lastSyncedAt)}  tasks ${tasks}  ${health}`,
+          `${prefix}${repo.name ?? repo.slug}  ${c.dim(repo.slug)}  ${branch}  ${dirty}  ${formatSynced(repo.lastSyncAt ?? repo.lastSyncedAt)}  tasks ${tasks}  branches ${branches}  ${health}`,
         );
       }
     }

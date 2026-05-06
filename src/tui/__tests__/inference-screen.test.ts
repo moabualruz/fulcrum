@@ -78,15 +78,8 @@ async function mountInferenceScreen(callerOverrides: Parameters<typeof makeCalle
   const caller = makeCaller(callerOverrides);
   const app = new TuiApp({ output: tty, input: tty, caller });
   await app.mount();
-
-  // Navigate to Inference screen: move cursor to "Inference" entry and press Enter
-  // Inference is at index 7 in NAV_ENTRIES
   tty.clear();
-  for (let i = 0; i < 7; i++) tty.inject("j");
-  // Wait for re-renders
-  await new Promise((r) => setTimeout(r, 20));
-  tty.clear();
-  tty.inject("\r");
+  await app.navigateTo("inference");
   await new Promise((r) => setTimeout(r, 50));
 
   const text = tty.plainText();
@@ -187,7 +180,7 @@ describe("InferenceDashboardScreen", () => {
     tty.inject("q");
     await new Promise((r) => setTimeout(r, 50));
     const text = tty.plainText();
-    expect(text).toContain("Fulcrum Settings");
+    expect(text).toContain("Fulcrum TUI");
     app.stop();
   });
 

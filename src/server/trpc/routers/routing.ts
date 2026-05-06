@@ -8,7 +8,7 @@ import { RoutingRule, RoutingRuleSource } from "../../../db/entities/router/Rout
 import { Task } from "../../../db/entities/tasks/Task.ts";
 import { RoutingRuleRepository } from "../../../db/repositories/router/RoutingRuleRepository.ts";
 import { EventRepository } from "../../../db/repositories/core/EventRepository.ts";
-import { autoAssign } from "../../../router/auto-assign.ts";
+import { autoAssign, configureAutoAssign } from "../../../router/auto-assign.ts";
 import { configureRulesEngine } from "../../../router/rules-engine.ts";
 import { configureRoutingTelemetry } from "../../../router/telemetry.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
@@ -168,6 +168,7 @@ function eventRepository(em: EntityManager): EventRepository {
 }
 
 function configureRouting(em: EntityManager): void {
+  configureAutoAssign({});
   configureRulesEngine({ routingRuleRepository: routingRuleRepository(em) });
   configureRoutingTelemetry({ eventRepository: eventRepository(em) });
 }

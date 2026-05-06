@@ -280,8 +280,15 @@ export class SprintService {
     if (!sprint) throw new TRPCError({ code: "NOT_FOUND", message: "Sprint not found." });
     await assertTaskInOrg(this.em, orgId, taskId);
     await this.em.getConnection().execute(
-      `update tasks set sprint_id = ?, project_id = ?, updated_at = now() where org_id = ? and id = ?`,
-      [sprint.id, sprint.projectId, orgId, taskId],
+      `update tasks
+       set sprint_id = ?,
+           project_id = case
+             when exists (select 1 from projects where org_id = ? and id = ?) then ?
+             else project_id
+           end,
+           updated_at = now()
+       where org_id = ? and id = ?`,
+      [sprint.id, orgId, sprint.projectId, sprint.projectId, orgId, taskId],
     );
     return { moved: true };
   }
@@ -348,4 +355,3 @@ async function assertTaskInOrg(em: EntityManager, orgId: string, taskId: string)
     throw new TRPCError({ code: "NOT_FOUND", message: "Task not found." });
   }
 }
-

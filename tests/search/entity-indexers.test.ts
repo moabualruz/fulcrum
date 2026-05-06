@@ -320,11 +320,13 @@ describe("P11#03 entity search indexers", () => {
         source_kind: "artifact",
         source_id: artifactId,
         title: "search-results.json",
-        body: "harvest Indexed harvested artifact",
-        labels: [],
+        body: "search-results.json\napplication/json\nharvest Indexed harvested artifact",
+        labels: ["application/json"],
         metadata: {
           mime: "application/json",
           project_id: project.id,
+          source: "harvest",
+          summary: "Indexed harvested artifact",
         },
       });
       expect(row?.search_vector).toContain("harvest");

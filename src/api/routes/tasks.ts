@@ -75,7 +75,7 @@ const ImportCsvResultSchema = z
 const FIXED_ORG = "11111111-1111-4111-8111-111111111111";
 
 /** Factory — each call returns a fresh Map so tests don't share state. */
-function makeStubStore(): Map<string, z.infer<typeof TaskSchema>> {
+function createFallbackStore(): Map<string, z.infer<typeof TaskSchema>> {
   return new Map([
     [
       "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -204,7 +204,7 @@ const importCsvRoute = createRoute({
 
 export function registerTaskRoutes(api: OpenAPIHono): void {
   // Fresh store per registration — each createPublicApi() call is isolated.
-  const store = makeStubStore();
+  const store = createFallbackStore();
 
   api.openapi(listRoute, (c) => {
     return c.json([...store.values()], 200);

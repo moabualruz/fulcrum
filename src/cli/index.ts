@@ -504,19 +504,8 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       return;
     }
     case "doctor": {
-      const { run: runDoctor } = await import("./commands/doctor.ts");
-      const helpOnly = rest.includes("--help") || rest.includes("-h") || rest[0] === "help";
-      if (helpOnly) {
-        await runDoctor(rest);
-        return;
-      }
-
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runDoctor(rest, { container });
-      } finally {
-        await cleanup();
-      }
+      const { run: runDoctor } = await import("./doctor.ts");
+      await runDoctor(rest);
       return;
     }
     case "completion": {

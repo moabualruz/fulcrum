@@ -21,7 +21,17 @@ for (const { target, out } of TARGETS) {
   const t0 = Date.now();
   process.stdout.write(`→ ${target} ... `);
   const proc = Bun.spawn(
-    ["bun", "build", "--compile", "--minify", `--target=${target}`, "src/index.ts", "--outfile", out],
+    [
+      "bun",
+      "build",
+      "--compile",
+      "--minify",
+      `--target=${target}`,
+      "--external=@opentui/core-*",
+      "src/index.ts",
+      "--outfile",
+      out,
+    ],
     { stdout: "pipe", stderr: "pipe" },
   );
   const exit = await proc.exited;

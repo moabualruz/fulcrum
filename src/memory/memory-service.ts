@@ -123,6 +123,10 @@ export class MemoryService {
       tags: data.tags ?? [],
       sourceRef: data.sourceRef ?? {},
     } as never);
+    if ("persistAndFlush" in em && typeof em.persistAndFlush === "function") {
+      await em.persistAndFlush(memory as never);
+      return memory;
+    }
     em.persist(memory as never);
     await em.flush();
     return memory;

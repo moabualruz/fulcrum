@@ -8,13 +8,15 @@
 
 import { z } from "zod";
 
+const UuidLikeSchema = z.string().regex(/^[0-9a-fA-F-]{36}$/);
+
 /** Repo provider — Pillar 8 extends with provider-specific OAuth fields. */
 export const RepoProviderSchema = z.enum(["github", "gitlab", "bitbucket", "local"]);
 
 /** Minimal Repo output schema shared by REST, CLI, TUI, and tRPC surfaces. */
 export const RepoSchema = z.object({
-  id: z.string().uuid().describe("Unique repository identifier."),
-  orgId: z.string().uuid().describe("Organisation that owns the repository."),
+  id: UuidLikeSchema.describe("Unique repository identifier."),
+  orgId: UuidLikeSchema.describe("Organisation that owns the repository."),
   name: z.string().describe("Repository name, typically matching the remote name."),
   slug: z.string().describe("Org-scoped repository slug."),
   kind: z.enum(["local", "remote"]).describe("Repository sync mode."),
@@ -30,48 +32,48 @@ export const RepoSchema = z.object({
 
 /** Input for listing repos. Authenticated context supplies org scope. */
 export const ListReposInputSchema = z.object({
-  includeArchived: z.boolean().optional().default(false),
+  includeArchived: z.boolean().optional().default(false).describe("Include archived repositories in the list response."),
 }).optional();
 
 export const RepoIdInputSchema = z.object({
-  id: z.string().uuid(),
+  id: UuidLikeSchema.describe("Repository identifier."),
 });
 
 export const SyncRepoInputSchema = z.object({
-  repoId: z.string().uuid(),
+  repoId: UuidLikeSchema.describe("Repository identifier to synchronize."),
 });
 
 export const RepoSyncTaskNameSchema = z.enum(["repo.sync.local", "repo.sync.remote"]);
 export const RepoApiStatusSchema = z.enum(["queued", "running", "stale", "synced", "failed"]);
 
 export const RepoSyncResultSchema = z.object({
-  repoId: z.string().uuid(),
-  status: z.literal("queued"),
-  taskName: RepoSyncTaskNameSchema,
-  jobKey: z.string(),
+  repoId: UuidLikeSchema.describe("Repository identifier queued for synchronization."),
+  status: z.literal("queued").describe("Queue status for the sync request."),
+  taskName: RepoSyncTaskNameSchema.describe("Worker task selected for this repository sync."),
+  jobKey: z.string().describe("Idempotency key for the queued sync job."),
 });
 
 export const RepoStatusResultSchema = z.object({
-  repoId: z.string().uuid(),
-  orgId: z.string().uuid(),
-  status: RepoApiStatusSchema,
-  syncStatus: z.string(),
-  lastSyncAt: z.date().nullable(),
-  lastTouchedAt: z.date().nullable(),
+  repoId: UuidLikeSchema.describe("Repository identifier."),
+  orgId: UuidLikeSchema.describe("Organisation that owns the repository."),
+  status: RepoApiStatusSchema.describe("Public sync status bucket."),
+  syncStatus: z.string().describe("Persisted repository sync status."),
+  lastSyncAt: z.date().nullable().describe("Most recent completed sync timestamp."),
+  lastTouchedAt: z.date().nullable().describe("Most recent detected repository activity timestamp."),
 });
 
 export const RegisterRepoInputSchema = z.discriminatedUnion("kind", [
   z.object({
-    kind: z.literal("local"),
-    path: z.string().trim().min(1),
-    name: z.string().trim().min(1).optional(),
-    slug: z.string().trim().min(1).optional(),
+    kind: z.literal("local").describe("Register a local repository path."),
+    path: z.string().trim().min(1).describe("Local repository path."),
+    name: z.string().trim().min(1).optional().describe("Display name for the repository."),
+    slug: z.string().trim().min(1).optional().describe("Org-scoped repository slug."),
   }),
   z.object({
-    kind: z.literal("remote"),
-    url: z.string().trim().min(1),
-    name: z.string().trim().min(1).optional(),
-    slug: z.string().trim().min(1).optional(),
+    kind: z.literal("remote").describe("Register a remote repository URL."),
+    url: z.string().trim().min(1).describe("Remote repository URL."),
+    name: z.string().trim().min(1).optional().describe("Display name for the repository."),
+    slug: z.string().trim().min(1).optional().describe("Org-scoped repository slug."),
   }),
 ]);
 

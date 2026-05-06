@@ -120,9 +120,11 @@ describe("RoutingService", () => {
 
   it("testRoute returns abstained when LLM returns low confidence", async () => {
     const { RoutingService } = await import("./service.ts");
+    const { configureLlmFallback } = await import("./llm-fallback.ts");
     const prevFeatures = process.env["FULCRUM_FEATURES"];
     process.env["FULCRUM_FEATURES"] = "router-llm";
     try {
+      configureLlmFallback({ sidecarClient: null });
       const service = new RoutingService({
         evaluateRuleMatch: async () => null,
       });

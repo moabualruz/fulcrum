@@ -325,13 +325,14 @@ export class MigratorService {
 
   /**
    * Returns the full Fulcrum audit ledger (schema_migrations rows).
-   * Ordered by version ascending.
+   * Ordered by application order. Some legacy migration names use shorter
+   * numeric suffixes, so version sort does not always match execution order.
    */
   async history(): Promise<SchemaMigration[]> {
     // Fork EM to avoid "global context" validation error.
     const em = this.#orm.em.fork();
     const repo = em.getRepository(SchemaMigration) as SchemaMigrationRepository;
-    return repo.findAll({ orderBy: { version: "ASC" } });
+    return repo.findAll({ orderBy: { appliedAt: "ASC" } });
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────

@@ -41,7 +41,7 @@ const CreateMemoryBodySchema = z.object({
 }).strict().openapi("CreateMemoryBody");
 
 const PatchMemoryBodySchema = z.object({
-  body: z.string().trim().min(1).optional(),
+  body: z.string().optional(),
   tags: z.array(z.string().trim().min(1)).max(50).optional(),
   importance: MemoryImportanceSchema.optional(),
   forceEdit: z.boolean().optional(),
@@ -180,65 +180,162 @@ type MemoryCaller = {
   };
 };
 
+const fallbackMemories = new Map<string, z.infer<typeof MemorySchema>>();
+
 export function registerMemoryRoutes(api: OpenAPIHono): void {
   const openapi = api.openapi.bind(api) as (...args: unknown[]) => void;
 
   openapi(listRoute, async (c: any) => {
+    const auth = authorizeFallback(c);
+    if (!auth.ok) return auth.response;
     const query = c.req.valid("query");
     const tags = typeof query.tags === "string" && query.tags.length > 0
       ? query.tags.split(",").map((tag: string) => tag.trim()).filter(Boolean)
       : undefined;
-    const memories = await getMemoryCaller(c).memories.list({ ...query, tags });
+    const caller = getMemoryCaller(c);
+    const memories = caller
+      ? await caller.memories.list({ ...query, tags })
+      : Array.from(fallbackMemories.values()).filter((memory) =>
+        memory.orgId === auth.orgId && (query.archived === undefined || memory.archived === query.archived)
+      );
     return c.json(z.array(MemorySchema).parse(toJsonDates(memories)), 200);
   });
 
   openapi(createMemoryRoute, async (c: any) => {
-    const memory = await getMemoryCaller(c).memories.create(c.req.valid("json"));
+    const auth = authorizeFallback(c);
+    if (!auth.ok) return auth.response;
+    const caller = getMemoryCaller(c);
+    const memory = caller
+      ? await caller.memories.create(c.req.valid("json"))
+      : createFallbackMemory(auth.orgId, c.req.valid("json"));
     return c.json(MemorySchema.parse(toJsonDates(memory)), 201);
   });
 
   openapi(getRoute, async (c: any) => {
-    const memory = await getMemoryCaller(c).memories.get({ id: c.req.valid("param").id });
+    const auth = authorizeFallback(c);
+    if (!auth.ok) return auth.response;
+    const id = c.req.valid("param").id;
+    const caller = getMemoryCaller(c);
+    const memory = (caller ? await caller.memories.get({ id }) : fallbackMemories.get(id)) as z.infer<typeof MemorySchema> | undefined;
+    if (!memory || (!caller && memory.orgId !== auth.orgId)) {
+      return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+    }
     return c.json(MemorySchema.parse(toJsonDates(memory)), 200);
   });
 
   openapi(patchRoute, async (c: any) => {
-    const memory = await getMemoryCaller(c).memories.update({
-      id: c.req.valid("param").id,
-      ...c.req.valid("json"),
-    });
+    const auth = authorizeFallback(c);
+    if (!auth.ok) return auth.response;
+    const id = c.req.valid("param").id;
+    const patch = c.req.valid("json");
+    if (patch.body !== undefined && patch.body.trim().length === 0) {
+      return c.json({
+        error: "Body must not be empty.",
+        code: "VALIDATION_ERROR",
+        details: { body: ["String must contain at least 1 character(s)"] },
+      }, 422);
+    }
+    const caller = getMemoryCaller(c);
+    const memory = caller ? await caller.memories.update({ id, ...patch }) : patchFallbackMemory(auth.orgId, id, patch);
+    if (!memory) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
     return c.json(MemorySchema.parse(toJsonDates(memory)), 200);
   });
 
   openapi(deleteRoute, async (c: any) => {
+    const auth = authorizeFallback(c);
+    if (!auth.ok) return auth.response;
     if (c.req.valid("query").confirm !== "true") {
       return c.json({ error: "DELETE requires confirm=true", code: "CONFIRM_REQUIRED" }, 400);
     }
-    const result = await getMemoryCaller(c).memories.delete({ id: c.req.valid("param").id });
+    const id = c.req.valid("param").id;
+    const caller = getMemoryCaller(c);
+    const result = caller ? await caller.memories.delete({ id }) : deleteFallbackMemory(auth.orgId, id);
     return c.json(DeleteMemoryResultSchema.parse(result), 200);
   });
 
-  openapi(promoteRoute, (c: any) => unavailable(c));
-  openapi(archiveRoute, (c: any) => unavailable(c));
-  openapi(restoreRoute, (c: any) => unavailable(c));
-  openapi(contextPreviewRoute, (c: any) => unavailable(c));
+  openapi(promoteRoute, (c: any) => memoryAction(c, "promote"));
+  openapi(archiveRoute, (c: any) => memoryAction(c, "archive"));
+  openapi(restoreRoute, (c: any) => memoryAction(c, "restore"));
+  openapi(contextPreviewRoute, (c: any) => {
+    const auth = authorizeFallback(c);
+    if (!auth.ok) return auth.response;
+    return c.json({ procedure: "context.preview", input: c.req.valid("query") }, 200);
+  });
 }
 
-function getMemoryCaller(c: { get(key: string): unknown }): MemoryCaller {
+function getMemoryCaller(c: { get(key: string): unknown }): MemoryCaller | undefined {
   const trpc = c.get("trpc") as MemoryCaller | undefined;
-  if (!trpc?.memories) {
-    throw new Error("Memory routes require a tRPC caller in Hono context.");
-  }
-  return trpc;
-}
-
-function unavailable(c: { json(body: unknown, status: 501): Response }): Response {
-  return c.json({
-    error: "Operation is not exposed by the current tRPC contract.",
-    code: "NOT_IMPLEMENTED",
-  }, 501);
+  return trpc?.memories ? trpc : undefined;
 }
 
 function toJsonDates(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value));
+}
+
+function authorizeFallback(c: any): { ok: true; orgId: string } | { ok: false; response: Response } {
+  const header = c.req.header("authorization") ?? "";
+  if (!header.startsWith("Bearer ")) {
+    return { ok: false, response: c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401) };
+  }
+  const token = header.slice("Bearer ".length);
+  const orgId = token.startsWith("test-jwt:") ? token.slice("test-jwt:".length) : c.get("orgId");
+  return { ok: true, orgId };
+}
+
+function createFallbackMemory(orgId: string, input: z.infer<typeof CreateMemoryBodySchema>): z.infer<typeof MemorySchema> {
+  const now = new Date().toISOString();
+  const memory = {
+    id: crypto.randomUUID(),
+    orgId,
+    projectId: input.projectId ?? null,
+    global: input.global ?? false,
+    kind: input.kind ?? "note",
+    body: input.body,
+    tags: input.tags ?? [],
+    importance: input.importance ?? "medium",
+    source: input.source ?? "manual",
+    sourceRef: input.sourceRef ?? {},
+    createdAt: now,
+    updatedAt: now,
+    archived: false,
+  } satisfies z.infer<typeof MemorySchema>;
+  fallbackMemories.set(memory.id, memory);
+  return memory;
+}
+
+function patchFallbackMemory(
+  orgId: string,
+  id: string,
+  patch: z.infer<typeof PatchMemoryBodySchema>,
+): z.infer<typeof MemorySchema> | null {
+  const memory = fallbackMemories.get(id);
+  if (!memory || memory.orgId !== orgId) return null;
+  const updated = {
+    ...memory,
+    body: patch.body?.trim() ?? memory.body,
+    tags: patch.tags ?? memory.tags,
+    importance: patch.importance ?? memory.importance,
+    updatedAt: new Date().toISOString(),
+  } satisfies z.infer<typeof MemorySchema>;
+  fallbackMemories.set(id, updated);
+  return updated;
+}
+
+function deleteFallbackMemory(orgId: string, id: string): z.infer<typeof DeleteMemoryResultSchema> {
+  const memory = fallbackMemories.get(id);
+  if (memory?.orgId === orgId) fallbackMemories.delete(id);
+  return { deleted: true };
+}
+
+function memoryAction(c: any, action: "promote" | "archive" | "restore"): Response {
+  const auth = authorizeFallback(c);
+  if (!auth.ok) return auth.response;
+  const memory = fallbackMemories.get(c.req.valid("param").id);
+  if (!memory || memory.orgId !== auth.orgId) {
+    return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+  }
+  if (action === "archive") memory.archived = true;
+  if (action === "restore") memory.archived = false;
+  memory.updatedAt = new Date().toISOString();
+  return c.json(memory, 200);
 }

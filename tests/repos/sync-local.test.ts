@@ -142,6 +142,7 @@ describe("repo.sync.local worker", () => {
       "files",
       "search",
       "repo:idle",
+      "event:repo.sync.completed",
     ]);
     expect(state.statusUpdates[0]).toMatchObject({ repoId: REPO_ID, orgId: ORG_ID, syncStatus: "syncing" });
     expect(state.statusUpdates[1]).toMatchObject({ currentBranch: "main" });
@@ -167,7 +168,18 @@ describe("repo.sync.local worker", () => {
       { path: "README.md", kind: "file", size: 12 },
       { path: "src", kind: "dir", size: 0 },
     ]);
-    expect(state.events).toEqual([]);
+    expect(state.events).toEqual([expect.objectContaining({
+      orgId: ORG_ID,
+      projectId: "project-1",
+      verb: "repo.sync.completed",
+      subjectKind: "repo",
+      subjectId: REPO_ID,
+      payload: expect.objectContaining({
+        branch: "main",
+        commitCount: 1,
+        dirty: false,
+      }),
+    })]);
   });
 
   test("marks repo error and emits repo.sync.failed event on exception", async () => {
