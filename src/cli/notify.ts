@@ -57,6 +57,7 @@ export async function run(argv: readonly string[], opts: NotifyRunOptions = {}):
     const caller = await resolveCaller(opts);
     switch (verb) {
       case "list":
+        if (!validateFlags(rest, new Set(["--json", "--unread", "--limit", "--offset"]), io)) return;
         return printValue(await caller.notify.list({
           unread: rest.includes("--unread") || undefined,
           limit: numberFlag(rest, "--limit"),
@@ -237,6 +238,21 @@ function flagValue(argv: readonly string[], flag: string): string | undefined {
   if (index < 0) return undefined;
   const value = argv[index + 1];
   return value && !value.startsWith("-") ? value : undefined;
+}
+
+function validateFlags(argv: readonly string[], allowed: Set<string>, io: Required<Pick<NotifyRunOptions, "printErr" | "exit">>): boolean {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (!arg.startsWith("--")) continue;
+    const name = arg.includes("=") ? arg.slice(0, arg.indexOf("=")) : arg;
+    if (!allowed.has(name)) {
+      io.printErr(`unknown flag: ${name}`);
+      io.exit(2);
+      return false;
+    }
+    if (!arg.includes("=") && (name === "--limit" || name === "--offset")) i += 1;
+  }
+  return true;
 }
 
 function requiredFlag(argv: readonly string[], flag: string): string {

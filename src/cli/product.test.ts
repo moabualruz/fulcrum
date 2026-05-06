@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { parseProductArgs, run as runProduct } from "./product.ts";
 
 function testIo() {
@@ -50,8 +53,19 @@ describe("fulcrum product CLI", () => {
 
   test("product init --json reports application-backed readiness shape", async () => {
     const io = testIo();
-    await runProduct(["init", "--json"], io.opts);
-    expect(JSON.parse(io.out[0]!)).toEqual({ ok: true, schemaApplied: [], org: null });
+    const prevHome = process.env["FULCRUM_HOME"];
+    process.env["FULCRUM_HOME"] = join(await mkdtemp(join(tmpdir(), "fulcrum-product-test-")), ".fulcrum");
+    try {
+      await runProduct(["init", "--json"], io.opts);
+    } finally {
+      if (prevHome === undefined) delete process.env["FULCRUM_HOME"];
+      else process.env["FULCRUM_HOME"] = prevHome;
+    }
+    expect(JSON.parse(io.out[0]!)).toEqual(expect.objectContaining({
+      ok: true,
+      engine: "pglite",
+      org: expect.objectContaining({ slug: "default", name: "Local", created: true }),
+    }));
   });
 
   test("product projects list --json uses caller fixture", async () => {
@@ -127,13 +141,13 @@ describe("fulcrum product CLI", () => {
     }
   });
 
-  test("invalid product arguments exit 1 with validation error", async () => {
+  test("invalid product arguments exit 2 with validation error", async () => {
     const io = testIo();
     await runProduct(["tasks", "create", "--project", "alpha"], {
       ...io.opts,
       caller: { tasks: { create: async () => ({}) } },
     });
-    expect(io.exits).toEqual([1]);
+    expect(io.exits).toEqual([2]);
     expect(io.err[0]).toContain("missing required flag --title");
   });
 });

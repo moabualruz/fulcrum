@@ -41,8 +41,10 @@ export async function run(argv: readonly string[], opts: SettingsRunOptions = {}
 
     switch (verb) {
       case "list":
+        if (!validateFlags(rest, new Set(["--json"]), io)) return;
         return printValue(await settings.list(), rest, io.print);
       case "get": {
+        if (!validateFlags(rest, new Set(["--json"]), io)) return;
         const key = firstArg(rest);
         if (!key) return usage(io, "usage: fulcrum settings get <key>");
         const value = await settings.get({ key });
@@ -54,6 +56,7 @@ export async function run(argv: readonly string[], opts: SettingsRunOptions = {}
         return printValue(value, rest, io.print);
       }
       case "set": {
+        if (!validateFlags(rest, new Set(["--json"]), io)) return;
         const args = positionals(rest);
         const [key, value] = args;
         if (!key || value === undefined) return usage(io, "usage: fulcrum settings set <key> <value>");
@@ -102,4 +105,15 @@ function ioFor(opts: SettingsRunOptions): Required<Pick<SettingsRunOptions, "pri
     printErr: opts.printErr ?? console.error,
     exit: opts.exit ?? process.exit,
   };
+}
+
+function validateFlags(argv: readonly string[], allowed: Set<string>, io: Required<Pick<SettingsRunOptions, "printErr" | "exit">>): boolean {
+  for (const arg of argv) {
+    if (arg.startsWith("--") && !allowed.has(arg)) {
+      io.printErr(`unknown flag: ${arg}`);
+      io.exit(2);
+      return false;
+    }
+  }
+  return true;
 }

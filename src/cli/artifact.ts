@@ -36,6 +36,7 @@ export async function run(argv: readonly string[], opts: ArtifactRunOptions = {}
   try {
     const caller = await resolveCaller(opts);
     if (verb === "list") {
+      if (!validateFlags(rest, new Set(["--json"]), io)) return;
       const rows = await caller.artifacts.list({});
       if (rest.includes("--json")) io.print(JSON.stringify(rows, null, 2));
       else if (rows.length === 0) io.print("no artifacts");
@@ -43,6 +44,7 @@ export async function run(argv: readonly string[], opts: ArtifactRunOptions = {}
       return;
     }
     if (verb === "show") {
+      if (!validateFlags(rest, new Set(["--json"]), io)) return;
       const id = firstArg(rest);
       if (!id) {
         io.printErr("usage: fulcrum artifact show <id> [--json]");
@@ -68,6 +70,17 @@ async function resolveCaller(opts: ArtifactRunOptions): Promise<ArtifactCaller> 
 
 function firstArg(argv: readonly string[]): string | undefined {
   return argv.find((arg) => !arg.startsWith("-"));
+}
+
+function validateFlags(argv: readonly string[], allowed: Set<string>, io: Required<Pick<ArtifactRunOptions, "printErr" | "exit">>): boolean {
+  for (const arg of argv) {
+    if (arg.startsWith("--") && !allowed.has(arg)) {
+      io.printErr(`unknown flag: ${arg}`);
+      io.exit(2);
+      return false;
+    }
+  }
+  return true;
 }
 
 function ioFor(opts: ArtifactRunOptions): Required<Pick<ArtifactRunOptions, "print" | "printErr" | "exit">> {

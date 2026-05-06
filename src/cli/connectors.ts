@@ -66,9 +66,11 @@ export async function run(argv: readonly string[], opts: ConnectorsRunOptions = 
     const caller = sub === "help" || sub === "--help" || sub === "-h" ? null : await resolveCaller(opts);
     switch (sub) {
       case "list":
+        if (!validateFlags(rest, new Set(["--json"]), io)) return;
         io.print(formatConnectorsList(await caller!.connectors.list({}), isJson));
         return;
       case "runs": {
+        if (!validateFlags(rest, new Set(["--json"]), io)) return;
         const kind = rest.find((a) => !a.startsWith("--"));
         if (!kind) {
           io.printErr("usage: fulcrum connectors runs <kind> [--json]");
@@ -104,6 +106,17 @@ function ioFor(opts: ConnectorsRunOptions): Required<Pick<ConnectorsRunOptions, 
     printErr: opts.printErr ?? console.error,
     exit: opts.exit ?? process.exit,
   };
+}
+
+function validateFlags(argv: readonly string[], allowed: Set<string>, io: Required<Pick<ConnectorsRunOptions, "printErr" | "exit">>): boolean {
+  for (const arg of argv) {
+    if (arg.startsWith("--") && !allowed.has(arg)) {
+      io.printErr(`unknown flag: ${arg}`);
+      io.exit(2);
+      return false;
+    }
+  }
+  return true;
 }
 
 function errorMessage(error: unknown): string {

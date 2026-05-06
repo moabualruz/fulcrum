@@ -1,5 +1,7 @@
 import type { Container } from "@needle-di/core";
 
+import { openDatabase, resolveDatabaseConfig } from "../config/database.ts";
+import { applyProductMigrations } from "../db/product-migrations.ts";
 import { createLocalCaller } from "./local-caller.ts";
 
 type ProductCaller = {
@@ -56,6 +58,8 @@ const VALUE_FLAGS = new Set<string>([
   "--title",
 ]);
 const KNOWN_FLAGS = new Set<string>([...BOOLEAN_FLAGS, ...VALUE_FLAGS]);
+const DEFAULT_ORG_SLUG = "default";
+const DEFAULT_ORG_NAME = "Local";
 
 export interface ParsedArgs {
   positionals: string[];
@@ -109,7 +113,7 @@ export async function run(argv: readonly string[], opts: ProductRunOptions = {})
     const caller = verb === "init" ? null : await resolveCaller(opts);
     switch (verb) {
       case "init":
-        return printValue({ ok: true, schemaApplied: [], org: null }, rest, io.print);
+        return await runInit(rest, io);
       case "projects":
         return await runProjects(caller!, rest, io);
       case "tasks":
@@ -130,7 +134,19 @@ export async function run(argv: readonly string[], opts: ProductRunOptions = {})
     }
   } catch (error) {
     io.printErr(`fulcrum product ${verb}: ${(error as Error).message}`);
-    io.exit(1);
+    io.exit(isUsageError(error) ? 2 : 1);
+  }
+}
+
+async function runInit(argv: readonly string[], io: Io): Promise<void> {
+  validateFlags(argv, new Set(["--json"]));
+  const db = await openDatabase(resolveDatabaseConfig());
+  try {
+    const schemaApplied = await applyProductMigrations(db);
+    const org = await ensureLocalOrg(db);
+    return printValue({ ok: true, engine: db.engine, schemaApplied, org }, argv, io.print);
+  } finally {
+    await db.close();
   }
 }
 
@@ -266,6 +282,34 @@ function numberFlag(argv: readonly string[], flag: string): number | undefined {
   return parsed;
 }
 
+async function ensureLocalOrg(db: Awaited<ReturnType<typeof openDatabase>>): Promise<{
+  id: string;
+  slug: string;
+  name: string;
+  created: boolean;
+}> {
+  const existing = await db.query<{ id: string; slug: string; name: string }>(
+    "SELECT id, slug, name FROM orgs WHERE slug = $1",
+    [DEFAULT_ORG_SLUG],
+  );
+  if (existing[0]) return { ...existing[0], created: false };
+  const rows = await db.query<{ id: string; slug: string; name: string }>(
+    "INSERT INTO orgs (id, slug, name) VALUES ($1, $2, $3) RETURNING id, slug, name",
+    [crypto.randomUUID(), DEFAULT_ORG_SLUG, DEFAULT_ORG_NAME],
+  );
+  const org = rows[0];
+  if (!org) throw new Error("failed to create local org");
+  return { ...org, created: true };
+}
+
+function validateFlags(argv: readonly string[], allowed: ReadonlySet<string>): void {
+  for (const token of argv) {
+    if (!token.startsWith("--")) continue;
+    const name = token.includes("=") ? token.slice(0, token.indexOf("=")) : token;
+    if (!allowed.has(name)) throw new Error(`unknown flag: ${name}`);
+  }
+}
+
 type Io = Required<Pick<ProductRunOptions, "print" | "printErr" | "exit">>;
 
 function ioFor(opts: ProductRunOptions): Io {
@@ -274,4 +318,12 @@ function ioFor(opts: ProductRunOptions): Io {
     printErr: opts.printErr ?? console.error,
     exit: opts.exit ?? process.exit,
   };
+}
+
+function isUsageError(error: unknown): boolean {
+  const message = (error as Error).message ?? "";
+  return message.startsWith("unknown flag:") ||
+    message.startsWith("missing value for flag:") ||
+    message.startsWith("flag does not take a value:") ||
+    message.startsWith("missing required flag");
 }
