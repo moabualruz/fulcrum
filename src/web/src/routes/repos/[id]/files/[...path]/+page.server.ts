@@ -1,6 +1,6 @@
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import {
   getFileByPath,
   getFileContent,
@@ -25,7 +25,7 @@ export const load: PageServerLoad = ({ params, url }) => {
   return {
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           const orgId = await getDefaultOrgId(db);
           const repoRows = await db.query<RepoRow>(

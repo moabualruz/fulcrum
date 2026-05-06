@@ -1,12 +1,12 @@
 import type { PageServerLoad, Actions } from "./$types";
-import { openProductDb } from "$lib/server/db";
+import { openDatabase } from "$lib/server/db";
 import { fail } from "@sveltejs/kit";
 
 export const load: PageServerLoad = () => {
   return {
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           await db.query(`
             CREATE TABLE IF NOT EXISTS backups (
@@ -38,7 +38,7 @@ export const load: PageServerLoad = () => {
 
 export const actions: Actions = {
   create: async () => {
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const id = crypto.randomUUID();
       await db.query(
@@ -47,7 +47,7 @@ export const actions: Actions = {
       );
       // Simulate async backup completion
       setTimeout(async () => {
-        const db2 = await openProductDb();
+        const db2 = await openDatabase();
         try {
           await db2.query(
             `UPDATE backups SET status='complete', size_bytes=1024, path='/backups/'||$1||'.json', completed_at=now()::text WHERE id=$1`,

@@ -7,7 +7,7 @@ import { superValidate } from "sveltekit-superforms/server";
 import { valibot } from "sveltekit-superforms/adapters";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "../../../lib/server/db";
+import { openDatabase, getDefaultOrgId } from "../../../lib/server/db";
 import { updateProjectAction, deleteProjectAction } from "../../../lib/server/projects";
 
 // Detail-page rename uses a narrower schema than `ProjectFormSchema` — slug
@@ -56,7 +56,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     typeof parent === "function"
       ? await parent()
       : ({ activeProjectId: null } as { activeProjectId: string | null });
-  const db = await openProductDb();
+  const db = await openDatabase();
   try {
     const orgId = await getDefaultOrgId(db);
     const rows = await db.query<ProjectRow>(
@@ -110,7 +110,7 @@ export const actions: Actions = {
   rename: async ({ params, request }) => {
     const form = await superValidate(request, valibot(RenameSchema));
     if (!form.valid) return fail(400, { form });
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       await updateProjectAction(db, {
@@ -125,7 +125,7 @@ export const actions: Actions = {
     return { form };
   },
   delete: async ({ params }) => {
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       await deleteProjectAction(db, params.id!, orgId);

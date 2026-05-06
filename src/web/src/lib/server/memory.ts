@@ -1,11 +1,11 @@
 /**
- * Memory actions — migrated from raw ProductDb to MikroORM EntityManager.
+ * Memory actions — migrated from raw LegacyDatabaseHandle to MikroORM EntityManager.
  * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
  */
 
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
-import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
+import { eventDispatcher } from "./application-compat";
 import { indexSearchDocumentOrm } from "./orm-helpers.ts";
 
 export type MemoryScope = "project" | "global" | "task" | "user";

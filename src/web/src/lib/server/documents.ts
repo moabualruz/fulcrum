@@ -1,11 +1,11 @@
 /**
- * Document actions — migrated from raw ProductDb to MikroORM EntityManager.
+ * Document actions — migrated from raw LegacyDatabaseHandle to MikroORM EntityManager.
  * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
  */
 
 import type { EntityManager } from "@mikro-orm/postgresql";
-import { newUlid } from "../../../../product-kernel/ids.ts";
-import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
+import { newUlid } from "./application-compat";
+import { eventDispatcher } from "./application-compat";
 import { indexSearchDocumentOrm } from "./orm-helpers.ts";
 
 export interface CreateDocumentInput {

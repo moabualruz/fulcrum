@@ -1,6 +1,6 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "../../../../../lib/server/db";
+import { openDatabase, getDefaultOrgId } from "../../../../../lib/server/db";
 import {
   upsertProjectConnector,
   syncProjectConnector,
@@ -8,7 +8,7 @@ import {
 } from "../../../../../lib/server/project-connectors";
 
 export const load: PageServerLoad = async ({ params }) => {
-  const db = await openProductDb();
+  const db = await openDatabase();
   try {
     const orgId = await getDefaultOrgId(db);
     const projRows = await db.query<{ id: string }>(
@@ -38,7 +38,7 @@ export const actions: Actions = {
         return fail(400, { error: "Invalid config JSON" });
       }
     }
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       await upsertProjectConnector(db, {
@@ -57,7 +57,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const id = fd.get("id") as string | null;
     if (!id) return fail(400, { error: "id required" });
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await syncProjectConnector(db, id);
     } finally {

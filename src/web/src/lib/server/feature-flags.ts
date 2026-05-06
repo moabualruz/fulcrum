@@ -1,5 +1,5 @@
 /**
- * Re-export from product-kernel so web server code can import via $lib alias.
+ * Re-export from kernel compatibility so web server code can import via $lib alias.
  */
 export {
   isFeatureEnabled,
@@ -7,4 +7,4 @@ export {
   loadFeatures,
   getFeatureBackend,
   type FeatureFlag,
-} from "../../../../product-kernel/features.ts";
+} from "./application-compat";

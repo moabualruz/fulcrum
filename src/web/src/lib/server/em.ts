@@ -1,7 +1,7 @@
 /**
  * EntityManager provider for the web server layer.
  *
- * Replaces `openProductDb()` raw SQL access with MikroORM EntityManager.
+ * Replaces `openDatabase()` raw SQL access with MikroORM EntityManager.
  * Each request should call `getEm()` which returns a forked EM for isolation.
  *
  * ARCH-01: Single ORM layer replaces raw SQL.

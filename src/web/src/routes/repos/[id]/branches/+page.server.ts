@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from "./$types";
 import { error, fail } from "@sveltejs/kit";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
-import { newUlid } from "../../../../../../product-kernel/ids.ts";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
+import { newUlid } from "$lib/server/application-compat";
 
 interface RepoRow {
   id: string;
@@ -16,7 +16,7 @@ interface BranchRow {
   is_default: boolean | null;
 }
 
-async function writeOpsEnabled(db: Awaited<ReturnType<typeof openProductDb>>, orgId: string): Promise<boolean> {
+async function writeOpsEnabled(db: Awaited<ReturnType<typeof openDatabase>>, orgId: string): Promise<boolean> {
   const exists = await db.query<{ to_regclass: string | null }>(`SELECT to_regclass('feature_flags')`);
   if (!exists[0]?.to_regclass) return false;
   const rows = await db.query<{ enabled: boolean }>(
@@ -40,7 +40,7 @@ export const load: PageServerLoad = ({ params, locals }) => ({
   activeProjectId: locals?.activeProjectId ?? null,
   streamed: {
     data: (async () => {
-      const db = await openProductDb();
+      const db = await openDatabase();
       try {
         const orgId = await getDefaultOrgId(db);
         const repos = await db.query<RepoRow>(
@@ -84,7 +84,7 @@ export const load: PageServerLoad = ({ params, locals }) => ({
   },
 });
 
-async function requireWriteOps(db: Awaited<ReturnType<typeof openProductDb>>, orgId: string) {
+async function requireWriteOps(db: Awaited<ReturnType<typeof openDatabase>>, orgId: string) {
   if (!(await writeOpsEnabled(db, orgId))) return gated();
   return null;
 }
@@ -93,7 +93,7 @@ export const actions: Actions = {
   create: async ({ params, request }) => {
     const form = await request.formData();
     const name = String(form.get("name") ?? "").trim();
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       const gate = await requireWriteOps(db, orgId);
@@ -112,7 +112,7 @@ export const actions: Actions = {
   checkout: async ({ params, request }) => {
     const form = await request.formData();
     const name = String(form.get("name") ?? "").trim();
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       const gate = await requireWriteOps(db, orgId);
@@ -129,7 +129,7 @@ export const actions: Actions = {
   delete: async ({ params, request }) => {
     const form = await request.formData();
     const name = String(form.get("name") ?? "").trim();
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       const gate = await requireWriteOps(db, orgId);

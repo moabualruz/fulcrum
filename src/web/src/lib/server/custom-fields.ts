@@ -1,11 +1,11 @@
 /**
- * Custom fields — migrated from raw ProductDb to MikroORM EntityManager.
+ * Custom fields — migrated from raw LegacyDatabaseHandle to MikroORM EntityManager.
  * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
  */
 
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
-import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
+import { eventDispatcher } from "./application-compat";
 
 export type FieldType = "text" | "number" | "date" | "select" | "multi_select" | "checkbox";
 

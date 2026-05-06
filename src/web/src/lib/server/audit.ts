@@ -1,5 +1,5 @@
 /**
- * Audit — migrated from raw ProductDb to MikroORM EntityManager.
+ * Audit — migrated from raw LegacyDatabaseHandle to MikroORM EntityManager.
  * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
  */
 

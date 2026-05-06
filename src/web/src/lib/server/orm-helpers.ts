@@ -1,5 +1,5 @@
 /**
- * ORM helper functions replacing product-kernel raw SQL helpers.
+ * ORM helper functions replacing kernel compatibility raw SQL helpers.
  *
  * Where entity stubs lack full column mappings, we use em.getConnection().execute()
  * for raw SQL through the unified MikroORM connection. This consolidates all DB

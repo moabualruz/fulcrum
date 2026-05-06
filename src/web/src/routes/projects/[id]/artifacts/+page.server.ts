@@ -1,5 +1,5 @@
 import type { PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import { listArtifacts, getArtifactStats, type ArtifactRow, type ArtifactStats } from "$lib/server/artifacts";
 
 export const load: PageServerLoad = ({ params, locals }) => {
@@ -10,7 +10,7 @@ export const load: PageServerLoad = ({ params, locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           const orgId = await getDefaultOrgId(db);
           const [artifacts, stats] = await Promise.all([

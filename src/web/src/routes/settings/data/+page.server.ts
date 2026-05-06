@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from "./$types";
-import { openProductDb } from "$lib/server/db";
+import { openDatabase } from "$lib/server/db";
 import { fail } from "@sveltejs/kit";
 
 const ENTITY_KINDS = ["projects", "tasks", "credentials", "feature_flags", "backups"] as const;
@@ -14,7 +14,7 @@ export const actions: Actions = {
     const form = await request.formData();
     const kinds = form.getAll("kinds") as EntityKind[];
     const selected = kinds.length > 0 ? kinds : [...ENTITY_KINDS];
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const result: Record<string, unknown[]> = {};
       for (const kind of selected) {
@@ -60,7 +60,7 @@ export const actions: Actions = {
       return fail(400, { error: "invalid JSON" });
     }
     const obj = parsed as Record<string, unknown[]>;
-    const db = await openProductDb();
+    const db = await openDatabase();
     let totalRows = 0;
     try {
       for (const [, rows] of Object.entries(obj)) {

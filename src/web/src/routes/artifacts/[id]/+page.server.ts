@@ -1,6 +1,6 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import { deleteArtifactAction, readArtifactDetail } from "$lib/server/artifacts";
 import { deleteArtifact } from "../../../../../artifacts/storage.ts";
 
@@ -8,7 +8,7 @@ export const load: PageServerLoad = ({ params }) => {
   return {
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           const orgId = await getDefaultOrgId(db);
           const artifact = await readArtifactDetail(db, { orgId, id: params.id });
@@ -24,7 +24,7 @@ export const load: PageServerLoad = ({ params }) => {
 
 export const actions: Actions = {
   delete: async ({ params, request }) => {
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       const artifact = await readArtifactDetail(db, { orgId, id: params.id! });

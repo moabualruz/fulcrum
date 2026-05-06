@@ -1,5 +1,5 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
-import { newUlid } from "../../../../product-kernel/ids.ts";
+import { newUlid } from "./application-compat";
 
 export interface UpsertDocLinkInput {
   orgId: string;

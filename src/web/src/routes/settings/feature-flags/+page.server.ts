@@ -1,12 +1,12 @@
 import type { PageServerLoad, Actions } from "./$types";
-import { openProductDb } from "$lib/server/db";
+import { openDatabase } from "$lib/server/db";
 import { fail } from "@sveltejs/kit";
 
 export const load: PageServerLoad = () => {
   return {
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           await db.query(`
             CREATE TABLE IF NOT EXISTS feature_flags (
@@ -51,7 +51,7 @@ export const actions: Actions = {
     const data = await request.formData();
     const id = data.get("id") as string;
     if (!id) return fail(400, { error: "id required" });
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await db.query(
         `UPDATE feature_flags SET enabled = NOT enabled, updated_at = now()::text WHERE id = $1`,
@@ -68,7 +68,7 @@ export const actions: Actions = {
     const id = data.get("id") as string;
     const pct = parseInt(data.get("rollout_percent") as string, 10);
     if (!id || isNaN(pct) || pct < 0 || pct > 100) return fail(400, { error: "invalid" });
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await db.query(
         `UPDATE feature_flags SET rollout_percent = $1, updated_at = now()::text WHERE id = $2`,
@@ -91,7 +91,7 @@ export const actions: Actions = {
     } catch {
       return fail(400, { error: "invalid JSON" });
     }
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await db.query(
         `UPDATE feature_flags SET cohort_rules = $1::jsonb, updated_at = now()::text WHERE id = $2`,

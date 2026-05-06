@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import { loadOrchestrationDashboard } from "$lib/server/orchestration";
 import { cancelRunAction, dispatchRunAction, retryRunAction } from "$lib/server/runs";
 import { actionOk } from "$lib/feedback/action-result";
@@ -17,7 +17,7 @@ export const load: PageServerLoad = ({ url, locals }) => {
     projectFilter,
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           const orgId = await getDefaultOrgId(db);
           const [dashboard, projects] = await Promise.all([
@@ -42,7 +42,7 @@ export const actions: Actions = {
     const taskId = (form.get("task_id") as string | null) ?? "";
     if (!taskId) return { success: false, message: "task_id required" };
     const agent = (form.get("agent") as string | null) ?? "codex";
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       const result = await dispatchRunAction(db, { orgId, taskId, agent });
@@ -59,7 +59,7 @@ export const actions: Actions = {
     const form = await request.formData();
     const id = (form.get("run_id") as string | null) ?? "";
     if (!id) return { success: false, message: "run_id required" };
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       await cancelRunAction(db, id, orgId);
@@ -73,7 +73,7 @@ export const actions: Actions = {
     const form = await request.formData();
     const id = (form.get("run_id") as string | null) ?? "";
     if (!id) return { success: false, message: "run_id required" };
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       await retryRunAction(db, id, orgId);

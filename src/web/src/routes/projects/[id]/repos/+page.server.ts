@@ -1,13 +1,13 @@
 import { basename, resolve } from "node:path";
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId, type OrmProductDb } from "../../../../lib/server/db";
+import { openDatabase, getDefaultOrgId, type WebDatabaseHandle } from "../../../../lib/server/db";
 import {
   listReposForProject,
   linkRepoToProject,
   type RepoRow,
-} from "../../../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../../../product-kernel/ids.ts";
+} from "$lib/server/application-compat";
+import { newUlid } from "$lib/server/application-compat";
 
 export interface ProjectRepoCard {
   id: string;
@@ -47,7 +47,7 @@ function toCard(row: RepoRow, _openTasks: number): ProjectRepoCard {
 }
 
 export const load: PageServerLoad = async ({ params }) => {
-  const db = await openProductDb();
+  const db = await openDatabase();
   try {
     const orgId = await getDefaultOrgId(db);
     // Verify project exists
@@ -76,7 +76,7 @@ function slugFromRemoteUrl(url: string): string {
 }
 
 async function insertRepo(
-  db: OrmProductDb,
+  db: WebDatabaseHandle,
   form: FormData,
   projectId: string,
 ): Promise<void> {
@@ -113,7 +113,7 @@ async function insertRepo(
 export const actions: Actions = {
   add: async ({ params, request }) => {
     const form = await request.formData();
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await insertRepo(db, form, params.id);
       return { ok: true };
@@ -130,7 +130,7 @@ export const actions: Actions = {
     const form = await request.formData();
     const repoId = String(form.get("repoId") ?? "").trim();
     if (!repoId) return fail(400, { ok: false, message: "repoId required" });
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await linkRepoToProject(db, repoId, params.id);
       return { ok: true };

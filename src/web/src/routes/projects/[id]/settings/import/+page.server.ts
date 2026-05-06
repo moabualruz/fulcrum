@@ -1,9 +1,9 @@
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "../../../../../lib/server/db";
+import { openDatabase, getDefaultOrgId } from "../../../../../lib/server/db";
 
 export const load: PageServerLoad = async ({ params }) => {
-  const db = await openProductDb();
+  const db = await openDatabase();
   try {
     const orgId = await getDefaultOrgId(db);
     const projRows = await db.query<{ id: string }>(

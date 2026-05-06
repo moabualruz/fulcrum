@@ -1,6 +1,6 @@
 import { redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import { listProfiles, testProfile, maskProfile } from "$lib/server/agents";
 import { dispatchRunAction } from "$lib/server/runs";
 import { actionOk } from "$lib/feedback/action-result";
@@ -21,7 +21,7 @@ export const load: PageServerLoad = ({ locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           const orgId = await getDefaultOrgId(db);
           const [profiles, projects, tasks] = await Promise.all([
@@ -49,7 +49,7 @@ export const actions: Actions = {
     const form = await request.formData();
     const name = form.get("name") as string;
     if (!name) return { success: false, message: "Missing profile name" };
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       const result = await testProfile(db, orgId, name);
@@ -68,7 +68,7 @@ export const actions: Actions = {
     const projectId = (form.get("project_id") as string | null) || null;
     if (!agent || !taskId)
       return { success: false, message: "agent and task_id are required" };
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       const run = await dispatchRunAction(db, { orgId, projectId, taskId, agent });

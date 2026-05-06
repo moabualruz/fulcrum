@@ -1,6 +1,6 @@
 import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import {
   loadOrchestrationConfig,
   upsertOrchestrationConfig,
@@ -13,7 +13,7 @@ export const load: PageServerLoad = ({ locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           const orgId = await getDefaultOrgId(db);
           const config = await loadOrchestrationConfig(db, orgId);
@@ -50,7 +50,7 @@ export const actions: Actions = {
     if (stallTimeoutS < 10 || stallTimeoutS > 86400)
       return fail(400, { error: "Stall timeout must be 10-86400s" });
 
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       await upsertOrchestrationConfig(db, orgId, {

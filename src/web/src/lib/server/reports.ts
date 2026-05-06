@@ -1,10 +1,10 @@
 /**
- * Reports — migrated from raw ProductDb to MikroORM EntityManager.
+ * Reports — migrated from raw LegacyDatabaseHandle to MikroORM EntityManager.
  * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
  */
 
 import type { EntityManager } from "@mikro-orm/postgresql";
-import { isFeatureEnabled } from "../../../../product-kernel/features.ts";
+import { isFeatureEnabled } from "./application-compat";
 
 // ---------- Types ----------
 

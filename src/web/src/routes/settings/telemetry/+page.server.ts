@@ -1,11 +1,11 @@
 import type { PageServerLoad, Actions } from "./$types";
-import { openProductDb } from "$lib/server/db";
+import { openDatabase } from "$lib/server/db";
 
 export const load: PageServerLoad = () => {
   return {
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           await db.query(`
             CREATE TABLE IF NOT EXISTS telemetry_settings (
@@ -41,7 +41,7 @@ export const load: PageServerLoad = () => {
 
 export const actions = {
   toggleOptIn: async () => {
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await db.query(`UPDATE telemetry_settings SET opt_in = NOT opt_in, updated_at = now()::text WHERE id = 'singleton'`);
       return { success: true };
@@ -51,7 +51,7 @@ export const actions = {
   },
 
   purge: async () => {
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await db.query(`DELETE FROM telemetry_events`);
       return { success: true, rowCount: 0 };

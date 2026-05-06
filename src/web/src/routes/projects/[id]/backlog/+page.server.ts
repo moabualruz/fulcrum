@@ -1,13 +1,13 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import {
   addTaskToSprintAction,
   removeTaskFromSprintAction,
 } from "$lib/server/sprints";
 
 export const load: PageServerLoad = async ({ params }) => {
-  const db = await openProductDb();
+  const db = await openDatabase();
   try {
     const orgId = await getDefaultOrgId(db);
     // Verify project exists
@@ -58,7 +58,7 @@ export const actions: Actions = {
     const taskId = fd.get("taskId") as string;
     if (!sprintId || !taskId) return fail(400, { error: "sprintId and taskId required" });
 
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await addTaskToSprintAction(db, { sprintId, taskId });
       return { ok: true };
@@ -74,7 +74,7 @@ export const actions: Actions = {
     const taskId = fd.get("taskId") as string;
     if (!sprintId || !taskId) return fail(400, { error: "sprintId and taskId required" });
 
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await removeTaskFromSprintAction(db, { sprintId, taskId });
       return { ok: true };

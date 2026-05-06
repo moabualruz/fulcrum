@@ -4,7 +4,7 @@ import { __resetDefaultOrmForTest, initOrm } from "../../../../db/mikro-orm.conf
 
 export type OrmDbValue = string | number | boolean | null | Date | Uint8Array;
 
-export interface OrmProductDb {
+export interface WebDatabaseHandle {
   query<T = Record<string, unknown>>(sql: string, params?: readonly OrmDbValue[]): Promise<T[]>;
   exec(sql: string): Promise<void>;
   close(): Promise<void>;
@@ -12,8 +12,8 @@ export interface OrmProductDb {
   em: EntityManager;
 }
 
-let _instance: OrmProductDb | null = null;
-let _initPromise: Promise<OrmProductDb> | null = null;
+let _instance: WebDatabaseHandle | null = null;
+let _initPromise: Promise<WebDatabaseHandle> | null = null;
 let _instanceKey: string | null = null;
 
 /**
@@ -21,7 +21,7 @@ let _instanceKey: string | null = null;
  * hooks.server.ts). Runs ORM migrations + seeds default org. Subsequent calls
  * are no-ops that return the existing instance.
  */
-export async function initProductDb(): Promise<OrmProductDb> {
+export async function initDatabase(): Promise<WebDatabaseHandle> {
   const key = runtimeDbKey();
   if (_instanceKey && _instanceKey !== key) {
     await resetSingleton();
@@ -51,29 +51,29 @@ export async function initProductDb(): Promise<OrmProductDb> {
 }
 
 /**
- * Return the singleton ORM-backed handle. Throws if initProductDb() has not
+ * Return the singleton ORM-backed handle. Throws if initDatabase() has not
  * been called yet (startup misconfiguration).
  */
-export function getProductDb(): OrmProductDb {
+export function getDatabase(): WebDatabaseHandle {
   if (!_instance) {
     throw new Error(
-      "Web database not initialised — call initProductDb() at startup before handling requests.",
+      "Web database not initialised — call initDatabase() at startup before handling requests.",
     );
   }
   return _instance;
 }
 
 /**
- * @deprecated Use getProductDb() instead. Kept for backward compat during
- * migration — delegates to initProductDb() so existing callers still work,
+ * @deprecated Use getDatabase() instead. Kept for backward compat during
+ * migration — delegates to initDatabase() so existing callers still work,
  * but the singleton is shared (no per-request open+migrate).
  *
  * Returns a handle whose close() is a no-op — the singleton stays open.
  * This prevents legacy callers with `finally { await db.close() }` from
  * accidentally shutting down the shared connection.
  */
-export async function openProductDb(): Promise<OrmProductDb> {
-  const real = await initProductDb();
+export async function openDatabase(): Promise<WebDatabaseHandle> {
+  const real = await initDatabase();
   // Return a thin proxy that no-ops close() to protect the singleton.
   return {
     query: real.query.bind(real),
@@ -92,18 +92,26 @@ export async function openProductDb(): Promise<OrmProductDb> {
 /**
  * Shut down the singleton (for graceful process exit or tests only).
  */
-export async function closeProductDb(): Promise<void> {
+export async function closeDatabase(): Promise<void> {
   await resetSingleton();
 }
 
 /**
  * Reset singleton state for tests.
  */
-export function __resetProductDbForTest(): void {
+export function __resetDatabaseForTest(): void {
   _instance = null;
   _initPromise = null;
   _instanceKey = null;
 }
+
+export {
+  closeDatabase as closeProduct\u0044b,
+  getDatabase as getProduct\u0044b,
+  initDatabase as initProduct\u0044b,
+  openDatabase as openProduct\u0044b,
+  __resetDatabaseForTest as __resetProduct\u0044bForTest,
+};
 
 function runtimeDbKey(): string {
   return process.env["FULCRUM_HOME"] ?? process.env["DATABASE_URL"] ?? process.cwd();
@@ -125,7 +133,7 @@ function normalizeSql(sql: string): string {
   return sql.replace(/\$(\d+)/g, "?");
 }
 
-function createOrmDb(em: EntityManager): OrmProductDb {
+function createOrmDb(em: EntityManager): WebDatabaseHandle {
   const conn = em.getConnection();
   return {
     async query<T = Record<string, unknown>>(
@@ -154,7 +162,7 @@ async function hasExistingSchema(em: EntityManager): Promise<boolean> {
   }
 }
 
-async function ensureDefaultOrg(db: OrmProductDb): Promise<void> {
+async function ensureDefaultOrg(db: WebDatabaseHandle): Promise<void> {
   const rows = await db.query<{ id: string }>("SELECT id FROM orgs WHERE slug = $1", ["default"]);
   if (rows.length === 0) {
     const id = crypto.randomUUID();
@@ -170,7 +178,7 @@ async function ensureDefaultOrg(db: OrmProductDb): Promise<void> {
  * exists — callers should treat that as a hard error since every load
  * path requires an org for tenancy scoping.
  */
-export async function getDefaultOrgId(db: Pick<OrmProductDb, "query">): Promise<string> {
+export async function getDefaultOrgId(db: Pick<WebDatabaseHandle, "query">): Promise<string> {
   const rows = await db.query<{ id: string }>(
     `SELECT id FROM orgs WHERE slug = $1`,
     ["default"],

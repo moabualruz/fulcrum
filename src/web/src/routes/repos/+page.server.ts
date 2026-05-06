@@ -1,6 +1,6 @@
 import type { Actions, PageServerLoad } from "./$types";
 import { actionOk } from "$lib/feedback/action-result";
-import { getDefaultOrgId, openProductDb, type OrmProductDb } from "$lib/server/db";
+import { getDefaultOrgId, openDatabase, type WebDatabaseHandle } from "$lib/server/db";
 
 type RepoRow = {
   id: string;
@@ -39,7 +39,7 @@ function isMissingColumn(error: unknown): boolean {
   );
 }
 
-async function listRepos(db: OrmProductDb, orgId: string): Promise<RepoRow[]> {
+async function listRepos(db: WebDatabaseHandle, orgId: string): Promise<RepoRow[]> {
   try {
     const rows = await db.query<RepoRow>(
       `SELECT r.id, r.slug, r.root_path, r.default_branch, r.remote_url,
@@ -101,7 +101,7 @@ async function listRepos(db: OrmProductDb, orgId: string): Promise<RepoRow[]> {
   return rows.map((row) => ({ ...row, lastSyncAt: isoStamp(row.lastSyncAt) }));
 }
 
-async function touchRepo(db: OrmProductDb, repoId: string): Promise<void> {
+async function touchRepo(db: WebDatabaseHandle, repoId: string): Promise<void> {
   try {
     await db.query(`UPDATE repos SET last_seen_at = now() WHERE id = $1`, [repoId]);
   } catch (error) {
@@ -117,7 +117,7 @@ export const load: PageServerLoad = ({ locals }) => {
     activeProjectId,
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           const orgId = locals?.orgId ?? await getDefaultOrgId(db);
           const repos = await listRepos(db, orgId);
@@ -140,7 +140,7 @@ export const actions: Actions = {
     if (trpcProxy?.repos?.syncRepo) {
       await trpcProxy.repos.syncRepo.mutate({ repoId });
     } else {
-      const db = await openProductDb();
+      const db = await openDatabase();
       try {
         await touchRepo(db, repoId);
       } finally {

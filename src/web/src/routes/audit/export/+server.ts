@@ -1,5 +1,5 @@
 import type { RequestHandler } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import { queryAuditEvents, eventsToCsv, eventsToJson } from "$lib/server/audit";
 
 export const GET: RequestHandler = async ({ url }) => {
@@ -11,7 +11,7 @@ export const GET: RequestHandler = async ({ url }) => {
   const since = (url.searchParams.get("since") ?? "").trim() || undefined;
   const until = (url.searchParams.get("until") ?? "").trim() || undefined;
 
-  const db = await openProductDb();
+  const db = await openDatabase();
   try {
     const orgId = await getDefaultOrgId(db);
     // Export up to 100k rows; beyond that would need a job

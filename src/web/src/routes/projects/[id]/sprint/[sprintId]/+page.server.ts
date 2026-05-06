@@ -2,7 +2,7 @@ import { error, fail } from "@sveltejs/kit";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
 import { listBoardTasks } from "$lib/product-queries";
-import { getDefaultOrgId, openProductDb } from "$lib/server/db";
+import { getDefaultOrgId, openDatabase } from "$lib/server/db";
 import { actionFail, actionOk } from "$lib/feedback/action-result";
 import { BoardMoveSchema } from "$lib/server/boards.schema";
 import { createTaskAction, moveTaskStatusAction } from "$lib/server/tasks";
@@ -22,7 +22,7 @@ interface SprintRow {
 }
 
 export const load: PageServerLoad = async ({ params }) => {
-  const db = await openProductDb();
+  const db = await openDatabase();
   try {
     const orgId = await getDefaultOrgId(db);
 
@@ -73,7 +73,7 @@ export const actions: Actions = {
     const status = String(fd.get("status") ?? "pending");
     if (!title) return fail(400, actionFail("Title required"));
 
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       const task = await createTaskAction(db, {
@@ -98,7 +98,7 @@ export const actions: Actions = {
     const parsed = v.safeParse(BoardMoveSchema, fdToRecord(await request.formData()));
     if (!parsed.success) return fail(400, actionFail("invalid input"));
 
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await moveTaskStatusAction(db, parsed.output);
       return actionOk("Task moved");
@@ -114,7 +114,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const goal = String(fd.get("goal") ?? "");
 
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await db.query(`UPDATE sprints SET goal = $1 WHERE id = $2`, [goal, params.sprintId]);
       return actionOk("Goal updated");
@@ -124,7 +124,7 @@ export const actions: Actions = {
   },
 
   closeSprint: async ({ params }) => {
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await db.query(
         `UPDATE sprints SET status = 'completed' WHERE id = $1`,

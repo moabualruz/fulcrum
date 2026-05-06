@@ -2,7 +2,7 @@ import { error } from "@sveltejs/kit";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 
 const execFileAsync = promisify(execFile);
 
@@ -76,7 +76,7 @@ export const load: PageServerLoad = ({ params, url, locals }) => {
     page,
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           const orgId = await getDefaultOrgId(db);
           const rows = await db.query<{

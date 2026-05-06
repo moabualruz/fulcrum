@@ -2,7 +2,7 @@ import { error } from "@sveltejs/kit";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import type { RequestHandler } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import { readArtifactDetail } from "$lib/server/artifacts";
 import { assertArtifactPathInRoot, resolveArtifactStoreRoot } from "../../../../../../artifacts/storage.ts";
 
@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 const { lookup } = require("mime-types") as { lookup: (filename: string) => string | false };
 
 export const GET: RequestHandler = async ({ params }) => {
-  const db = await openProductDb();
+  const db = await openDatabase();
   try {
     const orgId = await getDefaultOrgId(db);
     const artifact = await readArtifactDetail(db, { orgId, id: params.id });

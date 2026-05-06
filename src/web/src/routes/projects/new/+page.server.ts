@@ -4,7 +4,7 @@ import { valibot } from "sveltekit-superforms/adapters";
 import type { Actions, PageServerLoad } from "./$types";
 import { ProjectFormSchema } from "$lib/server/projects.schema";
 import { createProjectAction } from "$lib/server/projects";
-import { openProductDb } from "$lib/server/db";
+import { openDatabase } from "$lib/server/db";
 
 export const load: PageServerLoad = async () => {
   const form = await superValidate(valibot(ProjectFormSchema));
@@ -15,7 +15,7 @@ export const actions: Actions = {
   default: async ({ request }) => {
     const form = await superValidate(request, valibot(ProjectFormSchema));
     if (!form.valid) return fail(400, { form });
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgRows = await db.query<{ id: string }>(
         `SELECT id FROM orgs WHERE slug = $1`,

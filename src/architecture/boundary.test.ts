@@ -226,7 +226,7 @@ describe("Phase 9.5 interface boundary", () => {
 
   test("non-web ProductDb inventory has exact infrastructure allowlists by category", async () => {
     const found = await violations(NON_WEB_INVENTORY_ROOTS, FORBIDDEN_INTERFACE_ACCESS);
-    const allowed = new Set(EXACT_LEGACY_INFRASTRUCTURE_ALLOWLIST.map((entry) => entry.file));
+    const allowed = new Set<string>(EXACT_LEGACY_INFRASTRUCTURE_ALLOWLIST.map((entry) => entry.file));
     expect(found.filter((file) => !allowed.has(file))).toEqual([]);
     expect(EXACT_LEGACY_INFRASTRUCTURE_ALLOWLIST.map((entry) => entry.category)).toEqual([
       "config/database bootstrap",

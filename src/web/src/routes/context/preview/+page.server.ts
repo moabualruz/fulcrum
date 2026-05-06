@@ -1,5 +1,5 @@
 import type { PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import { listMemories } from "$lib/server/memory";
 
 interface ProjectOption {
@@ -63,7 +63,7 @@ export const load: PageServerLoad = ({ url, locals }) => {
     selectedTaskId,
     streamed: {
       options: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           const orgId = await getDefaultOrgId(db);
           const projects = await db.query<ProjectOption>(
@@ -85,7 +85,7 @@ export const load: PageServerLoad = ({ url, locals }) => {
       })(),
       bundle: selectedTaskId
         ? (async (): Promise<ContextBundle> => {
-            const db = await openProductDb();
+            const db = await openDatabase();
             try {
               const orgId = await getDefaultOrgId(db);
 

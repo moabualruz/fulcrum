@@ -1,6 +1,6 @@
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { createProject } from "../../../../product-kernel/store/repositories.ts";
-import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
+import type { LegacyDatabaseHandle } from "./application-compat";
+import { createProject } from "./application-compat";
+import { eventDispatcher } from "./application-compat";
 
 export interface CreateProjectInput {
   orgId: string;
@@ -17,7 +17,7 @@ export interface UpdateProjectInput {
 }
 
 export async function createProjectAction(
-  db: ProductDb,
+  db: LegacyDatabaseHandle,
   input: CreateProjectInput,
 ): Promise<{ id: string }> {
   const project = await createProject(db, input);
@@ -25,7 +25,7 @@ export async function createProjectAction(
 }
 
 export async function updateProjectAction(
-  db: ProductDb,
+  db: LegacyDatabaseHandle,
   input: UpdateProjectInput,
 ): Promise<{ ok: true }> {
   if (!input.id) throw new Error("updateProjectAction: id is required");
@@ -69,7 +69,7 @@ export async function updateProjectAction(
 }
 
 export async function deleteProjectAction(
-  db: ProductDb,
+  db: LegacyDatabaseHandle,
   id: string,
   orgId: string,
 ): Promise<{ ok: true }> {

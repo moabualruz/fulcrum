@@ -1,12 +1,12 @@
 import type { PageServerLoad, Actions } from "./$types";
-import { openProductDb } from "$lib/server/db";
+import { openDatabase } from "$lib/server/db";
 import { fail } from "@sveltejs/kit";
 
 export const load: PageServerLoad = () => {
   return {
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           // Ensure table exists
           await db.query(`
@@ -44,7 +44,7 @@ export const actions: Actions = {
     const value = (data.get("value") as string)?.trim();
     const provider = (data.get("provider") as string)?.trim() ?? "";
     if (!name || !value) return fail(400, { error: "name and value required" });
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await db.query(`
         INSERT INTO credentials (id, name, provider, value_hash, created_at)
@@ -62,7 +62,7 @@ export const actions: Actions = {
     const id = data.get("id") as string;
     const value = (data.get("value") as string)?.trim();
     if (!id || !value) return fail(400, { error: "id and value required" });
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await db.query(
         `UPDATE credentials SET value_hash = $1, last_used_at = now()::text WHERE id = $2`,
@@ -78,7 +78,7 @@ export const actions: Actions = {
     const data = await request.formData();
     const id = data.get("id") as string;
     if (!id) return fail(400, { error: "id required" });
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await db.query(`UPDATE credentials SET archived = NOT archived WHERE id = $1`, [id]);
       return { success: true };
@@ -91,7 +91,7 @@ export const actions: Actions = {
     const data = await request.formData();
     const id = data.get("id") as string;
     if (!id) return fail(400, { error: "id required" });
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await db.query(`DELETE FROM credentials WHERE id = $1`, [id]);
       return { success: true };

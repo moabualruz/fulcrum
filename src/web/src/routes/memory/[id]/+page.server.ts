@@ -1,13 +1,13 @@
 import { error, redirect, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import { getMemory, updateMemoryAction, deleteMemoryAction, MEMORY_SCOPES, type MemoryScope } from "$lib/server/memory";
 
 export const load: PageServerLoad = ({ params, locals }) => ({
   activeProjectId: locals?.activeProjectId ?? null,
   streamed: {
     data: (async () => {
-      const db = await openProductDb();
+      const db = await openDatabase();
       try {
         const orgId = await getDefaultOrgId(db);
         const mem = await getMemory(db, params.id, orgId);
@@ -28,7 +28,7 @@ export const actions: Actions = {
     const key = formData.get("key") as string | null;
     const kind = formData.get("kind") as string | null;
 
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       const updates: Record<string, string> = {};
@@ -44,7 +44,7 @@ export const actions: Actions = {
     }
   },
   delete: async ({ params }) => {
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       await deleteMemoryAction(db, params.id!, orgId);

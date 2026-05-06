@@ -1,6 +1,6 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import { loadWorkflowDef, upsertWorkflowDef } from "$lib/server/orchestration";
 import { actionOk } from "$lib/feedback/action-result";
 
@@ -10,7 +10,7 @@ export const load: PageServerLoad = ({ params, locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           const orgId = await getDefaultOrgId(db);
           const def = await loadWorkflowDef(db, orgId, params.id);
@@ -34,7 +34,7 @@ export const actions: Actions = {
 
     if (!name) return fail(400, { error: "Name is required" });
 
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       await upsertWorkflowDef(db, orgId, {

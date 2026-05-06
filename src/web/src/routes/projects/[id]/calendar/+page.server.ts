@@ -1,12 +1,12 @@
 import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb } from "../../../../lib/server/db";
+import { openDatabase } from "../../../../lib/server/db";
 import { updateTaskAction } from "../../../../lib/server/tasks";
 import { actionFail, actionOk } from "../../../../lib/feedback/action-result";
 
 export const load: PageServerLoad = async ({ params }) => {
   const projectId = params.id;
-  const db = await openProductDb();
+  const db = await openDatabase();
   try {
     // start_date/due_date may not exist; NULL until migration adds them
     const tasks = await db.query<{
@@ -86,7 +86,7 @@ export const actions: Actions = {
 
     if (typeof id !== "string" || !id) return fail(400, actionFail("missing id"));
 
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await updateTaskAction(db, {
         id,

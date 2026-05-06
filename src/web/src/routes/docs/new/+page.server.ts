@@ -7,7 +7,7 @@ import { valibot } from "sveltekit-superforms/adapters";
 import type { Actions, PageServerLoad } from "./$types";
 import { DocumentFormSchema } from "$lib/server/documents.schema";
 import { createDocumentAction } from "$lib/server/documents";
-import { openProductDb } from "$lib/server/db";
+import { openDatabase } from "$lib/server/db";
 import { parseLabels } from "$lib/markdown/labels";
 import { TEMPLATE_BODY_MAP } from "../../../../../docs/template-seeds.ts";
 import type { DocType } from "../../../../../db/entities/docs/enums.ts";
@@ -56,7 +56,7 @@ export const actions: Actions = {
   default: async ({ request }) => {
     const form = await superValidate(request, valibot(DocumentFormSchema));
     if (!form.valid) return fail(400, { form });
-    const db = await openProductDb();
+    const db = await openDatabase();
     let id: string;
     try {
       const orgRows = await db.query<{ id: string }>(

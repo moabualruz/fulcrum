@@ -1,5 +1,5 @@
 /**
- * Reports page server load — uses MikroORM EM from locals (no raw SQL / openProductDb).
+ * Reports page server load — uses MikroORM EM from locals (no raw SQL / openDatabase).
  *
  * Pillar 6: Metrics & reporting. Loads report data server-side via EM from locals.
  * Additional tRPC procedures (e.g. reports.burndown) available client-side.

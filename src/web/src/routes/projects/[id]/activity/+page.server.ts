@@ -1,7 +1,7 @@
 import type { PageServerLoad } from "./$types";
-import { openProductDb } from "$lib/server/db";
+import { openDatabase } from "$lib/server/db";
 import { getDefaultOrgId } from "$lib/server/db";
-import { listEventsFiltered } from "../../../../../../product-kernel/store/repositories.ts";
+import { listEventsFiltered } from "$lib/server/application-compat";
 
 export const load: PageServerLoad = ({ params, url, locals }) => {
   const projectId = params.id;
@@ -15,7 +15,7 @@ export const load: PageServerLoad = ({ params, url, locals }) => {
     filter: { kind, verb, actor },
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           const orgId = await getDefaultOrgId(db);
           const events = await listEventsFiltered(db, {

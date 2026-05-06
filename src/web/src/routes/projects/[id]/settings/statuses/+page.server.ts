@@ -1,6 +1,6 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "../../../../../lib/server/db";
+import { openDatabase, getDefaultOrgId } from "../../../../../lib/server/db";
 import {
   createProjectStatus,
   updateProjectStatus,
@@ -9,7 +9,7 @@ import {
 } from "../../../../../lib/server/project-statuses";
 
 export const load: PageServerLoad = async ({ params }) => {
-  const db = await openProductDb();
+  const db = await openDatabase();
   try {
     const orgId = await getDefaultOrgId(db);
     const projRows = await db.query<{ id: string }>(
@@ -31,7 +31,7 @@ export const actions: Actions = {
     const color = (fd.get("color") as string | null)?.trim() || "#6b7280";
     const isFinal = fd.get("isFinal") === "on";
     if (!name) return fail(400, { error: "Name is required" });
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       await createProjectStatus(db, {
@@ -54,7 +54,7 @@ export const actions: Actions = {
     const color = fd.get("color") as string | null;
     const isFinalRaw = fd.get("isFinal");
     const sortOrderRaw = fd.get("sortOrder") as string | null;
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await updateProjectStatus(db, {
         id,
@@ -72,7 +72,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const id = fd.get("id") as string | null;
     if (!id) return fail(400, { error: "id required" });
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await deleteProjectStatus(db, id);
     } finally {

@@ -7,13 +7,13 @@
 
 import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import {
   getTenantSetting,
   upsertTenantSetting,
   createCredential,
   listConnectorRuns,
-} from "../../../../../../product-kernel/store/settings-connectors-credentials.ts";
+} from "$lib/server/application-compat";
 import { actionOk } from "$lib/feedback/action-result";
 
 function isConnectorLinearEnabled(): boolean {
@@ -33,7 +33,7 @@ export const load: PageServerLoad = ({ locals }) => {
           return { teamId: null, hasApiKey: false, recentRuns: [] };
         }
 
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           const orgId = await getDefaultOrgId(db);
           const teamSetting = await getTenantSetting(db, orgId, "linear.team_id");
@@ -64,7 +64,7 @@ export const actions: Actions = {
 
     if (!teamId) return fail(400, { error: "Team ID is required" });
 
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
 

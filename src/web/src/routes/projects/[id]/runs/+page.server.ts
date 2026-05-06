@@ -1,6 +1,6 @@
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import { loadProjectRuns } from "$lib/server/orchestration";
 
 export const load: PageServerLoad = ({ params, locals }) => {
@@ -9,7 +9,7 @@ export const load: PageServerLoad = ({ params, locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           const orgId = await getDefaultOrgId(db);
           // Verify project exists

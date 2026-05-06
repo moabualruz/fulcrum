@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from "./$types";
-import { openProductDb } from "$lib/server/db";
+import { openDatabase } from "$lib/server/db";
 import { fail } from "@sveltejs/kit";
 
 const PAGE_SIZE = 20;
@@ -10,7 +10,7 @@ export const load: PageServerLoad = ({ url }) => {
     page,
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           await db.query(`
             CREATE TABLE IF NOT EXISTS error_logs (
@@ -60,7 +60,7 @@ export const actions: Actions = {
     const data = await request.formData();
     const before = data.get("before") as string;
     if (!before) return fail(400, { error: "before date required" });
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await db.query(`DELETE FROM error_logs WHERE occurred_at < $1`, [before]);
       return { success: true };

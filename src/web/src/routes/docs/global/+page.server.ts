@@ -1,5 +1,5 @@
 import type { PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import { buildDocTree, type FlatDoc } from "$lib/server/doc-tree";
 
 interface RawRow {
@@ -12,7 +12,7 @@ interface RawRow {
 }
 
 export const load: PageServerLoad = async () => {
-  const db = await openProductDb();
+  const db = await openDatabase();
   try {
     const orgId = await getDefaultOrgId(db);
     // Global docs = documents with no project_id

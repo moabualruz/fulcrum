@@ -2,7 +2,7 @@ import { fail } from "@sveltejs/kit";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
 import { listBoardTasks } from "../../../../lib/product-queries";
-import { openProductDb } from "../../../../lib/server/db";
+import { openDatabase } from "../../../../lib/server/db";
 import {
   createTaskAction,
   deleteTaskAction,
@@ -35,7 +35,7 @@ function fdToRecord(fd: FormData): Record<string, string | null> {
   return out;
 }
 
-async function defaultOrgId(db: Awaited<ReturnType<typeof openProductDb>>): Promise<string | null> {
+async function defaultOrgId(db: Awaited<ReturnType<typeof openDatabase>>): Promise<string | null> {
   const rows = await db.query<{ id: string }>(
     `SELECT id FROM orgs WHERE slug = $1`,
     ["default"],
@@ -50,7 +50,7 @@ export const actions: Actions = {
     const candidate: Record<string, unknown> = { ...raw, projectId: params.id };
     const parsed = v.safeParse(BoardCreateSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await defaultOrgId(db);
       if (!orgId) return fail(500, actionFail("no-org"));
@@ -75,7 +75,7 @@ export const actions: Actions = {
     if (candidate["description"] === "") candidate["description"] = null;
     const parsed = v.safeParse(BoardUpdateSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await updateTaskAction(db, parsed.output);
       return actionOk("Task updated");
@@ -90,7 +90,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const parsed = v.safeParse(BoardDeleteSchema, fdToRecord(fd));
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await deleteTaskAction(db, parsed.output.id);
       return actionOk("Task deleted");
@@ -103,7 +103,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const parsed = v.safeParse(BoardMoveSchema, fdToRecord(fd));
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await moveTaskStatusAction(db, parsed.output);
       return actionOk("Task moved");

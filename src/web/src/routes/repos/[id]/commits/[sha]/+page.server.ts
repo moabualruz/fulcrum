@@ -1,6 +1,6 @@
 import type { PageServerLoad } from "./$types";
 import { error } from "@sveltejs/kit";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 
 interface RepoRow {
   id: string;
@@ -58,7 +58,7 @@ export const load: PageServerLoad = ({ params, url, locals }) => ({
   activeProjectId: locals?.activeProjectId ?? null,
   streamed: {
     data: (async () => {
-      const db = await openProductDb();
+      const db = await openDatabase();
       try {
         const orgId = await getDefaultOrgId(db);
         const repos = await db.query<RepoRow>(

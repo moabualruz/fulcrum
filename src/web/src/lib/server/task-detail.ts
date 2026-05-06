@@ -1,12 +1,12 @@
 /**
- * Task detail — migrated from raw ProductDb to MikroORM EntityManager.
+ * Task detail — migrated from raw LegacyDatabaseHandle to MikroORM EntityManager.
  * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
  */
 
 import type { EntityManager } from "@mikro-orm/postgresql";
 import type { TaskStatus } from "./tasks.ts";
 import { TASK_STATUSES } from "./tasks.ts";
-import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
+import { eventDispatcher } from "./application-compat";
 
 export interface TaskDetail {
   id: string;

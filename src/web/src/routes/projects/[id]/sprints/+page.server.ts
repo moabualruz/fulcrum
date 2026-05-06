@@ -1,7 +1,7 @@
 import { fail } from "@sveltejs/kit";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import { listSprints, getSprintVelocity } from "$lib/product-queries";
 import {
   createSprintAction,
@@ -49,7 +49,7 @@ export const actions: Actions = {
     if (candidate["capacity"]) candidate["capacity"] = Number(candidate["capacity"]);
     const parsed = v.safeParse(CreateSprintSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       await createSprintAction(db, {
@@ -69,7 +69,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const parsed = v.safeParse(StartSprintSchema, fdToRecord(fd));
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await startSprintAction(db, parsed.output.id);
       return actionOk("Sprint started");
@@ -84,7 +84,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const parsed = v.safeParse(CompleteSprintSchema, fdToRecord(fd));
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const { id: sprintId, metrics } = await completeSprintAction(db, parsed.output.id);
 

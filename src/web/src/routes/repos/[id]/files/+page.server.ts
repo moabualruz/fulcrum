@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 
 const execFileAsync = promisify(execFile);
 
@@ -81,7 +81,7 @@ export const load: PageServerLoad = ({ params, url, locals }) => {
     filePath,
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           const orgId = await getDefaultOrgId(db);
           const rows = await db.query<{

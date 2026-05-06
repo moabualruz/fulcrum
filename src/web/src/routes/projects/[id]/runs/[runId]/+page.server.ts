@@ -1,6 +1,6 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { openDatabase, getDefaultOrgId } from "$lib/server/db";
 import { cancelRunAction, retryRunAction, type RunStatus } from "$lib/server/runs";
 import { actionOk } from "$lib/feedback/action-result";
 
@@ -47,7 +47,7 @@ export const load: PageServerLoad = ({ params, locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const db = await openDatabase();
         try {
           const orgId = await getDefaultOrgId(db);
           const rows = await db.query<AgentRunDetail>(
@@ -100,7 +100,7 @@ export const load: PageServerLoad = ({ params, locals }) => {
 
 export const actions: Actions = {
   cancel: async ({ params }) => {
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       await cancelRunAction(db, params.runId!, orgId);
@@ -111,7 +111,7 @@ export const actions: Actions = {
   },
   retry: async ({ params }) => {
     let newId: string;
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       const result = await retryRunAction(db, params.runId!, orgId);

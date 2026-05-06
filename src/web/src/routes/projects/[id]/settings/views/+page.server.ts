@@ -1,6 +1,6 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "../../../../../lib/server/db";
+import { openDatabase, getDefaultOrgId } from "../../../../../lib/server/db";
 import {
   createSavedView,
   updateSavedView,
@@ -11,7 +11,7 @@ import {
 } from "../../../../../lib/server/saved-views";
 
 export const load: PageServerLoad = async ({ params }) => {
-  const db = await openProductDb();
+  const db = await openDatabase();
   try {
     const orgId = await getDefaultOrgId(db);
     const projRows = await db.query<{ id: string }>(
@@ -45,7 +45,7 @@ export const actions: Actions = {
         return fail(400, { error: "Invalid filters JSON" });
       }
     }
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       const orgId = await getDefaultOrgId(db);
       await createSavedView(db, {
@@ -67,7 +67,7 @@ export const actions: Actions = {
     if (!id) return fail(400, { error: "id required" });
     const name = fd.get("name") as string | null;
     const isDefaultRaw = fd.get("isDefault");
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await updateSavedView(db, {
         id,
@@ -83,7 +83,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const id = fd.get("id") as string | null;
     if (!id) return fail(400, { error: "id required" });
-    const db = await openProductDb();
+    const db = await openDatabase();
     try {
       await deleteSavedView(db, id);
     } finally {

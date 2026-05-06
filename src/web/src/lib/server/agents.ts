@@ -1,12 +1,12 @@
 /**
- * Agent profiles — migrated from raw ProductDb to MikroORM EntityManager.
+ * Agent profiles — migrated from raw LegacyDatabaseHandle to MikroORM EntityManager.
  * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
  */
 
 import type { EntityManager } from "@mikro-orm/postgresql";
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
+import type { LegacyDatabaseHandle } from "./application-compat";
 import { randomUUID } from "node:crypto";
-import { eventDispatcher } from "../../../../product-kernel/event-dispatcher.ts";
+import { eventDispatcher } from "./application-compat";
 
 export interface AgentProfileRow {
   id: string;
@@ -37,7 +37,7 @@ export async function listProfiles(
 }
 
 export async function getProfile(
-  db: EntityManager | ProductDb,
+  db: EntityManager | LegacyDatabaseHandle,
   orgId: string,
   name: string,
 ): Promise<AgentProfileRow | null> {
