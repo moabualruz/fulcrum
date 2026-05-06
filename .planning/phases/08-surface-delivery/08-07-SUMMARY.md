@@ -2,7 +2,7 @@
 phase: 08-surface-delivery
 plan: 7
 status: completed
-completed_at: "2026-05-06T02:02:34Z"
+completed_at: "2026-05-06T03:03:17Z"
 commits: [d0a3c14b]
 requirements_completed: [CLI-01, CLI-05, CLI-06, CLI-07, TUI-02, TUI-07, WEB-08, WEB-10, API-03]
 ---
@@ -21,9 +21,8 @@ requirements_completed: [CLI-01, CLI-05, CLI-06, CLI-07, TUI-02, TUI-07, WEB-08,
 - PASS: `bun run lint`
 - PASS: focused Phase 08 gate subset — 72 pass, 0 fail.
 - PASS: routing targeted suite — 29 pass, 0 fail.
-- PASS: broad `bun run ci` test section before build fix — 4616 pass, 2 skip, 7 todo, 0 fail.
 - PASS: `bun run scripts/build-all.ts` after OpenTUI optional-native externalization — all five configured targets built.
-- INTERRUPTED: final post-fix `bun run ci` rerun was stopped by the tool before final summary; it had repeated passing sections and showed no product failure after the build fix.
+- PASS: final `bun run ci` — all 15 stages green; root tests 4617 pass, 2 skip, 7 todo, 0 fail; web tests 196 pass; Playwright smoke 2 passed.
 
 ## Notes
 

@@ -2,7 +2,7 @@
 phase: 08-surface-delivery
 type: uat
 status: pass
-last_updated: "2026-05-06T02:02:34Z"
+last_updated: "2026-05-06T03:03:17Z"
 ---
 
 # Phase 08 UAT
@@ -12,9 +12,8 @@ last_updated: "2026-05-06T02:02:34Z"
 - PASS: `bun run lint`
 - PASS: `bun test src/cli/doctor.test.ts src/cli/__tests__/phase08-cli-parity.test.ts tests/tui/routing-rules.test.ts tests/trpc/tasks-crud.test.ts tests/platform/doctor-checks.test.ts` — 72 pass, 0 fail.
 - PASS: `bun test src/router/routing-service.test.ts src/server/trpc/routers/__tests__/routing.test.ts` — 29 pass, 0 fail.
-- PASS: broad `bun run ci` test section before final build fix — 4616 pass, 2 skip, 7 todo, 0 fail.
 - PASS: `bun run scripts/build-all.ts` after OpenTUI optional-native externalization — darwin arm64/x64, linux x64/arm64, windows x64 binaries built.
-- INTERRUPTED: post-fix `bun run ci` rerun was stopped by the tool before final summary after repeated passing sections; no product failure observed after the build fix.
+- PASS: final `bun run ci` — 15/15 stages green; root tests 4617 pass, 2 skip, 7 todo, 0 fail; `web:check` 0 errors, 148 warnings; `web:test` 196 pass; `web:e2e:smoke` 2 passed.
 
 Direct Phase 08 parity coverage:
 
@@ -58,7 +57,7 @@ Huashu gate:
 - WEB-05 PASS: Gantt route renders dependency-oriented task data.
 - WEB-06 PASS: Calendar route renders tasks by due date.
 - WEB-07 PASS: Playwright Phase 08 surface delivery spec enumerates the 14 required journeys.
-- WEB-08 PASS: Web gate coverage is restored in the Phase 08 gate set; broad CI test section passed before build fix.
+- WEB-08 PASS: Web gate coverage is restored in the Phase 08 gate set; final `bun run ci` passed `web:check`, `web:build`, `web:test`, and `web:e2e:smoke`.
 - WEB-09 PASS: Dark mode persistence remains covered by web route/state tests.
 - WEB-10 PASS: Route render coverage is included in Phase 08 web and API parity tests.
 - WEB-11 PASS: Collaboration flag surfaces presence/cursor verification in the web journey set.

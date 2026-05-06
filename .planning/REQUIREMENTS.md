@@ -332,10 +332,10 @@
 | REP-01..07 | Phase 7 | Pending |
 | ART-01..06 | Phase 7 | Pending |
 | NTF-01..09 | Phase 7 | Pending |
-| CLI-01..07 | Phase 8 | Pending |
-| TUI-01..08 | Phase 8 | Pending |
-| WEB-01..11 | Phase 8 | Pending |
-| API-01..05 | Phase 8 | Pending |
+| CLI-01..07 | Phase 8 | Complete |
+| TUI-01..08 | Phase 8 | Complete |
+| WEB-01..11 | Phase 8 | Complete |
+| API-01..05 | Phase 8 | Complete |
 | XCT-01..12 | Phase 9 | Pending |
 | TST-01..10 | Each phase (TST-10) + Phase 9 | Pending |
 | SAS-01..06 | Phase 10 | Pending |

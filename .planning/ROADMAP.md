@@ -259,13 +259,15 @@ Plans:
 **Depends on**: Phases 5-7 (backend features must exist)
 **Requirements**: CLI-01..07, TUI-01..08, WEB-01..11, API-01..05
 **TDD**: CLI command tests; TUI screen tests; Playwright e2e; API Zod validation tests
+**Status**: Complete — all 7 Phase 08 plans executed and verified by full `bun run ci` on 2026-05-06.
 **Success Criteria**:
   1. Every CLI command wired — zero "not wired yet"; 15 domains covered; `--json` everywhere; binary builds
   2. TUI on OpenTUI with JSX (or ratatui fallback if OpenTUI insufficient); all screens functional via tRPC
   3. shadcn-svelte verified; LayerChart, DnD, TipTap confirmed; Playwright covers 14 journeys
   4. Single REST API with valid OpenAPI spec; rate limiting; every procedure Zod-tested
   5. Dead code removed: `app.ts` in TUI, stub routers, generated stubs replaced with real implementations
-**Plans:** TBD
+**Plans:** Complete — 08-01 through 08-07 delivered. Canonical evidence: `.planning/phases/08-surface-delivery/08-UAT.md`.
+**Verification**: `bun run ci` passed all 15 stages: root tests 4617 pass / 2 skip / 7 todo / 0 fail, web tests 196 pass, Playwright smoke 2 passed.
 **UI hint**: yes
 
 ### Phase 9: Cross-Cutting + Testing

@@ -2,26 +2,26 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-last_updated: "2026-05-06T02:25:53.397Z"
+status: Ready for Phase 09
+last_updated: "2026-05-06T03:03:17Z"
 progress:
   total_phases: 10
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 86
-  completed_plans: 75
-  percent: 87
+  completed_plans: 82
+  percent: 95
 ---
 
 # Planning State
 
 ## Current Position
 
-Phase: 08 (surface-delivery) — EXECUTED
-Plan: 7 of 7 completed
+Phase: 09 (cross-cutting-testing) — READY
+Plan: pending
 
 - **Phase**: 08-surface-delivery
 - **Plan**: 7 of 7 completed
-- **Status**: Phase 8 EXECUTED — all 7 plans delivered. Requirement-level UAT recorded in `.planning/phases/08-surface-delivery/08-UAT.md`. Broad test gate passed before final build fix; cross-target build gate passed after OpenTUI optional-native externalization; final post-fix CI rerun was interrupted by the tool before summary with no product failure observed.
+- **Status**: Phase 8 COMPLETE — all 7 plans delivered. Requirement-level UAT recorded in `.planning/phases/08-surface-delivery/08-UAT.md`. Final `bun run ci` passed on 2026-05-06: 15/15 stages green; root tests 4617 pass / 2 skip / 7 todo / 0 fail; web tests 196 pass; Playwright smoke 2 passed.
 - **Branch**: dev/v1.0
 
 ## Decisions
