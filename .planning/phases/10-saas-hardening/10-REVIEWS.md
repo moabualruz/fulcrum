@@ -179,3 +179,85 @@ HIGH. Methodology is sound, but volume and coupling are too high for the current
 - Gemini treated PGlite/RLS behavior as HIGH; other reviewers treated it as MEDIUM but agreed it needs explicit handling.
 - Claude considered Testcontainers/Bun compatibility a MEDIUM risk; other reviewers did not emphasize it.
 - OpenCode requested a separate deployment plan; others implied operational hardening but did not rank it as strongly.
+
+---
+
+# Cycle 2 Review — After 19-Plan Replan
+
+**Review date:** 2026-05-06
+**Reviewers:** Gemini, Claude, OpenCode, LM Studio
+**Plans reviewed:** 10-00 through 10-18
+
+## CYCLE_SUMMARY
+
+`current_high=2; current_medium=5; current_low=3; verdict=REPLAN_REQUIRED`
+
+OpenCode and LM Studio returned no HIGH blockers. Gemini and Claude both identified migration timestamp coordination across closure migrations as the remaining structural blocker. Both also noted residual plan density in connector/enterprise plans, but treated it as velocity risk rather than a hard execution blocker once the original 10-11/10-12 mega-plans were split.
+
+## Gemini Cycle 2
+
+### HIGH
+
+- Closure plan density remains substantial in 10-12, 10-13, and 10-14.
+- Concurrent migration collisions remain possible in waves 6-8 without explicit timestamp allocation.
+
+### MEDIUM
+
+- EventBus reconnect/backoff needs explicit failure test.
+- `graphile-worker@0.16.6` needs version availability verification.
+- Auth login closure must not leave interactive login unaddressed.
+- RLS UUID cast safety needs explicit verification.
+- Huashu score persistence is manual evidence and must not be implied as CI-generated.
+
+## Claude Cycle 2
+
+### HIGH
+
+- Migration ordering across closure waves 6-8 remains implicit.
+
+### MEDIUM
+
+- EventBus reconnect/backoff acceptance criteria too string-based.
+- `graphile-worker@0.16.6` pin needs fast dependency resolution check.
+- CLI login closure should assert exactly one selected path.
+- RLS unset/malformed tenant setting behavior should be tested.
+- Huashu numeric scores are manual review evidence, not automated gates.
+
+## OpenCode Cycle 2
+
+### Verdict
+
+`current_high=0; verdict=CONVERGED`
+
+### MEDIUM
+
+- Migration timestamp coordination undocumented.
+- 10-15 remains broad but is acceptable with gated adapters.
+- Cross-process test language should be tightened.
+
+## LM Studio Cycle 2
+
+### Verdict
+
+`current_high=0; verdict=CONVERGED`
+
+### MEDIUM
+
+- 10-14 connector/workflow density remains integration risk.
+
+## Cycle 2 Replan Applied
+
+- Added explicit closure migration timestamp allocations:
+  - 10-11: `Migration20260507110000_`..`115959_`
+  - 10-12: `Migration20260507120000_`..`125959_`
+  - 10-13: `Migration20260507130000_`..`135959_`
+  - 10-14: `Migration20260507140000_`..`145959_`
+  - 10-15: `Migration20260507150000_`..`155959_`
+- Added validation-level migration allocation rule.
+- Tightened 10-04 EventBus test to require separate Node.js subprocesses and listener disconnect/reconnect proof.
+- Tightened 10-17 deployment smoke to require subprocesses or an explicit blocker, not same-process equivalence.
+- Added graphile-worker dependency resolution precheck before implementation proceeds.
+- Tightened 10-10 auth login closure to assert `login_supported xor login_removed`.
+- Clarified 10-18 Huashu scores as manual reviewer evidence while automated tests enforce source/UI constraints.
+- Added product-surface parity append-only conventions per plan to reduce shared-file merge conflict risk.
+- Added independent adapter gating note to 10-15 so enterprise adapter failures do not block unrelated local-first flows.

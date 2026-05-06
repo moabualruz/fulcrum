@@ -63,6 +63,8 @@ created: 2026-05-06
 | 10-17-01 | 17 | 9 | SAS-01,SAS-02,SAS-03,SAS-05,SAS-06,CLOSURE-17 | T10-17-01 | Deployment, migration, backup/restore, and cross-process operations are proven. | integration | `bun test tests/postgres/operations.test.ts tests/platform/deployment-smoke.test.ts tests/db/migration-downgrade.test.ts` | W0 | pending |
 | 10-18-01 | 18 | 10 | SAS-01..06,CLOSURE-01..18 | T10-18-01 | Huashu gates, parity matrix, and final UAT cover every requirement after all implementation plans. | ui/integration | `bun test tests/web/phase10-huashu-routes.test.ts tests/cli/phase10-huashu-cli.test.ts tests/tui/phase10-huashu-tui.test.ts tests/platform/phase10-parity-matrix.test.ts && bun run ci` | W0 | pending |
 
+Migration timestamp allocation: 10-11 uses `Migration20260507110000_`..`115959_`; 10-12 uses `120000_`..`125959_`; 10-13 uses `130000_`..`135959_`; 10-14 uses `140000_`..`145959_`; 10-15 uses `150000_`..`155959_`. Implementers must update this validation file before adding a closure migration outside these ranges.
+
 *Status: pending · green · red · flaky*
 
 ---
