@@ -8,6 +8,7 @@ import {
   ENTITY_MANAGER_TOKEN,
   registerDbBindings,
 } from "../../db/db.module.ts";
+import { Session } from "../../db/entities/auth/Session.ts";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -527,16 +528,23 @@ function buildCliContext(container: Container | null): { container: Container; e
 }
 
 async function resolveActiveCliSession(em: EntityManager): Promise<Record<string, unknown> | null> {
-  const rows = await em.getConnection().execute(
-    "select s.* from sessions s join users u on u.id = s.user_id order by s.created_at desc limit 1",
-  ) as Array<Record<string, unknown>>;
-  const row = rows[0];
-  if (!row) return null;
+  const session = await em.findOne(
+    Session,
+    { expiresAt: { $gt: new Date() } },
+    { orderBy: { createdAt: "DESC" } },
+  );
+  if (!session) return null;
   return {
-    ...row,
-    userId: row["user_id"] ?? row["userId"],
-    orgId: row["org_id"] ?? row["orgId"],
-    activeOrganizationId: row["active_organization_id"] ?? row["activeOrganizationId"],
+    id: session.id,
+    token: session.id,
+    userId: session.userId,
+    orgId: session.orgId,
+    activeOrganizationId: session.activeOrganizationId ?? session.orgId,
+    expiresAt: session.expiresAt,
+    createdAt: session.createdAt,
+    updatedAt: session.createdAt,
+    ipAddress: session.ipAddress ?? null,
+    userAgent: session.userAgent ?? "fulcrum-cli",
   };
 }
 

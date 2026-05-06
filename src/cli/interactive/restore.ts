@@ -2,8 +2,11 @@
 
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
-import type { ProductDb } from "../../product-kernel/db/types.ts";
 import { InteractiveRequiredError } from "./errors.ts";
+
+interface LegacySqlDb {
+  query<T = unknown>(sql: string, params?: unknown[]): Promise<T[]>;
+}
 
 // Restore order: parents before children (FK deps).
 const RESTORE_ORDER = [
@@ -32,7 +35,7 @@ export interface RestoreOptions {
 
 /** Restore DB rows from backup tarball manifest. */
 export async function restoreBackup(
-  db: ProductDb,
+  db: LegacySqlDb,
   opts: RestoreOptions,
 ): Promise<void> {
   if (!(await exists(opts.input))) {
@@ -110,7 +113,7 @@ export interface InteractiveRestoreOptions {
  * (exit 7) because confirmation prompt cannot be shown.
  */
 export async function runInteractiveRestore(
-  db: ProductDb,
+  db: LegacySqlDb,
   opts: InteractiveRestoreOptions,
 ): Promise<void> {
   if (opts.nonInteractive) {

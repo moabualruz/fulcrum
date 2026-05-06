@@ -1,9 +1,12 @@
 // fulcrum init — interactive org + admin@local user seeding.
 // Idempotent: no-op after first successful run.
 
-import type { ProductDb } from "../../product-kernel/db/types.ts";
-import { newUlid } from "../../product-kernel/ids.ts";
 import { InteractiveRequiredError } from "./errors.ts";
+
+interface LegacySqlDb {
+  query<T = unknown>(sql: string, params?: unknown[]): Promise<T[]>;
+  exec(sql: string): Promise<unknown>;
+}
 
 export interface SeedResult {
   created: boolean;
@@ -12,7 +15,7 @@ export interface SeedResult {
 }
 
 /** Seed default org + admin@local user. Idempotent. */
-export async function seedOrgAndAdmin(db: ProductDb): Promise<SeedResult> {
+export async function seedOrgAndAdmin(db: LegacySqlDb): Promise<SeedResult> {
   const existing = await db.query<{ id: string }>(
     "SELECT id FROM orgs WHERE slug = $1",
     ["default"],
@@ -26,8 +29,8 @@ export async function seedOrgAndAdmin(db: ProductDb): Promise<SeedResult> {
     return { created: false, orgId, userId: existingUser[0]?.id ?? "" };
   }
 
-  const orgId = newUlid();
-  const userId = newUlid();
+  const orgId = crypto.randomUUID();
+  const userId = crypto.randomUUID();
 
   await db.exec(`
     INSERT INTO orgs (id, slug, name) VALUES ('${orgId}', 'default', 'Default Org');
@@ -48,7 +51,7 @@ export interface InitOptions {
  * prompt would be needed (i.e. no existing org).
  */
 export async function runInteractiveInit(
-  db: ProductDb,
+  db: LegacySqlDb,
   opts: InitOptions = {},
 ): Promise<SeedResult> {
   // Check if org already exists — if so, no prompt needed.

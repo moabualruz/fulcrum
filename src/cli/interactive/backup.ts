@@ -2,8 +2,11 @@
 
 import { mkdir, readdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
-import type { ProductDb } from "../../product-kernel/db/types.ts";
 import { InteractiveRequiredError } from "./errors.ts";
+
+interface LegacySqlDb {
+  query<T = unknown>(sql: string, params?: unknown[]): Promise<T[]>;
+}
 
 // Tables to dump (order matters for FK deps).
 const DUMP_TABLES = [
@@ -32,7 +35,7 @@ async function exists(p: string): Promise<boolean> {
 
 /** Dump all table rows as JSON, pack into tarball with artifacts manifest. */
 export async function createBackup(
-  db: ProductDb,
+  db: LegacySqlDb,
   opts: BackupOptions,
 ): Promise<void> {
   const dump: Record<string, unknown[]> = {};
@@ -106,7 +109,7 @@ export interface InteractiveBackupOptions {
  * --output was not provided (prompt would be needed for destination path).
  */
 export async function runInteractiveBackup(
-  db: ProductDb,
+  db: LegacySqlDb,
   opts: InteractiveBackupOptions,
 ): Promise<void> {
   let output = opts.output;

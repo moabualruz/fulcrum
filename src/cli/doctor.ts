@@ -13,9 +13,16 @@ import { scanSkillBudgets, type SkillBudgetReport } from "./skill-budget.ts";
 import { auditPackageParity, type PackageParityReport } from "./package-parity.ts";
 import { planPackageMirrorTargets } from "./package-mirror.ts";
 import { getPackageSurfaceManifest, MANAGED_PACKAGE_IDS, packageCacheSourceRoot } from "./package-surfaces.ts";
-import { runMemoryDoctorChecks, type MemoryDoctorReport, type SubsystemCheck } from "../product-kernel/memory-doctor.ts";
 import { runPlatformDoctorChecks, type PlatformDoctorCheck } from "../platform/doctor-checks.ts";
 import { listProfiles } from "../agents/registry.ts";
+import {
+  buildMemoryEngineDoctorReport,
+  buildProductKernelDoctorReport,
+  buildReposDoctorReport,
+  type MemoryDoctorReport,
+  type ProductKernelDoctorReport,
+  type ReposDoctorReport,
+} from "../infrastructure/doctor/legacy-db.ts";
 
 interface ToolCheck {
   cmd: string;
@@ -87,27 +94,8 @@ interface DoctorReport {
     database: string;
     packageParity: PackageParityReport[];
   };
-  productKernel: {
-    engine: "pglite" | "postgres" | "absent";
-    dbPath: string;
-    schemaApplied: number;
-    rows: {
-      orgs: number;
-      projects: number;
-      documents: number;
-      tasks: number;
-      agentRuns: number;
-    };
-    latestEventAt: string | null;
-    error?: string;
-  };
-  repos: {
-    totalRepos: number;
-    syncErrors: number;
-    activeWatchers: number;
-    lruQueueDepth: number;
-    mirrorDiskGb: number;
-  };
+  productKernel: ProductKernelDoctorReport;
+  repos: ReposDoctorReport;
   memoryEngine: MemoryDoctorReport;
   platformChecks: PlatformDoctorCheck[];
   memoriesSchema?: { subsystem: string; ok: boolean };
@@ -556,39 +544,6 @@ async function countInstalledComponents(): Promise<number> {
   }
 }
 
-async function buildMemoryEngineReport(
-  productKernel: DoctorReport["productKernel"],
-): Promise<{ memoryEngine: MemoryDoctorReport; warnings: number; errors: number }> {
-  let db: import("../product-kernel/db/types.ts").ProductDb | null = null;
-  if (productKernel.engine === "pglite" && !productKernel.error) {
-    try {
-      const { openPglite } = await import("../product-kernel/db/pglite.ts");
-      db = await openPglite(productKernel.dbPath);
-    } catch { /* use null db */ }
-  } else {
-    try {
-      const { mkdtemp } = await import("node:fs/promises");
-      const { tmpdir } = await import("node:os");
-      const { join } = await import("node:path");
-      const { openPglite } = await import("../product-kernel/db/pglite.ts");
-      const { applyProductMigrations } = await import("../db/product-migrations.ts");
-      db = await openPglite(join(await mkdtemp(join(tmpdir(), "fulcrum-doctor-memory-")), "db"));
-      await applyProductMigrations(db);
-    } catch { /* use null db */ }
-  }
-  const memoryEngine = await runMemoryDoctorChecks(db);
-  if (db) {
-    try { await db.close(); } catch { /* ignore */ }
-  }
-  let warnings = 0;
-  let errors = 0;
-  for (const check of memoryEngine.checks) {
-    if (check.status === "error") errors += 1;
-    else if (check.status === "warning") warnings += 1;
-  }
-  return { memoryEngine, warnings, errors };
-}
-
 async function buildPlatformReport(): Promise<{ platformChecks: PlatformDoctorCheck[]; warnings: number; errors: number }> {
   const platformChecks = await runPlatformDoctorChecks();
   let warnings = 0;
@@ -696,7 +651,7 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
   const componentDatabase = componentLedgerPath();
   const installedComponents = await countInstalledComponents();
   const packageParity = await buildPackageParityReport(home);
-  const productKernel = await buildProductKernelReport();
+  const productKernel = await buildProductKernelDoctorReport();
   if (productKernel.error) {
     warnings += 1;
     warningsList.push({
@@ -704,11 +659,11 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       message: productKernel.error,
     });
   }
-  const repos = await buildReposReport(productKernel);
+  const repos = await buildReposDoctorReport(productKernel);
   if (repos.syncErrors > 0 || repos.mirrorDiskGb > 10) {
     errors += 1;
   }
-  const memoryBuilt = await buildMemoryEngineReport(productKernel);
+  const memoryBuilt = await buildMemoryEngineDoctorReport(productKernel);
   warnings += memoryBuilt.warnings;
   errors += memoryBuilt.errors;
   const platformBuilt = await buildPlatformReport();
@@ -774,128 +729,6 @@ async function buildPackageParityReport(home: string): Promise<PackageParityRepo
     }
   }
   return reports;
-}
-
-async function buildProductKernelReport(): Promise<DoctorReport["productKernel"]> {
-  const { resolveDatabaseConfig } = await import("../config/database.ts");
-  const config = resolveDatabaseConfig();
-  if (config.backend !== "pglite") {
-    return {
-      engine: "absent",
-      dbPath: config.url,
-      schemaApplied: 0,
-      rows: { orgs: 0, projects: 0, documents: 0, tasks: 0, agentRuns: 0 },
-      latestEventAt: null,
-    };
-  }
-  const dbPath = config.dataDir;
-  const exists = await Bun.file(`${dbPath}/PG_VERSION`).exists();
-  if (!exists) {
-    return {
-      engine: "absent",
-      dbPath,
-      schemaApplied: 0,
-      rows: { orgs: 0, projects: 0, documents: 0, tasks: 0, agentRuns: 0 },
-      latestEventAt: null,
-    };
-  }
-  try {
-    const { openPglite } = await import("../product-kernel/db/pglite.ts");
-    const db = await openPglite(dbPath);
-    try {
-      const schemaRows = await db.query<{ count: number }>(
-        `SELECT COUNT(*)::int AS count FROM pg_class WHERE relname = 'schema_migrations' AND relkind = 'r'`,
-      );
-      if ((schemaRows[0]?.count ?? 0) === 0) {
-        return {
-          engine: "pglite",
-          dbPath,
-          schemaApplied: 0,
-          rows: { orgs: 0, projects: 0, documents: 0, tasks: 0, agentRuns: 0 },
-          latestEventAt: null,
-        };
-      }
-      const applied = await db.query<{ count: number }>(
-        `SELECT COUNT(*)::int AS count FROM schema_migrations`,
-      );
-      const counts = await db.query<{
-        orgs: number;
-        projects: number;
-        documents: number;
-        tasks: number;
-        agent_runs: number;
-      }>(
-        `SELECT (SELECT COUNT(*)::int FROM orgs) AS orgs,
-                (SELECT COUNT(*)::int FROM projects) AS projects,
-                (SELECT COUNT(*)::int FROM documents) AS documents,
-                (SELECT COUNT(*)::int FROM tasks) AS tasks,
-                (SELECT COUNT(*)::int FROM agent_runs) AS agent_runs`,
-      );
-      const latest = await db.query<{ created_at: string | null }>(
-        `SELECT created_at FROM events ORDER BY created_at DESC, id DESC LIMIT 1`,
-      );
-      return {
-        engine: "pglite",
-        dbPath,
-        schemaApplied: applied[0]?.count ?? 0,
-        rows: {
-          orgs: counts[0]?.orgs ?? 0,
-          projects: counts[0]?.projects ?? 0,
-          documents: counts[0]?.documents ?? 0,
-          tasks: counts[0]?.tasks ?? 0,
-          agentRuns: counts[0]?.agent_runs ?? 0,
-        },
-        latestEventAt: latest[0]?.created_at ?? null,
-      };
-    } finally {
-      await db.close();
-    }
-  } catch (err) {
-    return {
-      engine: "absent",
-      dbPath,
-      schemaApplied: 0,
-      rows: { orgs: 0, projects: 0, documents: 0, tasks: 0, agentRuns: 0 },
-      latestEventAt: null,
-      error: (err as Error).message,
-    };
-  }
-}
-
-async function buildReposReport(
-  productKernel: DoctorReport["productKernel"],
-): Promise<DoctorReport["repos"]> {
-  const empty = {
-    totalRepos: 0,
-    syncErrors: 0,
-    activeWatchers: 0,
-    lruQueueDepth: 0,
-    mirrorDiskGb: 0,
-  };
-
-  if (productKernel.engine !== "pglite" || productKernel.error) {
-    return empty;
-  }
-
-  try {
-    const { openPglite } = await import("../product-kernel/db/pglite.ts");
-    const { getReposDoctorStats } = await import("../product-kernel/store/repos.ts");
-    const db = await openPglite(productKernel.dbPath);
-    try {
-      const stats = await getReposDoctorStats(db);
-      return {
-        totalRepos: stats.totalRepos,
-        syncErrors: stats.syncErrors,
-        activeWatchers: 0,
-        lruQueueDepth: 0,
-        mirrorDiskGb: stats.mirrorDiskBytes / 1_073_741_824,
-      };
-    } finally {
-      await db.close();
-    }
-  } catch {
-    return empty;
-  }
 }
 
 function printHumanFormat(report: DoctorReport, home: string): void {

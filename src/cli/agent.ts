@@ -1,10 +1,6 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
-import { openPglite } from "../product-kernel/db/pglite.ts";
-import { applyProductMigrations } from "../db/product-migrations.ts";
-import { productDbDir } from "../product-kernel/paths.ts";
-import type { ProductDb } from "../product-kernel/db/types.ts";
-import { dispatchRunAction } from "../services/runs.ts";
+import type { Container } from "@needle-di/core";
+
+import { createLocalCaller } from "./local-caller.ts";
 
 const HELP = `fulcrum agent — agent run commands
 
@@ -19,53 +15,61 @@ interface ParsedArgs {
   flags: Record<string, string | true>;
 }
 
-async function openProductDb(): Promise<ProductDb> {
-  const dir = productDbDir();
-  await mkdir(dir, { recursive: true });
-  const db = await openPglite(join(dir, "main"));
-  await applyProductMigrations(db);
-  return db;
+type AgentRunResult = {
+  runId: string;
+  state: string;
+  agent: string;
+};
+
+type AgentCaller = {
+  orchestration: {
+    dispatchRun: (input: { taskId: string; agentName: string }) => Promise<AgentRunResult>;
+  };
+};
+
+export interface AgentRunOptions {
+  caller?: AgentCaller;
+  container?: Container | null;
+  print?: (line: string) => void;
+  printErr?: (line: string) => void;
+  exit?: (code: number) => void;
 }
 
-export async function run(argv: readonly string[]): Promise<void> {
+export async function run(argv: readonly string[], opts: AgentRunOptions = {}): Promise<void> {
+  const print = opts.print ?? console.log;
+  const printErr = opts.printErr ?? console.error;
+  const exit = opts.exit ?? process.exit;
   const [verb, ...rest] = argv;
   if (!verb || verb === "help" || verb === "--help" || verb === "-h") {
-    console.log(HELP);
+    print(HELP);
     return;
   }
   if (verb !== "run") {
-    console.error(`fulcrum agent: unknown verb '${verb}'`);
-    process.exit(2);
+    printErr(`fulcrum agent: unknown verb '${verb}'`);
+    exit(2);
+    return;
   }
   const parsed = parseArgs(rest);
   const taskId = flag(parsed, "task");
   if (!taskId) {
-    console.error("usage: fulcrum agent run --task <id>");
-    process.exit(2);
+    printErr("usage: fulcrum agent run --task <id>");
+    exit(2);
+    return;
   }
   const agent = flag(parsed, "agent") ?? "codex";
   const json = parsed.flags["--json"] !== undefined;
-  const db = await openProductDb();
   try {
-    const taskRows = await db.query<{ org_id: string; project_id: string | null }>(
-      `SELECT org_id, project_id FROM tasks WHERE id = $1`,
-      [taskId],
-    );
-    const task = taskRows[0];
-    if (!task) {
-      console.error(`task not found: ${taskId}`);
-      process.exit(1);
-    }
-    const result = await dispatchRunAction(db, {
-      orgId: task.org_id,
-      projectId: task.project_id,
-      taskId,
-      agent,
-    });
-    if (json) console.log(JSON.stringify(result, null, 2));
-    else console.log(`${result.status}\t${result.agent}\t${result.id}`);
-  } finally {
-    await db.close();
+    const caller = opts.caller ?? await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as AgentCaller;
+    const result = await caller.orchestration.dispatchRun({ taskId, agentName: agent });
+    const status = result.state === "unclaimed" ? "queued" : result.state;
+    const output = { id: result.runId, task_id: taskId, agent: result.agent, status };
+    if (json) print(JSON.stringify(output, null, 2));
+    else print(`${output.status}\t${output.agent}\t${output.id}`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const notFound = /not found/i.test(message);
+    printErr(notFound ? `task not found: ${taskId}` : message);
+    exit(notFound ? 1 : 1);
   }
 }
 

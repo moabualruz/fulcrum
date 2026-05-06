@@ -1,14 +1,10 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { run as runAgent } from "./agent.ts";
 import { run as runArtifact } from "./artifact.ts";
 import { run as runArtifacts, type ArtifactsClient } from "./artifacts.ts";
-import { openPglite } from "../product-kernel/db/pglite.ts";
-import { applyProductMigrations } from "../db/product-migrations.ts";
-import { productDbDir } from "../product-kernel/paths.ts";
-import { createLocalOrg, createProject, createTask } from "../product-kernel/store/repositories.ts";
 
 let scratch = "";
 let originalFulcrumHome: string | undefined;
@@ -36,22 +32,21 @@ function captureStdout(): { lines: string[]; restore: () => void } {
 
 describe("fulcrum agent/artifact CLI", () => {
   test("agent run --task <id> --json creates queued run", async () => {
-    await mkdir(productDbDir(), { recursive: true });
-    const db = await openPglite(join(productDbDir(), "main"));
-    let taskId = "";
-    try {
-      await applyProductMigrations(db);
-      const org = await createLocalOrg(db, { slug: "default", name: "Local" });
-      const project = await createProject(db, { orgId: org.id, slug: "p", name: "P" });
-      const task = await createTask(db, { orgId: org.id, projectId: project.id, title: "Run agent" });
-      taskId = task.id;
-    } finally {
-      await db.close();
-    }
+    const taskId = "task-agent-cli";
 
     const cap = captureStdout();
     try {
-      await runAgent(["run", "--task", taskId, "--agent", "codex", "--json"]);
+      await runAgent(["run", "--task", taskId, "--agent", "codex", "--json"], {
+        caller: {
+          orchestration: {
+            dispatchRun: async (input) => ({
+              runId: "run-agent-cli",
+              state: "unclaimed",
+              agent: input.agentName,
+            }),
+          },
+        },
+      });
     } finally {
       cap.restore();
     }
