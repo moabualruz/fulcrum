@@ -336,8 +336,8 @@
 | TUI-01..08 | Phase 8 | Complete |
 | WEB-01..11 | Phase 8 | Complete |
 | API-01..05 | Phase 8 | Complete |
-| XCT-01..12 | Phase 9 | Pending |
-| TST-01..10 | Each phase (TST-10) + Phase 9 | Pending |
+| XCT-01..12 | Phase 9 | Complete |
+| TST-01..10 | Each phase (TST-10) + Phase 9 | Complete |
 | SAS-01..06 | Phase 10 | Pending |
 
 **Coverage:**
@@ -347,4 +347,4 @@
 
 ---
 *Requirements defined: 2026-05-04*
-*Last corrected: 2026-05-04 after Wave 2 deep-dive audit (12 agents)*
+*Last corrected: 2026-05-06 after Phase 09 final UAT and full CI*

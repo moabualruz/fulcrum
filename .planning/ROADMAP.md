@@ -20,7 +20,7 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
 - [x] **Phase 6: Documents + Memory + Search** - Editor verification, memory engine, unified search, Cmd+K (completed 2026-05-05)
 - [x] **Phase 7: Repos + Artifacts + Notifications** - Git sync, artifact pipeline, notification delivery
 - [x] **Phase 8: Surface Delivery** - CLI wiring, TUI rewrite, Web completion, API surface
-- [ ] **Phase 9: Cross-Cutting + Testing** - i18n, theming, accessibility, telemetry, backup, comprehensive test coverage
+- [x] **Phase 9: Cross-Cutting + Testing** - i18n, theming, accessibility, telemetry, backup, comprehensive test coverage (completed 2026-05-06)
 - [ ] **Phase 10: SaaS Hardening** - Multi-org isolation, PostgreSQL pooling, job coordination
 
 ## Phase Details
@@ -275,13 +275,15 @@ Plans:
 **Depends on**: Phase 8 (surfaces must exist)
 **Requirements**: XCT-01..12, TST-01..10
 **TDD**: Final coverage sweep — any remaining RED tests from prior phases
+**Status**: Complete — all 10 Phase 09 plans executed and verified by full `bun run ci` on 2026-05-06.
 **Success Criteria**:
   1. i18n + custom themes + WCAG 2.1 AA (axe-core verified)
   2. Telemetry opt-in + error reporting + secret encryption + audit logging
   3. Backup/restore + import/export + migration downgrade + graceful shutdown
   4. Coverage threshold 80% enforced in CI; Symphony conformance green; gate regression tests pass
   5. TDD evidence: every phase has RED→GREEN commit pairs in git history
-**Plans:** TBD
+**Plans:** Complete — 09-00 through 09-09 delivered. Canonical evidence: `.planning/phases/09-cross-cutting-testing/09-UAT.md`.
+**Verification**: `bun run ci` passed all 20 stages: root tests, root coverage, migration downgrade, graceful shutdown, build, web tests, web coverage, web accessibility, Playwright smoke, and schema checks. Web coverage lines: 92.41%. Web accessibility: 19 passed / 3 skipped.
 
 ### Phase 10: SaaS Hardening
 **Goal**: Multi-tenant SaaS validated
@@ -308,9 +310,9 @@ Plans:
 | 6. Documents + Memory + Search | 10/10 | Complete   | 2026-05-05 |
 | 7. Repos + Artifacts + Notifications | 10/10 | Complete | 2026-05-05 |
 | 8. Surface Delivery | 7/7 | Complete | 2026-05-06 |
-| 9. Cross-Cutting + Testing | 0/? | Not started | - |
+| 9. Cross-Cutting + Testing | 10/10 | Complete | 2026-05-06 |
 | 10. SaaS Hardening | 0/? | Not started | - |
 
 ---
 *Roadmap created: 2026-05-04*
-*Last corrected: 2026-05-06 — marked Phase 7/8 progress rows complete after verified execution*
+*Last corrected: 2026-05-06 — marked Phase 09 complete after final UAT and full CI*
