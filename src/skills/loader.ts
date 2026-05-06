@@ -20,7 +20,7 @@ import {
   SkillVersion,
 } from "../db/entities/skills/index.ts";
 import { initOrm } from "../db/mikro-orm.config.ts";
-import { parseKernelMarkdown } from "../product-kernel/markdown.ts";
+import { parseKernelMarkdown } from "../shared/markdown.ts";
 import {
   readSkillsLockFile,
   skillsLockPath,

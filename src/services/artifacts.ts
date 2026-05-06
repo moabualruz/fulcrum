@@ -220,6 +220,19 @@ export async function getArtifactStats(
   orgId: string,
   projectId: string,
 ): Promise<ArtifactStats> {
+  if (isSqlExecutor(db)) {
+    const rows = await db.query<{ total_bytes: string | number | null; count: string | number }>(
+      `SELECT COALESCE(SUM(size), 0) AS total_bytes, COUNT(*)::int AS count
+         FROM artifacts
+        WHERE org_id = $1 AND project_id = $2`,
+      [orgId, projectId],
+    );
+    const row = rows[0] ?? { total_bytes: 0, count: 0 };
+    return {
+      totalBytes: Number(row.total_bytes ?? 0),
+      count: Number(row.count),
+    };
+  }
   const em = assertEm(db);
   const conn = em.getConnection();
   const rows = await conn.execute(

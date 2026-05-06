@@ -2,7 +2,7 @@ import { readable, type Readable } from "svelte/store";
 import {
   createFulcrumStore,
   type FulcrumState,
-} from "../../../../product-kernel/state/store.ts";
+} from "../../../../shared/state/store.ts";
 import type { StoreApi } from "zustand/vanilla";
 
 const store: StoreApi<FulcrumState> = createFulcrumStore();

@@ -10,7 +10,7 @@ import {
   SkillVersion,
 } from "../db/entities/skills/index.ts";
 import { initOrm } from "../db/mikro-orm.config.ts";
-import { parseKernelMarkdown } from "../product-kernel/markdown.ts";
+import { parseKernelMarkdown } from "../shared/markdown.ts";
 import { AGENT_DIRS, type AgentName } from "./loader.ts";
 import { readSkillsLockFile, writeSkillsLockFile } from "./lock.ts";
 

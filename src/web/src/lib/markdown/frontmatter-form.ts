@@ -1,7 +1,7 @@
 import {
   parseKernelMarkdown,
   serializeKernelMarkdown,
-} from "../../../../product-kernel/markdown.ts";
+} from "../../../../shared/markdown.ts";
 
 export interface FrontmatterFormValues {
   title: string;

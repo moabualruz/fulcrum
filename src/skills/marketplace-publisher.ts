@@ -6,7 +6,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
 import { join } from "node:path";
-import type { ProductDb } from "../product-kernel/db/types.ts";
+import type { SqlExecutor } from "../db/sql.ts";
 import {
   type MarketplaceListing,
   FeatureDisabledError,
@@ -81,7 +81,7 @@ export interface PublishOptions {
  * - If overwriting: revokes old key in DB
  */
 export async function generateKeypair(
-  db: ProductDb,
+  db: SqlExecutor,
   orgId: string,
   opts: KeygenOptions,
 ): Promise<KeygenResult> {
@@ -142,7 +142,7 @@ export async function generateKeypair(
  * Throws VersionConflictError if (slug, version) already exists.
  */
 export async function publishSkill(
-  db: ProductDb,
+  db: SqlExecutor,
   slug: string,
   version: string,
   orgId: string,

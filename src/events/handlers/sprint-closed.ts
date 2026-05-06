@@ -6,14 +6,8 @@
  * in the documents table. If Pillar 7 ships a tRPC router, the handler
  * can be updated to call it instead.
  */
-import type { ProductDb } from "../../product-kernel/db/types.ts";
-import type { EventRow, MetricsSnapshot } from "../../product-kernel/store/repositories.ts";
-import {
-  checkEventHandled,
-  markEventHandled,
-  setSprintRetroDocId,
-} from "../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../product-kernel/ids.ts";
+import type { SqlExecutor } from "../../db/sql.ts";
+import { newUlid } from "../../shared/ids.ts";
 
 const HANDLER_NAME = "sprint-closed-retro-doc";
 
@@ -23,6 +17,22 @@ export interface SprintClosedPayload {
   start_date: string | null;
   end_date: string | null;
   metrics_snapshot: MetricsSnapshot;
+}
+
+export interface MetricsSnapshot {
+  total_tasks: number;
+  completed_tasks: number;
+  completed_points: number;
+  capacity_points: number | null;
+  velocity: number;
+}
+
+export interface SprintClosedEventRow {
+  id: string;
+  org_id: string;
+  project_id: string | null;
+  subject_id: string;
+  payload: Record<string, unknown>;
 }
 
 export interface DocsCreateFn {
@@ -78,8 +88,8 @@ export interface HandleSprintClosedResult {
  *   creates document directly in the documents table.
  */
 export async function handleSprintClosed(
-  db: ProductDb,
-  event: EventRow,
+  db: SqlExecutor,
+  event: SprintClosedEventRow,
   docsCreate?: DocsCreateFn | null,
 ): Promise<HandleSprintClosedResult> {
   // Idempotency check
@@ -144,7 +154,7 @@ export async function handleSprintClosed(
 }
 
 async function insertDocDirectly(
-  db: ProductDb,
+  db: SqlExecutor,
   input: { orgId: string; projectId: string; title: string; body: string; sprintId: string },
 ): Promise<string> {
   const id = newUlid();
@@ -161,4 +171,41 @@ async function insertDocDirectly(
     ],
   );
   return id;
+}
+
+async function checkEventHandled(
+  db: SqlExecutor,
+  eventId: string,
+  handler: string,
+): Promise<boolean> {
+  const rows = await db.query<{ event_id: string }>(
+    `SELECT event_id FROM event_handler_log WHERE event_id = $1 AND handler = $2`,
+    [eventId, handler],
+  );
+  return rows.length > 0;
+}
+
+async function markEventHandled(
+  db: SqlExecutor,
+  eventId: string,
+  handler: string,
+): Promise<void> {
+  await db.query(
+    `INSERT INTO event_handler_log (event_id, handler)
+     VALUES ($1, $2)
+     ON CONFLICT (event_id, handler) DO NOTHING`,
+    [eventId, handler],
+  );
+}
+
+async function setSprintRetroDocId(
+  db: SqlExecutor,
+  sprintId: string,
+  docId: string,
+): Promise<void> {
+  const rows = await db.query<{ id: string }>(
+    `UPDATE sprints SET retro_doc_id = $1, updated_at = now() WHERE id = $2 RETURNING id`,
+    [docId, sprintId],
+  );
+  if (rows.length === 0) throw new Error(`sprint not found: ${sprintId}`);
 }

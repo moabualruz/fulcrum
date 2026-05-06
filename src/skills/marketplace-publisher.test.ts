@@ -28,7 +28,7 @@ function uint8ArrayToBase64url(bytes: Uint8Array): string {
 
 async function runMinimalMigrations(database: TestStore): Promise<void> {
   // Run only base + marketplace migrations to avoid PGlite date-type issues in sprint migrations
-  const migrationsDir = join(dirname(new URL(import.meta.url).pathname), "../test-support/product-fixtures.ts");
+  const migrationsDir = join(dirname(new URL(import.meta.url).pathname), "../product-kernel/db/migrations");
   for (const name of ["0001_product_kernel.sql", "0004_marketplace.sql"]) {
     const sql = await readFile(join(migrationsDir, name), "utf8");
     await database.exec(sql);

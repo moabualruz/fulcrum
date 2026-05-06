@@ -3,7 +3,7 @@
  * All functions gated behind FULCRUM_FEATURES=skill-marketplace.
  */
 
-import type { ProductDb } from "../product-kernel/db/types.ts";
+import type { SqlExecutor } from "../db/sql.ts";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -84,7 +84,7 @@ async function importEd25519PublicKey(
  * Returns the latest version when `version` is omitted.
  */
 export async function fetchListing(
-  db: ProductDb,
+  db: SqlExecutor,
   slug: string,
   version?: string,
 ): Promise<MarketplaceListing> {
@@ -115,7 +115,7 @@ export async function fetchListing(
  * - Bad sig → `false` (+ logged error)
  */
 export async function verifySignature(
-  db: ProductDb,
+  db: SqlExecutor,
   listing: MarketplaceListing,
   publisherOrgId: string,
 ): Promise<boolean> {
