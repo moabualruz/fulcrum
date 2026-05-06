@@ -28,7 +28,6 @@ export interface DocVersion {
   created_at: string;
 }
 
-type DocVersionRow = Omit<DocVersion, "created_at"> & { created_at: Date | string };
 type LegacyDocVersionRow = {
   id: string;
   doc_id: string;
@@ -38,16 +37,6 @@ type LegacyDocVersionRow = {
   snapshot: Record<string, unknown> | null;
   created_at: Date | string;
 };
-
-async function legacyVersionsTableExists(em: EntityManager): Promise<boolean> {
-  const conn = em.getConnection();
-  const rows = await conn.execute<{ exists: boolean }[]>(
-    `SELECT EXISTS (
-       SELECT 1 FROM information_schema.tables WHERE table_name = 'doc_versions'
-     ) AS exists`,
-  );
-  return rows[0]?.exists ?? false;
-}
 
 function normalizeTimestamp(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : value;
@@ -62,15 +51,19 @@ function legacyBody(row: LegacyDocVersionRow): string {
 
 function legacyToDocVersion(row: LegacyDocVersionRow): DocVersion {
   const body = legacyBody(row);
+  const snapshot = row.snapshot ?? {};
+  const frontmatter = typeof snapshot["frontmatter"] === "object" && snapshot["frontmatter"] !== null
+    ? snapshot["frontmatter"] as Record<string, unknown>
+    : {};
   return {
     id: row.id,
     doc_id: row.doc_id,
     org_id: row.org_id,
     version: row.version_num,
-    title: `Version ${row.version_num}`,
+    title: String(snapshot["title"] ?? `Version ${row.version_num}`),
     body,
-    frontmatter: {},
-    author: "system",
+    frontmatter,
+    author: String(snapshot["author"] ?? "system"),
     created_at: normalizeTimestamp(row.created_at),
   };
 }
@@ -80,20 +73,17 @@ export async function createDocumentVersion(
   input: CreateVersionInput,
 ): Promise<{ id: string; version: number }> {
   const id = randomUUID();
-  const conn = em.getConnection();
-  if (await legacyVersionsTableExists(em)) {
-    await conn.execute(
-      `INSERT INTO doc_versions (id, doc_id, org_id, version_num, snapshot, body_md_snapshot)
-       VALUES (?, ?, ?, ?, ?::jsonb, ?)`,
-      [id, input.docId, input.orgId, input.version, JSON.stringify(input.frontmatter), input.body],
-    );
-    return { id, version: input.version };
-  }
-  await conn.execute(
-    `INSERT INTO document_versions (id, doc_id, org_id, version, title, body, frontmatter, author)
-     VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?)`,
-    [id, input.docId, input.orgId, input.version, input.title, input.body, JSON.stringify(input.frontmatter), input.author],
-  );
+  await em.getKysely<any>()
+    .insertInto("doc_versions")
+    .values({
+      id,
+      doc_id: input.docId,
+      org_id: input.orgId,
+      version_num: input.version,
+      snapshot: { title: input.title, frontmatter: input.frontmatter, author: input.author },
+      body_md_snapshot: input.body,
+    })
+    .execute();
   return { id, version: input.version };
 }
 
@@ -101,24 +91,13 @@ export async function listDocumentVersions(
   em: EntityManager,
   docId: string,
 ): Promise<DocVersion[]> {
-  const conn = em.getConnection();
-  const rows = await conn.execute<DocVersionRow[]>(
-    `SELECT id, doc_id, org_id, version, title, body, frontmatter, author, created_at
-       FROM document_versions WHERE doc_id = ? ORDER BY version DESC`,
-    [docId],
-  );
-  if (rows.length === 0 && await legacyVersionsTableExists(em)) {
-    const legacyRows = await conn.execute<LegacyDocVersionRow[]>(
-      `SELECT id, doc_id, org_id, version_num, snapshot, body_md_snapshot, created_at
-         FROM doc_versions WHERE doc_id = ? ORDER BY version_num DESC`,
-      [docId],
-    );
-    return legacyRows.map(legacyToDocVersion);
-  }
-  return rows.map((r) => ({
-    ...r,
-    created_at: normalizeTimestamp(r.created_at),
-  }));
+  const rows = await em.getKysely<any>()
+    .selectFrom("doc_versions")
+    .select(["id", "doc_id", "org_id", "version_num", "snapshot", "body_md_snapshot", "created_at"])
+    .where("doc_id", "=", docId)
+    .orderBy("version_num", "desc")
+    .execute() as LegacyDocVersionRow[];
+  return rows.map(legacyToDocVersion);
 }
 
 export async function getDocumentVersion(
@@ -126,25 +105,13 @@ export async function getDocumentVersion(
   docId: string,
   version: number,
 ): Promise<DocVersion | null> {
-  const conn = em.getConnection();
-  const rows = await conn.execute<DocVersionRow[]>(
-    `SELECT id, doc_id, org_id, version, title, body, frontmatter, author, created_at
-       FROM document_versions WHERE doc_id = ? AND version = ?`,
-    [docId, version],
-  );
-  if (rows.length === 0) {
-    if (await legacyVersionsTableExists(em)) {
-      const legacyRows = await conn.execute<LegacyDocVersionRow[]>(
-        `SELECT id, doc_id, org_id, version_num, snapshot, body_md_snapshot, created_at
-           FROM doc_versions WHERE doc_id = ? AND version_num = ?`,
-        [docId, version],
-      );
-      return legacyRows[0] ? legacyToDocVersion(legacyRows[0]) : null;
-    }
-    return null;
-  }
-  const r = rows[0]!;
-  return { ...r, created_at: normalizeTimestamp(r.created_at) };
+  const rows = await em.getKysely<any>()
+    .selectFrom("doc_versions")
+    .select(["id", "doc_id", "org_id", "version_num", "snapshot", "body_md_snapshot", "created_at"])
+    .where("doc_id", "=", docId)
+    .where("version_num", "=", version)
+    .execute() as LegacyDocVersionRow[];
+  return rows[0] ? legacyToDocVersion(rows[0]) : null;
 }
 
 /** Restore a document's content from a specific version. */
@@ -156,27 +123,20 @@ export async function restoreDocumentVersion(
 ): Promise<void> {
   const ver = await getDocumentVersion(em, docId, version);
   if (!ver) throw new Error(`Version ${version} not found for doc ${docId}`);
-  const conn = em.getConnection();
-  await conn.execute(
-    `UPDATE documents SET title = ?, body = ?, frontmatter = ?::jsonb, updated_at = now()
-       WHERE id = ? AND org_id = ?`,
-    [ver.title, ver.body, JSON.stringify(ver.frontmatter), docId, orgId],
-  );
+  await em.getKysely<any>()
+    .updateTable("documents")
+    .set({ title: ver.title, body_md: ver.body, frontmatter: ver.frontmatter, updated_at: new Date() })
+    .where("id", "=", docId)
+    .where("org_id", "=", orgId)
+    .execute();
 }
 
 /** Get the next version number for a document. */
 export async function getNextVersionNumber(em: EntityManager, docId: string): Promise<number> {
-  const conn = em.getConnection();
-  if (await legacyVersionsTableExists(em)) {
-    const rows = await conn.execute<{ max_ver: number | null }[]>(
-      `SELECT MAX(version_num) AS max_ver FROM doc_versions WHERE doc_id = ?`,
-      [docId],
-    );
-    return (rows[0]?.max_ver ?? 0) + 1;
-  }
-  const rows = await conn.execute<{ max_ver: number | null }[]>(
-    `SELECT MAX(version) AS max_ver FROM document_versions WHERE doc_id = ?`,
-    [docId],
-  );
-  return (rows[0]?.max_ver ?? 0) + 1;
+  const rows = await em.getKysely<any>()
+    .selectFrom("doc_versions")
+    .select(["version_num"])
+    .where("doc_id", "=", docId)
+    .execute() as Array<{ version_num: number | null }>;
+  return Math.max(0, ...rows.map((row) => Number(row.version_num ?? 0))) + 1;
 }

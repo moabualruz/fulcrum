@@ -6,7 +6,7 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
 import { eventDispatcher } from "./application-compat";
-import { indexSearchDocumentOrm } from "./orm-helpers.ts";
+import { indexSearchDocumentOrm, ormSqlConnection } from "./orm-helpers.ts";
 
 export type MemoryScope = "project" | "global" | "task" | "user";
 
@@ -73,7 +73,7 @@ export async function createMemoryAction(
   input: CreateMemoryInput,
 ): Promise<{ id: string }> {
   const id = randomUUID();
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   await conn.execute(
     `INSERT INTO memories (id, org_id, project_id, scope, kind, key, body, source)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
@@ -112,7 +112,7 @@ export async function updateMemoryAction(
   const idIdx = params.length;
   params.push(input.orgId);
   const orgIdx = params.length;
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<MemoryRow[]>(
     `UPDATE memories SET ${sets.join(", ")}
        WHERE id = $${idIdx} AND org_id = $${orgIdx}
@@ -137,7 +137,7 @@ export async function deleteMemoryAction(
   id: string,
   orgId: string,
 ): Promise<{ ok: true }> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   await conn.execute(
     `DELETE FROM search_documents WHERE source_kind = 'memory' AND source_id = $1 AND org_id = $2`,
     [id, orgId],
@@ -161,7 +161,7 @@ export async function getMemory(
   id: string,
   orgId: string,
 ): Promise<ReturnType<typeof normalizeRow> | null> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<MemoryRow[]>(
     `SELECT id, org_id, project_id, scope, kind, key, body, source, created_at, updated_at
        FROM memories WHERE id = $1 AND org_id = $2`,
@@ -195,7 +195,7 @@ export async function listMemories(
   const limitIdx = params.length;
   params.push(offset);
   const offsetIdx = params.length;
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<MemoryRow[]>(
     `SELECT id, org_id, project_id, scope, kind, key, body, source, created_at, updated_at
        FROM memories

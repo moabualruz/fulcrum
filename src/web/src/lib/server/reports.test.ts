@@ -1,12 +1,9 @@
 import { mkdtempSync, rmSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
-import { createLocalOrg, createProject } from "../../../../test-support/product-fixtures.ts";
-import { makeId } from "../../../../test-support/product-fixtures.ts";
-import type { TestStore } from "../../../../test-support/product-fixtures.ts";
+import { createTestOrm, type TestOrm } from "../../../../test-utils/db.ts";
 import {
   listSprints,
   loadBurndown,
@@ -21,34 +18,37 @@ import {
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-reports-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
-async function freshDb(name: string): Promise<{ db: TestStore; orgId: string; projectId: string }> {
-  const db = await openIsolatedStore(join(scratch, name));
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const project = await createProject(db, { orgId: org.id, slug: "proj", name: "Proj" });
-  return { db, orgId: org.id, projectId: project.id };
+async function freshDb(_name: string): Promise<{ db: TestOrm; orgId: string; projectId: string }> {
+  const db = await createTestOrm();
+  const orgId = db.seed.orgId;
+  const projectId = randomUUID();
+  await db.pglite.query(
+    `INSERT INTO projects (id, org_id, name) VALUES ($1, $2, 'Proj')`,
+    [projectId, orgId],
+  );
+  return { db, orgId, projectId };
 }
 
 async function seedSprint(
-  db: TestStore, orgId: string, projectId: string,
+  db: TestOrm, orgId: string, projectId: string,
   opts: { name: string; startDate: string; endDate: string; status?: string },
 ): Promise<string> {
-  const id = makeId();
-  await db.query(
+  const id = randomUUID();
+  await db.pglite.query(
     `INSERT INTO sprints (id, org_id, project_id, name, start_date, end_date, status)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-    [id, orgId, projectId, opts.name, opts.startDate, opts.endDate, opts.status ?? "active"],
+    [id, orgId, projectId, opts.name, opts.startDate, opts.endDate, opts.status ?? "planned"],
   );
   return id;
 }
 
 async function seedTask(
-  db: TestStore, orgId: string, projectId: string,
+  db: TestOrm, orgId: string, projectId: string,
   opts: { status: string; sprintId?: string; storyPoints?: number; title?: string },
 ): Promise<string> {
-  const id = makeId();
-  await db.query(
-    `INSERT INTO tasks (id, org_id, project_id, title, status, priority, sprint_id, story_points)
+  const id = randomUUID();
+  await db.pglite.query(
+    `INSERT INTO tasks (id, org_id, project_id, title, status, priority, sprint_id, points)
        VALUES ($1,$2,$3,$4,$5,0,$6,$7)`,
     [id, orgId, projectId, opts.title ?? "task", opts.status, opts.sprintId ?? null, opts.storyPoints ?? null],
   );
@@ -56,25 +56,32 @@ async function seedTask(
 }
 
 async function seedMetric(
-  db: TestStore, orgId: string, projectId: string,
+  db: TestOrm, orgId: string, projectId: string,
   opts: { sprintId?: string; date: string; kind: string; payload: Record<string, unknown> },
 ): Promise<void> {
-  const id = makeId();
-  await db.query(
-    `INSERT INTO metrics_cache (id, org_id, project_id, sprint_id, snapshot_date, metric_kind, payload)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-    [id, orgId, projectId, opts.sprintId ?? null, opts.date, opts.kind, JSON.stringify(opts.payload)],
+  const id = randomUUID();
+  await db.pglite.query(
+    `INSERT INTO metrics_cache (id, project_id, sprint_id, date, points_remaining, status_counts)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+    [
+      id,
+      projectId,
+      opts.sprintId ?? null,
+      opts.date,
+      Number(opts.payload["remaining"] ?? 0),
+      JSON.stringify(opts.payload),
+    ],
   );
 }
 
 async function seedEvent(
-  db: TestStore, orgId: string, projectId: string,
+  db: TestOrm, orgId: string, projectId: string,
   opts: { taskId: string; verb: string; payload: Record<string, unknown>; createdAt: string },
 ): Promise<void> {
-  const id = makeId();
-  await db.query(
-    `INSERT INTO events (id, org_id, project_id, actor, subject_kind, subject_id, verb, payload, created_at)
-       VALUES ($1,$2,$3,'system','task',$4,$5,$6,$7)`,
+  const id = randomUUID();
+  await db.pglite.query(
+    `INSERT INTO events (id, org_id, project_id, subject_kind, subject_id, verb, payload, created_at)
+       VALUES ($1,$2,$3,'task',$4,$5,$6,$7)`,
     [id, orgId, projectId, opts.taskId, opts.verb, JSON.stringify(opts.payload), opts.createdAt],
   );
 }
@@ -87,7 +94,7 @@ describe("listSprints", () => {
     try {
       await seedSprint(db, orgId, projectId, { name: "S1", startDate: "2025-01-01", endDate: "2025-01-14" });
       await seedSprint(db, orgId, projectId, { name: "S2", startDate: "2025-01-15", endDate: "2025-01-28" });
-      const sprints = await listSprints(db, projectId);
+      const sprints = await listSprints(db.em.fork(), projectId);
       expect(sprints).toHaveLength(2);
       expect(sprints[0]!.name).toBe("S2");
       expect(sprints[1]!.name).toBe("S1");
@@ -112,7 +119,7 @@ describe("loadBurndown", () => {
       await seedMetric(db, orgId, projectId, {
         sprintId: sid, date: "2025-01-02", kind: "burndown", payload: { remaining: 5 },
       });
-      const points = await loadBurndown(db, projectId, sid);
+      const points = await loadBurndown(db.em.fork(), projectId, sid);
       expect(points.length).toBeGreaterThanOrEqual(3); // day 0, 1, 2
       expect(points[0]!.date).toBe("2025-01-01");
       expect(points[0]!.actual).toBe(10);
@@ -125,7 +132,7 @@ describe("loadBurndown", () => {
   test("returns empty for missing sprint", async () => {
     const { db, projectId } = await freshDb("burndown-missing");
     try {
-      const result = await loadBurndown(db, projectId, "nonexistent");
+      const result = await loadBurndown(db.em.fork(), projectId, randomUUID());
       expect(result).toEqual([]);
     } finally { await db.close(); }
   });
@@ -148,7 +155,7 @@ describe("loadVelocity", () => {
       await seedTask(db, orgId, projectId, { status: "pending", sprintId: s1, storyPoints: 2 }); // not completed
       await seedTask(db, orgId, projectId, { status: "completed", sprintId: s2, storyPoints: 7 });
 
-      const bars = await loadVelocity(db, projectId);
+      const bars = await loadVelocity(db.em.fork(), projectId);
       expect(bars).toHaveLength(2);
       // newest first
       expect(bars[0]!.sprint_name).toBe("S2");
@@ -190,7 +197,7 @@ describe("loadCycleTime", () => {
         createdAt: "2025-01-06T00:00:00Z",
       });
 
-      const stats = await loadCycleTime(db, projectId);
+      const stats = await loadCycleTime(db.em.fork(), projectId);
       expect(stats.bins.length).toBeGreaterThan(0);
       expect(stats.p50).toBeGreaterThanOrEqual(2);
       expect(stats.p90).toBeGreaterThanOrEqual(2);
@@ -200,7 +207,7 @@ describe("loadCycleTime", () => {
   test("returns empty stats for no events", async () => {
     const { db, projectId } = await freshDb("cycle-time-empty");
     try {
-      const stats = await loadCycleTime(db, projectId);
+      const stats = await loadCycleTime(db.em.fork(), projectId);
       expect(stats.bins).toEqual([]);
       expect(stats.p50).toBe(0);
     } finally { await db.close(); }
@@ -226,7 +233,7 @@ describe("loadThroughput", () => {
         createdAt: "2025-01-07T00:00:00Z",
       });
 
-      const points = await loadThroughput(db, projectId);
+      const points = await loadThroughput(db.em.fork(), projectId);
       expect(points.length).toBeGreaterThan(0);
       // Both in same week
       expect(points[0]!.count).toBe(2);
@@ -248,7 +255,7 @@ describe("loadWip", () => {
         date: "2025-01-02", kind: "wip",
         payload: { pending: 4, in_progress: 4, blocked: 0 },
       });
-      const points = await loadWip(db, projectId);
+      const points = await loadWip(db.em.fork(), projectId);
       expect(points).toHaveLength(2);
       expect(points[0]!.pending).toBe(5);
       expect(points[1]!.in_progress).toBe(4);
@@ -266,7 +273,7 @@ describe("loadCfd", () => {
         date: "2025-01-01", kind: "cfd",
         payload: { pending: 10, in_progress: 2, blocked: 0, completed: 1, cancelled: 0 },
       });
-      const points = await loadCfd(db, projectId);
+      const points = await loadCfd(db.em.fork(), projectId);
       expect(points).toHaveLength(1);
       expect(points[0]!.completed).toBe(1);
     } finally { await db.close(); }
@@ -283,7 +290,7 @@ describe("loadReports", () => {
         name: "S1", startDate: "2025-01-01", endDate: "2025-01-14",
       });
       await seedTask(db, orgId, projectId, { status: "completed", sprintId: sid, storyPoints: 5 });
-      const data = await loadReports(db, projectId, sid);
+      const data = await loadReports(db.em.fork(), projectId, sid);
       expect(data.sprints).toHaveLength(1);
       expect(data).toHaveProperty("burndown");
       expect(data).toHaveProperty("velocity");
@@ -297,7 +304,7 @@ describe("loadReports", () => {
   test("returns empty-safe data when no sprints", async () => {
     const { db, projectId } = await freshDb("reports-empty");
     try {
-      const data = await loadReports(db, projectId);
+      const data = await loadReports(db.em.fork(), projectId);
       expect(data.sprints).toEqual([]);
       expect(data.burndown).toEqual([]);
       expect(data.cycleTime.bins).toEqual([]);

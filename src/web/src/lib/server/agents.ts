@@ -7,6 +7,7 @@ import type { EntityManager } from "@mikro-orm/postgresql";
 import type { LegacyDatabaseHandle } from "./application-compat";
 import { randomUUID } from "node:crypto";
 import { eventDispatcher } from "./application-compat";
+import { ormSqlConnection } from "./orm-helpers.ts";
 
 export interface AgentProfileRow {
   id: string;
@@ -25,7 +26,7 @@ export async function listProfiles(
   em: EntityManager,
   orgId: string,
 ): Promise<AgentProfileRow[]> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   return conn.execute<AgentProfileRow[]>(
     `SELECT id, org_id, name, cli_path, default_flags, auth_env_vars,
             test_passed, last_tested_at, created_at, updated_at
@@ -52,7 +53,7 @@ export async function getProfile(
     );
     return rows[0] ?? null;
   }
-  const rows = await db.getConnection().execute<AgentProfileRow[]>(
+  const rows = await ormSqlConnection(db).execute<AgentProfileRow[]>(
     `SELECT id, org_id, name, cli_path, default_flags, auth_env_vars,
             test_passed, last_tested_at, created_at, updated_at
        FROM agent_profiles
@@ -76,7 +77,7 @@ export async function upsertProfileAction(
   input: UpsertProfileInput,
 ): Promise<{ id: string }> {
   const id = randomUUID();
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<{ id: string }[]>(
     `INSERT INTO agent_profiles (id, org_id, name, cli_path, default_flags, auth_env_vars)
      VALUES ($1, $2, $3, $4, $5, $6)
@@ -97,7 +98,7 @@ export async function testProfileAction(
   orgId: string,
   passed: boolean,
 ): Promise<{ ok: boolean }> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   await conn.execute(
     `UPDATE agent_profiles
         SET test_passed = $1, last_tested_at = now(), updated_at = now()

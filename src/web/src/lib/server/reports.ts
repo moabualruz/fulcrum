@@ -66,12 +66,20 @@ export async function listSprints(
   em: EntityManager,
   projectId: string,
 ): Promise<Sprint[]> {
-  const conn = em.getConnection();
-  return conn.execute<Sprint[]>(
-    `SELECT id, name, start_date::text, end_date::text, status
-       FROM sprints WHERE project_id = $1 ORDER BY start_date DESC`,
-    [projectId],
-  );
+  const db = em.getKysely<any>();
+  const rows = await db
+    .selectFrom("sprints")
+    .select(["id", "name", "start_date", "end_date", "status"])
+    .where("project_id", "=", projectId)
+    .orderBy("start_date", "desc")
+    .execute();
+  return rows.map((row: Record<string, unknown>) => ({
+    id: String(row["id"]),
+    name: String(row["name"]),
+    start_date: dateText(row["start_date"]),
+    end_date: dateText(row["end_date"]),
+    status: String(row["status"]),
+  }));
 }
 
 // ---------- Burndown ----------
@@ -81,38 +89,40 @@ export async function loadBurndown(
   projectId: string,
   sprintId: string,
 ): Promise<BurndownPoint[]> {
-  const conn = em.getConnection();
-  const sprints = await conn.execute<{ start_date: string; end_date: string }[]>(
-    `SELECT start_date::text, end_date::text FROM sprints WHERE id = $1 AND project_id = $2`,
-    [sprintId, projectId],
-  );
+  const db = em.getKysely<any>();
+  const sprints = await db
+    .selectFrom("sprints")
+    .select(["start_date", "end_date"])
+    .where("id", "=", sprintId)
+    .where("project_id", "=", projectId)
+    .execute();
   const sprint = sprints[0];
   if (!sprint) return [];
 
-  const totalRows = await conn.execute<{ total: string }[]>(
-    `SELECT coalesce(sum(story_points), 0)::text AS total
-       FROM tasks WHERE sprint_id = $1`,
-    [sprintId],
-  );
-  const totalPoints = Number(totalRows[0]?.total ?? 0);
+  const taskRows = await db
+    .selectFrom("tasks")
+    .select(["points"])
+    .where("sprint_id", "=", sprintId)
+    .execute();
+  const totalPoints = taskRows.reduce((sum: number, row: Record<string, unknown>) => sum + Number(row["points"] ?? 0), 0);
   if (totalPoints === 0) return [];
 
-  const cached = await conn.execute<{ snapshot_date: string; payload: string | { remaining: number } }[]>(
-    `SELECT snapshot_date::text, payload FROM metrics_cache
-       WHERE project_id = $1 AND sprint_id = $2 AND metric_kind = 'burndown'
-       ORDER BY snapshot_date`,
-    [projectId, sprintId],
-  );
+  const cached = await db
+    .selectFrom("metrics_cache")
+    .select(["date", "points_remaining"])
+    .where("project_id", "=", projectId)
+    .where("sprint_id", "=", sprintId)
+    .orderBy("date", "asc")
+    .execute() as Array<{ date: string; points_remaining: number }>;
 
-  const startDate = new Date(sprint.start_date);
-  const endDate = new Date(sprint.end_date);
+  const startDate = new Date(dateText(sprint.start_date));
+  const endDate = new Date(dateText(sprint.end_date));
   const totalDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000));
   const pointsPerDay = totalPoints / totalDays;
 
   const actualMap = new Map<string, number>();
   for (const row of cached) {
-    const payload = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
-    actualMap.set(row.snapshot_date, payload.remaining ?? 0);
+    actualMap.set(dateText(row.date), Number(row.points_remaining ?? 0));
   }
 
   const points: BurndownPoint[] = [];
@@ -137,18 +147,32 @@ export async function loadVelocity(
   projectId: string,
   windowSize = 3,
 ): Promise<VelocityBar[]> {
-  const conn = em.getConnection();
-  return conn.execute<VelocityBar[]>(
-    `SELECT s.id AS sprint_id, s.name AS sprint_name,
-            coalesce(sum(t.story_points), 0)::int AS points
-       FROM sprints s
-       LEFT JOIN tasks t ON t.sprint_id = s.id AND t.status = 'completed'
-       WHERE s.project_id = $1 AND s.status = 'completed'
-       GROUP BY s.id, s.name, s.end_date
-       ORDER BY s.end_date DESC
-       LIMIT $2`,
-    [projectId, windowSize],
-  );
+  const db = em.getKysely<any>();
+  const sprints = await db
+    .selectFrom("sprints")
+    .select(["id", "name", "end_date"])
+    .where("project_id", "=", projectId)
+    .where("status", "=", "completed")
+    .orderBy("end_date", "desc")
+    .limit(windowSize)
+    .execute();
+  if (sprints.length === 0) return [];
+  const tasks = await db
+    .selectFrom("tasks")
+    .select(["sprint_id", "points"])
+    .where("status", "=", "completed")
+    .where("sprint_id", "in", sprints.map((row: Record<string, unknown>) => String(row["id"])))
+    .execute();
+  const pointsBySprint = new Map<string, number>();
+  for (const task of tasks as Array<Record<string, unknown>>) {
+    const sprint = String(task["sprint_id"]);
+    pointsBySprint.set(sprint, (pointsBySprint.get(sprint) ?? 0) + Number(task["points"] ?? 0));
+  }
+  return sprints.map((row: Record<string, unknown>) => ({
+    sprint_id: String(row["id"]),
+    sprint_name: String(row["name"]),
+    points: pointsBySprint.get(String(row["id"])) ?? 0,
+  }));
 }
 
 // ---------- Cycle Time ----------
@@ -157,37 +181,34 @@ export async function loadCycleTime(
   em: EntityManager,
   projectId: string,
 ): Promise<CycleTimeStats> {
-  const conn = em.getConnection();
-  const rows = await conn.execute<{ days: string }[]>(
-    `WITH started AS (
-       SELECT payload->>'task' AS task_id,
-              min(created_at) AS started_at
-         FROM events
-         WHERE project_id = $1
-           AND subject_kind = 'task'
-           AND verb = 'status_changed'
-           AND payload->>'to' = 'in_progress'
-         GROUP BY payload->>'task'
-     ),
-     finished AS (
-       SELECT payload->>'task' AS task_id,
-              min(created_at) AS finished_at
-         FROM events
-         WHERE project_id = $1
-           AND subject_kind = 'task'
-           AND verb = 'status_changed'
-           AND payload->>'to' = 'completed'
-         GROUP BY payload->>'task'
-     )
-     SELECT extract(day FROM f.finished_at - s.started_at)::int::text AS days
-       FROM started s
-       JOIN finished f ON f.task_id = s.task_id
-       WHERE f.finished_at > s.started_at
-       ORDER BY days`,
-    [projectId],
-  );
+  const db = em.getKysely<any>();
+  const rows = await db
+    .selectFrom("events")
+    .select(["payload", "created_at"])
+    .where("project_id", "=", projectId)
+    .where("subject_kind", "=", "task")
+    .where("verb", "=", "status_changed")
+    .execute() as Array<{ payload: string | Record<string, unknown>; created_at: Date | string }>;
 
-  const dayValues = rows.map((r) => Number(r.days));
+  const started = new Map<string, Date>();
+  const finished = new Map<string, Date>();
+  for (const row of rows) {
+    const payload = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
+    const taskId = String(payload["task"] ?? "");
+    if (!taskId) continue;
+    const at = new Date(row.created_at);
+    if (payload["to"] === "in_progress" && (!started.has(taskId) || at < started.get(taskId)!)) started.set(taskId, at);
+    if (payload["to"] === "completed" && (!finished.has(taskId) || at < finished.get(taskId)!)) finished.set(taskId, at);
+  }
+
+  const dayValues = [...started.entries()]
+    .map(([taskId, startedAt]) => {
+      const finishedAt = finished.get(taskId);
+      if (!finishedAt || finishedAt <= startedAt) return null;
+      return Math.floor((finishedAt.getTime() - startedAt.getTime()) / 86400000);
+    })
+    .filter((days): days is number => days !== null)
+    .sort((a, b) => a - b);
   if (dayValues.length === 0) return { bins: [], p50: 0, p90: 0 };
 
   const binMap = new Map<number, number>();
@@ -211,19 +232,24 @@ export async function loadThroughput(
   em: EntityManager,
   projectId: string,
 ): Promise<ThroughputPoint[]> {
-  const conn = em.getConnection();
-  return conn.execute<ThroughputPoint[]>(
-    `SELECT date_trunc('week', e.created_at)::date::text AS week_start,
-            count(DISTINCT e.subject_id)::int AS count
-       FROM events e
-       WHERE e.project_id = $1
-         AND e.subject_kind = 'task'
-         AND e.verb = 'status_changed'
-         AND e.payload->>'to' = 'completed'
-       GROUP BY week_start
-       ORDER BY week_start`,
-    [projectId],
-  );
+  const db = em.getKysely<any>();
+  const rows = await db
+    .selectFrom("events")
+    .select(["subject_id", "payload", "created_at"])
+    .where("project_id", "=", projectId)
+    .where("subject_kind", "=", "task")
+    .where("verb", "=", "status_changed")
+    .execute() as Array<{ subject_id: string; payload: string | Record<string, unknown>; created_at: Date | string }>;
+  const weeks = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const payload = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
+    if (payload["to"] !== "completed") continue;
+    const week = weekStart(row.created_at);
+    const set = weeks.get(week) ?? new Set<string>();
+    set.add(row.subject_id);
+    weeks.set(week, set);
+  }
+  return [...weeks.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([week_start, ids]) => ({ week_start, count: ids.size }));
 }
 
 // ---------- WIP ----------
@@ -232,17 +258,11 @@ export async function loadWip(
   em: EntityManager,
   projectId: string,
 ): Promise<WipPoint[]> {
-  const conn = em.getConnection();
-  const rows = await conn.execute<{ snapshot_date: string; payload: string | WipPoint }[]>(
-    `SELECT snapshot_date::text, payload FROM metrics_cache
-       WHERE project_id = $1 AND metric_kind = 'wip'
-       ORDER BY snapshot_date`,
-    [projectId],
-  );
+  const rows = await metricPayloadRows<WipPoint>(em, projectId, "wip");
   return rows.map((r) => {
     const p = typeof r.payload === "string" ? JSON.parse(r.payload) : r.payload;
     return {
-      date: r.snapshot_date,
+      date: r.date,
       pending: p.pending ?? 0,
       in_progress: p.in_progress ?? 0,
       blocked: p.blocked ?? 0,
@@ -256,17 +276,11 @@ export async function loadCfd(
   em: EntityManager,
   projectId: string,
 ): Promise<CfdPoint[]> {
-  const conn = em.getConnection();
-  const rows = await conn.execute<{ snapshot_date: string; payload: string | CfdPoint }[]>(
-    `SELECT snapshot_date::text, payload FROM metrics_cache
-       WHERE project_id = $1 AND metric_kind = 'cfd'
-       ORDER BY snapshot_date`,
-    [projectId],
-  );
+  const rows = await metricPayloadRows<CfdPoint>(em, projectId, "cfd");
   return rows.map((r) => {
     const p = typeof r.payload === "string" ? JSON.parse(r.payload) : r.payload;
     return {
-      date: r.snapshot_date,
+      date: r.date,
       pending: p.pending ?? 0,
       in_progress: p.in_progress ?? 0,
       blocked: p.blocked ?? 0,
@@ -274,6 +288,36 @@ export async function loadCfd(
       cancelled: p.cancelled ?? 0,
     };
   });
+}
+
+async function metricPayloadRows<T>(
+  em: EntityManager,
+  projectId: string,
+  _kind: string,
+): Promise<Array<{ date: string; payload: string | T }>> {
+  const rows = await em.getKysely<any>()
+    .selectFrom("metrics_cache")
+    .select(["date", "status_counts"])
+    .where("project_id", "=", projectId)
+    .orderBy("date", "asc")
+    .execute();
+  return rows.map((row: Record<string, unknown>) => ({
+    date: dateText(row["date"]),
+    payload: row["status_counts"] as string | T,
+  }));
+}
+
+function dateText(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value);
+}
+
+function weekStart(value: Date | string): string {
+  const date = new Date(value);
+  const day = date.getUTCDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.toISOString().slice(0, 10);
 }
 
 // ---------- Aggregate loader ----------

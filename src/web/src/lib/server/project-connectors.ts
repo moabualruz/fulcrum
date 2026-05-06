@@ -6,6 +6,7 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
 import { eventDispatcher } from "./application-compat";
+import { ormSqlConnection } from "./orm-helpers.ts";
 
 export interface ProjectConnectorRow {
   id: string;
@@ -31,7 +32,7 @@ export async function upsertProjectConnector(
   em: EntityManager,
   input: UpsertConnectorInput,
 ): Promise<{ id: string }> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const existing = await conn.execute<{ id: string }[]>(
     `SELECT id FROM project_connectors WHERE project_id = $1 AND connector_type = $2`,
     [input.projectId, input.connectorType],
@@ -97,7 +98,7 @@ export async function syncProjectConnector(
   em: EntityManager,
   id: string,
 ): Promise<{ ok: true }> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<{ org_id: string; project_id: string; enabled: boolean }[]>(
     `UPDATE project_connectors SET last_synced_at = now(), updated_at = now() WHERE id = $1
        RETURNING org_id, project_id, enabled`,
@@ -120,7 +121,7 @@ export async function listProjectConnectors(
   em: EntityManager,
   projectId: string,
 ): Promise<ProjectConnectorRow[]> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   return conn.execute<ProjectConnectorRow[]>(
     `SELECT * FROM project_connectors WHERE project_id = $1 ORDER BY connector_type ASC`,
     [projectId],

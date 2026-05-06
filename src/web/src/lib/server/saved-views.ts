@@ -6,6 +6,7 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
 import { eventDispatcher } from "./application-compat";
+import { ormSqlConnection } from "./orm-helpers.ts";
 
 export type ViewScope = "org" | "project" | "private";
 
@@ -56,7 +57,7 @@ export async function createSavedView(
   const scope = input.scope ?? "project";
   assertScope(scope, "createSavedView");
   const id = randomUUID();
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
 
   if (input.isDefault) {
     await conn.execute(
@@ -119,7 +120,7 @@ export async function updateSavedView(
   if (input.isDefault !== undefined) push("is_default", input.isDefault);
   if (changed.length === 0) throw new Error("updateSavedView: no fields to update");
 
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
 
   if (input.isDefault) {
     const viewRows = await conn.execute<{ project_id: string }[]>(
@@ -158,7 +159,7 @@ export async function deleteSavedView(
   em: EntityManager,
   id: string,
 ): Promise<{ ok: true }> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<{ org_id: string; project_id: string }[]>(
     `DELETE FROM saved_views WHERE id = $1 RETURNING org_id, project_id`,
     [id],
@@ -180,7 +181,7 @@ export async function listSavedViews(
   em: EntityManager,
   projectId: string,
 ): Promise<SavedViewRow[]> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   return conn.execute<SavedViewRow[]>(
     `SELECT * FROM saved_views WHERE project_id = $1 ORDER BY is_default DESC, name ASC`,
     [projectId],

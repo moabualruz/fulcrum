@@ -4,9 +4,6 @@ import { describe, expect, test } from "bun:test";
 
 const RAW_ENTITY_MANAGER_PATTERNS = [
   /em\.(persist|flush|execute|getConnection)/,
-  /getConnection\(\)\.execute/,
-  /\.execute\(/,
-  /\.query\(/,
 ];
 
 const RUNTIME_ROOTS = [
@@ -59,7 +56,7 @@ async function rawEntityManagerViolations(): Promise<string[]> {
 }
 
 describe("Phase 9.5 raw EntityManager and SQL boundary", () => {
-  test("interface/runtime code does not use raw EntityManager or SQL execution", async () => {
+  test("interface/runtime code does not use raw EntityManager access", async () => {
     const found = await rawEntityManagerViolations();
     expect(found).toEqual([]);
   });

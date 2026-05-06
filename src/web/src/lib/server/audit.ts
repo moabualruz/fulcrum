@@ -42,53 +42,30 @@ export async function queryAuditEvents(
   filter: AuditFilter,
   opts: { limit?: number; offset?: number } = {},
 ): Promise<AuditQueryResult> {
-  const conditions: string[] = ["org_id = $1"];
-  const params: unknown[] = [filter.orgId];
-  let idx = 2;
-
-  if (filter.projectId) {
-    conditions.push(`project_id = $${idx++}`);
-    params.push(filter.projectId);
-  }
-  if (filter.actor) {
-    conditions.push(`actor = $${idx++}`);
-    params.push(filter.actor);
-  }
-  if (filter.subjectKind) {
-    conditions.push(`subject_kind = $${idx++}`);
-    params.push(filter.subjectKind);
-  }
-  if (filter.verb) {
-    conditions.push(`verb = $${idx++}`);
-    params.push(filter.verb);
-  }
-  if (filter.since) {
-    conditions.push(`created_at >= $${idx++}`);
-    params.push(filter.since);
-  }
-  if (filter.until) {
-    conditions.push(`created_at <= $${idx++}`);
-    params.push(filter.until);
-  }
-
-  const where = conditions.join(" AND ");
-  const conn = em.getConnection();
-
-  const countRows = await conn.execute<{ count: string }[]>(
-    `SELECT COUNT(*)::text AS count FROM events WHERE ${where}`,
-    params,
-  );
-  const total = parseInt(countRows[0]?.count ?? "0", 10);
-
   const limit = opts.limit ?? 50;
   const offset = opts.offset ?? 0;
+  const db = em.getKysely<any>();
+  let query = db.selectFrom("audit_events").selectAll().where("org_id", "=", filter.orgId);
+  let countQuery = db.selectFrom("audit_events").select((eb: any) => eb.fn.countAll().as("count")).where("org_id", "=", filter.orgId);
 
-  const rows = await conn.execute<EventRow[]>(
-    `SELECT * FROM events WHERE ${where} ORDER BY created_at DESC, id DESC LIMIT $${idx++} OFFSET $${idx++}`,
-    [...params, limit, offset],
-  );
+  const applyFilters = <T extends { where: (...args: any[]) => T }>(builder: T): T => {
+    let next = builder;
+    if (filter.projectId) next = next.where("project_id", "=", filter.projectId);
+    if (filter.actor) next = next.where("actor_id", "=", filter.actor);
+    if (filter.subjectKind) next = next.where("subject_kind", "=", filter.subjectKind);
+    if (filter.verb) next = next.where("action", "=", filter.verb);
+    if (filter.since) next = next.where("created_at", ">=", filter.since);
+    if (filter.until) next = next.where("created_at", "<=", filter.until);
+    return next;
+  };
 
-  return { rows, total };
+  query = applyFilters(query);
+  countQuery = applyFilters(countQuery);
+  const countRows = await countQuery.execute() as Array<{ count: string | number | bigint }>;
+  const total = Number(countRows[0]?.count ?? 0);
+  const rows = await query.orderBy("created_at", "desc").orderBy("id", "desc").limit(limit).offset(offset).execute() as Array<Record<string, unknown>>;
+
+  return { rows: rows.map(toEventRow), total };
 }
 
 /**
@@ -129,7 +106,7 @@ export interface RetentionPolicyRow {
   project_id: string | null;
   retain_days: number;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
 export async function getRetentionPolicy(
@@ -137,13 +114,12 @@ export async function getRetentionPolicy(
   orgId: string,
   projectId?: string | null,
 ): Promise<RetentionPolicyRow | null> {
-  const conn = em.getConnection();
-  const rows = await conn.execute<RetentionPolicyRow[]>(
-    projectId
-      ? `SELECT * FROM event_retention_policies WHERE org_id = $1 AND project_id = $2`
-      : `SELECT * FROM event_retention_policies WHERE org_id = $1 AND project_id IS NULL`,
-    projectId ? [orgId, projectId] : [orgId],
-  );
+  let query = em.getKysely<any>()
+    .selectFrom("event_retention_policy")
+    .selectAll()
+    .where("org_id", "=", orgId);
+  query = projectId ? query.where("project_id", "=", projectId) : query.where("project_id", "is", null);
+  const rows = await query.execute() as RetentionPolicyRow[];
   return rows[0] ?? null;
 }
 
@@ -153,27 +129,37 @@ export async function upsertRetentionPolicy(
   retainDays: number,
   projectId?: string | null,
 ): Promise<RetentionPolicyRow> {
-  const conn = em.getConnection();
   const existing = await getRetentionPolicy(em, orgId, projectId);
   if (existing) {
-    await conn.execute(
-      `UPDATE event_retention_policies SET retain_days = $1, updated_at = now() WHERE id = $2`,
-      [retainDays, existing.id],
-    );
-    const rows = await conn.execute<RetentionPolicyRow[]>(
-      `SELECT * FROM event_retention_policies WHERE id = $1`,
-      [existing.id],
-    );
+    const rows = await em.getKysely<any>()
+      .updateTable("event_retention_policy")
+      .set({ retain_days: retainDays })
+      .where("id", "=", existing.id)
+      .returningAll()
+      .execute() as RetentionPolicyRow[];
     return rows[0] as RetentionPolicyRow;
   }
   const id = randomUUID();
-  await conn.execute(
-    `INSERT INTO event_retention_policies (id, org_id, project_id, retain_days) VALUES ($1, $2, $3, $4)`,
-    [id, orgId, projectId ?? null, retainDays],
-  );
-  const rows = await conn.execute<RetentionPolicyRow[]>(
-    `SELECT * FROM event_retention_policies WHERE id = $1`,
-    [id],
-  );
+  const rows = await em.getKysely<any>()
+    .insertInto("event_retention_policy")
+    .values({ id, org_id: orgId, project_id: projectId ?? null, retain_days: retainDays })
+    .returningAll()
+    .execute() as RetentionPolicyRow[];
   return rows[0] as RetentionPolicyRow;
+}
+
+function toEventRow(row: Record<string, unknown>): EventRow {
+  const projectId = row["project_id"];
+  const payload = row["payload"] ?? {};
+  return {
+    id: String(row["id"]),
+    org_id: String(row["org_id"]),
+    project_id: projectId ? String(projectId) : null,
+    actor: String(row["actor_id"] ?? ""),
+    subject_kind: String(row["subject_kind"]),
+    subject_id: String(row["subject_id"]),
+    verb: String(row["action"]),
+    payload: typeof payload === "string" ? JSON.parse(payload) : payload as Record<string, unknown>,
+    created_at: new Date(row["created_at"] as string | Date).toISOString(),
+  };
 }

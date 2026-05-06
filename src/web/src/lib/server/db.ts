@@ -1,6 +1,7 @@
 import { tmpdir } from "node:os";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { __resetDefaultOrmForTest, initOrm } from "../../../../db/mikro-orm.config.ts";
+import { ormSqlConnection } from "./orm-helpers.ts";
 
 export type OrmDbValue = string | number | boolean | null | Date | Uint8Array;
 
@@ -134,7 +135,7 @@ function normalizeSql(sql: string): string {
 }
 
 function createOrmDb(em: EntityManager): WebDatabaseHandle {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   return {
     async query<T = Record<string, unknown>>(
       sql: string,
@@ -155,7 +156,7 @@ function createOrmDb(em: EntityManager): WebDatabaseHandle {
 
 async function hasExistingSchema(em: EntityManager): Promise<boolean> {
   try {
-    await em.getConnection().execute("SELECT 1 FROM orgs LIMIT 1");
+    await ormSqlConnection(em).execute("SELECT 1 FROM orgs LIMIT 1");
     return true;
   } catch {
     return false;

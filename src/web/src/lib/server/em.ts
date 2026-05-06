@@ -9,6 +9,7 @@
  */
 
 import type { EntityManager } from "@mikro-orm/postgresql";
+import { Org } from "../../../../db/entities/auth/Org.ts";
 import { initOrm } from "../../../../db/mikro-orm.config.ts";
 
 /**
@@ -25,12 +26,7 @@ export async function getEm(): Promise<EntityManager> {
  * Mirror of `getDefaultOrgId(db)` from db.ts but using the ORM connection.
  */
 export async function getDefaultOrgIdOrm(em: EntityManager): Promise<string> {
-  const conn = em.getConnection();
-  const rows = await conn.execute<{ id: string }[]>(
-    `SELECT id FROM orgs WHERE slug = ?`,
-    ["default"],
-  );
-  const id = rows[0]?.id;
-  if (!id) throw new Error("default org not found — run fulcrum init first");
-  return id;
+  const org = await em.findOne(Org, { slug: "default" } as never);
+  if (!org) throw new Error("default org not found — run fulcrum init first");
+  return org.id;
 }

@@ -5,6 +5,7 @@
 
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
+import { ormSqlConnection } from "./orm-helpers.ts";
 
 export interface SkillRow {
   id: string;
@@ -78,7 +79,7 @@ function normalise(row: RawSkillRow): SkillRow {
 }
 
 export async function listSkills(em: EntityManager, orgId: string): Promise<SkillRow[]> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<RawSkillRow[]>(
     `SELECT * FROM skills WHERE org_id = $1 ORDER BY slug ASC`,
     [orgId],
@@ -92,7 +93,7 @@ export async function installSkill(em: EntityManager, input: InstallSkillInput):
   }
   const id = randomUUID();
   const source = input.upstreamRepo ? "upstream" : "local";
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   await conn.execute(
     `INSERT INTO skills (id, org_id, slug, source, upstream_repo)
      VALUES ($1, $2, $3, $4, $5)`,
@@ -106,7 +107,7 @@ export async function installSkill(em: EntityManager, input: InstallSkillInput):
 }
 
 export async function upgradeSkill(em: EntityManager, orgId: string, slug: string): Promise<SkillRow> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<RawSkillRow[]>(
     `SELECT * FROM skills WHERE org_id = $1 AND slug = $2`,
     [orgId, slug],
@@ -136,7 +137,7 @@ export async function upgradeAllSkills(em: EntityManager, orgId: string): Promis
 }
 
 export async function uninstallSkill(em: EntityManager, orgId: string, slug: string): Promise<void> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const result = await conn.execute<{ id: string }[]>(
     `DELETE FROM skills WHERE org_id = $1 AND slug = $2 RETURNING id`,
     [orgId, slug],
@@ -150,7 +151,7 @@ export async function updateEnabledAgents(
   slug: string,
   enabledAgents: string[],
 ): Promise<SkillRow> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   await conn.execute(
     `UPDATE skills SET enabled_agents = $1::jsonb, updated_at = now() WHERE org_id = $2 AND slug = $3`,
     [JSON.stringify(enabledAgents), orgId, slug],
@@ -167,7 +168,7 @@ export async function resolveConflict(
   em: EntityManager,
   input: ResolveConflictInput,
 ): Promise<SkillRow> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<RawSkillRow[]>(
     `SELECT * FROM skills WHERE org_id = $1 AND slug = $2`,
     [input.orgId, input.slug],

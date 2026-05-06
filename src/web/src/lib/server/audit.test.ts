@@ -1,11 +1,9 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
-import { createLocalOrg, createProject, appendEvent } from "../../../../test-support/product-fixtures.ts";
-import type { TestStore } from "../../../../test-support/product-fixtures.ts";
+import { createTestOrm, type TestOrm } from "../../../../test-utils/db.ts";
 import {
   queryAuditEvents,
   eventsToCsv,
@@ -15,20 +13,19 @@ import {
 } from "./audit.ts";
 
 let scratch: string;
-let db: TestStore;
+let db: TestOrm;
 let orgId: string;
 let projectId: string;
 
 beforeEach(async () => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-audit-test-"));
-  const dbDir = join(scratch, "db");
-  mkdirSync(dbDir, { recursive: true });
-  db = await openIsolatedStore(join(dbDir, "main"));
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  orgId = org.id;
-  const proj = await createProject(db, { orgId, slug: "alpha", name: "Alpha" });
-  projectId = proj.id;
+  db = await createTestOrm();
+  orgId = db.seed.orgId;
+  projectId = randomUUID();
+  await db.pglite.query(
+    `INSERT INTO projects (id, org_id, name) VALUES ($1, $2, 'Alpha')`,
+    [projectId, orgId],
+  );
 });
 
 afterEach(async () => {
@@ -36,13 +33,37 @@ afterEach(async () => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
+async function appendTestEvent(input: {
+  orgId: string;
+  projectId?: string | null;
+  actor: string;
+  subjectKind: string;
+  subjectId: string;
+  verb: string;
+  payload?: Record<string, unknown>;
+}): Promise<void> {
+  await db.pglite.query(
+    `INSERT INTO audit_events (id, org_id, project_id, actor_id, subject_kind, subject_id, action, payload)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [
+      randomUUID(),
+      input.orgId,
+      input.projectId ?? "",
+      input.actor,
+      input.subjectKind,
+      input.subjectId,
+      input.verb,
+      JSON.stringify(input.payload ?? {}),
+    ],
+  );
+}
+
 describe("queryAuditEvents", () => {
   test("returns events for org ordered by created_at DESC", async () => {
-    await appendEvent(db, { orgId, actor: "alice", subjectKind: "task", subjectId: "t1", verb: "created" });
-    await appendEvent(db, { orgId, actor: "bob", subjectKind: "doc", subjectId: "d1", verb: "updated" });
-    const result = await queryAuditEvents(db, { orgId });
-    // total includes the project-created event from createProject
-    expect(result.total).toBeGreaterThanOrEqual(3);
+    await appendTestEvent({ orgId, actor: "alice", subjectKind: "task", subjectId: "t1", verb: "created" });
+    await appendTestEvent({ orgId, actor: "bob", subjectKind: "doc", subjectId: "d1", verb: "updated" });
+    const result = await queryAuditEvents(db.em.fork(), { orgId });
+    expect(result.total).toBe(2);
     // DESC order: latest first
     const dates = result.rows.map((r) => r.created_at);
     for (let i = 1; i < dates.length; i++) {
@@ -51,16 +72,16 @@ describe("queryAuditEvents", () => {
   });
 
   test("filters by subject_kind", async () => {
-    await appendEvent(db, { orgId, actor: "alice", subjectKind: "task", subjectId: "t1", verb: "created" });
-    await appendEvent(db, { orgId, actor: "bob", subjectKind: "doc", subjectId: "d1", verb: "updated" });
-    const result = await queryAuditEvents(db, { orgId, subjectKind: "task" });
+    await appendTestEvent({ orgId, actor: "alice", subjectKind: "task", subjectId: "t1", verb: "created" });
+    await appendTestEvent({ orgId, actor: "bob", subjectKind: "doc", subjectId: "d1", verb: "updated" });
+    const result = await queryAuditEvents(db.em.fork(), { orgId, subjectKind: "task" });
     expect(result.rows.every((r) => r.subject_kind === "task")).toBe(true);
     expect(result.total).toBeGreaterThanOrEqual(1);
   });
 
   test("filters by verb", async () => {
-    await appendEvent(db, { orgId, actor: "alice", subjectKind: "task", subjectId: "t1", verb: "assigned" });
-    const result = await queryAuditEvents(db, { orgId, verb: "assigned" });
+    await appendTestEvent({ orgId, actor: "alice", subjectKind: "task", subjectId: "t1", verb: "assigned" });
+    const result = await queryAuditEvents(db.em.fork(), { orgId, verb: "assigned" });
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0]!.verb).toBe("assigned");
   });
@@ -68,21 +89,20 @@ describe("queryAuditEvents", () => {
   test("filters by date range (since/until)", async () => {
     // All events are created "now", so filtering with a future 'since' should exclude them
     const futureDate = new Date(Date.now() + 86400000).toISOString();
-    const result = await queryAuditEvents(db, { orgId, since: futureDate });
+    const result = await queryAuditEvents(db.em.fork(), { orgId, since: futureDate });
     expect(result.total).toBe(0);
     expect(result.rows).toHaveLength(0);
   });
 
   test("pagination with limit and offset", async () => {
     for (let i = 0; i < 5; i++) {
-      await appendEvent(db, { orgId, actor: "a", subjectKind: "task", subjectId: `t${i}`, verb: "created" });
+      await appendTestEvent({ orgId, actor: "a", subjectKind: "task", subjectId: `t${i}`, verb: "created" });
     }
-    const page1 = await queryAuditEvents(db, { orgId }, { limit: 2, offset: 0 });
+    const page1 = await queryAuditEvents(db.em.fork(), { orgId }, { limit: 2, offset: 0 });
     expect(page1.rows).toHaveLength(2);
-    // total includes all events (5 task + 1 project created)
-    expect(page1.total).toBeGreaterThanOrEqual(6);
+    expect(page1.total).toBe(5);
 
-    const page2 = await queryAuditEvents(db, { orgId }, { limit: 2, offset: 2 });
+    const page2 = await queryAuditEvents(db.em.fork(), { orgId }, { limit: 2, offset: 2 });
     expect(page2.rows).toHaveLength(2);
     // No overlap
     const ids1 = page1.rows.map((r) => r.id);
@@ -91,9 +111,9 @@ describe("queryAuditEvents", () => {
   });
 
   test("filters by projectId", async () => {
-    await appendEvent(db, { orgId, projectId, actor: "alice", subjectKind: "task", subjectId: "t1", verb: "created" });
-    await appendEvent(db, { orgId, actor: "bob", subjectKind: "doc", subjectId: "d1", verb: "created" }); // no project
-    const result = await queryAuditEvents(db, { orgId, projectId });
+    await appendTestEvent({ orgId, projectId, actor: "alice", subjectKind: "task", subjectId: "t1", verb: "created" });
+    await appendTestEvent({ orgId, actor: "bob", subjectKind: "doc", subjectId: "d1", verb: "created" }); // no project
+    const result = await queryAuditEvents(db.em.fork(), { orgId, projectId });
     expect(result.rows.every((r) => r.project_id === projectId)).toBe(true);
   });
 });
@@ -132,31 +152,31 @@ describe("eventsToJson", () => {
 
 describe("retention policy", () => {
   test("getRetentionPolicy returns null when none set", async () => {
-    const result = await getRetentionPolicy(db, orgId);
+    const result = await getRetentionPolicy(db.em.fork(), orgId);
     expect(result).toBeNull();
   });
 
   test("upsertRetentionPolicy creates and returns policy", async () => {
-    const policy = await upsertRetentionPolicy(db, orgId, 30);
+    const policy = await upsertRetentionPolicy(db.em.fork(), orgId, 30);
     expect(policy.retain_days).toBe(30);
     expect(policy.org_id).toBe(orgId);
     expect(policy.project_id).toBeNull();
   });
 
   test("upsertRetentionPolicy updates existing policy", async () => {
-    await upsertRetentionPolicy(db, orgId, 30);
-    const updated = await upsertRetentionPolicy(db, orgId, 90);
+    await upsertRetentionPolicy(db.em.fork(), orgId, 30);
+    const updated = await upsertRetentionPolicy(db.em.fork(), orgId, 90);
     expect(updated.retain_days).toBe(90);
   });
 
   test("retain_days=0 accepted (keep forever)", async () => {
-    const policy = await upsertRetentionPolicy(db, orgId, 0);
+    const policy = await upsertRetentionPolicy(db.em.fork(), orgId, 0);
     expect(policy.retain_days).toBe(0);
   });
 
   test("getRetentionPolicy retrieves after upsert", async () => {
-    await upsertRetentionPolicy(db, orgId, 60);
-    const result = await getRetentionPolicy(db, orgId);
+    await upsertRetentionPolicy(db.em.fork(), orgId, 60);
+    const result = await getRetentionPolicy(db.em.fork(), orgId);
     expect(result).not.toBeNull();
     expect(result!.retain_days).toBe(60);
   });

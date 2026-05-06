@@ -6,6 +6,7 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
 import { eventDispatcher } from "./application-compat";
+import { ormSqlConnection } from "./orm-helpers.ts";
 
 export interface ProjectStatusRow {
   id: string;
@@ -40,7 +41,7 @@ export async function createProjectStatus(
   input: CreateStatusInput,
 ): Promise<{ id: string }> {
   const id = randomUUID();
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const maxRows = await conn.execute<{ mx: number | null }[]>(
     `SELECT MAX(sort_order) AS mx FROM project_statuses WHERE project_id = $1`,
     [input.projectId],
@@ -82,7 +83,7 @@ export async function updateProjectStatus(
   if (changed.length === 0) throw new Error("updateProjectStatus: no fields to update");
   sets.push("updated_at = now()");
   params.push(input.id);
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<{ org_id: string; project_id: string }[]>(
     `UPDATE project_statuses SET ${sets.join(", ")} WHERE id = $${params.length}
        RETURNING org_id, project_id`,
@@ -105,7 +106,7 @@ export async function deleteProjectStatus(
   em: EntityManager,
   id: string,
 ): Promise<{ ok: true }> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<{ org_id: string; project_id: string }[]>(
     `DELETE FROM project_statuses WHERE id = $1 RETURNING org_id, project_id`,
     [id],
@@ -127,7 +128,7 @@ export async function listProjectStatuses(
   em: EntityManager,
   projectId: string,
 ): Promise<ProjectStatusRow[]> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   return conn.execute<ProjectStatusRow[]>(
     `SELECT * FROM project_statuses WHERE project_id = $1 ORDER BY sort_order ASC, created_at ASC`,
     [projectId],

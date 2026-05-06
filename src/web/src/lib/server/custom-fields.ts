@@ -6,6 +6,7 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
 import { eventDispatcher } from "./application-compat";
+import { ormSqlConnection } from "./orm-helpers.ts";
 
 export type FieldType = "text" | "number" | "date" | "select" | "multi_select" | "checkbox";
 
@@ -54,7 +55,7 @@ export async function createCustomField(
 ): Promise<{ id: string }> {
   assertFieldType(input.fieldType, "createCustomField");
   const id = randomUUID();
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const maxRows = await conn.execute<{ mx: number | null }[]>(
     `SELECT MAX(sort_order) AS mx FROM custom_fields WHERE project_id = $1`,
     [input.projectId],
@@ -110,7 +111,7 @@ export async function updateCustomField(
   if (changed.length === 0) throw new Error("updateCustomField: no fields to update");
   sets.push("updated_at = now()");
   params.push(input.id);
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<{ org_id: string; project_id: string }[]>(
     `UPDATE custom_fields SET ${sets.join(", ")} WHERE id = $${params.length}
        RETURNING org_id, project_id`,
@@ -133,7 +134,7 @@ export async function archiveCustomField(
   em: EntityManager,
   id: string,
 ): Promise<{ ok: true }> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<{ org_id: string; project_id: string }[]>(
     `UPDATE custom_fields SET archived = true, updated_at = now() WHERE id = $1
        RETURNING org_id, project_id`,
@@ -159,7 +160,7 @@ export async function listCustomFields(
   const where = includeArchived
     ? `WHERE project_id = $1`
     : `WHERE project_id = $1 AND archived = false`;
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   return conn.execute<CustomFieldRow[]>(
     `SELECT * FROM custom_fields ${where} ORDER BY sort_order ASC, created_at ASC`,
     [projectId],

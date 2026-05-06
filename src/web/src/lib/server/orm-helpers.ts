@@ -1,13 +1,13 @@
 /**
- * ORM helper functions replacing kernel compatibility raw SQL helpers.
- *
- * Where entity stubs lack full column mappings, we use em.getConnection().execute()
- * for raw SQL through the unified MikroORM connection. This consolidates all DB
- * access through one layer (ARCH-01) while retaining correctness (ARCH-02).
+ * ORM helper functions replacing kernel compatibility helpers through Kysely.
  */
 
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
+
+export function ormSqlConnection(manager: EntityManager) {
+  return manager.getConnection();
+}
 
 export interface AppendEventInput {
   orgId: string;
@@ -19,26 +19,23 @@ export interface AppendEventInput {
   payload?: Record<string, unknown>;
 }
 
-/** Create an event row via the EM connection (Event entity is partial stub). */
 export async function appendEventOrm(
   em: EntityManager,
   input: AppendEventInput,
 ): Promise<{ id: string }> {
   const id = randomUUID();
-  await em.getConnection().execute(
-    `INSERT INTO events (id, org_id, project_id, actor, subject_kind, subject_id, verb, payload)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb)`,
-    [
+  await em.getKysely<any>()
+    .insertInto("events")
+    .values({
       id,
-      input.orgId,
-      input.projectId ?? null,
-      input.actor,
-      input.subjectKind,
-      input.subjectId,
-      input.verb,
-      JSON.stringify(input.payload ?? {}),
-    ],
-  );
+      org_id: input.orgId,
+      project_id: input.projectId ?? null,
+      subject_kind: input.subjectKind,
+      subject_id: input.subjectId,
+      verb: input.verb,
+      payload: { actor: input.actor, ...(input.payload ?? {}) },
+    })
+    .execute();
   return { id };
 }
 
@@ -52,33 +49,40 @@ export interface IndexSearchInput {
   labels?: string[];
 }
 
-/** Upsert a search_documents row (SearchDocument entity is partial stub). */
 export async function indexSearchDocumentOrm(
   em: EntityManager,
   input: IndexSearchInput,
 ): Promise<void> {
   const id = randomUUID();
-  const labels = input.labels ?? [];
-  const arrayLiteral = `{${labels.map((l) => `"${l.replace(/"/g, '\\"')}"`).join(",")}}`;
-  await em.getConnection().execute(
-    `INSERT INTO search_documents (id, org_id, project_id, source_kind, source_id, title, body, labels)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?::text[])
-     ON CONFLICT (org_id, source_kind, source_id) DO UPDATE
-       SET title = EXCLUDED.title,
-           body = EXCLUDED.body,
-           labels = EXCLUDED.labels,
-           updated_at = now()`,
-    [
+  const db = em.getKysely<any>();
+  const existing = await db
+    .selectFrom("search_documents")
+    .select(["id"])
+    .where("org_id", "=", input.orgId)
+    .where("entity_kind", "=", input.sourceKind)
+    .where("entity_id", "=", input.sourceId)
+    .executeTakeFirst();
+  const values = {
+    title: input.title,
+    body: input.body,
+    labels: input.labels ?? [],
+    updated_at: new Date(),
+    project_id: input.projectId ?? null,
+  };
+  if (existing) {
+    await db.updateTable("search_documents").set(values).where("id", "=", existing.id).execute();
+    return;
+  }
+  await db
+    .insertInto("search_documents")
+    .values({
       id,
-      input.orgId,
-      input.projectId ?? null,
-      input.sourceKind,
-      input.sourceId,
-      input.title,
-      input.body,
-      arrayLiteral,
-    ],
-  );
+      org_id: input.orgId,
+      entity_kind: input.sourceKind,
+      entity_id: input.sourceId,
+      ...values,
+    })
+    .execute();
 }
 
 export interface EnqueueJobInput {
@@ -91,26 +95,24 @@ export interface EnqueueJobInput {
   availableAt?: Date;
 }
 
-/** Enqueue a job row (Job entity is partial stub). */
 export async function enqueueJobOrm(
   em: EntityManager,
   input: EnqueueJobInput,
 ): Promise<{ id: string }> {
   const id = randomUUID();
-  await em.getConnection().execute(
-    `INSERT INTO jobs
-       (id, org_id, project_id, queue, kind, payload, status, max_attempts, available_at)
-     VALUES (?, ?, ?, ?, ?, ?::jsonb, 'queued', ?, ?)`,
-    [
+  await em.getKysely<any>()
+    .insertInto("jobs")
+    .values({
       id,
-      input.orgId,
-      input.projectId ?? null,
-      input.queue,
-      input.kind,
-      JSON.stringify(input.payload ?? {}),
-      input.maxAttempts ?? 3,
-      (input.availableAt ?? new Date()).toISOString(),
-    ],
-  );
+      org_id: input.orgId,
+      project_id: input.projectId ?? null,
+      queue: input.queue,
+      kind: input.kind,
+      payload: input.payload ?? {},
+      status: "queued",
+      max_attempts: input.maxAttempts ?? 3,
+      available_at: input.availableAt ?? new Date(),
+    })
+    .execute();
   return { id };
 }

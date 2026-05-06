@@ -4,8 +4,8 @@
  */
 
 import type { EntityManager } from "@mikro-orm/postgresql";
-import { newUlid } from "./application-compat";
-import { eventDispatcher } from "./application-compat";
+import { randomUUID } from "node:crypto";
+import { appendEventOrm } from "./orm-helpers.ts";
 import { indexSearchDocumentOrm } from "./orm-helpers.ts";
 
 export interface CreateDocumentInput {
@@ -30,9 +30,11 @@ export interface UpdateDocumentInput {
 interface DocRow {
   org_id: string;
   project_id: string | null;
-  kind: string;
+  kind?: string;
+  doc_type?: string;
   title: string;
-  body: string;
+  body?: string;
+  body_md?: string;
   frontmatter: Record<string, unknown>;
 }
 
@@ -46,16 +48,22 @@ export async function createDocumentAction(
   em: EntityManager,
   input: CreateDocumentInput,
 ): Promise<{ id: string }> {
-  const id = newUlid();
+  const id = randomUUID();
   const fm = input.frontmatter ?? {};
-  const conn = em.getConnection();
-  await conn.execute(
-    `INSERT INTO documents (id, org_id, project_id, kind, title, body, frontmatter, source_path)
-     VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?)`,
-    [id, input.orgId, input.projectId, input.kind, input.title, input.body, JSON.stringify(fm), input.sourcePath ?? null],
-  );
+  await em.getKysely<any>()
+    .insertInto("documents")
+    .values({
+      id,
+      org_id: input.orgId,
+      project_id: input.projectId,
+      doc_type: input.kind,
+      title: input.title,
+      body_md: input.body,
+      frontmatter: fm,
+    })
+    .execute();
   const ctx = { orgId: input.orgId, projectId: input.projectId, subjectKind: "document", subjectId: id } as const;
-  await eventDispatcher.dispatch(em, { ...ctx, actor: "system", verb: "created", payload: { title: input.title, kind: input.kind } });
+  await appendEventOrm(em, { ...ctx, actor: "system", verb: "created", payload: { title: input.title, kind: input.kind } });
   await indexSearchDocumentOrm(em, {
     orgId: input.orgId, projectId: input.projectId, sourceKind: "document", sourceId: id,
     title: input.title, body: input.body, labels: extractLabels(fm),
@@ -68,56 +76,53 @@ export async function updateDocumentAction(
   input: UpdateDocumentInput,
 ): Promise<{ ok: true }> {
   if (!input.id) throw new Error("updateDocumentAction: id is required");
-  const sets: string[] = [];
-  const params: (string | null)[] = [];
   const changed: string[] = [];
-  const push = (col: string, val: string, cast = "") => {
-    params.push(val);
-    sets.push(`${col} = ?${cast}`);
-    changed.push(col);
-  };
-  if (input.title !== undefined) push("title", input.title);
-  if (input.body !== undefined) push("body", input.body);
-  if (input.kind !== undefined) push("kind", input.kind);
-  if (input.frontmatter !== undefined) push("frontmatter", JSON.stringify(input.frontmatter), "::jsonb");
+  if (input.title !== undefined) changed.push("title");
+  if (input.body !== undefined) changed.push("body_md");
+  if (input.kind !== undefined) changed.push("doc_type");
+  if (input.frontmatter !== undefined) changed.push("frontmatter");
   if (changed.length === 0) throw new Error("updateDocumentAction: no fields to update");
-  sets.push(`updated_at = now()`);
-  params.push(input.id);
-  params.push(input.orgId);
-  const conn = em.getConnection();
-  const rows = await conn.execute<DocRow[]>(
-    `UPDATE documents SET ${sets.join(", ")}
-       WHERE id = ? AND org_id = ?
-     RETURNING org_id, project_id, kind, title, body, frontmatter`,
-    params,
-  );
+  const patch: Record<string, unknown> = {};
+  if (input.title !== undefined) patch["title"] = input.title;
+  if (input.body !== undefined) patch["body_md"] = input.body;
+  if (input.kind !== undefined) patch["doc_type"] = input.kind;
+  if (input.frontmatter !== undefined) patch["frontmatter"] = input.frontmatter;
+  patch["updated_at"] = new Date();
+  const rows = await em.getKysely<any>()
+    .updateTable("documents")
+    .set(patch)
+    .where("id", "=", input.id)
+    .where("org_id", "=", input.orgId)
+    .returning(["org_id", "project_id", "doc_type", "title", "body_md", "frontmatter"])
+    .execute() as DocRow[];
   const row = rows[0];
   if (!row) throw new Error(`updateDocumentAction: document not found: ${input.id}`);
-  await eventDispatcher.dispatch(em, {
+  await appendEventOrm(em, {
     orgId: row.org_id, projectId: row.project_id, actor: "system",
     subjectKind: "document", subjectId: input.id, verb: "updated", payload: { changed },
   });
   await indexSearchDocumentOrm(em, {
     orgId: row.org_id, projectId: row.project_id, sourceKind: "document", sourceId: input.id,
-    title: row.title, body: row.body, labels: extractLabels(row.frontmatter),
+    title: row.title, body: row.body ?? row.body_md ?? "", labels: extractLabels(row.frontmatter),
   });
   return { ok: true };
 }
 
 export async function deleteDocumentAction(em: EntityManager, id: string, orgId: string): Promise<{ ok: true }> {
-  const conn = em.getConnection();
-  await conn.execute(
-    `DELETE FROM search_documents
-       WHERE source_kind = 'document' AND source_id = ? AND org_id = ?`,
-    [id, orgId],
-  );
-  const rows = await conn.execute<{ org_id: string; project_id: string | null }[]>(
-    `DELETE FROM documents WHERE id = ? AND org_id = ? RETURNING org_id, project_id`,
-    [id, orgId],
-  );
+  const db = em.getKysely<any>();
+  await db.deleteFrom("search_documents")
+    .where("entity_kind", "=", "document")
+    .where("entity_id", "=", id)
+    .where("org_id", "=", orgId)
+    .execute();
+  const rows = await db.deleteFrom("documents")
+    .where("id", "=", id)
+    .where("org_id", "=", orgId)
+    .returning(["org_id", "project_id"])
+    .execute() as Array<{ org_id: string; project_id: string | null }>;
   const row = rows[0];
   if (row) {
-    await eventDispatcher.dispatch(em, {
+    await appendEventOrm(em, {
       orgId: row.org_id, projectId: row.project_id, actor: "system",
       subjectKind: "document", subjectId: id, verb: "deleted",
     });

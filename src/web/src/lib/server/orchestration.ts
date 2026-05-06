@@ -5,6 +5,7 @@
 
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
+import { ormSqlConnection } from "./orm-helpers.ts";
 export { SYMPHONY_COLORS, type SymphonyState } from "$lib/orchestration";
 
 // --- Types ---
@@ -72,7 +73,7 @@ export async function loadOrchestrationDashboard(
   orgId: string,
   projectId?: string,
 ): Promise<OrchestrationDashboardData> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
 
   const configRows = await conn.execute<OrchestrationConfigRow[]>(
     `SELECT * FROM orchestration_config WHERE org_id = $1`,
@@ -163,7 +164,7 @@ export async function loadProjectRuns(
   orgId: string,
   projectId: string,
 ): Promise<ProjectRunRow[]> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<ProjectRunRow[]>(
     `SELECT id, agent, model, status, symphony_state, started_at, ended_at,
             last_error_kind, retry_count, workspace_path
@@ -185,7 +186,7 @@ export async function loadOrchestrationConfig(
   em: EntityManager,
   orgId: string,
 ): Promise<OrchestrationConfigRow | null> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<OrchestrationConfigRow[]>(
     `SELECT * FROM orchestration_config WHERE org_id = $1`,
     [orgId],
@@ -203,7 +204,7 @@ export async function upsertOrchestrationConfig(
     workspaceRoot: string | null;
   },
 ): Promise<OrchestrationConfigRow> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<OrchestrationConfigRow[]>(
     `INSERT INTO orchestration_config (id, org_id, poll_interval_s, max_concurrency, stall_timeout_s, workspace_root, updated_at)
      VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, now())
@@ -226,7 +227,7 @@ export async function loadWorkflowDef(
   orgId: string,
   id: string,
 ): Promise<WorkflowDefRow | null> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<WorkflowDefRow[]>(
     `SELECT * FROM workflow_defs WHERE id = $1 AND org_id = $2`,
     [id, orgId],
@@ -238,7 +239,7 @@ export async function listWorkflowDefs(
   em: EntityManager,
   orgId: string,
 ): Promise<WorkflowDefRow[]> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   return conn.execute<WorkflowDefRow[]>(
     `SELECT * FROM workflow_defs WHERE org_id = $1 ORDER BY updated_at DESC`,
     [orgId],
@@ -258,7 +259,7 @@ export async function upsertWorkflowDef(
   },
 ): Promise<WorkflowDefRow> {
   const id = def.id ?? randomUUID();
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<WorkflowDefRow[]>(
     `INSERT INTO workflow_defs (id, org_id, project_id, name, description, yaml_config, prompt_template, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, now())

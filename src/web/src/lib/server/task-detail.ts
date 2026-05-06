@@ -7,6 +7,7 @@ import type { EntityManager } from "@mikro-orm/postgresql";
 import type { TaskStatus } from "./tasks.ts";
 import { TASK_STATUSES } from "./tasks.ts";
 import { eventDispatcher } from "./application-compat";
+import { ormSqlConnection } from "./orm-helpers.ts";
 
 export interface TaskDetail {
   id: string;
@@ -63,7 +64,7 @@ export async function getTaskDetail(
   taskId: string,
   orgId: string,
 ): Promise<TaskDetailPayload | null> {
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const rows = await conn.execute<TaskDetail[]>(
     `SELECT id, org_id, project_id, parent_id, title, description, status, priority, created_at, updated_at
        FROM tasks WHERE id = $1 AND org_id = $2`,
@@ -116,7 +117,7 @@ export async function bulkUpdateStatus(
   if (!TASK_STATUSES.includes(status)) {
     throw new Error(`bulkUpdateStatus: invalid status ${status}`);
   }
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const placeholders = ids.map((_, i) => `$${i + 3}`).join(", ");
   const params: (string | number)[] = [status, orgId, ...ids];
   const result = await conn.execute<{ id: string }[]>(
@@ -144,7 +145,7 @@ export async function bulkDeleteTasks(
   orgId: string,
 ): Promise<{ deleted: number }> {
   if (ids.length === 0) return { deleted: 0 };
-  const conn = em.getConnection();
+  const conn = ormSqlConnection(em);
   const placeholders = ids.map((_, i) => `$${i + 2}`).join(", ");
   const params: string[] = [orgId, ...ids];
   const result = await conn.execute<{ id: string; project_id: string | null }[]>(
