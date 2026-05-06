@@ -219,8 +219,7 @@ describe("Phase 9.5 interface boundary", () => {
 
   test("web API tRPC runtime adapters do not import product-kernel or open ProductDb/PGlite directly", async () => {
     const found = await violations(RUNTIME_ADAPTER_ROOTS, FORBIDDEN_INTERFACE_ACCESS);
-    expect(found.length, "runtime direct-access inventory should start non-empty before GREEN rewires").toBeGreaterThan(0);
-    expect(EXPECTED_RUNTIME_DIRECT_ACCESS_FILES.every((file) => found.includes(file))).toBe(true);
+    expect(EXPECTED_RUNTIME_DIRECT_ACCESS_FILES.length).toBeGreaterThan(0);
     expect(found).toEqual([]);
   });
 
