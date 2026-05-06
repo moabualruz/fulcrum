@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
-import { openPglite } from "../db/pglite.ts";
-import { runMigrations } from "../db/migrate.ts";
+import { openIsolatedStore } from "../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../test-support/product-fixtures.ts";
 import { createLocalOrg } from "./repositories.ts";
 import {
   upsertTenantSetting,
@@ -16,14 +16,14 @@ import {
   type ConnectorRunRow,
   type CredentialRow,
 } from "./settings-connectors-credentials.ts";
-import type { ProductDb } from "../db/types.ts";
+import type { TestStore } from "../../test-support/product-fixtures.ts";
 
-let db: ProductDb;
+let db: TestStore;
 let orgId: string;
 
 beforeAll(async () => {
-  db = await openPglite("memory://test-settings");
-  await runMigrations(db);
+  db = await openIsolatedStore("memory://test-settings");
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "test-org", name: "Test Org" });
   orgId = org.id;
 });

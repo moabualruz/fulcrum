@@ -8,11 +8,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { openPglite } from "./db/pglite.ts";
-import { runMigrations } from "./db/migrate.ts";
-import { createLocalOrg, createProject } from "./store/repositories.ts";
-import { newUlid } from "./ids.ts";
-import type { ProductDb } from "./db/types.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
+import { createLocalOrg, createProject } from "../test-support/product-fixtures.ts";
+import { makeId } from "../test-support/product-fixtures.ts";
+import type { TestStore } from "../test-support/product-fixtures.ts";
 
 interface MemoryRow {
   id: string;
@@ -29,11 +29,11 @@ interface MemoryRow {
 
 // Surface-agnostic CRUD operations — each surface (Web, CLI, TUI) maps
 // to these same queries. Parity = identical results from identical data.
-async function remember(db: ProductDb, input: {
+async function remember(db: TestStore, input: {
   orgId: string; projectId?: string | null; scope: string; kind: string;
   key: string; body: string; source?: string;
 }): Promise<MemoryRow> {
-  const id = newUlid();
+  const id = makeId();
   await db.query(
     `INSERT INTO memories (id, org_id, project_id, scope, kind, key, body, source)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -43,14 +43,14 @@ async function remember(db: ProductDb, input: {
   return rows[0]!;
 }
 
-async function list(db: ProductDb, orgId: string): Promise<MemoryRow[]> {
+async function list(db: TestStore, orgId: string): Promise<MemoryRow[]> {
   return db.query<MemoryRow>(
     `SELECT * FROM memories WHERE org_id = $1 ORDER BY updated_at DESC, id ASC`,
     [orgId],
   );
 }
 
-async function search(db: ProductDb, orgId: string, query: string): Promise<MemoryRow[]> {
+async function search(db: TestStore, orgId: string, query: string): Promise<MemoryRow[]> {
   return db.query<MemoryRow>(
     `SELECT * FROM memories WHERE org_id = $1 AND (key ILIKE '%' || $2 || '%' OR body ILIKE '%' || $2 || '%')
      ORDER BY updated_at DESC, id ASC`,
@@ -58,12 +58,12 @@ async function search(db: ProductDb, orgId: string, query: string): Promise<Memo
   );
 }
 
-async function show(db: ProductDb, id: string): Promise<MemoryRow | null> {
+async function show(db: TestStore, id: string): Promise<MemoryRow | null> {
   const rows = await db.query<MemoryRow>(`SELECT * FROM memories WHERE id = $1`, [id]);
   return rows[0] ?? null;
 }
 
-async function edit(db: ProductDb, id: string, body: string): Promise<MemoryRow> {
+async function edit(db: TestStore, id: string, body: string): Promise<MemoryRow> {
   await db.query(
     `UPDATE memories SET body = $2, updated_at = now() WHERE id = $1`,
     [id, body],
@@ -72,7 +72,7 @@ async function edit(db: ProductDb, id: string, body: string): Promise<MemoryRow>
   return rows[0]!;
 }
 
-async function promote(db: ProductDb, id: string): Promise<MemoryRow> {
+async function promote(db: TestStore, id: string): Promise<MemoryRow> {
   // Promote: set scope to 'global'
   await db.query(
     `UPDATE memories SET scope = 'global', updated_at = now() WHERE id = $1`,
@@ -82,14 +82,14 @@ async function promote(db: ProductDb, id: string): Promise<MemoryRow> {
   return rows[0]!;
 }
 
-async function archive(db: ProductDb, id: string): Promise<void> {
+async function archive(db: TestStore, id: string): Promise<void> {
   await db.query(
     `UPDATE memories SET scope = 'archived', updated_at = now() WHERE id = $1`,
     [id],
   );
 }
 
-async function restore(db: ProductDb, id: string, scope: string): Promise<MemoryRow> {
+async function restore(db: TestStore, id: string, scope: string): Promise<MemoryRow> {
   await db.query(
     `UPDATE memories SET scope = $2, updated_at = now() WHERE id = $1`,
     [id, scope],
@@ -98,18 +98,18 @@ async function restore(db: ProductDb, id: string, scope: string): Promise<Memory
   return rows[0]!;
 }
 
-async function forget(db: ProductDb, id: string): Promise<void> {
+async function forget(db: TestStore, id: string): Promise<void> {
   await db.query(`DELETE FROM memories WHERE id = $1`, [id]);
 }
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-crud-parity-"));
-let db: ProductDb;
+let db: TestStore;
 let orgId: string;
 let projectId: string;
 
 beforeAll(async () => {
-  db = await openPglite(join(scratch, "parity"));
-  await runMigrations(db);
+  db = await openIsolatedStore(join(scratch, "parity"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "parity", name: "Parity Org" });
   orgId = org.id;
   const project = await createProject(db, { orgId, slug: "pp", name: "Parity Project" });

@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
+import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { createLocalOrg } from "../../../../test-support/product-fixtures.ts";
+import { makeId } from "../../../../test-support/product-fixtures.ts";
 
 let scratch: string;
 
@@ -18,13 +18,13 @@ function streamedData<T>(result: unknown): Promise<T> {
 async function seedDb(scratch: string) {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
 
-  const r1 = newUlid();
-  const r2 = newUlid();
-  const r3 = newUlid();
+  const r1 = makeId();
+  const r2 = makeId();
+  const r3 = makeId();
 
   await db.query(
     `INSERT INTO repos (id, org_id, slug, root_path, default_branch, remote_url, registered_at, last_seen_at)
@@ -87,8 +87,8 @@ describe("/repos +page.server.ts load()", () => {
   test("returns empty array when no repos registered", async () => {
     const dbDir = join(scratch, "state", "product", "db");
     mkdirSync(dbDir, { recursive: true });
-    const db = await openPglite(join(dbDir, "main"));
-    await runMigrations(db);
+    const db = await openIsolatedStore(join(dbDir, "main"));
+    await migrateIsolatedStore(db);
     await createLocalOrg(db, { slug: "default", name: "Default" });
     await db.close();
 

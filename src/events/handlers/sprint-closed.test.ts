@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../product-kernel/db/migrate.ts";
+import { openIsolatedStore } from "../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../test-support/product-fixtures.ts";
 import {
   createLocalOrg,
   createProject,
@@ -11,8 +11,8 @@ import {
   createTask,
   addTaskToSprint,
   closeSprint,
-} from "../../product-kernel/store/repositories.ts";
-import type { ProductDb } from "../../product-kernel/db/types.ts";
+} from "../../test-support/product-fixtures.ts";
+import type { TestStore } from "../../test-support/product-fixtures.ts";
 import {
   handleSprintClosed,
   buildRetroContent,
@@ -27,13 +27,13 @@ afterAll(() => {
 });
 
 async function freshDb(name: string) {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(scratch, name));
+  await migrateIsolatedStore(db);
   return db;
 }
 
 /** Set up org + project + sprint with tasks, close the sprint, return event. */
-async function setupClosedSprint(db: ProductDb) {
+async function setupClosedSprint(db: TestStore) {
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const project = await createProject(db, { orgId: org.id, slug: "p1", name: "P1" });
   const sprint = await createSprint(db, {

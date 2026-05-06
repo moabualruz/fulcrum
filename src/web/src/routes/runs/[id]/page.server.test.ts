@@ -2,11 +2,11 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg, createProject } from "../../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../../product-kernel/ids.ts";
-import type { ProductDb } from "../../../../../product-kernel/db/types.ts";
+import { openIsolatedStore } from "../../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../../test-support/product-fixtures.ts";
+import { createLocalOrg, createProject } from "../../../../../test-support/product-fixtures.ts";
+import { makeId } from "../../../../../test-support/product-fixtures.ts";
+import type { TestStore } from "../../../../../test-support/product-fixtures.ts";
 
 let scratch: string;
 
@@ -45,11 +45,11 @@ afterEach(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-async function freshDb(): Promise<{ db: ProductDb; orgId: string; projectId: string }> {
+async function freshDb(): Promise<{ db: TestStore; orgId: string; projectId: string }> {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const project = await createProject(db, {
     orgId: org.id,
@@ -60,13 +60,13 @@ async function freshDb(): Promise<{ db: ProductDb; orgId: string; projectId: str
 }
 
 async function seedRun(
-  db: ProductDb,
+  db: TestStore,
   orgId: string,
   projectId: string,
   status: "queued" | "running" | "succeeded" | "failed" | "cancelled",
   transcriptPath: string | null = null,
 ): Promise<string> {
-  const id = newUlid();
+  const id = makeId();
   await db.query(
     `INSERT INTO agent_runs
       (id, org_id, project_id, agent, model, prompt, status, transcript_path)
@@ -132,7 +132,7 @@ describe("/runs/[id] +page.server.ts", () => {
     let artifactId: string;
     try {
       id = await seedRun(db, orgId, projectId, "succeeded");
-      artifactId = newUlid();
+      artifactId = makeId();
       await db.query(
         `INSERT INTO artifacts (id, org_id, project_id, run_id, kind, title, body_path, mime)
          VALUES ($1, $2, $3, $4, 'text', 'summary.txt', '/tmp/summary.txt', 'text/plain')`,
@@ -141,7 +141,7 @@ describe("/runs/[id] +page.server.ts", () => {
       await db.query(
         `INSERT INTO edges (id, org_id, project_id, from_kind, from_id, to_kind, to_id, rel)
          VALUES ($1, $2, $3, 'agent_run', $4, 'artifact', $5, 'produced')`,
-        [newUlid(), orgId, projectId, id, artifactId],
+        [makeId(), orgId, projectId, id, artifactId],
       );
     } finally {
       await db.close();
@@ -187,8 +187,8 @@ describe("/runs/[id] +page.server.ts", () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
     await mod.actions.cancel({ params: { id } } as Parameters<typeof mod.actions.cancel>[0]);
     const dbDir = join(scratch, "state", "product", "db");
-    const db2 = await openPglite(join(dbDir, "main"));
-    await runMigrations(db2);
+    const db2 = await openIsolatedStore(join(dbDir, "main"));
+    await migrateIsolatedStore(db2);
     try {
       const rows = await db2.query<{ status: string }>(
         `SELECT status FROM agent_runs WHERE id = $1`,

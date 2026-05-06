@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { openPglite } from "./db/pglite.ts";
-import { runMigrations } from "./db/migrate.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
 import { createTenantSettingRepository } from "./tenant-settings.ts";
-import type { ProductDb } from "./db/types.ts";
+import type { TestStore } from "../test-support/product-fixtures.ts";
 
 describe("TenantSettingRepository", () => {
-  let db: ProductDb;
+  let db: TestStore;
   let orgId: string;
 
   beforeEach(async () => {
-    db = await openPglite("memory://tenant-settings-test");
-    await runMigrations(db);
+    db = await openIsolatedStore("memory://tenant-settings-test");
+    await migrateIsolatedStore(db);
     // seed a default org
     await db.query(
       `INSERT INTO orgs (id, slug, name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,

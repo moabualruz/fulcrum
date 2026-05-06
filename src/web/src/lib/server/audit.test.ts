@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg, createProject, appendEvent } from "../../../../product-kernel/store/repositories.ts";
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
+import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { createLocalOrg, createProject, appendEvent } from "../../../../test-support/product-fixtures.ts";
+import type { TestStore } from "../../../../test-support/product-fixtures.ts";
 import {
   queryAuditEvents,
   eventsToCsv,
@@ -15,7 +15,7 @@ import {
 } from "./audit.ts";
 
 let scratch: string;
-let db: ProductDb;
+let db: TestStore;
 let orgId: string;
 let projectId: string;
 
@@ -23,8 +23,8 @@ beforeEach(async () => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-audit-test-"));
   const dbDir = join(scratch, "db");
   mkdirSync(dbDir, { recursive: true });
-  db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   orgId = org.id;
   const proj = await createProject(db, { orgId, slug: "alpha", name: "Alpha" });

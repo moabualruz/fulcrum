@@ -2,16 +2,16 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
+import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
 import {
   createLocalOrg,
   createTask,
   appendEvent,
   type EventRow,
-} from "../../../../product-kernel/store/repositories.ts";
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
+} from "../../../../test-support/product-fixtures.ts";
+import type { TestStore } from "../../../../test-support/product-fixtures.ts";
+import { makeId } from "../../../../test-support/product-fixtures.ts";
 import {
   getTaskDetail,
   bulkUpdateStatus,
@@ -24,9 +24,9 @@ afterAll(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-async function freshDb(name: string): Promise<{ db: ProductDb; orgId: string }> {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
+async function freshDb(name: string): Promise<{ db: TestStore; orgId: string }> {
+  const db = await openIsolatedStore(join(scratch, name));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   return { db, orgId: org.id };
 }
@@ -50,7 +50,7 @@ describe("getTaskDetail", () => {
       const child2 = await createTask(db, { orgId, title: "Child 2", parentId: parent.id });
 
       // Add an edge (blocked-by)
-      const edgeId = newUlid();
+      const edgeId = makeId();
       await db.query(
         `INSERT INTO edges (id, org_id, from_kind, from_id, to_kind, to_id, rel)
            VALUES ($1, $2, 'task', $3, 'task', $4, 'blocked_by')`,

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { formatConnectorsList, formatConnectorRuns } from "./connectors.ts";
-import type { ConnectorRunRow } from "../product-kernel/store/settings-connectors-credentials.ts";
+import type { ConnectorRunRow } from "../test-support/product-fixtures.ts";
 
 describe("connectors CLI formatters", () => {
   test("formatConnectorsList --json", () => {

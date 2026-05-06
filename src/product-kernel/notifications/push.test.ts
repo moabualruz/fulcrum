@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../db/pglite.ts";
-import { runMigrations } from "../db/migrate.ts";
-import { createLocalOrg } from "../store/repositories.ts";
-import type { ProductDb } from "../db/types.ts";
+import { openIsolatedStore } from "../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../test-support/product-fixtures.ts";
+import { createLocalOrg } from "../../test-support/product-fixtures.ts";
+import type { TestStore } from "../../test-support/product-fixtures.ts";
 import {
   deliverPush,
   isPushEnabled,
@@ -24,9 +24,9 @@ afterAll(() => {
 });
 
 let dbIdx = 0;
-async function freshDb(): Promise<ProductDb> {
-  const db = await openPglite(join(scratch, `push-${dbIdx++}`));
-  await runMigrations(db);
+async function freshDb(): Promise<TestStore> {
+  const db = await openIsolatedStore(join(scratch, `push-${dbIdx++}`));
+  await migrateIsolatedStore(db);
   return db;
 }
 

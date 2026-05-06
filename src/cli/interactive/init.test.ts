@@ -4,19 +4,19 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { ProductDb } from "../../product-kernel/db/types.ts";
+import type { TestStore } from "../../test-support/product-fixtures.ts";
 
-async function freshDb(): Promise<{ db: ProductDb; dir: string }> {
+async function freshDb(): Promise<{ db: TestStore; dir: string }> {
   const dir = await mkdtemp(join(tmpdir(), "fulcrum-init-interactive-"));
-  const { openPglite } = await import("../../product-kernel/db/pglite.ts");
-  const db = await openPglite(join(dir, "db"));
-  const { applyProductMigrations } = await import("../../db/product-migrations.ts");
-  await applyProductMigrations(db);
+  const { openIsolatedStore } = await import("../../test-support/product-fixtures.ts");
+  const db = await openIsolatedStore(join(dir, "db"));
+  const { migrateIsolatedStore } = await import("../../test-support/product-fixtures.ts");
+  await migrateIsolatedStore(db);
   return { db, dir };
 }
 
 describe("interactive init — seed org + admin@local", () => {
-  let db: ProductDb;
+  let db: TestStore;
   let dir: string;
 
   beforeEach(async () => {

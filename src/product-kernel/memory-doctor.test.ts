@@ -2,17 +2,17 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { openPglite } from "./db/pglite.ts";
-import { runMigrations } from "./db/migrate.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
 import { runMemoryDoctorChecks, type SubsystemCheck } from "./memory-doctor.ts";
-import type { ProductDb } from "./db/types.ts";
+import type { TestStore } from "../test-support/product-fixtures.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-mem-doctor-"));
-let db: ProductDb;
+let db: TestStore;
 
 beforeAll(async () => {
-  db = await openPglite(join(scratch, "doc"));
-  await runMigrations(db);
+  db = await openIsolatedStore(join(scratch, "doc"));
+  await migrateIsolatedStore(db);
 });
 
 afterAll(async () => {

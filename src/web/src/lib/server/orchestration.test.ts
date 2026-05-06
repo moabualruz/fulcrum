@@ -2,14 +2,14 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
+import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
 import {
   createLocalOrg,
   createProject,
-} from "../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
+} from "../../../../test-support/product-fixtures.ts";
+import { makeId } from "../../../../test-support/product-fixtures.ts";
+import type { TestStore } from "../../../../test-support/product-fixtures.ts";
 import {
   loadOrchestrationDashboard,
   loadProjectRuns,
@@ -28,12 +28,12 @@ afterAll(() => {
 });
 
 async function freshDb(name: string): Promise<{
-  db: ProductDb;
+  db: TestStore;
   orgId: string;
   projectId: string;
 }> {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(scratch, name));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const project = await createProject(db, {
     orgId: org.id,
@@ -44,7 +44,7 @@ async function freshDb(name: string): Promise<{
 }
 
 async function seedRun(
-  db: ProductDb,
+  db: TestStore,
   orgId: string,
   projectId: string | null,
   status: string,
@@ -55,7 +55,7 @@ async function seedRun(
     retry_count: number;
   }> = {},
 ): Promise<string> {
-  const id = newUlid();
+  const id = makeId();
   await db.query(
     `INSERT INTO agent_runs
       (id, org_id, project_id, agent, model, prompt, status, symphony_state, last_error_kind, retry_count)

@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg, createProject } from "../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
+import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { createLocalOrg, createProject } from "../../../../test-support/product-fixtures.ts";
+import { makeId } from "../../../../test-support/product-fixtures.ts";
 
 let scratch: string;
 
@@ -40,8 +40,8 @@ afterEach(() => {
 async function seedRuns(): Promise<{ ids: string[] }> {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const project = await createProject(db, {
     orgId: org.id,
@@ -50,7 +50,7 @@ async function seedRuns(): Promise<{ ids: string[] }> {
   });
   const ids: string[] = [];
   // claude / succeeded
-  const r1 = newUlid();
+  const r1 = makeId();
   await db.query(
     `INSERT INTO agent_runs (id, org_id, project_id, agent, model, prompt, status, started_at, ended_at)
      VALUES ($1, $2, $3, 'claude', 'opus', 'p1', 'succeeded', $4, $5)`,
@@ -58,7 +58,7 @@ async function seedRuns(): Promise<{ ids: string[] }> {
   );
   ids.push(r1);
   // codex / running
-  const r2 = newUlid();
+  const r2 = makeId();
   await db.query(
     `INSERT INTO agent_runs (id, org_id, project_id, agent, model, prompt, status, started_at)
      VALUES ($1, $2, $3, 'codex', 'gpt-5', 'p2', 'running', $4)`,
@@ -138,8 +138,8 @@ describe("/runs +page.server.ts load()", () => {
   test("returns empty array when DB has no runs", async () => {
     const dbDir = join(scratch, "state", "product", "db");
     mkdirSync(dbDir, { recursive: true });
-    const db = await openPglite(join(dbDir, "main"));
-    await runMigrations(db);
+    const db = await openIsolatedStore(join(dbDir, "main"));
+    await migrateIsolatedStore(db);
     await db.close();
     const url = new URL("http://localhost/runs");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);

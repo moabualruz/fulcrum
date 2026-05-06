@@ -2,17 +2,17 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "./db/pglite.ts";
-import { runMigrations } from "./db/migrate.ts";
-import { createLocalOrg } from "./store/repositories.ts";
-import { createArtifact, getArtifact, listArtifacts } from "./artifacts.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
+import { createLocalOrg } from "../test-support/product-fixtures.ts";
+import { createArtifact, getArtifact, listArtifacts } from "../test-support/product-fixtures.ts";
 import {
   buildNarrationPrompt,
   isNarrationEnabled,
   narrateArtifact,
   type SidecarClient,
 } from "./narration.ts";
-import type { ProductDb } from "./db/types.ts";
+import type { TestStore } from "../test-support/product-fixtures.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-narration-"));
 
@@ -21,15 +21,15 @@ afterAll(() => {
 });
 
 let dbCounter = 0;
-async function freshDb(): Promise<ProductDb> {
-  const db = await openPglite(join(scratch, `db-${dbCounter++}`));
-  await runMigrations(db);
+async function freshDb(): Promise<TestStore> {
+  const db = await openIsolatedStore(join(scratch, `db-${dbCounter++}`));
+  await migrateIsolatedStore(db);
   // Create org for FK
   await createLocalOrg(db, { slug: "test-org", name: "Test Org" });
   return db;
 }
 
-async function getOrgId(db: ProductDb): Promise<string> {
+async function getOrgId(db: TestStore): Promise<string> {
   const rows = await db.query<{ id: string }>("SELECT id FROM orgs LIMIT 1", []);
   return rows[0]!.id;
 }

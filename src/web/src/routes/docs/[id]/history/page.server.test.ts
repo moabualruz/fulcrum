@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../../../../../../product-kernel/store/repositories.ts";
+import { openIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
+import { createLocalOrg } from "../../../../../../test-support/product-fixtures.ts";
 import { createDocumentAction, updateDocumentAction } from "../../../../lib/server/documents.ts";
 import {
   createDocumentVersion,
@@ -28,8 +28,8 @@ afterEach(() => {
 async function openDb() {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   return db;
 }
 

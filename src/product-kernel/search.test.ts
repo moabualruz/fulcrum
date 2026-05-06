@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "./db/pglite.ts";
-import { runMigrations } from "./db/migrate.ts";
-import { createLocalOrg, createProject } from "./store/repositories.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
+import { createLocalOrg, createProject } from "../test-support/product-fixtures.ts";
 import { indexSearchDocument, searchProductDocuments } from "./search.ts";
 import { seedSearchTestData } from "../../scripts/seed-search-test-data.ts";
 import { scoreCommand } from "../web/src/lib/components/command-palette/score.ts";
@@ -17,9 +17,9 @@ afterAll(() => {
 
 describe("search", () => {
   test("returns FTS hits in stable score, updated_at, id order", async () => {
-    const db = await openPglite(join(scratch, "search"));
+    const db = await openIsolatedStore(join(scratch, "search"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
       const project = await createProject(db, { orgId: org.id, slug: "p", name: "P" });
       await indexSearchDocument(db, {
@@ -59,9 +59,9 @@ describe("search", () => {
   });
 
   test("filters by source kind", async () => {
-    const db = await openPglite(join(scratch, "search-kind"));
+    const db = await openIsolatedStore(join(scratch, "search-kind"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
       const project = await createProject(db, { orgId: org.id, slug: "p", name: "P" });
       await indexSearchDocument(db, {
@@ -95,9 +95,9 @@ describe("search", () => {
 
 describe("search — all 8 kinds from single seed", () => {
   test("seed script indexes all 8 kinds, single query returns all", async () => {
-    const db = await openPglite(join(scratch, "all-kinds"));
+    const db = await openIsolatedStore(join(scratch, "all-kinds"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
       const result = await seedSearchTestData(db, org.id);
       expect(result.seeded).toHaveLength(8);
@@ -117,9 +117,9 @@ describe("search — all 8 kinds from single seed", () => {
   });
 
   test("--kind filter narrows to 1 kind", async () => {
-    const db = await openPglite(join(scratch, "kind-filter"));
+    const db = await openIsolatedStore(join(scratch, "kind-filter"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
       await seedSearchTestData(db, org.id);
 
@@ -137,9 +137,9 @@ describe("search — all 8 kinds from single seed", () => {
 
 describe("search — ranking", () => {
   test("open task ranks higher than closed task (title-weight advantage)", async () => {
-    const db = await openPglite(join(scratch, "ranking"));
+    const db = await openIsolatedStore(join(scratch, "ranking"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
 
       // "open" task: search term appears in title (weight A) + body
@@ -172,9 +172,9 @@ describe("search — ranking", () => {
 
 describe("search — performance", () => {
   test("query p95 under 200ms at 10k rows", async () => {
-    const db = await openPglite(join(scratch, "perf-10k"));
+    const db = await openIsolatedStore(join(scratch, "perf-10k"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
 
       // Bulk insert 10k rows

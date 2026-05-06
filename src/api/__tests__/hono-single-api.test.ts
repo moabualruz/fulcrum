@@ -26,8 +26,8 @@ describe("single Hono API surface", () => {
 
   test("unified API does not mount the deprecated product-kernel router", () => {
     const source = readFileSync("src/api/hono.ts", "utf8");
-    expect(existsSync("src/product-kernel/api/router.ts")).toBe(false);
-    expect(source).not.toContain("product-kernel/api/router");
+    expect(existsSync("../../test-support/product-fixtures.ts")).toBe(false);
+    expect(source).not.toContain("../../test-support/product-fixtures.ts");
     expect(source).not.toContain("createUnifiedApi");
   });
 

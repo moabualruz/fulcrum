@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "./db/pglite.ts";
-import { runMigrations } from "./db/migrate.ts";
-import { createLocalOrg, appendEvent } from "./store/repositories.ts";
-import { newUlid } from "./ids.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
+import { createLocalOrg, appendEvent } from "../test-support/product-fixtures.ts";
+import { makeId } from "../test-support/product-fixtures.ts";
 import {
   type WebhookDispatchResult,
   computeHmacSignature,
@@ -17,7 +17,7 @@ import {
   createWebhookConfig,
   getWebhookConfig,
 } from "./webhook.ts";
-import type { ProductDb } from "./db/types.ts";
+import type { TestStore } from "../test-support/product-fixtures.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-webhook-"));
 
@@ -26,14 +26,14 @@ afterAll(() => {
 });
 
 async function freshDb(name: string) {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(scratch, name));
+  await migrateIsolatedStore(db);
   return db;
 }
 
-async function seedOrgAndRule(db: ProductDb) {
+async function seedOrgAndRule(db: TestStore) {
   const org = await createLocalOrg(db, { slug: "o", name: "O" });
-  const ruleId = newUlid();
+  const ruleId = makeId();
   await db.query(
     `INSERT INTO notification_rules (id, org_id, name, event_pattern, channels)
      VALUES ($1, $2, 'test-rule', 'task.*', '{webhook}')`,
@@ -42,13 +42,13 @@ async function seedOrgAndRule(db: ProductDb) {
   return { org, ruleId };
 }
 
-async function seedNotification(db: ProductDb, orgId: string, ruleId: string) {
-  const eventId = newUlid();
+async function seedNotification(db: TestStore, orgId: string, ruleId: string) {
+  const eventId = makeId();
   await appendEvent(db, {
     orgId,
     actor: "agent",
     subjectKind: "task",
-    subjectId: newUlid(),
+    subjectId: makeId(),
     verb: "created",
   });
   // Get the event we just created
@@ -56,7 +56,7 @@ async function seedNotification(db: ProductDb, orgId: string, ruleId: string) {
     "SELECT id FROM events WHERE org_id = $1 ORDER BY created_at DESC LIMIT 1",
     [orgId],
   );
-  const notifId = newUlid();
+  const notifId = makeId();
   await db.query(
     `INSERT INTO notifications (id, org_id, user_id, event_id, rule_id, channel, title)
      VALUES ($1, $2, 'user-1', $3, $4, 'webhook', 'Test notification')`,

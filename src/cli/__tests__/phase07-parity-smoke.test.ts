@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { run as runArtifactsCli, type ArtifactsClient } from "../artifacts.ts";
+import { run as runArtifactsCli, type ArtifactsClient } from "../../test-support/product-fixtures.ts";
 import { NotificationsScreen } from "../../tui/screens/notifications.ts";
 
 function captureStdout(): { lines: string[]; restore: () => void } {

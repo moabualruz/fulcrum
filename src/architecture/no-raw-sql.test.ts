@@ -38,7 +38,7 @@ const EXACT_RAW_SQL_ALLOWLIST = [
   "src/services/TaskService.ts",
   "src/services/tasks.ts",
   "src/services/runs.ts",
-  "src/services/artifacts.ts",
+  "../test-support/product-fixtures.ts",
   "src/tui/index.ts",
   "src/tui/screens/activity.ts",
   "src/tui/screens/audit.ts",
@@ -56,7 +56,7 @@ async function collectSourceFiles(root: string): Promise<string[]> {
     if (path.endsWith(".test.ts") || path.endsWith(".spec.ts") || path.includes("/__tests__/")) return [];
     if (path.includes("/node_modules/") || path.includes("/.svelte-kit/")) return [];
     if (path.includes("src/db/migrations/")) return [];
-    if (path.includes("src/product-kernel/db/migrations/")) return [];
+    if (path.includes("../test-support/product-fixtures.ts")) return [];
     return [path];
   }));
   return files.flat();
@@ -103,7 +103,7 @@ describe("Phase 9.5 raw SQL boundary", () => {
       "src/services/TaskService.ts",
       "src/services/tasks.ts",
       "src/services/runs.ts",
-      "src/services/artifacts.ts",
+      "../test-support/product-fixtures.ts",
       "src/tui/index.ts",
       "src/tui/screens/activity.ts",
       "src/tui/screens/audit.ts",

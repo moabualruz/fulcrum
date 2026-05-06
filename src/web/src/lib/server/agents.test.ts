@@ -2,13 +2,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
+import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
 import {
   createLocalOrg,
   type EventRow,
-} from "../../../../product-kernel/store/repositories.ts";
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
+} from "../../../../test-support/product-fixtures.ts";
+import type { TestStore } from "../../../../test-support/product-fixtures.ts";
 import {
   listProfiles,
   testProfileAction,
@@ -23,17 +23,17 @@ afterAll(() => {
 });
 
 async function freshDb(name: string): Promise<{
-  db: ProductDb;
+  db: TestStore;
   orgId: string;
 }> {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(scratch, name));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   return { db, orgId: org.id };
 }
 
 async function seedProfiles(
-  db: ProductDb,
+  db: TestStore,
   orgId: string,
   count: number,
 ): Promise<string[]> {

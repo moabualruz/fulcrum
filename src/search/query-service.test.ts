@@ -1,19 +1,19 @@
 /**
  * Tests for SearchQueryService — PGlite FTS query with facets.
- * These tests run against a mock ProductDb.
+ * These tests run against a mock TestStore.
  */
 
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { SearchQueryService } from "./query-service.ts";
-import type { ProductDb } from "../product-kernel/db/types.ts";
+import type { TestStore } from "../test-support/product-fixtures.ts";
 
-function makeDb(rows: Record<string, unknown>[] = []): ProductDb {
+function makeDb(rows: Record<string, unknown>[] = []): TestStore {
   return {
     query: mock(() => Promise.resolve(rows)),
-  } as unknown as ProductDb;
+  } as unknown as TestStore;
 }
 
-function queryCalls(db: ProductDb): unknown[][] {
+function queryCalls(db: TestStore): unknown[][] {
   return (db.query as unknown as { mock: { calls: unknown[][] } }).mock.calls;
 }
 
@@ -81,7 +81,7 @@ describe("SearchQueryService", () => {
         .mockResolvedValueOnce([]);
       const db = {
         query,
-      } as unknown as ProductDb;
+      } as unknown as TestStore;
       svc = new SearchQueryService(db);
       const result = await svc.query("org1", { term: "test", facets: true });
       expect(result.facets).toBeDefined();

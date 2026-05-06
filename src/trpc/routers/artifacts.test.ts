@@ -16,7 +16,7 @@ import {
   ListArtifactsInputSchema,
   UploadArtifactInputSchema,
   DownloadArtifactOutputSchema,
-} from "../schemas/artifacts.ts";
+} from "../../test-support/product-fixtures.ts";
 
 // --- Constants ---
 

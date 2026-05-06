@@ -2,13 +2,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
+import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
 import {
   createLocalOrg,
   type EventRow,
-} from "../../../../product-kernel/store/repositories.ts";
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
+} from "../../../../test-support/product-fixtures.ts";
+import type { TestStore } from "../../../../test-support/product-fixtures.ts";
 import {
   createDocumentAction,
   updateDocumentAction,
@@ -46,20 +46,20 @@ interface SearchDocRow {
   updated_at: string;
 }
 
-async function freshDb(name: string): Promise<{ db: ProductDb; orgId: string }> {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
+async function freshDb(name: string): Promise<{ db: TestStore; orgId: string }> {
+  const db = await openIsolatedStore(join(scratch, name));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   return { db, orgId: org.id };
 }
 
-async function readDoc(db: ProductDb, id: string): Promise<DocumentRow | undefined> {
+async function readDoc(db: TestStore, id: string): Promise<DocumentRow | undefined> {
   const rows = await db.query<DocumentRow>(`SELECT * FROM documents WHERE id = $1`, [id]);
   return rows[0];
 }
 
 async function readSearch(
-  db: ProductDb,
+  db: TestStore,
   sourceId: string,
 ): Promise<SearchDocRow | undefined> {
   const rows = await db.query<SearchDocRow>(
@@ -69,7 +69,7 @@ async function readSearch(
   return rows[0];
 }
 
-async function readEventsForSubject(db: ProductDb, subjectId: string): Promise<EventRow[]> {
+async function readEventsForSubject(db: TestStore, subjectId: string): Promise<EventRow[]> {
   return db.query<EventRow>(
     `SELECT * FROM events WHERE subject_id = $1 ORDER BY created_at ASC, id ASC`,
     [subjectId],

@@ -14,16 +14,16 @@ import {
   getSprintVelocity,
   type BoardTask,
 } from "./product-queries.ts";
-import { openPglite } from "../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../product-kernel/db/migrate.ts";
-import { productDbDir } from "../../../product-kernel/paths.ts";
+import { openIsolatedStore } from "../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../test-support/product-fixtures.ts";
+import { productDbDir } from "../../../test-support/product-fixtures.ts";
 import {
   createLocalOrg,
   createProject,
   createTask,
   createSprint,
-} from "../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../product-kernel/ids.ts";
+} from "../../../test-support/product-fixtures.ts";
+import { makeId } from "../../../test-support/product-fixtures.ts";
 
 let scratch = "";
 let originalFulcrumHome: string | undefined;
@@ -42,18 +42,18 @@ afterEach(async () => {
 
 async function seed() {
   await Bun.write(join(productDbDir(), ".keep"), "");
-  const db = await openPglite(join(productDbDir(), "main"));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(productDbDir(), "main"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Local" });
   const project = await createProject(db, { orgId: org.id, slug: "p1", name: "Alpha" });
   await createTask(db, { orgId: org.id, projectId: project.id, title: "Wire UI", status: "in_progress", priority: 5 });
   await createTask(db, { orgId: org.id, projectId: project.id, title: "Ship docs", status: "pending", priority: 1 });
-  const docId = newUlid();
+  const docId = makeId();
   await db.query(
     `INSERT INTO documents (id, org_id, project_id, kind, title, body) VALUES ($1, $2, $3, $4, $5, $6)`,
     [docId, org.id, project.id, "decision", "ADR-0001 PGlite", "use PGlite locally"],
   );
-  const runId = newUlid();
+  const runId = makeId();
   await db.query(
     `INSERT INTO agent_runs (id, org_id, project_id, agent, model, status) VALUES ($1, $2, $3, $4, $5, $6)`,
     [runId, org.id, project.id, "codex", "gpt-5", "succeeded"],
@@ -102,8 +102,8 @@ describe("web product-queries", () => {
   test("listSprints returns sprints with aggregated estimates", async () => {
     const { project } = await seed();
     // seed a sprint with tasks
-    const db2 = await openPglite(join(productDbDir(), "main"));
-    await runMigrations(db2);
+    const db2 = await openIsolatedStore(join(productDbDir(), "main"));
+    await migrateIsolatedStore(db2);
     const org = (await db2.query<{ id: string }>(`SELECT id FROM orgs WHERE slug = 'default'`))[0]!;
     const sprint = await createSprint(db2, {
       orgId: org.id,
@@ -138,8 +138,8 @@ describe("web product-queries", () => {
 
   test("listSprintTasks returns only tasks assigned to sprint", async () => {
     const { project } = await seed();
-    const db2 = await openPglite(join(productDbDir(), "main"));
-    await runMigrations(db2);
+    const db2 = await openIsolatedStore(join(productDbDir(), "main"));
+    await migrateIsolatedStore(db2);
     const org = (await db2.query<{ id: string }>(`SELECT id FROM orgs WHERE slug = 'default'`))[0]!;
     const sprint = await createSprint(db2, {
       orgId: org.id,
@@ -161,8 +161,8 @@ describe("web product-queries", () => {
 
   test("getSprintVelocity returns completed sprint points", async () => {
     const { project } = await seed();
-    const db2 = await openPglite(join(productDbDir(), "main"));
-    await runMigrations(db2);
+    const db2 = await openIsolatedStore(join(productDbDir(), "main"));
+    await migrateIsolatedStore(db2);
     const org = (await db2.query<{ id: string }>(`SELECT id FROM orgs WHERE slug = 'default'`))[0]!;
     const sprint = await createSprint(db2, {
       orgId: org.id,

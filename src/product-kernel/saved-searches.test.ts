@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "./db/pglite.ts";
-import { runMigrations } from "./db/migrate.ts";
-import { createLocalOrg } from "./store/repositories.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
+import { createLocalOrg } from "../test-support/product-fixtures.ts";
 import {
   createSavedSearch,
   deleteSavedSearch,
@@ -16,9 +16,9 @@ afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
 describe("saved searches", () => {
   test("create + list + delete round-trip", async () => {
-    const db = await openPglite(join(scratch, "saved1"));
+    const db = await openIsolatedStore(join(scratch, "saved1"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
 
       const created = await createSavedSearch(db, {
@@ -52,9 +52,9 @@ describe("saved searches", () => {
   });
 
   test("private scope hidden from other users", async () => {
-    const db = await openPglite(join(scratch, "saved2"));
+    const db = await openIsolatedStore(join(scratch, "saved2"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const org = await createLocalOrg(db, { slug: "o2", name: "O2" });
 
       await createSavedSearch(db, {
@@ -85,9 +85,9 @@ describe("saved searches", () => {
   });
 
   test("delete fails for wrong user", async () => {
-    const db = await openPglite(join(scratch, "saved3"));
+    const db = await openIsolatedStore(join(scratch, "saved3"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const org = await createLocalOrg(db, { slug: "o3", name: "O3" });
 
       const created = await createSavedSearch(db, {

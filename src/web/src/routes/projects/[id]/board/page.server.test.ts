@@ -2,14 +2,14 @@ import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../../../product-kernel/db/migrate.ts";
+import { openIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
 import {
   createLocalOrg,
   createProject,
   createTask,
   type EventRow,
-} from "../../../../../../product-kernel/store/repositories.ts";
+} from "../../../../../../test-support/product-fixtures.ts";
 
 let scratch: string;
 
@@ -26,8 +26,8 @@ afterEach(() => {
 async function seed() {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const alpha = await createProject(db, { orgId: org.id, slug: "alpha", name: "Alpha" });
   const beta = await createProject(db, { orgId: org.id, slug: "beta", name: "Beta" });
@@ -63,8 +63,8 @@ describe("/projects/[id]/board +page.server.ts", () => {
     } as Parameters<typeof mod.actions.move>[0]);
     expect((result as { status?: number }).status ?? 200).toBeLessThan(400);
 
-    const db = await openPglite(join(scratch, "state", "product", "db", "main"));
-    await runMigrations(db);
+    const db = await openIsolatedStore(join(scratch, "state", "product", "db", "main"));
+    await migrateIsolatedStore(db);
     try {
       const rows = await db.query<{ status: string }>("SELECT status FROM tasks WHERE id = $1", [task.id]);
       expect(rows[0]?.status).toBe("in_progress");

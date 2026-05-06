@@ -2,11 +2,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg, createProject } from "../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
+import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { createLocalOrg, createProject } from "../../../../test-support/product-fixtures.ts";
+import { makeId } from "../../../../test-support/product-fixtures.ts";
+import type { TestStore } from "../../../../test-support/product-fixtures.ts";
 import {
   listSprints,
   loadBurndown,
@@ -21,19 +21,19 @@ import {
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-reports-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
-async function freshDb(name: string): Promise<{ db: ProductDb; orgId: string; projectId: string }> {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
+async function freshDb(name: string): Promise<{ db: TestStore; orgId: string; projectId: string }> {
+  const db = await openIsolatedStore(join(scratch, name));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const project = await createProject(db, { orgId: org.id, slug: "proj", name: "Proj" });
   return { db, orgId: org.id, projectId: project.id };
 }
 
 async function seedSprint(
-  db: ProductDb, orgId: string, projectId: string,
+  db: TestStore, orgId: string, projectId: string,
   opts: { name: string; startDate: string; endDate: string; status?: string },
 ): Promise<string> {
-  const id = newUlid();
+  const id = makeId();
   await db.query(
     `INSERT INTO sprints (id, org_id, project_id, name, start_date, end_date, status)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
@@ -43,10 +43,10 @@ async function seedSprint(
 }
 
 async function seedTask(
-  db: ProductDb, orgId: string, projectId: string,
+  db: TestStore, orgId: string, projectId: string,
   opts: { status: string; sprintId?: string; storyPoints?: number; title?: string },
 ): Promise<string> {
-  const id = newUlid();
+  const id = makeId();
   await db.query(
     `INSERT INTO tasks (id, org_id, project_id, title, status, priority, sprint_id, story_points)
        VALUES ($1,$2,$3,$4,$5,0,$6,$7)`,
@@ -56,10 +56,10 @@ async function seedTask(
 }
 
 async function seedMetric(
-  db: ProductDb, orgId: string, projectId: string,
+  db: TestStore, orgId: string, projectId: string,
   opts: { sprintId?: string; date: string; kind: string; payload: Record<string, unknown> },
 ): Promise<void> {
-  const id = newUlid();
+  const id = makeId();
   await db.query(
     `INSERT INTO metrics_cache (id, org_id, project_id, sprint_id, snapshot_date, metric_kind, payload)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
@@ -68,10 +68,10 @@ async function seedMetric(
 }
 
 async function seedEvent(
-  db: ProductDb, orgId: string, projectId: string,
+  db: TestStore, orgId: string, projectId: string,
   opts: { taskId: string; verb: string; payload: Record<string, unknown>; createdAt: string },
 ): Promise<void> {
-  const id = newUlid();
+  const id = makeId();
   await db.query(
     `INSERT INTO events (id, org_id, project_id, actor, subject_kind, subject_id, verb, payload, created_at)
        VALUES ($1,$2,$3,'system','task',$4,$5,$6,$7)`,

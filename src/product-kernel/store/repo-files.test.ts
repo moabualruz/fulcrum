@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../db/pglite.ts";
-import { runMigrations } from "../db/migrate.ts";
+import { openIsolatedStore } from "../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../test-support/product-fixtures.ts";
 import { createLocalOrg } from "./repositories.ts";
-import { newUlid } from "../ids.ts";
+import { makeId } from "../../test-support/product-fixtures.ts";
 import {
   insertRepoFile,
   listTreeChildren,
@@ -24,11 +24,11 @@ afterAll(() => {
 });
 
 async function freshDb() {
-  const db = await openPglite(join(scratch, `db-${Date.now()}`));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(scratch, `db-${Date.now()}`));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   // Insert a repo row
-  const repoId = newUlid();
+  const repoId = makeId();
   await db.query(
     `INSERT INTO repos (id, org_id, slug, root_path) VALUES ($1, $2, $3, $4)`,
     [repoId, org.id, "test-repo", "/tmp/test-repo"],

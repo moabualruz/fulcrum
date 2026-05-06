@@ -4,7 +4,7 @@ const mockQuery = mock(() => Promise.resolve([]));
 const mockClose = mock(() => Promise.resolve());
 
 mock.module("$lib/server/db", () => ({
-  openProductDb: () => Promise.resolve({ query: mockQuery, close: mockClose }),
+  openIsolatedStore: () => Promise.resolve({ query: mockQuery, close: mockClose }),
   getDefaultOrgId: () => Promise.resolve("org-1"),
 }));
 

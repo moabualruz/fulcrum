@@ -2,16 +2,16 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { openPglite } from "../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg, appendEvent } from "../../../../product-kernel/store/repositories.ts";
+import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { createLocalOrg, appendEvent } from "../../../../test-support/product-fixtures.ts";
 
 mock.module("$lib/server/db", () => {
   const { join: j } = require("node:path");
-  const { openPglite: oP } = require("../../../../product-kernel/db/pglite.ts");
-  const { runMigrations: rM } = require("../../../../product-kernel/db/migrate.ts");
+  const { openIsolatedStore: oP } = require("../../../../test-support/product-fixtures.ts");
+  const { migrateIsolatedStore: rM } = require("../../../../test-support/product-fixtures.ts");
   return {
-    openProductDb: async () => {
+    openIsolatedStore: async () => {
       const scratch = process.env["FULCRUM_HOME"]!;
       const dbDir = j(scratch, "state", "product", "db");
       const { mkdirSync: mk } = require("node:fs");
@@ -44,9 +44,9 @@ function loadEvent(params: Record<string, string> = {}): Parameters<typeof impor
 async function setupDb(): Promise<{ orgId: string }> {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
+  const db = await openIsolatedStore(join(dbDir, "main"));
   try {
-    await runMigrations(db);
+    await migrateIsolatedStore(db);
     const org = await createLocalOrg(db, { slug: "default", name: "Default" });
     return { orgId: org.id };
   } finally {
@@ -56,7 +56,7 @@ async function setupDb(): Promise<{ orgId: string }> {
 
 async function seedEvents(orgId: string): Promise<void> {
   const dbDir = join(scratch, "state", "product", "db");
-  const db = await openPglite(join(dbDir, "main"));
+  const db = await openIsolatedStore(join(dbDir, "main"));
   try {
     await db.query(
       `INSERT INTO projects (id, org_id, slug, name, created_at, updated_at)
@@ -130,7 +130,7 @@ describe("/audit +page.server.ts load()", () => {
   test("pagination: page 2 of 26 events returns 1 row", async () => {
     const { orgId } = await setupDb();
     const dbDir = join(scratch, "state", "product", "db");
-    const db = await openPglite(join(dbDir, "main"));
+    const db = await openIsolatedStore(join(dbDir, "main"));
     try {
       for (let i = 0; i < 26; i++) {
         await appendEvent(db, { orgId, actor: "system", subjectKind: "doc", subjectId: `doc-${i}`, verb: "indexed" });

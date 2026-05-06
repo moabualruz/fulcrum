@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg, createProject } from "../../../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../../../product-kernel/ids.ts";
+import { openIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
+import { createLocalOrg, createProject } from "../../../../../../test-support/product-fixtures.ts";
+import { makeId } from "../../../../../../test-support/product-fixtures.ts";
 import type { ArtifactRow, ArtifactStats } from "$lib/server/artifacts";
 
 let scratch: string;
@@ -34,13 +34,13 @@ afterEach(() => {
 async function seed(): Promise<{ projectId: string; artifactIds: string[] }> {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const project = await createProject(db, { orgId: org.id, slug: "alpha", name: "Alpha" });
   const ids: string[] = [];
 
-  const a1 = newUlid();
+  const a1 = makeId();
   await db.query(
     `INSERT INTO artifacts (id, org_id, project_id, kind, title, mime, size)
      VALUES ($1, $2, $3, 'file', 'report.md', 'text/plain', 1024)`,
@@ -48,7 +48,7 @@ async function seed(): Promise<{ projectId: string; artifactIds: string[] }> {
   );
   ids.push(a1);
 
-  const a2 = newUlid();
+  const a2 = makeId();
   await db.query(
     `INSERT INTO artifacts (id, org_id, project_id, kind, title, mime, size)
      VALUES ($1, $2, $3, 'report', 'data.json', 'application/json', 2048)`,
@@ -81,8 +81,8 @@ describe("/projects/[id]/artifacts +page.server.ts load()", () => {
   test("returns zero stats when project has no artifacts", async () => {
     const dbDir = join(scratch, "state", "product", "db");
     mkdirSync(dbDir, { recursive: true });
-    const db = await openPglite(join(dbDir, "main"));
-    await runMigrations(db);
+    const db = await openIsolatedStore(join(dbDir, "main"));
+    await migrateIsolatedStore(db);
     const org = await createLocalOrg(db, { slug: "default", name: "Default" });
     const project = await createProject(db, { orgId: org.id, slug: "beta", name: "Beta" });
     await db.close();

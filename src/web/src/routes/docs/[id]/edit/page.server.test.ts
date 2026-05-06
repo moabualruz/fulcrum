@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../../../../../../product-kernel/store/repositories.ts";
+import { openIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
+import { createLocalOrg } from "../../../../../../test-support/product-fixtures.ts";
 import { createDocumentAction } from "$lib/server/documents";
 
 let scratch: string;
@@ -29,8 +29,8 @@ async function seedDoc(
 ): Promise<{ id: string }> {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const created = await createDocumentAction(db, {
     orgId: org.id,
@@ -90,8 +90,8 @@ describe("/docs/[id]/edit +page.server.ts", () => {
     } as Parameters<typeof mod.actions.default>[0]);
     expect((result as { form?: unknown }).form).toBeDefined();
     const dbDir = join(scratch, "state", "product", "db");
-    const db = await openPglite(join(dbDir, "main"));
-    await runMigrations(db);
+    const db = await openIsolatedStore(join(dbDir, "main"));
+    await migrateIsolatedStore(db);
     try {
       const rows = await db.query<{
         title: string;
@@ -141,8 +141,8 @@ describe("/docs/[id]/edit +page.server.ts", () => {
       typeof mod.actions.default
     >[0]);
     const dbDir = join(scratch, "state", "product", "db");
-    const db = await openPglite(join(dbDir, "main"));
-    await runMigrations(db);
+    const db = await openIsolatedStore(join(dbDir, "main"));
+    await migrateIsolatedStore(db);
     try {
       const rows = await db.query<{ body: string }>(
         `SELECT body FROM documents WHERE id = $1`,

@@ -2,21 +2,21 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { openPglite } from "./db/pglite.ts";
-import { runMigrations } from "./db/migrate.ts";
-import { createLocalOrg, createProject, createSprint } from "./store/repositories.ts";
-import type { ProductDb } from "./db/types.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
+import { createLocalOrg, createProject, createSprint } from "../test-support/product-fixtures.ts";
+import type { TestStore } from "../test-support/product-fixtures.ts";
 import { velocity, burndown } from "./reports.ts";
-import { newUlid } from "./ids.ts";
+import { makeId } from "../test-support/product-fixtures.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-reports-"));
-let db: ProductDb;
+let db: TestStore;
 let orgId: string;
 let projectId: string;
 
 beforeAll(async () => {
-  db = await openPglite(join(scratch, "reports-test"));
-  await runMigrations(db);
+  db = await openIsolatedStore(join(scratch, "reports-test"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "test", name: "Test" });
   orgId = org.id;
   const proj = await createProject(db, { orgId, slug: "rp", name: "Reports Project" });
@@ -48,7 +48,7 @@ describe("velocity", () => {
     await db.query(
       `INSERT INTO metrics_cache (id, project_id, sprint_id, date, points_completed)
        VALUES ($1, $2, $3, '2026-04-14', 15)`,
-      [newUlid(), projectId, sprint.id],
+      [makeId(), projectId, sprint.id],
     );
 
     const result = await velocity(db, projectId);

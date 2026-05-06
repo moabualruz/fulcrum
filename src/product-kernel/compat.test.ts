@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "./db/pglite.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
 import { openPostgres } from "./db/postgres.ts";
-import type { ProductDb } from "./db/types.ts";
+import type { TestStore } from "../test-support/product-fixtures.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-product-kernel-"));
 
@@ -12,7 +12,7 @@ afterAll(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-async function assertCoreSql(db: ProductDb): Promise<void> {
+async function assertCoreSql(db: TestStore): Promise<void> {
   await db.exec("CREATE TABLE pk_probe (id text PRIMARY KEY, body text NOT NULL)");
   await db.query("INSERT INTO pk_probe (id, body) VALUES ($1, $2)", ["one", "hello world"]);
   const rows = await db.query<{ id: string; body: string }>(
@@ -24,7 +24,7 @@ async function assertCoreSql(db: ProductDb): Promise<void> {
 
 describe("product kernel database compatibility", () => {
   test("PGlite supports core SQL contract", async () => {
-    const db = await openPglite(join(scratch, "pgdata"));
+    const db = await openIsolatedStore(join(scratch, "pgdata"));
     try {
       await assertCoreSql(db);
       expect(db.engine).toBe("pglite");

@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../product-kernel/db/pglite.ts";
-import { runMigrations } from "../product-kernel/db/migrate.ts";
-import type { ProductDb } from "../product-kernel/db/types.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
+import type { TestStore } from "../test-support/product-fixtures.ts";
 import {
   type MarketplaceListing,
   FeatureDisabledError,
@@ -15,7 +15,7 @@ import {
 } from "./marketplace-client.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-marketplace-"));
-let db: ProductDb;
+let db: TestStore;
 
 // ── Ed25519 key helpers ────────────────────────────────────────────────
 
@@ -53,8 +53,8 @@ async function signPayload(
 // ── Lifecycle ──────────────────────────────────────────────────────────
 
 beforeAll(async () => {
-  db = await openPglite(join(scratch, "marketplace"));
-  await runMigrations(db);
+  db = await openIsolatedStore(join(scratch, "marketplace"));
+  await migrateIsolatedStore(db);
 });
 
 afterAll(async () => {
@@ -113,7 +113,7 @@ describe("marketplace migration", () => {
   });
 
   test("migration is idempotent (re-run does not error)", async () => {
-    const applied = await runMigrations(db);
+    const applied = await migrateIsolatedStore(db);
     expect(applied).toEqual([]); // all already applied
   });
 

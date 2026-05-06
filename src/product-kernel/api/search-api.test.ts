@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../db/pglite.ts";
-import { runMigrations } from "../db/migrate.ts";
-import { createLocalOrg, createProject } from "../store/repositories.ts";
+import { openIsolatedStore } from "../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../test-support/product-fixtures.ts";
+import { createLocalOrg, createProject } from "../../test-support/product-fixtures.ts";
 import { indexSearchDocument } from "../search.ts";
 import { createSearchApi } from "./search-api.ts";
 
@@ -19,9 +19,9 @@ async function stubAuth(header: string | undefined): Promise<string | null> {
 
 describe("search API — flag OFF → 404", () => {
   test("GET /api/v1/search returns 404 when public-api disabled", async () => {
-    const db = await openPglite(join(scratch, "off1"));
+    const db = await openIsolatedStore(join(scratch, "off1"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const app = createSearchApi({
         db,
         featuresEnv: "",
@@ -37,9 +37,9 @@ describe("search API — flag OFF → 404", () => {
   });
 
   test("GET /api/v1/search/suggest returns 404 when disabled", async () => {
-    const db = await openPglite(join(scratch, "off2"));
+    const db = await openIsolatedStore(join(scratch, "off2"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const app = createSearchApi({
         db,
         featuresEnv: "",
@@ -55,9 +55,9 @@ describe("search API — flag OFF → 404", () => {
   });
 
   test("GET /api/v1/search/saved returns 404 when disabled", async () => {
-    const db = await openPglite(join(scratch, "off3"));
+    const db = await openIsolatedStore(join(scratch, "off3"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const app = createSearchApi({
         db,
         featuresEnv: "",
@@ -76,9 +76,9 @@ describe("search API — flag OFF → 404", () => {
 
 describe("search API — auth", () => {
   test("missing auth → 401", async () => {
-    const db = await openPglite(join(scratch, "auth1"));
+    const db = await openIsolatedStore(join(scratch, "auth1"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const app = createSearchApi({
         db,
         featuresEnv: "public-api",
@@ -92,9 +92,9 @@ describe("search API — auth", () => {
   });
 
   test("bad token → 401", async () => {
-    const db = await openPglite(join(scratch, "auth2"));
+    const db = await openIsolatedStore(join(scratch, "auth2"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const app = createSearchApi({
         db,
         featuresEnv: "public-api",
@@ -112,9 +112,9 @@ describe("search API — auth", () => {
 
 describe("search API — flag ON + authed", () => {
   test("GET /api/v1/search returns results", async () => {
-    const db = await openPglite(join(scratch, "on1"));
+    const db = await openIsolatedStore(join(scratch, "on1"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
       const project = await createProject(db, {
         orgId: org.id,
@@ -151,9 +151,9 @@ describe("search API — flag ON + authed", () => {
   });
 
   test("GET /api/v1/search/suggest returns suggestions", async () => {
-    const db = await openPglite(join(scratch, "on2"));
+    const db = await openIsolatedStore(join(scratch, "on2"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const org = await createLocalOrg(db, { slug: "o2", name: "O2" });
       await indexSearchDocument(db, {
         orgId: org.id,
@@ -180,9 +180,9 @@ describe("search API — flag ON + authed", () => {
   });
 
   test("saved search CRUD via REST", async () => {
-    const db = await openPglite(join(scratch, "on3"));
+    const db = await openIsolatedStore(join(scratch, "on3"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const org = await createLocalOrg(db, { slug: "o3", name: "O3" });
       const app = createSearchApi({
         db,
@@ -226,9 +226,9 @@ describe("search API — flag ON + authed", () => {
 
 describe("search API — OpenAPI spec", () => {
   test("GET /api/openapi.json returns valid spec", async () => {
-    const db = await openPglite(join(scratch, "spec"));
+    const db = await openIsolatedStore(join(scratch, "spec"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const app = createSearchApi({
         db,
         featuresEnv: "public-api",

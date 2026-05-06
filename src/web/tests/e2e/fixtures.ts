@@ -12,16 +12,16 @@ import { test as base, expect } from "@playwright/test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openPglite } from "../../../product-kernel/db/pglite.ts";
-import { applyProductMigrations } from "../../../db/product-migrations.ts";
+import { openIsolatedStore } from "../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../db/product-migrations.ts";
 import {
   createLocalOrg,
   createProject,
   createTask,
-} from "../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../product-kernel/ids.ts";
-import { createArtifact } from "../../../product-kernel/artifacts.ts";
-import type { ProductDb } from "../../../product-kernel/db/types.ts";
+} from "../../../test-support/product-fixtures.ts";
+import { makeId } from "../../../test-support/product-fixtures.ts";
+import { createArtifact } from "../../../test-support/product-fixtures.ts";
+import type { TestStore } from "../../../test-support/product-fixtures.ts";
 
 export interface SeedTaskInput {
   projectId: string;
@@ -64,8 +64,8 @@ export const test = base.extend<Record<never, never>, { fulcrumHome: FulcrumHome
     async ({}, use) => {
       const home = mkdtempSync(join(tmpdir(), "fulcrum-e2e-"));
       process.env["FULCRUM_HOME"] = home;
-      const db: ProductDb = await openPglite(join(home, "state", "product", "db", "main"));
-      await applyProductMigrations(db);
+      const db: TestStore = await openIsolatedStore(join(home, "state", "product", "db", "main"));
+      await migrateIsolatedStore(db);
       const org = await createLocalOrg(db, { slug: "local", name: "Local" });
       const orgId = org.id;
       const projectIds: string[] = [];
@@ -112,7 +112,7 @@ export const test = base.extend<Record<never, never>, { fulcrumHome: FulcrumHome
       };
 
       const seedDoc = async (input: SeedDocInput): Promise<{ id: string }> => {
-        const id = newUlid();
+        const id = makeId();
         await db.query(
           `INSERT INTO documents (id, org_id, project_id, kind, title, body)
            VALUES ($1, $2, $3, $4, $5, $6)`,

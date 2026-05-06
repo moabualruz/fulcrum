@@ -34,7 +34,7 @@ if (isPlaywrightCli) {
       });
 
       const response = await page.goto(`/artifacts/${artifact.id}`);
-      test.skip((response?.status() ?? 200) >= 500, "Artifact detail SSR is blocked by product-kernel/web artifact store mismatch in isolated E2E.");
+      test.skip((response?.status() ?? 200) >= 500, "../../../test-support/product-fixtures.ts");
       const title = page.locator("h1, [data-artifact-title]").first();
       test.skip((await title.count()) === 0, "Artifact detail did not render a title in isolated E2E.");
       test.skip((await title.textContent()) === "Internal Error", "Artifact detail rendered global error page in isolated E2E.");

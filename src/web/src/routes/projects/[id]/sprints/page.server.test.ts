@@ -2,13 +2,13 @@ import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../../../product-kernel/db/migrate.ts";
+import { openIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
 import {
   createLocalOrg,
   createProject,
   createSprint,
-} from "../../../../../../product-kernel/store/repositories.ts";
+} from "../../../../../../test-support/product-fixtures.ts";
 
 let scratch: string;
 
@@ -25,8 +25,8 @@ afterEach(() => {
 async function seedProject(): Promise<{ projectId: string; orgId: string }> {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const project = await createProject(db, { orgId: org.id, slug: "alpha", name: "Alpha" });
   await createSprint(db, { orgId: org.id, projectId: project.id, name: "Sprint 1", capacity: 20 });
@@ -64,8 +64,8 @@ describe("/projects/[id]/sprints +page.server.ts", () => {
   test("startSprint action transitions planned → active", async () => {
     const { projectId } = await seedProject();
     const dbDir = join(scratch, "state", "product", "db");
-    const db = await openPglite(join(dbDir, "main"));
-    await runMigrations(db);
+    const db = await openIsolatedStore(join(dbDir, "main"));
+    await migrateIsolatedStore(db);
     const sprints = await db.query<{ id: string }>(`SELECT id FROM sprints WHERE project_id = $1`, [projectId]);
     const sprintId = sprints[0]!.id;
     await db.close();
@@ -77,8 +77,8 @@ describe("/projects/[id]/sprints +page.server.ts", () => {
     const result = await mod.actions.startSprint({ request, params: { id: projectId } } as Parameters<typeof mod.actions.startSprint>[0]);
     expect((result as { ok: boolean }).ok).toBe(true);
 
-    const db2 = await openPglite(join(dbDir, "main"));
-    await runMigrations(db2);
+    const db2 = await openIsolatedStore(join(dbDir, "main"));
+    await migrateIsolatedStore(db2);
     const rows = await db2.query<{ status: string }>(`SELECT status FROM sprints WHERE id = $1`, [sprintId]);
     expect(rows[0]?.status).toBe("active");
     await db2.close();

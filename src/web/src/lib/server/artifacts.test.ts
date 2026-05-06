@@ -2,15 +2,15 @@ import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg, createProject } from "../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
-import { listArtifacts, getArtifactStats } from "./artifacts.ts";
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
+import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { createLocalOrg, createProject } from "../../../../test-support/product-fixtures.ts";
+import { makeId } from "../../../../test-support/product-fixtures.ts";
+import { listArtifacts, getArtifactStats } from "../../../../test-support/product-fixtures.ts";
+import type { TestStore } from "../../../../test-support/product-fixtures.ts";
 
 let scratch: string;
-let db: ProductDb;
+let db: TestStore;
 let orgId: string;
 let projectId: string;
 
@@ -18,8 +18,8 @@ beforeEach(async () => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-artifacts-"));
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   orgId = org.id;
   const proj = await createProject(db, { orgId, slug: "alpha", name: "Alpha" });
@@ -41,7 +41,7 @@ async function seedArtifact(overrides: Partial<{
   mime: string | null;
   size: number | null;
 }> = {}): Promise<string> {
-  const id = overrides.id ?? newUlid();
+  const id = overrides.id ?? makeId();
   await db.query(
     `INSERT INTO artifacts (id, org_id, project_id, run_id, task_id, kind, title, mime, size)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
@@ -88,7 +88,7 @@ describe("listArtifacts", () => {
   });
 
   test("filters by runId", async () => {
-    const runId = newUlid();
+    const runId = makeId();
     await db.query(
       `INSERT INTO agent_runs (id, org_id, project_id, agent, status, started_at)
        VALUES ($1, $2, $3, 'claude', 'succeeded', now())`,

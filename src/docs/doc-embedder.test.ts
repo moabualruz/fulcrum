@@ -3,10 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
 import type { EntityManager } from "@mikro-orm/postgresql";
-import { openPglite } from "../product-kernel/db/pglite.ts";
-import { applyProductMigrations } from "../product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../product-kernel/store/repositories.ts";
-import type { ProductDb } from "../product-kernel/db/types.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
+import { createLocalOrg } from "../test-support/product-fixtures.ts";
+import type { TestStore } from "../test-support/product-fixtures.ts";
 import type { InferenceClient, EmbeddingResponse } from "../inference/client.ts";
 import { initOrm } from "../db/mikro-orm.config.ts";
 import {
@@ -39,16 +39,16 @@ function failingClient(err: Error): InferenceClient {
   } as unknown as InferenceClient;
 }
 
-async function freshDb(name: string): Promise<{ db: ProductDb; em: EntityManager; orgId: string; close: () => Promise<void> }> {
+async function freshDb(name: string): Promise<{ db: TestStore; em: EntityManager; orgId: string; close: () => Promise<void> }> {
   const { PGlite } = await import("@electric-sql/pglite");
   const { vector } = await import("@electric-sql/pglite/vector");
   const pglite = new PGlite(join(scratch, name), { extensions: { vector } });
   await pglite.waitReady;
 
-  // ProductDb wrapper for legacy callers (embedDocument, readEmbedding)
-  const db: ProductDb = {
+  // TestStore wrapper for legacy callers (embedDocument, readEmbedding)
+  const db: TestStore = {
     engine: "pglite",
-    async query<T>(sql: string, params: readonly import("../product-kernel/db/types.ts").SqlValue[] = []) {
+    async query<T>(sql: string, params: readonly import("../test-support/product-fixtures.ts").SqlValue[] = []) {
       const result = await pglite.query<T>(sql, params as unknown[]);
       return result.rows;
     },
@@ -56,7 +56,7 @@ async function freshDb(name: string): Promise<{ db: ProductDb; em: EntityManager
     async close() { await pglite.close(); },
   };
 
-  await applyProductMigrations(db);
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
 
   // ORM EntityManager from the same PGlite instance
@@ -69,7 +69,7 @@ async function freshDb(name: string): Promise<{ db: ProductDb; em: EntityManager
   };
 }
 
-async function readEmbedding(db: ProductDb, docId: string): Promise<number[] | null> {
+async function readEmbedding(db: TestStore, docId: string): Promise<number[] | null> {
   const rows = await db.query<{ embedding: number[] | null }>(
     `SELECT embedding FROM documents WHERE id = $1`,
     [docId],
@@ -142,7 +142,7 @@ describe("flag OFF: embedding stays NULL", () => {
 
   test("triggerEmbedding with null client does nothing", () => {
     // Should not throw
-    triggerEmbedding(null as unknown as ProductDb, null, { docId: "x", bodyMd: "y" });
+    triggerEmbedding(null as unknown as TestStore, null, { docId: "x", bodyMd: "y" });
   });
 });
 

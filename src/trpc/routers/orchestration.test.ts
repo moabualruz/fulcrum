@@ -2,15 +2,15 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../../product-kernel/store/repositories.ts";
+import { openIsolatedStore } from "../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../test-support/product-fixtures.ts";
+import { createLocalOrg } from "../../test-support/product-fixtures.ts";
 import {
   clearHooks,
   createRun,
   registerHook,
   type SymphonyRunRow,
-} from "../../product-kernel/symphony.ts";
+} from "../../test-support/product-fixtures.ts";
 import { createContext } from "../context.ts";
 import { orchestrationRouter } from "./orchestration.ts";
 
@@ -25,13 +25,13 @@ afterEach(() => {
 });
 
 async function freshDb(name: string) {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(scratch, name));
+  await migrateIsolatedStore(db);
   return db;
 }
 
 // Create a tRPC caller bound to a context
-function createCaller(db: ReturnType<typeof openPglite> extends Promise<infer T> ? T : never, orgId: string) {
+function createCaller(db: ReturnType<typeof openIsolatedStore> extends Promise<infer T> ? T : never, orgId: string) {
   const userId = "user-1";
   return orchestrationRouter.createCaller(
     createContext({

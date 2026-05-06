@@ -3,10 +3,10 @@ import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../../../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../../../product-kernel/ids.ts";
+import { openIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
+import { createLocalOrg } from "../../../../../../test-support/product-fixtures.ts";
+import { makeId } from "../../../../../../test-support/product-fixtures.ts";
 
 let scratch: string;
 
@@ -29,8 +29,8 @@ afterEach(() => {
 async function seedBranches(writeOps = false): Promise<string> {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS name text not null default ''`);
   await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS kind text not null default 'local'`);
   await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS current_branch text null`);
@@ -40,7 +40,7 @@ async function seedBranches(writeOps = false): Promise<string> {
   await db.query(`CREATE TABLE IF NOT EXISTS repo_branches (id uuid primary key, org_id text not null, repo_id text not null, name text not null, sha text null, is_default boolean not null default false)`);
   await db.query(`CREATE TABLE IF NOT EXISTS feature_flags (id uuid primary key, org_id text null, user_id text null, flag text not null, enabled boolean not null default false)`);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const repoId = newUlid();
+  const repoId = makeId();
   await db.query(
     `INSERT INTO repos (id, org_id, slug, root_path, name, kind, current_branch, default_branch, archived)
      VALUES ($1, $2, 'fulcrum', '/workspace/fulcrum', 'Fulcrum', 'local', 'feature/repos', 'main', false)`,

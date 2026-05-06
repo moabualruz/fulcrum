@@ -8,8 +8,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../product-kernel/db/pglite.ts";
-import { runMigrations } from "../product-kernel/db/migrate.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
 import { computeQueryHash, recordSearchClick } from "./click-telemetry.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-click-telemetry-"));
@@ -20,9 +20,9 @@ afterAll(() => {
 
 describe("search click telemetry", () => {
   test("telemetry OFF → search_clicks table empty (no writes)", async () => {
-    const db = await openPglite(join(scratch, "off"));
+    const db = await openIsolatedStore(join(scratch, "off"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       // When flag OFF, caller should not call recordSearchClick at all.
       // Verify table starts empty.
       const rows = await db.query<{ count: number }>(
@@ -36,9 +36,9 @@ describe("search click telemetry", () => {
   });
 
   test("telemetry ON → row inserted with correct position, kind, query_hash", async () => {
-    const db = await openPglite(join(scratch, "on"));
+    const db = await openIsolatedStore(join(scratch, "on"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       // Need an org for FK
       await db.query(
         "INSERT INTO orgs (id, slug, name) VALUES ($1, $2, $3)",

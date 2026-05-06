@@ -2,12 +2,12 @@ import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../../../../../../../product-kernel/store/repositories.ts";
-import { insertRepoFile, upsertFileContent, insertBlameLine } from "../../../../../../../product-kernel/store/repo-files.ts";
-import { newUlid } from "../../../../../../../product-kernel/ids.ts";
-import type { ProductDb } from "../../../../../../../product-kernel/db/types.ts";
+import { openIsolatedStore } from "../../../../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../../../../test-support/product-fixtures.ts";
+import { createLocalOrg } from "../../../../../../../test-support/product-fixtures.ts";
+import { insertRepoFile, upsertFileContent, insertBlameLine } from "../../../../../../../test-support/product-fixtures.ts";
+import { makeId } from "../../../../../../../test-support/product-fixtures.ts";
+import type { TestStore } from "../../../../../../../test-support/product-fixtures.ts";
 
 let scratch: string;
 
@@ -27,13 +27,13 @@ afterEach(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-async function freshDb(): Promise<{ db: ProductDb; orgId: string; repoId: string }> {
+async function freshDb(): Promise<{ db: TestStore; orgId: string; repoId: string }> {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const repoId = newUlid();
+  const repoId = makeId();
   await db.query(
     `INSERT INTO repos (id, org_id, slug, root_path, default_branch)
      VALUES ($1, $2, $3, $4, $5)`,

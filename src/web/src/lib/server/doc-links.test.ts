@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../../../../product-kernel/store/repositories.ts";
+import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { createLocalOrg } from "../../../../test-support/product-fixtures.ts";
 import { initOrm } from "../../../../db/mikro-orm.config.ts";
 import { createDocumentAction } from "./documents";
 import { upsertDocLink, getBacklinks } from "./doc-links";
@@ -38,7 +38,7 @@ async function seedDb(): Promise<{ em: EntityManager; orgId: string; close: () =
     async exec(sql: string) { await pglite.exec(sql); },
     async close() { await pglite.close(); },
   };
-  await runMigrations(db);
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const orm = await initOrm({ pglite });
   const em = orm.em.fork();

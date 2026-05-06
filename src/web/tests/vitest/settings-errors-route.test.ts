@@ -27,7 +27,7 @@ const { db, errors, queries } = vi.hoisted(() => {
 });
 
 vi.mock("$lib/server/db", () => ({
-  openProductDb: async () => db,
+  openIsolatedStore: async () => db,
 }));
 
 const { actions, load } = await import("../../src/routes/settings/errors/+page.server");

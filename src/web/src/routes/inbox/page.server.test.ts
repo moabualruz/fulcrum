@@ -2,17 +2,17 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { openPglite } from "../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg, appendEvent } from "../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
+import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { createLocalOrg, appendEvent } from "../../../../test-support/product-fixtures.ts";
+import { makeId } from "../../../../test-support/product-fixtures.ts";
 
 mock.module("$lib/server/db", () => {
   const { join: j } = require("node:path");
-  const { openPglite: oP } = require("../../../../product-kernel/db/pglite.ts");
-  const { runMigrations: rM } = require("../../../../product-kernel/db/migrate.ts");
+  const { openIsolatedStore: oP } = require("../../../../test-support/product-fixtures.ts");
+  const { migrateIsolatedStore: rM } = require("../../../../test-support/product-fixtures.ts");
   return {
-    openProductDb: async () => {
+    openIsolatedStore: async () => {
       const scratch = process.env["FULCRUM_HOME"]!;
       const dbDir = j(scratch, "state", "product", "db");
       const { mkdirSync: mk } = require("node:fs");
@@ -45,9 +45,9 @@ function loadEvent(params: Record<string, string> = {}): Parameters<typeof impor
 async function setupDb(): Promise<{ orgId: string }> {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
+  const db = await openIsolatedStore(join(dbDir, "main"));
   try {
-    await runMigrations(db);
+    await migrateIsolatedStore(db);
     const org = await createLocalOrg(db, { slug: "default", name: "Default" });
     return { orgId: org.id };
   } finally {
@@ -57,9 +57,9 @@ async function setupDb(): Promise<{ orgId: string }> {
 
 async function seedNotification(orgId: string, readAt: string | null = null): Promise<void> {
   const dbDir = join(scratch, "state", "product", "db");
-  const db = await openPglite(join(dbDir, "main"));
+  const db = await openIsolatedStore(join(dbDir, "main"));
   try {
-    const id = newUlid();
+    const id = makeId();
     await db.query(
       `INSERT INTO notifications (id, org_id, recipient, subject_kind, subject_id, verb, actor, read_at)
        VALUES ($1, $2, 'local', 'task', 'task-1', 'created', 'system', $3)`,
@@ -72,7 +72,7 @@ async function seedNotification(orgId: string, readAt: string | null = null): Pr
 
 async function seedActivity(orgId: string): Promise<void> {
   const dbDir = join(scratch, "state", "product", "db");
-  const db = await openPglite(join(dbDir, "main"));
+  const db = await openIsolatedStore(join(dbDir, "main"));
   try {
     await appendEvent(db, {
       orgId,

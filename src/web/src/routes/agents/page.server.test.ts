@@ -48,7 +48,7 @@ const FAKE_PROFILES = [
 
 beforeEach(() => {
   mock.module("$lib/server/db", () => ({
-    openProductDb: async () => ({
+    openIsolatedStore: async () => ({
       query: async (sql: string) => {
         if (sql.includes("agent_profiles")) return FAKE_PROFILES;
         if (sql.includes("FROM projects")) return [];
@@ -84,7 +84,7 @@ describe("/agents +page.server.ts", () => {
 
   test("load returns empty array when no profiles", async () => {
     mock.module("$lib/server/db", () => ({
-      openProductDb: async () => ({
+      openIsolatedStore: async () => ({
         query: async () => [],
         close: async () => {},
       }),

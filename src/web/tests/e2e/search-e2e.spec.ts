@@ -12,14 +12,14 @@ const isPlaywrightCli = process.argv.some((arg) => arg.includes("playwright"));
 if (isPlaywrightCli) {
   const { test, expect } = await import("./fixtures.ts");
   const { indexSearchDocument } = await import(
-    "../../../product-kernel/search.ts"
+    "../../../test-support/product-fixtures.ts"
   );
-  const { openPglite } = await import("../../../product-kernel/db/pglite.ts");
-  const { runMigrations } = await import(
-    "../../../product-kernel/db/migrate.ts"
+  const { openIsolatedStore } = await import("../../../test-support/product-fixtures.ts");
+  const { migrateIsolatedStore } = await import(
+    "../../../test-support/product-fixtures.ts"
   );
   const { createLocalOrg } = await import(
-    "../../../product-kernel/store/repositories.ts"
+    "../../../test-support/product-fixtures.ts"
   );
   const { join } = await import("node:path");
 
@@ -37,9 +37,9 @@ if (isPlaywrightCli) {
 
   async function seedAllKinds(home: string): Promise<void> {
     const dbPath = join(home, "state", "product", "db", "main");
-    const db = await openPglite(dbPath);
+    const db = await openIsolatedStore(dbPath);
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const org = await createLocalOrg(db, {
         slug: "default",
         name: "Default",

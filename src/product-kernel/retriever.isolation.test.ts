@@ -2,20 +2,20 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { openPglite } from "./db/pglite.ts";
-import { runMigrations } from "./db/migrate.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
 import { indexSearchDocument, searchProductDocuments } from "./search.ts";
-import { createLocalOrg } from "./store/repositories.ts";
-import type { ProductDb } from "./db/types.ts";
+import { createLocalOrg } from "../test-support/product-fixtures.ts";
+import type { TestStore } from "../test-support/product-fixtures.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-retriever-iso-"));
-let db: ProductDb;
+let db: TestStore;
 let orgAId: string;
 let orgBId: string;
 
 beforeAll(async () => {
-  db = await openPglite(join(scratch, "iso"));
-  await runMigrations(db);
+  db = await openIsolatedStore(join(scratch, "iso"));
+  await migrateIsolatedStore(db);
   const orgA = await createLocalOrg(db, { slug: "org-a", name: "Org A" });
   const orgB = await createLocalOrg(db, { slug: "org-b", name: "Org B" });
   orgAId = orgA.id;

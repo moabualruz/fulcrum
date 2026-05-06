@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../product-kernel/db/pglite.ts";
-import { applyProductMigrations } from "../product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../product-kernel/store/repositories.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
+import { createLocalOrg } from "../test-support/product-fixtures.ts";
 import {
   ConnectorBase,
   type UpsertTaskInput,
@@ -17,8 +17,8 @@ const scratch = mkdtempSync(join(tmpdir(), "fulcrum-connectors-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
 async function freshDb(name: string) {
-  const db = await openPglite(join(scratch, name));
-  await applyProductMigrations(db);
+  const db = await openIsolatedStore(join(scratch, name));
+  await migrateIsolatedStore(db);
   return db;
 }
 

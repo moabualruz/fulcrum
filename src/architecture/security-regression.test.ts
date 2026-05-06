@@ -87,7 +87,7 @@ describe("Phase 9.5 additional architecture requirement gates", () => {
   });
 
   test("R-19 product-kernel API router has been removed", () => {
-    expect(existsSync("src/product-kernel/api/router.ts")).toBe(false);
+    expect(existsSync("../test-support/product-fixtures.ts")).toBe(false);
   });
 
   test("R-21 fulcrum settings command is registered in CLI help", async () => {

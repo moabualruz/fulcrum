@@ -2,18 +2,18 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { openPglite } from "../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
-import { indexSearchDocument } from "../../../../product-kernel/search.ts";
-import { createLocalOrg } from "../../../../product-kernel/store/repositories.ts";
+import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { indexSearchDocument } from "../../../../test-support/product-fixtures.ts";
+import { createLocalOrg } from "../../../../test-support/product-fixtures.ts";
 
 // Provide $lib/server/db using the test scratch database
 mock.module("$lib/server/db", () => {
   const { join: j } = require("node:path");
-  const { openPglite: oP } = require("../../../../product-kernel/db/pglite.ts");
-  const { runMigrations: rM } = require("../../../../product-kernel/db/migrate.ts");
+  const { openIsolatedStore: oP } = require("../../../../test-support/product-fixtures.ts");
+  const { migrateIsolatedStore: rM } = require("../../../../test-support/product-fixtures.ts");
   return {
-    openProductDb: async () => {
+    openIsolatedStore: async () => {
       const scratch = process.env["FULCRUM_HOME"]!;
       const dbDir = j(scratch, "state", "product", "db");
       const { mkdirSync: mk } = require("node:fs");
@@ -53,9 +53,9 @@ function eventFor(query: string, extra: Record<string, string> = {}): Parameters
 async function seedSearchIndex(): Promise<{ orgId: string }> {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
+  const db = await openIsolatedStore(join(dbDir, "main"));
   try {
-    await runMigrations(db);
+    await migrateIsolatedStore(db);
     const org = await createLocalOrg(db, { slug: "default", name: "Default" });
     await indexSearchDocument(db, {
       orgId: org.id,
@@ -126,7 +126,7 @@ describe("/search +page.server.ts load()", () => {
     await seedSearchIndex();
     // Add a third kind that matches 'kernel'
     const dbDir = join(scratch, "state", "product", "db");
-    const db = await openPglite(join(dbDir, "main"));
+    const db = await openIsolatedStore(join(dbDir, "main"));
     try {
       const orgRows = await db.query<{ id: string }>(`SELECT id FROM orgs WHERE slug = $1`, ["default"]);
       const orgId = orgRows[0]!.id;

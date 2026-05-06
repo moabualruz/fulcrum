@@ -7,8 +7,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "./pglite.ts";
-import { runMigrations } from "./migrate.ts";
+import { openIsolatedStore } from "./pglite.ts";
+import { migrateIsolatedStore } from "./migrate.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-search-schema-"));
 
@@ -17,7 +17,7 @@ afterAll(() => {
 });
 
 async function tableExists(
-  db: Awaited<ReturnType<typeof openPglite>>,
+  db: Awaited<ReturnType<typeof openIsolatedStore>>,
   name: string,
 ): Promise<boolean> {
   const rows = await db.query<{ count: number }>(
@@ -28,7 +28,7 @@ async function tableExists(
 }
 
 async function indexExists(
-  db: Awaited<ReturnType<typeof openPglite>>,
+  db: Awaited<ReturnType<typeof openIsolatedStore>>,
   name: string,
 ): Promise<boolean> {
   const rows = await db.query<{ count: number }>(
@@ -40,9 +40,9 @@ async function indexExists(
 
 describe("P11#01 search schema extension", () => {
   test("search_documents table has metadata jsonb column", async () => {
-    const db = await openPglite(join(scratch, "meta"));
+    const db = await openIsolatedStore(join(scratch, "meta"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const rows = await db.query<{ count: number }>(
         `SELECT COUNT(*)::int AS count FROM information_schema.columns
          WHERE table_name = 'search_documents' AND column_name = 'metadata'`,
@@ -55,9 +55,9 @@ describe("P11#01 search schema extension", () => {
   });
 
   test("search_documents has GIN index on metadata", async () => {
-    const db = await openPglite(join(scratch, "gin"));
+    const db = await openIsolatedStore(join(scratch, "gin"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       expect(await indexExists(db, "search_documents_metadata_idx")).toBe(true);
     } finally {
       await db.close();
@@ -65,9 +65,9 @@ describe("P11#01 search schema extension", () => {
   });
 
   test("search_documents has unique constraint on (org_id, source_kind, source_id)", async () => {
-    const db = await openPglite(join(scratch, "uniq"));
+    const db = await openIsolatedStore(join(scratch, "uniq"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       // Insert a row then try duplicate — should throw
       await db.query(
         `INSERT INTO search_documents (id, org_id, source_kind, source_id, title, body)
@@ -87,9 +87,9 @@ describe("P11#01 search schema extension", () => {
   });
 
   test("search_clicks table exists with org_id and composite index", async () => {
-    const db = await openPglite(join(scratch, "clicks"));
+    const db = await openIsolatedStore(join(scratch, "clicks"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       expect(await tableExists(db, "search_clicks")).toBe(true);
       // Verify org_id column present
       const rows = await db.query<{ count: number }>(
@@ -104,9 +104,9 @@ describe("P11#01 search schema extension", () => {
   });
 
   test("search_clicks composite index exists", async () => {
-    const db = await openPglite(join(scratch, "clicks-idx"));
+    const db = await openIsolatedStore(join(scratch, "clicks-idx"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       expect(await indexExists(db, "search_clicks_scope_idx")).toBe(true);
     } finally {
       await db.close();
@@ -114,9 +114,9 @@ describe("P11#01 search schema extension", () => {
   });
 
   test("saved_views table exists and accepts viewType = 'search'", async () => {
-    const db = await openPglite(join(scratch, "saved"));
+    const db = await openIsolatedStore(join(scratch, "saved"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       expect(await tableExists(db, "saved_views")).toBe(true);
       // FK requires a real org + project row (0004 schema has NOT NULL project_id)
       await db.query(
@@ -143,10 +143,10 @@ describe("P11#01 search schema extension", () => {
   });
 
   test("migration is idempotent for search extension", async () => {
-    const db = await openPglite(join(scratch, "idem"));
+    const db = await openIsolatedStore(join(scratch, "idem"));
     try {
-      await runMigrations(db);
-      const second = await runMigrations(db);
+      await migrateIsolatedStore(db);
+      const second = await migrateIsolatedStore(db);
       expect(second).toEqual([]);
       expect(await tableExists(db, "search_clicks")).toBe(true);
       expect(await tableExists(db, "saved_views")).toBe(true);

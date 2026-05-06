@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../db/pglite.ts";
-import { runMigrations } from "../db/migrate.ts";
-import type { ProductDb } from "../db/types.ts";
+import { openIsolatedStore } from "../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../test-support/product-fixtures.ts";
+import type { TestStore } from "../../test-support/product-fixtures.ts";
 import {
   blockToMarkdown,
   enqueueNotionSync,
@@ -18,11 +18,11 @@ import {
 import { isFeatureEnabled, FeatureDisabledError } from "./features.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-notion-"));
-let db: ProductDb;
+let db: TestStore;
 
 beforeAll(async () => {
-  db = await openPglite(join(scratch, "notion-test"));
-  await runMigrations(db);
+  db = await openIsolatedStore(join(scratch, "notion-test"));
+  await migrateIsolatedStore(db);
   // Seed org
   await db.query(`INSERT INTO orgs (id, slug, name) VALUES ('org1', 'test-org', 'Test Org')`, []);
 });

@@ -6,8 +6,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "./pglite.ts";
-import { runMigrations } from "./migrate.ts";
+import { openIsolatedStore } from "./pglite.ts";
+import { migrateIsolatedStore } from "./migrate.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-artifacts-schema-"));
 
@@ -16,7 +16,7 @@ afterAll(() => {
 });
 
 async function columnExists(
-  db: Awaited<ReturnType<typeof openPglite>>,
+  db: Awaited<ReturnType<typeof openIsolatedStore>>,
   table: string,
   column: string,
 ): Promise<boolean> {
@@ -30,7 +30,7 @@ async function columnExists(
 }
 
 async function indexExists(
-  db: Awaited<ReturnType<typeof openPglite>>,
+  db: Awaited<ReturnType<typeof openIsolatedStore>>,
   indexName: string,
 ): Promise<boolean> {
   const rows = await db.query<{ count: number }>(
@@ -42,9 +42,9 @@ async function indexExists(
 
 describe("artifacts schema migration (P10#01)", () => {
   test("artifacts table has all extended columns after migration", async () => {
-    const db = await openPglite(join(scratch, "cols"));
+    const db = await openIsolatedStore(join(scratch, "cols"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
 
       const required = [
         "filename",
@@ -64,9 +64,9 @@ describe("artifacts schema migration (P10#01)", () => {
   });
 
   test("artifacts_org_project_date index exists", async () => {
-    const db = await openPglite(join(scratch, "idx1"));
+    const db = await openIsolatedStore(join(scratch, "idx1"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       expect(await indexExists(db, "artifacts_org_project_date")).toBe(true);
     } finally {
       await db.close();
@@ -74,9 +74,9 @@ describe("artifacts schema migration (P10#01)", () => {
   });
 
   test("artifacts_org_run index exists", async () => {
-    const db = await openPglite(join(scratch, "idx2"));
+    const db = await openIsolatedStore(join(scratch, "idx2"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       expect(await indexExists(db, "artifacts_org_run")).toBe(true);
     } finally {
       await db.close();
@@ -84,9 +84,9 @@ describe("artifacts schema migration (P10#01)", () => {
   });
 
   test("artifacts_org_task index exists", async () => {
-    const db = await openPglite(join(scratch, "idx3"));
+    const db = await openIsolatedStore(join(scratch, "idx3"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       expect(await indexExists(db, "artifacts_org_task")).toBe(true);
     } finally {
       await db.close();
@@ -94,9 +94,9 @@ describe("artifacts schema migration (P10#01)", () => {
   });
 
   test("artifacts_checksum index exists", async () => {
-    const db = await openPglite(join(scratch, "idx4"));
+    const db = await openIsolatedStore(join(scratch, "idx4"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       expect(await indexExists(db, "artifacts_checksum")).toBe(true);
     } finally {
       await db.close();
@@ -104,9 +104,9 @@ describe("artifacts schema migration (P10#01)", () => {
   });
 
   test("artifacts_retention index exists", async () => {
-    const db = await openPglite(join(scratch, "idx5"));
+    const db = await openIsolatedStore(join(scratch, "idx5"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       expect(await indexExists(db, "artifacts_retention")).toBe(true);
     } finally {
       await db.close();
@@ -114,9 +114,9 @@ describe("artifacts schema migration (P10#01)", () => {
   });
 
   test("artifacts_org_archived_date index exists", async () => {
-    const db = await openPglite(join(scratch, "idx6"));
+    const db = await openIsolatedStore(join(scratch, "idx6"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       expect(await indexExists(db, "artifacts_org_archived_date")).toBe(true);
     } finally {
       await db.close();
@@ -124,9 +124,9 @@ describe("artifacts schema migration (P10#01)", () => {
   });
 
   test("projects table has artifact_retention_days column", async () => {
-    const db = await openPglite(join(scratch, "proj"));
+    const db = await openIsolatedStore(join(scratch, "proj"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       expect(await columnExists(db, "projects", "artifact_retention_days")).toBe(true);
     } finally {
       await db.close();
@@ -134,10 +134,10 @@ describe("artifacts schema migration (P10#01)", () => {
   });
 
   test("migration is idempotent (apply twice, no error)", async () => {
-    const db = await openPglite(join(scratch, "idem"));
+    const db = await openIsolatedStore(join(scratch, "idem"));
     try {
-      await runMigrations(db);
-      const second = await runMigrations(db);
+      await migrateIsolatedStore(db);
+      const second = await migrateIsolatedStore(db);
       // second run should skip already-applied migrations
       expect(second).toEqual([]);
     } finally {
@@ -146,9 +146,9 @@ describe("artifacts schema migration (P10#01)", () => {
   });
 
   test("artifacts row with new columns can be inserted and queried", async () => {
-    const db = await openPglite(join(scratch, "insert"));
+    const db = await openIsolatedStore(join(scratch, "insert"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
 
       await db.query(
         `INSERT INTO orgs (id, slug, name) VALUES ($1, $2, $3)`,

@@ -60,11 +60,11 @@ async function runDbMigrate(home: string, fulcrumHome: string): Promise<void> {
   const previousFulcrumHome = process.env["FULCRUM_HOME"];
   process.env["HOME"] = home;
   process.env["FULCRUM_HOME"] = fulcrumHome;
-  const { openPglite } = await import("../product-kernel/db/pglite.ts");
-  const { applyProductMigrations } = await import("../db/product-migrations.ts");
-  const db = await openPglite(join(fulcrumHome, "pglite.data"));
+  const { openIsolatedStore } = await import("../test-support/product-fixtures.ts");
+  const { migrateIsolatedStore } = await import("../test-support/product-fixtures.ts");
+  const db = await openIsolatedStore(join(fulcrumHome, "pglite.data"));
   try {
-    await applyProductMigrations(db);
+    await migrateIsolatedStore(db);
   } finally {
     await db.close();
     if (previousHome === undefined) delete process.env["HOME"];
@@ -773,9 +773,9 @@ describe("doctor --json repos section", () => {
     await initProc.exited;
 
     // Insert a repo with error directly via SQL
-    const { openPglite } = await import("../product-kernel/db/pglite.ts");
+    const { openIsolatedStore } = await import("../test-support/product-fixtures.ts");
     const dbPath = join(fulcrumHome, "pglite.data");
-    const db = await openPglite(dbPath);
+    const db = await openIsolatedStore(dbPath);
     try {
       // Get the default org
       const orgs = await db.query<{ id: string }>("SELECT id FROM orgs LIMIT 1");
@@ -815,8 +815,8 @@ describe("doctor --json repos section", () => {
     await initProc.exited;
 
     const dbPath = join(fulcrumHome, "pglite.data");
-    const { openPglite } = await import("../product-kernel/db/pglite.ts");
-    const db = await openPglite(dbPath);
+    const { openIsolatedStore } = await import("../test-support/product-fixtures.ts");
+    const db = await openIsolatedStore(dbPath);
     try {
       const orgs = await db.query<{ id: string }>("SELECT id FROM orgs LIMIT 1");
       const orgId = orgs[0]!.id;

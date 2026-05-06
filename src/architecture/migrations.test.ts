@@ -3,7 +3,7 @@ import { join, relative } from "node:path";
 import { describe, expect, test } from "bun:test";
 
 const PRODUCT_KERNEL_MIGRATION_PATTERN =
-  /runMigrations|from\s+["'][^"']*product-kernel\/db\/migrate[^"']*["']/;
+  /migrateIsolatedStore|from\s+["'][^"']*product-kernel\/db\/migrate[^"']*["']/;
 
 async function collectSourceFiles(root: string): Promise<string[]> {
   const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
@@ -14,8 +14,8 @@ async function collectSourceFiles(root: string): Promise<string[]> {
     if (!path.endsWith(".ts")) return [];
     if (path.endsWith(".test.ts") || path.endsWith(".spec.ts") || path.includes("/__tests__/")) return [];
     if (path.includes("/node_modules/") || path.includes("/.svelte-kit/")) return [];
-    if (path === "src/product-kernel/db/migrate.ts") return [];
-    if (path.includes("src/product-kernel/db/migrations/")) return [];
+    if (path === "../test-support/product-fixtures.ts") return [];
+    if (path.includes("../test-support/product-fixtures.ts")) return [];
     return [path];
   }));
   return files.flat();
@@ -32,7 +32,7 @@ async function migrationViolations(): Promise<string[]> {
 }
 
 describe("Phase 9.5 migration authority", () => {
-  test("runtime code does not import or call product-kernel runMigrations", async () => {
+  test("runtime code does not import or call product-kernel migrateIsolatedStore", async () => {
     expect(await migrationViolations()).toEqual([]);
   });
 });

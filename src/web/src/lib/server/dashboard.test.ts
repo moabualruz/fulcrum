@@ -2,28 +2,28 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg, createProject } from "../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../product-kernel/ids.ts";
-import type { ProductDb } from "../../../../product-kernel/db/types.ts";
+import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { createLocalOrg, createProject } from "../../../../test-support/product-fixtures.ts";
+import { makeId } from "../../../../test-support/product-fixtures.ts";
+import type { TestStore } from "../../../../test-support/product-fixtures.ts";
 import { loadDashboard } from "./dashboard.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-dashboard-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
-async function freshDb(name: string): Promise<{ db: ProductDb; orgId: string }> {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
+async function freshDb(name: string): Promise<{ db: TestStore; orgId: string }> {
+  const db = await openIsolatedStore(join(scratch, name));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   return { db, orgId: org.id };
 }
 
 async function seedTask(
-  db: ProductDb, orgId: string, projectId: string | null,
+  db: TestStore, orgId: string, projectId: string | null,
   status: string, priority: number, title = "task",
 ): Promise<string> {
-  const id = newUlid();
+  const id = makeId();
   await db.query(
     `INSERT INTO tasks (id, org_id, project_id, title, status, priority) VALUES ($1,$2,$3,$4,$5,$6)`,
     [id, orgId, projectId, title, status, priority],
@@ -32,10 +32,10 @@ async function seedTask(
 }
 
 async function seedDoc(
-  db: ProductDb, orgId: string, projectId: string | null,
+  db: TestStore, orgId: string, projectId: string | null,
   title: string, updatedAt: string, kind = "note",
 ): Promise<string> {
-  const id = newUlid();
+  const id = makeId();
   await db.query(
     `INSERT INTO documents (id, org_id, project_id, kind, title, body, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
@@ -45,10 +45,10 @@ async function seedDoc(
 }
 
 async function seedRun(
-  db: ProductDb, orgId: string, projectId: string | null,
+  db: TestStore, orgId: string, projectId: string | null,
   startedAt: string, agent = "codex", status = "succeeded",
 ): Promise<string> {
-  const id = newUlid();
+  const id = makeId();
   await db.query(
     `INSERT INTO agent_runs (id, org_id, project_id, agent, status, started_at)
        VALUES ($1,$2,$3,$4,$5,$6)`,
@@ -191,7 +191,7 @@ describe("loadDashboard", () => {
         await db.query(
           `INSERT INTO events (id, org_id, actor, subject_kind, subject_id, verb)
              VALUES ($1, $2, $3, $4, $5, $6)`,
-          [newUlid(), orgId, "system", "task", newUlid(), "created"],
+          [makeId(), orgId, "system", "task", makeId(), "created"],
         );
       }
       // Seed 1 old event (>24h ago)
@@ -199,7 +199,7 @@ describe("loadDashboard", () => {
       await db.query(
         `INSERT INTO events (id, org_id, actor, subject_kind, subject_id, verb, created_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [newUlid(), orgId, "system", "task", newUlid(), "created", twoDaysAgo],
+        [makeId(), orgId, "system", "task", makeId(), "created", twoDaysAgo],
       );
 
       const data = await loadDashboard(db, orgId);

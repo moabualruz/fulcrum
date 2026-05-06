@@ -2,11 +2,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../product-kernel/db/migrate.ts";
-import { createLocalOrg, createProject } from "../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../product-kernel/ids.ts";
-import type { ProductDb } from "../../../product-kernel/db/types.ts";
+import type { EntityManager } from "@mikro-orm/postgresql";
+import {
+  createIsolatedOrmFixture,
+  type TestOrmFixture,
+} from "../../../test-support/product-fixtures.ts";
+import type { TestStore } from "../../../test-support/product-fixtures.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-page-server-"));
 
@@ -15,45 +16,52 @@ afterAll(() => {
 });
 
 async function freshDb(name: string): Promise<{
-  db: ProductDb;
+  db: TestStore;
+  em: EntityManager;
   orgId: string;
   projectId: string;
+  close: () => Promise<void>;
 }> {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const project = await createProject(db, { orgId: org.id, slug: "alpha", name: "Alpha" });
-  return { db, orgId: org.id, projectId: project.id };
+  const fixture = await createIsolatedOrmFixture();
+  const db = fixture.pglite as unknown as TestStore;
+  const orgId = fixture.seed.orgId;
+  const projectId = crypto.randomUUID();
+  await db.query(
+    `INSERT INTO projects (id, org_id, name) VALUES ($1, $2, $3)`,
+    [projectId, orgId, `Alpha ${name}`],
+  );
+  return { db, em: fixture.em.fork(), orgId, projectId, close: fixture.close };
 }
 
 async function seedRun(
-  db: ProductDb,
+  db: TestStore,
   orgId: string,
   projectId: string | null,
   startedAt: string,
   agent = "codex",
   status = "succeeded",
 ): Promise<string> {
-  const id = newUlid();
+  const id = crypto.randomUUID();
+  void projectId;
   await db.query(
-    `INSERT INTO agent_runs (id, org_id, project_id, agent, status, started_at)
-       VALUES ($1,$2,$3,$4,$5,$6)`,
-    [id, orgId, projectId, agent, status, startedAt],
+    `INSERT INTO agent_runs (id, org_id, agent_name, status, started_at)
+       VALUES ($1,$2,$3,$4,$5)`,
+    [id, orgId, agent, status, startedAt],
   );
   return id;
 }
 
 async function seedDoc(
-  db: ProductDb,
+  db: TestStore,
   orgId: string,
   projectId: string | null,
   title: string,
   updatedAt: string,
   kind = "note",
 ): Promise<string> {
-  const id = newUlid();
+  const id = crypto.randomUUID();
   await db.query(
-    `INSERT INTO documents (id, org_id, project_id, kind, title, body, updated_at)
+    `INSERT INTO documents (id, org_id, project_id, doc_type, title, body_md, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
     [id, orgId, projectId, kind, title, "body", updatedAt],
   );
@@ -61,14 +69,14 @@ async function seedDoc(
 }
 
 async function seedTask(
-  db: ProductDb,
+  db: TestStore,
   orgId: string,
   projectId: string | null,
   status: string,
   priority: number,
   title = "task",
 ): Promise<string> {
-  const id = newUlid();
+  const id = crypto.randomUUID();
   await db.query(
     `INSERT INTO tasks (id, org_id, project_id, title, status, priority) VALUES ($1,$2,$3,$4,$5,$6)`,
     [id, orgId, projectId, title, status, priority],
@@ -77,19 +85,21 @@ async function seedTask(
 }
 
 // We test the load function by calling it directly after setting FULCRUM_HOME
-// so openProductDb points to our scratch PGlite instance.
-// Because openProductDb is stateless (calls openPglite each time), we must
+// so openIsolatedStore points to our scratch PGlite instance.
+// Because openIsolatedStore is stateless (calls openIsolatedStore each time), we must
 // mock it at module level. Instead we test the integration via the underlying
 // loadDashboard directly, exercising the same contract the load() function
 // exposes.
 
 describe("+page.server load contract", () => {
-  let db: ProductDb;
+  let db: TestStore;
+  let em: EntityManager;
   let orgId: string;
   let projectId: string;
+  let fixtureClose: TestOrmFixture["close"];
 
   beforeAll(async () => {
-    ({ db, orgId, projectId } = await freshDb("page-server-main"));
+    ({ db, em, orgId, projectId, close: fixtureClose } = await freshDb("page-server-main"));
     const now = new Date().toISOString();
     await seedRun(db, orgId, projectId, now);
     await seedDoc(db, orgId, projectId, "First doc", now);
@@ -97,7 +107,7 @@ describe("+page.server load contract", () => {
   });
 
   afterAll(async () => {
-    await db.close();
+    await fixtureClose();
   });
 
   test("load returns activeProjectId and streamed.dashboard Promise", async () => {
@@ -126,7 +136,7 @@ describe("+page.server load contract", () => {
   test("streamed.dashboard resolves to payload with all 4 counters + recentRuns + recentDocs + topTasks", async () => {
     const { loadDashboard } = await import("$lib/server/dashboard");
 
-    const data = await loadDashboard(db, orgId);
+    const data = await loadDashboard(em, orgId);
 
     expect(data).toHaveProperty("counters");
     expect(data.counters).toHaveProperty("projects");

@@ -27,7 +27,7 @@ const EMPTY_DASHBOARD: OrchestrationDashboardData = {
 
 function mockDb(dispatches: unknown[] = [], projects: unknown[] = []) {
   mock.module("$lib/server/db", () => ({
-    openProductDb: async () => ({
+    openIsolatedStore: async () => ({
       query: async (sql: string) => {
         if (sql.includes("FROM projects")) return projects;
         return [];
@@ -138,7 +138,7 @@ describe("/orchestration +page.server.ts load()", () => {
       SYMPHONY_COLORS: {},
     }));
     mock.module("$lib/server/db", () => ({
-      openProductDb: async () => ({
+      openIsolatedStore: async () => ({
         query: async () => [],
         close: async () => {},
       }),
@@ -178,7 +178,7 @@ describe("/orchestration +page.server.ts load()", () => {
       SYMPHONY_COLORS: {},
     }));
     mock.module("$lib/server/db", () => ({
-      openProductDb: async () => ({
+      openIsolatedStore: async () => ({
         query: async () => [],
         close: async () => {},
       }),

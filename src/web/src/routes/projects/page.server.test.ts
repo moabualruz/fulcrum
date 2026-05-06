@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg, createProject } from "../../../../product-kernel/store/repositories.ts";
+import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
+import { createLocalOrg, createProject } from "../../../../test-support/product-fixtures.ts";
 
 // `+page.server.ts` reads `productDbDir() + "/main"` (which honours
 // `FULCRUM_HOME`). We seed two projects there with controlled `created_at`
@@ -43,8 +43,8 @@ async function seedTwoProjects(): Promise<{ first: string; second: string }> {
   // opens `${productDbDir()}/main` so seed exactly there.
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const first = await createProject(db, {
     orgId: org.id,
@@ -94,8 +94,8 @@ describe("/projects +page.server.ts load()", () => {
     // Initialise an empty DB at the expected path so the route does not crash.
     const dbDir = join(scratch, "state", "product", "db");
     mkdirSync(dbDir, { recursive: true });
-    const db = await openPglite(join(dbDir, "main"));
-    await runMigrations(db);
+    const db = await openIsolatedStore(join(dbDir, "main"));
+    await migrateIsolatedStore(db);
     await db.close();
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const result = await mod.load({

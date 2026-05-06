@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync, readFileSync, statSync, mkdirSync } from "node:fs"
 import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, mock } from "bun:test";
-import { openPglite } from "../product-kernel/db/pglite.ts";
-import type { ProductDb } from "../product-kernel/db/types.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import type { TestStore } from "../test-support/product-fixtures.ts";
 import { FeatureDisabledError, type MarketplaceListing } from "./marketplace-client.ts";
 import { readFile } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -14,7 +14,7 @@ let generateKeypair: typeof import("./marketplace-publisher.ts").generateKeypair
 let VersionConflictError: typeof import("./marketplace-publisher.ts").VersionConflictError;
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-publisher-"));
-let db: ProductDb;
+let db: TestStore;
 
 // ── Ed25519 helpers (same as client test) ─────────────────────────────
 
@@ -26,9 +26,9 @@ function uint8ArrayToBase64url(bytes: Uint8Array): string {
 
 // ── Lifecycle ─────────────────────────────────────────────────────────
 
-async function runMinimalMigrations(database: ProductDb): Promise<void> {
+async function runMinimalMigrations(database: TestStore): Promise<void> {
   // Run only base + marketplace migrations to avoid PGlite date-type issues in sprint migrations
-  const migrationsDir = join(dirname(new URL(import.meta.url).pathname), "../product-kernel/db/migrations");
+  const migrationsDir = join(dirname(new URL(import.meta.url).pathname), "../test-support/product-fixtures.ts");
   for (const name of ["0001_product_kernel.sql", "0004_marketplace.sql"]) {
     const sql = await readFile(join(migrationsDir, name), "utf8");
     await database.exec(sql);
@@ -37,7 +37,7 @@ async function runMinimalMigrations(database: ProductDb): Promise<void> {
 
 beforeAll(async () => {
   process.env.FULCRUM_FEATURES = "skill-marketplace";
-  db = await openPglite(join(scratch, "publisher"));
+  db = await openIsolatedStore(join(scratch, "publisher"));
   await runMinimalMigrations(db);
 
   const mod = await import("./marketplace-publisher.ts");

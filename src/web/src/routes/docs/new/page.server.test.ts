@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../../product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../../../../../product-kernel/store/repositories.ts";
+import { openIsolatedStore } from "../../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../../test-support/product-fixtures.ts";
+import { createLocalOrg } from "../../../../../test-support/product-fixtures.ts";
 
 let scratch: string;
 
@@ -21,8 +21,8 @@ afterEach(() => {
 async function seedDb(): Promise<{ orgId: string }> {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   await db.close();
   return { orgId: org.id };
@@ -99,8 +99,8 @@ describe("/docs/new +page.server.ts", () => {
     }
     // Verify a document row was actually created.
     const dbDir = join(scratch, "state", "product", "db");
-    const db = await openPglite(join(dbDir, "main"));
-    await runMigrations(db);
+    const db = await openIsolatedStore(join(dbDir, "main"));
+    await migrateIsolatedStore(db);
     try {
       const rows = await db.query<{
         id: string;

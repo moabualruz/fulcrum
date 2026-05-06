@@ -1267,7 +1267,7 @@ maxAttempts: 5
       const { join } = await import("node:path");
       // Check http-server.ts or http-api.ts for loopback bind
       const httpServerPath = join(process.cwd(), "src/orchestration/symphony/http-server.ts");
-      const httpApiPath = join(process.cwd(), "src/product-kernel/symphony/http-api.ts");
+      const httpApiPath = join(process.cwd(), "../../test-support/product-fixtures.ts");
       const src = existsSync(httpServerPath)
         ? readFileSync(httpServerPath, "utf8")
         : existsSync(httpApiPath)
@@ -1288,13 +1288,13 @@ maxAttempts: 5
         expect(typeof (mod as Record<string, unknown>)["createHttpServer"]).toBe("function");
       } else {
         // Fall through: http-api already has createHttpApiRoutes
-        const mod = await import("../../product-kernel/symphony/http-api.ts");
+        const mod = await import("../../test-support/product-fixtures.ts");
         expect(typeof mod.createHttpApiRoutes).toBe("function");
       }
     });
 
     test("REQUIRED: GET /api/v1/state response includes generated_at, counts, running, retrying", async () => {
-      const { createHttpApiRoutes } = await import("../../product-kernel/symphony/http-api.ts");
+      const { createHttpApiRoutes } = await import("../../test-support/product-fixtures.ts");
       // Use a fake db with empty state
       const fakeDb = {
         query: async () => [],
@@ -1311,7 +1311,7 @@ maxAttempts: 5
     });
 
     test("REQUIRED: POST /api/v1/refresh returns queued:true and triggers refresh callback", async () => {
-      const { createHttpApiRoutes } = await import("../../product-kernel/symphony/http-api.ts");
+      const { createHttpApiRoutes } = await import("../../test-support/product-fixtures.ts");
       const fakeDb = { query: async () => [] } as never;
       let refreshCalled = false;
       const routes = createHttpApiRoutes(fakeDb, () => { refreshCalled = true; });

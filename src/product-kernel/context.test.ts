@@ -2,14 +2,14 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "./db/pglite.ts";
-import { runMigrations } from "./db/migrate.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
 import {
   createLocalOrg,
   createProject,
   createTask,
-} from "./store/repositories.ts";
-import { newUlid } from "./ids.ts";
+} from "../test-support/product-fixtures.ts";
+import { makeId } from "../test-support/product-fixtures.ts";
 import { assembleContext } from "./context.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-context-"));
@@ -20,9 +20,9 @@ afterAll(() => {
 
 describe("context assembly", () => {
   test("renders ordered sections and is byte-stable for identical inputs", async () => {
-    const db = await openPglite(join(scratch, "ctx"));
+    const db = await openIsolatedStore(join(scratch, "ctx"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
       const project = await createProject(db, { orgId: org.id, slug: "p", name: "P" });
       const task = await createTask(db, {
@@ -32,7 +32,7 @@ describe("context assembly", () => {
         description: "do the thing",
       });
 
-      const docId = newUlid();
+      const docId = makeId();
       await db.query(
         `INSERT INTO documents (id, org_id, project_id, kind, title, body)
          VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -41,10 +41,10 @@ describe("context assembly", () => {
       await db.query(
         `INSERT INTO edges (id, org_id, project_id, from_kind, from_id, to_kind, to_id, rel)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [newUlid(), org.id, project.id, "task", task.id, "document", docId, "references"],
+        [makeId(), org.id, project.id, "task", task.id, "document", docId, "references"],
       );
 
-      const memId = newUlid();
+      const memId = makeId();
       await db.query(
         `INSERT INTO memories (id, org_id, project_id, scope, kind, key, body)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -53,7 +53,7 @@ describe("context assembly", () => {
       await db.query(
         `INSERT INTO edges (id, org_id, project_id, from_kind, from_id, to_kind, to_id, rel)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [newUlid(), org.id, project.id, "task", task.id, "memory", memId, "informs"],
+        [makeId(), org.id, project.id, "task", task.id, "memory", memId, "informs"],
       );
 
       const first = await assembleContext(db, { orgId: org.id, taskId: task.id });

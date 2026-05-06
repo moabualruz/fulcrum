@@ -2,13 +2,13 @@ import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../../../product-kernel/db/migrate.ts";
+import { openIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
 import {
   createLocalOrg,
   createProject,
-} from "../../../../../../product-kernel/store/repositories.ts";
-import { newUlid } from "../../../../../../product-kernel/ids.ts";
+} from "../../../../../../test-support/product-fixtures.ts";
+import { makeId } from "../../../../../../test-support/product-fixtures.ts";
 
 let scratch: string;
 
@@ -25,8 +25,8 @@ afterEach(() => {
 async function seedProject(): Promise<{ id: string }> {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const project = await createProject(db, {
     orgId: org.id,
@@ -40,15 +40,15 @@ async function seedProject(): Promise<{ id: string }> {
 async function seedProjectWithSprint(): Promise<{ projectId: string; sprintId: string }> {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const project = await createProject(db, {
     orgId: org.id,
     slug: "proj",
     name: "Proj",
   });
-  const sprintId = newUlid();
+  const sprintId = makeId();
   await db.query(
     `INSERT INTO sprints (id, org_id, project_id, name, start_date, end_date, status)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
@@ -57,7 +57,7 @@ async function seedProjectWithSprint(): Promise<{ projectId: string; sprintId: s
   await db.query(
     `INSERT INTO tasks (id, org_id, project_id, title, status, priority, sprint_id, story_points)
        VALUES ($1,$2,$3,$4,$5,0,$6,$7)`,
-    [newUlid(), org.id, project.id, "task1", "pending", sprintId, 5],
+    [makeId(), org.id, project.id, "task1", "pending", sprintId, 5],
   );
   await db.close();
   return { projectId: project.id, sprintId };

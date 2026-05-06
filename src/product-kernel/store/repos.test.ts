@@ -2,8 +2,8 @@ import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openPglite } from "../db/pglite.ts";
-import { runMigrations } from "../db/migrate.ts";
+import { openIsolatedStore } from "../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../test-support/product-fixtures.ts";
 import { createLocalOrg } from "./repositories.ts";
 import {
   registerRepo,
@@ -14,16 +14,16 @@ import {
   getReposDoctorStats,
   type RepoRow,
 } from "./repos.ts";
-import type { ProductDb } from "../db/types.ts";
+import type { TestStore } from "../../test-support/product-fixtures.ts";
 
-let db: ProductDb;
+let db: TestStore;
 let TMP: string;
 let orgId: string;
 
 beforeAll(async () => {
   TMP = await mkdtemp(join(tmpdir(), "repos-store-test-"));
-  db = await openPglite(join(TMP, "db"));
-  await runMigrations(db);
+  db = await openIsolatedStore(join(TMP, "db"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "test-org", name: "Test Org" });
   orgId = org.id;
 });

@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../db/pglite.ts";
-import { runMigrations } from "../db/migrate.ts";
-import { createLocalOrg } from "../store/repositories.ts";
+import { openIsolatedStore } from "../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../test-support/product-fixtures.ts";
+import { createLocalOrg } from "../../test-support/product-fixtures.ts";
 import { _resetFeatureCache } from "../features.ts";
 import {
   listGithubPrs,
@@ -34,19 +34,19 @@ afterEach(() => {
 });
 
 async function freshDb(name: string) {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(scratch, name));
+  await migrateIsolatedStore(db);
   return db;
 }
 
 async function insertRepo(
-  db: Awaited<ReturnType<typeof openPglite>>,
+  db: Awaited<ReturnType<typeof openIsolatedStore>>,
   orgId: string,
   slug: string,
   remoteUrl: string,
 ) {
-  const { newUlid } = await import("../ids.ts");
-  const id = newUlid();
+  const { makeId } = await import("../../test-support/product-fixtures.ts");
+  const id = makeId();
   await db.query(
     `INSERT INTO repos (id, org_id, slug, root_path, remote_url) VALUES ($1, $2, $3, $4, $5)`,
     [id, orgId, slug, `/tmp/${slug}`, remoteUrl],

@@ -2,13 +2,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "./db/pglite.ts";
-import { runMigrations } from "./db/migrate.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
 import {
   createLocalOrg,
   createProject,
   createTask,
-} from "./store/repositories.ts";
+} from "../test-support/product-fixtures.ts";
 import { indexSearchDocument } from "./search.ts";
 import { createMockSidecar } from "./inference.ts";
 import {
@@ -25,8 +25,8 @@ afterAll(() => {
 });
 
 async function freshDb(name: string) {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(scratch, name));
+  await migrateIsolatedStore(db);
   return db;
 }
 

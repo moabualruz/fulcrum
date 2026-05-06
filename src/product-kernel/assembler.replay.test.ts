@@ -2,21 +2,21 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { openPglite } from "./db/pglite.ts";
-import { runMigrations } from "./db/migrate.ts";
-import { createLocalOrg, createProject, createTask } from "./store/repositories.ts";
+import { openIsolatedStore } from "../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
+import { createLocalOrg, createProject, createTask } from "../test-support/product-fixtures.ts";
 import { assembleContext } from "./context.ts";
-import { newUlid } from "./ids.ts";
-import type { ProductDb } from "./db/types.ts";
+import { makeId } from "../test-support/product-fixtures.ts";
+import type { TestStore } from "../test-support/product-fixtures.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-assembler-replay-"));
-let db: ProductDb;
+let db: TestStore;
 let orgId: string;
 let taskId: string;
 
 beforeAll(async () => {
-  db = await openPglite(join(scratch, "replay"));
-  await runMigrations(db);
+  db = await openIsolatedStore(join(scratch, "replay"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "r", name: "Replay Org" });
   orgId = org.id;
   const project = await createProject(db, { orgId, slug: "rp", name: "Replay Project" });
@@ -29,7 +29,7 @@ beforeAll(async () => {
   taskId = task.id;
 
   // Seed linked docs and memories
-  const docId = newUlid();
+  const docId = makeId();
   await db.query(
     `INSERT INTO documents (id, org_id, project_id, kind, title, body)
      VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -38,9 +38,9 @@ beforeAll(async () => {
   await db.query(
     `INSERT INTO edges (id, org_id, project_id, from_kind, from_id, to_kind, to_id, rel)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [newUlid(), orgId, project.id, "task", taskId, "document", docId, "references"],
+    [makeId(), orgId, project.id, "task", taskId, "document", docId, "references"],
   );
-  const memId = newUlid();
+  const memId = makeId();
   await db.query(
     `INSERT INTO memories (id, org_id, project_id, scope, kind, key, body)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -49,7 +49,7 @@ beforeAll(async () => {
   await db.query(
     `INSERT INTO edges (id, org_id, project_id, from_kind, from_id, to_kind, to_id, rel)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [newUlid(), orgId, project.id, "task", taskId, "memory", memId, "informs"],
+    [makeId(), orgId, project.id, "task", taskId, "memory", memId, "informs"],
   );
 });
 

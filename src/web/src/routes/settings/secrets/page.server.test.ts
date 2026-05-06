@@ -6,7 +6,7 @@ const mockDb = {
   close: vi.fn(),
 };
 vi.mock("$lib/server/db", () => ({
-  openProductDb: vi.fn(() => Promise.resolve(mockDb)),
+  openIsolatedStore: vi.fn(() => Promise.resolve(mockDb)),
 }));
 
 import { actions } from "./+page.server.js";

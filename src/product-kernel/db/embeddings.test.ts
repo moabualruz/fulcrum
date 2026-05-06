@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "./pglite.ts";
-import { runMigrations } from "./migrate.ts";
+import { openIsolatedStore } from "./pglite.ts";
+import { migrateIsolatedStore } from "./migrate.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-embeddings-"));
 
@@ -13,9 +13,9 @@ afterAll(() => {
 
 describe("embedding schema (P8#02)", () => {
   test("migration creates memory_embeddings and doc_embeddings tables", async () => {
-    const db = await openPglite(join(scratch, "tables"));
+    const db = await openIsolatedStore(join(scratch, "tables"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       for (const tbl of ["memory_embeddings", "doc_embeddings"]) {
         const rows = await db.query<{ count: number }>(
           `SELECT COUNT(*)::int AS count FROM pg_class WHERE relname = $1 AND relkind = 'r'`,
@@ -29,9 +29,9 @@ describe("embedding schema (P8#02)", () => {
   });
 
   test("embedding column is vector(384)", async () => {
-    const db = await openPglite(join(scratch, "vectype"));
+    const db = await openIsolatedStore(join(scratch, "vectype"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       for (const tbl of ["memory_embeddings", "doc_embeddings"]) {
         const rows = await db.query<{ typname: string; atttypmod: number }>(
           `SELECT t.typname, a.atttypmod
@@ -55,9 +55,9 @@ describe("embedding schema (P8#02)", () => {
   });
 
   test("HNSW index metadata present", async () => {
-    const db = await openPglite(join(scratch, "hnsw"));
+    const db = await openIsolatedStore(join(scratch, "hnsw"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       for (const idx of ["memory_embeddings_hnsw", "doc_embeddings_hnsw"]) {
         const rows = await db.query<{ count: number }>(
           `SELECT COUNT(*)::int AS count FROM pg_class WHERE relname = $1 AND relkind = 'i'`,
@@ -71,9 +71,9 @@ describe("embedding schema (P8#02)", () => {
   });
 
   test("memory_embeddings cascade deletes with parent memory row", async () => {
-    const db = await openPglite(join(scratch, "cascade"));
+    const db = await openIsolatedStore(join(scratch, "cascade"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       // Insert org + memory
       await db.query(
         `INSERT INTO orgs (id, slug, name) VALUES ($1, $2, $3)`,
@@ -112,10 +112,10 @@ describe("embedding schema (P8#02)", () => {
   });
 
   test("migration is idempotent on re-run", async () => {
-    const db = await openPglite(join(scratch, "idem"));
+    const db = await openIsolatedStore(join(scratch, "idem"));
     try {
-      await runMigrations(db);
-      const second = await runMigrations(db);
+      await migrateIsolatedStore(db);
+      const second = await migrateIsolatedStore(db);
       expect(second).toEqual([]);
       // Tables still there
       for (const tbl of ["memory_embeddings", "doc_embeddings"]) {
@@ -131,9 +131,9 @@ describe("embedding schema (P8#02)", () => {
   });
 
   test("doc_embeddings cascade deletes with parent document row", async () => {
-    const db = await openPglite(join(scratch, "doc-cascade"));
+    const db = await openIsolatedStore(join(scratch, "doc-cascade"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       await db.query(
         `INSERT INTO orgs (id, slug, name) VALUES ($1, $2, $3)`,
         ["o2", "org2", "Org 2"],

@@ -2,15 +2,15 @@ import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openPglite } from "../../../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../../../product-kernel/db/migrate.ts";
+import { openIsolatedStore } from "../../../../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../../../../test-support/product-fixtures.ts";
 import {
   createLocalOrg,
   createProject,
   createTask,
   type EventRow,
   type ProjectRow,
-} from "../../../../../product-kernel/store/repositories.ts";
+} from "../../../../../test-support/product-fixtures.ts";
 
 // `+page.server.ts` reads `productDbDir() + "/main"` (which honours
 // `FULCRUM_HOME`). Each test seeds a fresh temp DB there. `+page.server.ts`
@@ -35,8 +35,8 @@ async function seedOneProject(
 ): Promise<{ id: string }> {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(dbDir, "main"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const project = await createProject(db, {
     orgId: org.id,
@@ -86,8 +86,8 @@ describe("/projects/[id] +page.server.ts", () => {
   test("load returns task summary metrics for the project only", async () => {
     const dbDir = join(scratch, "state", "product", "db");
     mkdirSync(dbDir, { recursive: true });
-    const db = await openPglite(join(dbDir, "main"));
-    await runMigrations(db);
+    const db = await openIsolatedStore(join(dbDir, "main"));
+    await migrateIsolatedStore(db);
     const org = await createLocalOrg(db, { slug: "default", name: "Default" });
     const alpha = await createProject(db, { orgId: org.id, slug: "alpha", name: "Alpha" });
     const beta = await createProject(db, { orgId: org.id, slug: "beta", name: "Beta" });
@@ -131,8 +131,8 @@ describe("/projects/[id] +page.server.ts", () => {
     expect((result as { form?: unknown }).form).toBeDefined();
     // Re-open the same DB to verify the persisted update.
     const dbDir = join(scratch, "state", "product", "db");
-    const db = await openPglite(join(dbDir, "main"));
-    await runMigrations(db);
+    const db = await openIsolatedStore(join(dbDir, "main"));
+    await migrateIsolatedStore(db);
     try {
       const rows = await db.query<ProjectRow>(
         `SELECT * FROM projects WHERE id = $1`,
@@ -215,8 +215,8 @@ describe("/projects/[id] +page.server.ts", () => {
       expect(caught.location).toBe("/projects");
     }
     const dbDir = join(scratch, "state", "product", "db");
-    const db = await openPglite(join(dbDir, "main"));
-    await runMigrations(db);
+    const db = await openIsolatedStore(join(dbDir, "main"));
+    await migrateIsolatedStore(db);
     try {
       const rows = await db.query<ProjectRow>(
         `SELECT * FROM projects WHERE id = $1`,

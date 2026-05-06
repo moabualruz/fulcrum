@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
-import { CreateTaskBody } from "../../product-kernel/api/schemas.ts";
+import { CreateTaskBody } from "../../test-support/product-fixtures.ts";
 import {
   ListDocumentsInputSchema,
 } from "../schemas/documents.ts";
 import {
   ArtifactIdInputSchema,
   UploadArtifactInputSchema,
-} from "../schemas/artifacts.ts";
+} from "../../test-support/product-fixtures.ts";
 import { ListRunsInputSchema } from "../schemas/runs.ts";
 import { ListMemoriesInputSchema } from "../schemas/memories.ts";
 import {

@@ -6,16 +6,16 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../db/pglite.ts";
-import { runMigrations } from "../db/migrate.ts";
-import { createLocalOrg } from "../store/repositories.ts";
+import { openIsolatedStore } from "../../test-support/product-fixtures.ts";
+import { migrateIsolatedStore } from "../../test-support/product-fixtures.ts";
+import { createLocalOrg } from "../../test-support/product-fixtures.ts";
 import { createNotification, createRule } from "../store/notifications.ts";
-import type { ProductDb } from "../db/types.ts";
+import type { TestStore } from "../../test-support/product-fixtures.ts";
 import { createPublicApi, isPublicApiEnabled } from "./router.ts";
-import { newUlid } from "../ids.ts";
+import { makeId } from "../../test-support/product-fixtures.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-notify-audit-"));
-let db: ProductDb;
+let db: TestStore;
 let orgId: string;
 let apiKey: string;
 
@@ -28,16 +28,16 @@ async function hashKey(key: string): Promise<string> {
 }
 
 beforeAll(async () => {
-  db = await openPglite(join(scratch, "notify-audit-test"));
-  await runMigrations(db);
+  db = await openIsolatedStore(join(scratch, "notify-audit-test"));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "test", name: "Test" });
   orgId = org.id;
 
-  apiKey = "test-api-key-" + newUlid();
+  apiKey = "test-api-key-" + makeId();
   const keyHash = await hashKey(apiKey);
   await db.query(
     `INSERT INTO api_keys (id, org_id, user_id, key_hash, name) VALUES ($1, $2, $3, $4, $5)`,
-    [newUlid(), orgId, "user-1", keyHash, "Test Key"],
+    [makeId(), orgId, "user-1", keyHash, "Test Key"],
   );
 });
 
@@ -93,7 +93,7 @@ describe("GET /notifications", () => {
     await db.query(
       `INSERT INTO notifications (id, org_id, user_id, event_id, rule_id, channel, title, body, read, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, now())`,
-      [newUlid(), orgId, "user-1", "evt-placeholder", "rule-placeholder", "in-app", "Test notif", "Body"],
+      [makeId(), orgId, "user-1", "evt-placeholder", "rule-placeholder", "in-app", "Test notif", "Body"],
     ).catch(() => {
       // event_id and rule_id FK may fail; seed via store if available
     });
@@ -114,7 +114,7 @@ describe("POST /notifications/:id/read", () => {
   test("returns 404 for nonexistent notification", async () => {
     const res = await req(
       "POST",
-      `/notifications/${newUlid()}/read`,
+      `/notifications/${makeId()}/read`,
       undefined,
       authHeaders(),
     );
@@ -206,7 +206,7 @@ describe("PATCH /notifications/rules/:id", () => {
   test("returns 404 for nonexistent rule", async () => {
     const res = await req(
       "PATCH",
-      `/notifications/rules/${newUlid()}`,
+      `/notifications/rules/${makeId()}`,
       { name: "X" },
       authHeaders(),
     );
@@ -240,7 +240,7 @@ describe("DELETE /notifications/rules/:id", () => {
   test("returns 404 for nonexistent rule", async () => {
     const res = await req(
       "DELETE",
-      `/notifications/rules/${newUlid()}`,
+      `/notifications/rules/${makeId()}`,
       undefined,
       authHeaders(),
     );
@@ -280,7 +280,7 @@ describe("POST /notifications/rules/:id/config", () => {
   test("returns 404 for nonexistent rule", async () => {
     const res = await req(
       "POST",
-      `/notifications/rules/${newUlid()}/config`,
+      `/notifications/rules/${makeId()}/config`,
       { url: "https://x.com", secret: "abc" },
       authHeaders(),
     );
@@ -309,7 +309,7 @@ describe("GET /audit", () => {
     await db.query(
       `INSERT INTO events (id, org_id, actor, subject_kind, subject_id, verb, payload, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, now())`,
-      [newUlid(), orgId, "user-1", "task", "t1", "created", "{}"],
+      [makeId(), orgId, "user-1", "task", "t1", "created", "{}"],
     );
 
     const res = await req("GET", "/audit?kind=task", undefined, authHeaders());

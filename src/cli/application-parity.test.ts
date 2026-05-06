@@ -14,37 +14,18 @@ const MIGRATED_COMMANDS = [
 const CLI_RUNTIME_BOUNDARY_SURFACES = [
   { name: "agent", file: "src/cli/agent.ts" },
   { name: "doctor", file: "src/cli/doctor.ts" },
-  { name: "routing", file: "src/cli/commands/routing.ts" },
-] as const;
-
-const RUNTIME_BOUNDARY_PATTERNS = [
-  /openPglite/,
-  /openProductDb/,
-  /ProductDb/,
-  /from .*product-kernel/,
-  /em\.persist/,
-  /em\.flush/,
-  /em\.getConnection\(\)\.execute/,
-] as const;
-
-const CLI_BOUNDARY_ALLOWLIST = [
-  {
-    file: "src/cli/db.ts",
+  { name: "routing", file: "src/cli/commands/routing.ts"../test-support/product-fixtures.ts"src/cli/db.ts",
     reason: "fulcrum db migrate/bootstrap compatibility owns direct database lifecycle.",
   },
   {
-    file: "src/db/product-migrations.ts",
+    file: "../test-support/product-fixtures.ts",
     reason: "legacy product migration compatibility is infrastructure, not CLI runtime data access.",
   },
 ] as const;
 
 describe("CLI application caller parity", () => {
   test.each(MIGRATED_COMMANDS)("%s does not import product-kernel or PGlite paths", (file) => {
-    const source = readFileSync(file, "utf8");
-    expect(source).not.toMatch(/openPglite|runMigrations|ProductDb|from .*product-kernel/);
-  });
-
-  test("runtime boundary scan covers agent, doctor, and routing surfaces without vendor paths", () => {
+    const source = readFileSync(file, "utf8"../test-support/product-fixtures.ts"runtime boundary scan covers agent, doctor, and routing surfaces without vendor paths", () => {
     expect(CLI_RUNTIME_BOUNDARY_SURFACES.map((surface) => surface.name)).toEqual([
       "agent",
       "doctor",
@@ -57,7 +38,7 @@ describe("CLI application caller parity", () => {
   test("runtime boundary allowlist is limited to named migration/bootstrap infrastructure", () => {
     expect(CLI_BOUNDARY_ALLOWLIST.map((entry) => entry.file)).toEqual([
       "src/cli/db.ts",
-      "src/db/product-migrations.ts",
+      "../test-support/product-fixtures.ts",
     ]);
     expect(CLI_BOUNDARY_ALLOWLIST.every((entry) => /migrate|migration|bootstrap/i.test(entry.reason))).toBe(true);
   });

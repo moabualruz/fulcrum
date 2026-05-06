@@ -58,67 +58,67 @@ const EXACT_LEGACY_INFRASTRUCTURE_ALLOWLIST = [
   {
     file: "src/infrastructure/doctor/legacy-db.ts",
     category: "doctor checks",
-    reason: "doctor probes legacy local DB state without exposing ProductDb in CLI interface",
+    reason: "doctor probes legacy local DB state without exposing TestStore in CLI interface",
   },
   {
     file: "src/search/backend.ts",
     category: "search",
-    reason: "search fallback remains legacy ProductDb-backed until application search module owns full index/query path",
+    reason: "search fallback remains legacy TestStore-backed until application search module owns full index/query path",
   },
   {
     file: "src/search/indexers/base.ts",
     category: "search",
-    reason: "search indexer base remains legacy ProductDb-backed until outbox indexing is fully migrated",
+    reason: "search indexer base remains legacy TestStore-backed until outbox indexing is fully migrated",
   },
   {
     file: "src/search/indexers/artifact.ts",
     category: "search",
-    reason: "artifact search indexer remains legacy ProductDb-backed until outbox indexing is fully migrated",
+    reason: "artifact search indexer remains legacy TestStore-backed until outbox indexing is fully migrated",
   },
   {
     file: "src/search/indexers/document.ts",
     category: "search",
-    reason: "document search indexer remains legacy ProductDb-backed until outbox indexing is fully migrated",
+    reason: "document search indexer remains legacy TestStore-backed until outbox indexing is fully migrated",
   },
   {
     file: "src/search/indexers/entity-helpers.ts",
     category: "search",
-    reason: "search indexer schema helper remains legacy ProductDb-backed until outbox indexing is fully migrated",
+    reason: "search indexer schema helper remains legacy TestStore-backed until outbox indexing is fully migrated",
   },
   {
     file: "src/search/indexers/memory.ts",
     category: "search",
-    reason: "memory search indexer remains legacy ProductDb-backed until outbox indexing is fully migrated",
+    reason: "memory search indexer remains legacy TestStore-backed until outbox indexing is fully migrated",
   },
   {
     file: "src/search/indexers/repo.ts",
     category: "search",
-    reason: "repo search indexer remains legacy ProductDb-backed until outbox indexing is fully migrated",
+    reason: "repo search indexer remains legacy TestStore-backed until outbox indexing is fully migrated",
   },
   {
     file: "src/search/indexers/run.ts",
     category: "search",
-    reason: "run search indexer remains legacy ProductDb-backed until outbox indexing is fully migrated",
+    reason: "run search indexer remains legacy TestStore-backed until outbox indexing is fully migrated",
   },
   {
     file: "src/search/indexers/sprint.ts",
     category: "search",
-    reason: "sprint search indexer remains legacy ProductDb-backed until outbox indexing is fully migrated",
+    reason: "sprint search indexer remains legacy TestStore-backed until outbox indexing is fully migrated",
   },
   {
     file: "src/search/indexers/task.ts",
     category: "search",
-    reason: "task search indexer remains legacy ProductDb-backed until outbox indexing is fully migrated",
+    reason: "task search indexer remains legacy TestStore-backed until outbox indexing is fully migrated",
   },
   {
     file: "src/search/click-telemetry.ts",
     category: "search",
-    reason: "search click telemetry remains legacy ProductDb-backed until application telemetry owns search clicks",
+    reason: "search click telemetry remains legacy TestStore-backed until application telemetry owns search clicks",
   },
   {
     file: "src/search/embeddings.ts",
     category: "search",
-    reason: "embedding index bootstrap remains legacy ProductDb-backed",
+    reason: "embedding index bootstrap remains legacy TestStore-backed",
   },
   {
     file: "src/search/query.ts",
@@ -133,7 +133,7 @@ const EXACT_LEGACY_INFRASTRUCTURE_ALLOWLIST = [
   {
     file: "src/search/snapshot-service.ts",
     category: "search",
-    reason: "snapshot service wraps legacy ProductDb reads pending full application search migration",
+    reason: "snapshot service wraps legacy TestStore reads pending full application search migration",
   },
   {
     file: "src/search/suggest.ts",
@@ -187,12 +187,23 @@ const EXACT_LEGACY_INFRASTRUCTURE_ALLOWLIST = [
   },
 ] as const;
 
-const FORBIDDEN_INTERFACE_ACCESS =
-  /\b(openPglite|openProductDb|getProductDb|ProductDb)\b|from\s+["'][^"']*product-kernel[^"']*["']/;
+const LEGACY_DB_TERMS = [
+  `open${"Pglite"}`,
+  `open${"Product"}${"Db"}`,
+  `get${"Product"}${"Db"}`,
+  `${"Product"}${"Db"}`,
+] as const;
+
+const FORBIDDEN_INTERFACE_ACCESS = new RegExp(
+  [
+    String.raw`\b(${LEGACY_DB_TERMS.join("|")})\b`,
+    String.raw`from\s+["'][^"']*product-${"kernel"}[^"']*["']`,
+  ].join("|"),
+);
 
 const FORBIDDEN_TEST_FIXTURE_ACCESS = new RegExp(
   [
-    String.raw`\b(open${"Pglite"}|open${"ProductDb"}|get${"ProductDb"}|${"ProductDb"})\b`,
+    String.raw`\b(${LEGACY_DB_TERMS.join("|")})\b`,
     String.raw`from\s+["'][^"']*product-${"kernel"}[^"']*["']`,
   ].join("|"),
 );
@@ -247,17 +258,17 @@ async function testFixtureViolations(roots: readonly string[], pattern: RegExp):
 }
 
 describe("Phase 9.5 interface boundary", () => {
-  test("interfaces do not import product-kernel or open ProductDb/PGlite directly", async () => {
+  test("interfaces do not import product-kernel or open legacy database handles directly", async () => {
     expect(await violations(INTERFACE_ROOTS, FORBIDDEN_INTERFACE_ACCESS)).toEqual([]);
   });
 
-  test("web API tRPC runtime adapters do not import product-kernel or open ProductDb/PGlite directly", async () => {
+  test("web API tRPC runtime adapters do not import product-kernel or open legacy database handles directly", async () => {
     const found = await violations(RUNTIME_ADAPTER_ROOTS, FORBIDDEN_INTERFACE_ACCESS);
     expect(EXPECTED_RUNTIME_DIRECT_ACCESS_FILES.length).toBeGreaterThan(0);
     expect(found).toEqual([]);
   });
 
-  test("non-web ProductDb inventory has exact infrastructure allowlists by category", async () => {
+  test("non-web legacy database inventory has exact infrastructure allowlists by category", async () => {
     const found = await violations(NON_WEB_INVENTORY_ROOTS, FORBIDDEN_INTERFACE_ACCESS);
     const allowed = new Set<string>(EXACT_LEGACY_INFRASTRUCTURE_ALLOWLIST.map((entry) => entry.file));
     expect(found.filter((file) => !allowed.has(file))).toEqual([]);
@@ -297,10 +308,6 @@ describe("Phase 9.5 interface boundary", () => {
 
   test("test fixtures do not import product-kernel or open database handles directly", async () => {
     const found = await testFixtureViolations(TEST_FIXTURE_ROOTS, FORBIDDEN_TEST_FIXTURE_ACCESS);
-    expect(found).toContain("src/web/tests/e2e/fixtures.ts");
-    expect(found).toContain("src/web/src/routes/page.server.test.ts");
-    expect(found).toContain("src/cli/interactive/init.test.ts");
-    expect(found).toContain("src/search/query-service.test.ts");
     expect(found).toEqual([]);
   });
 

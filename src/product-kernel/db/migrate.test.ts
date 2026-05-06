@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "./pglite.ts";
-import { runMigrations } from "./migrate.ts";
+import { openIsolatedStore } from "./pglite.ts";
+import { migrateIsolatedStore } from "./migrate.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-migrate-"));
 
@@ -29,7 +29,7 @@ const REQUIRED_TABLES = [
 ] as const;
 
 async function tableExists(
-  db: Awaited<ReturnType<typeof openPglite>>,
+  db: Awaited<ReturnType<typeof openIsolatedStore>>,
   name: string,
 ): Promise<boolean> {
   const rows = await db.query<{ count: number }>(
@@ -41,9 +41,9 @@ async function tableExists(
 
 describe("product kernel migrations", () => {
   test("creates the required tables on a fresh database", async () => {
-    const db = await openPglite(join(scratch, "fresh"));
+    const db = await openIsolatedStore(join(scratch, "fresh"));
     try {
-      const applied = await runMigrations(db);
+      const applied = await migrateIsolatedStore(db);
       expect(applied.length).toBeGreaterThanOrEqual(4);
       for (const name of REQUIRED_TABLES) {
         expect(await tableExists(db, name)).toBe(true);
@@ -54,10 +54,10 @@ describe("product kernel migrations", () => {
   });
 
   test("is idempotent on re-run", async () => {
-    const db = await openPglite(join(scratch, "idem"));
+    const db = await openIsolatedStore(join(scratch, "idem"));
     try {
-      await runMigrations(db);
-      const second = await runMigrations(db);
+      await migrateIsolatedStore(db);
+      const second = await migrateIsolatedStore(db);
       expect(second).toEqual([]);
       for (const name of REQUIRED_TABLES) {
         expect(await tableExists(db, name)).toBe(true);
@@ -68,9 +68,9 @@ describe("product kernel migrations", () => {
   });
 
   test("populates search_documents.search_vector via the generated tsvector column", async () => {
-    const db = await openPglite(join(scratch, "fts"));
+    const db = await openIsolatedStore(join(scratch, "fts"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       await db.query(
         `INSERT INTO search_documents (id, org_id, source_kind, source_id, title, body)
          VALUES ($1, $2, $3, $4, $5, $6)`,

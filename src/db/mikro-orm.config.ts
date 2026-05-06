@@ -36,6 +36,7 @@ import { TenantSetting } from "./entities/TenantSetting.ts";
 // Tenant-scoped stub entities (P1#03 — composite index decorators land here so
 // later pillars never need a base-table migration).
 import { Task } from "./entities/tasks/Task.ts";
+import { Project } from "./entities/tasks/Project.ts";
 import { TaskStatus } from "./entities/tasks/TaskStatus.ts";
 import { Sprint } from "./entities/tasks/Sprint.ts";
 import { MetricsCache } from "./entities/tasks/MetricsCache.ts";
@@ -107,6 +108,7 @@ export {
   Event,
   TenantSetting,
   Task,
+  Project,
   TaskStatus,
   Sprint,
   MetricsCache,
@@ -212,6 +214,7 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     Event,
     TenantSetting,
     Task,
+    Project,
     TaskStatus,
     Sprint,
     MetricsCache,
