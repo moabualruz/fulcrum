@@ -60,6 +60,17 @@ describe("vault-adapter (flag OFF)", () => {
     expect(p).toBeInstanceOf(LocalNaclProvider);
     if (orig !== undefined) process.env["FULCRUM_FEATURES"] = orig;
   });
+
+  it("resolveProvider ignores 'aws-sm' credential when flag OFF and falls back to LocalNaclProvider", async () => {
+    const orig = process.env["FULCRUM_FEATURES"];
+    delete process.env["FULCRUM_FEATURES"];
+    const { resolveProvider, LocalNaclProvider } = await import(
+      "../../src/secrets/vault-adapter.ts"
+    );
+    const p = resolveProvider("aws-sm", { stateDir, native: null });
+    expect(p).toBeInstanceOf(LocalNaclProvider);
+    if (orig !== undefined) process.env["FULCRUM_FEATURES"] = orig;
+  });
 });
 
 // --- Flag ON (Vault) ----------------------------------------------------------

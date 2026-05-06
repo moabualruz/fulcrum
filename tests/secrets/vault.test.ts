@@ -20,6 +20,8 @@ import {
   NONCE_BYTES,
   KEY_BYTES,
   ALGO_LABEL,
+  KDF_ITERATIONS,
+  KDF_LABEL,
 } from "../../src/secrets/vault.ts";
 
 const TEST_KEY = new Uint8Array(KEY_BYTES).map((_, i) => i + 1);
@@ -75,6 +77,11 @@ describe("vault encrypt/decrypt", () => {
 });
 
 describe("vault deriveKey (KDF)", () => {
+  it("uses pbkdf2-sha256 with 100k iterations as the persisted KDF label", () => {
+    expect(KDF_LABEL).toBe("pbkdf2-sha256");
+    expect(KDF_ITERATIONS).toBe(100_000);
+  });
+
   it("derives 32-byte key from password+salt", async () => {
     const salt = new Uint8Array(16).fill(7);
     const key = await deriveKey("password123", salt);
