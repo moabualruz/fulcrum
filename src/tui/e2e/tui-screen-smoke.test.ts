@@ -18,6 +18,10 @@ const E2E_SPECS = [
   "src/tui/e2e/tui-data-display.test.ts",
 ] as const;
 
+const TUI_RUNTIME_BOUNDARY_SURFACES = [
+  { key: "tui telemetry", file: "src/tui/telemetry.ts" },
+] as const;
+
 describe("TUI screen application caller smoke", () => {
   test("enumerates all required screens", () => {
     expect(SCREEN_SPECS.map((screen) => screen.key)).toEqual([
@@ -42,4 +46,19 @@ describe("TUI screen application caller smoke", () => {
     const source = readFileSync(file, "utf8");
     expect(source).not.toMatch(/product-kernel|openPglite|openProductDb|PGlite/);
   });
+
+  test("runtime boundary scan names tui telemetry surface without vendor paths", () => {
+    expect(TUI_RUNTIME_BOUNDARY_SURFACES.map((surface) => surface.key)).toEqual(["tui telemetry"]);
+    expect(TUI_RUNTIME_BOUNDARY_SURFACES.every((surface) => surface.file.startsWith("src/tui/"))).toBe(true);
+    expect(TUI_RUNTIME_BOUNDARY_SURFACES.some((surface) => surface.file.includes("vendor/"))).toBe(false);
+  });
+
+  test.each(TUI_RUNTIME_BOUNDARY_SURFACES)(
+    "$key does not persist directly through EntityManager",
+    ({ file }) => {
+      const source = readFileSync(file, "utf8");
+      expect(source).not.toMatch(/from .*product-kernel|openPglite|openProductDb|ProductDb/);
+      expect(source).not.toMatch(/em\.(persist|flush)/);
+    },
+  );
 });
