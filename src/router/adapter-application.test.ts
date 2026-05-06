@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
 
 import { AppConflictError, AppValidationError } from "../application/errors.ts";
@@ -9,6 +9,21 @@ const ORG_ID = "00000000-0000-4000-8000-000000000001";
 const TASK_ID = "00000000-0000-4000-8000-000000000002";
 
 describe("router adapters delegate to application operations", () => {
+  afterEach(async () => {
+    const [
+      { configureConflictDetector },
+      { configureNoMatchPrompt },
+      { configureRoutingTelemetry },
+    ] = await Promise.all([
+      import("./conflict-detector.ts"),
+      import("./no-match-prompt.ts"),
+      import("./telemetry.ts"),
+    ]);
+    configureConflictDetector({ routingRuleRepository: null });
+    configureNoMatchPrompt({ routingRuleRepository: null });
+    configureRoutingTelemetry({ eventRepository: null });
+  });
+
   test("recordRoutingEvent calls application telemetry command", async () => {
     const { configureRoutingTelemetry, recordRoutingEvent } = await import("./telemetry.ts");
     const command = mock(async () => {});

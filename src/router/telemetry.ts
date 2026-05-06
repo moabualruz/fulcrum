@@ -1,17 +1,21 @@
-import { Event } from "../db/entities/core/Event.ts";
-import { Org } from "../db/entities/auth/Org.ts";
 import type { EventRepository } from "../db/repositories/core/EventRepository.ts";
-import { ROUTING_EVENT_VERB, RoutingEventPayloadSchema } from "./routing-event-payload.ts";
+import {
+  routingApplication,
+  type RoutingApplication,
+} from "../application/routing.ts";
 import type { RoutingDecision } from "./types.ts";
 
 interface RoutingTelemetryConfig {
   eventRepository?: EventRepository | null;
+  application?: Pick<RoutingApplication, "recordRoutingEvent"> | null;
 }
 
 let eventRepository: EventRepository | null = null;
+let application: Pick<RoutingApplication, "recordRoutingEvent"> = routingApplication;
 
 export function configureRoutingTelemetry(config: RoutingTelemetryConfig): void {
   eventRepository = config.eventRepository ?? null;
+  application = config.application ?? routingApplication;
 }
 
 export async function recordRoutingEvent(
@@ -20,27 +24,11 @@ export async function recordRoutingEvent(
   orgId: string,
   dryRun: boolean,
 ): Promise<void> {
-  if (dryRun) return;
-  if (!eventRepository) {
-    throw new Error("routing telemetry event repository is not configured");
-  }
-
-  const payload = RoutingEventPayloadSchema.parse({
-    rule_id: decision.ruleId,
-    source: decision.source,
-    agent: decision.agent,
-    confidence: decision.confidence,
+  await application.recordRoutingEvent({
+    decision,
+    taskId,
+    orgId,
+    dryRun,
+    eventRepository,
   });
-
-  const em = eventRepository.getEntityManager();
-  const event = eventRepository.create({
-    org: em.getReference(Org, orgId),
-    verb: ROUTING_EVENT_VERB,
-    subjectKind: "task",
-    subjectId: taskId,
-    payload,
-  } as never);
-
-  em.persist(event as Event);
-  await em.flush();
 }

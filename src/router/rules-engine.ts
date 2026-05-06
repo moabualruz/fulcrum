@@ -1,13 +1,8 @@
-import { mkdir } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { Engine, type TopLevelCondition } from "json-rules-engine";
-import { MikroORM } from "@mikro-orm/postgresql";
-import { PGlite } from "@electric-sql/pglite";
 
-import { createOrmConfig, RoutingRule } from "../db/mikro-orm.config.ts";
 import type { RoutingRule as RoutingRuleEntity } from "../db/entities/router/RoutingRule.ts";
 import type { RoutingRuleRepository } from "../db/repositories/router/RoutingRuleRepository.ts";
+import { initDefaultRoutingRuleRepository } from "../application/routing.ts";
 import type { TaskFacts } from "./types.ts";
 import { RoutingEventBus, routingEventBus } from "./event-bus.ts";
 
@@ -236,13 +231,4 @@ async function initDefaultRulesEngine(): Promise<RulesEngine> {
   engine.initialize();
   defaultEngine = engine;
   return engine;
-}
-
-async function initDefaultRoutingRuleRepository(): Promise<RoutingRuleRepository> {
-  const dbDir = join(process.env["FULCRUM_HOME"] ?? join(homedir(), ".fulcrum"), "db");
-  await mkdir(dbDir, { recursive: true });
-  const pglite = new PGlite(join(dbDir, "main"));
-  await pglite.waitReady;
-  const orm = await MikroORM.init(createOrmConfig({ pglite, debug: false }));
-  return orm.em.fork().getRepository(RoutingRule) as RoutingRuleRepository;
 }
