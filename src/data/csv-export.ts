@@ -2,7 +2,19 @@
 // Streams rows for large exports; column headers match TaskRow field names.
 
 import { createWriteStream } from "node:fs";
-import type { TaskRow } from "../product-kernel/store/repositories.ts";
+
+export interface TaskCsvRow {
+  id: string;
+  org_id: string;
+  project_id: string | null;
+  parent_id: string | null;
+  title: string;
+  description: string | null;
+  status: string | null;
+  priority: number | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface ExportResult {
   path: string;
@@ -10,7 +22,7 @@ export interface ExportResult {
 }
 
 /** CSV field order for task entities. */
-const TASK_COLUMNS: (keyof TaskRow)[] = [
+const TASK_COLUMNS: (keyof TaskCsvRow)[] = [
   "id",
   "org_id",
   "project_id",
@@ -36,7 +48,7 @@ function escapeCell(v: unknown): string {
 
 /** Serialize an array of TaskRow objects to a CSV file at `outPath`. */
 export async function exportTasksToCsv(
-  tasks: TaskRow[],
+  tasks: TaskCsvRow[],
   outPath: string,
 ): Promise<ExportResult> {
   const stream = createWriteStream(outPath, { encoding: "utf8" });

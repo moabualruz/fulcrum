@@ -1,4 +1,5 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
+import { Event } from "../../db/entities/core/Event.ts";
 import { Notification } from "../../db/entities/notifications/Notification.ts";
 import { AppForbiddenError, AppNotFoundError } from "../errors.ts";
 import type { AppContext, NotificationDto } from "./types.ts";
@@ -6,6 +7,17 @@ import type { AppContext, NotificationDto } from "./types.ts";
 export async function listNotifications(em: EntityManager, ctx: AppContext, input: { unread?: boolean } = {}): Promise<NotificationDto[]> {
   const rows = await em.find(Notification, { org: ctx.orgId, userId: ctx.userId, ...(input.unread ? { readAt: null } : {}) } as never, { orderBy: { createdAt: "DESC", id: "ASC" } });
   return rows.map(serializeNotification);
+}
+
+export async function countRecentNotifications(
+  em: EntityManager,
+  ctx: AppContext,
+  input: { since: Date },
+): Promise<number> {
+  return await em.count(Event, {
+    org: ctx.orgId,
+    createdAt: { $gte: input.since },
+  } as never);
 }
 
 export async function getNotification(em: EntityManager, ctx: AppContext, id: string): Promise<NotificationDto> {

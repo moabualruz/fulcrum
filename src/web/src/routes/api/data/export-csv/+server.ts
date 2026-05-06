@@ -5,10 +5,10 @@ import type { RequestHandler } from "@sveltejs/kit";
 import { join } from "node:path";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { openProductDb } from "$lib/server/db";
+import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
 import { isFeatureEnabled } from "../../../../../../data/features.ts";
 import { exportTasksToCsv } from "../../../../../../data/csv-export.ts";
-import type { TaskRow } from "../../../../../../product-kernel/store/repositories.ts";
+import { listTasks } from "../../../../../../application/tasks/queries.ts";
 
 function jsonError(msg: string, status = 400): Response {
   return new Response(JSON.stringify({ error: msg }), {
@@ -27,9 +27,22 @@ export const GET: RequestHandler = async ({ url }) => {
     return jsonError(`Unknown entity: ${entity}`);
   }
 
-  const db = await openProductDb();
-  const rows = await db.query<TaskRow>(`SELECT * FROM tasks ORDER BY created_at`);
-  await db.close();
+  const em = await getEm();
+  const orgId = await getDefaultOrgIdOrm(em);
+  const rows = (await listTasks(em, { orgId, userId: null }, {}))
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id))
+    .map((task) => ({
+      id: task.id,
+      org_id: task.orgId,
+      project_id: task.projectId,
+      parent_id: task.parentId,
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      priority: task.priority,
+      created_at: task.createdAt.toISOString(),
+      updated_at: task.updatedAt.toISOString(),
+    }));
 
   // Write to tmp file then stream back
   const dir = await mkdtemp(join(tmpdir(), "fulcrum-export-"));

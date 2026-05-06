@@ -1,32 +1,13 @@
 import type { ServerLoad, Actions } from "@sveltejs/kit";
-import { openProductDb } from "$lib/server/db";
-import { searchProductDocuments } from "../../../../product-kernel/search.ts";
-import type { SearchHit } from "../../../../product-kernel/search";
-import { newUlid } from "../../../../product-kernel/ids.ts";
+import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
+import {
+  listSavedSearches,
+  saveSearch,
+  searchDocuments,
+} from "../../../../application/search/queries.ts";
+import type { SavedSearch, SearchHit, SearchParams } from "../../../../application/search/types.ts";
 
-type ProductDb = Awaited<ReturnType<typeof openProductDb>>;
 type GroupedSearchHits = Record<string, SearchHit[]>;
-
-export interface SavedSearch {
-  id: string;
-  name: string;
-  params: SearchParams;
-}
-
-export interface SearchParams {
-  q: string;
-  kinds: string[];
-  dateFrom: string;
-  dateTo: string;
-}
-
-async function defaultOrgId(db: ProductDb): Promise<string | null> {
-  const rows = await db.query<{ id: string }>(
-    `SELECT id FROM orgs WHERE slug = $1`,
-    ["default"],
-  );
-  return rows[0]?.id ?? null;
-}
 
 function groupBySourceKind(hits: SearchHit[]): GroupedSearchHits {
   const grouped: GroupedSearchHits = {};
@@ -37,24 +18,6 @@ function groupBySourceKind(hits: SearchHit[]): GroupedSearchHits {
   return grouped;
 }
 
-async function listSavedSearches(
-  db: ProductDb,
-  orgId: string,
-  owner: string,
-): Promise<SavedSearch[]> {
-  const rows = await db.query<{ id: string; name: string; params: unknown }>(
-    `SELECT id, name, params FROM saved_searches
-      WHERE org_id = $1 AND owner = $2
-      ORDER BY created_at DESC`,
-    [orgId, owner],
-  );
-  return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    params: (typeof r.params === "string" ? JSON.parse(r.params) : r.params) as SearchParams,
-  }));
-}
-
 export const load: ServerLoad = async ({ url }) => {
   const q = (url.searchParams.get("q") ?? "").trim();
   const kindsParam = url.searchParams.get("kinds") ?? "";
@@ -62,38 +25,38 @@ export const load: ServerLoad = async ({ url }) => {
   const dateFrom = (url.searchParams.get("date_from") ?? "").trim();
   const dateTo = (url.searchParams.get("date_to") ?? "").trim();
 
-  const db = await openProductDb();
+  const em = await getEm();
+  let orgId: string;
   try {
-    const orgId = await defaultOrgId(db);
-    if (!orgId) return { q, kinds, dateFrom, dateTo, hits: [], grouped: {}, savedSearches: [] };
-
-    const savedSearches = await listSavedSearches(db, orgId, "local");
-
-    if (q.length === 0) {
-      return { q, kinds, dateFrom, dateTo, hits: [], grouped: {}, savedSearches };
-    }
-
-    const filters: import("../../../../product-kernel/search").SearchFilters = {
-      orgId,
-      limit: 50,
-      ...(kinds.length > 0 ? { sourceKinds: kinds } : {}),
-    };
-
-    let hits = await searchProductDocuments(db, q, filters);
-
-    // Apply date range filter in memory (updated_at is an ISO string)
-    if (dateFrom) {
-      hits = hits.filter((h) => h.updated_at >= dateFrom);
-    }
-    if (dateTo) {
-      const ceiling = dateTo.length === 10 ? `${dateTo}T23:59:59` : dateTo;
-      hits = hits.filter((h) => h.updated_at <= ceiling);
-    }
-
-    return { q, kinds, dateFrom, dateTo, hits, grouped: groupBySourceKind(hits), savedSearches };
-  } finally {
-    await db.close();
+    orgId = await getDefaultOrgIdOrm(em);
+  } catch {
+    return { q, kinds, dateFrom, dateTo, hits: [], grouped: {}, savedSearches: [] };
   }
+
+  const savedSearches: SavedSearch[] = await listSavedSearches(em, { orgId, userId: "local" }, "local");
+
+  if (q.length === 0) {
+    return { q, kinds, dateFrom, dateTo, hits: [], grouped: {}, savedSearches };
+  }
+
+  const filters = {
+    orgId,
+    limit: 50,
+    ...(kinds.length > 0 ? { sourceKinds: kinds } : {}),
+  };
+
+  let hits = await searchDocuments(em, q, filters);
+
+  // Apply date range filter in memory (updated_at is an ISO string)
+  if (dateFrom) {
+    hits = hits.filter((h) => h.updated_at >= dateFrom);
+  }
+  if (dateTo) {
+    const ceiling = dateTo.length === 10 ? `${dateTo}T23:59:59` : dateTo;
+    hits = hits.filter((h) => h.updated_at <= ceiling);
+  }
+
+  return { q, kinds, dateFrom, dateTo, hits, grouped: groupBySourceKind(hits), savedSearches };
 };
 
 export const actions: Actions = {
@@ -107,23 +70,15 @@ export const actions: Actions = {
 
     if (!name) return { error: "name required" };
 
-    const db = await openProductDb();
+    const em = await getEm();
     try {
-      const rows = await db.query<{ id: string }>(`SELECT id FROM orgs WHERE slug = $1`, ["default"]);
-      const orgId = rows[0]?.id;
-      if (!orgId) return { error: "no org" };
+      const orgId = await getDefaultOrgIdOrm(em);
 
-      const id = newUlid();
-      const params = JSON.stringify({ q, kinds: kinds ? kinds.split(",") : [], dateFrom, dateTo });
-      await db.query(
-        `INSERT INTO saved_searches (id, org_id, owner, name, params)
-         VALUES ($1, $2, $3, $4, $5::jsonb)
-         ON CONFLICT (org_id, owner, name) DO UPDATE SET params = EXCLUDED.params`,
-        [id, orgId, "local", name, params],
-      );
+      const params: SearchParams = { q, kinds: kinds ? kinds.split(",") : [], dateFrom, dateTo };
+      await saveSearch(em, { orgId, userId: "local" }, { owner: "local", name, params });
       return { saved: true };
-    } finally {
-      await db.close();
+    } catch {
+      return { error: "no org" };
     }
   },
 };

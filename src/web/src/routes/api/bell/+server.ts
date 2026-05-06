@@ -1,20 +1,13 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
+import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
+import { countRecentNotifications } from "../../../../../application/notifications/queries.ts";
 
 /** GET /api/bell — returns { count: number } of events in the last 24h. */
-export const GET: RequestHandler = async () => {
-  const db = await openProductDb();
-  try {
-    const orgId = await getDefaultOrgId(db);
-    const rows = await db.query<{ c: string | number }>(
-      `SELECT count(*)::text AS c FROM events
-         WHERE org_id = $1 AND created_at >= now() - interval '24 hours'`,
-      [orgId],
-    );
-    const count = typeof rows[0]?.c === "number" ? rows[0].c : Number.parseInt(String(rows[0]?.c ?? "0"), 10);
-    return json({ count });
-  } finally {
-    await db.close();
-  }
+export const GET: RequestHandler = async ({ locals }) => {
+  const em = await getEm();
+  const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const count = await countRecentNotifications(em, { orgId, userId: null }, { since });
+  return json({ count });
 };

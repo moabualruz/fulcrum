@@ -6,10 +6,10 @@ import type { RequestHandler } from "@sveltejs/kit";
 import { join } from "node:path";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { getDefaultOrgId, openProductDb } from "$lib/server/db";
+import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
 import { isFeatureEnabled } from "../../../../../../data/features.ts";
 import { importCsv } from "../../../../../../data/csv-import.ts";
-import { createTask } from "../../../../../../product-kernel/store/repositories.ts";
+import { createTask } from "../../../../../../application/tasks/commands.ts";
 
 function jsonError(msg: string, status = 400): Response {
   return new Response(JSON.stringify({ error: msg }), {
@@ -62,23 +62,18 @@ export const POST: RequestHandler = async ({ request }) => {
       return jsonError((err as Error).message);
     }
 
-    const db = await openProductDb();
-    const orgId = await getDefaultOrgId(db);
+    const em = await getEm();
+    const orgId = await getDefaultOrgIdOrm(em);
 
     let written = 0;
-    try {
-      for (const record of parsed.records) {
-        await createTask(db, {
-          orgId,
-          title: record["title"] as string,
-          status: record["status"] ?? "pending",
-          description: record["description"] ?? null,
-          priority: record["priority"] ? Number(record["priority"]) : 0,
-        });
-        written++;
-      }
-    } finally {
-      await db.close();
+    for (const record of parsed.records) {
+      await createTask(em, { orgId, userId: null }, {
+        title: record["title"] as string,
+        status: record["status"] ?? "pending",
+        description: record["description"] ?? null,
+        priority: record["priority"] ? Number(record["priority"]) : 0,
+      });
+      written++;
     }
 
     await rm(dir, { recursive: true, force: true });

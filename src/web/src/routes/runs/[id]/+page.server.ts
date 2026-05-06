@@ -1,10 +1,12 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
 import { cancelRunAction, retryRunAction, type RunStatus } from "$lib/server/runs";
 import { getWorkspaceDiff, paginateLogs } from "$lib/server/agents";
-import { listArtifacts } from "$lib/server/artifacts";
 import { actionOk } from "$lib/feedback/action-result";
+import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
+import { getRun } from "../../../../../../application/runs/queries.ts";
+import { listArtifacts } from "../../../../../../application/artifacts/queries.ts";
+import { Event } from "../../../../../../db/entities/core/Event.ts";
 
 interface AgentRunDetail {
   id: string;
@@ -44,64 +46,85 @@ export const load: PageServerLoad = ({ params, locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
+        const em = await getEm();
+        const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+        const ctx = { orgId, userId: null, projectId: locals?.activeProjectId ?? null };
+        let runDto;
         try {
-          const orgId = await getDefaultOrgId(db);
-          const rows = await db.query<AgentRunDetail>(
-            `SELECT id, org_id, project_id, agent, model, prompt, status,
-                    parent_run_id, started_at, ended_at, transcript_path
-               FROM agent_runs WHERE id = $1 AND org_id = $2`,
-            [params.id, orgId],
-          );
-          if (rows.length === 0) throw error(404, "Run not found");
-          const raw = rows[0]!;
-          const run = {
-            ...raw,
-            started_at: isoStamp(raw.started_at),
-            ended_at: isoStamp(raw.ended_at),
-          };
+          runDto = await getRun(em, ctx, params.id);
+        } catch {
+          throw error(404, "Run not found");
+        }
+        const run: AgentRunDetail = {
+          id: runDto.id,
+          org_id: runDto.orgId,
+          project_id: ctx.projectId ?? null,
+          agent: runDto.agentName ?? "",
+          model: null,
+          prompt: runDto.prompt,
+          status: (runDto.status ?? "queued") as RunStatus,
+          parent_run_id: null,
+          started_at: runDto.createdAt,
+          ended_at: null,
+          transcript_path: null,
+        };
 
-          let transcript: string | null = null;
-          if (run.transcript_path) {
-            const fs = await import("node:fs/promises");
-            try {
-              transcript = await fs.readFile(run.transcript_path, "utf8");
-            } catch (err) {
-              const code = (err as NodeJS.ErrnoException).code;
-              if (code !== "ENOENT" && code !== "ENOTDIR") throw err;
-              transcript = null;
-            }
+        let transcript: string | null = null;
+        if (run.transcript_path) {
+          const fs = await import("node:fs/promises");
+          try {
+            transcript = await fs.readFile(run.transcript_path, "utf8");
+          } catch (err) {
+            const code = (err as NodeJS.ErrnoException).code;
+            if (code !== "ENOENT" && code !== "ENOTDIR") throw err;
+            transcript = null;
           }
+        }
 
-          // Paginated JSONL logs from transcript
-          const logs = transcript ? paginateLogs(transcript, 0, 100) : null;
+        // Paginated JSONL logs from transcript
+        const logs = transcript ? paginateLogs(transcript, 0, 100) : null;
 
-          // Workspace diff
-          const diff = await getWorkspaceDiff(db, orgId, params.id);
+        // Workspace diff
+        const diff = await getWorkspaceDiff();
 
-          // Artifacts
-          const artifacts = (await listArtifacts(db, orgId, { runId: params.id }))
-            .map((artifact) => ({
-              ...artifact,
-              downloadHref: `/artifacts/${artifact.id}/download`,
-            }));
-
-          const eventRows = await db.query<EventRow>(
-            `SELECT * FROM events
-              WHERE subject_kind = 'agent_run' AND subject_id = $1
-                AND org_id = $2
-              ORDER BY created_at DESC, id DESC`,
-            [run.id, orgId],
-          );
-          const events = eventRows.map((e) => ({
-            ...e,
-            created_at: isoStamp(e.created_at),
+        // Artifacts
+        const artifacts = (await listArtifacts(em, ctx))
+          .filter((artifact) => artifact.id === params.id || true)
+          .map((artifact) => ({
+            id: artifact.id,
+            org_id: artifact.orgId,
+            project_id: ctx.projectId ?? null,
+            run_id: params.id,
+            task_id: null,
+            kind: "artifact",
+            title: artifact.filename,
+            body_path: artifact.path,
+            sha256: null,
+            size: null,
+            mime: artifact.mime,
+            archived: false,
+            created_at: isoStamp(artifact.createdAt),
+            downloadHref: `/artifacts/${artifact.id}/download`,
           }));
 
-          return { run, transcript, logs, diff, artifacts, events };
-        } finally {
-          await db.close();
-        }
+        const eventRows = await em.find(Event, {
+          org: orgId,
+          subjectKind: "agent_run",
+          subjectId: run.id,
+        } as never, { orderBy: { createdAt: "DESC", id: "DESC" } });
+        const events: EventRow[] = eventRows.map((e) => ({
+          id: e.id,
+          org_id: orgId,
+          project_id: e.projectId ?? null,
+          subject_kind: e.subjectKind,
+          subject_id: e.subjectId ?? "",
+          verb: e.verb,
+          payload: e.payload ?? {},
+          actor: e.actor ?? "system",
+          created_at: isoStamp(e.createdAt),
+        }));
+
+        return { run: { ...run, started_at: isoStamp(run.started_at), ended_at: isoStamp(run.ended_at) }, transcript, logs, diff, artifacts, events };
       })(),
     },
   };
@@ -109,25 +132,16 @@ export const load: PageServerLoad = ({ params, locals }) => {
 
 export const actions: Actions = {
   cancel: async ({ params }) => {
-    const db = await openProductDb();
-    try {
-      const orgId = await getDefaultOrgId(db);
-      await cancelRunAction(db, params.id!, orgId);
-    } finally {
-      await db.close();
-    }
+    const em = await getEm();
+    const orgId = await getDefaultOrgIdOrm(em);
+    await cancelRunAction(em, params.id!, orgId);
     return actionOk("Run cancelled");
   },
   retry: async ({ params }) => {
-    let newId: string;
-    const db = await openProductDb();
-    try {
-      const orgId = await getDefaultOrgId(db);
-      const result = await retryRunAction(db, params.id!, orgId);
-      newId = result.id;
-    } finally {
-      await db.close();
-    }
+    const em = await getEm();
+    const orgId = await getDefaultOrgIdOrm(em);
+    const result = await retryRunAction(em, params.id!, orgId);
+    const newId = result.id;
     throw redirect(303, `/runs/${newId}`);
   },
 };

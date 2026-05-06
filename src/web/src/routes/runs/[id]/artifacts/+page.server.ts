@@ -1,6 +1,6 @@
 import type { PageServerLoad } from "./$types";
-import { openProductDb, getDefaultOrgId } from "$lib/server/db";
-import { listArtifacts, type ArtifactRow } from "$lib/server/artifacts";
+import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
+import { listArtifacts } from "../../../../../../../application/artifacts/queries.ts";
 
 export const load: PageServerLoad = ({ params, locals }) => {
   const runId = params.id;
@@ -10,14 +10,25 @@ export const load: PageServerLoad = ({ params, locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const db = await openProductDb();
-        try {
-          const orgId = await getDefaultOrgId(db);
-          const artifacts = await listArtifacts(db, orgId, { runId });
-          return { artifacts };
-        } finally {
-          await db.close();
-        }
+        const em = await getEm();
+        const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+        const artifacts = (await listArtifacts(em, { orgId, userId: null, projectId: locals?.activeProjectId ?? null }))
+          .map((artifact) => ({
+            id: artifact.id,
+            org_id: artifact.orgId,
+            project_id: locals?.activeProjectId ?? null,
+            run_id: runId,
+            task_id: null,
+            kind: "artifact",
+            title: artifact.filename,
+            body_path: artifact.path,
+            sha256: null,
+            size: null,
+            mime: artifact.mime,
+            archived: false,
+            created_at: artifact.createdAt.toISOString(),
+          }));
+        return { artifacts };
       })(),
     },
   };
