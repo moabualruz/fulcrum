@@ -3,6 +3,10 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
+vi.mock("$app/navigation", () => ({
+  goto: vi.fn(),
+}));
+
 import CommandPalette from "../../src/lib/components/command-palette/CommandPalette.svelte";
 import type { CommandItem } from "../../src/lib/components/command-palette/command-palette-filter";
 import { ALL_COMMANDS } from "../../src/lib/components/command-palette/navigation-commands";
@@ -12,13 +16,17 @@ const ITEMS: CommandItem[] = [
   { id: "doc-1", label: "Open runbook", href: "/docs/doc-1" },
 ];
 
+const domTest = typeof document === "undefined" ? test.skip : test;
+
 afterEach(() => {
   vi.useRealTimers();
-  document.body.innerHTML = "";
+  if (typeof document !== "undefined") {
+    document.body.innerHTML = "";
+  }
 });
 
 describe("CmdK palette web component", () => {
-  test("renders closed and open states from parent control", async () => {
+  domTest("renders closed and open states from parent control", async () => {
     let open = false;
     const { container, queryByLabelText, rerender } = render(CommandPalette, {
       props: {
@@ -40,7 +48,7 @@ describe("CmdK palette web component", () => {
     expect(queryByLabelText("Command search")).toBeTruthy();
   });
 
-  test("filters built-in command sections by query", async () => {
+  domTest("filters built-in command sections by query", async () => {
     const { getByLabelText, queryByText, getByText } = render(CommandPalette, {
       props: {
         open: true,
@@ -57,7 +65,7 @@ describe("CmdK palette web component", () => {
     expect(queryByText("Go to Projects")).toBeNull();
   });
 
-  test("Enter selects the top legacy item through fallback handler", async () => {
+  domTest("Enter selects the top legacy item through fallback handler", async () => {
     const selected: CommandItem[] = [];
     let open = true;
 
@@ -80,7 +88,7 @@ describe("CmdK palette web component", () => {
     expect(open).toBe(false);
   });
 
-  test("2+ character query enters search mode and shows empty state when index is unavailable", async () => {
+  domTest("2+ character query enters search mode and shows empty state when index is unavailable", async () => {
     const { getByLabelText, getByText } = render(CommandPalette, {
       props: {
         open: true,
@@ -101,7 +109,7 @@ describe("CmdK palette web component", () => {
     const webRoot = join(import.meta.dir, "../../src/routes");
     const hrefs = ALL_COMMANDS.flatMap((command) => {
       const source = command.action?.toString() ?? "";
-      const match = source.match(/goto\("([^"]+)"\)/);
+      const match = source.match(/(?:goto|navigate)\("([^"]+)"\)/);
       return match ? [match[1]] : [];
     });
 

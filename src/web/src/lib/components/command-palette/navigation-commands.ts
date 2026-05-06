@@ -5,8 +5,6 @@
  * Bulk commands require items in selectedTaskIds store to appear.
  */
 
-import { goto } from "$app/navigation";
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface PaletteCommand {
@@ -19,6 +17,11 @@ export interface PaletteCommand {
   requiresSelection?: boolean;
 }
 
+async function navigate(path: string): Promise<void> {
+  const { goto } = await import("$app/navigation");
+  await goto(path);
+}
+
 // ── Navigation commands ───────────────────────────────────────────────────────
 
 export const NAVIGATION_COMMANDS: PaletteCommand[] = [
@@ -27,56 +30,56 @@ export const NAVIGATION_COMMANDS: PaletteCommand[] = [
     label: "Go to Dashboard",
     section: "Navigation",
     icon: "home",
-    action: () => goto("/"),
+    action: () => navigate("/"),
   },
   {
     id: "nav-projects",
     label: "Go to Projects",
     section: "Navigation",
     icon: "folder",
-    action: () => goto("/projects"),
+    action: () => navigate("/projects"),
   },
   {
     id: "nav-docs",
     label: "Go to Documents",
     section: "Navigation",
     icon: "file-text",
-    action: () => goto("/docs"),
-  },
-  {
-    id: "nav-tasks",
-    label: "Go to Tasks",
-    section: "Navigation",
-    icon: "check-square",
-    action: () => goto("/tasks"),
-  },
-  {
-    id: "nav-search",
-    label: "Go to Search",
-    section: "Navigation",
-    icon: "search",
-    action: () => goto("/search"),
-  },
-  {
-    id: "nav-memory",
-    label: "Go to Memory",
-    section: "Navigation",
-    icon: "brain",
-    action: () => goto("/memory"),
+    action: () => navigate("/docs"),
   },
   {
     id: "nav-boards",
     label: "Go to Boards",
     section: "Navigation",
     icon: "layout",
-    action: () => goto("/boards"),
+    action: () => navigate("/boards"),
+  },
+  {
+    id: "nav-search",
+    label: "Go to Search",
+    section: "Navigation",
+    icon: "search",
+    action: () => navigate("/search"),
+  },
+  {
+    id: "nav-memory",
+    label: "Go to Memory",
+    section: "Navigation",
+    icon: "brain",
+    action: () => navigate("/memory"),
+  },
+  {
+    id: "nav-settings",
+    label: "Go to Settings",
+    section: "Navigation",
+    icon: "settings",
+    action: () => navigate("/settings/inference"),
   },
   {
     id: "nav-runs",
     label: "Go to Agent Runs",
     section: "Navigation",
     icon: "activity",
-    action: () => goto("/runs"),
+    action: () => navigate("/runs"),
   },
 ];
 
@@ -84,32 +87,11 @@ export const NAVIGATION_COMMANDS: PaletteCommand[] = [
 
 export const CREATION_COMMANDS: PaletteCommand[] = [
   {
-    id: "create-task",
-    label: "New Task",
-    section: "Create",
-    icon: "plus-square",
-    action: () => goto("/tasks/new"),
-  },
-  {
     id: "create-doc",
-    label: "New Document",
+    label: "New Doc",
     section: "Create",
     icon: "file-plus",
-    action: () => goto("/docs/new"),
-  },
-  {
-    id: "create-sprint",
-    label: "New Sprint",
-    section: "Create",
-    icon: "zap",
-    action: () => goto("/sprints/new"),
-  },
-  {
-    id: "create-memory",
-    label: "New Memory",
-    section: "Create",
-    icon: "brain",
-    action: () => goto("/memory/new"),
+    action: () => navigate("/docs/new"),
   },
 ];
 

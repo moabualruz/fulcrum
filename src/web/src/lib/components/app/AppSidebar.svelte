@@ -4,7 +4,7 @@
 	import { buttonVariants } from "$lib/components/ui/button";
 	import { cn } from "$lib/utils.js";
 
-	import { LUCIDE_ICONS, NAV_ITEMS, type NavItem } from "./nav-items.ts";
+	import { LUCIDE_ICONS, NAV_GROUPS, type NavItem } from "./nav-items.ts";
 
 	interface Props {
 		activeProjectId: string | null;
@@ -27,24 +27,29 @@
 		"bg-sidebar text-sidebar-foreground flex h-full w-56 flex-col border-r",
 	)}
 >
-	<nav class={cn("flex flex-col gap-1 p-3")} aria-label="primary">
-		{#each NAV_ITEMS as item (item.href)}
-			{@const Icon = LUCIDE_ICONS[item.iconName]}
-			{@const current = isCurrent(item, page.url.pathname)}
-			<a
-				href={item.href}
-				data-slot="button"
-				data-current={current ? "true" : undefined}
-				aria-current={current ? "page" : undefined}
-				class={cn(
-					buttonVariants({ variant: "ghost" }),
-					"justify-start gap-2",
-					current && "bg-muted text-foreground",
-				)}
-			>
-				<Icon aria-hidden="true" />
-				<span>{item.label}</span>
-			</a>
+	<nav class={cn("flex flex-col gap-3 p-3")} aria-label="primary">
+		{#each NAV_GROUPS as group (group.label)}
+			<div class={cn("flex flex-col gap-1")}>
+				<span class={cn("px-2 text-xs font-medium text-muted-foreground")}>{group.label}</span>
+				{#each group.items as item (item.href)}
+					{@const Icon = LUCIDE_ICONS[item.iconName]}
+					{@const current = isCurrent(item, page.url.pathname)}
+					<a
+						href={item.href}
+						data-slot="button"
+						data-current={current ? "true" : undefined}
+						aria-current={current ? "page" : undefined}
+						class={cn(
+							buttonVariants({ variant: "ghost" }),
+							"h-9 justify-start gap-2",
+							current && "border-l-2 border-primary bg-sidebar-accent text-sidebar-accent-foreground",
+						)}
+					>
+						<Icon aria-hidden="true" class="h-4 w-4" />
+						<span>{item.label}</span>
+					</a>
+				{/each}
+			</div>
 		{/each}
 	</nav>
 	<div class={cn("mt-auto border-t p-3")}>

@@ -31,26 +31,48 @@ export interface NavItem {
   iconName: LucideIconName;
 }
 
-// Order is locked by `nav-items.test.ts`; reordering is intentional and
+export interface NavGroup {
+  label: "Work" | "Agent OS" | "System" | "Settings";
+  items: readonly NavItem[];
+}
+
+// Group order is locked by `nav-items.test.ts`; reordering is intentional and
 // requires updating the test snapshot.
-export const NAV_ITEMS: readonly NavItem[] = [
-  { href: "/", label: "Dashboard", iconName: "LayoutDashboard" },
-  { href: "/projects", label: "Projects", iconName: "Folder" },
-  { href: "/docs", label: "Docs", iconName: "FileText" },
-  { href: "/boards", label: "Board", iconName: "Kanban" },
-  { href: "/agents", label: "Agents", iconName: "Activity" },
-  { href: "/runs", label: "Runs", iconName: "Activity" },
-  { href: "/artifacts", label: "Artifacts", iconName: "FileText" },
-  { href: "/repos", label: "Repos", iconName: "Folder" },
-  { href: "/memory", label: "Memory", iconName: "FileText" },
-  { href: "/context/preview", label: "Context", iconName: "FileText" },
-  { href: "/orchestration", label: "Orchestration", iconName: "Kanban" },
-  { href: "/audit", label: "Audit", iconName: "FileText" },
-  { href: "/search", label: "Search", iconName: "Search" },
-  { href: "/doctor", label: "Doctor", iconName: "Activity" },
-  { href: "/settings/inference", label: "Inference", iconName: "Settings" },
-  { href: "/settings/skills", label: "Skills", iconName: "Settings" },
-  { href: "/settings/notifications", label: "Notifications", iconName: "Settings" },
-  { href: "/settings/orchestration", label: "Workflow Settings", iconName: "Settings" },
-  { href: "/settings/data", label: "Data", iconName: "Settings" },
+export const NAV_GROUPS: readonly NavGroup[] = [
+  {
+    label: "Work",
+    items: [
+      { href: "/", label: "Dashboard", iconName: "LayoutDashboard" },
+      { href: "/projects", label: "Projects", iconName: "Folder" },
+      { href: "/boards", label: "Board", iconName: "Kanban" },
+      { href: "/docs", label: "Docs", iconName: "FileText" },
+    ],
+  },
+  {
+    label: "Agent OS",
+    items: [
+      { href: "/agents", label: "Agents", iconName: "Activity" },
+      { href: "/runs", label: "Runs", iconName: "Activity" },
+      { href: "/artifacts", label: "Artifacts", iconName: "FileText" },
+      { href: "/orchestration", label: "Orchestration", iconName: "Kanban" },
+      { href: "/memory", label: "Memory", iconName: "FileText" },
+      { href: "/context/preview", label: "Context", iconName: "FileText" },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { href: "/search", label: "Search", iconName: "Search" },
+      { href: "/audit", label: "Audit", iconName: "FileText" },
+      { href: "/doctor", label: "Doctor", iconName: "Activity" },
+    ],
+  },
+  {
+    label: "Settings",
+    items: [
+      { href: "/settings/inference", label: "Settings", iconName: "Settings" },
+    ],
+  },
 ] as const;
+
+export const NAV_ITEMS: readonly NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
