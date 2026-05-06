@@ -41,6 +41,7 @@ export function createTasksCommand(): Command {
   const createCommand = command.command("create");
   createCommand.description("tasks create");
   createCommand.option("--json", "Emit JSON output");
+  createCommand.option("--assignee-id <string>", "assignee-id");
   createCommand.option("--description <string>", "description");
   createCommand.option("--description-text <string>", "description-text");
   createCommand.option("--points <number>", "points", Number.parseFloat);

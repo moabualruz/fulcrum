@@ -29,3 +29,5 @@ export async function applyProductMigrations(db: ProductDb): Promise<readonly st
   }
   return applied;
 }
+
+export const runMigrations = applyProductMigrations;

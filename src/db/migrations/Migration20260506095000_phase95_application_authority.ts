@@ -1,6 +1,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260506095000_phase95_application_authority extends Migration {
+  static isLossy = true;
+
   override async up(): Promise<void> {
     this.addSql(`alter table "events" add column if not exists "project_id" uuid null`);
     this.addSql(`create index if not exists "events_scope_idx" on "events" ("org_id", "project_id", "created_at")`);
