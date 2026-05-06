@@ -1,8 +1,11 @@
 import { fireEvent, render, waitFor } from "@testing-library/svelte";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import CommandPalette from "../../src/lib/components/command-palette/CommandPalette.svelte";
 import type { CommandItem } from "../../src/lib/components/command-palette/command-palette-filter";
+import { ALL_COMMANDS } from "../../src/lib/components/command-palette/navigation-commands";
 
 const ITEMS: CommandItem[] = [
   { id: "task-1", label: "Open task", href: "/tasks/task-1" },
@@ -92,5 +95,21 @@ describe("CmdK palette web component", () => {
 
     await waitFor(() => expect(getByText("Search Results")).toBeTruthy());
     expect(getByText("No results")).toBeTruthy();
+  });
+
+  test("built-in command routes resolve to SvelteKit pages", () => {
+    const webRoot = join(import.meta.dir, "../../src/routes");
+    const hrefs = ALL_COMMANDS.flatMap((command) => {
+      const source = command.action?.toString() ?? "";
+      const match = source.match(/goto\("([^"]+)"\)/);
+      return match ? [match[1]] : [];
+    });
+
+    expect(hrefs.length).toBeGreaterThan(0);
+    expect(hrefs).not.toContain("/repos");
+    for (const href of hrefs) {
+      const routePath = href === "/" ? "+page.svelte" : join(href.slice(1), "+page.svelte");
+      expect(existsSync(join(webRoot, routePath)), `${href} must resolve to a page route`).toBe(true);
+    }
   });
 });

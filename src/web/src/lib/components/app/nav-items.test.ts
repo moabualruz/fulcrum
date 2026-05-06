@@ -1,33 +1,34 @@
 import { describe, expect, test } from "bun:test";
 
-import { LUCIDE_ICONS, NAV_ITEMS, type NavItem } from "./nav-items.ts";
+import { LUCIDE_ICONS, NAV_GROUPS, NAV_ITEMS, type NavItem } from "./nav-items.ts";
 
 describe("NAV_ITEMS surface", () => {
-  test("declares feature-complete primary surface", () => {
-    expect(NAV_ITEMS.length).toBeGreaterThanOrEqual(18);
+  test("declares grouped primary surface", () => {
+    expect(NAV_GROUPS.map((group) => group.label)).toEqual(["Work", "Agent OS", "System", "Settings"]);
+    expect(NAV_GROUPS.map((group) => group.items.map((item) => item.href))).toEqual([
+      ["/", "/projects", "/boards", "/docs"],
+      ["/agents", "/runs", "/artifacts", "/orchestration", "/memory", "/context/preview"],
+      ["/search", "/audit", "/doctor"],
+      ["/settings/inference"],
+    ]);
   });
 
   test("exposes hrefs in declared order", () => {
     expect(NAV_ITEMS.map((i) => i.href)).toEqual([
       "/",
       "/projects",
-      "/docs",
       "/boards",
+      "/docs",
       "/agents",
       "/runs",
       "/artifacts",
-      "/repos",
+      "/orchestration",
       "/memory",
       "/context/preview",
-      "/orchestration",
-      "/audit",
       "/search",
+      "/audit",
       "/doctor",
       "/settings/inference",
-      "/settings/skills",
-      "/settings/notifications",
-      "/settings/orchestration",
-      "/settings/data",
     ]);
   });
 
@@ -35,24 +36,23 @@ describe("NAV_ITEMS surface", () => {
     expect(NAV_ITEMS.map((i) => i.label)).toEqual([
       "Dashboard",
       "Projects",
-      "Docs",
       "Board",
+      "Docs",
       "Agents",
       "Runs",
       "Artifacts",
-      "Repos",
+      "Orchestration",
       "Memory",
       "Context",
-      "Orchestration",
-      "Audit",
       "Search",
+      "Audit",
       "Doctor",
-      "Inference",
-      "Skills",
-      "Notifications",
-      "Workflow Settings",
-      "Data",
+      "Settings",
     ]);
+  });
+
+  test("does not expose project-scoped repos as a primary nav item", () => {
+    expect(NAV_ITEMS.find((i) => i.href === "/repos")).toBeUndefined();
   });
 
   test("each entry uses an icon resolvable through LUCIDE_ICONS", () => {
@@ -66,23 +66,18 @@ describe("NAV_ITEMS surface", () => {
     const pairs: Array<[string, NavItem["iconName"]]> = [
       ["/", "LayoutDashboard"],
       ["/projects", "Folder"],
-      ["/docs", "FileText"],
       ["/boards", "Kanban"],
+      ["/docs", "FileText"],
       ["/agents", "Activity"],
       ["/runs", "Activity"],
       ["/artifacts", "FileText"],
-      ["/repos", "Folder"],
+      ["/orchestration", "Kanban"],
       ["/memory", "FileText"],
       ["/context/preview", "FileText"],
-      ["/orchestration", "Kanban"],
-      ["/audit", "FileText"],
       ["/search", "Search"],
+      ["/audit", "FileText"],
       ["/doctor", "Activity"],
       ["/settings/inference", "Settings"],
-      ["/settings/skills", "Settings"],
-      ["/settings/notifications", "Settings"],
-      ["/settings/orchestration", "Settings"],
-      ["/settings/data", "Settings"],
     ];
     for (const [href, iconName] of pairs) {
       const entry = NAV_ITEMS.find((i) => i.href === href);

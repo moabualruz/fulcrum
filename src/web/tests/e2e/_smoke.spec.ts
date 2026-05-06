@@ -2,10 +2,21 @@ const isPlaywrightCli = process.argv.some((argument) => argument.includes("playw
 
 if (isPlaywrightCli) {
 	const { expect, test } = await import("@playwright/test");
+	const { NAV_ITEMS } = await import("../../src/lib/components/app/nav-items.ts");
 
 	test("home page loads with Fulcrum in title", async ({ page }) => {
 		await page.goto("/");
 		await expect(page).toHaveTitle(/Fulcrum/i);
+	});
+
+	test("every primary nav route SSRs without an error page", async ({ page }) => {
+		for (const item of NAV_ITEMS) {
+			const response = await page.goto(item.href);
+			expect(response?.ok(), `${item.href} returned ${response?.status() ?? "no response"}`).toBe(true);
+			await expect(page.locator("body")).not.toContainText("Internal Error");
+			await expect(page.locator("body")).not.toContainText("Not found");
+			await expect(page.locator("body")).not.toContainText("This page could not be found");
+		}
 	});
 
 	test("Cmd+K opens command palette, focuses input, and Escape closes it", async ({ page }) => {
