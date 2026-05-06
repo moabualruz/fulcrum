@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import { TenantSetting } from "../../../db/entities/TenantSetting.ts";
 import { TelemetryEvent } from "../../../db/entities/platform/TelemetryEvent.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import type { AuthenticatedContext } from "../../../trpc/middleware.ts";
@@ -19,7 +20,10 @@ export abstract class TelemetryStore {
   abstract count(orgId?: string): Promise<number>;
   abstract write(event: TelemetryWriteInput): Promise<void>;
   abstract purge(orgId?: string): Promise<number>;
+  async recordAudit(_verb: "opted_in" | "opted_out" | "purged", _payload: Record<string, unknown>, _orgId?: string): Promise<void> {}
 }
+
+const TELEMETRY_OPT_IN_KEY = "telemetry.opted_in";
 
 const EmptyInputSchema = z.object({}).default({});
 const StatusOutputSchema = z.object({
@@ -72,8 +76,6 @@ export async function writeTelemetryEvent(
 }
 
 class MikroTelemetryStore extends TelemetryStore {
-  private optedInByOrg = new Map<string, boolean>();
-
   constructor(private readonly ctx: AuthenticatedContext) {
     super();
   }
@@ -89,11 +91,20 @@ class MikroTelemetryStore extends TelemetryStore {
   }
 
   async getOptedIn(orgId = this.ctx.orgId): Promise<boolean> {
-    return this.optedInByOrg.get(orgId) ?? false;
+    const setting = await this.em().findOne(TenantSetting, { orgId, key: TELEMETRY_OPT_IN_KEY });
+    return setting?.value === true;
   }
 
   async setOptedIn(value: boolean, orgId = this.ctx.orgId): Promise<void> {
-    this.optedInByOrg.set(orgId, value);
+    const em = this.em();
+    const existing = await em.findOne(TenantSetting, { orgId, key: TELEMETRY_OPT_IN_KEY });
+    if (existing) {
+      existing.value = value;
+      existing.updatedAt = new Date();
+    } else {
+      em.persist(em.create(TenantSetting, { orgId, key: TELEMETRY_OPT_IN_KEY, value }));
+    }
+    await em.flush();
   }
 
   async count(orgId = this.ctx.orgId): Promise<number> {
@@ -142,7 +153,9 @@ export const telemetryRouter = t.router({
     .input(EmptyInputSchema)
     .output(OkOutputSchema)
     .mutation(async ({ ctx }) => {
-      await storeFromContext(ctx).setOptedIn(true, ctx.orgId);
+      const store = storeFromContext(ctx);
+      await store.setOptedIn(true, ctx.orgId);
+      await store.recordAudit("opted_in", { optedIn: true }, ctx.orgId);
       return { ok: true as const };
     }),
 
@@ -150,15 +163,19 @@ export const telemetryRouter = t.router({
     .input(EmptyInputSchema)
     .output(OkOutputSchema)
     .mutation(async ({ ctx }) => {
-      await storeFromContext(ctx).setOptedIn(false, ctx.orgId);
+      const store = storeFromContext(ctx);
+      await store.setOptedIn(false, ctx.orgId);
+      await store.recordAudit("opted_out", { optedIn: false }, ctx.orgId);
       return { ok: true as const };
     }),
 
   purge: permissionedProcedure({ resource: "telemetry", action: "purge" })
     .input(EmptyInputSchema)
     .output(PurgeOutputSchema)
-    .mutation(async ({ ctx }) => ({
-      ok: true as const,
-      deleted: await storeFromContext(ctx).purge(ctx.orgId),
-    })),
+    .mutation(async ({ ctx }) => {
+      const store = storeFromContext(ctx);
+      const deleted = await store.purge(ctx.orgId);
+      await store.recordAudit("purged", { deleted }, ctx.orgId);
+      return { ok: true as const, deleted };
+    }),
 });

@@ -19,6 +19,7 @@ interface WrittenEvent {
 class MemoryTelemetryStore extends TelemetryStore {
   optedIn = false;
   rows: WrittenEvent[] = [];
+  auditEvents: Array<{ verb: string; payload: Record<string, unknown> }> = [];
 
   async getOptedIn() {
     return this.optedIn;
@@ -41,6 +42,26 @@ class MemoryTelemetryStore extends TelemetryStore {
     this.rows = [];
     return deleted;
   }
+
+  async recordAudit(verb: string, payload: Record<string, unknown>) {
+    this.auditEvents.push({ verb, payload });
+  }
+}
+
+class SharedMemoryTelemetryStore extends MemoryTelemetryStore {
+  constructor(private readonly shared: { optedIn: boolean; rows: WrittenEvent[]; auditEvents: Array<{ verb: string; payload: Record<string, unknown> }> }) {
+    super();
+    this.rows = shared.rows;
+    this.auditEvents = shared.auditEvents;
+  }
+
+  async getOptedIn() {
+    return this.shared.optedIn;
+  }
+
+  async setOptedIn(value: boolean) {
+    this.shared.optedIn = value;
+  }
 }
 
 const createCaller = t.createCallerFactory(appRouter);
@@ -61,9 +82,9 @@ function session() {
   };
 }
 
-function caller() {
+function caller(nextStore = store) {
   const container = new Container();
-  container.bind({ provide: TelemetryStore, useValue: store });
+  container.bind({ provide: TelemetryStore, useValue: nextStore });
 
   return createCaller(
     createContext({
@@ -122,6 +143,17 @@ describe("telemetry collector", () => {
     });
   });
 
+  it("persists opt-in across router and store instances", async () => {
+    const shared = { optedIn: false, rows: [] as WrittenEvent[], auditEvents: [] as Array<{ verb: string; payload: Record<string, unknown> }> };
+
+    await caller(new SharedMemoryTelemetryStore(shared)).telemetry.optIn();
+
+    await expect(caller(new SharedMemoryTelemetryStore(shared)).telemetry.status()).resolves.toEqual({
+      opted_in: true,
+      row_count: 0,
+    });
+  });
+
   it("optOut disables later writes and purge deletes rows", async () => {
     await caller().telemetry.optIn();
     await writeTelemetryEvent(store, ORG_ID, USER_ID, "settings.opened", { count: 1 });
@@ -134,5 +166,15 @@ describe("telemetry collector", () => {
       opted_in: false,
       row_count: 0,
     });
+  });
+
+  it("emits audit events for opt-in, opt-out, and purge", async () => {
+    await caller().telemetry.optIn();
+    await writeTelemetryEvent(store, ORG_ID, USER_ID, "settings.opened", { count: 1 });
+    await caller().telemetry.purge();
+    await caller().telemetry.optOut();
+
+    expect(store.auditEvents.map((event) => event.verb)).toEqual(["opted_in", "purged", "opted_out"]);
+    expect(store.auditEvents[1]?.payload).toEqual({ deleted: 1 });
   });
 });
