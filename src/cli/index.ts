@@ -50,6 +50,13 @@ Usage:
   fulcrum doctor [--json]
   fulcrum completion --shell <bash|zsh|fish|powershell>
   fulcrum audit <query|export> [--json]
+  fulcrum i18n <list|set> [--json]
+  fulcrum theme <list|set> [--json]
+  fulcrum telemetry <status|opt-in|opt-out|purge> [--json]
+  fulcrum backup <create|restore|verify> [--json]
+  fulcrum data <export|import> [--json]
+  fulcrum secrets <set|get|rotate|init-keyring> [--json]
+  fulcrum errors <list|get|purge> [--json]
   fulcrum webhooks <list|test> [--json]
   fulcrum connectors <enable|sync> <id> [--json]
   fulcrum db <migrate|status|history> [options]
@@ -501,6 +508,103 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "component": {
       const { run: runComponent } = await import("./component.ts");
       await runComponent(rest);
+      return;
+    }
+    case "i18n": {
+      const { runI18n } = await import("./commands/cross-cutting-platform.ts");
+      await runI18n(rest);
+      return;
+    }
+    case "theme": {
+      const [{ runTheme }, { createLocalCaller }] = await Promise.all([
+        import("./commands/cross-cutting-platform.ts"),
+        import("./local-caller.ts"),
+      ]);
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runTheme(rest, { caller: await createLocalCaller({ container }) });
+      } finally {
+        await cleanup();
+      }
+      return;
+    }
+    case "telemetry": {
+      const [{ runTelemetry }, { createLocalCaller }] = await Promise.all([
+        import("./commands/cross-cutting-platform.ts"),
+        import("./local-caller.ts"),
+      ]);
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runTelemetry(rest, { caller: await createLocalCaller({ container }) });
+      } finally {
+        await cleanup();
+      }
+      return;
+    }
+    case "backup": {
+      const [{ runBackup }, { createLocalCaller }] = await Promise.all([
+        import("./commands/cross-cutting-platform.ts"),
+        import("./local-caller.ts"),
+      ]);
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runBackup(rest, { caller: await createLocalCaller({ container }) });
+      } finally {
+        await cleanup();
+      }
+      return;
+    }
+    case "data": {
+      const [{ runDataExport, runDataImport }, { createLocalCaller }] = await Promise.all([
+        import("./commands/cross-cutting-platform.ts"),
+        import("./local-caller.ts"),
+      ]);
+      const [sub = "help", ...dataRest] = rest;
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        const caller = await createLocalCaller({ container });
+        if (sub === "export") {
+          await runDataExport(dataRest, { caller });
+          return;
+        }
+        if (sub === "import") {
+          await runDataImport(dataRest, { caller });
+          return;
+        }
+      } finally {
+        await cleanup();
+      }
+      console.error(`fulcrum data: unknown command '${sub}'`);
+      process.exit(2);
+    }
+    case "secrets": {
+      const [{ runSecrets, runSecretsInitKeyring }, { createLocalCaller }] = await Promise.all([
+        import("./commands/cross-cutting-platform.ts"),
+        import("./local-caller.ts"),
+      ]);
+      if (rest[0] === "init-keyring") {
+        await runSecretsInitKeyring(rest.slice(1));
+        return;
+      }
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runSecrets(rest, { caller: await createLocalCaller({ container }) });
+      } finally {
+        await cleanup();
+      }
+      return;
+    }
+    case "errors": {
+      const [{ runErrors }, { createLocalCaller }] = await Promise.all([
+        import("./commands/cross-cutting-platform.ts"),
+        import("./local-caller.ts"),
+      ]);
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runErrors(rest, { caller: await createLocalCaller({ container }) });
+      } finally {
+        await cleanup();
+      }
       return;
     }
     case "doctor": {
