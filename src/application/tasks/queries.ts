@@ -13,7 +13,10 @@ export async function listTasks(
 ): Promise<TaskDto[]> {
   const repo = em.getRepository(Task) as TaskRepository;
   const tasks = await repo.list({ orgId: ctx.orgId, includeDeleted: input.includeDeleted });
-  return tasks.map(serializeTask);
+  const scopedTasks = ctx.projectId
+    ? tasks.filter((task) => task.projectId === ctx.projectId)
+    : tasks;
+  return scopedTasks.map(serializeTask);
 }
 
 export async function getTask(
@@ -51,6 +54,9 @@ export async function findVisibleTask(
   if (!task) throw new AppNotFoundError(`Task not found: ${taskId}`);
   if (task.org.id !== ctx.orgId) {
     throw new AppForbiddenError(`Task does not belong to org: ${ctx.orgId}`);
+  }
+  if (ctx.projectId && task.projectId !== ctx.projectId) {
+    throw new AppNotFoundError(`Task not found: ${taskId}`);
   }
   return task;
 }

@@ -156,7 +156,11 @@ export async function setDependencies(
       throw new AppConflictError("Task dependency cycle rejected.");
     }
 
-    const tasks = await txEm.find(Task, { org: ctx.orgId, deletedAt: null } as never);
+    const tasks = await txEm.find(Task, {
+      org: ctx.orgId,
+      ...(ctx.projectId ? { projectId: ctx.projectId } : {}),
+      deletedAt: null,
+    } as never);
     const knownIds = new Set(tasks.map((candidate) => candidate.id));
     if ([...referencedIds].some((id) => !knownIds.has(id))) {
       throw new AppNotFoundError("One or more tasks were not found.");
@@ -239,7 +243,12 @@ function applyBulkPatch(task: Task, patch: BulkTaskPatch): void {
 }
 
 async function findBulkTasksOrThrow(em: EntityManager, ctx: AppContext, ids: string[]): Promise<Task[]> {
-  const tasks = await em.find(Task, { org: ctx.orgId, id: { $in: ids }, deletedAt: null } as never);
+  const tasks = await em.find(Task, {
+    org: ctx.orgId,
+    ...(ctx.projectId ? { projectId: ctx.projectId } : {}),
+    id: { $in: ids },
+    deletedAt: null,
+  } as never);
   if (tasks.length !== ids.length) {
     throw new AppNotFoundError("One or more tasks were not found.");
   }
@@ -286,7 +295,11 @@ function replaceTaskDependencyEdges(input: {
   dependencies: TaskDependencies;
 }): Map<string, Set<string>> {
   const edges = new Map<string, Set<string>>();
-  for (const task of input.tasks) edges.set(task.id, new Set(task.dependencies.blocks));
+  for (const task of input.tasks) {
+    const blocks = new Set(task.dependencies.blocks);
+    blocks.delete(input.taskId);
+    edges.set(task.id, blocks);
+  }
   edges.set(input.taskId, new Set(input.dependencies.blocks));
   for (const blockerId of input.dependencies.blocked_by) {
     const blocks = edges.get(blockerId) ?? new Set<string>();
