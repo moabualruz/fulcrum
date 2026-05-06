@@ -1,5 +1,6 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 
+import { transitionRunForRetry } from "../../application/orchestration/commands.ts";
 import type { AgentRunOrchestrationState, WorkflowConfig } from "./schemas.ts";
 
 export interface RunRef {
@@ -36,52 +37,19 @@ export async function scheduleContinuationRetry(
   config: WorkflowConfig,
   opts: RetryClockOptions = {},
 ): Promise<void> {
-  const [{ AgentRun }, { Event }, { Org }] = await Promise.all([
-    import("../../db/entities/orchestration/AgentRun.ts"),
-    import("../../db/entities/core/Event.ts"),
-    import("../../db/entities/auth/Org.ts"),
-  ]);
-
   const CONTINUATION_DELAY_MS = 1_000;
   const now = opts.now?.() ?? new Date();
   const nextRetryAt = new Date(now.getTime() + CONTINUATION_DELAY_MS);
   const nextAttempt = run.attemptCount + 1;
   const exhausted = nextAttempt >= config.maxAttempts;
   const nextState = exhausted ? "failed" : "retry_queued";
-  const fork = em.fork();
-
-  await fork.transactional(async (tx) => {
-    const agentRunRepo = tx.getRepository(AgentRun);
-    const eventsRepo = tx.getRepository(Event);
-    const org = tx.getReference(Org, run.orgId);
-
-    const updatedCount = await agentRunRepo.nativeUpdate(
-      {
-        id: run.id,
-        org: run.orgId,
-        orchestrationState: run.orchestrationState,
-      } as never,
-      {
-        orchestrationState: nextState,
-        ...(exhausted ? { status: "failed" } : {}),
-        attemptCount: nextAttempt,
-        nextRetryAt: exhausted ? null : nextRetryAt,
-        lastErrorKind: "continuation",
-      } as never,
-    );
-
-    if (updatedCount === 0) return;
-
-    eventsRepo.create({
-      org,
-      subjectKind: "agent_run",
-      subjectId: run.id,
-      verb: "state_changed",
-      payload: { from: run.orchestrationState, to: nextState, kind: "continuation" },
-      createdAt: now,
-    });
-
-    await tx.flush();
+  await transitionRunForRetry(em, run, {
+    nextState,
+    nextAttempt,
+    nextRetryAt: exhausted ? null : nextRetryAt,
+    lastErrorKind: "continuation",
+    exhausted,
+    now,
   });
 }
 
@@ -92,12 +60,6 @@ export async function scheduleRetry(
   config: WorkflowConfig,
   opts: RetryClockOptions = {},
 ): Promise<void> {
-  const [{ AgentRun }, { Event }, { Org }] = await Promise.all([
-    import("../../db/entities/orchestration/AgentRun.ts"),
-    import("../../db/entities/core/Event.ts"),
-    import("../../db/entities/auth/Org.ts"),
-  ]);
-
   const now = opts.now?.() ?? new Date();
   const nextAttempt = run.attemptCount + 1;
   const exhausted = nextAttempt >= config.maxAttempts;
@@ -107,39 +69,12 @@ export async function scheduleRetry(
     : new Date(
         now.getTime() + calcRetryDelay(nextAttempt, config.maxRetryBackoffMs),
       );
-  const fork = em.fork();
-
-  await fork.transactional(async (tx) => {
-    const agentRunRepo = tx.getRepository(AgentRun);
-    const eventsRepo = tx.getRepository(Event);
-    const org = tx.getReference(Org, run.orgId);
-
-    const updatedCount = await agentRunRepo.nativeUpdate(
-      {
-        id: run.id,
-        org: run.orgId,
-        orchestrationState: run.orchestrationState,
-      } as never,
-      {
-        orchestrationState: nextState,
-        ...(exhausted ? { status: "failed" } : {}),
-        attemptCount: nextAttempt,
-        nextRetryAt,
-        lastErrorKind: error.kind,
-      } as never,
-    );
-
-    if (updatedCount === 0) return;
-
-    eventsRepo.create({
-      org,
-      subjectKind: "agent_run",
-      subjectId: run.id,
-      verb: "state_changed",
-      payload: { from: run.orchestrationState, to: nextState },
-      createdAt: now,
-    });
-
-    await tx.flush();
+  await transitionRunForRetry(em, run, {
+    nextState,
+    nextAttempt,
+    nextRetryAt,
+    lastErrorKind: error.kind,
+    exhausted,
+    now,
   });
 }

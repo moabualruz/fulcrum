@@ -14,8 +14,10 @@
 import { UniqueConstraintViolationException } from "@mikro-orm/core";
 import type { EntityManager } from "@mikro-orm/postgresql";
 
-import type { AgentRunRepository } from "../../db/repositories/orchestration/AgentRunRepository.ts";
-import type { EventRepository } from "../../db/repositories/core/EventRepository.ts";
+import {
+  claimRunState,
+  OrchestrationStateMutationConflict,
+} from "../../application/orchestration/commands.ts";
 import {
   dispatchLifecycleHook,
   type DispatchLifecycleHookOptions,
@@ -105,61 +107,8 @@ async function claimRunUnlocked(
   taskId: string,
   instanceId: string,
 ): Promise<ClaimRunResult> {
-  const [{ AgentRun }, { Event }, { Org }] = await Promise.all([
-    import("../../db/entities/orchestration/AgentRun.ts"),
-    import("../../db/entities/core/Event.ts"),
-    import("../../db/entities/auth/Org.ts"),
-  ]);
-
-  const fork = em.fork();
-
   try {
-    return await fork.transactional(async (tx) => {
-      const agentRunRepo = tx.getRepository(AgentRun) as AgentRunRepository;
-      const eventsRepo = tx.getRepository(Event) as EventRepository;
-      const org = tx.getReference(Org, orgId);
-
-      const candidate = await agentRunRepo.findOne(
-        {
-          org: orgId,
-          task: taskId,
-          orchestrationState: "unclaimed",
-        } as never,
-        { orderBy: { createdAt: "ASC", id: "ASC" }, fields: ["id"] },
-      );
-
-      if (!candidate) {
-        throw new ClaimConflictError(taskId);
-      }
-
-      const updatedCount = await agentRunRepo.nativeUpdate(
-        {
-          id: candidate.id,
-          orchestrationState: "unclaimed",
-        } as never,
-        {
-          orchestrationState: "claimed",
-          claimedBy: instanceId,
-        } as never,
-      );
-
-      if (updatedCount === 0) {
-        throw new ClaimConflictError(taskId);
-      }
-
-      eventsRepo.create({
-        org,
-        subjectKind: "agent_run",
-        subjectId: candidate.id,
-        verb: "state_changed",
-        payload: { from: "unclaimed", to: "claimed" },
-        createdAt: new Date(),
-      });
-
-      await tx.flush();
-
-      return { runId: candidate.id };
-    });
+    return await claimRunState(em, orgId, taskId, instanceId);
   } catch (error) {
     if (isClaimConflict(error)) throw new ClaimConflictError(taskId);
     throw error;
@@ -201,6 +150,7 @@ export async function dispatchRunWithHooks<T>(
 
 function isClaimConflict(error: unknown): boolean {
   if (error instanceof ClaimConflictError) return true;
+  if (error instanceof OrchestrationStateMutationConflict) return true;
   if (error instanceof UniqueConstraintViolationException) return true;
 
   const message = String((error as { message?: unknown }).message ?? error);
