@@ -5,7 +5,7 @@
  * Auth: Bearer token format "test-jwt:<orgId>" (real JWT in production).
  * Error mapping: orgId mismatch → 403, unknown ID → 404.
  *
- * WHY spec seed: real ProductDb routes are mounted when runtime deps are present; this route keeps static OpenAPI generation deterministic.
+ * WHY spec seed: real application routes are mounted when runtime deps are present; this route keeps static OpenAPI generation deterministic.
  */
 
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";

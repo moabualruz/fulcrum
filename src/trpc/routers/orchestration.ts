@@ -14,8 +14,8 @@ import {
   renderPromptPreview as renderTemplatePromptPreview,
   retryRun,
   upsertWorkflowDef,
-} from "../../product-kernel/symphony.ts";
-import type { ProductDb } from "../../product-kernel/db/types.ts";
+  type LegacySymphonyStore,
+} from "../../application/legacy/symphony.ts";
 import {
   claimRun as claimSymphonyRun,
   ClaimConflictError,
@@ -106,11 +106,11 @@ export const DriftEntrySchema = z.object({
 
 const AgentRunOrchestrationStateSchema = z.enum(AGENT_RUN_ORCHESTRATION_STATES);
 
-function requireDb(ctx: { db?: ProductDb }): ProductDb {
-  if (!ctx.db) {
-    throw new Error("ProductDb is required for orchestration procedures.");
+function requireLegacyStore(ctx: { legacyStore?: LegacySymphonyStore }): LegacySymphonyStore {
+  if (!ctx.legacyStore) {
+    throw new Error("Symphony legacy store is required for orchestration procedures.");
   }
-  return ctx.db;
+  return ctx.legacyStore;
 }
 
 function requireEm(ctx: { em?: EntityManager | null }): EntityManager {
@@ -187,7 +187,7 @@ export const orchestrationRouter = router({
     )
     .output(z.array(SymphonyRunSchema))
     .query(async ({ input, ctx }) => {
-      return listRuns(requireDb(ctx), requireOrgId(ctx), {
+      return listRuns(requireLegacyStore(ctx), requireOrgId(ctx), {
         limit: input.limit,
         offset: input.offset,
       });
@@ -206,35 +206,35 @@ export const orchestrationRouter = router({
       if (input.runId) {
         return getAgentRunForApi(requireEm(ctx), requireOrgId(ctx), input.runId);
       }
-      return getRun(requireDb(ctx), input.id as string);
+      return getRun(requireLegacyStore(ctx), input.id as string);
     }),
 
   cancelRun: permissionedProcedure({ resource: "orchestration", action: "cancelRun" })
     .input(z.object({ id: z.string() }))
     .output(SymphonyRunSchema.nullable())
     .mutation(async ({ input, ctx }) => {
-      return cancelRun(requireDb(ctx), input.id);
+      return cancelRun(requireLegacyStore(ctx), input.id);
     }),
 
   retryRun: permissionedProcedure({ resource: "orchestration", action: "retryRun" })
     .input(z.object({ id: z.string() }))
     .output(SymphonyRunSchema.nullable())
     .mutation(async ({ input, ctx }) => {
-      return retryRun(requireDb(ctx), input.id);
+      return retryRun(requireLegacyStore(ctx), input.id);
     }),
 
   getOrchestratorStatus: publicProcedure
     .input(z.object({}))
     .output(OrchestratorStatusSchema)
     .query(async ({ ctx }) => {
-      return getOrchestratorStatus(requireDb(ctx), requireOrgId(ctx));
+      return getOrchestratorStatus(requireLegacyStore(ctx), requireOrgId(ctx));
     }),
 
   listWorkflowDefs: publicProcedure
     .input(z.object({}))
     .output(z.array(WorkflowDefSchema))
     .query(async ({ ctx }) => {
-      return listWorkflowDefs(requireDb(ctx), requireOrgId(ctx));
+      return listWorkflowDefs(requireLegacyStore(ctx), requireOrgId(ctx));
     }),
 
   upsertWorkflowDef: permissionedProcedure({ resource: "orchestration", action: "upsertWorkflowDef" })
@@ -251,7 +251,7 @@ export const orchestrationRouter = router({
     )
     .output(WorkflowDefSchema)
     .mutation(async ({ input, ctx }) => {
-      return upsertWorkflowDef(requireDb(ctx), {
+      return upsertWorkflowDef(requireLegacyStore(ctx), {
         orgId: requireOrgId(ctx),
         ...input,
       });
@@ -390,13 +390,13 @@ export const orchestrationRouter = router({
     .input(z.object({ staleMinutes: z.number().int().min(1).optional() }))
     .output(z.array(DriftEntrySchema))
     .query(async ({ input, ctx }) => {
-      return getSymphonyDriftReport(requireDb(ctx), requireOrgId(ctx), input.staleMinutes);
+      return getSymphonyDriftReport(requireLegacyStore(ctx), requireOrgId(ctx), input.staleMinutes);
     }),
 
   // ---------------------------------------------------------------------------
   // dispatchRun — SND-06, SYM-25
   // Creates or updates an agent_runs row and queues the run for dispatch.
-  // Uses MikroORM EM path (ARCH-12), not product-kernel raw SQL.
+  // Uses MikroORM EM path (ARCH-12), not legacy SQL.
   // Protected by permissionedProcedure with explicit resource/action metadata.
   // ---------------------------------------------------------------------------
   dispatchRun: permissionedProcedure({ resource: "orchestration", action: "dispatchRun" })

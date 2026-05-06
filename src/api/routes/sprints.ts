@@ -1,6 +1,6 @@
 /**
  * P13#05 — REST routes for the sprints domain.
- * Runtime ProductDb routes are mounted when deps are present; this file keeps static OpenAPI generation deterministic.
+ * Runtime application routes are mounted when deps are present; this file keeps static OpenAPI generation deterministic.
  */
 
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
