@@ -76,7 +76,7 @@ export interface AppServerClientOptions {
   /**
    * Called when an approval event is received.
    * Return value is sent back to the session (implementation-defined).
-   * Defaults to auto-approve.
+   * Defaults to deny.
    */
   onApproval?: (event: unknown) => Promise<string>;
 
@@ -432,18 +432,18 @@ export class CodexAppServerClient {
   }
 
   /**
-   * Handle approval events with documented policy — auto-approve by default,
+   * Handle approval events with documented policy — deny by default,
    * never stall indefinitely (SYM-23).
    */
   private _handleApproval(
     payload: { threadId: string; status: unknown },
     proc: ReturnType<NonNullable<AppServerClientOptions["_spawnFn"]>>,
   ): void {
-    const policy = this._opts.onApproval ?? (async () => "approve");
+    const policy = this._opts.onApproval ?? (async () => "deny");
     // Fire-and-forget with timeout guard — cannot block the read loop
     void Promise.race([
       policy(payload),
-      new Promise<string>((res) => setTimeout(() => res("approve"), this._opts.turnTimeoutMs)),
+      new Promise<string>((res) => setTimeout(() => res("deny"), this._opts.turnTimeoutMs)),
     ]).then((decision) => {
       // Send approval response back if process still alive
       if (proc.killed) return;

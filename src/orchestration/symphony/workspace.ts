@@ -4,6 +4,7 @@
  * SPEC naming invariant: workspace keys contain only [A-Za-z0-9._-].
  */
 
+import { existsSync, realpathSync } from "node:fs";
 import { mkdir, readdir, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
@@ -147,8 +148,8 @@ export function assertWorkspacePathInOrgRoot(
   orgId: string,
   root?: string,
 ): void {
-  const orgRoot = resolve(workspaceRoot(root), orgId);
-  const target = resolve(workspacePath);
+  const orgRoot = realpathIfExists(resolve(workspaceRoot(root), orgId));
+  const target = realpathIfExists(resolve(workspacePath));
   const relativeTarget = relative(orgRoot, target);
 
   if (relativeTarget !== "" && !relativeTarget.startsWith("..") && !isAbsolute(relativeTarget)) {
@@ -232,6 +233,7 @@ export async function sweepTerminalWorkspaces(
   for (const run of terminalRuns) {
     const workspacePath = run.workspacePath;
     if (!workspacePath) continue;
+    assertWorkspacePathInOrgRoot(workspacePath, orgId, opts.root);
 
     if (opts.beforeRemove) {
       await opts.beforeRemove(run);
@@ -282,4 +284,8 @@ async function findManagedRun(em: EntityManager, runId: string): Promise<AgentRu
     "../../db/entities/orchestration/AgentRun.ts"
   );
   return em.findOneOrFail(AgentRun, runId);
+}
+
+function realpathIfExists(path: string): string {
+  return existsSync(path) ? realpathSync.native(path) : path;
 }

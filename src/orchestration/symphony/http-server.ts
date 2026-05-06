@@ -57,12 +57,12 @@ export async function createHttpServer(opts: HttpServerOptions): Promise<HttpSer
         const html = [
           "<html><head><title>Symphony</title></head><body>",
           "<h1>Symphony Orchestrator</h1>",
-          `<p>Generated: ${s.generated_at}</p>`,
+          `<p>Generated: ${escapeHtml(s.generated_at)}</p>`,
           `<p>Running: ${s.counts.running} | Retrying: ${s.counts.retrying}</p>`,
           "<h2>Running</h2><ul>",
-          ...s.running.map((r) => `<li>${r.issue_identifier} — ${r.state}</li>`),
+          ...s.running.map((r) => `<li>${escapeHtml(r.issue_identifier)} — ${escapeHtml(r.state)}</li>`),
           "</ul><h2>Retrying</h2><ul>",
-          ...s.retrying.map((r) => `<li>${r.issue_identifier} — attempt ${r.attempt}</li>`),
+          ...s.retrying.map((r) => `<li>${escapeHtml(r.issue_identifier)} — attempt ${r.attempt}</li>`),
           "</ul></body></html>",
         ].join("\n");
         return new Response(html, {
@@ -109,4 +109,13 @@ export async function createHttpServer(opts: HttpServerOptions): Promise<HttpSer
     port: server.port ?? port,
     stop: () => server.stop(true),
   };
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&#39;");
 }

@@ -211,11 +211,7 @@ export function createLinearTrackerAdapter(
 // Mapping helpers
 // ---------------------------------------------------------------------------
 
-let candidateIdCounter = 0;
-
 function mapSyncItemToCandidateIssue(item: SyncItem): CandidateIssue {
-  candidateIdCounter += 1;
-  // Generate a deterministic UUID-like id from the external id
   const id = deterministicUuid(item.externalId);
 
   return {
