@@ -8,13 +8,8 @@
  * C6: No plaintext SQL — schema via @Entity decorator class.
  * C7: MikroORM v7 ES Stage-3 decorator pattern (@mikro-orm/decorators/es).
  * C8: @Entity({ repository }) wires WebhookSubscriptionRepository.
- * C10: stub contains only the index-axis columns (id + org FK + active). All
- *      domain-specific fields deferred to Pillar 10 own-migration in its wave:
- *        - url: string        — outbound endpoint (primary dispatch field)
- *        - events: string[]   — event-verb filter list
- *        - secret: string     — HMAC shared secret for payload signing
- *        - createdAt: Date    — audit timestamp
- *      Non-id @Property count: 1 (active). Total non-id columns: 2 (org FK + active).
+ * Secret values are encrypted by src/application/webhooks/encryption.ts before
+ * persistence and are never projected back to callers as plaintext.
  */
 
 import {
@@ -44,4 +39,19 @@ export class WebhookSubscription {
 
   @Property({ type: "boolean" })
   active: boolean = true;
+
+  @Property({ type: "text" })
+  url!: string;
+
+  @Property({ type: "json" })
+  events: string[] = [];
+
+  @Property({ type: "text", fieldName: "encrypted_secret" })
+  encryptedSecret!: string;
+
+  @Property({ type: "datetime", fieldName: "created_at", defaultRaw: "now()" })
+  createdAt: Date = new Date();
+
+  @Property({ type: "datetime", fieldName: "updated_at", defaultRaw: "now()", onUpdate: () => new Date() })
+  updatedAt: Date = new Date();
 }
