@@ -59,7 +59,7 @@ export function serializeOutboxEvent(input: OutboxEventInput): SerializedOutboxE
     subjectKind: input.subjectKind,
     subjectId,
     payload: input.payload ?? {},
-    eventKey: `${input.verb}:${input.subjectKind}:${subjectId ?? "none"}`,
+    eventKey: crypto.randomUUID(),
   };
 }
 
@@ -115,14 +115,15 @@ export async function dispatchPendingOutboxEvents(
   let dispatched = 0;
 
   for (const row of rows) {
-    const event = serializeOutboxEvent({
+    const event: SerializedOutboxEvent = {
       orgId: row.org.id,
       projectId: row.projectId ?? null,
       verb: row.verb,
       subjectKind: row.subjectKind,
       subjectId: row.subjectId ?? null,
       payload: row.payload,
-    });
+      eventKey: row.eventKey,
+    };
     dispatcher.eventBus.publish(topicForOutboxEvent(event), event);
     await dispatcher.search?.handleEvent(event);
     await dispatcher.notifications?.handleEvent(event);

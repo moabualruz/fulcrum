@@ -34,7 +34,8 @@ describe("application outbox serialization", () => {
       subjectId: "task-1",
       payload: { title: "Outbox task" },
     });
-    expect(serialized.eventKey).toBe("task.created:task:task-1");
+    expect(serialized.eventKey).toMatch(/^[0-9a-f-]{36}$/);
+    expect(serializeOutboxEvent(EVENT_INPUT).eventKey).not.toBe(serialized.eventKey);
   });
 
   test("topicForOutboxEvent routes task and notification handoffs without PGlite channel coupling", () => {
