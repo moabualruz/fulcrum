@@ -17,5 +17,22 @@ export default defineConfig({
     environment: "happy-dom",
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/vitest/**/*.test.ts"],
+    coverage: {
+      provider: "v8",
+      include: [
+        "src/routes/settings/errors/+page.server.ts",
+        "src/routes/settings/errors/+page.svelte",
+        "src/routes/settings/i18n/+page.server.ts",
+        "src/routes/settings/telemetry/+page.server.ts",
+        "src/routes/settings/telemetry/+page.svelte",
+        "src/lib/components/tasks/CriticalPath.ts",
+        "src/lib/components/tasks/TaskDescriptionEditor.svelte",
+        "src/lib/components/tasks/task-description.ts",
+        "src/lib/components/tasks/task-timeline.ts",
+      ],
+      thresholds: {
+        lines: 80,
+      },
+    },
   },
 });

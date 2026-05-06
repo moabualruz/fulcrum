@@ -150,3 +150,30 @@ describe("ci STEPS — Phase 09 infrastructure gates", () => {
     ]);
   });
 });
+
+describe("ci STEPS — Phase 09 coverage gates", () => {
+  it("runs root and web coverage after normal unit gates", () => {
+    const names = STEPS.map((s) => s.name);
+
+    expect(names).toContain("coverage:root");
+    expect(names).toContain("coverage:web");
+    expect(names.indexOf("coverage:root")).toBeGreaterThan(names.indexOf("test"));
+    expect(names.indexOf("coverage:web")).toBeGreaterThan(names.indexOf("web:test"));
+  });
+
+  it("uses focused coverage commands", () => {
+    expect(STEPS.find((s) => s.name === "coverage:root")?.cmd).toEqual([
+      "bun",
+      "run",
+      "scripts/test-root.ts",
+      "--coverage",
+    ]);
+    expect(STEPS.find((s) => s.name === "coverage:web")?.cmd).toEqual([
+      "bun",
+      "run",
+      "web:test",
+      "--",
+      "--coverage",
+    ]);
+  });
+});

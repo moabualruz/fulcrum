@@ -7,6 +7,8 @@ const ROOTS = ["scripts", "src", "tests"] as const;
 const TEST_FILE = /\.(test|spec)\.(ts|tsx)$/;
 const SKIP_DIRS = new Set(["node_modules", ".svelte-kit", "dist", "coverage"]);
 const SKIP_PATHS = new Set(["tests/a11y"]);
+const args = process.argv.slice(2);
+const coverage = args.includes("--coverage");
 
 async function collect(root: string): Promise<string[]> {
   let entries: string[];
@@ -38,7 +40,8 @@ if (files.length === 0) {
   process.exit(1);
 }
 
-const proc = Bun.spawn(["bun", "test", "--conditions=svelte", ...files], {
+const coverageArgs = coverage ? ["--coverage"] : [];
+const proc = Bun.spawn(["bun", "test", "--conditions=svelte", ...coverageArgs, ...files], {
   stdout: "inherit",
   stderr: "inherit",
   stdin: "inherit",
