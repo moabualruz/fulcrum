@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Executing Phase 09.5
-last_updated: "2026-05-06T12:41:59.038Z"
+status: Ready to execute
+last_updated: "2026-05-06T20:55:07.530Z"
 progress:
   total_phases: 11
   completed_phases: 8
-  total_plans: 114
-  completed_plans: 85
-  percent: 75
+  total_plans: 119
+  completed_plans: 98
+  percent: 82
 ---
 
 # Planning State
@@ -17,7 +17,7 @@ progress:
 ## Current Position
 
 Phase: 09.5 (architecture-data-layer-remediation-full-interface-fix) — EXECUTING
-Plan: 1 of 9
+Plan: 2 of 14
 
 - **Phase**: 09-cross-cutting-testing
 - **Plan**: 10 of 10 completed
@@ -91,3 +91,6 @@ Plan: 1 of 9
 - [Phase 04-08]: Three-surface parity tests unified: Web vitest (8/8), CLI (49 tests), TUI (parity labels + inference backend states)
 - [Phase ?]: Yjs WS server from scratch
 - [Phase ?]: handleConnection returns Promise<void> for async auth
+- [Phase 09.5]: Doctor legacy database probes live in src/infrastructure/doctor/legacy-db.ts, not CLI interface files. — Keeps CLI interface free of ProductDb/PGlite imports while preserving doctor health checks.
+- [Phase 09.5]: TUI telemetry persists through src/application/telemetry/commands.ts. — Keeps TUI rendering code from direct EntityManager persist/flush calls.
+- [Phase 09.5]: Non-web compatibility debt is tracked with exact allowlists while global ProductDb removal remains broader phase work. — Prevents broad regex exceptions and makes residual boundary debt reviewable by file and rationale.
