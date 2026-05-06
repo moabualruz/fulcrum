@@ -35,6 +35,7 @@
   let query = $state("");
   let searchHits = $state<SearchHit[]>([]);
   let searchPending = $state(false);
+  let inputElement: HTMLInputElement | null = null;
 
   // ── Selection store ──────────────────────────────────────────────────────────
   let hasSelection = $state(false);
@@ -66,6 +67,11 @@
       searchHits = [];
       searchPending = false;
     });
+  });
+
+  $effect(() => {
+    if (!open || !inputElement) return;
+    queueMicrotask(() => inputElement?.focus());
   });
 
   // ── Legacy items fallback (backward compat with layout.svelte paletteItems) ──
@@ -104,7 +110,7 @@
   }
 </script>
 
-<div data-command-palette data-state={open ? "open" : "closed"}>
+<div data-command-palette data-state={open ? "open" : "closed"} class={open ? "fixed inset-0 z-50" : "hidden"}>
   {#if open}
     <div class={cn("fixed inset-0 z-50 bg-background/80 p-4 backdrop-blur-sm")}>
       <div
@@ -115,6 +121,7 @@
         <!-- Input -->
         <input
           data-command-palette-input
+          bind:this={inputElement}
           type="text"
           bind:value={query}
           onkeydown={handleInputKeydown}

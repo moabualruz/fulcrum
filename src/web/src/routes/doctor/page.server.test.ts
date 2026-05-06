@@ -29,7 +29,7 @@ describe("/doctor +page.server.ts", () => {
 
   test("all 17 subsystems present in correct order", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    const checks = await mod.runAll();
+    const checks = await mod._runAll();
     const subsystems = checks.map((c: { subsystem: string }) => c.subsystem);
     expect(subsystems).toEqual([
       "foundation", "inference", "orchestration", "sandcastle", "router",
@@ -40,7 +40,7 @@ describe("/doctor +page.server.ts", () => {
 
   test("each check result has required fields", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
-    const checks = await mod.runAll();
+    const checks = await mod._runAll();
     for (const check of checks) {
       expect(check).toHaveProperty("subsystem");
       expect(check).toHaveProperty("label");
@@ -57,7 +57,7 @@ describe("/doctor +page.server.ts", () => {
   test("foundation check: ok when FULCRUM_HOME dir exists", async () => {
     // scratch dir created in beforeEach
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
-    const checks = await mod.runAll();
+    const checks = await mod._runAll();
     const foundation = checks.find((c: { subsystem: string }) => c.subsystem === "foundation");
     expect(foundation?.status).toBe("ok");
   });
@@ -65,7 +65,7 @@ describe("/doctor +page.server.ts", () => {
   test("foundation check: fail when FULCRUM_HOME dir missing", async () => {
     process.env["FULCRUM_HOME"] = "/nonexistent/fulcrum-test-home-xyz";
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 4}`);
-    const checks = await mod.runAll();
+    const checks = await mod._runAll();
     const foundation = checks.find((c: { subsystem: string }) => c.subsystem === "foundation");
     expect(foundation?.status).toBe("fail");
     expect(foundation?.recovery).toBeTruthy();
@@ -74,7 +74,7 @@ describe("/doctor +page.server.ts", () => {
   test("inference check: ok when ANTHROPIC_API_KEY starts with sk-ant-", async () => {
     process.env["ANTHROPIC_API_KEY"] = "sk-ant-test-key";
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 5}`);
-    const checks = await mod.runAll();
+    const checks = await mod._runAll();
     const inference = checks.find((c: { subsystem: string }) => c.subsystem === "inference");
     expect(inference?.status).toBe("ok");
   });
@@ -82,7 +82,7 @@ describe("/doctor +page.server.ts", () => {
   test("inference check: fail when ANTHROPIC_API_KEY missing", async () => {
     delete process.env["ANTHROPIC_API_KEY"];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 6}`);
-    const checks = await mod.runAll();
+    const checks = await mod._runAll();
     const inference = checks.find((c: { subsystem: string }) => c.subsystem === "inference");
     expect(inference?.status).toBe("fail");
     expect(inference?.recovery).toBeTruthy();
@@ -90,7 +90,7 @@ describe("/doctor +page.server.ts", () => {
 
   test("web check: always ok (SSR self-check)", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 7}`);
-    const checks = await mod.runAll();
+    const checks = await mod._runAll();
     const web = checks.find((c: { subsystem: string }) => c.subsystem === "web");
     expect(web?.status).toBe("ok");
   });
@@ -98,7 +98,7 @@ describe("/doctor +page.server.ts", () => {
   test("memory check: warn when memory dir missing", async () => {
     // scratch exists but no memory subdir
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 8}`);
-    const checks = await mod.runAll();
+    const checks = await mod._runAll();
     const memory = checks.find((c: { subsystem: string }) => c.subsystem === "memory");
     expect(memory?.status).toBe("warn");
     expect(memory?.recovery).toBeTruthy();
@@ -107,7 +107,7 @@ describe("/doctor +page.server.ts", () => {
   test("memory check: ok when memory dir exists", async () => {
     mkdirSync(join(scratch, "memory"), { recursive: true });
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 9}`);
-    const checks = await mod.runAll();
+    const checks = await mod._runAll();
     const memory = checks.find((c: { subsystem: string }) => c.subsystem === "memory");
     expect(memory?.status).toBe("ok");
   });
@@ -118,7 +118,7 @@ describe("/doctor +page.server.ts", () => {
     process.env["FULCRUM_FEATURES"] = "sandbox-docker";
     // The check calls commandExists internally; in CI docker is absent → error status
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 10}`);
-    const checks = await mod.runAll();
+    const checks = await mod._runAll();
     const sandcastle = checks.find((c: { subsystem: string }) => c.subsystem === "sandcastle");
     // Status is fail when sandbox-docker is enabled but docker daemon is absent
     expect(sandcastle?.status).toMatch(/fail|warn/);

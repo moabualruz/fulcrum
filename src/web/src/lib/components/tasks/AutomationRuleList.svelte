@@ -56,8 +56,9 @@
 
   // ── Props ────────────────────────────────────────────────────────────────────
 
-  export let projectId: string;
-  export let trpc: {
+  interface Props {
+    projectId: string;
+    trpc?: {
     automations: {
       list: { query: (input: { projectId: string }) => Promise<AutomationRule[]> };
       create: { mutate: (input: {
@@ -73,7 +74,10 @@
       delete: { mutate: (input: { id: string }) => Promise<void> };
       templates: { query: () => Promise<AutomationTemplate[]> };
     };
-  } | null = null;
+    } | null;
+  }
+
+  let { projectId, trpc = null }: Props = $props();
 
   // ── State ────────────────────────────────────────────────────────────────────
 

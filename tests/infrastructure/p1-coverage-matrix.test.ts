@@ -112,6 +112,15 @@ describe("scripts/ci.ts baseline gate", () => {
     expect(installEnv["BUN_INSTALL_CACHE_DIR"]!.startsWith(tmpdir())).toBe(true);
   });
 
+  it("keeps Playwright smoke e2e on the host browser cache", () => {
+    const e2eStep = STEPS.find((step) => step.name === "web:e2e:smoke");
+    if (!e2eStep) throw new Error("missing web:e2e:smoke step");
+    const e2eEnv = envForStep(e2eStep);
+
+    expect(e2eEnv["HOME"]).toBe(homedir());
+    expect(e2eEnv["FULCRUM_HOME"]).toBeUndefined();
+  });
+
   it("does not hide the Bun compile cache from build:all", () => {
     const buildStep = STEPS.find((step) => step.name === "build:all");
     if (!buildStep) throw new Error("missing build:all step");

@@ -12,22 +12,26 @@
   import BulkCustomFieldEdit from "./BulkCustomFieldEdit.svelte";
 
   // ── Props ──────────────────────────────────────────────────────────
-  export let selectedTaskIds: string[] = [];
-  export let projectId: string = "";
-  export let customFieldDefs: Array<{
-    id: string;
-    name: string;
-    fieldType: string;
-    config?: Record<string, unknown>;
-  }> = [];
-  /** Injected tRPC client — caller provides typed client */
-  export let trpc: {
+  interface Props {
+    selectedTaskIds?: string[];
+    projectId?: string;
+    customFieldDefs?: Array<{
+      id: string;
+      name: string;
+      fieldType: string;
+      config?: Record<string, unknown>;
+    }>;
+    /** Injected tRPC client — caller provides typed client */
+    trpc?: {
     tasks: {
       bulkUpdate: { mutate: (input: { taskIds: string[]; patch: Record<string, unknown> }) => Promise<unknown> };
       bulkDelete: { mutate: (input: { taskIds: string[] }) => Promise<unknown> };
       archive: { mutate: (input: { taskIds: string[] }) => Promise<unknown> };
     };
-  } | null = null;
+    } | null;
+  }
+
+  let { selectedTaskIds = [], projectId = "", customFieldDefs = [], trpc = null }: Props = $props();
 
   const dispatch = createEventDispatcher<{
     done: { action: string; taskIds: string[] };
@@ -37,8 +41,8 @@
   // ── Constants ──────────────────────────────────────────────────────
   const MAX_BULK = 200; // D-75
 
-  $: isOverLimit = selectedTaskIds.length > MAX_BULK;
-  $: count = selectedTaskIds.length;
+  const isOverLimit = $derived(selectedTaskIds.length > MAX_BULK);
+  const count = $derived(selectedTaskIds.length);
 
   // ── Action state ───────────────────────────────────────────────────
   let loading = false;

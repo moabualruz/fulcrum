@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from "./$types";
 import { openProductDb, getDefaultOrgId } from "$lib/server/db";
 import { loadOrchestrationDashboard } from "$lib/server/orchestration";
-import { cancelRunAction, retryRunAction } from "$lib/server/runs";
+import { cancelRunAction, dispatchRunAction, retryRunAction } from "$lib/server/runs";
 import { actionOk } from "$lib/feedback/action-result";
 
 interface ProjectOption {
@@ -41,16 +41,17 @@ export const actions: Actions = {
     const form = await request.formData();
     const taskId = (form.get("task_id") as string | null) ?? "";
     if (!taskId) return { success: false, message: "task_id required" };
-    // Dispatch via canonical tRPC path — no raw SQL
-    // Import is deferred to avoid server-side bundling issues
-    const { createLocalCaller } = await import("$lib/server/trpc-caller");
+    const agent = (form.get("agent") as string | null) ?? "codex";
+    const db = await openProductDb();
     try {
-      const caller = await createLocalCaller();
-      const result = await caller.orchestration.dispatchRun({ taskId });
-      return actionOk(`Dispatched run ${result.runId} (${result.state})`);
+      const orgId = await getDefaultOrgId(db);
+      const result = await dispatchRunAction(db, { orgId, taskId, agent });
+      return actionOk(`Dispatched run ${result.id} (${result.status})`);
     } catch (err) {
       const msg = (err as Error).message ?? "Dispatch failed";
       return { success: false, message: msg };
+    } finally {
+      await db.close();
     }
   },
 

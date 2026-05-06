@@ -13,16 +13,22 @@
 
   // ── Props ────────────────────────────────────────────────────────────────────
 
-  export let projectId: string;
-  export let methodology: "scrum" | "kanban" | "none" = "scrum";
-  /** Injected tRPC client */
-  export let trpc: {
+  type Methodology = "scrum" | "kanban" | "none";
+
+  interface Props {
+    projectId: string;
+    methodology?: Methodology;
+    /** Injected tRPC client */
+    trpc?: {
     workflows: {
       getTransitions: { query: (input: { projectId: string }) => Promise<Record<string, string[]>> };
       updateTransitions: { mutate: (input: { projectId: string; transitions: Record<string, string[]> }) => Promise<void> };
       getDefault: { query: (input: { methodology: string }) => Promise<Record<string, string[]>> };
     };
-  } | null = null;
+    } | null;
+  }
+
+  let { projectId, methodology = "scrum", trpc = null }: Props = $props();
 
   // ── State ────────────────────────────────────────────────────────────────────
 

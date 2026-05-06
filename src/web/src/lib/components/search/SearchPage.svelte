@@ -476,16 +476,14 @@
                 <div class="flex items-center gap-2 mb-0.5">
                   <span
                     class="text-[14px] font-semibold leading-snug text-foreground truncate"
-                    {@html highlight(result.title ?? result.entityId, term)}
-                  ></span>
+                  >{@html highlight(result.title ?? result.entityId, term)}</span>
                   <span class="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-secondary text-secondary-foreground border border-border">
                     {result.entityKind}
                   </span>
                 </div>
                 <p
                   class="text-[14px] font-normal text-muted-foreground truncate"
-                  {@html highlight(result.snippet || (result.body ?? ""), term)}
-                ></p>
+                >{@html highlight(result.snippet || (result.body ?? ""), term)}</p>
               </div>
               <span class="shrink-0 text-xs text-muted-foreground mt-0.5">
                 {formatTimestamp(result.metadata?.["updatedAt"] ?? result.metadata?.["createdAt"])}

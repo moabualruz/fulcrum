@@ -27,9 +27,10 @@
 
   // ── Props ────────────────────────────────────────────────────────────────────
 
-  export let taskId: string;
-  export let existingRule: RecurrenceRule | null = null;
-  export let trpc: {
+  interface Props {
+    taskId: string;
+    existingRule?: RecurrenceRule | null;
+    trpc?: {
     recurrence: {
       create: { mutate: (input: {
         taskId: string;
@@ -42,7 +43,10 @@
       }) => Promise<RecurrenceRule> };
       delete: { mutate: (input: { ruleId: string }) => Promise<void> };
     };
-  } | null = null;
+    } | null;
+  }
+
+  let { taskId, existingRule = null, trpc = null }: Props = $props();
 
   // ── State ────────────────────────────────────────────────────────────────────
 

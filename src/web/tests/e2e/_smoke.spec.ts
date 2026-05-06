@@ -10,6 +10,7 @@ if (isPlaywrightCli) {
 
 	test("Cmd+K opens command palette, focuses input, and Escape closes it", async ({ page }) => {
 		await page.goto("/");
+		await page.waitForFunction(() => document.body.dataset.fulcrumHydrated === "true");
 		await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
 		await expect(page.locator("[data-command-palette][data-state='open']")).toBeVisible();
 		await expect(page.locator("[data-command-palette-input]")).toBeFocused();

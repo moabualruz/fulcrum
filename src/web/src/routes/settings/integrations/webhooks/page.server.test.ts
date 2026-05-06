@@ -13,19 +13,19 @@ describe("/settings/integrations/webhooks — isNotifyWebhookEnabled()", () => {
   test("isNotifyWebhookEnabled OFF by default", async () => {
     delete process.env["FULCRUM_FEATURES"];
     const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-    expect(mod.isNotifyWebhookEnabled()).toBe(false);
+    expect(mod._isNotifyWebhookEnabled()).toBe(false);
   });
 
   test("isNotifyWebhookEnabled ON with FULCRUM_FEATURES=notify-webhook", async () => {
     process.env["FULCRUM_FEATURES"] = "notify-webhook";
     const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-    expect(mod.isNotifyWebhookEnabled()).toBe(true);
+    expect(mod._isNotifyWebhookEnabled()).toBe(true);
   });
 
   test("isNotifyWebhookEnabled ON when mixed", async () => {
     process.env["FULCRUM_FEATURES"] = "saas-auth,notify-webhook";
     const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-    expect(mod.isNotifyWebhookEnabled()).toBe(true);
+    expect(mod._isNotifyWebhookEnabled()).toBe(true);
   });
 
   test("load throws 404 when notify-webhook OFF", async () => {
@@ -57,7 +57,7 @@ describe("/settings/integrations/webhooks — isNotifyWebhookEnabled()", () => {
 
   test("mapWebhookDeliveries returns debug metadata without secrets", async () => {
     const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-    const rows = mod.mapWebhookDeliveries([
+    const rows = mod._mapWebhookDeliveries([
       {
         id: "delivery-1",
         eventType: "artifact.created",
@@ -92,16 +92,16 @@ describe("/settings/integrations/webhooks — isNotifyWebhookEnabled()", () => {
 
   test("addSubscription / getSubscriptions round-trip", async () => {
     const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-    const before = mod.getSubscriptions().length;
-    mod.addSubscription({
+    const before = mod._getSubscriptions().length;
+    mod._addSubscription({
       id: "test-id",
       url: "https://example.com/hook",
       eventPattern: "task.*",
       signingSecret: "secret",
       createdAt: new Date().toISOString(),
     });
-    expect(mod.getSubscriptions().length).toBe(before + 1);
-    const found = mod.getSubscriptions().find((s: { id: string }) => s.id === "test-id");
+    expect(mod._getSubscriptions().length).toBe(before + 1);
+    const found = mod._getSubscriptions().find((s: { id: string }) => s.id === "test-id");
     expect(found).toBeTruthy();
     expect(found?.url).toBe("https://example.com/hook");
   });

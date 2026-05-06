@@ -175,7 +175,11 @@
                   {/if}
                 </td>
                 <td class={cn("px-4 py-3 text-xs font-mono")}>
-                  {row.model ?? <span class={cn("text-muted-foreground")}>—</span>}
+                  {#if row.model}
+                    {row.model}
+                  {:else}
+                    <span class={cn("text-muted-foreground")}>—</span>
+                  {/if}
                 </td>
                 <td class={cn("px-4 py-3")}>
                   {#if row.embedProbe === "ok"}
@@ -200,7 +204,11 @@
                   {/if}
                 </td>
                 <td class={cn("px-4 py-3 text-xs")}>
-                  {row.dimensions ?? <span class={cn("text-muted-foreground")}>—</span>}
+                  {#if row.dimensions}
+                    {row.dimensions}
+                  {:else}
+                    <span class={cn("text-muted-foreground")}>—</span>
+                  {/if}
                 </td>
                 <td class={cn("px-4 py-3")}>
                   {#if row.action === "start"}

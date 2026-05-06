@@ -11,6 +11,7 @@ export interface Step { name: string; cmd: string[]; soft?: boolean; cwd?: strin
 
 const sandboxHome = join(tmpdir(), `fulcrum-ci-home-${process.pid}`);
 const webInstallCache = join(tmpdir(), `fulcrum-bun-install-cache-${process.pid}`);
+const hostHome = process.env["HOME"];
 mkdirSync(sandboxHome, { recursive: true });
 mkdirSync(webInstallCache, { recursive: true });
 
@@ -35,15 +36,15 @@ export const STEPS: Step[] = [
   // Web pipeline runs from the SvelteKit subpackage. svelte-kit + svelte-check
   // catch regressions that the root tsc cannot see because src/web is excluded.
   { name: "web:install", cmd: ["bun", "install", "--frozen-lockfile"], cwd: "src/web", env: { BUN_INSTALL_CACHE_DIR: webInstallCache } },
-  { name: "web:check",   cmd: ["bun", "run", "check"], cwd: "src/web", env: { NODE_OPTIONS: "--max-old-space-size=8192" } },
+  { name: "web:check",   cmd: ["bun", "run", "check"], cwd: "src/web", env: { NODE_OPTIONS: "--max-old-space-size=12288" } },
   { name: "web:build",   cmd: ["bun", "run", "build"], cwd: "src/web" },
   // Vitest unit tests for the SvelteKit subpackage — always-on.
   { name: "web:test",    cmd: ["bun", "run", "web:test"], cwd: "src/web" },
-  { name: "web:e2e:smoke", cmd: ["bun", "run", "web:e2e:smoke"], cwd: "src/web" },
+  { name: "web:e2e:smoke", cmd: ["bun", "run", "web:e2e:smoke"], cwd: "src/web", env: hostHome ? { HOME: hostHome } : undefined },
   { name: "ci:schemas", cmd: ["bun", "run", "scripts/ci-schemas.ts"] },
   // Playwright e2e — opt-in via FULCRUM_RUN_E2E=1.
   ...(process.env["FULCRUM_RUN_E2E"] === "1"
-    ? [{ name: "web:e2e:full", cmd: ["bun", "run", "web:e2e:full"], cwd: "src/web" } satisfies Step]
+    ? [{ name: "web:e2e:full", cmd: ["bun", "run", "web:e2e:full"], cwd: "src/web", env: hostHome ? { HOME: hostHome } : undefined } satisfies Step]
     : []),
 ];
 

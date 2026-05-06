@@ -18,15 +18,24 @@
   import { Input } from "$lib/components/ui/input/index.js";
 
   // ── Props ──────────────────────────────────────────────────────────
-  export let currentUserId: string = "";
-  export let customFieldDefs: Array<{
-    id: string;
-    name: string;
-    fieldType: string;
-    config?: Record<string, unknown>;
-  }> = [];
-  export let initialQuery: SavedViewQuery = { filters: [], text: "", facets: {} };
-  export let includeArchived: boolean = false;
+  interface Props {
+    currentUserId?: string;
+    customFieldDefs?: Array<{
+      id: string;
+      name: string;
+      fieldType: string;
+      config?: Record<string, unknown>;
+    }>;
+    initialQuery?: SavedViewQuery;
+    includeArchived?: boolean;
+  }
+
+  let {
+    currentUserId = "",
+    customFieldDefs = [],
+    initialQuery = { filters: [], text: "", facets: {} },
+    includeArchived = false,
+  }: Props = $props();
 
   const dispatch = createEventDispatcher<{
     filterChange: SavedViewQuery;
@@ -67,7 +76,7 @@
     { key: "title", label: "Title", type: "text" },
   ];
 
-  $: allFields = [
+  const allFields = $derived([
     ...BUILT_IN_FIELDS,
     ...customFieldDefs.map((cf) => ({
       key: `custom_fields.${cf.id}`,
@@ -76,7 +85,7 @@
       customFieldId: cf.id,
       options: getCustomFieldOptions(cf),
     } as FieldDef)),
-  ];
+  ]);
 
   function mapCustomFieldType(type: string): FieldDef["type"] {
     switch (type) {
@@ -149,8 +158,8 @@
   let newOp: FilterOp = "eq";
   let newValue: string = "";
 
-  $: selectedFieldDef = allFields.find((f) => f.key === newFieldKey);
-  $: availableOps = selectedFieldDef ? getOperators(selectedFieldDef.type) : [];
+  const selectedFieldDef = $derived(allFields.find((f) => f.key === newFieldKey));
+  const availableOps = $derived(selectedFieldDef ? getOperators(selectedFieldDef.type) : []);
 
   function addFilter() {
     if (!newFieldKey || !newOp) return;

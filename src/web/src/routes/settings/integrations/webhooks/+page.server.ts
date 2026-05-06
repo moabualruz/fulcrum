@@ -39,12 +39,12 @@ interface LoadEvent extends Omit<RouteEvent, "request"> {
 
 const subscriptions: WebhookSubscription[] = [];
 
-export function isNotifyWebhookEnabled(): boolean {
+export function _isNotifyWebhookEnabled(): boolean {
   const features = (process.env["FULCRUM_FEATURES"] ?? "").split(",").map((f) => f.trim());
   return features.includes("notify-webhook");
 }
 
-export function addSubscription(subscription: WebhookSubscription): void {
+export function _addSubscription(subscription: WebhookSubscription): void {
   subscriptions.push({
     id: subscription.id,
     url: subscription.url,
@@ -53,7 +53,7 @@ export function addSubscription(subscription: WebhookSubscription): void {
   });
 }
 
-export function getSubscriptions(): WebhookSubscription[] {
+export function _getSubscriptions(): WebhookSubscription[] {
   return subscriptions.map(({ id, url, eventPattern, createdAt }) => ({ id, url, eventPattern, createdAt }));
 }
 
@@ -108,9 +108,9 @@ async function trpcMutation(event: RouteEvent, procedure: string, input: unknown
 export const load: ServerLoad = async (event) => {
   const loadEvent = event as LoadEvent;
   if (!loadEvent.locals.session) throw redirect(302, "/auth/login");
-  if (!isNotifyWebhookEnabled()) throw error(404, "Webhook feature is not enabled");
+  if (!_isNotifyWebhookEnabled()) throw error(404, "Webhook feature is not enabled");
   if (!loadEvent.fetch || !loadEvent.url) {
-    return { subscriptions: getSubscriptions(), deliveries: [], channels: [] };
+    return { subscriptions: _getSubscriptions(), deliveries: [], channels: [] };
   }
 
   const [rules, channels, webhooks] = await Promise.all([
@@ -129,12 +129,12 @@ export const load: ServerLoad = async (event) => {
     subscriptions: Array.isArray(rules)
       ? rules.filter((rule) => Array.isArray(rule.channels) && rule.channels.includes("webhook"))
       : [],
-    deliveries: mapWebhookDeliveries(deliveryGroups.flat()),
+    deliveries: _mapWebhookDeliveries(deliveryGroups.flat()),
     channels: Array.isArray(channels) ? channels : [],
   };
 };
 
-export function mapWebhookDeliveries(rows: unknown[]): WebhookDeliveryDebugRow[] {
+export function _mapWebhookDeliveries(rows: unknown[]): WebhookDeliveryDebugRow[] {
   return rows.map((row) => {
     const record = row as Record<string, unknown>;
     const responseCode = numberOrNull(record["responseStatus"] ?? record["responseCode"]);
@@ -163,7 +163,7 @@ export const actions: Actions = {
   create: async (event) => {
     const routeEvent = event as RouteEvent;
     if (!routeEvent.locals.session) throw redirect(302, "/auth/login");
-    if (!isNotifyWebhookEnabled()) throw error(404, "Webhook feature is not enabled");
+    if (!_isNotifyWebhookEnabled()) throw error(404, "Webhook feature is not enabled");
 
     const form = await routeEvent.request.formData();
     const url = String(form.get("url") ?? "").trim();
@@ -201,7 +201,7 @@ export const actions: Actions = {
   resend: async (event) => {
     const routeEvent = event as RouteEvent;
     if (!routeEvent.locals.session) throw redirect(302, "/auth/login");
-    if (!isNotifyWebhookEnabled()) throw error(404, "Webhook feature is not enabled");
+    if (!_isNotifyWebhookEnabled()) throw error(404, "Webhook feature is not enabled");
     const form = await routeEvent.request.formData();
     const deliveryId = String(form.get("deliveryId") ?? "").trim();
     if (!deliveryId) return fail(400, { resendError: "Delivery id is required" });

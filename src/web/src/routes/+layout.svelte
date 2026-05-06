@@ -83,15 +83,25 @@
 	$effect(() => {
 		toastFromForm(page.form as Parameters<typeof toastFromForm>[0]);
 	});
+
+	$effect(() => {
+		if (typeof window === "undefined") return;
+		document.body.dataset.fulcrumHydrated = "true";
+		const handler = makeKeydownHandler(() => paletteOpen, (next) => (paletteOpen = next));
+		window.addEventListener("keydown", handler);
+		return () => {
+			delete document.body.dataset.fulcrumHydrated;
+			window.removeEventListener("keydown", handler);
+		};
+	});
 </script>
 
 <svelte:head>
+	<title>Fulcrum</title>
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
 <ModeWatcher />
-
-<svelte:window onkeydown={makeKeydownHandler(() => paletteOpen, (next) => (paletteOpen = next))} />
 
 <!-- Toast region: aria-live so screen readers announce toasts without overwhelming them -->
 <div

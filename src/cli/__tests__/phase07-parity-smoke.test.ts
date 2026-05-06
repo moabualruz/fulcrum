@@ -103,7 +103,7 @@ describe("phase 07 cross-surface parity smoke", () => {
   test("webhook settings route exposes delivery debug metadata without secrets", async () => {
     process.env["FULCRUM_FEATURES"] = "notify-webhook";
     const mod = await import("../../web/src/routes/settings/integrations/webhooks/+page.server.ts");
-    const rows = mod.mapWebhookDeliveries([
+    const rows = mod._mapWebhookDeliveries([
       {
         id: "delivery-1",
         eventType: "artifact.created",

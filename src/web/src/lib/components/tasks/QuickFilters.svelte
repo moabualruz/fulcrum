@@ -9,9 +9,13 @@
   import { SavedViewQuerySchema } from "../../../../../filters/ast.ts";
   import { Button } from "$lib/components/ui/button/index.js";
 
-  export let currentUserId: string = "";
-  export let activePreset: string | null = null;
-  export let includeArchived: boolean = false;
+  interface Props {
+    currentUserId?: string;
+    activePreset?: string | null;
+    includeArchived?: boolean;
+  }
+
+  let { currentUserId = "", activePreset = null, includeArchived = false }: Props = $props();
 
   const dispatch = createEventDispatcher<{
     filterChange: { query: SavedViewQuery; preset: string | null };

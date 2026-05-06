@@ -47,12 +47,16 @@
 
   // ── Props ────────────────────────────────────────────────────────────────────
 
-  export let sprintId: string;
-  export let trpc: {
+  interface Props {
+    sprintId: string;
+    trpc?: {
     sprints: {
       get: { query: (input: { id: string }) => Promise<SprintData | null> };
     };
-  } | null = null;
+    } | null;
+  }
+
+  let { sprintId, trpc = null }: Props = $props();
 
   // ── State ────────────────────────────────────────────────────────────────────
 
@@ -106,6 +110,10 @@
   function velocityAvg(history: VelocityEntry[]): number {
     if (!history.length) return 0;
     return Math.round(history.reduce((s, e) => s + e.completedPoints, 0) / history.length);
+  }
+
+  function velocityMax(history: VelocityEntry[]): number {
+    return Math.max(...history.map((e) => e.completedPoints), 1);
   }
 </script>
 
@@ -171,10 +179,9 @@
             <div class={cn("flex items-center gap-3")}>
               <div class={cn("text-xs text-muted-foreground w-32 truncate")}>{entry.sprintName}</div>
               <div class={cn("flex-1 h-4 bg-muted rounded-full overflow-hidden")}>
-                {@const maxPts = Math.max(...sprint.velocityHistory!.map((e) => e.completedPoints), 1)}
                 <div
                   class={cn("h-full bg-primary/60 rounded-full transition-all")}
-                  style="width: {(entry.completedPoints / maxPts) * 100}%"
+                  style="width: {(entry.completedPoints / velocityMax(sprint.velocityHistory!)) * 100}%"
                 />
               </div>
               <div class={cn("text-xs font-medium w-8 text-right tabular-nums")}>{entry.completedPoints}</div>

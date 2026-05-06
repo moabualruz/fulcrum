@@ -9,12 +9,16 @@
   import { Input } from "$lib/components/ui/input/index.js";
   import * as Select from "$lib/components/ui/select/index.js";
 
-  export let customFieldDefs: Array<{
-    id: string;
-    name: string;
-    fieldType: string;
-    config?: Record<string, unknown>;
-  }> = [];
+  interface Props {
+    customFieldDefs?: Array<{
+      id: string;
+      name: string;
+      fieldType: string;
+      config?: Record<string, unknown>;
+    }>;
+  }
+
+  let { customFieldDefs = [] }: Props = $props();
 
   const dispatch = createEventDispatcher<{
     patch: Record<string, unknown>;
@@ -26,8 +30,8 @@
   let fieldValue: unknown = undefined;
   let multiSelectValues: string[] = [];
 
-  $: selectedField = customFieldDefs.find((f) => f.id === selectedFieldId);
-  $: fieldOptions = getOptions(selectedField);
+  const selectedField = $derived(customFieldDefs.find((f) => f.id === selectedFieldId));
+  const fieldOptions = $derived(getOptions(selectedField));
 
   function getOptions(field: typeof customFieldDefs[0] | undefined): Array<{ value: string; label: string }> {
     if (!field) return [];

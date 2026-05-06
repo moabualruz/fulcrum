@@ -6,7 +6,6 @@
  */
 
 import { create, insert, search as oramaSearch, count } from "@orama/orama";
-import { persist, restore } from "@orama/plugin-data-persistence";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -57,16 +56,23 @@ export interface SearchResult {
 
 export class OramaIndex {
   private db: OramaDB | null = null;
+  private documents: SearchDocument[] = [];
 
   /** Hydrate from a serialized JSON snapshot (from search.snapshot tRPC endpoint). */
   async hydrate(snapshot: string): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.db = await restore("json", snapshot as any) as OramaDB;
+    if (!snapshot) {
+      this.db = null;
+      this.documents = [];
+      return;
+    }
+    const docs = JSON.parse(snapshot) as SearchDocument[];
+    await this.build(Array.isArray(docs) ? docs : []);
   }
 
   /** Build index from documents directly (for testing / bench). */
   async build(docs: SearchDocument[]): Promise<void> {
     this.db = await create({ schema: SCHEMA });
+    this.documents = [...docs];
     for (const doc of docs) {
       await insert(this.db, doc as Record<string, unknown>);
     }
@@ -98,7 +104,7 @@ export class OramaIndex {
   /** Serialize current index to JSON string for SSR transfer. */
   async serialize(): Promise<string> {
     if (!this.db) return "";
-    return persist(this.db, "json") as unknown as string;
+    return JSON.stringify(this.documents);
   }
 
   /** Number of documents currently indexed. */

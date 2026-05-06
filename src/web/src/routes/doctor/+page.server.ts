@@ -185,12 +185,9 @@ const CHECKS: CheckFn[] = [
 // runAll — exported for CLI / test reuse
 // ----------------------------------------------------------------------------
 
-async function _runAll(): Promise<SubsystemCheckResult[]> {
+export async function _runAll(): Promise<SubsystemCheckResult[]> {
   return Promise.all(CHECKS.map((fn) => fn()));
 }
-
-/** Exported for CLI / test reuse. */
-export const runAll = _runAll;
 
 // ----------------------------------------------------------------------------
 // SvelteKit load
