@@ -15,6 +15,8 @@ const RUNTIME_ADAPTER_ROOTS = [
   "src/trpc",
 ];
 
+const TEST_FIXTURE_ROOTS = ["src", "src/web/tests"];
+
 const EXPECTED_RUNTIME_DIRECT_ACCESS_FILES = [
   "src/web/src/routes/api/repos/[id]/tree/+server.ts",
   "src/web/src/routes/orchestration/+page.server.ts",
@@ -188,6 +190,13 @@ const EXACT_LEGACY_INFRASTRUCTURE_ALLOWLIST = [
 const FORBIDDEN_INTERFACE_ACCESS =
   /\b(openPglite|openProductDb|getProductDb|ProductDb)\b|from\s+["'][^"']*product-kernel[^"']*["']/;
 
+const FORBIDDEN_TEST_FIXTURE_ACCESS = new RegExp(
+  [
+    String.raw`\b(open${"Pglite"}|open${"ProductDb"}|get${"ProductDb"}|${"ProductDb"})\b`,
+    String.raw`from\s+["'][^"']*product-${"kernel"}[^"']*["']`,
+  ].join("|"),
+);
+
 async function collectSourceFiles(root: string): Promise<string[]> {
   const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
   const files = await Promise.all(entries.map(async (entry) => {
@@ -202,8 +211,33 @@ async function collectSourceFiles(root: string): Promise<string[]> {
   return files.flat();
 }
 
+async function collectTestFiles(root: string): Promise<string[]> {
+  const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
+  const files = await Promise.all(entries.map(async (entry) => {
+    const path = join(root, entry.name);
+    if (entry.isDirectory()) return collectTestFiles(path);
+    if (!entry.isFile()) return [];
+    if (path.includes("/node_modules/") || path.includes("/.svelte-kit/")) return [];
+    if (path.endsWith(".test.ts") || path.endsWith(".spec.ts") || path.includes("src/web/tests/")) {
+      return [path];
+    }
+    return [];
+  }));
+  return files.flat();
+}
+
 async function violations(roots: readonly string[], pattern: RegExp): Promise<string[]> {
   const files = (await Promise.all(roots.map(collectSourceFiles))).flat();
+  const found: string[] = [];
+  for (const file of files) {
+    const text = await readFile(file, "utf8");
+    if (pattern.test(text)) found.push(relative(process.cwd(), file));
+  }
+  return found.sort();
+}
+
+async function testFixtureViolations(roots: readonly string[], pattern: RegExp): Promise<string[]> {
+  const files = Array.from(new Set((await Promise.all(roots.map(collectTestFiles))).flat()));
   const found: string[] = [];
   for (const file of files) {
     const text = await readFile(file, "utf8");
@@ -259,6 +293,15 @@ describe("Phase 9.5 interface boundary", () => {
       "legacy service wrappers",
     ]);
     expect(EXACT_LEGACY_INFRASTRUCTURE_ALLOWLIST.every((entry) => entry.reason.length > 20)).toBe(true);
+  });
+
+  test("test fixtures do not import product-kernel or open database handles directly", async () => {
+    const found = await testFixtureViolations(TEST_FIXTURE_ROOTS, FORBIDDEN_TEST_FIXTURE_ACCESS);
+    expect(found).toContain("src/web/tests/e2e/fixtures.ts");
+    expect(found).toContain("src/web/src/routes/page.server.test.ts");
+    expect(found).toContain("src/cli/interactive/init.test.ts");
+    expect(found).toContain("src/search/query-service.test.ts");
+    expect(found).toEqual([]);
   });
 
   test("R-11 subscriptions do not import or depend on PGlite/pglite directly", async () => {
