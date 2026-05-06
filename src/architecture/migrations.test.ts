@@ -14,8 +14,7 @@ async function collectSourceFiles(root: string): Promise<string[]> {
     if (!path.endsWith(".ts")) return [];
     if (path.endsWith(".test.ts") || path.endsWith(".spec.ts") || path.includes("/__tests__/")) return [];
     if (path.includes("/node_modules/") || path.includes("/.svelte-kit/")) return [];
-    if (path === "../test-support/product-fixtures.ts") return [];
-    if (path.includes("../test-support/product-fixtures.ts")) return [];
+    if (path === "src/test-support/product-fixtures.ts") return [];
     return [path];
   }));
   return files.flat();
