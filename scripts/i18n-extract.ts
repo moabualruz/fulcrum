@@ -5,12 +5,14 @@ import { join, relative } from "node:path";
 interface CheckInput {
   roots?: string[];
   catalogPath?: string;
+  localeCatalogPaths?: string[];
 }
 
 export interface I18nCheckResult {
   ok: boolean;
   missing: string[];
   extra: string[];
+  missingLocaleKeys: Array<{ locale: string; missing: string[] }>;
   referenced: string[];
   catalog: string[];
 }
@@ -22,6 +24,7 @@ const SOURCE_EXTENSIONS = new Set([".ts", ".svelte"]);
 export async function checkI18nCatalog(input: CheckInput = {}): Promise<I18nCheckResult> {
   const roots = input.roots ?? DEFAULT_ROOTS;
   const catalogPath = input.catalogPath ?? DEFAULT_CATALOG;
+  const localeCatalogPaths = input.localeCatalogPaths ?? ["src/i18n/locales/fr.json", "src/i18n/locales/ar.json"];
   const referenced = new Set<string>();
 
   for (const root of roots) {
@@ -38,14 +41,32 @@ export async function checkI18nCatalog(input: CheckInput = {}): Promise<I18nChec
   const referencedKeys = [...referenced].sort();
   const missing = referencedKeys.filter((key) => !catalogSet.has(key));
   const extra = catalog.filter((key) => !referenced.has(key));
+  const missingLocaleKeys = await missingKeysInLocaleCatalogs(catalog, localeCatalogPaths);
 
   return {
-    ok: missing.length === 0 && extra.length === 0,
+    ok: missing.length === 0 && extra.length === 0 && missingLocaleKeys.length === 0,
     missing,
     extra,
+    missingLocaleKeys,
     referenced: referencedKeys,
     catalog,
   };
+}
+
+async function missingKeysInLocaleCatalogs(
+  baseCatalog: readonly string[],
+  localeCatalogPaths: readonly string[],
+): Promise<Array<{ locale: string; missing: string[] }>> {
+  const results: Array<{ locale: string; missing: string[] }> = [];
+  for (const path of localeCatalogPaths) {
+    const localeCatalog = new Set(flattenCatalog(JSON.parse(await readFile(path, "utf8"))));
+    const missing = baseCatalog.filter((key) => !localeCatalog.has(key));
+    if (missing.length > 0) {
+      const locale = path.split("/").at(-1)?.replace(/\.json$/, "") ?? path;
+      results.push({ locale, missing });
+    }
+  }
+  return results;
 }
 
 async function sourceFiles(root: string): Promise<string[]> {
@@ -78,6 +99,9 @@ if (import.meta.main) {
   if (!result.ok) {
     for (const key of result.missing) console.error(`missing i18n key: ${key}`);
     for (const key of result.extra) console.error(`orphaned i18n key: ${key}`);
+    for (const locale of result.missingLocaleKeys) {
+      for (const key of locale.missing) console.error(`missing ${locale.locale} i18n key: ${key}`);
+    }
     process.exit(1);
   }
   console.log(`i18n catalog ok (${result.catalog.length} keys, ${result.referenced.length} referenced)`);

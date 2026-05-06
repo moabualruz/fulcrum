@@ -1,6 +1,17 @@
 import { describe, expect, test } from "bun:test";
 
-import { dirForLocale, isI18nEnabled, setLocale, t } from "./index.ts";
+import { dirForLocale, isI18nEnabled, normalizeLocale, setLocale, t } from "./index.ts";
+
+const SETTINGS_TITLE_KEYS = [
+  "settings.i18n.title",
+  "settings.theme.title",
+  "settings.telemetry.title",
+  "settings.errors.title",
+  "settings.backups.title",
+  "settings.data.title",
+  "settings.secrets.title",
+  "settings.audit.title",
+] as const;
 
 describe("i18n", () => {
   test("t resolves English and Arabic strings when i18n flag is on", () => {
@@ -30,6 +41,20 @@ describe("i18n", () => {
     } finally {
       if (previous === undefined) delete process.env["FULCRUM_FEATURES"];
       else process.env["FULCRUM_FEATURES"] = previous;
+    }
+  });
+
+  test("normalizes unsupported locales to English", () => {
+    expect(normalizeLocale("fr")).toBe("fr");
+    expect(normalizeLocale("AR")).toBe("ar");
+    expect(normalizeLocale("de")).toBe("en");
+  });
+
+  test("settings title keys exist in en, fr, and ar catalogs", () => {
+    for (const key of SETTINGS_TITLE_KEYS) {
+      expect(t(key, "en")).not.toBe(key);
+      expect(t(key, "fr")).not.toBe(key);
+      expect(t(key, "ar")).not.toBe(key);
     }
   });
 });

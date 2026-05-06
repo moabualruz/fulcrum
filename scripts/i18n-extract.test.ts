@@ -37,4 +37,25 @@ describe("i18n extraction gate", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  test("fails when fr or ar catalogs are missing locale keys", async () => {
+    const root = await mkdtemp(join(tmpdir(), "fulcrum-i18n-locale-missing-"));
+    try {
+      await writeFile(join(root, "component.ts"), `t("settings.i18n.title");\n`);
+      await writeFile(join(root, "en.json"), JSON.stringify({ settings: { i18n: { title: "Language" } } }));
+      await writeFile(join(root, "fr.json"), JSON.stringify({ settings: { i18n: { title: "Langue" } } }));
+      await writeFile(join(root, "ar.json"), JSON.stringify({ settings: { i18n: {} } }));
+
+      const result = await checkI18nCatalog({
+        roots: [root],
+        catalogPath: join(root, "en.json"),
+        localeCatalogPaths: [join(root, "fr.json"), join(root, "ar.json")],
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.missingLocaleKeys).toEqual([{ locale: "ar", missing: ["settings.i18n.title"] }]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });

@@ -2,6 +2,32 @@
   "common": {
     "save": "[fr]Save"
   },
+  "settings": {
+    "i18n": {
+      "title": "[fr]Language"
+    },
+    "theme": {
+      "title": "[fr]Theme"
+    },
+    "telemetry": {
+      "title": "[fr]Telemetry"
+    },
+    "errors": {
+      "title": "[fr]Errors"
+    },
+    "backups": {
+      "title": "[fr]Backups"
+    },
+    "data": {
+      "title": "[fr]Data"
+    },
+    "secrets": {
+      "title": "[fr]Secrets"
+    },
+    "audit": {
+      "title": "[fr]Audit"
+    }
+  },
   "tasks": {
     "noDueDate": "[fr]No due date"
   }
