@@ -144,12 +144,30 @@ export async function runSecrets(argv: readonly string[], opts: CliOptions = {})
 export async function runErrors(argv: readonly string[], opts: CliOptions = {}): Promise<void> {
   const { print } = io(opts);
   const [sub = "help"] = argv;
-  if (sub !== "list") return fail(opts, `fulcrum errors: unknown command '${sub}'`, 2);
-  const sinceValue = option(argv, "--since");
-  const rows = await opts.caller?.errorLogs.list({
-    since: sinceValue ? new Date(`${sinceValue}T00:00:00.000Z`) : undefined,
-  });
-  jsonOrText(print, has(argv, "--json"), rows, rows.map((row: { id: string; errorMessage: string }) => `${row.id} ${row.errorMessage}`).join("\n"));
+  if (sub === "list") {
+    const sinceValue = option(argv, "--since");
+    const rows = await opts.caller?.errorLogs.list({
+      since: sinceValue ? new Date(`${sinceValue}T00:00:00.000Z`) : undefined,
+    });
+    jsonOrText(print, has(argv, "--json"), rows, rows.map((row: { id: string; errorMessage: string }) => `${row.id} ${row.errorMessage}`).join("\n"));
+    return;
+  }
+
+  if (sub === "get") {
+    const id = positionals(argv.slice(1))[0];
+    if (!id) return fail(opts, "fulcrum errors get: missing required argument <id>", 2);
+    const row = await opts.caller?.errorLogs.get({ id });
+    jsonOrText(print, has(argv, "--json"), row, `${row.id} ${row.errorMessage}`);
+    return;
+  }
+
+  if (sub === "purge") {
+    const result = await opts.caller?.errorLogs.clear({});
+    jsonOrText(print, has(argv, "--json"), result, `deleted=${result.deleted}`);
+    return;
+  }
+
+  return fail(opts, `fulcrum errors: unknown command '${sub}'`, 2);
 }
 
 export async function runBackup(argv: readonly string[], opts: CliOptions = {}): Promise<void> {
@@ -182,9 +200,31 @@ export async function runRestore(argv: readonly string[], opts: CliOptions = {})
 export async function runTelemetry(argv: readonly string[], opts: CliOptions = {}): Promise<void> {
   const { print } = io(opts);
   const [sub = "help"] = argv;
-  if (sub !== "status") return fail(opts, `fulcrum telemetry: unknown command '${sub}'`, 2);
-  const result = await opts.caller?.telemetry.status({});
-  jsonOrText(print, has(argv, "--json"), result, `opted_in=${result.opted_in} row_count=${result.row_count}`);
+  if (sub === "status") {
+    const result = await opts.caller?.telemetry.status({});
+    jsonOrText(print, has(argv, "--json"), result, `opted_in=${result.opted_in} row_count=${result.row_count}`);
+    return;
+  }
+
+  if (sub === "opt-in") {
+    const result = await opts.caller?.telemetry.optIn({});
+    jsonOrText(print, has(argv, "--json"), result, "opted in");
+    return;
+  }
+
+  if (sub === "opt-out") {
+    const result = await opts.caller?.telemetry.optOut({});
+    jsonOrText(print, has(argv, "--json"), result, "opted out");
+    return;
+  }
+
+  if (sub === "purge") {
+    const result = await opts.caller?.telemetry.purge({});
+    jsonOrText(print, has(argv, "--json"), result, `deleted=${result.deleted}`);
+    return;
+  }
+
+  fail(opts, `fulcrum telemetry: unknown command '${sub}'`, 2);
 }
 
 export async function runDataExport(argv: readonly string[], opts: CliOptions = {}): Promise<void> {

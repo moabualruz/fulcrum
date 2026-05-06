@@ -168,6 +168,33 @@ describe("cross-cutting CLI surfaces", () => {
     expect(JSON.parse(h.lines[0] as string)).toEqual([{ id: "err-1", errorMessage: "boom" }]);
   });
 
+  it("error-logs get and purge emit JSON", async () => {
+    const { runErrors } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const getHarness = harness();
+    await runErrors(["get", "err-1", "--json"], {
+      caller: {
+        errorLogs: {
+          get: async (input: { id: string }) => ({ id: input.id, errorMessage: "boom" }),
+        },
+      },
+      ...getHarness,
+    });
+
+    expect(JSON.parse(getHarness.lines[0] as string)).toEqual({ id: "err-1", errorMessage: "boom" });
+
+    const purgeHarness = harness();
+    await runErrors(["purge", "--json"], {
+      caller: {
+        errorLogs: {
+          clear: async () => ({ ok: true, deleted: 2 }),
+        },
+      },
+      ...purgeHarness,
+    });
+
+    expect(JSON.parse(purgeHarness.lines[0] as string)).toEqual({ ok: true, deleted: 2 });
+  });
+
   it("backup --output writes dump, reports progress on stderr, and emits manifest JSON", async () => {
     const { runBackup } = await import("../../src/cli/commands/cross-cutting-platform.ts");
 
@@ -234,6 +261,28 @@ describe("cross-cutting CLI surfaces", () => {
     });
 
     expect(JSON.parse(h.lines[0] as string)).toEqual({ opted_in: false, row_count: 7 });
+  });
+
+  it("telemetry opt-in, opt-out, and purge emit JSON", async () => {
+    const { runTelemetry } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const h = harness();
+    const calls: string[] = [];
+
+    for (const argv of [["opt-in", "--json"], ["opt-out", "--json"], ["purge", "--json"]] as const) {
+      await runTelemetry(argv, {
+        caller: {
+          telemetry: {
+            optIn: async () => { calls.push("opt-in"); return { ok: true }; },
+            optOut: async () => { calls.push("opt-out"); return { ok: true }; },
+            purge: async () => { calls.push("purge"); return { ok: true, deleted: 3 }; },
+          },
+        },
+        ...h,
+      });
+    }
+
+    expect(calls).toEqual(["opt-in", "opt-out", "purge"]);
+    expect(h.lines.map((line) => JSON.parse(line))).toEqual([{ ok: true }, { ok: true }, { ok: true, deleted: 3 }]);
   });
 
   it("flags set validates rollout percent and emits requested shape", async () => {
