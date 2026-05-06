@@ -4,7 +4,7 @@ import { cancelRunAction, retryRunAction, type RunStatus } from "$lib/server/run
 import { getWorkspaceDiff, paginateLogs } from "$lib/server/agents";
 import { actionOk } from "$lib/feedback/action-result";
 import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
-import { getRun } from "../../../../../../application/runs/queries.ts";
+import { getRunDetail } from "../../../../../../application/runs/queries.ts";
 import { listArtifacts } from "../../../../../../application/artifacts/queries.ts";
 import { Event } from "../../../../../../db/entities/core/Event.ts";
 
@@ -51,22 +51,22 @@ export const load: PageServerLoad = ({ params, locals }) => {
         const ctx = { orgId, userId: null, projectId: locals?.activeProjectId ?? null };
         let runDto;
         try {
-          runDto = await getRun(em, ctx, params.id);
+          runDto = await getRunDetail(em, ctx, params.id);
         } catch {
           throw error(404, "Run not found");
         }
         const run: AgentRunDetail = {
           id: runDto.id,
           org_id: runDto.orgId,
-          project_id: ctx.projectId ?? null,
+          project_id: runDto.projectId,
           agent: runDto.agentName ?? "",
-          model: null,
+          model: runDto.model,
           prompt: runDto.prompt,
           status: (runDto.status ?? "queued") as RunStatus,
-          parent_run_id: null,
-          started_at: runDto.createdAt,
-          ended_at: null,
-          transcript_path: null,
+          parent_run_id: runDto.parentRunId,
+          started_at: runDto.startedAt,
+          ended_at: runDto.endedAt,
+          transcript_path: runDto.transcriptPath,
         };
 
         let transcript: string | null = null;
