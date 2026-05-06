@@ -1,9 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
+import { DomainEventOutbox } from "../db/entities/platform/DomainEventOutbox.ts";
+import { DEFAULT_ORG_ID } from "../db/seed.ts";
+import { createTestOrm } from "../test-utils/db.ts";
 import {
   createOutboxWorker,
+  dispatchPendingOutboxEvents,
   serializeOutboxEvent,
   topicForOutboxEvent,
+  writeOutboxEvent,
   type OutboxDispatcher,
   type OutboxEventInput,
 } from "./outbox.ts";
@@ -60,5 +65,45 @@ describe("application outbox worker contract", () => {
 
     expect(worker.pollingIntervalMs).toBe(250);
     expect(worker.supportsNotifyFastPath).toBe(true);
+  });
+});
+
+describe("application outbox CR-01 repeat-event dispatch", () => {
+  test("CR-01 writes and dispatches two later events for one subject", async () => {
+    const db = await createTestOrm();
+    try {
+      const em = db.em.fork();
+      const baseEvent = {
+        orgId: DEFAULT_ORG_ID,
+        projectId: "22222222-2222-4222-8222-222222222222",
+        verb: "task.updated",
+        subjectKind: "task",
+        subjectId: "33333333-3333-4333-8333-333333333333",
+      };
+      await writeOutboxEvent(em, { ...baseEvent, payload: { title: "first" } });
+      await writeOutboxEvent(em, { ...baseEvent, payload: { title: "second" } });
+      await em.flush();
+
+      const rows = await em.find(DomainEventOutbox, {
+        org: DEFAULT_ORG_ID,
+        verb: "task.updated",
+        subjectId: baseEvent.subjectId,
+        processedAt: null,
+      } as never);
+      const published: unknown[] = [];
+      const result = await dispatchPendingOutboxEvents(em, {
+        eventBus: {
+          publish(_topic, payload) {
+            published.push(payload);
+          },
+        },
+      });
+
+      expect(rows).toHaveLength(2);
+      expect(result.dispatched).toBe(2);
+      expect(published).toHaveLength(2);
+    } finally {
+      await db.close();
+    }
   });
 });
