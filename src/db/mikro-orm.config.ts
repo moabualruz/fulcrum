@@ -51,12 +51,21 @@ import { AgentRun } from "./entities/orchestration/AgentRun.ts";
 import { WorkflowDefinition } from "./entities/orchestration/WorkflowDefinition.ts";
 import { RoutingRule } from "./entities/router/RoutingRule.ts";
 import { AgentProfile, Artifact, Edge } from "./entities/sandbox/index.ts";
-import { Repo, RepoBranch, RepoCommit, RepoFilesIndex } from "./entities/repos/index.ts";
+import { Repo, RepoBlameLine, RepoBranch, RepoCommit, RepoFilesIndex, RepoTreeEntry } from "./entities/repos/index.ts";
 import { Job } from "./entities/jobs/Job.ts";
 import { SearchDocument } from "./entities/search/SearchDocument.ts";
 import { ModelCache } from "./entities/inference/ModelCache.ts";
 import { ProviderCredential } from "./entities/inference/ProviderCredential.ts";
-import { ConnectorSyncLog } from "./entities/connectors/ConnectorSyncLog.ts";
+import {
+  BitbucketIssue,
+  BitbucketPullRequest,
+  ConnectorSyncLog,
+  GithubConnectorState,
+  GitlabIssue,
+  GitlabMergeRequest,
+} from "./entities/connectors/index.ts";
+import { AuditEvent, AuditExport } from "./entities/audit/index.ts";
+import { ConnectorCredential } from "./entities/settings/index.ts";
 
 // Flag-stub entities (P1#03 — gated behind feature flags by later pillars).
 import { CasbinRule } from "./entities/flags/CasbinRule.ts";
@@ -119,11 +128,21 @@ export {
   RepoBranch,
   RepoCommit,
   RepoFilesIndex,
+  RepoTreeEntry,
+  RepoBlameLine,
   Job,
   SearchDocument,
   ModelCache,
   ProviderCredential,
   ConnectorSyncLog,
+  BitbucketPullRequest,
+  BitbucketIssue,
+  GitlabMergeRequest,
+  GitlabIssue,
+  GithubConnectorState,
+  AuditEvent,
+  AuditExport,
+  ConnectorCredential,
   CasbinRule,
   WebhookSubscription,
   NotificationRule,
@@ -212,11 +231,21 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     RepoBranch,
     RepoCommit,
     RepoFilesIndex,
+    RepoTreeEntry,
+    RepoBlameLine,
     Job,
     SearchDocument,
     ModelCache,
     ProviderCredential,
     ConnectorSyncLog,
+    BitbucketPullRequest,
+    BitbucketIssue,
+    GitlabMergeRequest,
+    GitlabIssue,
+    GithubConnectorState,
+    AuditEvent,
+    AuditExport,
+    ConnectorCredential,
     CasbinRule,
     WebhookSubscription,
     NotificationRule,

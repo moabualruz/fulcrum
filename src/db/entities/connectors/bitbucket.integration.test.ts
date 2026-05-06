@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { createTestOrm, type TestOrm } from "../../../test-utils/db.ts";
+import type { EntityManager } from "@mikro-orm/postgresql";
+
 import { Org } from "../auth/Org.ts";
 import {
   BitbucketIssue,
@@ -17,17 +19,18 @@ afterEach(async () => {
   db = undefined;
 });
 
-async function setup(): Promise<{ db: TestOrm; org: Org }> {
+async function setup(): Promise<{ db: TestOrm; em: EntityManager; org: Org }> {
   db = await createTestOrm();
-  const org = await db.em.findOneOrFail(Org, { id: db.seed.orgId });
-  return { db, org };
+  const em = db.orm.em.fork();
+  const org = await em.findOneOrFail(Org, { id: db.seed.orgId });
+  return { db, em, org };
 }
 
 describe("connector domain MikroORM entities", () => {
   it("persists and reloads BitbucketPullRequest and BitbucketIssue with org/project FKs", async () => {
-    const { db, org } = await setup();
+    const { em, org } = await setup();
 
-    const pullRequest = db.em.create(BitbucketPullRequest, {
+    const pullRequest = em.create(BitbucketPullRequest, {
       org,
       projectId: "project-alpha",
       repoSlug: "fulcrum",
@@ -37,7 +40,7 @@ describe("connector domain MikroORM entities", () => {
       url: "https://bitbucket.example/pr/42",
       payload: { source: "branch-a" },
     });
-    const issue = db.em.create(BitbucketIssue, {
+    const issue = em.create(BitbucketIssue, {
       org,
       projectId: "project-alpha",
       repoSlug: "fulcrum",
@@ -48,13 +51,14 @@ describe("connector domain MikroORM entities", () => {
       payload: { priority: "high" },
     });
 
-    await db.em.persistAndFlush([pullRequest, issue]);
-    db.em.clear();
+    em.persist([pullRequest, issue]);
+    await em.flush();
+    em.clear();
 
-    const reloadedPr = await db.em.findOneOrFail(BitbucketPullRequest, {
+    const reloadedPr = await em.findOneOrFail(BitbucketPullRequest, {
       pullRequestId: "bb-pr-42",
     }, { populate: ["org"] });
-    const reloadedIssue = await db.em.findOneOrFail(BitbucketIssue, {
+    const reloadedIssue = await em.findOneOrFail(BitbucketIssue, {
       issueId: "bb-issue-7",
     }, { populate: ["org"] });
 
@@ -65,9 +69,9 @@ describe("connector domain MikroORM entities", () => {
   });
 
   it("persists and reloads GitlabMergeRequest and GitlabIssue with org/project FKs", async () => {
-    const { db, org } = await setup();
+    const { em, org } = await setup();
 
-    const mergeRequest = db.em.create(GitlabMergeRequest, {
+    const mergeRequest = em.create(GitlabMergeRequest, {
       org,
       projectId: "project-beta",
       repoPath: "group/fulcrum",
@@ -77,7 +81,7 @@ describe("connector domain MikroORM entities", () => {
       url: "https://gitlab.example/group/fulcrum/-/merge_requests/12",
       payload: { targetBranch: "main" },
     });
-    const issue = db.em.create(GitlabIssue, {
+    const issue = em.create(GitlabIssue, {
       org,
       projectId: "project-beta",
       repoPath: "group/fulcrum",
@@ -88,13 +92,14 @@ describe("connector domain MikroORM entities", () => {
       payload: { labels: ["architecture"] },
     });
 
-    await db.em.persistAndFlush([mergeRequest, issue]);
-    db.em.clear();
+    em.persist([mergeRequest, issue]);
+    await em.flush();
+    em.clear();
 
-    const reloadedMr = await db.em.findOneOrFail(GitlabMergeRequest, {
+    const reloadedMr = await em.findOneOrFail(GitlabMergeRequest, {
       mergeRequestIid: "12",
     }, { populate: ["org"] });
-    const reloadedIssue = await db.em.findOneOrFail(GitlabIssue, {
+    const reloadedIssue = await em.findOneOrFail(GitlabIssue, {
       issueIid: "33",
     }, { populate: ["org"] });
 
@@ -105,9 +110,9 @@ describe("connector domain MikroORM entities", () => {
   });
 
   it("persists and reloads GithubConnectorState with org/project FKs", async () => {
-    const { db, org } = await setup();
+    const { em, org } = await setup();
 
-    const state = db.em.create(GithubConnectorState, {
+    const state = em.create(GithubConnectorState, {
       org,
       projectId: "project-gamma",
       installationId: "installation-9",
@@ -116,10 +121,11 @@ describe("connector domain MikroORM entities", () => {
       payload: { permissions: ["pull_requests"] },
     });
 
-    await db.em.persistAndFlush(state);
-    db.em.clear();
+    em.persist(state);
+    await em.flush();
+    em.clear();
 
-    const reloaded = await db.em.findOneOrFail(GithubConnectorState, {
+    const reloaded = await em.findOneOrFail(GithubConnectorState, {
       installationId: "installation-9",
     }, { populate: ["org"] });
 

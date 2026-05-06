@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
+import type { EntityManager } from "@mikro-orm/postgresql";
 
 import { createTestOrm, type TestOrm } from "../../../test-utils/db.ts";
 import { Org } from "../auth/Org.ts";
@@ -11,17 +12,18 @@ afterEach(async () => {
   db = undefined;
 });
 
-async function setup(): Promise<{ db: TestOrm; org: Org }> {
+async function setup(): Promise<{ db: TestOrm; em: EntityManager; org: Org }> {
   db = await createTestOrm();
-  const org = await db.em.findOneOrFail(Org, { id: db.seed.orgId });
-  return { db, org };
+  const em = db.orm.em.fork();
+  const org = await em.findOneOrFail(Org, { id: db.seed.orgId });
+  return { db, em, org };
 }
 
 describe("settings and credentials MikroORM entities", () => {
   it("persists and reloads ConnectorCredential with org/project FK", async () => {
-    const { db, org } = await setup();
+    const { em, org } = await setup();
 
-    const credential = db.em.create(ConnectorCredential, {
+    const credential = em.create(ConnectorCredential, {
       org,
       projectId: "project-settings",
       provider: "github",
@@ -31,10 +33,11 @@ describe("settings and credentials MikroORM entities", () => {
       metadata: { scopes: ["contents:read"] },
     });
 
-    await db.em.persistAndFlush(credential);
-    db.em.clear();
+    em.persist(credential);
+    await em.flush();
+    em.clear();
 
-    const reloaded = await db.em.findOneOrFail(ConnectorCredential, {
+    const reloaded = await em.findOneOrFail(ConnectorCredential, {
       provider: "github",
       accountId: "installation-9",
     }, { populate: ["org"] });

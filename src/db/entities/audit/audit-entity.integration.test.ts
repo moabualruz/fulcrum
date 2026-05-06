@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
+import type { EntityManager } from "@mikro-orm/postgresql";
 
 import { createTestOrm, type TestOrm } from "../../../test-utils/db.ts";
 import { Org } from "../auth/Org.ts";
@@ -11,17 +12,18 @@ afterEach(async () => {
   db = undefined;
 });
 
-async function setup(): Promise<{ db: TestOrm; org: Org }> {
+async function setup(): Promise<{ db: TestOrm; em: EntityManager; org: Org }> {
   db = await createTestOrm();
-  const org = await db.em.findOneOrFail(Org, { id: db.seed.orgId });
-  return { db, org };
+  const em = db.orm.em.fork();
+  const org = await em.findOneOrFail(Org, { id: db.seed.orgId });
+  return { db, em, org };
 }
 
 describe("audit MikroORM entities", () => {
   it("persists and reloads AuditEvent with org/project FK", async () => {
-    const { db, org } = await setup();
+    const { em, org } = await setup();
 
-    const event = db.em.create(AuditEvent, {
+    const event = em.create(AuditEvent, {
       org,
       projectId: "project-audit",
       actorId: "user-1",
@@ -31,10 +33,11 @@ describe("audit MikroORM entities", () => {
       payload: { title: "Audit me" },
     });
 
-    await db.em.persistAndFlush(event);
-    db.em.clear();
+    em.persist(event);
+    await em.flush();
+    em.clear();
 
-    const reloaded = await db.em.findOneOrFail(AuditEvent, {
+    const reloaded = await em.findOneOrFail(AuditEvent, {
       action: "task.created",
     }, { populate: ["org"] });
 
@@ -43,9 +46,9 @@ describe("audit MikroORM entities", () => {
   });
 
   it("persists and reloads AuditExport with org/project FK", async () => {
-    const { db, org } = await setup();
+    const { em, org } = await setup();
 
-    const auditExport = db.em.create(AuditExport, {
+    const auditExport = em.create(AuditExport, {
       org,
       projectId: "project-audit",
       requestedByUserId: "user-1",
@@ -54,10 +57,11 @@ describe("audit MikroORM entities", () => {
       filters: { subjectKind: "task" },
     });
 
-    await db.em.persistAndFlush(auditExport);
-    db.em.clear();
+    em.persist(auditExport);
+    await em.flush();
+    em.clear();
 
-    const reloaded = await db.em.findOneOrFail(AuditExport, {
+    const reloaded = await em.findOneOrFail(AuditExport, {
       requestedByUserId: "user-1",
     }, { populate: ["org"] });
 

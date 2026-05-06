@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
+import type { EntityManager } from "@mikro-orm/postgresql";
 
 import { createTestOrm, type TestOrm } from "../../../test-utils/db.ts";
 import { Org } from "../auth/Org.ts";
@@ -11,25 +12,27 @@ afterEach(async () => {
   db = undefined;
 });
 
-async function setup(): Promise<{ db: TestOrm; org: Org; repo: Repo }> {
+async function setup(): Promise<{ db: TestOrm; em: EntityManager; org: Org; repo: Repo }> {
   db = await createTestOrm();
-  const org = await db.em.findOneOrFail(Org, { id: db.seed.orgId });
-  const repo = db.em.create(Repo, {
+  const em = db.orm.em.fork();
+  const org = await em.findOneOrFail(Org, { id: db.seed.orgId });
+  const repo = em.create(Repo, {
     org,
     name: "Fulcrum",
     slug: "fulcrum-repo-files",
     kind: "local",
     localPath: "/tmp/fulcrum",
   });
-  await db.em.persistAndFlush(repo);
-  return { db, org, repo };
+  em.persist(repo);
+    await em.flush();
+  return { db, em, org, repo };
 }
 
 describe("repo file MikroORM entities", () => {
   it("persists and reloads RepoTreeEntry with org/project/repo FKs", async () => {
-    const { db, org, repo } = await setup();
+    const { em, org, repo } = await setup();
 
-    const entry = db.em.create(RepoTreeEntry, {
+    const entry = em.create(RepoTreeEntry, {
       org,
       projectId: "project-files",
       repo,
@@ -40,10 +43,11 @@ describe("repo file MikroORM entities", () => {
       contentHash: "sha256:abc123",
     });
 
-    await db.em.persistAndFlush(entry);
-    db.em.clear();
+    em.persist(entry);
+    await em.flush();
+    em.clear();
 
-    const reloaded = await db.em.findOneOrFail(RepoTreeEntry, {
+    const reloaded = await em.findOneOrFail(RepoTreeEntry, {
       path: "src/index.ts",
     }, { populate: ["org", "repo"] });
 
@@ -53,9 +57,9 @@ describe("repo file MikroORM entities", () => {
   });
 
   it("persists and reloads RepoBlameLine with org/project/repo FKs", async () => {
-    const { db, org, repo } = await setup();
+    const { em, org, repo } = await setup();
 
-    const blame = db.em.create(RepoBlameLine, {
+    const blame = em.create(RepoBlameLine, {
       org,
       projectId: "project-files",
       repo,
@@ -67,10 +71,11 @@ describe("repo file MikroORM entities", () => {
       committedAt: new Date("2026-05-06T00:00:00Z"),
     });
 
-    await db.em.persistAndFlush(blame);
-    db.em.clear();
+    em.persist(blame);
+    await em.flush();
+    em.clear();
 
-    const reloaded = await db.em.findOneOrFail(RepoBlameLine, {
+    const reloaded = await em.findOneOrFail(RepoBlameLine, {
       path: "src/index.ts",
       lineNumber: 7,
     }, { populate: ["org", "repo"] });
