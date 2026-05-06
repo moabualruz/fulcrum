@@ -1,323 +1,436 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-05-04
+**Analysis Date:** 2026-05-06
 
 ## Directory Layout
 
 ```
 fulcrum/
-├── src/                    # All TypeScript source (monorepo root)
-│   ├── index.ts            # CLI entry point (`fulcrum` binary)
-│   ├── agents/             # Agent profile registry (13 files)
-│   ├── api/                # Hono REST API — public /api/v1 (12 files)
-│   ├── artifacts/          # Artifact harvesting + indexing (7 files)
-│   ├── auth/               # Auth helpers (3 files)
-│   ├── backup/             # DB backup/restore (4 files)
-│   ├── cli/                # CLI subcommand handlers (155 files)
-│   ├── collab/             # Real-time collaboration (8 files)
-│   ├── components/         # Fulcrum component system (20 files)
-│   ├── connectors/         # External PM tool connectors (16 files)
-│   ├── context/            # Context assembly for agents (3 files)
-│   ├── data/               # Data import/export (12 files)
-│   ├── db/                 # MikroORM entities, repos, migrations (190 files)
-│   ├── docs/               # Document management logic (21 files)
-│   ├── doctor/             # Health check subsystem (14 files)
-│   ├── errors/             # Error types (2 files)
-│   ├── events/             # Domain event handlers (2 files)
-│   ├── filters/            # Query filter system (2 files)
-│   ├── flags/              # Feature flag registry + experiments (5 files)
-│   ├── hooks/              # Agent lifecycle hooks (16 files)
-│   ├── i18n/               # Internationalization (2 files)
-│   ├── importers/          # Data importers (6 files)
-│   ├── inference/          # TS client for Rust inference server (19 files)
-│   ├── keybindings/        # Keyboard shortcut system (4 files)
-│   ├── marketplace/        # Skill marketplace (5 files)
-│   ├── memory/             # Memory extraction + retrieval (16 files)
-│   ├── notifications/      # Notification fanout + rules (6 files)
-│   ├── orchestration/      # Symphony orchestrator + workers (26 files)
-│   ├── permissions/        # Casbin policy engine (2 files)
-│   ├── platform/           # Platform utilities (4 files)
-│   ├── product-kernel/     # Legacy PGlite data layer (110 files)
-│   ├── repo/               # (empty — see repos/)
-│   ├── repos/              # Repository management (5 files)
-│   ├── router/             # Agent routing engine (13 files)
-│   ├── search/             # FTS search + saved searches (21 files)
-│   ├── secrets/            # Credential encryption (8 files)
-│   ├── server/             # Backend tRPC router implementations (25 files)
-│   ├── skills/             # Skill sync + validation (9 files)
-│   ├── subscriptions/      # EventBus + polling fallback (9 files)
-│   ├── test-utils/         # Shared test helpers (5 files)
-│   ├── trpc/               # tRPC root router, middleware, schemas (41 files)
-│   ├── tui/                # Terminal UI screens + renderer (79 files)
-│   ├── types/              # Shared type definitions (1 file)
-│   ├── utils/              # General utilities (4 files)
-│   ├── web/                # SvelteKit web application (17,925 files)
-│   └── webhooks/           # Webhook dispatch (1 file)
-├── inference/              # Rust inference server workspace
-│   ├── inference-core/     # Shared Rust types
-│   ├── inference-embed/    # Embedding binary
-│   ├── inference-generate/ # Generation binary
-│   └── inference-server/   # HTTP server binary
-├── vendor/                 # Vendored dependencies
-│   └── openai-symphony/    # Symphony Elixir orchestrator (submodule)
-├── src-tauri/              # Tauri desktop shell (Rust)
-├── config/                 # Runtime config files
-├── docs/                   # Project documentation
-├── evals/                  # Skill evaluation scripts
-├── eval-results/           # Evaluation output
-├── hooks/                  # Git hooks
-├── plugins/                # Plugin system
-├── rules/                  # Agent rules files
-├── scripts/                # Build + CI scripts
-├── shims/                  # Runtime shims
-├── skills/                 # Authored skills (mirrored to agents)
-├── tests/                  # Integration/E2E tests
-├── .claude/                # Claude Code agent config
-├── .codex/                 # Codex agent config
-├── .gemini/                # Gemini CLI agent config
-├── .opencode/              # OpenCode agent config
-├── .planning/              # Planning documents (this directory)
-└── graphify-out/           # Code knowledge graph output
+├── AGENTS.md                    # Project agent rules and current product direction
+├── package.json                 # Root Bun package, scripts, dependencies
+├── justfile                     # Project recipes; currently `sync-symphony`
+├── tsconfig.json                # Root TypeScript configuration
+├── src/                         # Main TypeScript monorepo source
+│   ├── index.ts                 # `fulcrum` binary entry point
+│   ├── agents/                  # Agent profile registry and per-agent profiles
+│   ├── api/                     # Hono public REST/OpenAPI API
+│   ├── artifacts/               # Artifact harvest, storage, preview, pruning
+│   ├── auth/                    # Better-Auth integration
+│   ├── backup/                  # Backup/restore runners and adapters
+│   ├── cli/                     # CLI command implementations
+│   ├── collab/                  # Collaboration server/domain helpers
+│   ├── components/              # Fulcrum installable component catalog/planner/ledger
+│   ├── config/                  # Runtime config resolution
+│   ├── connectors/              # External tool connector registry/sync
+│   ├── context/                 # Agent context assembly
+│   ├── data/                    # CSV/import/export/redaction utilities
+│   ├── db/                      # Canonical MikroORM data layer
+│   ├── docs/                    # Document search/version/collab helpers
+│   ├── doctor/                  # Health check runner/check modules
+│   ├── errors/                  # Error reporting/persistence helpers
+│   ├── events/                  # Domain event handlers
+│   ├── flags/                   # Feature flag registry/evaluation
+│   ├── hooks/                   # Agent hook implementations
+│   ├── i18n/                    # Shared i18n helpers/locales
+│   ├── importers/               # Jira/Linear/Plane importer modules
+│   ├── inference/               # Inference client, lifecycle, probes, backends
+│   ├── keybindings/             # Shared keybinding schemas/defaults
+│   ├── marketplace/             # Marketplace listing registry/procedures
+│   ├── memory/                  # Memory digest/extraction/retrieval
+│   ├── notifications/           # Notification fanout/delivery/rules
+│   ├── orchestration/           # Symphony orchestration and sandbox dispatch
+│   ├── permissions/             # Permission policy integration
+│   ├── platform/                # Cross-cutting platform utilities
+│   ├── product-kernel/          # Legacy ProductDb SQL-first compatibility layer
+│   ├── queue/                   # Queue exports/helpers
+│   ├── repo/                    # Repo context docs/ADR namespace
+│   ├── repos/                   # Git/repository domain logic
+│   ├── router/                  # Agent routing rules engine
+│   ├── search/                  # Search query/index/cache/filter system
+│   ├── secrets/                 # Credentials and secret storage
+│   ├── server/                  # Server-only tRPC routers and Yjs server
+│   ├── services/                # Domain service classes
+│   ├── skills/                  # Skill registry, sync, lock, marketplace client
+│   ├── subscriptions/           # EventBus, tRPC subscriptions, polling bridges
+│   ├── surfaces/                # Surface parity checks
+│   ├── test-utils/              # Shared test helpers
+│   ├── tests/                   # Root-level UAT/phase tests
+│   ├── trpc/                    # Root tRPC router/context/middleware/schemas
+│   ├── tui/                     # OpenTUI terminal app
+│   ├── types/                   # Shared ambient/domain types
+│   ├── utils/                   # General utilities
+│   ├── web/                     # SvelteKit web application package
+│   ├── webhooks/                # Webhook dispatcher
+│   └── workers/                 # Worker registry/jobs
+├── docs/                        # Human project docs
+├── rules/                       # Fulcrum rules distributed to agents
+├── skills/                      # Authored skill source mirrored by `fulcrum skills sync`
+├── hooks/                       # Hook recipes/snippets
+├── scripts/                     # CI, release, build, boundary checks, generators
+├── config/                      # Tool/output policy runtime config
+├── plugins/                     # Plugin packaging/support files
+├── tests/                       # Cross-package integration/e2e tests
+├── vendor/openai-symphony/      # Symphony submodule synced by `just sync-symphony`
+├── .claude-plugin/              # Claude plugin marketplace metadata
+├── .planning/                   # GSD planning/state/codebase maps
+├── .scratch/                    # Local issue/research scratch area
+└── graphify-out/                # Generated code knowledge graph output
 ```
 
 ## Directory Purposes
 
-**`src/db/` (190 files) — Canonical data layer:**
-- Purpose: MikroORM v7 entities, repositories, migrations, DI wiring
-- Contains: 83 entity files across 18 domain subdirs, 54 repository files, 38 migration files
-- Key files:
-  - `src/db/db.module.ts` — needle-di registration of all entities/repos
-  - `src/db/mikro-orm.config.ts` — ORM configuration
-  - `src/db/migrator-service.ts` — Migration runner
-  - `src/db/seed.ts` — Database seeding
-  - `src/db/context.ts` — DB context helpers
-- Entity domains: `auth/`, `tasks/`, `docs/`, `memory/`, `orchestration/`, `notifications/`, `repos/`, `artifacts/`, `connectors/`, `flags/`, `inference/`, `jobs/`, `platform/`, `router/`, `sandbox/`, `search/`, `skills/`, `core/`
+**`src/`:**
+- Purpose: All first-party runtime TypeScript except the SvelteKit package internals under `src/web/`.
+- Contains: CLI, API, services, DB, TUI, orchestration, integrations, tests.
+- Key files: `src/index.ts`, `src/cli/index.ts`, `src/trpc/router.ts`, `src/db/db.module.ts`.
 
-**`src/product-kernel/` (110 files) — Legacy data layer:**
-- Purpose: Original PGlite-based data access with raw SQL
-- Contains: Domain modules (tasks, docs, memory, search, sprints, etc.) + `db/` subdir with PGlite driver and SQL migrations
-- Key files:
-  - `src/product-kernel/db/pglite.ts` — PGlite connection
-  - `src/product-kernel/db/postgres.ts` — Postgres connection
-  - `src/product-kernel/db/types.ts` — `ProductDb` interface
-  - `src/product-kernel/db/migrate.ts` — SQL migration runner
-- Note: Being migrated to MikroORM. Both layers coexist in tRPC context.
+**`src/agents/`:**
+- Purpose: Canonical agent support registry and profile definitions.
+- Contains: `types.ts`, `registry.ts`, `resolve-agent-run-config.ts`, `profiles/`.
+- Key files: `src/agents/registry.ts`, `src/agents/profiles/codex.ts`, `src/agents/profiles/claude-code.ts`.
 
-**`src/trpc/` (41 files) — tRPC root layer:**
-- Purpose: Root router composition, shared middleware, input/output schemas
-- Key files:
-  - `src/trpc/router.ts` — AppRouter (root, composes all domain routers)
-  - `src/trpc/trpc.ts` — tRPC instance + base procedures
-  - `src/trpc/middleware.ts` — Auth middleware (`protectedProcedure`)
-  - `src/trpc/context.ts` — `TrpcContext` type + `createContext()`
-  - `src/trpc/rest-api.ts` — REST API bridge
-  - `src/trpc/routers/` — Some domain routers (orchestration, artifacts, notifications, etc.)
-  - `src/trpc/schemas/` — Zod schemas for tRPC inputs/outputs
+**`src/api/`:**
+- Purpose: Public REST/OpenAPI API surface.
+- Contains: Hono factory, API auth, rate limit, feature flag gate, route adapters.
+- Key files: `src/api/hono.ts`, `src/api/auth.ts`, `src/api/feature-flags.ts`, `src/api/routes/tasks.ts`, `src/api/routes/kernel-tasks.ts`.
 
-**`src/server/trpc/routers/` (25 files) — Backend domain routers:**
-- Purpose: tRPC procedure implementations for core domains
-- Contains: `auth.ts`, `tasks.ts`, `docs.ts`, `sprints.ts`, `memory.ts`, `flags.ts`, `audit.ts`, `backup.ts`, `custom-fields.ts`, `inference.ts`, `routing.ts`, `skills.ts`, `telemetry.ts`, `theme.ts`, `orgs.ts`, `error-logs.ts`, `json-import-export.ts`, `doc-templates.ts`
-- Pattern: Each file exports a `createTRPCRouter()` domain router
+**`src/cli/`:**
+- Purpose: Implementation of `fulcrum <command>` subcommands.
+- Contains: command modules, generated domain command data, interactive helpers, Symphony CLI helpers.
+- Key files: `src/cli/index.ts`, `src/cli/install.ts`, `src/cli/product.ts`, `src/cli/component.ts`, `src/cli/mcp-cmd.ts`, `src/cli/compress.ts`.
 
-**`src/cli/` (155 files) — CLI subcommands:**
-- Purpose: All `fulcrum <cmd>` implementations
-- Key files:
-  - `src/cli/arg-parser.ts` — Argument parsing
-  - `src/cli/local-caller.ts` — In-process tRPC caller
-  - `src/cli/install.ts` — `fulcrum install` (agent config wiring)
-  - `src/cli/init.ts` — `fulcrum init` (project bootstrap)
-  - `src/cli/doctor.ts` — `fulcrum doctor` health checks
-  - `src/cli/inference.ts` — `fulcrum inference` commands
-  - `src/cli/product.ts` — `fulcrum product` commands
-  - `src/cli/component.ts` — Component system commands
-  - `src/cli/mcp-registry.ts` — MCP server management
+**`src/db/`:**
+- Purpose: Canonical MikroORM persistence layer.
+- Contains: entities, repositories, migrations, custom PGlite driver, DB module, migrator service, seed logic.
+- Key files: `src/db/db.module.ts`, `src/db/mikro-orm.config.ts`, `src/db/migrator-service.ts`, `src/db/seed.ts`.
+- Subdirs: `src/db/entities/`, `src/db/repositories/`, `src/db/migrations/`, `src/db/types/`.
 
-**`src/web/` (17,925 files) — SvelteKit web app:**
-- Purpose: Full web UI — dashboard, task management, docs, settings, etc.
-- Key files:
-  - `src/web/src/hooks.server.ts` — Server hooks (auth + tRPC mount)
-  - `src/web/svelte.config.js` — SvelteKit config
-  - `src/web/vite.config.ts` — Vite bundler config
-  - `src/web/package.json` — Web-specific dependencies (separate from root)
-- Route structure: `src/web/src/routes/` — `tasks/`, `docs/`, `agents/`, `runs/`, `boards/`, `search/`, `settings/`, `auth/`, `projects/`, `memory/`, `artifacts/`, `repos/`, `orchestration/`, `inference/`, `doctor/`, `audit/`, `inbox/`, `context/`, `offline/`
-- Components: `src/web/src/lib/components/` — `ui/`, `tasks/`, `docs/`, `editor/`, `dashboard/`, `board/`, `runs/`, `search/`, `command-palette/`, `saved-views/`, `planning/`, `repos/`, `artifacts/`, `markdown/`, `feedback/`, `projects/`, `app/`, `task-detail/`
-- State: `src/web/src/lib/state/` — Svelte stores for active project, etc.
+**`src/db/entities/`:**
+- Purpose: Domain model classes.
+- Contains: domain subdirectories for auth, tasks, docs, memory, orchestration, notifications, repos, search, skills, etc.
+- Key files: `src/db/entities/tasks/Task.ts`, `src/db/entities/docs/Document.ts`, `src/db/entities/orchestration/AgentRun.ts`, `src/db/entities/core/Event.ts`.
 
-**`src/tui/` (79 files) — Terminal UI:**
-- Purpose: Keyboard-first ANSI terminal interface
-- Key files:
-  - `src/tui/index.ts` — Entry point
-  - `src/tui/renderer.ts` — ANSI rendering engine
-  - `src/tui/screens/` — Screen implementations (auth, flags, activity, docs, notifications, etc.)
-  - `src/tui/testing/fake-tty.ts` — Test harness for headless testing
+**`src/db/repositories/`:**
+- Purpose: Typed repository subclasses and query helpers.
+- Contains: matching domain subdirectories to `src/db/entities/`.
+- Key files: `src/db/repositories/tasks/TaskRepository.ts`, `src/db/repositories/docs/DocumentRepository.ts`, `src/db/repositories/orchestration/AgentRunRepository.ts`.
 
-**`src/orchestration/` (26 files) — Symphony orchestrator:**
-- Purpose: Agent run state machine, dispatch, telemetry
-- Key files:
-  - `src/orchestration/symphony/orchestrator.ts` — Core state machine (Unclaimed → Claimed)
-  - `src/orchestration/symphony/worker.ts` — Agent worker process
-  - `src/orchestration/symphony/dispatch.ts` — Agent dispatch logic
-  - `src/orchestration/symphony/hooks.ts` — Lifecycle hook system
-  - `src/orchestration/symphony/stall.ts` — Stall detection scanner
-  - `src/orchestration/symphony/telemetry.ts` — Token/cost tracking
-  - `src/orchestration/symphony/schemas.ts` — Workflow config schemas
-  - `src/orchestration/sandbox-runner.ts` — Sandcastle sandbox runner
-  - `src/orchestration/session-resume.ts` — Session resume logic
-  - `src/orchestration/token-tracking.ts` — Token usage tracking
-  - `src/orchestration/artifact-harvest-hook.ts` — Post-run artifact collection
+**`src/product-kernel/`:**
+- Purpose: Legacy ProductDb SQL-first layer and compatibility modules.
+- Contains: SQL migrations, PGlite/Postgres adapters, store modules, API shims, notification/symphony helpers.
+- Key files: `src/product-kernel/db/types.ts`, `src/product-kernel/db/migrate.ts`, `src/product-kernel/db/pglite.ts`, `src/product-kernel/store/repositories.ts`.
+- Use: compatibility only for new architecture unless explicitly maintaining existing product-kernel callers.
 
-**`src/agents/` (13 files) — Agent registry:**
-- Purpose: Multi-agent profile definitions and persistence
-- Key files:
-  - `src/agents/registry.ts` — `getProfile()`, `listProfiles()`
-  - `src/agents/types.ts` — `AgentProfileSchema`
-  - `src/agents/profiles/claude-code.ts` — Claude Code profile
-  - `src/agents/profiles/codex.ts` — Codex profile
-  - `src/agents/profiles/gemini-cli.ts` — Gemini CLI profile
-  - `src/agents/profiles/opencode.ts` — OpenCode profile
-  - `src/agents/profiles/pi.ts` — Pi profile
-  - `src/agents/profiles/copilot.ts` — Copilot profile
+**`src/trpc/`:**
+- Purpose: Shared internal API boundary.
+- Contains: root router, context, base procedures, middleware, permissions metadata, domain routers, schemas.
+- Key files: `src/trpc/router.ts`, `src/trpc/context.ts`, `src/trpc/trpc.ts`, `src/trpc/middleware.ts`.
 
-**`src/connectors/` (16 files) — External PM connectors:**
-- Purpose: Sync tasks/docs from external tools
-- Contains: `linear.ts`, `jira.ts`, `github-issues.ts`, `gitlab.ts`, `notion.ts`, `confluence.ts`, `bitbucket.ts`, `plane.ts`, `csv.ts`
-- Key files:
-  - `src/connectors/interface.ts` — Connector interface definition
-  - `src/connectors/framework.ts` — Connector execution framework
-  - `src/connectors/registry.ts` — Connector registry
+**`src/server/trpc/routers/`:**
+- Purpose: Server-side domain tRPC procedure implementations.
+- Contains: auth, tasks, docs, sprints, flags, memory, audit, backup, custom fields, inference, routing, skills, telemetry, theme, orgs, comments, workflows, relationships, templates, recurrence, automations.
+- Key files: `src/server/trpc/routers/tasks.ts`, `src/server/trpc/routers/docs.ts`, `src/server/trpc/routers/auth.ts`.
+
+**`src/services/`:**
+- Purpose: Shared domain business services called by routers/surfaces.
+- Contains: service classes for tasks, docs, sprints, comments, workflow, automation, reports, relationships, templates, recurrence.
+- Key files: `src/services/TaskService.ts`, `src/services/DocService.ts`, `src/services/SprintService.ts`, `src/services/WorkflowService.ts`.
+
+**`src/web/`:**
+- Purpose: SvelteKit web app package with separate `package.json`.
+- Contains: SvelteKit config, Vite config, routes, components, lib modules, web tests.
+- Key files: `src/web/package.json`, `src/web/src/hooks.server.ts`, `src/web/src/routes/+layout.server.ts`, `src/web/src/routes/api/trpc/[...path]/+server.ts`.
+
+**`src/web/src/routes/`:**
+- Purpose: File-based web routing.
+- Contains: page routes and API endpoints for dashboard, projects, tasks, docs, repos, runs, settings, auth, search, memory, artifacts, inference, audit, doctor.
+- Key files: `src/web/src/routes/projects/[id]/board/+page.server.ts`, `src/web/src/routes/tasks/[id]/+page.server.ts`, `src/web/src/routes/api/v1/+server.ts`.
+
+**`src/web/src/lib/`:**
+- Purpose: Web-only components, state, server helpers, i18n, theme, editor, UI primitives.
+- Contains: `components/`, `server/`, `state/`, `collab/`, `i18n/`, web-specific utilities.
+- Key files: `src/web/src/lib/server/db.ts`, `src/web/src/lib/state/active-project.ts`.
+
+**`src/tui/`:**
+- Purpose: Keyboard-first terminal UI.
+- Contains: app root, router, screens, OpenTUI adapter, renderer, testing FakeTTY, theme/widgets.
+- Key files: `src/tui/index.ts`, `src/tui/router.ts`, `src/tui/screens/index.ts`, `src/tui/testing/fake-tty.ts`.
+
+**`src/orchestration/`:**
+- Purpose: Agent run lifecycle, Symphony state machine, sandbox dispatch, artifact harvest, token tracking.
+- Contains: `symphony/` state machine modules, workers, sandbox runner, session resume.
+- Key files: `src/orchestration/symphony/orchestrator.ts`, `src/orchestration/symphony/hooks.ts`, `src/orchestration/symphony/stall.ts`.
+
+**`src/router/`:**
+- Purpose: Agent/task routing rules engine.
+- Contains: rules engine, auto-assign, LLM fallback, conflict detector, learned drafts, telemetry.
+- Key files: `src/router/service.ts`, `src/router/rules-engine.ts`, `src/router/auto-assign.ts`, `src/router/telemetry.ts`.
+
+**`src/subscriptions/`:**
+- Purpose: Realtime/event subscription primitives.
+- Contains: EventBus, tRPC subscription procedures, PGlite bridge, polling fallback.
+- Key files: `src/subscriptions/event-bus.ts`, `src/subscriptions/procedures.ts`, `src/subscriptions/pglite-bridge.ts`.
+
+**`src/search/`:**
+- Purpose: Search and indexing services.
+- Contains: query services, indexers, cache, saved searches, filters, telemetry.
+- Key files: `src/search/query-service.ts`, `src/search/indexers/task.ts`, `src/search/indexers/document.ts`, `src/search/backend.ts`.
+
+**`src/notifications/`:**
+- Purpose: Notification rules, fanout, delivery, bell counters.
+- Contains: fanout worker, delivery worker/retry, quiet hours, delivery handlers.
+- Key files: `src/notifications/fanout-worker.ts`, `src/notifications/delivery-worker.ts`, `src/notifications/rule-engine.ts`.
+
+**`src/inference/`:**
+- Purpose: Model backend lifecycle and client/probe layer.
+- Contains: backend clients for embedded/Ollama/LM Studio/OpenAI-compatible paths, health probes, routing config, token helpers.
+- Key files: `src/inference/service.ts`, `src/inference/lifecycle.ts`, `src/inference/backend-probes.ts`, `src/inference/backends/index.ts`.
+
+**`src/hooks/`:**
+- Purpose: Agent hook subcommand implementations.
+- Contains: format, lint gate, package manager policy, test-on-edit, audit log, index checks, tool-output router.
+- Key files: `src/hooks/format.ts`, `src/hooks/lint-gate.ts`, `src/hooks/tool-output-router.ts`.
+
+**`scripts/`:**
+- Purpose: Project automation outside shipped runtime.
+- Contains: CI runner, release runner, build-all, boundary checks, generated trace tooling.
+- Key files: `scripts/ci.ts`, `scripts/build-all.ts`, `scripts/check-module-boundaries.ts`, `scripts/release.ts`.
+
+**`skills/`:**
+- Purpose: Source skills mirrored to supported agents.
+- Contains: one directory per authored skill plus source registry.
+- Key files: `skills/SOURCES.md`, `skills/*/SKILL.md`.
+
+**`rules/`:**
+- Purpose: Rules body spliced into agent runtime config files.
+- Contains: cross-agent AGENTS rules.
+- Key files: `rules/AGENTS.md`.
+
+**`.planning/`:**
+- Purpose: GSD project state, phases, research, and codebase maps.
+- Contains: `STATE.md`, `ROADMAP.md`, `phases/`, `codebase/`, graph archives.
+- Key files: `.planning/STATE.md`, `.planning/codebase/ARCHITECTURE.md`, `.planning/codebase/STRUCTURE.md`.
+
+**`graphify-out/`:**
+- Purpose: Generated code knowledge graph.
+- Contains: report, wiki, graph data.
+- Key files: `graphify-out/GRAPH_REPORT.md`, `graphify-out/wiki/index.md`.
 
 ## Key File Locations
 
 **Entry Points:**
-- `src/index.ts`: CLI binary entry (`#!/usr/bin/env bun`)
-- `src/web/src/hooks.server.ts`: Web server hooks
-- `src/tui/index.ts`: TUI application root
-- `src/api/hono.ts`: Hono REST API factory
-- `inference/inference-server/`: Rust inference HTTP server
+- `src/index.ts`: Bun executable entry point and top-level command dispatcher.
+- `src/cli/index.ts`: broad CLI command hub, DB bootstrap, web/TUI launch.
+- `src/web/src/hooks.server.ts`: SvelteKit request hook, auth/tRPC/DB locals.
+- `src/tui/index.ts`: terminal UI app root.
+- `src/api/hono.ts`: canonical public REST/OpenAPI API factory.
+- `src/server/yjs-server.ts`: Yjs collaboration WebSocket server.
 
 **Configuration:**
-- `package.json`: Root dependencies + scripts
-- `src/web/package.json`: Web-specific dependencies
-- `tsconfig.json`: TypeScript configuration
-- `bunfig.toml`: Bun runtime configuration
-- `src/db/mikro-orm.config.ts`: MikroORM configuration
-- `src/web/svelte.config.js`: SvelteKit configuration
-- `src/web/vite.config.ts`: Vite bundler configuration
-- `config/tool-output-policy.toml`: Tool output routing policy
-- `inference/models.toml`: Inference model configuration
-- `cliff.toml`: git-cliff changelog configuration
-- `justfile`: Task runner recipes
-- `src-tauri/tauri.conf.json`: Tauri desktop config
+- `package.json`: root Bun scripts and dependency set.
+- `src/web/package.json`: SvelteKit package scripts and web dependencies.
+- `justfile`: project recipe for syncing Symphony submodule and conformance trace.
+- `tsconfig.json`: root TypeScript config.
+- `src/web/svelte.config.js`: SvelteKit config.
+- `src/web/vite.config.ts`: Vite config.
+- `config/tool-output-policy.toml`: tool-output router policy.
+- `.symphony-spec.lock`: generated Symphony spec lock.
 
 **Core Logic:**
-- `src/trpc/router.ts`: AppRouter definition (all procedure namespaces)
-- `src/db/db.module.ts`: DI container wiring
-- `src/flags/registry.ts`: Feature flag resolution
-- `src/orchestration/symphony/orchestrator.ts`: Run state machine
-- `src/subscriptions/event-bus.ts`: Real-time event transport
-- `src/hooks/`: Agent hook implementations (format, lint-gate, pm-policy, test-on-edit, audit-log, index-check, index-rebuild, tool-output-router)
+- `src/trpc/router.ts`: root internal API router.
+- `src/trpc/context.ts`: request/session/data context.
+- `src/db/db.module.ts`: DI repository/service binding.
+- `src/db/migrator-service.ts`: migration safety wrapper.
+- `src/services/TaskService.ts`: task domain service.
+- `src/services/DocService.ts`: document domain service.
+- `src/orchestration/symphony/orchestrator.ts`: run claiming/state machine.
+- `src/agents/registry.ts`: canonical agent registry.
+- `src/flags/registry.ts`: feature flag registry.
+- `src/subscriptions/event-bus.ts`: in-process realtime event bus.
 
 **Testing:**
-- `src/test-utils/`: Shared test helpers
-- `src/web/tests/`: Web E2E tests (Playwright)
-- `src/web/vitest.config.ts`: Web unit test config
-- `tests/`: Integration tests
-- `evals/`: Skill evaluation scripts
+- `src/**/*.test.ts`: colocated Bun tests across core modules.
+- `src/web/src/routes/**/*.test.ts`: route loader/server tests.
+- `src/web/tests/e2e/`: Playwright e2e tests.
+- `src/web/tests/a11y/`: Playwright accessibility tests.
+- `src/web/tests/vitest/`: Vitest web tests.
+- `src/test-utils/`: shared root test helpers.
+- `src/web/tests/mocks/`: web mocks.
+
+**Planning/Knowledge:**
+- `.planning/STATE.md`: current milestone state and decisions.
+- `.planning/phases/`: phase context/plans/UAT.
+- `.planning/codebase/`: generated codebase reference maps.
+- `graphify-out/GRAPH_REPORT.md`: generated structural graph report.
+- `AGENTS.md`: project rules and current product context.
 
 ## Naming Conventions
 
 **Files:**
-- kebab-case for modules: `event-bus.ts`, `local-caller.ts`, `fake-tty.ts`
-- PascalCase for entity classes: `AgentRun.ts`, `FeatureFlag.ts`, `DocVersion.ts`
-- PascalCase + "Repository" suffix: `AgentRunRepository.ts`, `UserRepository.ts`
-- `.test.ts` suffix co-located with source: `registry.test.ts` next to `registry.ts`
+- PascalCase service classes: `src/services/TaskService.ts`, `src/services/DocService.ts`.
+- PascalCase ORM entities: `src/db/entities/tasks/Task.ts`, `src/db/entities/docs/Document.ts`.
+- PascalCase repositories with `Repository` suffix: `src/db/repositories/tasks/TaskRepository.ts`.
+- kebab-case utility/domain modules: `src/router/rules-engine.ts`, `src/product-kernel/db/migrate.ts`, `src/api/rate-limit.ts`.
+- SvelteKit route files follow framework names: `+page.svelte`, `+page.server.ts`, `+server.ts`, `+layout.server.ts`.
+- Test files are colocated with `.test.ts` suffix: `src/services/TaskService.test.ts`, `src/router/rules-engine.test.ts`.
+- Migration files use timestamp/class pattern under ORM: `src/db/migrations/Migration20260502090000_tasks_schema_extension.ts`.
+- Product-kernel SQL migrations use numbered `.sql`: `src/product-kernel/db/migrations/0001_product_kernel.sql`.
 
 **Directories:**
-- kebab-case: `product-kernel/`, `test-utils/`, `agent-profiles/`
-- Singular for entity domains: `auth/`, `tasks/`, `docs/`, `memory/`
-- Plural for collections: `routers/`, `schemas/`, `profiles/`, `migrations/`
+- Domain directories are lowercase/kebab-case where multiword: `src/product-kernel/`, `src/test-utils/`.
+- DB entity/repository domains mirror product domains: `auth/`, `tasks/`, `docs/`, `memory/`, `orchestration/`, `notifications/`, `repos/`, `search/`, `skills/`.
+- Web route directories follow URL path segments: `src/web/src/routes/projects/[id]/settings/workflow/`.
+- Dynamic SvelteKit params use bracket syntax: `[id]`, `[runId]`, `[...path]`.
 
 ## Where to Add New Code
 
-**New Domain Entity:**
-- Entity: `src/db/entities/<domain>/NewEntity.ts` (with `@Entity()` decorator)
-- Repository: `src/db/repositories/<domain>/NewEntityRepository.ts`
-- Register in: `src/db/db.module.ts` (add import + `container.bind()`)
-- Migration: `src/db/migrations/Migration<timestamp>_<name>.ts`
-- Index export: `src/db/entities/<domain>/index.ts`
+**New Product Feature:**
+- Primary service: `src/services/<Feature>Service.ts` when behavior spans routers/surfaces.
+- tRPC API: `src/server/trpc/routers/<feature>.ts` for server routers or `src/trpc/routers/<feature>.ts` for already-rooted internal routers.
+- Router mount: add to `src/trpc/router.ts`.
+- Web UI: `src/web/src/routes/<feature>/` plus components under `src/web/src/lib/components/<feature>/`.
+- CLI: `src/cli/<feature>.ts` or `src/cli/commands/<feature>.ts`, dispatched from `src/cli/index.ts` or `src/index.ts`.
+- TUI: screen under `src/tui/screens/<feature>.ts`, route in `src/tui/index.ts`/`src/tui/screens/index.ts`.
+- Tests: colocated `.test.ts`; web route/component tests under matching `src/web/src/routes/` or `src/web/tests/`.
 
-**New tRPC Router:**
-- Router implementation: `src/server/trpc/routers/<domain>.ts`
-- Mount in: `src/trpc/router.ts` (import + add to `appRouter`)
-- Schemas: `src/trpc/schemas/<domain>.ts`
+**New Database Entity:**
+- Entity: `src/db/entities/<domain>/<Entity>.ts`.
+- Repository: `src/db/repositories/<domain>/<Entity>Repository.ts`.
+- Exports: matching `src/db/entities/<domain>/index.ts` and `src/db/repositories/<domain>/index.ts` if domain uses index files.
+- DI binding: `src/db/db.module.ts`.
+- Migration: `src/db/migrations/MigrationYYYYMMDDHHMMSS_description.ts`.
+- Avoid: new ProductDb SQL migrations unless maintaining legacy compatibility in `src/product-kernel/`.
 
-**New REST API Route:**
-- Route: `src/api/routes/<domain>.ts`
-- Register in: `src/api/hono.ts` (add `register<Domain>Routes(api)`)
+**New Public REST Endpoint:**
+- Route adapter: `src/api/routes/<resource>.ts`.
+- Registration: `src/api/hono.ts`.
+- Auth/gating: use `src/api/auth.ts`, `src/api/rate-limit.ts`, `src/api/feature-flags.ts`.
+- Web route compatibility: only add `src/web/src/routes/api/v1/**` if SvelteKit mount needs explicit handling.
+- Tests: `src/api/__tests__/` and route-specific tests near web API route if applicable.
 
-**New CLI Subcommand:**
-- Handler: `src/cli/<command>.ts`
-- Wire in: `src/index.ts` (add to HELP text + dispatch switch)
+**New Web Page:**
+- Page route: `src/web/src/routes/<path>/+page.svelte`.
+- Server loader: `src/web/src/routes/<path>/+page.server.ts`.
+- Shared components: `src/web/src/lib/components/<domain>/`.
+- Web-only server helpers: `src/web/src/lib/server/`.
+- State: `src/web/src/lib/state/` when state is shared across routes.
 
-**New Web Route:**
-- Page: `src/web/src/routes/<path>/+page.svelte`
-- Server load: `src/web/src/routes/<path>/+page.server.ts`
-- Components: `src/web/src/lib/components/<domain>/`
+**New CLI Command:**
+- Command implementation: `src/cli/<command>.ts` for broad command or `src/cli/commands/<command>.ts` for focused subcommand.
+- Dispatch: `src/index.ts` for top-level commands, `src/cli/index.ts` for grouped commands.
+- Shared behavior: call `src/services/` or tRPC local caller; keep output formatting in CLI module.
 
 **New TUI Screen:**
-- Screen: `src/tui/screens/<name>.ts`
-- Register in: `src/tui/index.ts` (add to screen router)
+- Screen: `src/tui/screens/<screen>.ts`.
+- Routing: `src/tui/router.ts` route data usage and app route list in `src/tui/index.ts`.
+- Widgets/theme helpers: `src/tui/widgets/`, `src/tui/theme/`, `src/tui/utils/`.
+- Tests: `src/tui/__tests__/` or colocated screen tests using `src/tui/testing/fake-tty.ts`.
 
-**New Connector:**
-- Implementation: `src/connectors/<name>.ts` (implement `ConnectorInterface`)
-- Register in: `src/connectors/registry.ts`
+**New Agent Profile:**
+- Profile: `src/agents/profiles/<agent>.ts`.
+- Registry: `src/agents/registry.ts`.
+- Types/capabilities: `src/agents/types.ts`.
+- Install/sync integration: relevant modules in `src/cli/` and `src/components/` if surface needs distribution.
 
-**New Agent Hook:**
-- Hook: `src/hooks/<name>.ts`
-- Test: `src/hooks/<name>.test.ts`
-- Wire in: `src/index.ts` HELP text
+**New Hook:**
+- Runtime hook: `src/hooks/<name>.ts`.
+- Top-level hook dispatch: `src/index.ts`.
+- Hook recipe/snippet: `hooks/recipes/<name>.snippet.md` if distributed.
+- Docs/update references: `docs/hooks.md` if hook behavior changes.
 
-**New Feature Flag:**
-- Add to `FEATURE_FLAGS` array in `src/flags/registry.ts`
-- Gate code with `await flagRegistry.flag("flag-name", { orgId })`
+**New Integration/Connector:**
+- Connector logic: `src/connectors/` for sync/runtime connectors.
+- Importer mapping: `src/importers/` or `src/data/importers/` for data import paths.
+- Credentials: `src/secrets/` and DB entities/repositories if persisted.
+- Settings UI: `src/web/src/routes/settings/integrations/<id>/` or project settings connector route.
 
-**Shared Utilities:**
-- General: `src/utils/`
-- Test helpers: `src/test-utils/`
-- Type definitions: `src/types/`
+**New Search Indexer:**
+- Indexer: `src/search/indexers/<domain>.ts`.
+- Registration: `src/search/indexers/index.ts`.
+- Query support: `src/search/query-service.ts` or `src/search/backend.ts`.
+- Trigger: domain service write path such as `src/services/DocService.ts`.
+
+**New Notification Behavior:**
+- Rule/fanout logic: `src/notifications/rule-engine.ts`, `src/notifications/fanout-worker.ts`.
+- Delivery channel: `src/notifications/delivery-handlers/<channel>.ts`.
+- Subscription exposure: `src/subscriptions/procedures.ts`.
+- DB persistence: entities/repositories under `src/db/entities/notifications/` and `src/db/repositories/notifications/`.
+
+**Utilities:**
+- Shared runtime utilities: `src/utils/` only when not domain-specific.
+- Platform/cross-cutting: `src/platform/`.
+- Test helpers: `src/test-utils/`.
+- Web-only utilities: `src/web/src/lib/`.
+- Avoid adding parallel helpers when an existing domain service/module already owns behavior.
 
 ## Special Directories
 
-**`graphify-out/`:**
-- Purpose: Code knowledge graph (7829 nodes, 17125 edges, 89 communities)
-- Generated: Yes (by `graphify build .`)
-- Committed: Yes
-
-**`vendor/openai-symphony/`:**
-- Purpose: Vendored Symphony Elixir orchestrator (git submodule)
-- Generated: No (external dependency)
-- Committed: Yes (submodule reference)
-
-**`inference/`:**
-- Purpose: Rust workspace for local inference server
-- Generated: No (hand-written Rust)
-- Committed: Yes (source only; `inference/target/` gitignored)
-
-**`src-tauri/`:**
-- Purpose: Tauri desktop application shell
-- Generated: No
-- Committed: Yes
+**`src/web/.svelte-kit/`:**
+- Purpose: SvelteKit generated build/dev output.
+- Generated: Yes.
+- Committed: No.
 
 **`dist/`:**
-- Purpose: Compiled CLI binaries
-- Generated: Yes (by `bun build --compile`)
-- Committed: No (gitignored)
+- Purpose: compiled `fulcrum` binaries from `bun run build` / `bun run build:all`.
+- Generated: Yes.
+- Committed: build artifacts only if release process requires; do not edit manually.
+
+**`vendor/openai-symphony/`:**
+- Purpose: Symphony upstream submodule used for spec/conformance.
+- Generated: No, vendored submodule.
+- Committed: submodule pointer.
 
 **`.planning/`:**
-- Purpose: Planning and analysis documents
-- Generated: By GSD tooling
-- Committed: Yes
+- Purpose: GSD planning, state, phase, codebase map artifacts.
+- Generated: Partly.
+- Committed: Yes for planning artifacts.
+
+**`.scratch/`:**
+- Purpose: local issue/research scratch work.
+- Generated: Mixed.
+- Committed: only intentional planning/research artifacts when workflow requires.
+
+**`graphify-out/`:**
+- Purpose: generated knowledge graph/wiki.
+- Generated: Yes.
+- Committed: project-dependent; archived graph artifacts may also live under `.planning/graphs/`.
+
+**`skills/`:**
+- Purpose: source skill definitions.
+- Generated: No for authored source; mirrored copies elsewhere are generated by `fulcrum skills sync`.
+- Committed: Yes.
+
+**`rules/`:**
+- Purpose: cross-agent rules source.
+- Generated: No.
+- Committed: Yes.
+
+**`hooks/recipes/`:**
+- Purpose: hook recipe snippets vendored to agent/user config by install flows.
+- Generated: No.
+- Committed: Yes.
+
+**`.claude-plugin/`:**
+- Purpose: Claude plugin marketplace/package metadata for Fulcrum skills.
+- Generated: Mostly source metadata.
+- Committed: Yes.
+
+**`src/cli/generated/`:**
+- Purpose: generated CLI helper data.
+- Generated: Yes.
+- Committed: Yes if used by runtime/tests; regenerate through scripts rather than manual edits.
+
+**`src/web/static/`:**
+- Purpose: static web assets served by SvelteKit.
+- Generated: No for source assets.
+- Committed: Yes.
+
+**`src/product-kernel/db/migrations/`:**
+- Purpose: legacy SQL migration history.
+- Generated: No.
+- Committed: Yes.
+- Guidance: do not add for new canonical ORM features unless maintaining compatibility.
 
 ---
 
-*Structure analysis: 2026-05-04*
+*Structure analysis: 2026-05-06*

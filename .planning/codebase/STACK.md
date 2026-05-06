@@ -1,142 +1,126 @@
 # Technology Stack
 
-**Analysis Date:** 2026-05-04
+**Analysis Date:** 2026-05-06
 
 ## Languages
 
 **Primary:**
-- TypeScript 5.6+ — CLI core (`src/`), web frontend (`src/web/`), tRPC server, all business logic
-- TypeScript 6.0+ — web frontend (`src/web/package.json` declares `typescript: ^6.0.2`)
+- TypeScript ESNext - CLI, hooks, product kernel, REST API, tRPC, SvelteKit server code in `src/`, `src/api/`, `src/product-kernel/`, `src/trpc/`, `src/web/src/`
+- Svelte 5 - web dashboard UI in `src/web/src/routes/` and `src/web/src/lib/components/`
 
 **Secondary:**
-- Rust (2021 edition) — local inference engine (`inference/` workspace), Tauri desktop shell (`src-tauri/`)
-- SQL — MikroORM migrations (`src/db/migrations/`), PGlite embedded
+- Rust 2021 - local inference sidecar workspace in `inference/` and gated Tauri desktop wrapper in `src-tauri/`
+- SQL/PostgreSQL dialect - product-kernel migrations in `src/product-kernel/db/migrations/` and MikroORM migrations in `src/db/migrations/`
+- TOML/YAML/Markdown - configuration and authored skill/docs content in `config/`, `skills/`, `rules/`, `docs/`
 
 ## Runtime
 
 **Environment:**
-- Bun >= 1.3.0 (primary runtime, declared in `package.json` engines)
-- Node.js compatibility via Bun's Node API shims (`node:crypto`, `node:fs`, etc.)
+- Bun >=1.3.0 - root CLI runtime, package manager, test runner, and single-binary compiler from `package.json`
+- Browser + SvelteKit SSR runtime - web shell under `src/web/` via Vite dev server
+- Rust toolchain - inference crates in `inference/Cargo.toml`; desktop shell in `src-tauri/Cargo.toml`
 
 **Package Manager:**
-- Bun (root `bun.lockb` lockfile)
-- Bun (web `src/web/bun.lockb`)
-- Cargo (Rust workspace `inference/Cargo.toml`, `src-tauri/Cargo.toml`)
+- Bun - root scripts and lockfile in `package.json` and `bun.lock`
+- Bun - web app scripts and lockfile in `src/web/package.json` and `src/web/bun.lock`
+- Cargo - Rust workspaces in `inference/Cargo.toml`, `inference/Cargo.lock`, `src-tauri/Cargo.toml`
+- Lockfile: present for root Bun, web Bun, and inference Cargo; `src-tauri/Cargo.lock` not detected in scoped scan
 
 ## Frameworks
 
 **Core:**
-- SvelteKit 2.57+ / Svelte 5.55+ (runes mode forced) — web UI (`src/web/`)
-- Hono 4.12.16 — HTTP API layer (`src/api/`)
-- tRPC — RPC layer between web frontend and backend (`src/trpc/`, `src/server/trpc/`)
-- Effect 3.20.0 — functional effect system (`src/` various modules)
-- Tauri 2 — desktop app wrapper, gated behind `FULCRUM_FEATURES=desktop-app` (`src-tauri/`)
+- Bun compiled CLI - `src/index.ts` is root binary entry; build target `bun-darwin-arm64` in `package.json`
+- Hono 4.12.16 + `@hono/zod-openapi` 1.3.0 - public REST/OpenAPI API in `src/api/hono.ts`
+- tRPC - internal web/CLI/TUI procedure layer in `src/trpc/router.ts`, `src/trpc/context.ts`, `src/web/src/hooks.server.ts`
+- SvelteKit 2.59.0 + Svelte 5.55.x - web shell in `src/web/`, configured by `src/web/svelte.config.js`
+- Vite 8.0.x - web dev/build tool configured by `src/web/vite.config.ts`
+- MikroORM v7 pattern - entity graph and migrations configured by `src/db/mikro-orm.config.ts`
+- PGlite 0.4.5 + PostgreSQL/pg 8.20.0 - local-first and SaaS database backends in `src/config/database.ts`, `src/product-kernel/db/pglite.ts`, `src/product-kernel/db/postgres.ts`
+- Better-Auth - session, email/password, organization, OAuth/magic-link/email-OTP wiring in `src/auth/index.ts`
+- Casbin - ABAC/RBAC permission enforcement in `src/permissions/enforcer.ts` and `src/permissions/casbin-adapter.ts`
+- Yjs 13.6.30 + ws 8.18.3 - realtime collaboration server in `src/server/yjs-server.ts`
+- OpenTUI 0.2.2 - terminal UI adapter in `src/tui/opentui/adapter.ts`
+- Effect 3.20.0 + `@ai-hero/sandcastle` 0.5.6 - sandbox/process foundations in root `package.json`
+- Tauri 2 - gated desktop app wrapper in `src-tauri/Cargo.toml`
 
 **Testing:**
-- Vitest 4.1+ — web component/unit tests (`src/web/`)
-- Playwright 1.59+ — E2E and a11y tests (`src/web/tests/e2e/`, `src/web/tests/a11y/`)
-- bun:test — CLI/core unit tests (`bun test` at root)
-- Testing Library Svelte 5.3+ — component testing (`src/web/`)
-- happy-dom 20.9 / jsdom 29.1 — DOM environments for tests
+- Bun test - root unit/integration tests via `bun test` from `package.json`
+- Vitest 4.1.5 - web component/unit tests via `src/web/vitest.config.ts`
+- Playwright 1.59.1 + axe-core - E2E and accessibility tests via `src/web/playwright.config.ts`
+- Svelte Testing Library - component tests from `src/web/package.json`
+- Rust cargo test - inference workspace tests under `inference/`
 
 **Build/Dev:**
-- Vite 8.0+ — web dev server and build (`src/web/`)
-- Bun compile — CLI binary (`bun build --compile --minify`)
-- Cargo — Rust inference workspace build
-- `scripts/build-all.ts` — cross-platform build orchestrator
-- `scripts/ci.ts` — CI pipeline runner
-- `scripts/release.ts` — release automation
+- TypeScript 5.6 root / TypeScript 6.0 web - strict TS settings in `tsconfig.json` and `src/web/tsconfig.json`
+- `bun run scripts/ci.ts` - root local CI entry in `package.json`; `.planning/STATE.md` records 20/20 CI stages green
+- `bun run scripts/build-all.ts` - multi-target binary build from `package.json`
+- `just sync-symphony` - updates `vendor/openai-symphony` and `.symphony-spec.lock` from `justfile`
+- Tailwind CSS 4.2.4 + `@tailwindcss/vite` - web styling pipeline from `src/web/package.json` and `src/web/vite.config.ts`
+- shadcn-svelte, bits-ui, formsnap, sveltekit-superforms - web UI/form stack in `src/web/package.json`
+- CodeMirror, TipTap/ProseMirror, Mermaid, LayerChart, TanStack table/virtual - rich editor, diagram, chart, and table surfaces in `src/web/package.json`
 
 ## Key Dependencies
 
 **Critical:**
-- `@electric-sql/pglite` 0.4.5 — embedded PostgreSQL for local-first mode (`src/db/`)
-- `@mikro-orm/postgresql` + `@mikro-orm/migrations` (v7) — ORM with decorator entities (`src/db/entities/`)
-- `better-auth` — authentication framework (`src/auth/index.ts`)
-- `zod` 4.4.2 — schema validation (tRPC schemas, API validation)
-- `zustand` 5.0.12 — state management (product kernel store)
-- `@needle-di/core` — dependency injection (Stage-3 decorators)
-
-**Web UI:**
-- `bits-ui` 2.16+ — headless Svelte components
-- `shadcn-svelte` 1.2+ — component library
-- `tailwindcss` 4.2+ — styling via `@tailwindcss/vite` plugin
-- `@tiptap/core` 3.22+ / `svelte-tiptap` 3.0 — rich text editor
-- `codemirror` 6+ / `svelte-codemirror-editor` — code editor
-- `lucide-svelte` / `@lucide/svelte` — icons
-- `sveltekit-superforms` 2.30+ — form handling
-- `formsnap` 2.0+ — form components
-- `svelte-sonner` — toast notifications
-- `svelte-dnd-action` 0.9+ — drag and drop
-- `marked` 18+ / `dompurify` 3.4+ — markdown rendering + sanitization
-- `valibot` 1.3+ — additional validation (web-side)
+- `@electric-sql/pglite` 0.4.5 - default local product database in `src/config/database.ts`
+- `pg` 8.20.0 - PostgreSQL SaaS backend in `src/product-kernel/db/postgres.ts`
+- `hono` 4.12.16 + `@hono/zod-openapi` 1.3.0 - public REST API in `src/api/hono.ts`
+- `zod` 4.4.2 - schema validation and OpenAPI schemas across `src/api/routes/`
+- `better-auth` - imported by `src/auth/index.ts` for web auth; not listed in root `package.json`
+- `@mikro-orm/*` - imported by `src/db/mikro-orm.config.ts`, entities, repositories, services; not listed in root `package.json`
+- `@needle-di/core` - dependency injection across `src/db/db.module.ts`, `src/services/`, `src/web/src/hooks.server.ts`; not listed in root `package.json`
+- `@trpc/server` - internal API layer in `src/trpc/` and `src/web/src/hooks.server.ts`; not listed in root `package.json`
+- `casbin` - permission engine in `src/permissions/`; not listed in root `package.json`
+- `simple-git` - repository mirroring in `src/repos/git.ts`; not listed in root `package.json`
+- `yjs` 13.6.30 + `ws` 8.18.3 - collaboration state and WebSocket transport in `src/server/yjs-server.ts`
 
 **Infrastructure:**
-- `pg` 8.20 — PostgreSQL client for SaaS mode
-- `hono` 4.12.16 + `@hono/zod-openapi` 1.3 — OpenAPI-typed HTTP routes
-- `effect` 3.20 + `@effect/platform` 0.95 — structured concurrency, platform abstractions
-- `yaml` 2.8.3 — YAML parsing (config files, agent profiles)
-- `smol-toml` 1.4+ — TOML parsing
-- `unified` 11 + `rehype-parse` / `rehype-remark` / `remark-stringify` — HTML-to-markdown pipeline
-
-**Rust Inference Crates:**
-- `tokio` 1 (full) — async runtime
-- `serde` 1 + `serde_json` 1 — serialization
-- `reqwest` 0.12 (rustls-tls) — HTTP client
-- `rusqlite` 0.32 (bundled) — local model cache
-- `sha2` 0.10 — hashing
-- `toml` 0.8 — config parsing
-
-**Tauri Desktop:**
-- `tauri` 2 (updater feature) — desktop shell
-- `tauri-plugin-updater` 2 — auto-update
-- `tauri-plugin-dialog` 2 — native dialogs
-- `tauri-plugin-fs` 2 — filesystem access
+- `nodemailer` 8.0.7 - SMTP notifications in `src/notifications/delivery-handlers/smtp.ts`
+- `web-push` 3.6.7 - VAPID push notifications in `src/notifications/delivery-handlers/push.ts`
+- `@orama/orama` 3.1.18 - web-side search index in `src/web/src/lib/search/OramaIndex.ts`
+- `@tiptap/*`, `svelte-tiptap`, `@tiptap/pm` - rich text editor and collaboration extensions in `src/web/package.json`
+- `@codemirror/*`, `codemirror`, `svelte-codemirror-editor` - markdown/code editor stack in `src/web/package.json`
+- `dompurify`, `isomorphic-dompurify`, `marked`, `unified`, `remark-*`, `rehype-*`, `@shikijs/rehype` - markdown/HTML rendering and sanitization in root and web manifests
+- `fastembed` 4, `candle-*` 0.10, `tokenizers` 0.22, `reqwest` 0.12, `rusqlite` 0.32 - Rust inference/model cache stack in `inference/*/Cargo.toml`
+- `tauri` 2 + updater/dialog/fs plugins - desktop wrapper in `src-tauri/Cargo.toml`
 
 ## Configuration
 
 **Environment:**
-- `FULCRUM_FEATURES` — comma-separated feature gate tokens (e.g., `desktop-app`, `saas-auth`)
-- `FULCRUM_FLAG_<NAME>` — per-flag env override (e.g., `FULCRUM_FLAG_SAAS_AUTH=true`)
-- `DATABASE_URL` — PostgreSQL connection for SaaS mode (absent = PGlite local)
-- `BETTER_AUTH_SECRET` — auth secret (required in production)
-- `FULCRUM_TRUSTED_ORIGINS` — comma-separated CORS origins
-- `FULCRUM_INFERENCE_URL` / `FULCRUM_INFERENCE_API_KEY` — external LLM endpoint
-- `LINEAR_API_KEY` / `LINEAR_TEAM_ID` — Linear connector
-- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` — GitHub OAuth
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth
-
-**TypeScript (root):**
-- `tsconfig.json` — ESNext target, bundler moduleResolution, strict, `@/*` path alias to `src/*`
-- Excludes `src/web/**` (web has own tsconfig)
-
-**TypeScript (web):**
-- SvelteKit-managed tsconfig
-- Svelte 5 runes mode forced via `svelte.config.js` compilerOptions
+- `FULCRUM_HOME` controls local state root; resolved by `src/config/database.ts`, `src/product-kernel/paths.ts`, `src/web/src/lib/server/db.ts`, and Rust inference files
+- `DATABASE_URL` switches database backend to PostgreSQL when it starts with `postgresql://` or `postgres://` in `src/config/database.ts`
+- `FULCRUM_FEATURES` gates online/SaaS features across `src/api/feature-flags.ts`, `src/web/src/routes/settings/*`, `src/collab/feature-flag.ts`, `src/router/auto-assign.ts`
+- `FULCRUM_REQUIRE_AUTH` turns on web route auth guard in `src/web/src/hooks.server.ts`
+- `BETTER_AUTH_SECRET`, `FULCRUM_TRUSTED_ORIGINS`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` configure Better-Auth in `src/auth/index.ts`
+- `FULCRUM_INFERENCE_BACKEND`, `FULCRUM_INFERENCE_URL`, `FULCRUM_INFERENCE_API_KEY` configure inference backends in `src/server/trpc/routers/inference.ts`, `src/inference/backends/openai-compatible.ts`
+- `FULCRUM_YJS_URL`, `FULCRUM_YJS_PORT`, `FULCRUM_YJS_STANDALONE` configure Yjs collaboration in `src/server/yjs-server.ts`
+- `.env*` files: not detected; forbidden from reading by mapper policy
 
 **Build:**
-- `package.json` scripts — `dev`, `build`, `build:all`, `test`, `lint`, `ci`, `changelog`, `release`
-- `src/web/package.json` scripts — `dev`, `build`, `test`, `web:test`, `web:e2e`, `web:a11y`, `i18n:extract`
-- `justfile` — `sync-symphony` recipe (vendor submodule sync + conformance trace)
-- Bun compile targets: `bun-darwin-arm64` (default), `build:all` for cross-platform
+- Root scripts: `package.json`
+- Root TypeScript config: `tsconfig.json`
+- Web scripts/config: `src/web/package.json`, `src/web/tsconfig.json`, `src/web/vite.config.ts`, `src/web/svelte.config.js`
+- Web testing config: `src/web/vitest.config.ts`, `src/web/playwright.config.ts`
+- Root database ORM config: `src/db/mikro-orm.config.ts`
+- Rust workspaces: `inference/Cargo.toml`, `src-tauri/Cargo.toml`
+- Project runner: `justfile`
 
 ## Platform Requirements
 
 **Development:**
-- Bun >= 1.3.0
-- Rust toolchain (for inference engine, optional — gated)
-- Node.js not required (Bun provides Node API compat)
+- Install Bun >=1.3.0 before running root scripts from `package.json`
+- Use `bun run ci` for full local gate; `.planning/STATE.md` identifies this as source of truth
+- Use `bun run dev` at root for CLI development and `cd src/web && bun run dev` for SvelteKit web development
+- Use `bun test` for root tests, `cd src/web && bun run web:test` for web Vitest, and `cd src/web && bun run web:e2e:smoke` for smoke E2E
+- Rust toolchain required for `inference/` and `src-tauri/`
+- `just sync-symphony` requires initialized `vendor/openai-symphony` submodule
 
-**Production (Local-First):**
-- Single compiled Bun binary (`dist/fulcrum-darwin-arm64`)
-- PGlite embedded — no external database required
-- Tauri desktop shell (optional, gated behind `desktop-app` feature)
-
-**Production (SaaS):**
-- PostgreSQL server (via `DATABASE_URL`)
-- `BETTER_AUTH_SECRET` required
-- OAuth provider credentials for social login
+**Production:**
+- CLI ships as Bun-compiled binary from `scripts/build-all.ts` / root `build:all`
+- Local-first product DB defaults to PGlite under `FULCRUM_HOME`; PostgreSQL SaaS mode requires `DATABASE_URL`
+- SvelteKit uses `@sveltejs/adapter-auto`; concrete hosting adapter is not pinned in `src/web/svelte.config.js`
+- Desktop app is gated by `FULCRUM_FEATURES=desktop-app` in `src-tauri/Cargo.toml` description and `src/web/src/lib/tauri/ipc.ts`
 
 ---
 
-*Stack analysis: 2026-05-04*
+*Stack analysis: 2026-05-06*

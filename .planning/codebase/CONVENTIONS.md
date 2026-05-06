@@ -1,208 +1,108 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-05-04
+**Analysis Date:** 2026-05-06
 
 ## Naming Patterns
 
-**Entity Files (MikroORM):**
-- PascalCase single-noun: `Task.ts`, `Sprint.ts`, `User.ts`, `Org.ts`, `Document.ts`
-- Located in domain subdirs: `src/db/entities/{domain}/`
-- Barrel re-exports via `index.ts` in each entity subdirectory
-
-**Repository Files:**
-- PascalCase with `Repository` suffix: `TaskRepository.ts`, `SchemaMigrationRepository.ts`
-- Mirror entity domain dirs: `src/db/repositories/{domain}/`
-
-**tRPC Router Files:**
-- kebab-case or lowercase plural: `src/trpc/routers/tasks.ts`, `src/trpc/routers/artifacts.ts`
-- One router per domain, exported as `{domain}Router`
-
-**tRPC Schema Files:**
-- kebab-case or lowercase plural: `src/trpc/schemas/tasks.ts`, `src/trpc/schemas/artifacts.ts`
-- Zod schemas named `{Entity}{Purpose}Schema`: `TaskSchema`, `TaskStatusSchema`, `ListTasksInputSchema`
-
-**CLI Command Files:**
-- kebab-case: `src/cli/install.ts`, `src/cli/vendor-rules.ts`, `src/cli/package-mirror.ts`
-
-**Test Files:**
-- Co-located with source, suffix `.test.ts`: `install.test.ts`, `rules-engine.test.ts`
-- Some tests in top-level `tests/` dir mirroring `src/` structure
-
-**Utility Files:**
-- kebab-case: `src/utils/proc.ts`, `src/utils/io.ts`, `src/utils/source-clean.ts`
+**Files:**
+- Use kebab-case for most feature modules: `src/router/rules-engine.ts`, `src/router/no-match-prompt.ts`, `src/api/feature-flags.ts`.
+- Use PascalCase for class-centric services and entities: `src/services/TaskService.ts`, `src/services/WorkflowService.ts`, `src/db/entities/tasks/Task.ts`.
+- Use SvelteKit route names exactly: `src/web/src/routes/boards/+page.server.ts`, `src/web/src/routes/runs/[id]/+page.svelte`.
+- Use `.test.ts` for Bun and Vitest unit/contract tests: `src/services/TaskService.test.ts`, `tests/db/migrator-service.test.ts`, `src/web/src/routes/boards/page.svelte.test.ts`.
+- Use `.spec.ts` for Playwright browser tests: `src/web/tests/e2e/phase08-surface-delivery.spec.ts`, `src/web/tests/e2e/_smoke.spec.ts`.
 
 **Functions:**
-- camelCase: `createTestOrm`, `assembleSkillContext`, `lockCavemanUltra`, `scrubPaths`
+- Use `camelCase` verbs for functions and factories: `createPublicApi()` in `src/api/hono.ts`, `runMigrations()` in `src/product-kernel/db/migrate.ts`, `openPglite()` in `src/product-kernel/db/pglite.ts`.
+- Use `create*` for factory functions: `createPublicApiRouter()` in `src/api/hono.ts`, `createLocalOrg()` in `src/product-kernel/store/repositories.ts`.
+- Use `register*Routes` for Hono route registration modules: `registerDocRoutes()` in `src/api/routes/docs.ts`, `registerRunsRoutes()` in `src/api/routes/runs.ts`.
+- Use `make*`, `build*`, or `seed*` for test helpers: `makeTask()` in `src/services/TaskService.test.ts`, `buildOrm()` in `tests/db/migrator-service.test.ts`, `seedTasks()` in `src/web/src/routes/boards/page.server.test.ts`.
 
-**Variables/Constants:**
-- camelCase for locals: `sandboxHome`, `webInstallCache`
-- SCREAMING_SNAKE for module constants: `DEFAULT_ADMIN_EMAIL`, `DEFAULT_ORG_ID`, `CI_ENV`
+**Variables:**
+- Use `camelCase` locals and fields in TypeScript code: `activeProjectId`, `fulcrumHome`, `webInstallCache` in `scripts/ci.ts`.
+- Use `UPPER_SNAKE_CASE` for constants and canonical lists: `CUSTOM_FIELD_TYPES` in `src/db/entities/tasks/schemas.ts`, `CI_ENV` and `STEPS` in `scripts/ci.ts`.
+- Use descriptive test fixture names that encode behavior: `taskAlphaPendingId`, `betaProjectId` in `src/web/src/routes/boards/page.server.test.ts`.
+- Use snake_case only when mirroring database columns or API payloads: `project_id`, `updated_at` in `src/web/src/routes/boards/page.svelte.test.ts`.
 
-**Types/Interfaces:**
-- PascalCase: `TestOrm`, `TestContainer`, `TestSession`, `ErrorReportEntry`
-- Prefixed with `I` — NOT used (bare PascalCase only)
+**Types:**
+- Use PascalCase interfaces and type aliases: `TaskOutput`, `BulkTaskPatch`, `TaskContext` in `src/services/TaskService.ts`; `PublicApiDeps` in `src/api/hono.ts`.
+- Co-locate narrow service types with their service implementation when not shared broadly: `TaskOutput` and `BulkTaskPatch` in `src/services/TaskService.ts`.
+- Export service-facing contracts and keep private helper types unexported: `TaskContext` remains local in `src/services/TaskService.ts`.
+- Prefer `type` imports for types under `verbatimModuleSyntax`: `import type { EntityManager }` in `src/services/TaskService.ts`.
 
 ## Code Style
 
 **Formatting:**
-- No Prettier or Biome configured — formatting relies on editor defaults
-- 2-space indentation in TypeScript files
-- Semicolons used consistently
-- Double quotes for imports
+- Root TypeScript uses two-space indentation, double quotes, semicolons, trailing commas in multiline calls, and explicit `.ts` relative imports: `src/api/hono.ts`, `scripts/ci.ts`, `src/services/TaskService.ts`.
+- Web package files mostly follow SvelteKit defaults; TypeScript files use double quotes while generated/default JS config may use tabs/single quotes: `src/web/vitest.config.ts`, `src/web/svelte.config.js`.
+- No root Prettier, ESLint, or Biome config is detected. `evals/biome.json` is trigger-eval data, not a repo formatter config.
+- Formatting authority is current code style plus TypeScript checks; avoid introducing a new formatter config without an explicit phase decision.
 
 **Linting:**
-- TypeScript strict mode: `strict: true`, `noUncheckedIndexedAccess: true`, `noImplicitOverride: true`
-- `verbatimModuleSyntax: true` — must use `import type` for type-only imports
-- `isolatedModules: true` — no const enums or namespace merging
-- Lint command: `bun run --bun tsc --noEmit`
-
-**TypeScript Strictness:**
-- `tsconfig.json` enforces strict null checks, unchecked indexed access
-- Target ESNext with bundler module resolution
-- Bun types via `@types/bun`
+- Root lint is TypeScript only: `package.json` script `lint` runs `bun run --bun tsc --noEmit`.
+- Module boundaries have a dedicated gate: `package.json` script `lint:boundaries` runs `scripts/check-module-boundaries.ts`.
+- Web lint/check gate is SvelteKit + svelte-check: `src/web/package.json` script `check` runs `svelte-kit sync && svelte-check --no-tsconfig --threshold error --diagnostic-sources svelte,css`.
+- CI is authoritative: `scripts/ci.ts` runs install, typecheck, targeted conformance tests, root tests, coverage, license audit, codegen, migrations, build, web checks, web tests, accessibility, and Playwright smoke.
 
 ## Import Organization
 
-**Order (observed pattern):**
-1. Node.js built-ins (`node:fs`, `node:path`, `node:os`, `node:crypto`)
-2. External packages (`@trpc/server`, `zod`, `@mikro-orm/*`, `bun:test`)
-3. Internal absolute (`../db/entities/...`, `../trpc/...`)
-4. Relative siblings (`./install.ts`, `./auth.ts`)
+**Order:**
+1. Node built-ins: `node:fs`, `node:path`, `node:os` in `src/web/src/routes/boards/page.server.test.ts`.
+2. Test/runtime/framework imports: `bun:test`, `@trpc/server`, `hono`, `@hono/zod-openapi`, `@sveltejs/kit`.
+3. External package imports: `@mikro-orm/postgresql`, `@electric-sql/pglite`, `zod`.
+4. Internal absolute/alias imports for web: `$lib/server/db`, `$lib/server/runs` in `src/web/src/routes/runs/[id]/+page.server.ts`.
+5. Internal relative imports for root code: `../db/entities/core/Event.ts`, `./WorkflowService.ts` in `src/services/TaskService.ts`.
+6. Type imports are marked with `type` and often grouped with the related runtime import.
 
 **Path Aliases:**
-- `@/*` maps to `src/*` (defined in `tsconfig.json`) — but rarely used in practice
-- Most imports use relative paths with explicit `.ts` extension: `from "./install.ts"`
-- `allowImportingTsExtensions: true` — always include `.ts` extension on local imports
-
-**Barrel Files:**
-- Used in entity dirs: `src/db/entities/tasks/index.ts`, `src/db/entities/auth/index.ts`
-- Used in module roots: `src/test-utils/index.ts`, `src/flags/index.ts`, `src/connectors/index.ts`
-- Pattern: named re-exports, no default exports
-
-**Type-Only Imports:**
-- Required by `verbatimModuleSyntax`:
-  ```typescript
-  import type { EntityManager, MikroORM } from "@mikro-orm/postgresql";
-  import type { Session } from "better-auth";
-  ```
+- Root TypeScript alias `@/*` maps to `src/*` in `tsconfig.json`, but many modules use explicit relative imports with `.ts` extensions.
+- Web uses SvelteKit aliases, especially `$lib`, configured through SvelteKit and test aliases in `src/web/vitest.config.ts`.
+- Web tests mock SvelteKit virtual modules with `mock.module("$app/state", ...)` or Vitest aliases: `src/web/src/routes/boards/page.svelte.test.ts`, `src/web/vitest.config.ts`.
 
 ## Error Handling
 
-**tRPC Layer:**
-- Use `TRPCError` with appropriate codes: `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`
-- Error formatter adds `requestId` to every error shape (`src/trpc/trpc.ts`)
-- `protectedProcedure` middleware enforces session presence — missing session → `UNAUTHORIZED`
+**Patterns:**
+- Use domain/framework errors for API-facing failures: `TRPCError` in `src/services/TaskService.ts` and `error(404, ...)` from SvelteKit in `src/web/src/routes/runs/[id]/+page.server.ts`.
+- Use plain `Error` for CLI, scripts, and invariant failures: `scripts/gen-conformance-trace.ts`, `src/services/tasks.ts`.
+- Use fail-closed checks for config and gates: `scripts/ci-schemas.ts`, `scripts/check-module-boundaries.ts`, `scripts/ci/codegen.ts`.
+- Use best-effort `try/catch` only for non-critical side effects and log or ignore intentionally: watcher auto-subscribe in `src/services/TaskService.ts`, hot-reload listener isolation in `src/router/event-bus.ts`.
+- Preserve process environment around tests that mutate it: `runDbMigrate()` in `src/cli/doctor.test.ts`, route tests under `src/web/src/routes/*/page.server.test.ts`.
 
-**Error Reporting:**
-- Gated remote error reporting behind `FULCRUM_FEATURES=error-reporting-remote` flag
-- Stack traces scrubbed of absolute paths before transmission (`src/errors/reporter.ts`)
-- HMAC-SHA256 signing for outbound error reports
-- No PII in error payloads
+## Logging
 
-**General Pattern:**
-- Throw descriptive errors with context
-- Feature-flag gating: build always, gate ON behind flag (C1 convention)
+**Framework:** console
 
-## Commit Message Conventions
+**Patterns:**
+- CLI and CI scripts write user-facing progress with `console.log`/`console.error`: `scripts/ci.ts`, `scripts/release.ts`, `scripts/build-all.ts`.
+- Services avoid logging on happy paths; log only when fallback/observability matters: `src/router/rules-engine.ts`, `src/router/llm-fallback.ts`.
+- JSON output modes must remain parseable; tests validate `fulcrum doctor --json` by parsing stdout in `src/cli/doctor.test.ts`.
+- Prefer structured JSON for machine-facing reports when available: `scripts/license-audit.ts`, `scripts/static-build-proof.ts`.
 
-**Format:** Conventional Commits — `type(scope): subject`
-- Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `build`, `ci`
-- Scope examples: `web`, `test-gaps`, `01` (phase numbers)
-- Subject: lowercase, imperative mood, no trailing period
+## Comments
 
-**Examples from history:**
-```
-feat: add test coverage scratch plan + update README + feature guide
-fix(web): use local inference client on settings page
-fix(web): resolve dashboard crash — remove conflicting migration + auto-seed default org
-docs: add Wave 1 master audit report
-docs(01): create phase plan — 10 plans in 4 waves
-```
+**When to Comment:**
+- Comment non-local reasoning, compatibility constraints, or phase decisions: `scripts/ci.ts` explains web pipeline separation; `src/api/hono.ts` documents ARCH-09 consolidation and feature gate behavior.
+- Use section banners sparingly for large service/test files: `src/services/TaskService.ts`, `tests/db/migrator-service.test.ts`.
+- Avoid comments that restate one-line code; add comments where a future change could break a contract.
 
-**Changelog:** Generated via `git-cliff` (`bun run changelog`)
+**JSDoc/TSDoc:**
+- Use JSDoc for public factories and complex test setup: `createPublicApi()` in `src/api/hono.ts`, `buildOrm()` in `tests/db/migrator-service.test.ts`.
+- Use file-level block comments to capture TDD/phase acceptance context in large suites: `tests/db/migrator-service.test.ts`, `src/services/TaskService.test.ts`.
+- Do not require JSDoc for every function; most helpers use descriptive names instead.
 
-## Code Organization Per Module
+## Function Design
 
-**Entity → Repository → Schema → Router pattern:**
+**Size:** Keep new functions small unless matching existing service/test patterns. Large services split behavior with private helpers and section comments: `src/services/TaskService.ts`.
 
-1. **Entity** (`src/db/entities/{domain}/{Entity}.ts`):
-   - MikroORM v7 ES Stage-3 decorators (`@mikro-orm/decorators/es`)
-   - `@Entity({ tableName, repository })` wires to repository class
-   - Explicit `type` on every `@Property`/`@PrimaryKey` (Stage-3 no reflect-metadata)
+**Parameters:** Prefer object parameters for multi-field service calls and route dependencies: `createPublicApi(deps?: PublicApiDeps)` in `src/api/hono.ts`, `bulkUpdate(ctx, ids, patch)` in `src/services/TaskService.ts`.
 
-2. **Repository** (`src/db/repositories/{domain}/{Entity}Repository.ts`):
-   - Extends `EntityRepository<Entity>` from MikroORM
-   - Decorated with `@injectable()` from `@needle-di/core`
-   - Defines typed input interfaces: `TaskCreateInput`, `TaskListInput`, etc.
-
-3. **Schema** (`src/trpc/schemas/{domain}.ts`):
-   - Zod v4 schemas shared across web, CLI, and TUI surfaces
-   - Every field gets `.describe()` for OpenAPI generation
-   - Pattern: `{Entity}Schema` for output, `{Action}{Entity}InputSchema` for input
-
-4. **Router** (`src/trpc/routers/{domain}.ts`):
-   - Uses `protectedProcedure` for auth-required endpoints
-   - Procedures reference schemas for input/output validation
-   - One router per domain, composed in `src/trpc/router.ts`
-
-**DI Container:**
-- needle-di `Container` for dependency injection
-- `registerDbBindings()` wires ORM into container
-- Repositories resolved from `ctx.container` in tRPC procedures
-
-## TypeScript Patterns
-
-**Zod Schemas:**
-```typescript
-export const TaskStatusSchema = z.enum(["backlog", "todo", "in_progress", "in_review", "done", "cancelled"]);
-export const TaskSchema = z.object({
-  id: z.string().uuid().describe("Unique task identifier."),
-  orgId: z.string().uuid().describe("Organisation the task belongs to."),
-  title: z.string().describe("Short human-readable task title."),
-  status: TaskStatusSchema.describe("Current workflow status of the task."),
-  createdAt: z.date().describe("Timestamp when the task was created."),
-});
-```
-
-**Feature Flags:**
-- Feature gating via `FULCRUM_FEATURES` env var
-- Build always, gate ON behind flag (C1 convention)
-- `ExperimentStore` for A/B testing (`src/flags/experiments.ts`)
-
-**MikroORM Entity Pattern:**
-```typescript
-@Entity({ tableName: "tasks", repository: () => TaskRepository })
-@Index({ name: "idx_tasks_org_created", properties: ["org", "createdAt"] })
-export class Task {
-  @PrimaryKey({ type: "uuid" })
-  id!: string;
-
-  @ManyToOne(() => Org, { fieldName: "org_id" })
-  org!: Org;
-
-  @Property({ type: "timestamptz", defaultRaw: "now()" })
-  createdAt!: Date;
-}
-```
-
-**Non-null assertion (`!`):**
-- Used on MikroORM entity properties (populated by ORM, not constructor)
-- Used with indexed access after bounds check: `sections[0]!.heading`
+**Return Values:** Use explicit `Promise<T>` on exported async functions and services: `TaskService.list()` in `src/services/TaskService.ts`, `createPublicApi()` in `src/api/hono.ts`.
 
 ## Module Design
 
-**Exports:**
-- Named exports only — no default exports in source files
-- Exception: Svelte components use default exports (SvelteKit convention)
+**Exports:** Export named functions/classes/types; avoid default exports except framework-required files such as Svelte components/configs: `src/api/hono.ts`, `src/web/vite.config.ts`, `src/web/svelte.config.js`.
 
-**Barrel Files:**
-- Used for entity domains and module public APIs
-- Re-export types alongside values
-
-**File Header Comments:**
-- JSDoc block at top of significant files explaining purpose, conventions, and pillar references
-- Convention codes referenced: C1 (flag gating), C4 (shared schemas), C6 (no raw SQL), C7 (MikroORM decorators), C8 (DI pattern), C11 (casbin gating)
+**Barrel Files:** Use local barrels for domain surfaces where established: `src/router/index.ts`, `src/services/index.ts`. Do not add broad barrels for new code unless matching an existing domain boundary.
 
 ---
 
-*Convention analysis: 2026-05-04*
+*Convention analysis: 2026-05-06*

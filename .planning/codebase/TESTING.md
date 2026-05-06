@@ -1,409 +1,218 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-05-04
+**Analysis Date:** 2026-05-06
 
 ## Test Framework
 
-**Primary Runner (CLI/backend):**
-- `bun:test` — Bun's built-in test runner
-- 208 test files use `bun:test` across `src/` and `tests/`
-- Config: none required (Bun discovers `.test.ts` files natively)
-
-**Secondary Runner (Web/SvelteKit):**
-- Vitest 4.x — for SvelteKit component tests
-- 11 test files in `src/web/tests/vitest/`
-- Config: `src/web/vitest.config.ts`
-- Environment: `happy-dom`
-- Setup file: `src/web/tests/setup.ts`
-
-**E2E:**
-- Playwright 1.59.x — browser-based end-to-end tests
-- Config: `src/web/playwright.config.ts`
-- 10 spec files in `src/web/tests/e2e/`
-- Opt-in via `FULCRUM_RUN_E2E=1` env var (not in default CI)
-
-**A11y:**
-- axe-core via `@axe-core/playwright` — accessibility audits
-- 5 test files in `src/web/tests/a11y/`
-- Run via: `bun run web:a11y` (from `src/web/`)
-- Uses SSR rendering + axe-core for violations
+**Runner:**
+- Bun test for root unit, integration, service, CLI, DB, and most Svelte SSR tests.
+- Vitest 4.1.5 for selected web component/unit coverage under `src/web/tests/vitest/**/*.test.ts`.
+- Playwright 1.59.1 for web browser smoke, accessibility, and full e2e tests under `src/web/tests/`.
+- Config: root `bunfig.toml`, root `scripts/test-root.ts`, web `src/web/vitest.config.ts`, web `src/web/playwright.config.ts`.
 
 **Assertion Library:**
-- `expect` from `bun:test` (backend)
-- `expect` from `vitest` (web Vitest tests)
-- `expect` from `@playwright/test` (e2e)
+- Bun assertions via `expect` from `bun:test`: `src/services/TaskService.test.ts`, `tests/db/migrator-service.test.ts`.
+- Vitest assertions for web vitest suites configured by `src/web/vitest.config.ts`.
+- Playwright assertions via `expect` from `@playwright/test`: `src/web/tests/e2e/phase08-surface-delivery.spec.ts`.
 
 **Run Commands:**
 ```bash
-bun test                              # Run all bun:test tests (root)
-bun run scripts/test-root.ts          # Discover + run all non-web tests
-bun run ci                            # Full CI pipeline (typecheck + test + build + web)
-cd src/web && bun run web:test        # Vitest web component tests
-cd src/web && bun run web:e2e         # Playwright e2e (needs FULCRUM_RUN_E2E=1)
-cd src/web && bun run web:a11y        # Playwright a11y audits
+bun run ci                                # Full local CI gate
+bun test                                  # Raw Bun test runner
+bun run scripts/test-root.ts              # Root test discovery excluding src/web and tests/a11y
+bun run scripts/test-root.ts --coverage   # Root coverage gate
+(cd src/web && bun run check)             # SvelteKit + svelte-check
+(cd src/web && bun run test)              # Bun Svelte lib tests
+(cd src/web && bun run web:test)          # Vitest web tests
+(cd src/web && bun run web:test -- --coverage) # Vitest coverage
+(cd src/web && bun run web:a11y)          # Playwright accessibility subset
+(cd src/web && bun run web:e2e:smoke)     # Playwright smoke
+FULCRUM_RUN_E2E=1 bun run ci              # Include full Playwright e2e in CI script
 ```
 
 ## Test File Organization
 
-**Location — Mixed strategy:**
-1. **Co-located** (primary for CLI/core): test files next to source
-   - `src/cli/install.test.ts` alongside `src/cli/install.ts`
-   - `src/router/rules-engine.test.ts` alongside `src/router/rules-engine.ts`
-   - `src/inference/client.test.ts` alongside `src/inference/client.ts`
-
-2. **Top-level `tests/`** (integration/cross-cutting): mirrors `src/` domain structure
-   - `tests/connectors/github-issues.test.ts`
-   - `tests/db/repositories/repos/`
-   - `tests/symphony/spec-lock.test.ts`
-   - `tests/trpc/`, `tests/auth/`, `tests/memory/`
-
-3. **`__tests__/` dirs** (occasional): used within some modules
-   - `src/inference/backends/__tests__/backends.test.ts`
-   - `src/orchestration/__tests__/symphony-conformance.test.ts`
-   - `src/tui/__tests__/`
-
-4. **Web tests** (Vitest + Playwright):
-   - Vitest: `src/web/tests/vitest/*.test.ts`
-   - E2E: `src/web/tests/e2e/*.spec.ts`
-   - A11y: `src/web/tests/a11y/*.test.ts`
-   - Co-located Svelte tests: `src/web/src/lib/components/**/*.test.ts` (201 files)
+**Location:**
+- Co-located root unit tests live beside implementation: `src/router/rules-engine.test.ts`, `src/services/TaskService.test.ts`, `src/cli/doctor.test.ts`.
+- Cross-domain root tests live under `tests/<domain>/`: `tests/db/migrator-service.test.ts`, `tests/api/rest-parity.test.ts`, `tests/orchestration/dispatch-loop.test.ts`.
+- Web route server/component tests live beside routes with framework names stripped from test names: `src/web/src/routes/boards/page.server.test.ts`, `src/web/src/routes/boards/page.svelte.test.ts`.
+- Web Playwright tests live under `src/web/tests/e2e/` and `src/web/tests/a11y/`.
+- Vitest tests are selected by `src/web/vitest.config.ts` include pattern `tests/vitest/**/*.test.ts`.
 
 **Naming:**
-- Backend: `{module}.test.ts` (co-located) or `{domain}.test.ts` (tests/ dir)
-- E2E: `{feature}.spec.ts`
-- A11y: `{route}.test.ts`
+- Use `.test.ts` for Bun and Vitest.
+- Use `.spec.ts` for Playwright.
+- For SvelteKit route tests, name by route artifact: `page.server.test.ts`, `page.svelte.test.ts`, `server.test.ts`.
+- Keep phase/parity names when tests encode milestone gates: `src/api/__tests__/phase08-api-parity.test.ts`, `tests/parity/p13-three-surfaces.test.ts`.
 
-**Test Discovery:**
-- `scripts/test-root.ts` collects all `.test.ts`/`.spec.ts` from `scripts/`, `src/`, `tests/`
-- Skips `node_modules`, `.svelte-kit`, `dist`, `coverage`, and `src/web/` (separate pipeline)
-- Passes discovered files to `bun test --conditions=svelte`
+**Structure:**
+```text
+src/<domain>/*.test.ts                 # Co-located root tests
+tests/<domain>/*.test.ts               # Cross-domain root tests
+src/web/src/routes/**/page.server.test.ts
+src/web/src/routes/**/page.svelte.test.ts
+src/web/tests/e2e/*.spec.ts
+src/web/tests/a11y/*.test.ts
+```
 
 ## Test Structure
 
-**bun:test Suite Organization (standard pattern):**
+**Suite Organization:**
 ```typescript
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 
-describe("ComponentName", () => {
-  // Setup/teardown
-  let scratch: string;
-  beforeEach(async () => {
-    scratch = mkdtempSync(join(tmpdir(), "fulcrum-test-"));
+describe("/boards +page.server.ts load()", () => {
+  beforeEach(() => {
+    scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-boards-"));
+    process.env["FULCRUM_HOME"] = scratch;
   });
-  afterEach(async () => {
+
+  afterEach(() => {
+    delete process.env["FULCRUM_HOME"];
     rmSync(scratch, { recursive: true, force: true });
   });
 
-  // Grouped by operation
-  describe("create", () => {
-    test("creates with required fields", () => { /* ... */ });
-    test("stores and retrieves by id", () => { /* ... */ });
-  });
-
-  describe("delete", () => {
-    test("removes entry", () => { /* ... */ });
+  test("project search-param narrows tasks to that project", async () => {
+    const ids = await seedTasks();
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
+    const result = await mod.load(fakeLoadEvent({ project: ids.alphaProjectId }));
+    const payload = await streamedData<BoardPayload>(result);
+    expect(payload.tasks).toHaveLength(2);
   });
 });
 ```
 
-**Section Dividers:**
-- Comment banners used to separate test groups:
-  ```typescript
-  // ---------------------------------------------------------------------------
-  // 1. ~/.agents/ guard
-  // ---------------------------------------------------------------------------
-  ```
-
 **Patterns:**
-- Temp directories via `mkdtempSync` + `afterAll`/`afterEach` cleanup
-- Synchronous setup preferred when possible
-- `test()` preferred over `it()` in bun:test (though `it` also used in connector tests)
-
-## Test Utilities
-
-**Location:** `src/test-utils/`
-
-**Barrel export:** `src/test-utils/index.ts`
-```typescript
-export { adminSession, type TestSession } from "./auth.ts";
-export { createTestContainer, type TestContainer } from "./container.ts";
-export { createTestOrm, type CreateTestOrmOptions, type TestOrm } from "./db.ts";
-export { createTestCaller } from "./trpc.ts";
-```
-
-**`createTestOrm()`** (`src/test-utils/db.ts`):
-- Spins up in-memory PGlite instance
-- Runs all MikroORM migrations
-- Seeds default data via `SeedService`
-- Returns `{ orm, em, pglite, seed, close }` — MUST call `close()` in teardown
-
-**`createTestContainer()`** (`src/test-utils/container.ts`):
-- Creates needle-di `Container` with DB bindings
-- Accepts raw `MikroORM` or `TestOrm` instance
-- Attaches seed result for test session resolution
-
-**`createTestCaller()`** (`src/test-utils/trpc.ts`):
-- Creates tRPC caller with auth context
-- Auto-resolves admin session from seed data
-- Full `appRouter` caller for integration tests
-
-**`adminSession()`** (`src/test-utils/auth.ts`):
-- Generates a `TestSession` with admin privileges
-- Uses `DEFAULT_ADMIN_EMAIL` and `DEFAULT_ORG_ID` from seed
-- Configurable overrides for userId, orgId, sessionToken
-
-**TUI Testing:** `src/tui/testing/fake-tty.ts`
-- `FakeTTY` — headless terminal driver
-- Captures output via `TuiOutput.write()`
-- Injects synthetic keypresses
-- `tty.plainText()` for ANSI-stripped assertions
-
-**Web Testing Mocks:** `src/web/tests/mocks/`
-- `app-environment.ts` — stubs `$app/environment` (browser, building, dev, version)
-- `app-forms.ts` — stubs `$app/forms`
-- `app-navigation.ts` �� stubs `$app/navigation`
-- `app-state.ts` — stubs `$app/state`
+- Use `describe()` around domain/route behavior and `test()` or `it()` for behavior names: `src/router/rules-engine-hot-reload.test.ts`, `src/web/src/routes/boards/page.server.test.ts`.
+- Use `beforeEach`/`afterEach` for isolated temp homes, PGlite stores, and environment mutation: `src/web/src/routes/runs/page.server.test.ts`.
+- Use `beforeAll`/`afterAll` for heavier shared setup such as ORM instances or dynamic Svelte SSR imports: `tests/db/migrator-service.test.ts`, `src/web/src/routes/boards/page.svelte.test.ts`.
+- Use cache-busted dynamic imports when testing SvelteKit server modules that read environment/module state: `src/web/src/routes/boards/page.server.test.ts`.
+- Use explicit data seeding helpers rather than hidden global fixtures for product DB tests: `seedTasks()` in `src/web/src/routes/boards/page.server.test.ts`.
 
 ## Mocking
 
-**bun:test Mocking:**
-```typescript
-import { spyOn } from "bun:test";
-import * as proc from "../utils/proc.ts";
+**Framework:** Bun `mock`/`mock.module`, Bun `vi` compatibility, Vitest mocks, Playwright fixtures.
 
-// Spy on module function
-const spy = spyOn(proc, "run").mockResolvedValue({ code: 0, stdout: "", stderr: "" });
+**Patterns:**
+```typescript
+import { mock } from "bun:test";
+
+mock.module("$app/navigation", () => ({
+  goto: async () => {},
+  invalidateAll: async () => {},
+}));
 ```
 
-**Vitest Mocking:**
 ```typescript
-import { vi } from "vitest";
-vi.mock("$app/environment", () => ({ browser: false, dev: false }));
+import { vi } from "bun:test";
+
+const mockEm = {
+  getRepository: vi.fn(() => makeMockRepo(tasks, () => mockEmBox.em)),
+  transactional: vi.fn(async (cb) => {
+    await cb(txEm);
+  }),
+} as unknown as EntityManager;
 ```
-
-**Inline Mocks (common pattern):**
-- Connector tests inject mock `fetch`:
-  ```typescript
-  const connector = new GitHubIssuesConnector({
-    token: "token",
-    repo: "owner/repo",
-    fetch: async (input, init) => {
-      requests.push(new Request(input, init));
-      return Response.json([/* mock data */]);
-    },
-  });
-  ```
-
-**Standalone Mini-Routers:**
-- tRPC router tests create isolated routers with in-memory stores instead of importing `appRouter`
-- Avoids pulling full dependency tree for focused unit tests
-- Pattern in `src/trpc/routers/artifacts.test.ts`
 
 **What to Mock:**
-- External API calls (fetch injection)
-- File system (temp dirs, not mocks)
-- Auth sessions (via `adminSession()`)
-- tRPC context (via `createTestCaller()`)
+- Mock SvelteKit virtual modules for SSR component tests: `$app/state`, `$app/navigation`, `$app/forms` in `src/web/src/routes/boards/page.svelte.test.ts`.
+- Mock repository/EntityManager surfaces for pure service behavior: `makeMockRepo()` and `makeMockEm()` in `src/services/TaskService.test.ts`.
+- Mock process HOME/config roots with temp directories for CLI behavior: `src/cli/doctor.test.ts`.
+- Use Playwright fixtures for browser-level seeded product data: `src/web/tests/e2e/_fixtures.spec.ts`.
 
 **What NOT to Mock:**
-- Database — use PGlite in-memory instances
-- Migrations — run real migrations against PGlite
-- Zod schemas — validate against real schemas
+- Do not mock PGlite for migration/schema/product DB contract tests; use in-memory PGlite and real migrations: `tests/db/migrator-service.test.ts`, `src/web/src/routes/boards/page.server.test.ts`.
+- Do not mock public API route registration when testing OpenAPI/parity contracts: `tests/api/openapi-memory.test.ts`, `tests/api/rest-parity.test.ts`.
+- Do not mock Svelte SSR output when asserting rendered markup; use `svelte/server` `render()` with Bun preload from `bunfig.toml`.
 
 ## Fixtures and Factories
 
-**Database Seeding:**
+**Test Data:**
 ```typescript
-const testOrm = await createTestOrm();
-const container = createTestContainer(testOrm);
-const caller = await createTestCaller(container);
-// testOrm.seed contains { orgId, userId, sessionToken }
-```
-
-**Inline Factories:**
-```typescript
-function row(overrides: Partial<ArtifactRow> = {}): ArtifactRow {
+function makeTask(overrides: Partial<Task> = {}): Task {
   return {
-    id: ARTIFACT_ID,
-    orgId: ORG_ID,
-    filename: "report.md",
+    id: crypto.randomUUID(),
+    org: { id: "org-1" } as never,
+    title: "Test Task",
+    status: "todo",
+    dependencies: { blocks: [], blocked_by: [] },
+    customFields: {},
     ...overrides,
-  };
+  } as unknown as Task;
 }
 ```
 
-**Temp Directory Pattern:**
 ```typescript
-const scratch = mkdtempSync(join(tmpdir(), "fulcrum-test-"));
-afterAll(() => rmSync(scratch, { recursive: true, force: true }));
+async function seedTasks(): Promise<SeededIds> {
+  const db = await openPglite(join(dbDir, "main"));
+  await runMigrations(db);
+  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
+  const alpha = await createProject(db, { orgId: org.id, slug: "alpha", name: "Alpha" });
+  const task = await createTask(db, { orgId: org.id, projectId: alpha.id, title: "Alpha pending" });
+  await db.close();
+  return { orgId: org.id, alphaProjectId: alpha.id, taskAlphaPendingId: task.id };
+}
 ```
 
-**Fixture Files:**
-- `tests/scripts/license-audit.fixtures/` — file-based fixtures for license audit tests
-- `src/web/tests/e2e/fixtures.ts` — Playwright page fixtures
+**Location:**
+- Keep simple factories in the test file that uses them: `makeTask()` in `src/services/TaskService.test.ts`.
+- Keep route seed helpers in the route test file unless shared by multiple route suites: `seedTasks()` in `src/web/src/routes/boards/page.server.test.ts`.
+- Use shared product-kernel repository helpers for DB fixtures: `createLocalOrg()`, `createProject()`, `createTask()` from `src/product-kernel/store/repositories.ts`.
+- Playwright browser fixtures live under `src/web/tests/e2e/`, including fixture validation in `src/web/tests/e2e/_fixtures.spec.ts`.
 
 ## Coverage
 
-**Requirements:** None enforced — currently at ~0% formal coverage tracking
+**Requirements:** Root Bun coverage threshold is 80% via `bunfig.toml`; web Vitest coverage threshold is 80% lines for configured include set in `src/web/vitest.config.ts`.
 
-**Planned:**
-- 108 test issues planned across 10 phases (documented in `.planning/scratch/test-coverage-plan.md`)
-- Test gaps identified in infrastructure, DB, tRPC, CLI, web domains
+**View Coverage:**
+```bash
+bun run scripts/test-root.ts --coverage
+(cd src/web && bun run web:test -- --coverage)
+```
 
-**No Coverage Tool Configured:**
-- No `c8`, `istanbul`, or `@vitest/coverage-*` in dependencies
-- No coverage thresholds in CI
-
-## CI Pipeline
-
-**Runner:** `scripts/ci.ts` — local CI script (no GitHub Actions)
-
-**Steps (in order):**
-| Step | Command | What it checks |
-|------|---------|----------------|
-| `install` | `bun install --frozen-lockfile` | Lockfile integrity |
-| `typecheck` | `bun run --bun tsc --noEmit` | TypeScript compilation |
-| `symphony:lock` | `bun test tests/symphony/spec-lock.test.ts` | Symphony spec lockfile |
-| `symphony:conformance` | `bun test src/orchestration/__tests__/symphony-conformance.test.ts` | Symphony protocol conformance |
-| `test` | `bun run scripts/test-root.ts` | All non-web tests |
-| `license-audit` | `bun run scripts/license-audit.ts` | Dependency license compliance |
-| `ci:codegen` | `bun run scripts/ci/codegen.ts` | Generated code freshness |
-| `build:all` | `bun run scripts/build-all.ts` | Binary compilation |
-| `web:install` | `bun install --frozen-lockfile` (in `src/web/`) | Web lockfile integrity |
-| `web:check` | `bun run check` (in `src/web/`) | svelte-check TypeScript |
-| `web:build` | `bun run build` (in `src/web/`) | SvelteKit production build |
-| `web:test` | `bun run web:test` (in `src/web/`) | Vitest component tests |
-| `ci:schemas` | `bun run scripts/ci-schemas.ts` | Schema validation |
-| `skills:lint` | `bun run src/index.ts skills lint skills/` | Skills linting |
-| `compress:check` | `bash scripts/compress-with-caveman.sh --check` | Compression check |
-| `web:e2e` | (opt-in: `FULCRUM_RUN_E2E=1`) | Playwright e2e tests |
-
-**Sandbox:** CI uses isolated `HOME` dir (`/tmp/fulcrum-ci-home-{pid}`) to prevent test pollution.
-
-**Soft-fail steps:** `compress:check` can soft-fail with pending file count.
+CI runs both coverage gates through `scripts/ci.ts`: `coverage:root` and `coverage:web`. `.planning/STATE.md` records Phase 9 completion with root coverage passed and web coverage lines 92.41%.
 
 ## Test Types
 
 **Unit Tests:**
-- Scope: individual functions, stores, utilities, Zod schemas
-- Pattern: direct import + assert, no DB
-- Examples: `src/flags/experiments.test.ts`, `src/data/csv.test.ts`, `src/filters/ast.test.ts`
+- Pure domain/service logic with mocks: `src/services/TaskService.test.ts`, `tests/notifications/rule-engine.test.ts`, `src/router/rules-engine.test.ts`.
+- CLI and config behavior with temp HOME roots: `src/cli/doctor.test.ts`, `src/cli/install.test.ts`.
 
-**Integration Tests (DB-backed):**
-- Scope: repository + migration + seed lifecycle
-- Pattern: `createTestOrm()` → `createTestContainer()` → `createTestCaller()`
-- Examples: `src/product-kernel/sprints.test.ts`, `tests/db/repositories/`
+**Integration Tests:**
+- PGlite/MikroORM migrations and DB schema contracts: `tests/db/migrator-service.test.ts`, `tests/db/migrations/*.test.ts`.
+- Web route server actions against seeded local product DB: `src/web/src/routes/boards/page.server.test.ts`, `src/web/src/routes/runs/page.server.test.ts`.
+- API parity/OpenAPI tests: `tests/api/rest-parity.test.ts`, `tests/api/hono-setup.test.ts`.
 
-**tRPC Router Tests:**
-- Two approaches:
-  1. **Standalone mini-router** — isolated, no appRouter dependency (`src/trpc/routers/artifacts.test.ts`)
-  2. **Full caller** — `createTestCaller()` with PGlite (`tests/trpc/`)
-
-**TUI Tests:**
-- Headless via `FakeTTY` — no real terminal needed
-- Located in `src/tui/__tests__/`
-- Inject keypresses, assert rendered output
-
-**Web Component Tests (Vitest):**
-- `@testing-library/svelte` for Svelte 5 components
-- happy-dom environment
-- Located in `src/web/tests/vitest/`
-- Pattern:
-  ```typescript
-  import { cleanup, render, waitFor } from "@testing-library/svelte";
-  import { afterEach, describe, expect, test } from "vitest";
-  import DocEditor from "../../src/lib/components/editor/DocEditor.svelte";
-
-  describe("DocEditor", () => {
-    afterEach(cleanup);
-    test("renders toolbar controls", async () => {
-      const { getByLabelText } = render(DocEditor, { props: { content: { /* ... */ } } });
-      await waitFor(() => expect(getByLabelText("Bold")).toBeTruthy());
-    });
-  });
-  ```
-
-**E2E Tests (Playwright):**
-- Browser-based, Chromium only
-- Dev server auto-started with isolated `FULCRUM_HOME`
-- Located in `src/web/tests/e2e/*.spec.ts`
-- Pattern:
-  ```typescript
-  import { expect, test } from "@playwright/test";
-  test("home page loads with Fulcrum in title", async ({ page }) => {
-    await page.goto("/");
-    await expect(page).toHaveTitle(/Fulcrum/i);
-  });
-  ```
-
-**A11y Tests:**
-- SSR render Svelte components → parse HTML → run axe-core
-- Located in `src/web/tests/a11y/`
-- Pattern:
-  ```typescript
-  import { auditRoute } from "./runs-helpers";
-  test("no axe-core serious/critical violations on /runs", async () => {
-    const { body } = render(Page, { props: { data: { /* ... */ } } });
-    // axe-core audit against rendered HTML
-  });
-  ```
+**E2E Tests:**
+- Playwright smoke is always in CI through `web:e2e:smoke`: `src/web/tests/e2e/_smoke.spec.ts`.
+- Full Playwright e2e runs with `FULCRUM_RUN_E2E=1`: `src/web/playwright.config.ts`, `scripts/ci.ts`.
+- Accessibility uses Playwright + axe: `src/web/package.json` script `web:a11y`, tests under `src/web/tests/a11y/`.
 
 ## Common Patterns
 
-**Async Testing (bun:test):**
+**Async Testing:**
 ```typescript
-test("async operation works", async () => {
-  const result = await someAsyncFn();
-  expect(result.status).toBe("active");
-});
+await expect(service.migrate()).resolves.toBeUndefined();
+await expect(
+  svc.bulkUpdate({ orgId: "org-1", userId: "user-1", em: null }, ids, { status: "done" }),
+).rejects.toMatchObject({ code: "BAD_REQUEST" });
 ```
 
-**Error Testing (bun:test):**
-```typescript
-test("throws for invalid input", () => {
-  expect(() => assertNotAgentsPath(`${home}/.agents`, home)).toThrow("HARD RULE VIOLATION");
-});
+Use `await streamedData<T>(result)` for SvelteKit streamed load promises: `src/web/src/routes/boards/page.server.test.ts`.
 
-test("async rejection", async () => {
-  await expect(connector.pull()).rejects.toThrow("connector disabled");
-});
-```
-
-**Database Lifecycle Pattern:**
+**Error Testing:**
 ```typescript
-async function freshDb(name: string) {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
-  return db;
+let caught: unknown;
+try {
+  await mod.load(fakeLoadEvent({ id: "missing" }));
+} catch (e) {
+  caught = e;
 }
-
-describe("domain", () => {
-  test("lifecycle", async () => {
-    const db = await freshDb("test-name");
-    try {
-      // ... test logic
-    } finally {
-      // cleanup if needed
-    }
-  });
-});
+expect(caught).toBeDefined();
 ```
 
-**Console Capture:**
-```typescript
-test("logs warning for missing input", async () => {
-  const warnings: string[] = [];
-  const origWarn = console.warn;
-  console.warn = (...args: unknown[]) => { warnings.push(String(args[0])); };
-  try {
-    // ... test that triggers warning
-    expect(warnings.some(w => w.includes("not found"))).toBe(true);
-  } finally {
-    console.warn = origWarn;
-  }
-});
-```
+Use `rejects.toMatchObject()` for domain/framework errors where possible: `src/services/TaskService.test.ts`. Use explicit `try/catch` when framework helpers throw non-Error response objects: `src/web/src/routes/runs/[id]/page.server.test.ts`.
 
 ---
 
-*Testing analysis: 2026-05-04*
+*Testing analysis: 2026-05-06*

@@ -1,314 +1,221 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-05-04
+**Analysis Date:** 2026-05-06
 
 ## Tech Debt
 
-### Dual Data Layer (CRITICAL)
+**Root tRPC surface still contains generated placeholder routers:**
+- Issue: Placeholder CRUD procedures return `[]`, `null`, or `{ ok: true }` for mounted API domains.
+- Files: `src/trpc/routers/stub-helpers.ts`, `src/trpc/router.ts`, `src/trpc/routers/connectors.ts`, `src/trpc/routers/agent-runs.ts`, `src/trpc/routers/repo-commits.ts`, `src/trpc/routers/saved-views.ts`, `src/trpc/routers/context.ts`
+- Impact: Consumers can call procedures that appear successful without persistence or domain behavior. This hides missing work and creates false parity between real routers and placeholders.
+- Fix approach: Replace each placeholder router with service-backed procedures or make unsupported procedures fail loudly with typed `TRPCError` codes. Do not add new routers through `crudRouter()` unless the domain is intentionally read-only and documented.
 
-- Issue: Two active, growing data access patterns coexist — product-kernel raw SQL and MikroORM entities/repositories. `TrpcContext` exposes both: `em` (ORM) + `db` (raw SQL).
-- Files:
-  - `src/product-kernel/store/repositories.ts` (713 lines raw SQL)
-  - `src/web/src/lib/server/` (171 raw SQL calls across tasks.ts, documents.ts, skills.ts, audit.ts, memory.ts, etc.)
-  - `src/db/entities/` (MikroORM entity definitions)
-  - `src/server/trpc/routers/` (ORM-based routers)
-- Impact: 171 web raw SQL calls bypass tRPC middleware — no permission checks, no Zod validation, no audit trail. Two divergent schemas for the same domain (e.g., two complete task CRUDs with different column sets).
-- Fix approach: Migrate raw SQL calls to MikroORM repositories. Extract a service layer so routers delegate to shared business logic instead of inline SQL.
+**Two database models coexist for product state:**
+- Issue: Web/server code mixes raw `ProductDb` access, MikroORM `EntityManager`, and service wrappers.
+- Files: `src/trpc/context.ts`, `src/web/src/lib/server/db.ts`, `src/web/src/lib/server/em.ts`, `src/web/src/lib/product-queries.ts`, `src/services/tasks.ts`, `src/services/artifacts.ts`, `src/services/runs.ts`
+- Impact: Schema ownership is split between `src/product-kernel/db/migrations/*.sql` and `src/db/migrations/*.ts`, so route code can depend on columns or behaviors not present in one path.
+- Fix approach: Use `EntityManager` as the write/read boundary for web and tRPC. Keep `ProductDb` only behind strict compatibility shims until each remaining raw query has an owning repository/service.
 
-### No Service Layer
+**Feature-flag parsing is duplicated across surfaces:**
+- Issue: Several modules parse `FULCRUM_FEATURES` directly instead of using one registry/helper.
+- Files: `src/api/feature-flags.ts`, `src/api/routes/tasks.ts`, `src/server/trpc/routers/routing.ts`, `src/web/src/lib/collab/feature-flags.ts`, `src/web/src/routes/settings/connectors/+page.server.ts`, `src/web/src/routes/settings/importers/+page.server.ts`
+- Impact: Server, API, web, and client-gated behavior can drift on whitespace, environment source, and flag names.
+- Fix approach: Route server-side flags through `src/api/feature-flags.ts` or the canonical registry; expose client-safe derived flags via SvelteKit load data or `VITE_FULCRUM_FEATURES`.
 
-- Issue: Business logic lives inline in tRPC routers — serialization, event emission, repository resolution, bulk patching, search indexing, narration all in one procedure.
-- Files:
-  - `src/server/trpc/routers/docs.ts` (763 lines)
-  - `src/server/trpc/routers/tasks.ts` (508 lines)
-  - `src/product-kernel/api/router.ts` (674 lines)
-- Impact: Untestable without full tRPC context. Impossible to reuse logic across CLI/TUI/Web surfaces. High cyclomatic complexity.
-- Fix approach: Extract domain services (e.g., `src/services/docs.ts`, `src/services/tasks.ts`) that routers, CLI commands, and web server actions all call.
+**Large multipurpose modules concentrate unrelated responsibilities:**
+- Issue: Several files exceed 700-1,400 lines and combine parsing, I/O, rendering, orchestration, and command behavior.
+- Files: `src/tui/index.ts`, `src/product-kernel/store/repositories.ts`, `src/cli/doctor.ts`, `src/cli/vendor-packages.ts`, `src/cli/install.ts`, `src/auth/adapter.ts`, `src/web/src/lib/components/tasks/TaskDetailPanel.svelte`, `src/web/src/lib/components/tasks/TaskComments.svelte`
+- Impact: Small changes have high review cost and high regression surface. Tests tend to target whole modules instead of smaller behavioral units.
+- Fix approach: Extract narrow domain modules only when touching related behavior. Preserve public exports and add characterization tests before splitting shared command or UI modules.
 
-### Three Event Mechanisms
-
-- Issue: Three separate event systems with no unifying abstraction:
-  1. Process-singleton `EventBus` — `src/subscriptions/event-bus.ts`
-  2. Routing-specific `RoutingEventBus` — `src/router/event-bus.ts`
-  3. `events` table via `appendEvent()` — `src/product-kernel/events.ts` → `src/product-kernel/store/repositories.ts`
-- Impact: MikroORM writes never publish to EventBus — WebSocket subscriptions permanently dead for ORM-path mutations. Mixed ULID/UUID PK formats in events table.
-- Fix approach: Unify into single EventBus that persists to events table AND publishes to subscribers. Standardize on one PK format.
-
-### Layering Violations
-
-- Issue: Backend and CLI import directly from web presentation layer, inverting the dependency rule.
-- Files:
-  - `src/product-kernel/search.test.ts` → imports from `src/web/src/lib/components/command-palette/score.ts`
-  - `src/cli/artifact.ts` → imports from `src/web/src/lib/server/artifacts.ts`
-  - `src/cli/agent.ts` → imports from `src/web/src/lib/server/runs.ts`
-- Impact: Web becomes an implicit dependency of CLI/backend. Cannot build or test surfaces independently.
-- Fix approach: Extract shared logic into `src/services/` or `src/shared/`; reverse the dependency direction.
-
-### Stub Routers in AppRouter
-
-- Issue: ~15 inline CRUD stubs in the tRPC AppRouter return empty arrays alongside real implementations. Duplicate mounts exist: `skills`/`fulcrum_skills`, `memory`/`memories`, `runs`/`agent_runs`.
-- Files: `src/trpc/router.ts`
-- Impact: Consumers cannot tell which endpoints work. Duplicates cause routing ambiguity.
-- Fix approach: Remove stubs or mark as explicitly unimplemented with proper error codes. Consolidate duplicate mounts.
-
-### Process-Singleton EventBus
-
-- Issue: `getEventBus()` returns a module-level singleton — won't scale to multi-instance deployment.
-- Files: `src/subscriptions/event-bus.ts`
-- Impact: Blocks SaaS multi-instance scaling. No cross-process event delivery.
-- Fix approach: Replace with injectable EventBus; add Redis/pg_notify transport for multi-instance.
-
-### Two Hono API Implementations
-
-- Issue: Two separate Hono API servers both claiming `/api/v1`.
-- Files: `src/product-kernel/api/router.ts`, `src/server/` (tRPC + Hono)
-- Impact: Conflicting route registration. Unclear which serves production traffic.
-- Fix approach: Consolidate into single API surface.
-
----
+**Product-kernel migrations use a simple SQL ledger without checksums:**
+- Issue: SQL migrations record only file names in `schema_migrations`; they do not store checksums or lossiness metadata.
+- Files: `src/product-kernel/db/migrate.ts`, `src/product-kernel/db/migrations/*.sql`, `src/db/migrator-service.ts`, `src/db/entities/SchemaMigration.ts`
+- Impact: Edited product-kernel SQL migration files are not detected after apply, unlike MikroORM migrations managed by `MigratorService`.
+- Fix approach: Add checksum columns or route product-kernel migration execution through the same migration ledger guarantees used by `src/db/migrator-service.ts`.
 
 ## Known Bugs
 
-### Compiled Binary ENOENT for PGlite (CRITICAL)
+**Database migrations settings page is hard-unimplemented:**
+- Symptoms: Settings database migration route throws HTTP 501 for both page load and form action.
+- Files: `src/web/src/routes/settings/database/migrations/+page.server.ts`
+- Trigger: Navigate to settings database migrations page or submit its migrate action.
+- Workaround: Use CLI/local migration commands instead of the web page.
 
-- Symptoms: PGlite crashes with ENOENT when running from `bun build --compile` binary.
-- Files: `src/product-kernel/db/pglite.ts`
-- Trigger: Run any product-kernel command from compiled binary.
-- Workaround: Run from source via `bun run src/index.ts`.
+**Settings connector configuration is process-local and stores plaintext tokens:**
+- Symptoms: Saved connector config disappears on process restart and token values are stored in module-level memory.
+- Files: `src/web/src/routes/settings/connectors/+page.server.ts`
+- Trigger: Enable `connector-confluence`, `connector-notion`, or `connector-github-issues`, save connector config, restart server.
+- Workaround: Use production connector service/credential storage where available; do not rely on this settings route for durable secrets.
 
-### Web Type-Check Fails
+**Settings importers simulate external import success:**
+- Symptoms: Linear/Jira/Plane preflight returns fixed row data, confirm import records a success entry without external API calls or durable writes.
+- Files: `src/web/src/routes/settings/importers/+page.server.ts`
+- Trigger: Enable `import-linear`, `import-jira`, or `import-plane`, submit API key preflight/import flow.
+- Workaround: Treat this route as UI shell only until importer actions delegate to `src/importers/*` and task services.
 
-- Symptoms: TypeScript compilation errors due to missing `bun:test` types in web context.
-- Files: `src/web/`
-- Trigger: Run `tsc --noEmit` in web package.
-- Workaround: None documented.
+**Yjs server accepts any non-empty bearer token by default:**
+- Symptoms: Default auth returns an authenticated user for any non-empty `Authorization: Bearer <token>` value.
+- Files: `src/server/yjs-server.ts`
+- Trigger: Start the Yjs WebSocket server without injecting a custom `validateSession` implementation.
+- Workaround: Always pass a session validator that checks the database/session provider before enabling collaborative editing outside tests.
 
-### Root CI Excludes Web Checks
-
-- Symptoms: Web type errors and build failures not caught in CI.
-- Files: Root CI config
-- Trigger: Any PR — web checks silently skipped.
-- Workaround: None — bugs reach main branch.
-
-### PGlite Per-Request Connection in Web
-
-- Symptoms: Each SvelteKit server load function calls `openProductDb()` which opens a new PGlite instance AND runs migrations.
-- Files:
-  - `src/web/src/lib/server/db.ts` (opens PGlite + runs migrations on each call)
-  - `src/web/src/routes/runs/[id]/+page.server.ts` (calls `openProductDb()` in load, multiple form actions)
-  - `src/web/src/routes/runs/+page.server.ts` (same pattern)
-- Trigger: Any page load that uses product-kernel data.
-- Workaround: None — causes slow page loads and potential concurrent deadlocks.
-
-### ALTER TABLE in Request Handlers
-
-- Symptoms: Schema DDL runs during normal HTTP request handling.
-- Files: Product-kernel actions called from web server handlers
-- Trigger: Concurrent requests can deadlock on schema locks.
-- Workaround: Move DDL to proper migration files.
-
-### Cookie Advisory in Web Lockfile
-
-- Symptoms: `cookie@0.6.0` has a low-severity advisory.
-- Files: `src/web/bun.lockb`
-- Trigger: Dependency audit.
-- Workaround: Upgrade cookie package.
-
----
+**Search failover is explicitly missing:**
+- Symptoms: Search throws when PGlite crashes; test comment states Orama failover should return an empty result later.
+- Files: `src/product-kernel/search.ts`, `src/product-kernel/search.test.ts`
+- Trigger: `searchProductDocuments()` receives a failing `ProductDb` query implementation.
+- Workaround: Catch search errors at route/UI boundary and surface degraded search state.
 
 ## Security Considerations
 
-### Command Injection via Agent cliPath
+**Raw HTML rendering has multiple trust boundaries:**
+- Risk: Svelte `{@html ...}` is used for rendered docs, diffs, markdown previews, Mermaid output, comments, and highlighted search snippets.
+- Files: `src/web/src/routes/docs/[id]/history/+page.svelte`, `src/web/src/routes/repos/[id]/commits/[sha]/+page.svelte`, `src/web/src/lib/components/docs/ReadOnlyRenderer.svelte`, `src/web/src/lib/components/docs/DocVersionTimeline.svelte`, `src/web/src/lib/components/docs/MermaidNode.svelte`, `src/web/src/lib/components/markdown/MarkdownPreview.svelte`, `src/web/src/lib/components/tasks/TaskComments.svelte`, `src/web/src/lib/components/search/SearchPage.svelte`, `src/docs/sanitize.ts`
+- Current mitigation: Some paths sanitize through `DOMPurify` or `src/docs/sanitize.ts`; `ReadOnlyRenderer.svelte` explicitly uses `DOMPurify.sanitize()`.
+- Recommendations: Require every `{@html}` source to pass through a named sanitizer adjacent to the renderer. Add a static test that blocks new `{@html}` usage without an allowlist entry.
 
-- Risk: `Bun.spawn([cliPath, "--version"])` where `cliPath` is read from database-stored agent profile. Any user who can write to `agent_profiles` table can execute arbitrary binaries.
-- Files: `src/trpc/router.ts:228`
-- Current mitigation: None — no validation on `cliPath` content.
-- Recommendations: Allowlist agent binary paths. Validate against known agent names. Never spawn arbitrary paths from DB.
+**Settings connector tokens bypass credential storage:**
+- Risk: Connector tokens are stored as plaintext in a module-level `Map`.
+- Files: `src/web/src/routes/settings/connectors/+page.server.ts`, `src/db/entities/platform/Credential.ts`, `src/secrets/credentials-router.ts`
+- Current mitigation: Route requires a session and feature flag.
+- Recommendations: Store connector secrets only through `Credential`/credentials router, redact token fields from load data, and delete the in-memory `_configs` store.
 
-### Webhook Secrets — Dual Path Inconsistency
+**Subprocess helpers include shell invocation path:**
+- Risk: `Bun.spawn(["sh", "-c", ...])` is used for command detection; unsafe expansion can become command injection if caller passes untrusted command names.
+- Files: `src/utils/proc.ts`
+- Current mitigation: Usage appears oriented around known local commands.
+- Recommendations: Keep `commandExists()` inputs restricted to static tool names or replace shell detection with direct executable lookup.
 
-- Risk: MikroORM webhook path (`src/trpc/routers/webhooks.ts`) encrypts via nacl.secretbox/vault.ts, but product-kernel path (`src/product-kernel/webhook.ts`) accepts `encryptedSecret` as plain string with NO encryption call. Column named `encrypted_secret` but caller must encrypt.
-- Files:
-  - `src/trpc/routers/webhooks.ts:74-87` (encrypts properly)
-  - `src/product-kernel/webhook.ts:108-119` (no encryption)
-  - `src/web/src/routes/settings/integrations/linear/+page.server.ts:81` (comment: "In production: encrypt before storing" — NOT encrypted)
-- Current mitigation: MikroORM path is encrypted; product-kernel path is not.
-- Recommendations: Centralize encryption in a shared function. Never store plaintext in `encrypted_secret` column.
-
-### Semgrep Findings (14)
-
-- Risk: 14 semgrep findings including regexp and IFS issues.
-- Files: Various across `src/`
-- Current mitigation: None — findings unresolved.
-- Recommendations: Run `semgrep --config auto` and triage all 14 findings.
-
-### Gitleaks Historical Findings (18)
-
-- Risk: 18 historical secret leaks detected in git history.
-- Files: Git history
-- Current mitigation: None documented.
-- Recommendations: Rotate affected credentials. Add gitleaks to pre-commit hook.
-
-### Raw SQL Without Permission Middleware
-
-- Risk: 171 raw SQL calls in `src/web/src/lib/server/` bypass tRPC middleware — no permission checks, no Zod validation, no audit trail.
-- Files: `src/web/src/lib/server/tasks.ts`, `src/web/src/lib/server/documents.ts`, `src/web/src/lib/server/skills.ts`, and ~15 others.
-- Current mitigation: None — direct DB access with org_id passed manually.
-- Recommendations: Route all mutations through tRPC or a service layer with permission enforcement.
-
----
+**Session-bearing API routes depend on default-org fallbacks:**
+- Risk: Several static OpenAPI/demo route modules use a fixed org ID, while real routes use authenticated org context.
+- Files: `src/api/routes/tasks.ts`, `src/api/routes/docs.ts`, `src/api/routes/audit.ts`, `src/api/routes/notifications.ts`, `src/api/routes/sprints.ts`, `src/api/routes/saved-views.ts`
+- Current mitigation: Comments mark these as static/spec or feature-gated route seeds.
+- Recommendations: Keep fixed-org modules out of authenticated runtime mounts. Add tests that runtime `src/api/hono.ts` routes always derive org from auth/context.
 
 ## Performance Bottlenecks
 
-### PGlite Instance Per Request
+**Search is PostgreSQL FTS-only on the critical query path:**
+- Problem: Search always queries `search_documents` with `plainto_tsquery` and ranks via `ts_rank`.
+- Files: `src/product-kernel/search.ts`, `src/product-kernel/db/migrations/0002_search.sql`, `src/product-kernel/db/migrations/0006_search_extended.sql`, `src/product-kernel/hybrid-scoring.test.ts`
+- Cause: Hybrid scoring and embedding paths have todo tests; no runtime fallback is wired for degraded DB search.
+- Improvement path: Finish hybrid search behind feature flags, keep deterministic FTS default, and add route-level degraded behavior for DB failures.
 
-- Problem: `openProductDb()` opens a new PGlite instance for each server load function call, including running all migrations.
-- Files: `src/web/src/lib/server/db.ts`, all `+page.server.ts` files that import it.
-- Cause: No connection pooling or singleton pattern for PGlite in web context.
-- Improvement path: Create a module-level singleton PGlite instance. Run migrations once at startup.
+**Web DB singleton forks one long-lived EntityManager:**
+- Problem: `initProductDb()` creates a singleton DB handle around `orm.em.fork()` and returns no-op close proxies to legacy callers.
+- Files: `src/web/src/lib/server/db.ts`, `src/web/src/hooks.server.ts`
+- Cause: Backward-compatible migration from per-request `openProductDb()` to singleton avoids repeated DB startup but keeps mutable EM state alive.
+- Improvement path: Use singleton ORM/connection with request-scoped forked `EntityManager` for work units; keep `openProductDb()` as a temporary compatibility API only.
 
-### Large Router Files
-
-- Problem: Monolithic router files with high cyclomatic complexity (CCN 18-59 per lizard analysis).
-- Files:
-  - `src/server/trpc/routers/docs.ts` (763 lines)
-  - `src/server/trpc/routers/tasks.ts` (508 lines)
-  - `src/product-kernel/store/repositories.ts` (713 lines)
-  - `src/product-kernel/api/router.ts` (674 lines)
-  - `src/tui/index.ts` (1170 lines)
-  - `src/cli/doctor.ts` (1181 lines)
-- Cause: No service layer extraction. All business logic inline.
-- Improvement path: Extract domain services. Split routers by sub-domain.
-
----
+**Large UI components perform many client-side responsibilities in one component:**
+- Problem: Task detail/comments components combine fetch, editor setup, nested rendering, optimistic state, and form actions.
+- Files: `src/web/src/lib/components/tasks/TaskDetailPanel.svelte`, `src/web/src/lib/components/tasks/TaskComments.svelte`
+- Cause: Feature growth is concentrated in single Svelte files.
+- Improvement path: Extract data adapters and editor subcomponents under `src/web/src/lib/components/tasks/` with tests around helpers before moving markup.
 
 ## Fragile Areas
 
-### Product-Kernel ↔ MikroORM Event Divergence
+**Schema compatibility across ProductDb and MikroORM:**
+- Files: `src/product-kernel/db/migrations/*.sql`, `src/db/migrations/*.ts`, `src/db/entities/orchestration/AgentRun.ts`, `src/web/src/routes/runs/+page.server.ts`, `src/web/src/routes/runs/[id]/+page.server.ts`
+- Why fragile: Web routes query columns such as `sandbox_mode` and `iteration_count` while compatibility migrations and ORM migrations define overlapping schemas.
+- Safe modification: Before changing agent run columns, update both migration systems or remove the compatibility path entirely. Run route tests for `/runs` and product-kernel migration tests.
+- Test coverage: Route-level tests exist, but drift risk remains because two schema systems are accepted.
 
-- Files: `src/product-kernel/events.ts`, `src/db/entities/core/Event.ts`, `src/subscriptions/event-bus.ts`
-- Why fragile: MikroORM events use UUID PKs, product-kernel uses ULID PKs — same `events` table. Neither path publishes to EventBus. Incompatible column sets.
-- Safe modification: Any event-related change must update BOTH paths or the events table becomes inconsistent.
-- Test coverage: `src/product-kernel/events.test.ts` exists but only tests product-kernel path.
+**Direct SQL string construction is widespread in services:**
+- Files: `src/services/AutomationService.ts`, `src/services/SprintService.ts`, `src/services/TaskService.ts`, `src/server/trpc/routers/backup.ts`, `src/server/trpc/routers/json-import-export.ts`, `src/web/src/lib/product-queries.ts`, `src/web/src/lib/server/orm-helpers.ts`
+- Why fragile: SQL shape, column names, and tenant predicates are manually maintained outside typed entity/repository APIs.
+- Safe modification: Add or update repository methods first, then replace route/service SQL calls. Keep raw SQL only for batch/report/query shapes with explicit tests.
+- Test coverage: Many route and service tests exist; no global boundary gate prevents new raw ProductDb queries.
 
-### Web Server Actions (Raw SQL)
+**OpenAPI/spec placeholder routes sit near real runtime routes:**
+- Files: `src/api/routes/tasks.ts`, `src/api/routes/sprints.ts`, `src/api/routes/saved-views.ts`, `src/api/hono.ts`
+- Why fragile: Static specification routes can be mistaken for runtime service-backed routes because they live under the same `src/api/routes/` namespace.
+- Safe modification: Keep comments and tests asserting `src/api/hono.ts` mounts real routes when deps exist. Prefer separate `src/api/spec-routes/` namespace for future static-only surfaces.
+- Test coverage: `src/api/__tests__/phase08-api-parity.test.ts` checks for stub patterns, but fixed-org/static paths still require review discipline.
 
-- Files: `src/web/src/lib/server/*.ts` (171 raw SQL calls)
-- Why fragile: No schema validation (Zod), no permission middleware, manual org_id threading. Schema changes in MikroORM migrations won't update raw SQL.
-- Safe modification: Always check both MikroORM entities AND raw SQL queries when changing a table schema.
-- Test coverage: Test files exist (e.g., `agents.test.ts`, `documents.test.ts`) but coverage is incomplete.
-
-### Generated CLI Commands
-
-- Files: `src/cli/generated/` (49 files)
-- Why fragile: All 49 generated command files throw "Generated tRPC invocation for X is not wired yet." Any attempt to use these commands fails immediately.
-- Safe modification: Wire each to actual tRPC client calls. 12 hand-written CLI commands in `src/cli/commands/` work correctly and serve as pattern.
-- Test coverage: None for generated commands.
-
----
+**Feature-gated pages can imply production readiness while using local stubs:**
+- Files: `src/web/src/routes/settings/connectors/+page.server.ts`, `src/web/src/routes/settings/importers/+page.server.ts`, `src/web/src/routes/workspace/portfolio/+page.svelte`, `src/web/src/lib/components/tasks/FieldDependencyConfig.svelte`
+- Why fragile: Flags turn on UI and actions even when persistence/integration is incomplete.
+- Safe modification: Gate incomplete pages with explicit disabled states or route actions that fail with typed “not implemented” errors until service-backed.
+- Test coverage: Page tests verify flag visibility; they do not prove durable external integration.
 
 ## Scaling Limits
 
-### Process-Singleton EventBus
+**Local-first PGlite/Postgres duality sets practical single-node limits:**
+- Current capacity: Local-first default uses PGlite under `FULCRUM_HOME`; PostgreSQL path is optional via `DATABASE_URL`.
+- Limit: Concurrent multi-user write workloads, large search indexes, and collaboration updates need PostgreSQL/service boundaries rather than PGlite assumptions.
+- Scaling path: Keep local PGlite for single-user/dev. Use PostgreSQL-backed `EntityManager`, request-scoped EM forks, and service/repository APIs for multi-user deployments.
 
-- Current capacity: Single process only.
-- Limit: Cannot deliver events across multiple server instances.
-- Scaling path: Replace with Redis pub/sub or PostgreSQL LISTEN/NOTIFY.
+**Context assembly uses approximate token counting:**
+- Current capacity: Token budgets are estimated by whitespace/character heuristics.
+- Limit: Large context bundles can exceed real model token budgets or underuse budget depending on tokenizer.
+- Scaling path: Use deterministic tokenizer support per configured model while keeping current heuristic fallback.
 
-### PGlite (Embedded Postgres)
-
-- Current capacity: Single-user, single-process local development.
-- Limit: No concurrent multi-user access. No connection pooling.
-- Scaling path: Replace with external PostgreSQL for production/SaaS.
-
----
+**In-memory settings stores do not scale beyond one process:**
+- Current capacity: Connector/importer settings/history are module-level arrays/maps.
+- Limit: Restart loses data; multiple server processes diverge.
+- Scaling path: Persist settings in credentials/config/sync-log tables and use service-backed load/actions.
 
 ## Dependencies at Risk
 
-### cookie@0.6.0
+**Bun-specific APIs constrain web/server boundaries:**
+- Risk: Files using Bun APIs cannot be imported safely by SvelteKit/Vite Node loaders.
+- Impact: Web route code avoids direct `src/db/` imports and one migrations page remains unimplemented.
+- Migration plan: Keep Bun-only code behind server adapters or CLI boundaries. Expose web functionality through tRPC/REST/service modules that Vite can load.
 
-- Risk: Low-severity advisory in web lockfile.
-- Impact: Potential cookie parsing vulnerability.
-- Migration plan: Upgrade to latest cookie version.
+**MikroORM and product-kernel SQL migrations can diverge:**
+- Risk: Runtime can pass against one migration path while failing against another.
+- Impact: Route loads and API handlers can query missing columns in one database setup.
+- Migration plan: Collapse to one authoritative schema path or add generated compatibility checks that compare entity metadata, SQL migrations, and route query columns.
 
-### PGlite Compiled Binary Incompatibility
-
-- Risk: PGlite WASM assets cannot be extracted from bun-compiled binary.
-- Impact: Product-kernel features unavailable in distributed binary.
-- Migration plan: Ship PGlite assets alongside binary, or use SQLite for compiled mode.
-
----
+**OpenTUI and compiled binary dependencies are platform-sensitive:**
+- Risk: TUI/build code depends on platform-specific packages and binary compilation.
+- Impact: Cross-platform build/test failures can block release even when core TypeScript passes.
+- Migration plan: Keep TUI/platform checks in CI stages and isolate optional runtime imports behind capability checks.
 
 ## Missing Critical Features
 
-### Zero Test Coverage Enforcement
+**Durable connector settings and sync history:**
+- Problem: Connector settings UI has no durable persistence or real sync execution.
+- Blocks: Production use of Confluence, Notion, and GitHub Issues settings pages.
 
-- Problem: 108 test scenarios planned, none enforced in CI. No coverage thresholds.
-- Blocks: Confidence in refactoring. Any of the above fixes risk regressions without tests.
+**Database migration web control plane:**
+- Problem: Web migration page intentionally throws 501.
+- Blocks: Admin UI parity for migration status/history/apply controls.
 
-### Symphony Conformance Gaps
+**Search resilience and hybrid scoring:**
+- Problem: Search failover and hybrid scoring have todo tests or comments rather than runtime implementation.
+- Blocks: Reliable search UX during DB/index failures and relevance improvements when embeddings are enabled.
 
-- Problem: Symphony orchestration scores 3 PASS / 10 PARTIAL / 1 FAIL / 6 MISSING against spec.
-- Details:
-  - FAIL: Continuation retry completely absent (core spec feature)
-  - MISSING: Dynamic config reload, per-state concurrency, token accounting, codex.command, startup cleanup, `$VAR` resolution
-  - PARTIAL: Issue model stripped (5/12 fields missing), stall detection incomplete, workspace safety only on destroy
-- Files: `src/symphony/` (orchestrator), `src/server/trpc/routers/` (symphony routes)
-- Blocks: Reliable multi-step agent orchestration.
-
-### Missing Libraries Per PRD
-
-- Problem: Several PRD-required libraries not installed or not wired:
-  - LayerChart — not installed (burndown/velocity charts impossible)
-  - Orama — not installed (in-browser search impossible)
-  - Cmd+K — component exists but keyboard shortcut NOT bound
-- Files: `src/web/src/lib/components/command-palette/` (exists, not wired to keyboard)
-
-### Three-Surface Parity Failure
-
-- Problem: Every pillar fails Web + CLI + TUI parity. Web is furthest along; CLI has 49 dead generated commands; TUI data wiring to tRPC unclear.
-- Blocks: Consistent user experience across surfaces.
-
----
+**Authenticated collaboration server default:**
+- Problem: Default Yjs server auth accepts any non-empty bearer token.
+- Blocks: Safe realtime collaboration deployment without custom validator injection.
 
 ## Test Coverage Gaps
 
-### Web Server Actions
-
-- What's not tested: Permission enforcement, org-scoping, concurrent access patterns for 171 raw SQL calls.
-- Files: `src/web/src/lib/server/*.ts`
-- Risk: Authorization bypass, data leaks across orgs.
+**Todo tests for context and search scoring:**
+- What's not tested: Context bundle budgeting behavior and hybrid search scoring.
+- Files: `src/product-kernel/context-bundle.test.ts`, `src/product-kernel/hybrid-scoring.test.ts`
+- Risk: Context assembly and search relevance can regress without failing CI.
 - Priority: High
 
-### Symphony Orchestration
-
-- What's not tested: Continuation retry, stall detection edge cases, concurrent state transitions.
-- Files: `src/symphony/`
-- Risk: Stuck orchestrations, lost work, silent failures.
+**Skipped isolated E2E routes hide SSR/integration failures:**
+- What's not tested: Several route tests skip on 500/auth/service setup failures.
+- Files: `src/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts`, `src/web/tests/e2e/phase08-surface-delivery.spec.ts`, `src/web/tests/e2e/phase09-accessibility.spec.ts`, `src/web/tests/a11y/phase08-routes.test.ts`, `src/web/tests/a11y/phase09-cross-cutting.test.ts`
+- Risk: Broken SSR routes can pass CI when skipped under isolated setup.
 - Priority: High
 
-### Generated CLI Commands
-
-- What's not tested: All 49 generated commands in `src/cli/generated/` — every one throws.
-- Files: `src/cli/generated/*.ts`
-- Risk: Dead code accumulation. Users encounter errors on any generated command.
+**Editor/rendering placeholder tests remain todo:**
+- What's not tested: Editor content JSON losslessness, KaTeX rendering, Mermaid rendering, docs tree reordering, search facets, command palette behavior.
+- Files: `src/docs/editor.test.ts`, `src/web/src/lib/editor/katex.test.ts`, `src/web/src/lib/editor/mermaid.test.ts`, `src/web/src/lib/docs/tree.test.ts`, `src/web/src/lib/components/search/search.test.ts`, `src/web/src/lib/components/command-palette/palette.test.ts`
+- Risk: Rich document and navigation features can regress without executable assertions.
 - Priority: Medium
 
-### Event System Integration
-
-- What's not tested: Cross-path event consistency (MikroORM vs product-kernel), EventBus subscription delivery.
-- Files: `src/subscriptions/event-bus.ts`, `src/product-kernel/events.ts`, `src/db/entities/core/Event.ts`
-- Risk: Events silently lost. WebSocket subscriptions permanently dead.
+**No global gate for new placeholder routers or in-memory production stores:**
+- What's not tested: New `crudRouter()` mounts, `query(() => [])`, `query(() => null)`, and module-level `_configs`/`_history` stores in runtime code.
+- Files: `src/trpc/routers/stub-helpers.ts`, `src/web/src/routes/settings/connectors/+page.server.ts`, `src/web/src/routes/settings/importers/+page.server.ts`
+- Risk: Future phases can add apparently successful no-op routes.
 - Priority: High
 
 ---
 
-## Cross-Reference
-
-- Full audit: `.scratch/master-audit/AUDIT-REPORT.md` (19 confirmed bugs, 17 cross-cutting gaps, 11 recommendations)
-- Wave 2 corrections: `.scratch/master-audit/WAVE2-CORRECTIONS.md` (12 Wave-1 errors corrected, new P0/P1 findings)
-- Requirements spec: `.scratch/agent-os-vision/REQUIREMENTS.md` (213 requirements across 16 pillars)
-
----
-
-*Concerns audit: 2026-05-04*
+*Concerns audit: 2026-05-06*
