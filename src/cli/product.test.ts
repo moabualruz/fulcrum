@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { parseProductArgs, run as runProduct } from "./product.ts";
 import { resolveDatabaseConfig } from "../config/database.ts";
 import { openPglite } from "../product-kernel/db/pglite.ts";
-import { runMigrations } from "../product-kernel/db/migrate.ts";
+import { applyProductMigrations } from "../db/product-migrations.ts";
 import { productDbDir } from "../product-kernel/paths.ts";
 import {
   createLocalOrg,
@@ -48,7 +48,7 @@ async function migrateCliProductDb(): Promise<void> {
   const dbPath = config.dataDir;
   const db = await openPglite(dbPath);
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
   } finally {
     await db.close();
   }
@@ -105,7 +105,7 @@ describe("fulcrum product CLI", () => {
     await Bun.write(join(productDbDir(), ".keep"), "");
     const db = await openPglite(dbPath);
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       await createProject(db, { orgId: org.id, slug: "alpha", name: "Alpha" });
     } finally {
@@ -127,7 +127,7 @@ describe("fulcrum product CLI", () => {
     await Bun.write(join(productDbDir(), ".keep"), "");
     const db = await openPglite(dbPath);
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       await indexSearchDocument(db, {
         orgId: org.id,
@@ -155,7 +155,7 @@ describe("fulcrum product CLI", () => {
     await Bun.write(join(productDbDir(), ".keep"), "");
     const db = await openPglite(dbPath);
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       await indexSearchDocument(db, {
         orgId: org.id,
@@ -194,7 +194,7 @@ describe("fulcrum product CLI", () => {
     await Bun.write(join(productDbDir(), ".keep"), "");
     const db = await openPglite(dbPath);
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       await indexSearchDocument(db, {
         orgId: org.id,
@@ -250,7 +250,7 @@ describe("fulcrum product CLI", () => {
     await Bun.write(join(productDbDir(), ".keep"), "");
     const db = await openPglite(dbPath);
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       await createProject(db, { orgId: org.id, slug: "alpha", name: "Alpha" });
     } finally {
@@ -273,7 +273,7 @@ describe("fulcrum product CLI", () => {
     await Bun.write(join(productDbDir(), ".keep"), "");
     const db = await openPglite(dbPath);
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       const proj = await createProject(db, { orgId: org.id, slug: "p", name: "P" });
       await createTask(db, { orgId: org.id, projectId: proj.id, title: "Open task", status: "pending" });
@@ -299,7 +299,7 @@ describe("fulcrum product CLI", () => {
     const db = await openPglite(dbPath);
     let taskId = "";
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       const proj = await createProject(db, { orgId: org.id, slug: "p", name: "P" });
       const task = await createTask(db, { orgId: org.id, projectId: proj.id, title: "T1" });
@@ -335,7 +335,7 @@ describe("fulcrum product CLI", () => {
     const db = await openPglite(dbPath);
     let id1 = "", id2 = "";
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       const proj = await createProject(db, { orgId: org.id, slug: "p", name: "P" });
       const t1 = await createTask(db, { orgId: org.id, projectId: proj.id, title: "T1" });
@@ -363,7 +363,7 @@ describe("fulcrum product CLI", () => {
     const db = await openPglite(dbPath);
     let taskId = "", sprintId = "";
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       const proj = await createProject(db, { orgId: org.id, slug: "p", name: "P" });
       const task = await createTask(db, { orgId: org.id, projectId: proj.id, title: "T1" });
@@ -389,7 +389,7 @@ describe("fulcrum product CLI", () => {
     await Bun.write(join(productDbDir(), ".keep"), "");
     const db = await openPglite(dbPath);
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       const proj = await createProject(db, { orgId: org.id, slug: "p", name: "P" });
       await createSprint(db, { orgId: org.id, projectId: proj.id, name: "Sprint 1" });
@@ -415,7 +415,7 @@ describe("fulcrum product CLI", () => {
     const db = await openPglite(dbPath);
     let sprintId = "";
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       const proj = await createProject(db, { orgId: org.id, slug: "p", name: "P" });
       const sprint = await createSprint(db, { orgId: org.id, projectId: proj.id, name: "Sprint 1" });
@@ -455,7 +455,7 @@ describe("fulcrum product CLI", () => {
     const db = await openPglite(dbPath);
     let sprintId = "";
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       const proj = await createProject(db, { orgId: org.id, slug: "p", name: "P" });
       const sprint = await createSprint(db, { orgId: org.id, projectId: proj.id, name: "Sprint 1", status: "active" });
@@ -485,7 +485,7 @@ describe("fulcrum product CLI", () => {
     await Bun.write(join(productDbDir(), ".keep"), "");
     const db = await openPglite(dbPath);
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       const proj = await createProject(db, { orgId: org.id, slug: "p", name: "P" });
       await createCustomField(db, { orgId: org.id, projectId: proj.id, name: "Priority Level", fieldType: "select" });
@@ -510,7 +510,7 @@ describe("fulcrum product CLI", () => {
     await Bun.write(join(productDbDir(), ".keep"), "");
     const db = await openPglite(dbPath);
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       const proj = await createProject(db, { orgId: org.id, slug: "p", name: "P" });
       await createSavedView(db, { orgId: org.id, projectId: proj.id, name: "My Board" });
@@ -535,7 +535,7 @@ describe("fulcrum product CLI", () => {
     const db = await openPglite(dbPath);
     let taskId = "";
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       const project = await createProject(db, { orgId: org.id, slug: "p", name: "P" });
       const task = await createTask(db, {

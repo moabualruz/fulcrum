@@ -10,7 +10,7 @@ import {
 
 const EVENT_INPUT: OutboxEventInput = {
   orgId: "00000000-0000-0000-0000-000000000001",
-  projectId: "project-alpha",
+  projectId: "22222222-2222-4222-8222-222222222222",
   verb: "task.created",
   subjectKind: "task",
   subjectId: "task-1",
@@ -33,7 +33,7 @@ describe("application outbox serialization", () => {
   });
 
   test("topicForOutboxEvent routes task and notification handoffs without PGlite channel coupling", () => {
-    expect(topicForOutboxEvent(EVENT_INPUT)).toBe("project.project-alpha.tasks");
+    expect(topicForOutboxEvent(EVENT_INPUT)).toBe("project.22222222-2222-4222-8222-222222222222.tasks");
     expect(topicForOutboxEvent({
       ...EVENT_INPUT,
       projectId: null,

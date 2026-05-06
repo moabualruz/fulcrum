@@ -1,7 +1,8 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
+import { Org } from "../db/entities/auth/Org.ts";
+import { NotificationRule } from "../db/entities/notifications/NotificationRule.ts";
 
 const DEFAULT_CHANNELS = ["in-app"] as const;
-const DEFAULT_CHANNELS_SQL = "{in-app}";
 
 export const DEFAULT_NOTIFICATION_RULES = [
   {
@@ -46,44 +47,27 @@ export async function seedDefaultRules(
   orgId: string,
   em: EntityManager,
 ): Promise<void> {
-  // Defensive: skip if notifications migration has not yet expanded notification_rules.
-  // SeedService runs in test setups before all migrations have been applied.
-  const cols = await em.getConnection().execute<Array<{ column_name: string }>>(
-    `select column_name from information_schema.columns where table_name = 'notification_rules' and column_name = 'user_id'`,
-  );
-  if (!cols.length) return;
-
   const now = new Date();
+  const org = em.getReference(Org, orgId);
 
   for (const rule of DEFAULT_NOTIFICATION_RULES) {
-    await em.getConnection().execute(
-      `
-        insert into "notification_rules" (
-          "id",
-          "org_id",
-          "user_id",
-          "subject_kind",
-          "active",
-          "name",
-          "event_pattern",
-          "channels",
-          "enabled",
-          "created_at",
-          "updated_at"
-        ) values (?, ?, ?, ?, true, ?, ?::jsonb, ?::text[], true, ?, ?)
-        on conflict ("user_id", "name") do nothing
-      `,
-      [
-        crypto.randomUUID(),
-        orgId,
-        userId,
-        rule.subjectKind,
-        rule.name,
-        JSON.stringify(rule.eventPattern),
-        DEFAULT_CHANNELS_SQL,
-        now,
-        now,
-      ],
-    );
+    const existing = await em.findOne(NotificationRule, {
+      userId,
+      name: rule.name,
+    } as never);
+    if (existing) continue;
+    em.persist(em.create(NotificationRule, {
+      org,
+      userId,
+      subjectKind: rule.subjectKind,
+      active: true,
+      name: rule.name,
+      eventPattern: rule.eventPattern,
+      channels: [...DEFAULT_CHANNELS],
+      enabled: true,
+      createdAt: now,
+      updatedAt: now,
+    }));
   }
+  await em.flush();
 }

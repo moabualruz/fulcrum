@@ -1,9 +1,8 @@
 import { readdir, readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import type { ProductDb } from "./types.ts";
+import { join } from "node:path";
+import type { ProductDb } from "../product-kernel/db/types.ts";
 
-const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), "migrations");
+const MIGRATIONS_DIR = new URL("../product-kernel/db/migrations/", import.meta.url).pathname;
 
 export async function applyProductMigrations(db: ProductDb): Promise<readonly string[]> {
   await db.exec(`

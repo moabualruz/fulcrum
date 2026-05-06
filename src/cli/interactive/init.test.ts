@@ -10,8 +10,8 @@ async function freshDb(): Promise<{ db: ProductDb; dir: string }> {
   const dir = await mkdtemp(join(tmpdir(), "fulcrum-init-interactive-"));
   const { openPglite } = await import("../../product-kernel/db/pglite.ts");
   const db = await openPglite(join(dir, "db"));
-  const { runMigrations } = await import("../../product-kernel/db/migrate.ts");
-  await runMigrations(db);
+  const { applyProductMigrations } = await import("../../db/product-migrations.ts");
+  await applyProductMigrations(db);
   return { db, dir };
 }
 

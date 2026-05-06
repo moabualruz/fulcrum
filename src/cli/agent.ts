@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { openPglite } from "../product-kernel/db/pglite.ts";
-import { runMigrations } from "../product-kernel/db/migrate.ts";
+import { applyProductMigrations } from "../db/product-migrations.ts";
 import { productDbDir } from "../product-kernel/paths.ts";
 import type { ProductDb } from "../product-kernel/db/types.ts";
 import { dispatchRunAction } from "../services/runs.ts";
@@ -23,7 +23,7 @@ async function openProductDb(): Promise<ProductDb> {
   const dir = productDbDir();
   await mkdir(dir, { recursive: true });
   const db = await openPglite(join(dir, "main"));
-  await runMigrations(db);
+  await applyProductMigrations(db);
   return db;
 }
 

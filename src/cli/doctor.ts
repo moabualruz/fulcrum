@@ -571,9 +571,9 @@ async function buildMemoryEngineReport(
       const { tmpdir } = await import("node:os");
       const { join } = await import("node:path");
       const { openPglite } = await import("../product-kernel/db/pglite.ts");
-      const { runMigrations } = await import("../product-kernel/db/migrate.ts");
+      const { applyProductMigrations } = await import("../db/product-migrations.ts");
       db = await openPglite(join(await mkdtemp(join(tmpdir(), "fulcrum-doctor-memory-")), "db"));
-      await runMigrations(db);
+      await applyProductMigrations(db);
     } catch { /* use null db */ }
   }
   const memoryEngine = await runMemoryDoctorChecks(db);

@@ -19,7 +19,7 @@
 
 import { dbMigrate, dbStatus, dbHistory } from "../../db/db.router.ts";
 import { openDatabase, resolveDatabaseConfig, type DbBackend } from "../../config/database.ts";
-import { runMigrations } from "../../product-kernel/db/migrate.ts";
+import { applyProductMigrations } from "../../db/product-migrations.ts";
 
 /** Help text for the `db` subcommand. */
 const HELP = `fulcrum db
@@ -70,7 +70,7 @@ async function runExplicitProductMigration(rest: readonly string[]): Promise<voi
   });
   const db = await openDatabase(config);
   try {
-    const applied = await runMigrations(db);
+    const applied = await applyProductMigrations(db);
     const rows = await db.query<{ name: string }>(
       "SELECT name FROM schema_migrations ORDER BY name ASC",
     );

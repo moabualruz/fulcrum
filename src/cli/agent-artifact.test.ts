@@ -6,7 +6,7 @@ import { run as runAgent } from "./agent.ts";
 import { run as runArtifact } from "./artifact.ts";
 import { run as runArtifacts, type ArtifactsClient } from "./artifacts.ts";
 import { openPglite } from "../product-kernel/db/pglite.ts";
-import { runMigrations } from "../product-kernel/db/migrate.ts";
+import { applyProductMigrations } from "../db/product-migrations.ts";
 import { productDbDir } from "../product-kernel/paths.ts";
 import { createLocalOrg, createProject, createTask } from "../product-kernel/store/repositories.ts";
 import { newUlid } from "../product-kernel/ids.ts";
@@ -41,7 +41,7 @@ describe("fulcrum agent/artifact CLI", () => {
     const db = await openPglite(join(productDbDir(), "main"));
     let taskId = "";
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       const project = await createProject(db, { orgId: org.id, slug: "p", name: "P" });
       const task = await createTask(db, { orgId: org.id, projectId: project.id, title: "Run agent" });
@@ -67,7 +67,7 @@ describe("fulcrum agent/artifact CLI", () => {
     const db = await openPglite(join(productDbDir(), "main"));
     let artifactId = "";
     try {
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "default", name: "Local" });
       const project = await createProject(db, { orgId: org.id, slug: "p", name: "P" });
       const runId = newUlid();

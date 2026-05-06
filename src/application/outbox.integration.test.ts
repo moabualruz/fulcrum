@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 
 import { Event } from "../db/entities/core/Event.ts";
 import { DomainEventOutbox } from "../db/entities/platform/DomainEventOutbox.ts";
-import { createTask } from "./tasks/commands.ts";
+import { Org } from "../db/entities/auth/Org.ts";
+import { Task } from "../db/entities/tasks/Task.ts";
 import { DEFAULT_ORG_ID } from "../db/seed.ts";
 import { createTestOrm, type TestOrm } from "../test-utils/db.ts";
 import {
@@ -63,17 +64,14 @@ describe("transactional outbox integration", () => {
     const em = testDb.em.fork();
 
     const created = await em.transactional(async (txEm) => {
-      const task = await createTask(txEm, {
-        orgId: DEFAULT_ORG_ID,
-        userId: USER_ID,
-        projectId: "project-outbox",
-      }, {
+      const task = txEm.create(Task, {
+        id: "33333333-3333-4333-8333-333333333333",
+        org: txEm.getReference(Org, DEFAULT_ORG_ID),
         title: "same transaction outbox",
-        projectId: "project-outbox",
       });
+      txEm.persist(task);
       await writeOutboxEvent(txEm, {
         orgId: DEFAULT_ORG_ID,
-        projectId: "project-outbox",
         verb: "task.created",
         subjectKind: "task",
         subjectId: task.id,
@@ -103,7 +101,7 @@ describe("transactional outbox integration", () => {
     const em = testDb.em.fork();
     await writeOutboxEvent(em, {
       orgId: DEFAULT_ORG_ID,
-      projectId: "project-outbox",
+      projectId: "22222222-2222-4222-8222-222222222222",
       verb: "task.updated",
       subjectKind: "task",
       subjectId: "task-1",
@@ -141,18 +139,21 @@ describe("transactional outbox integration", () => {
       },
     });
 
-    await worker.start();
-    await writeOutboxEvent(em, {
-      orgId: DEFAULT_ORG_ID,
-      projectId: "project-outbox",
-      verb: "task.updated",
-      subjectKind: "task",
-      subjectId: "task-2",
-      payload: {},
-    });
-    await em.flush();
-    await notifyHandler?.();
-    await worker.stop();
+    try {
+      await worker.start();
+      await writeOutboxEvent(em, {
+        orgId: DEFAULT_ORG_ID,
+        projectId: "22222222-2222-4222-8222-222222222222",
+        verb: "task.updated",
+        subjectKind: "task",
+        subjectId: "task-2",
+        payload: {},
+      });
+      await em.flush();
+      await notifyHandler?.();
+    } finally {
+      await worker.stop();
+    }
 
     expect(sinks.published).toHaveLength(1);
   });

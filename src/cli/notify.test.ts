@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { run as runNotify } from "./notify.ts";
 import { openPglite } from "../product-kernel/db/pglite.ts";
-import { runMigrations } from "../product-kernel/db/migrate.ts";
+import { applyProductMigrations } from "../db/product-migrations.ts";
 import { productDbDir } from "../product-kernel/paths.ts";
 import { createLocalOrg } from "../product-kernel/store/repositories.ts";
 import {
@@ -39,7 +39,7 @@ async function seedDb() {
   const dbPath = join(productDbDir(), "main");
   await Bun.write(join(productDbDir(), ".keep"), "");
   const db = await openPglite(dbPath);
-  await runMigrations(db);
+  await applyProductMigrations(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Local" });
   return { db, org };
 }

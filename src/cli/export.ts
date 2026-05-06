@@ -8,7 +8,7 @@ import { mkdir } from "node:fs/promises";
 import { assertFeatureEnabled } from "../data/features.ts";
 import { exportTasksToCsv } from "../data/csv-export.ts";
 import { openPglite } from "../product-kernel/db/pglite.ts";
-import { runMigrations } from "../product-kernel/db/migrate.ts";
+import { applyProductMigrations } from "../db/product-migrations.ts";
 import { productDbDir } from "../product-kernel/paths.ts";
 import type { TaskRow } from "../product-kernel/store/repositories.ts";
 
@@ -71,7 +71,7 @@ export async function run(args: string[]): Promise<void> {
     const dbDir = productDbDir();
     await mkdir(dbDir, { recursive: true });
     const db = await openPglite(join(dbDir, "main"));
-    await runMigrations(db);
+    await applyProductMigrations(db);
 
     if (entity === "tasks") {
       const rows = await db.query<TaskRow>(`SELECT * FROM tasks ORDER BY created_at`);

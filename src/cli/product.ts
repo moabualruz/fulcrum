@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { openDatabase, resolveDatabaseConfig } from "../config/database.ts";
 import { openPglite } from "../product-kernel/db/pglite.ts";
-import { runMigrations } from "../product-kernel/db/migrate.ts";
+import { applyProductMigrations } from "../db/product-migrations.ts";
 import {
   createTask,
   updateTask,
@@ -184,7 +184,7 @@ async function runInit(argv: readonly string[]): Promise<void> {
   const json = hasFlag(argv, "json");
   const db = await openProductDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const org = await ensureLocalOrg(db);
     const result = {
       engine: db.engine,
@@ -213,7 +213,7 @@ async function runProjects(argv: readonly string[]): Promise<void> {
   const json = hasFlag(rest, "json");
   const db = await openProductDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const rows = await db.query<ProjectRow>(
       `SELECT * FROM projects ORDER BY created_at ASC, id ASC`,
     );
@@ -258,7 +258,7 @@ async function runTasksCreate(argv: readonly string[]): Promise<void> {
   }
   const db = await openProductDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const org = await ensureLocalOrg(db);
     let projectId: string | null = null;
     if (projectSlug) {
@@ -296,7 +296,7 @@ async function runTasksList(argv: readonly string[]): Promise<void> {
   const projectSlug = parseFlag(argv, "project");
   const db = await openProductDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const org = await ensureLocalOrg(db);
     let projectId: string | undefined;
     if (projectSlug) {
@@ -337,7 +337,7 @@ async function runTasksUpdate(argv: readonly string[]): Promise<void> {
   const title = parseFlag(argv, "title");
   const db = await openProductDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const dbStatus = status === "open" ? "pending" : status === "done" ? "completed" : status;
     const task = await updateTask(db, {
       id: taskId,
@@ -371,7 +371,7 @@ async function runTasksBulk(argv: readonly string[]): Promise<void> {
   const dbStatus = status === "open" ? "pending" : status === "done" ? "completed" : status;
   const db = await openProductDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const results: { id: string; title: string; status: string }[] = [];
     for (const id of ids) {
       const task = await updateTask(db, { id, status: dbStatus });
@@ -398,7 +398,7 @@ async function runTasksMove(argv: readonly string[]): Promise<void> {
   }
   const db = await openProductDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const task = await moveTaskToSprint(db, taskId, sprintId);
     if (json) {
       console.log(JSON.stringify({ id: task.id, title: task.title, sprint_id: sprintId }));
@@ -434,7 +434,7 @@ async function runSprintsList(argv: readonly string[]): Promise<void> {
   }
   const db = await openProductDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const org = await ensureLocalOrg(db);
     const rows = await db.query<ProjectRow>(
       `SELECT * FROM projects WHERE slug = $1 AND org_id = $2`,
@@ -468,7 +468,7 @@ async function runSprintsActivate(argv: readonly string[]): Promise<void> {
   }
   const db = await openProductDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     // Check current status
     const existing = await db.query<SprintRow>(`SELECT * FROM sprints WHERE id = $1`, [sprintId]);
     if (existing.length === 0) {
@@ -515,7 +515,7 @@ async function runSprintsComplete(argv: readonly string[]): Promise<void> {
   }
   const db = await openProductDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const sprint = await updateSprint(db, { id: sprintId, status: "completed" });
     // Velocity rollup: count completed tasks in this sprint
     const completedTasks = await db.query<{ cnt: string }>(
@@ -556,7 +556,7 @@ async function runCustomFields(argv: readonly string[]): Promise<void> {
   }
   const db = await openProductDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const org = await ensureLocalOrg(db);
     const rows = await db.query<ProjectRow>(
       `SELECT * FROM projects WHERE slug = $1 AND org_id = $2`,
@@ -594,7 +594,7 @@ async function runSavedViews(argv: readonly string[]): Promise<void> {
   }
   const db = await openProductDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const org = await ensureLocalOrg(db);
     const rows = await db.query<ProjectRow>(
       `SELECT * FROM projects WHERE slug = $1 AND org_id = $2`,
@@ -631,7 +631,7 @@ async function runSearch(argv: readonly string[]): Promise<void> {
   const limit = Number(parseFlag(argv, "limit") ?? "25");
   const db = await openProductDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const orgRows = await db.query<{ id: string }>(
       `SELECT id FROM orgs WHERE slug = $1`,
       [orgSlug],
@@ -673,7 +673,7 @@ async function runContext(argv: readonly string[]): Promise<void> {
   const json = hasFlag(rest, "json");
   const db = await openProductDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const orgRows = await db.query<{ id: string }>(
       `SELECT id FROM orgs WHERE slug = $1`,
       [orgSlug],

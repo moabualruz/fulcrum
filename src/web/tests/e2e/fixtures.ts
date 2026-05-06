@@ -13,7 +13,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openPglite } from "../../../product-kernel/db/pglite.ts";
-import { runMigrations } from "../../../product-kernel/db/migrate.ts";
+import { applyProductMigrations } from "../../../db/product-migrations.ts";
 import {
   createLocalOrg,
   createProject,
@@ -65,7 +65,7 @@ export const test = base.extend<Record<never, never>, { fulcrumHome: FulcrumHome
       const home = mkdtempSync(join(tmpdir(), "fulcrum-e2e-"));
       process.env["FULCRUM_HOME"] = home;
       const db: ProductDb = await openPglite(join(home, "state", "product", "db", "main"));
-      await runMigrations(db);
+      await applyProductMigrations(db);
       const org = await createLocalOrg(db, { slug: "local", name: "Local" });
       const orgId = org.id;
       const projectIds: string[] = [];

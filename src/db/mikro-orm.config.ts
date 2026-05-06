@@ -70,7 +70,8 @@ import { ConnectorCredential } from "./entities/settings/index.ts";
 // Flag-stub entities (P1#03 — gated behind feature flags by later pillars).
 import { CasbinRule } from "./entities/flags/CasbinRule.ts";
 import { WebhookSubscription } from "./entities/flags/WebhookSubscription.ts";
-import { NotificationRule } from "./entities/flags/NotificationRule.ts";
+import { Notification } from "./entities/notifications/Notification.ts";
+import { NotificationRule } from "./entities/notifications/NotificationRule.ts";
 
 // Webhook entities (P13#07).
 import { Webhook } from "./entities/notifications/Webhook.ts";
@@ -79,6 +80,7 @@ import { EventRetentionPolicy } from "./entities/notifications/EventRetentionPol
 
 // Platform / cross-cutting entities (P17#01 — Pillar 17 always-on).
 import { Credential } from "./entities/platform/Credential.ts";
+import { DomainEventOutbox } from "./entities/platform/DomainEventOutbox.ts";
 import { TelemetryEvent } from "./entities/platform/TelemetryEvent.ts";
 import { ErrorLog } from "./entities/platform/ErrorLog.ts";
 import { ExperimentAssignment } from "./entities/platform/ExperimentAssignment.ts";
@@ -145,11 +147,13 @@ export {
   ConnectorCredential,
   CasbinRule,
   WebhookSubscription,
+  Notification,
   NotificationRule,
   Webhook,
   WebhookDelivery,
   EventRetentionPolicy,
   Credential,
+  DomainEventOutbox,
   TelemetryEvent,
   ErrorLog,
   ExperimentAssignment,
@@ -248,11 +252,13 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     ConnectorCredential,
     CasbinRule,
     WebhookSubscription,
+    Notification,
     NotificationRule,
     Webhook,
     WebhookDelivery,
     EventRetentionPolicy,
     Credential,
+    DomainEventOutbox,
     TelemetryEvent,
     ErrorLog,
     ExperimentAssignment,

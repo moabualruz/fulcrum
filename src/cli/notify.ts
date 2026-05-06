@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { openPglite } from "../product-kernel/db/pglite.ts";
-import { runMigrations } from "../product-kernel/db/migrate.ts";
+import { applyProductMigrations } from "../db/product-migrations.ts";
 import { productDbDir } from "../product-kernel/paths.ts";
 import type { ProductDb } from "../product-kernel/db/types.ts";
 import {
@@ -132,7 +132,7 @@ async function runList(argv: readonly string[]): Promise<void> {
   const offset = Number(flag(args, "offset") ?? "0");
   const db = await openDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const orgId = await resolveOrgId(db);
     const rows = await listNotifications(db, {
       orgId, userId: DEFAULT_USER_ID, unread: unreadOnly, limit, offset,
@@ -158,7 +158,7 @@ async function runRead(argv: readonly string[]): Promise<void> {
   if (!id) { console.error("usage: fulcrum notify read <id>"); process.exit(2); }
   const db = await openDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const orgId = await resolveOrgId(db);
     const rows = await db.query<Record<string, unknown>>(
       `SELECT * FROM user_notifications WHERE id = $1 AND org_id = $2`,
@@ -176,7 +176,7 @@ async function runMarkRead(argv: readonly string[]): Promise<void> {
   const all = hasFlag(args, "all");
   const db = await openDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const orgId = await resolveOrgId(db);
     if (all) {
       const count = await markAllRead(db, orgId, DEFAULT_USER_ID);
@@ -204,7 +204,7 @@ async function runMute(argv: readonly string[]): Promise<void> {
   const json = hasFlag(args, "json");
   const db = await openDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const orgId = await resolveOrgId(db);
     const row = await mute(db, { orgId, userId: DEFAULT_USER_ID, subjectKind, subjectId, mutedUntil: until });
     if (json) {
@@ -226,7 +226,7 @@ async function runUnmute(argv: readonly string[]): Promise<void> {
   }
   const db = await openDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const orgId = await resolveOrgId(db);
     const ok = await unmute(db, orgId, DEFAULT_USER_ID, subjectKind, subjectId);
     if (ok) console.log(`unmuted ${subjectKind}:${subjectId}`);
@@ -256,7 +256,7 @@ async function runRulesList(argv: readonly string[]): Promise<void> {
   const json = hasFlag(args, "json");
   const db = await openDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const orgId = await resolveOrgId(db);
     const rows = await listRules(db, orgId);
     if (json) {
@@ -281,7 +281,7 @@ async function runRulesGet(argv: readonly string[]): Promise<void> {
   const json = hasFlag(args, "json");
   const db = await openDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const orgId = await resolveOrgId(db);
     const rule = await getRule(db, orgId, id);
     if (!rule) { console.error(`rule not found: ${id}`); process.exit(1); }
@@ -319,7 +319,7 @@ async function runRulesCreate(argv: readonly string[]): Promise<void> {
   const json = hasFlag(args, "json");
   const db = await openDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const orgId = await resolveOrgId(db);
     const rule = await createRule(db, { orgId, name, eventPattern, channels, enabled });
     if (json) {
@@ -351,7 +351,7 @@ async function runRulesUpdate(argv: readonly string[]): Promise<void> {
   if (hasFlag(args, "disable")) patch.enabled = false;
   const db = await openDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const orgId = await resolveOrgId(db);
     const rule = await updateRule(db, orgId, id, patch);
     if (!rule) { console.error(`rule not found: ${id}`); process.exit(1); }
@@ -371,7 +371,7 @@ async function runRulesDelete(argv: readonly string[]): Promise<void> {
   if (!id) { console.error("usage: fulcrum notify rules delete <id>"); process.exit(2); }
   const db = await openDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const orgId = await resolveOrgId(db);
     const ok = await deleteRule(db, orgId, id);
     if (ok) console.log(`deleted rule ${id}`);
@@ -399,7 +399,7 @@ async function runChannelsList(argv: readonly string[]): Promise<void> {
   const json = hasFlag(args, "json");
   const db = await openDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const orgId = await resolveOrgId(db);
     const rows = await listChannels(db, orgId);
     if (json) {
@@ -433,7 +433,7 @@ async function runChannelsConfig(argv: readonly string[]): Promise<void> {
   if (secret) config.secret = secret;
   const db = await openDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const orgId = await resolveOrgId(db);
     const row = await configureChannel(db, { orgId, kind, config });
     if (json) {
@@ -452,7 +452,7 @@ async function runChannelsTest(argv: readonly string[]): Promise<void> {
   if (!kind) { console.error("usage: fulcrum notify channels test <kind>"); process.exit(2); }
   const db = await openDb();
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const orgId = await resolveOrgId(db);
     const rows = await listChannels(db, orgId);
     const ch = rows.find((c) => c.kind === kind);

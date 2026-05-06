@@ -12,7 +12,7 @@ import { assertFeatureEnabled } from "../data/features.ts";
 import { importCsv } from "../data/csv-import.ts";
 import { runImport, formatImportResult } from "./import-pm.ts";
 import { openPglite } from "../product-kernel/db/pglite.ts";
-import { runMigrations } from "../product-kernel/db/migrate.ts";
+import { applyProductMigrations } from "../db/product-migrations.ts";
 import { productDbDir } from "../product-kernel/paths.ts";
 import {
   createLocalOrg,
@@ -140,7 +140,7 @@ export async function run(args: string[]): Promise<void> {
       const dbDir = productDbDir();
       await mkdir(dbDir, { recursive: true });
       const db = await openPglite(join(dbDir, "main"));
-      await runMigrations(db);
+      await applyProductMigrations(db);
 
       // Ensure local org exists
       const existingOrg = await db.query<{ id: string }>(

@@ -61,10 +61,10 @@ async function runDbMigrate(home: string, fulcrumHome: string): Promise<void> {
   process.env["HOME"] = home;
   process.env["FULCRUM_HOME"] = fulcrumHome;
   const { openPglite } = await import("../product-kernel/db/pglite.ts");
-  const { runMigrations } = await import("../product-kernel/db/migrate.ts");
+  const { applyProductMigrations } = await import("../db/product-migrations.ts");
   const db = await openPglite(join(fulcrumHome, "pglite.data"));
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
   } finally {
     await db.close();
     if (previousHome === undefined) delete process.env["HOME"];

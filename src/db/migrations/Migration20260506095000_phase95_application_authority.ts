@@ -2,6 +2,9 @@ import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260506095000_phase95_application_authority extends Migration {
   override async up(): Promise<void> {
+    this.addSql(`alter table "events" add column if not exists "project_id" uuid null`);
+    this.addSql(`create index if not exists "events_scope_idx" on "events" ("org_id", "project_id", "created_at")`);
+
     this.addSql(`create table if not exists "bitbucket_pull_requests" (
       "id" uuid not null default gen_random_uuid(),
       "org_id" uuid not null,
@@ -177,9 +180,28 @@ export class Migration20260506095000_phase95_application_authority extends Migra
     this.addSql(`alter table "connector_credentials" add constraint "connector_credentials_org_id_foreign" foreign key ("org_id") references "orgs" ("id") on delete cascade`);
     this.addSql(`create index if not exists "connector_credentials_org_project" on "connector_credentials" ("org_id", "project_id")`);
     this.addSql(`create unique index if not exists "connector_credentials_provider_account_unique" on "connector_credentials" ("org_id", "provider", "account_id")`);
+
+    this.addSql(`create table if not exists "domain_event_outbox" (
+      "id" uuid not null default gen_random_uuid(),
+      "org_id" uuid not null,
+      "project_id" varchar(255) null,
+      "verb" varchar(255) not null,
+      "subject_kind" varchar(255) not null,
+      "subject_id" varchar(255) null,
+      "event_key" varchar(255) not null,
+      "payload" jsonb not null default '{}',
+      "created_at" timestamptz not null default now(),
+      "processed_at" timestamptz null,
+      "attempts" int not null default 0,
+      primary key ("id")
+    )`);
+    this.addSql(`alter table "domain_event_outbox" add constraint "domain_event_outbox_org_id_foreign" foreign key ("org_id") references "orgs" ("id") on delete cascade`);
+    this.addSql(`create index if not exists "domain_event_outbox_pending" on "domain_event_outbox" ("processed_at", "created_at") where "processed_at" is null`);
+    this.addSql(`create unique index if not exists "domain_event_outbox_event_key_unique" on "domain_event_outbox" ("event_key")`);
   }
 
   override async down(): Promise<void> {
+    this.addSql(`drop table if exists "domain_event_outbox" cascade`);
     this.addSql(`drop table if exists "connector_credentials" cascade`);
     this.addSql(`drop table if exists "audit_exports" cascade`);
     this.addSql(`drop table if exists "audit_events" cascade`);
@@ -190,5 +212,7 @@ export class Migration20260506095000_phase95_application_authority extends Migra
     this.addSql(`drop table if exists "gitlab_merge_requests" cascade`);
     this.addSql(`drop table if exists "bitbucket_issues" cascade`);
     this.addSql(`drop table if exists "bitbucket_pull_requests" cascade`);
+    this.addSql(`drop index if exists "events_scope_idx"`);
+    this.addSql(`alter table "events" drop column if exists "project_id"`);
   }
 }

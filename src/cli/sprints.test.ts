@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { openPglite } from "../product-kernel/db/pglite.ts";
-import { runMigrations } from "../product-kernel/db/migrate.ts";
+import { applyProductMigrations } from "../db/product-migrations.ts";
 import {
   createLocalOrg,
   createProject,
@@ -28,7 +28,7 @@ async function seedDb() {
   const dbDir = join(scratch, "state", "product", "db");
   mkdirSync(dbDir, { recursive: true });
   const db = await openPglite(join(dbDir, "main"));
-  await runMigrations(db);
+  await applyProductMigrations(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const project = await createProject(db, { orgId: org.id, slug: "proj", name: "P" });
   const sprint = await createSprint(db, { orgId: org.id, projectId: project.id, name: "S1" });

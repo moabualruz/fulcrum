@@ -1,20 +1,20 @@
 /**
- * PGlite bridge unit tests — P13#02.
+ * Notify bridge unit tests — P13#02.
  *
- * Uses a mock PGlite to test LISTEN/NOTIFY → EventBus forwarding.
+ * Uses a mock Notify to test LISTEN/NOTIFY → EventBus forwarding.
  * Also tests topicToPGChannel mapping.
  */
 
 import { afterEach, describe, expect, test } from "bun:test";
 
 import { EventBus, resetEventBus } from "./event-bus.ts";
-import { startPGliteBridge, topicToPGChannel } from "./pglite-bridge.ts";
+import { startNotifyBridge, topicToPGChannel } from "./pglite-bridge.ts";
 import type { SubscriptionEvent } from "./event-bus.ts";
 
 afterEach(() => resetEventBus());
 
-// Mock PGlite: captures listen registrations and provides a way to simulate NOTIFY.
-function createMockPGlite() {
+// Mock notify client: captures listen registrations and provides a way to simulate NOTIFY.
+function createMockNotifyClient() {
   const listeners = new Map<string, (payload: string) => void>();
 
   return {
@@ -24,7 +24,7 @@ function createMockPGlite() {
         listeners.delete(channel);
       };
     },
-    query: async (_sql: string) => ({ rows: [] }),
+    notify: async (channel: string, payload: string) => { listeners.get(channel)?.(payload); },
 
     // Test helper: simulate a NOTIFY.
     simulateNotify(channel: string, payload: string) {
@@ -59,22 +59,22 @@ describe("topicToPGChannel", () => {
   });
 });
 
-describe("startPGliteBridge", () => {
+describe("startNotifyBridge", () => {
   test("NOTIFY on agent_run channel → EventBus receives event", async () => {
     const bus = new EventBus();
-    const pglite = createMockPGlite();
+    const client = createMockNotifyClient();
     const received: SubscriptionEvent[] = [];
 
     const topic = "agent_run.run123";
     bus.subscribe(topic, (evt) => received.push(evt));
 
-    const teardown = await startPGliteBridge({
-      pglite: pglite as any,
+    const teardown = await startNotifyBridge({
+      client: client as any,
       eventBus: bus,
     });
 
-    // Simulate PGlite NOTIFY with JSON payload.
-    pglite.simulateNotify(
+    // Simulate notify with JSON payload.
+    client.simulateNotify(
       "agent_run",
       JSON.stringify({ topic, data: { status: "running" } }),
     );
@@ -87,17 +87,17 @@ describe("startPGliteBridge", () => {
 
   test("non-JSON NOTIFY payload published raw", async () => {
     const bus = new EventBus();
-    const pglite = createMockPGlite();
+    const client = createMockNotifyClient();
     const received: SubscriptionEvent[] = [];
 
     bus.subscribe("agent_run", (evt) => received.push(evt));
 
-    const teardown = await startPGliteBridge({
-      pglite: pglite as any,
+    const teardown = await startNotifyBridge({
+      client: client as any,
       eventBus: bus,
     });
 
-    pglite.simulateNotify("agent_run", "plain-text");
+    client.simulateNotify("agent_run", "plain-text");
 
     expect(received).toHaveLength(1);
     expect(received[0]!.payload).toBe("plain-text");
@@ -105,28 +105,28 @@ describe("startPGliteBridge", () => {
     await teardown();
   });
 
-  test("teardown removes all PGlite listeners", async () => {
+  test("teardown removes all notify listeners", async () => {
     const bus = new EventBus();
-    const pglite = createMockPGlite();
+    const client = createMockNotifyClient();
 
-    const teardown = await startPGliteBridge({
-      pglite: pglite as any,
+    const teardown = await startNotifyBridge({
+      client: client as any,
       eventBus: bus,
     });
 
-    expect(pglite.getListenerCount()).toBeGreaterThan(0);
+    expect(client.getListenerCount()).toBeGreaterThan(0);
 
     await teardown();
 
-    expect(pglite.getListenerCount()).toBe(0);
+    expect(client.getListenerCount()).toBe(0);
   });
 
   test("subscriber receives update within 500ms (simulated)", async () => {
     const bus = new EventBus();
-    const pglite = createMockPGlite();
+    const client = createMockNotifyClient();
 
-    const teardown = await startPGliteBridge({
-      pglite: pglite as any,
+    const teardown = await startNotifyBridge({
+      client: client as any,
       eventBus: bus,
     });
 
@@ -135,7 +135,7 @@ describe("startPGliteBridge", () => {
     bus.subscribe(topic, () => receivedAt.push(Date.now()));
 
     const sentAt = Date.now();
-    pglite.simulateNotify(
+    client.simulateNotify(
       "agent_run",
       JSON.stringify({ topic, data: { ts: sentAt } }),
     );
