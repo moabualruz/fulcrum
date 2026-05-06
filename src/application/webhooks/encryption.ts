@@ -66,6 +66,7 @@ function base64UrlEncode(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("base64url");
 }
 
-function base64UrlDecode(value: string): Uint8Array {
-  return new Uint8Array(Buffer.from(value, "base64url"));
+function base64UrlDecode(value: string): ArrayBuffer {
+  const bytes = Buffer.from(value, "base64url");
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
