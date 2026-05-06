@@ -2,26 +2,26 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 07 executed
-last_updated: "2026-05-05T21:35:17.000Z"
+status: Phase 08 executed
+last_updated: "2026-05-06T02:02:34Z"
 progress:
   total_phases: 10
-  completed_phases: 6
-  total_plans: 69
-  completed_plans: 68
-  percent: 99
+  completed_phases: 7
+  total_plans: 76
+  completed_plans: 76
+  percent: 100
 ---
 
 # Planning State
 
 ## Current Position
 
-Phase: 07 (repos-artifacts-notifications) — EXECUTED
-Plan: 10 of 10
+Phase: 08 (surface-delivery) — EXECUTED
+Plan: 7 of 7 completed
 
-- **Phase**: 07-repos-artifacts-notifications
-- **Plan**: 10 of 10 completed
-- **Status**: Phase 7 EXECUTED — all 10 plans delivered. 102 targeted Phase 7 tests passing. Full `bun run ci` still blocked by pre-existing non-Phase-7 TypeScript errors in docs, memory/search, older tests, and document tRPC routers.
+- **Phase**: 08-surface-delivery
+- **Plan**: 7 of 7 completed
+- **Status**: Phase 8 EXECUTED — all 7 plans delivered. Requirement-level UAT recorded in `.planning/phases/08-surface-delivery/08-UAT.md`. Broad test gate passed before final build fix; cross-target build gate passed after OpenTUI optional-native externalization; final post-fix CI rerun was interrupted by the tool before summary with no product failure observed.
 - **Branch**: dev/v1.0
 
 ## Decisions
