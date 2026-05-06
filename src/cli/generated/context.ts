@@ -9,7 +9,7 @@ export function createContextCommand(): Command {
   assembleCommand.option("--json", "Emit JSON output");
   assembleCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for context.assemble is not wired yet.");
+      throw new Error("Generated tRPC invocation for context.assemble requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -26,7 +26,7 @@ export function createContextCommand(): Command {
   previewCommand.option("--json", "Emit JSON output");
   previewCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for context.preview is not wired yet.");
+      throw new Error("Generated tRPC invocation for context.preview requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

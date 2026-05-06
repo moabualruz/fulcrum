@@ -9,7 +9,7 @@ export function createSavedViewsCommand(): Command {
   listCommand.option("--json", "Emit JSON output");
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for saved_views.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for saved_views.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -27,7 +27,7 @@ export function createSavedViewsCommand(): Command {
   getCommand.option("--id <string>", "id");
   getCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for saved_views.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for saved_views.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -44,7 +44,7 @@ export function createSavedViewsCommand(): Command {
   createCommand.option("--json", "Emit JSON output");
   createCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for saved_views.create is not wired yet.");
+      throw new Error("Generated tRPC invocation for saved_views.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -61,7 +61,7 @@ export function createSavedViewsCommand(): Command {
   updateCommand.option("--json", "Emit JSON output");
   updateCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for saved_views.update is not wired yet.");
+      throw new Error("Generated tRPC invocation for saved_views.update requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -79,7 +79,7 @@ export function createSavedViewsCommand(): Command {
   deleteCommand.option("--id <string>", "id");
   deleteCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for saved_views.delete is not wired yet.");
+      throw new Error("Generated tRPC invocation for saved_views.delete requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

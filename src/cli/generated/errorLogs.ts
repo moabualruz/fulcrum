@@ -9,7 +9,7 @@ export function createErrorLogsCommand(): Command {
   clearCommand.option("--json", "Emit JSON output");
   clearCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for errorLogs.clear is not wired yet.");
+      throw new Error("Generated tRPC invocation for errorLogs.clear requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -27,7 +27,7 @@ export function createErrorLogsCommand(): Command {
   getCommand.option("--id <string>", "id");
   getCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for errorLogs.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for errorLogs.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -45,7 +45,7 @@ export function createErrorLogsCommand(): Command {
   listCommand.option("--limit <number>", "limit", Number.parseFloat);
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for errorLogs.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for errorLogs.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

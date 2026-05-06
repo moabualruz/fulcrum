@@ -4,13 +4,14 @@ export function createDocVersionsCommand(): Command {
   const command = new Command("doc_versions");
   command.description("Generated doc_versions commands.");
 
-  const getCommand = command.command("get");
-  getCommand.description("doc_versions get");
-  getCommand.option("--json", "Emit JSON output");
-  getCommand.option("--id <string>", "id");
-  getCommand.action(async (options) => {
+  const diffCommand = command.command("diff");
+  diffCommand.description("doc_versions diff");
+  diffCommand.option("--json", "Emit JSON output");
+  diffCommand.option("--document-id <string>", "document-id");
+  diffCommand.option("--version-id <string>", "version-id");
+  diffCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for doc_versions.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for doc_versions.diff requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -25,9 +26,10 @@ export function createDocVersionsCommand(): Command {
   const listCommand = command.command("list");
   listCommand.description("doc_versions list");
   listCommand.option("--json", "Emit JSON output");
+  listCommand.option("--document-id <string>", "document-id");
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for doc_versions.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for doc_versions.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -42,10 +44,11 @@ export function createDocVersionsCommand(): Command {
   const restoreCommand = command.command("restore");
   restoreCommand.description("doc_versions restore");
   restoreCommand.option("--json", "Emit JSON output");
-  restoreCommand.option("--id <string>", "id");
+  restoreCommand.option("--document-id <string>", "document-id");
+  restoreCommand.option("--version-id <string>", "version-id");
   restoreCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for doc_versions.restore is not wired yet.");
+      throw new Error("Generated tRPC invocation for doc_versions.restore requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

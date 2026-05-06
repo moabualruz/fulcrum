@@ -9,7 +9,7 @@ export function createSprintsCommand(): Command {
   addTaskCommand.option("--json", "Emit JSON output");
   addTaskCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for sprints.addTask is not wired yet.");
+      throw new Error("Generated tRPC invocation for sprints.addTask requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -26,7 +26,7 @@ export function createSprintsCommand(): Command {
   closeCommand.option("--json", "Emit JSON output");
   closeCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for sprints.close is not wired yet.");
+      throw new Error("Generated tRPC invocation for sprints.close requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -43,7 +43,7 @@ export function createSprintsCommand(): Command {
   createCommand.option("--json", "Emit JSON output");
   createCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for sprints.create is not wired yet.");
+      throw new Error("Generated tRPC invocation for sprints.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -60,7 +60,7 @@ export function createSprintsCommand(): Command {
   deleteCommand.option("--json", "Emit JSON output");
   deleteCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for sprints.delete is not wired yet.");
+      throw new Error("Generated tRPC invocation for sprints.delete requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -77,7 +77,7 @@ export function createSprintsCommand(): Command {
   getCommand.option("--json", "Emit JSON output");
   getCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for sprints.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for sprints.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -95,7 +95,7 @@ export function createSprintsCommand(): Command {
   listCommand.addOption(new Option("--status <choice>", "status").choices(["planned","active","completed"]));
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for sprints.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for sprints.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -112,7 +112,7 @@ export function createSprintsCommand(): Command {
   removeTaskCommand.option("--json", "Emit JSON output");
   removeTaskCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for sprints.removeTask is not wired yet.");
+      throw new Error("Generated tRPC invocation for sprints.removeTask requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -129,7 +129,7 @@ export function createSprintsCommand(): Command {
   startCommand.option("--json", "Emit JSON output");
   startCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for sprints.start is not wired yet.");
+      throw new Error("Generated tRPC invocation for sprints.start requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -146,7 +146,7 @@ export function createSprintsCommand(): Command {
   updateCommand.option("--json", "Emit JSON output");
   updateCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for sprints.update is not wired yet.");
+      throw new Error("Generated tRPC invocation for sprints.update requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

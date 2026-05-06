@@ -9,7 +9,7 @@ export function createThemeCommand(): Command {
   getThemeCommand.option("--json", "Emit JSON output");
   getThemeCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for theme.getTheme is not wired yet.");
+      throw new Error("Generated tRPC invocation for theme.getTheme requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -26,7 +26,7 @@ export function createThemeCommand(): Command {
   listThemesCommand.option("--json", "Emit JSON output");
   listThemesCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for theme.listThemes is not wired yet.");
+      throw new Error("Generated tRPC invocation for theme.listThemes requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -44,7 +44,7 @@ export function createThemeCommand(): Command {
   setThemeCommand.option("--value <string>", "value");
   setThemeCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for theme.setTheme is not wired yet.");
+      throw new Error("Generated tRPC invocation for theme.setTheme requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

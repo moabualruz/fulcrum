@@ -100,7 +100,7 @@ export async function run(argv: readonly string[], opts: ReportRunOptions = {}):
     const procedure = caller.reports[procedureName];
 
     if (!procedure) {
-      // Procedure not wired yet — return empty result
+      // Compatibility fallback for report types without a runtime procedure.
       const data: AnyRecord[] = [];
       outputData(data, format, type as ReportType, print);
       return;

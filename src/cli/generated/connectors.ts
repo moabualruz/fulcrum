@@ -10,7 +10,7 @@ export function createConnectorsCommand(): Command {
   disableCommand.option("--id <string>", "id");
   disableCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for connectors.disable is not wired yet.");
+      throw new Error("Generated tRPC invocation for connectors.disable requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -27,7 +27,7 @@ export function createConnectorsCommand(): Command {
   enableCommand.option("--json", "Emit JSON output");
   enableCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for connectors.enable is not wired yet.");
+      throw new Error("Generated tRPC invocation for connectors.enable requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -45,7 +45,7 @@ export function createConnectorsCommand(): Command {
   getCommand.option("--id <string>", "id");
   getCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for connectors.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for connectors.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -62,7 +62,7 @@ export function createConnectorsCommand(): Command {
   listCommand.option("--json", "Emit JSON output");
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for connectors.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for connectors.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -80,7 +80,7 @@ export function createConnectorsCommand(): Command {
   runsGetCommand.option("--id <string>", "id");
   runsGetCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for connectors.runs.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for connectors.runs.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -97,7 +97,7 @@ export function createConnectorsCommand(): Command {
   runsListCommand.option("--json", "Emit JSON output");
   runsListCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for connectors.runs.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for connectors.runs.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -114,7 +114,7 @@ export function createConnectorsCommand(): Command {
   syncCommand.option("--json", "Emit JSON output");
   syncCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for connectors.sync is not wired yet.");
+      throw new Error("Generated tRPC invocation for connectors.sync requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

@@ -11,7 +11,7 @@ export function createDataExportCommand(): Command {
   createCommand.option("--pretty", "pretty");
   createCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for dataExport.create is not wired yet.");
+      throw new Error("Generated tRPC invocation for dataExport.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

@@ -5,7 +5,7 @@
  * Auth: Bearer token format "test-jwt:<orgId>" (real JWT in production).
  * Error mapping: orgId mismatch → 403, unknown ID → 404.
  *
- * WHY stub store: Pillar 3 replaces with real repo; P13#05 wires the HTTP layer.
+ * WHY spec seed: real ProductDb routes are mounted when runtime deps are present; this route keeps static OpenAPI generation deterministic.
  */
 
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
@@ -70,7 +70,7 @@ const ImportCsvResultSchema = z
   })
   .openapi("ImportCsvResult");
 
-// ── In-memory stub store (replaced by repo in Pillar 3) ──────────────────────
+// ── Static OpenAPI seed data ─────────────────────────────────────────────────
 
 const FIXED_ORG = "11111111-1111-4111-8111-111111111111";
 
@@ -82,7 +82,7 @@ function makeStubStore(): Map<string, z.infer<typeof TaskSchema>> {
       {
         id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         orgId: FIXED_ORG,
-        title: "Stub task",
+        title: "Seed task",
         status: "todo" as const,
         createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
       },

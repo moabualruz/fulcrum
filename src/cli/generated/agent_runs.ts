@@ -10,7 +10,7 @@ export function createAgentRunsCommand(): Command {
   cancelCommand.option("--id <string>", "id");
   cancelCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for agent_runs.cancel is not wired yet.");
+      throw new Error("Generated tRPC invocation for agent_runs.cancel requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -27,7 +27,7 @@ export function createAgentRunsCommand(): Command {
   createCommand.option("--json", "Emit JSON output");
   createCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for agent_runs.create is not wired yet.");
+      throw new Error("Generated tRPC invocation for agent_runs.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -45,7 +45,7 @@ export function createAgentRunsCommand(): Command {
   getCommand.option("--id <string>", "id");
   getCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for agent_runs.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for agent_runs.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -62,7 +62,7 @@ export function createAgentRunsCommand(): Command {
   listCommand.option("--json", "Emit JSON output");
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for agent_runs.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for agent_runs.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -80,7 +80,7 @@ export function createAgentRunsCommand(): Command {
   retryCommand.option("--id <string>", "id");
   retryCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for agent_runs.retry is not wired yet.");
+      throw new Error("Generated tRPC invocation for agent_runs.retry requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

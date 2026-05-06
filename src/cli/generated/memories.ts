@@ -9,7 +9,7 @@ export function createMemoriesCommand(): Command {
   createCommand.option("--json", "Emit JSON output");
   createCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for memories.create is not wired yet.");
+      throw new Error("Generated tRPC invocation for memories.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -26,7 +26,7 @@ export function createMemoriesCommand(): Command {
   deleteCommand.option("--json", "Emit JSON output");
   deleteCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for memories.delete is not wired yet.");
+      throw new Error("Generated tRPC invocation for memories.delete requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -43,7 +43,7 @@ export function createMemoriesCommand(): Command {
   getCommand.option("--json", "Emit JSON output");
   getCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for memories.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for memories.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -67,7 +67,7 @@ export function createMemoriesCommand(): Command {
   listCommand.addOption(new Option("--source <choice>", "source").choices([]));
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for memories.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for memories.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -84,7 +84,7 @@ export function createMemoriesCommand(): Command {
   searchCommand.option("--json", "Emit JSON output");
   searchCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for memories.search is not wired yet.");
+      throw new Error("Generated tRPC invocation for memories.search requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -101,7 +101,7 @@ export function createMemoriesCommand(): Command {
   updateCommand.option("--json", "Emit JSON output");
   updateCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for memories.update is not wired yet.");
+      throw new Error("Generated tRPC invocation for memories.update requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

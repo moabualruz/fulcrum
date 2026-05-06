@@ -9,7 +9,7 @@ export function createAuditCommand(): Command {
   exportCommand.option("--json", "Emit JSON output");
   exportCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for audit.export is not wired yet.");
+      throw new Error("Generated tRPC invocation for audit.export requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -26,7 +26,7 @@ export function createAuditCommand(): Command {
   queryCommand.option("--json", "Emit JSON output");
   queryCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for audit.query is not wired yet.");
+      throw new Error("Generated tRPC invocation for audit.query requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -43,7 +43,7 @@ export function createAuditCommand(): Command {
   retentionPolicyGetCommand.option("--json", "Emit JSON output");
   retentionPolicyGetCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for audit.retentionPolicy.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for audit.retentionPolicy.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -60,7 +60,7 @@ export function createAuditCommand(): Command {
   retentionPolicyListCommand.option("--json", "Emit JSON output");
   retentionPolicyListCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for audit.retentionPolicy.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for audit.retentionPolicy.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -78,7 +78,7 @@ export function createAuditCommand(): Command {
   retentionPolicySetCommand.option("--retain-days <number>", "retain-days", Number.parseFloat);
   retentionPolicySetCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for audit.retentionPolicy.set is not wired yet.");
+      throw new Error("Generated tRPC invocation for audit.retentionPolicy.set requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

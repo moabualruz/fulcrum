@@ -10,7 +10,7 @@ export function createRepoBranchesCommand(): Command {
   getCommand.option("--id <string>", "id");
   getCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for repo_branches.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for repo_branches.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -27,7 +27,7 @@ export function createRepoBranchesCommand(): Command {
   listCommand.option("--json", "Emit JSON output");
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for repo_branches.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for repo_branches.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

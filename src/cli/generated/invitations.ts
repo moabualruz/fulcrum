@@ -9,7 +9,7 @@ export function createInvitationsCommand(): Command {
   createCommand.option("--json", "Emit JSON output");
   createCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for invitations.create is not wired yet.");
+      throw new Error("Generated tRPC invocation for invitations.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -27,7 +27,7 @@ export function createInvitationsCommand(): Command {
   getCommand.option("--id <string>", "id");
   getCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for invitations.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for invitations.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -44,7 +44,7 @@ export function createInvitationsCommand(): Command {
   listCommand.option("--json", "Emit JSON output");
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for invitations.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for invitations.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -62,7 +62,7 @@ export function createInvitationsCommand(): Command {
   revokeCommand.option("--id <string>", "id");
   revokeCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for invitations.revoke is not wired yet.");
+      throw new Error("Generated tRPC invocation for invitations.revoke requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

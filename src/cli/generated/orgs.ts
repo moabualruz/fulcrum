@@ -9,7 +9,7 @@ export function createOrgsCommand(): Command {
   getCommand.option("--json", "Emit JSON output");
   getCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for orgs.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for orgs.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -26,7 +26,7 @@ export function createOrgsCommand(): Command {
   membersListCommand.option("--json", "Emit JSON output");
   membersListCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for orgs.members.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for orgs.members.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -44,7 +44,7 @@ export function createOrgsCommand(): Command {
   membersRemoveCommand.option("--user-id <string>", "User to remove from the organisation.");
   membersRemoveCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for orgs.members.remove is not wired yet.");
+      throw new Error("Generated tRPC invocation for orgs.members.remove requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -63,7 +63,7 @@ export function createOrgsCommand(): Command {
   membersUpdateRoleCommand.option("--user-id <string>", "User whose role should be updated.");
   membersUpdateRoleCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for orgs.members.updateRole is not wired yet.");
+      throw new Error("Generated tRPC invocation for orgs.members.updateRole requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -81,7 +81,7 @@ export function createOrgsCommand(): Command {
   updateCommand.option("--name <string>", "New human-readable organisation name.");
   updateCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for orgs.update is not wired yet.");
+      throw new Error("Generated tRPC invocation for orgs.update requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

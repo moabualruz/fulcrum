@@ -9,7 +9,7 @@ export function createTaskCustomFieldsCommand(): Command {
   clearCommand.option("--json", "Emit JSON output");
   clearCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for taskCustomFields.clear is not wired yet.");
+      throw new Error("Generated tRPC invocation for taskCustomFields.clear requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -26,7 +26,7 @@ export function createTaskCustomFieldsCommand(): Command {
   setCommand.option("--json", "Emit JSON output");
   setCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for taskCustomFields.set is not wired yet.");
+      throw new Error("Generated tRPC invocation for taskCustomFields.set requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

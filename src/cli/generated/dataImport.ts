@@ -10,7 +10,7 @@ export function createDataImportCommand(): Command {
   preflightCommand.option("--path <string>", "path");
   preflightCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for dataImport.preflight is not wired yet.");
+      throw new Error("Generated tRPC invocation for dataImport.preflight requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -30,7 +30,7 @@ export function createDataImportCommand(): Command {
   runCommand.addOption(new Option("--on-conflict <choice>", "on-conflict").choices(["skip","update","error"]));
   runCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for dataImport.run is not wired yet.");
+      throw new Error("Generated tRPC invocation for dataImport.run requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

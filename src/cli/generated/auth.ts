@@ -10,7 +10,7 @@ export function createAuthCommand(): Command {
   acceptInviteCommand.option("--token <string>", "Plaintext token from the invitation email.");
   acceptInviteCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for auth.acceptInvite is not wired yet.");
+      throw new Error("Generated tRPC invocation for auth.acceptInvite requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -29,7 +29,7 @@ export function createAuthCommand(): Command {
   inviteCommand.addOption(new Option("--role <choice>", "Role to assign to the invited user.").choices(["owner","admin","member","guest"]));
   inviteCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for auth.invite is not wired yet.");
+      throw new Error("Generated tRPC invocation for auth.invite requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -46,7 +46,7 @@ export function createAuthCommand(): Command {
   whoamiCommand.option("--json", "Emit JSON output");
   whoamiCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for auth.whoami is not wired yet.");
+      throw new Error("Generated tRPC invocation for auth.whoami requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

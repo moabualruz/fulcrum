@@ -14,7 +14,7 @@ export function createNotifySubscriptionsCommand(): Command {
         await runGeneratedSubscriptionWatch({ procedurePath: "notifySubscriptions.onNewNotification" });
         return;
       }
-      throw new Error("Generated tRPC invocation for notifySubscriptions.onNewNotification is not wired yet.");
+      throw new Error("Generated tRPC invocation for notifySubscriptions.onNewNotification requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -35,6 +35,6 @@ async function runGeneratedSubscriptionWatch(options: { procedurePath: string })
   });
   await Promise.race([
     shutdown,
-    Promise.reject(new Error(`Generated tRPC subscription for ${options.procedurePath} is not wired yet.`)),
+    Promise.reject(new Error(`Generated tRPC subscription for ${options.procedurePath} requires an explicit surface adapter.`)),
   ]);
 }

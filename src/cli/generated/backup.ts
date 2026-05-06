@@ -9,7 +9,7 @@ export function createBackupCommand(): Command {
   createCommand.option("--json", "Emit JSON output");
   createCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for backup.create is not wired yet.");
+      throw new Error("Generated tRPC invocation for backup.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -27,7 +27,7 @@ export function createBackupCommand(): Command {
   restoreCommand.option("--dump <string>", "dump");
   restoreCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for backup.restore is not wired yet.");
+      throw new Error("Generated tRPC invocation for backup.restore requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

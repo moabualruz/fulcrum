@@ -9,7 +9,7 @@ export function createCustomFieldsCommand(): Command {
   createCommand.option("--json", "Emit JSON output");
   createCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for custom_fields.create is not wired yet.");
+      throw new Error("Generated tRPC invocation for custom_fields.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -27,7 +27,7 @@ export function createCustomFieldsCommand(): Command {
   deleteCommand.option("--id <string>", "id");
   deleteCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for custom_fields.delete is not wired yet.");
+      throw new Error("Generated tRPC invocation for custom_fields.delete requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -44,7 +44,7 @@ export function createCustomFieldsCommand(): Command {
   listCommand.option("--json", "Emit JSON output");
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for custom_fields.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for custom_fields.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -61,7 +61,7 @@ export function createCustomFieldsCommand(): Command {
   reorderCommand.option("--json", "Emit JSON output");
   reorderCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for custom_fields.reorder is not wired yet.");
+      throw new Error("Generated tRPC invocation for custom_fields.reorder requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -78,7 +78,7 @@ export function createCustomFieldsCommand(): Command {
   updateCommand.option("--json", "Emit JSON output");
   updateCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for custom_fields.update is not wired yet.");
+      throw new Error("Generated tRPC invocation for custom_fields.update requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

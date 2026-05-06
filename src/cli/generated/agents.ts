@@ -10,7 +10,7 @@ export function createAgentsCommand(): Command {
   getProfileCommand.option("--name <string>", "name");
   getProfileCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for agents.getProfile is not wired yet.");
+      throw new Error("Generated tRPC invocation for agents.getProfile requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -27,7 +27,7 @@ export function createAgentsCommand(): Command {
   listProfilesCommand.option("--json", "Emit JSON output");
   listProfilesCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for agents.listProfiles is not wired yet.");
+      throw new Error("Generated tRPC invocation for agents.listProfiles requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -45,7 +45,7 @@ export function createAgentsCommand(): Command {
   testProfileCommand.option("--name <string>", "name");
   testProfileCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for agents.testProfile is not wired yet.");
+      throw new Error("Generated tRPC invocation for agents.testProfile requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

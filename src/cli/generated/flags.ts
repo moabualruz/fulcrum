@@ -12,7 +12,7 @@ export function createFlagsCommand(): Command {
   evaluateCommand.option("--user-id <string>", "user-id");
   evaluateCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for flags.evaluate is not wired yet.");
+      throw new Error("Generated tRPC invocation for flags.evaluate requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -30,7 +30,7 @@ export function createFlagsCommand(): Command {
   experimentsAssignmentsCommand.option("--experiment-id <string>", "experiment-id");
   experimentsAssignmentsCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for flags.experiments.assignments is not wired yet.");
+      throw new Error("Generated tRPC invocation for flags.experiments.assignments requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -50,7 +50,7 @@ export function createFlagsCommand(): Command {
   experimentsCreateCommand.option("--rollout-percent <number>", "rollout-percent", Number.parseFloat);
   experimentsCreateCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for flags.experiments.create is not wired yet.");
+      throw new Error("Generated tRPC invocation for flags.experiments.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -67,7 +67,7 @@ export function createFlagsCommand(): Command {
   experimentsListCommand.option("--json", "Emit JSON output");
   experimentsListCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for flags.experiments.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for flags.experiments.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -86,7 +86,7 @@ export function createFlagsCommand(): Command {
   experimentsMetricsCommand.option("--experiment-id <string>", "experiment-id");
   experimentsMetricsCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for flags.experiments.metrics is not wired yet.");
+      throw new Error("Generated tRPC invocation for flags.experiments.metrics requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -103,7 +103,7 @@ export function createFlagsCommand(): Command {
   listCommand.option("--json", "Emit JSON output");
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for flags.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for flags.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -124,7 +124,7 @@ export function createFlagsCommand(): Command {
   setCommand.option("--user-id <string>", "user-id");
   setCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for flags.set is not wired yet.");
+      throw new Error("Generated tRPC invocation for flags.set requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -144,7 +144,7 @@ export function createFlagsCommand(): Command {
   setOverrideCommand.option("--org-id <string>", "org-id");
   setOverrideCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for flags.setOverride is not wired yet.");
+      throw new Error("Generated tRPC invocation for flags.setOverride requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -164,7 +164,7 @@ export function createFlagsCommand(): Command {
   setRolloutCommand.option("--rollout-percent <number>", "rollout-percent", Number.parseFloat);
   setRolloutCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for flags.setRollout is not wired yet.");
+      throw new Error("Generated tRPC invocation for flags.setRollout requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

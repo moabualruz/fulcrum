@@ -1,6 +1,6 @@
 /**
  * P13#05 — REST routes for the saved-views domain.
- * Pillar 6 replaces stub store with real SavedViewRepository.
+ * Runtime ProductDb routes are mounted when deps are present; this file keeps static OpenAPI generation deterministic.
  */
 
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
@@ -41,7 +41,7 @@ const ErrorSchema = z
   .object({ error: z.string(), code: z.string() })
   .openapi("RestError");
 
-// ── Stub store ───────────────────────────────────────────────────────────────
+// ── Static OpenAPI seed data ─────────────────────────────────────────────────
 
 const FIXED_ORG = "11111111-1111-4111-8111-111111111111";
 
@@ -52,7 +52,7 @@ function makeStubStore(): Map<string, z.infer<typeof SavedViewSchema>> {
       {
         id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         orgId: FIXED_ORG,
-        name: "Stub view",
+        name: "Seed view",
         scope: "private" as const,
         viewType: "list" as const,
         createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),

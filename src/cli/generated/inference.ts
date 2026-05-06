@@ -9,7 +9,24 @@ export function createInferenceCommand(): Command {
   backendsListCommand.option("--json", "Emit JSON output");
   backendsListCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for inference.backends.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for inference.backends.list requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const backendsProbeCommand = command.command("backends probe");
+  backendsProbeCommand.description("inference backends probe");
+  backendsProbeCommand.option("--json", "Emit JSON output");
+  backendsProbeCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.backends.probe requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -27,7 +44,7 @@ export function createInferenceCommand(): Command {
   classifyCommand.option("--text <string>", "text");
   classifyCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for inference.classify is not wired yet.");
+      throw new Error("Generated tRPC invocation for inference.classify requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -44,7 +61,7 @@ export function createInferenceCommand(): Command {
   configGetCommand.option("--json", "Emit JSON output");
   configGetCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for inference.config.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for inference.config.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -62,7 +79,7 @@ export function createInferenceCommand(): Command {
   configSetCommand.addOption(new Option("--feature <choice>", "feature").choices(["embeddings","router-llm","memory-llm-extract","classify","tokenize"]));
   configSetCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for inference.config.set is not wired yet.");
+      throw new Error("Generated tRPC invocation for inference.config.set requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -80,7 +97,7 @@ export function createInferenceCommand(): Command {
   embedCommand.option("--model <string>", "model");
   embedCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for inference.embed is not wired yet.");
+      throw new Error("Generated tRPC invocation for inference.embed requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -98,7 +115,7 @@ export function createInferenceCommand(): Command {
   generateCommand.option("--prompt <string>", "prompt");
   generateCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for inference.generate is not wired yet.");
+      throw new Error("Generated tRPC invocation for inference.generate requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -115,7 +132,7 @@ export function createInferenceCommand(): Command {
   healthCommand.option("--json", "Emit JSON output");
   healthCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for inference.health is not wired yet.");
+      throw new Error("Generated tRPC invocation for inference.health requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -132,7 +149,7 @@ export function createInferenceCommand(): Command {
   modelsListCommand.option("--json", "Emit JSON output");
   modelsListCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for inference.models.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for inference.models.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -156,7 +173,7 @@ export function createInferenceCommand(): Command {
         await runGeneratedSubscriptionWatch({ procedurePath: "inference.models.pull" });
         return;
       }
-      throw new Error("Generated tRPC invocation for inference.models.pull is not wired yet.");
+      throw new Error("Generated tRPC invocation for inference.models.pull requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -175,7 +192,7 @@ export function createInferenceCommand(): Command {
   modelsRmCommand.option("--model-id <string>", "model-id");
   modelsRmCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for inference.models.rm is not wired yet.");
+      throw new Error("Generated tRPC invocation for inference.models.rm requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -194,7 +211,7 @@ export function createInferenceCommand(): Command {
   providerSetCommand.option("--url <string>", "url");
   providerSetCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for inference.provider.set is not wired yet.");
+      throw new Error("Generated tRPC invocation for inference.provider.set requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -211,7 +228,7 @@ export function createInferenceCommand(): Command {
   providerTestCommand.option("--json", "Emit JSON output");
   providerTestCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for inference.provider.test is not wired yet.");
+      throw new Error("Generated tRPC invocation for inference.provider.test requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -230,7 +247,7 @@ export function createInferenceCommand(): Command {
   tokenizeCommand.option("--text <string>", "text");
   tokenizeCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for inference.tokenize is not wired yet.");
+      throw new Error("Generated tRPC invocation for inference.tokenize requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -251,6 +268,6 @@ async function runGeneratedSubscriptionWatch(options: { procedurePath: string })
   });
   await Promise.race([
     shutdown,
-    Promise.reject(new Error(`Generated tRPC subscription for ${options.procedurePath} is not wired yet.`)),
+    Promise.reject(new Error(`Generated tRPC subscription for ${options.procedurePath} requires an explicit surface adapter.`)),
   ]);
 }

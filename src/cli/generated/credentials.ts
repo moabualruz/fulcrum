@@ -11,7 +11,7 @@ export function createCredentialsCommand(): Command {
   archiveCommand.option("--user-id <string>", "user-id");
   archiveCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for credentials.archive is not wired yet.");
+      throw new Error("Generated tRPC invocation for credentials.archive requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -30,7 +30,7 @@ export function createCredentialsCommand(): Command {
   getCommand.option("--user-id <string>", "user-id");
   getCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for credentials.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for credentials.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -48,7 +48,7 @@ export function createCredentialsCommand(): Command {
   listCommand.option("--include-archived", "include-archived");
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for credentials.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for credentials.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -67,7 +67,7 @@ export function createCredentialsCommand(): Command {
   removeCommand.option("--user-id <string>", "user-id");
   removeCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for credentials.remove is not wired yet.");
+      throw new Error("Generated tRPC invocation for credentials.remove requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -87,7 +87,7 @@ export function createCredentialsCommand(): Command {
   rotateCommand.option("--user-id <string>", "user-id");
   rotateCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for credentials.rotate is not wired yet.");
+      throw new Error("Generated tRPC invocation for credentials.rotate requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -106,7 +106,7 @@ export function createCredentialsCommand(): Command {
   setCommand.option("--value <string>", "value");
   setCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for credentials.set is not wired yet.");
+      throw new Error("Generated tRPC invocation for credentials.set requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

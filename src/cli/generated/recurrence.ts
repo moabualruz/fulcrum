@@ -1,15 +1,22 @@
 import { Command, Option } from "commander";
 
-export function createDocLinksCommand(): Command {
-  const command = new Command("doc_links");
-  command.description("Generated doc_links commands.");
+export function createRecurrenceCommand(): Command {
+  const command = new Command("recurrence");
+  command.description("Generated recurrence commands.");
 
   const createCommand = command.command("create");
-  createCommand.description("doc_links create");
+  createCommand.description("recurrence create");
   createCommand.option("--json", "Emit JSON output");
+  createCommand.option("--cron-expression <string>", "cron-expression");
+  createCommand.option("--include-subtasks", "include-subtasks");
+  createCommand.option("--interval-days <number>", "interval-days", Number.parseFloat);
+  createCommand.option("--max-occurrences <number>", "max-occurrences", Number.parseFloat);
+  createCommand.option("--task-id <string>", "task-id");
+  createCommand.option("--timezone <string>", "timezone");
+  createCommand.addOption(new Option("--trigger-type <choice>", "trigger-type").choices(["schedule","on_complete"]));
   createCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for doc_links.create requires an explicit surface adapter.");
+      throw new Error("Generated tRPC invocation for recurrence.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -22,12 +29,12 @@ export function createDocLinksCommand(): Command {
   });
 
   const deleteCommand = command.command("delete");
-  deleteCommand.description("doc_links delete");
+  deleteCommand.description("recurrence delete");
   deleteCommand.option("--json", "Emit JSON output");
-  deleteCommand.option("--id <string>", "id");
+  deleteCommand.option("--rule-id <string>", "rule-id");
   deleteCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for doc_links.delete requires an explicit surface adapter.");
+      throw new Error("Generated tRPC invocation for recurrence.delete requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -40,11 +47,12 @@ export function createDocLinksCommand(): Command {
   });
 
   const listCommand = command.command("list");
-  listCommand.description("doc_links list");
+  listCommand.description("recurrence list");
   listCommand.option("--json", "Emit JSON output");
+  listCommand.option("--task-id <string>", "task-id");
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for doc_links.list requires an explicit surface adapter.");
+      throw new Error("Generated tRPC invocation for recurrence.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

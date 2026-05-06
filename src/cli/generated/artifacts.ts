@@ -10,7 +10,7 @@ export function createArtifactsCommand(): Command {
   archiveCommand.option("--id <string>", "Artifact identifier.");
   archiveCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for artifacts.archive is not wired yet.");
+      throw new Error("Generated tRPC invocation for artifacts.archive requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -29,7 +29,7 @@ export function createArtifactsCommand(): Command {
   deleteCommand.option("--id <string>", "Artifact identifier.");
   deleteCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for artifacts.delete is not wired yet.");
+      throw new Error("Generated tRPC invocation for artifacts.delete requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -47,7 +47,7 @@ export function createArtifactsCommand(): Command {
   downloadCommand.option("--id <string>", "Artifact identifier.");
   downloadCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for artifacts.download is not wired yet.");
+      throw new Error("Generated tRPC invocation for artifacts.download requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -65,7 +65,7 @@ export function createArtifactsCommand(): Command {
   getCommand.option("--id <string>", "Artifact identifier.");
   getCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for artifacts.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for artifacts.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -88,7 +88,7 @@ export function createArtifactsCommand(): Command {
   listCommand.option("--task-id <string>", "Filter by linked task.");
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for artifacts.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for artifacts.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -106,7 +106,7 @@ export function createArtifactsCommand(): Command {
   unarchiveCommand.option("--id <string>", "Artifact identifier.");
   unarchiveCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for artifacts.unarchive is not wired yet.");
+      throw new Error("Generated tRPC invocation for artifacts.unarchive requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -129,7 +129,7 @@ export function createArtifactsCommand(): Command {
   uploadCommand.option("--task-id <string>", "Linked task, when available.");
   uploadCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for artifacts.upload is not wired yet.");
+      throw new Error("Generated tRPC invocation for artifacts.upload requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

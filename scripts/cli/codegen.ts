@@ -597,7 +597,7 @@ function emitDomain(domain: DomainMetadata): string {
       lines.push(`        return;`);
       lines.push(`      }`);
     }
-    lines.push(`      throw new Error(${JSON.stringify(`Generated tRPC invocation for ${procedurePath} is not wired yet.`)});`);
+    lines.push(`      throw new Error(${JSON.stringify(`Generated tRPC invocation for ${procedurePath} requires an explicit surface adapter.`)});`);
     lines.push(`    } catch (error) {`);
     lines.push(`      if (options.json === true) {`);
     lines.push(`        const message = error instanceof Error ? error.message : String(error);`);
@@ -621,7 +621,7 @@ function emitDomain(domain: DomainMetadata): string {
     lines.push("  });");
     lines.push("  await Promise.race([");
     lines.push("    shutdown,");
-    lines.push("    Promise.reject(new Error(`Generated tRPC subscription for ${options.procedurePath} is not wired yet.`)),");
+    lines.push("    Promise.reject(new Error(`Generated tRPC subscription for ${options.procedurePath} requires an explicit surface adapter.`)),");
     lines.push("  ]);");
     lines.push("}");
     lines.push("");

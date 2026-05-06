@@ -16,7 +16,7 @@ export function createNotifyCommand(): Command {
   channelsConfigCommand.option("--url <string>", "url");
   channelsConfigCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.channels.config is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.channels.config requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -33,7 +33,7 @@ export function createNotifyCommand(): Command {
   channelsListCommand.option("--json", "Emit JSON output");
   channelsListCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.channels.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.channels.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -51,7 +51,7 @@ export function createNotifyCommand(): Command {
   channelsTestCommand.addOption(new Option("--channel <choice>", "channel").choices(["in-app","email","slack","discord","webhook","push"]));
   channelsTestCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.channels.test is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.channels.test requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -71,7 +71,7 @@ export function createNotifyCommand(): Command {
   listCommand.option("--unread", "Filter to unread notifications.");
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -88,7 +88,7 @@ export function createNotifyCommand(): Command {
   markAllReadCommand.option("--json", "Emit JSON output");
   markAllReadCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.markAllRead is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.markAllRead requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -106,7 +106,7 @@ export function createNotifyCommand(): Command {
   markReadCommand.option("--id <string>", "Notification identifier.");
   markReadCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.markRead is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.markRead requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -123,7 +123,7 @@ export function createNotifyCommand(): Command {
   muteCommand.option("--json", "Emit JSON output");
   muteCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.mute is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.mute requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -140,7 +140,7 @@ export function createNotifyCommand(): Command {
   mutesListCommand.option("--json", "Emit JSON output");
   mutesListCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.mutes.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.mutes.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -157,7 +157,7 @@ export function createNotifyCommand(): Command {
   quietHoursGetCommand.option("--json", "Emit JSON output");
   quietHoursGetCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.quietHours.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.quietHours.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -177,7 +177,7 @@ export function createNotifyCommand(): Command {
   quietHoursSetCommand.option("--tz <string>", "IANA time zone.");
   quietHoursSetCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.quietHours.set is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.quietHours.set requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -192,12 +192,16 @@ export function createNotifyCommand(): Command {
   const rulesCreateCommand = command.command("rules create");
   rulesCreateCommand.description("notify rules create");
   rulesCreateCommand.option("--json", "Emit JSON output");
+  rulesCreateCommand.option("--critical", "Whether the rule is critical.");
+  rulesCreateCommand.option("--delay-seconds <number>", "Delayed delivery offset.", Number.parseFloat);
+  rulesCreateCommand.addOption(new Option("--delivery-mode <choice>", "Delivery timing mode.").choices(["immediate","digest","delayed"]));
+  rulesCreateCommand.option("--digest-window-seconds <number>", "Digest aggregation window.", Number.parseFloat);
   rulesCreateCommand.option("--enabled", "Whether rule is active.");
   rulesCreateCommand.option("--name <string>", "Notification rule name.");
   rulesCreateCommand.option("--subject-kind <string>", "Optional subject type scope.");
   rulesCreateCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.rules.create is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.rules.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -215,7 +219,7 @@ export function createNotifyCommand(): Command {
   rulesDeleteCommand.option("--id <string>", "Notification identifier.");
   rulesDeleteCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.rules.delete is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.rules.delete requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -233,7 +237,7 @@ export function createNotifyCommand(): Command {
   rulesGetCommand.option("--id <string>", "Notification identifier.");
   rulesGetCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.rules.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.rules.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -250,7 +254,7 @@ export function createNotifyCommand(): Command {
   rulesListCommand.option("--json", "Emit JSON output");
   rulesListCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.rules.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.rules.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -265,13 +269,17 @@ export function createNotifyCommand(): Command {
   const rulesUpdateCommand = command.command("rules update");
   rulesUpdateCommand.description("notify rules update");
   rulesUpdateCommand.option("--json", "Emit JSON output");
+  rulesUpdateCommand.option("--critical", "Whether the rule is critical.");
+  rulesUpdateCommand.option("--delay-seconds <number>", "Delayed delivery offset.", Number.parseFloat);
+  rulesUpdateCommand.addOption(new Option("--delivery-mode <choice>", "Delivery timing mode.").choices(["immediate","digest","delayed"]));
+  rulesUpdateCommand.option("--digest-window-seconds <number>", "Digest aggregation window.", Number.parseFloat);
   rulesUpdateCommand.option("--enabled", "Whether rule is active.");
   rulesUpdateCommand.option("--id <string>", "Notification rule identifier.");
   rulesUpdateCommand.option("--name <string>", "Notification rule name.");
   rulesUpdateCommand.option("--subject-kind <string>", "Optional subject type scope.");
   rulesUpdateCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.rules.update is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.rules.update requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -290,7 +298,7 @@ export function createNotifyCommand(): Command {
   unmuteCommand.option("--subject-kind <string>", "Notification subject type.");
   unmuteCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.unmute is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.unmute requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -307,7 +315,7 @@ export function createNotifyCommand(): Command {
   unreadCountCommand.option("--json", "Emit JSON output");
   unreadCountCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for notify.unreadCount is not wired yet.");
+      throw new Error("Generated tRPC invocation for notify.unreadCount requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

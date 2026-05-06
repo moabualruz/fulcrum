@@ -13,7 +13,7 @@ export function createWebhooksCommand(): Command {
   createCommand.option("--url <string>", "HTTPS destination for webhook events.");
   createCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for webhooks.create is not wired yet.");
+      throw new Error("Generated tRPC invocation for webhooks.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -31,7 +31,7 @@ export function createWebhooksCommand(): Command {
   deleteCommand.option("--id <string>", "id");
   deleteCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for webhooks.delete is not wired yet.");
+      throw new Error("Generated tRPC invocation for webhooks.delete requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -49,7 +49,7 @@ export function createWebhooksCommand(): Command {
   deliveriesGetCommand.option("--id <string>", "id");
   deliveriesGetCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for webhooks.deliveries.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for webhooks.deliveries.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -68,7 +68,7 @@ export function createWebhooksCommand(): Command {
   deliveriesListCommand.option("--webhook-id <string>", "Webhook whose delivery log to retrieve.");
   deliveriesListCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for webhooks.deliveries.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for webhooks.deliveries.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -86,7 +86,7 @@ export function createWebhooksCommand(): Command {
   getCommand.option("--id <string>", "id");
   getCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for webhooks.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for webhooks.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -103,7 +103,7 @@ export function createWebhooksCommand(): Command {
   listCommand.option("--json", "Emit JSON output");
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for webhooks.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for webhooks.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -125,7 +125,7 @@ export function createWebhooksCommand(): Command {
   updateCommand.option("--url <string>", "New HTTPS destination.");
   updateCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for webhooks.update is not wired yet.");
+      throw new Error("Generated tRPC invocation for webhooks.update requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

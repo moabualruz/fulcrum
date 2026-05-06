@@ -1,6 +1,6 @@
 /**
  * P13#05 — REST routes for the sprints domain.
- * Pillar 3 replaces stub store with real SprintRepository.
+ * Runtime ProductDb routes are mounted when deps are present; this file keeps static OpenAPI generation deterministic.
  */
 
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
@@ -42,7 +42,7 @@ const ErrorSchema = z
   .object({ error: z.string(), code: z.string() })
   .openapi("RestError");
 
-// ── Stub store ───────────────────────────────────────────────────────────────
+// ── Static OpenAPI seed data ─────────────────────────────────────────────────
 
 const FIXED_ORG = "11111111-1111-4111-8111-111111111111";
 
@@ -53,7 +53,7 @@ function makeStubStore(): Map<string, z.infer<typeof SprintSchema>> {
       {
         id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         orgId: FIXED_ORG,
-        name: "Stub sprint",
+        name: "Seed sprint",
         status: "planning" as const,
         createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
       },

@@ -9,7 +9,7 @@ export function createDocsCommand(): Command {
   commentsCreateCommand.option("--json", "Emit JSON output");
   commentsCreateCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.comments.create is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.comments.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -26,7 +26,7 @@ export function createDocsCommand(): Command {
   commentsDeleteCommand.option("--json", "Emit JSON output");
   commentsDeleteCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.comments.delete is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.comments.delete requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -44,7 +44,7 @@ export function createDocsCommand(): Command {
   commentsListCommand.option("--resolved", "resolved");
   commentsListCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.comments.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.comments.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -62,7 +62,7 @@ export function createDocsCommand(): Command {
   commentsResolveCommand.option("--resolved", "resolved");
   commentsResolveCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.comments.resolve is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.comments.resolve requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -79,7 +79,7 @@ export function createDocsCommand(): Command {
   commentsUpdateCommand.option("--json", "Emit JSON output");
   commentsUpdateCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.comments.update is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.comments.update requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -98,7 +98,7 @@ export function createDocsCommand(): Command {
   createCommand.option("--sort-position <number>", "sort-position", Number.parseFloat);
   createCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.create is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -116,7 +116,7 @@ export function createDocsCommand(): Command {
   deleteCommand.option("--hard", "hard");
   deleteCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.delete is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.delete requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -133,7 +133,7 @@ export function createDocsCommand(): Command {
   getCommand.option("--json", "Emit JSON output");
   getCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -150,7 +150,7 @@ export function createDocsCommand(): Command {
   linksListBacklinksCommand.option("--json", "Emit JSON output");
   linksListBacklinksCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.links.listBacklinks is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.links.listBacklinks requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -167,7 +167,7 @@ export function createDocsCommand(): Command {
   linksListForwardLinksCommand.option("--json", "Emit JSON output");
   linksListForwardLinksCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.links.listForwardLinks is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.links.listForwardLinks requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -187,7 +187,7 @@ export function createDocsCommand(): Command {
   listCommand.option("--offset <number>", "offset", Number.parseFloat);
   listCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -205,7 +205,7 @@ export function createDocsCommand(): Command {
   templatesListCommand.option("--project-id <string>", "project-id");
   templatesListCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.templates.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.templates.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -224,7 +224,7 @@ export function createDocsCommand(): Command {
   templatesResolveCommand.option("--project-id <string>", "project-id");
   templatesResolveCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.templates.resolve is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.templates.resolve requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -241,7 +241,7 @@ export function createDocsCommand(): Command {
   updateCommand.option("--json", "Emit JSON output");
   updateCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.update is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.update requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -258,7 +258,7 @@ export function createDocsCommand(): Command {
   versionsDiffCommand.option("--json", "Emit JSON output");
   versionsDiffCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.versions.diff is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.versions.diff requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -275,7 +275,7 @@ export function createDocsCommand(): Command {
   versionsGetCommand.option("--json", "Emit JSON output");
   versionsGetCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.versions.get is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.versions.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -292,7 +292,7 @@ export function createDocsCommand(): Command {
   versionsListCommand.option("--json", "Emit JSON output");
   versionsListCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.versions.list is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.versions.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -309,7 +309,7 @@ export function createDocsCommand(): Command {
   versionsRestoreCommand.option("--json", "Emit JSON output");
   versionsRestoreCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for docs.versions.restore is not wired yet.");
+      throw new Error("Generated tRPC invocation for docs.versions.restore requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
