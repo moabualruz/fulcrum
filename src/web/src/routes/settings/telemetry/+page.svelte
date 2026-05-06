@@ -38,6 +38,7 @@
           type="submit"
           data-opt-in-toggle
           data-enabled={payload.optIn}
+          aria-label={payload.optIn ? "Disable telemetry" : "Enable telemetry"}
           class={cn(
             "inline-flex h-6 w-11 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
             payload.optIn ? "bg-primary" : "bg-muted",
