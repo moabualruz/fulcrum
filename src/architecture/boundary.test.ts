@@ -39,152 +39,15 @@ const NON_WEB_INVENTORY_ROOTS = [
   "src/infrastructure/doctor",
 ];
 
-const EXACT_LEGACY_INFRASTRUCTURE_ALLOWLIST = [
-  {
-    file: "src/config/database.ts",
-    category: "config/database bootstrap",
-    reason: "central database opener is infrastructure, not interface runtime data access",
-  },
-  {
-    file: "src/db/product-migrations.ts",
-    category: "product migration compatibility",
-    reason: "legacy SQL migration reader is compatibility infrastructure",
-  },
-  {
-    file: "src/db/mikro-orm.config.ts",
-    category: "config/database bootstrap",
-    reason: "ORM config resolves legacy local database directory during local bootstrap",
-  },
-  {
-    file: "src/infrastructure/doctor/legacy-db.ts",
-    category: "doctor checks",
-    reason: "doctor probes legacy local DB state without exposing TestStore in CLI interface",
-  },
-  {
-    file: "src/search/backend.ts",
-    category: "search",
-    reason: "search fallback remains legacy TestStore-backed until application search module owns full index/query path",
-  },
-  {
-    file: "src/search/indexers/base.ts",
-    category: "search",
-    reason: "search indexer base remains legacy TestStore-backed until outbox indexing is fully migrated",
-  },
-  {
-    file: "src/search/indexers/artifact.ts",
-    category: "search",
-    reason: "artifact search indexer remains legacy TestStore-backed until outbox indexing is fully migrated",
-  },
-  {
-    file: "src/search/indexers/document.ts",
-    category: "search",
-    reason: "document search indexer remains legacy TestStore-backed until outbox indexing is fully migrated",
-  },
-  {
-    file: "src/search/indexers/entity-helpers.ts",
-    category: "search",
-    reason: "search indexer schema helper remains legacy TestStore-backed until outbox indexing is fully migrated",
-  },
-  {
-    file: "src/search/indexers/memory.ts",
-    category: "search",
-    reason: "memory search indexer remains legacy TestStore-backed until outbox indexing is fully migrated",
-  },
-  {
-    file: "src/search/indexers/repo.ts",
-    category: "search",
-    reason: "repo search indexer remains legacy TestStore-backed until outbox indexing is fully migrated",
-  },
-  {
-    file: "src/search/indexers/run.ts",
-    category: "search",
-    reason: "run search indexer remains legacy TestStore-backed until outbox indexing is fully migrated",
-  },
-  {
-    file: "src/search/indexers/sprint.ts",
-    category: "search",
-    reason: "sprint search indexer remains legacy TestStore-backed until outbox indexing is fully migrated",
-  },
-  {
-    file: "src/search/indexers/task.ts",
-    category: "search",
-    reason: "task search indexer remains legacy TestStore-backed until outbox indexing is fully migrated",
-  },
-  {
-    file: "src/search/click-telemetry.ts",
-    category: "search",
-    reason: "search click telemetry remains legacy TestStore-backed until application telemetry owns search clicks",
-  },
-  {
-    file: "src/search/embeddings.ts",
-    category: "search",
-    reason: "embedding index bootstrap remains legacy TestStore-backed",
-  },
-  {
-    file: "src/search/query.ts",
-    category: "search",
-    reason: "PGlite FTS query compatibility remains isolated in search infrastructure",
-  },
-  {
-    file: "src/search/query-service.ts",
-    category: "search",
-    reason: "query service wraps legacy search query path pending full application search migration",
-  },
-  {
-    file: "src/search/snapshot-service.ts",
-    category: "search",
-    reason: "snapshot service wraps legacy TestStore reads pending full application search migration",
-  },
-  {
-    file: "src/search/suggest.ts",
-    category: "search",
-    reason: "suggest query remains legacy FTS compatibility path",
-  },
-  {
-    file: "src/docs/doc-embedder.ts",
-    category: "docs embedder",
-    reason: "document embedding background writer remains legacy compatibility path",
-  },
-  {
-    file: "src/collab/server.ts",
-    category: "collab server",
-    reason: "collab persistence uses minimal DB protocol and does not import product-kernel directly",
-  },
-  {
-    file: "src/connectors/framework.ts",
-    category: "connector framework",
-    reason: "connector framework legacy sync path remains isolated pending connector application migration",
-  },
-  {
-    file: "src/doctor/checks/api.ts",
-    category: "doctor checks",
-    reason: "doctor check config accepts legacy DB only as injectable diagnostic dependency",
-  },
-  {
-    file: "src/doctor/checks/routing.ts",
-    category: "doctor checks",
-    reason: "routing doctor check accepts legacy DB only as injectable diagnostic dependency",
-  },
-  {
-    file: "src/orchestration/symphony/http-server.ts",
-    category: "Symphony HTTP server",
-    reason: "Symphony compatibility HTTP server wraps product-kernel status API pending orchestration API migration",
-  },
-  {
-    file: "src/services/tasks.ts",
-    category: "legacy service wrappers",
-    reason: "legacy task service wrapper retained while application task callers migrate",
-  },
-  {
-    file: "src/services/runs.ts",
-    category: "legacy service wrappers",
-    reason: "legacy run service wrapper retained while orchestration callers migrate",
-  },
-  {
-    file: "src/services/artifacts.ts",
-    category: "legacy service wrappers",
-    reason: "legacy artifact service wrapper retained while artifact callers migrate",
-  },
+const EXPECTED_NON_WEB_LEGACY_REPRESENTATIVES = [
+  "src/config/database.ts",
+  "src/search/query-service.ts",
+  "src/services/tasks.ts",
+  "src/connectors/framework.ts",
+  "src/docs/doc-embedder.ts",
+  "src/collab/server.ts",
+  "src/doctor/checks/api.ts",
+  "src/orchestration/symphony/http-server.ts",
 ] as const;
 
 const LEGACY_DB_TERMS = [
@@ -268,42 +131,12 @@ describe("Phase 9.5 interface boundary", () => {
     expect(found).toEqual([]);
   });
 
-  test("non-web legacy database inventory has exact infrastructure allowlists by category", async () => {
+  test("non-web code does not import product-kernel or expose legacy database names", async () => {
     const found = await violations(NON_WEB_INVENTORY_ROOTS, FORBIDDEN_INTERFACE_ACCESS);
-    const allowed = new Set<string>(EXACT_LEGACY_INFRASTRUCTURE_ALLOWLIST.map((entry) => entry.file));
-    expect(found.filter((file) => !allowed.has(file))).toEqual([]);
-    expect(EXACT_LEGACY_INFRASTRUCTURE_ALLOWLIST.map((entry) => entry.category)).toEqual([
-      "config/database bootstrap",
-      "product migration compatibility",
-      "config/database bootstrap",
-      "doctor checks",
-      "search",
-      "search",
-      "search",
-      "search",
-      "search",
-      "search",
-      "search",
-      "search",
-      "search",
-      "search",
-      "search",
-      "search",
-      "search",
-      "search",
-      "search",
-      "search",
-      "docs embedder",
-      "collab server",
-      "connector framework",
-      "doctor checks",
-      "doctor checks",
-      "Symphony HTTP server",
-      "legacy service wrappers",
-      "legacy service wrappers",
-      "legacy service wrappers",
-    ]);
-    expect(EXACT_LEGACY_INFRASTRUCTURE_ALLOWLIST.every((entry) => entry.reason.length > 20)).toBe(true);
+    for (const representative of EXPECTED_NON_WEB_LEGACY_REPRESENTATIVES) {
+      expect(found).toContain(representative);
+    }
+    expect(found).toEqual([]);
   });
 
   test("test fixtures do not import product-kernel or open database handles directly", async () => {
