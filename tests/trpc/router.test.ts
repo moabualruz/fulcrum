@@ -11,7 +11,7 @@
  * Per C8: needle-di Container pattern; ctx.container set in context.
  */
 
-import { afterEach, describe, it, expect } from "bun:test";
+import { afterEach, describe, it, expect, mock } from "bun:test";
 import { TRPCError } from "@trpc/server";
 import { Container } from "@needle-di/core";
 import { z } from "zod";
@@ -22,6 +22,7 @@ import { t } from "../../src/trpc/trpc.ts";
 import { FlagRegistry } from "../../src/flags/registry.ts";
 import { CasbinRuleRepository } from "../../src/db/repositories/flags/CasbinRuleRepository.ts";
 import { protectedProcedure } from "../../src/trpc/middleware.ts";
+import { __setTaskApplicationForTest } from "../../src/server/trpc/routers/tasks.ts";
 import {
   DOC_TEMPLATE_SERVICE_TOKEN,
   type DocTemplateService,
@@ -31,6 +32,7 @@ const createCaller = t.createCallerFactory(appRouter);
 const LOCAL_ORG_ID = "00000000-0000-0000-0000-000000000001";
 const LOCAL_BYPASS_FLAG = "trpc-permission-local-dev-bypass";
 const previousFeatures = process.env["FULCRUM_FEATURES"];
+let restoreTaskApplication: (() => void) | null = null;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: build a mock session object that satisfies the TRPCContext shape
@@ -65,6 +67,7 @@ function unauthenticatedCaller() {
 function authenticatedCaller(
   userId = "user-test-001",
   orgId = LOCAL_ORG_ID,
+  em: Parameters<typeof createContext>[0]["em"] = null,
 ) {
   const session = mockSession({ userId, orgId });
   return createCaller(
@@ -72,7 +75,7 @@ function authenticatedCaller(
       session: session as unknown as import("better-auth").Session,
       orgId,
       userId,
-      em: null,
+      em,
       container: null,
     }),
   );
@@ -127,6 +130,8 @@ function testCallerForRouter(
 }
 
 afterEach(() => {
+  restoreTaskApplication?.();
+  restoreTaskApplication = null;
   if (previousFeatures === undefined) delete process.env["FULCRUM_FEATURES"];
   else process.env["FULCRUM_FEATURES"] = previousFeatures;
 });
@@ -467,7 +472,9 @@ describe("authenticated calls", () => {
   });
 
   it("tasks.list returns empty array for authenticated caller", async () => {
-    const caller = authenticatedCaller();
+    const listTasks = mock(async () => []);
+    restoreTaskApplication = __setTaskApplicationForTest({ listTasks });
+    const caller = authenticatedCaller("user-test-001", LOCAL_ORG_ID, {} as Parameters<typeof createContext>[0]["em"]);
     const result = await caller.tasks.list();
     expect(Array.isArray(result)).toBe(true);
   });
