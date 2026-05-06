@@ -13,6 +13,7 @@ import {
 } from "../../product-kernel/store/settings-connectors-credentials.ts";
 import type { ProductDb } from "../../product-kernel/db/types.ts";
 import {
+  buildSettingsScreenData,
   renderConnectorsScreen,
   renderThemeScreen,
   renderSecretsScreen,
@@ -41,6 +42,22 @@ afterAll(async () => {
 // --- Connectors Screen ---
 
 describe("ConnectorsScreen", () => {
+  test("data comes from caller fixture", async () => {
+    const data = await buildSettingsScreenData({
+      connectors: {
+        list: async () => [{ kind: "github", enabled: true, lastSyncAt: "2026-05-01T00:00:00Z" }],
+        runs: { list: async () => [{ kind: "github", status: "succeeded", startedAt: "2026-05-01T00:00:00Z", recordsSynced: 2 }] },
+      },
+      credentials: {
+        list: async () => [{ key: "TOKEN", encryptedValue: "enc:test" }],
+      },
+    });
+
+    expect(data.connectors[0]?.kind).toBe("github");
+    expect(data.connectors[0]?.runs[0]?.status).toBe("succeeded");
+    expect(data.credentials[0]?.key).toBe("TOKEN");
+  });
+
   test("renders enabled connectors with last sync", async () => {
     const run = await createConnectorRun(db, { orgId, kind: "github" });
     await completeConnectorRun(db, run.id, { status: "succeeded", recordsSynced: 10 });
