@@ -43,6 +43,7 @@ Usage:
   fulcrum agents <list|profile|test> [--json]
   fulcrum runs <list|show|cancel|retry|logs> [--json]
   fulcrum notify list [--unread] [--json|--watch]
+  fulcrum settings <list|get|set> [--json]
   fulcrum memory <list|get|add|delete|search|promote> [--json]
   fulcrum search query <query> [--json]
   fulcrum artifacts <list|show|download|archive|unarchive|delete> [--json]
@@ -499,6 +500,23 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       const { container, cleanup } = await buildDbContainer();
       try {
         await runPillar14Command(cmd, rest, { container });
+      } finally {
+        await cleanup();
+      }
+      return;
+    }
+    case "settings": {
+      const { run: runSettings } = await import("./settings.ts");
+      const helpOnly = rest.includes("--help") || rest.includes("-h") || rest[0] === "help";
+      if (helpOnly) {
+        await runSettings(rest);
+        return;
+      }
+
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        const { createLocalCaller } = await import("./local-caller.ts");
+        await runSettings(rest, { caller: await createLocalCaller({ container }) } as never);
       } finally {
         await cleanup();
       }

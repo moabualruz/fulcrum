@@ -1,26 +1,39 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
-import { openPglite } from "../product-kernel/db/pglite.ts";
-import { applyProductMigrations } from "../db/product-migrations.ts";
-import { productDbDir } from "../product-kernel/paths.ts";
-import type { ProductDb } from "../product-kernel/db/types.ts";
-import {
-  listNotifications,
-  unreadCount,
-  markRead,
-  markAllRead,
-  mute,
-  unmute,
-  listRules,
-  getRule,
-  createRule,
-  updateRule,
-  deleteRule,
-  listChannels,
-  configureChannel,
-} from "../product-kernel/store/notifications.ts";
+import type { Container } from "@needle-di/core";
+import { TRPCError } from "@trpc/server";
 
-const HELP = `fulcrum notify — notification management
+import { createLocalCaller } from "./local-caller.ts";
+
+type NotifyCaller = {
+  notify: {
+    list(input: { unread?: boolean; limit?: number; offset?: number }): Promise<unknown>;
+    markRead(input: { id: string }): Promise<unknown>;
+    markAllRead(): Promise<unknown>;
+    mute(input: { subjectKind: string; subjectId: string; mutedUntil?: Date | null }): Promise<unknown>;
+    unmute(input: { subjectKind: string; subjectId: string }): Promise<unknown>;
+    rules: {
+      list(): Promise<unknown[]>;
+      get(input: { id: string }): Promise<unknown | null>;
+      create(input: Record<string, unknown>): Promise<unknown>;
+      update(input: Record<string, unknown>): Promise<unknown>;
+      delete(input: { id: string }): Promise<unknown>;
+    };
+    channels: {
+      list(): Promise<unknown[]>;
+      config(input: Record<string, unknown>): Promise<unknown>;
+      test(input: { kind: string }): Promise<unknown>;
+    };
+  };
+};
+
+export interface NotifyRunOptions {
+  caller?: NotifyCaller;
+  container?: Container | null;
+  print?: (line: string) => void;
+  printErr?: (line: string) => void;
+  exit?: (code: number) => void;
+}
+
+const HELP = `fulcrum notify - notification management
 
 Usage:
   fulcrum notify list [--unread] [--limit N] [--offset N] [--json]
@@ -28,446 +41,231 @@ Usage:
   fulcrum notify mark-read <id>|--all
   fulcrum notify mute <subject-kind> <subject-id> [--until <ISO>] [--json]
   fulcrum notify unmute <subject-kind> <subject-id>
-  fulcrum notify rules list [--json]
-  fulcrum notify rules get <id> [--json]
-  fulcrum notify rules create --name <name> --pattern <json> --channels <csv> [--disable] [--json]
-  fulcrum notify rules update <id> [--name <name>] [--pattern <json>] [--channels <csv>] [--enable|--disable] [--json]
-  fulcrum notify rules delete <id>
-  fulcrum notify channels list [--json]
-  fulcrum notify channels config <kind> [--url <url>] [--secret <secret>] [--json]
-  fulcrum notify channels test <kind>
+  fulcrum notify rules list|get|create|update|delete [options]
+  fulcrum notify channels list|config|test [options]
 `;
 
-const DEFAULT_ORG_SLUG = "default";
-const DEFAULT_USER_ID = "local";
-
-// --- Flag parser (matches product.ts pattern) ---
-
-const BOOLEAN_FLAGS = new Set<string>(["--json", "--unread", "--all", "--enable", "--disable"]);
-
-interface ParsedArgs {
-  positionals: string[];
-  flags: Record<string, string | true>;
-}
-
-function parseArgs(argv: readonly string[]): ParsedArgs {
-  const positionals: string[] = [];
-  const flags: Record<string, string | true> = {};
-  for (let i = 0; i < argv.length; i++) {
-    const token = argv[i] as string;
-    if (token.startsWith("--")) {
-      const eq = token.indexOf("=");
-      if (eq !== -1) {
-        flags[token.slice(0, eq)] = token.slice(eq + 1);
-        continue;
-      }
-      if (BOOLEAN_FLAGS.has(token)) {
-        flags[token] = true;
-        continue;
-      }
-      const next = argv[i + 1];
-      if (next !== undefined && !next.startsWith("--")) {
-        flags[token] = next;
-        i += 1;
-        continue;
-      }
-      flags[token] = true;
-      continue;
-    }
-    positionals.push(token);
-  }
-  return { positionals, flags };
-}
-
-function flag(args: ParsedArgs, name: string): string | undefined {
-  const v = args.flags[`--${name}`];
-  return typeof v === "string" ? v : undefined;
-}
-
-function hasFlag(args: ParsedArgs, name: string): boolean {
-  return args.flags[`--${name}`] !== undefined;
-}
-
-async function openDb(): Promise<ProductDb> {
-  const dir = productDbDir();
-  await mkdir(dir, { recursive: true });
-  return openPglite(join(dir, "main"));
-}
-
-async function resolveOrgId(db: ProductDb): Promise<string> {
-  const rows = await db.query<{ id: string }>(
-    `SELECT id FROM orgs WHERE slug = $1`,
-    [DEFAULT_ORG_SLUG],
-  );
-  if (!rows[0]) throw new Error(`no org with slug=${DEFAULT_ORG_SLUG}; run 'fulcrum product init' first`);
-  return rows[0].id;
-}
-
-export async function run(argv: readonly string[]): Promise<void> {
-  const [verb, ...rest] = argv;
-  if (!verb || verb === "help" || verb === "--help" || verb === "-h") {
-    console.log(HELP);
+export async function run(argv: readonly string[], opts: NotifyRunOptions = {}): Promise<void> {
+  const io = ioFor(opts);
+  const [verb = "help", ...rest] = argv;
+  if (verb === "help" || verb === "--help" || verb === "-h") {
+    io.print(HELP);
     return;
   }
-  switch (verb) {
-    case "list": return runList(rest);
-    case "read": return runRead(rest);
-    case "mark-read": return runMarkRead(rest);
-    case "mute": return runMute(rest);
-    case "unmute": return runUnmute(rest);
-    case "rules": return runRules(rest);
-    case "channels": return runChannels(rest);
-    default:
-      console.error(`fulcrum notify: unknown verb '${verb}'`);
-      console.error(HELP);
-      process.exit(2);
-  }
-}
 
-async function runList(argv: readonly string[]): Promise<void> {
-  const args = parseArgs(argv);
-  const json = hasFlag(args, "json");
-  const unreadOnly = hasFlag(args, "unread");
-  const limit = Number(flag(args, "limit") ?? "50");
-  const offset = Number(flag(args, "offset") ?? "0");
-  const db = await openDb();
   try {
-    await applyProductMigrations(db);
-    const orgId = await resolveOrgId(db);
-    const rows = await listNotifications(db, {
-      orgId, userId: DEFAULT_USER_ID, unread: unreadOnly, limit, offset,
-    });
-    if (json) {
-      console.log(JSON.stringify(rows, null, 2));
-    } else if (rows.length === 0) {
-      console.log("no notifications");
-    } else {
-      for (const n of rows) {
-        const marker = n.read_at ? " " : "*";
-        console.log(`${marker} ${n.id}\t${n.subject_kind}:${n.subject_id}\t${n.verb}\t${n.title}`);
-      }
+    const caller = await resolveCaller(opts);
+    switch (verb) {
+      case "list":
+        return printValue(await caller.notify.list({
+          unread: rest.includes("--unread") || undefined,
+          limit: numberFlag(rest, "--limit"),
+          offset: numberFlag(rest, "--offset"),
+        }), rest, io.print);
+      case "read":
+      case "mark-read":
+        return runMarkRead(caller, rest, io);
+      case "mute":
+        return runMute(caller, rest, io);
+      case "unmute":
+        return runUnmute(caller, rest, io);
+      case "rules":
+        return runRules(caller, rest, io);
+      case "channels":
+        return runChannels(caller, rest, io);
+      default:
+        io.printErr(`fulcrum notify: unknown verb '${verb}'`);
+        io.printErr(HELP);
+        io.exit(2);
     }
-  } finally {
-    await db.close();
+  } catch (error) {
+    io.printErr(`fulcrum notify ${verb}: ${errorMessage(error)}`);
+    io.exit(1);
   }
 }
 
-async function runRead(argv: readonly string[]): Promise<void> {
-  const args = parseArgs(argv);
-  const id = args.positionals[0];
-  if (!id) { console.error("usage: fulcrum notify read <id>"); process.exit(2); }
-  const db = await openDb();
-  try {
-    await applyProductMigrations(db);
-    const orgId = await resolveOrgId(db);
-    const rows = await db.query<Record<string, unknown>>(
-      `SELECT * FROM user_notifications WHERE id = $1 AND org_id = $2`,
-      [id, orgId],
-    );
-    if (!rows[0]) { console.error(`notification not found: ${id}`); process.exit(1); }
-    console.log(JSON.stringify(rows[0], null, 2));
-  } finally {
-    await db.close();
+async function runMarkRead(
+  caller: NotifyCaller,
+  argv: readonly string[],
+  io: Required<Pick<NotifyRunOptions, "print" | "printErr" | "exit">>,
+): Promise<void> {
+  if (argv.includes("--all")) {
+    printValue(await caller.notify.markAllRead(), argv, io.print);
+    return;
   }
+  const id = firstArg(argv);
+  if (!id) {
+    io.printErr("usage: fulcrum notify mark-read <id>|--all");
+    io.exit(2);
+    return;
+  }
+  printValue(await caller.notify.markRead({ id }), argv, io.print);
 }
 
-async function runMarkRead(argv: readonly string[]): Promise<void> {
-  const args = parseArgs(argv);
-  const all = hasFlag(args, "all");
-  const db = await openDb();
-  try {
-    await applyProductMigrations(db);
-    const orgId = await resolveOrgId(db);
-    if (all) {
-      const count = await markAllRead(db, orgId, DEFAULT_USER_ID);
-      console.log(`marked ${count} notification(s) read`);
-    } else {
-      const id = args.positionals[0];
-      if (!id) { console.error("usage: fulcrum notify mark-read <id>|--all"); process.exit(2); }
-      const ok = await markRead(db, orgId, DEFAULT_USER_ID, id);
-      if (ok) console.log(`marked read: ${id}`);
-      else console.log(`already read or not found: ${id}`);
-    }
-  } finally {
-    await db.close();
-  }
-}
-
-async function runMute(argv: readonly string[]): Promise<void> {
-  const args = parseArgs(argv);
-  const [subjectKind, subjectId] = args.positionals;
+async function runMute(
+  caller: NotifyCaller,
+  argv: readonly string[],
+  io: Required<Pick<NotifyRunOptions, "print" | "printErr" | "exit">>,
+): Promise<void> {
+  const args = positionals(argv);
+  const [subjectKind, subjectId] = args;
   if (!subjectKind || !subjectId) {
-    console.error("usage: fulcrum notify mute <subject-kind> <subject-id> [--until <ISO>]");
-    process.exit(2);
+    io.printErr("usage: fulcrum notify mute <subject-kind> <subject-id> [--until <ISO>]");
+    io.exit(2);
+    return;
   }
-  const until = flag(args, "until") ?? null;
-  const json = hasFlag(args, "json");
-  const db = await openDb();
-  try {
-    await applyProductMigrations(db);
-    const orgId = await resolveOrgId(db);
-    const row = await mute(db, { orgId, userId: DEFAULT_USER_ID, subjectKind, subjectId, mutedUntil: until });
-    if (json) {
-      console.log(JSON.stringify(row, null, 2));
-    } else {
-      console.log(`muted ${subjectKind}:${subjectId}${until ? ` until ${until}` : ""}`);
-    }
-  } finally {
-    await db.close();
-  }
+  const until = flagValue(argv, "--until");
+  printValue(await caller.notify.mute({
+    subjectKind,
+    subjectId,
+    mutedUntil: until ? new Date(until) : null,
+  }), argv, io.print);
 }
 
-async function runUnmute(argv: readonly string[]): Promise<void> {
-  const args = parseArgs(argv);
-  const [subjectKind, subjectId] = args.positionals;
+async function runUnmute(
+  caller: NotifyCaller,
+  argv: readonly string[],
+  io: Required<Pick<NotifyRunOptions, "print" | "printErr" | "exit">>,
+): Promise<void> {
+  const args = positionals(argv);
+  const [subjectKind, subjectId] = args;
   if (!subjectKind || !subjectId) {
-    console.error("usage: fulcrum notify unmute <subject-kind> <subject-id>");
-    process.exit(2);
+    io.printErr("usage: fulcrum notify unmute <subject-kind> <subject-id>");
+    io.exit(2);
+    return;
   }
-  const db = await openDb();
-  try {
-    await applyProductMigrations(db);
-    const orgId = await resolveOrgId(db);
-    const ok = await unmute(db, orgId, DEFAULT_USER_ID, subjectKind, subjectId);
-    if (ok) console.log(`unmuted ${subjectKind}:${subjectId}`);
-    else console.log(`no mute found for ${subjectKind}:${subjectId}`);
-  } finally {
-    await db.close();
-  }
+  printValue(await caller.notify.unmute({ subjectKind, subjectId }), argv, io.print);
 }
 
-async function runRules(argv: readonly string[]): Promise<void> {
+async function runRules(
+  caller: NotifyCaller,
+  argv: readonly string[],
+  io: Required<Pick<NotifyRunOptions, "print" | "printErr" | "exit">>,
+): Promise<void> {
   const [sub, ...rest] = argv;
-  if (!sub) { console.error("usage: fulcrum notify rules <list|get|create|update|delete>"); process.exit(2); }
+  if (!sub) {
+    io.printErr("usage: fulcrum notify rules <list|get|create|update|delete>");
+    io.exit(2);
+    return;
+  }
   switch (sub) {
-    case "list": return runRulesList(rest);
-    case "get": return runRulesGet(rest);
-    case "create": return runRulesCreate(rest);
-    case "update": return runRulesUpdate(rest);
-    case "delete": return runRulesDelete(rest);
-    default:
-      console.error(`fulcrum notify rules: unknown verb '${sub}'`);
-      process.exit(2);
-  }
-}
-
-async function runRulesList(argv: readonly string[]): Promise<void> {
-  const args = parseArgs(argv);
-  const json = hasFlag(args, "json");
-  const db = await openDb();
-  try {
-    await applyProductMigrations(db);
-    const orgId = await resolveOrgId(db);
-    const rows = await listRules(db, orgId);
-    if (json) {
-      console.log(JSON.stringify(rows, null, 2));
-    } else if (rows.length === 0) {
-      console.log("no rules");
-    } else {
-      for (const r of rows) {
-        const state = r.enabled ? "on" : "off";
-        console.log(`${r.id}\t${r.name}\t[${state}]\tchannels=${r.channels.join(",")}`);
+    case "list":
+      return printValue(await caller.notify.rules.list(), rest, io.print);
+    case "get": {
+      const id = firstArg(rest);
+      if (!id) return usage(io, "usage: fulcrum notify rules get <id>");
+      const rule = await caller.notify.rules.get({ id });
+      if (!rule) {
+        io.printErr(`rule not found: ${id}`);
+        io.exit(1);
+        return;
       }
+      return printValue(rule, rest, io.print);
     }
-  } finally {
-    await db.close();
-  }
-}
-
-async function runRulesGet(argv: readonly string[]): Promise<void> {
-  const args = parseArgs(argv);
-  const id = args.positionals[0];
-  if (!id) { console.error("usage: fulcrum notify rules get <id>"); process.exit(2); }
-  const json = hasFlag(args, "json");
-  const db = await openDb();
-  try {
-    await applyProductMigrations(db);
-    const orgId = await resolveOrgId(db);
-    const rule = await getRule(db, orgId, id);
-    if (!rule) { console.error(`rule not found: ${id}`); process.exit(1); }
-    if (json) {
-      console.log(JSON.stringify(rule, null, 2));
-    } else {
-      console.log(`${rule.id}\t${rule.name}\t${rule.enabled ? "on" : "off"}`);
-      console.log(`pattern: ${JSON.stringify(rule.event_pattern)}`);
-      console.log(`channels: ${rule.channels.join(", ")}`);
+    case "create":
+      return printValue(await caller.notify.rules.create({
+        name: requiredFlag(rest, "--name"),
+        eventPattern: parseJsonFlag(rest, "--pattern"),
+        channels: (requiredFlag(rest, "--channels")).split(",").map((channel) => channel.trim()).filter(Boolean),
+        enabled: !rest.includes("--disable"),
+      }), rest, io.print);
+    case "update": {
+      const id = firstArg(rest);
+      if (!id) return usage(io, "usage: fulcrum notify rules update <id>");
+      return printValue(await caller.notify.rules.update({ id }), rest, io.print);
     }
-  } finally {
-    await db.close();
-  }
-}
-
-async function runRulesCreate(argv: readonly string[]): Promise<void> {
-  const args = parseArgs(argv);
-  const name = flag(args, "name");
-  const patternStr = flag(args, "pattern");
-  const channelsStr = flag(args, "channels");
-  if (!name || !patternStr || !channelsStr) {
-    console.error("usage: fulcrum notify rules create --name <name> --pattern <json> --channels <csv>");
-    process.exit(2);
-  }
-  let eventPattern: Record<string, unknown>;
-  try {
-    eventPattern = JSON.parse(patternStr) as Record<string, unknown>;
-  } catch {
-    console.error(`invalid JSON for --pattern: ${patternStr}`);
-    process.exit(2);
-    return; // unreachable, satisfies TS
-  }
-  const channels = channelsStr.split(",").map((c) => c.trim()).filter(Boolean);
-  const enabled = !hasFlag(args, "disable");
-  const json = hasFlag(args, "json");
-  const db = await openDb();
-  try {
-    await applyProductMigrations(db);
-    const orgId = await resolveOrgId(db);
-    const rule = await createRule(db, { orgId, name, eventPattern, channels, enabled });
-    if (json) {
-      console.log(JSON.stringify(rule, null, 2));
-    } else {
-      console.log(`created rule ${rule.id}: ${rule.name}`);
+    case "delete": {
+      const id = firstArg(rest);
+      if (!id) return usage(io, "usage: fulcrum notify rules delete <id>");
+      return printValue(await caller.notify.rules.delete({ id }), rest, io.print);
     }
-  } finally {
-    await db.close();
+    default:
+      io.printErr(`fulcrum notify rules: unknown verb '${sub}'`);
+      io.exit(2);
   }
 }
 
-async function runRulesUpdate(argv: readonly string[]): Promise<void> {
-  const args = parseArgs(argv);
-  const id = args.positionals[0];
-  if (!id) { console.error("usage: fulcrum notify rules update <id> [--name ...] [--pattern ...] [--channels ...] [--enable|--disable]"); process.exit(2); }
-  const json = hasFlag(args, "json");
-  const patch: Parameters<typeof updateRule>[3] = {};
-  const nameVal = flag(args, "name");
-  if (nameVal !== undefined) patch.name = nameVal;
-  const patternStr = flag(args, "pattern");
-  if (patternStr !== undefined) {
-    try { patch.eventPattern = JSON.parse(patternStr) as Record<string, unknown>; }
-    catch { console.error(`invalid JSON for --pattern: ${patternStr}`); process.exit(2); }
-  }
-  const channelsStr = flag(args, "channels");
-  if (channelsStr !== undefined) patch.channels = channelsStr.split(",").map((c) => c.trim()).filter(Boolean);
-  if (hasFlag(args, "enable")) patch.enabled = true;
-  if (hasFlag(args, "disable")) patch.enabled = false;
-  const db = await openDb();
-  try {
-    await applyProductMigrations(db);
-    const orgId = await resolveOrgId(db);
-    const rule = await updateRule(db, orgId, id, patch);
-    if (!rule) { console.error(`rule not found: ${id}`); process.exit(1); }
-    if (json) {
-      console.log(JSON.stringify(rule, null, 2));
-    } else {
-      console.log(`updated rule ${rule.id}: ${rule.name}`);
-    }
-  } finally {
-    await db.close();
-  }
-}
-
-async function runRulesDelete(argv: readonly string[]): Promise<void> {
-  const args = parseArgs(argv);
-  const id = args.positionals[0];
-  if (!id) { console.error("usage: fulcrum notify rules delete <id>"); process.exit(2); }
-  const db = await openDb();
-  try {
-    await applyProductMigrations(db);
-    const orgId = await resolveOrgId(db);
-    const ok = await deleteRule(db, orgId, id);
-    if (ok) console.log(`deleted rule ${id}`);
-    else console.log(`rule not found: ${id}`);
-  } finally {
-    await db.close();
-  }
-}
-
-async function runChannels(argv: readonly string[]): Promise<void> {
+async function runChannels(
+  caller: NotifyCaller,
+  argv: readonly string[],
+  io: Required<Pick<NotifyRunOptions, "print" | "printErr" | "exit">>,
+): Promise<void> {
   const [sub, ...rest] = argv;
-  if (!sub) { console.error("usage: fulcrum notify channels <list|config|test>"); process.exit(2); }
   switch (sub) {
-    case "list": return runChannelsList(rest);
-    case "config": return runChannelsConfig(rest);
-    case "test": return runChannelsTest(rest);
+    case "list":
+      return printValue(await caller.notify.channels.list(), rest, io.print);
+    case "config": {
+      const kind = firstArg(rest);
+      if (!kind) return usage(io, "usage: fulcrum notify channels config <kind>");
+      return printValue(await caller.notify.channels.config({ kind, url: flagValue(rest, "--url") }), rest, io.print);
+    }
+    case "test": {
+      const kind = firstArg(rest);
+      if (!kind) return usage(io, "usage: fulcrum notify channels test <kind>");
+      return printValue(await caller.notify.channels.test({ kind }), rest, io.print);
+    }
     default:
-      console.error(`fulcrum notify channels: unknown verb '${sub}'`);
-      process.exit(2);
+      io.printErr("usage: fulcrum notify channels <list|config|test>");
+      io.exit(2);
   }
 }
 
-async function runChannelsList(argv: readonly string[]): Promise<void> {
-  const args = parseArgs(argv);
-  const json = hasFlag(args, "json");
-  const db = await openDb();
-  try {
-    await applyProductMigrations(db);
-    const orgId = await resolveOrgId(db);
-    const rows = await listChannels(db, orgId);
-    if (json) {
-      // Mask secrets in config before output
-      const masked = rows.map((r) => ({
-        ...r,
-        config: maskSecrets(r.config),
-      }));
-      console.log(JSON.stringify(masked, null, 2));
-    } else if (rows.length === 0) {
-      console.log("no channels configured");
-    } else {
-      for (const c of rows) {
-        console.log(`${c.kind}\t${c.enabled ? "on" : "off"}`);
-      }
-    }
-  } finally {
-    await db.close();
-  }
+async function resolveCaller(opts: NotifyRunOptions): Promise<NotifyCaller> {
+  if (opts.caller) return opts.caller;
+  return await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as NotifyCaller;
 }
 
-async function runChannelsConfig(argv: readonly string[]): Promise<void> {
-  const args = parseArgs(argv);
-  const kind = args.positionals[0];
-  if (!kind) { console.error("usage: fulcrum notify channels config <kind> [--url ...] [--secret ...]"); process.exit(2); }
-  const json = hasFlag(args, "json");
-  const config: Record<string, unknown> = {};
-  const url = flag(args, "url");
-  if (url) config.url = url;
-  const secret = flag(args, "secret");
-  if (secret) config.secret = secret;
-  const db = await openDb();
-  try {
-    await applyProductMigrations(db);
-    const orgId = await resolveOrgId(db);
-    const row = await configureChannel(db, { orgId, kind, config });
-    if (json) {
-      console.log(JSON.stringify({ ...row, config: maskSecrets(row.config) }, null, 2));
-    } else {
-      console.log(`configured channel ${kind}`);
-    }
-  } finally {
-    await db.close();
-  }
+function printValue(value: unknown, argv: readonly string[], print: (line: string) => void): void {
+  print(argv.includes("--json") ? JSON.stringify(value) : JSON.stringify(value, null, 2));
 }
 
-async function runChannelsTest(argv: readonly string[]): Promise<void> {
-  const args = parseArgs(argv);
-  const kind = args.positionals[0];
-  if (!kind) { console.error("usage: fulcrum notify channels test <kind>"); process.exit(2); }
-  const db = await openDb();
-  try {
-    await applyProductMigrations(db);
-    const orgId = await resolveOrgId(db);
-    const rows = await listChannels(db, orgId);
-    const ch = rows.find((c) => c.kind === kind);
-    if (!ch) { console.error(`channel not configured: ${kind}`); process.exit(1); }
-    // Test delivery is a stub — would enqueue async delivery in production
-    console.log(`test delivery queued for channel ${kind}`);
-  } finally {
-    await db.close();
-  }
+function usage(io: Required<Pick<NotifyRunOptions, "printErr" | "exit">>, message: string): void {
+  io.printErr(message);
+  io.exit(2);
 }
 
-function maskSecrets(config: Record<string, unknown>): Record<string, unknown> {
-  const out = { ...config };
-  if (typeof out.secret === "string") {
-    out.secret = "****";
-  }
-  return out;
+function positionals(argv: readonly string[]): string[] {
+  return argv.filter((arg, index) => !arg.startsWith("-") && !argv[index - 1]?.startsWith("--"));
+}
+
+function firstArg(argv: readonly string[]): string | undefined {
+  return positionals(argv)[0];
+}
+
+function flagValue(argv: readonly string[], flag: string): string | undefined {
+  const index = argv.indexOf(flag);
+  if (index < 0) return undefined;
+  const value = argv[index + 1];
+  return value && !value.startsWith("-") ? value : undefined;
+}
+
+function requiredFlag(argv: readonly string[], flag: string): string {
+  const value = flagValue(argv, flag);
+  if (!value) throw new Error(`missing required flag ${flag}`);
+  return value;
+}
+
+function numberFlag(argv: readonly string[], flag: string): number | undefined {
+  const value = flagValue(argv, flag);
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) throw new Error(`${flag} must be an integer`);
+  return parsed;
+}
+
+function parseJsonFlag(argv: readonly string[], flag: string): Record<string, unknown> {
+  return JSON.parse(requiredFlag(argv, flag)) as Record<string, unknown>;
+}
+
+function ioFor(opts: NotifyRunOptions): Required<Pick<NotifyRunOptions, "print" | "printErr" | "exit">> {
+  return {
+    print: opts.print ?? console.log,
+    printErr: opts.printErr ?? console.error,
+    exit: opts.exit ?? process.exit,
+  };
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof TRPCError) return `${error.code}: ${error.message}`;
+  return (error as Error).message;
 }

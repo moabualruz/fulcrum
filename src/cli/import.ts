@@ -1,198 +1,170 @@
-// fulcrum import — gated behind FULCRUM_FEATURES.
-//
-// Usage:
-//   fulcrum import --input <path> --format csv --column-map <json> [--dry-run] [--json]
-//   fulcrum import --format linear --project <teamId> [--dry-run] [--json]
-//   fulcrum import --format jira --project <projectKey> [--dry-run] [--json]
-//   fulcrum import --format plane --project <projectId> --workspace <slug> [--dry-run] [--json]
+import type { Container } from "@needle-di/core";
+import { readFileSync } from "node:fs";
 
-import { join } from "node:path";
-import { mkdir } from "node:fs/promises";
-import { assertFeatureEnabled } from "../data/features.ts";
-import { importCsv } from "../data/csv-import.ts";
-import { runImport, formatImportResult } from "./import-pm.ts";
-import { openPglite } from "../product-kernel/db/pglite.ts";
-import { applyProductMigrations } from "../db/product-migrations.ts";
-import { productDbDir } from "../product-kernel/paths.ts";
-import {
-  createLocalOrg,
-  createTask,
-} from "../product-kernel/store/repositories.ts";
+import { createLocalCaller } from "./local-caller.ts";
 
-const HELP = `fulcrum import — import entities from file
+type ImportCaller = {
+  tasks: {
+    bulkCreate(input: { projectId: string; tasks: ImportedTask[] }): Promise<unknown>;
+  };
+};
+
+export interface ImportRunOptions {
+  caller?: ImportCaller;
+  container?: Container | null;
+  print?: (line: string) => void;
+  printErr?: (line: string) => void;
+  exit?: (code: number) => void;
+}
+
+interface ImportedTask {
+  title: string;
+  status?: string;
+  priority?: string;
+  assignee?: string;
+  description?: string;
+  dueDate?: string;
+  externalId?: string;
+}
+
+const VALID_SOURCES = ["csv", "jira", "github", "trello", "linear", "plane"] as const;
+
+const HELP = `fulcrum import
 
 Usage:
-  fulcrum import --input <path> --format csv --column-map <json> [--dry-run] [--json]
-
-Flags:
-  --input <path>       Input file path.
-  --format <fmt>       Import format. Currently: csv.
-  --column-map <json>  JSON object mapping CSV headers → Fulcrum fields.
-                       Example: '{"Title":"title","Status":"status"}'
-  --dry-run            Parse and validate only; do not write to DB.
-  --json               Print result as JSON.
-
-Environment:
-  FULCRUM_FEATURES  Must include "import-csv" to use --format csv.
+  fulcrum import csv --project <id> --file <path> [--dry-run] [--json]
+  fulcrum import jira --project <id> [--dry-run] [--json]
+  fulcrum import github --project <id> [--dry-run] [--json]
+  fulcrum import trello --project <id> [--dry-run] [--json]
 `;
 
-const DEFAULT_ORG_SLUG = "default";
-const DEFAULT_ORG_NAME = "Local";
-
-export async function run(args: string[]): Promise<void> {
-  if (args.includes("--help") || args.includes("-h")) {
-    console.log(HELP);
+export async function run(argv: readonly string[], opts: ImportRunOptions = {}): Promise<void> {
+  const io = ioFor(opts);
+  const [source = "help", ...rest] = normalizeLegacyCsvArgs(argv);
+  if (source === "help" || source === "--help" || source === "-h") {
+    io.print(HELP);
+    return;
+  }
+  if (!VALID_SOURCES.includes(source as never)) {
+    io.printErr(`fulcrum import: unknown source '${source}'`);
+    io.exit(2);
     return;
   }
 
-  // Parse args
-  let format: string | undefined;
-  let inputPath: string | undefined;
-  let columnMapRaw: string | undefined;
-  let dryRun = false;
-  let jsonMode = false;
-
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a === "--format" && args[i + 1]) { format = args[++i]; }
-    else if (a === "--input" && args[i + 1]) { inputPath = args[++i]; }
-    else if (a === "--column-map" && args[i + 1]) { columnMapRaw = args[++i]; }
-    else if (a === "--dry-run") { dryRun = true; }
-    else if (a === "--json") { jsonMode = true; }
-  }
-
-  let projectId: string | undefined;
-  let workspace: string | undefined;
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a === "--project" && args[i + 1]) { projectId = args[++i]; }
-    else if (a === "--workspace" && args[i + 1]) { workspace = args[++i]; }
-  }
-
-  if (!format) {
-    console.error("fulcrum import: --format required");
-    process.exit(1);
-  }
-
-  // PM tool imports (linear / jira / plane)
-  if (format === "linear" || format === "jira" || format === "plane") {
-    if (!projectId) {
-      console.error("fulcrum import: --project required");
-      process.exit(1);
-    }
-    try {
-      // Use a no-op credential repo and fetch client in CLI context
-      // (real impl would wire CredentialRepository from product kernel)
-      const { NullCredentialRepository, FetchHttpClient } = await import("./import-pm.ts");
-      const result = await runImport({
-        format,
-        project: projectId,
-        dryRun,
-        json: jsonMode,
-        credentials: new NullCredentialRepository(),
-        http: new FetchHttpClient(),
-        workspace,
-      });
-      console.log(formatImportResult(result, jsonMode));
-    } catch (err) {
-      console.error(`fulcrum import: ${(err as Error).message}`);
-      process.exit(1);
-    }
+  const projectId = flagValue(rest, "--project");
+  if (!projectId) {
+    io.printErr("fulcrum import: --project <id> is required");
+    io.exit(2);
     return;
   }
 
-  if (format === "csv") {
-    try {
-      assertFeatureEnabled("import-csv");
-    } catch {
-      console.error("Feature import-csv not enabled");
-      process.exit(1);
+  const dryRun = rest.includes("--dry-run");
+  const jsonMode = rest.includes("--json");
+
+  try {
+    if (source !== "csv") {
+      io.printErr(`fulcrum import ${source}: API-based import not implemented in this release`);
+      io.exit(1);
+      return;
     }
 
-    if (!inputPath) {
-      console.error("fulcrum import: --input required");
-      process.exit(1);
+    const filePath = flagValue(rest, "--file") ?? flagValue(rest, "--input");
+    if (!filePath) {
+      io.printErr("fulcrum import csv: --file <path> is required");
+      io.exit(2);
+      return;
     }
 
-    if (!columnMapRaw) {
-      console.error("fulcrum import: --column-map required");
-      process.exit(1);
+    const tasks = parseCsv(filePath);
+    if (dryRun) {
+      if (jsonMode) io.print(JSON.stringify({ dryRun: true, count: tasks.length, tasks }, null, 2));
+      else io.print(`Dry run - would import ${tasks.length} tasks into ${projectId}`);
+      return;
     }
 
-    let columnMap: Record<string, string>;
-    try {
-      columnMap = JSON.parse(columnMapRaw) as Record<string, string>;
-    } catch {
-      console.error("fulcrum import: --column-map must be valid JSON");
-      process.exit(1);
-    }
-
-    let parseResult;
-    try {
-      parseResult = await importCsv(inputPath, columnMap, { dryRun: true });
-    } catch (err) {
-      console.error(`fulcrum import: ${(err as Error).message}`);
-      process.exit(1);
-    }
-
-    if (!dryRun && parseResult.records.length > 0) {
-      // Write to product DB
-      const dbDir = productDbDir();
-      await mkdir(dbDir, { recursive: true });
-      const db = await openPglite(join(dbDir, "main"));
-      await applyProductMigrations(db);
-
-      // Ensure local org exists
-      const existingOrg = await db.query<{ id: string }>(
-        `SELECT id FROM orgs WHERE slug = $1`,
-        [DEFAULT_ORG_SLUG],
-      );
-      let orgId: string;
-      if (existingOrg[0]) {
-        orgId = existingOrg[0].id;
-      } else {
-        const org = await createLocalOrg(db, {
-          slug: DEFAULT_ORG_SLUG,
-          name: DEFAULT_ORG_NAME,
-        });
-        orgId = org.id;
-      }
-
-      let written = 0;
-      for (const record of parseResult.records) {
-        await createTask(db, {
-          orgId,
-          title: record["title"] as string,
-          status: record["status"] ?? "pending",
-          description: record["description"] ?? null,
-          priority: record["priority"] ? Number(record["priority"]) : 0,
-        });
-        written++;
-      }
-      parseResult = { ...parseResult, written };
-    }
-
-    const output = {
-      total: parseResult.total,
-      written: dryRun ? 0 : parseResult.written,
-      skipped: parseResult.skipped,
-      skipped_records: parseResult.skipped_records,
-    };
-
-    if (jsonMode) {
-      console.log(JSON.stringify(output));
-    } else if (dryRun) {
-      console.log(`[dry-run] Would import ${parseResult.total - parseResult.skipped} records (${parseResult.skipped} skipped).`);
-      if (parseResult.skipped_records.length > 0) {
-        for (const s of parseResult.skipped_records) {
-          console.log(`  record ${s.record}: ${s.reason}`);
-        }
-      }
-    } else {
-      console.log(`Imported ${output.written} records (${output.skipped} skipped).`);
-    }
-  } else {
-    console.error(`fulcrum import: unknown format '${format}'`);
-    process.exit(1);
+    const caller = await resolveCaller(opts);
+    await caller.tasks.bulkCreate({ projectId, tasks });
+    if (jsonMode) io.print(JSON.stringify({ imported: tasks.length, projectId }));
+    else io.print(`Import complete: ${tasks.length} tasks added to ${projectId}`);
+  } catch (error) {
+    io.printErr(`fulcrum import: ${(error as Error).message}`);
+    io.exit(1);
   }
+}
+
+function normalizeLegacyCsvArgs(argv: readonly string[]): string[] {
+  if (argv.includes("--format") && flagValue(argv, "--format") === "csv") {
+    const next = argv.filter((arg, index) => arg !== "--format" && argv[index - 1] !== "--format");
+    return ["csv", ...next];
+  }
+  return [...argv];
+}
+
+function parseCsv(filePath: string): ImportedTask[] {
+  const content = readFileSync(filePath, "utf8");
+  const lines = content.split("\n").filter((line) => line.trim());
+  if (lines.length < 2) return [];
+  const headers = lines[0]!.split(",").map((header) => header.trim().toLowerCase().replace(/[^a-z_]/g, "_"));
+  const map: Record<string, keyof ImportedTask> = {
+    title: "title",
+    name: "title",
+    summary: "title",
+    status: "status",
+    state: "status",
+    priority: "priority",
+    assignee: "assignee",
+    assigned_to: "assignee",
+    description: "description",
+    body: "description",
+    due_date: "dueDate",
+    due: "dueDate",
+    external_id: "externalId",
+    id: "externalId",
+  };
+  const tasks: ImportedTask[] = [];
+  for (const line of lines.slice(1)) {
+    const values = splitCsvRow(line);
+    const task: ImportedTask = { title: "" };
+    for (let i = 0; i < headers.length; i++) {
+      const field = map[headers[i]!];
+      if (field && values[i]) (task as unknown as Record<string, string>)[field] = values[i]!.trim();
+    }
+    if (task.title) tasks.push(task);
+  }
+  return tasks;
+}
+
+function splitCsvRow(line: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (const char of line) {
+    if (char === "\"") inQuotes = !inQuotes;
+    else if (char === "," && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else current += char;
+  }
+  result.push(current);
+  return result;
+}
+
+async function resolveCaller(opts: ImportRunOptions): Promise<ImportCaller> {
+  if (opts.caller) return opts.caller;
+  return await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as ImportCaller;
+}
+
+function flagValue(argv: readonly string[], flag: string): string | undefined {
+  const index = argv.indexOf(flag);
+  if (index < 0) return undefined;
+  const value = argv[index + 1];
+  return value && !value.startsWith("-") ? value : undefined;
+}
+
+function ioFor(opts: ImportRunOptions): Required<Pick<ImportRunOptions, "print" | "printErr" | "exit">> {
+  return {
+    print: opts.print ?? console.log,
+    printErr: opts.printErr ?? console.error,
+    exit: opts.exit ?? process.exit,
+  };
 }

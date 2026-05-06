@@ -48,6 +48,7 @@ Usage:
   fulcrum tui
   fulcrum inference <start|status|embed|generate|stop> [--json]
   fulcrum projects|tasks|sprints|memory|search|artifacts|credentials|webhooks|repos|docs|runs|notify|audit|connectors
+  fulcrum settings <list|get|set> [--json]
   fulcrum completion --shell <bash|zsh|fish|powershell>
   fulcrum product init [--json]      Initialise the local product kernel (PGlite + migrations).
   fulcrum product projects list [--json]
@@ -143,6 +144,11 @@ async function main() {
     case "import": {
       const { run: runImport } = await import("./cli/import.ts");
       await runImport(rest);
+      return;
+    }
+    case "settings": {
+      const { run } = await import("./cli/index.ts");
+      await run([cmd, ...rest]);
       return;
     }
     case "auth":

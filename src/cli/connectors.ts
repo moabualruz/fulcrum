@@ -1,14 +1,40 @@
-/**
- * CLI: fulcrum connectors list [--json]
- *      fulcrum connectors runs <kind> [--json]
- */
+import type { Container } from "@needle-di/core";
+import { TRPCError } from "@trpc/server";
 
-import type { ConnectorRunRow } from "../product-kernel/store/settings-connectors-credentials.ts";
+import { createLocalCaller } from "./local-caller.ts";
 
 export interface ConnectorSummary {
   kind: string;
   enabled: boolean;
   lastSyncAt: string | null;
+}
+
+export interface ConnectorRunSummary {
+  id?: string;
+  kind: string;
+  status: string;
+  startedAt?: string | null;
+  started_at?: string | null;
+  recordsSynced?: number;
+  records_synced?: number;
+  error?: string | null;
+}
+
+type ConnectorsCaller = {
+  connectors: {
+    list(input?: Record<string, unknown>): Promise<ConnectorSummary[]>;
+    runs?: {
+      list(input: { kind: string }): Promise<ConnectorRunSummary[]>;
+    };
+  };
+};
+
+export interface ConnectorsRunOptions {
+  caller?: ConnectorsCaller;
+  container?: Container | null;
+  print?: (line: string) => void;
+  printErr?: (line: string) => void;
+  exit?: (code: number) => void;
 }
 
 export function formatConnectorsList(connectors: ConnectorSummary[], json: boolean): string {
@@ -19,36 +45,68 @@ export function formatConnectorsList(connectors: ConnectorSummary[], json: boole
     .join("\n");
 }
 
-export function formatConnectorRuns(runs: ConnectorRunRow[], json: boolean): string {
+export function formatConnectorRuns(runs: ConnectorRunSummary[], json: boolean): string {
   if (json) return JSON.stringify(runs, null, 2);
   if (runs.length === 0) return "No runs found.";
   return runs
-    .map((r) => `${r.kind}  ${r.status}  ${r.started_at}  ${r.records_synced} records  ${r.error ?? ""}`.trimEnd())
+    .map((r) => {
+      const started = r.startedAt ?? r.started_at ?? "unknown";
+      const records = r.recordsSynced ?? r.records_synced ?? 0;
+      return `${r.kind}  ${r.status}  ${started}  ${records} records  ${r.error ?? ""}`.trimEnd();
+    })
     .join("\n");
 }
 
-export async function run(args: string[]): Promise<void> {
-  const [sub, ...rest] = args;
+export async function run(argv: readonly string[], opts: ConnectorsRunOptions = {}): Promise<void> {
+  const io = ioFor(opts);
+  const [sub = "help", ...rest] = argv;
   const isJson = rest.includes("--json");
 
-  switch (sub) {
-    case "list": {
-      // In a full implementation, would read from DB. Stub for CLI surface.
-      console.log(formatConnectorsList([], isJson));
-      return;
-    }
-    case "runs": {
-      const kind = rest.find((a) => !a.startsWith("--"));
-      if (!kind) {
-        console.error("usage: fulcrum connectors runs <kind> [--json]");
-        process.exit(2);
+  try {
+    const caller = sub === "help" || sub === "--help" || sub === "-h" ? null : await resolveCaller(opts);
+    switch (sub) {
+      case "list":
+        io.print(formatConnectorsList(await caller!.connectors.list({}), isJson));
+        return;
+      case "runs": {
+        const kind = rest.find((a) => !a.startsWith("--"));
+        if (!kind) {
+          io.printErr("usage: fulcrum connectors runs <kind> [--json]");
+          io.exit(2);
+          return;
+        }
+        io.print(formatConnectorRuns(await caller!.connectors.runs?.list({ kind }) ?? [], isJson));
+        return;
       }
-      // Stub — full implementation reads from product kernel DB
-      console.log(formatConnectorRuns([], isJson));
-      return;
+      case "help":
+      case "--help":
+      case "-h":
+        io.print("usage: fulcrum connectors <list|runs> [--json]");
+        return;
+      default:
+        io.printErr("usage: fulcrum connectors <list|runs> [--json]");
+        io.exit(2);
     }
-    default:
-      console.error("usage: fulcrum connectors <list|runs> [--json]");
-      process.exit(2);
+  } catch (error) {
+    io.printErr(`fulcrum connectors ${sub}: ${errorMessage(error)}`);
+    io.exit(1);
   }
+}
+
+async function resolveCaller(opts: ConnectorsRunOptions): Promise<ConnectorsCaller> {
+  if (opts.caller) return opts.caller;
+  return await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as ConnectorsCaller;
+}
+
+function ioFor(opts: ConnectorsRunOptions): Required<Pick<ConnectorsRunOptions, "print" | "printErr" | "exit">> {
+  return {
+    print: opts.print ?? console.log,
+    printErr: opts.printErr ?? console.error,
+    exit: opts.exit ?? process.exit,
+  };
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof TRPCError) return `${error.code}: ${error.message}`;
+  return (error as Error).message;
 }

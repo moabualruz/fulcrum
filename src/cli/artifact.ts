@@ -1,56 +1,84 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
-import { openPglite } from "../product-kernel/db/pglite.ts";
-import { applyProductMigrations } from "../db/product-migrations.ts";
-import { productDbDir } from "../product-kernel/paths.ts";
-import type { ProductDb } from "../product-kernel/db/types.ts";
-import { listArtifacts, readArtifactDetail } from "../services/artifacts.ts";
+import type { Container } from "@needle-di/core";
+import { TRPCError } from "@trpc/server";
 
-const HELP = `fulcrum artifact — artifact commands
+import { createLocalCaller } from "./local-caller.ts";
+
+type ArtifactCaller = {
+  artifacts: {
+    list(input?: Record<string, unknown>): Promise<unknown[]>;
+    get(input: { id: string }): Promise<unknown>;
+  };
+};
+
+export interface ArtifactRunOptions {
+  caller?: ArtifactCaller;
+  container?: Container | null;
+  print?: (line: string) => void;
+  printErr?: (line: string) => void;
+  exit?: (code: number) => void;
+}
+
+const HELP = `fulcrum artifact - artifact commands
 
 Usage:
   fulcrum artifact list [--json]
+  fulcrum artifact show <id> [--json]
 `;
 
-async function openProductDb(): Promise<ProductDb> {
-  const dir = productDbDir();
-  await mkdir(dir, { recursive: true });
-  const db = await openPglite(join(dir, "main"));
-  await applyProductMigrations(db);
-  return db;
-}
-
-export async function run(argv: readonly string[]): Promise<void> {
-  const [verb, ...rest] = argv;
-  if (!verb || verb === "help" || verb === "--help" || verb === "-h") {
-    console.log(HELP);
+export async function run(argv: readonly string[], opts: ArtifactRunOptions = {}): Promise<void> {
+  const io = ioFor(opts);
+  const [verb = "help", ...rest] = argv;
+  if (verb === "help" || verb === "--help" || verb === "-h") {
+    io.print(HELP);
     return;
   }
-  if (verb !== "list") {
-    console.error(`fulcrum artifact: unknown verb '${verb}'`);
-    process.exit(2);
-  }
-  const json = rest.includes("--json");
-  const db = await openProductDb();
+
   try {
-    const orgRows = await db.query<{ id: string }>(`SELECT id FROM orgs WHERE slug = $1`, ["default"]);
-    const orgId = orgRows[0]?.id;
-    if (!orgId) {
-      if (json) console.log("[]");
-      else console.log("no artifacts");
+    const caller = await resolveCaller(opts);
+    if (verb === "list") {
+      const rows = await caller.artifacts.list({});
+      if (rest.includes("--json")) io.print(JSON.stringify(rows, null, 2));
+      else if (rows.length === 0) io.print("no artifacts");
+      else for (const row of rows as Array<Record<string, unknown>>) io.print(`${row["filename"] ?? row["kind"] ?? "artifact"}\t${row["id"]}`);
       return;
     }
-    const rows = await listArtifacts(db, orgId);
-    if (json) {
-      const withPreview = await Promise.all(rows.map(async (row) => {
-        const detail = await readArtifactDetail(db, { orgId, id: row.id });
-        return { ...row, preview: detail?.content ?? undefined };
-      }));
-      console.log(JSON.stringify(withPreview, null, 2));
+    if (verb === "show") {
+      const id = firstArg(rest);
+      if (!id) {
+        io.printErr("usage: fulcrum artifact show <id> [--json]");
+        io.exit(2);
+        return;
+      }
+      const artifact = await caller.artifacts.get({ id });
+      io.print(rest.includes("--json") ? JSON.stringify(artifact) : JSON.stringify(artifact, null, 2));
+      return;
     }
-    else if (rows.length === 0) console.log("no artifacts");
-    else for (const a of rows) console.log(`${a.kind}\t${a.title}\t${a.id}`);
-  } finally {
-    await db.close();
+    io.printErr(`fulcrum artifact: unknown verb '${verb}'`);
+    io.exit(2);
+  } catch (error) {
+    io.printErr(`fulcrum artifact ${verb}: ${errorMessage(error)}`);
+    io.exit(1);
   }
+}
+
+async function resolveCaller(opts: ArtifactRunOptions): Promise<ArtifactCaller> {
+  if (opts.caller) return opts.caller;
+  return await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as ArtifactCaller;
+}
+
+function firstArg(argv: readonly string[]): string | undefined {
+  return argv.find((arg) => !arg.startsWith("-"));
+}
+
+function ioFor(opts: ArtifactRunOptions): Required<Pick<ArtifactRunOptions, "print" | "printErr" | "exit">> {
+  return {
+    print: opts.print ?? console.log,
+    printErr: opts.printErr ?? console.error,
+    exit: opts.exit ?? process.exit,
+  };
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof TRPCError) return `${error.code}: ${error.message}`;
+  return (error as Error).message;
 }
