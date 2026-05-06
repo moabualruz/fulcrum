@@ -6,11 +6,11 @@ describe("createGracefulShutdown", () => {
   test("runs shutdown hooks in infrastructure-safe order", async () => {
     const calls: string[] = [];
     const shutdown = createGracefulShutdown({
-      stopWorkers: async () => calls.push("stopWorkers"),
-      closeSubscriptions: async () => calls.push("closeSubscriptions"),
-      closeHttpServer: async () => calls.push("closeHttpServer"),
-      closeDatabase: async () => calls.push("closeDatabase"),
-      cleanupWorkspaces: async () => calls.push("cleanupWorkspaces"),
+      stopWorkers: async () => { calls.push("stopWorkers"); },
+      closeSubscriptions: async () => { calls.push("closeSubscriptions"); },
+      closeHttpServer: async () => { calls.push("closeHttpServer"); },
+      closeDatabase: async () => { calls.push("closeDatabase"); },
+      cleanupWorkspaces: async () => { calls.push("cleanupWorkspaces"); },
       log: () => undefined,
     });
 

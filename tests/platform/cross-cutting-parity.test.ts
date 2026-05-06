@@ -28,7 +28,7 @@ describe("Phase 09 cross-cutting parity matrix", () => {
   test("contains every cross-cutting capability", () => {
     const ids = CROSS_CUTTING_CAPABILITIES.map((capability) => capability.id);
 
-    expect(ids).toEqual(EXPECTED_CAPABILITIES);
+    expect(ids).toEqual([...EXPECTED_CAPABILITIES]);
   });
 
   test("maps all XCT-01 through XCT-12 requirements", () => {

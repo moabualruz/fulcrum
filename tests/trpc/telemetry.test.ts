@@ -21,29 +21,29 @@ class MemoryTelemetryStore extends TelemetryStore {
   rows: WrittenEvent[] = [];
   auditEvents: Array<{ verb: string; payload: Record<string, unknown> }> = [];
 
-  async getOptedIn() {
+  override async getOptedIn() {
     return this.optedIn;
   }
 
-  async setOptedIn(value: boolean) {
+  override async setOptedIn(value: boolean) {
     this.optedIn = value;
   }
 
-  async count() {
+  override async count() {
     return this.rows.length;
   }
 
-  async write(event: WrittenEvent) {
+  override async write(event: WrittenEvent) {
     this.rows.push(event);
   }
 
-  async purge() {
+  override async purge() {
     const deleted = this.rows.length;
     this.rows = [];
     return deleted;
   }
 
-  async recordAudit(verb: string, payload: Record<string, unknown>) {
+  override async recordAudit(verb: string, payload: Record<string, unknown>) {
     this.auditEvents.push({ verb, payload });
   }
 }
@@ -55,11 +55,11 @@ class SharedMemoryTelemetryStore extends MemoryTelemetryStore {
     this.auditEvents = shared.auditEvents;
   }
 
-  async getOptedIn() {
+  override async getOptedIn() {
     return this.shared.optedIn;
   }
 
-  async setOptedIn(value: boolean) {
+  override async setOptedIn(value: boolean) {
     this.shared.optedIn = value;
   }
 }
