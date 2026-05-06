@@ -3,9 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
 
-import { openPglite } from "../../src/product-kernel/db/pglite.ts";
-import { runMigrations } from "../../src/product-kernel/db/migrate.ts";
-import type { ProductDb } from "../../src/product-kernel/db/types.ts";
+import { openIsolatedStore, migrateIsolatedStore, type TestStore } from "../../src/test-support/product-fixtures.ts";
 import { parseQuickFilter } from "../../src/search/quick-filter-parser.ts";
 import { suggestSearchDocuments } from "../../src/search/suggest.ts";
 
@@ -16,13 +14,13 @@ afterAll(() => {
 });
 
 async function freshDb(name: string) {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(scratch, name));
+  await migrateIsolatedStore(db);
   return db;
 }
 
 async function insertDoc(
-  db: ProductDb,
+  db: TestStore,
   input: {
     id: string;
     orgId?: string;

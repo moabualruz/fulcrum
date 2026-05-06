@@ -3,10 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
 
-import { openPglite } from "../../src/product-kernel/db/pglite.ts";
-import { runMigrations } from "../../src/product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../../src/product-kernel/store/repositories.ts";
-import type { ProductDb } from "../../src/product-kernel/db/types.ts";
+import { openIsolatedStore, migrateIsolatedStore, createLocalOrg, type TestStore } from "../../src/test-support/product-fixtures.ts";
 import { querySearchDocuments } from "../../src/search/query.ts";
 import {
   SearchIndexHook,
@@ -36,8 +33,8 @@ class TaskSearchIndexHook extends SearchIndexHook {
 }
 
 async function freshDb(name: string) {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(scratch, name));
+  await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: name, name });
   return { db, org };
 }
@@ -69,7 +66,7 @@ function installFetchMock(
   };
 }
 
-async function insertPgliteDoc(db: ProductDb, orgId: string) {
+async function insertLocalDoc(db: TestStore, orgId: string) {
   await db.query(
     `INSERT INTO search_documents
        (id, org_id, source_kind, source_id, title, body, labels, metadata, updated_at)
@@ -104,7 +101,7 @@ describe("P11#15 Meilisearch backend", () => {
           MEILISEARCH_KEY: "secret",
         },
         async () => {
-          await insertPgliteDoc(db, org.id);
+          await insertLocalDoc(db, org.id);
 
           const result = await querySearchDocuments(db, { orgId: org.id, q: "alpha" });
 
@@ -215,7 +212,7 @@ describe("P11#15 Meilisearch backend", () => {
           MEILISEARCH_KEY: "secret",
         },
         async () => {
-          await insertPgliteDoc(db, org.id);
+          await insertLocalDoc(db, org.id);
 
           const result = await querySearchDocuments(db, { orgId: org.id, q: "alpha" });
 

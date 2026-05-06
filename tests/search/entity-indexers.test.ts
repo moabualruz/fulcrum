@@ -2,9 +2,15 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../../src/product-kernel/db/pglite.ts";
-import { runMigrations } from "../../src/product-kernel/db/migrate.ts";
-import { createLocalOrg, createProject, createTask } from "../../src/product-kernel/store/repositories.ts";
+import {
+  openIsolatedStore,
+  migrateIsolatedStore,
+  createLocalOrg,
+  createProject,
+  createTask,
+  makeId,
+  type TestStore,
+} from "../../src/test-support/product-fixtures.ts";
 import {
   AgentRunIndexer,
   ArtifactIndexer,
@@ -14,8 +20,6 @@ import {
   SprintIndexer,
   TaskIndexer,
 } from "../../src/search/indexers/index.ts";
-import { newUlid } from "../../src/product-kernel/ids.ts";
-import type { ProductDb } from "../../src/product-kernel/db/types.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-entity-indexers-"));
 
@@ -24,8 +28,8 @@ afterAll(() => {
 });
 
 async function freshDb(name: string) {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(scratch, name));
+  await migrateIsolatedStore(db);
   await extendEntityTables(db);
   const org = await createLocalOrg(db, { slug: name, name });
   const project = await createProject(db, {
@@ -36,7 +40,7 @@ async function freshDb(name: string) {
   return { db, org, project };
 }
 
-async function extendEntityTables(db: ProductDb) {
+async function extendEntityTables(db: TestStore) {
   await db.exec(`
     ALTER TABLE tasks ADD COLUMN IF NOT EXISTS custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb;
     ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sprint_id text;
@@ -66,7 +70,7 @@ async function extendEntityTables(db: ProductDb) {
   `);
 }
 
-async function searchRow(db: ProductDb, kind: string, sourceId: string) {
+async function searchRow(db: TestStore, kind: string, sourceId: string) {
   const rows = await db.query<{
     source_kind: string;
     source_id: string;
@@ -95,7 +99,7 @@ describe("P11#03 entity search indexers", () => {
         description: "Need search over task descriptions",
         status: "in_progress",
       });
-      const sprintId = newUlid();
+      const sprintId = makeId();
       await db.query(
         `INSERT INTO sprints (id, org_id, project_id, name) VALUES ($1, $2, $3, $4)`,
         [sprintId, org.id, project.id, "Search Sprint"],
@@ -141,7 +145,7 @@ describe("P11#03 entity search indexers", () => {
   test("DocumentIndexer indexes, updates, lists, and deletes document search documents", async () => {
     const { db, org, project } = await freshDb("document-indexer");
     try {
-      const docId = newUlid();
+      const docId = makeId();
       await db.query(
         `INSERT INTO documents (id, org_id, project_id, kind, title, body, body_md, doc_type, scope, frontmatter)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)`,
@@ -189,7 +193,7 @@ describe("P11#03 entity search indexers", () => {
   test("MemoryIndexer indexes, updates, lists, and deletes memory search documents", async () => {
     const { db, org, project } = await freshDb("memory-indexer");
     try {
-      const memoryId = newUlid();
+      const memoryId = makeId();
       await db.query(
         `INSERT INTO memories (id, org_id, project_id, scope, kind, key, body, tags, importance, global)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text[], $9, $10)`,
@@ -244,7 +248,7 @@ describe("P11#03 entity search indexers", () => {
         description: "Find failing search tests",
         status: "in_progress",
       });
-      const runId = newUlid();
+      const runId = makeId();
       await db.query(
         `INSERT INTO agent_runs (id, org_id, project_id, task_id, agent, model, prompt, status, agent_name, workspace_path)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
@@ -296,7 +300,7 @@ describe("P11#03 entity search indexers", () => {
   test("ArtifactIndexer indexes, updates, lists, and deletes artifact search documents", async () => {
     const { db, org, project } = await freshDb("artifact-indexer");
     try {
-      const artifactId = newUlid();
+      const artifactId = makeId();
       await db.query(
         `INSERT INTO artifacts (id, org_id, project_id, kind, title, filename, mime, metadata_json)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
@@ -347,7 +351,7 @@ describe("P11#03 entity search indexers", () => {
   test("RepoIndexer indexes, updates, lists, and deletes repo search documents", async () => {
     const { db, org, project } = await freshDb("repo-indexer");
     try {
-      const repoId = newUlid();
+      const repoId = makeId();
       await db.query(
         `INSERT INTO repos (id, org_id, project_id, slug, root_path, default_branch, remote_url, name, description)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
@@ -397,7 +401,7 @@ describe("P11#03 entity search indexers", () => {
   test("SprintIndexer indexes, updates, lists, and deletes sprint search documents", async () => {
     const { db, org, project } = await freshDb("sprint-indexer");
     try {
-      const sprintId = newUlid();
+      const sprintId = makeId();
       await db.query(
         `INSERT INTO sprints (id, org_id, project_id, name, goal, status)
          VALUES ($1, $2, $3, $4, $5, $6)`,

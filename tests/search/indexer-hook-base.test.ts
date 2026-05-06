@@ -2,16 +2,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openPglite } from "../../src/product-kernel/db/pglite.ts";
-import { runMigrations } from "../../src/product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../../src/product-kernel/store/repositories.ts";
+import { openIsolatedStore, migrateIsolatedStore, createLocalOrg, type TestStore } from "../../src/test-support/product-fixtures.ts";
 import {
   IndexerRegistry,
   SearchIndexHook,
   type SearchDocumentInput,
   type SearchIndexHookOptions,
 } from "../../src/search/indexers/base.ts";
-import type { ProductDb } from "../../src/product-kernel/db/types.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-search-indexers-"));
 
@@ -22,7 +19,7 @@ afterAll(() => {
 class TaskSearchIndexHook extends SearchIndexHook {
   override readonly kind = "task";
 
-  constructor(db: ProductDb, options: SearchIndexHookOptions = {}) {
+  constructor(db: TestStore, options: SearchIndexHookOptions = {}) {
     super(db, options);
   }
 
@@ -44,8 +41,8 @@ class TaskSearchIndexHook extends SearchIndexHook {
 }
 
 async function freshDb(name: string) {
-  const db = await openPglite(join(scratch, name));
-  await runMigrations(db);
+  const db = await openIsolatedStore(join(scratch, name));
+  await migrateIsolatedStore(db);
   await db.exec(`ALTER TABLE search_documents ADD COLUMN IF NOT EXISTS embedding text NULL`);
   const org = await createLocalOrg(db, { slug: name, name });
   return { db, org };
@@ -85,9 +82,9 @@ describe("P11#02 search indexer hook base", () => {
   });
 
   test("same entity id in two orgs creates separate rows and remove only deletes scoped row", async () => {
-    const db = await openPglite(join(scratch, "org-scope"));
+    const db = await openIsolatedStore(join(scratch, "org-scope"));
     try {
-      await runMigrations(db);
+      await migrateIsolatedStore(db);
       const orgA = await createLocalOrg(db, { slug: "org-a", name: "Org A" });
       const orgB = await createLocalOrg(db, { slug: "org-b", name: "Org B" });
       const hook = new TaskSearchIndexHook(db);

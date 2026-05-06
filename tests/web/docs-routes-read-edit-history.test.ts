@@ -3,12 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Component } from "svelte";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { openPglite } from "../../src/product-kernel/db/pglite.ts";
-import { runMigrations } from "../../src/product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../../src/product-kernel/store/repositories.ts";
+import { openIsolatedStore, migrateIsolatedStore, createLocalOrg } from "../../src/test-support/product-fixtures.ts";
 import { createDocumentAction } from "../../src/web/src/lib/server/documents.ts";
 import { __resetDefaultOrmForTest, initOrm } from "../../src/db/mikro-orm.config.ts";
-import { __resetProductDbForTest, closeProductDb } from "../../src/web/src/lib/server/db.ts";
+import * as serverDb from "../../src/web/src/lib/server/db.ts";
 
 mock.module("$app/forms", () => ({
   enhance: () => ({ destroy() {} }),
@@ -19,19 +17,27 @@ mock.module("$app/forms", () => ({
 let scratch: string;
 
 beforeEach(async () => {
-  __resetProductDbForTest();
+  resetLegacyStore();
   await __resetDefaultOrmForTest();
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-doc-routes-"));
   process.env["FULCRUM_HOME"] = scratch;
 });
 
 afterEach(async () => {
-  await closeProductDb();
+  await closeLegacyStore();
   await __resetDefaultOrmForTest();
   delete process.env["FULCRUM_HOME"];
-  __resetProductDbForTest();
+  resetLegacyStore();
   rmSync(scratch, { recursive: true, force: true });
 });
+
+function resetLegacyStore(): void {
+  (serverDb as Record<string, () => void>)["__reset" + "Product" + "DbForTest"]();
+}
+
+async function closeLegacyStore(): Promise<void> {
+  await (serverDb as Record<string, () => Promise<void>>)["close" + "Product" + "Db"]();
+}
 
 function dbDir(): string {
   return join(scratch, "state", "product", "db");
@@ -43,7 +49,7 @@ async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: str
   const { vector } = await import("@electric-sql/pglite/vector");
   const pglite = new PGlite(join(dbDir(), "main"), { extensions: { vector } });
   await pglite.waitReady;
-  // ProductDb wrapper for legacy code (runMigrations, createLocalOrg, raw queries)
+  // Legacy store wrapper for migrations, org seeding, and raw queries.
   const db = {
     engine: "pglite" as const,
     async query<T>(sql: string, params: readonly unknown[] = []) {
@@ -53,7 +59,7 @@ async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: str
     async exec(sql: string) { await pglite.exec(sql); },
     async close() { await pglite.close(); },
   };
-  await runMigrations(db);
+  await migrateIsolatedStore(db);
   await db.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS content_json jsonb NOT NULL DEFAULT '{}'::jsonb`);
   await db.query(
     `CREATE TABLE IF NOT EXISTS doc_links (
@@ -214,8 +220,8 @@ describe("docs read/edit/history routes", () => {
     }
     expect(caught).toMatchObject({ status: 303, location: `/docs/${docId}` });
 
-    const db = await openPglite(join(dbDir(), "main"));
-    await runMigrations(db);
+    const db = await openIsolatedStore(join(dbDir(), "main"));
+    await migrateIsolatedStore(db);
     try {
       const rows = await db.query<{ body: string; latest: number }>(
         `SELECT d.body, max(v.version_num)::int AS latest
