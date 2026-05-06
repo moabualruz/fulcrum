@@ -44,6 +44,7 @@ export const STEPS: Step[] = [
   // Vitest unit tests for the SvelteKit subpackage — always-on.
   { name: "web:test",    cmd: ["bun", "run", "web:test"], cwd: "src/web" },
   { name: "coverage:web", cmd: ["bun", "run", "web:test", "--", "--coverage"], cwd: "src/web" },
+  { name: "web:a11y", cmd: ["bun", "run", "web:a11y"], cwd: "src/web", env: hostHome ? { HOME: hostHome } : undefined },
   { name: "web:e2e:smoke", cmd: ["bun", "run", "web:e2e:smoke"], cwd: "src/web", env: hostHome ? { HOME: hostHome } : undefined },
   { name: "ci:schemas", cmd: ["bun", "run", "scripts/ci-schemas.ts"] },
   // Playwright e2e — opt-in via FULCRUM_RUN_E2E=1.

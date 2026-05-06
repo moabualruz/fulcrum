@@ -73,7 +73,8 @@
   <h2 class={cn("text-lg font-semibold mb-3")}>Import</h2>
   <form method="POST" action="?/preflight" enctype="multipart/form-data" use:enhance>
     <div class={cn("flex gap-2 items-center")}>
-      <input type="file" name="file" accept=".json" data-import-file
+      <label for="data-import-file" class={cn("sr-only")}>Import file</label>
+      <input id="data-import-file" type="file" name="file" accept=".json" data-import-file
         class={cn("text-sm")}
         onchange={(e) => { importFile = (e.currentTarget as HTMLInputElement).files?.[0] ?? null; }} />
       <button type="submit" data-import-preflight disabled={!importFile}

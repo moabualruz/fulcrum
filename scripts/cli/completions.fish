@@ -386,9 +386,11 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'templates'" -a 'set-default
 complete -c fulcrum -n "__fish_seen_subcommand_from 'templates'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'templates'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'templates')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'theme' -d 'fulcrum theme'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'theme'" -a 'get' -d 'theme get'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'theme'" -a 'get-theme' -d 'theme get-theme'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'theme'" -a 'list-themes' -d 'theme list-themes'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'theme'" -a 'set-theme' -d 'theme set-theme'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'theme'" -a 'update' -d 'theme update'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'theme'" -l json -d option
 complete -c fulcrum -n "__fish_use_subcommand" -a 'webhooks' -d 'fulcrum webhooks'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'webhooks'" -a 'create' -d 'webhooks create'

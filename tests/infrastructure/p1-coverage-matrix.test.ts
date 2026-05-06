@@ -59,7 +59,7 @@ describe("P1 test coverage matrix", () => {
 });
 
 describe("scripts/ci.ts baseline gate", () => {
-  it("keeps the default CI gate at 15 always-on product stages", () => {
+  it("keeps the default CI gate at 20 always-on product stages", () => {
     const names = STEPS.map((step) => step.name);
     expect(names).toEqual([
       "install",
@@ -68,13 +68,18 @@ describe("scripts/ci.ts baseline gate", () => {
       "symphony:conformance",
       "trpc:permissions",
       "test",
+      "coverage:root",
       "license-audit",
       "ci:codegen",
+      "migration:downgrade",
+      "graceful:shutdown",
       "build:all",
       "web:install",
       "web:check",
       "web:build",
       "web:test",
+      "coverage:web",
+      "web:a11y",
       "web:e2e:smoke",
       "ci:schemas",
     ]);

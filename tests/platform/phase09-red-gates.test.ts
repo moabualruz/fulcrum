@@ -6,16 +6,18 @@ async function read(path: string): Promise<string> {
 }
 
 describe("Phase 09 RED gates", () => {
-  test("root CI includes a coverage gate stage named coverage", async () => {
+  test("root CI includes root and web coverage gate stages", async () => {
     const ci = await read("scripts/ci.ts");
 
-    expect(ci).toContain('name: "coverage"');
+    expect(ci).toContain('name: "coverage:root"');
+    expect(ci).toContain('name: "coverage:web"');
   });
 
   test("web Vitest enforces coverage.thresholds.lines at 80", async () => {
     const config = await read("src/web/vitest.config.ts");
 
-    expect(config).toContain("coverage.thresholds.lines");
+    expect(config).toContain("coverage:");
+    expect(config).toContain("thresholds:");
     expect(config).toMatch(/lines:\s*80/);
   });
 
@@ -28,12 +30,14 @@ describe("Phase 09 RED gates", () => {
   test("root CI runs migration downgrade coverage", async () => {
     const ci = await read("scripts/ci.ts");
 
-    expect(ci.toLowerCase()).toContain("migration downgrade");
+    expect(ci).toContain('name: "migration:downgrade"');
+    expect(ci).toContain("tests/db/migration-downgrade.test.ts");
   });
 
   test("root CI runs graceful shutdown coverage", async () => {
     const ci = await read("scripts/ci.ts");
 
-    expect(ci.toLowerCase()).toContain("graceful shutdown");
+    expect(ci).toContain('name: "graceful:shutdown"');
+    expect(ci).toContain("tests/platform/graceful-shutdown.test.ts");
   });
 });

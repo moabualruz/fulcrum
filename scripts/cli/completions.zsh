@@ -318,7 +318,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     theme)
-      local -a values=('get-theme:fulcrum theme get-theme' 'list-themes:fulcrum theme list-themes' 'set-theme:fulcrum theme set-theme' '--json:option')
+      local -a values=('get:fulcrum theme get' 'get-theme:fulcrum theme get-theme' 'list-themes:fulcrum theme list-themes' 'set-theme:fulcrum theme set-theme' 'update:fulcrum theme update' '--json:option')
       _describe 'command or option' values
       ;;
     webhooks)

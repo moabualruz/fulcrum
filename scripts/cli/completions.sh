@@ -561,7 +561,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     theme)
-      local verbs='get-theme list-themes set-theme'
+      local verbs='get get-theme list-themes set-theme update'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )

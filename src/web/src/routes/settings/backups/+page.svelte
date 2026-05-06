@@ -90,7 +90,8 @@
   <h2 class={cn("text-lg font-semibold mb-3")}>Restore from backup</h2>
   <form method="POST" action="?/restore" enctype="multipart/form-data" use:enhance>
     <div class={cn("flex gap-2 items-center")}>
-      <input type="file" name="file" accept=".json" data-restore-file
+      <label for="backup-restore-file" class={cn("sr-only")}>Backup file</label>
+      <input id="backup-restore-file" type="file" name="file" accept=".json" data-restore-file
         class={cn("text-sm")}
         onchange={(e) => { restoreFile = (e.currentTarget as HTMLInputElement).files?.[0] ?? null; }} />
       <button type="submit" data-restore-submit disabled={!restoreFile}

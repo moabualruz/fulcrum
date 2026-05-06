@@ -18,8 +18,6 @@
  * Run: npx playwright test tests/a11y/ --project=chromium
  */
 
-import { describe as bunDescribe, expect as bunExpect, test as bunTest } from "bun:test";
-
 const isPlaywrightCli = process.argv.some((argument) => argument.includes("playwright"));
 
 const { test, expect, AxeBuilder } = isPlaywrightCli
@@ -27,21 +25,25 @@ const { test, expect, AxeBuilder } = isPlaywrightCli
       ...(await import("@playwright/test")),
       AxeBuilder: (await import("@axe-core/playwright")).default,
     }
-  : {
-      test: Object.assign((name: string, fn: () => unknown) => bunTest.skip(name, fn), {
-        describe: bunDescribe.skip,
-        use: () => {},
-      }),
-      expect: bunExpect,
-      AxeBuilder: class AxeBuilder {
-        withTags() {
-          return this;
-        }
-        async analyze() {
-          return { violations: [] };
-        }
-      },
-    };
+  : await (async () => {
+      const { describe: bunDescribe, expect: bunExpect, test: bunTest } = await import("bun:test");
+
+      return {
+        test: Object.assign((name: string, fn: () => unknown) => bunTest.skip(name, fn), {
+          describe: bunDescribe.skip,
+          use: () => {},
+        }),
+        expect: bunExpect,
+        AxeBuilder: class AxeBuilder {
+          withTags() {
+            return this;
+          }
+          async analyze() {
+            return { violations: [] };
+          }
+        },
+      };
+    })();
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
