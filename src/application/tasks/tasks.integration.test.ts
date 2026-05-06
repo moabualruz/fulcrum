@@ -6,12 +6,14 @@ import { TaskRepository } from "../../db/repositories/tasks/TaskRepository.ts";
 import { DEFAULT_ORG_ID } from "../../db/seed.ts";
 import { createTestOrm, type TestOrm } from "../../test-utils/db.ts";
 import { AppForbiddenError, AppNotFoundError, AppValidationError } from "../errors.ts";
-import { createTask, deleteTask, updateTask } from "./commands.ts";
+import { createTask, deleteTask, setDependencies, setParent, updateTask } from "./commands.ts";
 import { getTask, listTasks } from "./queries.ts";
 import type { AppContext } from "./types.ts";
 
 const USER_ID = "00000000-0000-0000-0000-000000000010";
 const OTHER_ORG_ID = "11111111-1111-4111-8111-111111111111";
+const PROJECT_A_ID = "22222222-2222-4222-8222-222222222222";
+const PROJECT_B_ID = "33333333-3333-4333-8333-333333333333";
 
 let db: TestOrm | null = null;
 
@@ -27,6 +29,17 @@ afterEach(async () => {
 
 function ctx(orgId = DEFAULT_ORG_ID): AppContext {
   return { orgId, userId: USER_ID, projectId: null };
+}
+
+function projectCtx(projectId: string): AppContext {
+  return { orgId: DEFAULT_ORG_ID, userId: USER_ID, projectId };
+}
+
+async function seedProjects(testDb: TestOrm): Promise<void> {
+  await testDb.pglite.query(
+    `insert into "projects" ("id", "org_id", "name") values ($1, $2, $3), ($4, $2, $5)`,
+    [PROJECT_A_ID, DEFAULT_ORG_ID, "Project A", PROJECT_B_ID, "Project B"],
+  );
 }
 
 describe("application tasks commands and queries", () => {
@@ -109,5 +122,59 @@ describe("application tasks commands and queries", () => {
     await em.flush();
 
     await expect(getTask(em, ctx(), otherTask.id)).rejects.toBeInstanceOf(AppForbiddenError);
+  });
+
+  test("CR-02 removes stale reverse blocked_by dependency edges", async () => {
+    const testDb = await freshDb();
+    const em = testDb.em.fork();
+    const blocked = await createTask(em, ctx(), { title: "Blocked task" });
+    const blocker = await createTask(em, ctx(), { title: "Blocker task" });
+
+    await setDependencies(em, ctx(), blocked.id, {
+      blocks: [],
+      blocked_by: [blocker.id],
+    });
+    await setDependencies(em, ctx(), blocked.id, {
+      blocks: [],
+      blocked_by: [],
+    });
+
+    expect((await getTask(em, ctx(), blocked.id)).dependencies.blocked_by).toEqual([]);
+    expect((await getTask(em, ctx(), blocker.id)).dependencies.blocks).toEqual([]);
+  });
+
+  test("CR-03 project-scoped context cannot read or mutate another project task", async () => {
+    const testDb = await freshDb();
+    const em = testDb.em.fork();
+    await seedProjects(testDb);
+    const visible = await createTask(em, projectCtx(PROJECT_A_ID), { title: "Visible project task" });
+    const hidden = await createTask(em, projectCtx(PROJECT_B_ID), { title: "Hidden project task" });
+    const hiddenForDelete = await createTask(em, projectCtx(PROJECT_B_ID), { title: "Hidden delete task" });
+
+    await expect(getTask(em, projectCtx(PROJECT_A_ID), hidden.id)).rejects.toBeInstanceOf(AppNotFoundError);
+    await expect(
+      updateTask(em, projectCtx(PROJECT_A_ID), hidden.id, { title: "Cross-project update" }),
+    ).rejects.toBeInstanceOf(AppNotFoundError);
+    await expect(
+      deleteTask(em, projectCtx(PROJECT_A_ID), hiddenForDelete.id),
+    ).rejects.toBeInstanceOf(AppNotFoundError);
+    await expect(
+      setParent(em, projectCtx(PROJECT_A_ID), hidden.id, visible.id),
+    ).rejects.toBeInstanceOf(AppNotFoundError);
+    await expect(
+      setDependencies(em, projectCtx(PROJECT_A_ID), hidden.id, { blocks: [visible.id], blocked_by: [] }),
+    ).rejects.toBeInstanceOf(AppNotFoundError);
+  });
+
+  test("WR-02 listTasks applies project scope before serialization", async () => {
+    const testDb = await freshDb();
+    const em = testDb.em.fork();
+    await seedProjects(testDb);
+    const projectA = await createTask(em, projectCtx(PROJECT_A_ID), { title: "Project A task" });
+    await createTask(em, projectCtx(PROJECT_B_ID), { title: "Project B task" });
+
+    const listed = await listTasks(em, projectCtx(PROJECT_A_ID));
+
+    expect(listed.map((task) => task.id)).toEqual([projectA.id]);
   });
 });
