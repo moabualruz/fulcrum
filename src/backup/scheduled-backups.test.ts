@@ -15,12 +15,13 @@
  */
 
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { mkdir, writeFile, readdir } from "node:fs/promises";
+import { mkdir, writeFile, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { rmSync } from "node:fs";
 
 import { parseDSN, uploadBackup, pruneLocalBackups, makeBackupEvent, MAX_LOCAL_COPIES, type UploadResult } from "./remote-adapters.ts";
+import { createLocalBackup, verifyBackupArchive } from "./runner.ts";
 import { runScheduledBackup, shouldRegisterTask } from "./scheduled-task.ts";
 
 // ---------------------------------------------------------------------------
@@ -94,6 +95,37 @@ describe("makeBackupEvent", () => {
     const evt = makeBackupEvent(result);
     expect(evt.kind).toBe("backup_upload_failed");
     expect(evt.payload.error).toBe("net err");
+  });
+});
+
+describe("createLocalBackup", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = tmpDir();
+    await mkdir(dir, { recursive: true });
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("writes fulcrum.backup.v1 archive and verifies checksum", async () => {
+    const dump = Buffer.from(JSON.stringify({ format: "fulcrum.db-dump.v1", tables: {} }), "utf8").toString("base64");
+    const result = await createLocalBackup({
+      stateDir: dir,
+      tag: "phase09",
+      dump,
+      entityCounts: { tasks: 2 },
+    });
+
+    expect(await readFile(result.archivePath)).toBeDefined();
+    const verified = await verifyBackupArchive(result.archivePath);
+    expect(verified).toMatchObject({
+      ok: true,
+      format: "fulcrum.backup.v1",
+      entityCounts: { tasks: 2 },
+    });
+    expect(verified.checksumSha256).toMatch(/^[0-9a-f]{64}$/);
   });
 });
 
