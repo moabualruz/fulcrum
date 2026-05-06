@@ -140,8 +140,12 @@ export function registerKernelTaskRoutes(api: OpenAPIHono<ApiEnv>): void {
         projectId: body.project_id ?? null,
         title: body.title,
         description: body.description ?? null,
+        descriptionText: body.descriptionText,
+        tiptapContent: body.tiptapContent,
         status: body.status,
         priority: body.priority,
+        points: body.points,
+        assigneeId: body.assigneeId,
       });
       return c.json({ id: task.id }, 201);
     }) as never;
