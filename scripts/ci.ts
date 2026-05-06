@@ -23,35 +23,80 @@ export function envForStep(step: Step): NodeJS.ProcessEnv {
   return { ...CI_ENV, ...step.env };
 }
 
-export const STEPS: Step[] = [
-  { name: "install",     cmd: ["bun", "install", "--frozen-lockfile"] },
-  { name: "typecheck",   cmd: ["bun", "run", "--bun", "tsc", "--noEmit"] },
-  { name: "symphony:lock", cmd: ["bun", "test", "tests/symphony/spec-lock.test.ts"] },
-  { name: "symphony:conformance", cmd: ["bun", "test", "src/orchestration/__tests__/symphony-conformance.test.ts"] },
-  { name: "trpc:permissions", cmd: ["bun", "test", "tests/trpc/app-router-scaffold.test.ts", "tests/trpc/router.test.ts"] },
-  { name: "test",        cmd: ["bun", "run", "scripts/test-root.ts"] },
-  { name: "coverage:root", cmd: ["bun", "run", "scripts/test-root.ts", "--coverage"] },
-  { name: "license-audit", cmd: ["bun", "run", "scripts/license-audit.ts"] },
-  { name: "ci:codegen", cmd: ["bun", "run", "scripts/ci/codegen.ts"] },
-  { name: "migration:downgrade", cmd: ["bun", "test", "tests/db/migration-downgrade.test.ts"] },
-  { name: "graceful:shutdown", cmd: ["bun", "test", "tests/platform/graceful-shutdown.test.ts"] },
-  { name: "build:all",   cmd: ["bun", "run", "scripts/build-all.ts"] },
-  // Web pipeline runs from the SvelteKit subpackage. svelte-kit + svelte-check
-  // catch regressions that the root tsc cannot see because src/web is excluded.
-  { name: "web:install", cmd: ["bun", "install", "--frozen-lockfile"], cwd: "src/web", env: { BUN_INSTALL_CACHE_DIR: webInstallCache } },
-  { name: "web:check",   cmd: ["bun", "run", "check"], cwd: "src/web", env: { NODE_OPTIONS: "--max-old-space-size=12288" } },
-  { name: "web:build",   cmd: ["bun", "run", "build"], cwd: "src/web" },
-  // Vitest unit tests for the SvelteKit subpackage — always-on.
-  { name: "web:test",    cmd: ["bun", "run", "web:test"], cwd: "src/web" },
-  { name: "coverage:web", cmd: ["bun", "run", "web:test", "--", "--coverage"], cwd: "src/web" },
-  { name: "web:a11y", cmd: ["bun", "run", "web:a11y"], cwd: "src/web", env: hostHome ? { HOME: hostHome } : undefined },
-  { name: "web:e2e:smoke", cmd: ["bun", "run", "web:e2e:smoke"], cwd: "src/web", env: hostHome ? { HOME: hostHome } : undefined },
-  { name: "ci:schemas", cmd: ["bun", "run", "scripts/ci-schemas.ts"] },
-  // Playwright e2e — opt-in via FULCRUM_RUN_E2E=1.
+// ── CI Tiers ──────────────────────────────────────────────────────────────────
+// Usage:
+//   bun run ci                     → full (all tiers)
+//   bun run ci --tier=quick        → T0 only (~10s, typecheck + lint)
+//   bun run ci --tier=unit         → T0 + T1 (~30s, + unit tests)
+//   bun run ci --tier=integration  → T0 + T1 + T2 (~90s, + integration + web)
+//   bun run ci --tier=e2e          → T0 + T1 + T2 + T3 (+ Playwright + CLI E2E)
+//   bun run ci --tier=full         → all tiers (same as no flag)
+//
+// Domain focus (combine with tier):
+//   bun run ci --domain=application  → only application layer tests
+//   bun run ci --domain=web          → only web pipeline
+//   bun run ci --domain=cli          → only CLI tests
+//   bun run ci --domain=tui          → only TUI tests
+//   bun run ci --domain=api          → only API/tRPC tests
+
+type CiTier = "quick" | "unit" | "integration" | "e2e" | "full";
+type CiDomain = "application" | "web" | "cli" | "tui" | "api" | "all";
+
+const tierArg = process.argv.find(a => a.startsWith("--tier="))?.split("=")[1] as CiTier | undefined ?? "full";
+const domainArg = process.argv.find(a => a.startsWith("--domain="))?.split("=")[1] as CiDomain | undefined ?? "all";
+
+const TIER_ORDER: CiTier[] = ["quick", "unit", "integration", "e2e", "full"];
+function tierIncludes(step: CiTier): boolean {
+  return TIER_ORDER.indexOf(tierArg) >= TIER_ORDER.indexOf(step);
+}
+
+function domainIncludes(step: CiDomain | "all"): boolean {
+  if (domainArg === "all") return true;
+  if (step === "all") return true;
+  return domainArg === step;
+}
+
+export interface TieredStep extends Step {
+  tier: CiTier;
+  domain: CiDomain | "all";
+}
+
+export const ALL_STEPS: TieredStep[] = [
+  // ── T0: Quick (~10s) — typecheck + boundaries ──
+  { name: "install",          cmd: ["bun", "install", "--frozen-lockfile"], tier: "quick", domain: "all" },
+  { name: "typecheck",        cmd: ["bun", "run", "--bun", "tsc", "--noEmit"], tier: "quick", domain: "all" },
+
+  // ── T1: Unit (~30s) — fast unit tests, no DB ──
+  { name: "symphony:lock",    cmd: ["bun", "test", "tests/symphony/spec-lock.test.ts"], tier: "unit", domain: "all" },
+  { name: "symphony:conformance", cmd: ["bun", "test", "src/orchestration/__tests__/symphony-conformance.test.ts"], tier: "unit", domain: "all" },
+  { name: "trpc:permissions", cmd: ["bun", "test", "tests/trpc/app-router-scaffold.test.ts", "tests/trpc/router.test.ts"], tier: "unit", domain: "api" },
+  { name: "test",             cmd: ["bun", "run", "scripts/test-root.ts"], tier: "unit", domain: "all" },
+  { name: "license-audit",    cmd: ["bun", "run", "scripts/license-audit.ts"], tier: "unit", domain: "all" },
+  { name: "ci:codegen",       cmd: ["bun", "run", "scripts/ci/codegen.ts"], tier: "unit", domain: "all" },
+
+  // ── T2: Integration (~90s) — DB, web build, coverage ──
+  { name: "migration:downgrade", cmd: ["bun", "test", "tests/db/migration-downgrade.test.ts"], tier: "integration", domain: "all" },
+  { name: "graceful:shutdown",   cmd: ["bun", "test", "tests/platform/graceful-shutdown.test.ts"], tier: "integration", domain: "all" },
+  { name: "coverage:root",    cmd: ["bun", "run", "scripts/test-root.ts", "--coverage"], tier: "integration", domain: "all" },
+  { name: "build:all",        cmd: ["bun", "run", "scripts/build-all.ts"], tier: "integration", domain: "all" },
+  { name: "web:install",      cmd: ["bun", "install", "--frozen-lockfile"], cwd: "src/web", env: { BUN_INSTALL_CACHE_DIR: webInstallCache }, tier: "integration", domain: "web" },
+  { name: "web:check",        cmd: ["bun", "run", "check"], cwd: "src/web", env: { NODE_OPTIONS: "--max-old-space-size=12288" }, tier: "integration", domain: "web" },
+  { name: "web:build",        cmd: ["bun", "run", "build"], cwd: "src/web", tier: "integration", domain: "web" },
+  { name: "web:test",         cmd: ["bun", "run", "web:test"], cwd: "src/web", tier: "integration", domain: "web" },
+  { name: "coverage:web",     cmd: ["bun", "run", "web:test", "--", "--coverage"], cwd: "src/web", tier: "integration", domain: "web" },
+  { name: "ci:schemas",       cmd: ["bun", "run", "scripts/ci-schemas.ts"], tier: "integration", domain: "all" },
+
+  // ── T3: E2E (~180s+) — Playwright, a11y, full E2E ──
+  { name: "web:a11y",         cmd: ["bun", "run", "web:a11y"], cwd: "src/web", env: hostHome ? { HOME: hostHome } : undefined, tier: "e2e", domain: "web" },
+  { name: "web:e2e:smoke",    cmd: ["bun", "run", "web:e2e:smoke"], cwd: "src/web", env: hostHome ? { HOME: hostHome } : undefined, tier: "e2e", domain: "web" },
   ...(process.env["FULCRUM_RUN_E2E"] === "1"
-    ? [{ name: "web:e2e:full", cmd: ["bun", "run", "web:e2e:full"], cwd: "src/web", env: hostHome ? { HOME: hostHome } : undefined } satisfies Step]
+    ? [{ name: "web:e2e:full", cmd: ["bun", "run", "web:e2e:full"], cwd: "src/web", env: hostHome ? { HOME: hostHome } : undefined, tier: "e2e", domain: "web" } satisfies TieredStep]
     : []),
 ];
+
+export const STEPS: Step[] = ALL_STEPS
+  .filter(s => tierIncludes(s.tier))
+  .filter(s => domainIncludes(s.domain));
 
 interface Result { step: string; ok: boolean; soft?: boolean; skipped?: boolean; pending?: number; ms: number; }
 
