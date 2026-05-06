@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { formatConnectorsList, formatConnectorRuns } from "./connectors.ts";
-import type { ConnectorRunRow } from "../test-support/product-fixtures.ts";
+import type { ConnectorRunSummary } from "./connectors.ts";
+
+type ConnectorRunFixture = ConnectorRunSummary & {
+  org_id: string;
+  ended_at: string | null;
+};
 
 describe("connectors CLI formatters", () => {
   test("formatConnectorsList --json", () => {
@@ -22,7 +27,7 @@ describe("connectors CLI formatters", () => {
   });
 
   test("formatConnectorRuns --json", () => {
-    const runs: ConnectorRunRow[] = [
+    const runs: ConnectorRunFixture[] = [
       { id: "r1", org_id: "o1", kind: "github", status: "succeeded", started_at: "2026-05-01", ended_at: "2026-05-01", error: null, records_synced: 5 },
     ];
     const json = JSON.parse(formatConnectorRuns(runs, true));
@@ -31,7 +36,7 @@ describe("connectors CLI formatters", () => {
   });
 
   test("formatConnectorRuns text", () => {
-    const runs: ConnectorRunRow[] = [
+    const runs: ConnectorRunFixture[] = [
       { id: "r1", org_id: "o1", kind: "github", status: "failed", started_at: "2026-05-01", ended_at: "2026-05-01", error: "timeout", records_synced: 0 },
     ];
     const text = formatConnectorRuns(runs, false);

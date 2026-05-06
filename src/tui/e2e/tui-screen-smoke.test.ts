@@ -43,12 +43,12 @@ describe("TUI screen application caller smoke", () => {
     ]);
   });
 
-  test.each(SCREEN_SPECS)("$key screen does not read product storage directly", ({ file }) => {
+  test.each([...SCREEN_SPECS])("$key screen does not read product storage directly", ({ file }) => {
     const source = readFileSync(file, "utf8");
     expect(source).not.toMatch(TUI_PRODUCT_ACCESS_PATTERN);
   });
 
-  test.each(E2E_SPECS)("$# E2E spec does not import product-kernel or PGlite", (file) => {
+  test.each([...E2E_SPECS])("$# E2E spec does not import product-kernel or PGlite", (file) => {
     const source = readFileSync(file, "utf8");
     expect(source).not.toMatch(TUI_E2E_PRODUCT_ACCESS_PATTERN);
   });
@@ -59,7 +59,7 @@ describe("TUI screen application caller smoke", () => {
     expect(TUI_RUNTIME_BOUNDARY_SURFACES.some((surface) => surface.file.includes("vendor/"))).toBe(false);
   });
 
-  test.each(TUI_RUNTIME_BOUNDARY_SURFACES)(
+  test.each([...TUI_RUNTIME_BOUNDARY_SURFACES])(
     "$key does not persist directly through EntityManager",
     ({ file }) => {
       const source = readFileSync(file, "utf8");

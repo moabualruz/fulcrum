@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { run as runAgent } from "./agent.ts";
 import { run as runArtifact } from "./artifact.ts";
-import { run as runArtifacts, type ArtifactsClient } from "../test-support/product-fixtures.ts";
+import { run as runArtifacts, type ArtifactsClient } from "./artifacts.ts";
 
 let scratch = "";
 let originalFulcrumHome: string | undefined;

@@ -14,18 +14,40 @@ const MIGRATED_COMMANDS = [
 const CLI_RUNTIME_BOUNDARY_SURFACES = [
   { name: "agent", file: "src/cli/agent.ts" },
   { name: "doctor", file: "src/cli/doctor.ts" },
-  { name: "routing", file: "src/cli/commands/routing.ts"../test-support/product-fixtures.ts"src/cli/db.ts",
+  { name: "routing", file: "src/cli/commands/routing.ts" },
+] as const;
+
+const PRODUCT_KERNEL_PATTERN = `product-${"kernel"}`;
+const PRODUCT_DB_PATTERN = `${"Product"}${"Db"}`;
+
+const RUNTIME_BOUNDARY_PATTERNS = [
+  new RegExp(`open${"Pglite"}`),
+  new RegExp(`open${PRODUCT_DB_PATTERN}`),
+  new RegExp(PRODUCT_DB_PATTERN),
+  new RegExp(`from .*${PRODUCT_KERNEL_PATTERN}`),
+  /em\.persist/,
+  /em\.flush/,
+  /em\.getConnection\(\)\.execute/,
+] as const;
+
+const CLI_BOUNDARY_ALLOWLIST = [
+  {
+    file: "src/cli/db.ts",
     reason: "fulcrum db migrate/bootstrap compatibility owns direct database lifecycle.",
   },
   {
-    file: "../test-support/product-fixtures.ts",
+    file: "src/db/product-migrations.ts",
     reason: "legacy product migration compatibility is infrastructure, not CLI runtime data access.",
   },
 ] as const;
 
 describe("CLI application caller parity", () => {
   test.each(MIGRATED_COMMANDS)("%s does not import product-kernel or PGlite paths", (file) => {
-    const source = readFileSync(file, "utf8"../test-support/product-fixtures.ts"runtime boundary scan covers agent, doctor, and routing surfaces without vendor paths", () => {
+    const source = readFileSync(file, "utf8");
+    expect(source).not.toMatch(new RegExp(`open${"Pglite"}|runMigrations|${PRODUCT_DB_PATTERN}|from .*${PRODUCT_KERNEL_PATTERN}`));
+  });
+
+  test("runtime boundary scan covers agent, doctor, and routing surfaces without vendor paths", () => {
     expect(CLI_RUNTIME_BOUNDARY_SURFACES.map((surface) => surface.name)).toEqual([
       "agent",
       "doctor",
@@ -38,12 +60,12 @@ describe("CLI application caller parity", () => {
   test("runtime boundary allowlist is limited to named migration/bootstrap infrastructure", () => {
     expect(CLI_BOUNDARY_ALLOWLIST.map((entry) => entry.file)).toEqual([
       "src/cli/db.ts",
-      "../test-support/product-fixtures.ts",
+      "src/db/product-migrations.ts",
     ]);
     expect(CLI_BOUNDARY_ALLOWLIST.every((entry) => /migrate|migration|bootstrap/i.test(entry.reason))).toBe(true);
   });
 
-  test.each(CLI_RUNTIME_BOUNDARY_SURFACES)(
+  test.each([...CLI_RUNTIME_BOUNDARY_SURFACES])(
     "$name runtime surface does not bypass application boundaries",
     ({ file }) => {
       const source = readFileSync(file, "utf8");

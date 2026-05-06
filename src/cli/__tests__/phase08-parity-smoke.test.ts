@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 
-import { run as runArtifactsCli } from "../../test-support/product-fixtures.ts";
+import { run as runArtifactsCli } from "../commands/artifacts.ts";
 import { run as runDocsCli } from "../commands/docs.ts";
 import { run as runReposCli } from "../commands/repos.ts";
 import { run as runTasksCli } from "../commands/tasks.ts";
