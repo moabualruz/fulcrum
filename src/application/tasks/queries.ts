@@ -70,7 +70,7 @@ export function serializeTask(task: Task): TaskDto {
     assigneeId: task.assigneeId ?? null,
     labels: task.labels ?? [],
     parentId: task.parent?.id ?? null,
-    dependencies: task.dependencies,
+    dependencies: task.dependencies ?? { blocks: [], blocked_by: [] },
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
     deletedAt: task.deletedAt,
