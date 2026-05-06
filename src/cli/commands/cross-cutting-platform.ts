@@ -1,4 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { dirForLocale, normalizeLocale } from "../../i18n/index.ts";
 import type { NativeKeyringAdapter } from "../../secrets/keyring.ts";
 import { productionAdapterFactory, type NativeAdapterLoader } from "../../secrets/keyring-platform.ts";
 
@@ -59,10 +60,50 @@ function fail(opts: CliOptions, message: string, code = 1): void {
 export async function runTheme(argv: readonly string[], opts: CliOptions = {}): Promise<void> {
   const { print } = io(opts);
   const [sub = "help"] = argv;
-  if (sub !== "list") return fail(opts, `fulcrum theme: unknown command '${sub}'`, 2);
-  const rows = await opts.caller?.theme.listThemes();
-  const compact = rows.map((row: { key: string; value: string }) => ({ key: row.key, value: row.value }));
-  jsonOrText(print, has(argv, "--json"), compact, compact.map((row: { key: string; value: string }) => `${row.key}=${row.value}`).join("\n"));
+  if (sub === "list") {
+    const rows = await opts.caller?.theme.listThemes();
+    const compact = rows.map((row: { key: string; value: string; defaultValue: string }) => ({
+      key: row.key,
+      value: row.value,
+      defaultValue: row.defaultValue,
+    }));
+    jsonOrText(print, has(argv, "--json"), compact, compact.map((row: { key: string; value: string }) => `${row.key}=${row.value}`).join("\n"));
+    return;
+  }
+
+  if (sub === "set") {
+    const key = option(argv, "--key");
+    const value = option(argv, "--value");
+    if (!key) return fail(opts, "fulcrum theme set: missing required option --key", 2);
+    if (!value) return fail(opts, "fulcrum theme set: missing required option --value", 2);
+    const result = await opts.caller?.theme.setTheme({ key, value });
+    jsonOrText(print, has(argv, "--json"), result, `${result.key}=${result.value}`);
+    return;
+  }
+
+  fail(opts, `fulcrum theme: unknown command '${sub}'`, 2);
+}
+
+export async function runI18n(argv: readonly string[], opts: CliOptions = {}): Promise<void> {
+  const { print } = io(opts);
+  const [sub = "help"] = argv;
+
+  if (sub === "list") {
+    jsonOrText(print, has(argv, "--json"), {
+      locales: ["en", "fr", "ar"],
+      defaultLocale: "en",
+    }, "en\nfr\nar");
+    return;
+  }
+
+  if (sub === "set") {
+    const locale = normalizeLocale(option(argv, "--locale"));
+    const payload = { locale, dir: dirForLocale(locale, true) };
+    jsonOrText(print, has(argv, "--json"), payload, `${payload.locale} ${payload.dir}`);
+    return;
+  }
+
+  fail(opts, `fulcrum i18n: unknown command '${sub}'`, 2);
 }
 
 export async function runSecrets(argv: readonly string[], opts: CliOptions = {}): Promise<void> {

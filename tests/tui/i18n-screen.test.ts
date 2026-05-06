@@ -97,6 +97,14 @@ describe("i18n screen — flag ON", () => {
     expect(result.locales).toContain("fr");
   });
 
+  test("renderI18nScreen includes en, fr, and ar in locales list", async () => {
+    const settings = makeSettings();
+    const result = await renderI18nScreen({ settings, env });
+    expect(result.locales).toContain("en");
+    expect(result.locales).toContain("fr");
+    expect(result.locales).toContain("ar");
+  });
+
   test("i18nTabVisible returns true when flag ON", () => {
     expect(i18nTabVisible(env)).toBe(true);
   });

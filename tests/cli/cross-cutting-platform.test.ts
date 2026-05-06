@@ -35,6 +35,27 @@ async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
 }
 
 describe("cross-cutting CLI surfaces", () => {
+  it("i18n list --json returns supported locales and default locale", async () => {
+    const { runI18n } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const h = harness();
+
+    await runI18n(["list", "--json"], h);
+
+    expect(JSON.parse(h.lines[0] as string)).toEqual({
+      locales: ["en", "fr", "ar"],
+      defaultLocale: "en",
+    });
+  });
+
+  it("i18n set --locale fr --json returns locale and text direction", async () => {
+    const { runI18n } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const h = harness();
+
+    await runI18n(["set", "--locale", "fr", "--json"], h);
+
+    expect(JSON.parse(h.lines[0] as string)).toEqual({ locale: "fr", dir: "ltr" });
+  });
+
   it("theme list --json returns typed theme settings", async () => {
     const { runTheme } = await import("../../src/cli/commands/cross-cutting-platform.ts");
     const h = harness();
@@ -49,7 +70,34 @@ describe("cross-cutting CLI surfaces", () => {
     });
 
     expect(h.exitCode).toBeUndefined();
-    expect(JSON.parse(h.lines[0] as string)).toEqual([{ key: "theme.accent", value: "#123456" }]);
+    expect(JSON.parse(h.lines[0] as string)).toEqual([
+      { key: "theme.accent", value: "#123456", defaultValue: "#6D28D9" },
+    ]);
+  });
+
+  it("theme set --key theme.accent --value #2563EB --json returns updated setting", async () => {
+    const { runTheme } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const h = harness();
+    let input: { key: string; value: string } | undefined;
+
+    await runTheme(["set", "--key", "theme.accent", "--value", "#2563EB", "--json"], {
+      caller: {
+        theme: {
+          setTheme: async (next: { key: string; value: string }) => {
+            input = next;
+            return { key: next.key, value: next.value, defaultValue: "#6D28D9" };
+          },
+        },
+      },
+      ...h,
+    });
+
+    expect(input).toEqual({ key: "theme.accent", value: "#2563EB" });
+    expect(JSON.parse(h.lines[0] as string)).toEqual({
+      key: "theme.accent",
+      value: "#2563EB",
+      defaultValue: "#6D28D9",
+    });
   });
 
   it("secrets set reads stdin and never prints secret value", async () => {
