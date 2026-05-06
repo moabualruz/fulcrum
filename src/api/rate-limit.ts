@@ -5,6 +5,7 @@ interface RateLimitOptions {
   windowMs?: number;
   now?: () => number;
   store?: Map<string, Bucket>;
+  scope?: string;
 }
 
 interface Bucket {
@@ -23,7 +24,7 @@ export function rateLimit(options: RateLimitOptions = {}) {
   const store = options.store ?? defaultStore;
 
   return async (c: Context, next: Next) => {
-    const key = await callerKey(c);
+    const key = `${options.scope ?? `${limit}:${windowMs}`}:${await callerKey(c)}`;
     const current = now();
     const bucket = currentBucket(store, key, current, windowMs);
     const remaining = Math.max(0, limit - bucket.count - 1);
