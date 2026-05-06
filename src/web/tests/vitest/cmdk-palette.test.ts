@@ -1,6 +1,7 @@
 import { fireEvent, render, waitFor } from "@testing-library/svelte";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 vi.mock("$app/navigation", () => ({
@@ -15,6 +16,7 @@ const ITEMS: CommandItem[] = [
   { id: "task-1", label: "Open task", href: "/tasks/task-1" },
   { id: "doc-1", label: "Open runbook", href: "/docs/doc-1" },
 ];
+const testDir = dirname(fileURLToPath(import.meta.url));
 
 const domTest = typeof document === "undefined" ? test.skip : test;
 
@@ -106,7 +108,7 @@ describe("CmdK palette web component", () => {
   });
 
   test("built-in command routes resolve to SvelteKit pages", () => {
-    const webRoot = join(import.meta.dir, "../../src/routes");
+    const webRoot = join(testDir, "../../src/routes");
     const hrefs = ALL_COMMANDS.flatMap((command) => {
       const source = command.action?.toString() ?? "";
       const match = source.match(/(?:goto|navigate)\("([^"]+)"\)/);
