@@ -126,3 +126,27 @@ describe("ci STEPS — tRPC permission gate", () => {
     ]);
   });
 });
+
+describe("ci STEPS — Phase 09 infrastructure gates", () => {
+  it("runs migration downgrade and graceful shutdown before build:all", () => {
+    const names = STEPS.map((s) => s.name);
+
+    expect(names).toContain("migration:downgrade");
+    expect(names).toContain("graceful:shutdown");
+    expect(names.indexOf("migration:downgrade")).toBeLessThan(names.indexOf("build:all"));
+    expect(names.indexOf("graceful:shutdown")).toBeLessThan(names.indexOf("build:all"));
+  });
+
+  it("uses focused infrastructure test commands", () => {
+    expect(STEPS.find((s) => s.name === "migration:downgrade")?.cmd).toEqual([
+      "bun",
+      "test",
+      "tests/db/migration-downgrade.test.ts",
+    ]);
+    expect(STEPS.find((s) => s.name === "graceful:shutdown")?.cmd).toEqual([
+      "bun",
+      "test",
+      "tests/platform/graceful-shutdown.test.ts",
+    ]);
+  });
+});
