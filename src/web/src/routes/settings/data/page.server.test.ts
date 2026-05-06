@@ -70,4 +70,10 @@ describe("/settings/data actions", () => {
     const result = await actions.import(makeRequest({ file }));
     expect(result).toMatchObject({ imported: true, totalRows: 2 });
   });
+
+  it("page copy exposes dry-run state", async () => {
+    const source = await Bun.file(new URL("./+page.svelte", import.meta.url)).text();
+    expect(source).toContain("Dry run");
+    expect(source).toContain("data-import-dry-run");
+  });
 });

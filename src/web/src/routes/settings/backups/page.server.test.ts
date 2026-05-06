@@ -55,4 +55,10 @@ describe("/settings/backups actions", () => {
     const result = await actions.confirmRestore(makeRequest({ entityCounts: '{"projects":1}' }));
     expect(result).toMatchObject({ restored: true, message: "Restore complete" });
   });
+
+  it("page copy exposes backup verify state", async () => {
+    const source = await Bun.file(new URL("./+page.svelte", import.meta.url)).text();
+    expect(source).toContain("Verify backup");
+    expect(source).toContain("data-backup-verify");
+  });
 });

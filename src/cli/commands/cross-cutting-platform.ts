@@ -1,4 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { verifyBackupArchive } from "../../backup/runner.ts";
 import { dirForLocale, normalizeLocale } from "../../i18n/index.ts";
 import type { NativeKeyringAdapter } from "../../secrets/keyring.ts";
 import { productionAdapterFactory, type NativeAdapterLoader } from "../../secrets/keyring-platform.ts";
@@ -172,6 +173,32 @@ export async function runErrors(argv: readonly string[], opts: CliOptions = {}):
 
 export async function runBackup(argv: readonly string[], opts: CliOptions = {}): Promise<void> {
   const { print, printErr } = io(opts);
+  const [sub] = argv;
+
+  if (sub === "create") {
+    const result = await opts.caller?.backup.create();
+    jsonOrText(print, has(argv, "--json"), result, `Backup created ${result.path ?? ""}`.trim());
+    return;
+  }
+
+  if (sub === "restore") {
+    const dump = option(argv, "--dump");
+    if (!dump) return fail(opts, "fulcrum backup restore: missing required option --dump", 2);
+    const result = await opts.caller?.backup.restore({ dump, dryRun: has(argv, "--dry-run") });
+    jsonOrText(print, has(argv, "--json"), result, `${result.collisions?.length ?? 0} collisions`);
+    return;
+  }
+
+  if (sub === "verify") {
+    const path = option(argv, "--path");
+    if (!path) return fail(opts, "fulcrum backup verify: missing required option --path", 2);
+    const result = opts.caller?.backup.verify
+      ? await opts.caller.backup.verify({ path })
+      : { path, ...await verifyBackupArchive(path) };
+    jsonOrText(print, has(argv, "--json"), result, result.ok ? "Backup verified" : "Backup verification failed");
+    return;
+  }
+
   const output = option(argv, "--output");
   if (!output) return fail(opts, "fulcrum backup: missing required option --output", 2);
   const result = await opts.caller?.backup.create();
@@ -240,14 +267,46 @@ export async function runDataExport(argv: readonly string[], opts: CliOptions = 
     if (!enabled) return fail(opts, "Feature import-csv/export-csv not enabled", 1);
   }
 
-  const result = await opts.caller?.jsonImportExport.create({
+  const dataExport = opts.caller?.dataExport ?? opts.caller?.jsonImportExport;
+  const result = await dataExport.create({
     pretty: true,
     outputPath: output,
     entity: option(argv, "--entity"),
     format,
   });
   await writeFile(output, result.json);
-  io(opts).print(JSON.stringify({ path: output, entity_counts: result.entityCounts }));
+  jsonOrText(io(opts).print, has(argv, "--json"), {
+    path: output,
+    entityCounts: result.entityCounts,
+    format,
+  }, `Export written to ${output}`);
+}
+
+export async function runDataImport(argv: readonly string[], opts: CliOptions = {}): Promise<void> {
+  const { print } = io(opts);
+  const [sub = "help"] = argv;
+
+  if (sub === "preflight") {
+    const path = option(argv, "--path");
+    if (!path) return fail(opts, "fulcrum data import preflight: missing required option --path", 2);
+    const result = await opts.caller?.dataImport.preflight({ path });
+    jsonOrText(print, has(argv, "--json"), result, `${Object.keys(result.counts ?? {}).length} entity kinds`);
+    return;
+  }
+
+  if (sub === "run") {
+    const importId = option(argv, "--import-id");
+    if (!importId) return fail(opts, "fulcrum data import run: missing required option --import-id", 2);
+    const result = await opts.caller?.dataImport.run({
+      importId,
+      dryRun: has(argv, "--dry-run"),
+      onConflict: option(argv, "--on-conflict"),
+    });
+    jsonOrText(print, has(argv, "--json"), result, `imported=${result.imported} updated=${result.updated}`);
+    return;
+  }
+
+  fail(opts, `fulcrum data import: unknown command '${sub}'`, 2);
 }
 
 /**

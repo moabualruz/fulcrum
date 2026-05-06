@@ -223,6 +223,74 @@ describe("cross-cutting CLI surfaces", () => {
     });
   });
 
+  it("backup create, restore --dump, and verify emit JSON parity payloads", async () => {
+    const { runBackup } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const createHarness = harness();
+
+    await runBackup(["create", "--json"], {
+      caller: {
+        backup: {
+          create: async () => ({
+            path: "/tmp/fulcrum.backup.gz",
+            entityCounts: { tasks: 2 },
+            checksumSha256: "abc123",
+          }),
+        },
+      },
+      ...createHarness,
+    });
+
+    expect(JSON.parse(createHarness.lines[0] as string)).toEqual({
+      path: "/tmp/fulcrum.backup.gz",
+      entityCounts: { tasks: 2 },
+      checksumSha256: "abc123",
+    });
+
+    const restoreHarness = harness();
+    await runBackup(["restore", "--dump", "base64-dump", "--dry-run", "--json"], {
+      caller: {
+        backup: {
+          restore: async (input: { dump: string; dryRun: boolean }) => ({
+            dryRun: input.dryRun,
+            dump: input.dump,
+            entityCounts: { tasks: 2 },
+            collisions: [{ kind: "tasks", id: "task-1" }],
+          }),
+        },
+      },
+      ...restoreHarness,
+    });
+
+    expect(JSON.parse(restoreHarness.lines[0] as string)).toEqual({
+      dryRun: true,
+      dump: "base64-dump",
+      entityCounts: { tasks: 2 },
+      collisions: [{ kind: "tasks", id: "task-1" }],
+    });
+
+    const verifyHarness = harness();
+    await runBackup(["verify", "--path", "/tmp/fulcrum.backup.gz", "--json"], {
+      caller: {
+        backup: {
+          verify: async (input: { path: string }) => ({
+            ok: true,
+            path: input.path,
+            format: "fulcrum.backup.v1",
+            entityCounts: { tasks: 2 },
+          }),
+        },
+      },
+      ...verifyHarness,
+    });
+
+    expect(JSON.parse(verifyHarness.lines[0] as string)).toEqual({
+      ok: true,
+      path: "/tmp/fulcrum.backup.gz",
+      format: "fulcrum.backup.v1",
+      entityCounts: { tasks: 2 },
+    });
+  });
+
   it("restore --dry-run returns collisions and exits 0", async () => {
     const { runRestore } = await import("../../src/cli/commands/cross-cutting-platform.ts");
     const h = harness();
@@ -324,5 +392,90 @@ describe("cross-cutting CLI surfaces", () => {
 
     expect(h.exitCode).toBe(1);
     expect(h.errLines.join("\n")).toContain("Feature import-csv/export-csv not enabled");
+  });
+
+  it("data export and import commands emit JSON with entity counts", async () => {
+    const { runDataExport, runDataImport } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+
+    await withTempDir(async (dir) => {
+      const exportHarness = harness();
+      const jsonOutput = join(dir, "fulcrum-export.json");
+      await runDataExport(["--format", "json", "--output", jsonOutput, "--json"], {
+        caller: {
+          dataExport: {
+            create: async () => ({ json: "{\"format\":\"fulcrum.json-export.v1\"}", entityCounts: { tasks: 2 } }),
+          },
+        },
+        ...exportHarness,
+      });
+      expect(JSON.parse(exportHarness.lines[0] as string)).toEqual({
+        path: jsonOutput,
+        entityCounts: { tasks: 2 },
+        format: "json",
+      });
+
+      const csvHarness = harness();
+      const csvOutput = join(dir, "tasks.csv");
+      await runDataExport(["--format", "csv", "--entity", "tasks", "--output", csvOutput, "--json"], {
+        caller: {
+          flags: { list: async () => [{ name: "import-csv/export-csv", enabled: true }] },
+          dataExport: {
+            create: async () => ({ json: "id,title\n1,Task", entityCounts: { tasks: 1 } }),
+          },
+        },
+        ...csvHarness,
+      });
+      expect(JSON.parse(csvHarness.lines[0] as string)).toEqual({
+        path: csvOutput,
+        entityCounts: { tasks: 1 },
+        format: "csv",
+      });
+
+      const preflightHarness = harness();
+      await runDataImport(["preflight", "--path", jsonOutput, "--json"], {
+        caller: {
+          dataImport: {
+            preflight: async (input: { path: string }) => ({
+              importId: input.path,
+              counts: { tasks: 2 },
+              collisions: [{ kind: "tasks", id: "task-1" }],
+            }),
+          },
+        },
+        ...preflightHarness,
+      });
+      expect(JSON.parse(preflightHarness.lines[0] as string)).toEqual({
+        importId: jsonOutput,
+        counts: { tasks: 2 },
+        collisions: [{ kind: "tasks", id: "task-1" }],
+      });
+
+      const runHarness = harness();
+      await runDataImport(["run", "--import-id", jsonOutput, "--dry-run", "--json"], {
+        caller: {
+          dataImport: {
+            run: async (input: { importId: string; dryRun: boolean }) => ({
+              importId: input.importId,
+              dryRun: input.dryRun,
+              imported: 0,
+              updated: 0,
+              skipped: 0,
+              errors: 0,
+              counts: { tasks: 2 },
+            }),
+          },
+        },
+        ...runHarness,
+      });
+      expect(JSON.parse(runHarness.lines[0] as string)).toEqual({
+        importId: jsonOutput,
+        dryRun: true,
+        imported: 0,
+        updated: 0,
+        skipped: 0,
+        errors: 0,
+        counts: { tasks: 2 },
+      });
+    });
   });
 });

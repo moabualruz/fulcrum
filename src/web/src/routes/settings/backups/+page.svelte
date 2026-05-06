@@ -95,6 +95,8 @@
         onchange={(e) => { restoreFile = (e.currentTarget as HTMLInputElement).files?.[0] ?? null; }} />
       <button type="submit" data-restore-submit disabled={!restoreFile}
         class={cn(buttonVariants({ variant: "default" }))}>Preflight check</button>
+      <button type="submit" data-backup-verify disabled={!restoreFile}
+        class={cn(buttonVariants({ variant: "secondary" }))}>Verify backup</button>
     </div>
   </form>
 </section>

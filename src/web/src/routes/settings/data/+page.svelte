@@ -99,6 +99,10 @@
       <div class={cn("flex gap-2 justify-end")}>
         <button onclick={() => { confirmImportOpen = false; }} class={cn(buttonVariants({ variant: "ghost" }))}>Cancel</button>
         <form method="POST" action="?/import" enctype="multipart/form-data" use:enhance>
+          <input type="hidden" name="_confirm" value="dry-run" />
+          <button type="submit" data-import-dry-run class={cn(buttonVariants({ variant: "secondary" }))}>Dry run</button>
+        </form>
+        <form method="POST" action="?/import" enctype="multipart/form-data" use:enhance>
           {#if importFile}
             <!-- Re-submit the same file for actual import -->
           {/if}

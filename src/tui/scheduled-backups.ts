@@ -55,3 +55,26 @@ export class ScheduledBackupsPanel {
     return this.schedule;
   }
 }
+
+export interface BackupDataParityState {
+  backupStatus: string;
+  verifyStatus: string;
+  entityCounts: Record<string, number>;
+  dataStatus: string;
+}
+
+export function renderBackupDataParityScreen(state: BackupDataParityState): string {
+  const counts = Object.entries(state.entityCounts)
+    .map(([kind, count]) => `${kind}: ${count}`)
+    .join("\n");
+
+  return [
+    "Backup",
+    `Status: ${state.backupStatus}`,
+    "Verify",
+    `Verify status: ${state.verifyStatus}`,
+    "Data",
+    state.dataStatus === "dry-run" ? "Dry run" : `Status: ${state.dataStatus}`,
+    counts,
+  ].filter(Boolean).join("\n");
+}

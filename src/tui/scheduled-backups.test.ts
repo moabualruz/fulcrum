@@ -2,6 +2,7 @@ import { describe, expect, test, afterEach } from "bun:test";
 import {
   ScheduledBackupsPanel,
   isValidCron,
+  renderBackupDataParityScreen,
 } from "./scheduled-backups.ts";
 
 describe("ScheduledBackupsPanel", () => {
@@ -52,6 +53,21 @@ describe("ScheduledBackupsPanel", () => {
     const panel = new ScheduledBackupsPanel();
     const result = panel.setCronSchedule("0 2 * * *");
     expect(result.success).toBe(false);
+  });
+
+  test("renders backup verify and data dry-run counts", () => {
+    const output = renderBackupDataParityScreen({
+      backupStatus: "complete",
+      verifyStatus: "ok",
+      entityCounts: { tasks: 2, projects: 1 },
+      dataStatus: "dry-run",
+    });
+
+    expect(output).toContain("Backup");
+    expect(output).toContain("Verify");
+    expect(output).toContain("Dry run");
+    expect(output).toContain("tasks: 2");
+    expect(output).toContain("projects: 1");
   });
 });
 
