@@ -23,6 +23,16 @@ import type { MikroORM, EntityManager } from "@mikro-orm/postgresql";
 import { FlagRegistry } from "../flags/registry.ts";
 import * as taskCommands from "../application/tasks/commands.ts";
 import * as taskQueries from "../application/tasks/queries.ts";
+import * as docCommands from "../application/docs/commands.ts";
+import * as docQueries from "../application/docs/queries.ts";
+import * as sprintCommands from "../application/sprints/commands.ts";
+import * as sprintQueries from "../application/sprints/queries.ts";
+import * as reportCommands from "../application/reports/commands.ts";
+import * as reportQueries from "../application/reports/queries.ts";
+import * as runCommands from "../application/runs/commands.ts";
+import * as runQueries from "../application/runs/queries.ts";
+import * as artifactCommands from "../application/artifacts/commands.ts";
+import * as artifactQueries from "../application/artifacts/queries.ts";
 
 // P1#19 — MigratorService + SchemaMigration ledger
 import { SchemaMigration } from "./entities/SchemaMigration.ts";
@@ -150,6 +160,46 @@ export const APPLICATION_TASK_QUERIES_TOKEN = new InjectionToken<typeof taskQuer
   "ApplicationTaskQueries",
 );
 
+export const APPLICATION_DOC_COMMANDS_TOKEN = new InjectionToken<typeof docCommands>(
+  "ApplicationDocCommands",
+);
+
+export const APPLICATION_DOC_QUERIES_TOKEN = new InjectionToken<typeof docQueries>(
+  "ApplicationDocQueries",
+);
+
+export const APPLICATION_SPRINT_COMMANDS_TOKEN = new InjectionToken<typeof sprintCommands>(
+  "ApplicationSprintCommands",
+);
+
+export const APPLICATION_SPRINT_QUERIES_TOKEN = new InjectionToken<typeof sprintQueries>(
+  "ApplicationSprintQueries",
+);
+
+export const APPLICATION_REPORT_COMMANDS_TOKEN = new InjectionToken<typeof reportCommands>(
+  "ApplicationReportCommands",
+);
+
+export const APPLICATION_REPORT_QUERIES_TOKEN = new InjectionToken<typeof reportQueries>(
+  "ApplicationReportQueries",
+);
+
+export const APPLICATION_RUN_COMMANDS_TOKEN = new InjectionToken<typeof runCommands>(
+  "ApplicationRunCommands",
+);
+
+export const APPLICATION_RUN_QUERIES_TOKEN = new InjectionToken<typeof runQueries>(
+  "ApplicationRunQueries",
+);
+
+export const APPLICATION_ARTIFACT_COMMANDS_TOKEN = new InjectionToken<typeof artifactCommands>(
+  "ApplicationArtifactCommands",
+);
+
+export const APPLICATION_ARTIFACT_QUERIES_TOKEN = new InjectionToken<typeof artifactQueries>(
+  "ApplicationArtifactQueries",
+);
+
 export interface DbBindingOptions {
   flagRegistry?: FlagRegistry;
 }
@@ -189,6 +239,16 @@ export function registerDbBindings(
     provide: APPLICATION_TASK_QUERIES_TOKEN,
     useValue: taskQueries,
   });
+  container.bind({ provide: APPLICATION_DOC_COMMANDS_TOKEN, useValue: docCommands });
+  container.bind({ provide: APPLICATION_DOC_QUERIES_TOKEN, useValue: docQueries });
+  container.bind({ provide: APPLICATION_SPRINT_COMMANDS_TOKEN, useValue: sprintCommands });
+  container.bind({ provide: APPLICATION_SPRINT_QUERIES_TOKEN, useValue: sprintQueries });
+  container.bind({ provide: APPLICATION_REPORT_COMMANDS_TOKEN, useValue: reportCommands });
+  container.bind({ provide: APPLICATION_REPORT_QUERIES_TOKEN, useValue: reportQueries });
+  container.bind({ provide: APPLICATION_RUN_COMMANDS_TOKEN, useValue: runCommands });
+  container.bind({ provide: APPLICATION_RUN_QUERIES_TOKEN, useValue: runQueries });
+  container.bind({ provide: APPLICATION_ARTIFACT_COMMANDS_TOKEN, useValue: artifactCommands });
+  container.bind({ provide: APPLICATION_ARTIFACT_QUERIES_TOKEN, useValue: artifactQueries });
 
   // Auth repositories — bind custom subclass as injectable token.
   // em.getRepository(X) returns the typed subclass because @Entity({ repository: () => XRepository })
