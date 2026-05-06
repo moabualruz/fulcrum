@@ -12,7 +12,7 @@ type MemoryRow = {
 };
 
 type MemoryCaller = {
-  memory: {
+  memories: {
     list: (input?: Record<string, unknown>) => Promise<MemoryRow[]>;
     get: (input: { id: string }) => Promise<MemoryRow>;
     create: (input: Record<string, unknown>) => Promise<MemoryRow>;
@@ -39,7 +39,7 @@ function fakeCaller(): MemoryCaller & { calls: Array<{ procedure: string; input:
 
   return {
     calls,
-    memory: {
+    memories: {
       list: async (input = {}) => {
         calls.push({ procedure: "memory.list", input });
         return rows;
@@ -189,7 +189,7 @@ describe("memory CLI verbs", () => {
     expect(caller.calls[0]).toEqual({
       procedure: "memory.search",
       input: {
-        query: "deterministic retrieval",
+      term: "deterministic retrieval",
         projectId: "00000000-0000-4000-8000-000000000010",
         topK: 5,
       },

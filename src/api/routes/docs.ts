@@ -100,28 +100,30 @@ type DocsCaller = {
 };
 
 export function registerDocRoutes(api: OpenAPIHono): void {
-  api.openapi(listRoute, async (c) => {
+  const openapi = api.openapi.bind(api) as (...args: unknown[]) => void;
+
+  openapi(listRoute, async (c: any) => {
     const docs = await getDocsCaller(c).docs.list({});
-    return c.json(toJsonDates(docs), 200);
+    return c.json(z.array(DocSchema).parse(toJsonDates(docs)), 200);
   });
 
-  api.openapi(createRoute_, async (c) => {
+  openapi(createRoute_, async (c: any) => {
     const body = c.req.valid("json");
     const doc = await getDocsCaller(c).docs.create({
       title: body.title,
       docType: body.type,
       bodyMd: body.bodyMd,
     });
-    return c.json(normalizeDoc(doc), 201);
+    return c.json(DocSchema.parse(normalizeDoc(doc)), 201);
   });
 
-  api.openapi(getRoute, async (c) => {
+  openapi(getRoute, async (c: any) => {
     const doc = await getDocsCaller(c).docs.get({ id: c.req.valid("param").id });
     if (!doc) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
-    return c.json(normalizeDoc(doc), 200);
+    return c.json(DocSchema.parse(normalizeDoc(doc)), 200);
   });
 
-  api.openapi(patchRoute, async (c) => {
+  openapi(patchRoute, async (c: any) => {
     const body = c.req.valid("json");
     const doc = await getDocsCaller(c).docs.update({
       id: c.req.valid("param").id,
@@ -130,10 +132,10 @@ export function registerDocRoutes(api: OpenAPIHono): void {
       bodyMd: body.bodyMd,
     });
     if (!doc) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
-    return c.json(normalizeDoc(doc), 200);
+    return c.json(DocSchema.parse(normalizeDoc(doc)), 200);
   });
 
-  api.openapi(deleteRoute, async (c) => {
+  openapi(deleteRoute, async (c: any) => {
     const doc = await getDocsCaller(c).docs.delete({ id: c.req.valid("param").id });
     if (!doc) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
     return new Response(null, { status: 204 });

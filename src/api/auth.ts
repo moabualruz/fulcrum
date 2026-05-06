@@ -16,6 +16,7 @@ export interface ApiEnv {
     db: ProductDb;
     orgId: string;
     userId: string;
+    trpc?: unknown;
   };
 }
 

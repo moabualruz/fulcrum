@@ -213,9 +213,9 @@ function createCaller(subscriptions = createSubscriptionHarness()): TuiCaller {
       create: async (input) => ({ id: "run-2", agent: input.agent, status: "queued" }),
       cancel: async () => ({ ok: true }),
     },
-    runsSubscriptions: subscriptions,
+    runsSubscriptions: subscriptions as never,
     repos: { list: async () => [] },
-    artifacts: { list: async () => [], get: async () => null },
+    artifacts: { list: async () => [], get: async () => null } as never,
     memories: { list: async () => [], promote: async () => ({ ok: true }) },
     search: { query: async () => [], suggest: async () => [] },
   };

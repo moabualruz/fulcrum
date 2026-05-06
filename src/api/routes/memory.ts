@@ -183,26 +183,26 @@ type MemoryCaller = {
 export function registerMemoryRoutes(api: OpenAPIHono): void {
   const openapi = api.openapi.bind(api) as (...args: unknown[]) => void;
 
-  openapi(listRoute, async (c) => {
+  openapi(listRoute, async (c: any) => {
     const query = c.req.valid("query");
     const tags = typeof query.tags === "string" && query.tags.length > 0
-      ? query.tags.split(",").map((tag) => tag.trim()).filter(Boolean)
+      ? query.tags.split(",").map((tag: string) => tag.trim()).filter(Boolean)
       : undefined;
     const memories = await getMemoryCaller(c).memories.list({ ...query, tags });
     return c.json(z.array(MemorySchema).parse(toJsonDates(memories)), 200);
   });
 
-  openapi(createMemoryRoute, async (c) => {
+  openapi(createMemoryRoute, async (c: any) => {
     const memory = await getMemoryCaller(c).memories.create(c.req.valid("json"));
     return c.json(MemorySchema.parse(toJsonDates(memory)), 201);
   });
 
-  openapi(getRoute, async (c) => {
+  openapi(getRoute, async (c: any) => {
     const memory = await getMemoryCaller(c).memories.get({ id: c.req.valid("param").id });
     return c.json(MemorySchema.parse(toJsonDates(memory)), 200);
   });
 
-  openapi(patchRoute, async (c) => {
+  openapi(patchRoute, async (c: any) => {
     const memory = await getMemoryCaller(c).memories.update({
       id: c.req.valid("param").id,
       ...c.req.valid("json"),
@@ -210,7 +210,7 @@ export function registerMemoryRoutes(api: OpenAPIHono): void {
     return c.json(MemorySchema.parse(toJsonDates(memory)), 200);
   });
 
-  openapi(deleteRoute, async (c) => {
+  openapi(deleteRoute, async (c: any) => {
     if (c.req.valid("query").confirm !== "true") {
       return c.json({ error: "DELETE requires confirm=true", code: "CONFIRM_REQUIRED" }, 400);
     }
@@ -218,10 +218,10 @@ export function registerMemoryRoutes(api: OpenAPIHono): void {
     return c.json(DeleteMemoryResultSchema.parse(result), 200);
   });
 
-  openapi(promoteRoute, (c) => unavailable(c));
-  openapi(archiveRoute, (c) => unavailable(c));
-  openapi(restoreRoute, (c) => unavailable(c));
-  openapi(contextPreviewRoute, (c) => unavailable(c));
+  openapi(promoteRoute, (c: any) => unavailable(c));
+  openapi(archiveRoute, (c: any) => unavailable(c));
+  openapi(restoreRoute, (c: any) => unavailable(c));
+  openapi(contextPreviewRoute, (c: any) => unavailable(c));
 }
 
 function getMemoryCaller(c: { get(key: string): unknown }): MemoryCaller {

@@ -40,7 +40,7 @@ describe("Phase 08 final cross-surface parity smoke", () => {
         tasks: {
           list: async () => [{ id: "task-1", title: "Phase 08 smoke" }],
         },
-      },
+      } as any,
     });
     expect(parseLastJson<Array<{ id: string }>>(tasks)[0]?.id).toBe("task-1");
 
@@ -51,14 +51,14 @@ describe("Phase 08 final cross-surface parity smoke", () => {
         tasks: {
           create: async (input: Record<string, unknown>) => ({ id: "task-2", ...input }),
         },
-      },
+      } as any,
     });
     expect(parseLastJson<{ title: string }>(createdTask).title).toBe("Phase 08 smoke");
 
     const docs = capture();
     await runDocsCli(["list", "--json"], {
       ...docs,
-      caller: { docs: { list: async () => [{ id: "doc-1", title: "Surface contract" }] } },
+      caller: { docs: { list: async () => [{ id: "doc-1", title: "Surface contract" }] } } as any,
     });
     expect(parseLastJson<Array<{ id: string }>>(docs)[0]?.id).toBe("doc-1");
 
@@ -69,7 +69,7 @@ describe("Phase 08 final cross-surface parity smoke", () => {
         repos: {
           list: async () => [{ id: "repo-1", slug: "fulcrum", branch: "main", dirty: false, openTaskCount: 0 }],
         },
-      },
+      } as any,
     });
     expect(parseLastJson<Array<{ slug: string }>>(repos)[0]?.slug).toBe("fulcrum");
 
@@ -80,14 +80,14 @@ describe("Phase 08 final cross-surface parity smoke", () => {
         repos: {
           syncRepo: async () => ({ repoId: "repo-1", status: "queued", taskName: "repo.sync", jobKey: "repo-1:sync" }),
         },
-      },
+      } as any,
     });
     expect(parseLastJson<{ status: string }>(repoSync).status).toBe("queued");
 
     const artifacts = capture();
     await runArtifactsCli(["list", "--json"], {
       ...artifacts,
-      caller: { artifacts: { list: async () => [{ id: "artifact-1", filename: "report.txt" }] } },
+      caller: { artifacts: { list: async () => [{ id: "artifact-1", filename: "report.txt" }] } } as any,
     });
     expect(parseLastJson<Array<{ filename: string }>>(artifacts)[0]?.filename).toBe("report.txt");
 
@@ -98,7 +98,7 @@ describe("Phase 08 final cross-surface parity smoke", () => {
         artifacts: {
           download: async () => ({ id: "artifact-1", filename: "report.txt", path: "artifacts/report.txt" }),
         },
-      },
+      } as any,
     });
     expect(parseLastJson<{ path: string }>(artifactDownload).path).toBe("artifacts/report.txt");
 
@@ -114,7 +114,7 @@ describe("Phase 08 final cross-surface parity smoke", () => {
     process.env["FULCRUM_FEATURES"] = "public-api";
     const api = createPublicApiRouter();
     const response = await api.request("/api/v1/openapi.json");
-    const spec = await response.json();
+    const spec = await response.json() as { paths?: Record<string, unknown> };
     const apiPaths = Object.keys(spec.paths ?? {});
     const tuiSource = await readFile(new URL("../../tui/__tests__/phase08-tui-parity.test.ts", import.meta.url), "utf-8");
 

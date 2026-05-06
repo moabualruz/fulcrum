@@ -39,8 +39,8 @@ describe("Phase 08 REST API parity inventory", () => {
 
     expect(v1.status).toBe(200);
     expect(compat.status).toBe(200);
-    expect((await v1.json()).openapi).toBe("3.1.0");
-    expect((await compat.json()).openapi).toBe("3.1.0");
+    expect(((await v1.json()) as { openapi: string }).openapi).toBe("3.1.0");
+    expect(((await compat.json()) as { openapi: string }).openapi).toBe("3.1.0");
   });
 
   test("OpenAPI 3.1 document includes every Phase 08 public domain path", async () => {
@@ -48,7 +48,7 @@ describe("Phase 08 REST API parity inventory", () => {
     const api = createPublicApiRouter();
 
     const response = await api.request("/api/v1/openapi.json");
-    const spec = await response.json();
+    const spec = await response.json() as { openapi: string; paths?: Record<string, unknown> };
     const paths = Object.keys(spec.paths ?? {});
 
     expect(spec.openapi).toBe("3.1.0");
@@ -77,7 +77,7 @@ describe("Phase 08 REST API parity inventory", () => {
 
   test("rate limiter keeps one bucket per caller identity and returns RATE_LIMITED", async () => {
     const store = new Map();
-    const app = new Hono();
+    const app = new Hono<{ Variables: { userId: string; orgId: string } }>();
     app.use("*", async (c, next) => {
       c.set("userId", "user-1");
       c.set("orgId", "org-1");

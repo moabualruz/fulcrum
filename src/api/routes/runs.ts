@@ -70,15 +70,17 @@ type RunsCaller = {
 };
 
 export function registerRunsRoutes(api: OpenAPIHono): void {
-  api.openapi(listRoute, async (c) => {
+  const openapi = api.openapi.bind(api) as (...args: unknown[]) => void;
+
+  openapi(listRoute, async (c: any) => {
     const runs = await getRunsCaller(c).orchestration.listRuns(c.req.valid("query"));
-    return c.json(toJsonDates(runs), 200);
+    return c.json(z.array(AgentRunSchema).parse(toJsonDates(runs)), 200);
   });
 
-  api.openapi(getRoute, async (c) => {
+  openapi(getRoute, async (c: any) => {
     const run = await getRunsCaller(c).orchestration.getRun({ runId: c.req.valid("param").id });
     if (!run) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
-    return c.json(toJsonDates(run), 200);
+    return c.json(AgentRunSchema.parse(toJsonDates(run)), 200);
   });
 }
 
