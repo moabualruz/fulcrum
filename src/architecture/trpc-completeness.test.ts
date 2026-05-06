@@ -14,6 +14,7 @@ const REQUIRED_SERVER_TRPC_ROUTERS = [
 describe("Phase 9.5 tRPC router completeness", () => {
   test.each([...REQUIRED_SERVER_TRPC_ROUTERS])("%s router exists in server tRPC surface", (domain) => {
     const candidates = [
+      join("src", "router", `${domain}.ts`),
       join("src", "server", "trpc", "routers", `${domain}.ts`),
       join("src", "server", "trpc", "routers", `${domain}.index.ts`),
     ];
