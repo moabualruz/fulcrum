@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { openPglite } from "../product-kernel/db/pglite.ts";
-import { runMigrations } from "../product-kernel/db/migrate.ts";
+import { applyProductMigrations } from "../product-kernel/db/migrate.ts";
 import { createLocalOrg } from "../product-kernel/store/repositories.ts";
 import type { ProductDb } from "../product-kernel/db/types.ts";
 import type { InferenceClient, EmbeddingResponse } from "../inference/client.ts";
@@ -56,7 +56,7 @@ async function freshDb(name: string): Promise<{ db: ProductDb; em: EntityManager
     async close() { await pglite.close(); },
   };
 
-  await runMigrations(db);
+  await applyProductMigrations(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
 
   // ORM EntityManager from the same PGlite instance
