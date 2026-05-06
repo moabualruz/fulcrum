@@ -48,7 +48,7 @@
   <div class="rounded-lg border border-border bg-card p-4 flex flex-col gap-3">
     <h2 class="text-sm font-medium">API Keys</h2>
     {#if data.apiKeys.length === 0}
-      <p data-api-keys-empty class="text-sm text-muted-foreground">No API keys created yet.</p>
+      <p data-api-keys-empty data-api-key-status class="text-sm text-muted-foreground">No API keys created yet.</p>
     {:else}
       <table class="w-full text-sm">
         <thead>
@@ -71,5 +71,27 @@
         </tbody>
       </table>
     {/if}
+  </div>
+
+  <div class="rounded-lg border border-border bg-card p-4 flex flex-col gap-3">
+    <h2 class="text-sm font-medium">Rate limits</h2>
+    <dl data-api-rate-limit-status class="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+      <div>
+        <dt class="text-xs uppercase text-muted-foreground">Status</dt>
+        <dd>{data.rateLimit.enabled ? "Enabled" : "Disabled"}</dd>
+      </div>
+      <div>
+        <dt class="text-xs uppercase text-muted-foreground">Policy</dt>
+        <dd>{data.rateLimit.policy}</dd>
+      </div>
+      <div>
+        <dt class="text-xs uppercase text-muted-foreground">Limit</dt>
+        <dd>{data.rateLimit.limit} requests</dd>
+      </div>
+      <div>
+        <dt class="text-xs uppercase text-muted-foreground">Window</dt>
+        <dd>{data.rateLimit.windowSeconds}s</dd>
+      </div>
+    </dl>
   </div>
 </section>

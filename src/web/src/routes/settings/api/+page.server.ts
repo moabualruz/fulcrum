@@ -19,7 +19,17 @@ export const load: PageServerLoad = async ({ locals, url }) => {
   }
 
   const baseUrl = `${url.protocol}//${url.host}/api/v1`;
-  return { baseUrl, apiKeys: [] as ApiKeyRow[] };
+  return {
+    baseUrl,
+    openApiUrl: `${baseUrl}/openapi.json`,
+    apiKeys: [] as ApiKeyRow[],
+    rateLimit: {
+      enabled: true,
+      policy: "per API key / org identity",
+      limit: 120,
+      windowSeconds: 60,
+    },
+  };
 };
 
 export interface ApiKeyRow {

@@ -46,6 +46,29 @@ Skip Huashu animation/video/export paths. Phase 08 needs product-surface UX revi
 - Use existing shadcn-svelte components in `src/web/src/lib/components/ui/`.
 - No hero pages, decorative cards, or marketing layouts.
 
+### Huashu-Design Gate: Web Route Family Findings
+
+**Assumptions:** Fulcrum Web is an operational console for repeated repository and agent workflow supervision. Web completion must preserve the current shadcn-svelte/Bits UI vocabulary and Phase 5-7 route architecture instead of introducing a new visual direction.
+
+**Existing vocabulary extracted from code:** Inter variable font, shadcn-svelte token colors (`background`, `foreground`, `muted`, `border`, `card`, `primary`), `rounded-md` controls, `rounded-lg` empty states, `border-b` page headers, dense tables with `data-slot="table"`, filter rails/forms, route skeletons with `role="status"`, primary/outline/ghost button variants, and operational route data hooks (`data-project-board-grid`, `data-search-input`, `data-repo-row`, `data-artifact-row`, `data-inbox-tabs`).
+
+**Route family consistency:** `/projects/[id]/board`, `/search`, `/repos`, `/artifacts`, and `/inbox` share a functional hierarchy: compact page header, filters/actions near the top, table/list/board as the main working region, and explicit empty/error states. No Web route should switch to landing-page hero composition, decorative gradient/orb backgrounds, or explanatory marketing copy.
+
+**Huashu critique score:**
+- Philosophy alignment: 8/10 — dense operational layouts match Fulcrum's local-first Agent OS role.
+- Visual hierarchy: 8/10 — consistent headers, filters, tables, tab bars, and empty states make scanning predictable.
+- Craft: 7/10 — current pages are coherent; verification must guard against spacing drift, unlabeled icon buttons, and accidental decorative filler.
+- Functionality: 8/10 — visible UI maps to real operations: filter, create, sync, download, mark read, dispatch, edit.
+- Originality: 6/10 — intentionally conventional enterprise-console patterns; originality is less important than reliability in this phase.
+
+**Blocking findings converted to tests:**
+- Route source tests must reject hero/marketing/orb/gradient decoration on Phase 08 operational routes.
+- Route source tests must require the shared operational hooks for board, search, repos, artifacts, inbox, runs, docs, memory, and API settings.
+- Settings API must surface `/api/v1/openapi.json`, API key status, and rate-limit status.
+- Playwright UAT must enumerate the 14 WEB-07 journeys and use conditional skips only with concrete route/error reasons.
+
+**Non-blocking findings:** aesthetic polish on copy density, color accents, and table spacing belongs to later focused UI polish, not 08-06.
+
 ## TUI Contract
 
 - Top-level navigation: Projects, Tasks, Docs, Memory, Runs, Repos, Artifacts, Search, Notifications, Routing/Skills, Doctor/Settings.
