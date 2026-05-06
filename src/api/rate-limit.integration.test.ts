@@ -29,4 +29,46 @@ describe("REST rate limiting", () => {
       },
     });
   });
+
+  test("keys buckets by user, org, and API key", async () => {
+    const store = new Map();
+    const app = new Hono();
+    app.use("/user/*", async (c, next) => {
+      c.set("userId", c.req.header("x-user-id"));
+      await next();
+    });
+    app.use("/org/*", async (c, next) => {
+      c.set("orgId", c.req.header("x-org-id"));
+      await next();
+    });
+    app.use("*", rateLimit({ limit: 1, windowMs: 60_000, store }));
+    app.get("*", (c) => c.json({ ok: true }));
+
+    expect((await app.request("/user/resource", { headers: { "x-user-id": "u1" } })).status).toBe(200);
+    expect((await app.request("/user/resource", { headers: { "x-user-id": "u1" } })).status).toBe(429);
+    expect((await app.request("/user/resource", { headers: { "x-user-id": "u2" } })).status).toBe(200);
+
+    expect((await app.request("/org/resource", { headers: { "x-org-id": "o1" } })).status).toBe(200);
+    expect((await app.request("/org/resource", { headers: { "x-org-id": "o1" } })).status).toBe(429);
+    expect((await app.request("/org/resource", { headers: { "x-org-id": "o2" } })).status).toBe(200);
+
+    expect((await app.request("/api/resource", { headers: { Authorization: "Bearer key-one" } })).status).toBe(200);
+    expect((await app.request("/api/resource", { headers: { Authorization: "Bearer key-one" } })).status).toBe(429);
+    expect((await app.request("/api/resource", { headers: { Authorization: "Bearer key-two" } })).status).toBe(200);
+  });
+
+  test("supports per-route limits", async () => {
+    const store = new Map();
+    const app = new Hono();
+    app.use("/strict/*", rateLimit({ limit: 1, windowMs: 60_000, store }));
+    app.use("/loose/*", rateLimit({ limit: 2, windowMs: 60_000, store }));
+    app.get("*", (c) => c.json({ ok: true }));
+
+    expect((await app.request("/strict/resource", { headers: { "x-forwarded-for": "198.51.100.1" } })).status).toBe(200);
+    expect((await app.request("/strict/resource", { headers: { "x-forwarded-for": "198.51.100.1" } })).status).toBe(429);
+
+    expect((await app.request("/loose/resource", { headers: { "x-forwarded-for": "198.51.100.1" } })).status).toBe(200);
+    expect((await app.request("/loose/resource", { headers: { "x-forwarded-for": "198.51.100.1" } })).status).toBe(200);
+    expect((await app.request("/loose/resource", { headers: { "x-forwarded-for": "198.51.100.1" } })).status).toBe(429);
+  });
 });
