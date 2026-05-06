@@ -127,6 +127,59 @@ describe("cross-cutting CLI surfaces", () => {
     });
   });
 
+  it("secrets set --name --value returns metadata only", async () => {
+    const { runSecrets } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const h = harness();
+
+    await runSecrets(["set", "--name", "API_KEY", "--value", "sk-live-secret", "--json"], {
+      caller: {
+        credentials: {
+          set: async (input: { name: string; value: string }) => ({
+            id: "cred-1",
+            name: input.name,
+            provider: "local",
+            status: "stored",
+          }),
+        },
+      },
+      ...h,
+    });
+
+    expect(h.lines.join("\n")).not.toContain("sk-live-secret");
+    expect(JSON.parse(h.lines[0] as string)).toEqual({
+      id: "cred-1",
+      name: "API_KEY",
+      provider: "local",
+      status: "stored",
+    });
+  });
+
+  it("secrets rotate --name returns provider status metadata only", async () => {
+    const { runSecrets } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const h = harness();
+
+    await runSecrets(["rotate", "--name", "API_KEY", "--json"], {
+      stdin: async () => "rotated-secret\n",
+      caller: {
+        credentials: {
+          rotate: async (input: { name: string; value: string }) => ({
+            name: input.name,
+            provider: "local",
+            status: "rotated",
+          }),
+        },
+      },
+      ...h,
+    });
+
+    expect(h.lines.join("\n")).not.toContain("rotated-secret");
+    expect(JSON.parse(h.lines[0] as string)).toEqual({
+      name: "API_KEY",
+      provider: "local",
+      status: "rotated",
+    });
+  });
+
   it("secrets get --json masks values by default", async () => {
     const { runSecrets } = await import("../../src/cli/commands/cross-cutting-platform.ts");
     const h = harness();

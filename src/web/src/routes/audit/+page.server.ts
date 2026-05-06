@@ -8,10 +8,12 @@ export interface AuditData {
   events: EventRow[];
   total: number;
   page: number;
-  actor: string;
-  kind: string;
-  dateFrom: string;
-  dateTo: string;
+      actor: string;
+      kind: string;
+      verb: string;
+      project: string;
+      dateFrom: string;
+      dateTo: string;
 }
 
 const PAGE_SIZE = 25;
@@ -19,6 +21,8 @@ const PAGE_SIZE = 25;
 export const load: ServerLoad = async ({ url }) => {
   const actor = (url.searchParams.get("actor") ?? "").trim();
   const kind = (url.searchParams.get("kind") ?? "").trim();
+  const verb = (url.searchParams.get("verb") ?? "").trim();
+  const project = (url.searchParams.get("project") ?? "").trim();
   const dateFrom = (url.searchParams.get("date_from") ?? "").trim();
   const dateTo = (url.searchParams.get("date_to") ?? "").trim();
   const pageRaw = parseInt(url.searchParams.get("page") ?? "1", 10);
@@ -29,7 +33,7 @@ export const load: ServerLoad = async ({ url }) => {
   try {
     const orgRows = await db.query<{ id: string }>(`SELECT id FROM orgs WHERE slug = $1`, ["default"]);
     const orgId = orgRows[0]?.id;
-    if (!orgId) return { events: [], total: 0, page, actor, kind, dateFrom, dateTo } satisfies AuditData;
+    if (!orgId) return { events: [], total: 0, page, actor, kind, verb, project, dateFrom, dateTo } satisfies AuditData;
 
     const params: (string | number)[] = [orgId];
     const conditions: string[] = ["org_id = $1"];
@@ -41,6 +45,14 @@ export const load: ServerLoad = async ({ url }) => {
     if (kind) {
       params.push(kind);
       conditions.push(`subject_kind = $${params.length}`);
+    }
+    if (verb) {
+      params.push(verb);
+      conditions.push(`verb = $${params.length}`);
+    }
+    if (project) {
+      params.push(project);
+      conditions.push(`project_id = $${params.length}`);
     }
     if (dateFrom) {
       params.push(dateFrom);
@@ -70,7 +82,7 @@ export const load: ServerLoad = async ({ url }) => {
       pageParams as never,
     );
 
-    return { events, total, page, actor, kind, dateFrom, dateTo } satisfies AuditData;
+    return { events, total, page, actor, kind, verb, project, dateFrom, dateTo } satisfies AuditData;
   } finally {
     await db.close();
   }

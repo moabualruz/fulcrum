@@ -89,8 +89,8 @@ describe("ThemeScreen", () => {
 
 describe("SecretsScreen", () => {
   test("masks credential values", () => {
-    expect(maskCredentialValue("supersecret")).toBe("****");
-    expect(maskCredentialValue("")).toBe("****");
+    expect(maskCredentialValue("supersecret")).toBe("•••• redacted");
+    expect(maskCredentialValue("")).toBe("•••• redacted");
   });
 
   test("renders masked list with add/delete hints", async () => {
@@ -99,7 +99,8 @@ describe("SecretsScreen", () => {
     const output = renderSecretsScreen(creds);
 
     expect(output).toContain("API_KEY");
-    expect(output).toContain("****");
+    expect(output).toContain("••••");
+    expect(output).toContain("redacted");
     expect(output).not.toContain("enc:abc");
     expect(output).toContain("[a] Add");
     expect(output).toContain("[d] Delete");

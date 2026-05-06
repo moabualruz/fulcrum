@@ -63,7 +63,11 @@ function caller() {
         input.kind === "task" && input.since?.toISOString() === "2026-01-01T00:00:00.000Z"
           ? [auditEvent]
           : [],
-      export: async () => [auditEvent],
+      export: async (input: { format: "csv" | "json" }) =>
+        input.format === "csv" ? { format: "csv", csv: "id\netc-1\n" } : { format: "json", rows: [auditEvent] },
+      retentionPolicy: {
+        set: async (input: { retainDays: number }) => ({ retainDays: input.retainDays }),
+      },
     },
     webhooks: {
       list: async () => [{ id: "wh-1", url: "https://example.test/hook" }],
@@ -155,6 +159,34 @@ describe("P14#08 generated domain CLI contracts", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it("audit export writes CSV to output path", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "fulcrum-audit-export-"));
+    try {
+      const h = harness();
+      const output = join(dir, "audit.csv");
+      await runPillar14Command("audit", ["export", "--format", "csv", "--output", output], {
+        caller: caller(),
+        ...h,
+      });
+
+      expect(h.exitCode).toBeUndefined();
+      expect(await readFile(output, "utf8")).toBe("id\netc-1\n");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("audit retention set emits JSON", async () => {
+    const h = harness();
+    await runPillar14Command("audit", ["retention", "set", "--days", "90", "--json"], {
+      caller: caller(),
+      ...h,
+    });
+
+    expect(h.exitCode).toBeUndefined();
+    expect(JSON.parse(h.lines[0] as string)).toEqual({ retainDays: 90 });
   });
 
   it("webhooks list emits JSON rows", async () => {

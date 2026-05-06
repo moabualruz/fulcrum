@@ -9,6 +9,8 @@
       page: number;
       actor: string;
       kind: string;
+      verb: string;
+      project: string;
       dateFrom: string;
       dateTo: string;
     };
@@ -21,6 +23,8 @@
 
   let actor = $state(data.actor);
   let kind = $state(data.kind);
+  let verb = $state(data.verb);
+  let project = $state(data.project);
   let dateFrom = $state(data.dateFrom);
   let dateTo = $state(data.dateTo);
 
@@ -104,6 +108,28 @@
       bind:value={kind}
       placeholder="task, doc, run…"
       data-audit-kind-input
+      class={cn("h-8 rounded border border-input bg-background px-2 text-sm")}
+    />
+  </label>
+  <label class={cn("flex flex-col gap-1")}>
+    <span class={cn("text-xs font-medium text-muted-foreground")}>Verb</span>
+    <input
+      type="text"
+      name="verb"
+      bind:value={verb}
+      placeholder="created, updated…"
+      data-audit-verb-input
+      class={cn("h-8 rounded border border-input bg-background px-2 text-sm")}
+    />
+  </label>
+  <label class={cn("flex flex-col gap-1")}>
+    <span class={cn("text-xs font-medium text-muted-foreground")}>Project</span>
+    <input
+      type="text"
+      name="project"
+      bind:value={project}
+      placeholder="project id"
+      data-audit-project-input
       class={cn("h-8 rounded border border-input bg-background px-2 text-sm")}
     />
   </label>

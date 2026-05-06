@@ -24,7 +24,7 @@ type Io = Required<Pick<Pillar14RunOptions, "print" | "printErr" | "exit">>;
 const HELP: Record<Pillar14Domain, string> = {
   runs: "fulcrum runs <list|show|cancel|retry|logs|attach> [--json]",
   notify: "fulcrum notify <list|mark-read|mark-all-read|mute|watch> [--unread] [--json]",
-  audit: "fulcrum audit <query|export> [--json]",
+  audit: "fulcrum audit <query|export|retention> [--json]",
   webhooks: "fulcrum webhooks <list|test> [--json]",
   connectors: "fulcrum connectors <enable|sync> <id> [--json]",
   flags: "fulcrum flags <list|set> [--json]",
@@ -282,9 +282,23 @@ async function runAudit(sub: string, argv: readonly string[], caller: any, io: I
     const output = optionValue(argv, "--output");
     requireValue(output, "audit export: missing --output");
     const result = await caller.audit.export({ format });
+    if (format === "csv") {
+      const csv = typeof result === "string" ? result : result.csv;
+      await writeFile(output, csv.endsWith("\n") ? csv : `${csv}\n`);
+      return;
+    }
     const rows = normalizeAuditResult(result);
-    if (format !== "json") throw new Error("Only JSON audit export is supported by this CLI slice.");
     await writeFile(output, `${JSON.stringify(rows, null, 2)}\n`);
+    return;
+  }
+  if (sub === "retention") {
+    const [action] = positional(argv);
+    if (action !== "set") return unknown("audit", "retention", io);
+    const daysRaw = optionValue(argv, "--days");
+    requireValue(daysRaw, "audit retention set: missing --days");
+    const retainDays = Number.parseInt(daysRaw, 10);
+    if (!Number.isFinite(retainDays) || retainDays < 0) throw new Error("audit retention set: --days must be >= 0");
+    emitJson(await caller.audit.retentionPolicy.set({ retainDays }), io);
     return;
   }
   unknown("audit", sub, io);

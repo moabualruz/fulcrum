@@ -58,9 +58,15 @@ async function seedEvents(orgId: string): Promise<void> {
   const dbDir = join(scratch, "state", "product", "db");
   const db = await openPglite(join(dbDir, "main"));
   try {
+    await db.query(
+      `INSERT INTO projects (id, org_id, slug, name, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, now(), now())`,
+      ["project-1", orgId, "project-1", "Project 1"],
+    );
     await appendEvent(db, { orgId, actor: "system", subjectKind: "task", subjectId: "task-1", verb: "created" });
     await appendEvent(db, { orgId, actor: "local", subjectKind: "doc", subjectId: "doc-1", verb: "updated" });
     await appendEvent(db, { orgId, actor: "local", subjectKind: "task", subjectId: "task-2", verb: "closed" });
+    await appendEvent(db, { orgId, actor: "agent", projectId: "project-1", subjectKind: "task", subjectId: "task-3", verb: "updated" });
   } finally {
     await db.close();
   }
@@ -80,8 +86,8 @@ describe("/audit +page.server.ts load()", () => {
     await seedEvents(orgId);
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const result = await mod.load(loadEvent());
-    expect(result.events).toHaveLength(3);
-    expect(result.total).toBe(3);
+    expect(result.events).toHaveLength(4);
+    expect(result.total).toBe(4);
   });
 
   test("filter by kind=task returns only task events", async () => {
@@ -89,9 +95,26 @@ describe("/audit +page.server.ts load()", () => {
     await seedEvents(orgId);
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
     const result = await mod.load(loadEvent({ kind: "task" }));
-    expect(result.events).toHaveLength(2);
+    expect(result.events).toHaveLength(3);
     for (const ev of result.events) {
       expect(ev.subject_kind).toBe("task");
+    }
+  });
+
+  test("filter by verb and project returns only matching events", async () => {
+    const { orgId } = await setupDb();
+    await seedEvents(orgId);
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 5}`);
+    const result = await mod.load(loadEvent({ verb: "updated", project: "project-1" }));
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]!.verb).toBe("updated");
+    expect(result.events[0]!.project_id).toBe("project-1");
+  });
+
+  test("page exposes actor, subject kind, verb, date range, and project filters", async () => {
+    const source = await Bun.file(new URL("./+page.svelte", import.meta.url)).text();
+    for (const field of ["name=\"actor\"", "name=\"kind\"", "name=\"verb\"", "name=\"date_from\"", "name=\"date_to\"", "name=\"project\""]) {
+      expect(source).toContain(field);
     }
   });
 

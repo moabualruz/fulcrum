@@ -111,18 +111,20 @@ export async function runSecrets(argv: readonly string[], opts: CliOptions = {})
   const { print } = io(opts);
   const [sub = "help"] = argv;
   const args = positionals(argv.slice(1));
-  const name = args[0];
+  const name = option(argv, "--name") ?? args[0];
   if (!name) return fail(opts, `fulcrum secrets ${sub}: missing required argument <name>`, 2);
 
   if (sub === "set") {
-    const raw = await (opts.stdin ?? (() => new Response(Bun.stdin.stream()).text()))();
+    const raw = option(argv, "--value") ??
+      await (opts.stdin ?? (() => new Response(Bun.stdin.stream()).text()))();
     const result = await opts.caller?.credentials.set({ name, value: raw.replace(/\r?\n$/, "") });
     print(JSON.stringify(result));
     return;
   }
 
   if (sub === "rotate") {
-    const raw = await (opts.stdin ?? (() => new Response(Bun.stdin.stream()).text()))();
+    const raw = option(argv, "--value") ??
+      await (opts.stdin ?? (() => new Response(Bun.stdin.stream()).text()))();
     const result = await opts.caller?.credentials.rotate({ name, value: raw.replace(/\r?\n$/, "") });
     print(JSON.stringify(result));
     return;

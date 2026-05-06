@@ -87,7 +87,7 @@ export function renderThemeScreen(presetIndex: number): string {
 // --- Secrets Screen ---
 
 export function maskCredentialValue(_value: string): string {
-  return "****";
+  return "•••• redacted";
 }
 
 export function renderSecretsScreen(credentials: CredentialRow[]): string {
