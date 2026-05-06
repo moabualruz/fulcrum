@@ -21,7 +21,7 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
 - [x] **Phase 7: Repos + Artifacts + Notifications** - Git sync, artifact pipeline, notification delivery
 - [x] **Phase 8: Surface Delivery** - CLI wiring, TUI rewrite, Web completion, API surface
 - [x] **Phase 9: Cross-Cutting + Testing** - i18n, theming, accessibility, telemetry, backup, comprehensive test coverage (completed 2026-05-06)
-- [ ] **Phase 10: SaaS Hardening** - Multi-org isolation, PostgreSQL pooling, job coordination
+- [ ] **Phase 10: SaaS Hardening + Milestone Closure** - Multi-org isolation, PostgreSQL pooling, job coordination, all deferred item closure, Huashu Web/CLI/TUI UX gate
 
 ## Phase Details
 
@@ -285,18 +285,21 @@ Plans:
 **Plans:** Complete — 09-00 through 09-09 delivered. Canonical evidence: `.planning/phases/09-cross-cutting-testing/09-UAT.md`.
 **Verification**: `bun run ci` passed all 20 stages: root tests, root coverage, migration downgrade, graceful shutdown, build, web tests, web coverage, web accessibility, Playwright smoke, and schema checks. Web coverage lines: 92.41%. Web accessibility: 19 passed / 3 skipped.
 
-### Phase 10: SaaS Hardening
-**Goal**: Multi-tenant SaaS validated
+### Phase 10: SaaS Hardening + Milestone Closure
+**Goal**: Multi-tenant SaaS validated and all prior deferred items closed
 **Depends on**: Phase 9
-**Requirements**: SAS-01..06
-**TDD**: Integration tests against PostgreSQL
+**Requirements**: SAS-01..06, CLOSURE-01..18
+**TDD**: Integration tests against PostgreSQL plus closure feature, integration, and Huashu UI/UX parity tests
 **Success Criteria**:
   1. Multi-org data isolation — zero cross-org leakage
   2. Auth org-switching + member management functional
   3. EventBus injectable; graphile-worker advisory locks coordinate cross-instance
   4. Connection pooling configured + verified under load
   5. Full integration test suite green against PostgreSQL
-**Plans:** TBD
+  6. CLOSURE-01..18 implemented or proven already closed with UAT evidence
+  7. Web/CLI/TUI/API parity matrix covers every SAS and CLOSURE requirement
+  8. `$huashu-design` Web/CLI/TUI design gate passes with recorded scores
+**Plans:** Complete — 10-00 through 10-13 planned. Canonical evidence: `.planning/phases/10-saas-hardening/10-CONTEXT.md`, `10-RESEARCH-DEFERRED-CLOSURE.md`, `10-UI-SPEC.md`.
 
 ## Progress
 
@@ -311,8 +314,8 @@ Plans:
 | 7. Repos + Artifacts + Notifications | 10/10 | Complete | 2026-05-05 |
 | 8. Surface Delivery | 7/7 | Complete | 2026-05-06 |
 | 9. Cross-Cutting + Testing | 10/10 | Complete | 2026-05-06 |
-| 10. SaaS Hardening | 0/? | Not started | - |
+| 10. SaaS Hardening + Milestone Closure | 0/14 | Planned | - |
 
 ---
 *Roadmap created: 2026-05-04*
-*Last corrected: 2026-05-06 — marked Phase 09 complete after final UAT and full CI*
+*Last corrected: 2026-05-06 — expanded Phase 10 to include all prior deferred closure items and Huashu Web/CLI/TUI gate*

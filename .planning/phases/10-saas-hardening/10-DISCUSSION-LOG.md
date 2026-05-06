@@ -5,7 +5,7 @@
 
 **Date:** 2026-05-06
 **Phase:** 10-SaaS Hardening
-**Areas discussed:** Multi-org isolation, auth org management, PostgreSQL pooling, injectable EventBus, job coordination, PostgreSQL integration tests, maximum interface parity
+**Areas discussed:** Multi-org isolation, auth org management, PostgreSQL pooling, injectable EventBus, job coordination, PostgreSQL integration tests, maximum interface parity, imported deferred closure, Huashu Web/CLI/TUI design gate
 
 ---
 
@@ -110,6 +110,34 @@ $gsd-discuss-phase 10 --all --auto Make sure maximum feature parity in all inter
 **User's choice:** Auto-selected maximum feature parity.
 **Notes:** Every SAS capability needs parity rows and tests.
 
+## Imported Deferred Closure
+
+User follow-up requested:
+
+```text
+what other deferred items from all other phases there is we should include them all in here in this phase as well as rechecking the system design for ui ux with $huashu-design for all interfaces tui cli and web in all requirements in phase 10 and all deferred items as phase 10 will be the closure that have everything and not skip anything
+```
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Keep Phase 10 SAS-only | Preserve original SAS-01..06 scope | |
+| Import explicit Phases 2-9 deferrals | Turn all prior deferred items into closure requirements and plans | ✓ |
+| Reopen every future/v2 idea in project handover | Would exceed source-phase explicit deferrals and mix aspirational roadmap with closure | |
+
+**User's choice:** Include all prior deferred items in Phase 10.
+**Notes:** Added `10-RESEARCH-DEFERRED-CLOSURE.md`, CLOSURE-01..18 mapping, and plans 10-10..10-13.
+
+## Huashu UI/UX Recheck
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Generate new HTML prototypes | Useful for greenfield design, wrong for production closure | |
+| Focused Huashu design review gate | Apply critique dimensions and anti-slop rules to Web/CLI/TUI tests | ✓ |
+| Skip because Phase 8 had UI-SPEC | Would miss closure surfaces added in Phase 10 | |
+
+**User's choice:** Recheck all interfaces with `$huashu-design`.
+**Notes:** Added `10-UI-SPEC.md` and plan 10-13. Huashu is used as product-surface review, not marketing/prototype generation.
+
 ## the agent's Discretion
 
 - Exact plan wave split.
@@ -120,9 +148,5 @@ $gsd-discuss-phase 10 --all --auto Make sure maximum feature parity in all inter
 
 ## Deferred Ideas
 
-- Billing/plans/quotas.
-- SSO/SAML/OIDC beyond current OAuth.
-- Multi-region deployment.
-- Redis/NATS EventBus adapters.
-- Separate database/schema per tenant.
-- Hosted auth provider replacement.
+- Prior Phase 2-9 deferred items are now imported into CLOSURE-01..18.
+- Still intentionally out unless user adds new requirements: replacing Better Auth, multi-region tenant placement, separate tenant DB/schema.

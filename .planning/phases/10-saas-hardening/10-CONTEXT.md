@@ -7,7 +7,7 @@
 <domain>
 ## Phase Boundary
 
-Phase 10 validates Fulcrum's SaaS posture on real PostgreSQL after local-first product completion: multi-org data isolation, Better Auth organization switching and member management, PostgreSQL pooling, injectable cross-instance EventBus, PostgreSQL-backed job coordination, and PostgreSQL integration tests. Scope is hardening and proving SAS-01..06 with maximum practical Web/CLI/TUI/API parity. Scope is not billing, SSO/SAML, multi-region hosting, marketplace hosting, or replacing Better Auth.
+Phase 10 is the milestone closure phase after local-first product completion. It validates Fulcrum's SaaS posture on real PostgreSQL and closes deferred items from Phases 2-9: multi-org isolation, Better Auth organization switching and member management, PostgreSQL pooling, injectable cross-instance EventBus, PostgreSQL-backed job coordination, PostgreSQL integration tests, deferred product features, deferred integration channels, deferred UI/UX polish, hosted API gateway/tier billing, and final cross-surface parity. Scope is hardening and proving SAS-01..06 plus CLOSURE-01..CLOSURE-18 with maximum practical Web/CLI/TUI/API parity. Scope is not replacing Better Auth or adding multi-region tenant placement unless explicit tests make current design defective.
 
 </domain>
 
@@ -66,12 +66,37 @@ Phase 10 validates Fulcrum's SaaS posture on real PostgreSQL after local-first p
 - **D-35:** PostgreSQL integration suite must cover tenant isolation, auth org switch/member roles, pooling/load, EventBus cross-instance, graphile-worker coordination, and migrations up/down.
 - **D-36:** Use `postgres:17-alpine` or the current PostgreSQL stable container image selected by the planner; record exact image tag in plan and tests.
 
+### Milestone Closure Scope
+- **D-37:** Phase 10 imports every explicit deferred item from Phases 2-9. No deferred item may remain only in source-phase prose; each must map to a CLOSURE requirement, an implementation plan, or a documented "already closed by later phase" proof.
+- **D-38:** BUG-17 final main-sync/repo hygiene belongs to Phase 10 closure UAT. It must verify `dev/v1.0` is merge-ready without pushing `main` unless user explicitly requests the release merge.
+- **D-39:** Phase 2 auth stubs are closure scope: interactive login and logout/session invalidation must become real or be removed from the public command surface.
+- **D-40:** Phase 3 external tracker dispatch parity is closure scope: Linear and GitHub Issues must become dispatch-capable or be explicitly disabled as ingest-only with failing tests preventing accidental dispatch claims.
+- **D-41:** Phase 4 INF-02 Linux static proof must close with Docker/native Linux evidence or a recorded environment blocker in UAT; static-proof command existing is not enough.
+- **D-42:** Phase 4 `z.any()` public schema gap is closure scope; public tRPC schemas must be typed without `z.any()` unless a narrow documented exception is tested.
+- **D-43:** Phase 6 MEM-09 repo-state context bundle must now use Phase 7 repo state. Empty placeholder repoState is no longer acceptable.
+- **D-44:** Phase 6 named document version tags, AI Q&A search, and Meilisearch adapter are closure scope. Meilisearch must remain optional and deterministic; PGlite/Orama stay default.
+- **D-45:** Phase 5 v2/deferred task features are closure scope: time entries/timesheets, widget dashboard builder, scheduled email reports, multi-assignee, watcher notification delivery, chart export, Goals/OKRs, Email/Slack task creation, task merge, and form-based templates.
+- **D-46:** Phase 7 deferred notification/artifact/repo items are closure scope: notification workflow designer UI, Slack/Discord channels, general binary/media preview pipeline, hosted remote repository cache service, and artifact signing/attestation verification.
+- **D-47:** Phase 8 deferred surface items are closure scope: CLI framework migration decision, CLI `--jq`/`--template`, Web design-system/polish pass, and hosted API gateway/tier billing.
+- **D-48:** Phase 9 deferred hardening items are closure scope where they are compatible with local-first v1: optional Sentry/Datadog/OTel exporter, theme builder, representative l10n completion, external SIEM JSON/CSV export, and encryption scheme verification. Replacing encryption with Argon2/native libs only happens if verification fails or migration is low-risk and tested.
+- **D-49:** Closure work must preserve local-first defaults. Hosted/cloud integrations are adapters behind config gates, not required runtime dependencies for PGlite/local usage.
+- **D-50:** Exact packages for closure planning: `@slack/bolt@4.7.2`, `discord.js@14.26.4`, `commander@14.0.3` or `@oclif/core@4.11.0`, `stripe@22.1.0`, `meilisearch@0.58.0`, `@meilisearch/instant-meilisearch@0.31.1`, `sigstore@4.1.0`, `@opentelemetry/api@1.9.1`, `argon2@0.44.0` only if replacing vault derivation is selected, `@cloudflare/workers-types@4.20260506.1` for inbound-email adapter typing, `@sendgrid/mail@8.1.6` only if SendGrid becomes outbound provider.
+
+### Huashu UI/UX Closure Gate
+- **D-51:** `$huashu-design` is a focused design review gate for Phase 10 Web, CLI, and TUI surfaces. It must not generate marketing pages, animation demos, or decorative redesigns.
+- **D-52:** Web Phase 10 UX follows the existing operational console vocabulary: dense settings/admin routes, tables, split panes, inline forms, status badges, visible failure states, keyboard focus, no hero/marketing/orb/gradient decoration.
+- **D-53:** CLI Phase 10 UX follows GitHub CLI patterns: readable default output, `--json` everywhere, optional `--jq`, optional template output, deterministic exit codes, and no interactive-only workflows for automation-critical actions.
+- **D-54:** TUI Phase 10 UX follows OpenTUI/opencode patterns: keyboard-first navigation, live panes, status footer, scrollback/log views, visible focus, non-color-only state, and plain-text render fallback.
+- **D-55:** Every closure capability needs a parity row across Web, CLI, TUI, API/tRPC, tests, and UAT. If a surface is intentionally read-only, the plan must say why and provide an equivalent action path.
+- **D-56:** Huashu critique dimensions are mandatory acceptance gates for Web/TUI and adapted for CLI: philosophy alignment, visual hierarchy/information hierarchy, craft, functionality, and originality/no-AI-slop. Minimum score is 8/10 for functionality and 7/10 for craft before Phase 10 UAT.
+
 ### the agent's Discretion
 - Exact plan wave split is planner discretion, but research and parity matrix must come before implementation tasks.
 - Exact Web route/component placement is flexible if it fits existing settings/admin navigation.
 - Exact CLI command spelling can follow existing command registry conventions, but canonical Phase 10 examples should use plural domain `orgs`.
 - Exact RLS helper implementation is planner discretion if tests prove no cross-org leakage and PgBouncer-compatible transaction-local behavior.
 - Exact graphile-worker version must be verified at implementation time and pinned in `package.json`.
+- Exact closure wave split is planner discretion, but every CLOSURE requirement must appear in at least one plan.
 
 </decisions>
 
@@ -84,6 +109,8 @@ Phase 10 validates Fulcrum's SaaS posture on real PostgreSQL after local-first p
 - `.planning/phases/10-saas-hardening/10-RESEARCH-PLATFORMS.md` — competitive SaaS/org/RLS/pooling/job/test platform patterns.
 - `.planning/phases/10-saas-hardening/10-RESEARCH-DEPENDENCIES.md` — exact package decisions and dependency adoption/avoidance.
 - `.planning/phases/10-saas-hardening/10-RESEARCH-INTEGRATION.md` — codebase integration map, event producer/consumer map, files that must not break.
+- `.planning/phases/10-saas-hardening/10-RESEARCH-DEFERRED-CLOSURE.md` — imported deferred-item inventory, exact provenance, package choices, and closure mapping.
+- `.planning/phases/10-saas-hardening/10-UI-SPEC.md` — Huashu design-system closure gate for Web/CLI/TUI.
 
 ### Requirements
 - `.planning/ROADMAP.md` §Phase 10 — scope, dependencies, TDD expectation, success criteria.
@@ -106,6 +133,16 @@ Phase 10 validates Fulcrum's SaaS posture on real PostgreSQL after local-first p
 - PgBouncer feature map: https://www.pgbouncer.org/features.html
 - Graphile Worker repository: https://github.com/graphile/worker
 - Testcontainers PostgreSQL module: https://node.testcontainers.org/modules/postgresql/
+- Slack Bolt for JavaScript: https://docs.slack.dev/tools/bolt-js/creating-an-app
+- Discord application commands/interactions: https://docs.discord.com/developers/interactions/application-commands
+- Commander.js package: https://www.npmjs.com/package/commander
+- Sigstore overview: https://docs.sigstore.dev/
+- Meilisearch JavaScript SDK: https://www.meilisearch.com/docs/getting_started/sdks/javascript
+- OpenTelemetry JavaScript: https://opentelemetry.io/docs/languages/js/
+- Stripe subscriptions API: https://docs.stripe.com/api/subscriptions/object
+- Cloudflare Email Workers: https://developers.cloudflare.com/email-routing/email-workers/
+- Postmark inbound webhook: https://postmarkapp.com/developer/webhooks/inbound-webhook
+- ntfy API: https://docs.ntfy.sh/subscribe/api/
 
 ### Codebase Starting Points
 - `src/auth/index.ts` — Better Auth configuration, organization plugin, SaaS auth gate.
@@ -137,6 +174,14 @@ Phase 10 validates Fulcrum's SaaS posture on real PostgreSQL after local-first p
 - `tests/subscriptions/` — EventBus/PGlite bridge/subscription tests.
 - `tests/workers/registry.test.ts` — worker registry baseline.
 - `scripts/ci.ts` — local CI source of truth.
+- `src/cli/commands/auth.ts` — Phase 2 login/logout stubs to close.
+- `src/search/`, `src/memory/`, `src/context/` — MEM-09 repo-state and optional Meilisearch/AI Q&A integration seams.
+- `src/docs/` and `src/web/src/routes/docs` — named version tags.
+- `src/notifications/` and `src/web/src/routes/notifications` — workflow designer, Slack/Discord/ntfy/email delivery adapters.
+- `src/artifacts/` — media preview and Sigstore attestation.
+- `src/repos/` — remote repository cache service and BUG-17 repo hygiene evidence.
+- `src/api/`, `src/server/trpc/`, `src/billing/` — hosted API gateway, quotas, billing, and public schema gates.
+- `src/tui/`, `src/web/src/routes`, `src/cli/commands` — Huashu Web/CLI/TUI closure surfaces.
 
 </canonical_refs>
 
@@ -178,18 +223,16 @@ Phase 10 validates Fulcrum's SaaS posture on real PostgreSQL after local-first p
 - Copy Graphile Worker's PostgreSQL-only queue posture; avoid Redis/RabbitMQ/NATS for v1.
 - Copy GitHub/Sentry-style operational status panels for worker health, queue depth, failed jobs, pool health, and tenant isolation test status.
 - Keep Phase 8/9 parity discipline: every SaaS hardening feature gets Web/CLI/TUI/API/test rows.
+- Import all source-phase deferred notes into CLOSURE requirements; do not leave "future/v2" language unassigned.
+- Apply Huashu as an operational product design review, not as a visual prototype generator.
 
 </specifics>
 
 <deferred>
 ## Deferred Ideas
 
-- Billing, plans, subscriptions, metering, and usage quotas — future SaaS/business phase.
-- SSO/SAML/OIDC beyond Google/GitHub OAuth — v2 requirement ADV-08.
-- Multi-region deployment and tenant placement — v2 requirement ADV-06.
-- Redis/NATS event bus adapters — future scale option; PostgreSQL NOTIFY is v1 SaaS target.
-- Separate database/schema per tenant — enterprise/v2 isolation option, not Phase 10.
-- Hosted Clerk/Auth0/WorkOS replacement — out of scope; Better Auth remains v1 auth provider.
+- None from prior phases remain unassigned. Prior deferred items are imported into CLOSURE-01..CLOSURE-18 and plans 10-10..10-13.
+- Still intentionally out of Phase 10 unless the user adds new requirements: replacing Better Auth with Clerk/Auth0/WorkOS, multi-region tenant placement, and separate database/schema per tenant.
 
 </deferred>
 

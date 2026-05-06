@@ -286,20 +286,41 @@
 - [ ] **SAS-05**: Job queue coordination across instances (graphile-worker advisory locks)
 - [ ] **SAS-06**: Integration tests run against PostgreSQL (not just PGlite)
 
+### Milestone Closure (CLOSURE)
+
+- [ ] **CLOSURE-01**: BUG-17 final repo hygiene and release merge readiness verified without mutating `main`
+- [ ] **CLOSURE-02**: CLI auth `login`/`logout` stubs closed with real behavior or removed public surface
+- [ ] **CLOSURE-03**: External tracker dispatch parity resolved for Linear/GitHub Issues or tested as explicitly unsupported
+- [ ] **CLOSURE-04**: INF-02 Linux static proof and public tRPC `z.any()` schema gaps closed
+- [ ] **CLOSURE-05**: MEM-09 repo-state context bundle uses real Phase 7 repo status
+- [ ] **CLOSURE-06**: Named document version tags implemented
+- [ ] **CLOSURE-07**: Optional Meilisearch adapter and deterministic AI Q&A search implemented behind config gates
+- [ ] **CLOSURE-08**: Time tracking, time entries, and timesheets implemented across Web/CLI/TUI/API
+- [ ] **CLOSURE-09**: Custom dashboard builder implemented with saved widget layouts
+- [ ] **CLOSURE-10**: Scheduled email report delivery implemented with worker-backed scheduling
+- [ ] **CLOSURE-11**: Multi-assignee task model implemented while preserving watcher behavior
+- [ ] **CLOSURE-12**: Chart/report export to PNG/PDF implemented
+- [ ] **CLOSURE-13**: Goals/OKRs, task merge, form templates, and Email/Slack task creation implemented
+- [ ] **CLOSURE-14**: Notification workflow designer UI plus Slack/Discord/ntfy channel adapters implemented behind gates
+- [ ] **CLOSURE-15**: Binary/media preview pipeline, artifact attestations, and hosted remote repo cache implemented behind gates
+- [ ] **CLOSURE-16**: CLI framework/formatting decision, `--jq`, `--template`, hosted API gateway, quotas, and billing adapter implemented
+- [ ] **CLOSURE-17**: Optional OTel/Sentry/Datadog/SIEM export, theme builder/l10n closure, and encryption scheme verification implemented
+- [ ] **CLOSURE-18**: Huashu Web/CLI/TUI UI/UX system design recheck passed for all Phase 10 requirements and closure items
+
 ## v2 Requirements
 
 ### Advanced Features
 
 - **ADV-01**: Real-time collaborative editing (Yjs/CRDT)
 - **ADV-02**: Third-party marketplace hosting
-- **ADV-03**: Custom workflow designer UI
+- **ADV-03**: Custom workflow designer UI beyond Phase 10 notification workflow designer
 - **ADV-04**: Mobile responsive web (PWA)
 - **ADV-05**: Plugin sandboxing (WASM)
 - **ADV-06**: Multi-region deployment
-- **ADV-07**: Audit log export to external SIEM
+- **ADV-07**: Enterprise SIEM integrations beyond Phase 10 JSON/CSV export
 - **ADV-08**: SSO (SAML/OIDC) beyond OAuth
 - **ADV-09**: SSH Worker Extension (Symphony spec Appendix A — OPTIONAL)
-- **ADV-10**: Slack + Discord notification channels (gated delivery)
+- **ADV-10**: Slack + Discord notification channels beyond Phase 10 gated delivery baseline
 
 ## Out of Scope
 
@@ -339,10 +360,11 @@
 | XCT-01..12 | Phase 9 | Complete |
 | TST-01..10 | Each phase (TST-10) + Phase 9 | Complete |
 | SAS-01..06 | Phase 10 | Pending |
+| CLOSURE-01..18 | Phase 10 | Pending |
 
 **Coverage:**
-- v1 requirements: 213 total
-- Mapped to phases: 213
+- v1 requirements: 232 total
+- Mapped to phases: 232
 - Unmapped: 0 ✓
 
 ---
