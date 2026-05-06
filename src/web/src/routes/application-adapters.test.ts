@@ -13,6 +13,11 @@ type Surface = {
   keys: string[];
 };
 
+type RuntimeSurface = {
+  name: string;
+  file: string;
+};
+
 const SURFACES: Surface[] = [
   {
     name: "dashboard",
@@ -72,6 +77,18 @@ const SURFACES: Surface[] = [
   },
 ];
 
+const RUNTIME_SURFACES: RuntimeSurface[] = [
+  { name: "runs detail", file: "runs/[id]/+page.server.ts" },
+  { name: "run artifacts", file: "runs/[id]/artifacts/+page.server.ts" },
+  { name: "CSV export/import", file: "api/data/export-csv/+server.ts" },
+  { name: "CSV export/import", file: "api/data/import-csv/+server.ts" },
+  { name: "skills API", file: "api/skills/+server.ts" },
+  { name: "bell API", file: "api/bell/+server.ts" },
+  { name: "search loader", file: "search/+page.server.ts" },
+];
+
+const FORBIDDEN_RUNTIME_BOUNDARY = /openProductDb|getProductDb|OrmProductDb|\bProductDb\b|from\s+["'][^"']*product-kernel[^"']*["']|\.query\(|getConnection\(\)\.execute/g;
+
 function source(file: string): string {
   return readFileSync(join(routesRoot, file), "utf8");
 }
@@ -81,6 +98,14 @@ function tokenPattern(key: string): RegExp {
 }
 
 describe("web route application adapters", () => {
+  for (const surface of RUNTIME_SURFACES) {
+    test(`${surface.name} runtime adapter avoids direct ProductDb and raw data access`, () => {
+      const text = source(surface.file);
+      const matches = [...text.matchAll(FORBIDDEN_RUNTIME_BOUNDARY)].map((match) => match[0]);
+      expect(matches, `${surface.file} boundary violations: ${matches.join(", ")}`).toEqual([]);
+    });
+  }
+
   for (const surface of SURFACES) {
     test(`${surface.name} loader uses application query module and preserves page data keys`, () => {
       const text = source(surface.file);
