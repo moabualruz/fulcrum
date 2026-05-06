@@ -69,6 +69,34 @@ describe("kernel task REST adapter", () => {
     expect(input).toMatchObject({ title: "REST adapter task", status: "todo" });
   });
 
+  test("WR-01 POST /tasks forwards accepted application create fields", async () => {
+    const api = await app();
+    const tiptapContent = { type: "doc", content: [{ type: "paragraph" }] };
+    const response = await api.request("/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: "REST adapter task",
+        descriptionText: "Preserved description",
+        tiptapContent,
+        points: 5,
+        assigneeId: USER_ID,
+        project_id: "22222222-2222-4222-8222-222222222222",
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(createTask).toHaveBeenCalledTimes(1);
+    const [, , input] = createTask.mock.calls[0] as unknown as [unknown, AppContext, Record<string, unknown>];
+    expect(input).toMatchObject({
+      projectId: "22222222-2222-4222-8222-222222222222",
+      descriptionText: "Preserved description",
+      tiptapContent,
+      points: 5,
+      assigneeId: USER_ID,
+    });
+  });
+
   test("GET /tasks calls application task query", async () => {
     const api = await app();
     const response = await api.request("/tasks");
