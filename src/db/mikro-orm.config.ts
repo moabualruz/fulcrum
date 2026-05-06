@@ -293,7 +293,11 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
   const getPglite = pglite
     ? () => pglite
     : async () => {
-      const dataDir = resolveDatabaseConfig().dataDir;
+      const localDatabase = resolveDatabaseConfig();
+      if (localDatabase.backend !== "pglite") {
+        throw new Error("PGlite configuration expected for local ORM startup.");
+      }
+      const dataDir = localDatabase.dataDir;
       await mkdir(dataDir, { recursive: true });
       const { PGlite } = await import("@electric-sql/pglite");
       return new PGlite(dataDir);

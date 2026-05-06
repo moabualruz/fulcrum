@@ -1,12 +1,13 @@
 /**
  * Task service — pure DB operations for task CRUD.
  * Canonical home for task actions; web layer re-exports from here.
- * Dependency direction: services -> product-kernel (never web).
+ * Dependency direction: services use neutral persistence protocols (never web).
  */
-import type { DbHandle } from "../product-kernel/store/repositories.ts";
-import { createTask } from "../product-kernel/store/repositories.ts";
-import { eventDispatcher } from "../product-kernel/event-dispatcher.ts";
-import type { ProductDb } from "../product-kernel/db/types.ts";
+import type { EntityManager } from "@mikro-orm/postgresql";
+import type { SqlExecutor } from "../db/sql.ts";
+import { newUlid } from "../shared/ids.ts";
+
+type DbHandle = EntityManager | { em?: EntityManager } | SqlExecutor;
 
 export type TaskStatus =
   | "pending"
@@ -47,8 +48,40 @@ export async function createTaskAction(
   input: CreateTaskInput,
 ): Promise<{ id: string }> {
   if (input.status !== undefined) assertStatus(input.status, "createTaskAction");
-  const task = await createTask(db, input);
-  return { id: task.id };
+  const id = newUlid();
+  const status = input.status ?? "pending";
+  if (isSqlExecutor(db)) {
+    await db.query(
+      `INSERT INTO tasks (id, org_id, project_id, title, description, status, priority)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [id, input.orgId, input.projectId, input.title, input.description ?? null, status, input.priority ?? 0],
+    );
+    await appendServiceEvent(db, {
+      orgId: input.orgId,
+      projectId: input.projectId,
+      subjectKind: "task",
+      subjectId: id,
+      verb: "created",
+      payload: { title: input.title, status },
+    });
+    return { id };
+  }
+  const em = assertEm(db);
+  const conn = em.getConnection();
+  await conn.execute(
+    `INSERT INTO tasks (id, org_id, project_id, title, description, status, priority)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, input.orgId, input.projectId, input.title, input.description ?? null, status, input.priority ?? 0],
+  );
+  await appendServiceEvent(db, {
+    orgId: input.orgId,
+    projectId: input.projectId,
+    subjectKind: "task",
+    subjectId: id,
+    verb: "created",
+    payload: { title: input.title, status },
+  });
+  return { id };
 }
 
 interface TaskScopeRow {
@@ -56,22 +89,49 @@ interface TaskScopeRow {
   project_id: string | null;
 }
 
-/** Resolve EntityManager from DbHandle (mirrors repositories.ts pattern). */
 function assertEm(db: DbHandle) {
   if ("persist" in db && typeof (db as { persist: unknown }).persist === "function") {
-    return db as import("@mikro-orm/postgresql").EntityManager;
+    return db as EntityManager;
   }
   if ("em" in db) {
     const em = (db as { em?: unknown }).em;
     if (em && typeof (em as { persist?: unknown }).persist === "function") {
-      return em as import("@mikro-orm/postgresql").EntityManager;
+      return em as EntityManager;
     }
   }
-  throw new Error("tasks.ts: EntityManager required — pass em instead of raw ProductDb.");
+  throw new Error("tasks.ts: EntityManager required for this operation.");
 }
 
-function isProductDb(db: DbHandle): db is ProductDb {
-  return !("em" in db) && "query" in db && typeof (db as ProductDb).query === "function";
+function isSqlExecutor(db: DbHandle): db is SqlExecutor {
+  return !("em" in db) && "query" in db && typeof (db as { query: unknown }).query === "function";
+}
+
+async function appendServiceEvent(
+  db: DbHandle,
+  input: {
+    orgId: string;
+    projectId?: string | null;
+    subjectKind: string;
+    subjectId: string;
+    verb: string;
+    payload?: Record<string, unknown>;
+  },
+): Promise<void> {
+  const id = newUlid();
+  if (isSqlExecutor(db)) {
+    await db.query(
+      `INSERT INTO events (id, org_id, project_id, actor, subject_kind, subject_id, verb, payload, created_at)
+       VALUES ($1, $2, $3, 'system', $4, $5, $6, $7::jsonb, now())`,
+      [id, input.orgId, input.projectId ?? null, input.subjectKind, input.subjectId, input.verb, JSON.stringify(input.payload ?? {})],
+    );
+    return;
+  }
+  const em = assertEm(db);
+  await em.getConnection().execute(
+    `INSERT INTO events (id, org_id, project_id, actor, subject_kind, subject_id, verb, payload, created_at)
+     VALUES (?, ?, ?, 'system', ?, ?, ?, ?::jsonb, now())`,
+    [id, input.orgId, input.projectId ?? null, input.subjectKind, input.subjectId, input.verb, JSON.stringify(input.payload ?? {})],
+  );
 }
 
 export async function updateTaskAction(
@@ -79,7 +139,7 @@ export async function updateTaskAction(
   input: UpdateTaskInput,
 ): Promise<{ ok: true }> {
   if (!input.id) throw new Error("updateTaskAction: id is required");
-  if (isProductDb(db)) {
+  if (isSqlExecutor(db)) {
     const sets: string[] = [];
     const params: (string | number | null)[] = [];
     const changed: string[] = [];
@@ -109,10 +169,9 @@ export async function updateTaskAction(
     const row = rows[0];
     if (!row) throw new Error(`updateTaskAction: task not found: ${input.id}`);
 
-    await eventDispatcher.dispatch(db, {
+    await appendServiceEvent(db, {
       orgId: row.org_id,
       projectId: row.project_id,
-      actor: "system",
       subjectKind: "task",
       subjectId: input.id,
       verb: "updated",
@@ -152,10 +211,9 @@ export async function updateTaskAction(
   const row = rows[0];
   if (!row) throw new Error(`updateTaskAction: task not found: ${input.id}`);
 
-  await eventDispatcher.dispatch(db, {
+  await appendServiceEvent(db, {
     orgId: row.org_id,
     projectId: row.project_id,
-    actor: "system",
     subjectKind: "task",
     subjectId: input.id,
     verb: "updated",
@@ -168,17 +226,16 @@ export async function deleteTaskAction(
   db: DbHandle,
   id: string,
 ): Promise<{ ok: true }> {
-  if (isProductDb(db)) {
+  if (isSqlExecutor(db)) {
     const rows = await db.query<TaskScopeRow>(
       `DELETE FROM tasks WHERE id = $1 RETURNING org_id, project_id`,
       [id],
     );
     const row = rows[0];
     if (row) {
-      await eventDispatcher.dispatch(db, {
+      await appendServiceEvent(db, {
         orgId: row.org_id,
         projectId: row.project_id,
-        actor: "system",
         subjectKind: "task",
         subjectId: id,
         verb: "deleted",
@@ -194,10 +251,9 @@ export async function deleteTaskAction(
   ) as Array<TaskScopeRow>;
   const row = rows[0];
   if (row) {
-    await eventDispatcher.dispatch(db, {
+    await appendServiceEvent(db, {
       orgId: row.org_id,
       projectId: row.project_id,
-      actor: "system",
       subjectKind: "task",
       subjectId: id,
       verb: "deleted",
@@ -212,6 +268,26 @@ export async function moveTaskStatusAction(
 ): Promise<{ ok: true }> {
   assertStatus(input.from, "moveTaskStatusAction.from");
   assertStatus(input.to, "moveTaskStatusAction.to");
+  if (isSqlExecutor(db)) {
+    const rows = await db.query<TaskScopeRow>(
+      `UPDATE tasks SET status = $1, updated_at = now()
+       WHERE id = $2 AND status = $3 RETURNING org_id, project_id`,
+      [input.to, input.id, input.from],
+    );
+    const row = rows[0];
+    if (!row) {
+      throw new Error(`status conflict: task ${input.id} not in ${input.from}`);
+    }
+    await appendServiceEvent(db, {
+      orgId: row.org_id,
+      projectId: row.project_id,
+      subjectKind: "task",
+      subjectId: input.id,
+      verb: "status_changed",
+      payload: { from: input.from, to: input.to, task: input.id },
+    });
+    return { ok: true };
+  }
   const em = assertEm(db);
   const conn = em.getConnection();
   const rows = await conn.execute(
@@ -223,10 +299,9 @@ export async function moveTaskStatusAction(
   if (!row) {
     throw new Error(`status conflict: task ${input.id} not in ${input.from}`);
   }
-  await eventDispatcher.dispatch(db, {
+  await appendServiceEvent(db, {
     orgId: row.org_id,
     projectId: row.project_id,
-    actor: "system",
     subjectKind: "task",
     subjectId: input.id,
     verb: "status_changed",

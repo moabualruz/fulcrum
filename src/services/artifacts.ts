@@ -1,9 +1,12 @@
 /**
  * Artifact service — pure DB operations for artifact CRUD.
  * Canonical home; web layer re-exports from here.
- * Dependency direction: services -> product-kernel (never web).
+ * Dependency direction: services use neutral persistence protocols (never web).
  */
-import type { DbHandle } from "../product-kernel/store/repositories.ts";
+import type { EntityManager } from "@mikro-orm/postgresql";
+import type { SqlExecutor } from "../db/sql.ts";
+
+type DbHandle = EntityManager | { em?: EntityManager } | SqlExecutor;
 
 export interface ArtifactRow {
   id: string;
@@ -38,21 +41,20 @@ function isoStamp(value: string | Date): string {
   return value instanceof Date ? value.toISOString() : value;
 }
 
-/** Resolve EntityManager from DbHandle (mirrors repositories.ts pattern). */
 function assertEm(db: DbHandle) {
   if ("persist" in db && typeof (db as { persist: unknown }).persist === "function") {
-    return db as import("@mikro-orm/postgresql").EntityManager;
+    return db as EntityManager;
   }
   if ("em" in db) {
     const em = (db as { em?: unknown }).em;
     if (em && typeof (em as { persist?: unknown }).persist === "function") {
-      return em as import("@mikro-orm/postgresql").EntityManager;
+      return em as EntityManager;
     }
   }
-  throw new Error("artifacts.ts: EntityManager required — pass em instead of raw ProductDb.");
+  throw new Error("artifacts.ts: EntityManager required for this operation.");
 }
 
-function isProductDb(db: DbHandle): db is import("../product-kernel/db/types.ts").ProductDb {
+function isSqlExecutor(db: DbHandle): db is SqlExecutor {
   return !("em" in db) && "query" in db && typeof (db as { query: unknown }).query === "function";
 }
 
@@ -61,7 +63,7 @@ export async function listArtifacts(
   orgId: string,
   filter?: ArtifactFilter & { includeArchived?: boolean },
 ): Promise<ArtifactRow[]> {
-  if (isProductDb(db)) {
+  if (isSqlExecutor(db)) {
     const conditions = ["org_id = $1"];
     const params: (string | null)[] = [orgId];
     const push = (condition: string, value: string) => {
@@ -145,7 +147,7 @@ export async function readArtifactDetail(
   db: DbHandle,
   input: { orgId: string; id: string },
 ): Promise<ArtifactDetail | null> {
-  if (isProductDb(db)) {
+  if (isSqlExecutor(db)) {
     const rows = await db.query<ArtifactRow & { created_at: string | Date }>(
       `SELECT id, org_id, project_id, run_id, task_id, kind, title,
               body_path, sha256, size, mime, COALESCE(archived, false) AS archived, created_at
