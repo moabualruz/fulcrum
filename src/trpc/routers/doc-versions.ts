@@ -70,6 +70,40 @@ export const docVersionsRouter = t.router({
       }));
     }),
 
+  /** Get one document version by ID. */
+  get: permissionedProcedure({ resource: "doc_versions", action: "list" })
+    .input(z.object({
+      documentId: z.string().uuid(),
+      versionId: z.string().uuid(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const em = getEm(ctx);
+      const orgId = requireOrg(ctx);
+
+      const version = await em.findOne("DocVersion" as never, {
+        id: input.versionId,
+        org: orgId,
+        doc: input.documentId,
+      } as never, {
+        populate: ["author", "restoreOf"] as never,
+      }) as DocVersion | null;
+
+      if (!version) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Version not found" });
+      }
+
+      return {
+        id: version.id,
+        versionNum: version.versionNum,
+        createdAt: version.createdAt,
+        authorId: (version.author as null | { id: string })?.id ?? null,
+        authorName: (version.author as null | { name?: string; email?: string })?.name
+          ?? (version.author as null | { name?: string; email?: string })?.email
+          ?? null,
+        isRestoreOf: (version.restoreOf as null | { id: string })?.id ?? null,
+      };
+    }),
+
   /**
    * Restore document to the content of a previous version.
    * T-06-17: Creates a new version entry linking restoreOf → source version (audit trail).

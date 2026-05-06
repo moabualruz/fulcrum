@@ -23,6 +23,25 @@ export function createDocVersionsCommand(): Command {
     }
   });
 
+  const getCommand = command.command("get");
+  getCommand.description("doc_versions get");
+  getCommand.option("--json", "Emit JSON output");
+  getCommand.option("--document-id <string>", "document-id");
+  getCommand.option("--version-id <string>", "version-id");
+  getCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for doc_versions.get requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   const listCommand = command.command("list");
   listCommand.description("doc_versions list");
   listCommand.option("--json", "Emit JSON output");

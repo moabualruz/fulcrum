@@ -193,7 +193,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     doc_comments)
-      local verbs='create delete list resolve'
+      local verbs='create delete list resolve update'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -219,7 +219,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     doc_versions)
-      local verbs='diff list restore'
+      local verbs='diff get list restore'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )

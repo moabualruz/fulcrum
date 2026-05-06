@@ -79,5 +79,25 @@ export function createDocCommentsCommand(): Command {
     }
   });
 
+  const updateCommand = command.command("update");
+  updateCommand.description("doc_comments update");
+  updateCommand.option("--json", "Emit JSON output");
+  updateCommand.option("--body-md <string>", "body-md");
+  updateCommand.option("--id <string>", "id");
+  updateCommand.option("--resolved", "resolved");
+  updateCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for doc_comments.update requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   return command;
 }

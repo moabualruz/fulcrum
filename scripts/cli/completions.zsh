@@ -110,7 +110,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     doc_comments)
-      local -a values=('create:fulcrum doc_comments create' 'delete:fulcrum doc_comments delete' 'list:fulcrum doc_comments list' 'resolve:fulcrum doc_comments resolve' '--json:option')
+      local -a values=('create:fulcrum doc_comments create' 'delete:fulcrum doc_comments delete' 'list:fulcrum doc_comments list' 'resolve:fulcrum doc_comments resolve' 'update:fulcrum doc_comments update' '--json:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
         _values 'ids' $(_fulcrum_dynamic_ids 'doc_comments')
         return
@@ -126,7 +126,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     doc_versions)
-      local -a values=('diff:fulcrum doc_versions diff' 'list:fulcrum doc_versions list' 'restore:fulcrum doc_versions restore' '--json:option')
+      local -a values=('diff:fulcrum doc_versions diff' 'get:fulcrum doc_versions get' 'list:fulcrum doc_versions list' 'restore:fulcrum doc_versions restore' '--json:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
         _values 'ids' $(_fulcrum_dynamic_ids 'doc_versions')
         return

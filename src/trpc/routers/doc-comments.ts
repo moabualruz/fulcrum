@@ -101,6 +101,29 @@ export const docCommentsRouter = t.router({
       return comment;
     }),
 
+  /** Update a comment body or anchor metadata. */
+  update: permissionedProcedure({ resource: "doc_comments", action: "write" })
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        bodyMd: z.string().min(1).max(10_000).optional(),
+        anchorRange: z.record(z.string(), z.unknown()).nullable().optional(),
+        resolved: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const em = getEm(ctx);
+      const comment = await resolveComment(ctx, input.id);
+      const writable = comment as unknown as Record<string, unknown>;
+
+      if (input.bodyMd !== undefined) writable["bodyMd"] = input.bodyMd;
+      if (input.anchorRange !== undefined) writable["anchorRange"] = input.anchorRange;
+      if (input.resolved !== undefined) writable["resolved"] = input.resolved;
+
+      await em.flush();
+      return comment;
+    }),
+
   /** Mark a comment as resolved. */
   resolve: permissionedProcedure({ resource: "doc_comments", action: "write" })
     .input(z.object({ id: z.string().uuid() }))

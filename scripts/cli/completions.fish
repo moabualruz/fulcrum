@@ -115,6 +115,7 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_comments'" -a 'create' 
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_comments'" -a 'delete' -d 'doc_comments delete'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_comments'" -a 'list' -d 'doc_comments list'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_comments'" -a 'resolve' -d 'doc_comments resolve'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_comments'" -a 'update' -d 'doc_comments update'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_comments'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_comments'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'doc_comments')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'doc_links' -d 'fulcrum doc_links'
@@ -125,6 +126,7 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_links'" -l json -d opti
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_links'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'doc_links')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'doc_versions' -d 'fulcrum doc_versions'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_versions'" -a 'diff' -d 'doc_versions diff'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_versions'" -a 'get' -d 'doc_versions get'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_versions'" -a 'list' -d 'doc_versions list'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_versions'" -a 'restore' -d 'doc_versions restore'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_versions'" -l json -d option
