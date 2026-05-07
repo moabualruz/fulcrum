@@ -3,10 +3,11 @@ import { randomUUID } from "node:crypto";
 import { basename, resolve } from "node:path";
 import { Org } from "../../db/entities/auth/Org.ts";
 import { Repo } from "../../db/entities/repos/Repo.ts";
+import { RepoBranch } from "../../db/entities/repos/RepoBranch.ts";
 import { RepoTreeEntry } from "../../db/entities/repos/RepoTreeEntry.ts";
-import { AppValidationError } from "../errors.ts";
+import { AppForbiddenError, AppValidationError } from "../errors.ts";
 import { ormSqlConnection } from "../orm-helpers.ts";
-import { serializeRepo, serializeRepoTreeEntry } from "./queries.ts";
+import { getRepo, isRepoWriteOpsEnabled, serializeRepo, serializeRepoTreeEntry } from "./queries.ts";
 import type { AppContext, InsertRepoTreeEntryInput, RegisterRepoInput, RepoDto, RepoTreeEntryDto } from "./types.ts";
 
 export async function registerRepo(em: EntityManager, ctx: AppContext, input: RegisterRepoInput): Promise<RepoDto> {
@@ -46,15 +47,13 @@ export async function addProjectRepo(
   const displayName = name || (kind === "local" ? basename(resolvedPath ?? "repo") : slugFromRemoteUrl(url));
   const id = randomUUID();
   const rows = await ormSqlConnection(em).execute<Array<{ id: string }>>(
-    `INSERT INTO repos (id, org_id, project_id, slug, root_path, default_branch, remote_url, name, kind, local_path, current_branch, sync_status, last_touched_at)
-     VALUES ($1, $2, $3, $4, $5, 'main', $6, $7, $8, $9, 'main', 'idle', now())
+    `INSERT INTO repos (id, org_id, slug, default_branch, remote_url, name, kind, local_path, current_branch, sync_status, last_touched_at)
+     VALUES ($1, $2, $3, 'main', $4, $5, $6, $7, 'main', 'idle', now())
      RETURNING id`,
     [
       id,
       ctx.orgId,
-      ctx.projectId ?? null,
       slug,
-      resolvedPath ?? "",
       kind === "remote" ? url : null,
       displayName,
       kind,
@@ -70,14 +69,62 @@ export async function linkProjectRepoToProject(
   repoId: string,
 ): Promise<{ ok: true }> {
   if (!repoId) throw new AppValidationError("repoId required");
-  await ormSqlConnection(em).execute(
-    `UPDATE repos
-        SET project_id = $1, updated_at = now()
-      WHERE id = $2
-        AND org_id = $3`,
-    [ctx.projectId ?? null, repoId, ctx.orgId],
-  );
+  await getRepo(em, ctx, repoId);
   return { ok: true };
+}
+
+export async function touchRepoSync(em: EntityManager, ctx: AppContext, repoId: string): Promise<{ ok: true }> {
+  await em.getKysely<any>()
+    .updateTable("repos")
+    .set({ last_sync_at: new Date(), last_touched_at: new Date() })
+    .where("id", "=", repoId)
+    .where("org_id", "=", ctx.orgId)
+    .execute();
+  return { ok: true };
+}
+
+export async function createRepoBranch(em: EntityManager, ctx: AppContext, input: { repoId: string; name: string }): Promise<{ ok: true }> {
+  await requireRepoWriteOps(em, ctx);
+  if (!input.name) throw new AppValidationError("branch name required");
+  await em.transactional(async (txEm) => {
+    const branch = txEm.create(RepoBranch, {
+      org: txEm.getReference(Org, ctx.orgId),
+      repo: txEm.getReference(Repo, input.repoId),
+      name: input.name,
+      sha: null,
+      isDefault: false,
+    });
+    txEm.persist(branch);
+    await txEm.flush();
+  });
+  return { ok: true };
+}
+
+export async function checkoutRepoBranch(em: EntityManager, ctx: AppContext, input: { repoId: string; name: string }): Promise<{ ok: true }> {
+  await requireRepoWriteOps(em, ctx);
+  await em.getKysely<any>()
+    .updateTable("repos")
+    .set({ current_branch: input.name, last_touched_at: new Date() })
+    .where("id", "=", input.repoId)
+    .where("org_id", "=", ctx.orgId)
+    .execute();
+  return { ok: true };
+}
+
+export async function deleteRepoBranch(em: EntityManager, ctx: AppContext, input: { repoId: string; name: string }): Promise<{ ok: true }> {
+  await requireRepoWriteOps(em, ctx);
+  await em.getKysely<any>()
+    .deleteFrom("repo_branches")
+    .where("org_id", "=", ctx.orgId)
+    .where("repo_id", "=", input.repoId)
+    .where("name", "=", input.name)
+    .where("is_default", "=", false)
+    .execute();
+  return { ok: true };
+}
+
+async function requireRepoWriteOps(em: EntityManager, ctx: AppContext): Promise<void> {
+  if (!(await isRepoWriteOpsEnabled(em, ctx))) throw new AppForbiddenError("repo-write-ops disabled");
 }
 
 function slugFromRemoteUrl(url: string): string {
