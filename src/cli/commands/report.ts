@@ -24,12 +24,16 @@
  *   --days <n>         Date range in days
  */
 
+import type { Container } from "@needle-di/core";
+import { createLocalCaller } from "../local-caller.ts";
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyRecord = Record<string, any>;
 
 export interface ReportRunOptions {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   caller?: { reports: Record<string, (...args: any[]) => Promise<any>> };
+  container?: Container | null;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -174,20 +178,7 @@ function outputData(data: any, format: string, type: ReportType, print: (line: s
 async function resolveCaller(opts: ReportRunOptions): Promise<ReportRunOptions["caller"] & object> {
   if (opts.caller) return opts.caller as object & { reports: Record<string, (...args: unknown[]) => Promise<unknown>> };
 
-  const { t } = await import("../../trpc/trpc.ts");
-  const { appRouter } = await import("../../trpc/router.ts");
-  const { createContext } = await import("../../trpc/context.ts");
-  const { MikroORM } = await import("@mikro-orm/postgresql");
-  const { Container } = await import("@needle-di/core");
-  const { ENTITY_MANAGER_TOKEN, registerDbBindings } = await import("../../db/db.module.ts");
-
-  const orm = new MikroORM({} as never);
-  const container = new Container();
-  container.bind({ provide: MikroORM, useValue: orm });
-  const em = orm.em.fork();
-  registerDbBindings(container, orm, em);
-
-  const ctx = createContext({ session: null as never, orgId: "", userId: "", em, container });
-  const factory = t.createCallerFactory(appRouter);
-  return factory(ctx) as object & { reports: Record<string, (...args: unknown[]) => Promise<unknown>> };
+  return await createLocalCaller({ container: opts.container, requireSession: false }) as object & {
+    reports: Record<string, (...args: unknown[]) => Promise<unknown>>;
+  };
 }

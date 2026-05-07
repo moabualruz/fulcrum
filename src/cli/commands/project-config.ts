@@ -8,6 +8,9 @@
  *   fulcrum project config <projectId> --json
  */
 
+import type { Container } from "@needle-di/core";
+import { createLocalCaller } from "../local-caller.ts";
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => Promise<any>;
 
@@ -19,6 +22,7 @@ export interface ProjectConfigRunOptions {
       updateEnabledTaskTypes: AnyFn;
     };
   };
+  container?: Container | null;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -101,20 +105,5 @@ export async function run(argv: readonly string[], opts: ProjectConfigRunOptions
 async function resolveCaller(opts: ProjectConfigRunOptions): Promise<Required<ProjectConfigRunOptions>["caller"]> {
   if (opts.caller) return opts.caller;
 
-  const { t } = await import("../../trpc/trpc.ts");
-  const { appRouter } = await import("../../trpc/router.ts");
-  const { createContext } = await import("../../trpc/context.ts");
-  const { MikroORM } = await import("@mikro-orm/postgresql");
-  const { Container } = await import("@needle-di/core");
-  const { registerDbBindings } = await import("../../db/db.module.ts");
-
-  const orm = new MikroORM({} as never);
-  const container = new Container();
-  container.bind({ provide: MikroORM, useValue: orm });
-  const em = orm.em.fork();
-  registerDbBindings(container, orm, em);
-
-  const ctx = createContext({ session: null as never, orgId: "", userId: "", em, container });
-  const factory = t.createCallerFactory(appRouter);
-  return factory(ctx) as Required<ProjectConfigRunOptions>["caller"];
+  return await createLocalCaller({ container: opts.container, requireSession: false }) as never;
 }

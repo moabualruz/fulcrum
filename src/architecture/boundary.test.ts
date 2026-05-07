@@ -90,17 +90,15 @@ const RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS = new Map([
     "src/cli/index.ts",
     "CLI composition root may wire database bindings while command files migrate to caller/application adapters",
   ],
+  [
+    "src/cli/commands/init.ts",
+    "CLI init is the exact bootstrap exception that opens PGlite/MikroORM, runs migrations, and seeds the local org before application callers exist",
+  ],
 ]);
 
 const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES = [
-  "src/cli/commands/auth.ts",
   "src/cli/commands/context.ts",
-  "src/cli/commands/flags.ts",
-  "src/cli/commands/init.ts",
-  "src/cli/commands/pillar14-generated.ts",
   "src/cli/commands/repos.ts",
-  "src/cli/commands/symphony.ts",
-  "src/cli/docs-templates.ts",
   "src/server/trpc/routers/audit.ts",
   "src/server/trpc/routers/auth.ts",
   "src/server/trpc/routers/memory.ts",
@@ -256,7 +254,7 @@ describe("Phase 9.5 interface boundary", () => {
 
   test("interface adapters do not use ORM/entity/repository access outside exact composition roots", async () => {
     const found = await residualDirectAccessViolations();
-    expect(RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS.size).toBe(3);
+    expect(RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS.size).toBe(4);
     expect(found).toEqual(EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES);
   });
 

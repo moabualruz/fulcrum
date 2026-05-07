@@ -4,10 +4,8 @@
 
 import { TRPCError } from "@trpc/server";
 import type { Container } from "@needle-di/core";
-import type { EntityManager } from "@mikro-orm/postgresql";
 
 import { DEFAULT_ORG_ID } from "../../db/seed.ts";
-import { ENTITY_MANAGER_TOKEN } from "../../db/db.module.ts";
 import type {
   AgentRunIssue,
   CandidateIssue,
@@ -354,7 +352,6 @@ async function resolveCaller(opts: SymphonyRunOptions): Promise<SymphonyCaller> 
   const container = opts.container ?? null;
   const orgId = opts.orgId ?? DEFAULT_ORG_ID;
   const userId = opts.userId ?? "admin-local-user";
-  const em = resolveEntityManager(container);
   const factory = t.createCallerFactory(appRouter);
 
   return factory(
@@ -362,19 +359,10 @@ async function resolveCaller(opts: SymphonyRunOptions): Promise<SymphonyCaller> 
       session: localCliSession(orgId, userId) as never,
       orgId,
       userId,
-      em,
+      em: null,
       container,
     }),
   ) as unknown as SymphonyCaller;
-}
-
-function resolveEntityManager(container: Container | null): EntityManager | null {
-  if (!container) return null;
-  try {
-    return container.get(ENTITY_MANAGER_TOKEN);
-  } catch {
-    return null;
-  }
 }
 
 function localCliSession(orgId: string, userId: string) {

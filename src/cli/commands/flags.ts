@@ -17,13 +17,7 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import { Container } from "@needle-di/core";
-import { MikroORM, type EntityManager } from "@mikro-orm/postgresql";
-import type { Session as BetterAuthSession } from "better-auth";
-import {
-  ENTITY_MANAGER_TOKEN,
-  registerDbBindings,
-} from "../../db/db.module.ts";
+import { createLocalCaller } from "../local-caller.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -241,97 +235,11 @@ async function resolveCaller(opts: FlagsRunOptions): Promise<{
 }> {
   if (opts.caller) return opts.caller;
 
-  // Production path: build caller from needle-di container + tRPC router
-  const { t } = await import("../../trpc/trpc.ts");
-  const { appRouter } = await import("../../trpc/router.ts");
-  const { createContext } = await import("../../trpc/context.ts");
-
-  const cliContext = buildCliContext(opts.container ?? null);
-  const { container, em } = cliContext;
-  const session = await resolveActiveCliSession(em);
-  if (!session) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "No active CLI session found. Run `fulcrum init` or `fulcrum auth login` before feature flag commands.",
-    });
-  }
-
-  const orgId = session.activeOrganizationId ?? session.orgId;
-  const userId = session.userId;
-  if (!orgId || !userId) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "Active CLI session is missing orgId or userId. Re-authenticate.",
-    });
-  }
-
-  const ctx = createContext({
-    session: session as unknown as BetterAuthSession,
-    orgId,
-    userId,
-    em,
-    container,
-  });
-  const factory = t.createCallerFactory(appRouter);
   // Cast: caller's flags.set input is narrowed to FeatureFlagName union by tRPC; our
   // interface uses string for duck-typed testability. Runtime validation is unchanged.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return factory(ctx) as any;
-}
-
-function buildCliContext(container: Container | null): { container: Container | null; em: EntityManager | null } {
-  if (!container) return { container: null, em: null };
-
-  try {
-    const orm = container.get(MikroORM);
-    const em = container.get(ENTITY_MANAGER_TOKEN).fork();
-    const requestContainer = new Container();
-    requestContainer.bind({ provide: MikroORM, useValue: orm });
-    registerDbBindings(requestContainer, orm, em);
-    return { container: requestContainer, em };
-  } catch {
-    return { container, em: null };
-  }
-}
-
-async function resolveActiveCliSession(em: EntityManager | null): Promise<{
-  id: string;
-  token: string;
-  userId: string;
-  orgId: string;
-  activeOrganizationId: string;
-  expiresAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
-  ipAddress: string | null;
-  userAgent: string | null;
-} | null> {
-  if (!em) return null;
-
-  const { Session } = await import("../../db/entities/auth/Session.ts");
-  const now = new Date();
-
-  try {
-    const session = await em.findOne(
-      Session,
-      { expiresAt: { $gt: now } },
-      { orderBy: { createdAt: "DESC" } },
-    );
-    if (!session) return null;
-
-    return {
-      id: session.id,
-      token: session.id,
-      userId: session.userId,
-      orgId: session.orgId,
-      activeOrganizationId: session.activeOrganizationId ?? session.orgId,
-      expiresAt: session.expiresAt,
-      createdAt: session.createdAt,
-      updatedAt: session.createdAt,
-      ipAddress: session.ipAddress ?? null,
-      userAgent: session.userAgent ?? "fulcrum-cli",
-    };
-  } catch {
-    return null;
-  }
+  return await createLocalCaller({
+    container: opts.container,
+    requireSession: true,
+  }) as any;
 }
