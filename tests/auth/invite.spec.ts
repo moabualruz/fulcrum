@@ -22,7 +22,7 @@
 import { describe, it, expect } from "bun:test";
 
 // Import the load function and actions from our new page server.
-import { load, actions } from "../../src/web/src/routes/auth/invite/[token]/+page.server.ts";
+import { load, actions } from "@fulcrum/web/routes/auth/invite/[token]/+page.server.ts";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 

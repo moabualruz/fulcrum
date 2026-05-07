@@ -4,8 +4,8 @@
 import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { McpVirtualSkill } from "../db/entities/skills/McpVirtualSkill.ts";
-import { LearnedDraftSchema } from "../router/decision-schema.ts";
-import { createDisabledDraft } from "../router/learned-drafts.ts";
+import { LearnedDraftSchema } from "@fulcrum/server/router/decision-schema.ts";
+import { createDisabledDraft } from "@fulcrum/server/router/learned-drafts.ts";
 
 // ---------------------------------------------------------------------------
 // 1. MCP Virtual Skill descriptor hashing

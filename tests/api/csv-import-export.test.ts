@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { createPublicApiRouter } from "../../src/api/hono.ts";
+import { createPublicApiRouter } from "@fulcrum/server/api/hono.ts";
 import { exportGenericCsv } from "../../src/connectors/csv.ts";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";

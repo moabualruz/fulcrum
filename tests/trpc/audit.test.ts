@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { Container } from "@needle-di/core";
 
 import { createTestOrm } from "../../src/test-utils/db.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { appRouter } from "../../src/trpc/router.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { Event } from "../../src/db/entities/core/Event.ts";
 import { Org } from "../../src/db/entities/auth/Org.ts";
 import { User } from "../../src/db/entities/auth/User.ts";

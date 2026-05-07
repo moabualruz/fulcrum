@@ -39,7 +39,7 @@ export class RepoFilesIndex {
   @ManyToOne(() => Repo, { fieldName: "repo_id", nullable: false, deleteRule: "cascade" })
   repo!: Repo;
 
-  /** Relative path from repo root (e.g. "src/index.ts"). */
+  /** Relative path from repo root (e.g. "apps/cli/src/main.ts"). */
   @Property({ type: "text" })
   path!: string;
 

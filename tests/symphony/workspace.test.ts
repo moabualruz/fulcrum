@@ -41,9 +41,9 @@ import {
   destroyWorkspace,
   sanitizeWorkspaceKey,
 } from "../../src/orchestration/symphony/workspace.ts";
-import { appRouter } from "../../src/trpc/router.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 
 const TASK_ID = "12345678-90ab-cdef-0000-000000000001";
 const RUN_ID = "90000000-0000-0000-0000-000000000001";

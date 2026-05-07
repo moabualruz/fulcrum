@@ -17,8 +17,8 @@ import {
   run,
   parseArtifactsArgs,
   ARTIFACTS_HELP,
-} from "../../src/cli/artifacts.ts";
-import { ArtifactSchema } from "../../src/trpc/schemas/artifacts.ts";
+} from "@fulcrum/cli/artifacts.ts";
+import { ArtifactSchema } from "@fulcrum/server/trpc/schemas/artifacts.ts";
 
 // --- Fixtures ---
 

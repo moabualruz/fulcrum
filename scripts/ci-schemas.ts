@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * ci:schemas — schema registry integrity check.
- * Imports all schema files from src/trpc/schemas/ and asserts:
+ * Imports all schema files from apps/server/src/trpc/schemas/ and asserts:
  *   1. At least 20 schema files exist.
  *   2. No exported ZodObject field uses z.any().
  *
@@ -12,7 +12,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 
-const SCHEMAS_DIR = join(import.meta.dir, "../src/trpc/schemas");
+const SCHEMAS_DIR = join(import.meta.dir, "../apps/server/src/trpc/schemas");
 
 const schemaFiles = readdirSync(SCHEMAS_DIR).filter((f) => f.endsWith(".ts"));
 

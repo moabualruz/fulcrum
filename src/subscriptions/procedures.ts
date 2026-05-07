@@ -11,8 +11,8 @@
 import { z } from "zod";
 import { observable } from "@trpc/server/observable";
 
-import { t } from "../trpc/trpc.ts";
-import { permissionedProcedure } from "../trpc/middleware.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
+import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { getEventBus, type SubscriptionEvent } from "./event-bus.ts";
 
 // --- Schemas ---

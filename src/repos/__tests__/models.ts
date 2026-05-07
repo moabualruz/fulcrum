@@ -69,7 +69,7 @@ export function createMockFile(input: Partial<RepoDashboardFile> = {}): RepoDash
     id: input.id ?? "file-1",
     orgId: input.orgId ?? "11111111-1111-4111-8111-111111111111",
     repoId: input.repoId ?? "repo-1",
-    path: input.path ?? "src/index.ts",
+    path: input.path ?? "apps/cli/src/main.ts",
     kind: input.kind ?? "file",
     size: input.size ?? 0,
     updatedAt: input.updatedAt ?? new Date("2026-05-05T12:00:00.000Z"),

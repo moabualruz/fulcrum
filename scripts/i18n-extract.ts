@@ -17,7 +17,7 @@ export interface I18nCheckResult {
   catalog: string[];
 }
 
-const DEFAULT_ROOTS = ["src/web/src", "src/i18n"];
+const DEFAULT_ROOTS = ["apps/web/src", "src/i18n"];
 const DEFAULT_CATALOG = "src/i18n/locales/en.json";
 const SOURCE_EXTENSIONS = new Set([".ts", ".svelte"]);
 

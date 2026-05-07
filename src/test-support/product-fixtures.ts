@@ -75,9 +75,9 @@ export async function getArtifactStats(...args: unknown[]) {
   const mod = await import("../services/artifacts.ts");
   return mod.getArtifactStats(...args as Parameters<typeof mod.getArtifactStats>);
 }
-export { run } from "../cli/artifact.ts";
-export type { ArtifactRunOptions } from "../cli/artifact.ts";
-export type ArtifactsClient = NonNullable<import("../cli/artifact.ts").ArtifactRunOptions["caller"]>["artifacts"];
+export { run } from "@fulcrum/cli/artifact.ts";
+export type { ArtifactRunOptions } from "@fulcrum/cli/artifact.ts";
+export type ArtifactsClient = NonNullable<import("@fulcrum/cli/artifact.ts").ArtifactRunOptions["caller"]>["artifacts"];
 export const makeId = newUlid;
 export type SqlValue = string | number | boolean | null | Uint8Array;
 export interface EventRow {
@@ -150,4 +150,4 @@ export {
   DownloadArtifactOutputSchema,
   ListArtifactsInputSchema,
   UploadArtifactInputSchema,
-} from "../trpc/schemas/artifacts.ts";
+} from "@fulcrum/server/trpc/schemas/artifacts.ts";

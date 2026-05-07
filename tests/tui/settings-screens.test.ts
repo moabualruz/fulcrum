@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { Renderer } from "../../src/tui/renderer.ts";
+import { Renderer } from "@fulcrum/tui/renderer.ts";
 import {
   BackupSettingsScreen,
   DataSettingsScreen,
@@ -10,8 +10,8 @@ import {
   SettingsTabs,
   TelemetrySettingsScreen,
   ThemeSettingsScreen,
-} from "../../src/tui/screens/settings.ts";
-import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
+} from "@fulcrum/tui/screens/settings.ts";
+import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 
 type SettingsTabName = InstanceType<typeof SettingsTabs>["current"];
 

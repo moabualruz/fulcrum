@@ -31,7 +31,7 @@ async function runAudit(envelope: object): Promise<{ stdout: string; exit: numbe
   const stdinFile = `${TMP}/stdin-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
   await Bun.write(stdinFile, json);
   // Run from inside TMP so projectSlug() resolves to TMP's basename.
-  const proc = Bun.spawn(["bun", "src/index.ts", "hook", "audit-log"], {
+  const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", "hook", "audit-log"], {
     stdin: Bun.file(stdinFile),
     stdout: "pipe",
     stderr: "pipe",

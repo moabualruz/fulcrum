@@ -11,7 +11,7 @@
  * These tests will FAIL in RED phase because the wiring code doesn't exist yet.
  */
 import { describe, expect, test } from "bun:test";
-import { run } from "../cli/inference.ts";
+import { run } from "@fulcrum/cli/inference.ts";
 import { probeConfiguredBackends, type BackendHealth } from "./backend-probes.ts";
 import { InferenceService } from "./service.ts";
 import type { HealthResult } from "./protocol.ts";

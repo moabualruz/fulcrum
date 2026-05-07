@@ -62,7 +62,7 @@ async function runRouterWith(envelope: object): Promise<{ stdout: string; exit: 
   const json = JSON.stringify(envelope);
   const stdinFile = `${TMP}/stdin-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
   await Bun.write(stdinFile, json);
-  const proc = Bun.spawn(["bun", "src/index.ts", "hook", "router"], {
+  const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", "hook", "router"], {
     stdin: Bun.file(stdinFile),
     stdout: "pipe",
     stderr: "pipe",
@@ -176,7 +176,7 @@ describe("tool-output-router", () => {
       tool_input: { server: "deepwiki", tool: "ask_question", input: { question: "what is this repo?" } },
       tool_response: { stdout: "This is a monorepo.\n", exit_code: 0 },
     };
-    const proc = Bun.spawn(["bun", "src/index.ts", "hook", "router"], {
+    const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", "hook", "router"], {
       stdin: Bun.file(await writeEnvFile(env)),
       stdout: "pipe",
       stderr: "pipe",
@@ -196,7 +196,7 @@ describe("tool-output-router", () => {
       tool_input: { server: "deepwiki", tool: "read_wiki_contents", input: {} },
       tool_response: { stdout: "a".repeat(500), exit_code: 0 },
     };
-    const proc = Bun.spawn(["bun", "src/index.ts", "hook", "router"], {
+    const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", "hook", "router"], {
       stdin: Bun.file(await writeEnvFile(env)),
       stdout: "pipe",
       stderr: "pipe",

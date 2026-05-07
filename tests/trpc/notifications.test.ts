@@ -13,9 +13,9 @@ import {
   NotificationQuietHours,
   NotificationRule,
 } from "../../src/db/entities/notifications/index.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { t } from "../../src/trpc/trpc.ts";
-import { notificationsRouter } from "../../src/trpc/routers/notifications.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
+import { notificationsRouter } from "@fulcrum/server/trpc/routers/notifications.ts";
 
 const ORG_ID = "00000000-0000-4000-8000-000000000001";
 const OTHER_ORG_ID = "00000000-0000-4000-8000-000000000002";

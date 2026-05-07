@@ -1,7 +1,7 @@
 /**
  * Schema registry tests — RED before GREEN.
  * Acceptance criteria from P13#03:
- *   1. 20+ schema files in src/trpc/schemas/
+ *   1. 20+ schema files in apps/server/src/trpc/schemas/
  *   2. Every exported schema uses z.object() at root, no z.any() on public fields
  *   3. All fields have .describe() strings
  *   4. Round-trip parse identity for every schema with fixture data
@@ -13,7 +13,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 
-const SCHEMAS_DIR = join(import.meta.dir, "../../src/trpc/schemas");
+const SCHEMAS_DIR = join(import.meta.dir, "../../apps/server/src/trpc/schemas");
 
 const schemaFiles = readdirSync(SCHEMAS_DIR).filter((f) => f.endsWith(".ts"));
 
@@ -51,7 +51,7 @@ describe("schema registry — file count", () => {
 
 describe("schema registry — error shapes", () => {
   it("exports TRPCErrorShape from errors.ts", async () => {
-    const mod = await import("../../src/trpc/schemas/errors.ts");
+    const mod = await import("@fulcrum/server/trpc/schemas/errors.ts");
     expect(mod.TRPCErrorShape).toBeDefined();
     const result = mod.TRPCErrorShape.safeParse({
       code: "NOT_FOUND",
@@ -62,7 +62,7 @@ describe("schema registry — error shapes", () => {
   });
 
   it("exports RESTErrorShape from errors.ts", async () => {
-    const mod = await import("../../src/trpc/schemas/errors.ts");
+    const mod = await import("@fulcrum/server/trpc/schemas/errors.ts");
     expect(mod.RESTErrorShape).toBeDefined();
     const result = mod.RESTErrorShape.safeParse({
       error: { code: "BAD_REQUEST", message: "bad", requestId: "req-456" },
@@ -109,7 +109,7 @@ describe("schema registry — all fields have descriptions", () => {
 
 describe("schema registry — projects domain", () => {
   it("exports ProjectInput and ProjectOutput", async () => {
-    const mod = await import("../../src/trpc/schemas/projects.ts");
+    const mod = await import("@fulcrum/server/trpc/schemas/projects.ts");
     expect(mod.ProjectInput).toBeDefined();
     expect(mod.ProjectOutput).toBeDefined();
   });
@@ -117,7 +117,7 @@ describe("schema registry — projects domain", () => {
 
 describe("schema registry — skills domain", () => {
   it("exports SkillInput and SkillOutput", async () => {
-    const mod = await import("../../src/trpc/schemas/skills.ts");
+    const mod = await import("@fulcrum/server/trpc/schemas/skills.ts");
     expect(mod.SkillInput).toBeDefined();
     expect(mod.SkillOutput).toBeDefined();
   });
@@ -125,7 +125,7 @@ describe("schema registry — skills domain", () => {
 
 describe("schema registry — connectors domain", () => {
   it("exports ConnectorInput and ConnectorOutput", async () => {
-    const mod = await import("../../src/trpc/schemas/connectors.ts");
+    const mod = await import("@fulcrum/server/trpc/schemas/connectors.ts");
     expect(mod.ConnectorInput).toBeDefined();
     expect(mod.ConnectorOutput).toBeDefined();
   });
@@ -133,7 +133,7 @@ describe("schema registry — connectors domain", () => {
 
 describe("schema registry — inference domain", () => {
   it("exports InferenceInput and InferenceOutput", async () => {
-    const mod = await import("../../src/trpc/schemas/inference.ts");
+    const mod = await import("@fulcrum/server/trpc/schemas/inference.ts");
     expect(mod.InferenceInput).toBeDefined();
     expect(mod.InferenceOutput).toBeDefined();
   });
@@ -141,7 +141,7 @@ describe("schema registry — inference domain", () => {
 
 describe("schema registry — orchestration domain", () => {
   it("exports OrchestrationInput and OrchestrationOutput", async () => {
-    const mod = await import("../../src/trpc/schemas/orchestration.ts");
+    const mod = await import("@fulcrum/server/trpc/schemas/orchestration.ts");
     expect(mod.OrchestrationInput).toBeDefined();
     expect(mod.OrchestrationOutput).toBeDefined();
   });
@@ -149,7 +149,7 @@ describe("schema registry — orchestration domain", () => {
 
 describe("schema registry — routing domain", () => {
   it("exports RoutingInput and RoutingOutput", async () => {
-    const mod = await import("../../src/trpc/schemas/routing.ts");
+    const mod = await import("@fulcrum/server/trpc/schemas/routing.ts");
     expect(mod.RoutingInput).toBeDefined();
     expect(mod.RoutingOutput).toBeDefined();
   });
@@ -157,7 +157,7 @@ describe("schema registry — routing domain", () => {
 
 describe("schema registry — audit domain", () => {
   it("exports AuditInput and AuditOutput", async () => {
-    const mod = await import("../../src/trpc/schemas/audit.ts");
+    const mod = await import("@fulcrum/server/trpc/schemas/audit.ts");
     expect(mod.AuditInput).toBeDefined();
     expect(mod.AuditOutput).toBeDefined();
   });
@@ -165,13 +165,13 @@ describe("schema registry — audit domain", () => {
 
 describe("schema registry — round-trip parse", () => {
   it("TRPCErrorShape round-trips", async () => {
-    const { TRPCErrorShape } = await import("../../src/trpc/schemas/errors.ts");
+    const { TRPCErrorShape } = await import("@fulcrum/server/trpc/schemas/errors.ts");
     const fixture = { code: "INTERNAL_SERVER_ERROR", message: "oops", requestId: "rid-1" };
     expect(TRPCErrorShape.parse(fixture)).toEqual(fixture);
   });
 
   it("RESTErrorShape round-trips", async () => {
-    const { RESTErrorShape } = await import("../../src/trpc/schemas/errors.ts");
+    const { RESTErrorShape } = await import("@fulcrum/server/trpc/schemas/errors.ts");
     const fixture = { error: { code: "UNAUTHORIZED", message: "no auth", requestId: "rid-2" } };
     expect(RESTErrorShape.parse(fixture)).toEqual(fixture);
   });

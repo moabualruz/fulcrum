@@ -1,6 +1,6 @@
 /**
  * TDD — i18n screen gating.
- * RED written first; GREEN by src/tui/screens/i18n-screen.ts.
+ * RED written first; GREEN by apps/tui/src/screens/i18n-screen.ts.
  *
  * Acceptance criteria covered:
  *  - i18n OFF → screen hidden, "Feature disabled" banner
@@ -17,7 +17,7 @@ import {
   selectLocale,
   i18nTabVisible,
   SETTINGS_KEY_LOCALE,
-} from "../../src/tui/screens/i18n-screen.ts";
+} from "@fulcrum/tui/screens/i18n-screen.ts";
 import { resetFeaturesCache } from "../../src/flags/index.ts";
 
 // Minimal in-memory SettingsService for tests.

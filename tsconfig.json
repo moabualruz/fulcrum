@@ -18,11 +18,15 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@fulcrum/cli/*": ["apps/cli/src/*"],
+      "@fulcrum/tui/*": ["apps/tui/src/*"],
+      "@fulcrum/server/*": ["apps/server/src/*"],
+      "@fulcrum/web/*": ["apps/web/src/*"]
     },
     "experimentalDecorators": false,
     "useDefineForClassFields": true
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"],
-  "exclude": ["node_modules", "dist", "src/web/**"]
+  "include": ["src/**/*.ts", "apps/cli/src/**/*.ts", "apps/tui/src/**/*.ts", "apps/server/src/**/*.ts", "tests/**/*.ts"],
+  "exclude": ["node_modules", "dist", "apps/web/**"]
 }

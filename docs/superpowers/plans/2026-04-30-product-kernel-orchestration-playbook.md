@@ -20,7 +20,7 @@
 - The parent orchestrator owns scheduling, dependency graph, integration, final verification, and user escalation.
 - Every implementation subagent gets full task text copied from the plan. Do not tell a subagent to "read the plan and figure it out".
 - Parallel write lanes must use isolated worktrees and disjoint owned paths.
-- No two workers own `package.json`, `bun.lock`, `src/index.ts`, `HANDOVER.md`, or `README.md` at the same time.
+- No two workers own `package.json`, `bun.lock`, `apps/cli/src/main.ts`, `HANDOVER.md`, or `README.md` at the same time.
 - Implementation must follow the TDD iron law: no product behavior code before a failing test proves the missing behavior.
 - Missing RED evidence is a task failure. Tests written after implementation do not count.
 - Every task needs two reviews before integration: spec-compliance review first, code-quality review second.
@@ -141,16 +141,16 @@ Final review and branch finish
 | Task | Lane | Owned write paths | Shared-file rule | Effort |
 |---|---|---|---|---|
 | 1 | `task-01-db` | `src/product-kernel/db/*`, `src/product-kernel/compat.test.ts` | Dependency changes reported to parent; parent serially integrates `package.json`/`bun.lock`. | medium |
-| 2 | `task-02-ui` | `src/web/*` | Dependency changes reported to parent; no React. | medium |
+| 2 | `task-02-ui` | `apps/web/*` | Dependency changes reported to parent; no React. | medium |
 | 3 | `task-03-markdown` | `src/product-kernel/markdown.ts`, `src/product-kernel/markdown.test.ts` | Dependency changes reported to parent. | medium |
 | 4 | `task-04-state` | `src/product-kernel/state/*`, `src/product-kernel/state.test.ts` | Dependency changes reported to parent. | low |
 | 5 | `task-05-schema` | `src/product-kernel/db/migrate.ts`, `src/product-kernel/db/migrations/*`, `src/product-kernel/db/migrate.test.ts` | Requires Task 1 integrated. | high |
 | 6 | `task-06-repos-events` | `src/product-kernel/store/repositories.ts`, `src/product-kernel/events.ts`, `src/product-kernel/events.test.ts` | Requires Task 5 integrated. | medium |
 | 7 | `task-07-search-context` | `src/product-kernel/search.ts`, `src/product-kernel/context.ts`, search/context tests | Requires Tasks 5 and 6 integrated. | high |
 | 8 | `task-08-jobs-runs` | `src/product-kernel/jobs.ts`, `src/product-kernel/jobs.test.ts` | Requires Task 5 integrated. | medium |
-| 9 | `task-09-cli` | `src/cli/product.ts`, `src/cli/product.test.ts`, `src/index.ts` | Requires Tasks 6 and 7 integrated. Owns `src/index.ts` only during this lane. | medium |
-| 10 | `task-10-doctor-uninstall` | `src/cli/doctor.ts`, `src/cli/doctor.test.ts`, `src/cli/uninstall.ts`, `src/cli/uninstall.test.ts` | Requires Task 5 integrated. HANDOVER note goes to Task 12 unless Task 12 is not running. | medium |
-| 11 | `task-11-web` | `src/web/*` | Requires Tasks 2, 4, and 6 integrated. No React. | high |
+| 9 | `task-09-cli` | `apps/cli/src/product.ts`, `apps/cli/src/product.test.ts`, `apps/cli/src/main.ts` | Requires Tasks 6 and 7 integrated. Owns `apps/cli/src/main.ts` only during this lane. | medium |
+| 10 | `task-10-doctor-uninstall` | `apps/cli/src/doctor.ts`, `apps/cli/src/doctor.test.ts`, `apps/cli/src/uninstall.ts`, `apps/cli/src/uninstall.test.ts` | Requires Task 5 integrated. HANDOVER note goes to Task 12 unless Task 12 is not running. | medium |
+| 11 | `task-11-web` | `apps/web/*` | Requires Tasks 2, 4, and 6 integrated. No React. | high |
 | 12 | `task-12-docs` | `README.md`, `HANDOVER.md`, `docs/product-kernel.md` | Runs after Tasks 1-11 integrate. Owns all final docs. | medium |
 
 ## Wave 1 Execution
@@ -162,7 +162,7 @@ Each implementer receives:
 - Full text of its task from `2026-04-30-product-kernel.md`.
 - Spec link and the exact product constraints: Postgres-compatible kernel, PGlite local default, PostgreSQL server mode, Svelte/shadcn-svelte, Markdown/frontmatter canonical, zustand/vanilla state, no React, no embeddings/RAG/models.
 - Owned paths from the ownership table.
-- Instruction: do not edit shared docs, `src/index.ts`, `HANDOVER.md`, or unrelated code.
+- Instruction: do not edit shared docs, `apps/cli/src/main.ts`, `HANDOVER.md`, or unrelated code.
 - Instruction: if dependency installation modifies `package.json`/`bun.lock`, report exact dependency diff and keep it inside the lane until parent integrates.
 
 Acceptance gates:
@@ -256,14 +256,14 @@ Dispatch in parallel only if ownership is clean:
 - Task 10 can run after Task 5 integrates, but prefer starting after Task 9 if product CLI changes affect doctor output.
 - Task 11 can run after Tasks 2, 4, and 6 integrate.
 
-If Task 9 and Task 10 both need `src/index.ts`, Task 9 owns it and Task 10 waits.
+If Task 9 and Task 10 both need `apps/cli/src/main.ts`, Task 9 owns it and Task 10 waits.
 
 Acceptance gates:
 
 ```bash
-bun test src/cli/product.test.ts
-bun run src/index.ts product init --json
-bun test src/cli/doctor.test.ts src/cli/uninstall.test.ts
+bun test apps/cli/src/product.test.ts
+bun run apps/cli/src/main.ts product init --json
+bun test apps/cli/src/doctor.test.ts apps/cli/src/uninstall.test.ts
 bun run --bun tsc --noEmit
 bun run ci
 ```
@@ -438,7 +438,7 @@ git -C <worktree> log --oneline --max-count=6
 
 - [ ] Confirm RED/GREEN evidence is present for behavior work before merging.
 - [ ] Apply or merge only the worker's owned paths into parent.
-- [ ] Resolve shared files serially: `package.json`, `bun.lock`, `src/index.ts`, `README.md`, `HANDOVER.md`.
+- [ ] Resolve shared files serially: `package.json`, `bun.lock`, `apps/cli/src/main.ts`, `README.md`, `HANDOVER.md`.
 - [ ] Run focused gate for that task from parent.
 - [ ] Run `git status --short` and `git diff --stat`.
 - [ ] Mark the task complete in controller notes only after parent gate passes.

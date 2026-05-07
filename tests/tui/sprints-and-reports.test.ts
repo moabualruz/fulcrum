@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { Renderer } from "../../src/tui/renderer.ts";
-import { ReportsScreen } from "../../src/tui/screens/reports.ts";
-import { ActiveSprintBoardScreen, SprintPlanningScreen, SprintsListScreen } from "../../src/tui/screens/sprints.ts";
-import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
+import { Renderer } from "@fulcrum/tui/renderer.ts";
+import { ReportsScreen } from "@fulcrum/tui/screens/reports.ts";
+import { ActiveSprintBoardScreen, SprintPlanningScreen, SprintsListScreen } from "@fulcrum/tui/screens/sprints.ts";
+import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 
 function renderPlain(render: (renderer: Renderer) => void): string {
   const tty = new FakeTTY({ columns: 120, rows: 40 });

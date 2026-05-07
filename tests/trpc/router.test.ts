@@ -16,14 +16,14 @@ import { TRPCError } from "@trpc/server";
 import { Container } from "@needle-di/core";
 import { z } from "zod";
 
-import { appRouter } from "../../src/trpc/router.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { FlagRegistry } from "../../src/flags/registry.ts";
 import { CasbinRuleRepository } from "../../src/db/repositories/flags/CasbinRuleRepository.ts";
-import { protectedProcedure } from "../../src/trpc/middleware.ts";
-import { __setTaskApplicationForTest } from "../../src/server/trpc/routers/tasks.ts";
-import { __setMemoryApplicationForTest } from "../../src/server/trpc/routers/memory.ts";
+import { protectedProcedure } from "@fulcrum/server/trpc/middleware.ts";
+import { __setTaskApplicationForTest } from "@fulcrum/server/runtime/trpc/routers/tasks.ts";
+import { __setMemoryApplicationForTest } from "@fulcrum/server/runtime/trpc/routers/memory.ts";
 import {
   DOC_TEMPLATE_SERVICE_TOKEN,
   type DocTemplateService,

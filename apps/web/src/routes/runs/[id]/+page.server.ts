@@ -1,0 +1,78 @@
+import { error, redirect } from "@sveltejs/kit";
+import type { Actions, PageServerLoad } from "./$types";
+import { getWorkspaceDiff, paginateLogs } from "$lib/server/agents";
+import { actionOk } from "$lib/feedback/action-result";
+import { requestAppScope } from "$lib/server/application-scope";
+import { cancelRun, retryRun } from "@/application/runs/commands.ts";
+import { getProjectRunPageData } from "@/application/runs/queries.ts";
+import type { RunStatus } from "@/services/runs.ts";
+
+interface AgentRunDetail {
+  id: string;
+  org_id: string;
+  project_id: string | null;
+  agent: string;
+  model: string | null;
+  prompt: string | null;
+  status: RunStatus;
+  parent_run_id: string | null;
+  started_at: string | Date;
+  ended_at: string | Date | null;
+  transcript_path: string | null;
+}
+
+interface EventRow {
+  id: string;
+  org_id: string;
+  project_id: string | null;
+  subject_kind: string;
+  subject_id: string;
+  verb: string;
+  payload: Record<string, unknown>;
+  actor: string;
+  created_at: string | Date;
+}
+
+function isoStamp(value: string | Date): string;
+function isoStamp(value: string | Date | null): string | null;
+function isoStamp(value: string | Date | null): string | null {
+  if (value === null) return null;
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+export const load: PageServerLoad = ({ params, locals }) => {
+  return {
+    activeProjectId: locals?.activeProjectId ?? null,
+    streamed: {
+      data: (async () => {
+        const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+        let data;
+        try {
+          data = await getProjectRunPageData(em, ctx, params.id);
+        } catch {
+          throw error(404, "Run not found");
+        }
+
+        const run = { ...data.run, status: data.run.status as RunStatus };
+        const transcript = data.transcript;
+        const logs = transcript ? paginateLogs(transcript, 0, 100) : null;
+        const diff = await getWorkspaceDiff();
+        return { run, transcript, logs, diff, artifacts: data.artifacts, events: data.events };
+      })(),
+    },
+  };
+};
+
+export const actions: Actions = {
+  cancel: async ({ params, locals }) => {
+    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    await cancelRun(em, ctx, params.id!);
+    return actionOk("Run cancelled");
+  },
+  retry: async ({ params, locals }) => {
+    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    const result = await retryRun(em, ctx, params.id!);
+    const newId = result.id;
+    throw redirect(303, `/runs/${newId}`);
+  },
+};

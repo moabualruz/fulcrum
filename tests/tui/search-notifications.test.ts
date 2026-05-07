@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { EventEmitter } from "node:events";
 
-import { Renderer } from "../../src/tui/renderer.ts";
-import { AuditLogScreen } from "../../src/tui/screens/audit.ts";
-import { NotificationsScreen } from "../../src/tui/screens/notifications.ts";
-import { SearchScreen } from "../../src/tui/screens/search.ts";
-import type { TuiSearchResult } from "../../src/tui/screens/search.ts";
-import { SubscriptionBridge } from "../../src/tui/subscriptions.ts";
-import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
+import { Renderer } from "@fulcrum/tui/renderer.ts";
+import { AuditLogScreen } from "@fulcrum/tui/screens/audit.ts";
+import { NotificationsScreen } from "@fulcrum/tui/screens/notifications.ts";
+import { SearchScreen } from "@fulcrum/tui/screens/search.ts";
+import type { TuiSearchResult } from "@fulcrum/tui/screens/search.ts";
+import { SubscriptionBridge } from "@fulcrum/tui/subscriptions.ts";
+import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 
 function renderPlain(render: (renderer: Renderer) => void): string {
   const tty = new FakeTTY({ columns: 120, rows: 40 });

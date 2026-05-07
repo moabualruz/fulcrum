@@ -10,9 +10,9 @@ import {
   listProfiles,
 } from "./registry.ts";
 import { AgentProfileSchema, type AgentProfile } from "./types.ts";
-import { appRouter } from "../trpc/router.ts";
-import { createContext } from "../trpc/context.ts";
-import { t } from "../trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 
 const FAKE_HOME = "/home/testuser";
 

@@ -162,7 +162,7 @@ Required fix:
 
 ### Shared package model
 
-Add `src/cli/package-surfaces.ts`:
+Add `apps/cli/src/package-surfaces.ts`:
 
 ```ts
 export type PackageSurfaceKind =
@@ -277,7 +277,7 @@ Never mutate:
 
 ### Per-agent mirror targets
 
-Add `src/cli/package-mirror.ts`:
+Add `apps/cli/src/package-mirror.ts`:
 
 | Agent | Mirror target strategy |
 |---|---|
@@ -366,8 +366,8 @@ Future package output requirements:
 Every future package must run:
 
 ```bash
-bun test src/cli/package-surfaces.test.ts src/cli/package-mirror.test.ts src/cli/package-parity.test.ts
-bun run src/index.ts component status package.<name> --json
+bun test apps/cli/src/package-surfaces.test.ts apps/cli/src/package-mirror.test.ts apps/cli/src/package-parity.test.ts
+bun run apps/cli/src/main.ts component status package.<name> --json
 ```
 
 ## Implementation Workflow
@@ -376,7 +376,7 @@ Parent starts with failing tests and interface skeletons, then dispatches indepe
 
 ### Wave A - lock requirements and tests
 
-- [x] Task A1: Add `src/cli/package-surfaces.test.ts`.
+- [x] Task A1: Add `apps/cli/src/package-surfaces.test.ts`.
   - Owns package fixture/source discovery tests.
   - Assertions:
     - Repomix manifest includes `S/M/C/A/R/P`.
@@ -386,17 +386,17 @@ Parent starts with failing tests and interface skeletons, then dispatches indepe
     - Source backup files are not mirrorable surfaces.
   - Verify:
     ```bash
-    bun test src/cli/package-surfaces.test.ts
+    bun test apps/cli/src/package-surfaces.test.ts
     ```
 
 - [x] Task A2: Add parity expectations to existing package tests.
   - Owns:
     ```text
-    src/cli/repomix-package.test.ts
-    src/cli/vendor-packages.test.ts
-    src/cli/install.test.ts
-    src/cli/uninstall.test.ts
-    src/cli/mirror-policy.test.ts
+    apps/cli/src/repomix-package.test.ts
+    apps/cli/src/vendor-packages.test.ts
+    apps/cli/src/install.test.ts
+    apps/cli/src/uninstall.test.ts
+    apps/cli/src/mirror-policy.test.ts
     ```
   - New expectations:
     - OpenCode Repomix mirror includes skills, MCP config, explorer agent, commands, rules/context, package metadata where supported.
@@ -407,14 +407,14 @@ Parent starts with failing tests and interface skeletons, then dispatches indepe
     - Caveman non-native mirrors include all supported official package surfaces, not skills-only.
   - Verify:
     ```bash
-    bun test src/cli/repomix-package.test.ts src/cli/vendor-packages.test.ts src/cli/install.test.ts src/cli/uninstall.test.ts src/cli/mirror-policy.test.ts
+    bun test apps/cli/src/repomix-package.test.ts apps/cli/src/vendor-packages.test.ts apps/cli/src/install.test.ts apps/cli/src/uninstall.test.ts apps/cli/src/mirror-policy.test.ts
     ```
 
 - [x] Task A3: Add disabled MCP semantic tests.
   - Owns:
     ```text
-    src/cli/mcp-registry.test.ts
-    src/cli/mcp-cmd.test.ts
+    apps/cli/src/mcp-registry.test.ts
+    apps/cli/src/mcp-cmd.test.ts
     src/components/adapters/mcp.test.ts
     ```
   - Assertions:
@@ -424,7 +424,7 @@ Parent starts with failing tests and interface skeletons, then dispatches indepe
     - Claude/Pi return `disabledConfigUnsupported` unless a native disabled state is implemented.
   - Verify:
     ```bash
-    bun test src/cli/mcp-registry.test.ts src/cli/mcp-cmd.test.ts src/components/adapters/mcp.test.ts
+    bun test apps/cli/src/mcp-registry.test.ts apps/cli/src/mcp-cmd.test.ts src/components/adapters/mcp.test.ts
     ```
 
 ### Wave B - shared package manifest and mirror core
@@ -435,45 +435,45 @@ Dispatch after A1 test skeleton lands.
   - Worktree: `~/.config/superpowers/worktrees/fulcrum/package-surfaces`
   - Owns:
     ```text
-    src/cli/package-surfaces.ts
-    src/cli/package-surfaces.test.ts
+    apps/cli/src/package-surfaces.ts
+    apps/cli/src/package-surfaces.test.ts
     ```
   - Must implement deterministic discovery, SHA-256 hashing, mirror filtering, and package source descriptors for Caveman, Repomix, Cloudflare, and Superpowers.
   - Verify:
     ```bash
-    bun test src/cli/package-surfaces.test.ts
+    bun test apps/cli/src/package-surfaces.test.ts
     ```
 
 - [x] Worker B2: Implement per-agent package mirror planner.
   - Worktree: `~/.config/superpowers/worktrees/fulcrum/package-mirror`
   - Owns:
     ```text
-    src/cli/package-mirror.ts
-    src/cli/package-mirror.test.ts
+    apps/cli/src/package-mirror.ts
+    apps/cli/src/package-mirror.test.ts
     ```
   - Must map manifest surfaces to Claude/Codex/Gemini/OpenCode/Pi targets and unsupported reasons.
   - Verify:
     ```bash
-    bun test src/cli/package-mirror.test.ts
+    bun test apps/cli/src/package-mirror.test.ts
     ```
 
 - [x] Worker B3: Implement package parity audit.
   - Worktree: `~/.config/superpowers/worktrees/fulcrum/package-parity`
   - Owns:
     ```text
-    src/cli/package-parity.ts
-    src/cli/package-parity.test.ts
+    apps/cli/src/package-parity.ts
+    apps/cli/src/package-parity.test.ts
     ```
   - Must count source vs installed surfaces, detect missing targets, unsupported targets, and `.original.md` leaks.
   - Verify:
     ```bash
-    bun test src/cli/package-parity.test.ts
+    bun test apps/cli/src/package-parity.test.ts
     ```
 
 Parent integration after B1/B2/B3:
 
 ```bash
-bun test src/cli/package-surfaces.test.ts src/cli/package-mirror.test.ts src/cli/package-parity.test.ts
+bun test apps/cli/src/package-surfaces.test.ts apps/cli/src/package-mirror.test.ts apps/cli/src/package-parity.test.ts
 ```
 
 ### Wave C - package refactors
@@ -484,62 +484,62 @@ Dispatch only after shared interfaces compile. Keep write sets separate.
   - Worktree: `~/.config/superpowers/worktrees/fulcrum/package-repomix`
   - Owns:
     ```text
-    src/cli/repomix-package.ts
-    src/cli/repomix-package.test.ts
-    src/cli/mirror-policy.test.ts
+    apps/cli/src/repomix-package.ts
+    apps/cli/src/repomix-package.test.ts
+    apps/cli/src/mirror-policy.test.ts
     ```
   - Must repair OpenCode/Pi missing surfaces and keep Codex/Gemini full mirrors.
   - Verify:
     ```bash
-    bun test src/cli/repomix-package.test.ts src/cli/mirror-policy.test.ts
+    bun test apps/cli/src/repomix-package.test.ts apps/cli/src/mirror-policy.test.ts
     ```
 
 - [x] Worker C2: Refactor Cloudflare package.
   - Worktree: `~/.config/superpowers/worktrees/fulcrum/package-cloudflare`
   - Owns:
     ```text
-    src/cli/vendor-packages.ts
-    src/cli/vendor-packages.test.ts
+    apps/cli/src/vendor-packages.ts
+    apps/cli/src/vendor-packages.test.ts
     ```
   - Must preserve native Claude plugin and mirror supported package surfaces to Codex/Gemini/OpenCode/Pi.
   - If Cloudflare official package ships a surface no target agent can load, record unsupported reason in parity, not silent omission.
   - Verify:
     ```bash
-    bun test src/cli/vendor-packages.test.ts
+    bun test apps/cli/src/vendor-packages.test.ts
     ```
 
 - [x] Worker C3: Refactor Superpowers package.
   - Worktree: `~/.config/superpowers/worktrees/fulcrum/package-superpowers`
   - Owns:
     ```text
-    src/cli/vendor-packages.ts
-    src/cli/vendor-packages.test.ts
-    src/cli/upstream-skills.ts
-    src/cli/upstream-skills.test.ts
+    apps/cli/src/vendor-packages.ts
+    apps/cli/src/vendor-packages.test.ts
+    apps/cli/src/upstream-skills.ts
+    apps/cli/src/upstream-skills.test.ts
     ```
   - Must preserve native Claude/Gemini/OpenCode/Pi installs and make Codex plus Pi fallback full package mirrors, not skill-only.
   - Must keep `vendor_canonical_agents` skip behavior for skill-only upstream sync.
   - Verify:
     ```bash
-    bun test src/cli/vendor-packages.test.ts src/cli/upstream-skills.test.ts
+    bun test apps/cli/src/vendor-packages.test.ts apps/cli/src/upstream-skills.test.ts
     ```
 
 - [x] Worker C4: Refactor Caveman package.
   - Worktree: `~/.config/superpowers/worktrees/fulcrum/package-caveman`
   - Owns:
     ```text
-    src/cli/install.ts
-    src/cli/install.test.ts
-    src/cli/uninstall.ts
-    src/cli/uninstall.test.ts
+    apps/cli/src/install.ts
+    apps/cli/src/install.test.ts
+    apps/cli/src/uninstall.ts
+    apps/cli/src/uninstall.test.ts
     ```
   - Must preserve native Claude/Gemini install and make Codex/OpenCode/Pi mirrors manifest-driven. Codex must keep plugin metadata/assets/hooks/config mirror. OpenCode/Pi must receive supported non-skill surfaces.
   - Verify:
     ```bash
-    bun test src/cli/install.test.ts src/cli/uninstall.test.ts
+    bun test apps/cli/src/install.test.ts apps/cli/src/uninstall.test.ts
     ```
 
-Parent resolves conflicts between C2/C3 because both touch `src/cli/vendor-packages.ts`. If conflict risk is high, serialize C2 then C3.
+Parent resolves conflicts between C2/C3 because both touch `apps/cli/src/vendor-packages.ts`. If conflict risk is high, serialize C2 then C3.
 
 ### Wave D - MCP disabled setup and component semantics
 
@@ -547,10 +547,10 @@ Parent resolves conflicts between C2/C3 because both touch `src/cli/vendor-packa
   - Worktree: `~/.config/superpowers/worktrees/fulcrum/mcp-disabled-setup`
   - Owns:
     ```text
-    src/cli/mcp-registry.ts
-    src/cli/mcp-registry.test.ts
-    src/cli/mcp-cmd.ts
-    src/cli/mcp-cmd.test.ts
+    apps/cli/src/mcp-registry.ts
+    apps/cli/src/mcp-registry.test.ts
+    apps/cli/src/mcp-cmd.ts
+    apps/cli/src/mcp-cmd.test.ts
     src/components/adapters/mcp.ts
     src/components/adapters/mcp.test.ts
     ```
@@ -558,22 +558,22 @@ Parent resolves conflicts between C2/C3 because both touch `src/cli/vendor-packa
   - Must keep package-owned MCPs out of generic remove/disable unless package component owns the operation.
   - Verify:
     ```bash
-    bun test src/cli/mcp-registry.test.ts src/cli/mcp-cmd.test.ts src/components/adapters/mcp.test.ts
+    bun test apps/cli/src/mcp-registry.test.ts apps/cli/src/mcp-cmd.test.ts src/components/adapters/mcp.test.ts
     ```
 
 - [x] Worker D2: Add package parity to component status and doctor.
   - Worktree: `~/.config/superpowers/worktrees/fulcrum/package-status-doctor`
   - Owns:
     ```text
-    src/cli/component.ts
-    src/cli/component.test.ts
-    src/cli/doctor.ts
-    src/cli/doctor.test.ts
+    apps/cli/src/component.ts
+    apps/cli/src/component.test.ts
+    apps/cli/src/doctor.ts
+    apps/cli/src/doctor.test.ts
     ```
   - Must expose parity reports, unsupported reasons, package-owned MCPs, and source-only leak checks in JSON.
   - Verify:
     ```bash
-    bun test src/cli/component.test.ts src/cli/doctor.test.ts
+    bun test apps/cli/src/component.test.ts apps/cli/src/doctor.test.ts
     ```
 
 ### Wave E - graphify, ast-grep, tavily lifecycle audit
@@ -582,8 +582,8 @@ Parent resolves conflicts between C2/C3 because both touch `src/cli/vendor-packa
   - Worktree: `~/.config/superpowers/worktrees/fulcrum/project-integrations`
   - Owns:
     ```text
-    src/cli/vendor-installs.ts
-    src/cli/init.test.ts
+    apps/cli/src/vendor-installs.ts
+    apps/cli/src/init.test.ts
     src/components/catalog.ts
     src/components/catalog.test.ts
     src/components/adapters/vendor.ts
@@ -593,7 +593,7 @@ Parent resolves conflicts between C2/C3 because both touch `src/cli/vendor-packa
   - Must add remove/status behavior or explicit non-removable/manual reason for vendor commands that do not publish uninstall.
   - Verify:
     ```bash
-    bun test src/cli/init.test.ts src/components/catalog.test.ts src/components/adapters/vendor.test.ts
+    bun test apps/cli/src/init.test.ts src/components/catalog.test.ts src/components/adapters/vendor.test.ts
     ```
 
 ### Wave F - docs only after code is true
@@ -618,8 +618,8 @@ Parent resolves conflicts between C2/C3 because both touch `src/cli/vendor-packa
   - Verify:
     ```bash
     rg -n "Repomix|Superpowers|Cloudflare|disabled" HANDOVER.md docs README.md
-    bun run src/index.ts component list --json
-    bun run src/index.ts doctor --json
+    bun run apps/cli/src/main.ts component list --json
+    bun run apps/cli/src/main.ts doctor --json
     ```
 
 ## One-Go Execution Order
@@ -656,12 +656,12 @@ Final report: changed files, commands run, pass/fail output, unresolved risks, a
 Focused test gates:
 
 ```bash
-bun test src/cli/package-surfaces.test.ts src/cli/package-mirror.test.ts src/cli/package-parity.test.ts
-bun test src/cli/repomix-package.test.ts src/cli/vendor-packages.test.ts
-bun test src/cli/install.test.ts src/cli/uninstall.test.ts src/cli/mirror-policy.test.ts
-bun test src/cli/mcp-registry.test.ts src/cli/mcp-cmd.test.ts src/components/adapters/mcp.test.ts
-bun test src/cli/component.test.ts src/cli/doctor.test.ts src/components/adapters/vendor.test.ts src/components/catalog.test.ts
-bun test src/cli/init.test.ts src/cli/upstream-skills.test.ts
+bun test apps/cli/src/package-surfaces.test.ts apps/cli/src/package-mirror.test.ts apps/cli/src/package-parity.test.ts
+bun test apps/cli/src/repomix-package.test.ts apps/cli/src/vendor-packages.test.ts
+bun test apps/cli/src/install.test.ts apps/cli/src/uninstall.test.ts apps/cli/src/mirror-policy.test.ts
+bun test apps/cli/src/mcp-registry.test.ts apps/cli/src/mcp-cmd.test.ts src/components/adapters/mcp.test.ts
+bun test apps/cli/src/component.test.ts apps/cli/src/doctor.test.ts src/components/adapters/vendor.test.ts src/components/catalog.test.ts
+bun test apps/cli/src/init.test.ts apps/cli/src/upstream-skills.test.ts
 ```
 
 Live cleanup/reinstall verification must use Fulcrum project commands for remove/install operations. Direct shell is allowed only for inspection and targeted cleanup of stale files before the reinstall test.
@@ -672,35 +672,35 @@ Inspection commands:
 git status --short
 git diff --stat
 find ~/.codex ~/.gemini ~/.config/opencode ~/.pi/agent ~/.claude -name '*.original.md' -o -name '*.backup.md'
-bun run src/index.ts component list --json
-bun run src/index.ts component status package.repomix --json
-bun run src/index.ts component status package.cloudflare --json
-bun run src/index.ts component status package.superpowers --json
-bun run src/index.ts component status package.caveman --json
-bun run src/index.ts doctor --json
+bun run apps/cli/src/main.ts component list --json
+bun run apps/cli/src/main.ts component status package.repomix --json
+bun run apps/cli/src/main.ts component status package.cloudflare --json
+bun run apps/cli/src/main.ts component status package.superpowers --json
+bun run apps/cli/src/main.ts component status package.caveman --json
+bun run apps/cli/src/main.ts doctor --json
 ```
 
 Remove/install smoke commands:
 
 ```bash
-bun run src/index.ts component remove package.repomix --all-agents
-bun run src/index.ts component install package.repomix --all-agents
-bun run src/index.ts component remove package.cloudflare --all-agents
-bun run src/index.ts component install package.cloudflare --all-agents
-bun run src/index.ts component remove package.superpowers --all-agents
-bun run src/index.ts component install package.superpowers --all-agents
-bun run src/index.ts component remove package.caveman --all-agents
-bun run src/index.ts component install package.caveman --all-agents
+bun run apps/cli/src/main.ts component remove package.repomix --all-agents
+bun run apps/cli/src/main.ts component install package.repomix --all-agents
+bun run apps/cli/src/main.ts component remove package.cloudflare --all-agents
+bun run apps/cli/src/main.ts component install package.cloudflare --all-agents
+bun run apps/cli/src/main.ts component remove package.superpowers --all-agents
+bun run apps/cli/src/main.ts component install package.superpowers --all-agents
+bun run apps/cli/src/main.ts component remove package.caveman --all-agents
+bun run apps/cli/src/main.ts component install package.caveman --all-agents
 ```
 
 Disabled MCP smoke commands:
 
 ```bash
-bun run src/index.ts install --profile minimal --no-default-mcps
-bun run src/index.ts mcp disable context7 --all-agents
-bun run src/index.ts mcp disable github --all-agents
-bun run src/index.ts component disable mcp.context7 --all-agents
-bun run src/index.ts doctor --json
+bun run apps/cli/src/main.ts install --profile minimal --no-default-mcps
+bun run apps/cli/src/main.ts mcp disable context7 --all-agents
+bun run apps/cli/src/main.ts mcp disable github --all-agents
+bun run apps/cli/src/main.ts component disable mcp.context7 --all-agents
+bun run apps/cli/src/main.ts doctor --json
 ```
 
 Final gate:

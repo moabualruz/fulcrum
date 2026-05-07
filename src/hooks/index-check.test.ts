@@ -30,7 +30,7 @@ async function reset() {
 async function runIdxCheck(): Promise<{ stdout: string; exit: number; stderr: string }> {
   const stdinFile = `${TMP}/stdin-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
   await Bun.write(stdinFile, "{}");
-  const proc = Bun.spawn(["bun", join(FULCRUM_REPO, "src/index.ts"), "hook", "index-check"], {
+  const proc = Bun.spawn(["bun", join(FULCRUM_REPO, "apps/cli/src/main.ts"), "hook", "index-check"], {
     stdin: Bun.file(stdinFile),
     stdout: "pipe",
     stderr: "pipe",

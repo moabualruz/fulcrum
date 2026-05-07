@@ -28,7 +28,7 @@ async function runFormat(envelope: object, env: Record<string, string> = {}): Pr
   await Bun.write(stdinFile, json);
   const processEnv = { ...process.env, HOME: TMP, ...env } as Record<string, string>;
   delete processEnv["FULCRUM_DEBUG"];
-  const proc = Bun.spawn(["bun", "src/index.ts", "hook", "format"], {
+  const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", "hook", "format"], {
     stdin: Bun.file(stdinFile),
     stdout: "pipe",
     stderr: "pipe",
@@ -76,7 +76,7 @@ describe("format", () => {
     await Bun.write(stdinFile, "{ invalid json }");
     const processEnv = { ...process.env, HOME: TMP } as Record<string, string>;
     delete processEnv["FULCRUM_DEBUG"];
-    const proc = Bun.spawn(["bun", "src/index.ts", "hook", "format"], {
+    const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", "hook", "format"], {
       stdin: Bun.file(stdinFile),
       stdout: "pipe",
       stderr: "pipe",
@@ -98,7 +98,7 @@ describe("format", () => {
     await Bun.write(stdinFile, "");
     const processEnv = { ...process.env, HOME: TMP } as Record<string, string>;
     delete processEnv["FULCRUM_DEBUG"];
-    const proc = Bun.spawn(["bun", "src/index.ts", "hook", "format"], {
+    const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", "hook", "format"], {
       stdin: Bun.file(stdinFile),
       stdout: "pipe",
       stderr: "pipe",

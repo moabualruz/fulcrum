@@ -1,5 +1,5 @@
-import { installRulesBlocks } from "../../cli/install.ts";
-import { removeRulesBlocks } from "../../cli/uninstall.ts";
+import { installRulesBlocks } from "@fulcrum/cli/install.ts";
+import { removeRulesBlocks } from "@fulcrum/cli/uninstall.ts";
 import type { Operation } from "../types.ts";
 
 type RulesOperation = Exclude<Operation, "status">;

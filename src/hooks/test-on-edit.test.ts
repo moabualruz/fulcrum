@@ -30,7 +30,7 @@ async function runTOE(envelope: object): Promise<{ stdout: string; exit: number;
   await Bun.write(stdinFile, json);
   const env = { ...process.env, CLAUDE_PROJECT_DIR: TMP, HOME: TMP } as Record<string, string>;
   delete env["FULCRUM_DEBUG"];
-  const proc = Bun.spawn(["bun", "src/index.ts", "hook", "test-on-edit"], {
+  const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", "hook", "test-on-edit"], {
     stdin: Bun.file(stdinFile),
     stdout: "pipe",
     stderr: "pipe",

@@ -63,7 +63,7 @@ import {
 import { sha256Hex } from "../../src/db/migration-checksums.ts";
 import { dbMigrationVersion, dbCanRunOnCurrentBinary, MAX_KNOWN_MIGRATION_VERSION } from "../../src/db/doctor-checks.ts";
 import { PermissionNotAvailableError } from "../../src/db/db.router.ts";
-import { run as runDbCommand } from "../../src/cli/commands/db.ts";
+import { run as runDbCommand } from "@fulcrum/cli/commands/db.ts";
 
 // All entity classes for the test ORM
 const ALL_ENTITIES = [

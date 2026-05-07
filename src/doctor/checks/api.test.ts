@@ -334,7 +334,7 @@ describe("runApiDoctorChecks integration", () => {
 
 describe("fulcrum doctor --subsystem api --json", () => {
   test("returns DoctorApiCheck shape via CLI", async () => {
-    const proc = Bun.spawn(["bun", "src/index.ts", "doctor", "--subsystem", "api", "--json"], {
+    const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", "doctor", "--subsystem", "api", "--json"], {
       cwd: process.cwd(),
       stdout: "pipe",
       stderr: "pipe",
@@ -352,7 +352,7 @@ describe("fulcrum doctor --subsystem api --json", () => {
   });
 
   test("non-json output includes check statuses", async () => {
-    const proc = Bun.spawn(["bun", "src/index.ts", "doctor", "--subsystem", "api"], {
+    const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", "doctor", "--subsystem", "api"], {
       cwd: process.cwd(),
       stdout: "pipe",
       stderr: "pipe",

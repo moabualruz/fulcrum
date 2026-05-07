@@ -3,35 +3,35 @@ import { join, relative } from "node:path";
 import { describe, expect, test } from "bun:test";
 
 const INTERFACE_ROOTS = [
-  "src/cli",
-  "src/tui",
-  "src/router",
+  "apps/cli/src",
+  "apps/tui/src",
+  "apps/server/src/router",
 ];
 
 const RUNTIME_ADAPTER_ROOTS = [
-  "src/web/src/routes",
-  "src/web/src/lib/server",
-  "src/api/routes",
-  "src/trpc",
+  "apps/web/src/routes",
+  "apps/web/src/lib/server",
+  "apps/server/src/api/routes",
+  "apps/server/src/trpc",
 ];
 
 const RESIDUAL_INTERFACE_ROOTS = [
-  "src/web/src/routes",
-  "src/web/src/lib",
-  "src/cli",
-  "src/tui",
-  "src/api",
-  "src/router",
-  "src/trpc",
-  "src/server/trpc",
+  "apps/web/src/routes",
+  "apps/web/src/lib",
+  "apps/cli/src",
+  "apps/tui/src",
+  "apps/server/src/api",
+  "apps/server/src/router",
+  "apps/server/src/trpc",
+  "apps/server/src/runtime/trpc",
 ];
 
-const TEST_FIXTURE_ROOTS = ["src", "src/web/tests"];
+const TEST_FIXTURE_ROOTS = ["src", "apps/web/tests"];
 
 const EXPECTED_RUNTIME_DIRECT_ACCESS_FILES = [
-  "src/web/src/routes/orchestration/+page.server.ts",
-  "src/web/src/lib/server/db.ts",
-  "src/trpc/context.ts",
+  "apps/web/src/routes/orchestration/+page.server.ts",
+  "apps/web/src/lib/server/db.ts",
+  "apps/server/src/trpc/context.ts",
 ];
 
 const NON_WEB_INVENTORY_ROOTS = [
@@ -91,19 +91,19 @@ const FORBIDDEN_INTERFACE_STUB_DATA_PROVIDERS = new RegExp(
 
 const RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS = new Map([
   [
-    "src/web/src/lib/server/db.ts",
+    "apps/web/src/lib/server/db.ts",
     "web composition root owns current database singleton until route/helper callers move behind application services",
   ],
   [
-    "src/trpc/context.ts",
+    "apps/server/src/trpc/context.ts",
     "tRPC context composition root still carries EntityManager during staged router migration",
   ],
   [
-    "src/cli/index.ts",
+    "apps/cli/src/index.ts",
     "CLI composition root may wire database bindings while command files migrate to caller/application adapters",
   ],
   [
-    "src/cli/commands/init.ts",
+    "apps/cli/src/commands/init.ts",
     "CLI init is the exact bootstrap exception that opens PGlite/MikroORM, runs migrations, and seeds the local org before application callers exist",
   ],
 ]);
@@ -111,33 +111,33 @@ const RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS = new Map([
 const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES: string[] = [];
 
 const PLAN21_ROUTER_FILES = [
-  "src/server/trpc/routers/comments.ts",
-  "src/server/trpc/routers/doc-templates.ts",
-  "src/server/trpc/routers/docs.ts",
-  "src/server/trpc/routers/skills.ts",
-  "src/server/trpc/routers/sprints.ts",
-  "src/server/trpc/routers/templates.ts",
+  "apps/server/src/runtime/trpc/routers/comments.ts",
+  "apps/server/src/runtime/trpc/routers/doc-templates.ts",
+  "apps/server/src/runtime/trpc/routers/docs.ts",
+  "apps/server/src/runtime/trpc/routers/skills.ts",
+  "apps/server/src/runtime/trpc/routers/sprints.ts",
+  "apps/server/src/runtime/trpc/routers/templates.ts",
 ];
 
 const PLAN44_CLI_FILES = [
-  "src/cli/docs-templates.ts",
-  "src/cli/commands/export.ts",
-  "src/cli/commands/import.ts",
-  "src/cli/commands/auth.ts",
-  "src/cli/commands/flags.ts",
-  "src/cli/commands/project-config.ts",
-  "src/cli/commands/report.ts",
-  "src/cli/commands/task-hierarchy.ts",
-  "src/cli/commands/task-relate.ts",
-  "src/cli/commands/symphony.ts",
-  "src/cli/commands/pillar14-generated.ts",
+  "apps/cli/src/docs-templates.ts",
+  "apps/cli/src/commands/export.ts",
+  "apps/cli/src/commands/import.ts",
+  "apps/cli/src/commands/auth.ts",
+  "apps/cli/src/commands/flags.ts",
+  "apps/cli/src/commands/project-config.ts",
+  "apps/cli/src/commands/report.ts",
+  "apps/cli/src/commands/task-hierarchy.ts",
+  "apps/cli/src/commands/task-relate.ts",
+  "apps/cli/src/commands/symphony.ts",
+  "apps/cli/src/commands/pillar14-generated.ts",
 ];
 
 const PLAN45_CLI_FILES = [
-  "src/cli/commands/comment.ts",
-  "src/cli/commands/context.ts",
-  "src/cli/commands/my-work.ts",
-  "src/cli/commands/repos.ts",
+  "apps/cli/src/commands/comment.ts",
+  "apps/cli/src/commands/context.ts",
+  "apps/cli/src/commands/my-work.ts",
+  "apps/cli/src/commands/repos.ts",
 ];
 
 const FORBIDDEN_PLAN44_CLI_DIRECT_ACCESS = new RegExp(
@@ -174,7 +174,7 @@ async function collectTestFiles(root: string): Promise<string[]> {
     if (entry.isDirectory()) return collectTestFiles(path);
     if (!entry.isFile()) return [];
     if (path.includes("/node_modules/") || path.includes("/.svelte-kit/")) return [];
-    if (path.endsWith(".test.ts") || path.endsWith(".spec.ts") || path.includes("src/web/tests/")) {
+    if (path.endsWith(".test.ts") || path.endsWith(".spec.ts") || path.includes("apps/web/tests/")) {
       return [path];
     }
     return [];
@@ -266,7 +266,7 @@ describe("Phase 9.5 interface boundary", () => {
   });
 
   test("web routes do not own stub data providers or fake persistence stores", async () => {
-    expect(await violations(["src/web/src/routes"], FORBIDDEN_INTERFACE_STUB_DATA_PROVIDERS)).toEqual([]);
+    expect(await violations(["apps/web/src/routes"], FORBIDDEN_INTERFACE_STUB_DATA_PROVIDERS)).toEqual([]);
   });
 
   test("Plan 21 docs comments templates skills and sprints tRPC routers delegate persistence to application modules", async () => {

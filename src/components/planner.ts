@@ -1,4 +1,4 @@
-import { ALL_AGENT_IDS, type AgentId } from "../cli/mcp-registry.ts";
+import { ALL_AGENT_IDS, type AgentId } from "@fulcrum/cli/mcp-registry.ts";
 import { expandProfile, getComponent } from "./catalog.ts";
 import type { ComponentAction, ComponentPlan, ComponentSpec, Operation, SurfaceSpec } from "./types.ts";
 

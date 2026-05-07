@@ -17,7 +17,7 @@
 
 ## Cross-context coupling
 
-- Imported by every other context. Imports nothing from `src/cli/`, `src/components/`, `src/hooks/`, `src/agents/`, `src/repo/`.
+- Imported by every other context. Imports nothing from `apps/cli/src/`, `src/components/`, `src/hooks/`, `src/agents/`, `src/repo/`.
 
 ## ADRs
 

@@ -4,9 +4,9 @@ import type { Session } from "better-auth";
 import { Document } from "../../src/db/entities/docs/Document.ts";
 import { configureDocNarrator } from "../../src/docs/llm-narrator.ts";
 import { createTestOrm } from "../../src/test-utils/db.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { appRouter } from "../../src/trpc/router.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 
 type TipTapNode = { type?: string; attrs?: { readonly?: boolean }; content?: TipTapNode[] };
 type TipTapDoc = { type?: string; content?: TipTapNode[] };

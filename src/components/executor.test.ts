@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { ComponentLedger } from "./ledger.ts";
 import { planComponentOperation } from "./planner.ts";
 import { executeComponentPlan } from "./executor.ts";
-import { loadRegistry } from "../cli/mcp-registry.ts";
+import { loadRegistry } from "@fulcrum/cli/mcp-registry.ts";
 import type { ComponentPlan } from "./types.ts";
 
 let scratch = "";

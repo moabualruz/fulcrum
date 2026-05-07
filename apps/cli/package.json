@@ -1,0 +1,9 @@
+{
+  "name": "@fulcrum/cli",
+  "private": true,
+  "type": "module",
+  "module": "src/main.ts",
+  "bin": {
+    "fulcrum": "src/main.ts"
+  }
+}

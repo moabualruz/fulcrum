@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { access } from "node:fs/promises";
 
-import { GENERATED_DOMAIN_COMMANDS } from "../cli/generated-domains.ts";
-import { appRouter } from "../trpc/router.ts";
+import { GENERATED_DOMAIN_COMMANDS } from "@fulcrum/cli/generated-domains.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import {
   REQUIRED_SURFACE_DOMAINS,
   listMissingApiDomains,

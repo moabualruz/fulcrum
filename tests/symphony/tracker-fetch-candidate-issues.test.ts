@@ -40,9 +40,9 @@ import {
   fetchIssuesByStates,
   fetchIssueStatesByIds,
 } from "../../src/orchestration/symphony/tracker.ts";
-import { appRouter } from "../../src/trpc/router.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 

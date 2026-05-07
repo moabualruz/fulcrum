@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { GENERATED_DOMAIN_COMMANDS } from "../../src/cli/generated-domains.ts";
+import { GENERATED_DOMAIN_COMMANDS } from "@fulcrum/cli/generated-domains.ts";
 
 const BASE_DOMAINS = [
   "projects",
@@ -83,7 +83,7 @@ function cliTestFiles(): string[] {
 
   return [
     ...walk("tests/cli"),
-    ...walk("src/cli"),
+    ...walk("apps/cli/src"),
   ].filter((file) => file.endsWith(".test.ts"));
 }
 
@@ -93,7 +93,7 @@ function generatedAliases(domain: string): string[] {
 
 describe("Phase 09 all-domain CLI coverage gate", () => {
   test("all required CLI domains are mounted or generated", async () => {
-    const index = await read("../../src/cli/index.ts");
+    const index = await read("../../apps/cli/src/index.ts");
     const generated = new Set(GENERATED_DOMAIN_COMMANDS);
     const missing = [...BASE_DOMAINS, ...PHASE09_DOMAINS].filter((domain) =>
       !generatedAliases(domain).some((alias) =>
@@ -124,7 +124,7 @@ describe("Phase 09 all-domain CLI coverage gate", () => {
   });
 
   test("Phase 09 domains are exposed in top-level CLI help", async () => {
-    const index = await read("../../src/cli/index.ts");
+    const index = await read("../../apps/cli/src/index.ts");
     const missing = PHASE09_DOMAINS.filter((domain) => !index.includes(`fulcrum ${domain} `));
 
     expect(missing).toEqual([]);

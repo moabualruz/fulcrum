@@ -191,6 +191,6 @@ describe("SeedService", () => {
   });
 
   test.skip("layout-server seed hook deferred to Pillar 13/16", () => {
-    // Deferral is documented in src/web/src/routes/+layout.server.ts for P1#04.
+    // Deferral is documented in apps/web/src/routes/+layout.server.ts for P1#04.
   });
 });

@@ -5,7 +5,7 @@
 ## Vocabulary
 
 - **Hook envelope** — JSON payload passed on stdin by the agent runtime. Shape varies by hook event: `SessionStart`, `PreToolUse`, `PostToolUse`, `SessionEnd`.
-- **Hook subcommand** — `fulcrum hook <name>`. Each `<name>.ts` exports a single async entry point invoked from `src/index.ts`.
+- **Hook subcommand** — `fulcrum hook <name>`. Each `<name>.ts` exports a single async entry point invoked from `apps/cli/src/main.ts`.
 - **Recipe** — companion shell snippet under `hooks/recipes/<name>.snippet.md` vendored into agent settings by `fulcrum install`.
 - **Marker** — sentinel comment that lets the hook detect whether it has already been registered.
 
@@ -34,7 +34,7 @@
 
 - Reads `AGENTS` for per-agent shape conventions where envelopes differ.
 - Tool-output-router reads `config/tool-output-policy.toml`.
-- No reverse coupling: hooks never call `src/cli/`, `src/components/`, or the lifecycle engine.
+- No reverse coupling: hooks never call `apps/cli/src/`, `src/components/`, or the lifecycle engine.
 
 ## ADRs
 

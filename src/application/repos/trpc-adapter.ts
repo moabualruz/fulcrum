@@ -13,7 +13,7 @@ import type {
   Repo as TrpcRepoOutput,
   RepoStatusResult,
   RepoSyncResult,
-} from "../../trpc/schemas/repos.ts";
+} from "@fulcrum/server/trpc/schemas/repos.ts";
 import type { AppContext } from "./types.ts";
 
 type RepoSyncTaskName = typeof REPO_SYNC_LOCAL_TASK | typeof REPO_SYNC_REMOTE_TASK;

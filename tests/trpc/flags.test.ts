@@ -28,9 +28,9 @@ import { OrgMember } from "../../src/db/entities/auth/OrgMember.ts";
 import { FeatureFlagRollout } from "../../src/db/entities/platform/FeatureFlagRollout.ts";
 import { FeatureFlagRepository } from "../../src/db/repositories/auth/FeatureFlagRepository.ts";
 import { OrgMemberRepository } from "../../src/db/repositories/auth/OrgMemberRepository.ts";
-import { appRouter } from "../../src/trpc/router.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { FlagRegistry } from "../../src/flags/registry.ts";
 
 const TEST_ORG_ID = "00000000-0000-4000-8000-000000000001";

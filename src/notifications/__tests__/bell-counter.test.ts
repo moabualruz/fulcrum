@@ -4,7 +4,7 @@ import { BellCounterPoll } from "../bell-counter-poll.ts";
 import {
   calculateUnreadNotificationCount,
   markNotificationRead,
-} from "../../trpc/routers/notifications.ts";
+} from "@fulcrum/server/trpc/routers/notifications.ts";
 
 describe("notification bell counter source of truth", () => {
   test("unread badge count uses only user notification rows with readAt = null", () => {

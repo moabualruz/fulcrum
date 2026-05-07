@@ -25,7 +25,7 @@ import { describe, it, expect } from "bun:test";
 import {
   load,
   actions,
-} from "../../src/web/src/routes/settings/users/+page.server.ts";
+} from "@fulcrum/web/routes/settings/users/+page.server.ts";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 

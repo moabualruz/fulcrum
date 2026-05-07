@@ -24,7 +24,7 @@ async function runLint(envelope: object, env: Record<string, string> = {}): Prom
   const json = JSON.stringify(envelope);
   const stdinFile = `${TMP}/stdin-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
   await Bun.write(stdinFile, json);
-  const proc = Bun.spawn(["bun", "src/index.ts", "hook", "lint-gate"], {
+  const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", "hook", "lint-gate"], {
     stdin: Bun.file(stdinFile),
     stdout: "pipe",
     stderr: "pipe",

@@ -132,8 +132,8 @@ async function checkHeuristicExtractor(): Promise<SubsystemCheck> {
   try {
     // Verify the extractor patterns work on a fixture transcript
     const fixture = [
-      "[read] src/index.ts",
-      "[wrote] src/cli/doctor.ts",
+      "[read] apps/cli/src/main.ts",
+      "[wrote] apps/cli/src/doctor.ts",
       "decided: use PGlite for local dev",
       "## Decision: adopt BM25 scoring",
       "blocked by upstream release",

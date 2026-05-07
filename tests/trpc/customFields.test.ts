@@ -7,9 +7,9 @@ import { CustomFieldDef } from "../../src/db/entities/tasks/CustomFieldDef.ts";
 import { Task } from "../../src/db/entities/tasks/Task.ts";
 import { TaskRepository } from "../../src/db/repositories/tasks/TaskRepository.ts";
 import { createTestOrm } from "../../src/test-utils/db.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { appRouter } from "../../src/trpc/router.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 const ORG_ID = "00000000-0000-0000-0000-000000000001";

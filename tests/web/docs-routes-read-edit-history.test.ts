@@ -4,10 +4,10 @@ import { join } from "node:path";
 import type { Component } from "svelte";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { openIsolatedStore, migrateIsolatedStore, createLocalOrg } from "../../src/test-support/product-fixtures.ts";
-import { createDocumentAction } from "../../src/web/src/lib/server/documents.ts";
+import { createDocumentAction } from "@fulcrum/web/lib/server/documents.ts";
 import { __resetDefaultOrmForTest, initOrm } from "../../src/db/mikro-orm.config.ts";
-import { __setApplicationScopeForTest } from "../../src/web/src/lib/server/application-scope.ts";
-import * as serverDb from "../../src/web/src/lib/server/db.ts";
+import { __setApplicationScopeForTest } from "@fulcrum/web/lib/server/application-scope.ts";
+import * as serverDb from "@fulcrum/web/lib/server/db.ts";
 
 mock.module("$app/forms", () => ({
   enhance: () => ({ destroy() {} }),
@@ -169,7 +169,7 @@ async function streamedData<T>(result: unknown): Promise<T> {
 describe("docs read/edit/history routes", () => {
   test("read route returns sanitized rendered HTML, wikilink chips, frontmatter, and backlinks", async () => {
     const { docId, linkedId } = await seedDocs();
-    const mod = await import("../../src/web/src/routes/docs/[id]/+page.server.ts");
+    const mod = await import("@fulcrum/web/routes/docs/[id]/+page.server.ts");
     const result = await mod.load({ params: { id: docId }, locals: {} } as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<{
       doc: {
@@ -189,7 +189,7 @@ describe("docs read/edit/history routes", () => {
   });
 
   test("sanitizeDocHtml strips script tags and event handler attrs", async () => {
-    const { sanitizeDocHtml } = await import("../../src/web/src/routes/docs/[id]/doc-render.ts");
+    const { sanitizeDocHtml } = await import("@fulcrum/web/routes/docs/[id]/doc-render.ts");
     const html = sanitizeDocHtml("<img src=x onerror=alert(1)><script>alert(2)</script>");
     expect(html).toContain("<img");
     expect(html).not.toContain("onerror");
@@ -198,7 +198,7 @@ describe("docs read/edit/history routes", () => {
 
   test("edit route loads content_json for DocEditor", async () => {
     const { docId } = await seedDocs();
-    const mod = await import("../../src/web/src/routes/docs/[id]/edit/+page.server.ts");
+    const mod = await import("@fulcrum/web/routes/docs/[id]/edit/+page.server.ts");
     const result = await mod.load({ params: { id: docId } } as Parameters<typeof mod.load>[0]);
     expect(result.doc.contentJson).toEqual({
       type: "doc",
@@ -208,7 +208,7 @@ describe("docs read/edit/history routes", () => {
 
   test("history route lists versions and returns a diff for selected versions", async () => {
     const { docId } = await seedDocs();
-    const mod = await import("../../src/web/src/routes/docs/[id]/history/+page.server.ts");
+    const mod = await import("@fulcrum/web/routes/docs/[id]/history/+page.server.ts");
     const result = await mod.load({
       params: { id: docId },
       url: new URL(`http://localhost/docs/${docId}/history?from=1&to=2`),
@@ -224,7 +224,7 @@ describe("docs read/edit/history routes", () => {
 
   test("history restore creates a new version and redirects to read view", async () => {
     const { docId } = await seedDocs();
-    const mod = await import("../../src/web/src/routes/docs/[id]/history/+page.server.ts");
+    const mod = await import("@fulcrum/web/routes/docs/[id]/history/+page.server.ts");
     const fd = new FormData();
     fd.set("version_num", "1");
     let caught: unknown;
@@ -257,7 +257,7 @@ describe("docs read/edit/history routes", () => {
 
   test("history view renders timeline, snapshot badge, diff, and restore buttons", async () => {
     const { render } = await import("svelte/server");
-    const mod = await import("../../src/web/src/routes/docs/[id]/history/+page.svelte");
+    const mod = await import("@fulcrum/web/routes/docs/[id]/history/+page.svelte");
     const Page = mod.default as Component<{
       data: {
         doc: { id: string; title: string };

@@ -7,27 +7,27 @@ const RAW_ENTITY_MANAGER_PATTERNS = [
 ];
 
 const RUNTIME_ROOTS = [
-  "src/web",
-  "src/cli",
-  "src/tui",
-  "src/router",
-  "src/api",
+  "apps/web",
+  "apps/cli/src",
+  "apps/tui/src",
+  "apps/server/src/router",
+  "apps/server/src/api",
 ];
 
 const WEB_DATA_HANDLE_ROOTS = [
-  "src/web/src/routes",
-  "src/web/src/lib",
+  "apps/web/src/routes",
+  "apps/web/src/lib",
 ];
 
 const SQL_INTERFACE_ROOTS = [
-  "src/web/src/routes",
-  "src/web/src/lib",
-  "src/cli",
-  "src/tui",
-  "src/api",
-  "src/router",
-  "src/trpc",
-  "src/server/trpc",
+  "apps/web/src/routes",
+  "apps/web/src/lib",
+  "apps/cli/src",
+  "apps/tui/src",
+  "apps/server/src/api",
+  "apps/server/src/router",
+  "apps/server/src/trpc",
+  "apps/server/src/runtime/trpc",
 ];
 
 const WEB_DATA_HANDLE_PATTERN = /\b(openDatabase|getDatabase|getEm|getDefaultOrgIdOrm|ormSqlConnection|WebDatabaseHandle|LegacyDatabaseHandle|application-compat)\b/;
@@ -36,7 +36,7 @@ const RAW_SQL_CALL_PATTERN = /\b(db|conn|connection|pglite)\.query\s*(?:<[^>]+>)
 
 const WEB_DATA_HANDLE_COMPOSITION_ROOTS = new Map([
   [
-    "src/web/src/lib/server/db.ts",
+    "apps/web/src/lib/server/db.ts",
     "web composition root owns current database singleton until route/helper callers move behind application services",
   ],
 ]);

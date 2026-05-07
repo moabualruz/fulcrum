@@ -120,7 +120,7 @@ function fakeCaller(): RoutingCaller & { calls: Array<{ procedure: string; input
 }
 
 async function runRouting(argv: readonly string[], caller = fakeCaller()) {
-  const { run } = await import("../../src/cli/commands/routing.ts");
+  const { run } = await import("@fulcrum/cli/commands/routing.ts");
   const stdout: string[] = [];
   const stderr: string[] = [];
   let exitCode: number | undefined;

@@ -9,14 +9,14 @@
  *
  * Env:
  *   WEB_BUILD_TIMEOUT_MS  — override default 60000ms (for testing).
- *   WEB_DIR               — path to the web package (default: src/web).
+ *   WEB_DIR               — path to the web package (default: apps/web).
  */
 
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 
 const BUDGET_MS = Number(process.env["WEB_BUILD_TIMEOUT_MS"] ?? 60_000);
-const WEB_DIR = resolve(process.env["WEB_DIR"] ?? "src/web");
+const WEB_DIR = resolve(process.env["WEB_DIR"] ?? "apps/web");
 
 function runBuild(): Promise<{ exitCode: number; durationMs: number }> {
   return new Promise((res, rej) => {

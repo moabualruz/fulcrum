@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { readFile } from "node:fs/promises";
 
-import { createPublicApiRouter } from "../../src/api/hono.ts";
+import { createPublicApiRouter } from "@fulcrum/server/api/hono.ts";
 
 const ROUTE_FILES = [
-  "src/api/routes/tasks.ts",
-  "src/api/routes/docs.ts",
-  "src/api/routes/memory.ts",
-  "src/api/routes/sprints.ts",
-  "src/api/routes/saved-views.ts",
-  "src/api/routes/notifications.ts",
-  "src/api/routes/search.ts",
+  "apps/server/src/api/routes/tasks.ts",
+  "apps/server/src/api/routes/docs.ts",
+  "apps/server/src/api/routes/memory.ts",
+  "apps/server/src/api/routes/sprints.ts",
+  "apps/server/src/api/routes/saved-views.ts",
+  "apps/server/src/api/routes/notifications.ts",
+  "apps/server/src/api/routes/search.ts",
 ];
 
 function req(path: string): Request {

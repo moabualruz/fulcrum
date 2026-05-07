@@ -61,7 +61,7 @@ describe("Sandcastle dependency policy", () => {
     const sourceFiles = await glob("src/**/*.{ts,tsx,svelte}", {
       cwd: root,
       absolute: true,
-      ignore: ["src/web/**"],
+      ignore: ["apps/web/**"],
     });
     const violations = sourceFiles
       .filter((file) => !relative(root, file).startsWith("src/orchestration/"))

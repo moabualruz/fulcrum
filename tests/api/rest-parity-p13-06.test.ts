@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { createPublicApiRouter } from "../../src/api/hono.ts";
+import { createPublicApiRouter } from "@fulcrum/server/api/hono.ts";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const RUN_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";

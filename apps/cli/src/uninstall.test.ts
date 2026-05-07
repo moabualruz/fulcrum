@@ -1,0 +1,783 @@
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
+import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
+import { removeCavemanCopies, removeExactLine, removeSentinelBlock, run, setDryRun } from "./uninstall.ts";
+import * as proc from "@/utils/proc.ts";
+
+let TMP: string;
+let originalHome: string | undefined;
+let originalFulcrumHome: string | undefined;
+let originalRepoDir: string | undefined;
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+beforeEach(async () => {
+  TMP = await mkdtemp(join(tmpdir(), "fulcrum-uninstall-"));
+  originalHome = process.env["HOME"];
+  originalFulcrumHome = process.env["FULCRUM_HOME"];
+  originalRepoDir = process.env["FULCRUM_REPO_DIR"];
+  process.env["HOME"] = TMP;
+  process.env["FULCRUM_HOME"] = join(TMP, ".fulcrum");
+  process.env["FULCRUM_REPO_DIR"] = TMP;
+  setDryRun(false);
+});
+
+afterEach(async () => {
+  setDryRun(false);
+  if (originalHome !== undefined) process.env["HOME"] = originalHome;
+  else delete process.env["HOME"];
+  if (originalFulcrumHome !== undefined) process.env["FULCRUM_HOME"] = originalFulcrumHome;
+  else delete process.env["FULCRUM_HOME"];
+  if (originalRepoDir !== undefined) process.env["FULCRUM_REPO_DIR"] = originalRepoDir;
+  else delete process.env["FULCRUM_REPO_DIR"];
+  await rm(TMP, { recursive: true, force: true });
+});
+
+describe("removeSentinelBlock", () => {
+  test("removes only Fulcrum rules block and preserves user content", async () => {
+    const file = join(TMP, "AGENTS.md");
+    await writeFile(
+      file,
+      [
+        "# User rules",
+        "",
+        "<!-- BEGIN FULCRUM RULES -->",
+        "managed",
+        "<!-- END FULCRUM RULES -->",
+        "",
+        "Keep me",
+        "",
+      ].join("\n"),
+    );
+
+    await removeSentinelBlock(file, "Test");
+
+    expect(await readFile(file, "utf8")).toBe("# User rules\n\nKeep me\n");
+  });
+
+  test("refuses mismatched markers", async () => {
+    const file = join(TMP, "bad.md");
+    await writeFile(file, "<!-- BEGIN FULCRUM RULES -->\nmanaged\n");
+
+    await removeSentinelBlock(file, "Bad");
+
+    expect(await readFile(file, "utf8")).toBe("<!-- BEGIN FULCRUM RULES -->\nmanaged\n");
+  });
+});
+
+describe("removeExactLine", () => {
+  test("removes only the generated Gemini import line", async () => {
+    const file = join(TMP, "GEMINI.md");
+    await writeFile(file, "before\n@AGENTS.md\nafter\n");
+
+    await removeExactLine(file, "@AGENTS.md", "Gemini import");
+
+    expect(await readFile(file, "utf8")).toBe("before\nafter\n");
+  });
+});
+
+describe("run", () => {
+  test("dry-run delegates to component default profile removal", async () => {
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+
+    try {
+      await run(["--dry-run"]);
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(logs.join("\n")).toContain("profile.default");
+    expect(logs.join("\n")).toContain("DRY RUN");
+  });
+
+  test("dry-run keeps caveman unless explicitly included", async () => {
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+
+    try {
+      await run(["--dry-run"]);
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(logs.join("\n")).not.toContain("package.caveman");
+    expect(logs.join("\n")).toContain("keep caveman");
+  });
+
+  test("dry-run does not remove hook registrations", async () => {
+    const hookPath = join(TMP, ".config", "opencode", "plugins", "fulcrum-index-check.ts");
+    await mkdir(dirname(hookPath), { recursive: true });
+    await writeFile(hookPath, "managed hook\n");
+
+    await run(["--dry-run"]);
+
+    expect(await readFile(hookPath, "utf8")).toBe("managed hook\n");
+  });
+
+  test("--purge removes Fulcrum cache and generated state", async () => {
+    await mkdir(join(TMP, ".fulcrum", "cache", "repomix"), { recursive: true });
+    await writeFile(join(TMP, ".fulcrum", "cache", "repomix", "README.md"), "cache\n");
+    await mkdir(join(TMP, ".fulcrum", "state", "global", "backups", "skills"), { recursive: true });
+    await writeFile(join(TMP, ".fulcrum", "state", "global", "backups", "skills", "README.md"), "backup\n");
+    await mkdir(join(TMP, ".fulcrum", "state", "global", "smoke-test"), { recursive: true });
+    await writeFile(join(TMP, ".fulcrum", "state", "global", "smoke-test", "run.md"), "smoke\n");
+    await mkdir(join(TMP, ".fulcrum", "state", "global", "upstream-skills", "codex"), { recursive: true });
+    await mkdir(join(TMP, ".codex", "plugins", "cache", "cloudflare"), { recursive: true });
+    await mkdir(join(TMP, ".codex", "plugins", "cache", "superpowers"), { recursive: true });
+
+    await run(["--purge", "--include-caveman"]);
+
+    expect(await pathExists(join(TMP, ".fulcrum", "cache"))).toBe(false);
+    expect(await pathExists(join(TMP, ".fulcrum", "hooks"))).toBe(false);
+    expect(await pathExists(join(TMP, ".fulcrum", "state", "global"))).toBe(false);
+    expect(await pathExists(join(TMP, ".fulcrum", "state", "global", "backups"))).toBe(false);
+    expect(await pathExists(join(TMP, ".fulcrum", "state", "global", "smoke-test"))).toBe(false);
+    expect(await pathExists(join(TMP, ".fulcrum", "state", "global", "upstream-skills"))).toBe(false);
+    expect(await pathExists(join(TMP, ".fulcrum", "state", "global", "components.db"))).toBe(false);
+    expect(await pathExists(join(TMP, ".codex", "plugins", "cache", "cloudflare"))).toBe(false);
+    expect(await pathExists(join(TMP, ".codex", "plugins", "cache", "superpowers"))).toBe(false);
+  });
+
+  test("--purge removes managed Claude marketplace metadata", async () => {
+    const { writeMarker } = await import("./claude-plugin-markers.ts");
+    await writeMarker({ plugin: "fulcrum@fulcrum", marketplace: "moabualruz/fulcrum", source: "package.fulcrum", operation: "install" });
+    await writeMarker({ plugin: "repomix-mcp@repomix", marketplace: "yamadashy/repomix", source: "package.repomix", operation: "install" });
+    await writeMarker({ plugin: "cloudflare@cloudflare", marketplace: "cloudflare/skills", source: "package.cloudflare", operation: "install" });
+    await writeMarker({ plugin: "caveman@caveman", marketplace: "JuliusBrussee/caveman", source: "package.caveman", operation: "install" });
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    await writeFile(join(TMP, ".claude", "settings.json"), JSON.stringify({
+      extraKnownMarketplaces: {
+        fulcrum: { source: { source: "github", repo: "moabualruz/fulcrum" } },
+        repomix: { source: { source: "github", repo: "yamadashy/repomix" } },
+        cloudflare: { source: { source: "github", repo: "cloudflare/skills" } },
+        caveman: { source: { source: "github", repo: "JuliusBrussee/caveman" } },
+        user: { source: { source: "github", repo: "example/user" } },
+      },
+    }, null, 2) + "\n");
+
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await run(["--purge", "--include-caveman"]);
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    const settings = JSON.parse(await readFile(join(TMP, ".claude", "settings.json"), "utf8"));
+    expect(settings.extraKnownMarketplaces.fulcrum).toBeUndefined();
+    expect(settings.extraKnownMarketplaces.repomix).toBeUndefined();
+    expect(settings.extraKnownMarketplaces.cloudflare).toBeUndefined();
+    expect(settings.extraKnownMarketplaces.caveman).toBeUndefined();
+    expect(settings.extraKnownMarketplaces.user).toBeDefined();
+  });
+
+  test("--purge removes orphan Codex managed MCP blocks without registry state", async () => {
+    await mkdir(join(TMP, ".codex"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "config.toml"), [
+      'model = "gpt-5.5"',
+      "",
+      "[mcp_servers.deepwiki]",
+      'url = "https://mcp.deepwiki.com/mcp"',
+      "# END FULCRUM MCP deepwiki",
+      "",
+    ].join("\n"));
+
+    await run(["--purge", "--include-caveman"]);
+
+    const config = await readFile(join(TMP, ".codex", "config.toml"), "utf8");
+    expect(config).toContain('model = "gpt-5.5"');
+    expect(config).not.toContain("[mcp_servers.deepwiki]");
+    expect(config).not.toContain("FULCRUM MCP deepwiki");
+  });
+
+  test("removes managed namespaces, hook state, and unmodified policy", async () => {
+    await mkdir(join(TMP, "config"), { recursive: true });
+    await writeFile(join(TMP, "config", "tool-output-policy.toml"), "default = true\n");
+
+    await mkdir(join(TMP, ".fulcrum", "hooks", "snippets"), { recursive: true });
+    await mkdir(join(TMP, ".fulcrum", "hooks", "enabled"), { recursive: true });
+    await writeFile(join(TMP, ".fulcrum", "tool-output-policy.toml"), "default = true\n");
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    await writeFile(
+      join(TMP, ".claude", "settings.json"),
+      JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command: "fulcrum hook index-check" }] }] } }, null, 2) + "\n",
+    );
+    await mkdir(join(TMP, ".config", "opencode", "plugins"), { recursive: true });
+    await writeFile(join(TMP, ".config", "opencode", "plugins", "fulcrum-index-check.ts"), "managed\n");
+
+    await mkdir(join(TMP, ".codex", "skills", "fulcrum", "jq"), { recursive: true });
+    await mkdir(join(TMP, ".codex", "skills", "fulcrum-upstream", "ast-grep"), { recursive: true });
+    await mkdir(join(TMP, ".gemini", "extensions", "fulcrum-skills", "skills", "jq"), { recursive: true });
+    await mkdir(join(TMP, ".gemini", "extensions", "fulcrum-upstream-skills", "skills", "ast-grep"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "AGENTS.md"), "user\n<!-- BEGIN FULCRUM RULES -->\nmanaged\n<!-- END FULCRUM RULES -->\n");
+    await mkdir(join(TMP, ".gemini"), { recursive: true });
+    await writeFile(join(TMP, ".gemini", "GEMINI.md"), "@AGENTS.md\n");
+
+    await run([]);
+
+    expect(await Bun.file(join(TMP, ".codex", "skills", "fulcrum")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".codex", "skills", "fulcrum-upstream")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".gemini", "extensions", "fulcrum-skills")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".gemini", "extensions", "fulcrum-upstream-skills")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".fulcrum", "hooks", "snippets")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".fulcrum", "hooks", "enabled")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".claude", "settings.json")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".config", "opencode", "plugins", "fulcrum-index-check.ts")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".fulcrum", "tool-output-policy.toml")).exists()).toBe(false);
+    expect(await readFile(join(TMP, ".codex", "AGENTS.md"), "utf8")).toBe("user\n");
+    expect(await readFile(join(TMP, ".gemini", "GEMINI.md"), "utf8")).toBe("");
+  });
+
+  test("removes curated upstream skills and empty hook containers", async () => {
+    await mkdir(join(TMP, "skills"), { recursive: true });
+    await writeFile(join(TMP, "skills", "upstream.lock"), [
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.superpowers-using-superpowers]",
+      'source = "https://github.com/obra/superpowers"',
+      'subpath = "skills/using-superpowers"',
+      'ref = "main"',
+      'tree_sha = "6efe32c9e2dd002d0c394e861e0529675d1ab32e"',
+      'license = "MIT"',
+      'author_class = "individual"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+      "[skills.cloudflare-platform]",
+      'source = "https://github.com/cloudflare/skills"',
+      'subpath = "skills/cloudflare"',
+      'ref = "main"',
+      'tree_sha = "7c449def4e0c63daa27212d853094e4c8e37bbe8"',
+      'license = "Apache-2.0"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+    ].join("\n"));
+
+    await mkdir(join(TMP, ".codex", "skills", "superpowers-using-superpowers"), { recursive: true });
+    await mkdir(join(TMP, ".codex", "skills", "cloudflare-platform"), { recursive: true });
+    await mkdir(join(TMP, ".pi", "agent", "skills", "using-superpowers"), { recursive: true });
+    await mkdir(join(TMP, ".pi", "agent", "skills", "cloudflare"), { recursive: true });
+    await mkdir(join(TMP, ".gemini", "skills", "superpowers-using-superpowers"), { recursive: true });
+    for (const marker of [
+      join(TMP, ".fulcrum", "state", "global", "upstream-skills", "codex", "superpowers-using-superpowers.installed"),
+      join(TMP, ".fulcrum", "state", "global", "upstream-skills", "codex", "cloudflare-platform.installed"),
+      join(TMP, ".fulcrum", "state", "global", "upstream-skills", "pi", "using-superpowers.installed"),
+      join(TMP, ".fulcrum", "state", "global", "upstream-skills", "pi", "cloudflare.installed"),
+      join(TMP, ".fulcrum", "state", "global", "upstream-skills", "gemini", "superpowers-using-superpowers.installed"),
+    ]) {
+      await mkdir(join(marker, ".."), { recursive: true });
+      await writeFile(marker, "installed\n");
+    }
+    await writeFile(join(TMP, ".codex", "hooks.json"), JSON.stringify({ hooks: { UserPromptSubmit: [] } }, null, 2) + "\n");
+    await writeFile(join(TMP, ".gemini", "settings.json"), JSON.stringify({ mcpServers: {}, hooks: { PreCompress: [] }, security: { auth: { selectedType: "oauth-personal" } } }, null, 2) + "\n");
+    await mkdir(join(TMP, ".config", "opencode"), { recursive: true });
+    await writeFile(join(TMP, ".config", "opencode", "opencode.json"), JSON.stringify({ $schema: "https://opencode.ai/config.json", mcp: {}, plugin: [] }, null, 2) + "\n");
+    await writeFile(join(TMP, ".pi", "agent", "settings.json"), JSON.stringify({ packages: [], defaultModel: "gpt-5.5" }, null, 2) + "\n");
+
+    await run([]);
+
+    expect(await Bun.file(join(TMP, ".codex", "skills", "superpowers-using-superpowers")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".codex", "skills", "cloudflare-platform")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".pi", "agent", "skills", "using-superpowers")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".pi", "agent", "skills", "cloudflare")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".gemini", "skills", "superpowers-using-superpowers")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".codex", "hooks.json")).exists()).toBe(false);
+    const geminiSettings = JSON.parse(await readFile(join(TMP, ".gemini", "settings.json"), "utf8"));
+    expect(geminiSettings.mcpServers).toBeUndefined();
+    expect(geminiSettings.hooks).toBeUndefined();
+    const openCode = JSON.parse(await readFile(join(TMP, ".config", "opencode", "opencode.json"), "utf8"));
+    expect(openCode.mcp).toBeUndefined();
+    expect(openCode.plugin).toBeUndefined();
+    const piSettings = JSON.parse(await readFile(join(TMP, ".pi", "agent", "settings.json"), "utf8"));
+    expect(piSettings.packages).toBeUndefined();
+  });
+
+  test("--purge preserves markerless Claude plugin cache leftovers", async () => {
+    const leftovers = [
+      [".claude", "plugins", "cache", "fulcrum"],
+      [".claude", "plugins", "marketplaces", "fulcrum"],
+      [".claude", "plugins", "cache", "caveman"],
+      [".claude", "plugins", "marketplaces", "caveman"],
+      [".claude", "plugins", "cache", "repomix"],
+      [".claude", "plugins", "marketplaces", "repomix"],
+      [".claude", "plugins", "cache", "cloudflare"],
+      [".claude", "plugins", "marketplaces", "cloudflare"],
+      [".claude", "plugins", "cache", "claude-plugins-official", "superpowers"],
+    ];
+    for (const parts of leftovers) {
+      await mkdir(join(TMP, ...parts), { recursive: true });
+      await writeFile(join(TMP, ...parts, "marker.txt"), "old\n");
+    }
+
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await run(["--purge", "--include-caveman"]);
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    for (const parts of leftovers) {
+      expect(await Bun.file(join(TMP, ...parts, "marker.txt")).exists()).toBe(true);
+    }
+  });
+
+  test("--purge removes Claude plugin cache leftovers only with Fulcrum ownership markers", async () => {
+    const { writeMarker } = await import("./claude-plugin-markers.ts");
+    await writeMarker({ plugin: "fulcrum@fulcrum", marketplace: "moabualruz/fulcrum", source: "package.fulcrum", operation: "install" });
+    await writeMarker({ plugin: "cloudflare@cloudflare", marketplace: "cloudflare/skills", source: "package.cloudflare", operation: "install" });
+    await mkdir(join(TMP, ".claude", "plugins", "cache", "fulcrum"), { recursive: true });
+    await mkdir(join(TMP, ".claude", "plugins", "marketplaces", "fulcrum"), { recursive: true });
+    await mkdir(join(TMP, ".claude", "plugins", "cache", "cloudflare"), { recursive: true });
+    await mkdir(join(TMP, ".claude", "plugins", "marketplaces", "cloudflare"), { recursive: true });
+
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    try {
+      await run(["--purge", "--include-caveman"]);
+    } finally {
+      whichSpy.mockRestore();
+    }
+
+    expect(await Bun.file(join(TMP, ".claude", "plugins", "cache", "fulcrum")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".claude", "plugins", "marketplaces", "fulcrum")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".claude", "plugins", "cache", "cloudflare")).exists()).toBe(false);
+    expect(await Bun.file(join(TMP, ".claude", "plugins", "marketplaces", "cloudflare")).exists()).toBe(false);
+  });
+
+  test("preserves unmarked user-owned upstream vendor skill dirs", async () => {
+    await mkdir(join(TMP, "skills"), { recursive: true });
+    await writeFile(join(TMP, "skills", "upstream.lock"), [
+      "[meta]",
+      "schema_version = 1",
+      "",
+      "[skills.wrangler]",
+      'source = "https://github.com/cloudflare/skills"',
+      'subpath = "skills/wrangler"',
+      'ref = "main"',
+      'tree_sha = "7c449def4e0c63daa27212d853094e4c8e37bbe8"',
+      'license = "Apache-2.0"',
+      'author_class = "tool-vendor"',
+      'pinned_on = "2026-04-28"',
+      'review_due = "2026-07-27"',
+      "",
+    ].join("\n"));
+    await mkdir(join(TMP, ".codex", "skills", "wrangler"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "skills", "wrangler", "SKILL.md"), "user-owned\n");
+
+    await run([]);
+
+    expect(await readFile(join(TMP, ".codex", "skills", "wrangler", "SKILL.md"), "utf8")).toBe("user-owned\n");
+  });
+
+  test("keeps modified policy without --purge", async () => {
+    await mkdir(join(TMP, "config"), { recursive: true });
+    await mkdir(join(TMP, ".fulcrum"), { recursive: true });
+    await writeFile(join(TMP, "config", "tool-output-policy.toml"), "default = true\n");
+    await writeFile(join(TMP, ".fulcrum", "tool-output-policy.toml"), "user = true\n");
+
+    await run([]);
+
+    expect(await readFile(join(TMP, ".fulcrum", "tool-output-policy.toml"), "utf8")).toBe("user = true\n");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W1.1 — caveman Claude uninstall: `claude plugin uninstall caveman@caveman`
+// ---------------------------------------------------------------------------
+
+describe("removeCavemanCopies — W1.1 Claude plugin uninstall", () => {
+  async function seedMarker() {
+    const { writeMarker } = await import("./claude-plugin-markers.ts");
+    await writeMarker({ plugin: "caveman@caveman", marketplace: "JuliusBrussee/caveman", source: "package.caveman", operation: "install" });
+  }
+
+  test("opts dry-run logs without running or removing filesystem copies", async () => {
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    await mkdir(join(TMP, ".codex", "skills", "caveman"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "skills", "caveman", "SKILL.md"), "caveman\n");
+    await seedMarker();
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => cmd === "claude" ? "/usr/local/bin/claude" : null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+    try {
+      await removeCavemanCopies(TMP, { dryRun: true });
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+    expect(runSpy.mock.calls).toHaveLength(0);
+    expect(logs.some((l) => l.includes("dry-run"))).toBe(true);
+    expect(await Bun.file(join(TMP, ".codex", "skills", "caveman", "SKILL.md")).exists()).toBe(true);
+  });
+
+  test("calls claude plugin uninstall only when a Fulcrum marker exists", async () => {
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    await mkdir(join(TMP, ".claude", "plugins", "cache", "caveman", "caveman"), { recursive: true });
+    await mkdir(join(TMP, ".claude", "plugins", "marketplaces", "caveman"), { recursive: true });
+    await seedMarker();
+
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => {
+      if (cmd === "claude") return "/usr/local/bin/claude";
+      if (cmd === "npx") return null;
+      return null;
+    });
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+
+    try {
+      await run(["--include-caveman"]);
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const claudeUninstall = calls.find(
+        (cmd) => Array.isArray(cmd) && cmd.includes("plugin") && cmd.includes("uninstall") && cmd.includes("caveman@caveman"),
+      );
+      expect(claudeUninstall).toBeDefined();
+      expect(await Bun.file(join(TMP, ".claude", "plugins", "cache", "caveman")).exists()).toBe(false);
+      expect(await Bun.file(join(TMP, ".claude", "plugins", "marketplaces", "caveman")).exists()).toBe(false);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+  });
+
+  test("skips claude plugin uninstall when no Fulcrum marker exists", async () => {
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    await mkdir(join(TMP, ".claude", "plugins", "cache", "caveman", "caveman"), { recursive: true });
+
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => {
+      if (cmd === "claude") return "/usr/local/bin/claude";
+      return null;
+    });
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+
+    try {
+      // Call removeCavemanCopies directly so we exercise only the safety
+      // gating for caveman; the full `run(["--include-caveman"])` flow walks
+      // many other unrelated cleanup paths that have their own ownership rules.
+      await removeCavemanCopies(TMP);
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const claudeUninstall = calls.find(
+        (cmd) => Array.isArray(cmd) && cmd.includes("plugin") && cmd.includes("uninstall") && cmd.includes("caveman@caveman"),
+      );
+      expect(claudeUninstall).toBeUndefined();
+      expect(logs.some((l) => l.includes("no-marker") || l.includes("manual: claude plugin uninstall caveman@caveman"))).toBe(true);
+      // Cache dir is preserved when no Fulcrum marker proves Fulcrum installed it.
+      const dirExists = await import("node:fs/promises").then((fs) =>
+        fs.stat(join(TMP, ".claude", "plugins", "cache", "caveman", "caveman")).then(() => true).catch(() => false),
+      );
+      expect(dirExists).toBe(true);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+
+  test("skips claude uninstall when .claude dir absent", async () => {
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    try {
+      await run(["--include-caveman"]);
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const claudeUninstall = calls.find(
+        (cmd) => Array.isArray(cmd) && cmd.includes("plugin") && cmd.includes("uninstall"),
+      );
+      expect(claudeUninstall).toBeUndefined();
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+  });
+
+  test("logs and continues when claude plugin uninstall exits non-zero", async () => {
+    await mkdir(join(TMP, ".claude"), { recursive: true });
+    await seedMarker();
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => {
+      if (cmd === "claude") return "/usr/local/bin/claude";
+      return null;
+    });
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 1, stdout: "", stderr: "not found" });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(String(args[0]));
+    });
+    try {
+      // Must not throw even though run returns non-zero.
+      await expect(run(["--include-caveman"])).resolves.toBeUndefined();
+      expect(logs.some((l) => l.includes("uninstall failed"))).toBe(true);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W2 — MCP registry uninstall
+// ---------------------------------------------------------------------------
+
+import { registerServer, DEFAULT_GITHUB_SERVER, DEFAULT_REPOMIX_SERVER } from "./mcp-registry.ts";
+
+describe("uninstall MCP registry (W2)", () => {
+  test("registry file deleted by default (no --keep-state)", async () => {
+    const stateDir = join(TMP, ".fulcrum", "state", "global");
+    await mkdir(stateDir, { recursive: true });
+    await registerServer("github", DEFAULT_GITHUB_SERVER);
+    await registerServer("repomix", DEFAULT_REPOMIX_SERVER);
+
+    await run([]);
+
+    const registryFile = join(TMP, ".fulcrum", "state", "global", "mcp-registry.toml");
+    expect(await Bun.file(registryFile).exists()).toBe(false);
+  });
+
+  test("--keep-state preserves registry file", async () => {
+    const stateDir = join(TMP, ".fulcrum", "state", "global");
+    await mkdir(stateDir, { recursive: true });
+    await registerServer("github", DEFAULT_GITHUB_SERVER);
+
+    await run(["--keep-state"]);
+
+    const registryFile = join(TMP, ".fulcrum", "state", "global", "mcp-registry.toml");
+    expect(await Bun.file(registryFile).exists()).toBe(true);
+  });
+
+  test("uninstall when registry not present does not throw", async () => {
+    // No registry file created.
+    await expect(run([])).resolves.toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W1.2 — caveman Gemini uninstall: `gemini extensions uninstall caveman`
+// ---------------------------------------------------------------------------
+
+describe("removeCavemanCopies — W1.2 Gemini extension uninstall", () => {
+  test("calls gemini extensions uninstall when .gemini exists and gemini on PATH", async () => {
+    await mkdir(join(TMP, ".gemini"), { recursive: true });
+    await mkdir(join(TMP, ".gemini", "extensions", "caveman"), { recursive: true });
+
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => {
+      if (cmd === "gemini") return "/usr/local/bin/gemini";
+      if (cmd === "npx") return null;
+      return null;
+    });
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+
+    try {
+      await run(["--include-caveman"]);
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const geminiUninstall = calls.find(
+        (cmd) => Array.isArray(cmd) && cmd[0] === "gemini" && cmd.includes("uninstall") && cmd.includes("caveman"),
+      );
+      expect(geminiUninstall).toBeDefined();
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+  });
+
+  test("skips gemini uninstall when gemini not on PATH", async () => {
+    await mkdir(join(TMP, ".gemini"), { recursive: true });
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(String(args[0]));
+    });
+    try {
+      await run(["--include-caveman"]);
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const geminiUninstall = calls.find(
+        (cmd) => Array.isArray(cmd) && cmd[0] === "gemini" && cmd.includes("uninstall"),
+      );
+      expect(geminiUninstall).toBeUndefined();
+      expect(logs.some((l) => l.includes("not on PATH"))).toBe(true);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+  // W1.4 — caveman Codex/OpenCode/Pi uninstall via filesystem mirrors
+  // ---------------------------------------------------------------------------
+
+describe("removeCavemanCopies — W1.4 filesystem mirrors", () => {
+  async function writeCavemanMirrorMarker(): Promise<void> {
+    await mkdir(join(TMP, ".fulcrum", "state", "global"), { recursive: true });
+    await writeFile(join(TMP, ".fulcrum", "state", "global", "caveman-mirrors.installed"), "installed\n");
+  }
+
+  test("does not call npx skills remove caveman; removes marked per-agent mirrors", async () => {
+    await writeCavemanMirrorMarker();
+    await mkdir(join(TMP, ".codex", "skills", "caveman"), { recursive: true });
+    await mkdir(join(TMP, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0"), { recursive: true });
+    await mkdir(join(TMP, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0", "package", ".codex"), { recursive: true });
+    await writeFile(
+      join(TMP, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0", "package", ".codex", "hooks.json"),
+      JSON.stringify({ hooks: { UserPromptSubmit: [{ command: "hooks/caveman-activate.js" }] } }, null, 2) + "\n",
+    );
+    await writeFile(
+      join(TMP, ".codex", "config.toml"),
+      [
+        "[features]",
+        "codex_hooks = true",
+        "",
+        "[marketplaces.caveman]",
+        'source_type = "git"',
+        'source = "https://github.com/JuliusBrussee/caveman"',
+        "",
+        '[plugins."caveman@caveman"]',
+        "enabled = true",
+        "",
+      ].join("\n"),
+    );
+    await writeFile(
+      join(TMP, ".codex", "hooks.json"),
+      JSON.stringify({
+        hooks: {
+          UserPromptSubmit: [
+            { command: "hooks/caveman-activate.js" },
+            { command: "user-owned-hook" },
+          ],
+        },
+      }, null, 2) + "\n",
+    );
+    await mkdir(join(TMP, ".config", "opencode", "skills", "caveman"), { recursive: true });
+    await mkdir(join(TMP, ".config", "opencode", "packages", "caveman", "commands"), { recursive: true });
+    await mkdir(join(TMP, ".pi", "agent", "skills", "caveman"), { recursive: true });
+    await mkdir(join(TMP, ".pi", "agent", "packages", "caveman", "hooks"), { recursive: true });
+
+    const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => {
+      if (cmd === "npx") return "/usr/local/bin/npx";
+      return null;
+    });
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+
+    try {
+      await run(["--include-caveman"]);
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const npxRemovals = calls.filter(
+        (cmd) => Array.isArray(cmd) && cmd[0] === "npx" && cmd.includes("remove") && cmd.includes("caveman"),
+      );
+      expect(npxRemovals.length).toBe(0);
+      expect(await Bun.file(join(TMP, ".codex", "skills", "caveman")).exists()).toBe(false);
+      expect(await Bun.file(join(TMP, ".codex", "plugins", "cache", "caveman")).exists()).toBe(false);
+      expect(await Bun.file(join(TMP, ".config", "opencode", "packages", "caveman")).exists()).toBe(false);
+      expect(await Bun.file(join(TMP, ".pi", "agent", "packages", "caveman")).exists()).toBe(false);
+      expect(await Bun.file(join(TMP, ".config", "opencode", "skills", "caveman")).exists()).toBe(false);
+      expect(await Bun.file(join(TMP, ".pi", "agent", "skills", "caveman")).exists()).toBe(false);
+      expect(await readFile(join(TMP, ".codex", "config.toml"), "utf8")).not.toContain("caveman");
+      const hooks = JSON.parse(await readFile(join(TMP, ".codex", "hooks.json"), "utf8"));
+      expect(hooks.hooks.UserPromptSubmit).toEqual([{ command: "user-owned-hook" }]);
+      expect(await Bun.file(join(TMP, ".fulcrum", "state", "global", "caveman-mirrors.installed")).exists()).toBe(false);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+  });
+
+  test("preserves unmarked user-owned caveman-looking mirror dirs", async () => {
+    await mkdir(join(TMP, ".codex", "skills", "caveman"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "skills", "caveman", "SKILL.md"), "user-owned\n");
+    await mkdir(join(TMP, ".config", "opencode", "packages", "caveman"), { recursive: true });
+    await writeFile(join(TMP, ".config", "opencode", "packages", "caveman", "README.md"), "user-owned\n");
+    await mkdir(join(TMP, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0"), { recursive: true });
+    await writeFile(join(TMP, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0", "README.md"), "user-owned\n");
+
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+
+    try {
+      await run(["--include-caveman"]);
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const npxCall = calls.find(
+        (cmd) => Array.isArray(cmd) && cmd[0] === "npx",
+      );
+      expect(npxCall).toBeUndefined();
+      expect(await readFile(join(TMP, ".codex", "skills", "caveman", "SKILL.md"), "utf8")).toBe("user-owned\n");
+      expect(await readFile(join(TMP, ".config", "opencode", "packages", "caveman", "README.md"), "utf8")).toBe("user-owned\n");
+      expect(await readFile(join(TMP, ".codex", "plugins", "cache", "caveman", "caveman", "0.1.0", "README.md"), "utf8")).toBe("user-owned\n");
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+  });
+
+  test("falls back to removePath when npx not on PATH and Fulcrum marker exists", async () => {
+    await writeCavemanMirrorMarker();
+    await mkdir(join(TMP, ".codex", "skills", "caveman"), { recursive: true });
+
+    const whichSpy = spyOn(proc, "which").mockResolvedValue(null);
+    const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
+
+    try {
+      await run(["--include-caveman"]);
+      const calls = runSpy.mock.calls.map((c) => c[0]);
+      const npxCall = calls.find(
+        (cmd) => Array.isArray(cmd) && cmd[0] === "npx",
+      );
+      expect(npxCall).toBeUndefined();
+      expect(await Bun.file(join(TMP, ".codex", "skills", "caveman")).exists()).toBe(false);
+    } finally {
+      whichSpy.mockRestore();
+      runSpy.mockRestore();
+    }
+  });
+});
+
+describe("uninstall product kernel state (issue 10)", () => {
+  test("default uninstall preserves product DB; --purge removes it", async () => {
+    const home = await Bun.$`mktemp -d -t fulcrum-uninstall-pk-XXXXXX`.text();
+    const HOME = home.trim();
+    const fulcrumHome = `${HOME}/.fulcrum`;
+    const productDir = `${fulcrumHome}/state/product`;
+    const probe = `${productDir}/db/main/PG_VERSION`;
+    await Bun.write(probe, "16\n");
+    expect(await Bun.file(probe).exists()).toBe(true);
+
+    const originalHome = process.env["HOME"];
+    const originalFh = process.env["FULCRUM_HOME"];
+    process.env["HOME"] = HOME;
+    process.env["FULCRUM_HOME"] = fulcrumHome;
+    try {
+      const { run } = await import("./uninstall.ts");
+
+      // Default uninstall (no --purge) must keep the product DB.
+      await run(["--dry-run"]);
+      expect(await Bun.file(probe).exists()).toBe(true);
+
+      // --purge must remove the product state directory entirely.
+      await run(["--purge"]);
+      expect(await Bun.file(probe).exists()).toBe(false);
+    } finally {
+      if (originalHome === undefined) delete process.env["HOME"]; else process.env["HOME"] = originalHome;
+      if (originalFh === undefined) delete process.env["FULCRUM_HOME"]; else process.env["FULCRUM_HOME"] = originalFh;
+      await Bun.$`rm -rf ${HOME}`.quiet();
+    }
+  });
+});

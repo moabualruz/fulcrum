@@ -6,9 +6,9 @@ import { createTestOrm } from "../../src/test-utils/db.ts";
 import { Document } from "../../src/db/entities/docs/Document.ts";
 import { DocVersion } from "../../src/db/entities/docs/DocVersion.ts";
 import { SearchDocument } from "../../src/db/entities/search/SearchDocument.ts";
-import { appRouter } from "../../src/trpc/router.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 const ORG_ID = "00000000-0000-0000-0000-000000000001";

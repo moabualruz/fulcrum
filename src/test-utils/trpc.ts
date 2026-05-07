@@ -1,8 +1,8 @@
 import type { Session } from "better-auth";
 
-import { appRouter } from "../trpc/router.ts";
-import { createContext } from "../trpc/context.ts";
-import { t } from "../trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { ENTITY_MANAGER_TOKEN } from "../db/db.module.ts";
 import { Session as SessionEntity, User } from "../db/entities/auth/index.ts";
 import { DEFAULT_ADMIN_EMAIL, DEFAULT_ORG_ID } from "../db/seed.ts";

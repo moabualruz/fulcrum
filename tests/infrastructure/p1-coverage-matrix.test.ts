@@ -12,8 +12,8 @@ interface SurfaceCoverage {
 }
 
 const SURFACES: SurfaceCoverage[] = [
-  { surface: "web", roots: ["tests/auth", "src/web/src", "src/web/tests"], match: /\.(test|spec)\.ts$/ },
-  { surface: "cli", roots: ["tests/cli", "src/cli"], match: /\.test\.ts$/ },
+  { surface: "web", roots: ["tests/auth", "apps/web/src", "apps/web/tests"], match: /\.(test|spec)\.ts$/ },
+  { surface: "cli", roots: ["tests/cli", "apps/cli/src"], match: /\.test\.ts$/ },
   { surface: "tui", roots: ["tests/tui"], match: /\.test\.ts$/ },
   { surface: "tRPC", roots: ["tests/trpc"], match: /\.test\.ts$/ },
   { surface: "auth", roots: ["tests/auth", "tests/db/auth"], match: /\.(test|spec)\.ts$/ },
@@ -52,7 +52,7 @@ describe("P1 test coverage matrix", () => {
   }
 
   it("keeps Playwright coverage for auth login/logout routes", async () => {
-    const files = await collectFiles("src/web/tests/e2e");
+    const files = await collectFiles("apps/web/tests/e2e");
     const authSpecs = files.filter((file) => /auth.*\.spec\.ts$/.test(file));
     expect(authSpecs.length).toBeGreaterThan(0);
   });

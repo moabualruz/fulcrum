@@ -5,4 +5,4 @@ frozenLockfile = true
 [test]
 coverage = false
 coverageThreshold = 0.80
-preload = ["./src/web/src/lib/test/svelte-ssr-preload.ts"]
+preload = ["./apps/web/src/lib/test/svelte-ssr-preload.ts"]

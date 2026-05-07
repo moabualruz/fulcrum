@@ -2,8 +2,8 @@
  * Migration: DDL cleanup — relocate inline ALTER TABLE from request handlers.
  *
  * Moves schema changes previously executed at runtime in:
- *   - src/web/src/lib/server/tasks.ts (due_date, start_date columns)
- *   - src/web/src/lib/server/documents.ts (doc_links columns + defaults)
+ *   - apps/web/src/lib/server/tasks.ts (due_date, start_date columns)
+ *   - apps/web/src/lib/server/documents.ts (doc_links columns + defaults)
  *
  * All statements use IF NOT EXISTS / idempotent forms so this migration is
  * safe to run on databases that already have the columns from runtime DDL.

@@ -12,7 +12,7 @@
  *   4. On failure: emit backup_upload_failed + mark doctor fail
  */
 
-import { isFeatureEnabled } from "../tui/feature-flags.ts";
+import { isFeatureEnabled } from "@fulcrum/tui/feature-flags.ts";
 import { createLocalBackup } from "./runner.ts";
 import { uploadBackup, pruneLocalBackups, makeBackupEvent, type RemoteAdapterOptions } from "./remote-adapters.ts";
 

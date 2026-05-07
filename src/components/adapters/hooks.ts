@@ -1,5 +1,5 @@
-import { disableHookRecipe, enableHookRecipe, isRecipeName } from "../../cli/hooks.ts";
-import type { AgentId } from "../../cli/mcp-registry.ts";
+import { disableHookRecipe, enableHookRecipe, isRecipeName } from "@fulcrum/cli/hooks.ts";
+import type { AgentId } from "@fulcrum/cli/mcp-registry.ts";
 import type { ComponentAction } from "../types.ts";
 
 export async function applyHookAction(action: ComponentAction): Promise<void> {

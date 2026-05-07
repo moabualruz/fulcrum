@@ -85,7 +85,7 @@ console.log("\n→ running CI gate (bun run ci)\n");
 run(["bun", "run", "ci"]);
 
 console.log("\n→ running release-only content gates\n");
-run(["bun", "run", "src/index.ts", "skills", "lint", "skills/"]);
+run(["bun", "run", "apps/cli/src/main.ts", "skills", "lint", "skills/"]);
 run(["bash", "scripts/compress-with-caveman.sh", "--check"]);
 
 // 4. CHANGELOG via git-cliff

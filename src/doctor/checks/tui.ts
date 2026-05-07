@@ -16,9 +16,9 @@ const binaryTuiEntrypoint: DoctorCheckDef = {
   subsystem: SUBSYSTEM,
   run: async () => {
     const { exists } = await import("../../utils/proc.ts");
-    const devEntry = `${process.cwd()}/src/tui/index.ts`;
+    const devEntry = `${process.cwd()}/apps/tui/src/index.ts`;
     if (await exists(devEntry)) {
-      return { status: "ok", message: "TUI entrypoint src/tui/index.ts exists" };
+      return { status: "ok", message: "TUI entrypoint apps/tui/src/index.ts exists" };
     }
     const distEntry = `${process.cwd()}/dist/tui/index.js`;
     if (await exists(distEntry)) {
@@ -26,7 +26,7 @@ const binaryTuiEntrypoint: DoctorCheckDef = {
     }
     return {
       status: "fail",
-      message: "TUI entrypoint not found (src/tui/index.ts and dist/tui/index.js missing)",
+      message: "TUI entrypoint not found (apps/tui/src/index.ts and dist/tui/index.js missing)",
       recovery: "run: bun run build:all",
     };
   },
@@ -180,13 +180,13 @@ const trpcWarmup: DoctorCheckDef = {
   subsystem: SUBSYSTEM,
   run: async () => {
     try {
-      const { buildCaller } = await import("../../../src/tui/index.ts").catch(
-        () => import("../../tui/index.ts"),
+      const { buildCaller } = await import("@fulcrum/tui/index.ts").catch(
+        () => import("@fulcrum/tui/index.ts"),
       );
       if (typeof buildCaller !== "function") {
         return {
           status: "warn",
-          message: "buildCaller not exported from src/tui/index.ts",
+          message: "buildCaller not exported from apps/tui/src/index.ts",
           recovery: "Ensure TUI index exports buildCaller()",
         };
       }
@@ -200,7 +200,7 @@ const trpcWarmup: DoctorCheckDef = {
       return {
         status: "warn",
         message: `tRPC warmup failed: ${(err as Error).message}`,
-        recovery: "Check tRPC router setup in src/tui/index.ts",
+        recovery: "Check tRPC router setup in apps/tui/src/index.ts",
       };
     }
   },
@@ -214,7 +214,7 @@ const subscriptionBridge: DoctorCheckDef = {
   subsystem: SUBSYSTEM,
   run: async () => {
     try {
-      const { SubscriptionBridge } = await import("../../tui/subscriptions.ts");
+      const { SubscriptionBridge } = await import("@fulcrum/tui/subscriptions.ts");
       const bus = new EventEmitter();
       const bridge = new SubscriptionBridge(bus);
 
@@ -235,7 +235,7 @@ const subscriptionBridge: DoctorCheckDef = {
         return {
           status: "fail",
           message: "SubscriptionBridge did not deliver event",
-          recovery: "Check EventEmitter bridge wiring in src/tui/subscriptions.ts",
+          recovery: "Check EventEmitter bridge wiring in apps/tui/src/subscriptions.ts",
         };
       }
       if (elapsed > 200) {
@@ -251,7 +251,7 @@ const subscriptionBridge: DoctorCheckDef = {
       return {
         status: "fail",
         message: `SubscriptionBridge check failed: ${(err as Error).message}`,
-        recovery: "Ensure src/tui/subscriptions.ts exports SubscriptionBridge",
+        recovery: "Ensure apps/tui/src/subscriptions.ts exports SubscriptionBridge",
       };
     }
   },

@@ -8,7 +8,7 @@ import {
   SAVED_VIEW_SCOPES,
   type SavedViewScope,
 } from "../db/entities/tasks/SavedView.ts";
-import type { AuthenticatedContext } from "../trpc/middleware.ts";
+import type { AuthenticatedContext } from "@fulcrum/server/trpc/middleware.ts";
 
 const SearchQueryJsonSchema = z.object({
   text: z.string().default(""),

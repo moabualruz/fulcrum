@@ -15,7 +15,7 @@ import {
   embedDocument,
   triggerEmbedding,
 } from "./doc-embedder.ts";
-import { createDocumentAction, updateDocumentAction } from "../web/src/lib/server/documents.ts";
+import { createDocumentAction, updateDocumentAction } from "@fulcrum/web/lib/server/documents.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-doc-embedder-"));
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { createPublicApi } from "../../api/hono.ts";
-import { isPublicApiEnabled } from "../../api/feature-flags.ts";
+import { createPublicApi } from "@fulcrum/server/api/hono.ts";
+import { isPublicApiEnabled } from "@fulcrum/server/api/feature-flags.ts";
 
 const VALID_KEY_HASH = await hashKey("test-api-key");
 

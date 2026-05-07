@@ -8,7 +8,7 @@ import type { DoctorCheckDef } from "../types.ts";
 
 const SUBSYSTEM = "cli";
 
-/** 1. Binary entrypoint — `fulcrum` or `bun src/index.ts` resolves. */
+/** 1. Binary entrypoint — `fulcrum` or `bun apps/cli/src/main.ts` resolves. */
 const binaryEntrypoint: DoctorCheckDef = {
   name: "binary-entrypoint",
   subsystem: SUBSYSTEM,
@@ -18,14 +18,14 @@ const binaryEntrypoint: DoctorCheckDef = {
     if (bin) {
       return { status: "ok", message: `fulcrum binary at ${bin}` };
     }
-    // Dev mode: check that src/index.ts exists
-    const devEntry = `${process.cwd()}/src/index.ts`;
+    // Dev mode: check that apps/cli/src/main.ts exists
+    const devEntry = `${process.cwd()}/apps/cli/src/main.ts`;
     if (await exists(devEntry)) {
-      return { status: "ok", message: "dev-mode entrypoint src/index.ts exists" };
+      return { status: "ok", message: "dev-mode entrypoint apps/cli/src/main.ts exists" };
     }
     return {
       status: "fail",
-      message: "fulcrum binary not found and src/index.ts missing",
+      message: "fulcrum binary not found and apps/cli/src/main.ts missing",
       recovery: "run: bun run build:all",
     };
   },
@@ -74,7 +74,7 @@ const jsonFlagSupport: DoctorCheckDef = {
     // Smoke-test: run `fulcrum doctor --json` (ourselves) — if we got this far
     // the flag works. For broader coverage, just verify the help text mentions --json.
     try {
-      const proc = Bun.spawn(["bun", "src/index.ts", "help"], {
+      const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", "help"], {
         stdout: "pipe",
         stderr: "pipe",
         cwd: process.cwd(),
@@ -90,7 +90,7 @@ const jsonFlagSupport: DoctorCheckDef = {
         return {
           status: "warn",
           message: `commands missing from help: ${missing.join(", ")}`,
-          recovery: "update help text in src/index.ts",
+          recovery: "update help text in apps/cli/src/main.ts",
         };
       }
       return { status: "ok", message: "all domain commands listed with --json" };
@@ -112,7 +112,7 @@ const initIdempotency: DoctorCheckDef = {
     // the function signature is correct. Actually running init would
     // mutate the filesystem, which doctor should not do.
     try {
-      const mod = await import("../../cli/init.ts");
+      const mod = await import("@fulcrum/cli/init.ts");
       if (typeof mod.run !== "function") {
         return { status: "fail", message: "init.ts missing run() export" };
       }

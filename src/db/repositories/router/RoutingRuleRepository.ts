@@ -8,7 +8,7 @@
 import { injectable } from "@needle-di/core";
 import { EntityRepository } from "@mikro-orm/postgresql";
 import type { RoutingRule } from "../../entities/router/RoutingRule.ts";
-import { routingEventBus, type RoutingEventBus } from "../../../router/event-bus.ts";
+import { routingEventBus, type RoutingEventBus } from "@fulcrum/server/router/event-bus.ts";
 
 @injectable()
 export class RoutingRuleRepository extends EntityRepository<RoutingRule> {

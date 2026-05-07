@@ -55,7 +55,7 @@ function fakeCaller() {
 }
 
 async function runDocs(args: readonly string[], caller = fakeCaller()) {
-  const { run } = await import("../../src/cli/commands/docs.ts");
+  const { run } = await import("@fulcrum/cli/commands/docs.ts");
   const lines: string[] = [];
   const errors: string[] = [];
   let exitCode: number | undefined;

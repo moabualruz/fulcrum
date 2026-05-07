@@ -2,7 +2,7 @@
  * Read-only renderer XSS sanitization tests (DOC-10 / T-06-13).
  *
  * Uses the root docs sanitizer. Browser component tests for DOMPurify live in
- * src/web where DOMPurify is an explicit dependency.
+ * apps/web where DOMPurify is an explicit dependency.
  */
 
 import { describe, expect, test } from "bun:test";

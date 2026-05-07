@@ -96,7 +96,7 @@ const path = ".tmp-tsconfig-ci-quick-" + process.pid + ".json";
 writeFileSync(path, JSON.stringify({
   extends: "./tsconfig.json",
   include: ["src/**/*.ts"],
-  exclude: ["node_modules", "dist", "src/web/**", "**/*.test.ts", "**/*.spec.ts", "**/__tests__/**"],
+  exclude: ["node_modules", "dist", "apps/web/**", "**/*.test.ts", "**/*.spec.ts", "**/__tests__/**"],
 }));
 const result = spawnSync("bun", ["run", "--bun", "tsc", "--noEmit", "-p", path], { stdio: "inherit" });
 rmSync(path, { force: true });
@@ -108,7 +108,7 @@ export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[
   const fullE2EStep: TieredStep = {
     name: "web:e2e:full",
     cmd: ["bun", "run", "web:e2e:full"],
-    cwd: "src/web",
+    cwd: "apps/web",
     env: home ? { HOME: home } : undefined,
     tier: "e2e",
     domain: "web",
@@ -133,16 +133,16 @@ export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[
     { name: "graceful:shutdown",   cmd: ["bun", "test", "tests/platform/graceful-shutdown.test.ts"], tier: "integration", domain: "all" },
     { name: "coverage:root",    cmd: ["bun", "run", "scripts/test-root.ts", "--coverage"], tier: "integration", domain: "all" },
     { name: "build:all",        cmd: ["bun", "run", "scripts/build-all.ts"], tier: "integration", domain: "all" },
-    { name: "web:install",      cmd: ["bun", "install", "--frozen-lockfile"], cwd: "src/web", env: { BUN_INSTALL_CACHE_DIR: webInstallCache }, tier: "integration", domain: "web" },
-    { name: "web:check",        cmd: ["bun", "run", "check"], cwd: "src/web", env: { NODE_OPTIONS: "--max-old-space-size=12288" }, tier: "integration", domain: "web" },
-    { name: "web:build",        cmd: ["bun", "run", "build"], cwd: "src/web", tier: "integration", domain: "web" },
-    { name: "web:test",         cmd: ["bun", "run", "web:test"], cwd: "src/web", tier: "integration", domain: "web" },
-    { name: "coverage:web",     cmd: ["bun", "run", "web:test", "--", "--coverage"], cwd: "src/web", tier: "integration", domain: "web" },
+    { name: "web:install",      cmd: ["bun", "install", "--frozen-lockfile"], cwd: "apps/web", env: { BUN_INSTALL_CACHE_DIR: webInstallCache }, tier: "integration", domain: "web" },
+    { name: "web:check",        cmd: ["bun", "run", "check"], cwd: "apps/web", env: { NODE_OPTIONS: "--max-old-space-size=12288" }, tier: "integration", domain: "web" },
+    { name: "web:build",        cmd: ["bun", "run", "build"], cwd: "apps/web", tier: "integration", domain: "web" },
+    { name: "web:test",         cmd: ["bun", "run", "web:test"], cwd: "apps/web", tier: "integration", domain: "web" },
+    { name: "coverage:web",     cmd: ["bun", "run", "web:test", "--", "--coverage"], cwd: "apps/web", tier: "integration", domain: "web" },
     { name: "ci:schemas",       cmd: ["bun", "run", "scripts/ci-schemas.ts"], tier: "integration", domain: "all" },
 
     // ── T3: E2E (~180s+) — Playwright, a11y, full E2E ──
-    { name: "web:a11y",         cmd: ["bun", "run", "web:a11y"], cwd: "src/web", env: home ? { HOME: home } : undefined, tier: "e2e", domain: "web" },
-    { name: "web:e2e:smoke",    cmd: ["bun", "run", "web:e2e:smoke"], cwd: "src/web", env: home ? { HOME: home } : undefined, tier: "e2e", domain: "web" },
+    { name: "web:a11y",         cmd: ["bun", "run", "web:a11y"], cwd: "apps/web", env: home ? { HOME: home } : undefined, tier: "e2e", domain: "web" },
+    { name: "web:e2e:smoke",    cmd: ["bun", "run", "web:e2e:smoke"], cwd: "apps/web", env: home ? { HOME: home } : undefined, tier: "e2e", domain: "web" },
     fullE2EStep,
 
     // ── Phase 9.5 architecture closure gates ──

@@ -7,7 +7,7 @@ import { Org } from "../../db/entities/auth/Org.ts";
 import { Memory } from "../../db/entities/memory/Memory.ts";
 import { MemoryLink } from "../../db/entities/memory/MemoryLink.ts";
 import { AfterRunMemoryHook } from "../hooks/after-run-hook.ts";
-import type { TRPCContext } from "../../trpc/context.ts";
+import type { TRPCContext } from "@fulcrum/server/trpc/context.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
 const RUN_ID = "22222222-2222-2222-2222-222222222222";

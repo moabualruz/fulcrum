@@ -25,7 +25,7 @@ async function runPmPolicy(envelope: object): Promise<{ stdout: string; exit: nu
   const json = JSON.stringify(envelope);
   const stdinFile = `${TMP}/stdin-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
   await Bun.write(stdinFile, json);
-  const proc = Bun.spawn(["bun", "src/index.ts", "hook", "pm-policy"], {
+  const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", "hook", "pm-policy"], {
     stdin: Bun.file(stdinFile),
     stdout: "pipe",
     stderr: "pipe",

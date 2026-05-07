@@ -21,6 +21,8 @@ const GENERATED_OR_VENDOR_DIRS = new Set([
   "vendor",
 ]);
 
+const RUNNABLE_SURFACE_DIRS = ["cli", "tui", "web", "api", "router", "server", "trpc"];
+
 async function walkDirs(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
   const dirs: string[] = [];
@@ -69,7 +71,7 @@ describe("repository structure hygiene", () => {
     for (const dir of dirs) {
       const rel = relative(ROOT, dir);
       if (EMPTY_DIR_ALLOWLIST.has(rel)) continue;
-      if (!rel.startsWith("src/") && !rel.startsWith("tests/")) continue;
+      if (!rel.startsWith("src/") && !rel.startsWith("apps/") && !rel.startsWith("tests/")) continue;
       if ((await visibleEntries(dir)).length === 0) emptyDirs.push(rel);
     }
 
@@ -88,5 +90,29 @@ describe("repository structure hygiene", () => {
     }
 
     expect(duplicateTemplates.sort()).toEqual([]);
+  });
+
+  test("runnable surfaces live under apps instead of root src", async () => {
+    const srcEntries = await visibleEntries(join(ROOT, "src"));
+    const misplaced = RUNNABLE_SURFACE_DIRS.filter((dir) => srcEntries.includes(dir));
+
+    expect(misplaced).toEqual([]);
+  });
+
+  test("local client and server apps have first-class package manifests", async () => {
+    const expectedPackages = new Map([
+      ["apps/cli/package.json", "@fulcrum/cli"],
+      ["apps/server/package.json", "@fulcrum/server"],
+      ["apps/tui/package.json", "@fulcrum/tui"],
+      ["apps/web/package.json", "@fulcrum/web"],
+    ]);
+
+    const missingOrMisnamed: string[] = [];
+    for (const [path, name] of expectedPackages) {
+      const raw = await readFile(join(ROOT, path), "utf8").catch(() => "");
+      if (!raw.includes(`"name": "${name}"`)) missingOrMisnamed.push(path);
+    }
+
+    expect(missingOrMisnamed).toEqual([]);
   });
 });

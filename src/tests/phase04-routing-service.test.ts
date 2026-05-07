@@ -6,15 +6,15 @@ import {
   RoutingDecisionResultSchema,
   RoutingResultStatus,
   type RoutingDecisionResult,
-} from "../router/decision-schema.ts";
-import { detectConflicts, configureConflictDetector } from "../router/conflict-detector.ts";
+} from "@fulcrum/server/router/decision-schema.ts";
+import { detectConflicts, configureConflictDetector } from "@fulcrum/server/router/conflict-detector.ts";
 import {
   llmFallback,
   configureLlmFallback,
   CONFIDENCE_THRESHOLD,
   ABSTAIN_THRESHOLD,
   type SidecarClient,
-} from "../router/llm-fallback.ts";
+} from "@fulcrum/server/router/llm-fallback.ts";
 
 // ---------------------------------------------------------------------------
 // 1. Decision schema validation

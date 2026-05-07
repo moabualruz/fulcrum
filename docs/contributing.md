@@ -169,7 +169,7 @@ A well-formed contribution has all of the following:
 
 **Tests in scratch HOME.** Tests that touch the filesystem use a scratch HOME (`mkdtemp`) and restore `process.env.HOME` in cleanup. No tests write to the real `~` during `bun test`.
 
-**Doctor delta documented.** If the change affects what `fulcrum doctor` reports (new tool, new layer, new MCP, changed verdict logic), the `DoctorReport` interface and `src/cli/doctor.ts` are updated, and a test covers the new section.
+**Doctor delta documented.** If the change affects what `fulcrum doctor` reports (new tool, new layer, new MCP, changed verdict logic), the `DoctorReport` interface and `apps/cli/src/doctor.ts` are updated, and a test covers the new section.
 
 **Doc delta committed.** If the change affects user-visible behavior, one of the per-topic docs in `docs/` is updated. If a new OS layer lands, `docs/<layer>.md` is created (per [HANDOVER.md §6 cross-layer rules](../HANDOVER.md)) and added to the README documents table and HANDOVER §9.
 

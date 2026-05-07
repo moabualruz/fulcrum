@@ -2,7 +2,7 @@
  * Notification + audit REST adapter smoke tests.
  */
 import { describe, expect, test } from "bun:test";
-import { createPublicApi } from "../../api/hono.ts";
+import { createPublicApi } from "@fulcrum/server/api/hono.ts";
 
 const VALID_KEY_HASH = await hashKey("test-api-key");
 

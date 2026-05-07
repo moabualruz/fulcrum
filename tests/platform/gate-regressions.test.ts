@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { STEPS } from "../../scripts/ci.ts";
-import { appRouter } from "../../src/trpc/router.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
 
 type ProcedureDef = {
   _def?: {
@@ -86,9 +86,9 @@ describe("Phase 09 platform gate regressions", () => {
   test("public Zod schema sources do not use z.any()", () => {
     const root = new URL("../..", import.meta.url).pathname;
     const offenders = [
-      ...sourceFiles(join(root, "src/trpc/schemas")),
-      ...sourceFiles(join(root, "src/trpc/routers")),
-      ...sourceFiles(join(root, "src/server/trpc/routers")),
+      ...sourceFiles(join(root, "apps/server/src/trpc/schemas")),
+      ...sourceFiles(join(root, "apps/server/src/trpc/routers")),
+      ...sourceFiles(join(root, "apps/server/src/runtime/trpc/routers")),
     ]
       .filter((file) => readFileSync(file, "utf8").includes("z.any("))
       .map((file) => relative(root, file))
@@ -99,7 +99,7 @@ describe("Phase 09 platform gate regressions", () => {
 
   test("runtime CLI/API/TUI code does not ship stub leakage strings", () => {
     const root = new URL("../..", import.meta.url).pathname;
-    const runtimeRoots = ["src/cli", "src/api", "src/tui"].map((dir) => join(root, dir));
+    const runtimeRoots = ["apps/cli/src", "apps/server/src/api", "apps/tui/src"].map((dir) => join(root, dir));
     const offenders = runtimeRoots.flatMap((dir) => {
       try {
         return sourceFiles(dir);

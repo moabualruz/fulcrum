@@ -28,7 +28,7 @@ for (const { target, out } of TARGETS) {
       "--minify",
       `--target=${target}`,
       "--external=@opentui/core-*",
-      "src/index.ts",
+      "apps/cli/src/main.ts",
       "--outfile",
       out,
     ],

@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
-import { Renderer } from "../../src/tui/renderer.ts";
+import { Renderer } from "@fulcrum/tui/renderer.ts";
 import {
   RoutingRulesScreen,
   type RoutingRuleFormInput,
   type RoutingRulesScreenOptions,
   type TuiEnrichedDecision,
   type TuiRoutingRule,
-} from "../../src/tui/screens/routing-rules.ts";
-import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
+} from "@fulcrum/tui/screens/routing-rules.ts";
+import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 
 function renderPlain(render: (renderer: Renderer) => void): string {
   const tty = new FakeTTY({ columns: 140, rows: 40 });

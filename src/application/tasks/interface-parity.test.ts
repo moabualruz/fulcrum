@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { MikroORM } from "@mikro-orm/postgresql";
 
-import { run as runTasksCommand } from "../../cli/commands/tasks.ts";
-import { createLocalCaller } from "../../cli/local-caller.ts";
+import { run as runTasksCommand } from "@fulcrum/cli/commands/tasks.ts";
+import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
 import { Session } from "../../db/entities/auth/Session.ts";
 import { createTestContainer, createTestOrm, type TestOrm } from "../../test-utils/index.ts";
-import { buildCaller } from "../../tui/index.ts";
+import { buildCaller } from "@fulcrum/tui/index.ts";
 import { createTask } from "./commands.ts";
 import type { AppContext, TaskDto } from "./types.ts";
 

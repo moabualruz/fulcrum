@@ -5,9 +5,9 @@ import { Event } from "../../src/db/entities/core/Event.ts";
 import { Org } from "../../src/db/entities/auth/Org.ts";
 import { Repo } from "../../src/db/entities/repos/Repo.ts";
 import { RepoRepository } from "../../src/db/repositories/repos/RepoRepository.ts";
-import { appRouter } from "../../src/trpc/router.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { createTestOrm } from "../../src/test-utils/db.ts";
 
 const createCaller = t.createCallerFactory(appRouter);

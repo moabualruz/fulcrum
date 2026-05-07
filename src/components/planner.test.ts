@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ALL_AGENT_IDS } from "../cli/mcp-registry.ts";
+import { ALL_AGENT_IDS } from "@fulcrum/cli/mcp-registry.ts";
 import { planComponentOperation } from "./planner.ts";
 
 describe("component planner", () => {

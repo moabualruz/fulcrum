@@ -30,7 +30,7 @@ import { EventEmitter } from "node:events";
 const ROOT = join(import.meta.dir, "../..");
 
 function webRouteExists(...segments: string[]): boolean {
-  const base = join(ROOT, "src/web/src/routes", ...segments);
+  const base = join(ROOT, "apps/web/src/routes", ...segments);
   return (
     existsSync(join(base, "+page.svelte")) ||
     existsSync(join(base, "+page.server.ts")) ||
@@ -39,12 +39,12 @@ function webRouteExists(...segments: string[]): boolean {
 }
 
 function cliDomainRegistered(domain: string): boolean {
-  const { GENERATED_DOMAIN_COMMANDS } = require("../../src/cli/generated-domains.ts");
+  const { GENERATED_DOMAIN_COMMANDS } = require("../../apps/cli/src/generated-domains.ts");
   return (GENERATED_DOMAIN_COMMANDS as readonly string[]).includes(domain);
 }
 
 function tuiScreenExists(screen: string): boolean {
-  return existsSync(join(ROOT, "src/tui/screens", `${screen}.ts`));
+  return existsSync(join(ROOT, "apps/tui/src/screens", `${screen}.ts`));
 }
 
 // ─── 1. TUI screen inventory — all 44 always-on screens exist ───────────────
@@ -114,7 +114,7 @@ describe("P15 TUI screen inventory — all always-on screens exist", () => {
 
 describe("P15 Web surface — 12 domain routes exist", () => {
   it("tasks — /tasks/[id] route", () => {
-    const path = join(ROOT, "src/web/src/routes/tasks/[id]/+page.svelte");
+    const path = join(ROOT, "apps/web/src/routes/tasks/[id]/+page.svelte");
     expect(existsSync(path)).toBe(true);
   });
   it("docs — /docs route", () => { expect(webRouteExists("docs")).toBe(true); });
@@ -166,73 +166,73 @@ describe("P15 TUI surface — 12 domain screens exist", () => {
 
 describe("P15 tRPC — domain procedures reachable via createLocalCaller", () => {
   it("tasks.list exists", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.tasks.list).toBe("function");
   });
 
   it("docs.list exists", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.docs.list).toBe("function");
   });
 
   it("memories.list exists", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.memories.list).toBe("function");
   });
 
   it("runs.list exists", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.runs.list).toBe("function");
   });
 
   it("repos.list exists", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.repos.list).toBe("function");
   });
 
   it("artifacts.list exists", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.artifacts.list).toBe("function");
   });
 
   it("search.query exists", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.search.query).toBe("function");
   });
 
   it("notify.list exists", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.notify.list).toBe("function");
   });
 
   it("agents.list exists", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.agents.list).toBe("function");
   });
 
   it("orchestration.status exists", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.orchestration.status).toBe("function");
   });
 
   it("inference.list exists", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.inference.list).toBe("function");
   });
 
   it("flags.list exists", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.flags.list).toBe("function");
   });
@@ -242,7 +242,7 @@ describe("P15 tRPC — domain procedures reachable via createLocalCaller", () =>
 
 describe("P15 VirtualList perf — 1000 items <16ms/frame", () => {
   it("renders 1000-item list in <16ms (average over 100 frames)", async () => {
-    const { VirtualList } = await import("../../src/tui/widgets/VirtualList.ts");
+    const { VirtualList } = await import("@fulcrum/tui/widgets/VirtualList.ts");
     const items = Array.from({ length: 1000 }, (_, i) => `item-${i}`);
     const vl = new VirtualList({ items, visibleRows: 20, renderItem: (item) => item });
 
@@ -257,7 +257,7 @@ describe("P15 VirtualList perf — 1000 items <16ms/frame", () => {
   });
 
   it("VirtualList scrollToEnd + render on 1000 items <16ms each", async () => {
-    const { VirtualList } = await import("../../src/tui/widgets/VirtualList.ts");
+    const { VirtualList } = await import("@fulcrum/tui/widgets/VirtualList.ts");
     const items = Array.from({ length: 1000 }, (_, i) => `item-${i}`);
     const vl = new VirtualList({ items, visibleRows: 20, renderItem: (item) => item });
 
@@ -276,8 +276,8 @@ describe("P15 VirtualList perf — 1000 items <16ms/frame", () => {
 
 describe("P15 Screen navigation perf — 50 pane switches <50ms each", () => {
   it("50 consecutive in-process navigations average <50ms", async () => {
-    const { FakeTTY } = await import("../../src/tui/testing/fake-tty.ts");
-    const { TuiApp } = await import("../../src/tui/index.ts");
+    const { FakeTTY } = await import("@fulcrum/tui/testing/fake-tty.ts");
+    const { TuiApp } = await import("@fulcrum/tui/index.ts");
 
     const tty = new FakeTTY();
     const app = new TuiApp({

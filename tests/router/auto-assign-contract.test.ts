@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 
-import { autoAssign, configureAutoAssign } from "../../src/router/auto-assign.ts";
-import { configureRulesEngine } from "../../src/router/rules-engine.ts";
-import type { AutoAssignInput } from "../../src/router/types.ts";
+import { autoAssign, configureAutoAssign } from "@fulcrum/server/router/auto-assign.ts";
+import { configureRulesEngine } from "@fulcrum/server/router/rules-engine.ts";
+import type { AutoAssignInput } from "@fulcrum/server/router/types.ts";
 
 const issueContractInput = {
   agentOverride: "codex",

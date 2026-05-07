@@ -12,7 +12,7 @@ import {
   OrchestrationStrategySchema,
   ListOrchestrationInput,
   type OrchestrationInputType,
-} from "../trpc/schemas/orchestration.ts";
+} from "@fulcrum/server/trpc/schemas/orchestration.ts";
 import { AgentRunOrchestrationStateSchema } from "../orchestration/symphony/schemas.ts";
 
 const validUuid = "a1234567-89ab-4def-8123-456789abcdef";

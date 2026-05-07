@@ -1,4 +1,4 @@
-import type { AgentId } from "../cli/mcp-registry.ts";
+import type { AgentId } from "@fulcrum/cli/mcp-registry.ts";
 
 export type ComponentKind = "profile" | "rules" | "policy" | "hook" | "skill" | "package" | "mcp";
 export type SurfaceKind = "sentinel-block" | "policy-seed" | "hook-registration" | "skill-sync" | "upstream-skill-sync" | "mcp-registry-entry" | "mcp-agent-config" | "vendor-command" | "directory-copy" | "file-copy" | "json-patch" | "toml-block";

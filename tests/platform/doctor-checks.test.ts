@@ -140,7 +140,7 @@ describe("platform doctor checks", () => {
     const home = await tempDir("cli");
     try {
       await writeFile(join(home, "theme.json"), JSON.stringify({ accent: "not-hex" }));
-      const proc = Bun.spawn(["bun", "src/index.ts", "doctor", "--json"], {
+      const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", "doctor", "--json"], {
         cwd: process.cwd(),
         stdout: "pipe",
         stderr: "pipe",

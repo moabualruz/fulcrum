@@ -6,14 +6,14 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { openProductDb } from "../src/web/src/lib/server/db.ts";
+import { openProductDb } from "@fulcrum/web/lib/server/db.ts";
 import {
   createLocalOrg,
   createProject,
   appendEvent,
 } from "../src/product-kernel/store/repositories.ts";
 import { createTaskAction } from "../src/services/tasks.ts";
-import { createDocumentAction } from "../src/web/src/lib/server/documents.ts";
+import { createDocumentAction } from "@fulcrum/web/lib/server/documents.ts";
 import { newUlid } from "../src/product-kernel/ids.ts";
 
 const REPO = "/Users/mkh/workspace/fulcrum";

@@ -22,13 +22,13 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { TRPCError } from "@trpc/server";
 import { randomUUID } from "node:crypto";
 
-import { appRouter } from "../../src/trpc/router.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 import {
   WebhookOutputSchema,
   DeliveryOutputSchema,
-} from "../../src/trpc/schemas/webhooks.ts";
+} from "@fulcrum/server/trpc/schemas/webhooks.ts";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

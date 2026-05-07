@@ -128,9 +128,9 @@ bun run release vX.Y.Z --gh   # also create GitHub release and upload dist/*
 ### Run from source
 
 ```bash
-bun run src/index.ts doctor           # any subcommand
-bun run src/index.ts install --dry-run
-bun run src/index.ts hook format      # test a hook (reads stdin JSON)
+bun run apps/cli/src/main.ts doctor           # any subcommand
+bun run apps/cli/src/main.ts install --dry-run
+bun run apps/cli/src/main.ts hook format      # test a hook (reads stdin JSON)
 ```
 
 ### CI stages
@@ -238,7 +238,7 @@ author_class = "vendor"
 
 ### Doctor reporting shape
 
-`DoctorReport` (from `src/cli/doctor.ts`):
+`DoctorReport` (from `apps/cli/src/doctor.ts`):
 
 ```typescript
 interface DoctorReport {
@@ -269,7 +269,7 @@ interface DoctorReport {
    - Fail-open: missing tool → exit 0 (log to stderr).
    - Target <200ms for PreToolUse, <500ms for PostToolUse.
 
-2. **Register in the CLI dispatcher** (`src/index.ts`) under the `hook` subcommand.
+2. **Register in the CLI dispatcher** (`apps/cli/src/main.ts`) under the `hook` subcommand.
 
 3. **Add the recipe table entry** in `docs/hooks.md §5` (name, lifecycle, purpose, blocks?).
 
@@ -299,7 +299,7 @@ process.exit(0);
 
 ## Adding a new managed MCP
 
-1. **Add the builtin definition** in `src/cli/mcp-builtins.ts`:
+1. **Add the builtin definition** in `apps/cli/src/mcp-builtins.ts`:
 
 ```typescript
 {
@@ -314,13 +314,13 @@ process.exit(0);
 }
 ```
 
-2. **Update `fulcrum doctor`** in `src/cli/doctor.ts` to probe the server if HTTP, and report `auth_status`.
+2. **Update `fulcrum doctor`** in `apps/cli/src/doctor.ts` to probe the server if HTTP, and report `auth_status`.
 
 3. **Add auth entry** to `docs/mcp.md §5` table.
 
 4. **Add a catalogue entry** in `docs/mcp.md §3`.
 
-5. **Write or update tests** in `src/cli/mcp-registry.test.ts` and `src/cli/mcp-cmd.test.ts`.
+5. **Write or update tests** in `apps/cli/src/mcp-registry.test.ts` and `apps/cli/src/mcp-cmd.test.ts`.
 
 6. **Run `bun run ci`**.
 
@@ -435,16 +435,16 @@ This checks out the tree SHA, computes `subpath_sha256`, and writes it back.
 
 - `src/agents/registry.test.ts` — AGENTS array invariants (all 5 present, rootDir unique).
 - `src/utils/io.test.ts` — `readHookEvent` parse + `deriveTool` Pi proxy normalisation.
-- `src/cli/install.test.ts` — `assertNotAgentsPath`, `lockCavemanUltra`, sentinel-splice idempotency.
-- `src/cli/uninstall.test.ts` — removal of managed artifacts; edited policy preserved.
-- `src/cli/hooks.test.ts` — enable/disable detection-aware + `--all` overrides.
-- `src/cli/upstream-skills.test.ts` — `subpath_sha256` verify + mismatch exit.
-- `src/cli/mcp-registry.test.ts` — round-trip register/unregister, enable/disable, apply/remove.
-- `src/cli/mcp-cmd.test.ts` — CLI verb round-trip.
-- `src/cli/doctor.test.ts` — report shape, tool detection, caveman section, Pi adapter.
-- `src/cli/package-surfaces.test.ts` — package surface discovery and source-only exclusions.
-- `src/cli/package-mirror.test.ts` — per-agent mirror target planning and unsupported surface records.
-- `src/cli/package-parity.test.ts` — source-vs-installed parity, missing targets, source-backup leaks.
+- `apps/cli/src/install.test.ts` — `assertNotAgentsPath`, `lockCavemanUltra`, sentinel-splice idempotency.
+- `apps/cli/src/uninstall.test.ts` — removal of managed artifacts; edited policy preserved.
+- `apps/cli/src/hooks.test.ts` — enable/disable detection-aware + `--all` overrides.
+- `apps/cli/src/upstream-skills.test.ts` — `subpath_sha256` verify + mismatch exit.
+- `apps/cli/src/mcp-registry.test.ts` — round-trip register/unregister, enable/disable, apply/remove.
+- `apps/cli/src/mcp-cmd.test.ts` — CLI verb round-trip.
+- `apps/cli/src/doctor.test.ts` — report shape, tool detection, caveman section, Pi adapter.
+- `apps/cli/src/package-surfaces.test.ts` — package surface discovery and source-only exclusions.
+- `apps/cli/src/package-mirror.test.ts` — per-agent mirror target planning and unsupported surface records.
+- `apps/cli/src/package-parity.test.ts` — source-vs-installed parity, missing targets, source-backup leaks.
 - `src/components/*.test.ts` — component catalog, planner, executor, ledger, and surface adapters.
 - `src/hooks/*.test.ts` — per-hook stdin parse, happy path, fail-open on missing tool.
 
@@ -452,7 +452,7 @@ This checks out the tree SHA, computes `subpath_sha256`, and writes it back.
 
 ```bash
 bun test                                 # full test suite
-bun test src/cli/install.test.ts         # single file
+bun test apps/cli/src/install.test.ts         # single file
 bun test --watch                         # watch mode
 ```
 

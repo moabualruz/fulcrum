@@ -1,5 +1,5 @@
-import { installToolOutputPolicy } from "../../cli/install.ts";
-import { removeToolOutputPolicy } from "../../cli/uninstall.ts";
+import { installToolOutputPolicy } from "@fulcrum/cli/install.ts";
+import { removeToolOutputPolicy } from "@fulcrum/cli/uninstall.ts";
 import type { Operation } from "../types.ts";
 
 type PolicyOperation = Exclude<Operation, "status">;

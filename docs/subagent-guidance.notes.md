@@ -83,7 +83,7 @@ Worked well for:
 - Vendor-research before init redesign (per-tool README fetch + plan section)
 
 Failure modes seen when parallelism was wrong:
-- Multiple agents touching the same file (`HANDOVER.md`, `README.md`, `src/cli/install.ts`) — last-write-wins clobbered earlier work.
+- Multiple agents touching the same file (`HANDOVER.md`, `README.md`, `apps/cli/src/install.ts`) — last-write-wins clobbered earlier work.
 - An agent's claim of test count (e.g. "238 → 248") didn't match the actual diff (the file the agent said it created didn't exist).
 
 Mitigation:

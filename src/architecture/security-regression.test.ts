@@ -72,8 +72,8 @@ describe("Phase 9.5 additional architecture requirement gates", () => {
     )).toEqual([]);
   });
 
-  test("R-16 rate-limit middleware exists under src/server or src/api", async () => {
-    expect(await filesMatching(["src/server", "src/api"], /rateLimit|rateLimiter/)).not.toEqual([]);
+  test("R-16 rate-limit middleware exists under apps/server/src/runtime or apps/server/src/api", async () => {
+    expect(await filesMatching(["apps/server/src/runtime", "apps/server/src/api"], /rateLimit|rateLimiter/)).not.toEqual([]);
   });
 
   test("R-17 encrypt/decrypt functions exist in application crypto boundary", async () => {
@@ -91,7 +91,7 @@ describe("Phase 9.5 additional architecture requirement gates", () => {
   });
 
   test("R-21 fulcrum settings command is registered in CLI help", async () => {
-    const source = await readFile("src/cli/index.ts", "utf8");
+    const source = await readFile("apps/cli/src/index.ts", "utf8");
 
     expect(source).toContain("fulcrum settings");
   });

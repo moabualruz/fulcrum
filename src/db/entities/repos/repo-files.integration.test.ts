@@ -37,7 +37,7 @@ describe("repo file MikroORM entities", () => {
       projectId: "project-files",
       repo,
       commitSha: "abc123",
-      path: "src/index.ts",
+      path: "apps/cli/src/main.ts",
       kind: "file",
       size: 512,
       contentHash: "sha256:abc123",
@@ -48,7 +48,7 @@ describe("repo file MikroORM entities", () => {
     em.clear();
 
     const reloaded = await em.findOneOrFail(RepoTreeEntry, {
-      path: "src/index.ts",
+      path: "apps/cli/src/main.ts",
     }, { populate: ["org", "repo"] });
 
     expect(reloaded.org.id).toBe(org.id);
@@ -63,7 +63,7 @@ describe("repo file MikroORM entities", () => {
       org,
       projectId: "project-files",
       repo,
-      path: "src/index.ts",
+      path: "apps/cli/src/main.ts",
       lineNumber: 7,
       commitSha: "def456",
       authorName: "Ada Lovelace",
@@ -76,7 +76,7 @@ describe("repo file MikroORM entities", () => {
     em.clear();
 
     const reloaded = await em.findOneOrFail(RepoBlameLine, {
-      path: "src/index.ts",
+      path: "apps/cli/src/main.ts",
       lineNumber: 7,
     }, { populate: ["org", "repo"] });
 

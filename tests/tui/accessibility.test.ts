@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
-import { Renderer } from "../../src/tui/renderer.ts";
+import { Renderer } from "@fulcrum/tui/renderer.ts";
 import {
   ACCESSIBLE_STATUS_LABELS,
   renderFocusableRow,
   renderHighContrastLegend,
-} from "../../src/tui/screens/accessibility.ts";
-import { SettingsTabs } from "../../src/tui/screens/settings.ts";
-import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
+} from "@fulcrum/tui/screens/accessibility.ts";
+import { SettingsTabs } from "@fulcrum/tui/screens/settings.ts";
+import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 
 function renderPlain(render: (renderer: Renderer) => void): string {
   const tty = new FakeTTY({ columns: 100, rows: 30 });

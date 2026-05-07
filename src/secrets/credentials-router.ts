@@ -30,8 +30,8 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { t } from "../trpc/trpc.ts";
-import { permissionedProcedure } from "../trpc/middleware.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
+import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import {
   ALGO_LABEL,
   KDF_LABEL,

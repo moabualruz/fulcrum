@@ -60,7 +60,7 @@ Vendor installers (e.g. `graphify install`) may also write rules directly into t
 **Rule ownership:**
 - Behavioral rule text → `rules/AGENTS.md` (single source of truth)
 - Hook registrations → vendor settings files (managed by vendor CLI)
-- Sentinel splice → `src/cli/install.ts` (`spliceSentinel`)
-- Vendor block strip → `src/cli/install.ts` (`stripVendorRuleBlocks`), called from `src/cli/init-vendor.ts`
+- Sentinel splice → `apps/cli/src/install.ts` (`spliceSentinel`)
+- Vendor block strip → `apps/cli/src/install.ts` (`stripVendorRuleBlocks`), called from `apps/cli/src/init-vendor.ts`
 
 **Adding a new vendor rule:** append to `rules/AGENTS.original.md` §12, run compress, add the heading string to `VENDOR_RULE_HEADINGS` in `install.ts`.

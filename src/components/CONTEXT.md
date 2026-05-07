@@ -31,7 +31,7 @@
 - The catalog is declarative. No filesystem I/O.
 - The planner is pure. Same inputs → identical plan.
 - `--dry-run` calls the same planner as real execution and skips writes.
-- Adapters never parse CLI args. The CLI lives in `src/cli/component.ts`.
+- Adapters never parse CLI args. The CLI lives in `apps/cli/src/component.ts`.
 - `RemovePolicy` is honored: `keep-modified` preserves user-modified files unless `--purge`; `sentinel-only` removes only the spliced block; `managed-only` removes only Fulcrum-owned files; `purgeable` is removed by `remove --purge` and only then.
 - Package-owned MCPs/skills are removed only through the package component, never through generic registry/skills paths.
 - Ledger writes happen after the adapter call succeeds. Failures leave the ledger consistent with disk.
@@ -39,8 +39,8 @@
 ## Cross-context coupling
 
 - Reads `AGENTS` from `src/agents/`.
-- Reuses helpers from `src/cli/install.ts` / `uninstall.ts` / `skills.ts` / `upstream-skills.ts` / `vendor-packages.ts` / `repomix-package.ts` / `mcp-registry.ts`.
-- The CLI handler in `src/cli/component.ts` is the only command surface; this directory is engine-only.
+- Reuses helpers from `apps/cli/src/install.ts` / `uninstall.ts` / `skills.ts` / `upstream-skills.ts` / `vendor-packages.ts` / `repomix-package.ts` / `mcp-registry.ts`.
+- The CLI handler in `apps/cli/src/component.ts` is the only command surface; this directory is engine-only.
 
 ## ADRs
 

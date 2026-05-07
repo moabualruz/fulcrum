@@ -2,13 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { Container } from "@needle-di/core";
 import { TRPCError } from "@trpc/server";
 
-import { appRouter } from "../../src/trpc/router.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 import {
   ErrorLogStore,
   type ErrorLogRecord,
-} from "../../src/server/trpc/routers/error-logs.ts";
+} from "@fulcrum/server/runtime/trpc/routers/error-logs.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
 const USER_ID = "00000000-0000-0000-0000-000000000010";
@@ -83,7 +83,7 @@ function row(overrides: Partial<ErrorLogRecord>): ErrorLogRecord {
     recentCliCommand: overrides.recentCliCommand ?? "fulcrum web",
     recentTrpcProcedure: overrides.recentTrpcProcedure ?? "tasks.list",
     errorMessage: overrides.errorMessage ?? "boom",
-    stackTrace: overrides.stackTrace ?? "Error: boom\n at run (<cwd>/src/index.ts:1:1)",
+    stackTrace: overrides.stackTrace ?? "Error: boom\n at run (<cwd>/apps/cli/src/main.ts:1:1)",
     context: overrides.context ?? { source: "uncaughtException" },
   };
 }
@@ -121,11 +121,11 @@ describe("errorLogs tRPC router", () => {
 
   test("get returns full entry including stack trace", async () => {
     const result = await caller([
-      row({ id: "err-1", stackTrace: "Error: boom\n at run (<cwd>/src/index.ts:1:1)" }),
+      row({ id: "err-1", stackTrace: "Error: boom\n at run (<cwd>/apps/cli/src/main.ts:1:1)" }),
     ]).errorLogs.get({ id: "err-1" });
 
     expect(result?.id).toBe("err-1");
-    expect(result?.stackTrace).toContain("<cwd>/src/index.ts");
+    expect(result?.stackTrace).toContain("<cwd>/apps/cli/src/main.ts");
   });
 
   test("clear deletes matching rows and reports count", async () => {

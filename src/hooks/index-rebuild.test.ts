@@ -39,7 +39,7 @@ afterAll(async () => {
 async function runIdxRebuild(): Promise<{ stdout: string; exit: number; stderr: string }> {
   const stdinFile = `${TMP}/stdin-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
   await Bun.write(stdinFile, "{}");
-  const proc = Bun.spawn(["bun", join(FULCRUM_REPO, "src/index.ts"), "hook", "index-rebuild"], {
+  const proc = Bun.spawn(["bun", join(FULCRUM_REPO, "apps/cli/src/main.ts"), "hook", "index-rebuild"], {
     stdin: Bun.file(stdinFile),
     stdout: "pipe",
     stderr: "pipe",

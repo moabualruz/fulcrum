@@ -27,9 +27,9 @@ import { User } from "../../src/db/entities/auth/User.ts";
 import { OrgMember } from "../../src/db/entities/auth/OrgMember.ts";
 import { OrgMemberRepository } from "../../src/db/repositories/auth/OrgMemberRepository.ts";
 import { FlagRegistry } from "../../src/flags/registry.ts";
-import { appRouter } from "../../src/trpc/router.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 
 // Use valid v4 UUIDs so Zod input validation passes when these are used as procedure inputs
 const TEST_ORG_ID = "00000000-0000-0000-0000-000000000001"; // nil-adjacent — only used as DB seed, not input

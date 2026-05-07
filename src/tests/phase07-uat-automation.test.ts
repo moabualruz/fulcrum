@@ -53,7 +53,7 @@ const CHECKPOINTS: UatCheckpoint[] = [
     layers: ["unit", "component"],
     evidence: [
       { path: "src/repos/__tests__/dashboard.test.ts", patterns: [/detail tab selectors/, /branches/, /syncLog/] },
-      { path: "src/web/src/routes/repos/[id]/page.svelte.test.ts", patterns: [/branch, commit, file, and sync-log slices/] },
+      { path: "apps/web/src/routes/repos/[id]/page.svelte.test.ts", patterns: [/branch, commit, file, and sync-log slices/] },
     ],
   },
   {
@@ -61,8 +61,8 @@ const CHECKPOINTS: UatCheckpoint[] = [
     name: "Repo REST and tRPC Sync",
     layers: ["integration"],
     evidence: [
-      { path: "src/api/__tests__/repos.api.test.ts", patterns: [/tRPC caller/, /queued status/, /404/] },
-      { path: "src/trpc/routers/repos.ts", patterns: [/syncRepo/, /statusRepo/, /resource: "repos", action: "sync"/] },
+      { path: "apps/server/src/api/__tests__/repos.api.test.ts", patterns: [/tRPC caller/, /queued status/, /404/] },
+      { path: "apps/server/src/trpc/routers/repos.ts", patterns: [/syncRepo/, /statusRepo/, /resource: "repos", action: "sync"/] },
     ],
   },
   {
@@ -70,10 +70,10 @@ const CHECKPOINTS: UatCheckpoint[] = [
     name: "Repo Surface Parity",
     layers: ["component", "integration", "e2e"],
     evidence: [
-      { path: "src/cli/commands/repos.test.ts", patterns: [/list --json/, /sync --json/] },
-      { path: "src/tui/screens/repos.test.ts", patterns: [/canonical dashboard row fields/] },
-      { path: "src/web/src/routes/repos/page.svelte.test.ts", patterns: [/shared dashboard fields/] },
-      { path: "src/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts", patterns: [/repos list exposes dashboard fields/] },
+      { path: "apps/cli/src/commands/repos.test.ts", patterns: [/list --json/, /sync --json/] },
+      { path: "apps/tui/src/screens/repos.test.ts", patterns: [/canonical dashboard row fields/] },
+      { path: "apps/web/src/routes/repos/page.svelte.test.ts", patterns: [/shared dashboard fields/] },
+      { path: "apps/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts", patterns: [/repos list exposes dashboard fields/] },
     ],
   },
   {
@@ -108,9 +108,9 @@ const CHECKPOINTS: UatCheckpoint[] = [
     name: "Artifact Preview and Download UX",
     layers: ["component", "integration", "e2e"],
     evidence: [
-      { path: "src/web/src/routes/artifacts/page.svelte.test.ts", patterns: [/data-artifacts-list/, /data-artifacts-filter/] },
-      { path: "src/web/src/routes/artifacts/[id]/page.svelte.test.ts", patterns: [/preview|download|digest/i] },
-      { path: "src/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts", patterns: [/artifact detail exposes provenance/] },
+      { path: "apps/web/src/routes/artifacts/page.svelte.test.ts", patterns: [/data-artifacts-list/, /data-artifacts-filter/] },
+      { path: "apps/web/src/routes/artifacts/[id]/page.svelte.test.ts", patterns: [/preview|download|digest/i] },
+      { path: "apps/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts", patterns: [/artifact detail exposes provenance/] },
     ],
   },
   {
@@ -155,7 +155,7 @@ const CHECKPOINTS: UatCheckpoint[] = [
     layers: ["unit", "component", "integration"],
     evidence: [
       { path: "src/notifications/__tests__/bell-counter.test.ts", patterns: [/unread badge count/, /markRead decreases unread/] },
-      { path: "src/web/src/routes/inbox/page.svelte.test.ts", patterns: [/unread|mark/i] },
+      { path: "apps/web/src/routes/inbox/page.svelte.test.ts", patterns: [/unread|mark/i] },
       { path: "tests/notifications/bell-counter-poll.test.ts", patterns: [/polls unread count/, /realtime unread-count/] },
     ],
   },
@@ -164,9 +164,9 @@ const CHECKPOINTS: UatCheckpoint[] = [
     name: "Notification Settings and CLI Controls",
     layers: ["component", "integration"],
     evidence: [
-      { path: "src/web/src/routes/settings/notifications/channels/page.server.test.ts", patterns: [/quiet|rules|channels/i] },
+      { path: "apps/web/src/routes/settings/notifications/channels/page.server.test.ts", patterns: [/quiet|rules|channels/i] },
       { path: "tests/cli/runs-notify-audit-webhooks.test.ts", patterns: [/notify list --unread/, /watch streams JSON lines/] },
-      { path: "src/cli/commands/pillar14-generated.ts", patterns: [/mark-all-read/, /mark-read/, /mute/] },
+      { path: "apps/cli/src/commands/pillar14-generated.ts", patterns: [/mark-all-read/, /mark-read/, /mute/] },
     ],
   },
   {
@@ -175,7 +175,7 @@ const CHECKPOINTS: UatCheckpoint[] = [
     layers: ["component", "integration"],
     evidence: [
       { path: "tests/tui/search-notifications.test.ts", patterns: [/NotificationsScreen/, /marks notifications read/] },
-      { path: "src/tui/screens/notifications.ts", patterns: [/markAllRead/, /mute/, /unread/] },
+      { path: "apps/tui/src/screens/notifications.ts", patterns: [/markAllRead/, /mute/, /unread/] },
     ],
   },
   {
@@ -192,8 +192,8 @@ const CHECKPOINTS: UatCheckpoint[] = [
     name: "Webhook Delivery Debug UI",
     layers: ["component", "integration"],
     evidence: [
-      { path: "src/web/src/routes/settings/integrations/webhooks/page.server.test.ts", patterns: [/debug metadata without secrets/] },
-      { path: "src/web/src/routes/settings/integrations/webhooks/page.svelte.test.ts", patterns: [/delivery debug columns/, /resend action/] },
+      { path: "apps/web/src/routes/settings/integrations/webhooks/page.server.test.ts", patterns: [/debug metadata without secrets/] },
+      { path: "apps/web/src/routes/settings/integrations/webhooks/page.svelte.test.ts", patterns: [/delivery debug columns/, /resend action/] },
     ],
   },
   {
@@ -201,8 +201,8 @@ const CHECKPOINTS: UatCheckpoint[] = [
     name: "Phase 7 Cross-Surface Parity Smoke",
     layers: ["e2e", "integration"],
     evidence: [
-      { path: "src/cli/__tests__/phase07-parity-smoke.test.ts", patterns: [/artifact rows expose provenance/, /notification unread\/list flow/, /webhook settings route/] },
-      { path: "src/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts", patterns: [/end-to-end phase 7 cycle/] },
+      { path: "apps/cli/src/__tests__/phase07-parity-smoke.test.ts", patterns: [/artifact rows expose provenance/, /notification unread\/list flow/, /webhook settings route/] },
+      { path: "apps/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts", patterns: [/end-to-end phase 7 cycle/] },
     ],
   },
 ];

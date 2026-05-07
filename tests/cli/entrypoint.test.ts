@@ -7,7 +7,7 @@ const BINARY = join(process.cwd(), "dist", "fulcrum");
 async function buildBinary(): Promise<void> {
   await mkdir(dirname(BINARY), { recursive: true });
   const proc = Bun.spawn(
-    ["bun", "build", "--compile", "src/index.ts", "--outfile", BINARY],
+    ["bun", "build", "--compile", "apps/cli/src/main.ts", "--outfile", BINARY],
     {
       cwd: process.cwd(),
       stdout: "pipe",

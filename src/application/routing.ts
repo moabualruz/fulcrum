@@ -8,10 +8,10 @@ import { Task } from "../db/entities/tasks/Task.ts";
 import type { EventRepository } from "../db/repositories/core/EventRepository.ts";
 import type { RoutingRuleRepository } from "../db/repositories/router/RoutingRuleRepository.ts";
 import { RoutingRuleSource, type RoutingConditions } from "../domain/routing/types.ts";
-import { ROUTING_EVENT_VERB, RoutingEventPayloadSchema } from "../router/routing-event-payload.ts";
-import type { RoutingRuleRecord } from "../router/rules-engine.ts";
-import type { TaskFacts } from "../router/types.ts";
-import type { RoutingDecision } from "../router/types.ts";
+import { ROUTING_EVENT_VERB, RoutingEventPayloadSchema } from "@fulcrum/server/router/routing-event-payload.ts";
+import type { RoutingRuleRecord } from "@fulcrum/server/router/rules-engine.ts";
+import type { TaskFacts } from "@fulcrum/server/router/types.ts";
+import type { RoutingDecision } from "@fulcrum/server/router/types.ts";
 import { AppNotFoundError, AppValidationError } from "./errors.ts";
 
 export interface RoutingAppContext {
@@ -322,7 +322,7 @@ export async function testRoutingRule(
   input: { taskId: string },
 ): Promise<RoutingEnrichedDto> {
   await configureRouting(em);
-  const { autoAssign } = await import("../router/auto-assign.ts");
+  const { autoAssign } = await import("@fulcrum/server/router/auto-assign.ts");
   const task = await em.findOne(Task, { id: input.taskId, org: ctx.orgId });
   if (!task) throw new AppNotFoundError("Task not found.");
 
@@ -337,7 +337,7 @@ export async function dryRunRoutingRule(
   input: { taskJson: { title: string; kind: string; priority: string | number; tags: string[]; projectId?: string; agentOverride?: string } },
 ): Promise<RoutingEnrichedDto> {
   await configureRouting(em);
-  const { autoAssign } = await import("../router/auto-assign.ts");
+  const { autoAssign } = await import("@fulcrum/server/router/auto-assign.ts");
   const taskFacts = taskFactsFromJson(input.taskJson);
   const decision = await autoAssign({
     agentOverride: input.taskJson.agentOverride,
@@ -442,9 +442,9 @@ function eventRepository(em: EntityManager): EventRepository {
 
 async function configureRouting(em: EntityManager): Promise<void> {
   const [{ configureAutoAssign }, { configureRulesEngine }, { configureRoutingTelemetry }] = await Promise.all([
-    import("../router/auto-assign.ts"),
-    import("../router/rules-engine.ts"),
-    import("../router/telemetry.ts"),
+    import("@fulcrum/server/router/auto-assign.ts"),
+    import("@fulcrum/server/router/rules-engine.ts"),
+    import("@fulcrum/server/router/telemetry.ts"),
   ]);
   const routingRules = routingRuleRepository(em);
   configureAutoAssign({});

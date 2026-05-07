@@ -6,7 +6,7 @@
  * When flag OFF → throws FeatureDisabledError.
  */
 
-import { isFeatureEnabled } from "../tui/feature-flags.ts";
+import { isFeatureEnabled } from "@fulcrum/tui/feature-flags.ts";
 import {
   FeatureDisabledError,
   SignatureVerificationError,

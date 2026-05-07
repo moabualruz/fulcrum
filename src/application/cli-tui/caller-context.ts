@@ -7,9 +7,9 @@ import { openDatabase, resolveDatabaseConfig } from "../../config/database.ts";
 import { ENTITY_MANAGER_TOKEN, registerDbBindings } from "../../db/db.module.ts";
 import { Session } from "../../db/entities/auth/Session.ts";
 import { applyProductMigrations } from "../../db/product-migrations.ts";
-import { appRouter } from "../../trpc/router.ts";
-import { createContext } from "../../trpc/context.ts";
-import { t } from "../../trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 
 const DEFAULT_ORG_SLUG = "default";
 const DEFAULT_ORG_NAME = "Local";

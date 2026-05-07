@@ -58,7 +58,7 @@ function fakeFlagsCaller(flags: FlagItem[] = FAKE_FLAGS): {
 
 describe("flags.run — list --json", () => {
   it("prints JSON array with name, enabled, description", async () => {
-    const { run } = await import("../../src/cli/commands/flags.ts");
+    const { run } = await import("@fulcrum/cli/commands/flags.ts");
 
     const lines: string[] = [];
     let exitCode: number | undefined;
@@ -83,7 +83,7 @@ describe("flags.run — list --json", () => {
   });
 
   it("prints human-readable table when --json not passed", async () => {
-    const { run } = await import("../../src/cli/commands/flags.ts");
+    const { run } = await import("@fulcrum/cli/commands/flags.ts");
 
     const lines: string[] = [];
 
@@ -102,7 +102,7 @@ describe("flags.run — list --json", () => {
 
 describe("flags.run — set", () => {
   it("set router-llm on exits 0 and prints confirmation", async () => {
-    const { run } = await import("../../src/cli/commands/flags.ts");
+    const { run } = await import("@fulcrum/cli/commands/flags.ts");
 
     const lines: string[] = [];
     let exitCode: number | undefined;
@@ -120,7 +120,7 @@ describe("flags.run — set", () => {
   });
 
   it("set embeddings off exits 0 and prints confirmation", async () => {
-    const { run } = await import("../../src/cli/commands/flags.ts");
+    const { run } = await import("@fulcrum/cli/commands/flags.ts");
 
     const lines: string[] = [];
     let exitCode: number | undefined;
@@ -138,7 +138,7 @@ describe("flags.run — set", () => {
   });
 
   it("set with missing value argument exits 1 with error", async () => {
-    const { run } = await import("../../src/cli/commands/flags.ts");
+    const { run } = await import("@fulcrum/cli/commands/flags.ts");
 
     const errLines: string[] = [];
     let exitCode: number | undefined;
@@ -155,7 +155,7 @@ describe("flags.run — set", () => {
   });
 
   it("set with invalid on/off value exits 1 with error", async () => {
-    const { run } = await import("../../src/cli/commands/flags.ts");
+    const { run } = await import("@fulcrum/cli/commands/flags.ts");
 
     const errLines: string[] = [];
     let exitCode: number | undefined;

@@ -8,7 +8,7 @@ import { DEFAULT_ORG_ID } from "../../src/db/seed.ts";
 
 describe("symphony.run — runs list --state ready --json", () => {
   it("prints a valid JSON array from orchestration.fetchCandidateIssues", async () => {
-    const { run } = await import("../../src/cli/commands/symphony.ts");
+    const { run } = await import("@fulcrum/cli/commands/symphony.ts");
     const printed: string[] = [];
     const calls: unknown[] = [];
 
@@ -52,7 +52,7 @@ describe("symphony.run — runs list --state ready --json", () => {
 
 describe("symphony.run — runs list --state <state> --json", () => {
   it("prints JSON from orchestration.fetchIssuesByStates for run states", async () => {
-    const { run } = await import("../../src/cli/commands/symphony.ts");
+    const { run } = await import("@fulcrum/cli/commands/symphony.ts");
     const printed: string[] = [];
     const calls: unknown[] = [];
 
@@ -130,7 +130,7 @@ describe("symphony.run — runs list --state <state> --json", () => {
 
 describe("symphony.run — runs show <runId> --json", () => {
   it("prints JSON with workspacePath from orchestration.getWorkspacePath", async () => {
-    const { run } = await import("../../src/cli/commands/symphony.ts");
+    const { run } = await import("@fulcrum/cli/commands/symphony.ts");
     const printed: string[] = [];
     const calls: unknown[] = [];
 
@@ -172,7 +172,7 @@ describe("symphony.run — runs show <runId> --json", () => {
   });
 
   it("accepts --json before the run id", async () => {
-    const { run } = await import("../../src/cli/commands/symphony.ts");
+    const { run } = await import("@fulcrum/cli/commands/symphony.ts");
     const printed: string[] = [];
     const calls: unknown[] = [];
     const runId = "10000000-0000-0000-0000-000000000001";
@@ -209,7 +209,7 @@ describe("symphony.run — runs show <runId> --json", () => {
   });
 
   it("prints retry schedule fields from orchestration.getRun", async () => {
-    const { run } = await import("../../src/cli/commands/symphony.ts");
+    const { run } = await import("@fulcrum/cli/commands/symphony.ts");
     const printed: string[] = [];
     const runId = "10000000-0000-0000-0000-000000000001";
 
@@ -256,7 +256,7 @@ describe("symphony.run — runs show <runId> --json", () => {
 
 describe("symphony.run — runs show <runId> --verbose", () => {
   it("prints a rendered prompt excerpt when verbose mode is enabled", async () => {
-    const { run } = await import("../../src/cli/commands/symphony.ts");
+    const { run } = await import("@fulcrum/cli/commands/symphony.ts");
     const printed: string[] = [];
     const runId = "10000000-0000-0000-0000-000000000001";
 

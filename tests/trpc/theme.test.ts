@@ -2,14 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { Container } from "@needle-di/core";
 import { TRPCError } from "@trpc/server";
 
-import { appRouter } from "../../src/trpc/router.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 import {
   ThemeSettingsRepository,
   THEME_DEFAULTS,
   type ThemeKey,
-} from "../../src/server/trpc/routers/theme.ts";
+} from "@fulcrum/server/runtime/trpc/routers/theme.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
 const USER_ID = "00000000-0000-0000-0000-000000000010";

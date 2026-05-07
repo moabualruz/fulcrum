@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
-import { Renderer } from "../../src/tui/renderer.ts";
-import { RepoDetailScreen, ReposScreen } from "../../src/tui/screens/repos.ts";
-import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
+import { Renderer } from "@fulcrum/tui/renderer.ts";
+import { RepoDetailScreen, ReposScreen } from "@fulcrum/tui/screens/repos.ts";
+import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 
 function renderPlain(render: (renderer: Renderer) => void): string {
   const tty = new FakeTTY({ columns: 120, rows: 40 });
@@ -98,7 +98,7 @@ describe("RepoDetailScreen", () => {
           fileTree: async () => [
             { id: "src", path: "src", type: "dir", parentId: null },
             { id: "readme", path: "README.md", type: "file", parentId: null },
-            { id: "index", path: "src/index.ts", type: "file", parentId: "src" },
+            { id: "index", path: "apps/cli/src/main.ts", type: "file", parentId: "src" },
           ],
           fileContent: async (input) => ({ path: input.path, content: "export const ok = true;\n" }),
           commits: async () => [
@@ -116,7 +116,7 @@ describe("RepoDetailScreen", () => {
     await screen.handleKey("j");
     await screen.handleKey("\r");
     const content = renderPlain((renderer) => screen.render(renderer));
-    expect(content).toContain("src/index.ts");
+    expect(content).toContain("apps/cli/src/main.ts");
     expect(content).toContain("export const ok = true;");
 
     await screen.handleKey("l");

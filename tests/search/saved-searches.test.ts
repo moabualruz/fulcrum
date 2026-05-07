@@ -6,9 +6,9 @@ import { OrgMember, User } from "../../src/db/entities/auth/index.ts";
 import { SavedView } from "../../src/db/entities/tasks/SavedView.ts";
 import { DEFAULT_ORG_ID } from "../../src/db/seed.ts";
 import { createTestOrm, type TestOrm } from "../../src/test-utils/db.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { appRouter } from "../../src/trpc/router.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 const MEMBER_USER_ID = "6acb6d91-483f-484a-8a0c-27148c353284";

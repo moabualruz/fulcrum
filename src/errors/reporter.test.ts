@@ -26,8 +26,8 @@ import {
 
 describe("scrubPaths", () => {
   test("replaces Unix /Users/<name>/... with <homedir>/...", () => {
-    const result = scrubPaths("/Users/mkh/projects/fulcrum/src/index.ts");
-    expect(result).toBe("<homedir>/projects/fulcrum/src/index.ts");
+    const result = scrubPaths("/Users/mkh/projects/fulcrum/apps/cli/src/main.ts");
+    expect(result).toBe("<homedir>/projects/fulcrum/apps/cli/src/main.ts");
   });
 
   test("replaces /home/<name>/... with <homedir>/...", () => {
@@ -66,7 +66,7 @@ describe("buildReportPayload", () => {
     const entry: ErrorReportEntry = {
       id: "test-id",
       errorMessage: "boom",
-      stackTrace: "/Users/mkh/fulcrum/src/index.ts:10:5",
+      stackTrace: "/Users/mkh/fulcrum/apps/cli/src/main.ts:10:5",
       occurredAt: new Date("2025-01-01T00:00:00Z"),
       os: "darwin",
       arch: "arm64",
@@ -74,7 +74,7 @@ describe("buildReportPayload", () => {
       fulcrumVersion: "0.1.0",
     };
     const payload = buildReportPayload(entry);
-    expect(payload.stack_trace).toBe("<homedir>/fulcrum/src/index.ts:10:5");
+    expect(payload.stack_trace).toBe("<homedir>/fulcrum/apps/cli/src/main.ts:10:5");
     expect(payload.error_message).toBe("boom");
   });
 

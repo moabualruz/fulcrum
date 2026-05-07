@@ -137,8 +137,8 @@ fi
 if [ ! -f "$SKILL_INSTALLED" ]; then
   cat >&2 <<EOF
 fulcrum: skill '$SKILL' is not installed under ~/.codex/skills/fulcrum/.
-Run: bun run src/index.ts skills sync --codex-global
-Or install project-local skills with: bun run src/index.ts skills sync --codex-project <dir>
+Run: bun run apps/cli/src/main.ts skills sync --codex-global
+Or install project-local skills with: bun run apps/cli/src/main.ts skills sync --codex-project <dir>
 EOF
   exit 1
 fi

@@ -79,7 +79,7 @@ function fakeReposCaller(repos: RepoItem[] = [ALPHA]) {
 
 describe("repos.run", () => {
   it("registers local repos with --path and prints JSON", async () => {
-    const { run } = await import("../../src/cli/commands/repos.ts");
+    const { run } = await import("@fulcrum/cli/commands/repos.ts");
     const caller = fakeReposCaller();
     const lines: string[] = [];
 
@@ -103,7 +103,7 @@ describe("repos.run", () => {
   });
 
   it("registers remote repos with --url", async () => {
-    const { run } = await import("../../src/cli/commands/repos.ts");
+    const { run } = await import("@fulcrum/cli/commands/repos.ts");
     const caller = fakeReposCaller();
 
     await run(["register", "--url", "https://example.test/alpha.git", "--slug", "alpha"], {
@@ -121,7 +121,7 @@ describe("repos.run", () => {
   });
 
   it("lists repos as JSON", async () => {
-    const { run } = await import("../../src/cli/commands/repos.ts");
+    const { run } = await import("@fulcrum/cli/commands/repos.ts");
     const lines: string[] = [];
 
     await run(["list", "--json"], {
@@ -137,7 +137,7 @@ describe("repos.run", () => {
   });
 
   it("sync, unregister, and status call matching tRPC procedures", async () => {
-    const { run } = await import("../../src/cli/commands/repos.ts");
+    const { run } = await import("@fulcrum/cli/commands/repos.ts");
     const caller = fakeReposCaller();
     const lines: string[] = [];
 
@@ -174,7 +174,7 @@ describe("repos.run", () => {
   });
 
   it("unknown repo id exits 1", async () => {
-    const { run } = await import("../../src/cli/commands/repos.ts");
+    const { run } = await import("@fulcrum/cli/commands/repos.ts");
     let exitCode: number | undefined;
     const errors: string[] = [];
 

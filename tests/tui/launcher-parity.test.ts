@@ -3,7 +3,7 @@
  * keybinding-driven dispatch, theme contract consumption).
  *
  * RED: registry, launcher, keybinding-action dispatch, theme getter all absent.
- * GREEN: src/tui/screen-registry.ts + launchTui() in src/tui/index.ts +
+ * GREEN: apps/tui/src/screen-registry.ts + launchTui() in apps/tui/src/index.ts +
  *        TuiApp.keybindings + TuiApp.theme.
  */
 import { describe, expect, it } from "bun:test";
@@ -11,11 +11,11 @@ import {
   TuiApp,
   launchTui,
   type TuiCaller,
-} from "../../src/tui/index.ts";
-import { ScreenRegistry } from "../../src/tui/screen-registry.ts";
-import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
+} from "@fulcrum/tui/index.ts";
+import { ScreenRegistry } from "@fulcrum/tui/screen-registry.ts";
+import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 import { getDefaultKeybindings } from "../../src/keybindings/index.ts";
-import { buildTheme } from "../../src/tui/theme/index.ts";
+import { buildTheme } from "@fulcrum/tui/theme/index.ts";
 
 function fakeCaller(): TuiCaller {
   return {

@@ -19,7 +19,7 @@ import {
   type PlatformKeyringFlag,
 } from "./keyring-platform.ts";
 import { keyringHealthCheck } from "./doctor-checks.ts";
-import { runSecretsInitKeyring } from "../cli/commands/cross-cutting-platform.ts";
+import { runSecretsInitKeyring } from "@fulcrum/cli/commands/cross-cutting-platform.ts";
 import { loadOrCreateMasterKey, KeyringStatus, type KeyringConfig } from "./keyring.ts";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────

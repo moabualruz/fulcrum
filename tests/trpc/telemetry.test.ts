@@ -1,10 +1,10 @@
 import { describe, expect, it, beforeEach } from "bun:test";
 import { Container } from "@needle-di/core";
 
-import { appRouter } from "../../src/trpc/router.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { t } from "../../src/trpc/trpc.ts";
-import { TelemetryStore, writeTelemetryEvent } from "../../src/server/trpc/routers/telemetry.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
+import { TelemetryStore, writeTelemetryEvent } from "@fulcrum/server/runtime/trpc/routers/telemetry.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
 const USER_ID = "11111111-1111-4111-8111-111111111111";

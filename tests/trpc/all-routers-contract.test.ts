@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { basename } from "node:path";
 
-import { appRouter } from "../../src/trpc/router.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
 
 const REQUIRED_NAMESPACES = [
   "tasks",

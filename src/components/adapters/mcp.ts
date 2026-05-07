@@ -1,4 +1,4 @@
-import { BUILTIN_MCPS } from "../../cli/mcp-builtins.ts";
+import { BUILTIN_MCPS } from "@fulcrum/cli/mcp-builtins.ts";
 import {
   applyDisabledToAgents,
   applyToAgents,
@@ -8,7 +8,7 @@ import {
   setEnabled,
   unregisterServer,
   type AgentId,
-} from "../../cli/mcp-registry.ts";
+} from "@fulcrum/cli/mcp-registry.ts";
 import type { ComponentAction } from "../types.ts";
 
 export async function registerBuiltinMcpByName(

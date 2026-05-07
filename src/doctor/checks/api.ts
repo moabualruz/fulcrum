@@ -68,7 +68,7 @@ async function checkTrpcRouter(cfg: ApiDoctorConfig): Promise<DoctorApiCheckEntr
       name: "trpc-router",
       status: "fail",
       message: "tRPC appRouter not available (module not loaded)",
-      recovery: "Ensure src/api/trpc/router.ts exports appRouter and Pillar 13 #04 is implemented.",
+      recovery: "Ensure apps/server/src/api/trpc/router.ts exports appRouter and Pillar 13 #04 is implemented.",
     };
   }
   try {

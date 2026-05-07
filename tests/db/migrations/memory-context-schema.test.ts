@@ -246,7 +246,7 @@ describe("doctor --json memories_schema subsystem", () => {
     const home = await mkdtemp(join(tmpdir(), "fulcrum-memory-doctor-"));
     try {
       await mkdir(home, { recursive: true });
-      const proc = Bun.spawn(["bun", "src/index.ts", "doctor", "--json"], {
+      const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", "doctor", "--json"], {
         cwd: process.cwd(),
         stdout: "pipe",
         stderr: "pipe",

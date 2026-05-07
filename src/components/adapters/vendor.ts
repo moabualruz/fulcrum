@@ -1,26 +1,26 @@
-import { installCaveman } from "../../cli/install.ts";
+import { installCaveman } from "@fulcrum/cli/install.ts";
 import {
   installRepomixClaudePlugins,
   installRepomixPackageMirrors,
   uninstallRepomixClaudePlugins,
   uninstallRepomixPackageMirrors,
-} from "../../cli/repomix-package.ts";
-import { removeAuthoredSkills, syncSkills } from "../../cli/skills.ts";
-import { removeUpstreamSkills, syncUpstreamSkills } from "../../cli/upstream-skills.ts";
-import { removeCavemanCopies } from "../../cli/uninstall.ts";
+} from "@fulcrum/cli/repomix-package.ts";
+import { removeAuthoredSkills, syncSkills } from "@fulcrum/cli/skills.ts";
+import { removeUpstreamSkills, syncUpstreamSkills } from "@fulcrum/cli/upstream-skills.ts";
+import { removeCavemanCopies } from "@fulcrum/cli/uninstall.ts";
 import {
   runAstGrepIntegration,
   runGraphifyIntegration,
   runPiMcpAdapterIntegration,
   runTavilyIntegration,
-} from "../../cli/vendor-installs.ts";
+} from "@fulcrum/cli/vendor-installs.ts";
 import {
   installCloudflarePackage,
   installSuperpowersPackage,
   uninstallCloudflarePackage,
   uninstallSuperpowersPackage,
-} from "../../cli/vendor-packages.ts";
-import type { AgentId } from "../../cli/mcp-registry.ts";
+} from "@fulcrum/cli/vendor-packages.ts";
+import type { AgentId } from "@fulcrum/cli/mcp-registry.ts";
 import type { ComponentAction } from "../types.ts";
 
 const CLOUDFLARE_SKILLS_SOURCE = "https://github.com/cloudflare/skills";

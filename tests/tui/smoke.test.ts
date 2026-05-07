@@ -13,12 +13,12 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { FakeTTY, stripAnsi } from "../../src/tui/testing/fake-tty.ts";
-import { TuiApp } from "../../src/tui/index.ts";
-import type { TuiCaller } from "../../src/tui/index.ts";
-import { AuthScreen } from "../../src/tui/screens/auth.ts";
-import { FlagsScreen } from "../../src/tui/screens/flags.ts";
-import { Renderer } from "../../src/tui/renderer.ts";
+import { FakeTTY, stripAnsi } from "@fulcrum/tui/testing/fake-tty.ts";
+import { TuiApp } from "@fulcrum/tui/index.ts";
+import type { TuiCaller } from "@fulcrum/tui/index.ts";
+import { AuthScreen } from "@fulcrum/tui/screens/auth.ts";
+import { FlagsScreen } from "@fulcrum/tui/screens/flags.ts";
+import { Renderer } from "@fulcrum/tui/renderer.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test doubles

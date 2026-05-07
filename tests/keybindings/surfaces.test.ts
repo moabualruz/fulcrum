@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { renderKeybindingHelp } from "../../src/cli/keybindings.ts";
-import { createTuiKeybindingMap } from "../../src/tui/keybindings.ts";
+import { renderKeybindingHelp } from "@fulcrum/cli/keybindings.ts";
+import { createTuiKeybindingMap } from "@fulcrum/tui/keybindings.ts";
 import {
   createKeybind,
   getWebKeybindings,
-} from "../../src/web/src/lib/keybindings.ts";
+} from "@fulcrum/web/lib/keybindings.ts";
 
 describe("keybinding surface imports", () => {
   test("web, CLI, and TUI import the shared registry without duplicating actions", async () => {

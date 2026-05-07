@@ -29,9 +29,9 @@ import { CredentialRepository } from "../../src/db/repositories/platform/Credent
 import { OrgMemberRepository } from "../../src/db/repositories/auth/OrgMemberRepository.ts";
 import { CasbinRuleRepository } from "../../src/db/repositories/flags/CasbinRuleRepository.ts";
 import { FlagRegistry } from "../../src/flags/registry.ts";
-import { appRouter } from "../../src/trpc/router.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { SecretsKeyringToken } from "../../src/secrets/keyring.ts";
 import type { NativeKeyringAdapter } from "../../src/secrets/keyring.ts";
 

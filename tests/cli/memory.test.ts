@@ -69,7 +69,7 @@ function fakeCaller(): MemoryCaller & { calls: Array<{ procedure: string; input:
 }
 
 async function runMemory(argv: readonly string[], caller = fakeCaller()) {
-  const { run } = await import("../../src/cli/commands/memory.ts");
+  const { run } = await import("@fulcrum/cli/commands/memory.ts");
   const stdout: string[] = [];
   const stderr: string[] = [];
   let exitCode: number | undefined;

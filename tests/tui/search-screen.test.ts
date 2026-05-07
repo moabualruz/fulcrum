@@ -1,7 +1,7 @@
 // @ts-nocheck
 /**
  * TDD — semantic search toggle gating.
- * RED written first; GREEN by src/tui/screens/search-screen.ts.
+ * RED written first; GREEN by apps/tui/src/screens/search-screen.ts.
  *
  * Acceptance criteria covered:
  *  - Embeddings OFF → "Semantic" chip not visible; mode='fts'
@@ -17,8 +17,8 @@ import {
   buildFilterChips,
   toggleSemanticMode,
   executeSearch,
-} from "../../src/tui/screens/search-screen.ts";
-import type { SearchOptions, SearchResult } from "../../src/tui/types.ts";
+} from "@fulcrum/tui/screens/search-screen.ts";
+import type { SearchOptions, SearchResult } from "@fulcrum/tui/types.ts";
 import { resetFeaturesCache } from "../../src/flags/index.ts";
 
 beforeEach(() => {

@@ -1435,7 +1435,7 @@ Prompt`);
 
   describe("Dispatch parity — tRPC dispatchRun (SND-06)", () => {
     test("REQUIRED: orchestration router exports dispatchRun procedure", async () => {
-      const { orchestrationRouter } = await import("../../trpc/routers/orchestration.ts");
+      const { orchestrationRouter } = await import("@fulcrum/server/trpc/routers/orchestration.ts");
       // The router must contain dispatchRun as a callable procedure
       // Check procedure exists by inspecting the router's internal definition
       const routerAny = orchestrationRouter as unknown as { _def: { procedures: Record<string, unknown> } };
@@ -1447,7 +1447,7 @@ Prompt`);
       const { readFileSync } = await import("node:fs");
       const { join } = await import("node:path");
       const src = readFileSync(
-        join(process.cwd(), "src/trpc/routers/orchestration.ts"),
+        join(process.cwd(), "apps/server/src/trpc/routers/orchestration.ts"),
         "utf8",
       );
       expect(src).toContain("dispatchRun");
@@ -1456,8 +1456,8 @@ Prompt`);
 
     test("REQUIRED: dispatchRun output shape includes runId, state, agent, sandboxMode", async () => {
       const { createTestOrm } = await import("../../test-utils/db.ts");
-      const { createContext } = await import("../../trpc/context.ts");
-      const { orchestrationRouter } = await import("../../trpc/routers/orchestration.ts");
+      const { createContext } = await import("@fulcrum/server/trpc/context.ts");
+      const { orchestrationRouter } = await import("@fulcrum/server/trpc/routers/orchestration.ts");
 
       const db = await createTestOrm();
       try {
@@ -1499,8 +1499,8 @@ Prompt`);
 
     test("REQUIRED: dispatchRun creates or updates agent_runs row", async () => {
       const { createTestOrm } = await import("../../test-utils/db.ts");
-      const { createContext } = await import("../../trpc/context.ts");
-      const { orchestrationRouter } = await import("../../trpc/routers/orchestration.ts");
+      const { createContext } = await import("@fulcrum/server/trpc/context.ts");
+      const { orchestrationRouter } = await import("@fulcrum/server/trpc/routers/orchestration.ts");
 
       const db = await createTestOrm();
       try {
@@ -1540,15 +1540,15 @@ Prompt`);
   });
 
   describe("CLI dispatch surface (SND-06)", () => {
-    test("REQUIRED: src/cli/symphony.ts SymphonyCaller includes dispatchRun method", async () => {
+    test("REQUIRED: apps/cli/src/symphony.ts SymphonyCaller includes dispatchRun method", async () => {
       const { readFileSync } = await import("node:fs");
       const { join } = await import("node:path");
-      const src = readFileSync(join(process.cwd(), "src/cli/symphony.ts"), "utf8");
+      const src = readFileSync(join(process.cwd(), "apps/cli/src/symphony.ts"), "utf8");
       expect(src).toContain("dispatchRun");
     });
 
     test("REQUIRED: symphony CLI help contains 'runs dispatch'", async () => {
-      const { run } = await import("../../cli/symphony.ts");
+      const { run } = await import("@fulcrum/cli/symphony.ts");
       const out: string[] = [];
       const err: string[] = [];
       await run(["--help"], {
@@ -1569,7 +1569,7 @@ Prompt`);
     });
 
     test("REQUIRED: symphony CLI runs dispatch --json returns runId, state, agent, sandboxMode", async () => {
-      const { run } = await import("../../cli/symphony.ts");
+      const { run } = await import("@fulcrum/cli/symphony.ts");
       const out: string[] = [];
       let exitCode: number | undefined;
 
@@ -1607,7 +1607,7 @@ Prompt`);
       const { readFileSync } = await import("node:fs");
       const { join } = await import("node:path");
       const src = readFileSync(
-        join(process.cwd(), "src/web/src/routes/orchestration/+page.server.ts"),
+        join(process.cwd(), "apps/web/src/routes/orchestration/+page.server.ts"),
         "utf8",
       );
       expect(src).toContain("dispatch");
@@ -1619,7 +1619,7 @@ Prompt`);
       const { readFileSync } = await import("node:fs");
       const { join } = await import("node:path");
       const src = readFileSync(
-        join(process.cwd(), "src/tui/screens/orchestration.ts"),
+        join(process.cwd(), "apps/tui/src/screens/orchestration.ts"),
         "utf8",
       );
       expect(src).toContain("dispatch");

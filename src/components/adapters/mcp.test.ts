@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadRegistry } from "../../cli/mcp-registry.ts";
+import { loadRegistry } from "@fulcrum/cli/mcp-registry.ts";
 import type { ComponentAction } from "../types.ts";
 import { applyMcpAction, registerBuiltinMcpByName } from "./mcp.ts";
 

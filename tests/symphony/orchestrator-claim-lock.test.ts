@@ -37,9 +37,9 @@ import { Migration20260502070200_docs_related_tables } from "../../src/db/migrat
 import { Migration20260502070400_agent_runs_sandcastle_columns } from "../../src/db/migrations/Migration20260502070400_agent_runs_sandcastle_columns.ts";
 import { Migration20260502090000_tasks_schema_extension } from "../../src/db/migrations/Migration20260502090000_tasks_schema_extension.ts";
 import { claimRun, ClaimConflictError } from "../../src/orchestration/symphony/orchestrator.ts";
-import { appRouter } from "../../src/trpc/router.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 

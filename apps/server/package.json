@@ -1,0 +1,6 @@
+{
+  "name": "@fulcrum/server",
+  "private": true,
+  "type": "module",
+  "module": "src/index.ts"
+}

@@ -23,10 +23,10 @@
 
 ## Consumers
 
-- `src/cli/install.ts` / `uninstall.ts` — sentinel splice + per-agent setup.
-- `src/cli/skills.ts` / `upstream-skills.ts` / `vendor-packages.ts` — per-agent mirrors.
-- `src/cli/mcp-registry.ts` — per-agent MCP config writers.
-- `src/cli/doctor.ts` — per-agent detection + state report.
+- `apps/cli/src/install.ts` / `uninstall.ts` — sentinel splice + per-agent setup.
+- `apps/cli/src/skills.ts` / `upstream-skills.ts` / `vendor-packages.ts` — per-agent mirrors.
+- `apps/cli/src/mcp-registry.ts` — per-agent MCP config writers.
+- `apps/cli/src/doctor.ts` — per-agent detection + state report.
 - `src/components/adapters/*` — per-agent action execution.
 
 ## ADRs

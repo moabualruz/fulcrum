@@ -43,7 +43,7 @@ describe("repo-files store", () => {
       const row = await insertRepoFile(db, {
         repoId,
         branch: "main",
-        path: "src/index.ts",
+        path: "apps/cli/src/main.ts",
         kind: "file",
         mime: "text/typescript",
         sizeBytes: 1024,
@@ -51,7 +51,7 @@ describe("repo-files store", () => {
         parentPath: "src",
         depth: 1,
       });
-      expect(row.path).toBe("src/index.ts");
+      expect(row.path).toBe("apps/cli/src/main.ts");
       expect(row.kind).toBe("file");
       expect(row.mime).toBe("text/typescript");
       expect(row.depth).toBe(1);
@@ -60,7 +60,7 @@ describe("repo-files store", () => {
       const updated = await insertRepoFile(db, {
         repoId,
         branch: "main",
-        path: "src/index.ts",
+        path: "apps/cli/src/main.ts",
         kind: "file",
         mime: "text/typescript",
         sizeBytes: 2048,
@@ -80,7 +80,7 @@ describe("repo-files store", () => {
     try {
       await insertRepoFile(db, { repoId, branch: "main", path: "src", kind: "directory", parentPath: null, depth: 0 });
       await insertRepoFile(db, { repoId, branch: "main", path: "README.md", kind: "file", parentPath: null, depth: 0 });
-      await insertRepoFile(db, { repoId, branch: "main", path: "src/index.ts", kind: "file", parentPath: "src", depth: 1 });
+      await insertRepoFile(db, { repoId, branch: "main", path: "apps/cli/src/main.ts", kind: "file", parentPath: "src", depth: 1 });
       await insertRepoFile(db, { repoId, branch: "main", path: "src/utils", kind: "directory", parentPath: "src", depth: 1 });
 
       const root = await listTreeChildren(db, repoId, "main", null);
@@ -117,11 +117,11 @@ describe("repo-files store", () => {
       await upsertFileContent(db, {
         repoId,
         branch: "main",
-        path: "src/index.ts",
+        path: "apps/cli/src/main.ts",
         content: "const x = 1;",
         isBinary: false,
       });
-      const row = await getFileContent(db, repoId, "main", "src/index.ts");
+      const row = await getFileContent(db, repoId, "main", "apps/cli/src/main.ts");
       expect(row).not.toBeNull();
       expect(row!.content).toBe("const x = 1;");
       expect(row!.is_binary).toBe(false);
@@ -139,7 +139,7 @@ describe("repo-files store", () => {
       await insertBlameLine(db, {
         repoId,
         branch: "main",
-        path: "src/index.ts",
+        path: "apps/cli/src/main.ts",
         lineNumber: 1,
         commitSha: "abc123",
         author: "alice",
@@ -149,7 +149,7 @@ describe("repo-files store", () => {
       await insertBlameLine(db, {
         repoId,
         branch: "main",
-        path: "src/index.ts",
+        path: "apps/cli/src/main.ts",
         lineNumber: 2,
         commitSha: "def456",
         author: "bob",
@@ -157,7 +157,7 @@ describe("repo-files store", () => {
         lineContent: "const y = 2;",
       });
 
-      const blame = await getBlameForFile(db, repoId, "main", "src/index.ts");
+      const blame = await getBlameForFile(db, repoId, "main", "apps/cli/src/main.ts");
       expect(blame.length).toBe(2);
       expect(blame[0]!.line_number).toBe(1);
       expect(blame[0]!.author).toBe("alice");

@@ -386,7 +386,7 @@ describe("runImport", () => {
   });
 
   test("unknown format → error", async () => {
-    const { runImport } = await import("../../cli/import-pm.ts");
+    const { runImport } = await import("@fulcrum/cli/import-pm.ts");
     await expect(
       runImport({
         format: "notion",
@@ -400,14 +400,14 @@ describe("runImport", () => {
   });
 
   test("formatImportResult --json", async () => {
-    const { formatImportResult } = await import("../../cli/import-pm.ts");
+    const { formatImportResult } = await import("@fulcrum/cli/import-pm.ts");
     const result = { imported: 5, skipped: 1, errors: [] };
     const out = formatImportResult(result, true);
     expect(JSON.parse(out)).toEqual(result);
   });
 
   test("formatImportResult text", async () => {
-    const { formatImportResult } = await import("../../cli/import-pm.ts");
+    const { formatImportResult } = await import("@fulcrum/cli/import-pm.ts");
     const result = { imported: 3, skipped: 0, errors: [] };
     const out = formatImportResult(result, false);
     expect(out).toContain("imported: 3");

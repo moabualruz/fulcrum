@@ -10,7 +10,7 @@ const MAX_BYTES = 150 * 1024 * 1024;
 await mkdir(dirname(OUTFILE), { recursive: true });
 
 const proc = Bun.spawn(
-  ["bun", "build", "--compile", "--minify", "src/index.ts", "--outfile", OUTFILE],
+  ["bun", "build", "--compile", "--minify", "apps/cli/src/main.ts", "--outfile", OUTFILE],
   {
     cwd: process.cwd(),
     stdout: "pipe",

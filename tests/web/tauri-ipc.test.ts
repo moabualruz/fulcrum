@@ -37,7 +37,7 @@ import {
   checkFeatureFlag,
   type CopyArtifactResult,
   type UpdateCheckResult,
-} from "../../src/web/src/lib/tauri/ipc.ts";
+} from "@fulcrum/web/lib/tauri/ipc.ts";
 
 // ---------------------------------------------------------------------------
 // isTauriEnv()

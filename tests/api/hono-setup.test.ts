@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { createPublicApi, createPublicApiRouter } from "../../src/api/hono.ts";
+import { createPublicApi, createPublicApiRouter } from "@fulcrum/server/api/hono.ts";
 
 describe("P13#04 — Hono public API setup", () => {
   let originalFeatures: string | undefined;

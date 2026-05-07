@@ -28,7 +28,7 @@ function fakeCaller() {
 }
 
 async function runContext(args: readonly string[], caller = fakeCaller()) {
-  const { run } = await import("../../src/cli/commands/context.ts");
+  const { run } = await import("@fulcrum/cli/commands/context.ts");
   const lines: string[] = [];
   const errors: string[] = [];
   let exitCode: number | undefined;

@@ -21,7 +21,7 @@ describe("application repos", () => {
     try {
       const em = db.em.fork();
       const repo = await registerRepo(em, ctx, { slug: "fulcrum", name: "Fulcrum", kind: "local", localPath: "/repo" });
-      await insertRepoTreeEntry(em, ctx, { repoId: repo.id, commitSha: "abc", path: "src/index.ts", kind: "file" });
+      await insertRepoTreeEntry(em, ctx, { repoId: repo.id, commitSha: "abc", path: "apps/cli/src/main.ts", kind: "file" });
       expect(await listRepos(em, ctx)).toHaveLength(1);
       expect(await listRepoTree(em, ctx, { repoId: repo.id, commitSha: "abc" })).toHaveLength(1);
       await expect(getRepo(em, ctx, repo.id)).resolves.toMatchObject({ id: repo.id });

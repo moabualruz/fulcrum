@@ -3,10 +3,9 @@
  * Module-boundary lint: enforces layering rules.
  *
  * Rules:
- *   1. product-kernel/ never imports from web/
- *   2. cli/ never imports from web/
- *   3. services/ never imports from web/
- *   4. Dependency direction: web -> services -> product-kernel
+ *   1. product-kernel never imports from web app
+ *   2. CLI app never imports from web app
+ *   3. services never imports from web app
  *
  * Usage: bun run scripts/check-module-boundaries.ts
  * Exit code 0 = clean, 1 = violations found.
@@ -14,7 +13,8 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-const ROOT = join(import.meta.dir, "..", "src");
+const ROOT = join(import.meta.dir, "..");
+const SOURCE_ROOTS = ["src", "apps"];
 
 interface Violation {
   file: string;
@@ -32,18 +32,18 @@ const RULES: Array<{
   rule: string;
 }> = [
   {
-    sourcePrefix: "product-kernel/",
-    forbiddenImport: "/web/",
+    sourcePrefix: "src/product-kernel/",
+    forbiddenImport: "/apps/web/",
     rule: "product-kernel must not import from web layer",
   },
   {
-    sourcePrefix: "cli/",
-    forbiddenImport: "/web/",
+    sourcePrefix: "apps/cli/src/",
+    forbiddenImport: "/apps/web/",
     rule: "CLI must not import from web layer",
   },
   {
-    sourcePrefix: "services/",
-    forbiddenImport: "/web/",
+    sourcePrefix: "src/services/",
+    forbiddenImport: "/apps/web/",
     rule: "services must not import from web layer",
   },
 ];
@@ -54,8 +54,7 @@ function walk(dir: string): string[] {
     const full = join(dir, entry);
     const stat = statSync(full);
     if (stat.isDirectory()) {
-      // Skip node_modules, .svelte-kit, dist
-      if (entry === "node_modules" || entry === ".svelte-kit" || entry === "dist") continue;
+      if (entry === "node_modules" || entry === ".svelte-kit" || entry === "dist" || entry === "graphify-out") continue;
       files.push(...walk(full));
     } else if (entry.endsWith(".ts") || entry.endsWith(".tsx")) {
       files.push(full);
@@ -65,7 +64,7 @@ function walk(dir: string): string[] {
 }
 
 const violations: Violation[] = [];
-const allFiles = walk(ROOT);
+const allFiles = SOURCE_ROOTS.flatMap((sourceRoot) => walk(join(ROOT, sourceRoot)));
 
 for (const file of allFiles) {
   const rel = relative(ROOT, file);

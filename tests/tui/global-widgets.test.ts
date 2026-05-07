@@ -6,12 +6,12 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { FakeTTY, stripAnsi } from "../../src/tui/testing/fake-tty.ts";
-import { Renderer } from "../../src/tui/renderer.ts";
+import { FakeTTY, stripAnsi } from "@fulcrum/tui/testing/fake-tty.ts";
+import { Renderer } from "@fulcrum/tui/renderer.ts";
 
 // ─── wcwidth-aware truncate ─────────────────────────────────────────────────
 
-import { truncateWide } from "../../src/tui/utils/truncate.ts";
+import { truncateWide } from "@fulcrum/tui/utils/truncate.ts";
 
 describe("truncateWide (wcwidth)", () => {
   it("truncates CJK double-width chars correctly", () => {
@@ -43,7 +43,7 @@ describe("truncateWide (wcwidth)", () => {
 
 // ─── VirtualList ────────────────────────────────────────────────────────────
 
-import { VirtualList } from "../../src/tui/widgets/VirtualList.ts";
+import { VirtualList } from "@fulcrum/tui/widgets/VirtualList.ts";
 
 describe("VirtualList", () => {
   it("renders 1000-item list without blank rows", () => {
@@ -88,7 +88,7 @@ describe("VirtualList", () => {
 
 // ─── StatusBar ──────────────────────────────────────────────────────────────
 
-import { StatusBarWidget } from "../../src/tui/widgets/StatusBar.ts";
+import { StatusBarWidget } from "@fulcrum/tui/widgets/StatusBar.ts";
 
 describe("StatusBar", () => {
   it("renders org name, user email, and current screen", () => {
@@ -147,7 +147,7 @@ describe("StatusBar", () => {
 
 // ─── Palette (Cmd+K) ───────────────────────────────────────────────────────
 
-import { Palette } from "../../src/tui/widgets/Palette.ts";
+import { Palette } from "@fulcrum/tui/widgets/Palette.ts";
 
 describe("Palette", () => {
   it("opens and closes with Escape", () => {
@@ -207,7 +207,7 @@ describe("Palette", () => {
 
 // ─── HelpOverlay ────────────────────────────────────────────────────────────
 
-import { HelpOverlay } from "../../src/tui/widgets/HelpOverlay.ts";
+import { HelpOverlay } from "@fulcrum/tui/widgets/HelpOverlay.ts";
 
 describe("HelpOverlay", () => {
   it("renders current screen keybinding map", () => {
@@ -249,7 +249,7 @@ describe("HelpOverlay", () => {
 
 // ─── FilterChips ────────────────────────────────────────────────────────────
 
-import { FilterChips } from "../../src/tui/widgets/FilterChips.ts";
+import { FilterChips } from "@fulcrum/tui/widgets/FilterChips.ts";
 
 describe("FilterChips", () => {
   it("adds and removes chips", () => {
@@ -303,7 +303,7 @@ import {
   renderVelocityBar,
   renderSparkline,
   renderHistogram,
-} from "../../src/tui/widgets/AsciiChart.ts";
+} from "@fulcrum/tui/widgets/AsciiChart.ts";
 
 describe("ASCII Charts", () => {
   it("burndown with known data produces deterministic output", () => {

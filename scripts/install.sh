@@ -116,7 +116,7 @@ elif command -v bun >/dev/null 2>&1; then
   echo "  building from source via bun..."
   cd "$REPO_DIR"
   mkdir -p dist
-  bun build --compile --minify --target="bun-$plat" src/index.ts --outfile="dist/fulcrum-$plat" >/dev/null
+  bun build --compile --minify --target="bun-$plat" apps/cli/src/main.ts --outfile="dist/fulcrum-$plat" >/dev/null
   src_bin="$REPO_DIR/dist/fulcrum-$plat"
   echo "  built: $src_bin"
 else

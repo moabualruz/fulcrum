@@ -41,7 +41,7 @@ async function loadRouterModules(): Promise<RouterModules> {
   const entity = await import("../../../src/db/entities/router/RoutingRule.ts");
   const repo = await import("../../../src/db/repositories/router/RoutingRuleRepository.ts");
   const repoBarrel = await import("../../../src/db/repositories/router/index.ts");
-  const payload = await import("../../../src/router/routing-event-payload.ts");
+  const payload = await import("@fulcrum/server/router/routing-event-payload.ts");
   const migration = await import(
     "../../../src/db/migrations/Migration20260502050000_routing_rules.ts"
   );

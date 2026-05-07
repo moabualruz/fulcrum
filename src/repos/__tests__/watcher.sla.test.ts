@@ -191,7 +191,7 @@ describe("RepoWatcher SLA", () => {
     const watcher = new RepoWatcher(localRepo(), queue, { backend, debounceMs: 10 });
     await watcher.start();
 
-    backend.emit("change", "src/index.ts");
+    backend.emit("change", "apps/cli/src/main.ts");
     await sleep(40);
 
     expect(queue.jobs).toEqual([
@@ -199,7 +199,7 @@ describe("RepoWatcher SLA", () => {
         name: "repo.sync.local",
         payload: {
           repoId: "repo-1",
-          filename: "src/index.ts",
+          filename: "apps/cli/src/main.ts",
           eventType: "change",
           retryable: true,
         },

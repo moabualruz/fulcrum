@@ -5,7 +5,7 @@ import { ENTITY_MANAGER_TOKEN } from "../../db/db.module.ts";
 import { Org } from "../../db/entities/auth/Org.ts";
 import { Memory } from "../../db/entities/memory/Memory.ts";
 import { MemoryLink } from "../../db/entities/memory/MemoryLink.ts";
-import type { TRPCContext } from "../../trpc/context.ts";
+import type { TRPCContext } from "@fulcrum/server/trpc/context.ts";
 import { HeuristicExtractor, type HeuristicMemory } from "../extractor-heuristic.ts";
 
 @Injectable()

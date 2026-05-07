@@ -8,10 +8,10 @@ const PLAN_39_TEST_FILES = [
   "src/application/artifacts/interface-parity.test.ts",
   "src/application/settings/interface-parity.test.ts",
   "src/application/search/interface-parity.test.ts",
-  "src/api/__tests__/phase95-interface-parity.test.ts",
-  "src/cli/application-parity.test.ts",
-  "src/tui/__tests__/phase95-interface-parity.test.ts",
-  "src/web/tests/e2e/phase95-cross-interface-parity.spec.ts",
+  "apps/server/src/api/__tests__/phase95-interface-parity.test.ts",
+  "apps/cli/src/application-parity.test.ts",
+  "apps/tui/src/__tests__/phase95-interface-parity.test.ts",
+  "apps/web/tests/e2e/phase95-cross-interface-parity.spec.ts",
 ] as const;
 
 describe("Phase 09.5 aggregate interface parity proof", () => {
@@ -24,7 +24,7 @@ describe("Phase 09.5 aggregate interface parity proof", () => {
   });
 
   test("web parity spec has no skip helper or skipped critical checks", () => {
-    const source = readFileSync("src/web/tests/e2e/phase95-cross-interface-parity.spec.ts", "utf8");
+    const source = readFileSync("apps/web/tests/e2e/phase95-cross-interface-parity.spec.ts", "utf8");
     expect(source).not.toContain("gotoOrSkip");
     expect(source).not.toMatch(/\btest\.skip\b|\.skip\(/);
     expect(source).toMatch(/response\?\.ok\(\)/);

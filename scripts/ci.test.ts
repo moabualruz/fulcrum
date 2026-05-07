@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { describe, it, expect } from "bun:test";
 import { buildAllSteps, STEPS } from "./ci.ts";
 
-const webPackageJson = JSON.parse(readFileSync("src/web/package.json", "utf8")) as {
+const webPackageJson = JSON.parse(readFileSync("apps/web/package.json", "utf8")) as {
   scripts?: Record<string, string>;
 };
 
@@ -18,10 +18,10 @@ describe("ci STEPS — web:test always-on", () => {
     expect(names).toContain("web:test");
   });
 
-  it("web:test runs bun run web:test from src/web", () => {
+  it("web:test runs bun run web:test from apps/web", () => {
     const step = STEPS.find((s) => s.name === "web:test");
     expect(step).toBeDefined();
-    expect(step!.cwd).toBe("src/web");
+    expect(step!.cwd).toBe("apps/web");
     expect(step!.cmd).toEqual(["bun", "run", "web:test"]);
   });
 });
@@ -42,7 +42,7 @@ describe("ci STEPS — WR-03 explicit full E2E semantics", () => {
     expect(step).toBeDefined();
     expect(step!.tier).toBe("e2e");
     expect(step!.domain).toBe("web");
-    expect(step!.cwd).toBe("src/web");
+    expect(step!.cwd).toBe("apps/web");
     expect(step!.cmd).toEqual(["bun", "run", "web:e2e:full"]);
     expect("skipReason" in step!).toBe(false);
   });
@@ -66,7 +66,7 @@ describe("ci STEPS — Phase 02 stable web gates", () => {
   it("includes default smoke e2e gate", () => {
     const step = STEPS.find((s) => s.name === "web:e2e:smoke");
     expect(step).toBeDefined();
-    expect(step!.cwd).toBe("src/web");
+    expect(step!.cwd).toBe("apps/web");
     expect(step!.cmd).toEqual(["bun", "run", "web:e2e:smoke"]);
   });
 
@@ -86,7 +86,7 @@ describe("ci STEPS — Phase 02 stable web gates", () => {
 
 describe("web lockfile — vulnerable cookie resolution", () => {
   it("does not resolve cookie@0.6.0", () => {
-    const lockfile = readFileSync("src/web/bun.lock", "utf8");
+    const lockfile = readFileSync("apps/web/bun.lock", "utf8");
     expect(lockfile).not.toContain('"cookie": ["cookie@0.6.0"');
   });
 });

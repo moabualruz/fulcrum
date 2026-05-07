@@ -4,9 +4,9 @@ import type { Session } from "better-auth";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { appRouter } from "../../src/trpc/router.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 
 // Note: duplicate mount aliases (skills, memory, runs, notifications) were removed
 // in the router cleanup.  Only canonical names remain.
@@ -167,11 +167,11 @@ const REQUIRED_PROCEDURES = [
 ] as const;
 
 const PUBLIC_MUTATION_ALLOWLIST = new Set([
-  "src/server/trpc/routers/auth.ts:acceptInvite",
+  "apps/server/src/runtime/trpc/routers/auth.ts:acceptInvite",
 ]);
 
 const PUBLIC_MUTATION_ALLOWLIST_COMMENTS: Record<string, string> = {
-  "src/server/trpc/routers/auth.ts:acceptInvite": "no session required",
+  "apps/server/src/runtime/trpc/routers/auth.ts:acceptInvite": "no session required",
 };
 
 type RouterIntrospection = {
@@ -233,9 +233,9 @@ function sourceFiles(dir: string): string[] {
 function findMutationPermissionViolations(): string[] {
   const root = new URL("../..", import.meta.url).pathname;
   const files = [
-    join(root, "src/trpc/router.ts"),
-    ...sourceFiles(join(root, "src/trpc/routers")),
-    ...sourceFiles(join(root, "src/server/trpc/routers")),
+    join(root, "apps/server/src/trpc/router.ts"),
+    ...sourceFiles(join(root, "apps/server/src/trpc/routers")),
+    ...sourceFiles(join(root, "apps/server/src/runtime/trpc/routers")),
   ];
 
   const violations: string[] = [];
@@ -272,8 +272,8 @@ function findMutationPermissionViolations(): string[] {
 function findProtectedProcedurePermissionViolations(): string[] {
   const root = new URL("../..", import.meta.url).pathname;
   const files = [
-    ...sourceFiles(join(root, "src/trpc/routers")),
-    ...sourceFiles(join(root, "src/server/trpc/routers")),
+    ...sourceFiles(join(root, "apps/server/src/trpc/routers")),
+    ...sourceFiles(join(root, "apps/server/src/runtime/trpc/routers")),
   ];
 
   const violations: string[] = [];
@@ -302,7 +302,7 @@ function findProtectedProcedurePermissionViolations(): string[] {
 }
 
 afterEach(async () => {
-  const otel = await import("../../src/server/trpc/middleware/otel.ts").catch(() => null);
+  const otel = await import("@fulcrum/server/runtime/trpc/middleware/otel.ts").catch(() => null);
   otel?.setTRPCSpanRecorderForTests(null);
 });
 
@@ -344,10 +344,10 @@ describe("P13.01 appRouter scaffold", () => {
   it("keeps tRPC public schemas free of z.any()", () => {
     const root = new URL("../..", import.meta.url).pathname;
     const files = [
-      join(root, "src/trpc/router.ts"),
-      ...sourceFiles(join(root, "src/trpc/routers")),
-      ...sourceFiles(join(root, "src/trpc/schemas")),
-      ...sourceFiles(join(root, "src/server/trpc/routers")),
+      join(root, "apps/server/src/trpc/router.ts"),
+      ...sourceFiles(join(root, "apps/server/src/trpc/routers")),
+      ...sourceFiles(join(root, "apps/server/src/trpc/schemas")),
+      ...sourceFiles(join(root, "apps/server/src/runtime/trpc/routers")),
     ];
     const offenders = files
       .filter((file) => readFileSync(file, "utf8").includes("z.any("))
@@ -390,7 +390,7 @@ describe("P13.01 cross-cutting tRPC middleware", () => {
   });
 
   it("records an OTel span per tRPC call with org, user, request, and procedure attributes", async () => {
-    const otel = await import("../../src/server/trpc/middleware/otel.ts");
+    const otel = await import("@fulcrum/server/runtime/trpc/middleware/otel.ts");
     const spans: Array<{ name: string; attributes: Record<string, string> }> = [];
     otel.setTRPCSpanRecorderForTests((span) => spans.push(span));
 

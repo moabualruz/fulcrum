@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "bun:test";
 
-import { runPillar14Command } from "../../src/cli/commands/pillar14-generated.ts";
+import { runPillar14Command } from "@fulcrum/cli/commands/pillar14-generated.ts";
 
 type Harness = {
   lines: string[];

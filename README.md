@@ -37,13 +37,13 @@ cd fulcrum
 bun install
 
 # Run the web app (local dev — no auth required)
-cd src/web && bun run dev
+cd apps/web && bun run dev
 # → http://localhost:5173
 
 # Or use the CLI
-bun run src/index.ts doctor
-bun run src/index.ts projects list --json
-bun run src/index.ts tasks create --title "My first task" --json
+bun run apps/cli/src/main.ts doctor
+bun run apps/cli/src/main.ts projects list --json
+bun run apps/cli/src/main.ts tasks create --title "My first task" --json
 ```
 
 ## Supported Agents
@@ -59,6 +59,19 @@ Fulcrum manages configuration for 5 CLI coding agents:
 | Pi CLI | `~/.pi/agent/AGENTS.md` | `~/.pi/agent/skills/` | TypeScript extension | `pi-mcp-adapter` |
 
 ## Architecture
+
+Runtime surfaces are first-class local apps:
+
+| Path | Role |
+|---|---|
+| `apps/web` | SvelteKit client and local web UI. `fulcrum web` serves its built output locally. |
+| `apps/cli` | Bun CLI app and `fulcrum` binary entrypoint. |
+| `apps/tui` | OpenTUI client. Runs in-process against local application callers. |
+| `apps/server` | Local server adapters: Hono REST API, tRPC router, routing engine, Yjs/runtime adapters. |
+| `src/application` | Business workflows, DTOs, validation, command/query services. Interfaces call here. |
+| `src/db` | ORM entities, repositories, migrations, DB composition. |
+| `src/domain` | Domain enums/value types and pure domain helpers. |
+| `tests` | Cross-interface, e2e, integration, migration, and parity tests. |
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -171,8 +184,8 @@ fulcrum tui
 bun install                  # Install deps
 bun run --bun tsc --noEmit   # Typecheck
 bun run scripts/test-root.ts # Run root tests
-cd src/web && bun run dev    # Dev server
-cd src/web && bun run web:e2e # Playwright e2e tests
+cd apps/web && bun run dev    # Dev server
+cd apps/web && bun run web:e2e # Playwright e2e tests
 ```
 
 ## Docs

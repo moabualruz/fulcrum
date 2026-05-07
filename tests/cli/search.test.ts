@@ -53,7 +53,7 @@ function fakeCaller() {
 }
 
 async function runSearch(args: readonly string[], caller = fakeCaller()) {
-  const { run } = await import("../../src/cli/commands/search.ts");
+  const { run } = await import("@fulcrum/cli/commands/search.ts");
   const lines: string[] = [];
   const errors: string[] = [];
   let exitCode: number | undefined;
@@ -71,7 +71,7 @@ async function runSearch(args: readonly string[], caller = fakeCaller()) {
 }
 
 async function runCmdk(args: readonly string[], caller = fakeCaller()) {
-  const { runCmdk } = await import("../../src/cli/commands/search.ts");
+  const { runCmdk } = await import("@fulcrum/cli/commands/search.ts");
   const lines: string[] = [];
   const errors: string[] = [];
   let exitCode: number | undefined;

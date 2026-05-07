@@ -24,7 +24,7 @@ import { join } from "node:path";
 const ROOT = join(import.meta.dir, "../..");
 
 function webRouteExists(...segments: string[]): boolean {
-  const base = join(ROOT, "src/web/src/routes", ...segments);
+  const base = join(ROOT, "apps/web/src/routes", ...segments);
   return (
     existsSync(join(base, "+page.svelte")) ||
     existsSync(join(base, "+page.server.ts")) ||
@@ -33,12 +33,12 @@ function webRouteExists(...segments: string[]): boolean {
 }
 
 function cliDomainRegistered(domain: string): boolean {
-  const { GENERATED_DOMAIN_COMMANDS } = require("../../src/cli/generated-domains.ts");
+  const { GENERATED_DOMAIN_COMMANDS } = require("../../apps/cli/src/generated-domains.ts");
   return (GENERATED_DOMAIN_COMMANDS as readonly string[]).includes(domain);
 }
 
 function tuiScreenExists(screen: string): boolean {
-  return existsSync(join(ROOT, "src/tui/screens", `${screen}.ts`));
+  return existsSync(join(ROOT, "apps/tui/src/screens", `${screen}.ts`));
 }
 
 // ─── 1. Web surface (15 domains) ────────────────────────────────────────────
@@ -49,7 +49,7 @@ describe("P14 Web surface — route files exist", () => {
   });
 
   it("tasks — /tasks/[id] route", () => {
-    const path = join(ROOT, "src/web/src/routes/tasks/[id]/+page.svelte");
+    const path = join(ROOT, "apps/web/src/routes/tasks/[id]/+page.svelte");
     expect(existsSync(path)).toBe(true);
   });
 
@@ -98,7 +98,7 @@ describe("P14 Web surface — route files exist", () => {
   });
 
   it("connectors — projects/[id]/settings/connectors route", () => {
-    const path = join(ROOT, "src/web/src/routes/projects/[id]/settings/connectors/+page.server.ts");
+    const path = join(ROOT, "apps/web/src/routes/projects/[id]/settings/connectors/+page.server.ts");
     expect(existsSync(path)).toBe(true);
   });
 
@@ -241,92 +241,92 @@ describe("P14 TUI surface — screen modules exist", () => {
 
 describe("P14 TUI tRPC — procedures reachable via createLocalCaller", () => {
   it("projects.list procedure exists on appRouter", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.projects.list).toBe("function");
   });
 
   it("tasks.list procedure exists on appRouter", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.tasks.list).toBe("function");
   });
 
   it("docs.list procedure exists on appRouter", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.docs.list).toBe("function");
   });
 
   it("memories.list procedure exists on appRouter", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.memories.list).toBe("function");
   });
 
   it("runs.list procedure exists on appRouter", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.agent_runs.list).toBe("function");
   });
 
   it("repos.list procedure exists on appRouter", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.repos.list).toBe("function");
   });
 
   it("artifacts.list procedure exists on appRouter", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.artifacts.list).toBe("function");
   });
 
   it("search.query procedure exists on appRouter", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.search.query).toBe("function");
   });
 
   it("notify.list procedure exists on appRouter", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.notify.list).toBe("function");
   });
 
   it("audit.query procedure exists on appRouter", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.audit.query).toBe("function");
   });
 
   it("routing.list procedure exists on appRouter", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.routing.list).toBe("function");
   });
 
   it("skills.list procedure exists on appRouter (via fulcrum_skills alias)", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     // skills exposed both as 'skills' and 'fulcrum_skills'
     expect(typeof caller.fulcrum_skills.list).toBe("function");
   });
 
   it("webhooks.list procedure exists on appRouter", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.webhooks.list).toBe("function");
   });
 
   it("connectors.list procedure exists on appRouter", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.connectors.list).toBe("function");
   });
 
   it("flags.list procedure exists on appRouter", async () => {
-    const { createLocalCaller } = await import("../../src/cli/local-caller.ts");
+    const { createLocalCaller } = await import("@fulcrum/cli/local-caller.ts");
     const caller = await createLocalCaller();
     expect(typeof caller.flags.list).toBe("function");
   });

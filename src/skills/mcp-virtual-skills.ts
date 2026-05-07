@@ -13,7 +13,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { BUILTIN_MCPS } from "../cli/mcp-builtins.ts";
+import { BUILTIN_MCPS } from "@fulcrum/cli/mcp-builtins.ts";
 
 // ── Shared types ───────────────────────────────────────────────────────
 

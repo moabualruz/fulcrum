@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { describe, expect, test } from "bun:test";
 
 import { generateCliFiles } from "../../scripts/cli/codegen.ts";
-import { generateCompletionScripts } from "../../src/cli/completion.ts";
+import { generateCompletionScripts } from "@fulcrum/cli/completion.ts";
 
 const root = resolve(import.meta.dir, "../..");
 
@@ -58,7 +58,7 @@ const taskVerbs = [
 describe("CLI shell completions", () => {
   test("generates non-empty bash, zsh, and fish scripts covering domains and task verbs", async () => {
     const scripts = await generateCompletionScripts({
-      routerPath: join(root, "src/server/trpc/router.ts"),
+      routerPath: join(root, "apps/server/src/trpc/router.ts"),
     });
 
     for (const shell of ["bash", "zsh", "fish"] as const) {
@@ -78,14 +78,14 @@ describe("CLI shell completions", () => {
     const scratch = await mkdtemp(join(tmpdir(), "fulcrum-completions-"));
     try {
       await generateCliFiles({
-        routerPath: join(root, "src/server/trpc/router.ts"),
+        routerPath: join(root, "apps/server/src/trpc/router.ts"),
         outDir: join(scratch, "generated"),
         completionsDir: join(scratch, "scripts"),
         useAst: true,
       });
 
       const runtime = await generateCompletionScripts({
-        routerPath: join(root, "src/server/trpc/router.ts"),
+        routerPath: join(root, "apps/server/src/trpc/router.ts"),
       });
 
       expect(await readFile(join(scratch, "scripts", "completions.sh"), "utf8")).toBe(runtime.bash);
@@ -98,7 +98,7 @@ describe("CLI shell completions", () => {
 
   test("committed static completion scripts match runtime generation", async () => {
     const runtime = await generateCompletionScripts({
-      routerPath: join(root, "src/server/trpc/router.ts"),
+      routerPath: join(root, "apps/server/src/trpc/router.ts"),
     });
 
     expect(await readFile(join(root, "scripts/cli/completions.sh"), "utf8")).toBe(runtime.bash);

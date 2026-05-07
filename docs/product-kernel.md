@@ -52,7 +52,7 @@ bun test src/product-kernel/events.test.ts
 bun test src/product-kernel/search.test.ts
 bun test src/product-kernel/context.test.ts
 bun test src/product-kernel/jobs.test.ts
-bun test src/cli/product.test.ts src/cli/doctor.test.ts src/cli/uninstall.test.ts
+bun test apps/cli/src/product.test.ts apps/cli/src/doctor.test.ts apps/cli/src/uninstall.test.ts
 bun run --bun tsc --noEmit
 bun run ci
 ```
@@ -76,4 +76,4 @@ fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
 
 ## Web shell
 
-SvelteKit 2 + shadcn-svelte web shell at `src/web/`, same PGlite product DB CLI uses (`${FULCRUM_HOME}/state/product/db/main`). Surfaces all CLI domains as interactive views: `/` dashboard, `/projects`, `/docs` (Markdown editor), `/boards` (drag/drop kanban), `/runs` (filterable run list + detail w/ cancel/retry), `/search` (full-text), global cmd+K palette. Form actions return uniform `ActionResult` shape; layout `Toaster` bridge surfaces success/error toasts. Heavy queries stream via SvelteKit `streamed` loader so route headers paint while data resolves; `RouteSkeleton` placeholders fill pending branch.
+SvelteKit 2 + shadcn-svelte web shell at `apps/web/`, same PGlite product DB CLI uses (`${FULCRUM_HOME}/state/product/db/main`). Surfaces all CLI domains as interactive views: `/` dashboard, `/projects`, `/docs` (Markdown editor), `/boards` (drag/drop kanban), `/runs` (filterable run list + detail w/ cancel/retry), `/search` (full-text), global cmd+K palette. Form actions return uniform `ActionResult` shape; layout `Toaster` bridge surfaces success/error toasts. Heavy queries stream via SvelteKit `streamed` loader so route headers paint while data resolves; `RouteSkeleton` placeholders fill pending branch.

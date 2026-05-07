@@ -14,7 +14,7 @@ describe("Phase 09 RED gates", () => {
   });
 
   test("web Vitest enforces coverage.thresholds.lines at 80", async () => {
-    const config = await read("src/web/vitest.config.ts");
+    const config = await read("apps/web/vitest.config.ts");
 
     expect(config).toContain("coverage:");
     expect(config).toContain("thresholds:");

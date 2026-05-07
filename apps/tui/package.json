@@ -1,0 +1,6 @@
+{
+  "name": "@fulcrum/tui",
+  "private": true,
+  "type": "module",
+  "module": "src/index.ts"
+}

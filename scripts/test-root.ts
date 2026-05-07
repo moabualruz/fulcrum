@@ -22,7 +22,7 @@ async function collect(root: string): Promise<string[]> {
   for (const entry of entries) {
     if (SKIP_DIRS.has(entry)) continue;
     const path = join(root, entry);
-    if (path === "src/web") continue;
+    if (path === "apps/web") continue;
     if (SKIP_PATHS.has(path)) continue;
     const info = await stat(path);
     if (info.isDirectory()) {

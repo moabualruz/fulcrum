@@ -25,15 +25,15 @@ describe("Phase 09 coverage threshold gates", () => {
     const web = STEPS.find((step) => step.name === "coverage:web");
 
     expect(root?.cmd).toEqual(["bun", "run", "scripts/test-root.ts", "--coverage"]);
-    expect(web?.cwd).toBe("src/web");
+    expect(web?.cwd).toBe("apps/web");
     expect(web?.cmd).toEqual(["bun", "run", "web:test", "--", "--coverage"]);
   });
 
   test("web Vitest coverage uses v8 provider and 80 percent lines", () => {
-    const pkg = JSON.parse(readFileSync("src/web/package.json", "utf8")) as {
+    const pkg = JSON.parse(readFileSync("apps/web/package.json", "utf8")) as {
       devDependencies?: Record<string, string>;
     };
-    const config = readFileSync("src/web/vitest.config.ts", "utf8");
+    const config = readFileSync("apps/web/vitest.config.ts", "utf8");
 
     expect(pkg.devDependencies?.["@vitest/coverage-v8"]).toBe("^4.1.5");
     expect(config).toContain('provider: "v8"');

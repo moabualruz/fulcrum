@@ -28,9 +28,9 @@ import { Invitation } from "../../src/db/entities/auth/Invitation.ts";
 import { OrgMemberRepository } from "../../src/db/repositories/auth/OrgMemberRepository.ts";
 import { InvitationRepository } from "../../src/db/repositories/auth/InvitationRepository.ts";
 import { FlagRegistry } from "../../src/flags/registry.ts";
-import { appRouter } from "../../src/trpc/router.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { t } from "../../src/trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 
 const TEST_ORG_ID = "00000000-0000-0000-0000-000000000001"; // nil-adjacent — DB seed only
 const TEST_OWNER_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";

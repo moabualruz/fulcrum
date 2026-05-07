@@ -103,7 +103,7 @@ export async function generateCliFiles(options: GenerateCliFilesOptions): Promis
 
   if (options.completionsDir !== undefined) {
     const completionsDir = resolve(options.completionsDir);
-    const { emitCompletionScripts } = await import("../../src/cli/completion.ts");
+    const { emitCompletionScripts } = await import("@fulcrum/cli/completion.ts");
     const scripts = emitCompletionScripts(domains);
     await mkdir(completionsDir, { recursive: true });
     await Promise.all([
@@ -671,8 +671,8 @@ function camel(value: string): string {
 if (import.meta.main) {
   const args = new Set(Bun.argv.slice(2));
   const root = resolve(import.meta.dir, "../..");
-  const routerPath = join(root, "src/server/trpc/router.ts");
-  const outDir = join(root, "src/cli/generated");
+  const routerPath = join(root, "apps/server/src/trpc/router.ts");
+  const outDir = join(root, "apps/cli/src/generated");
   const completionsDir = join(root, "scripts/cli");
   const start = performance.now();
   await generateCliFiles({ routerPath, outDir, completionsDir, useAst: !args.has("--no-ast") });

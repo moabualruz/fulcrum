@@ -11,7 +11,7 @@
  *   4. `fulcrum auth invite <email> --role member --json` calls auth.invite.
  *   5. Unimplemented login/logout exit non-zero.
  *
- * These tests call run() from src/cli/commands/auth.ts directly, passing a
+ * These tests call run() from apps/cli/src/commands/auth.ts directly, passing a
  * pre-built container/caller so no DB connection is needed.
  */
 
@@ -108,7 +108,7 @@ async function runFulcrum(args: readonly string[], fulcrumHome: string) {
 
 describe("auth.run — whoami --json", () => {
   it("prints JSON with userId, orgId, email, role and exits 0", async () => {
-    const { run } = await import("../../src/cli/commands/auth.ts");
+    const { run } = await import("@fulcrum/cli/commands/auth.ts");
 
     const lines: string[] = [];
     let exitCode: number | undefined;
@@ -130,7 +130,7 @@ describe("auth.run — whoami --json", () => {
   });
 
   it("prints human-readable text when --json not passed", async () => {
-    const { run } = await import("../../src/cli/commands/auth.ts");
+    const { run } = await import("@fulcrum/cli/commands/auth.ts");
 
     const lines: string[] = [];
 
@@ -147,7 +147,7 @@ describe("auth.run — whoami --json", () => {
   });
 
   it("calls exit(1) and prints to stderr on UNAUTHORIZED", async () => {
-    const { run } = await import("../../src/cli/commands/auth.ts");
+    const { run } = await import("@fulcrum/cli/commands/auth.ts");
 
     const errLines: string[] = [];
     let exitCode: number | undefined;
@@ -174,7 +174,7 @@ describe("root entrypoint — auth", () => {
     });
   });
 
-  it("runs whoami through src/index.ts without a fake caller", async () => {
+  it("runs whoami through apps/cli/src/main.ts without a fake caller", async () => {
     await withFulcrumHome(async (home) => {
       const init = await runFulcrum(["init"], home);
       expect(init.exitCode).toBe(0);
@@ -202,7 +202,7 @@ describe("root entrypoint — auth", () => {
     });
   });
 
-  it("runs invite through src/index.ts without a fake caller", async () => {
+  it("runs invite through apps/cli/src/main.ts without a fake caller", async () => {
     await withFulcrumHome(async (home) => {
       const init = await runFulcrum(["init"], home);
       expect(init.exitCode).toBe(0);
@@ -229,7 +229,7 @@ describe("root entrypoint — auth", () => {
 
 describe("auth.run — invite", () => {
   it("invite creates an invitation and prints JSON", async () => {
-    const { run } = await import("../../src/cli/commands/auth.ts");
+    const { run } = await import("@fulcrum/cli/commands/auth.ts");
 
     let exitCode: number | undefined;
     const lines: string[] = [];
@@ -250,7 +250,7 @@ describe("auth.run — invite", () => {
 
 describe("auth.run — login / logout not implemented", () => {
   it("login --non-interactive exits 1", async () => {
-    const { run } = await import("../../src/cli/commands/auth.ts");
+    const { run } = await import("@fulcrum/cli/commands/auth.ts");
 
     let exitCode: number | undefined;
     const errLines: string[] = [];
@@ -267,7 +267,7 @@ describe("auth.run — login / logout not implemented", () => {
   });
 
   it("logout exits 1", async () => {
-    const { run } = await import("../../src/cli/commands/auth.ts");
+    const { run } = await import("@fulcrum/cli/commands/auth.ts");
 
     let exitCode: number | undefined;
     const errLines: string[] = [];

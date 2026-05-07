@@ -36,7 +36,7 @@ async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
 
 describe("cross-cutting CLI surfaces", () => {
   it("i18n list --json returns supported locales and default locale", async () => {
-    const { runI18n } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runI18n } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
 
     await runI18n(["list", "--json"], h);
@@ -48,7 +48,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("i18n set --locale fr --json returns locale and text direction", async () => {
-    const { runI18n } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runI18n } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
 
     await runI18n(["set", "--locale", "fr", "--json"], h);
@@ -57,7 +57,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("theme list --json returns typed theme settings", async () => {
-    const { runTheme } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runTheme } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
 
     await runTheme(["list", "--json"], {
@@ -76,7 +76,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("theme set --key theme.accent --value #2563EB --json returns updated setting", async () => {
-    const { runTheme } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runTheme } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
     let input: { key: string; value: string } | undefined;
 
@@ -101,7 +101,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("secrets set reads stdin and never prints secret value", async () => {
-    const { runSecrets } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runSecrets } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
     let storedValue = "";
 
@@ -128,7 +128,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("secrets set --name --value returns metadata only", async () => {
-    const { runSecrets } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runSecrets } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
 
     await runSecrets(["set", "--name", "API_KEY", "--value", "sk-live-secret", "--json"], {
@@ -155,7 +155,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("secrets rotate --name returns provider status metadata only", async () => {
-    const { runSecrets } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runSecrets } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
 
     await runSecrets(["rotate", "--name", "API_KEY", "--json"], {
@@ -181,7 +181,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("secrets get --json masks values by default", async () => {
-    const { runSecrets } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runSecrets } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
 
     await runSecrets(["get", "MY_KEY", "--json"], {
@@ -201,7 +201,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("errors list --since filters through caller and emits JSON", async () => {
-    const { runErrors } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runErrors } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
     let since: Date | undefined;
 
@@ -222,7 +222,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("error-logs get and purge emit JSON", async () => {
-    const { runErrors } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runErrors } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const getHarness = harness();
     await runErrors(["get", "err-1", "--json"], {
       caller: {
@@ -249,7 +249,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("backup --output writes dump, reports progress on stderr, and emits manifest JSON", async () => {
-    const { runBackup } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runBackup } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
 
     await withTempDir(async (dir) => {
       const h = harness();
@@ -277,7 +277,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("backup create, restore --dump, and verify emit JSON parity payloads", async () => {
-    const { runBackup } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runBackup } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const createHarness = harness();
 
     await runBackup(["create", "--json"], {
@@ -345,7 +345,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("restore --dry-run returns collisions and exits 0", async () => {
-    const { runRestore } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runRestore } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
 
     await runRestore(["--input", "/tmp/b.tar.gz", "--dry-run", "--json"], {
@@ -369,7 +369,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("telemetry status --json returns opt-in status and row count", async () => {
-    const { runTelemetry } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runTelemetry } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
 
     await runTelemetry(["status", "--json"], {
@@ -385,7 +385,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("telemetry opt-in, opt-out, and purge emit JSON", async () => {
-    const { runTelemetry } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runTelemetry } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
     const calls: string[] = [];
 
@@ -407,7 +407,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("flags set validates rollout percent and emits requested shape", async () => {
-    const { runFlags } = await import("../../src/cli/commands/flags.ts");
+    const { runFlags } = await import("@fulcrum/cli/commands/flags.ts");
     const h = harness();
 
     await runFlags(["set", "my-feature", "--enabled", "--rollout-percent", "50", "--json"], {
@@ -432,7 +432,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("data export blocks csv when import-csv/export-csv flag is disabled", async () => {
-    const { runDataExport } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runDataExport } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
 
     await runDataExport(["--format", "csv", "--entity", "tasks", "--output", "/tmp/tasks.csv"], {
@@ -448,7 +448,7 @@ describe("cross-cutting CLI surfaces", () => {
   });
 
   it("data export and import commands emit JSON with entity counts", async () => {
-    const { runDataExport, runDataImport } = await import("../../src/cli/commands/cross-cutting-platform.ts");
+    const { runDataExport, runDataImport } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
 
     await withTempDir(async (dir) => {
       const exportHarness = harness();

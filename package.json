@@ -4,20 +4,20 @@
   "description": "Multi-agent foundation CLI — hooks, skills, rules across Claude Code, Codex, Gemini, OpenCode, Pi.",
   "type": "module",
   "private": true,
-  "module": "src/index.ts",
+  "module": "apps/cli/src/main.ts",
   "bin": {
-    "fulcrum": "src/index.ts"
+    "fulcrum": "apps/cli/src/main.ts"
   },
   "scripts": {
-    "dev": "bun run src/index.ts",
-    "build": "bun build --compile --minify --target=bun-darwin-arm64 src/index.ts --outfile=dist/fulcrum-darwin-arm64",
+    "dev": "bun run apps/cli/src/main.ts",
+    "build": "bun build --compile --minify --target=bun-darwin-arm64 apps/cli/src/main.ts --outfile=dist/fulcrum-darwin-arm64",
     "build:all": "bun run scripts/build-all.ts",
     "test": "bun test",
     "lint": "bun run --bun tsc --noEmit",
     "lint:boundaries": "bun run scripts/check-module-boundaries.ts",
     "ci": "bun run scripts/ci.ts",
     "changelog": "git-cliff -o CHANGELOG.md",
-    "compress": "bun run src/index.ts compress",
+    "compress": "bun run apps/cli/src/main.ts compress",
     "release": "bun run scripts/release.ts"
   },
   "engines": {

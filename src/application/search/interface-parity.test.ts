@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { MikroORM } from "@mikro-orm/postgresql";
 
-import { run as runSearchCommand } from "../../cli/commands/search.ts";
-import { createLocalCaller } from "../../cli/local-caller.ts";
+import { run as runSearchCommand } from "@fulcrum/cli/commands/search.ts";
+import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
 import { Org } from "../../db/entities/auth/Org.ts";
 import { Session } from "../../db/entities/auth/Session.ts";
 import { SearchDocument } from "../../db/entities/search/SearchDocument.ts";
 import { createTestContainer, createTestOrm, type TestOrm } from "../../test-utils/index.ts";
-import { appRouter } from "../../trpc/router.ts";
-import { createContext } from "../../trpc/context.ts";
-import { t } from "../../trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { searchDocuments } from "./queries.ts";
 
 let db: TestOrm | null = null;
