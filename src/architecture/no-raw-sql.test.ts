@@ -137,8 +137,6 @@ const EXPECTED_RAW_SQL_CALL_FILES = [
   "src/cli/interactive/backup.ts",
   "src/cli/interactive/restore.ts",
   "src/router/domain-adapter.ts",
-  "src/server/trpc/routers/backup.ts",
-  "src/server/trpc/routers/json-import-export.ts",
   "src/web/src/lib/server/agents.ts",
   "src/web/src/lib/server/audit.ts",
   "src/web/src/lib/server/custom-fields.ts",

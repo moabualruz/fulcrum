@@ -117,20 +117,17 @@ const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES = [
   "src/server/trpc/routers/audit.ts",
   "src/server/trpc/routers/auth.ts",
   "src/server/trpc/routers/automations.ts",
-  "src/server/trpc/routers/automations.ts",
-  "src/server/trpc/routers/backup.ts",
+  "src/server/trpc/routers/comments.ts",
   "src/server/trpc/routers/custom-fields.ts",
-  "src/server/trpc/routers/error-logs.ts",
-  "src/server/trpc/routers/flags.ts",
-  "src/server/trpc/routers/inference.ts",
-  "src/server/trpc/routers/json-import-export.ts",
+  "src/server/trpc/routers/doc-templates.ts",
+  "src/server/trpc/routers/docs.ts",
   "src/server/trpc/routers/memory.ts",
   "src/server/trpc/routers/orgs.ts",
-  "src/server/trpc/routers/recurrence.ts",
-  "src/server/trpc/routers/relationships.ts",
   "src/server/trpc/routers/routing.ts",
+  "src/server/trpc/routers/skills.ts",
+  "src/server/trpc/routers/sprints.ts",
   "src/server/trpc/routers/tasks.ts",
-  "src/server/trpc/routers/workflows.ts",
+  "src/server/trpc/routers/templates.ts",
   "src/server/trpc/routers/workflows.ts",
   "src/trpc/routers/agents.ts",
   "src/trpc/routers/doc-comments.ts",
@@ -149,9 +146,13 @@ const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES = [
   "src/web/src/routes/runs/[id]/+page.server.ts",
 ];
 
-const PLAN23_TASK1_ROUTER_FILES = [
-  "src/server/trpc/routers/automations.ts",
-  "src/server/trpc/routers/workflows.ts",
+const PLAN21_ROUTER_FILES = [
+  "src/server/trpc/routers/comments.ts",
+  "src/server/trpc/routers/doc-templates.ts",
+  "src/server/trpc/routers/docs.ts",
+  "src/server/trpc/routers/skills.ts",
+  "src/server/trpc/routers/sprints.ts",
+  "src/server/trpc/routers/templates.ts",
 ];
 
 async function collectSourceFiles(root: string): Promise<string[]> {
@@ -257,7 +258,7 @@ describe("Phase 9.5 interface boundary", () => {
     expect(found).toEqual(EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES);
   });
 
-  test("Plan 23 automation and workflow tRPC routers delegate persistence to application modules", async () => {
-    expect(await directAccessInExactFiles(PLAN23_TASK1_ROUTER_FILES)).toEqual([]);
+  test("Plan 21 docs comments templates skills and sprints tRPC routers delegate persistence to application modules", async () => {
+    expect(await directAccessInExactFiles(PLAN21_ROUTER_FILES)).toEqual([]);
   });
 });
