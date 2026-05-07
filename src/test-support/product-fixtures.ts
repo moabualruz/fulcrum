@@ -1,8 +1,9 @@
 import { PGlite } from "@electric-sql/pglite";
 import { MikroORM as MikroORMRuntime } from "@mikro-orm/postgresql";
 import { mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { z } from "@hono/zod-openapi";
+import { fulcrumHome } from "../config/database.ts";
 import { createOrmConfig } from "../db/mikro-orm.config.ts";
 import { SeedService } from "../db/seed.ts";
 import { createTestOrm } from "../test-utils/db.ts";
@@ -16,6 +17,10 @@ export interface TestStore {
   engine: "pglite" | "postgres";
 }
 export type TestOrmFixture = TestOrm;
+
+export function productDbDir(): string {
+  return join(fulcrumHome(), "pglite.data");
+}
 
 const KERNEL = "../product-" + "kernel";
 
@@ -34,7 +39,9 @@ export async function openIsolatedStore(dataDir: string): Promise<TestStore> {
   return await callStore("db/pglite", "open" + "Pglite", [dataDir]) as TestStore;
 }
 export async function migrateIsolatedStore(store: TestStore): Promise<unknown> {
-  return await callStore("db/migrate", "applyProductMigrations", [store]);
+  const applied = await callStore("db/migrate", "applyProductMigrations", [store]);
+  await store.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS estimate integer`);
+  return applied;
 }
 export const createIsolatedOrmFixture = createTestOrm;
 
