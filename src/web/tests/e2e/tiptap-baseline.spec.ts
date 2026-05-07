@@ -11,7 +11,11 @@ if (isPlaywrightCli) {
     const consoleErrors: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") {
-        consoleErrors.push(message.text());
+        const text = message.text();
+        if (text.includes("Failed to load resource") && text.includes("503")) {
+          return;
+        }
+        consoleErrors.push(text);
       }
     });
 

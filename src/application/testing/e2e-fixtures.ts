@@ -1,5 +1,7 @@
 import { indexSearchDocument } from "../../product-kernel/search.ts";
 import type { ProductDb } from "../../product-kernel/db/types.ts";
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { indexSearchDocumentOrm } from "../orm-helpers.ts";
 
 export interface E2eSeedTaskInput {
   projectId: string;
@@ -44,8 +46,8 @@ export async function seedE2eProject(
 ): Promise<{ id: string }> {
   const id = crypto.randomUUID();
   await db.query(
-    `INSERT INTO projects (id, org_id, name) VALUES ($1, $2, $3)`,
-    [id, orgId, name ?? slug],
+    `INSERT INTO projects (id, org_id, slug, name) VALUES ($1, $2, $3, $4)`,
+    [id, orgId, slug, name ?? slug],
   );
   return { id };
 }
@@ -90,18 +92,28 @@ export async function seedE2eArtifact(
     [runId, orgId, "e2e-fixture", "succeeded"],
   );
   await db.query(
-    `INSERT INTO artifacts (id, org_id, run_id, task_id, path, filename, mime, size_bytes, checksum_sha256, archived_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, ${input.archived ? "now()" : "NULL"})`,
+    `INSERT INTO artifacts (
+       id, org_id, project_id, run_id, task_id, kind, title, body_path, sha256, size,
+       path, filename, mime, size_bytes, checksum_sha256, archived
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
     [
       id,
       orgId,
+      input.projectId ?? null,
       runId,
       input.taskId ?? null,
+      input.kind ?? "file",
+      input.title,
+      input.bodyPath ?? input.title,
+      input.sha256 ?? null,
+      input.size ?? null,
       input.bodyPath ?? input.title,
       input.title,
       input.mime ?? "application/octet-stream",
       input.size ?? null,
       input.sha256 ?? null,
+      input.archived ?? false,
     ],
   );
   return { id, runId };
@@ -127,6 +139,26 @@ export async function seedE2eSearchKinds(
   return { sourceIds };
 }
 
+export async function seedE2eSearchKindsOrm(
+  em: EntityManager,
+  orgId: string,
+  input: { common: string; kinds: readonly string[] },
+): Promise<{ sourceIds: string[] }> {
+  const sourceIds: string[] = [];
+  for (const kind of input.kinds) {
+    const sourceId = `${kind}-e2e-${crypto.randomUUID()}`;
+    await indexSearchDocumentOrm(em, {
+      orgId,
+      sourceKind: kind,
+      sourceId,
+      title: `${input.common} ${kind} title`,
+      body: `${input.common} ${kind} body`,
+    });
+    sourceIds.push(sourceId);
+  }
+  return { sourceIds };
+}
+
 export async function cleanupE2eFixtures(
   db: ProductDb,
   input: E2eCleanupInput,
@@ -134,13 +166,26 @@ export async function cleanupE2eFixtures(
   await deleteByIds(db, "artifacts", input.artifactIds);
   await deleteByIds(db, "documents", input.docIds);
   await deleteByIds(db, "tasks", input.taskIds);
-  await deleteByIds(db, "search_documents", input.searchSourceIds, "source_id");
+  await deleteSearchDocuments(db, input.searchSourceIds);
 
   for (const id of input.projectIds ?? []) {
     await db.query("DELETE FROM events WHERE project_id = $1", [id]);
     await db.query("DELETE FROM projects WHERE id = $1", [id]);
   }
   await deleteByIds(db, "agent_runs", input.runIds);
+}
+
+async function deleteSearchDocuments(
+  db: ProductDb,
+  ids: readonly string[] | undefined,
+): Promise<void> {
+  const columns = await db.query<{ column_name: string }>(
+    `SELECT column_name FROM information_schema.columns WHERE table_name = $1`,
+    ["search_documents"],
+  );
+  const columnNames = new Set(columns.map((row) => row.column_name));
+  const idColumn = columnNames.has("source_id") ? "source_id" : "entity_id";
+  await deleteByIds(db, "search_documents", ids, idColumn);
 }
 
 async function deleteByIds(

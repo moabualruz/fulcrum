@@ -85,17 +85,33 @@
     closeSheet();
   }
 
-  function onCardKeydown(event: KeyboardEvent): void {
+  function tasksFromSnapshot(next: typeof snapshot): BoardTask[] {
+    return TASK_STATUSES.flatMap((status) => next.groups[status]);
+  }
+
+  async function onCardKeydown(event: KeyboardEvent): Promise<void> {
     const target = event.target as HTMLElement | null;
     const taskId = target?.closest<HTMLElement>("[data-task-id]")?.dataset["taskId"] ?? null;
     if (!taskId) return;
     const arrows = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"] as const;
     if (!(arrows as readonly string[]).includes(event.key)) return;
+    const fromStatus = TASK_STATUSES.find((status) =>
+      snapshot.groups[status].some((task) => task.id === taskId),
+    );
     const result = keyboardMove(snapshot, taskId, {
       key: event.key as (typeof arrows)[number],
       withMod: event.metaKey || event.ctrlKey,
     });
-    if (result.description) { announcement = result.description; event.preventDefault(); }
+    if (!result.description) return;
+    announcement = result.description;
+    event.preventDefault();
+    resolvedTasks = tasksFromSnapshot(result.next);
+    if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && fromStatus) {
+      const toStatus = TASK_STATUSES.find((status) =>
+        result.next.groups[status].some((task) => task.id === taskId),
+      );
+      if (toStatus && toStatus !== fromStatus) await onMove({ taskId, fromStatus, toStatus });
+    }
   }
 </script>
 
@@ -128,7 +144,13 @@
 {#await data.streamed.data}
   <RouteSkeleton kind="board" />
 {:then _payload}
-  <div data-project-board-grid class="flex gap-3 overflow-x-auto pb-2" onkeydown={onCardKeydown} role="presentation">
+  <div
+    data-project-board-grid
+    data-testid="kanban-board"
+    class="flex gap-3 overflow-x-auto pb-2"
+    onkeydown={onCardKeydown}
+    role="presentation"
+  >
     {#each TASK_STATUSES as status (status)}
       <BoardColumn
         {status}

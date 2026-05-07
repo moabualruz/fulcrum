@@ -186,6 +186,18 @@ function emptySession(): HydratedSession {
   return { session: null, orgId: null, userId: null };
 }
 
+async function localDevSession(requestRuntime: WebRequestRuntime | null): Promise<HydratedSession> {
+  return {
+    session: {
+      id: "local-dev-session",
+      userId: "local-admin",
+      expiresAt: new Date(Date.now() + 86400000),
+    } as App.Locals["session"],
+    orgId: requestRuntime?.em ? await getDefaultOrgIdOrm(requestRuntime.em) : null,
+    userId: "local-admin",
+  };
+}
+
 export async function __getWebRuntimeForTest(): Promise<{
   em: EntityManager;
   container: Container;
@@ -246,6 +258,9 @@ export const handle: Handle = async ({ event, resolve }) => {
         locale = await readPersistedLocale(requestRuntime.container);
       }
       const sessionState = await hydrateSession(request, runtime?.authHandler ?? null);
+      const effectiveSessionState = !sessionState.session && !process.env["FULCRUM_REQUIRE_AUTH"]
+        ? await localDevSession(requestRuntime)
+        : sessionState;
 
       // 4. tRPC handler on /api/trpc/**
       //    fetchRequestHandler passes the Request + context to appRouter.
@@ -257,9 +272,9 @@ export const handle: Handle = async ({ event, resolve }) => {
           router: trpc.appRouter,
           createContext: ({ resHeaders }) =>
             trpc.createContext({
-              session: sessionState.session,
-              orgId: sessionState.orgId,
-              userId: sessionState.userId,
+              session: effectiveSessionState.session,
+              orgId: effectiveSessionState.orgId,
+              userId: effectiveSessionState.userId,
               em: requestRuntime?.em ?? null,
               container: requestRuntime?.container ?? null,
               db: getDatabase(),
@@ -270,23 +285,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 
       // 5. Session hydration for non-auth/non-trpc routes
       //    Better-Auth reads the session cookie and validates it against the DB.
-      event.locals.session = sessionState.session;
-      event.locals.orgId = sessionState.orgId;
+      const routeSessionState = url.pathname.startsWith("/auth") ? sessionState : effectiveSessionState;
+      event.locals.session = routeSessionState.session;
+      event.locals.orgId = routeSessionState.orgId;
+      event.locals.userId = routeSessionState.userId;
 
       // In local/dev mode, auto-create a session so users don't need to log in.
       // Production (SaaS) mode requires real auth via Better-Auth.
-      if (!event.locals.session && !process.env["FULCRUM_REQUIRE_AUTH"] && !url.pathname.startsWith("/auth")) {
-        event.locals.session = {
-          id: "local-dev-session",
-          userId: "local-admin",
-          expiresAt: new Date(Date.now() + 86400000),
-        } as App.Locals["session"];
-        event.locals.orgId = requestRuntime?.em
-          ? await getDefaultOrgIdOrm(requestRuntime.em)
-          : null;
-        event.locals.userId = "local-admin";
-      }
-
       // Auth guard — only active when FULCRUM_REQUIRE_AUTH is set (SaaS mode).
       if (
         !event.locals.session &&

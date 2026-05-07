@@ -113,7 +113,7 @@
                 <li class="flex items-center justify-between gap-4">
                   <span class="text-sm text-foreground">{shortcut.description}</span>
                   <span class="flex shrink-0 items-center gap-1">
-                    {#each shortcut.keys as key (key)}
+                    {#each shortcut.keys as key, i (`${key}-${i}`)}
                       <kbd
                         class={cn(
                           "inline-flex items-center rounded border border-border bg-muted",

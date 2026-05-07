@@ -1426,6 +1426,38 @@
       "name": "artifacts",
       "schema": "public",
       "columns": {
+        "archived": {
+          "name": "archived",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "false",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "boolean"
+        },
+        "body_path": {
+          "name": "body_path",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
         "checksum_sha256": {
           "name": "checksum_sha256",
           "type": "varchar(64)",
@@ -1489,6 +1521,22 @@
           "comment": null,
           "enumItems": [],
           "mappedType": "uuid"
+        },
+        "kind": {
+          "name": "kind",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": "'file'",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
         },
         "metadata_json": {
           "name": "metadata_json",
@@ -1554,6 +1602,22 @@
           "enumItems": [],
           "mappedType": "string"
         },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "uuid"
+        },
         "retention_until": {
           "name": "retention_until",
           "type": "timestamptz(6)",
@@ -1586,6 +1650,38 @@
           "enumItems": [],
           "mappedType": "uuid"
         },
+        "sha256": {
+          "name": "sha256",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "size": {
+          "name": "size",
+          "type": "bigint",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "bigint"
+        },
         "size_bytes": {
           "name": "size_bytes",
           "type": "bigint",
@@ -1617,9 +1713,49 @@
           "comment": null,
           "enumItems": [],
           "mappedType": "uuid"
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": "'Untitled artifact'",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
         }
       },
       "indexes": [
+        {
+          "columnNames": [
+            "org_id",
+            "archived",
+            "created_at"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "artifacts_org_archived_date",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "project_id",
+            "created_at"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "artifacts_org_project_date",
+          "primary": false,
+          "unique": false
+        },
         {
           "columnNames": [
             "org_id",
@@ -11182,6 +11318,22 @@
           "enumItems": [],
           "mappedType": "datetime"
         },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
         "enabled_task_types": {
           "name": "enabled_task_types",
           "type": "jsonb",
@@ -11298,6 +11450,22 @@
           "enumItems": [],
           "mappedType": "uuid"
         },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
         "task_sequence": {
           "name": "task_sequence",
           "type": "int",
@@ -11359,6 +11527,17 @@
           "primary": false,
           "unique": true,
           "expression": "CREATE UNIQUE INDEX projects_org_key ON public.projects USING btree (org_id, key) WHERE (key IS NOT NULL)"
+        },
+        {
+          "columnNames": [
+            "org_id",
+            "slug"
+          ],
+          "composite": true,
+          "constraint": false,
+          "keyName": "projects_org_slug",
+          "primary": false,
+          "unique": true
         },
         {
           "columnNames": [

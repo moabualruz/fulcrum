@@ -11,7 +11,9 @@ test.describe("Phase 9.5 critical command palette and settings journeys", () => 
   test("critical journey 09: command palette opens and searches registered routes", async ({ page }) => {
     await expectOkPage(page, "/");
     await page.waitForFunction(() => document.body.dataset.fulcrumHydrated === "true");
-    await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
+    await page.evaluate(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }));
+    });
     await expect(page.locator("[data-command-palette][data-state='open']")).toBeVisible();
     await page.locator("[data-command-palette-input]").fill("settings");
     await expect(page.locator("[data-command-palette-item]").first()).toContainText(/Settings|Search Results/);

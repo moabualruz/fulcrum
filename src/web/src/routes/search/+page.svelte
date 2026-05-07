@@ -116,6 +116,7 @@
         <label class={cn("flex items-center gap-2 cursor-pointer")}>
           <input
             type="checkbox"
+            data-testid="facet-chip"
             data-kind-checkbox={kind}
             checked={selectedKinds.includes(kind)}
             onchange={() => toggleKind(kind)}

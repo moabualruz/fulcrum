@@ -55,5 +55,10 @@ export async function deleteArtifactForWeb(
   if (!guard.ok) return;
   if (input.hard) {
     await deleteArtifactAction(em, input.id, ctx.orgId);
+    return;
   }
+  await em.getConnection().execute(
+    `UPDATE artifacts SET archived = true WHERE id = ? AND org_id = ?`,
+    [input.id, ctx.orgId],
+  );
 }

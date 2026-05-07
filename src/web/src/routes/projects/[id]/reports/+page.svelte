@@ -9,6 +9,7 @@
 	import WipChart from "$lib/components/reports/WipChart.svelte";
 	import ForecastChart from "$lib/components/reports/ForecastChart.svelte";
 	import ReportDatePicker from "$lib/components/reports/ReportDatePicker.svelte";
+	import { page } from "$app/state";
 
 	interface Props {
 		data: PageData;
@@ -18,7 +19,11 @@
 
 	const tabs = ["burndown", "velocity", "cycle-time", "throughput", "wip", "cfd", "forecast"] as const;
 	type Tab = (typeof tabs)[number];
-	let activeTab = $state<Tab>("burndown");
+	function parseTab(value: string | null): Tab {
+		return tabs.includes(value as Tab) ? (value as Tab) : "burndown";
+	}
+
+	let activeTab = $state<Tab>(parseTab(page.url.searchParams.get("tab")));
 
 	const tabLabels: Record<Tab, string> = {
 		burndown: "Burndown",
@@ -102,6 +107,10 @@
 		dateRange = range;
 	}
 
+	$effect(() => {
+		activeTab = parseTab(page.url.searchParams.get("tab"));
+	});
+
 	function exportCsv(tab: Tab) {
 		let rows: string[][] = [];
 		let filename = `${tab}-${data.project.id}.csv`;
@@ -126,6 +135,7 @@
 	}
 </script>
 
+<div data-testid="reports-page">
 <header
 	data-reports-header
 	class={cn("flex items-baseline justify-between gap-4 border-b border-border pb-4 mb-4")}
@@ -171,27 +181,31 @@
 <!-- Tab navigation -->
 <nav data-report-tabs class={cn("flex gap-1 border-b border-border mb-6")} aria-label="Report tabs">
 	{#each tabs as tab}
-		<button
+		<a
+			href={`?tab=${tab}`}
 			data-tab={tab}
+			data-testid={`report-tab-${tab}`}
 			class={cn(
 				"px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
 				activeTab === tab
 					? "border-primary text-primary"
 					: "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
 			)}
+			onpointerdown={() => (activeTab = tab)}
 			onclick={() => (activeTab = tab)}
+			onfocus={() => (activeTab = tab)}
 			aria-selected={activeTab === tab}
 			role="tab"
 		>
 			{tabLabels[tab]}
-		</button>
+		</a>
 	{/each}
 </nav>
 
 <!-- Tab content -->
 <section data-report-content class={cn("min-h-[300px]")}>
 	{#if activeTab === "burndown"}
-		<div data-chart-burndown class={cn("space-y-3")}>
+		<div data-chart-burndown data-testid="chart-burndown" class={cn("space-y-3")}>
 			<div class={cn("flex items-center justify-between")}>
 				<div>
 					<h2 class={cn("text-lg font-semibold")}>Burndown</h2>
@@ -208,7 +222,7 @@
 			<BurndownChart data={burndownData} />
 		</div>
 	{:else if activeTab === "velocity"}
-		<div data-chart-velocity class={cn("space-y-3")}>
+		<div data-chart-velocity data-testid="chart-velocity" class={cn("space-y-3")}>
 			<div class={cn("flex items-center justify-between")}>
 				<div>
 					<h2 class={cn("text-lg font-semibold")}>Velocity</h2>
@@ -225,7 +239,7 @@
 			<VelocityChart data={velocityData} />
 		</div>
 	{:else if activeTab === "cycle-time"}
-		<div data-chart-cycle-time class={cn("space-y-3")}>
+		<div data-chart-cycle-time data-testid="chart-cycle-time" class={cn("space-y-3")}>
 			<div>
 				<h2 class={cn("text-lg font-semibold")}>Cycle Time</h2>
 				<p class={cn("text-sm text-muted-foreground")}>Time from started to completed per task</p>
@@ -233,7 +247,7 @@
 			<CycleTimeChart data={cycleTimeData} percentiles={cycleTimePercentiles} />
 		</div>
 	{:else if activeTab === "throughput"}
-		<div data-chart-throughput class={cn("space-y-3")}>
+		<div data-chart-throughput data-testid="chart-throughput" class={cn("space-y-3")}>
 			<div class={cn("flex items-center justify-between")}>
 				<div>
 					<h2 class={cn("text-lg font-semibold")}>Throughput</h2>
@@ -250,7 +264,7 @@
 			<ThroughputChart data={throughputData} />
 		</div>
 	{:else if activeTab === "wip"}
-		<div data-chart-wip class={cn("space-y-3")}>
+		<div data-chart-wip data-testid="chart-wip" class={cn("space-y-3")}>
 			<div>
 				<h2 class={cn("text-lg font-semibold")}>Work In Progress</h2>
 				<p class={cn("text-sm text-muted-foreground")}>In-progress task count over time</p>
@@ -258,7 +272,7 @@
 			<WipChart data={wipData} />
 		</div>
 	{:else if activeTab === "cfd"}
-		<div data-chart-cfd class={cn("space-y-3")}>
+		<div data-chart-cfd data-testid="chart-cfd" class={cn("space-y-3")}>
 			<div>
 				<h2 class={cn("text-lg font-semibold")}>Cumulative Flow Diagram</h2>
 				<p class={cn("text-sm text-muted-foreground")}>Task distribution across statuses over time</p>
@@ -266,7 +280,7 @@
 			<CfdChart data={cfdData} />
 		</div>
 	{:else if activeTab === "forecast"}
-		<div data-chart-forecast class={cn("space-y-3")}>
+		<div data-chart-forecast data-testid="chart-forecast" class={cn("space-y-3")}>
 			<div>
 				<h2 class={cn("text-lg font-semibold")}>Forecast</h2>
 				<p class={cn("text-sm text-muted-foreground")}>Monte Carlo simulation — P50/P75/P85/P95 completion dates</p>
@@ -279,3 +293,4 @@
 		</div>
 	{/if}
 </section>
+</div>

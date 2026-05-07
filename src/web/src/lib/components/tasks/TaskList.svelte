@@ -12,6 +12,7 @@
 
 <section
   data-task-list
+  data-testid="task-list-table"
   data-virtual-item-height="48"
   data-virtual-overscan="5"
   class={cn("flex flex-col overflow-hidden rounded-md border border-border")}
@@ -19,6 +20,7 @@
   {#each tasks as task (task.id)}
     <a
       data-task-list-row
+      data-testid="task-row"
       data-task-id={task.id}
       data-task-list-link
       href={`/projects/${projectId}/board?task=${task.id}`}

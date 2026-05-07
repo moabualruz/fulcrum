@@ -115,7 +115,20 @@ async function fixturePost<T = unknown>(
   request: APIRequestContext,
   body: Record<string, unknown>,
 ): Promise<T> {
-  const response = await request.post("/api/e2e-fixtures", { data: body });
+  let response: Awaited<ReturnType<APIRequestContext["post"]>> | null = null;
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      response = await request.post("/api/e2e-fixtures", { data: body });
+      break;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 100 * (attempt + 1)));
+    }
+  }
+  if (!response) {
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
   if (!response.ok()) {
     throw new Error(`E2E fixture request failed: ${response.status()} ${await response.text()}`);
   }

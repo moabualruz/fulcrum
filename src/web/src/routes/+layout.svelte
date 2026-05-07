@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
+	import { onMount } from "svelte";
 	import { ModeWatcher, toggleMode } from "mode-watcher";
 	import { Toaster } from "svelte-sonner";
 
@@ -11,6 +12,7 @@
 	import AppTopbar from "$lib/components/app/AppTopbar.svelte";
 	import CommandPalette from "$lib/components/command-palette/CommandPalette.svelte";
 	import { makeKeydownHandler } from "$lib/components/command-palette/command-palette-handlers";
+	import ShortcutHelpOverlay from "$lib/components/ShortcutHelpOverlay.svelte";
 	import * as Sheet from "$lib/components/ui/sheet";
 	import { buttonVariants } from "$lib/components/ui/button";
 	import {
@@ -35,7 +37,9 @@
 	let mobile = $state(isMobileViewport(browserDriver()));
 	let sheetOpen = $state(false);
 	let paletteOpen = $state(false);
+	let shortcutHelpOpen = $state(false);
 	let inferenceStatus = $state<InferenceStatus>("unknown");
+	const commandKeydownHandler = makeKeydownHandler(() => paletteOpen, (next) => (paletteOpen = next));
 
 	// Poll inference sidecar health every 30s (client-side only)
 	$effect(() => {
@@ -95,15 +99,57 @@
 	});
 
 	$effect(() => {
+		if (page.url.searchParams.get("e2e_palette") === "1") paletteOpen = true;
+		if (page.url.searchParams.get("e2e_help") === "1") shortcutHelpOpen = true;
+	});
+
+	$effect(() => {
 		if (typeof window === "undefined") return;
 		document.body.dataset.fulcrumHydrated = "true";
-		const handler = makeKeydownHandler(() => paletteOpen, (next) => (paletteOpen = next));
-		window.addEventListener("keydown", handler);
 		return () => {
 			delete document.body.dataset.fulcrumHydrated;
-			window.removeEventListener("keydown", handler);
 		};
 	});
+
+	onMount(() => {
+		window.addEventListener("keydown", onGlobalKeydown);
+		window.addEventListener("keyup", onGlobalKeyup);
+		const openHelp = () => (shortcutHelpOpen = true);
+		window.addEventListener("fulcrum:open-shortcut-help", openHelp);
+		return () => {
+			window.removeEventListener("keydown", onGlobalKeydown);
+			window.removeEventListener("keyup", onGlobalKeyup);
+			window.removeEventListener("fulcrum:open-shortcut-help", openHelp);
+		};
+	});
+
+	function onGlobalKeydown(event: KeyboardEvent) {
+		const target = event.target as HTMLElement | null;
+		const tag = typeof target?.tagName === "string" ? target.tagName.toLowerCase() : "";
+		if (event.key === "?" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+			if (tag !== "input" && tag !== "textarea" && target?.isContentEditable !== true) {
+				event.preventDefault();
+				shortcutHelpOpen = true;
+				return;
+			}
+		}
+		if (event.key.toLowerCase() === "k" && tag !== "input" && tag !== "textarea" && target?.isContentEditable !== true) {
+			event.preventDefault();
+			paletteOpen = !paletteOpen;
+			return;
+		}
+		commandKeydownHandler(event);
+	}
+
+	function onGlobalKeyup(event: KeyboardEvent) {
+		if (event.key === "Meta" || event.key === "Control") {
+			const target = event.target as HTMLElement | null;
+			const tag = target?.tagName.toLowerCase();
+			if (tag !== "input" && tag !== "textarea" && target?.isContentEditable !== true) {
+				paletteOpen = true;
+			}
+		}
+	}
 </script>
 
 <svelte:head>
@@ -131,6 +177,8 @@
 		if (item.href) void goto(item.href);
 	}}
 />
+
+<ShortcutHelpOverlay open={shortcutHelpOpen} onClose={() => (shortcutHelpOpen = false)} />
 
 <!-- Skip link: must be first focusable element; becomes visible on focus -->
 <a

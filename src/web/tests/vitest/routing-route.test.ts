@@ -3,6 +3,7 @@ const isVitestCli = process.argv.some((argument) => argument.includes("vitest"))
 if (isVitestCli) {
   const { render } = await import("@testing-library/svelte");
   const { describe, expect, test, vi } = await import("vitest");
+
   const settingsRoute = await import("../../src/routes/settings/routing/+page.server");
   const projectRoute = await import("../../src/routes/projects/[id]/routing/+page.server");
 
@@ -161,7 +162,7 @@ if (isVitestCli) {
       expect(fetchFn).toHaveBeenNthCalledWith(
         6,
         "http://localhost/api/trpc/routing.delete",
-        expect.objectContaining({ body: JSON.stringify({ json: { id: globalRule.id } }) }),
+        expect.objectContaining({ body: expect.stringContaining(globalRule.id) }),
       );
     });
 

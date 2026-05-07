@@ -10,6 +10,7 @@ export default defineConfig({
       "$app/environment": new URL("./tests/mocks/app-environment.ts", import.meta.url).pathname,
       "$app/forms": new URL("./tests/mocks/app-forms.ts", import.meta.url).pathname,
       "$app/navigation": new URL("./tests/mocks/app-navigation.ts", import.meta.url).pathname,
+      "$app/state": new URL("./tests/mocks/app-state.ts", import.meta.url).pathname,
       $lib: new URL("./src/lib", import.meta.url).pathname,
     },
   },

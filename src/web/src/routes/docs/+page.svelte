@@ -60,6 +60,7 @@
 
 	<div
 		data-docs-hub
+		data-testid="docs-sidebar"
 		class={cn("mb-4 grid gap-3 lg:grid-cols-2")}
 	>
 		<div data-project-doc-tree>

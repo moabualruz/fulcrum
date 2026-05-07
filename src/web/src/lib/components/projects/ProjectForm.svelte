@@ -39,6 +39,10 @@
 		// Empty after a manual edit means "go back to auto"; otherwise stay manual.
 		slugTouched = slugValue.length > 0;
 	}
+
+	$effect(() => {
+		if (!slugTouched) slugValue = deriveAutoSlug(nameValue, slugValue, false);
+	});
 </script>
 
 <form
@@ -55,7 +59,7 @@
 			type="text"
 			data-project-name
 			data-slot="input"
-			value={nameValue}
+			bind:value={nameValue}
 			oninput={onNameInput}
 			aria-invalid={nameError ? "true" : undefined}
 			required
@@ -75,7 +79,7 @@
 			type="text"
 			data-project-slug
 			data-slot="input"
-			value={slugValue}
+			bind:value={slugValue}
 			oninput={onSlugInput}
 			aria-invalid={slugError ? "true" : undefined}
 			pattern="[a-z0-9][a-z0-9-]{'{0,63}'}"
@@ -94,7 +98,7 @@
 			name="description"
 			data-project-description
 			data-slot="textarea"
-			value={descriptionValue}
+			bind:value={descriptionValue}
 			oninput={(e) => (descriptionValue = (e.target as HTMLTextAreaElement).value)}
 			rows="3"
 			maxlength="280"

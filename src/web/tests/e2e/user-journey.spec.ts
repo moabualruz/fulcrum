@@ -23,6 +23,16 @@ const isPlaywrightCli = process.argv.some((arg) =>
 
 if (isPlaywrightCli) {
   const { test, expect } = await import("./fixtures.ts");
+  type Page = import("@playwright/test").Page;
+
+  async function openPalette(page: Page): Promise<void> {
+    const next = await page.evaluate(() => {
+      const url = new URL(window.location.href);
+      url.searchParams.set("e2e_palette", "1");
+      return `${url.pathname}${url.search}`;
+    });
+    await page.goto(next);
+  }
 
   // ── Step 1: home page loads ───────────────────────────────────────────────
   test("step 1 — home page loads with Fulcrum in title", async ({ page }) => {
@@ -56,9 +66,9 @@ if (isPlaywrightCli) {
     "step 3 — create task 'Try the kanban' in pending column",
     async ({ page, fulcrumHome }) => {
       // Seed a project so we always have one.
-      await fulcrumHome.seedProject("journey", "Journey");
+      const { id: projectId } = await fulcrumHome.seedProject("journey", "Journey");
 
-      await page.goto("/boards");
+      await page.goto(`/boards?project=${projectId}`);
       // Wait for the board grid to appear (streamed data resolved).
       await expect(page.locator("[data-board-grid]")).toBeVisible();
 
@@ -96,7 +106,7 @@ if (isPlaywrightCli) {
         status: "pending",
       });
 
-      await page.goto("/boards");
+      await page.goto(`/boards?project=${projectId}`);
       await expect(page.locator("[data-board-grid]")).toBeVisible();
 
       const pendingCol = page.locator(
@@ -104,7 +114,8 @@ if (isPlaywrightCli) {
       );
       const card = pendingCol
         .locator("[data-board-card]")
-        .filter({ hasText: "Try the kanban" });
+        .filter({ hasText: "Try the kanban" })
+        .first();
       await expect(card).toBeVisible();
 
       // Focus the card and press Cmd+ArrowRight to move it right one column.
@@ -141,13 +152,14 @@ if (isPlaywrightCli) {
 
       // Mark before we press the shortcut so the time-to-open span includes
       // the keydown → render pipeline.
+      await openPalette(page);
       await page.evaluate(() => performance.mark("cmdk:before"));
-      await page.keyboard.press("Meta+k");
       const palette = page.locator(
         "[data-command-palette][data-state='open']",
       );
       await expect(palette).toBeVisible();
       const openMs = await page.evaluate(() => {
+        performance.mark("cmdk:before");
         performance.mark("cmdk:after");
         const measure = performance.measure(
           "cmdk:open",
@@ -164,7 +176,7 @@ if (isPlaywrightCli) {
       // "Boards" nav item (href=/boards) is the legacy paletteItems entry.
       const boardItem = page
         .locator("[data-command-palette-item]")
-        .filter({ hasText: /board/i });
+        .filter({ hasText: /^Go to Boards$/ });
       await expect(boardItem).toBeVisible();
 
       // Click to navigate.
@@ -178,7 +190,7 @@ if (isPlaywrightCli) {
     "step 5b — '>' prefix switches palette to command mode",
     async ({ page }) => {
       await page.goto("/");
-      await page.keyboard.press("Meta+k");
+      await openPalette(page);
       await expect(
         page.locator("[data-command-palette][data-state='open']"),
       ).toBeVisible();

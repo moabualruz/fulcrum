@@ -63,6 +63,7 @@
 
 <section
   data-board-column
+  data-testid="kanban-column"
   data-status={status}
   class={cn("flex min-w-[16rem] flex-col gap-2 rounded-md border border-border bg-muted/30 p-2")}
 >

@@ -1,7 +1,4 @@
 <script lang="ts">
-  import * as Popover from "$lib/components/ui/popover/index.js";
-  import * as Button from "$lib/components/ui/button/index.js";
-
   interface DateRange {
     start: Date;
     end: Date;
@@ -50,6 +47,7 @@
   {#each presets as preset}
     <button
       type="button"
+      data-testid={`date-range-last-${preset.days}`}
       class="preset-btn"
       style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border: 1px solid hsl(var(--border)); border-radius: 0.375rem; background: hsl(var(--background)); cursor: pointer; color: hsl(var(--foreground));"
       onclick={() => applyPreset(preset.days)}
@@ -59,17 +57,16 @@
   {/each}
 
   <!-- Custom range popover -->
-  <Popover.Root bind:open={showCustom}>
-    <Popover.Trigger>
-      <button
-        type="button"
-        class="custom-range-btn"
-        style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border: 1px solid hsl(var(--border)); border-radius: 0.375rem; background: hsl(var(--background)); cursor: pointer; color: hsl(var(--foreground));"
-      >
-        {formatDate(value.start)} – {formatDate(value.end)}
-      </button>
-    </Popover.Trigger>
-    <Popover.Content>
+  <div>
+    <button
+      type="button"
+      class="custom-range-btn"
+      style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border: 1px solid hsl(var(--border)); border-radius: 0.375rem; background: hsl(var(--background)); cursor: pointer; color: hsl(var(--foreground));"
+      onclick={() => (showCustom = !showCustom)}
+    >
+      {formatDate(value.start)} – {formatDate(value.end)}
+    </button>
+    {#if showCustom}
       <div class="custom-range-form" style="padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; min-width: 240px;">
         <div>
           <label style="font-size: 0.75rem; font-weight: 500; display: block; margin-bottom: 0.25rem;">Start</label>
@@ -95,6 +92,6 @@
           Apply
         </button>
       </div>
-    </Popover.Content>
-  </Popover.Root>
+    {/if}
+  </div>
 </div>

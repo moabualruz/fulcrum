@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { __resetDefaultOrmForTest, initOrm } from "../../../../db/mikro-orm.config.ts";
 import { DEFAULT_ORG_ID, DEFAULT_ORG_NAME, DEFAULT_ORG_SLUG } from "../../../../db/seed.ts";
+import { normalizeSqlParams } from "../../../../application/orm-helpers.ts";
 import { sqlAccess } from "./orm-helpers.ts";
 
 export type OrmDbValue = string | number | boolean | null | Date | Uint8Array;
@@ -78,6 +79,11 @@ export function getDatabase(): WebDatabaseHandle {
   return _instance;
 }
 
+export async function getE2eFixtureContext(): Promise<{ db: WebDatabaseHandle; orgId: string }> {
+  const db = getDatabase();
+  return { db, orgId: await getDefaultOrgId(db) };
+}
+
 /**
  * @deprecated Use getDatabase() instead. Kept for backward compat during
  * migration — delegates to initDatabase() so existing callers still work,
@@ -149,10 +155,6 @@ async function resetSingleton(): Promise<void> {
   _instanceKey = null;
 }
 
-function normalizeSql(sql: string): string {
-  return sql.replace(/\$(\d+)/g, "?");
-}
-
 function createOrmDb(
   orm: import("@mikro-orm/postgresql").MikroORM,
   em: EntityManager,
@@ -164,7 +166,8 @@ function createOrmDb(
       sql: string,
       params: readonly OrmDbValue[] = [],
     ): Promise<T[]> {
-      return await conn.execute<T[]>(normalizeSql(sql), [...params]);
+      const normalized = normalizeSqlParams(sql, params);
+      return await conn.execute<T[]>(normalized.sql, normalized.params as OrmDbValue[]);
     },
     async exec(sql: string): Promise<void> {
       await conn.execute(sql);

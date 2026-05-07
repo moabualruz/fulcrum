@@ -5,10 +5,10 @@ import {
   seedE2eArtifact,
   seedE2eDoc,
   seedE2eProject,
-  seedE2eSearchKinds,
+  seedE2eSearchKindsOrm,
   seedE2eTask,
 } from "../../../../../application/testing/e2e-fixtures.ts";
-import { getDatabase, getDefaultOrgId } from "$lib/server/db";
+import { getE2eFixtureContext } from "$lib/server/db";
 
 export const POST: RequestHandler = async ({ request }) => {
   if (process.env["FULCRUM_E2E"] !== "1") {
@@ -17,8 +17,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const action = body?.["action"];
-  const db = getDatabase();
-  const orgId = await getDefaultOrgId(db);
+  const { db, orgId } = await getE2eFixtureContext();
 
   switch (action) {
     case "init":
@@ -35,7 +34,7 @@ export const POST: RequestHandler = async ({ request }) => {
     case "seedArtifact":
       return json(await seedE2eArtifact(db, orgId, object(body, "input")));
     case "seedSearchKinds":
-      return json(await seedE2eSearchKinds(db, orgId, {
+      return json(await seedE2eSearchKindsOrm(db.em, orgId, {
         common: string(body, "common"),
         kinds: stringArray(body, "kinds"),
       }));

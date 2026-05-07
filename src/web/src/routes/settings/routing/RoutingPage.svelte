@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from "$app/state";
   import type { DraftRow, EnrichedDecisionRow, LlmGateConfig, RoutingDecisionRow, RoutingRuleRow } from "./routing.types";
 
   interface Props {
@@ -28,10 +29,15 @@
   const inheritedRules = $derived(data.inheritedRules ?? []);
   const allVisibleRules = $derived([...rules, ...inheritedRules]);
   const dryRunRule = $derived(allVisibleRules.find((rule) => rule.id === form?.dryRunResult?.ruleId));
-  const defaultConditionsJson = JSON.stringify({ all: [{ fact: "task.kind", operator: "equal", value: "bug" }] });
+  const defaultConditionsJson = JSON.stringify({ all: [{ fact: "task", path: "$.kind", operator: "equal", value: "bug" }] });
   const defaultTaskJson = JSON.stringify({ title: "Fix bug", kind: "bug", priority: "high", tags: [] });
 
-  let activeTab = $state("rules");
+  type RoutingTab = "rules" | "drafts" | "test" | "llm-gate" | "evidence";
+  function parseTab(value: string | null): RoutingTab {
+    return value === "drafts" || value === "test" || value === "llm-gate" || value === "evidence" ? value : "rules";
+  }
+
+  let activeTab = $state<RoutingTab>(parseTab(page.url.searchParams.get("tab")));
   let editorMode = $state<"builder" | "raw">("builder");
 
   // LLM gate form initial state (read once from props)
@@ -42,6 +48,10 @@
   let enrichedResult = $state<EnrichedDecisionRow | null>(null);
   $effect(() => {
     enrichedResult = form?.testResult ?? null;
+  });
+
+  $effect(() => {
+    activeTab = parseTab(page.url.searchParams.get("tab"));
   });
 </script>
 
@@ -83,36 +93,41 @@
 
   <!-- Tabs -->
   <div data-routing-tabs class="flex gap-1 border-b border-border">
-    <button
-      type="button"
+    <a
+      href="?tab=rules"
       data-tab="rules"
       class="px-4 py-2 text-sm font-medium {activeTab === 'rules' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}"
+      onpointerdown={() => (activeTab = "rules")}
       onclick={() => (activeTab = "rules")}
-    >Rules</button>
-    <button
-      type="button"
+    >Rules</a>
+    <a
+      href="?tab=drafts"
       data-tab="drafts"
       class="px-4 py-2 text-sm font-medium {activeTab === 'drafts' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}"
+      onpointerdown={() => (activeTab = "drafts")}
       onclick={() => (activeTab = "drafts")}
-    >Drafts</button>
-    <button
-      type="button"
+    >Drafts</a>
+    <a
+      href="?tab=test"
       data-tab="test"
       class="px-4 py-2 text-sm font-medium {activeTab === 'test' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}"
+      onpointerdown={() => (activeTab = "test")}
       onclick={() => (activeTab = "test")}
-    >Test</button>
-    <button
-      type="button"
+    >Test</a>
+    <a
+      href="?tab=llm-gate"
       data-tab="llm-gate"
       class="px-4 py-2 text-sm font-medium {activeTab === 'llm-gate' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}"
+      onpointerdown={() => (activeTab = "llm-gate")}
       onclick={() => (activeTab = "llm-gate")}
-    >LLM Gate</button>
-    <button
-      type="button"
+    >LLM Gate</a>
+    <a
+      href="?tab=evidence"
       data-tab="evidence"
       class="px-4 py-2 text-sm font-medium {activeTab === 'evidence' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}"
+      onpointerdown={() => (activeTab = "evidence")}
       onclick={() => (activeTab = "evidence")}
-    >Evidence</button>
+    >Evidence</a>
   </div>
 
   <!-- ==================== RULES TAB ==================== -->
@@ -136,7 +151,7 @@
         </div>
         <details data-routing-create-panel class="rounded-md border border-border p-2" open={rules.length === 0}>
           <summary class="cursor-pointer text-sm font-medium">
-            <button type="button" class="pointer-events-none rounded-md border border-border px-3 py-1.5 text-sm">Create rule</button>
+            <button type="button" class="pointer-events-none rounded-md border border-border px-3 py-1.5 text-sm">New rule</button>
           </summary>
           <form method="POST" action="?/create" class="mt-4 grid gap-3 md:grid-cols-2">
             <input type="hidden" name="enabled" value="true" />

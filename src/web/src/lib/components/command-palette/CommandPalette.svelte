@@ -1,6 +1,7 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
   import { selectedTaskIds } from "$lib/stores/selection.ts";
+  import { onMount } from "svelte";
   import { oramaIndex } from "$lib/search/OramaIndex.ts";
   import {
     NAVIGATION_COMMANDS,
@@ -36,6 +37,13 @@
   let searchHits = $state<SearchHit[]>([]);
   let searchPending = $state(false);
   let inputElement: HTMLInputElement | null = null;
+  let selectedIndex = $state(0);
+
+  onMount(() => {
+    const openPalette = () => onOpenChange(true);
+    window.addEventListener("fulcrum:open-command-palette", openPalette);
+    return () => window.removeEventListener("fulcrum:open-command-palette", openPalette);
+  });
 
   // ── Selection store ──────────────────────────────────────────────────────────
   let hasSelection = $state(false);
@@ -44,14 +52,16 @@
   });
 
   // ── Visible command sections ─────────────────────────────────────────────────
-  const navCommands = $derived(filterCommands(NAVIGATION_COMMANDS, query));
-  const createCommands = $derived(filterCommands(CREATION_COMMANDS, query));
+  const isCommandMode = $derived(query.trimStart().startsWith(">"));
+  const commandQuery = $derived(isCommandMode ? query.trimStart().slice(1).trim() : query);
+  const navCommands = $derived(filterCommands(NAVIGATION_COMMANDS, commandQuery));
+  const createCommands = $derived(filterCommands(CREATION_COMMANDS, commandQuery));
   const bulkCommands = $derived(
-    hasSelection ? filterCommands(BULK_COMMANDS, query) : [],
+    hasSelection ? filterCommands(BULK_COMMANDS, commandQuery) : [],
   );
 
   // ── Search mode (2+ chars) ───────────────────────────────────────────────────
-  const isSearchMode = $derived(query.trim().length >= 2);
+  const isSearchMode = $derived(!isCommandMode && query.trim().length >= 2);
 
   $effect(() => {
     if (!isSearchMode) {
@@ -81,8 +91,24 @@
 
   // ── Keyboard nav ─────────────────────────────────────────────────────────────
   function handleInputKeydown(event: KeyboardEvent) {
+    const visibleItems = visibleCommandItems();
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      selectedIndex = Math.min(selectedIndex + 1, Math.max(visibleItems.length - 1, 0));
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      selectedIndex = Math.max(selectedIndex - 1, 0);
+      return;
+    }
     if (event.key !== "Enter") return;
     event.preventDefault();
+    const item = visibleItems[selectedIndex] ?? visibleItems[0];
+    if (item) {
+      selectLegacyItem(item);
+      return;
+    }
     makeSelect(items, query, onSelect, onOpenChange)();
   }
 
@@ -108,9 +134,18 @@
     const lower = q.toLowerCase();
     return cmds.filter((c) => c.label.toLowerCase().includes(lower));
   }
+
+  function visibleCommandItems(): CommandItem[] {
+    return [
+      ...navCommands.map((cmd) => ({ id: cmd.id, label: cmd.label })),
+      ...createCommands.map((cmd) => ({ id: cmd.id, label: cmd.label })),
+      ...bulkCommands.map((cmd) => ({ id: cmd.id, label: cmd.label })),
+      ...legacyFiltered,
+    ];
+  }
 </script>
 
-<div data-command-palette data-state={open ? "open" : "closed"} class={open ? "fixed inset-0 z-50" : "hidden"}>
+<div data-command-palette data-testid="command-palette" data-state={open ? "open" : "closed"} class={open ? "fixed inset-0 z-50" : "hidden"}>
   {#if open}
     <div class={cn("fixed inset-0 z-50 bg-background/80 p-4 backdrop-blur-sm")}>
       <div
@@ -135,17 +170,25 @@
 
         <!-- List -->
         <div data-command-palette-list class={cn("max-h-96 overflow-y-auto p-1")}>
+          {#if isCommandMode}
+            <div
+              data-section="Commands"
+              class={cn("px-2 py-1 text-xs font-normal text-muted-foreground")}
+            >Commands</div>
+          {/if}
 
           <!-- Navigation section -->
           {#if navCommands.length > 0}
             <div
               data-section="Navigation"
-              class={cn("px-2 py-1 text-xs font-normal text-muted-foreground")}
+              class={cn("px-2 py-1 text-xs font-normal text-muted-foreground", isCommandMode && "mt-1")}
             >Navigation</div>
-            {#each navCommands as cmd (cmd.id)}
+            {#each navCommands as cmd, i (cmd.id)}
               <button
                 type="button"
                 data-command-palette-item
+                data-testid="command-item"
+                data-selected={selectedIndex === i ? "true" : "false"}
                 data-id={cmd.id}
                 onclick={() => selectCommand(cmd)}
                 class={cn(
@@ -164,10 +207,12 @@
               data-section="Create"
               class={cn("px-2 py-1 text-xs font-normal text-muted-foreground", navCommands.length > 0 && "mt-1")}
             >Create</div>
-            {#each createCommands as cmd (cmd.id)}
+            {#each createCommands as cmd, i (cmd.id)}
               <button
                 type="button"
                 data-command-palette-item
+                data-testid="command-item"
+                data-selected={selectedIndex === navCommands.length + i ? "true" : "false"}
                 data-id={cmd.id}
                 onclick={() => selectCommand(cmd)}
                 class={cn(
@@ -190,6 +235,7 @@
               <button
                 type="button"
                 data-command-palette-item
+                data-testid="command-item"
                 data-id={cmd.id}
                 onclick={() => selectCommand(cmd)}
                 class={cn(

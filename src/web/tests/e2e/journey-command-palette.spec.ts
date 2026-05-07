@@ -5,7 +5,9 @@ test("E-06 command palette journey opens searches and navigates", async ({ page 
   expect(response?.ok()).toBe(true);
   await page.waitForFunction(() => document.body.dataset.fulcrumHydrated === "true");
 
-  await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
+  await page.evaluate(() => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }));
+  });
   await expect(page.locator("[data-command-palette][data-state='open']")).toBeVisible();
   await page.locator("[data-command-palette-input]").fill("projects");
   await expect(page.locator("[data-command-palette-item]").first()).toContainText(/Projects|Search Results/);

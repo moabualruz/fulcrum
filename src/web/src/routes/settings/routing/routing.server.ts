@@ -86,7 +86,7 @@ async function trpcPost(
     method: "POST",
     credentials: "include",
     headers: { "content-type": "application/json", cookie },
-    body: JSON.stringify({ json: input }),
+    body: JSON.stringify(input ?? {}),
   });
   const body = await response.json().catch(() => null);
   if (!response.ok) throw new Error(extractTrpcError(body));

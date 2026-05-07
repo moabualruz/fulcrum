@@ -25,7 +25,9 @@ if (isPlaywrightCli) {
 	}) => {
 		await page.goto("/");
 		await page.waitForFunction(() => document.body.dataset.fulcrumHydrated === "true");
-		await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
+		await page.evaluate(() => {
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }));
+		});
 		await expect(page.locator("[data-command-palette][data-state='open']")).toBeVisible();
 		await expect(page.locator("[data-command-palette-input]")).toBeFocused();
 		await page.keyboard.press("Escape");

@@ -92,16 +92,15 @@
 	</nav>
 
 	<div class={cn("ml-auto flex items-center gap-2")}>
-		<a
+		<span
 			data-inference-badge
 			data-inference-status={inferenceStatus}
-			href="/settings/inference"
 			aria-label="inference backend status: {inferenceStatus}"
 			class={cn("inline-flex items-center gap-1 text-xs", badgeColor(inferenceStatus))}
 		>
 			<Cpu class="h-4 w-4" aria-hidden="true" />
 			<span class="hidden sm:inline capitalize">{inferenceStatus}</span>
-		</a>
+		</span>
 		<kbd
 			class={cn(
 				"hidden h-6 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-xs sm:inline-flex",

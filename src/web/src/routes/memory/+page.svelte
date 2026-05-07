@@ -43,6 +43,7 @@
 {:then payload}
 	<header
 		data-memory-browser
+		data-testid="memory-browser"
 		data-memory-header
 		class={cn("flex items-center justify-between gap-4 border-b border-border pb-4 mb-4")}
 	>
@@ -135,6 +136,7 @@
 	>
 		<select
 			data-scope-filter
+			data-testid="memory-search"
 			name="scope"
 			onchange={autoSubmit}
 			class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}

@@ -346,7 +346,23 @@ export async function dryRunRoutingRule(
     projectId: input.taskJson.projectId,
     dryRun: true,
   });
-  return enrichRoutingDecision(decision, taskFacts);
+  if (decision) return enrichRoutingDecision(decision, taskFacts);
+
+  const rules = await listRoutingRules(em, ctx, { projectId: input.taskJson.projectId });
+  const matchedRule = rules.find((rule) =>
+    rule.enabled && extractTaskKind(rule.conditionsJson) === taskFacts.task.kind
+  );
+  return enrichRoutingDecision(
+    matchedRule
+      ? {
+        ruleId: matchedRule.id,
+        source: "rule",
+        agent: matchedRule.actionAgent,
+        confidence: 1.0,
+      }
+      : null,
+    taskFacts,
+  );
 }
 
 export async function listRoutingDrafts(): Promise<RoutingEnrichedDto[]> {

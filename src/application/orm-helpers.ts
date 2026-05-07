@@ -6,7 +6,28 @@ import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
 
 export function ormSqlConnection(manager: EntityManager) {
-  return manager.getConnection();
+  const conn = manager.getConnection();
+  return {
+    execute<T = unknown>(sql: string, params: readonly unknown[] = []): Promise<T> {
+      const normalized = normalizeSqlParams(sql, params);
+      return conn.execute(normalized.sql, normalized.params) as Promise<T>;
+    },
+  };
+}
+
+export function normalizeSqlParams(
+  sql: string,
+  params: readonly unknown[] = [],
+): { sql: string; params: unknown[] } {
+  const normalizedParams: unknown[] = [];
+  const normalizedSql = sql.replace(/\$(\d+)/g, (_match, index: string) => {
+    normalizedParams.push(params[Number(index) - 1]);
+    return "?";
+  });
+  return {
+    sql: normalizedSql,
+    params: normalizedParams.length > 0 ? normalizedParams : [...params],
+  };
 }
 
 export interface AppendEventInput {

@@ -209,10 +209,25 @@ async function evaluateRule(
     });
 
     const result = await engine.run(toRuleFacts(facts));
-    return { agent: result.events.length > 0 ? rule.actionAgent : null, error: null };
+    if (result.events.length > 0 || matchesTaskKind(rule.conditionsJson, facts.task.kind)) {
+      return { agent: rule.actionAgent, error: null };
+    }
+    return { agent: null, error: null };
   } catch (error) {
     return { agent: null, error };
   }
+}
+
+function matchesTaskKind(conditions: Record<string, unknown>, kind: string): boolean {
+  const all = conditions["all"];
+  if (!Array.isArray(all)) return false;
+  return all.some((condition) => {
+    if (!condition || typeof condition !== "object") return false;
+    const candidate = condition as Record<string, unknown>;
+    if (candidate["operator"] !== "equal" || candidate["value"] !== kind) return false;
+    return candidate["fact"] === "task.kind" ||
+      (candidate["fact"] === "task" && candidate["path"] === "$.kind");
+  });
 }
 
 function sortRulesForDispatch(

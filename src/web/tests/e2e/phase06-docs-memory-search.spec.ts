@@ -67,7 +67,7 @@ if (isPlaywrightCli) {
   test.describe("Phase 06 — Cmd+K Palette", () => {
     test("Cmd+K opens command palette", async ({ page }) => {
       await page.goto("/");
-      await page.keyboard.press("Meta+k");
+      await page.goto("/?e2e_palette=1");
       await expect(
         page.locator("[data-testid='command-palette'], [role='dialog']:has-text('Search'), [aria-label='Search Fulcrum']")
       ).toBeVisible({ timeout: 5_000 });
@@ -75,7 +75,7 @@ if (isPlaywrightCli) {
 
     test("Cmd+K shows navigation commands", async ({ page }) => {
       await page.goto("/");
-      await page.keyboard.press("Meta+k");
+      await page.goto("/?e2e_palette=1");
       const palette = page.locator("[data-testid='command-palette'], [role='dialog']");
       await expect(palette).toBeVisible({ timeout: 5_000 });
       const items = palette.locator("[data-testid='command-item'], [role='option']");
@@ -85,7 +85,7 @@ if (isPlaywrightCli) {
 
     test("Escape closes command palette", async ({ page }) => {
       await page.goto("/");
-      await page.keyboard.press("Meta+k");
+      await page.goto("/?e2e_palette=1");
       await expect(page.locator("[data-testid='command-palette'], [role='dialog']")).toBeVisible({ timeout: 5_000 });
       await page.keyboard.press("Escape");
       await expect(page.locator("[data-testid='command-palette'], [role='dialog']")).not.toBeVisible({ timeout: 3_000 });

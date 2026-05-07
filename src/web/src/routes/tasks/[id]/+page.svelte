@@ -21,20 +21,26 @@
   let editingTitle = $state(false);
   let activeOverlay = $state<string | null>(null);
   let autosaveStatus = $state<"idle" | "saving" | "saved" | "error">("idle");
+  const normalizePayload = (p: TaskDetailPayload): TaskDetailPayload => ({
+    ...p,
+    subtasks: p.subtasks ?? [],
+    edges: p.edges ?? [],
+    events: p.events ?? [],
+  });
 
   // Sync from streamed
   {
     const d = data.streamed.data;
-    if (!(d instanceof Promise)) payload = d;
+    if (!(d instanceof Promise)) payload = normalizePayload(d);
   }
   $effect(() => {
     const d = data.streamed.data;
     if (d instanceof Promise) {
       let cancelled = false;
-      void d.then((p) => { if (!cancelled) payload = p; });
+      void d.then((p) => { if (!cancelled) payload = normalizePayload(p); });
       return () => { cancelled = true; };
     } else {
-      payload = d;
+      payload = normalizePayload(d);
     }
   });
 

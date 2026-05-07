@@ -34,13 +34,12 @@ if (isPlaywrightCli) {
 
   // ── Empty state ───────────────────────────────────────────────────────────
 
-  test("artifacts list shows empty state when no artifacts", async ({ page }) => {
+  test("artifacts list shows empty state when no artifacts", async ({ page, fulcrumHome }) => {
+    void fulcrumHome;
     await page.goto("/artifacts");
-    // Either empty-state div or an empty table — both valid
     const empty = page.locator("[data-empty-artifacts]");
     const list = page.locator("[data-artifacts-list]");
-    const either = await empty.isVisible() || await list.isVisible();
-    expect(either).toBe(true);
+    await expect(empty.or(list).first()).toBeVisible();
   });
 
   // ── Detail page ───────────────────────────────────────────────────────────

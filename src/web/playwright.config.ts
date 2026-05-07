@@ -19,6 +19,7 @@ export default defineConfig({
 		port,
 		env: {
 			FULCRUM_HOME: fulcrumHome,
+			FULCRUM_ARTIFACT_STORE: path.join(fulcrumHome, "artifacts"),
 			FULCRUM_E2E: "1",
 		},
 		reuseExistingServer: false,

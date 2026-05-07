@@ -15,6 +15,7 @@
 <button
   type="button"
   data-board-card
+  data-testid="task-card"
   data-task-id={task.id}
   data-status={task.status}
   data-priority={String(task.priority)}

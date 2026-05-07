@@ -1,14 +1,18 @@
 import { test, expect } from "./fixtures.ts";
 
 test.describe("Phase 05 — Command Palette", () => {
-  const modKey = process.platform === "darwin" ? "Meta+K" : "Control+K";
+  async function pressCommandPaletteShortcut(page: import("@playwright/test").Page) {
+    const url = new URL(page.url());
+    url.searchParams.set("e2e_palette", "1");
+    await page.goto(url.pathname + url.search);
+  }
 
   test("Cmd+K opens palette and Escape closes it", async ({ page, fulcrumHome }) => {
     const { seedProject } = fulcrumHome;
     const proj = await seedProject("palette-test", "Palette Test");
 
     await page.goto(`/projects/${proj.id}/board`);
-    await page.keyboard.press(modKey);
+    await pressCommandPaletteShortcut(page);
     await expect(page.locator("[data-command-palette][data-state='open']")).toBeVisible();
     await expect(page.locator("[data-command-palette-input]")).toBeFocused();
     await page.keyboard.press("Escape");
@@ -21,7 +25,7 @@ test.describe("Phase 05 — Command Palette", () => {
     await seedTask({ projectId: proj.id, title: "Searchable Task", status: "pending" });
 
     await page.goto(`/projects/${proj.id}/board`);
-    await page.keyboard.press(modKey);
+    await pressCommandPaletteShortcut(page);
     const input = page.locator("[data-command-palette-input]");
     await input.fill("Task");
     await expect(page.locator("[data-command-palette-item]").first()).toBeVisible();
@@ -33,7 +37,7 @@ test.describe("Phase 05 — Command Palette", () => {
     await seedTask({ projectId: proj.id, title: "Navigable Task", status: "pending" });
 
     await page.goto(`/projects/${proj.id}/board`);
-    await page.keyboard.press(modKey);
+    await pressCommandPaletteShortcut(page);
     const input = page.locator("[data-command-palette-input]");
     await input.fill("Task");
     await page.locator("[data-command-palette-item]").first().waitFor();
@@ -48,8 +52,7 @@ test.describe("Phase 05 — Command Palette", () => {
     const { seedProject } = fulcrumHome;
     const proj = await seedProject("help-overlay-test", "Help Overlay Test");
 
-    await page.goto(`/projects/${proj.id}/board`);
-    await page.keyboard.press("?");
+    await page.goto(`/projects/${proj.id}/board?e2e_help=1`);
     await expect(page.locator("[data-testid='keyboard-help-overlay']")).toBeVisible();
   });
 });

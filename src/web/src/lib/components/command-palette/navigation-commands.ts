@@ -87,6 +87,13 @@ export const NAVIGATION_COMMANDS: PaletteCommand[] = [
 
 export const CREATION_COMMANDS: PaletteCommand[] = [
   {
+    id: "create-task",
+    label: "New Task",
+    section: "Create",
+    icon: "square-check",
+    action: () => navigate("/boards"),
+  },
+  {
     id: "create-doc",
     label: "New Doc",
     section: "Create",

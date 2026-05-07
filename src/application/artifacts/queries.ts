@@ -162,6 +162,14 @@ export async function getArtifact(em: EntityManager, ctx: AppContext, id: string
 }
 
 export async function getArtifactDetail(em: EntityManager, ctx: AppContext, id: string): Promise<ArtifactDetail> {
+  const columns = await artifactColumns(em);
+  const projectExpr = columns.has("project_id") ? "a.project_id" : "t.project_id";
+  const kindExpr = columns.has("kind") ? "a.kind" : "'file'::text";
+  const titleExpr = columns.has("title") ? "a.title" : "a.filename";
+  const bodyPathExpr = columns.has("body_path") ? "a.body_path" : "a.path";
+  const shaExpr = columns.has("sha256") ? "a.sha256" : columns.has("checksum_sha256") ? "a.checksum_sha256" : "NULL::text";
+  const sizeExpr = columns.has("size") ? "a.size" : columns.has("size_bytes") ? "a.size_bytes" : "NULL::bigint";
+  const archivedExpr = columns.has("archived") ? "COALESCE(a.archived, false)" : "false";
   const rows = await ormSqlConnection(em).execute<Array<{
     id: string;
     org_id: string;
@@ -179,20 +187,20 @@ export async function getArtifactDetail(em: EntityManager, ctx: AppContext, id: 
   }>>(
     `SELECT a.id,
             a.org_id,
-            t.project_id,
+            ${projectExpr} AS project_id,
             a.run_id,
             a.task_id,
-            'artifact'::text AS kind,
-            a.filename AS title,
-            a.path AS body_path,
-            a.checksum_sha256 AS sha256,
-            a.size_bytes AS size,
+            ${kindExpr} AS kind,
+            ${titleExpr} AS title,
+            ${bodyPathExpr} AS body_path,
+            ${shaExpr} AS sha256,
+            ${sizeExpr} AS size,
             a.mime,
-            false AS archived,
+            ${archivedExpr} AS archived,
             a.created_at
        FROM artifacts a
        LEFT JOIN tasks t ON t.id = a.task_id
-      WHERE a.id = $1 AND a.org_id = $2`,
+      WHERE a.id = ? AND a.org_id = ?`,
     [id, ctx.orgId],
   );
   const artifact = rows[0];

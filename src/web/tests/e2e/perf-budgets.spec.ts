@@ -152,7 +152,9 @@ maybeTest("Cmd+K open < 50ms", async ({ page }) => {
   });
 
   // Trigger Cmd+K
-  await page.keyboard.press("Meta+k");
+  await page.evaluate(() => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }));
+  });
   await page.waitForSelector("[data-testid='command-palette']");
 
   expect(measuredMs).toBeLessThan(50);
