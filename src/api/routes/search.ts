@@ -1,14 +1,15 @@
 /**
  * P13#06 — REST routes for the search domain.
- * Delegates to SearchQueryService for real FTS results.
- *
- * T-06-07: org_id filter enforced in SearchQueryService.
- * T-06-08: parameterized queries only.
+ * Delegates to application search queries.
  * T-06-09: limit capped at 100.
  */
 
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
-import { SearchQueryService } from "../../search/query-service.ts";
+import type { EntityManager } from "@mikro-orm/postgresql";
+
+import { searchDocuments } from "../../application/search/queries.ts";
+import { appErrorToHttpResponse } from "../../application/error-mapping.ts";
+import { AppInvariantError } from "../../application/errors.ts";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -64,46 +65,47 @@ export function registerSearchRoutes(api: OpenAPIHono): void {
       return c.json([], 200);
     }
 
-    // Resolve db from context (injected by app setup)
-    const db = (c.get as (key: string) => unknown)("db");
-
-    if (!db) {
-      const title = "Search fallback result";
-      const term = q.toLowerCase();
-      const matches = term === "stub" || title.toLowerCase().includes(term);
-      return c.json(matches ? [{
-        kind: kind ?? "task",
-        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        title,
-        snippet: "Search fallback result for public API contract tests.",
-        rank: 1,
-      }] : [], 200);
-    }
-
-    const svc = new SearchQueryService(db as never);
-    const output = await svc.query(orgId, {
-      term: q,
-      filters: {
-        kinds: kind ? [kind] : undefined,
-        projectIds: project ? [project] : undefined,
-      },
-      limit: limit ?? 20,
-      offset: offset ?? 0,
-    });
-
-    const results = output.results.map((r) => ({
-      kind: r.entityKind,
-      id: r.entityId,
-      title: r.title,
-      snippet: r.snippet,
-      rank: r.rank,
-    }));
-
-    return c.json(results, 200);
+    return await mapHttpError(c, async () => {
+      const hits = await searchDocuments(resolveEntityManager(c), q, {
+        orgId,
+        projectId: project ?? undefined,
+        sourceKinds: kind ? [kind] : undefined,
+        limit: limit ?? 20,
+      });
+      const results = hits.slice(offset ?? 0).map((hit) => ({
+        kind: hit.source_kind,
+        id: hit.source_id,
+        title: hit.title || null,
+        snippet: hit.body,
+        rank: hit.score,
+      }));
+      return c.json(results, 200);
+    }) as never;
   });
 }
 
 function orgIdFromAuthorization(header: string | undefined): string | undefined {
   if (!header?.startsWith("Bearer test-jwt:")) return undefined;
   return header.slice("Bearer test-jwt:".length);
+}
+
+function resolveEntityManager(c: { get(key: string): unknown }): EntityManager {
+  const db = c.get("db");
+  if (db && typeof db === "object" && "transactional" in db) return db as EntityManager;
+  if (db && typeof db === "object" && "em" in db) {
+    const entityManager = (db as { em?: unknown }).em;
+    if (entityManager && typeof entityManager === "object" && "transactional" in entityManager) {
+      return entityManager as EntityManager;
+    }
+  }
+  throw new AppInvariantError("EntityManager could not be resolved.");
+}
+
+async function mapHttpError(c: any, fn: () => Promise<Response>): Promise<Response> {
+  try {
+    return await fn();
+  } catch (error) {
+    const mapped = appErrorToHttpResponse(error);
+    return c.json(mapped.body, mapped.status as never);
+  }
 }

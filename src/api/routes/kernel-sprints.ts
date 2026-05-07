@@ -1,4 +1,9 @@
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
+import type { EntityManager } from "@mikro-orm/postgresql";
+
+import { listSprints } from "../../application/sprints/queries.ts";
+import { appErrorToHttpResponse } from "../../application/error-mapping.ts";
+import { AppInvariantError } from "../../application/errors.ts";
 import type { KernelSprintApplication } from "../application.ts";
 import type { ApiEnv } from "../auth.ts";
 
@@ -30,13 +35,36 @@ export function registerKernelSprintRoutes(
   api.openapi(listSprintsRoute, async (c) => {
     const application = options.application ?? c.get("application")?.sprints;
     const { project_id } = c.req.valid("query");
-    if (!application) return c.json({ data: [] }, 200);
-    return c.json(
-      await application.listSprints({
-        orgId: c.get("orgId"),
+    const orgId = c.get("orgId");
+    return await mapHttpError(c, async () => {
+      if (application) {
+        return c.json(await application.listSprints({ orgId, projectId: project_id }) as never, 200);
+      }
+      const result = await listSprints(resolveEntityManager(c), { orgId, userId: c.get("userId"), projectId: project_id }, {
         projectId: project_id,
-      }) as never,
-      200,
-    );
+      });
+      return c.json({ data: result } as never, 200);
+    }) as never;
   });
+}
+
+function resolveEntityManager(c: { get(key: string): unknown }): EntityManager {
+  const db = c.get("db");
+  if (db && typeof db === "object" && "transactional" in db) return db as EntityManager;
+  if (db && typeof db === "object" && "em" in db) {
+    const entityManager = (db as { em?: unknown }).em;
+    if (entityManager && typeof entityManager === "object" && "transactional" in entityManager) {
+      return entityManager as EntityManager;
+    }
+  }
+  throw new AppInvariantError("EntityManager could not be resolved.");
+}
+
+async function mapHttpError(c: any, fn: () => Promise<Response>): Promise<Response> {
+  try {
+    return await fn();
+  } catch (error) {
+    const mapped = appErrorToHttpResponse(error);
+    return c.json(mapped.body, mapped.status as never);
+  }
 }

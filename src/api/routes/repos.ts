@@ -4,7 +4,13 @@
  */
 
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import type { EntityManager } from "@mikro-orm/postgresql";
 
+import * as repoCommands from "../../application/repos/commands.ts";
+import * as repoQueries from "../../application/repos/queries.ts";
+import type { AppContext, RepoDto } from "../../application/repos/types.ts";
+import { appErrorToHttpResponse } from "../../application/error-mapping.ts";
+import { AppInvariantError } from "../../application/errors.ts";
 import type { ApiEnv } from "../auth.ts";
 import {
   ListReposInputSchema,
@@ -41,22 +47,6 @@ const RepoStatusResponseSchema = RepoStatusResultSchema.extend({
   lastSyncAt: z.union([z.string().datetime(), z.null()]),
   lastTouchedAt: z.union([z.string().datetime(), z.null()]),
 }).openapi("RepoStatus");
-
-const FALLBACK_REPOS: Array<z.infer<typeof RepoResponseSchema>> = [{
-  id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-  orgId: "11111111-1111-4111-8111-111111111111",
-  name: "fulcrum",
-  slug: "fulcrum",
-  kind: "local",
-  localPath: "/tmp/fulcrum",
-  remoteUrl: null,
-  defaultBranch: "main",
-  currentBranch: "main",
-  lastSyncAt: null,
-  syncStatus: "synced",
-  lastTouchedAt: null,
-  archived: false,
-}];
 
 const listRoute = createRoute({
   method: "get",
@@ -128,36 +118,61 @@ export function registerRepoRoutes(api: OpenAPIHono<any>): void {
   const repoApi = api as unknown as OpenAPIHono<RepoApiEnv>;
 
   repoApi.openapi(listRoute, async (c) => {
-    const trpc = getRepoCaller(c);
     const query = c.req.valid("query");
     const input = ListReposInputSchema.parse({
       includeArchived: query.includeArchived ?? false,
     });
-    const repos = trpc
-      ? await trpc.repos.list(input)
-      : FALLBACK_REPOS.filter((repo) => input?.includeArchived || !repo.archived);
-    return c.json(z.array(RepoResponseSchema).parse(toJsonDates(repos)), 200);
+    return await mapHttpError(c, async () => {
+      const entityManager = tryResolveEntityManager(c);
+      if (entityManager) {
+        const repos = await repoQueries.listRepos(entityManager, appContext(c));
+        return c.json(z.array(RepoResponseSchema).parse(toJsonDates(repos.map((repo) => repoResponse(repo)))), 200);
+      }
+      const trpc = getRepoCaller(c);
+      const repos = trpc ? await trpc.repos.list(input) : [];
+      return c.json(z.array(RepoResponseSchema).parse(toJsonDates(repos)), 200);
+    }) as never;
   });
 
   repoApi.openapi(syncRoute, async (c) => {
-    const trpc = getRepoCaller(c);
     const input = SyncRepoInputSchema.parse({ repoId: c.req.valid("param").id });
-    if (!trpc) return c.json({ error: "repo not found" }, 404);
-    const result = await trpc.repos.syncRepo(input);
-    if (!result) return c.json({ error: "repo not found" }, 404);
-    return c.json(RepoSyncResultSchema.parse(result), 202);
+    return await mapHttpError(c, async () => {
+      const entityManager = tryResolveEntityManager(c);
+      if (entityManager) {
+        const repo = await repoQueries.getRepo(entityManager, appContext(c), input.repoId);
+        await repoCommands.touchRepoSync(entityManager, appContext(c), input.repoId);
+        return c.json(RepoSyncResultSchema.parse({
+          repoId: repo.id,
+          status: "queued",
+          taskName: repo.kind === "remote" ? "repo.sync.remote" : "repo.sync.local",
+          jobKey: `${repo.kind === "remote" ? "repo.sync.remote" : "repo.sync.local"}:${repo.id}`,
+        }), 202);
+      }
+      const trpc = getRepoCaller(c);
+      if (!trpc) return c.json({ error: "repo not found" }, 404);
+      const result = await trpc.repos.syncRepo(input);
+      if (!result) return c.json({ error: "repo not found" }, 404);
+      return c.json(RepoSyncResultSchema.parse(result), 202);
+    }) as never;
   });
 
   repoApi.openapi(statusRoute, async (c) => {
-    const trpc = getRepoCaller(c);
     const input = SyncRepoInputSchema.parse({ repoId: c.req.valid("param").id });
-    if (!trpc) return c.json({ error: "repo not found" }, 404);
-    const result = await trpc.repos.statusRepo(input);
-    const parsed = result ? RepoStatusResultSchema.parse(result) : null;
-    if (!parsed || parsed.orgId !== c.get("orgId")) {
-      return c.json({ error: "repo not found" }, 404);
-    }
-    return c.json(RepoStatusResponseSchema.parse(toJsonDates(parsed)), 200);
+    return await mapHttpError(c, async () => {
+      const entityManager = tryResolveEntityManager(c);
+      if (entityManager) {
+        const repo = await repoQueries.getRepo(entityManager, appContext(c), input.repoId);
+        return c.json(RepoStatusResponseSchema.parse(toJsonDates(repoStatusResponse(repo))), 200);
+      }
+      const trpc = getRepoCaller(c);
+      if (!trpc) return c.json({ error: "repo not found" }, 404);
+      const result = await trpc.repos.statusRepo(input);
+      const parsed = result ? RepoStatusResultSchema.parse(result) : null;
+      if (!parsed || parsed.orgId !== c.get("orgId")) {
+        return c.json({ error: "repo not found" }, 404);
+      }
+      return c.json(RepoStatusResponseSchema.parse(toJsonDates(parsed)), 200);
+    }) as never;
   });
 }
 
@@ -168,4 +183,84 @@ function getRepoCaller(c: { get(key: string): unknown }): RepoCaller | undefined
 
 function toJsonDates(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value));
+}
+
+function appContext(c: { get(key: string): unknown }): AppContext {
+  return {
+    orgId: String(c.get("orgId")),
+    userId: String(c.get("userId")),
+    projectId: null,
+  };
+}
+
+function repoResponse(repo: RepoDto): z.infer<typeof RepoResponseSchema> {
+  return {
+    id: repo.id,
+    orgId: repo.orgId,
+    name: repo.name,
+    slug: repo.slug,
+    kind: repo.kind === "remote" ? "remote" : "local",
+    localPath: repo.localPath,
+    remoteUrl: repo.remoteUrl ?? null,
+    defaultBranch: repo.defaultBranch ?? null,
+    currentBranch: repo.currentBranch ?? null,
+    lastSyncAt: isoOrNull(repo.lastSyncAt ?? null),
+    syncStatus: repo.syncStatus ?? "idle",
+    lastTouchedAt: null,
+    archived: false,
+  };
+}
+
+function repoStatusResponse(repo: RepoDto): z.infer<typeof RepoStatusResponseSchema> {
+  const syncStatus = repo.syncStatus ?? "idle";
+  return {
+    repoId: repo.id,
+    orgId: repo.orgId,
+    status: publicStatus(syncStatus, repo.lastSyncAt ?? null),
+    syncStatus,
+    lastSyncAt: isoOrNull(repo.lastSyncAt ?? null),
+    lastTouchedAt: null,
+  };
+}
+
+function publicStatus(syncStatus: string, lastSyncAt: Date | null): z.infer<typeof RepoStatusResultSchema>["status"] {
+  if (syncStatus === "error" || syncStatus === "failed") return "failed";
+  if (syncStatus === "syncing" || syncStatus === "running") return "running";
+  if (!lastSyncAt) return "stale";
+  return Date.now() - lastSyncAt.getTime() > 30 * 60 * 1_000 ? "stale" : "synced";
+}
+
+function isoOrNull(value: Date | string | null): string | null {
+  if (value == null) return null;
+  if (value instanceof Date) return value.toISOString();
+  return new Date(value).toISOString();
+}
+
+function tryResolveEntityManager(c: { get(key: string): unknown }): EntityManager | null {
+  try {
+    return resolveEntityManager(c);
+  } catch {
+    return null;
+  }
+}
+
+function resolveEntityManager(c: { get(key: string): unknown }): EntityManager {
+  const db = c.get("db");
+  if (db && typeof db === "object" && "transactional" in db) return db as EntityManager;
+  if (db && typeof db === "object" && "em" in db) {
+    const entityManager = (db as { em?: unknown }).em;
+    if (entityManager && typeof entityManager === "object" && "transactional" in entityManager) {
+      return entityManager as EntityManager;
+    }
+  }
+  throw new AppInvariantError("EntityManager could not be resolved.");
+}
+
+async function mapHttpError(c: any, fn: () => Promise<Response>): Promise<Response> {
+  try {
+    return await fn();
+  } catch (error) {
+    const mapped = appErrorToHttpResponse(error);
+    return c.json(mapped.body, mapped.status as never);
+  }
 }

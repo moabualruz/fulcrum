@@ -1,4 +1,9 @@
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
+import type { EntityManager } from "@mikro-orm/postgresql";
+
+import { listNotifications } from "../../application/notifications/queries.ts";
+import { appErrorToHttpResponse } from "../../application/error-mapping.ts";
+import { AppInvariantError } from "../../application/errors.ts";
 import type { KernelNotificationApplication } from "../application.ts";
 import type { ApiEnv } from "../auth.ts";
 
@@ -28,13 +33,35 @@ export function registerKernelNotificationRoutes(
 ): void {
   api.openapi(listNotificationsRoute, async (c) => {
     const application = options.application ?? c.get("application")?.notifications;
-    if (!application) return c.json({ data: [] }, 200);
-    return c.json(
-      await application.listNotifications({
-        orgId: c.get("orgId"),
-        userId: c.get("userId"),
-      }) as never,
-      200,
-    );
+    const orgId = c.get("orgId");
+    const userId = c.get("userId");
+    return await mapHttpError(c, async () => {
+      if (application) {
+        return c.json(await application.listNotifications({ orgId, userId }) as never, 200);
+      }
+      const result = await listNotifications(resolveEntityManager(c), { orgId, userId }, { limit: 50, offset: 0 });
+      return c.json({ data: result.items } as never, 200);
+    }) as never;
   });
+}
+
+function resolveEntityManager(c: { get(key: string): unknown }): EntityManager {
+  const db = c.get("db");
+  if (db && typeof db === "object" && "transactional" in db) return db as EntityManager;
+  if (db && typeof db === "object" && "em" in db) {
+    const entityManager = (db as { em?: unknown }).em;
+    if (entityManager && typeof entityManager === "object" && "transactional" in entityManager) {
+      return entityManager as EntityManager;
+    }
+  }
+  throw new AppInvariantError("EntityManager could not be resolved.");
+}
+
+async function mapHttpError(c: any, fn: () => Promise<Response>): Promise<Response> {
+  try {
+    return await fn();
+  } catch (error) {
+    const mapped = appErrorToHttpResponse(error);
+    return c.json(mapped.body, mapped.status as never);
+  }
 }
