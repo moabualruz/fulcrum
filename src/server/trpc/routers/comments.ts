@@ -15,23 +15,40 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { CommentService } from "../../../services/CommentService.ts";
+import {
+  addTaskCommentReaction,
+  createTaskComment,
+  deleteTaskComment,
+  removeTaskCommentReaction,
+  resolveTaskComment,
+  subscribeTaskComment,
+  unresolveTaskComment,
+  unsubscribeTaskComment,
+} from "../../../application/comments/commands.ts";
+import {
+  getThreadedTaskComments,
+  listTaskComments,
+  listTaskCommentWatchers,
+} from "../../../application/comments/queries.ts";
+import type { AppContext } from "../../../application/comments/types.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-type ResolveCtx = {
-  em: import("@mikro-orm/postgresql").EntityManager | null;
-  container: import("@needle-di/core").Container | null;
-};
+type EntityManager = import("@mikro-orm/postgresql").EntityManager;
 
-function resolveService(ctx: ResolveCtx): CommentService {
-  if (ctx.em) return new CommentService(ctx.em);
+function requireEntityManager(ctx: Record<string, unknown>): EntityManager {
+  const em = ctx["em"] as EntityManager | null | undefined;
+  if (em) return em;
   throw new TRPCError({
     code: "INTERNAL_SERVER_ERROR",
-    message: "CommentService could not be resolved: no EntityManager in context.",
+    message: "EntityManager could not be resolved for comments.",
   });
+}
+
+function appContext(ctx: { orgId: string; userId: string }): AppContext {
+  return { orgId: ctx.orgId, userId: ctx.userId };
 }
 
 // ── Router ─────────────────────────────────────────────────────────
@@ -42,13 +59,13 @@ export const commentsRouter = t.router({
   list: permissionedProcedure({ resource: "comments", action: "list" })
     .input(z.object({ taskId: z.string().uuid() }))
     .query(({ ctx, input }) => {
-      return resolveService(ctx).listComments(ctx.orgId, input.taskId);
+      return listTaskComments(requireEntityManager(ctx), appContext(ctx), input.taskId);
     }),
 
   threaded: permissionedProcedure({ resource: "comments", action: "list" })
     .input(z.object({ taskId: z.string().uuid() }))
     .query(({ ctx, input }) => {
-      return resolveService(ctx).getThreaded(ctx.orgId, input.taskId);
+      return getThreadedTaskComments(requireEntityManager(ctx), appContext(ctx), input.taskId);
     }),
 
   // ── Comment mutations ────────────────────────────────────────
@@ -62,32 +79,25 @@ export const commentsRouter = t.router({
       }),
     )
     .mutation(({ ctx, input }) => {
-      // T-05-05: authorId from ctx.userId, not user input
-      return resolveService(ctx).createComment(
-        ctx.orgId,
-        input.taskId,
-        ctx.userId,
-        input.body,
-        input.parentCommentId,
-      );
+      return createTaskComment(requireEntityManager(ctx), appContext(ctx), input);
     }),
 
   delete: permissionedProcedure({ resource: "comments", action: "delete" })
     .input(z.object({ commentId: z.string().uuid() }))
     .mutation(({ ctx, input }) => {
-      return resolveService(ctx).deleteComment(ctx.orgId, input.commentId);
+      return deleteTaskComment(requireEntityManager(ctx), appContext(ctx), input.commentId);
     }),
 
   resolve: permissionedProcedure({ resource: "comments", action: "update" })
     .input(z.object({ commentId: z.string().uuid() }))
     .mutation(({ ctx, input }) => {
-      return resolveService(ctx).resolveComment(ctx.orgId, input.commentId, ctx.userId);
+      return resolveTaskComment(requireEntityManager(ctx), appContext(ctx), input.commentId);
     }),
 
   unresolve: permissionedProcedure({ resource: "comments", action: "update" })
     .input(z.object({ commentId: z.string().uuid() }))
     .mutation(({ ctx, input }) => {
-      return resolveService(ctx).unresolveComment(ctx.orgId, input.commentId);
+      return unresolveTaskComment(requireEntityManager(ctx), appContext(ctx), input.commentId);
     }),
 
   // ── Reaction mutations ───────────────────────────────────────
@@ -95,13 +105,13 @@ export const commentsRouter = t.router({
   addReaction: permissionedProcedure({ resource: "comments", action: "update" })
     .input(z.object({ commentId: z.string().uuid(), emoji: z.string().max(8) }))
     .mutation(({ ctx, input }) => {
-      return resolveService(ctx).addReaction(input.commentId, ctx.userId, input.emoji);
+      return addTaskCommentReaction(requireEntityManager(ctx), appContext(ctx), input.commentId, input.emoji);
     }),
 
   removeReaction: permissionedProcedure({ resource: "comments", action: "update" })
     .input(z.object({ commentId: z.string().uuid(), emoji: z.string().max(8) }))
     .mutation(({ ctx, input }) => {
-      return resolveService(ctx).removeReaction(input.commentId, ctx.userId, input.emoji);
+      return removeTaskCommentReaction(requireEntityManager(ctx), appContext(ctx), input.commentId, input.emoji);
     }),
 
   // ── Watcher procedures ───────────────────────────────────────
@@ -109,18 +119,18 @@ export const commentsRouter = t.router({
   watchers: permissionedProcedure({ resource: "comments", action: "list" })
     .input(z.object({ taskId: z.string().uuid() }))
     .query(({ ctx, input }) => {
-      return resolveService(ctx).listWatchers(ctx.orgId, input.taskId);
+      return listTaskCommentWatchers(requireEntityManager(ctx), appContext(ctx), input.taskId);
     }),
 
   subscribe: permissionedProcedure({ resource: "comments", action: "create" })
     .input(z.object({ taskId: z.string().uuid() }))
     .mutation(({ ctx, input }) => {
-      return resolveService(ctx).subscribe(ctx.orgId, input.taskId, ctx.userId, "manual");
+      return subscribeTaskComment(requireEntityManager(ctx), appContext(ctx), input.taskId);
     }),
 
   unsubscribe: permissionedProcedure({ resource: "comments", action: "delete" })
     .input(z.object({ taskId: z.string().uuid() }))
     .mutation(({ ctx, input }) => {
-      return resolveService(ctx).unsubscribe(ctx.orgId, input.taskId, ctx.userId);
+      return unsubscribeTaskComment(requireEntityManager(ctx), appContext(ctx), input.taskId);
     }),
 });

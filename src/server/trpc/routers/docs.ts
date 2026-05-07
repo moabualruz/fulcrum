@@ -1,10 +1,30 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { DocTypeEnum, ScopeEnum } from "../../../db/entities/docs/enums.ts";
+import {
+  createDoc,
+  createDocComment,
+  deleteDoc,
+  deleteDocComment,
+  resolveDocComment,
+  restoreDocVersion,
+  updateDoc,
+  updateDocComment,
+} from "../../../application/docs/commands.ts";
+import {
+  diffDocVersions,
+  getDoc,
+  getDocVersion,
+  listDocBacklinks,
+  listDocComments,
+  listDocForwardLinks,
+  listDocs,
+  listDocVersions,
+} from "../../../application/docs/queries.ts";
+import type { AppContext } from "../../../application/docs/types.ts";
+import { DocTypeEnum, ScopeEnum } from "../../../application/docs/types.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
-import { DocService } from "../../../services/DocService.ts";
 import { docTemplatesRouter } from "./doc-templates.ts";
 
 // ── Schemas ────────────────────────────────────────────────────────
@@ -157,11 +177,22 @@ const VersionDiffOutputSchema = z.object({ html: z.string() });
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-function requireService(ctx: { em: import("@mikro-orm/postgresql").EntityManager | null }): DocService {
-  if (!ctx.em) {
+type EntityManager = import("@mikro-orm/postgresql").EntityManager;
+
+function requireEntityManager(ctx: Record<string, unknown>): EntityManager {
+  const em = ctx["em"] as EntityManager | null | undefined;
+  if (!em) {
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "EntityManager is not available." });
   }
-  return new DocService(ctx.em);
+  return em;
+}
+
+function optionalEntityManager(ctx: Record<string, unknown>): EntityManager | null {
+  return (ctx["em"] as EntityManager | null | undefined) ?? null;
+}
+
+function appContext(ctx: { orgId: string; userId: string }): AppContext {
+  return { orgId: ctx.orgId, userId: ctx.userId, projectId: null };
 }
 
 // ── Router (thin delegation layer) ─────────────────────────────────
@@ -171,37 +202,39 @@ export const docsRouter = t.router({
     .input(ListDocsInputSchema)
     .output(z.array(DocOutputSchema))
     .query(async ({ ctx, input }) => {
-      if (!ctx.em) return [];
-      return requireService(ctx).list(ctx.orgId, input ?? undefined);
+      const em = optionalEntityManager(ctx);
+      if (!em) return [];
+      return listDocs(em, appContext(ctx), input ?? undefined);
     }),
 
   get: permissionedProcedure({ resource: "docs", action: "get" })
     .input(GetDocInputSchema)
     .output(DocOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
-      if (!ctx.em) return null;
-      return requireService(ctx).get(ctx.orgId, input);
+      const em = optionalEntityManager(ctx);
+      if (!em) return null;
+      return getDoc(em, appContext(ctx), input);
     }),
 
   create: permissionedProcedure({ resource: "docs", action: "create" })
     .input(CreateDocInputSchema)
     .output(DocOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      return requireService(ctx).create(ctx, input);
+      return createDoc(requireEntityManager(ctx), appContext(ctx), input);
     }),
 
   update: permissionedProcedure({ resource: "docs", action: "update" })
     .input(UpdateDocInputSchema)
     .output(DocOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
-      return requireService(ctx).update(ctx, input);
+      return updateDoc(requireEntityManager(ctx), appContext(ctx), input);
     }),
 
   delete: permissionedProcedure({ resource: "docs", action: "delete" })
     .input(DeleteDocInputSchema)
     .output(z.union([DocOutputSchema, HardDeleteOutputSchema]).nullable())
     .mutation(async ({ ctx, input }) => {
-      return requireService(ctx).delete(ctx, input.id, input.hard);
+      return deleteDoc(requireEntityManager(ctx), appContext(ctx), input.id, input.hard);
     }),
 
   comments: t.router({
@@ -209,36 +242,37 @@ export const docsRouter = t.router({
       .input(ListCommentsInputSchema)
       .output(z.array(CommentOutputSchema))
       .query(async ({ ctx, input }) => {
-        if (!ctx.em) return [];
-        return requireService(ctx).listComments(ctx, input.docId, input.resolved);
+        const em = optionalEntityManager(ctx);
+        if (!em) return [];
+        return listDocComments(em, appContext(ctx), input.docId, input.resolved);
       }),
 
     create: permissionedProcedure({ resource: "docs", action: "create" })
       .input(CreateCommentInputSchema)
       .output(CommentOutputSchema)
       .mutation(async ({ ctx, input }) => {
-        return requireService(ctx).createComment(ctx, input);
+        return createDocComment(requireEntityManager(ctx), appContext(ctx), input);
       }),
 
     update: permissionedProcedure({ resource: "docs", action: "update" })
       .input(UpdateCommentInputSchema)
       .output(CommentOutputSchema.nullable())
       .mutation(async ({ ctx, input }) => {
-        return requireService(ctx).updateComment(ctx, input.id, input.bodyMd);
+        return updateDocComment(requireEntityManager(ctx), appContext(ctx), input.id, input.bodyMd);
       }),
 
     delete: permissionedProcedure({ resource: "docs", action: "delete" })
       .input(DeleteCommentInputSchema)
       .output(DeleteCommentOutputSchema.nullable())
       .mutation(async ({ ctx, input }) => {
-        return requireService(ctx).deleteComment(ctx, input.id);
+        return deleteDocComment(requireEntityManager(ctx), appContext(ctx), input.id);
       }),
 
     resolve: permissionedProcedure({ resource: "docs", action: "resolve" })
       .input(ResolveCommentInputSchema)
       .output(CommentOutputSchema.nullable())
       .mutation(async ({ ctx, input }) => {
-        return requireService(ctx).resolveComment(ctx, input.id, input.resolved);
+        return resolveDocComment(requireEntityManager(ctx), appContext(ctx), input.id, input.resolved);
       }),
   }),
 
@@ -247,28 +281,34 @@ export const docsRouter = t.router({
       .input(VersionDocInputSchema)
       .output(z.array(VersionListOutputSchema))
       .query(async ({ ctx, input }) => {
-        return requireService(ctx).listVersions(ctx, input.docId);
+        return listDocVersions(requireEntityManager(ctx), appContext(ctx), input.docId);
       }),
 
     get: permissionedProcedure({ resource: "docs", action: "get" })
       .input(VersionGetInputSchema)
       .output(VersionOutputSchema.nullable())
       .query(async ({ ctx, input }) => {
-        return requireService(ctx).getVersion(ctx, input.docId, input.versionNum);
+        return getDocVersion(requireEntityManager(ctx), appContext(ctx), input.docId, input.versionNum);
       }),
 
     diff: permissionedProcedure({ resource: "docs", action: "diff" })
       .input(VersionDiffInputSchema)
       .output(VersionDiffOutputSchema)
       .query(async ({ ctx, input }) => {
-        return requireService(ctx).diffVersions(ctx, input.docId, input.fromVersionNum, input.toVersionNum);
+        return diffDocVersions(
+          requireEntityManager(ctx),
+          appContext(ctx),
+          input.docId,
+          input.fromVersionNum,
+          input.toVersionNum,
+        );
       }),
 
     restore: permissionedProcedure({ resource: "docs", action: "restore" })
       .input(VersionGetInputSchema)
       .output(DocOutputSchema)
       .mutation(async ({ ctx, input }) => {
-        return requireService(ctx).restoreVersion(ctx, input.docId, input.versionNum);
+        return restoreDocVersion(requireEntityManager(ctx), appContext(ctx), input.docId, input.versionNum);
       }),
   }),
 
@@ -279,16 +319,18 @@ export const docsRouter = t.router({
       .input(DocLinksInputSchema)
       .output(z.array(BacklinkOutputSchema))
       .query(async ({ ctx, input }) => {
-        if (!ctx.em) return [];
-        return requireService(ctx).listBacklinks(ctx.orgId, input.docId);
+        const em = optionalEntityManager(ctx);
+        if (!em) return [];
+        return listDocBacklinks(em, appContext(ctx), input.docId);
       }),
 
     listForwardLinks: permissionedProcedure({ resource: "docs", action: "listForwardLinks" })
       .input(DocLinksInputSchema)
       .output(z.array(ForwardLinkOutputSchema))
       .query(async ({ ctx, input }) => {
-        if (!ctx.em) return [];
-        return requireService(ctx).listForwardLinks(ctx.orgId, input.docId);
+        const em = optionalEntityManager(ctx);
+        if (!em) return [];
+        return listDocForwardLinks(em, appContext(ctx), input.docId);
       }),
   }),
 });
