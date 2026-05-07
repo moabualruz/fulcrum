@@ -97,8 +97,6 @@ const RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS = new Map([
 ]);
 
 const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES = [
-  "src/cli/commands/context.ts",
-  "src/cli/commands/repos.ts",
   "src/server/trpc/routers/audit.ts",
   "src/server/trpc/routers/auth.ts",
   "src/server/trpc/routers/memory.ts",
@@ -129,6 +127,13 @@ const PLAN44_CLI_FILES = [
   "src/cli/commands/task-relate.ts",
   "src/cli/commands/symphony.ts",
   "src/cli/commands/pillar14-generated.ts",
+];
+
+const PLAN45_CLI_FILES = [
+  "src/cli/commands/comment.ts",
+  "src/cli/commands/context.ts",
+  "src/cli/commands/my-work.ts",
+  "src/cli/commands/repos.ts",
 ];
 
 const FORBIDDEN_PLAN44_CLI_DIRECT_ACCESS = new RegExp(
@@ -262,5 +267,9 @@ describe("Phase 9.5 interface boundary", () => {
 
   test("Plan 44 residual CLI commands use caller/application boundaries for runtime domain work", async () => {
     expect(await patternInExactFiles(PLAN44_CLI_FILES, FORBIDDEN_PLAN44_CLI_DIRECT_ACCESS)).toEqual([]);
+  });
+
+  test("Plan 45 residual CLI commands use caller/application boundaries for runtime domain work", async () => {
+    expect(await patternInExactFiles(PLAN45_CLI_FILES, FORBIDDEN_PLAN44_CLI_DIRECT_ACCESS)).toEqual([]);
   });
 });
