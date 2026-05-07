@@ -1,55 +1,44 @@
 /**
- * Webhooks sub-router — Pillar 13, Issue 07.
- *
- * Procedures:
- *   webhooks.list         — list org webhooks (secrets masked)
- *   webhooks.get          — get one webhook by id
- *   webhooks.create       — create + encrypt secret
- *   webhooks.update       — update fields; re-encrypt secret if changed
- *   webhooks.delete       — delete + cascade deliveries
- *   webhooks.deliveries.list — list delivery attempts for a webhook
- *   webhooks.deliveries.get  — get single delivery attempt
- *
- * Feature gate: `outbound-webhooks` flag (FULCRUM_FEATURES or DB row).
- *   - OFF → FeatureDisabledError (FORBIDDEN).
- *   - ON  → normal CRUD.
- *
- * Secret discipline:
- *   - Plain-text secret accepted on create/update.
- *   - Encrypted via nacl.secretbox (vault.ts) before persistence.
- *   - List/get always returns "****" for secret field.
- *   - Raw ciphertext is only decrypted by the dispatcher (Issue 08).
- *
- * C6: No raw SQL.
- * C8: needle-di Container pattern; em/container resolved from ctx.
+ * Webhooks sub-router — thin tRPC adapter over application webhooks services.
  */
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { t } from "../trpc.ts";
+import { appErrorToTrpcError } from "../../application/error-mapping.ts";
+import { AppError, AppNotFoundError } from "../../application/errors.ts";
+import {
+  createWebhook,
+  deleteWebhook,
+  updateWebhook,
+} from "../../application/webhooks/commands.ts";
+import {
+  getWebhook,
+  getWebhookDelivery,
+  listWebhookDeliveries,
+  listWebhooks,
+} from "../../application/webhooks/queries.ts";
+import type { WebhookAppContext } from "../../application/webhooks/types.ts";
+import { FlagRegistry } from "../../flags/registry.ts";
+import { requireTrpcEntityManager, type TrpcContext } from "../context.ts";
 import { permissionedProcedure } from "../middleware.ts";
 import {
-  WebhookInputSchema,
-  WebhookUpdateInputSchema,
-  WebhookOutputSchema,
   DeliveryOutputSchema,
   ListDeliveriesInputSchema,
+  WebhookInputSchema,
+  WebhookOutputSchema,
+  WebhookUpdateInputSchema,
 } from "../schemas/webhooks.ts";
-import { FlagRegistry } from "../../flags/registry.ts";
-
-// ─── Feature gate helper ──────────────────────────────────────────────────────
+import { t } from "../trpc.ts";
 
 async function assertOutboundWebhooksEnabled(ctx: {
   container: import("@needle-di/core").Container | null;
   orgId: string | null;
   userId: string | null;
 }): Promise<void> {
-  // Fast-path: check FULCRUM_FEATURES env var.
-  const envFlags = (process.env.FULCRUM_FEATURES ?? "").split(",").map((f) => f.trim());
+  const envFlags = (process.env.FULCRUM_FEATURES ?? "").split(",").map((flag) => flag.trim());
   if (envFlags.includes("outbound-webhooks")) return;
 
-  // Container path: FlagRegistry.
   if (ctx.container?.has(FlagRegistry)) {
     try {
       const flagRegistry = ctx.container.get(FlagRegistry);
@@ -59,7 +48,7 @@ async function assertOutboundWebhooksEnabled(ctx: {
       });
       if (enabled) return;
     } catch {
-      // Fall through to FORBIDDEN.
+      // Preserve existing fail-closed feature-gate behavior.
     }
   }
 
@@ -69,83 +58,29 @@ async function assertOutboundWebhooksEnabled(ctx: {
   });
 }
 
-// ─── Encryption helpers (lazy — avoid bundling nacl in SSR without a container) ─
+function appContext(ctx: TrpcContext): WebhookAppContext {
+  if (!ctx.orgId) throw new TRPCError({ code: "UNAUTHORIZED", message: "No org context." });
+  return { orgId: ctx.orgId, userId: ctx.userId, projectId: null };
+}
 
-async function encryptSecret(plaintext: string): Promise<string> {
+async function mapAppError<T>(fn: () => Promise<T>): Promise<T> {
   try {
-    const [{ encrypt }, { loadOrCreateMasterKey }] = await Promise.all([
-      import("../../secrets/vault.ts"),
-      import("../../secrets/keyring.ts"),
-    ]);
-    const masterKey = await loadOrCreateMasterKey({} as never).catch(() => null);
-    if (!masterKey) {
-      // No keyring configured — store with a "plain:" prefix (test/dev environments).
-      // Dispatcher skips HMAC signing when prefix is present.
-      return "plain:" + Buffer.from(plaintext, "utf8").toString("base64");
-    }
-    // MasterKey.key is the raw Uint8Array for encryption.
-    const ciphertext = encrypt(masterKey.key, plaintext);
-    return Buffer.from(ciphertext).toString("base64url");
-  } catch {
-    // Vault or keyring unavailable — store with plain prefix.
-    return "plain:" + Buffer.from(plaintext, "utf8").toString("base64");
+    return await fn();
+  } catch (error) {
+    if (error instanceof AppError) throw appErrorToTrpcError(error);
+    throw error;
   }
 }
 
-// ─── Shared output projection ─────────────────────────────────────────────────
-
-function projectWebhook(row: {
-  id: string;
-  org: { id: string } | string;
-  name: string;
-  url: string;
-  eventsFilter: string[] | null;
-  enabled: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  lastDeliveryAt: Date | null;
-}): z.infer<typeof WebhookOutputSchema> {
-  return {
-    id: row.id,
-    orgId: typeof row.org === "string" ? row.org : row.org.id,
-    name: row.name,
-    url: row.url,
-    secret: "****",
-    eventsFilter: (row.eventsFilter ?? null) as z.infer<typeof WebhookOutputSchema>["eventsFilter"],
-    enabled: row.enabled,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    lastDeliveryAt: row.lastDeliveryAt,
-  };
+async function nullableNotFound<T>(fn: () => Promise<T>): Promise<T | null> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AppNotFoundError) return null;
+    if (error instanceof AppError) throw appErrorToTrpcError(error);
+    throw error;
+  }
 }
-
-function projectDelivery(row: {
-  id: string;
-  org: { id: string } | string;
-  webhook: { id: string } | string;
-  eventId: string | null;
-  status: string;
-  attempt: number;
-  responseCode: number | null;
-  error: string | null;
-  nextRetryAt: Date | null;
-  createdAt: Date;
-}): z.infer<typeof DeliveryOutputSchema> {
-  return {
-    id: row.id,
-    orgId: typeof row.org === "string" ? row.org : row.org.id,
-    webhookId: typeof row.webhook === "string" ? row.webhook : row.webhook.id,
-    eventId: row.eventId,
-    status: row.status as z.infer<typeof DeliveryOutputSchema>["status"],
-    attempt: row.attempt,
-    responseCode: row.responseCode,
-    error: row.error,
-    nextRetryAt: row.nextRetryAt,
-    createdAt: row.createdAt,
-  };
-}
-
-// ─── Deliveries sub-router ────────────────────────────────────────────────────
 
 const deliveriesRouter = t.router({
   list: permissionedProcedure({ resource: "webhooks", action: "list" })
@@ -153,15 +88,9 @@ const deliveriesRouter = t.router({
     .output(z.array(DeliveryOutputSchema))
     .query(async ({ ctx, input }) => {
       await assertOutboundWebhooksEnabled(ctx);
-      if (!ctx.em) return [];
-
-      const { WebhookDelivery } = await import("../../db/entities/notifications/WebhookDelivery.ts");
-      const rows = await ctx.em.find(
-        WebhookDelivery,
-        { webhook: { id: input.webhookId }, org: { id: ctx.orgId } },
-        { limit: input.limit ?? 50, orderBy: { createdAt: "DESC" } },
+      return mapAppError(() =>
+        listWebhookDeliveries(requireTrpcEntityManager(ctx, "No database connection."), appContext(ctx), input)
       );
-      return rows.map(projectDelivery);
     }),
 
   get: permissionedProcedure({ resource: "webhooks", action: "get" })
@@ -169,15 +98,11 @@ const deliveriesRouter = t.router({
     .output(DeliveryOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
       await assertOutboundWebhooksEnabled(ctx);
-      if (!ctx.em) return null;
-
-      const { WebhookDelivery } = await import("../../db/entities/notifications/WebhookDelivery.ts");
-      const row = await ctx.em.findOne(WebhookDelivery, { id: input.id, org: { id: ctx.orgId } });
-      return row ? projectDelivery(row) : null;
+      return nullableNotFound(() =>
+        getWebhookDelivery(requireTrpcEntityManager(ctx, "No database connection."), appContext(ctx), input.id)
+      );
     }),
 });
-
-// ─── Main router ──────────────────────────────────────────────────────────────
 
 export const webhooksRouter = t.router({
   list: permissionedProcedure({ resource: "webhooks", action: "list" })
@@ -185,11 +110,9 @@ export const webhooksRouter = t.router({
     .output(z.array(WebhookOutputSchema))
     .query(async ({ ctx }) => {
       await assertOutboundWebhooksEnabled(ctx);
-      if (!ctx.em) return [];
-
-      const { Webhook } = await import("../../db/entities/notifications/Webhook.ts");
-      const rows = await ctx.em.find(Webhook, { org: { id: ctx.orgId } }, { orderBy: { createdAt: "DESC" } });
-      return rows.map(projectWebhook);
+      return mapAppError(() =>
+        listWebhooks(requireTrpcEntityManager(ctx, "No database connection."), appContext(ctx))
+      );
     }),
 
   get: permissionedProcedure({ resource: "webhooks", action: "get" })
@@ -197,11 +120,9 @@ export const webhooksRouter = t.router({
     .output(WebhookOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
       await assertOutboundWebhooksEnabled(ctx);
-      if (!ctx.em) return null;
-
-      const { Webhook } = await import("../../db/entities/notifications/Webhook.ts");
-      const row = await ctx.em.findOne(Webhook, { id: input.id, org: { id: ctx.orgId } });
-      return row ? projectWebhook(row) : null;
+      return nullableNotFound(() =>
+        getWebhook(requireTrpcEntityManager(ctx, "No database connection."), appContext(ctx), input.id)
+      );
     }),
 
   create: permissionedProcedure({ resource: "webhooks", action: "create" })
@@ -209,26 +130,9 @@ export const webhooksRouter = t.router({
     .output(WebhookOutputSchema)
     .mutation(async ({ ctx, input }) => {
       await assertOutboundWebhooksEnabled(ctx);
-      if (!ctx.em) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No database connection." });
-
-      const { Webhook } = await import("../../db/entities/notifications/Webhook.ts");
-      const { Org } = await import("../../db/entities/auth/Org.ts");
-
-      const org = ctx.em.getReference(Org, ctx.orgId);
-      const encryptedSecret = input.secret ? await encryptSecret(input.secret) : null;
-
-      const webhook = ctx.em.create(Webhook, {
-        org,
-        name: input.name,
-        url: input.url,
-        encryptedSecret,
-        eventsFilter: input.eventsFilter ?? null,
-        enabled: input.enabled ?? true,
-      });
-
-      ctx.em.persist(webhook);
-      await ctx.em.flush();
-      return projectWebhook(webhook);
+      return mapAppError(() =>
+        createWebhook(requireTrpcEntityManager(ctx, "No database connection."), appContext(ctx), input)
+      );
     }),
 
   update: permissionedProcedure({ resource: "webhooks", action: "update" })
@@ -236,20 +140,9 @@ export const webhooksRouter = t.router({
     .output(WebhookOutputSchema)
     .mutation(async ({ ctx, input }) => {
       await assertOutboundWebhooksEnabled(ctx);
-      if (!ctx.em) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No database connection." });
-
-      const { Webhook } = await import("../../db/entities/notifications/Webhook.ts");
-      const webhook = await ctx.em.findOne(Webhook, { id: input.id, org: { id: ctx.orgId } });
-      if (!webhook) throw new TRPCError({ code: "NOT_FOUND", message: "Webhook not found." });
-
-      if (input.name !== undefined) webhook.name = input.name;
-      if (input.url !== undefined) webhook.url = input.url;
-      if (input.secret !== undefined) webhook.encryptedSecret = await encryptSecret(input.secret);
-      if (input.eventsFilter !== undefined) webhook.eventsFilter = input.eventsFilter ?? null;
-      if (input.enabled !== undefined) webhook.enabled = input.enabled;
-
-      await ctx.em.flush();
-      return projectWebhook(webhook);
+      return mapAppError(() =>
+        updateWebhook(requireTrpcEntityManager(ctx, "No database connection."), appContext(ctx), input)
+      );
     }),
 
   delete: permissionedProcedure({ resource: "webhooks", action: "delete" })
@@ -257,15 +150,9 @@ export const webhooksRouter = t.router({
     .output(z.object({ ok: z.literal(true) }))
     .mutation(async ({ ctx, input }) => {
       await assertOutboundWebhooksEnabled(ctx);
-      if (!ctx.em) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No database connection." });
-
-      const { Webhook } = await import("../../db/entities/notifications/Webhook.ts");
-      const webhook = await ctx.em.findOne(Webhook, { id: input.id, org: { id: ctx.orgId } });
-      if (!webhook) throw new TRPCError({ code: "NOT_FOUND", message: "Webhook not found." });
-
-      ctx.em.remove(webhook);
-      await ctx.em.flush();
-      return { ok: true as const };
+      return mapAppError(() =>
+        deleteWebhook(requireTrpcEntityManager(ctx, "No database connection."), appContext(ctx), input.id)
+      );
     }),
 
   deliveries: deliveriesRouter,
