@@ -17,6 +17,13 @@ import {
   type LegacySymphonyStore,
 } from "../../application/legacy/symphony.ts";
 import {
+  dispatchTaskRun,
+} from "../../application/runs/commands.ts";
+import {
+  getRunDetail,
+} from "../../application/runs/queries.ts";
+import type { AppContext as RunsAppContext } from "../../application/runs/types.ts";
+import {
   claimRun as claimSymphonyRun,
   ClaimConflictError,
 } from "../../orchestration/symphony/orchestrator.ts";
@@ -113,14 +120,15 @@ function requireLegacyStore(ctx: { legacyStore?: LegacySymphonyStore }): LegacyS
   return ctx.legacyStore;
 }
 
-function requireEm(ctx: { em?: EntityManager | null }): EntityManager {
-  if (!ctx.em) {
+function requireEm(ctx: Record<string, unknown>): EntityManager {
+  const manager = ctx["em"] as EntityManager | null | undefined;
+  if (!manager) {
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
       message: "EntityManager is required for Symphony orchestration procedures.",
     });
   }
-  return ctx.em;
+  return manager;
 }
 
 function requireOrgId(ctx: { orgId: string | null }): string {
@@ -134,9 +142,13 @@ function inputOrgId(ctx: { orgId: string | null }, orgId?: string): string {
   return orgId ?? requireOrgId(ctx);
 }
 
+function runsAppContext(ctx: { orgId: string | null; userId: string | null; projectId?: string | null }): RunsAppContext {
+  return { orgId: requireOrgId(ctx), userId: ctx.userId, projectId: ctx.projectId ?? null };
+}
+
 async function getAgentRunForApi(
-  em: EntityManager,
-  orgId: string,
+  manager: EntityManager,
+  appCtx: RunsAppContext,
   runId: string,
 ): Promise<{
   id: string;
@@ -148,24 +160,17 @@ async function getAgentRunForApi(
   nextRetryAt: Date | null;
   lastErrorKind: string | null;
 } | null> {
-  const { AgentRun } = await import("../../db/entities/orchestration/AgentRun.ts");
-  const fork = em.fork();
-  const run = await fork.findOne(AgentRun, {
-    id: runId,
-    org: orgId,
-  } as never);
-  if (!run) return null;
-
-  const state = run.orchestrationState ?? null;
+  const run = await getRunDetail(manager, appCtx, runId);
+  const state = null;
   return {
     id: run.id,
     state,
     orchestrationState: state,
-    workspacePath: run.workspacePath ?? null,
+    workspacePath: run.workspaceDiffPath ?? null,
     renderedPrompt: null,
-    attemptCount: run.attemptCount,
-    nextRetryAt: run.nextRetryAt ?? null,
-    lastErrorKind: run.lastErrorKind ?? null,
+    attemptCount: 0,
+    nextRetryAt: null,
+    lastErrorKind: null,
   };
 }
 
@@ -175,8 +180,10 @@ async function getAgentRunForApi(
 export const orchestrationRouter = router({
   list: permissionedProcedure({ resource: "orchestration", action: "list" })
     .input(z.void())
-    .output(z.array(z.never()))
-    .query(() => []),
+    .output(z.array(SymphonyRunSchema))
+    .query(async ({ ctx }) => {
+      return listRuns(requireLegacyStore(ctx), requireOrgId(ctx));
+    }),
 
   listRuns: publicProcedure
     .input(
@@ -204,7 +211,7 @@ export const orchestrationRouter = router({
     )
     .query(async ({ input, ctx }) => {
       if (input.runId) {
-        return getAgentRunForApi(requireEm(ctx), requireOrgId(ctx), input.runId);
+        return getAgentRunForApi(requireEm(ctx), runsAppContext(ctx), input.runId);
       }
       return getRun(requireLegacyStore(ctx), input.id as string);
     }),
@@ -421,55 +428,24 @@ export const orchestrationRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const em = requireEm(ctx);
-      const orgId = inputOrgId(ctx, input.orgId);
-
-      const { AgentRun } = await import("../../db/entities/orchestration/AgentRun.ts");
-      const { Task } = await import("../../db/entities/tasks/Task.ts");
-      const { Org } = await import("../../db/entities/auth/Org.ts");
-
-      const fork = em.fork();
-
-      // Resolve agent name — default to codex (D-10)
       const agentName = input.agentName ?? "codex";
-      // sandboxMode in DB is 'host'|'docker'|'podman'; 'noSandbox' is the human-facing
-      // alias for 'host' (D-12). Map input or default to 'host'.
       const rawSandbox = input.sandboxMode ?? "noSandbox";
-      const dbSandboxMode: "host" | "docker" | "podman" =
-        rawSandbox === "docker" ? "docker" :
-        rawSandbox === "podman" ? "podman" :
-        "host";
-      // The API surface returns the human-readable name (noSandbox for host)
-      const sandboxMode = dbSandboxMode === "host" ? "noSandbox" : dbSandboxMode;
-
-      // Verify task exists and belongs to this org
-      const task = await fork.findOne(Task, { id: input.taskId } as never);
-      if (!task) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: `Task '${input.taskId}' not found`,
-        });
-      }
-
-      // Create AgentRun row (D-19: full run records persist)
-      const run = fork.create(AgentRun, {
-        org: fork.getReference(Org, orgId),
-        task: fork.getReference(Task, input.taskId),
-        orchestrationState: "unclaimed",
-        agentName,
-        sandboxMode: dbSandboxMode,
-        attemptCount: 0,
-        workspacePath: null,
+      const sandboxMode = rawSandbox === "docker" || rawSandbox === "podman" ? rawSandbox : "noSandbox";
+      const run = await dispatchTaskRun(requireEm(ctx), {
+        ...runsAppContext(ctx),
+        orgId: inputOrgId(ctx, input.orgId),
+        projectId: input.projectId ?? null,
+      }, {
+        taskId: input.taskId,
+        agent: agentName,
       });
-      fork.persist(run);
-      await fork.flush();
 
       return {
         runId: run.id,
-        state: run.orchestrationState ?? "unclaimed",
+        state: "unclaimed",
         agent: agentName,
         sandboxMode,
-        transcriptPath: run.transcriptPath ?? null,
+        transcriptPath: null,
         artifactCount: 0,
       };
     }),

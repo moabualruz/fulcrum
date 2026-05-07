@@ -1,211 +1,125 @@
 /**
- * Doc-versions tRPC router — version history, restore, and diff for documents.
- *
- * Threat mitigations:
- *   T-06-17 (Repudiation): restore creates a new version entry (audit trail preserved);
- *           original versions are never deleted.
- *   T-06-18 (Tampering): diff operates on server-side stored version snapshots;
- *           no client-supplied content is used for comparison.
+ * Doc-versions tRPC router — schema/auth adapter over application docs service.
  */
 
+import type { EntityManager } from "@mikro-orm/postgresql";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 
-import { t } from "../trpc.ts";
-import { permissionedProcedure } from "../middleware.ts";
+import { appErrorToTrpcError } from "../../application/error-mapping.ts";
+import { AppError } from "../../application/errors.ts";
+import { restoreDocVersion } from "../../application/docs/commands.ts";
+import {
+  diffDocVersions,
+  getDocVersion,
+  listDocVersions,
+} from "../../application/docs/queries.ts";
+import type { AppContext, DocVersionListDto } from "../../application/docs/types.ts";
 import type { TRPCContext } from "../context.ts";
-import { reconstructDocVersion, diffDocVersionsHtml } from "../../docs/version-reconstructor.ts";
-import type { DocVersion } from "../../db/entities/docs/DocVersion.ts";
+import { permissionedProcedure } from "../middleware.ts";
+import { t } from "../trpc.ts";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function getEm(ctx: TRPCContext) {
-  if (!ctx.em) {
-    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No database connection" });
-  }
-  return ctx.em;
+function requireEntityManager(ctx: Record<string, unknown>): EntityManager {
+  const manager = ctx["em"] as EntityManager | null | undefined;
+  if (manager) return manager;
+  throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No database connection" });
 }
 
-function requireOrg(ctx: TRPCContext): string {
-  if (!ctx.orgId) {
-    throw new TRPCError({ code: "UNAUTHORIZED", message: "No org context" });
-  }
-  return ctx.orgId;
+function appContext(ctx: TRPCContext): AppContext {
+  if (!ctx.orgId) throw new TRPCError({ code: "UNAUTHORIZED", message: "No org context" });
+  return { orgId: ctx.orgId, userId: ctx.userId, projectId: null };
 }
 
-// ---------------------------------------------------------------------------
-// Router
-// ---------------------------------------------------------------------------
+async function mapAppError<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AppError) throw appErrorToTrpcError(error);
+    throw error;
+  }
+}
+
+async function versionById(
+  manager: EntityManager,
+  ctx: AppContext,
+  documentId: string,
+  versionId: string,
+): Promise<DocVersionListDto> {
+  const versions = await listDocVersions(manager, ctx, documentId);
+  const version = versions.find((candidate) => candidate.id === versionId);
+  if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "Version not found" });
+  return version;
+}
+
+function listShape(version: DocVersionListDto) {
+  return {
+    id: version.id,
+    versionNum: version.versionNum,
+    createdAt: version.createdAt,
+    authorId: version.authorId,
+    authorName: null,
+    isRestoreOf: null,
+  };
+}
 
 export const docVersionsRouter = t.router({
-  /**
-   * List all versions for a document, ordered newest-first.
-   * Returns: id, versionNum, createdAt, authorId, authorName.
-   */
   list: permissionedProcedure({ resource: "doc_versions", action: "list" })
     .input(z.object({ documentId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const em = getEm(ctx);
-      const orgId = requireOrg(ctx);
-
-      const versions = await em.find("DocVersion" as never, {
-        org: orgId,
-        doc: input.documentId,
-      } as never, {
-        orderBy: { versionNum: "DESC" } as never,
-        populate: ["author"] as never,
-      }) as DocVersion[];
-
-      return versions.map((v) => ({
-        id: v.id,
-        versionNum: v.versionNum,
-        createdAt: v.createdAt,
-        authorId: (v.author as null | { id: string })?.id ?? null,
-        authorName: (v.author as null | { name?: string; email?: string })?.name
-          ?? (v.author as null | { name?: string; email?: string })?.email
-          ?? null,
-        isRestoreOf: (v.restoreOf as null | { id: string })?.id ?? null,
-      }));
+      return mapAppError(async () => {
+        const versions = await listDocVersions(requireEntityManager(ctx), appContext(ctx), input.documentId);
+        return versions.map(listShape);
+      });
     }),
 
-  /** Get one document version by ID. */
   get: permissionedProcedure({ resource: "doc_versions", action: "list" })
     .input(z.object({
       documentId: z.string().uuid(),
       versionId: z.string().uuid(),
     }))
     .query(async ({ ctx, input }) => {
-      const em = getEm(ctx);
-      const orgId = requireOrg(ctx);
-
-      const version = await em.findOne("DocVersion" as never, {
-        id: input.versionId,
-        org: orgId,
-        doc: input.documentId,
-      } as never, {
-        populate: ["author", "restoreOf"] as never,
-      }) as DocVersion | null;
-
-      if (!version) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Version not found" });
-      }
-
-      return {
-        id: version.id,
-        versionNum: version.versionNum,
-        createdAt: version.createdAt,
-        authorId: (version.author as null | { id: string })?.id ?? null,
-        authorName: (version.author as null | { name?: string; email?: string })?.name
-          ?? (version.author as null | { name?: string; email?: string })?.email
-          ?? null,
-        isRestoreOf: (version.restoreOf as null | { id: string })?.id ?? null,
-      };
+      return mapAppError(async () => {
+        const manager = requireEntityManager(ctx);
+        const version = await versionById(manager, appContext(ctx), input.documentId, input.versionId);
+        return listShape(version);
+      });
     }),
 
-  /**
-   * Restore document to the content of a previous version.
-   * T-06-17: Creates a new version entry linking restoreOf → source version (audit trail).
-   * Original versions are never deleted.
-   */
   restore: permissionedProcedure({ resource: "doc_versions", action: "write" })
     .input(z.object({
       documentId: z.string().uuid(),
       versionId: z.string().uuid(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const em = getEm(ctx);
-      const orgId = requireOrg(ctx);
-
-      // Resolve the target version to get its versionNum
-      const targetVersion = await em.findOne("DocVersion" as never, {
-        id: input.versionId,
-        org: orgId,
-        doc: input.documentId,
-      } as never) as DocVersion | null;
-
-      if (!targetVersion) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Version not found" });
-      }
-
-      // Reconstruct document content at that version (server-side; T-06-18)
-      const reconstructed = await reconstructDocVersion(em, {
-        orgId,
-        docId: input.documentId,
-        versionNum: targetVersion.versionNum,
+      return mapAppError(async () => {
+        const manager = requireEntityManager(ctx);
+        const appCtx = appContext(ctx);
+        const version = await versionById(manager, appCtx, input.documentId, input.versionId);
+        const restored = await restoreDocVersion(manager, appCtx, input.documentId, version.versionNum);
+        const versions = await listDocVersions(manager, appCtx, restored.id);
+        const newVersion = versions.at(0);
+        return {
+          id: newVersion?.id ?? restored.id,
+          versionNum: newVersion?.versionNum ?? version.versionNum,
+          restoredFromVersionId: input.versionId,
+        };
       });
-
-      // Find current max version number
-      const latestVersion = await em.findOne("DocVersion" as never, {
-        org: orgId,
-        doc: input.documentId,
-      } as never, {
-        orderBy: { versionNum: "DESC" } as never,
-      }) as DocVersion | null;
-
-      const nextVersionNum = (latestVersion?.versionNum ?? 0) + 1;
-
-      // T-06-17: Create new version (audit trail — originals are never deleted)
-      const newVersion = em.create("DocVersion" as never, {
-        org: orgId,
-        doc: input.documentId,
-        versionNum: nextVersionNum,
-        snapshot: reconstructed.contentJson,
-        bodyMdSnapshot: reconstructed.bodyMd,
-        author: ctx.userId ?? null,
-        restoreOf: input.versionId,
-      } as never) as DocVersion;
-
-      if ("persistAndFlush" in em && typeof em.persistAndFlush === "function") {
-        await em.persistAndFlush(newVersion as never);
-      } else {
-        em.persist(newVersion as never);
-        await em.flush();
-      }
-
-      return {
-        id: newVersion.id,
-        versionNum: nextVersionNum,
-        restoredFromVersionId: input.versionId,
-      };
     }),
 
-  /**
-   * Return HTML diff between a version and its predecessor.
-   * T-06-18: Uses server-side stored snapshots; no client content used.
-   */
   diff: permissionedProcedure({ resource: "doc_versions", action: "list" })
     .input(z.object({
       documentId: z.string().uuid(),
       versionId: z.string().uuid(),
     }))
     .query(async ({ ctx, input }) => {
-      const em = getEm(ctx);
-      const orgId = requireOrg(ctx);
-
-      const version = await em.findOne("DocVersion" as never, {
-        id: input.versionId,
-        org: orgId,
-        doc: input.documentId,
-      } as never) as DocVersion | null;
-
-      if (!version) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Version not found" });
-      }
-
-      if (version.versionNum <= 1) {
-        // First version — no predecessor; return empty diff
-        return { html: "", hasDiff: false };
-      }
-
-      const [current, previous] = await Promise.all([
-        reconstructDocVersion(em, { orgId, docId: input.documentId, versionNum: version.versionNum }),
-        reconstructDocVersion(em, { orgId, docId: input.documentId, versionNum: version.versionNum - 1 }),
-      ]);
-
-      const html = diffDocVersionsHtml(previous.contentJson, current.contentJson);
-      return { html, hasDiff: true };
+      return mapAppError(async () => {
+        const manager = requireEntityManager(ctx);
+        const appCtx = appContext(ctx);
+        const version = await versionById(manager, appCtx, input.documentId, input.versionId);
+        if (version.versionNum <= 1) return { html: "", hasDiff: false };
+        const diff = await diffDocVersions(manager, appCtx, input.documentId, version.versionNum - 1, version.versionNum);
+        return { html: diff.html, hasDiff: true };
+      });
     }),
 });
 

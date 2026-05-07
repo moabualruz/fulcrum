@@ -1,90 +1,81 @@
 /**
- * Documents tRPC router — Pillar 7 (docs + wiki).
- *
- * Real CRUD backed by DocumentRepository (MikroORM EntityRepository<Document>).
- * All procedures scoped to ctx.orgId via permissionedProcedure.
- *
- * Threat mitigations:
- *   T-06-11: list/get scoped to orgId from auth context — no cross-tenant data.
- *   T-06-10: contentJson is ProseMirror JSON (structured), not raw HTML — XSS not
- *            applicable at storage layer; read-only renderer handles HTML output (T-06-13).
+ * Documents tRPC router — legacy mount-compatible adapter over application docs service.
  */
 
+import type { EntityManager } from "@mikro-orm/postgresql";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 
-import { t } from "../trpc.ts";
-import { permissionedProcedure } from "../middleware.ts";
+import { appErrorToTrpcError } from "../../application/error-mapping.ts";
+import { AppError } from "../../application/errors.ts";
+import {
+  createDoc,
+  deleteDoc,
+  updateDoc,
+} from "../../application/docs/commands.ts";
+import {
+  getDoc,
+  listDocs,
+} from "../../application/docs/queries.ts";
+import type { AppContext, DocDto } from "../../application/docs/types.ts";
 import type { TRPCContext } from "../context.ts";
-import { ContextSummaryExtractor } from "../../docs/context-summary-extractor.ts";
-import { syncDocWikilinks } from "../../docs/wikilink-extractor.ts";
-import type { Document } from "../../db/entities/docs/Document.ts";
-
-// ---------------------------------------------------------------------------
-// Zod schemas
-// ---------------------------------------------------------------------------
+import { permissionedProcedure } from "../middleware.ts";
+import { t } from "../trpc.ts";
 
 const DocTypeSchema = z.enum([
-  "spec", "adr", "wiki", "runbook", "meeting", "postmortem", "rfc", "note", "scratch",
+  "spec",
+  "adr",
+  "wiki",
+  "runbook",
+  "meeting",
+  "postmortem",
+  "rfc",
+  "note",
+  "scratch",
 ]);
 
 const ContentJsonSchema = z.record(z.string(), z.unknown());
-
 const FrontmatterSchema = z.record(z.string(), z.unknown()).optional();
 
-// ---------------------------------------------------------------------------
-// Dependency helpers
-// ---------------------------------------------------------------------------
+function requireEntityManager(ctx: Record<string, unknown>): EntityManager {
+  const manager = ctx["em"] as EntityManager | null | undefined;
+  if (manager) return manager;
+  throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No database connection" });
+}
 
-type DocumentsCtx = TRPCContext & {
-  docs?: {
-    repository?: {
-      findAll?: (opts: Record<string, unknown>) => Promise<Document[]>;
-      findOne?: (where: Record<string, unknown>, opts?: Record<string, unknown>) => Promise<Document | null>;
-      create?: (data: Record<string, unknown>) => Document;
-    };
-  };
-};
+function appContext(ctx: TRPCContext): AppContext {
+  if (!ctx.orgId) throw new TRPCError({ code: "UNAUTHORIZED", message: "No org context" });
+  return { orgId: ctx.orgId, userId: ctx.userId, projectId: null };
+}
 
-function getEm(ctx: TRPCContext) {
-  if (!ctx.em) {
-    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No database connection" });
+async function mapAppError<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AppError) throw appErrorToTrpcError(error);
+    throw error;
   }
-  return ctx.em;
 }
 
-function requireOrg(ctx: TRPCContext): string {
-  if (!ctx.orgId) {
-    throw new TRPCError({ code: "UNAUTHORIZED", message: "No org context" });
-  }
-  return ctx.orgId;
+function bodyFromContentJson(contentJson: Record<string, unknown>): string {
+  if (typeof contentJson["text"] === "string") return contentJson["text"];
+  const content = contentJson["content"];
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((child) => typeof child === "object" && child !== null ? bodyFromContentJson(child as Record<string, unknown>) : "")
+    .filter(Boolean)
+    .join(" ");
 }
 
-async function resolveDoc(ctx: TRPCContext, id: string): Promise<Document> {
-  const em = getEm(ctx);
-  const orgId = requireOrg(ctx);
-  const doc = await em.findOne("Document" as never, { id, org: orgId } as never) as Document | null;
-  if (!doc) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Document not found" });
-  }
-  return doc;
+function sortLegacyDocs(docs: DocDto[]): DocDto[] {
+  return [...docs].sort((left, right) =>
+    left.sortPosition - right.sortPosition
+    || right.updatedAt.getTime() - left.updatedAt.getTime()
+    || left.id.localeCompare(right.id)
+  );
 }
-
-// Simple ProseMirror JSON → plain text walker for contextSummary extraction.
-// Avoids requiring @tiptap/core on the server (no DOM).
-function jsonToText(node: Record<string, unknown>): string {
-  if (typeof node.text === "string") return node.text;
-  const content = node.content as Record<string, unknown>[] | undefined;
-  if (!content) return "";
-  return content.map((child) => jsonToText(child)).join(" ");
-}
-
-// ---------------------------------------------------------------------------
-// Router
-// ---------------------------------------------------------------------------
 
 export const documentsRouter = t.router({
-  /** List docs by projectId, optionally scoped to docType. Returns flat list with parent info for tree building. */
   list: permissionedProcedure({ resource: "documents", action: "list" })
     .input(
       z.object({
@@ -94,27 +85,22 @@ export const documentsRouter = t.router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const em = getEm(ctx);
-      const orgId = requireOrg(ctx);
-
-      const where: Record<string, unknown> = { org: orgId, archived: input.archived };
-      if (input.projectId) where["projectId"] = input.projectId;
-      if (input.docType) where["docType"] = input.docType;
-
-      return em.find("Document" as never, where as never, {
-        orderBy: { sortPosition: "ASC", updatedAt: "DESC" } as never,
-        populate: ["parent"] as never,
-      }) as Promise<Document[]>;
+      return mapAppError(async () => {
+        const docs = await listDocs(requireEntityManager(ctx), appContext(ctx), {
+          docType: input.docType,
+          archived: input.archived,
+          limit: 100,
+        });
+        return sortLegacyDocs(input.projectId ? docs.filter((doc) => doc.projectId === input.projectId) : docs);
+      });
     }),
 
-  /** Get a single document by id, including contentJson. */
   get: permissionedProcedure({ resource: "documents", action: "read" })
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      return resolveDoc(ctx, input.id);
+      return mapAppError(() => getDoc(requireEntityManager(ctx), appContext(ctx), input.id));
     }),
 
-  /** Create a document. */
   create: permissionedProcedure({ resource: "documents", action: "write" })
     .input(
       z.object({
@@ -128,27 +114,20 @@ export const documentsRouter = t.router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const em = getEm(ctx);
-      const orgId = requireOrg(ctx);
-
-      const doc = em.create("Document" as never, {
-        org: orgId,
-        title: input.title,
-        docType: input.docType,
-        projectId: input.projectId ?? null,
-        parent: input.parentId ?? null,
-        sortPosition: input.sortPosition,
-        contentJson: input.contentJson,
-        frontmatter: input.frontmatter ?? {},
-        bodyMd: "",
-      } as never) as Document;
-
-      em.persist(doc as never);
-      await em.flush();
-      return doc;
+      return mapAppError(() =>
+        createDoc(requireEntityManager(ctx), appContext(ctx), {
+          title: input.title,
+          docType: input.docType,
+          projectId: input.projectId ?? null,
+          parentId: input.parentId ?? null,
+          sortPosition: input.sortPosition,
+          contentJson: input.contentJson,
+          frontmatter: input.frontmatter ?? {},
+          bodyMd: bodyFromContentJson(input.contentJson),
+        })
+      );
     }),
 
-  /** Update document content + metadata. Triggers ContextSummaryExtractor and wikilink sync. */
   update: permissionedProcedure({ resource: "documents", action: "write" })
     .input(
       z.object({
@@ -159,31 +138,17 @@ export const documentsRouter = t.router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const em = getEm(ctx);
-      const doc = await resolveDoc(ctx, input.id);
-
-      if (input.title !== undefined) (doc as unknown as Record<string, unknown>)["title"] = input.title;
-      if (input.frontmatter !== undefined) (doc as unknown as Record<string, unknown>)["frontmatter"] = input.frontmatter;
-
-      if (input.contentJson !== undefined) {
-        (doc as unknown as Record<string, unknown>)["contentJson"] = input.contentJson;
-
-        // Extract plain text from ProseMirror JSON → run ContextSummaryExtractor
-        const bodyMd = jsonToText(input.contentJson);
-        (doc as unknown as Record<string, unknown>)["bodyMd"] = bodyMd;
-
-        const extractor = new ContextSummaryExtractor();
-        (doc as unknown as Record<string, unknown>)["contextSummary"] = extractor.extractSummary(bodyMd);
-
-        // Sync wikilinks → doc_links table (T-06-10: structured JSON, not raw HTML)
-        await syncDocWikilinks(em, requireOrg(ctx), doc, input.contentJson);
-      }
-
-      await em.flush();
-      return doc;
+      return mapAppError(() =>
+        updateDoc(requireEntityManager(ctx), appContext(ctx), {
+          id: input.id,
+          title: input.title,
+          contentJson: input.contentJson,
+          bodyMd: input.contentJson ? bodyFromContentJson(input.contentJson) : undefined,
+          frontmatter: input.frontmatter,
+        })
+      );
     }),
 
-  /** Update sort position + parent (drag-drop reorder per D-09). */
   updatePosition: permissionedProcedure({ resource: "documents", action: "write" })
     .input(
       z.object({
@@ -193,27 +158,19 @@ export const documentsRouter = t.router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const em = getEm(ctx);
-      const doc = await resolveDoc(ctx, input.id);
-
-      if (input.parentId !== undefined) {
-        (doc as unknown as Record<string, unknown>)["parent"] = input.parentId;
-      }
-      (doc as unknown as Record<string, unknown>)["sortPosition"] = input.sortPosition;
-
-      await em.flush();
-      return doc;
+      return mapAppError(() =>
+        updateDoc(requireEntityManager(ctx), appContext(ctx), {
+          id: input.id,
+          parentId: input.parentId,
+          sortPosition: input.sortPosition,
+        })
+      );
     }),
 
-  /** Soft-delete a document. */
   delete: permissionedProcedure({ resource: "documents", action: "write" })
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const em = getEm(ctx);
-      const doc = await resolveDoc(ctx, input.id);
-
-      (doc as unknown as Record<string, unknown>)["archived"] = true;
-      await em.flush();
+      await mapAppError(() => deleteDoc(requireEntityManager(ctx), appContext(ctx), input.id, false));
       return { id: input.id, archived: true };
     }),
 });

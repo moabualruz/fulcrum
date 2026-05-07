@@ -1,52 +1,48 @@
 /**
- * Doc-comments tRPC router — anchored comment threads.
- *
- * Threat mitigations:
- *   T-06-12: author set from authenticated session user, never from client input.
+ * Doc-comments tRPC router — schema/auth adapter over application docs service.
  */
 
+import type { EntityManager } from "@mikro-orm/postgresql";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 
-import { t } from "../trpc.ts";
-import { permissionedProcedure } from "../middleware.ts";
+import { appErrorToTrpcError } from "../../application/error-mapping.ts";
+import { AppError } from "../../application/errors.ts";
+import {
+  createDocComment,
+  deleteDocComment,
+  resolveDocComment,
+  updateDocComment,
+} from "../../application/docs/commands.ts";
+import { listDocComments } from "../../application/docs/queries.ts";
+import type { AppContext } from "../../application/docs/types.ts";
 import type { TRPCContext } from "../context.ts";
-import type { DocComment } from "../../db/entities/docs/DocComment.ts";
+import { permissionedProcedure } from "../middleware.ts";
+import { t } from "../trpc.ts";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const CommentAnchorSchema = z.record(z.string(), z.unknown());
 
-function getEm(ctx: TRPCContext) {
-  if (!ctx.em) {
-    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No database connection" });
-  }
-  return ctx.em;
+function requireEntityManager(ctx: Record<string, unknown>): EntityManager {
+  const manager = ctx["em"] as EntityManager | null | undefined;
+  if (manager) return manager;
+  throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No database connection" });
 }
 
-function requireOrg(ctx: TRPCContext): string {
-  if (!ctx.orgId) {
-    throw new TRPCError({ code: "UNAUTHORIZED", message: "No org context" });
-  }
-  return ctx.orgId;
+function appContext(ctx: TRPCContext): AppContext {
+  if (!ctx.orgId) throw new TRPCError({ code: "UNAUTHORIZED", message: "No org context" });
+  return { orgId: ctx.orgId, userId: ctx.userId, projectId: null };
 }
 
-async function resolveComment(ctx: TRPCContext, id: string): Promise<DocComment> {
-  const em = getEm(ctx);
-  const orgId = requireOrg(ctx);
-  const comment = await em.findOne("DocComment" as never, { id, org: orgId } as never) as DocComment | null;
-  if (!comment) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Comment not found" });
+async function mapAppError<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AppError) throw appErrorToTrpcError(error);
+    throw error;
   }
-  return comment;
 }
-
-// ---------------------------------------------------------------------------
-// Router
-// ---------------------------------------------------------------------------
 
 export const docCommentsRouter = t.router({
-  /** List comments for a document including thread parents. */
   list: permissionedProcedure({ resource: "doc_comments", action: "list" })
     .input(
       z.object({
@@ -55,97 +51,74 @@ export const docCommentsRouter = t.router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const em = getEm(ctx);
-      const orgId = requireOrg(ctx);
-
-      const where: Record<string, unknown> = { org: orgId, doc: input.docId };
-      if (!input.includeResolved) where["resolved"] = false;
-
-      return em.find("DocComment" as never, where as never, {
-        orderBy: { createdAt: "ASC" } as never,
-        populate: ["author", "parentComment"] as never,
-      }) as Promise<DocComment[]>;
+      return mapAppError(async () => {
+        const manager = requireEntityManager(ctx);
+        const unresolved = await listDocComments(manager, appContext(ctx), input.docId, false);
+        if (!input.includeResolved) return unresolved;
+        const resolved = await listDocComments(manager, appContext(ctx), input.docId, true);
+        return [...unresolved, ...resolved].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      });
     }),
 
-  /** Create a comment with optional anchor range and thread parent. */
   create: permissionedProcedure({ resource: "doc_comments", action: "write" })
     .input(
       z.object({
         docId: z.string().uuid(),
         bodyMd: z.string().min(1).max(10_000),
-        /** Serialized anchor range (e.g. {from, to} or {nodeId, offset}) */
-        anchorRange: z.record(z.string(), z.unknown()).optional(),
-        /** Parent comment id for threading */
+        anchorRange: CommentAnchorSchema.optional(),
         parentCommentId: z.string().uuid().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const em = getEm(ctx);
-      const orgId = requireOrg(ctx);
-
-      // T-06-12: author from session, never client input
-      const authorId = ctx.userId ?? null;
-
-      const comment = em.create("DocComment" as never, {
-        org: orgId,
-        doc: input.docId,
-        bodyMd: input.bodyMd,
-        anchorRange: input.anchorRange ?? null,
-        author: authorId,
-        parentComment: input.parentCommentId ?? null,
-        resolved: false,
-      } as never) as DocComment;
-
-      em.persist(comment as never);
-      await em.flush();
-      return comment;
+      return mapAppError(() =>
+        createDocComment(requireEntityManager(ctx), appContext(ctx), {
+          docId: input.docId,
+          bodyMd: input.bodyMd,
+          anchorRange: input.anchorRange ?? null,
+          parentCommentId: input.parentCommentId ?? null,
+        })
+      );
     }),
 
-  /** Update a comment body or anchor metadata. */
   update: permissionedProcedure({ resource: "doc_comments", action: "write" })
     .input(
       z.object({
         id: z.string().uuid(),
         bodyMd: z.string().min(1).max(10_000).optional(),
-        anchorRange: z.record(z.string(), z.unknown()).nullable().optional(),
+        anchorRange: CommentAnchorSchema.nullable().optional(),
         resolved: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const em = getEm(ctx);
-      const comment = await resolveComment(ctx, input.id);
-      const writable = comment as unknown as Record<string, unknown>;
-
-      if (input.bodyMd !== undefined) writable["bodyMd"] = input.bodyMd;
-      if (input.anchorRange !== undefined) writable["anchorRange"] = input.anchorRange;
-      if (input.resolved !== undefined) writable["resolved"] = input.resolved;
-
-      await em.flush();
-      return comment;
+      if (input.anchorRange !== undefined && input.bodyMd === undefined && input.resolved === undefined) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Comment anchor-only updates are not available through the application docs service.",
+        });
+      }
+      return mapAppError(async () => {
+        const manager = requireEntityManager(ctx);
+        let comment = input.bodyMd !== undefined
+          ? await updateDocComment(manager, appContext(ctx), input.id, input.bodyMd)
+          : null;
+        if (input.resolved !== undefined) {
+          comment = await resolveDocComment(manager, appContext(ctx), input.id, input.resolved);
+        }
+        return comment;
+      });
     }),
 
-  /** Mark a comment as resolved. */
   resolve: permissionedProcedure({ resource: "doc_comments", action: "write" })
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const em = getEm(ctx);
-      const comment = await resolveComment(ctx, input.id);
-
-      (comment as unknown as Record<string, unknown>)["resolved"] = true;
-      await em.flush();
-      return { id: input.id, resolved: true };
+      return mapAppError(() => resolveDocComment(requireEntityManager(ctx), appContext(ctx), input.id, true));
     }),
 
-  /** Delete a comment (hard delete). */
   delete: permissionedProcedure({ resource: "doc_comments", action: "write" })
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const em = getEm(ctx);
-      const comment = await resolveComment(ctx, input.id);
-
-      em.remove(comment as never);
-      await em.flush();
-      return { id: input.id, deleted: true };
+      const deleted = await mapAppError(() => deleteDocComment(requireEntityManager(ctx), appContext(ctx), input.id));
+      return { id: input.id, deleted: Boolean(deleted?.deleted) };
     }),
 });
 

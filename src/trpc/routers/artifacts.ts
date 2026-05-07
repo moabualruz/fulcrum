@@ -1,8 +1,18 @@
 import { TRPCError } from "@trpc/server";
+import type { EntityManager } from "@mikro-orm/postgresql";
 
 import type { TRPCContext } from "../context.ts";
 import { t } from "../trpc.ts";
 import { permissionedProcedure } from "../middleware.ts";
+import {
+  createArtifact as createApplicationArtifact,
+  deleteArtifactForWeb,
+} from "../../application/artifacts/commands.ts";
+import {
+  getArtifact as getApplicationArtifact,
+  listArtifacts as listApplicationArtifacts,
+} from "../../application/artifacts/queries.ts";
+import type { AppContext as ArtifactAppContext, ArtifactDto } from "../../application/artifacts/types.ts";
 import {
   ArchiveArtifactOutputSchema,
   ArtifactIdInputSchema,
@@ -88,6 +98,17 @@ function deps(ctx: TRPCContext) {
   };
 }
 
+function optionalEntityManager(ctx: TRPCContext): EntityManager | null {
+  return (ctx as unknown as Record<string, unknown>)["em"] as EntityManager | null ?? null;
+}
+
+function appContext(ctx: TRPCContext): ArtifactAppContext {
+  if (!ctx.orgId) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "No org context" });
+  }
+  return { orgId: ctx.orgId, userId: ctx.userId, projectId: null };
+}
+
 function orgIdOf(record: ArtifactRecord): string | null {
   if (record.orgId) return record.orgId;
   if (typeof record.org === "string") return record.org;
@@ -136,6 +157,23 @@ function toArtifact(record: ArtifactRecord): Artifact {
     attestation: attestationOf(record.metadataJson?.["attestation"]),
     createdAt: record.createdAt ?? new Date(0),
   });
+}
+
+function appArtifactToRecord(artifact: ArtifactDto): ArtifactRecord {
+  return {
+    id: artifact.id,
+    orgId: artifact.orgId,
+    filename: artifact.filename,
+    mime: artifact.mime,
+    path: artifact.path,
+    sizeBytes: 0,
+    checksumSha256: null,
+    metadataJson: {},
+    archived: false,
+    pruned: false,
+    retentionUntil: null,
+    createdAt: artifact.createdAt,
+  };
 }
 
 function stringifyBytes(value: ArtifactRecord["sizeBytes"]): string {
@@ -187,6 +225,10 @@ function attestationOf(value: unknown): Artifact["attestation"] {
 }
 
 async function findArtifact(ctx: TRPCContext, id: string): Promise<ArtifactRecord> {
+  const manager = optionalEntityManager(ctx);
+  if (manager) {
+    return appArtifactToRecord(await getApplicationArtifact(manager, appContext(ctx), id));
+  }
   const record = await deps(ctx).repository.getById?.({ id });
   if (!record) {
     throw new TRPCError({
@@ -231,6 +273,11 @@ export const artifactsRouter = t.router({
           message: "Cannot list artifacts for a different org.",
         });
       }
+      const manager = optionalEntityManager(ctx);
+      if (manager) {
+        const rows = await listApplicationArtifacts(manager, appContext(ctx));
+        return rows.map(appArtifactToRecord).map(toArtifact);
+      }
       const rows = await deps(ctx).repository.list?.({ ...input, orgId }) ?? [];
       return rows.map(toArtifact);
     }),
@@ -251,6 +298,16 @@ export const artifactsRouter = t.router({
         projectId: input.projectId,
         runId: input.runId,
       }) ?? { path: input.filename };
+      const manager = optionalEntityManager(ctx);
+      if (manager) {
+        const artifact = toArtifact(appArtifactToRecord(await createApplicationArtifact(manager, appContext(ctx), {
+          filename: input.filename,
+          path: stored.path,
+          mime: input.mime,
+        })));
+        await recordEvent(ctx, "artifact.uploaded", artifact, uploadPayload(input));
+        return artifact;
+      }
       const record = await deps(ctx).repository.create?.({
         orgId: ctx.orgId,
         userId: ctx.userId,
@@ -308,10 +365,14 @@ export const artifactsRouter = t.router({
       const artifact = toArtifact(await findArtifact(ctx, input.id));
       if (input.hard) {
         await deps(ctx).storage.delete?.(artifact.path);
-        await deps(ctx).repository.delete?.({ id: input.id });
+        const manager = optionalEntityManager(ctx);
+        if (manager) await deleteArtifactForWeb(manager, appContext(ctx), { id: input.id, hard: true, confirm: true });
+        else await deps(ctx).repository.delete?.({ id: input.id });
         await recordEvent(ctx, "artifact.deleted", artifact, { hard: true });
       } else {
-        await deps(ctx).repository.update?.({ id: input.id, data: { archived: true } });
+        const manager = optionalEntityManager(ctx);
+        if (manager) await deleteArtifactForWeb(manager, appContext(ctx), { id: input.id, hard: false });
+        else await deps(ctx).repository.update?.({ id: input.id, data: { archived: true } });
         await recordEvent(ctx, "artifact.deleted", artifact, { hard: false });
       }
       return { ok: true, id: input.id };

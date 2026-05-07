@@ -2,13 +2,17 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import type { EntityManager } from "@mikro-orm/postgresql";
 
 import { t } from "../trpc.ts";
 import { publicProcedure } from "../trpc.ts";
 import { permissionedProcedure } from "../middleware.ts";
 import { getProfile, listProfiles } from "../../agents/registry.ts";
 import { AgentProfileSchema } from "../../agents/types.ts";
-import { AgentProfile as AgentProfileEntity } from "../../db/entities/sandbox/AgentProfile.ts";
+import {
+  getProfile as getStoredAgentProfile,
+  testProfileAction,
+} from "../../application/agents/queries.ts";
 
 // ─── SEC-02: CLI binary allowlist ────────────────────────────────────────────
 // Only binaries registered in the agent profile registry may be spawned.
@@ -37,6 +41,15 @@ function assertCliPathAllowed(cliPath: string): void {
   }
 }
 
+function requireEntityManager(ctx: Record<string, unknown>): EntityManager {
+  const manager = ctx["em"] as EntityManager | null | undefined;
+  if (manager) return manager;
+  throw new TRPCError({
+    code: "INTERNAL_SERVER_ERROR",
+    message: "EntityManager required for agents.testProfile.",
+  });
+}
+
 export const agentsRouter = t.router({
   listProfiles: publicProcedure
     .output(z.array(AgentProfileSchema))
@@ -54,18 +67,8 @@ export const agentsRouter = t.router({
       exitCode: z.number().nullable(),
     }))
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.em) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "EntityManager required for agents.testProfile.",
-        });
-      }
-
-      const agentProfileRepo = ctx.em.getRepository(AgentProfileEntity);
-      const profile = await agentProfileRepo.findOne({
-        org: ctx.orgId,
-        name: input.name,
-      });
+      const manager = requireEntityManager(ctx);
+      const profile = await getStoredAgentProfile(manager, ctx.orgId, input.name);
 
       if (!profile) {
         throw new TRPCError({
@@ -74,7 +77,7 @@ export const agentsRouter = t.router({
         });
       }
 
-      const cliPath = profile.cliPath ?? input.name;
+      const cliPath = profile.cli_path ?? input.name;
 
       // SEC-02: Validate cliPath against allowlist before spawning.
       assertCliPathAllowed(cliPath);
@@ -87,8 +90,7 @@ export const agentsRouter = t.router({
       const testPassed = exitCode === 0;
       const lastTestedAt = new Date();
 
-      agentProfileRepo.assign(profile, { lastTestedAt, testPassed });
-      await ctx.em.flush();
+      await testProfileAction(manager, profile.id, ctx.orgId, testPassed);
 
       return {
         name: profile.name,
