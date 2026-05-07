@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 
+import { run as runSettingsCommand } from "./settings.ts";
+
 const MIGRATED_COMMANDS = [
   "src/cli/import.ts",
   "src/cli/export.ts",
@@ -119,5 +121,35 @@ describe("CLI application caller parity", () => {
       exit: () => {},
     } as never);
     expect(JSON.parse(output[0]!)).toEqual([{ kind: "github", enabled: true, lastSyncAt: null }]);
+  });
+
+  test("settings get --json emits application-created setting by stable id", async () => {
+    const created = {
+      id: "11111111-1111-4111-8111-111111111111",
+      orgId: "00000000-0000-0000-0000-000000000001",
+      key: "public-api",
+      value: { enabled: true },
+    };
+    const output: string[] = [];
+
+    await runSettingsCommand(["get", created.key, "--json"], {
+      caller: {
+        settings: {
+          list: async () => [created],
+          get: async ({ key }: { key: string }) => key === created.key ? created : null,
+          set: async () => created,
+        },
+      },
+      print: (line) => output.push(line),
+      printErr: (line) => {
+        throw new Error(line);
+      },
+      exit: (code) => {
+        throw new Error(`unexpected CLI exit ${code}`);
+      },
+    });
+
+    expect(JSON.parse(output[0]!)).toEqual(created);
+    expect(JSON.parse(output[0]!).id).toBe(created.id);
   });
 });

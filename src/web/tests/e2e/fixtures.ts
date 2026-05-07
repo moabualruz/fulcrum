@@ -54,7 +54,8 @@ export interface FulcrumHome {
 export const test = base.extend<Record<never, never>, { fulcrumHome: FulcrumHome }>({
   fulcrumHome: [
     async ({}, use) => {
-      const home = mkdtempSync(join(tmpdir(), "fulcrum-e2e-"));
+      const configuredHome = process.env["FULCRUM_HOME"];
+      const home = configuredHome ?? mkdtempSync(join(tmpdir(), "fulcrum-e2e-"));
       process.env["FULCRUM_HOME"] = home;
       const fixture = await createApplicationStoreFixture(join(home, "state", "product", "db", "main"));
       const db: TestStore = fixture.store;
@@ -135,7 +136,8 @@ export const test = base.extend<Record<never, never>, { fulcrumHome: FulcrumHome
 
       await fixture.close();
       rmSync(home, { recursive: true, force: true });
-      delete process.env["FULCRUM_HOME"];
+      if (configuredHome === undefined) delete process.env["FULCRUM_HOME"];
+      else process.env["FULCRUM_HOME"] = configuredHome;
     },
     { scope: "worker" },
   ],

@@ -13,6 +13,7 @@ export interface WebDatabaseHandle {
   close(): Promise<void>;
   engine: "mikro-orm";
   em: EntityManager;
+  orm: import("@mikro-orm/postgresql").MikroORM;
   pglite?: unknown;
 }
 
@@ -44,7 +45,7 @@ export async function initDatabase(): Promise<WebDatabaseHandle> {
     if (!(await hasExistingSchema(orm.em))) {
       await orm.migrator.up();
     }
-    const db = createOrmDb(orm.em.fork(), async () => {
+    const db = createOrmDb(orm, orm.em.fork(), async () => {
       await orm.close(true);
       await pglite.close();
     });
@@ -99,6 +100,7 @@ export async function openDatabase(): Promise<WebDatabaseHandle> {
     },
     engine: real.engine,
     em: real.em,
+    orm: real.orm,
   };
 }
 
@@ -150,7 +152,11 @@ function normalizeSql(sql: string): string {
   return sql.replace(/\$(\d+)/g, "?");
 }
 
-function createOrmDb(em: EntityManager, closeRuntime: () => Promise<void>): WebDatabaseHandle {
+function createOrmDb(
+  orm: import("@mikro-orm/postgresql").MikroORM,
+  em: EntityManager,
+  closeRuntime: () => Promise<void>,
+): WebDatabaseHandle {
   const conn = ormSqlConnection(em);
   return {
     async query<T = Record<string, unknown>>(
@@ -168,6 +174,7 @@ function createOrmDb(em: EntityManager, closeRuntime: () => Promise<void>): WebD
     },
     engine: "mikro-orm",
     em,
+    orm,
   };
 }
 

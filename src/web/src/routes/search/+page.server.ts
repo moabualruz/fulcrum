@@ -33,7 +33,8 @@ export const load: ServerLoad = async ({ url }) => {
     return { q, kinds, dateFrom, dateTo, hits: [], grouped: {}, savedSearches: [] };
   }
 
-  const savedSearches: SavedSearch[] = await listSavedSearches(em, { orgId, userId: "local" }, "local");
+  const savedSearches: SavedSearch[] = await listSavedSearches(em, { orgId, userId: "local" }, "local")
+    .catch(() => []);
 
   if (q.length === 0) {
     return { q, kinds, dateFrom, dateTo, hits: [], grouped: {}, savedSearches };

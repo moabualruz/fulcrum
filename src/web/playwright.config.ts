@@ -5,6 +5,8 @@ const tempRoot = process.env.TMPDIR ?? "/tmp/fulcrum-e2e";
 const fulcrumHome = path.join(tempRoot, `fulcrum-e2e-${process.pid}`);
 const port = Number(process.env.FULCRUM_E2E_PORT ?? "5173");
 
+process.env.FULCRUM_HOME ??= fulcrumHome;
+
 export default defineConfig({
 	testDir: "tests/",
 	timeout: 30000,

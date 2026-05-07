@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import { MikroORM } from "@mikro-orm/postgresql";
 import { readFile } from "node:fs/promises";
+
+import { setTenantSetting } from "../../application/settings/commands.ts";
+import { createTask } from "../../application/tasks/commands.ts";
+import { Session } from "../../db/entities/auth/Session.ts";
+import { createTestContainer, createTestOrm } from "../../test-utils/index.ts";
+import { buildCaller } from "../index.ts";
 
 const RUNTIME_FILES = [
   "../index.ts",
@@ -17,6 +24,21 @@ const SCREEN_FILES = [
 
 async function source(path: string): Promise<string> {
   return await readFile(new URL(path, import.meta.url), "utf-8");
+}
+
+async function ensureSession(db: Awaited<ReturnType<typeof createTestOrm>>): Promise<void> {
+  const em = db.em.fork();
+  em.persist(em.create(Session, {
+    id: `parity-${crypto.randomUUID()}`,
+    userId: db.seed.userId,
+    orgId: db.seed.orgId,
+    activeOrganizationId: db.seed.orgId,
+    expiresAt: new Date(Date.now() + 60_000),
+    createdAt: new Date(),
+    ipAddress: null,
+    userAgent: "test",
+  }));
+  await em.flush();
 }
 
 describe("Phase 09.5 TUI interface encapsulation", () => {
@@ -61,5 +83,46 @@ describe("Phase 09.5 TUI interface encapsulation", () => {
 
     expect(text).not.toContain("../../search/nl-filter.ts");
     expect(text).toMatch(/caller\.search\.query/);
+  });
+
+  test("buildCaller exposes application-created task and setting data to TUI surfaces", async () => {
+      const db = await createTestOrm();
+      try {
+        const container = createTestContainer(db);
+        container.bind({ provide: MikroORM, useValue: db.orm });
+      const created = await createTask(db.em.fork(), {
+        orgId: db.seed.orgId,
+        userId: db.seed.userId,
+        projectId: null,
+      }, {
+        title: "TUI parity task",
+        status: "todo",
+      });
+      await setTenantSetting(db.em.fork(), {
+        orgId: db.seed.orgId,
+        userId: db.seed.userId,
+        projectId: null,
+      }, {
+        key: "public-api",
+        value: { enabled: true },
+      });
+      await ensureSession(db);
+
+      const caller = await buildCaller(container);
+      const tasks = await caller.tasks?.list() ?? [];
+      const flags = await caller.flags.list();
+
+      expect(tasks.find((task) => task.id === created.id)).toMatchObject({
+        id: created.id,
+        title: "TUI parity task",
+        status: "todo",
+      });
+      expect(flags.find((flag) => flag.name === "public-api")).toMatchObject({
+        name: "public-api",
+        enabled: true,
+      });
+    } finally {
+      await db.close();
+    }
   });
 });

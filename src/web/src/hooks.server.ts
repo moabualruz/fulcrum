@@ -25,6 +25,7 @@ import { getActiveProject } from "./lib/state/active-project.ts";
 import type { FlagRegistry } from "../../../src/flags/registry.ts";
 import { dirForLocale, isI18nEnabled, normalizeLocale } from "$lib/i18n/index.ts";
 import { initDatabase, getDatabase } from "$lib/server/db";
+import { getDefaultOrgIdOrm } from "$lib/server/em";
 
 // ─── Startup: initialise PGlite singleton (runs migrations once) ─────────────
 // This top-level await runs when the server module is first loaded, before any
@@ -78,10 +79,10 @@ async function getWebRuntime(): Promise<WebRuntime> {
   if (!_runtimePromise) {
     _runtimePromise = (async () => {
       const { AuthService } = await import("../../../src/auth/index.ts");
-      const { initOrm } = await import("../../../src/db/mikro-orm.config.ts");
       const { createFlagRegistry, registerDbBindings } = await import("../../../src/db/db.module.ts");
 
-      const orm = await initOrm();
+      const database = await initDatabase();
+      const orm = database.orm;
       const flagRegistry = createFlagRegistry(orm);
 
       let authHandler: ((req: Request) => Promise<Response>) | null = null;
@@ -280,7 +281,9 @@ export const handle: Handle = async ({ event, resolve }) => {
           userId: "local-admin",
           expiresAt: new Date(Date.now() + 86400000),
         } as App.Locals["session"];
-        event.locals.orgId = "default";
+        event.locals.orgId = requestRuntime?.em
+          ? await getDefaultOrgIdOrm(requestRuntime.em)
+          : null;
         event.locals.userId = "local-admin";
       }
 
