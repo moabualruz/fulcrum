@@ -5,6 +5,8 @@ import { Sprint } from "../../db/entities/tasks/Sprint.ts";
 import { Task } from "../../db/entities/tasks/Task.ts";
 import { ReportService } from "../../services/ReportService.ts";
 import { AppNotFoundError } from "../errors.ts";
+import { getProjectOrNull } from "../projects/queries.ts";
+import { loadReports, type ReportsData } from "./web-queries.ts";
 import type {
   AppContext,
   BurndownPoint,
@@ -106,6 +108,27 @@ export async function getSprintBurndown(
   }
 
   return points;
+}
+
+export async function loadProjectReportsPage(
+  em: EntityManager,
+  ctx: AppContext,
+  input: { projectId: string; sprintId?: string },
+): Promise<{
+  project: { id: string; name: string };
+  reports: ReportsData;
+  selectedSprintId: string | null;
+  orgId: string;
+}> {
+  const project = await getProjectOrNull(em, ctx, input.projectId);
+  if (!project) throw new AppNotFoundError("Project not found");
+  const reports = await loadReports(em, project.id, input.sprintId);
+  return {
+    project: { id: project.id, name: project.name },
+    reports,
+    selectedSprintId: input.sprintId ?? null,
+    orgId: ctx.orgId,
+  };
 }
 
 export async function getBurndownReport(

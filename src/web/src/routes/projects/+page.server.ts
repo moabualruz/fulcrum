@@ -1,5 +1,6 @@
 import type { PageServerLoad } from "./$types";
-import { listProjects } from "$lib/product-queries";
+import { listProjectRows } from "../../../../application/projects/queries.ts";
+import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = ({ locals }) => {
   const activeProjectId = locals?.activeProjectId ?? null;
@@ -7,7 +8,8 @@ export const load: PageServerLoad = ({ locals }) => {
     activeProjectId,
     streamed: {
       data: (async () => {
-        const projects = await listProjects();
+        const { em, ctx } = await requestAppScope(locals, activeProjectId);
+        const projects = await listProjectRows(em, ctx);
         return { projects };
       })(),
     },

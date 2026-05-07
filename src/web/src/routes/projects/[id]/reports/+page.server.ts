@@ -1,39 +1,16 @@
-/**
- * Reports page server load — uses MikroORM EM from locals (no raw SQL / openDatabase).
- *
- * Pillar 6: Metrics & reporting. Loads report data server-side via EM from locals.
- * Additional tRPC procedures (e.g. reports.burndown) available client-side.
- */
-
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
-import { loadReports } from "$lib/server/reports";
+import { AppNotFoundError } from "../../../../../../application/errors.ts";
+import { loadProjectReportsPage } from "../../../../../../application/reports/queries.ts";
+import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = async ({ params, url, locals }) => {
-  const em = locals.em;
-  if (!em) {
-    throw error(500, "EntityManager not available");
-  }
-
-  const orgId = locals.orgId;
-  if (!orgId) {
-    throw error(401, "Not authenticated");
-  }
-
   const sprintId = url.searchParams.get("sprint") ?? undefined;
-
-  const rows = await em.getKysely<any>()
-    .selectFrom("projects")
-    .select(["id", "name"])
-    .where("id", "=", params.id)
-    .where("org_id", "=", orgId)
-    .where("deleted_at", "is", null)
-    .execute() as Array<{ id: string; name: string }>;
-
-  if (rows.length === 0) throw error(404, "Project not found");
-
-  const project = rows[0]!;
-  const reports = await loadReports(em, project.id, sprintId);
-
-  return { project, reports, selectedSprintId: sprintId ?? null, orgId };
+  const { em, ctx } = await requestAppScope(locals, params.id);
+  try {
+    return await loadProjectReportsPage(em, ctx, { projectId: params.id, sprintId });
+  } catch (err) {
+    if (err instanceof AppNotFoundError) throw error(404, err.message);
+    throw err;
+  }
 };

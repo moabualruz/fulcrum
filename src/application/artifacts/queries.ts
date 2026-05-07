@@ -13,6 +13,147 @@ export async function listArtifacts(em: EntityManager, ctx: AppContext): Promise
   return artifacts.map(serializeArtifact);
 }
 
+export interface ArtifactRow {
+  id: string;
+  org_id: string;
+  project_id: string | null;
+  run_id: string | null;
+  task_id: string | null;
+  kind: string;
+  title: string;
+  body_path: string | null;
+  sha256: string | null;
+  size: number | null;
+  mime: string | null;
+  archived: boolean;
+  created_at: string;
+}
+
+export interface ArtifactStats {
+  totalBytes: number;
+  count: number;
+}
+
+export interface ArtifactRowFilter {
+  projectId?: string | null;
+  runId?: string | null;
+  taskId?: string | null;
+  mime?: string | null;
+  kind?: string | null;
+  includeArchived?: boolean;
+}
+
+export async function listArtifactRows(
+  em: EntityManager,
+  ctx: AppContext,
+  filter: ArtifactRowFilter = {},
+): Promise<ArtifactRow[]> {
+  const columns = await artifactColumns(em);
+  const projectExpr = columns.has("project_id") ? "a.project_id" : "t.project_id";
+  const runExpr = columns.has("run_id") ? "a.run_id" : "NULL::uuid";
+  const taskExpr = columns.has("task_id") ? "a.task_id" : "NULL::uuid";
+  const kindExpr = columns.has("kind") ? "a.kind" : "'file'::text";
+  const titleExpr = columns.has("title") ? "a.title" : "a.filename";
+  const bodyPathExpr = columns.has("body_path") ? "a.body_path" : "a.path";
+  const shaExpr = columns.has("sha256") ? "a.sha256" : columns.has("checksum_sha256") ? "a.checksum_sha256" : "NULL::text";
+  const sizeExpr = columns.has("size") ? "a.size" : columns.has("size_bytes") ? "a.size_bytes" : "NULL::bigint";
+  const archivedExpr = columns.has("archived") ? "COALESCE(a.archived, false)" : "false";
+  const joins = columns.has("task_id") ? "LEFT JOIN tasks t ON t.id = a.task_id" : "";
+  const conditions = ["a.org_id = ?"];
+  const params: unknown[] = [ctx.orgId];
+
+  if (!filter.includeArchived && columns.has("archived")) {
+    conditions.push("(a.archived = false OR a.archived IS NULL)");
+  }
+  if (filter.projectId) {
+    params.push(filter.projectId);
+    conditions.push(`${projectExpr} = ?`);
+  }
+  if (filter.runId && columns.has("run_id")) {
+    params.push(filter.runId);
+    conditions.push("a.run_id = ?");
+  }
+  if (filter.taskId && columns.has("task_id")) {
+    params.push(filter.taskId);
+    conditions.push("a.task_id = ?");
+  }
+  if (filter.mime) {
+    params.push(filter.mime);
+    conditions.push("a.mime = ?");
+  }
+  if (filter.kind && columns.has("kind")) {
+    params.push(filter.kind);
+    conditions.push("a.kind = ?");
+  } else if (filter.kind && filter.kind !== "file") {
+    return [];
+  }
+
+  const rows = await ormSqlConnection(em).execute<Array<{
+    id: string;
+    org_id: string;
+    project_id: string | null;
+    run_id: string | null;
+    task_id: string | null;
+    kind: string;
+    title: string;
+    body_path: string | null;
+    sha256: string | null;
+    size: number | string | bigint | null;
+    mime: string | null;
+    archived: boolean;
+    created_at: string | Date;
+  }>>(
+    `SELECT a.id,
+            a.org_id,
+            ${projectExpr} AS project_id,
+            ${runExpr} AS run_id,
+            ${taskExpr} AS task_id,
+            ${kindExpr} AS kind,
+            ${titleExpr} AS title,
+            ${bodyPathExpr} AS body_path,
+            ${shaExpr} AS sha256,
+            ${sizeExpr} AS size,
+            a.mime,
+            ${archivedExpr} AS archived,
+            a.created_at
+       FROM artifacts a
+       ${joins}
+      WHERE ${conditions.join(" AND ")}
+      ORDER BY a.created_at DESC, a.id ASC`,
+    params,
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    archived: Boolean(row.archived),
+    size: row.size === null ? null : Number(row.size),
+    created_at: isoStamp(row.created_at),
+  }));
+}
+
+export async function getArtifactStats(
+  em: EntityManager,
+  ctx: AppContext,
+  projectId: string,
+): Promise<ArtifactStats> {
+  const columns = await artifactColumns(em);
+  const projectExpr = columns.has("project_id") ? "a.project_id" : "t.project_id";
+  const sizeExpr = columns.has("size") ? "a.size" : columns.has("size_bytes") ? "a.size_bytes" : "NULL::bigint";
+  const joins = columns.has("task_id") ? "LEFT JOIN tasks t ON t.id = a.task_id" : "";
+  const rows = await ormSqlConnection(em).execute<Array<{ total_bytes: number | string | null; count: number | string }>>(
+    `SELECT COALESCE(SUM(${sizeExpr}), 0) AS total_bytes, COUNT(*)::int AS count
+       FROM artifacts a
+       ${joins}
+      WHERE a.org_id = ? AND ${projectExpr} = ?`,
+    [ctx.orgId, projectId],
+  );
+  const row = rows[0] ?? { total_bytes: 0, count: 0 };
+  return {
+    totalBytes: Number(row.total_bytes ?? 0),
+    count: Number(row.count),
+  };
+}
+
 export async function getArtifact(em: EntityManager, ctx: AppContext, id: string): Promise<ArtifactDto> {
   const artifact = await em.findOne(Artifact, { id } as never);
   if (!artifact) throw new AppNotFoundError(`Artifact not found: ${id}`);
@@ -96,4 +237,18 @@ function safeArtifactPath(value: string): string {
   const root = resolveArtifactStoreRoot();
   const candidate = value.startsWith("/") ? value : `${root}/${value}`;
   return assertArtifactPathInRoot(root, candidate);
+}
+
+async function artifactColumns(em: EntityManager): Promise<Set<string>> {
+  const rows = await em.getKysely<any>()
+    .selectFrom("information_schema.columns")
+    .select(["column_name"])
+    .where("table_schema", "=", "public")
+    .where("table_name", "=", "artifacts")
+    .execute() as Array<{ column_name: string }>;
+  return new Set(rows.map((row) => row.column_name));
+}
+
+function isoStamp(value: string | Date): string {
+  return value instanceof Date ? value.toISOString() : value;
 }

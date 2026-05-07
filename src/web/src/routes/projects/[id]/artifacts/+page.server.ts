@@ -1,6 +1,6 @@
 import type { PageServerLoad } from "./$types";
-import { openDatabase, getDefaultOrgId } from "$lib/server/db";
-import { listArtifacts, getArtifactStats, type ArtifactRow, type ArtifactStats } from "$lib/server/artifacts";
+import { getArtifactStats, listArtifactRows } from "../../../../../../application/artifacts/queries.ts";
+import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = ({ params, locals }) => {
   const projectId = params.id;
@@ -10,17 +10,12 @@ export const load: PageServerLoad = ({ params, locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const db = await openDatabase();
-        try {
-          const orgId = await getDefaultOrgId(db);
-          const [artifacts, stats] = await Promise.all([
-            listArtifacts(db, orgId, { projectId }),
-            getArtifactStats(db, orgId, projectId),
-          ]);
-          return { artifacts, stats };
-        } finally {
-          await db.close();
-        }
+        const { em, ctx } = await requestAppScope(locals, projectId);
+        const [artifacts, stats] = await Promise.all([
+          listArtifactRows(em, ctx, { projectId }),
+          getArtifactStats(em, ctx, projectId),
+        ]);
+        return { artifacts, stats };
       })(),
     },
   };

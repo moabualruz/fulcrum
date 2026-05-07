@@ -70,6 +70,19 @@ export interface ProjectOverviewData {
   };
 }
 
+export interface ProjectListing {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  updated_at: string;
+}
+
+export interface ProjectOption {
+  id: string;
+  name: string;
+}
+
 export interface BoardTaskRow {
   id: string;
   title: string;
@@ -80,13 +93,52 @@ export interface BoardTaskRow {
   updated_at: string;
 }
 
+export async function listProjectRows(em: EntityManager, ctx: AppContext): Promise<ProjectListing[]> {
+  const columns = await projectColumns(em);
+  const slugExpr = columns.has("slug") ? "COALESCE(slug, id::text)" : "id::text";
+  const descriptionExpr = columns.has("description") ? "description" : "NULL::text";
+  const rows = await ormSqlConnection(em).execute<Array<{
+    id: string;
+    slug: string | null;
+    name: string;
+    description: string | null;
+    updated_at: string | Date;
+  }>>(
+    `SELECT id, ${slugExpr} AS slug, name, ${descriptionExpr} AS description, updated_at
+       FROM projects
+      WHERE org_id = ?
+      ORDER BY created_at ASC, id ASC`,
+    [ctx.orgId],
+  );
+  return rows.map((project) => ({
+    id: project.id,
+    slug: project.slug ?? project.id,
+    name: project.name,
+    description: project.description ?? null,
+    updated_at: isoStamp(project.updated_at),
+  }));
+}
+
+export async function listProjectOptions(em: EntityManager, ctx: AppContext): Promise<ProjectOption[]> {
+  const rows = await ormSqlConnection(em).execute<ProjectOption[]>(
+    `SELECT id, name
+       FROM projects
+      WHERE org_id = ?
+      ORDER BY name ASC, id ASC`,
+    [ctx.orgId],
+  );
+  return rows;
+}
+
 export async function getProjectOrNull(
   em: EntityManager,
   ctx: AppContext,
   projectId: string,
 ): Promise<ProjectRow | null> {
+  const columns = await projectColumns(em);
+  const slugExpr = columns.has("slug") ? "COALESCE(slug, id::text)" : "id::text";
   const rows = await ormSqlConnection(em).execute<ProjectRow[]>(
-    `SELECT id, slug, name FROM projects WHERE id = $1 AND org_id = $2`,
+    `SELECT id, ${slugExpr} AS slug, name FROM projects WHERE id = ? AND org_id = ?`,
     [projectId, ctx.orgId],
   );
   return rows[0] ?? null;
@@ -276,4 +328,14 @@ function dateOnly(value: string | Date): string {
 
 function isoStamp(value: string | Date): string {
   return value instanceof Date ? value.toISOString() : value;
+}
+
+async function projectColumns(em: EntityManager): Promise<Set<string>> {
+  const rows = await em.getKysely<any>()
+    .selectFrom("information_schema.columns")
+    .select(["column_name"])
+    .where("table_schema", "=", "public")
+    .where("table_name", "=", "projects")
+    .execute() as Array<{ column_name: string }>;
+  return new Set(rows.map((row) => row.column_name));
 }

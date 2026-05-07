@@ -41,6 +41,40 @@ export async function listChildren(
   return children.map(serializeTask);
 }
 
+export interface TaskOption {
+  id: string;
+  project_id: string | null;
+  title: string;
+}
+
+export async function listOpenTaskOptions(em: EntityManager, ctx: AppContext): Promise<TaskOption[]> {
+  const tasks = await listTasks(em, ctx, {});
+  return tasks
+    .filter((task) => ["pending", "in_progress", "blocked"].includes(task.status ?? ""))
+    .map((task) => ({ id: task.id, project_id: task.projectId, title: task.title }));
+}
+
+export interface BoardTaskRow {
+  id: string;
+  title: string;
+  status: string;
+  priority: number;
+  project_id: string | null;
+  updated_at: string;
+}
+
+export async function listBoardTaskRows(em: EntityManager, ctx: AppContext): Promise<BoardTaskRow[]> {
+  const tasks = await listTasks(em, ctx, {});
+  return tasks.map((task) => ({
+    id: task.id,
+    title: task.title,
+    status: task.status ?? "pending",
+    priority: task.priority ?? 0,
+    project_id: task.projectId,
+    updated_at: task.updatedAt.toISOString(),
+  }));
+}
+
 export async function findVisibleTask(
   em: EntityManager,
   ctx: AppContext,

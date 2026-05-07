@@ -4,6 +4,8 @@ import { readFile } from "node:fs/promises";
 import { AgentRun } from "../../db/entities/orchestration/AgentRun.ts";
 import { AppForbiddenError, AppNotFoundError } from "../errors.ts";
 import { ormSqlConnection } from "../orm-helpers.ts";
+import { listProjectOptions, type ProjectOption } from "../projects/queries.ts";
+import { listOpenTaskOptions, type TaskOption } from "../tasks/queries.ts";
 import type { AppContext, RunDetailDto, RunDto } from "./types.ts";
 
 export async function listRuns(em: EntityManager, ctx: AppContext): Promise<RunDto[]> {
@@ -76,6 +78,126 @@ export interface RunEventRow {
   payload: Record<string, unknown>;
   actor: string;
   created_at: string | Date;
+}
+
+export interface RunRow {
+  id: string;
+  agent: string;
+  model: string | null;
+  status: string;
+  project_id: string | null;
+  started_at: string;
+  ended_at: string | null;
+  sandbox_mode: string | null;
+  iteration_count: number | null;
+}
+
+export interface RunRowsFilter {
+  projectId?: string | null;
+  agent?: string | null;
+  status?: string | null;
+  range?: "24h" | "7d" | "30d" | "all";
+}
+
+export interface RunsPageData {
+  runs: RunRow[];
+  projects: ProjectOption[];
+  tasks: TaskOption[];
+}
+
+export async function loadRunsPageData(
+  em: EntityManager,
+  ctx: AppContext,
+  filter: RunRowsFilter = {},
+): Promise<RunsPageData> {
+  const runCtx = { ...ctx, projectId: filter.projectId === undefined ? ctx.projectId : filter.projectId };
+  const [runs, projects, tasks] = await Promise.all([
+    listRunRows(em, runCtx, filter),
+    listProjectOptions(em, ctx),
+    listOpenTaskOptions(em, ctx),
+  ]);
+  return { runs, projects, tasks };
+}
+
+export async function listRunRows(
+  em: EntityManager,
+  ctx: AppContext,
+  filter: RunRowsFilter = {},
+): Promise<RunRow[]> {
+  const columns = await agentRunColumns(em);
+  const hasProjectId = columns.has("project_id");
+  const agentExpr = columns.has("agent") ? "ar.agent" : "ar.agent_name";
+  const modelExpr = columns.has("model") ? "ar.model" : "ar.agent_version";
+  const statusExpr = columns.has("status") ? "ar.status" : "NULL::text";
+  const projectExpr = hasProjectId ? "ar.project_id" : "t.project_id";
+  const endedExpr = columns.has("ended_at") ? "ar.ended_at" : "NULL::timestamptz";
+  const sandboxExpr = columns.has("sandbox_mode") ? "ar.sandbox_mode" : "NULL::text";
+  const iterationExpr = columns.has("iteration_count") ? "ar.iteration_count" : "NULL::int";
+  const joins = hasProjectId ? "" : "LEFT JOIN tasks t ON t.id = ar.task_id";
+  const conditions = ["ar.org_id = ?"];
+  const params: unknown[] = [ctx.orgId];
+
+  if (ctx.projectId !== undefined && ctx.projectId !== null) {
+    params.push(ctx.projectId);
+    conditions.push(`${projectExpr} = ?`);
+  } else if (filter.projectId !== undefined && filter.projectId !== null) {
+    params.push(filter.projectId);
+    conditions.push(`${projectExpr} = ?`);
+  }
+  if (filter.projectId === null) {
+    conditions.push(`${projectExpr} IS NULL`);
+  }
+  if (filter.agent) {
+    params.push(filter.agent);
+    conditions.push(`${agentExpr} = ?`);
+  }
+  if (filter.status) {
+    params.push(filter.status);
+    conditions.push(`${statusExpr} = ?`);
+  }
+  if (filter.range && filter.range !== "all") {
+    const hours = filter.range === "24h" ? 24 : filter.range === "7d" ? 24 * 7 : 24 * 30;
+    params.push(new Date(Date.now() - hours * 60 * 60 * 1000));
+    conditions.push("ar.started_at >= ?");
+  }
+
+  const rows = await ormSqlConnection(em).execute<Array<{
+    id: string;
+    agent: string | null;
+    model: string | null;
+    status: string | null;
+    project_id: string | null;
+    started_at: string | Date;
+    ended_at: string | Date | null;
+    sandbox_mode: string | null;
+    iteration_count: number | string | null;
+  }>>(
+    `SELECT ar.id,
+            ${agentExpr} AS agent,
+            ${modelExpr} AS model,
+            ${statusExpr} AS status,
+            ${projectExpr} AS project_id,
+            ar.started_at,
+            ${endedExpr} AS ended_at,
+            ${sandboxExpr} AS sandbox_mode,
+            ${iterationExpr} AS iteration_count
+       FROM agent_runs ar
+       ${joins}
+      WHERE ${conditions.join(" AND ")}
+      ORDER BY ar.started_at DESC, ar.id ASC`,
+    params,
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    agent: row.agent ?? "",
+    model: row.model ?? null,
+    status: row.status ?? "queued",
+    project_id: row.project_id ?? null,
+    started_at: isoStamp(row.started_at),
+    ended_at: nullableIsoStamp(row.ended_at),
+    sandbox_mode: row.sandbox_mode ?? null,
+    iteration_count: row.iteration_count === null ? null : Number(row.iteration_count),
+  }));
 }
 
 export async function listProjectRuns(em: EntityManager, ctx: AppContext): Promise<ProjectRunRow[]> {
@@ -231,4 +353,14 @@ function isoStamp(value: string | Date): string {
 function nullableIsoStamp(value: string | Date | null): string | null {
   if (value === null) return null;
   return isoStamp(value);
+}
+
+async function agentRunColumns(em: EntityManager): Promise<Set<string>> {
+  const rows = await em.getKysely<any>()
+    .selectFrom("information_schema.columns")
+    .select(["column_name"])
+    .where("table_schema", "=", "public")
+    .where("table_name", "=", "agent_runs")
+    .execute() as Array<{ column_name: string }>;
+  return new Set(rows.map((row) => row.column_name));
 }

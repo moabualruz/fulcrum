@@ -8,7 +8,7 @@ import {
   deleteTask,
   updateTask,
 } from "../../../../application/tasks/commands.ts";
-import { listTasks } from "../../../../application/tasks/queries.ts";
+import { listBoardTaskRows } from "../../../../application/tasks/queries.ts";
 import {
   BoardCreateSchema,
   BoardDeleteSchema,
@@ -17,7 +17,7 @@ import {
 } from "$lib/server/boards.schema";
 import { BulkStatusSchema, BulkDeleteSchema } from "$lib/server/task-bulk.schema";
 import { actionOk, actionFail } from "$lib/feedback/action-result";
-import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
+import { requestAppScope } from "$lib/server/application-scope";
 
 // Inherit `activeProjectId` from the root layout-data so the optional
 // project scoping is consistent with `/projects` and `/docs`. Tests for the
@@ -33,21 +33,8 @@ export const load: PageServerLoad = async ({ url, parent, locals }) => {
     activeProjectId: parentData.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const em = locals.em ?? await getEm();
-        const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
-        const tasks = await listTasks(em, { orgId, userId: null, projectId: project || null }, {});
-        return {
-          tasks: tasks
-            .filter((task) => !project || task.projectId === project)
-            .map((task) => ({
-              id: task.id,
-              title: task.title,
-              status: task.status ?? "pending",
-              priority: task.priority ?? 0,
-              project_id: task.projectId,
-              updated_at: task.updatedAt.toISOString(),
-            })),
-        };
+        const { em, ctx } = await requestAppScope(locals, project || null);
+        return { tasks: await listBoardTaskRows(em, ctx) };
       })(),
     },
   };
@@ -73,12 +60,8 @@ export const actions: Actions = {
     if (priorityFromFd != null) candidate["priority"] = Number(priorityFromFd);
     const parsed = v.safeParse(BoardCreateSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const em = locals.em ?? await getEm();
-    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
-    const created = await createTask(em, {
-      orgId, userId: null,
-      projectId: parsed.output.projectId ?? null,
-    }, {
+    const { em, ctx } = await requestAppScope(locals, parsed.output.projectId ?? null);
+    const created = await createTask(em, ctx, {
       title: parsed.output.title,
       status: parsed.output.status,
     });
@@ -96,11 +79,10 @@ export const actions: Actions = {
     if (candidate["description"] === "") candidate["description"] = null;
     const parsed = v.safeParse(BoardUpdateSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const em = locals.em ?? await getEm();
-    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
     try {
       const { id, ...input } = parsed.output;
-      await updateTask(em, { orgId, userId: null }, id, input);
+      await updateTask(em, ctx, id, input);
       return actionOk("Task updated");
     } catch (err) {
       return fail(400, actionFail((err as Error).message));
@@ -111,9 +93,8 @@ export const actions: Actions = {
     const fd = await request.formData();
     const parsed = v.safeParse(BoardDeleteSchema, fdToRecord(fd));
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const em = locals.em ?? await getEm();
-    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
-    await deleteTask(em, { orgId, userId: null }, parsed.output.id);
+    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    await deleteTask(em, ctx, parsed.output.id);
     return actionOk("Task deleted");
   },
 
@@ -124,9 +105,8 @@ export const actions: Actions = {
     if (!parsed.success) return fail(400, actionFail("invalid input"));
     const ids = parsed.output.ids.split(",").filter(Boolean);
     if (ids.length === 0) return fail(400, actionFail("no ids"));
-    const em = locals.em ?? await getEm();
-    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
-    const result = await bulkUpdate(em, { orgId, userId: null }, ids, { status: parsed.output.status });
+    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    const result = await bulkUpdate(em, ctx, ids, { status: parsed.output.status });
     return actionOk(`${result.updated} task(s) updated`);
   },
 
@@ -137,9 +117,8 @@ export const actions: Actions = {
     if (!parsed.success) return fail(400, actionFail("invalid input"));
     const ids = parsed.output.ids.split(",").filter(Boolean);
     if (ids.length === 0) return fail(400, actionFail("no ids"));
-    const em = locals.em ?? await getEm();
-    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
-    const result = await bulkDelete(em, { orgId, userId: null }, ids);
+    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    const result = await bulkDelete(em, ctx, ids);
     return actionOk(`${result.deleted} task(s) deleted`);
   },
 
@@ -147,10 +126,9 @@ export const actions: Actions = {
     const fd = await request.formData();
     const parsed = v.safeParse(BoardMoveSchema, fdToRecord(fd));
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const em = locals.em ?? await getEm();
-    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
     try {
-      await updateTask(em, { orgId, userId: null }, parsed.output.id, { status: parsed.output.status });
+      await updateTask(em, ctx, parsed.output.id, { status: parsed.output.status });
       return actionOk("Task moved");
     } catch (err) {
       const msg = (err as Error).message;
