@@ -130,7 +130,6 @@ const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES = [
   "src/tui/telemetry.ts",
   "src/web/src/lib/components/docs/frontmatter-ui.ts",
   "src/web/src/lib/server/em.ts",
-  "src/web/src/routes/docs/new/+page.server.ts",
   "src/web/src/routes/runs/[id]/+page.server.ts",
 ];
 

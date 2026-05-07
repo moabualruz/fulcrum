@@ -4,16 +4,14 @@ import type { Actions, PageServerLoad } from "./$types";
 import { deleteTask, updateTask } from "../../../../../application/tasks/commands.ts";
 import { getTask, listChildren } from "../../../../../application/tasks/queries.ts";
 import { actionOk, actionFail } from "$lib/feedback/action-result";
-import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
+import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = ({ params, locals }) => {
   return {
     streamed: {
       data: (async () => {
-        const em = locals.em ?? await getEm();
-        const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+        const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
         try {
-          const ctx = { orgId, userId: null, projectId: locals?.activeProjectId ?? null };
           const task = await getTask(em, ctx, params.id);
           const children = await listChildren(em, ctx, params.id);
           return { task, children };
@@ -58,11 +56,10 @@ export const actions: Actions = {
     if (candidate["description"] === "") candidate["description"] = null;
     const parsed = v.safeParse(UpdateFieldSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const em = locals.em ?? await getEm();
-    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
     try {
       const { id: _id, ...input } = parsed.output;
-      await updateTask(em, { orgId, userId: null, projectId: locals?.activeProjectId ?? null }, params.id, input);
+      await updateTask(em, ctx, params.id, input);
       return actionOk("Task updated");
     } catch (err) {
       return fail(400, actionFail((err as Error).message));
@@ -70,9 +67,8 @@ export const actions: Actions = {
   },
 
   delete: async ({ params, locals }) => {
-    const em = locals.em ?? await getEm();
-    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
-    await deleteTask(em, { orgId, userId: null, projectId: locals?.activeProjectId ?? null }, params.id);
+    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    await deleteTask(em, ctx, params.id);
     return actionOk("Task deleted");
   },
 
@@ -82,12 +78,11 @@ export const actions: Actions = {
     const candidate = { id: params.id, description: raw["description"] ?? null };
     const parsed = v.safeParse(UpdateDescriptionSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const em = locals.em ?? await getEm();
-    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
+    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
     try {
       await updateTask(
         em,
-        { orgId, userId: null, projectId: locals?.activeProjectId ?? null },
+        ctx,
         params.id,
         { description: parsed.output.description },
       );

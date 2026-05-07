@@ -1,78 +1,43 @@
 import { error, redirect } from "@sveltejs/kit";
-import type { EntityManager } from "@mikro-orm/postgresql";
-import { getEm, getDefaultOrgIdOrm } from "../../../lib/server/em.ts";
-import { deleteDocumentAction } from "../../../lib/server/documents.ts";
-import { getBacklinks } from "../../../lib/server/doc-links.ts";
+import { deleteDocumentAction } from "../../../../../application/docs/document-actions.ts";
+import { getDoc, listDocBacklinks } from "../../../../../application/docs/queries.ts";
+import { requestAppScope } from "../../../lib/server/application-scope.ts";
 import { renderDocMarkdownToHtml } from "./doc-render.ts";
-
-interface DocRow {
-  id: string;
-  org_id: string;
-  project_id: string | null;
-  kind: string;
-  title: string;
-  body: string;
-  frontmatter: Record<string, unknown>;
-  updated_at: Date | string;
-}
 
 interface LoadEvent {
   params: { id: string };
-  locals?: { activeProjectId?: string | null };
+  locals: Parameters<typeof requestAppScope>[0] & { activeProjectId?: string | null };
 }
 
 interface ActionEvent {
   params: { id: string };
-}
-
-async function loadDoc(em: EntityManager, id: string, orgId: string): Promise<{ doc: {
-  id: string;
-  org_id: string;
-  project_id: string | null;
-  kind: string;
-  title: string;
-  body: string;
-  renderedHtml: string;
-  frontmatter: Record<string, unknown>;
-  updated_at: string;
-} }> {
-  const rows = await em.getKysely<any>()
-    .selectFrom("documents")
-    .select(["id", "org_id", "project_id", "doc_type as kind", "title", "body_md as body", "frontmatter", "updated_at"])
-    .where("id", "=", id)
-    .where("org_id", "=", orgId)
-    .execute() as DocRow[];
-  if (rows.length === 0) throw error(404, "Document not found");
-  const row = rows[0]!;
-  return {
-    doc: {
-      id: row.id,
-      org_id: row.org_id,
-      project_id: row.project_id,
-      kind: row.kind,
-      title: row.title,
-      body: row.body,
-      renderedHtml: renderDocMarkdownToHtml(row.body),
-      frontmatter: row.frontmatter ?? {},
-      updated_at:
-        row.updated_at instanceof Date
-          ? row.updated_at.toISOString()
-          : row.updated_at,
-    },
-  };
+  locals: Parameters<typeof requestAppScope>[0];
 }
 
 export const load = ({ params, locals }: LoadEvent) => ({
   activeProjectId: locals?.activeProjectId ?? null,
   streamed: {
     data: (async () => {
-      const em = await getEm();
-      const orgId = await getDefaultOrgIdOrm(em);
-      const docResult = await loadDoc(em, params.id, orgId);
-      const backlinks = (await getBacklinks(em, params.id)).map((backlink) => ({
-        id: backlink.source_doc_id,
+      const { em, ctx } = await requestAppScope(locals);
+      const doc = await getDoc(em, ctx, params.id);
+      if (!doc) throw error(404, "Document not found");
+      const docResult = {
+        doc: {
+          id: doc.id,
+          org_id: doc.orgId,
+          project_id: doc.projectId,
+          kind: doc.docType,
+          title: doc.title,
+          body: doc.bodyMd,
+          renderedHtml: renderDocMarkdownToHtml(doc.bodyMd),
+          frontmatter: doc.frontmatter ?? {},
+          updated_at: doc.updatedAt.toISOString(),
+        },
+      };
+      const backlinks = (await listDocBacklinks(em, ctx, params.id)).map((backlink) => ({
+        id: backlink.fromDocId,
         title: backlink.title,
-        href: `/docs/${backlink.source_doc_id}`,
+        href: `/docs/${backlink.fromDocId}`,
       }));
       return { ...docResult, backlinks };
     })(),
@@ -80,10 +45,9 @@ export const load = ({ params, locals }: LoadEvent) => ({
 });
 
 export const actions = {
-  delete: async ({ params }: ActionEvent) => {
-    const em = await getEm();
-    const orgId = await getDefaultOrgIdOrm(em);
-    await deleteDocumentAction(em, params.id!, orgId);
+  delete: async ({ params, locals }: ActionEvent) => {
+    const { em, ctx } = await requestAppScope(locals);
+    await deleteDocumentAction(em, params.id!, ctx.orgId);
     throw redirect(303, "/docs");
   },
 };

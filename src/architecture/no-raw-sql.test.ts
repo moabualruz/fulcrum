@@ -42,8 +42,6 @@ const WEB_DATA_HANDLE_COMPOSITION_ROOTS = new Map([
 ]);
 
 const EXPECTED_WEB_DATA_HANDLE_FILES = [
-  "src/web/src/lib/server/doc-versions.ts",
-  "src/web/src/lib/server/documents.ts",
   "src/web/src/lib/server/em.ts",
   "src/web/src/lib/server/feature-flags.ts",
   "src/web/src/lib/server/orchestration.ts",
@@ -69,11 +67,7 @@ const EXPECTED_WEB_DATA_HANDLE_FILES = [
   "src/web/src/routes/boards/+page.server.ts",
   "src/web/src/routes/context/preview/+page.server.ts",
   "src/web/src/routes/docs/+page.server.ts",
-  "src/web/src/routes/docs/[id]/+page.server.ts",
   "src/web/src/routes/docs/[id]/edit/+page.server.ts",
-  "src/web/src/routes/docs/[id]/history/+page.server.ts",
-  "src/web/src/routes/docs/global/+page.server.ts",
-  "src/web/src/routes/docs/new/+page.server.ts",
   "src/web/src/routes/memory/+page.server.ts",
   "src/web/src/routes/memory/[id]/+page.server.ts",
   "src/web/src/routes/orchestration/+page.server.ts",
@@ -101,7 +95,6 @@ const EXPECTED_WEB_DATA_HANDLE_FILES = [
   "src/web/src/routes/settings/secrets/+page.server.ts",
   "src/web/src/routes/settings/skills/+page.server.ts",
   "src/web/src/routes/settings/telemetry/+page.server.ts",
-  "src/web/src/routes/tasks/[id]/+page.server.ts",
 ];
 
 const EXPECTED_RAW_SQL_CALL_FILES = [
@@ -109,15 +102,11 @@ const EXPECTED_RAW_SQL_CALL_FILES = [
   "src/cli/interactive/backup.ts",
   "src/cli/interactive/restore.ts",
   "src/router/domain-adapter.ts",
-  "src/web/src/lib/server/doc-versions.ts",
-  "src/web/src/lib/server/documents.ts",
   "src/web/src/lib/server/orm-helpers.ts",
   "src/web/src/lib/server/projects.ts",
   "src/web/src/lib/server/skills.ts",
   "src/web/src/routes/artifacts/[id]/+page.server.ts",
-  "src/web/src/routes/docs/[id]/+page.server.ts",
   "src/web/src/routes/docs/[id]/edit/+page.server.ts",
-  "src/web/src/routes/docs/[id]/history/+page.server.ts",
   "src/web/src/routes/projects/[id]/reports/+page.server.ts",
   "src/web/src/routes/repos/+page.server.ts",
   "src/web/src/routes/repos/[id]/branches/+page.server.ts",

@@ -1,8 +1,15 @@
 import { error } from "@sveltejs/kit";
+import type { EntityManager } from "@mikro-orm/postgresql";
 
 import { resolveOrgId } from "../../../../application/auth/org-context.ts";
 
-export async function requestAppScope(locals: App.Locals, projectId?: string | null) {
+interface ApplicationScopeLocals {
+  em?: EntityManager | null;
+  orgId?: string | null;
+  userId?: string | null;
+}
+
+export async function requestAppScope(locals: ApplicationScopeLocals, projectId?: string | null) {
   const em = locals.em;
   if (!em) throw error(500, "Application runtime unavailable");
   const orgId = await resolveOrgId(em, locals.orgId);

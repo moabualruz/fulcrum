@@ -6,14 +6,13 @@ import { superValidate } from "sveltekit-superforms/server";
 import { valibot } from "sveltekit-superforms/adapters";
 import type { Actions, PageServerLoad } from "./$types";
 import { DocumentFormSchema } from "$lib/server/documents.schema";
-import { createDocumentAction } from "$lib/server/documents";
-import { openDatabase } from "$lib/server/db";
+import { createDocumentAction } from "../../../../../application/docs/document-actions.ts";
 import { parseLabels } from "$lib/markdown/labels";
 import { TEMPLATE_BODY_MAP } from "../../../../../docs/template-seeds.ts";
-import type { DocType } from "../../../../../db/entities/docs/enums.ts";
 import {
   DOC_TEMPLATE_SERVICE_TOKEN,
 } from "../../../../../docs/doc-template-service.ts";
+import { requestAppScope } from "$lib/server/application-scope";
 
 // ─── Load ────────────────────────────────────────────────────────────────────
 
@@ -40,7 +39,7 @@ export const load: PageServerLoad = async (event) => {
       const svc = container.get(DOC_TEMPLATE_SERVICE_TOKEN);
       const rows = await svc.list(orgId);
       for (const row of rows) {
-        templates[row.docType as DocType] = row.bodyTemplate;
+        templates[String(row.docType)] = row.bodyTemplate;
       }
     } catch {
       // service not bound — keep static fallback
@@ -53,31 +52,15 @@ export const load: PageServerLoad = async (event) => {
 // ─── Actions ─────────────────────────────────────────────────────────────────
 
 export const actions: Actions = {
-  default: async ({ request }) => {
+  default: async ({ request, locals }) => {
     const form = await superValidate(request, valibot(DocumentFormSchema));
     if (!form.valid) return fail(400, { form });
-    const db = await openDatabase();
     let id: string;
-    try {
-      const orgRows = await db.query<{ id: string }>(
-        `SELECT id FROM orgs WHERE slug = $1`,
-        ["default"],
-      );
-      if (orgRows.length === 0) {
-        return fail(500, {
-          form: {
-            ...form,
-            errors: {
-              ...form.errors,
-              _errors: ["Default org not found. Run fulcrum product init."],
-            },
-          },
-        });
-      }
-      const orgId = orgRows[0]!.id;
+    {
+      const { em, ctx } = await requestAppScope(locals, form.data.projectId ?? null);
       const labels = parseLabels(form.data.labels ?? "");
-      const created = await createDocumentAction(db, {
-        orgId,
+      const created = await createDocumentAction(em, {
+        orgId: ctx.orgId,
         projectId: form.data.projectId ?? null,
         kind: form.data.kind,
         title: form.data.title,
@@ -89,8 +72,6 @@ export const actions: Actions = {
         },
       });
       id = created.id;
-    } finally {
-      await db.close();
     }
     throw redirect(303, `/docs/${id}`);
   },

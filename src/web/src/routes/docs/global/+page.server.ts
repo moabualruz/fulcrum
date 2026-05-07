@@ -1,38 +1,18 @@
 import type { PageServerLoad } from "./$types";
-import { openDatabase, getDefaultOrgId } from "$lib/server/db";
+import { listDocs } from "../../../../../application/docs/queries.ts";
 import { buildDocTree, type FlatDoc } from "$lib/server/doc-tree";
+import { requestAppScope } from "$lib/server/application-scope";
 
-interface RawRow {
-  id: string;
-  title: string;
-  kind: string;
-  parent_id: string | null;
-  sort_order: number;
-  updated_at: string | Date;
-}
-
-export const load: PageServerLoad = async () => {
-  const db = await openDatabase();
-  try {
-    const orgId = await getDefaultOrgId(db);
-    // Global docs = documents with no project_id
-    const rows = await db.query<RawRow>(
-      `SELECT id, title, kind, parent_id, sort_order, updated_at
-         FROM documents
-        WHERE org_id = $1 AND project_id IS NULL
-        ORDER BY sort_order ASC, title ASC`,
-      [orgId],
-    );
-    const flat: FlatDoc[] = rows.map((r) => ({
-      id: r.id,
-      title: r.title,
-      kind: r.kind,
-      parent_id: r.parent_id,
-      sort_order: r.sort_order,
-      updated_at: r.updated_at instanceof Date ? r.updated_at.toISOString() : r.updated_at,
-    }));
-    return { tree: buildDocTree(flat) };
-  } finally {
-    await db.close();
-  }
+export const load: PageServerLoad = async ({ locals }) => {
+  const { em, ctx } = await requestAppScope(locals);
+  const rows = (await listDocs(em, ctx, {})).filter((doc) => doc.projectId === null);
+  const flat: FlatDoc[] = rows.map((doc) => ({
+    id: doc.id,
+    title: doc.title,
+    kind: doc.docType,
+    parent_id: doc.parentId,
+    sort_order: doc.sortPosition,
+    updated_at: doc.updatedAt.toISOString(),
+  }));
+  return { tree: buildDocTree(flat) };
 };

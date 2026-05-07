@@ -1,20 +1,23 @@
 import { error, fail, redirect } from "@sveltejs/kit";
-import { getEm, getDefaultOrgIdOrm } from "../../../../lib/server/em.ts";
+import { getDoc } from "../../../../../../application/docs/queries.ts";
 import {
   listDocumentVersions,
   restoreDocumentVersion,
   createDocumentVersion,
   getNextVersionNumber,
-} from "../../../../lib/server/doc-versions.ts";
+} from "../../../../../../application/docs/version-queries.ts";
+import { requestAppScope } from "../../../../lib/server/application-scope.ts";
 
 interface LoadEvent {
   params: { id: string };
-  url?: URL;
+  url: URL;
+  locals: Parameters<typeof requestAppScope>[0];
 }
 
 interface ActionEvent {
   params: { id: string };
   request: Request;
+  locals: Parameters<typeof requestAppScope>[0];
 }
 
 function escapeHtml(value: string): string {
@@ -28,17 +31,10 @@ function diffHtml(fromBody: string, toBody: string): string {
   return `<del>${escapeHtml(fromBody)}</del><ins>${escapeHtml(toBody)}</ins>`;
 }
 
-export const load = async ({ params, url }: LoadEvent) => {
-  const em = await getEm();
-  const orgId = await getDefaultOrgIdOrm(em);
-  const rows = await em.getKysely<any>()
-    .selectFrom("documents")
-    .select(["id", "title"])
-    .where("id", "=", params.id)
-    .where("org_id", "=", orgId)
-    .execute() as Array<{ id: string; title: string }>;
-  if (rows.length === 0) throw error(404, "Document not found");
-  const doc = rows[0]!;
+export const load = async ({ params, url, locals }: LoadEvent) => {
+  const { em, ctx } = await requestAppScope(locals);
+  const doc = await getDoc(em, ctx, params.id);
+  if (!doc) throw error(404, "Document not found");
   const versions = await listDocumentVersions(em, params.id);
   const from = Number(url?.searchParams.get("from") ?? 0);
   const to = Number(url?.searchParams.get("to") ?? 0);
@@ -57,34 +53,26 @@ export const load = async ({ params, url }: LoadEvent) => {
 };
 
 export const actions = {
-  restore: async ({ params, request }: ActionEvent) => {
+  restore: async ({ params, request, locals }: ActionEvent) => {
     const fd = await request.formData();
     const versionStr = fd.get("version") ?? fd.get("version_num");
     const version = Number(versionStr);
     if (!version || version < 1) return fail(400, { error: "Invalid version" });
-    const em = await getEm();
-    const orgId = await getDefaultOrgIdOrm(em);
-    // Snapshot current state before restore
-    const currentRows = await em.getKysely<any>()
-      .selectFrom("documents")
-      .select(["title", "body_md as body", "frontmatter"])
-      .where("id", "=", params.id)
-      .where("org_id", "=", orgId)
-      .execute() as Array<{ title: string; body: string; frontmatter: Record<string, unknown> }>;
-    if (currentRows.length > 0) {
-      const cur = currentRows[0]!;
+    const { em, ctx } = await requestAppScope(locals);
+    const current = await getDoc(em, ctx, params.id);
+    if (current) {
       const nextVer = await getNextVersionNumber(em, params.id);
       await createDocumentVersion(em, {
         docId: params.id,
-        orgId,
+        orgId: ctx.orgId,
         version: nextVer,
-        title: cur.title,
-        body: cur.body,
-        frontmatter: cur.frontmatter ?? {},
+        title: current.title,
+        body: current.bodyMd,
+        frontmatter: current.frontmatter ?? {},
         author: "system",
       });
     }
-    await restoreDocumentVersion(em, params.id, orgId, version);
+    await restoreDocumentVersion(em, params.id, ctx.orgId, version);
     throw redirect(303, `/docs/${params.id}`);
   },
 };
