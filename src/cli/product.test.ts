@@ -145,7 +145,7 @@ describe("fulcrum product CLI", () => {
     const io = testIo();
     await runProduct(["tasks", "create", "--project", "alpha"], {
       ...io.opts,
-      caller: { tasks: { create: async () => ({}) } },
+      caller: { tasks: { create: async () => ({}), list: async () => [], update: async () => ({}) } },
     });
     expect(io.exits).toEqual([2]);
     expect(io.err[0]).toContain("missing required flag --title");

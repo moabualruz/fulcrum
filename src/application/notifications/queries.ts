@@ -12,6 +12,8 @@ import type {
   ListNotificationsInput,
   NotificationDto,
   NotificationListDto,
+  NotificationChannel,
+  NotificationDeliveryMode,
   NotificationMuteDto,
   NotificationQuietHoursDto,
   NotificationRuleDto,
@@ -52,7 +54,7 @@ export function serializeNotification(row: Notification): NotificationDto {
   return {
     id: row.id,
     orgId: row.org.id,
-    userId: row.userId,
+    userId: row.userId ?? "",
     ruleId: row.ruleId ?? null,
     eventId: row.eventId,
     title: row.title,
@@ -97,12 +99,12 @@ export function serializeRule(row: NotificationRule): NotificationRuleDto {
   return {
     id: row.id,
     orgId: row.org.id,
-    userId: row.userId,
+    userId: row.userId ?? "",
     name: row.name ?? "",
     subjectKind: row.subjectKind ?? null,
     active: row.active,
     eventPattern: row.eventPattern ?? {},
-    channels: row.channels ?? [],
+    channels: notificationChannels(row.channels),
     enabled: row.enabled,
     deliveryMode: timing.deliveryMode,
     digestWindowSeconds: timing.digestWindowSeconds,
@@ -111,6 +113,13 @@ export function serializeRule(row: NotificationRule): NotificationRuleDto {
     createdAt: row.createdAt ?? new Date(0),
     updatedAt: row.updatedAt ?? new Date(0),
   };
+}
+
+function notificationChannels(channels: string[] | null): NotificationChannel[] {
+  const allowed = new Set<NotificationChannel>(["in-app", "email", "slack", "discord", "webhook", "push"]);
+  return (channels ?? []).filter((channel): channel is NotificationChannel =>
+    allowed.has(channel as NotificationChannel)
+  );
 }
 
 export function serializeMute(row: NotificationMute): NotificationMuteDto {
@@ -136,7 +145,12 @@ export function serializeQuietHours(row: NotificationQuietHours): NotificationQu
   };
 }
 
-export function ruleTiming(pattern: Record<string, unknown>) {
+export function ruleTiming(pattern: Record<string, unknown>): {
+  deliveryMode: NotificationDeliveryMode;
+  digestWindowSeconds: number | null;
+  delaySeconds: number | null;
+  critical: boolean;
+} {
   const deliveryMode = pattern["deliveryMode"] === "digest" || pattern["deliveryMode"] === "delayed"
     ? pattern["deliveryMode"]
     : "immediate";

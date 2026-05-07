@@ -49,7 +49,7 @@ describe("EventDispatcher", () => {
 
       // Persisted to DB
       const dbEvents = await listEventsForProject(db, project.id);
-      const match = dbEvents.find((e) => e.id === event.id);
+      const match = dbEvents.find((e: { id: string }) => e.id === event.id);
       expect(match).toBeDefined();
       expect(match?.verb).toBe("created");
 

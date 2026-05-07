@@ -278,7 +278,7 @@ describe("artifacts store", () => {
       const list = await listArtifacts(db, orgId);
       expect(list.length).toBe(1);
       // metadata_json should not be in the result
-      expect((list[0] as Record<string, unknown>).metadata_json).toBeUndefined();
+      expect((list[0] as unknown as Record<string, unknown>).metadata_json).toBeUndefined();
     } finally {
       await db.close();
     }

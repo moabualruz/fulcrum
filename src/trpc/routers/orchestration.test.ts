@@ -81,10 +81,10 @@ describe("orchestration tRPC procedures", () => {
     const db = await freshDb("cancel-proc");
     try {
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
-      const run = await createRun(db, { orgId: org.id, identifier: "c1" });
+      const run = await createRun(db, { orgId: org.id, identifier: "c1" }) as { id: string };
 
       const hookCalls: SymphonyRunRow[] = [];
-      registerHook("on_cancel", (r) => { hookCalls.push(r); });
+      registerHook("on_cancel", (r: SymphonyRunRow) => { hookCalls.push(r); });
 
       const caller = createCaller(db, org.id);
       const cancelled = await caller.cancelRun({ id: run.id });
@@ -108,7 +108,7 @@ describe("orchestration tRPC procedures", () => {
     const db = await freshDb("retry-proc");
     try {
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
-      const run = await createRun(db, { orgId: org.id, identifier: "r1" });
+      const run = await createRun(db, { orgId: org.id, identifier: "r1" }) as { id: string };
 
       const caller = createCaller(db, org.id);
       const retried = await caller.retryRun({ id: run.id });
@@ -124,7 +124,7 @@ describe("orchestration tRPC procedures", () => {
     try {
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
       await createRun(db, { orgId: org.id, identifier: "s1" });
-      const r2 = await createRun(db, { orgId: org.id, identifier: "s2" });
+      const r2 = await createRun(db, { orgId: org.id, identifier: "s2" }) as { id: string };
 
       const caller = createCaller(db, org.id);
       await caller.cancelRun({ id: r2.id });

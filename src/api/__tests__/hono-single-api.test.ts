@@ -10,7 +10,7 @@ describe("single Hono API surface", () => {
     try {
       const router = createPublicApiRouter();
       const response = await router.request("/api/v1/openapi.json");
-      const spec = await response.json();
+      const spec = await response.json() as { openapi: string; info: { title: string } };
 
       expect(response.status).toBe(200);
       expect(spec.openapi).toBe("3.1.0");

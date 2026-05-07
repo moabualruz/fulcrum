@@ -183,7 +183,10 @@ async function requireInvitePermission(
 
 function hasEntityMetadata(em: EntityManager, entityName: string): boolean {
   try {
-    const metadata = em.getMetadata() as { find?: (name: string) => unknown; get?: (name: string) => unknown };
+    const metadata = em.getMetadata() as unknown as {
+      find?: (name: string) => unknown;
+      get?: (name: string) => unknown;
+    };
     return Boolean(metadata.find?.(entityName) ?? metadata.get?.(entityName));
   } catch {
     return false;

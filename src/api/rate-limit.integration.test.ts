@@ -34,11 +34,11 @@ describe("REST rate limiting", () => {
     const store = new Map();
     const app = new Hono();
     app.use("/user/*", async (c, next) => {
-      c.set("userId", c.req.header("x-user-id"));
+      c.set("userId" as never, c.req.header("x-user-id") as never);
       await next();
     });
     app.use("/org/*", async (c, next) => {
-      c.set("orgId", c.req.header("x-org-id"));
+      c.set("orgId" as never, c.req.header("x-org-id") as never);
       await next();
     });
     app.use("*", rateLimit({ limit: 1, windowMs: 60_000, store }));

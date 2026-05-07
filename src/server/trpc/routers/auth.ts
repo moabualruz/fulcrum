@@ -96,6 +96,11 @@ export const authRouter = t.router({
   acceptInvite: publicProcedure
     .input(AcceptInviteInputSchema)
     .mutation(async ({ ctx, input }) => {
-      return mapAppError(() => authApplication.acceptInvitation(requireAuthEntityManager(ctx.em as EntityManager | null), input));
+      return mapAppError(() =>
+        authApplication.acceptInvitation(requireAuthEntityManager(ctx.em as EntityManager | null), {
+          token: input.token,
+          ...(input.name === null || input.name === undefined ? {} : { name: input.name }),
+        })
+      );
     }),
 });

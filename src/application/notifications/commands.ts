@@ -284,9 +284,9 @@ export async function upsertPushSubscription(
     org: em.getReference(Org, ctx.orgId),
     userId: ctx.userId!,
     endpoint: input.endpoint,
+    p256dh: input.keys.p256dh,
+    auth: input.keys.auth,
   });
-  row.p256dh = input.keys.p256dh;
-  row.auth = input.keys.auth;
   row.userAgent = input.userAgent ?? null;
   em.persist(row);
   await em.flush();
@@ -316,7 +316,12 @@ export async function setNotificationQuietHours(
   input: QuietHoursSetInput,
 ) {
   const row = await em.findOne(NotificationQuietHours, { org: ctx.orgId, userId: ctx.userId } as never) ??
-    em.create(NotificationQuietHours, { org: em.getReference(Org, ctx.orgId), userId: ctx.userId! });
+    em.create(NotificationQuietHours, {
+      org: em.getReference(Org, ctx.orgId),
+      userId: ctx.userId!,
+      startHour: input.startHour,
+      endHour: input.endHour,
+    });
   row.tz = input.tz;
   row.startHour = input.startHour;
   row.endHour = input.endHour;

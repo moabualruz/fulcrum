@@ -232,28 +232,28 @@ export const routingRouter = t.router({
       .input(DraftListInputSchema)
       .output(z.array(RoutingEnrichedOutputSchema))
       .query(({ ctx, input }) =>
-        mapAppError(() => routingApplication.listRoutingDrafts(requireEntityManager(ctx), appContext(ctx), input ?? {}))
+        mapAppError(() => routingApplication.listRoutingDrafts())
       ),
 
     approve: permissionedProcedure({ resource: "routing", action: "create" })
       .input(DraftApproveInputSchema)
       .output(z.object({ ok: z.literal(true) }))
       .mutation(({ ctx, input }) =>
-        mapAppError(() => routingApplication.approveRoutingDraft(requireEntityManager(ctx), appContext(ctx), input))
+        mapAppError(() => routingApplication.approveRoutingDraft())
       ),
 
     delete: permissionedProcedure({ resource: "routing", action: "delete" })
       .input(DraftDeleteInputSchema)
       .output(z.object({ ok: z.literal(true) }))
       .mutation(({ ctx, input }) =>
-        mapAppError(() => routingApplication.deleteRoutingDraft(requireEntityManager(ctx), appContext(ctx), input))
+        mapAppError(() => routingApplication.deleteRoutingDraft())
       ),
 
     update: permissionedProcedure({ resource: "routing", action: "update" })
       .input(DraftUpdateInputSchema)
       .output(z.object({ ok: z.literal(true) }))
       .mutation(({ ctx, input }) =>
-        mapAppError(() => routingApplication.updateRoutingDraft(requireEntityManager(ctx), appContext(ctx), input))
+        mapAppError(() => routingApplication.updateRoutingDraft())
       ),
   }),
 

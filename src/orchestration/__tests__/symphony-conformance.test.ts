@@ -1233,7 +1233,7 @@ maxAttempts: 5
       const count = await sweepFn!(db.em, ORG_ID, { beforeRemove, root: scratchRoot });
       expect(count).toBe(3);
       expect(beforeRemove).toHaveBeenCalledTimes(6);
-      expect(beforeRemove.mock.calls.map(([run]) => run.id).sort()).toEqual([
+      expect((beforeRemove.mock.calls as unknown as Array<[{ id: string }]>).map((call) => call[0].id).sort()).toEqual([
         dryRunTerminal.id,
         dryRunTerminal.id,
         failed.id,
@@ -1299,7 +1299,9 @@ maxAttempts: 5
       const fakeDb = {
         query: async () => [],
       } as never;
-      const routes = createHttpApiRoutes(fakeDb);
+      const routes = createHttpApiRoutes(fakeDb) as {
+        getState(): Promise<{ status: number; body: Record<string, unknown> }>;
+      };
       const result = await routes.getState();
       expect(result.status).toBe(200);
       expect(result.body).toHaveProperty("generated_at");
@@ -1314,7 +1316,9 @@ maxAttempts: 5
       const { createHttpApiRoutes } = await import("../../test-support/product-fixtures.ts");
       const fakeDb = { query: async () => [] } as never;
       let refreshCalled = false;
-      const routes = createHttpApiRoutes(fakeDb, () => { refreshCalled = true; });
+      const routes = createHttpApiRoutes(fakeDb, () => { refreshCalled = true; }) as {
+        postRefresh(): Promise<{ status: number; body: Record<string, unknown> }>;
+      };
       const result = await routes.postRefresh();
       expect(result.status).toBe(200);
       expect((result.body as { queued: boolean }).queued).toBe(true);

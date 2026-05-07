@@ -58,7 +58,7 @@ describe("REST API routes", () => {
     const db = await freshDb("rest-get");
     try {
       const org = await createLocalOrg(db, { slug: "o", name: "O" });
-      const run = await createRun(db, { orgId: org.id, identifier: "r1" });
+      const run = await createRun(db, { orgId: org.id, identifier: "r1" }) as { id: string };
 
       const app = createSymphonyRestApi(db, org.id);
       const res = await app.request(`/api/v1/symphony/${run.id}`);

@@ -42,7 +42,7 @@ describe("product kernel migrations", () => {
   test("creates the required tables on a fresh database", async () => {
     const db = await openIsolatedStore(join(scratch, "fresh"));
     try {
-      const applied = await migrateIsolatedStore(db);
+      const applied = await migrateIsolatedStore(db) as unknown[];
       expect(applied.length).toBeGreaterThanOrEqual(4);
       for (const name of REQUIRED_TABLES) {
         expect(await tableExists(db, name)).toBe(true);

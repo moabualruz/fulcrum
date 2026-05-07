@@ -33,6 +33,7 @@ export interface CreateContextInput {
   em: EntityManager | null;
   container: Container | null;
   legacyStore?: LegacySymphonyStore;
+  db?: LegacySymphonyStore;
   requestId?: string | null;
   responseHeaders?: Headers | null;
 }

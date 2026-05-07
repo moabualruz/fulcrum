@@ -53,7 +53,7 @@ describe("repositories + event log", () => {
       expect(task.title).toBe("Build kernel");
       const events = await listEventsForProject(db, project.id);
       expect(events).toHaveLength(2);
-      expect(events.map((e) => e.subject_kind)).toEqual(["project", "task"]);
+      expect(events.map((e: { subject_kind: string }) => e.subject_kind)).toEqual(["project", "task"]);
       const taskEvent = events[1];
       expect(taskEvent?.verb).toBe("created");
       expect(taskEvent?.payload).toMatchObject({ title: "Build kernel", status: "pending" });

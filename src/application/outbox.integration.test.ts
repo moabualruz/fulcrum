@@ -150,7 +150,8 @@ describe("transactional outbox integration", () => {
         payload: {},
       });
       await em.flush();
-      await notifyHandler?.();
+      const notify = notifyHandler as (() => Promise<void>) | null;
+      if (notify) await notify();
     } finally {
       await worker.stop();
     }

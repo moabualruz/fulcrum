@@ -44,7 +44,8 @@ describe("router adapters delegate to application operations", () => {
     await recordRoutingEvent(decision, TASK_ID, ORG_ID, false);
 
     expect(command).toHaveBeenCalledTimes(1);
-    expect(command.mock.calls[0]?.[0]).toMatchObject({
+    const commandInput = (command.mock.calls as unknown as Array<[unknown]>)[0]?.[0];
+    expect(commandInput).toMatchObject({
       taskId: TASK_ID,
       orgId: ORG_ID,
       dryRun: false,
@@ -75,7 +76,7 @@ describe("router adapters delegate to application operations", () => {
 
   test("learnRule calls application learned-rule command", async () => {
     const { configureNoMatchPrompt, learnRule } = await import("./no-match-prompt.ts");
-    const rule = { id: "learned-rule-1", enabled: true };
+    const rule = { id: "learned-rule-1", enabled: true } as never;
     const command = mock(async () => rule);
 
     configureNoMatchPrompt({
