@@ -98,3 +98,5 @@ Plan: 8 of 14
 - [Phase 09.5-architecture-data-layer-remediation-full-interface-fix]: 09.5-15 used application ORM/PGlite fixture seeding for Phase 9.5 Playwright tests while preserving real journeys. — Keeps E2E coverage real and avoids reintroducing skip helpers.
 - [Phase 09.5]: Residual architecture gates record exact current-debt file baselines instead of broad allowlists.
 - [Phase 09.5]: Composition-root exceptions are exact and limited to web DB bootstrap, tRPC context, CLI bootstrap, and web DB data-handle bootstrap.
+- [Phase 09.5-28]: Plan 28 routers keep tRPC schemas and permission metadata while application modules own persistence and DB-adjacent branching.
+- [Phase 09.5-28]: Admin/status persistence was centralized in src/application/admin/queries.ts to preserve existing DTOs without new services.
