@@ -1,7 +1,6 @@
 import type { PageServerLoad } from "./$types";
-import { openDatabase } from "$lib/server/db";
-import { getDefaultOrgId } from "$lib/server/db";
-import { listEventsFiltered } from "$lib/server/application-compat";
+import { listProjectActivityEvents } from "../../../../../../application/projects/queries.ts";
+import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = ({ params, url, locals }) => {
   const projectId = params.id;
@@ -15,21 +14,14 @@ export const load: PageServerLoad = ({ params, url, locals }) => {
     filter: { kind, verb, actor },
     streamed: {
       data: (async () => {
-        const db = await openDatabase();
-        try {
-          const orgId = await getDefaultOrgId(db);
-          const events = await listEventsFiltered(db, {
-            orgId,
-            projectId,
-            subjectKind: kind || null,
-            verb: verb || null,
-            actorId: actor || null,
-            limit: 20,
-          });
-          return { events };
-        } finally {
-          await db.close();
-        }
+        const { em, ctx } = await requestAppScope(locals, projectId);
+        const events = await listProjectActivityEvents(em, ctx, {
+          subjectKind: kind,
+          verb,
+          actorId: actor,
+          limit: 20,
+        });
+        return { events };
       })(),
     },
   };

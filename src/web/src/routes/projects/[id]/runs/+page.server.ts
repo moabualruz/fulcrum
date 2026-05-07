@@ -1,7 +1,8 @@
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
-import { openDatabase, getDefaultOrgId } from "$lib/server/db";
-import { loadProjectRuns } from "$lib/server/orchestration";
+import { listProjectRuns } from "../../../../../../application/runs/queries.ts";
+import { getProjectOrNull } from "../../../../../../application/projects/queries.ts";
+import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = ({ params, locals }) => {
   return {
@@ -9,20 +10,11 @@ export const load: PageServerLoad = ({ params, locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const db = await openDatabase();
-        try {
-          const orgId = await getDefaultOrgId(db);
-          // Verify project exists
-          const projectRows = await db.query<{ id: string }>(
-            `SELECT id FROM projects WHERE id = $1 AND org_id = $2`,
-            [params.id, orgId],
-          );
-          if (projectRows.length === 0) throw error(404, "Project not found");
-          const runs = await loadProjectRuns(db, orgId, params.id);
-          return { runs };
-        } finally {
-          await db.close();
-        }
+        const { em, ctx } = await requestAppScope(locals, params.id);
+        const project = await getProjectOrNull(em, ctx, params.id);
+        if (!project) throw error(404, "Project not found");
+        const runs = await listProjectRuns(em, ctx);
+        return { runs };
       })(),
     },
   };

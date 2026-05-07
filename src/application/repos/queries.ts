@@ -2,6 +2,7 @@ import type { EntityManager } from "@mikro-orm/postgresql";
 import { Repo } from "../../db/entities/repos/Repo.ts";
 import { RepoTreeEntry } from "../../db/entities/repos/RepoTreeEntry.ts";
 import { AppForbiddenError, AppNotFoundError } from "../errors.ts";
+import { ormSqlConnection } from "../orm-helpers.ts";
 import type { AppContext, RepoDto, RepoTreeEntryDto } from "./types.ts";
 
 export async function listRepos(em: EntityManager, ctx: AppContext): Promise<RepoDto[]> {
@@ -26,4 +27,51 @@ export function serializeRepo(repo: Repo): RepoDto {
 
 export function serializeRepoTreeEntry(row: RepoTreeEntry): RepoTreeEntryDto {
   return { id: row.id, orgId: row.org.id, repoId: row.repo.id, commitSha: row.commitSha, path: row.path, kind: row.kind };
+}
+
+export interface ProjectRepoCard {
+  id: string;
+  name: string;
+  slug: string;
+  kind: "local" | "remote";
+  currentBranch: string | null;
+  syncStatus: "idle" | "syncing" | "error";
+  remoteUrl: string | null;
+  localPath: string | null;
+  openTaskCount: number;
+  lastCommits: Array<{ subject: string; relativeTime: string }>;
+}
+
+interface ProjectRepoRow {
+  id: string;
+  name: string | null;
+  slug: string;
+  kind: string | null;
+  current_branch: string | null;
+  sync_status: string | null;
+  remote_url: string | null;
+  local_path: string | null;
+}
+
+export async function listProjectRepoCards(em: EntityManager, ctx: AppContext): Promise<ProjectRepoCard[]> {
+  const rows = await ormSqlConnection(em).execute<ProjectRepoRow[]>(
+    `SELECT id, name, slug, kind, current_branch, sync_status, remote_url, local_path
+       FROM repos
+      WHERE org_id = $1
+        AND project_id = $2
+      ORDER BY name ASC, slug ASC`,
+    [ctx.orgId, ctx.projectId ?? null],
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name || row.slug,
+    slug: row.slug,
+    kind: row.kind === "remote" ? "remote" : "local",
+    currentBranch: row.current_branch,
+    syncStatus: row.sync_status === "syncing" || row.sync_status === "error" ? row.sync_status : "idle",
+    remoteUrl: row.remote_url,
+    localPath: row.local_path,
+    openTaskCount: 0,
+    lastCommits: [],
+  }));
 }
