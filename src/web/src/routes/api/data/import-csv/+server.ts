@@ -3,13 +3,9 @@
 // Gated behind FULCRUM_FEATURES=import-csv.
 
 import type { RequestHandler } from "@sveltejs/kit";
-import { join } from "node:path";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { requestAppScope } from "$lib/server/application-scope";
 import { isFeatureEnabled } from "../../../../../../data/features.ts";
-import { importCsv } from "../../../../../../data/csv-import.ts";
-import { createTask } from "../../../../../../application/tasks/commands.ts";
+import { importTasksFromCsvUpload } from "../../../../../../application/tasks/csv.ts";
 
 function jsonError(msg: string, status = 400): Response {
   return new Response(JSON.stringify({ error: msg }), {
@@ -47,47 +43,18 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     return jsonError("columnMap is not valid JSON");
   }
 
-  // Write upload to tmp file
-  const dir = await mkdtemp(join(tmpdir(), "fulcrum-import-"));
-  const csvPath = join(dir, "upload.csv");
   try {
-    const bytes = await file.arrayBuffer();
-    await writeFile(csvPath, Buffer.from(bytes));
-
-    let parsed;
-    try {
-      parsed = await importCsv(csvPath, columnMap, { dryRun: false });
-    } catch (err) {
-      await rm(dir, { recursive: true, force: true });
-      return jsonError((err as Error).message);
-    }
-
     const { em, ctx } = await requestAppScope(locals);
-
-    let written = 0;
-    for (const record of parsed.records) {
-      await createTask(em, ctx, {
-        title: record["title"] as string,
-        status: record["status"] ?? "pending",
-        description: record["description"] ?? null,
-        priority: record["priority"] ? Number(record["priority"]) : 0,
-      });
-      written++;
-    }
-
-    await rm(dir, { recursive: true, force: true });
+    const result = await importTasksFromCsvUpload(em, ctx, {
+      bytes: await file.arrayBuffer(),
+      columnMap,
+    });
 
     return new Response(
-      JSON.stringify({
-        total: parsed.total,
-        written,
-        skipped: parsed.skipped,
-        skipped_records: parsed.skipped_records,
-      }),
+      JSON.stringify(result),
       { headers: { "content-type": "application/json" } },
     );
   } catch (err) {
-    await rm(dir, { recursive: true, force: true });
-    throw err;
+    return jsonError((err as Error).message);
   }
 };

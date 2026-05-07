@@ -29,8 +29,7 @@ const SURFACES: Surface[] = [
   {
     name: "projects",
     file: "projects/+page.server.ts",
-    applicationModule: null,
-    helperModule: "$lib/product-queries",
+    applicationModule: "application/projects/queries",
     keys: ["activeProjectId", "streamed", "data", "projects"],
   },
   {
@@ -105,6 +104,16 @@ const FORBIDDEN_RUNTIME_BOUNDARY = new RegExp(
   "g",
 );
 
+const FORBIDDEN_WEB_ROUTE_ORCHESTRATION = new RegExp(
+  [
+    `from\\s+["'][^"']*data/(csv-import|csv-export)["']`,
+    `for\\s*\\([^)]*of\\s+parsed\\.records\\)`,
+    `mkdtemp\\(`,
+    `writeFile\\(`,
+    `Bun\\.file\\(`,
+  ].join("|"),
+);
+
 function source(file: string): string {
   return readFileSync(join(routesRoot, file), "utf8");
 }
@@ -119,6 +128,7 @@ describe("web route application adapters", () => {
       const text = source(surface.file);
       const matches = [...text.matchAll(FORBIDDEN_RUNTIME_BOUNDARY)].map((match) => match[0]);
       expect(matches, `${surface.file} boundary violations: ${matches.join(", ")}`).toEqual([]);
+      expect(text, `${surface.file} should call an application facade instead of owning CSV/file orchestration`).not.toMatch(FORBIDDEN_WEB_ROUTE_ORCHESTRATION);
     });
   }
 

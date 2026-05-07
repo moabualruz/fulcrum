@@ -7,7 +7,7 @@ import { DEFAULT_ORG_ID } from "../../db/seed.ts";
 import { createTestOrm, type TestOrm } from "../../test-utils/db.ts";
 import { AppForbiddenError, AppNotFoundError, AppValidationError } from "../errors.ts";
 import { createTask, deleteTask, setDependencies, setParent, updateTask } from "./commands.ts";
-import { getTask, listTasks } from "./queries.ts";
+import { getTask, listChildren, listTasks } from "./queries.ts";
 import type { AppContext } from "./types.ts";
 
 const USER_ID = "00000000-0000-0000-0000-000000000010";
@@ -176,5 +176,21 @@ describe("application tasks commands and queries", () => {
     const listed = await listTasks(em, projectCtx(PROJECT_A_ID));
 
     expect(listed.map((task) => task.id)).toEqual([projectA.id]);
+  });
+
+  test("project-scoped listChildren hides cross-project children", async () => {
+    const testDb = await freshDb();
+    const em = testDb.em.fork();
+    await seedProjects(testDb);
+    const parent = await createTask(em, projectCtx(PROJECT_A_ID), { title: "Project A parent" });
+    const visibleChild = await createTask(em, projectCtx(PROJECT_A_ID), { title: "Project A child" });
+    const hiddenChild = await createTask(em, projectCtx(PROJECT_B_ID), { title: "Project B child" });
+
+    await setParent(em, ctx(), visibleChild.id, parent.id);
+    await setParent(em, ctx(), hiddenChild.id, parent.id);
+
+    const children = await listChildren(em, projectCtx(PROJECT_A_ID), parent.id);
+
+    expect(children.map((task) => task.id)).toEqual([visibleChild.id]);
   });
 });

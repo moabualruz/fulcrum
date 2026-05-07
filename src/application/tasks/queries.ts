@@ -35,7 +35,12 @@ export async function listChildren(
   const parent = await findVisibleTask(em, ctx, taskId);
   const repo = em.getRepository(Task) as TaskRepository;
   const children = await repo.find(
-    { org: ctx.orgId, parent: parent.id, deletedAt: null } as never,
+    {
+      org: ctx.orgId,
+      parent: parent.id,
+      ...(ctx.projectId ? { projectId: ctx.projectId } : {}),
+      deletedAt: null,
+    } as never,
     { orderBy: { createdAt: "ASC", id: "ASC" } },
   );
   return children.map(serializeTask);
