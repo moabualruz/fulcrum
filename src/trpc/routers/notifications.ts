@@ -1,8 +1,29 @@
+import type { EntityManager } from "@mikro-orm/postgresql";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import {
+  createNotificationRule,
+  deleteNotificationRule,
+  markAllNotificationsRead,
+  markNotificationRead as markNotificationReadCommand,
+  muteNotificationSubject,
+  setNotificationQuietHours,
+  unmuteNotificationSubject,
+  updateNotificationRule,
+  upsertPushSubscription,
+} from "../../application/notifications/commands.ts";
+import {
+  getNotificationQuietHours,
+  getNotificationRule,
+  listNotificationMutes,
+  listNotificationRules,
+  listNotifications,
+  unreadNotificationCount,
+} from "../../application/notifications/queries.ts";
+import type { AppContext } from "../../application/notifications/types.ts";
+import { AppNotFoundError } from "../../application/errors.ts";
 import { permissionedProcedure } from "../middleware.ts";
-import { t } from "../trpc.ts";
 import {
   ChannelNameSchema,
   DeliveryModeSchema,
@@ -14,8 +35,8 @@ import {
   QuietHoursSetInputSchema,
   SubjectInputSchema,
 } from "../schemas/notifications.ts";
+import { t } from "../trpc.ts";
 
-type EntityManager = import("@mikro-orm/postgresql").EntityManager;
 type AuthCtx = { em: EntityManager | null; orgId: string; userId: string };
 type NotificationCountRow = { orgId?: string; org?: string | { id?: string }; userId: string; readAt: Date | null };
 type NotificationReadRow = { readAt: Date | null };
@@ -99,126 +120,29 @@ export function markNotificationRead(row: NotificationReadRow, now = new Date())
   return true;
 }
 
-function requireEm(ctx: AuthCtx): EntityManager {
-  if (!ctx.em) {
+function requireEm(context: AuthCtx): EntityManager {
+  if (!context.em) {
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
       message: "EntityManager not available in tRPC context.",
     });
   }
-  return ctx.em;
+  return context.em;
 }
 
-async function entities() {
-  return import("../../db/entities/notifications/index.ts");
-}
-
-async function orgClass() {
-  return (await import("../../db/entities/auth/Org.ts")).Org;
-}
-
-function notificationToOutput(row: any) {
-  return {
-    id: row.id,
-    orgId: row.org?.id ?? row.org,
-    userId: row.userId,
-    ruleId: row.ruleId ?? null,
-    eventId: row.eventId,
-    title: row.title,
-    body: row.body,
-    entityKind: row.entityKind,
-    entityId: row.entityId,
-    read: row.readAt !== null,
-    readAt: row.readAt ?? null,
-    createdAt: row.createdAt,
-  };
-}
-
-function ruleToOutput(row: any) {
-  const timing = ruleTiming(row.eventPattern ?? {});
-  return {
-    id: row.id,
-    orgId: row.org?.id ?? row.org,
-    userId: row.userId,
-    name: row.name ?? "",
-    subjectKind: row.subjectKind ?? null,
-    active: row.active,
-    eventPattern: row.eventPattern ?? {},
-    channels: row.channels ?? [],
-    enabled: row.enabled,
-    deliveryMode: timing.deliveryMode,
-    digestWindowSeconds: timing.digestWindowSeconds,
-    delaySeconds: timing.delaySeconds,
-    critical: timing.critical,
-    createdAt: row.createdAt ?? new Date(0),
-    updatedAt: row.updatedAt ?? new Date(0),
-  };
-}
-
-function muteToOutput(row: any) {
-  return {
-    id: row.id,
-    orgId: row.org?.id ?? row.org,
-    userId: row.userId,
-    subjectKind: row.subjectKind,
-    subjectId: row.subjectId,
-    mutedUntil: row.mutedUntil ?? null,
-  };
-}
-
-function quietHoursToOutput(row: any) {
-  return {
-    id: row.id,
-    orgId: row.org?.id ?? row.org,
-    userId: row.userId,
-    tz: row.tz,
-    startHour: row.startHour,
-    endHour: row.endHour,
-    daysOfWeek: (row.daysOfWeek ?? []).map(Number),
-  };
-}
-
-async function findOrgRef(em: EntityManager, orgId: string) {
-  const Org = await orgClass();
-  return em.findOneOrFail(Org, { id: orgId });
+function appContext(ctx: AuthCtx): AppContext {
+  return { orgId: ctx.orgId, userId: ctx.userId };
 }
 
 function notificationOrgId(row: NotificationCountRow): string | undefined {
   return typeof row.org === "object" ? row.org.id : row.org ?? row.orgId;
 }
 
-function ruleTiming(pattern: Record<string, unknown>) {
-  const deliveryMode = DeliveryModeSchema.catch("immediate").parse(pattern["deliveryMode"]);
-  return {
-    deliveryMode,
-    digestWindowSeconds: typeof pattern["digestWindowSeconds"] === "number" ? pattern["digestWindowSeconds"] : null,
-    delaySeconds: typeof pattern["delaySeconds"] === "number" ? pattern["delaySeconds"] : null,
-    critical: pattern["critical"] === true,
-  };
-}
-
-function withRuleTiming(
-  pattern: Record<string, unknown>,
-  input: {
-    deliveryMode?: "immediate" | "digest" | "delayed";
-    digestWindowSeconds?: number | null;
-    delaySeconds?: number | null;
-    critical?: boolean;
-  },
-): Record<string, unknown> {
-  const next = { ...pattern };
-  if (input.deliveryMode !== undefined) next["deliveryMode"] = input.deliveryMode;
-  if (input.digestWindowSeconds !== undefined) {
-    if (input.digestWindowSeconds === null) delete next["digestWindowSeconds"];
-    else next["digestWindowSeconds"] = input.digestWindowSeconds;
+function mapAppError(error: unknown): never {
+  if (error instanceof AppNotFoundError) {
+    throw new TRPCError({ code: "NOT_FOUND", message: error.message });
   }
-  if (input.delaySeconds !== undefined) {
-    if (input.delaySeconds === null) delete next["delaySeconds"];
-    else next["delaySeconds"] = input.delaySeconds;
-  }
-  if (input.critical !== undefined) next["critical"] = input.critical;
-  if (next["deliveryMode"] === "digest" && next["digestWindowSeconds"] === undefined) next["digestWindowSeconds"] = 300;
-  return next;
+  throw error;
 }
 
 export const notificationsRouter = t.router({
@@ -226,228 +150,78 @@ export const notificationsRouter = t.router({
     .input(ListNotificationsInputSchema.default({ limit: 50, offset: 0 }))
     .output(NotificationListOutputSchema)
     .query(async ({ ctx, input }) => {
-      const em = requireEm(ctx);
-      const { Notification } = await entities();
-      const where: Record<string, unknown> = {
-        org: ctx.orgId,
-        userId: ctx.userId,
-      };
-      if (input.unread) where["readAt"] = null;
-
-      const [items, total] = await em.findAndCount(Notification, where as any, {
-        limit: input.limit,
-        offset: input.offset,
-        orderBy: { createdAt: "DESC" } as any,
-      });
-
-      return { items: items.map(notificationToOutput), total };
+      try {
+        return await listNotifications(requireEm(ctx), appContext(ctx), input);
+      } catch (error) {
+        return mapAppError(error);
+      }
     }),
 
   unreadCount: permissionedProcedure({ resource: "notify", action: "unreadCount" })
     .output(z.object({ count: z.number().int().nonnegative() }))
-    .query(async ({ ctx }) => {
-      const em = requireEm(ctx);
-      const { Notification } = await entities();
-      const count = await em.count(Notification, {
-        org: ctx.orgId,
-        userId: ctx.userId,
-        readAt: null,
-      } as any);
-      return { count };
-    }),
+    .query(async ({ ctx }) => ({ count: await unreadNotificationCount(requireEm(ctx), appContext(ctx)) })),
 
   markRead: permissionedProcedure({ resource: "notify", action: "markRead" })
     .input(IdInputSchema)
     .output(NotificationOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      const em = requireEm(ctx);
-      const { Notification } = await entities();
-      const row = await em.findOne(Notification, {
-        id: input.id,
-        org: ctx.orgId,
-        userId: ctx.userId,
-      } as any);
-      if (!row) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Notification not found." });
+      try {
+        return await markNotificationReadCommand(requireEm(ctx), appContext(ctx), input.id);
+      } catch (error) {
+        return mapAppError(error);
       }
-      markNotificationRead(row as any);
-      await em.flush();
-      return notificationToOutput(row);
     }),
 
   markAllRead: permissionedProcedure({ resource: "notify", action: "markAllRead" })
     .output(z.object({ count: z.number().int().nonnegative() }))
-    .mutation(async ({ ctx }) => {
-      const em = requireEm(ctx);
-      const { Notification } = await entities();
-      const rows = await em.find(Notification, {
-        org: ctx.orgId,
-        userId: ctx.userId,
-        readAt: null,
-      } as any);
-      const now = new Date();
-      for (const row of rows) (row as any).readAt = now;
-      await em.flush();
-      return { count: rows.length };
-    }),
+    .mutation(async ({ ctx }) => markAllNotificationsRead(requireEm(ctx), appContext(ctx))),
 
   mute: permissionedProcedure({ resource: "notify", action: "mute" })
     .input(MuteInputSchema)
     .output(MuteOutputSchema)
-    .mutation(async ({ ctx, input }) => {
-      const em = requireEm(ctx);
-      const { NotificationMute } = await entities();
-      const existing = await em.findOne(NotificationMute, {
-        org: ctx.orgId,
-        userId: ctx.userId,
-        subjectKind: input.subjectKind,
-        subjectId: input.subjectId,
-      } as any);
-      const row = existing ?? em.create(NotificationMute, {
-        org: await findOrgRef(em, ctx.orgId),
-        userId: ctx.userId,
-        subjectKind: input.subjectKind,
-        subjectId: input.subjectId,
-      } as any);
-      (row as any).mutedUntil = input.mutedUntil ?? null;
-      em.persist(row);
-      await em.flush();
-      return muteToOutput(row);
-    }),
+    .mutation(async ({ ctx, input }) => muteNotificationSubject(requireEm(ctx), appContext(ctx), input)),
 
   mutes: t.router({
     list: permissionedProcedure({ resource: "notify", action: "list" })
       .output(z.array(MuteOutputSchema))
-      .query(async ({ ctx }) => {
-        const em = requireEm(ctx);
-        const { NotificationMute } = await entities();
-        const rows = await em.find(NotificationMute, {
-          org: ctx.orgId,
-          userId: ctx.userId,
-        } as any, { orderBy: { subjectKind: "ASC" } as any });
-        return rows.map(muteToOutput);
-      }),
+      .query(async ({ ctx }) => listNotificationMutes(requireEm(ctx), appContext(ctx))),
   }),
 
   unmute: permissionedProcedure({ resource: "notify", action: "unmute" })
     .input(SubjectInputSchema)
     .output(z.object({ ok: z.literal(true) }))
-    .mutation(async ({ ctx, input }) => {
-      const em = requireEm(ctx);
-      const { NotificationMute } = await entities();
-      const row = await em.findOne(NotificationMute, {
-        org: ctx.orgId,
-        userId: ctx.userId,
-        subjectKind: input.subjectKind,
-        subjectId: input.subjectId,
-      } as any);
-      if (row) em.remove(row);
-      await em.flush();
-      return { ok: true };
-    }),
+    .mutation(async ({ ctx, input }) => unmuteNotificationSubject(requireEm(ctx), appContext(ctx), input)),
 
   rules: t.router({
     list: permissionedProcedure({ resource: "notify", action: "list" })
       .output(z.array(NotificationRuleOutputSchema))
-      .query(async ({ ctx }) => {
-        const em = requireEm(ctx);
-        const { NotificationRule } = await entities();
-        const rows = await em.find(NotificationRule, {
-          org: ctx.orgId,
-          userId: ctx.userId,
-        } as any, { orderBy: { name: "ASC" } as any });
-        return rows.map(ruleToOutput);
-      }),
+      .query(async ({ ctx }) => listNotificationRules(requireEm(ctx), appContext(ctx))),
 
     get: permissionedProcedure({ resource: "notify", action: "get" })
       .input(IdInputSchema)
       .output(NotificationRuleOutputSchema.nullable())
-      .query(async ({ ctx, input }) => {
-        const em = requireEm(ctx);
-        const { NotificationRule } = await entities();
-        const row = await em.findOne(NotificationRule, {
-          id: input.id,
-          org: ctx.orgId,
-          userId: ctx.userId,
-        } as any);
-        return row ? ruleToOutput(row) : null;
-      }),
+      .query(async ({ ctx, input }) => getNotificationRule(requireEm(ctx), appContext(ctx), input.id)),
 
     create: permissionedProcedure({ resource: "notify", action: "create" })
       .input(NotificationRuleCreateInputSchema)
       .output(NotificationRuleOutputSchema)
-      .mutation(async ({ ctx, input }) => {
-        const em = requireEm(ctx);
-        const { NotificationRule } = await entities();
-        const now = new Date();
-      const eventPattern = withRuleTiming(input.eventPattern, input);
-      const row = em.create(NotificationRule, {
-          org: await findOrgRef(em, ctx.orgId),
-          userId: ctx.userId,
-          name: input.name,
-          subjectKind: input.subjectKind ?? null,
-          active: input.enabled,
-          eventPattern,
-          channels: input.channels,
-          enabled: input.enabled,
-          createdAt: now,
-          updatedAt: now,
-        } as any);
-        em.persist(row);
-        await em.flush();
-        return ruleToOutput(row);
-      }),
+      .mutation(async ({ ctx, input }) => createNotificationRule(requireEm(ctx), appContext(ctx), input)),
 
     update: permissionedProcedure({ resource: "notify", action: "update" })
       .input(NotificationRuleUpdateInputSchema)
       .output(NotificationRuleOutputSchema)
       .mutation(async ({ ctx, input }) => {
-        const em = requireEm(ctx);
-        const { NotificationRule } = await entities();
-        const row = await em.findOne(NotificationRule, {
-          id: input.id,
-          org: ctx.orgId,
-          userId: ctx.userId,
-        } as any);
-        if (!row) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Notification rule not found." });
+        try {
+          return await updateNotificationRule(requireEm(ctx), appContext(ctx), input);
+        } catch (error) {
+          return mapAppError(error);
         }
-        if (input.name !== undefined) (row as any).name = input.name;
-        if (input.subjectKind !== undefined) (row as any).subjectKind = input.subjectKind;
-        if (input.eventPattern !== undefined) (row as any).eventPattern = input.eventPattern;
-        if (
-          input.deliveryMode !== undefined ||
-          input.digestWindowSeconds !== undefined ||
-          input.delaySeconds !== undefined ||
-          input.critical !== undefined
-        ) {
-          (row as any).eventPattern = withRuleTiming((row as any).eventPattern ?? {}, input);
-        }
-        if (input.channels !== undefined) (row as any).channels = input.channels;
-        if (input.enabled !== undefined) {
-          (row as any).enabled = input.enabled;
-          (row as any).active = input.enabled;
-        }
-        (row as any).updatedAt = new Date();
-        await em.flush();
-        return ruleToOutput(row);
       }),
 
     delete: permissionedProcedure({ resource: "notify", action: "delete" })
       .input(IdInputSchema)
       .output(z.object({ ok: z.literal(true) }))
-      .mutation(async ({ ctx, input }) => {
-        const em = requireEm(ctx);
-        const { NotificationRule } = await entities();
-        const row = await em.findOne(NotificationRule, {
-          id: input.id,
-          org: ctx.orgId,
-          userId: ctx.userId,
-        } as any);
-        if (row) em.remove(row);
-        await em.flush();
-        return { ok: true };
-      }),
+      .mutation(async ({ ctx, input }) => deleteNotificationRule(requireEm(ctx), appContext(ctx), input.id)),
   }),
 
   channels: t.router({
@@ -472,14 +246,7 @@ export const notificationsRouter = t.router({
       .output(z.object({ ok: z.literal(true) }))
       .mutation(async ({ ctx, input }) => {
         if (input.channel !== "push" || !input.subscription) return { ok: true };
-
-        const em = requireEm(ctx);
-        const { PushSubscription } = await entities();
-        let parsed: {
-          endpoint?: string;
-          keys?: { p256dh?: string; auth?: string };
-          userAgent?: string;
-        };
+        let parsed: { endpoint?: string; keys?: { p256dh?: string; auth?: string }; userAgent?: string };
         try {
           parsed = JSON.parse(input.subscription) as typeof parsed;
         } catch {
@@ -488,22 +255,11 @@ export const notificationsRouter = t.router({
         if (!parsed.endpoint || !parsed.keys?.p256dh || !parsed.keys.auth) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Push subscription is incomplete." });
         }
-        const existing = await em.findOne(PushSubscription, {
-          org: ctx.orgId,
-          userId: ctx.userId,
+        return upsertPushSubscription(requireEm(ctx), appContext(ctx), {
           endpoint: parsed.endpoint,
-        } as any);
-        const row = existing ?? em.create(PushSubscription, {
-          org: await findOrgRef(em, ctx.orgId),
-          userId: ctx.userId,
-          endpoint: parsed.endpoint,
-        } as any);
-        (row as any).p256dh = parsed.keys.p256dh;
-        (row as any).auth = parsed.keys.auth;
-        (row as any).userAgent = parsed.userAgent ?? null;
-        em.persist(row);
-        await em.flush();
-        return { ok: true };
+          keys: { p256dh: parsed.keys.p256dh, auth: parsed.keys.auth },
+          userAgent: parsed.userAgent,
+        });
       }),
 
     test: permissionedProcedure({ resource: "notify", action: "test" })
@@ -523,37 +279,12 @@ export const notificationsRouter = t.router({
   quietHours: t.router({
     get: permissionedProcedure({ resource: "notify", action: "get" })
       .output(QuietHoursOutputSchema.nullable())
-      .query(async ({ ctx }) => {
-        const em = requireEm(ctx);
-        const { NotificationQuietHours } = await entities();
-        const row = await em.findOne(NotificationQuietHours, {
-          org: ctx.orgId,
-          userId: ctx.userId,
-        } as any);
-        return row ? quietHoursToOutput(row) : null;
-      }),
+      .query(async ({ ctx }) => getNotificationQuietHours(requireEm(ctx), appContext(ctx))),
 
     set: permissionedProcedure({ resource: "notify", action: "set" })
       .input(QuietHoursSetInputSchema)
       .output(QuietHoursOutputSchema)
-      .mutation(async ({ ctx, input }) => {
-        const em = requireEm(ctx);
-        const { NotificationQuietHours } = await entities();
-        const row = await em.findOne(NotificationQuietHours, {
-          org: ctx.orgId,
-          userId: ctx.userId,
-        } as any) ?? em.create(NotificationQuietHours, {
-          org: await findOrgRef(em, ctx.orgId),
-          userId: ctx.userId,
-        } as any);
-        (row as any).tz = input.tz;
-        (row as any).startHour = input.startHour;
-        (row as any).endHour = input.endHour;
-        (row as any).daysOfWeek = input.daysOfWeek;
-        em.persist(row);
-        await em.flush();
-        return quietHoursToOutput(row);
-      }),
+      .mutation(async ({ ctx, input }) => setNotificationQuietHours(requireEm(ctx), appContext(ctx), input)),
   }),
 });
 

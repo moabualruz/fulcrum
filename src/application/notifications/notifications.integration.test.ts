@@ -14,7 +14,7 @@ describe("application notifications", () => {
     try {
       const em = db.em.fork();
       const notification = await createNotification(em, ctx, { eventId: "33333333-3333-4333-8333-333333333333", entityKind: "task", entityId: "44444444-4444-4444-8444-444444444444", title: "Assigned" });
-      expect(await listNotifications(em, ctx, { unread: true })).toHaveLength(1);
+      expect(await listNotifications(em, ctx, { unread: true, limit: 50, offset: 0 })).toMatchObject({ total: 1 });
       await markNotificationRead(em, ctx, notification.id);
       await expect(getNotification(em, ctx, notification.id)).resolves.toMatchObject({ id: notification.id, read: true });
       await expect(getNotification(em, ctx, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")).rejects.toBeInstanceOf(AppNotFoundError);

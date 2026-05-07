@@ -117,17 +117,11 @@ const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES = [
   "src/server/trpc/routers/audit.ts",
   "src/server/trpc/routers/auth.ts",
   "src/server/trpc/routers/automations.ts",
-  "src/server/trpc/routers/comments.ts",
   "src/server/trpc/routers/custom-fields.ts",
-  "src/server/trpc/routers/doc-templates.ts",
-  "src/server/trpc/routers/docs.ts",
   "src/server/trpc/routers/memory.ts",
   "src/server/trpc/routers/orgs.ts",
   "src/server/trpc/routers/routing.ts",
-  "src/server/trpc/routers/skills.ts",
-  "src/server/trpc/routers/sprints.ts",
   "src/server/trpc/routers/tasks.ts",
-  "src/server/trpc/routers/templates.ts",
   "src/server/trpc/routers/workflows.ts",
   "src/trpc/routers/agents.ts",
   "src/trpc/routers/doc-comments.ts",
@@ -144,6 +138,15 @@ const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES = [
   "src/web/src/lib/server/em.ts",
   "src/web/src/routes/docs/new/+page.server.ts",
   "src/web/src/routes/runs/[id]/+page.server.ts",
+];
+
+const PLAN21_ROUTER_FILES = [
+  "src/server/trpc/routers/comments.ts",
+  "src/server/trpc/routers/doc-templates.ts",
+  "src/server/trpc/routers/docs.ts",
+  "src/server/trpc/routers/skills.ts",
+  "src/server/trpc/routers/sprints.ts",
+  "src/server/trpc/routers/templates.ts",
 ];
 
 async function collectSourceFiles(root: string): Promise<string[]> {
@@ -197,6 +200,15 @@ async function residualDirectAccessViolations(): Promise<string[]> {
   return Array.from(new Set(found)).sort();
 }
 
+async function directAccessInExactFiles(files: readonly string[]): Promise<string[]> {
+  const found: string[] = [];
+  for (const file of files) {
+    const text = await readFile(file, "utf8");
+    if (FORBIDDEN_RESIDUAL_DIRECT_ACCESS.test(text)) found.push(file);
+  }
+  return found.sort();
+}
+
 async function testFixtureViolations(roots: readonly string[], pattern: RegExp): Promise<string[]> {
   const files = Array.from(new Set((await Promise.all(roots.map(collectTestFiles))).flat()));
   const found: string[] = [];
@@ -238,5 +250,9 @@ describe("Phase 9.5 interface boundary", () => {
     const found = await residualDirectAccessViolations();
     expect(RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS.size).toBe(3);
     expect(found).toEqual(EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES);
+  });
+
+  test("Plan 21 docs comments templates skills and sprints tRPC routers delegate persistence to application modules", async () => {
+    expect(await directAccessInExactFiles(PLAN21_ROUTER_FILES)).toEqual([]);
   });
 });

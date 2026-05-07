@@ -1,12 +1,33 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { Event } from "../../db/entities/core/Event.ts";
-import { Notification } from "../../db/entities/notifications/Notification.ts";
+import {
+  Notification,
+  NotificationMute,
+  NotificationQuietHours,
+  NotificationRule,
+} from "../../db/entities/notifications/index.ts";
 import { AppForbiddenError, AppNotFoundError } from "../errors.ts";
-import type { AppContext, NotificationDto } from "./types.ts";
+import type {
+  AppContext,
+  ListNotificationsInput,
+  NotificationDto,
+  NotificationListDto,
+  NotificationMuteDto,
+  NotificationQuietHoursDto,
+  NotificationRuleDto,
+} from "./types.ts";
 
-export async function listNotifications(em: EntityManager, ctx: AppContext, input: { unread?: boolean } = {}): Promise<NotificationDto[]> {
-  const rows = await em.find(Notification, { org: ctx.orgId, userId: ctx.userId, ...(input.unread ? { readAt: null } : {}) } as never, { orderBy: { createdAt: "DESC", id: "ASC" } });
-  return rows.map(serializeNotification);
+export async function listNotifications(
+  em: EntityManager,
+  ctx: AppContext,
+  input: ListNotificationsInput = { limit: 50, offset: 0 },
+): Promise<NotificationListDto> {
+  const rows = await em.findAndCount(
+    Notification,
+    { org: ctx.orgId, userId: ctx.userId, ...(input.unread ? { readAt: null } : {}) } as never,
+    { limit: input.limit, offset: input.offset, orderBy: { createdAt: "DESC", id: "ASC" } },
+  );
+  return { items: rows[0].map(serializeNotification), total: rows[1] };
 }
 
 export async function countRecentNotifications(
@@ -28,5 +49,101 @@ export async function getNotification(em: EntityManager, ctx: AppContext, id: st
 }
 
 export function serializeNotification(row: Notification): NotificationDto {
-  return { id: row.id, orgId: row.org.id, userId: row.userId, title: row.title, read: row.readAt !== null };
+  return {
+    id: row.id,
+    orgId: row.org.id,
+    userId: row.userId,
+    ruleId: row.ruleId ?? null,
+    eventId: row.eventId,
+    title: row.title,
+    body: row.body,
+    entityKind: row.entityKind,
+    entityId: row.entityId,
+    read: row.readAt !== null,
+    readAt: row.readAt ?? null,
+    createdAt: row.createdAt,
+  };
+}
+
+export async function unreadNotificationCount(em: EntityManager, ctx: AppContext): Promise<number> {
+  return em.count(Notification, { org: ctx.orgId, userId: ctx.userId, readAt: null } as never);
+}
+
+export async function listNotificationMutes(em: EntityManager, ctx: AppContext): Promise<NotificationMuteDto[]> {
+  const rows = await em.find(NotificationMute, { org: ctx.orgId, userId: ctx.userId } as never, { orderBy: { subjectKind: "ASC" } });
+  return rows.map(serializeMute);
+}
+
+export async function listNotificationRules(em: EntityManager, ctx: AppContext): Promise<NotificationRuleDto[]> {
+  const rows = await em.find(NotificationRule, { org: ctx.orgId, userId: ctx.userId } as never, { orderBy: { name: "ASC" } });
+  return rows.map(serializeRule);
+}
+
+export async function getNotificationRule(em: EntityManager, ctx: AppContext, id: string): Promise<NotificationRuleDto | null> {
+  const row = await em.findOne(NotificationRule, { id, org: ctx.orgId, userId: ctx.userId } as never);
+  return row ? serializeRule(row) : null;
+}
+
+export async function getNotificationQuietHours(
+  em: EntityManager,
+  ctx: AppContext,
+): Promise<NotificationQuietHoursDto | null> {
+  const row = await em.findOne(NotificationQuietHours, { org: ctx.orgId, userId: ctx.userId } as never);
+  return row ? serializeQuietHours(row) : null;
+}
+
+export function serializeRule(row: NotificationRule): NotificationRuleDto {
+  const timing = ruleTiming(row.eventPattern ?? {});
+  return {
+    id: row.id,
+    orgId: row.org.id,
+    userId: row.userId,
+    name: row.name ?? "",
+    subjectKind: row.subjectKind ?? null,
+    active: row.active,
+    eventPattern: row.eventPattern ?? {},
+    channels: row.channels ?? [],
+    enabled: row.enabled,
+    deliveryMode: timing.deliveryMode,
+    digestWindowSeconds: timing.digestWindowSeconds,
+    delaySeconds: timing.delaySeconds,
+    critical: timing.critical,
+    createdAt: row.createdAt ?? new Date(0),
+    updatedAt: row.updatedAt ?? new Date(0),
+  };
+}
+
+export function serializeMute(row: NotificationMute): NotificationMuteDto {
+  return {
+    id: row.id,
+    orgId: row.org.id,
+    userId: row.userId,
+    subjectKind: row.subjectKind,
+    subjectId: row.subjectId,
+    mutedUntil: row.mutedUntil ?? null,
+  };
+}
+
+export function serializeQuietHours(row: NotificationQuietHours): NotificationQuietHoursDto {
+  return {
+    id: row.id,
+    orgId: row.org.id,
+    userId: row.userId,
+    tz: row.tz,
+    startHour: row.startHour,
+    endHour: row.endHour,
+    daysOfWeek: (row.daysOfWeek ?? []).map(Number),
+  };
+}
+
+export function ruleTiming(pattern: Record<string, unknown>) {
+  const deliveryMode = pattern["deliveryMode"] === "digest" || pattern["deliveryMode"] === "delayed"
+    ? pattern["deliveryMode"]
+    : "immediate";
+  return {
+    deliveryMode,
+    digestWindowSeconds: typeof pattern["digestWindowSeconds"] === "number" ? pattern["digestWindowSeconds"] : null,
+    delaySeconds: typeof pattern["delaySeconds"] === "number" ? pattern["delaySeconds"] : null,
+    critical: pattern["critical"] === true,
+  };
 }
