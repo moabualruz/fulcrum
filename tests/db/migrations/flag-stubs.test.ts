@@ -125,21 +125,18 @@ describe("WebhookSubscription entity metadata", () => {
     expect(meta.tableName).toBe("webhook_subscriptions");
   });
 
-  it("has C10-minimum columns: id + org ManyToOne + active (index axes only)", () => {
-    // C10 stub ceiling: id + org FK + columns-in-composite-index.
-    // Index: (org, active). Domain fields (url, events, secret, created_at)
-    // deferred to Pillar 10 own-migration. Trimmed per P1#03 follow-up.
+  it("has outbound webhook delivery columns", () => {
     const meta = orm.getMetadata().get(WebhookSubscription);
     expect(meta.properties["id"]).toBeDefined();
     expect(meta.properties["org"]).toBeDefined();
     expect(meta.properties["org"]!.kind).toBe(ReferenceKind.MANY_TO_ONE);
     expect(meta.properties["active"]).toBeDefined();
-    // Ensure trimmed columns are NOT present at this stub stage.
-    // Cast to Record to allow indexing by removed property names (TS7053 guard).
     const props = meta.properties as Record<string, unknown>;
-    expect(props["url"]).toBeUndefined();
-    expect(props["events"]).toBeUndefined();
-    expect(props["secret"]).toBeUndefined();
+    expect(props["url"]).toBeDefined();
+    expect(props["events"]).toBeDefined();
+    expect(props["encryptedSecret"]).toBeDefined();
+    expect(props["createdAt"]).toBeDefined();
+    expect(props["updatedAt"]).toBeDefined();
   });
 
   it("count() === 0 on fresh schema", async () => {

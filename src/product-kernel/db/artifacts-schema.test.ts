@@ -6,8 +6,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "./pglite.ts";
-import { migrateIsolatedStore } from "./migrate.ts";
+import { openIsolatedStore, migrateIsolatedStore } from "../../test-support/product-fixtures.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-artifacts-schema-"));
 

@@ -77,10 +77,10 @@ export const searchRouter = t.router({
       const orgId = ctx.orgId;
       if (!orgId) return { results: [], total: 0 };
 
-      // Prefer container-injected service; fall back to direct construction via deprecated db
+      // Prefer container injection; fall back to the neutral legacy SQL executor.
       const svc =
         (ctx.container?.get(SearchQueryService) as SearchQueryService | undefined) ??
-        (ctx.db ? new SearchQueryService(ctx.db) : null);
+        (ctx.legacyStore ? new SearchQueryService(ctx.legacyStore) : null);
       if (!svc) return { results: [], total: 0 };
 
       return svc.query(orgId, input);
@@ -101,7 +101,7 @@ export const searchRouter = t.router({
 
       const svc =
         (ctx.container?.get(SearchQueryService) as SearchQueryService | undefined) ??
-        (ctx.db ? new SearchQueryService(ctx.db) : null);
+        (ctx.legacyStore ? new SearchQueryService(ctx.legacyStore) : null);
       if (!svc) return { suggestions: [] };
 
       const suggestions = await svc.suggest(orgId, input.term, input.limit);
@@ -145,7 +145,7 @@ export const searchRouter = t.router({
 
       const svc =
         (ctx.container?.get(SnapshotService) as SnapshotService | undefined) ??
-        (ctx.db ? new SnapshotService(ctx.db) : null);
+        (ctx.legacyStore ? new SnapshotService(ctx.legacyStore) : null);
       if (!svc) return { snapshot: "" };
 
       const snapshot = await svc.buildSnapshot(orgId);
@@ -176,9 +176,9 @@ export const searchRouter = t.router({
       }
 
       const { recordSearchClick } = await import("../../search/click-telemetry.ts");
-      if (!ctx.db || !ctx.orgId) return { recorded: false };
+      if (!ctx.legacyStore || !ctx.orgId) return { recorded: false };
 
-      await recordSearchClick(ctx.db, {
+      await recordSearchClick(ctx.legacyStore, {
         orgId: ctx.orgId,
         query: input.query,
         filters: input.filters,

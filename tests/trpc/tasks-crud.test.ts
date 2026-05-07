@@ -118,7 +118,9 @@ describe("tasks CRUD tRPC baseline", () => {
       expect(deleted!.deletedAt).toBeInstanceOf(Date);
 
       expect(await caller.tasks.list()).toEqual([]);
-      expect(await caller.tasks.get({ id: created.id })).toBeNull();
+      await expect(caller.tasks.get({ id: created.id })).rejects.toMatchObject({
+        code: "NOT_FOUND",
+      });
       expect(await caller.tasks.list({ includeDeleted: true })).toHaveLength(1);
     } finally {
       await db.close();
@@ -137,9 +139,15 @@ describe("tasks CRUD tRPC baseline", () => {
         status: "todo",
       });
 
-      expect(await otherOrgCaller.tasks.get({ id: created.id })).toBeNull();
-      expect(await otherOrgCaller.tasks.update({ id: created.id, title: "Nope" })).toBeNull();
-      expect(await otherOrgCaller.tasks.delete({ id: created.id })).toBeNull();
+      await expect(otherOrgCaller.tasks.get({ id: created.id })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      await expect(otherOrgCaller.tasks.update({ id: created.id, title: "Nope" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      await expect(otherOrgCaller.tasks.delete({ id: created.id })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
       expect((await caller.tasks.get({ id: created.id }))?.title).toBe("Org scoped task");
     } finally {
       await db.close();
@@ -366,6 +374,10 @@ describe("tasks bulk operations tRPC", () => {
       const caller = callerFor(repo);
       const projectId = "33333333-3333-4333-8333-333333333333";
       const sprintId = "44444444-4444-4444-8444-444444444444";
+      await repo.getEntityManager().getConnection().execute(
+        `insert into projects (id, org_id, name) values (?, ?, ?)`,
+        [projectId, ORG_ID, "Bulk Project"],
+      );
       await repo.getEntityManager().getConnection().execute(
         `insert into sprints (id, org_id, project_id, name, start_date, end_date) values (?, ?, ?, ?, ?, ?)`,
         [sprintId, ORG_ID, projectId, "Sprint Bulk", "2026-05-01", "2026-05-14"],

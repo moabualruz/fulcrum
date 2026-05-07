@@ -30,6 +30,7 @@ export async function appendEventOrm(
       id,
       org_id: input.orgId,
       project_id: input.projectId ?? null,
+      actor: input.actor,
       subject_kind: input.subjectKind,
       subject_id: input.subjectId,
       verb: input.verb,
@@ -55,12 +56,15 @@ export async function indexSearchDocumentOrm(
 ): Promise<void> {
   const id = randomUUID();
   const db = em.getKysely<any>();
+  const columns = await tableColumns(em, "search_documents");
+  const kindColumn = columns.has("source_kind") ? "source_kind" : "entity_kind";
+  const idColumn = columns.has("source_id") ? "source_id" : "entity_id";
   const existing = await db
     .selectFrom("search_documents")
     .select(["id"])
     .where("org_id", "=", input.orgId)
-    .where("entity_kind", "=", input.sourceKind)
-    .where("entity_id", "=", input.sourceId)
+    .where(kindColumn, "=", input.sourceKind)
+    .where(idColumn, "=", input.sourceId)
     .executeTakeFirst();
   const values = {
     title: input.title,
@@ -68,21 +72,36 @@ export async function indexSearchDocumentOrm(
     labels: input.labels ?? [],
     updated_at: new Date(),
     project_id: input.projectId ?? null,
-  };
+  } as Record<string, unknown>;
+  if (!columns.has("labels")) delete values["labels"];
+  if (!columns.has("updated_at")) delete values["updated_at"];
+  if (!columns.has("project_id")) delete values["project_id"];
   if (existing) {
     await db.updateTable("search_documents").set(values).where("id", "=", existing.id).execute();
     return;
   }
-  await db
-    .insertInto("search_documents")
-    .values({
-      id,
-      org_id: input.orgId,
-      entity_kind: input.sourceKind,
-      entity_id: input.sourceId,
-      ...values,
-    })
-    .execute();
+  const insert = {
+    id,
+    org_id: input.orgId,
+    [kindColumn]: input.sourceKind,
+    [idColumn]: input.sourceId,
+    ...values,
+  } as Record<string, unknown>;
+  if (columns.has("entity_kind")) insert["entity_kind"] = input.sourceKind;
+  if (columns.has("entity_id")) insert["entity_id"] = input.sourceId;
+  if (columns.has("source_kind")) insert["source_kind"] = input.sourceKind;
+  if (columns.has("source_id")) insert["source_id"] = input.sourceId;
+  await db.insertInto("search_documents").values(insert).execute();
+}
+
+async function tableColumns(em: EntityManager, tableName: string): Promise<Set<string>> {
+  const rows = await em.getKysely<any>()
+    .selectFrom("information_schema.columns")
+    .select(["column_name"])
+    .where("table_schema", "=", "public")
+    .where("table_name", "=", tableName)
+    .execute() as Array<{ column_name: string }>;
+  return new Set(rows.map((row) => row.column_name));
 }
 
 export interface EnqueueJobInput {

@@ -1,4 +1,6 @@
+import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { __resetDefaultOrmForTest, initOrm } from "../../../../db/mikro-orm.config.ts";
 import { ormSqlConnection } from "./orm-helpers.ts";
@@ -11,6 +13,7 @@ export interface WebDatabaseHandle {
   close(): Promise<void>;
   engine: "mikro-orm";
   em: EntityManager;
+  pglite?: unknown;
 }
 
 let _instance: WebDatabaseHandle | null = null;
@@ -32,11 +35,20 @@ export async function initDatabase(): Promise<WebDatabaseHandle> {
   if (_initPromise) return _initPromise;
 
   _initPromise = (async () => {
-    const orm = await initOrm();
+    await mkdir(productDbDir(), { recursive: true });
+    const { PGlite } = await import("@electric-sql/pglite");
+    const { vector } = await import("@electric-sql/pglite/vector");
+    const pglite = new PGlite(join(productDbDir(), "main"), { extensions: { vector } });
+    await pglite.waitReady;
+    const orm = await initOrm({ pglite });
     if (!(await hasExistingSchema(orm.em))) {
       await orm.migrator.up();
     }
-    const db = createOrmDb(orm.em.fork());
+    const db = createOrmDb(orm.em.fork(), async () => {
+      await orm.close(true);
+      await pglite.close();
+    });
+    db.pglite = pglite;
     await ensureDefaultOrg(db);
     _instance = db;
     _instanceKey = key;
@@ -123,6 +135,10 @@ function isTempFulcrumHome(): boolean {
   return typeof home === "string" && home.startsWith(tmpdir());
 }
 
+function productDbDir(): string {
+  return join(process.env["FULCRUM_HOME"] ?? join(process.env["HOME"] ?? "", ".fulcrum"), "state", "product", "db");
+}
+
 async function resetSingleton(): Promise<void> {
   if (_instance) await _instance.close();
   _instance = null;
@@ -134,7 +150,7 @@ function normalizeSql(sql: string): string {
   return sql.replace(/\$(\d+)/g, "?");
 }
 
-function createOrmDb(em: EntityManager): WebDatabaseHandle {
+function createOrmDb(em: EntityManager, closeRuntime: () => Promise<void>): WebDatabaseHandle {
   const conn = ormSqlConnection(em);
   return {
     async query<T = Record<string, unknown>>(
@@ -148,6 +164,7 @@ function createOrmDb(em: EntityManager): WebDatabaseHandle {
     },
     async close(): Promise<void> {
       em.clear();
+      await closeRuntime();
     },
     engine: "mikro-orm",
     em,

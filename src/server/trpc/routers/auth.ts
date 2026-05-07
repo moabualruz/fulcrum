@@ -61,6 +61,16 @@ async function getOrgMemberRepository() {
   return OrgMemberRepository;
 }
 
+async function getOrgClass() {
+  const { Org } = await import("../../../db/entities/auth/Org.ts");
+  return Org;
+}
+
+async function getAccountClass() {
+  const { Account } = await import("../../../db/entities/auth/Account.ts");
+  return Account;
+}
+
 async function getInvitationClass() {
   const { Invitation } = await import("../../../db/entities/auth/Invitation.ts");
   return Invitation;
@@ -152,6 +162,20 @@ async function requireEm(ctx: CtxWithEm) {
   return ctx.em;
 }
 
+function hasEntityMetadata(ctx: CtxWithEm, entityName: string): boolean {
+  try {
+    const metadata = ctx.em?.getMetadata() as
+      | {
+          find?: (name: string) => unknown;
+          get?: (name: string) => unknown;
+        }
+      | undefined;
+    return Boolean(metadata?.find?.(entityName) ?? metadata?.get?.(entityName));
+  } catch {
+    return false;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // auth router
 // ─────────────────────────────────────────────────────────────────────────────
@@ -183,10 +207,21 @@ export const authRouter = t.router({
       return base;
     }
 
+    const Org = await getOrgClass();
+    const Account = hasEntityMetadata(ctx, "Account") ? await getAccountClass() : null;
+    const [org, passkeyCount] = await Promise.all([
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ctx.em.findOne(Org, { id: ctx.orgId } as any),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      Account ? ctx.em.count(Account, { userId: ctx.userId, providerId: "passkey" } as any) : Promise.resolve(0),
+    ]);
+
     return {
       ...base,
       email: (user as { email: string }).email,
       role: (user as { role: string }).role,
+      orgName: (org as { name?: string } | null)?.name ?? ctx.orgId,
+      passkeyCount,
     };
   }),
 

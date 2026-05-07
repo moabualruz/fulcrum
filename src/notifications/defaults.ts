@@ -51,10 +51,16 @@ export async function seedDefaultRules(
   const org = em.getReference(Org, orgId);
 
   for (const rule of DEFAULT_NOTIFICATION_RULES) {
-    const existing = await em.findOne(NotificationRule, {
-      userId,
-      name: rule.name,
-    } as never);
+    let existing: NotificationRule | null;
+    try {
+      existing = await em.findOne(NotificationRule, {
+        userId,
+        name: rule.name,
+      } as never);
+    } catch (error) {
+      if (isMissingNotificationRuleColumns(error)) return;
+      throw error;
+    }
     if (existing) continue;
     em.persist(em.create(NotificationRule, {
       org,
@@ -70,4 +76,18 @@ export async function seedDefaultRules(
     }));
   }
   await em.flush();
+}
+
+function isMissingNotificationRuleColumns(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { cause?: unknown; code?: unknown; message?: unknown };
+  const message = String(candidate.message ?? "");
+  if (
+    (candidate.code === "42703" || message.includes("does not exist")) &&
+    (message.includes("notification_rules") || message.includes("n0")) &&
+    message.includes("user_id")
+  ) {
+    return true;
+  }
+  return isMissingNotificationRuleColumns(candidate.cause);
 }

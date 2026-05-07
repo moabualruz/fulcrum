@@ -56,8 +56,10 @@ export async function createDocumentAction(
       id,
       org_id: input.orgId,
       project_id: input.projectId,
+      kind: input.kind,
       doc_type: input.kind,
       title: input.title,
+      body: input.body,
       body_md: input.body,
       frontmatter: fm,
     })
@@ -84,8 +86,14 @@ export async function updateDocumentAction(
   if (changed.length === 0) throw new Error("updateDocumentAction: no fields to update");
   const patch: Record<string, unknown> = {};
   if (input.title !== undefined) patch["title"] = input.title;
-  if (input.body !== undefined) patch["body_md"] = input.body;
-  if (input.kind !== undefined) patch["doc_type"] = input.kind;
+  if (input.body !== undefined) {
+    patch["body"] = input.body;
+    patch["body_md"] = input.body;
+  }
+  if (input.kind !== undefined) {
+    patch["kind"] = input.kind;
+    patch["doc_type"] = input.kind;
+  }
   if (input.frontmatter !== undefined) patch["frontmatter"] = input.frontmatter;
   patch["updated_at"] = new Date();
   const rows = await em.getKysely<any>()

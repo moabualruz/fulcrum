@@ -10,15 +10,15 @@
 
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { Org } from "../../../../db/entities/auth/Org.ts";
-import { initOrm } from "../../../../db/mikro-orm.config.ts";
+import { initDatabase } from "./db.ts";
 
 /**
  * Returns a forked EntityManager for request-scoped DB access.
  * The fork isolates the unit-of-work from other concurrent requests.
  */
 export async function getEm(): Promise<EntityManager> {
-  const orm = await initOrm();
-  return orm.em.fork();
+  const db = await initDatabase();
+  return db.em.fork();
 }
 
 /**

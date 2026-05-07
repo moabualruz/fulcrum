@@ -170,8 +170,9 @@ export async function setDependencies(
       blocks: normalizedUnique(dependencies.blocks),
       blocked_by: normalizedUnique(dependencies.blocked_by),
     };
+    const proposedEdges = proposedTaskDependencyEdges({ taskId: task.id, tasks, dependencies: normalizedDeps });
+    assertDependencyGraphDoesNotCycle(proposedEdges);
     const edges = replaceTaskDependencyEdges({ taskId: task.id, tasks, dependencies: normalizedDeps });
-    assertDependencyGraphDoesNotCycle(edges);
 
     for (const candidate of tasks) {
       const nextDependencies = dependenciesForTask(candidate.id, edges);
@@ -299,6 +300,24 @@ function replaceTaskDependencyEdges(input: {
     const blocks = new Set(task.dependencies.blocks);
     blocks.delete(input.taskId);
     edges.set(task.id, blocks);
+  }
+  edges.set(input.taskId, new Set(input.dependencies.blocks));
+  for (const blockerId of input.dependencies.blocked_by) {
+    const blocks = edges.get(blockerId) ?? new Set<string>();
+    blocks.add(input.taskId);
+    edges.set(blockerId, blocks);
+  }
+  return edges;
+}
+
+function proposedTaskDependencyEdges(input: {
+  taskId: string;
+  tasks: Task[];
+  dependencies: TaskDependencies;
+}): Map<string, Set<string>> {
+  const edges = new Map<string, Set<string>>();
+  for (const task of input.tasks) {
+    edges.set(task.id, new Set(task.dependencies.blocks));
   }
   edges.set(input.taskId, new Set(input.dependencies.blocks));
   for (const blockerId of input.dependencies.blocked_by) {

@@ -32,11 +32,15 @@ afterEach(async () => {
 });
 
 function resetLegacyStore(): void {
-  (serverDb as Record<string, () => void>)["__reset" + "Product" + "DbForTest"]();
+  const reset = (serverDb as unknown as Record<string, () => void>)["__reset" + "Product" + "DbForTest"];
+  if (!reset) throw new Error("reset product db test hook missing");
+  reset();
 }
 
 async function closeLegacyStore(): Promise<void> {
-  await (serverDb as Record<string, () => Promise<void>>)["close" + "Product" + "Db"]();
+  const close = (serverDb as unknown as Record<string, () => Promise<void>>)["close" + "Product" + "Db"];
+  if (!close) throw new Error("close product db hook missing");
+  await close();
 }
 
 function dbDir(): string {

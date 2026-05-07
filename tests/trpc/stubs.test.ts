@@ -71,12 +71,8 @@ function authenticatedCaller(
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("stub routers — authenticated list() returns []", () => {
-  it("tasks.list returns [] for authenticated caller", async () => {
-    const caller = authenticatedCaller();
-    const result = await caller.tasks.list();
-    expect(Array.isArray(result)).toBe(true);
-    expect(result).toHaveLength(0);
-  });
+  // Note: tasks.list is excluded here — it is a real application-layer implementation
+  // that requires em in ctx. Its tests live in tests/trpc/tasks-crud.test.ts.
 
   it("docs.list returns [] for authenticated caller", async () => {
     const caller = authenticatedCaller();

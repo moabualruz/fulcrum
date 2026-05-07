@@ -33,8 +33,8 @@ export async function getRun(store: LegacySymphonyStore, id: string): Promise<an
   return (await symphonyFn("getRun"))(store, id);
 }
 
-export async function getSymphonyDriftReport(store: LegacySymphonyStore, orgId: string): Promise<any> {
-  return (await symphonyFn("getSymphonyDriftReport"))(store, orgId);
+export async function getSymphonyDriftReport(store: LegacySymphonyStore, orgId: string, staleMinutes?: number): Promise<any> {
+  return (await symphonyFn("getSymphonyDriftReport"))(store, orgId, staleMinutes);
 }
 
 export async function listRuns(store: LegacySymphonyStore, orgId: string, opts?: unknown): Promise<any> {

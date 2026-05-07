@@ -289,16 +289,26 @@ describe("SubscriptionBridge", () => {
 
 describe("TUI in-process tRPC caller smoke", () => {
   it("tasks.list returns typed data with session and is forbidden without session", async () => {
-    const authed = createCaller(
-      createContext({
-        session: mockSession() as unknown as import("better-auth").Session,
-        orgId: "org-tui",
-        userId: "user-tui",
-        em: null,
-        container: null,
-      }),
-    );
-    await expect(authed.tasks.list()).resolves.toEqual([]);
+    const db = await createTestOrm();
+    try {
+      const authed = createCaller(
+        createContext({
+          session: {
+            ...mockSession(),
+            userId: db.seed.userId,
+            orgId: db.seed.orgId,
+            activeOrganizationId: db.seed.orgId,
+          } as unknown as import("better-auth").Session,
+          orgId: db.seed.orgId,
+          userId: db.seed.userId,
+          em: db.em.fork(),
+          container: testContainer(db),
+        }),
+      );
+      await expect(authed.tasks.list()).resolves.toEqual([]);
+    } finally {
+      await db.close();
+    }
 
     const bad = createCaller(
       createContext({

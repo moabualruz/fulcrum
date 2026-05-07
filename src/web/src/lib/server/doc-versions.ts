@@ -125,7 +125,7 @@ export async function restoreDocumentVersion(
   if (!ver) throw new Error(`Version ${version} not found for doc ${docId}`);
   await em.getKysely<any>()
     .updateTable("documents")
-    .set({ title: ver.title, body_md: ver.body, frontmatter: ver.frontmatter, updated_at: new Date() })
+    .set({ title: ver.title, body: ver.body, body_md: ver.body, frontmatter: ver.frontmatter, updated_at: new Date() })
     .where("id", "=", docId)
     .where("org_id", "=", orgId)
     .execute();
