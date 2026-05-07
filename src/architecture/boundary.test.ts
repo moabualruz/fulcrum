@@ -123,6 +123,31 @@ const PLAN21_ROUTER_FILES = [
   "src/server/trpc/routers/templates.ts",
 ];
 
+const PLAN44_CLI_FILES = [
+  "src/cli/docs-templates.ts",
+  "src/cli/commands/auth.ts",
+  "src/cli/commands/flags.ts",
+  "src/cli/commands/project-config.ts",
+  "src/cli/commands/report.ts",
+  "src/cli/commands/task-hierarchy.ts",
+  "src/cli/commands/task-relate.ts",
+  "src/cli/commands/symphony.ts",
+  "src/cli/commands/pillar14-generated.ts",
+];
+
+const FORBIDDEN_PLAN44_CLI_DIRECT_ACCESS = new RegExp(
+  [
+    String.raw`from\s+["'][^"']*(@mikro-orm/postgresql|db/entities|db/repositories|db\.module|mikro-orm\.config)[^"']*["']`,
+    String.raw`import\(["'][^"']*(@mikro-orm/postgresql|db/entities|db/repositories|db\.module|mikro-orm\.config)[^"']*["']\)`,
+    String.raw`\bENTITY_MANAGER_TOKEN\b`,
+    String.raw`\bregisterDbBindings\b`,
+    String.raw`\bnew\s+MikroORM\b`,
+    String.raw`\bem\.(find|findOne|create|persist|flush|transactional|getRepository)\b`,
+    String.raw`\borm\.em\b`,
+    String.raw`\bcontainer\.get\(ENTITY_MANAGER_TOKEN\)`,
+  ].join("|"),
+);
+
 async function collectSourceFiles(root: string): Promise<string[]> {
   const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
   const files = await Promise.all(entries.map(async (entry) => {
@@ -183,6 +208,15 @@ async function directAccessInExactFiles(files: readonly string[]): Promise<strin
   return found.sort();
 }
 
+async function patternInExactFiles(files: readonly string[], pattern: RegExp): Promise<string[]> {
+  const found: string[] = [];
+  for (const file of files) {
+    const text = await readFile(file, "utf8");
+    if (pattern.test(text)) found.push(file);
+  }
+  return found.sort();
+}
+
 async function testFixtureViolations(roots: readonly string[], pattern: RegExp): Promise<string[]> {
   const files = Array.from(new Set((await Promise.all(roots.map(collectTestFiles))).flat()));
   const found: string[] = [];
@@ -228,5 +262,9 @@ describe("Phase 9.5 interface boundary", () => {
 
   test("Plan 21 docs comments templates skills and sprints tRPC routers delegate persistence to application modules", async () => {
     expect(await directAccessInExactFiles(PLAN21_ROUTER_FILES)).toEqual([]);
+  });
+
+  test("Plan 44 residual CLI commands use caller/application boundaries for runtime domain work", async () => {
+    expect(await patternInExactFiles(PLAN44_CLI_FILES, FORBIDDEN_PLAN44_CLI_DIRECT_ACCESS)).toEqual([]);
   });
 });
