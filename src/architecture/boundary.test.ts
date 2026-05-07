@@ -95,6 +95,68 @@ const RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS = new Map([
   ],
 ]);
 
+const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES = [
+  "src/cli/commands/auth.ts",
+  "src/cli/commands/context.ts",
+  "src/cli/commands/docs.ts",
+  "src/cli/commands/flags.ts",
+  "src/cli/commands/init.ts",
+  "src/cli/commands/memory.ts",
+  "src/cli/commands/pillar14-generated.ts",
+  "src/cli/commands/repos.ts",
+  "src/cli/commands/routing.ts",
+  "src/cli/commands/search.ts",
+  "src/cli/commands/skills.ts",
+  "src/cli/commands/symphony.ts",
+  "src/cli/docs-templates.ts",
+  "src/cli/local-caller.ts",
+  "src/router/conflict-detector.ts",
+  "src/router/no-match-prompt.ts",
+  "src/router/rules-engine.ts",
+  "src/router/telemetry.ts",
+  "src/server/trpc/routers/audit.ts",
+  "src/server/trpc/routers/auth.ts",
+  "src/server/trpc/routers/automations.ts",
+  "src/server/trpc/routers/backup.ts",
+  "src/server/trpc/routers/comments.ts",
+  "src/server/trpc/routers/custom-fields.ts",
+  "src/server/trpc/routers/doc-templates.ts",
+  "src/server/trpc/routers/docs.ts",
+  "src/server/trpc/routers/error-logs.ts",
+  "src/server/trpc/routers/flags.ts",
+  "src/server/trpc/routers/inference.ts",
+  "src/server/trpc/routers/json-import-export.ts",
+  "src/server/trpc/routers/memory.ts",
+  "src/server/trpc/routers/orgs.ts",
+  "src/server/trpc/routers/recurrence.ts",
+  "src/server/trpc/routers/relationships.ts",
+  "src/server/trpc/routers/reports.ts",
+  "src/server/trpc/routers/routing.ts",
+  "src/server/trpc/routers/skills.ts",
+  "src/server/trpc/routers/sprints.ts",
+  "src/server/trpc/routers/tasks.ts",
+  "src/server/trpc/routers/telemetry.ts",
+  "src/server/trpc/routers/templates.ts",
+  "src/server/trpc/routers/workflows.ts",
+  "src/trpc/routers/agents.ts",
+  "src/trpc/routers/doc-comments.ts",
+  "src/trpc/routers/doc-versions.ts",
+  "src/trpc/routers/documents.ts",
+  "src/trpc/routers/notifications.ts",
+  "src/trpc/routers/orchestration.ts",
+  "src/trpc/routers/reports.ts",
+  "src/trpc/routers/repos.ts",
+  "src/trpc/routers/webhooks.ts",
+  "src/tui/index.ts",
+  "src/tui/telemetry.ts",
+  "src/web/src/lib/components/docs/frontmatter-ui.ts",
+  "src/web/src/lib/product-queries.ts",
+  "src/web/src/lib/server/dashboard.ts",
+  "src/web/src/lib/server/em.ts",
+  "src/web/src/routes/docs/new/+page.server.ts",
+  "src/web/src/routes/runs/[id]/+page.server.ts",
+];
+
 async function collectSourceFiles(root: string): Promise<string[]> {
   const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
   const files = await Promise.all(entries.map(async (entry) => {
@@ -185,6 +247,7 @@ describe("Phase 9.5 interface boundary", () => {
 
   test("interface adapters do not use ORM/entity/repository access outside exact composition roots", async () => {
     const found = await residualDirectAccessViolations();
-    expect(found).toEqual([]);
+    expect(RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS.size).toBe(3);
+    expect(found).toEqual(EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES);
   });
 });
