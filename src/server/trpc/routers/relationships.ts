@@ -1,20 +1,44 @@
-/**
- * relationshipsRouter — Phase 05 Plan 04.
- *
- * tRPC surface for RelationshipService (HIGH-04 fix).
- * D-122: markAsDuplicate
- * D-123: listBlockedBy
- *
- * Security: permissionedProcedure enforces session + org scope.
- */
-
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import {
+  createRelationship,
+  deleteRelationship,
+  listBlockedItems,
+  listRelationshipsForTask,
+  listTaskBlockers,
+  listTasksBlockedBy,
+  markTaskAsDuplicate,
+  type RelationshipsAppContext,
+} from "../../../application/relationships/commands.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
-import { RelationshipService } from "../../../services/RelationshipService.ts";
 
-// ── Router ─────────────────────────────────────────────────────────────────────
+const relationshipsApplication = {
+  createRelationship,
+  deleteRelationship,
+  listRelationshipsForTask,
+  listTaskBlockers,
+  listBlockedItems,
+  listTasksBlockedBy,
+  markTaskAsDuplicate,
+};
+
+export function __setRelationshipsApplicationForTest(overrides: Partial<typeof relationshipsApplication>): () => void {
+  const previous = { ...relationshipsApplication };
+  Object.assign(relationshipsApplication, overrides);
+  return () => Object.assign(relationshipsApplication, previous);
+}
+
+function requireEntityManager({ em }: { em: EntityManager | null }): EntityManager {
+  if (em) return em;
+  throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "EntityManager could not be resolved." });
+}
+
+function appContext(ctx: { orgId: string; userId: string }): RelationshipsAppContext {
+  return { orgId: ctx.orgId, userId: ctx.userId };
+}
 
 export const relationshipsRouter = t.router({
   create: permissionedProcedure({ resource: "tasks", action: "update" })
@@ -24,53 +48,44 @@ export const relationshipsRouter = t.router({
       type: z.enum(["blocks", "relates_to", "duplicate_of"]),
     }))
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new RelationshipService(ctx.em);
-      return svc.create(ctx.orgId, input.sourceTaskId, input.targetTaskId, input.type, ctx.userId);
+      return relationshipsApplication.createRelationship(requireEntityManager(ctx), appContext(ctx), {
+        sourceTaskId: input.sourceTaskId,
+        targetTaskId: input.targetTaskId,
+        type: input.type,
+        userId: ctx.userId,
+      });
     }),
 
   delete: permissionedProcedure({ resource: "tasks", action: "update" })
     .input(z.object({ relationshipId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new RelationshipService(ctx.em);
-      await svc.delete(ctx.orgId, input.relationshipId);
+      await relationshipsApplication.deleteRelationship(requireEntityManager(ctx), appContext(ctx), input.relationshipId);
     }),
 
   listForTask: permissionedProcedure({ resource: "tasks", action: "list" })
     .input(z.object({ taskId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new RelationshipService(ctx.em);
-      return svc.listForTask(ctx.orgId, input.taskId);
+      return relationshipsApplication.listRelationshipsForTask(requireEntityManager(ctx), appContext(ctx), input.taskId);
     }),
 
   blockers: permissionedProcedure({ resource: "tasks", action: "list" })
     .input(z.object({ taskId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new RelationshipService(ctx.em);
-      return svc.listBlockers(ctx.orgId, input.taskId);
+      return relationshipsApplication.listTaskBlockers(requireEntityManager(ctx), appContext(ctx), input.taskId);
     }),
 
   blockedItems: permissionedProcedure({ resource: "tasks", action: "list" })
     .input(z.object({ projectId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new RelationshipService(ctx.em);
-      return svc.getBlockedItems(ctx.orgId, input.projectId);
+      return relationshipsApplication.listBlockedItems(requireEntityManager(ctx), appContext(ctx), input.projectId);
     }),
 
-  /** D-123: reverse query — what does this task block? */
   listBlockedBy: permissionedProcedure({ resource: "tasks", action: "list" })
     .input(z.object({ taskId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new RelationshipService(ctx.em);
-      return svc.listBlockedBy(ctx.orgId, input.taskId);
+      return relationshipsApplication.listTasksBlockedBy(requireEntityManager(ctx), appContext(ctx), input.taskId);
     }),
 
-  /** D-122: mark as duplicate with auto-close + watcher transfer */
   markAsDuplicate: permissionedProcedure({ resource: "tasks", action: "update" })
     .input(z.object({
       sourceTaskId: z.string().uuid(),
@@ -79,9 +94,9 @@ export const relationshipsRouter = t.router({
       transferWatchers: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new RelationshipService(ctx.em);
-      return svc.markAsDuplicate(ctx.orgId, input.sourceTaskId, input.targetTaskId, {
+      return relationshipsApplication.markTaskAsDuplicate(requireEntityManager(ctx), appContext(ctx), {
+        sourceTaskId: input.sourceTaskId,
+        targetTaskId: input.targetTaskId,
         autoClose: input.autoClose,
         transferWatchers: input.transferWatchers,
       });
