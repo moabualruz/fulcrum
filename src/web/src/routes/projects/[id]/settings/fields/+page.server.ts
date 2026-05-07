@@ -1,6 +1,5 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openDatabase, getDefaultOrgId } from "../../../../../lib/server/db";
 import {
   createCustomField,
   updateCustomField,
@@ -8,27 +7,20 @@ import {
   listCustomFields,
   FIELD_TYPES,
   type FieldType,
-} from "../../../../../lib/server/custom-fields";
+} from "../../../../../../../application/custom-fields/commands.ts";
+import { getProjectOrNull } from "../../../../../../../application/projects/queries.ts";
+import { requestAppScope } from "$lib/server/application-scope";
 
-export const load: PageServerLoad = async ({ params }) => {
-  const db = await openDatabase();
-  try {
-    const orgId = await getDefaultOrgId(db);
-    // Verify project exists
-    const projRows = await db.query<{ id: string }>(
-      `SELECT id FROM projects WHERE id = $1 AND org_id = $2`,
-      [params.id, orgId],
-    );
-    if (projRows.length === 0) throw error(404, "Project not found");
-    const fields = await listCustomFields(db, params.id);
-    return { fields, projectId: params.id };
-  } finally {
-    await db.close();
-  }
+export const load: PageServerLoad = async ({ params, locals }) => {
+  const { em, ctx } = await requestAppScope(locals, params.id);
+  const project = await getProjectOrNull(em, ctx, params.id);
+  if (!project) throw error(404, "Project not found");
+  const fields = await listCustomFields(em, params.id);
+  return { fields, projectId: params.id };
 };
 
 export const actions: Actions = {
-  create: async ({ params, request }) => {
+  create: async ({ params, request, locals }) => {
     const fd = await request.formData();
     const name = (fd.get("name") as string | null)?.trim();
     const fieldType = fd.get("fieldType") as string | null;
@@ -41,50 +33,37 @@ export const actions: Actions = {
     const options = optionsRaw
       ? optionsRaw.split(",").map((s) => s.trim()).filter(Boolean)
       : [];
-    const db = await openDatabase();
-    try {
-      const orgId = await getDefaultOrgId(db);
-      await createCustomField(db, {
-        orgId,
+    const { em, ctx } = await requestAppScope(locals, params.id);
+    await createCustomField(em, {
+        orgId: ctx.orgId,
         projectId: params.id!,
         name,
         fieldType: fieldType as FieldType,
         required,
         options,
       });
-    } finally {
-      await db.close();
-    }
     return { success: true };
   },
-  update: async ({ request }) => {
+  update: async ({ request, locals }) => {
     const fd = await request.formData();
     const id = fd.get("id") as string | null;
     if (!id) return fail(400, { error: "id required" });
     const name = fd.get("name") as string | null;
     const sortOrderRaw = fd.get("sortOrder") as string | null;
-    const db = await openDatabase();
-    try {
-      await updateCustomField(db, {
+    const { em } = await requestAppScope(locals);
+    await updateCustomField(em, {
         id,
         ...(name ? { name: name.trim() } : {}),
         ...(sortOrderRaw != null ? { sortOrder: Number(sortOrderRaw) } : {}),
       });
-    } finally {
-      await db.close();
-    }
     return { success: true };
   },
-  archive: async ({ request }) => {
+  archive: async ({ request, locals }) => {
     const fd = await request.formData();
     const id = fd.get("id") as string | null;
     if (!id) return fail(400, { error: "id required" });
-    const db = await openDatabase();
-    try {
-      await archiveCustomField(db, id);
-    } finally {
-      await db.close();
-    }
+    const { em } = await requestAppScope(locals);
+    await archiveCustomField(em, id);
     return { success: true };
   },
 };

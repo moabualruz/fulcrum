@@ -1,6 +1,5 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openDatabase, getDefaultOrgId } from "../../../../../lib/server/db";
 import {
   createSavedView,
   updateSavedView,
@@ -8,26 +7,20 @@ import {
   listSavedViews,
   VIEW_SCOPES,
   type ViewScope,
-} from "../../../../../lib/server/saved-views";
+} from "../../../../../../../application/saved-views/queries.ts";
+import { getProjectOrNull } from "../../../../../../../application/projects/queries.ts";
+import { requestAppScope } from "$lib/server/application-scope";
 
-export const load: PageServerLoad = async ({ params }) => {
-  const db = await openDatabase();
-  try {
-    const orgId = await getDefaultOrgId(db);
-    const projRows = await db.query<{ id: string }>(
-      `SELECT id FROM projects WHERE id = $1 AND org_id = $2`,
-      [params.id, orgId],
-    );
-    if (projRows.length === 0) throw error(404, "Project not found");
-    const views = await listSavedViews(db, params.id);
-    return { views, projectId: params.id };
-  } finally {
-    await db.close();
-  }
+export const load: PageServerLoad = async ({ params, locals }) => {
+  const { em, ctx } = await requestAppScope(locals, params.id);
+  const project = await getProjectOrNull(em, ctx, params.id);
+  if (!project) throw error(404, "Project not found");
+  const views = await listSavedViews(em, params.id);
+  return { views, projectId: params.id };
 };
 
 export const actions: Actions = {
-  create: async ({ params, request }) => {
+  create: async ({ params, request, locals }) => {
     const fd = await request.formData();
     const name = (fd.get("name") as string | null)?.trim();
     const scope = (fd.get("scope") as string | null) || "project";
@@ -45,50 +38,37 @@ export const actions: Actions = {
         return fail(400, { error: "Invalid filters JSON" });
       }
     }
-    const db = await openDatabase();
-    try {
-      const orgId = await getDefaultOrgId(db);
-      await createSavedView(db, {
-        orgId,
+    const { em, ctx } = await requestAppScope(locals, params.id);
+    await createSavedView(em, {
+        orgId: ctx.orgId,
         projectId: params.id!,
         name,
         scope: scope as ViewScope,
         filters,
         isDefault,
       });
-    } finally {
-      await db.close();
-    }
     return { success: true };
   },
-  update: async ({ request }) => {
+  update: async ({ request, locals }) => {
     const fd = await request.formData();
     const id = fd.get("id") as string | null;
     if (!id) return fail(400, { error: "id required" });
     const name = fd.get("name") as string | null;
     const isDefaultRaw = fd.get("isDefault");
-    const db = await openDatabase();
-    try {
-      await updateSavedView(db, {
+    const { em } = await requestAppScope(locals);
+    await updateSavedView(em, {
         id,
         ...(name ? { name: name.trim() } : {}),
         ...(isDefaultRaw != null ? { isDefault: isDefaultRaw === "on" } : {}),
       });
-    } finally {
-      await db.close();
-    }
     return { success: true };
   },
-  delete: async ({ request }) => {
+  delete: async ({ request, locals }) => {
     const fd = await request.formData();
     const id = fd.get("id") as string | null;
     if (!id) return fail(400, { error: "id required" });
-    const db = await openDatabase();
-    try {
-      await deleteSavedView(db, id);
-    } finally {
-      await db.close();
-    }
+    const { em } = await requestAppScope(locals);
+    await deleteSavedView(em, id);
     return { success: true };
   },
 };

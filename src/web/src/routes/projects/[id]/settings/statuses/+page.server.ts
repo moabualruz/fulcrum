@@ -1,52 +1,40 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openDatabase, getDefaultOrgId } from "../../../../../lib/server/db";
 import {
   createProjectStatus,
   updateProjectStatus,
   deleteProjectStatus,
   listProjectStatuses,
-} from "../../../../../lib/server/project-statuses";
+} from "../../../../../../../application/project-statuses/commands.ts";
+import { getProjectOrNull } from "../../../../../../../application/projects/queries.ts";
+import { requestAppScope } from "$lib/server/application-scope";
 
-export const load: PageServerLoad = async ({ params }) => {
-  const db = await openDatabase();
-  try {
-    const orgId = await getDefaultOrgId(db);
-    const projRows = await db.query<{ id: string }>(
-      `SELECT id FROM projects WHERE id = $1 AND org_id = $2`,
-      [params.id, orgId],
-    );
-    if (projRows.length === 0) throw error(404, "Project not found");
-    const statuses = await listProjectStatuses(db, params.id);
-    return { statuses, projectId: params.id };
-  } finally {
-    await db.close();
-  }
+export const load: PageServerLoad = async ({ params, locals }) => {
+  const { em, ctx } = await requestAppScope(locals, params.id);
+  const project = await getProjectOrNull(em, ctx, params.id);
+  if (!project) throw error(404, "Project not found");
+  const statuses = await listProjectStatuses(em, params.id);
+  return { statuses, projectId: params.id };
 };
 
 export const actions: Actions = {
-  create: async ({ params, request }) => {
+  create: async ({ params, request, locals }) => {
     const fd = await request.formData();
     const name = (fd.get("name") as string | null)?.trim();
     const color = (fd.get("color") as string | null)?.trim() || "#6b7280";
     const isFinal = fd.get("isFinal") === "on";
     if (!name) return fail(400, { error: "Name is required" });
-    const db = await openDatabase();
-    try {
-      const orgId = await getDefaultOrgId(db);
-      await createProjectStatus(db, {
-        orgId,
+    const { em, ctx } = await requestAppScope(locals, params.id);
+    await createProjectStatus(em, {
+        orgId: ctx.orgId,
         projectId: params.id!,
         name,
         color,
         isFinal,
       });
-    } finally {
-      await db.close();
-    }
     return { success: true };
   },
-  update: async ({ request }) => {
+  update: async ({ request, locals }) => {
     const fd = await request.formData();
     const id = fd.get("id") as string | null;
     if (!id) return fail(400, { error: "id required" });
@@ -54,30 +42,22 @@ export const actions: Actions = {
     const color = fd.get("color") as string | null;
     const isFinalRaw = fd.get("isFinal");
     const sortOrderRaw = fd.get("sortOrder") as string | null;
-    const db = await openDatabase();
-    try {
-      await updateProjectStatus(db, {
+    const { em } = await requestAppScope(locals);
+    await updateProjectStatus(em, {
         id,
         ...(name ? { name: name.trim() } : {}),
         ...(color ? { color: color.trim() } : {}),
         ...(isFinalRaw != null ? { isFinal: isFinalRaw === "on" } : {}),
         ...(sortOrderRaw != null ? { sortOrder: Number(sortOrderRaw) } : {}),
       });
-    } finally {
-      await db.close();
-    }
     return { success: true };
   },
-  delete: async ({ request }) => {
+  delete: async ({ request, locals }) => {
     const fd = await request.formData();
     const id = fd.get("id") as string | null;
     if (!id) return fail(400, { error: "id required" });
-    const db = await openDatabase();
-    try {
-      await deleteProjectStatus(db, id);
-    } finally {
-      await db.close();
-    }
+    const { em } = await requestAppScope(locals);
+    await deleteProjectStatus(em, id);
     return { success: true };
   },
 };

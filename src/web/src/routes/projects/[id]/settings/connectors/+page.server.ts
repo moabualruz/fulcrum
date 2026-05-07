@@ -1,30 +1,23 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openDatabase, getDefaultOrgId } from "../../../../../lib/server/db";
 import {
   upsertProjectConnector,
   syncProjectConnector,
   listProjectConnectors,
-} from "../../../../../lib/server/project-connectors";
+} from "../../../../../../../application/project-connectors/commands.ts";
+import { getProjectOrNull } from "../../../../../../../application/projects/queries.ts";
+import { requestAppScope } from "$lib/server/application-scope";
 
-export const load: PageServerLoad = async ({ params }) => {
-  const db = await openDatabase();
-  try {
-    const orgId = await getDefaultOrgId(db);
-    const projRows = await db.query<{ id: string }>(
-      `SELECT id FROM projects WHERE id = $1 AND org_id = $2`,
-      [params.id, orgId],
-    );
-    if (projRows.length === 0) throw error(404, "Project not found");
-    const connectors = await listProjectConnectors(db, params.id);
-    return { connectors, projectId: params.id };
-  } finally {
-    await db.close();
-  }
+export const load: PageServerLoad = async ({ params, locals }) => {
+  const { em, ctx } = await requestAppScope(locals, params.id);
+  const project = await getProjectOrNull(em, ctx, params.id);
+  if (!project) throw error(404, "Project not found");
+  const connectors = await listProjectConnectors(em, params.id);
+  return { connectors, projectId: params.id };
 };
 
 export const actions: Actions = {
-  upsert: async ({ params, request }) => {
+  upsert: async ({ params, request, locals }) => {
     const fd = await request.formData();
     const connectorType = (fd.get("connectorType") as string | null)?.trim();
     const enabled = fd.get("enabled") === "on";
@@ -38,31 +31,22 @@ export const actions: Actions = {
         return fail(400, { error: "Invalid config JSON" });
       }
     }
-    const db = await openDatabase();
-    try {
-      const orgId = await getDefaultOrgId(db);
-      await upsertProjectConnector(db, {
-        orgId,
+    const { em, ctx } = await requestAppScope(locals, params.id);
+    await upsertProjectConnector(em, {
+        orgId: ctx.orgId,
         projectId: params.id!,
         connectorType,
         enabled,
         config,
       });
-    } finally {
-      await db.close();
-    }
     return { success: true };
   },
-  sync: async ({ request }) => {
+  sync: async ({ request, locals }) => {
     const fd = await request.formData();
     const id = fd.get("id") as string | null;
     if (!id) return fail(400, { error: "id required" });
-    const db = await openDatabase();
-    try {
-      await syncProjectConnector(db, id);
-    } finally {
-      await db.close();
-    }
+    const { em } = await requestAppScope(locals);
+    await syncProjectConnector(em, id);
     return { success: true };
   },
 };
