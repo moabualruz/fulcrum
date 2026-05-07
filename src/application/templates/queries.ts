@@ -8,6 +8,7 @@ import {
   type DocTemplateService,
 } from "../../docs/doc-template-service.ts";
 import { EntityManagerDocTemplateService } from "../../docs/em-doc-template-service.ts";
+import type { DocType } from "../../db/entities/docs/enums.ts";
 import { TemplateService } from "../../services/TemplateService.ts";
 import type { AppContext, CreateTemplateInput, TemplateDto } from "./types.ts";
 
@@ -70,7 +71,7 @@ export async function resolveDocTemplate(
   container: Container | null,
   ctx: Pick<AppContext, "orgId">,
   projectId: string | null,
-  docType: string,
+  docType: DocType,
 ): Promise<DocTemplateRow | null> {
   return (await resolveDocTemplateService(em, container)).resolve(ctx.orgId, projectId, docType);
 }
