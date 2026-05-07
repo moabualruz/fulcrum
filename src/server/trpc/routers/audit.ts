@@ -1,5 +1,3 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { setRetentionPolicy } from "../../../application/audit/commands.ts";
@@ -11,6 +9,7 @@ import {
 } from "../../../application/audit/queries.ts";
 import { appErrorToTrpcError } from "../../../application/error-mapping.ts";
 import { AppError } from "../../../application/errors.ts";
+import { requireTrpcEntityManager } from "../../../trpc/context.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 
@@ -93,11 +92,6 @@ export function __setAuditApplicationForTest(overrides: Partial<typeof auditAppl
   return () => Object.assign(auditApplication, previous);
 }
 
-function requireEntityManager(ctx: { em: EntityManager | null }): EntityManager {
-  if (ctx.em) return ctx.em;
-  throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "EntityManager could not be resolved." });
-}
-
 function appContext(ctx: { orgId: string; userId: string }) {
   return { orgId: ctx.orgId, userId: ctx.userId, projectId: null };
 }
@@ -116,14 +110,14 @@ export const auditRouter = t.router({
     .input(AuditQueryInputSchema)
     .output(AuditQueryOutputSchema)
     .query(({ ctx, input }) =>
-      mapAppError(() => auditApplication.queryAuditEvents(requireEntityManager(ctx), appContext(ctx), input ?? {}))
+      mapAppError(() => auditApplication.queryAuditEvents(requireTrpcEntityManager(ctx), appContext(ctx), input ?? {}))
     ),
 
   export: permissionedProcedure({ resource: "audit", action: "export" })
     .input(AuditExportInputSchema)
     .output(AuditExportOutputSchema)
     .mutation(({ ctx, input }) =>
-      mapAppError(() => auditApplication.exportAuditEvents(requireEntityManager(ctx), appContext(ctx), input ?? {}))
+      mapAppError(() => auditApplication.exportAuditEvents(requireTrpcEntityManager(ctx), appContext(ctx), input ?? {}))
     ),
 
   retentionPolicy: t.router({
@@ -131,21 +125,21 @@ export const auditRouter = t.router({
       .input(RetentionPolicyInputSchema.optional())
       .output(RetentionPolicyOutputSchema.nullable())
       .query(({ ctx, input }) =>
-        mapAppError(() => auditApplication.getRetentionPolicy(requireEntityManager(ctx), appContext(ctx), input ?? {}))
+        mapAppError(() => auditApplication.getRetentionPolicy(requireTrpcEntityManager(ctx), appContext(ctx), input ?? {}))
       ),
 
     list: permissionedProcedure({ resource: "audit", action: "list" })
       .input(RetentionPolicyInputSchema.optional())
       .output(z.array(RetentionPolicyOutputSchema))
       .query(({ ctx, input }) =>
-        mapAppError(() => auditApplication.listRetentionPolicies(requireEntityManager(ctx), appContext(ctx), input ?? {}))
+        mapAppError(() => auditApplication.listRetentionPolicies(requireTrpcEntityManager(ctx), appContext(ctx), input ?? {}))
       ),
 
     set: permissionedProcedure({ resource: "audit", action: "set" })
       .input(RetentionPolicySetInputSchema)
       .output(RetentionPolicyOutputSchema)
       .mutation(({ ctx, input }) =>
-        mapAppError(() => auditApplication.setRetentionPolicy(requireEntityManager(ctx), appContext(ctx), input))
+        mapAppError(() => auditApplication.setRetentionPolicy(requireTrpcEntityManager(ctx), appContext(ctx), input))
       ),
   }),
 });

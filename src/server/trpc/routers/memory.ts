@@ -1,5 +1,3 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { createMemory, deleteMemory, updateMemory } from "../../../application/memory/commands.ts";
@@ -11,6 +9,7 @@ import {
   MEMORY_KINDS,
   MEMORY_SOURCES,
 } from "../../../db/entities/memory/enums.ts";
+import { requireTrpcEntityManager } from "../../../trpc/context.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 
@@ -103,11 +102,6 @@ export function __setMemoryApplicationForTest(overrides: Partial<typeof memoryAp
   return () => Object.assign(memoryApplication, previous);
 }
 
-function requireEntityManager(ctx: { em: EntityManager | null }): EntityManager {
-  if (ctx.em) return ctx.em;
-  throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "EntityManager could not be resolved." });
-}
-
 function appContext(ctx: { orgId: string; userId: string }) {
   return { orgId: ctx.orgId, userId: ctx.userId, projectId: null };
 }
@@ -126,46 +120,42 @@ export const memoryRouter = t.router({
     .input(CreateMemoryInputSchema)
     .output(MemoryOutputSchema)
     .mutation(({ ctx, input }) =>
-      mapAppError(() => memoryApplication.createMemory(requireEntityManager(ctx), appContext(ctx), input))
+      mapAppError(() => memoryApplication.createMemory(requireTrpcEntityManager(ctx), appContext(ctx), input))
     ),
 
   get: permissionedProcedure({ resource: "memories", action: "get" })
     .input(IdInputSchema)
     .output(MemoryOutputSchema)
     .query(({ ctx, input }) =>
-      mapAppError(() => memoryApplication.getMemory(requireEntityManager(ctx), appContext(ctx), input.id))
+      mapAppError(() => memoryApplication.getMemory(requireTrpcEntityManager(ctx), appContext(ctx), input.id))
     ),
 
   list: permissionedProcedure({ resource: "memories", action: "list" })
     .input(ListMemoriesInputSchema)
     .output(z.array(MemoryOutputSchema))
     .query(({ ctx, input }) =>
-      ctx.em
-        ? mapAppError(() => memoryApplication.listMemories(requireEntityManager(ctx), appContext(ctx), input ?? {}))
-        : []
+      mapAppError(() => memoryApplication.listMemories(requireTrpcEntityManager(ctx), appContext(ctx), input ?? {}))
     ),
 
   update: permissionedProcedure({ resource: "memories", action: "update" })
     .input(UpdateMemoryInputSchema)
     .output(MemoryOutputSchema)
     .mutation(({ ctx, input }) =>
-      mapAppError(() => memoryApplication.updateMemory(requireEntityManager(ctx), appContext(ctx), input))
+      mapAppError(() => memoryApplication.updateMemory(requireTrpcEntityManager(ctx), appContext(ctx), input))
     ),
 
   delete: permissionedProcedure({ resource: "memories", action: "delete" })
     .input(IdInputSchema)
     .output(DeleteMemoryOutputSchema)
     .mutation(({ ctx, input }) =>
-      mapAppError(() => memoryApplication.deleteMemory(requireEntityManager(ctx), appContext(ctx), input.id))
+      mapAppError(() => memoryApplication.deleteMemory(requireTrpcEntityManager(ctx), appContext(ctx), input.id))
     ),
 
   search: permissionedProcedure({ resource: "memories", action: "search" })
     .input(SearchMemoryInputSchema)
     .output(z.array(RankedMemoryOutputSchema))
     .query(({ ctx, input }) =>
-      ctx.em
-        ? mapAppError(() => memoryApplication.searchMemories(requireEntityManager(ctx), appContext(ctx), input))
-        : []
+      mapAppError(() => memoryApplication.searchMemories(requireTrpcEntityManager(ctx), appContext(ctx), input))
     ),
 });
 

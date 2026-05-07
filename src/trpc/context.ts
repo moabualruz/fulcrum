@@ -1,5 +1,6 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 import type { Container } from "@needle-di/core";
+import { TRPCError } from "@trpc/server";
 import type { Session } from "better-auth";
 
 import type { LegacySymphonyStore } from "../application/legacy/symphony.ts";
@@ -58,4 +59,12 @@ export function ensureRequestId(ctx: TrpcContext): string {
   ctx.requestId = requestId;
   ctx.responseHeaders?.set(FULCRUM_REQUEST_ID_HEADER, requestId);
   return requestId;
+}
+
+export function requireTrpcEntityManager(
+  ctx: Pick<TrpcContext, "em">,
+  message = "EntityManager could not be resolved.",
+): EntityManager {
+  if (ctx.em) return ctx.em;
+  throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
 }

@@ -17,22 +17,18 @@
  *   static value imports so SvelteKit SSR bundle stays clean.
  *
  * C6: No raw SQL.
- * C7: MikroORM v7 em.create / em.persistAndFlush / em.upsert / em.flush.
- * C8: Repositories resolved from ctx.container or ctx.em.
+ * Persistence dependency resolution stays in the tRPC composition context.
  */
-
-import type { EntityManager } from "@mikro-orm/postgresql";
-import { TRPCError } from "@trpc/server";
 
 import { t } from "../../../trpc/trpc.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { publicProcedure } from "../../../trpc/trpc.ts";
+import { requireTrpcEntityManager } from "../../../trpc/context.ts";
 import { appErrorToTrpcError } from "../../../application/error-mapping.ts";
 import { AppError } from "../../../application/errors.ts";
 import {
   acceptInvitation,
   createInvitation,
-  requireAuthEntityManager,
   resolveApplicationSessionContext,
 } from "../../../application/auth/session-context.ts";
 import {
@@ -74,7 +70,9 @@ export const authRouter = t.router({
    * auth.whoami — returns current user + org info from session.
    */
   whoami: permissionedProcedure({ resource: "auth", action: "whoami" }).query(async ({ ctx }) => {
-    return mapAppError(() => authApplication.resolveApplicationSessionContext(ctx.em, appContext(ctx)));
+    return mapAppError(() =>
+      authApplication.resolveApplicationSessionContext(requireTrpcEntityManager(ctx), appContext(ctx))
+    );
   }),
 
   /**
@@ -85,7 +83,7 @@ export const authRouter = t.router({
     .input(InviteInputSchema)
     .mutation(async ({ ctx, input }) => {
       return mapAppError(() =>
-        authApplication.createInvitation(requireAuthEntityManager(ctx.em), appContext(ctx), input)
+        authApplication.createInvitation(requireTrpcEntityManager(ctx), appContext(ctx), input)
       );
     }),
 
@@ -97,7 +95,7 @@ export const authRouter = t.router({
     .input(AcceptInviteInputSchema)
     .mutation(async ({ ctx, input }) => {
       return mapAppError(() =>
-        authApplication.acceptInvitation(requireAuthEntityManager(ctx.em as EntityManager | null), {
+        authApplication.acceptInvitation(requireTrpcEntityManager(ctx), {
           token: input.token,
           ...(input.name === null || input.name === undefined ? {} : { name: input.name }),
         })

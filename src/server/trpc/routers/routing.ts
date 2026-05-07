@@ -1,5 +1,3 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import {
@@ -19,6 +17,7 @@ import {
 import { appErrorToTrpcError } from "../../../application/error-mapping.ts";
 import { AppError } from "../../../application/errors.ts";
 import { RoutingRuleSource } from "../../../db/entities/router/RoutingRule.ts";
+import { requireTrpcEntityManager } from "../../../trpc/context.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 
@@ -159,11 +158,6 @@ export function __setRoutingApplicationForTest(overrides: Partial<typeof routing
   return () => Object.assign(routingApplication, previous);
 }
 
-function requireEntityManager(ctx: { em: EntityManager | null }): EntityManager {
-  if (ctx.em) return ctx.em;
-  throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "EntityManager could not be resolved." });
-}
-
 function appContext(ctx: { orgId: string; userId: string }) {
   return { orgId: ctx.orgId, userId: ctx.userId, projectId: null };
 }
@@ -182,49 +176,49 @@ export const routingRouter = t.router({
     .input(ListInputSchema)
     .output(z.array(RoutingRuleOutputSchema))
     .query(({ ctx, input }) =>
-      mapAppError(() => routingApplication.listRoutingRules(requireEntityManager(ctx), appContext(ctx), input ?? {}))
+      mapAppError(() => routingApplication.listRoutingRules(requireTrpcEntityManager(ctx), appContext(ctx), input ?? {}))
     ),
 
   get: permissionedProcedure({ resource: "routing", action: "get" })
     .input(GetInputSchema)
     .output(RoutingRuleOutputSchema.nullable())
     .query(({ ctx, input }) =>
-      mapAppError(() => routingApplication.getRoutingRule(requireEntityManager(ctx), appContext(ctx), input.id))
+      mapAppError(() => routingApplication.getRoutingRule(requireTrpcEntityManager(ctx), appContext(ctx), input.id))
     ),
 
   create: permissionedProcedure({ resource: "routing", action: "create" })
     .input(CreateInputSchema)
     .output(RoutingRuleOutputSchema)
     .mutation(({ ctx, input }) =>
-      mapAppError(() => routingApplication.createRoutingRule(requireEntityManager(ctx), appContext(ctx), input))
+      mapAppError(() => routingApplication.createRoutingRule(requireTrpcEntityManager(ctx), appContext(ctx), input))
     ),
 
   update: permissionedProcedure({ resource: "routing", action: "update" })
     .input(UpdateInputSchema)
     .output(RoutingRuleOutputSchema.nullable())
     .mutation(({ ctx, input }) =>
-      mapAppError(() => routingApplication.updateRoutingRule(requireEntityManager(ctx), appContext(ctx), input))
+      mapAppError(() => routingApplication.updateRoutingRule(requireTrpcEntityManager(ctx), appContext(ctx), input))
     ),
 
   delete: permissionedProcedure({ resource: "routing", action: "delete" })
     .input(GetInputSchema)
     .output(z.object({ ok: z.literal(true) }))
     .mutation(({ ctx, input }) =>
-      mapAppError(() => routingApplication.deleteRoutingRule(requireEntityManager(ctx), appContext(ctx), input.id))
+      mapAppError(() => routingApplication.deleteRoutingRule(requireTrpcEntityManager(ctx), appContext(ctx), input.id))
     ),
 
   test: permissionedProcedure({ resource: "routing", action: "test" })
     .input(TestInputSchema)
     .output(RoutingEnrichedOutputSchema)
     .mutation(({ ctx, input }) =>
-      mapAppError(() => routingApplication.testRoutingRule(requireEntityManager(ctx), appContext(ctx), input))
+      mapAppError(() => routingApplication.testRoutingRule(requireTrpcEntityManager(ctx), appContext(ctx), input))
     ),
 
   dryRun: permissionedProcedure({ resource: "routing", action: "dryRun" })
     .input(DryRunInputSchema)
     .output(RoutingEnrichedOutputSchema)
     .query(({ ctx, input }) =>
-      mapAppError(() => routingApplication.dryRunRoutingRule(requireEntityManager(ctx), appContext(ctx), input))
+      mapAppError(() => routingApplication.dryRunRoutingRule(requireTrpcEntityManager(ctx), appContext(ctx), input))
     ),
 
   drafts: t.router({
@@ -262,7 +256,7 @@ export const routingRouter = t.router({
       .input(LlmGateUpdateSchema)
       .output(z.object({ ok: z.literal(true) }))
       .mutation(({ ctx, input }) =>
-        mapAppError(() => routingApplication.updateLlmGateConfig(requireEntityManager(ctx), appContext(ctx), input))
+        mapAppError(() => routingApplication.updateLlmGateConfig(requireTrpcEntityManager(ctx), appContext(ctx), input))
       ),
   }),
 });
