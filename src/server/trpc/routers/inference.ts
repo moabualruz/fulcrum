@@ -2,6 +2,11 @@ import { observable } from "@trpc/server/observable";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import {
+  markInferenceModelDownloaded,
+  markInferenceModelMissing,
+  type AdminAppContext,
+} from "../../../application/admin/queries.ts";
 import type { InferenceClient } from "../../../inference/client.ts";
 import type { BackendHealth } from "../../../inference/backends/types.ts";
 import {
@@ -58,51 +63,24 @@ const ModelInputSchema = z.object({
   force: z.boolean().optional(),
 });
 
-async function getOrgClass() {
-  const { Org } = await import("../../../db/entities/auth/Org.ts");
-  return Org;
-}
-
-async function getModelCacheClass() {
-  const { ModelCache } = await import("../../../db/entities/inference/ModelCache.ts");
-  return ModelCache;
+function appContext(ctx: TRPCContext): AdminAppContext | null {
+  const { orgId, userId, em, container } = ctx;
+  if (!orgId || !userId) return null;
+  return { orgId, userId, em, container };
 }
 
 async function syncModelDownloaded(ctx: TRPCContext, modelId: string): Promise<void> {
-  if (!ctx.em || !ctx.orgId) return;
-  const Org = await getOrgClass();
-  const org = await ctx.em.findOne(Org, { id: ctx.orgId } as never);
-  if (!org) return;
+  const appCtx = appContext(ctx);
+  if (!appCtx) return;
   const client = await resolveClient(ctx);
   const model = (await client.listModels()).find((item) => item.id === modelId);
-  if (!model) return;
-  const ModelCache = await getModelCacheClass();
-  const repo = ctx.em.getRepository(ModelCache) as unknown as {
-    markDownloaded(input: {
-      org: typeof org;
-      modelId: string;
-      kind: string;
-      sizeBytes?: number;
-    }): Promise<unknown>;
-  };
-  await repo.markDownloaded({
-    org,
-    modelId,
-    kind: model.kind,
-    sizeBytes: model.sizeBytesActual ?? model.sizeBytes,
-  });
+  await markInferenceModelDownloaded(appCtx, modelId, model);
 }
 
 async function syncModelMissing(ctx: TRPCContext, modelId: string): Promise<void> {
-  if (!ctx.em || !ctx.orgId) return;
-  const Org = await getOrgClass();
-  const org = await ctx.em.findOne(Org, { id: ctx.orgId } as never);
-  if (!org) return;
-  const ModelCache = await getModelCacheClass();
-  const repo = ctx.em.getRepository(ModelCache) as unknown as {
-    markMissing(input: { org: typeof org; modelId: string }): Promise<unknown>;
-  };
-  await repo.markMissing({ org, modelId });
+  const appCtx = appContext(ctx);
+  if (!appCtx) return;
+  await markInferenceModelMissing(appCtx, modelId);
 }
 
 async function findBoundClient(container: TRPCContext["container"]): Promise<InferenceClient | null> {

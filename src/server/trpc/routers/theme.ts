@@ -1,33 +1,24 @@
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import {
+  getLegacyThemeSettings,
+  getThemeSetting,
+  listThemeSettings,
+  setThemeSetting,
+  THEME_DEFAULTS,
+  ThemeSettingsRepository,
+  updateLegacyThemeSettings,
+  type AdminAppContext,
+  type LegacyThemeSettings,
+  type ThemeKey,
+  type ThemeSetting,
+} from "../../../application/admin/queries.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
-import type { AuthenticatedContext } from "../../../trpc/middleware.ts";
 
-export const THEME_DEFAULTS = {
-  "theme.accent": "#6D28D9",
-  "theme.radius": "8px",
-  "theme.font-family": "Inter, system-ui, sans-serif",
-  "theme.spacing-unit": "4px",
-  "theme.animation-duration": "150ms",
-  "theme.dark-mode": "auto",
-} as const;
+export { THEME_DEFAULTS, ThemeSettingsRepository, type ThemeKey, type ThemeSetting };
 
-export type ThemeKey = keyof typeof THEME_DEFAULTS;
-
-export type ThemeSetting = {
-  key: ThemeKey;
-  value: string;
-  defaultValue: string;
-};
-
-export type RawThemeSetting = {
-  key: string;
-  value: string;
-};
-
-const LegacyThemeSettingsSchema = z.object({
+const LegacyThemeSettingsSchema: z.ZodType<LegacyThemeSettings> = z.object({
   accentHue: z.number().min(0).max(360),
   accentSaturation: z.number().min(0).max(100),
   accentLightness: z.number().min(0).max(100),
@@ -39,31 +30,12 @@ const LegacyThemeSettingsSchema = z.object({
   preset: z.enum(["default", "ocean", "forest", "sunset", "monochrome"]),
 });
 
-type LegacyThemeSettings = z.infer<typeof LegacyThemeSettingsSchema>;
-
-const LEGACY_THEME_DEFAULTS: LegacyThemeSettings = {
-  accentHue: 262,
-  accentSaturation: 83,
-  accentLightness: 58,
-  radius: 0.5,
-  fontFamily: "inter",
-  colorScheme: "auto",
-  compactMode: false,
-  animationSpeed: "normal",
-  preset: "default",
-};
-
-export abstract class ThemeSettingsRepository {
-  abstract listThemeSettings(orgId: string, userId: string): Promise<RawThemeSetting[]>;
-  abstract upsertThemeSetting(orgId: string, userId: string, key: string, value: string): Promise<void>;
-}
-
 const ThemeKeyInputSchema = z.union([
   z.enum(Object.keys(THEME_DEFAULTS) as [ThemeKey, ...ThemeKey[]]),
   z.enum(["accent", "radius", "font-family", "spacing-unit", "animation-duration", "dark-mode"]),
 ]);
 
-const ThemeSettingSchema = z.object({
+const ThemeSettingSchema: z.ZodType<ThemeSetting> = z.object({
   key: z.enum(Object.keys(THEME_DEFAULTS) as [ThemeKey, ...ThemeKey[]]),
   value: z.string(),
   defaultValue: z.string(),
@@ -75,134 +47,31 @@ const SetThemeInputSchema = z.object({
   value: z.string().min(1),
 });
 
-function normalizeThemeKey(key: z.infer<typeof ThemeKeyInputSchema>): ThemeKey {
-  const normalized = key.startsWith("theme.") ? key : `theme.${key}`;
-  if (normalized in THEME_DEFAULTS) return normalized as ThemeKey;
-  throw new TRPCError({
-    code: "BAD_REQUEST",
-    message: `Unknown theme key '${key}'.`,
-  });
-}
-
-function validateThemeValue(key: ThemeKey, value: string): string {
-  const trimmed = value.trim();
-
-  if (key === "theme.accent" && !/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "theme.accent must be a 6-digit HEX color.",
-    });
-  }
-
-  if (key === "theme.dark-mode" && !["light", "dark", "auto"].includes(trimmed)) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "theme.dark-mode must be light, dark, or auto.",
-    });
-  }
-
-  return trimmed;
-}
-
-function repoFromContext(ctx: AuthenticatedContext): ThemeSettingsRepository {
-  if (!ctx.container?.has(ThemeSettingsRepository)) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Theme settings repository is not configured.",
-    });
-  }
-
-  return ctx.container.get(ThemeSettingsRepository);
-}
-
-async function readThemeMap(ctx: AuthenticatedContext): Promise<Map<ThemeKey, string>> {
-  const repo = repoFromContext(ctx);
-  const overrides = await repo.listThemeSettings(ctx.orgId, ctx.userId);
-  const values = new Map<ThemeKey, string>();
-
-  for (const item of overrides) {
-    if (!(item.key in THEME_DEFAULTS)) continue;
-    values.set(item.key as ThemeKey, item.value);
-  }
-
-  return values;
-}
-
-async function readRawThemeMap(ctx: AuthenticatedContext): Promise<Map<string, string>> {
-  const repo = repoFromContext(ctx);
-  const overrides = await repo.listThemeSettings(ctx.orgId, ctx.userId);
-  return new Map(overrides.map((item) => [item.key, item.value]));
-}
-
-function legacyKey(key: keyof LegacyThemeSettings): string {
-  return `theme.web.${key}`;
-}
-
-function legacyThemeSettings(overrides: Map<string, string>): LegacyThemeSettings {
-  return {
-    accentHue: Number(overrides.get(legacyKey("accentHue")) ?? LEGACY_THEME_DEFAULTS.accentHue),
-    accentSaturation: Number(overrides.get(legacyKey("accentSaturation")) ?? LEGACY_THEME_DEFAULTS.accentSaturation),
-    accentLightness: Number(overrides.get(legacyKey("accentLightness")) ?? LEGACY_THEME_DEFAULTS.accentLightness),
-    radius: Number(overrides.get(legacyKey("radius")) ?? LEGACY_THEME_DEFAULTS.radius),
-    fontFamily: (overrides.get(legacyKey("fontFamily")) ?? LEGACY_THEME_DEFAULTS.fontFamily) as LegacyThemeSettings["fontFamily"],
-    colorScheme: (overrides.get(legacyKey("colorScheme")) ?? LEGACY_THEME_DEFAULTS.colorScheme) as LegacyThemeSettings["colorScheme"],
-    compactMode: (overrides.get(legacyKey("compactMode")) ?? String(LEGACY_THEME_DEFAULTS.compactMode)) === "true",
-    animationSpeed: (overrides.get(legacyKey("animationSpeed")) ?? LEGACY_THEME_DEFAULTS.animationSpeed) as LegacyThemeSettings["animationSpeed"],
-    preset: (overrides.get(legacyKey("preset")) ?? LEGACY_THEME_DEFAULTS.preset) as LegacyThemeSettings["preset"],
-  };
-}
-
-function themeSetting(key: ThemeKey, overrides: Map<ThemeKey, string>): ThemeSetting {
-  const defaultValue = THEME_DEFAULTS[key];
-  return {
-    key,
-    value: overrides.get(key) ?? defaultValue,
-    defaultValue,
-  };
+function appContext({ orgId, userId, em, container }: AdminAppContext): AdminAppContext {
+  return { orgId, userId, em, container };
 }
 
 export const themeRouter = t.router({
   get: permissionedProcedure({ resource: "theme", action: "getTheme" })
     .output(LegacyThemeSettingsSchema)
-    .query(async ({ ctx }) => legacyThemeSettings(await readRawThemeMap(ctx))),
+    .query(async ({ ctx }) => getLegacyThemeSettings(appContext(ctx))),
 
   update: permissionedProcedure({ resource: "theme", action: "setTheme" })
     .input(LegacyThemeSettingsSchema)
     .output(LegacyThemeSettingsSchema)
-    .mutation(async ({ ctx, input }) => {
-      const repo = repoFromContext(ctx);
-      for (const [key, value] of Object.entries(input) as Array<[keyof LegacyThemeSettings, LegacyThemeSettings[keyof LegacyThemeSettings]]>) {
-        await repo.upsertThemeSetting(ctx.orgId, ctx.userId, legacyKey(key), String(value));
-      }
-      return input;
-    }),
+    .mutation(async ({ ctx, input }) => updateLegacyThemeSettings(appContext(ctx), input)),
 
   listThemes: permissionedProcedure({ resource: "theme", action: "listThemes" })
     .output(z.array(ThemeSettingSchema))
-    .query(async ({ ctx }) => {
-      const overrides = await readThemeMap(ctx);
-      return (Object.keys(THEME_DEFAULTS) as ThemeKey[]).map((key) =>
-        themeSetting(key, overrides),
-      );
-    }),
+    .query(async ({ ctx }) => listThemeSettings(appContext(ctx))),
 
   getTheme: permissionedProcedure({ resource: "theme", action: "getTheme" })
     .input(GetThemeInputSchema)
     .output(ThemeSettingSchema)
-    .query(async ({ ctx, input }) => {
-      const key = normalizeThemeKey(input.key);
-      const overrides = await readThemeMap(ctx);
-      return themeSetting(key, overrides);
-    }),
+    .query(async ({ ctx, input }) => getThemeSetting(appContext(ctx), input.key)),
 
   setTheme: permissionedProcedure({ resource: "theme", action: "setTheme" })
     .input(SetThemeInputSchema)
     .output(ThemeSettingSchema)
-    .mutation(async ({ ctx, input }) => {
-      const key = normalizeThemeKey(input.key);
-      const value = validateThemeValue(key, input.value);
-      const repo = repoFromContext(ctx);
-      await repo.upsertThemeSetting(ctx.orgId, ctx.userId, key, value);
-      return { key, value, defaultValue: THEME_DEFAULTS[key] };
-    }),
+    .mutation(async ({ ctx, input }) => setThemeSetting(appContext(ctx), input)),
 });

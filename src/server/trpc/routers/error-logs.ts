@@ -1,32 +1,17 @@
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { ErrorLog } from "../../../db/entities/platform/ErrorLog.ts";
+import {
+  clearErrorLogs,
+  ErrorLogStore,
+  getErrorLog,
+  listErrorLogs,
+  type AdminAppContext,
+  type ErrorLogRecord,
+} from "../../../application/admin/queries.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
-import type { AuthenticatedContext } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 
-export interface ErrorLogRecord {
-  id: string;
-  orgId: string;
-  userId: string | null;
-  occurredAt: Date;
-  os?: string | null;
-  arch?: string | null;
-  bunVersion?: string | null;
-  fulcrumVersion?: string | null;
-  recentCliCommand?: string | null;
-  recentTrpcProcedure?: string | null;
-  errorMessage: string;
-  stackTrace?: string | null;
-  context: Record<string, unknown>;
-}
-
-export abstract class ErrorLogStore {
-  abstract list(orgId: string, input: { limit: number; since?: Date }): Promise<ErrorLogRecord[]>;
-  abstract get(orgId: string, id: string): Promise<ErrorLogRecord | null>;
-  abstract clear(orgId: string, input: { before?: Date }): Promise<number>;
-}
+export { ErrorLogStore, type ErrorLogRecord };
 
 const IsoDateInputSchema = z.string().datetime().transform((value) => new Date(value));
 const ListInputSchema = z.object({
@@ -52,90 +37,26 @@ const ErrorLogOutputSchema = z.object({
   context: z.record(z.string(), z.unknown()),
 });
 
-function entityToRecord(entity: ErrorLog): ErrorLogRecord {
-  const org = entity.org as unknown as { id?: string } | string;
-  const user = entity.user as unknown as { id?: string } | string | undefined;
-
-  return {
-    id: entity.id,
-    orgId: typeof org === "string" ? org : org.id ?? "",
-    userId: user ? (typeof user === "string" ? user : user.id ?? null) : null,
-    occurredAt: entity.occurredAt,
-    os: entity.os ?? null,
-    arch: entity.arch ?? null,
-    bunVersion: entity.bunVersion ?? null,
-    fulcrumVersion: entity.fulcrumVersion ?? null,
-    recentCliCommand: entity.recentCliCommand ?? null,
-    recentTrpcProcedure: entity.recentTrpcProcedure ?? null,
-    errorMessage: entity.errorMessage,
-    stackTrace: entity.stackTrace ?? null,
-    context: entity.context ?? {},
-  };
-}
-
-class MikroErrorLogStore extends ErrorLogStore {
-  constructor(private readonly ctx: AuthenticatedContext) {
-    super();
-  }
-
-  private repo() {
-    if (!this.ctx.em) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Error log repository is not configured.",
-      });
-    }
-    return this.ctx.em.getRepository(ErrorLog);
-  }
-
-  async list(orgId: string, input: { limit: number; since?: Date }) {
-    const where = input.since
-      ? { org: orgId, occurredAt: { $gte: input.since } }
-      : { org: orgId };
-    const rows = await this.repo().find(where as never, {
-      orderBy: { occurredAt: "DESC" },
-      limit: input.limit,
-    });
-    return rows.map(entityToRecord);
-  }
-
-  async get(orgId: string, id: string) {
-    const row = await this.repo().findOne({ id, org: orgId } as never);
-    return row ? entityToRecord(row) : null;
-  }
-
-  async clear(orgId: string, input: { before?: Date }) {
-    const where = input.before
-      ? { org: orgId, occurredAt: { $lt: input.before } }
-      : { org: orgId };
-    const rows = await this.repo().find(where as never);
-    this.ctx.em!.remove(rows);
-    await this.ctx.em!.flush();
-    return rows.length;
-  }
-}
-
-function storeFromContext(ctx: AuthenticatedContext): ErrorLogStore {
-  if (ctx.container?.has(ErrorLogStore)) return ctx.container.get(ErrorLogStore);
-  return new MikroErrorLogStore(ctx);
+function appContext({ orgId, userId, em, container }: AdminAppContext): AdminAppContext {
+  return { orgId, userId, em, container };
 }
 
 export const errorLogsRouter = t.router({
   list: permissionedProcedure({ resource: "error_logs", action: "list" })
     .input(ListInputSchema)
     .output(z.array(ErrorLogOutputSchema))
-    .query(({ ctx, input }) => storeFromContext(ctx).list(ctx.orgId, input)),
+    .query(({ ctx, input }) => listErrorLogs(appContext(ctx), input)),
 
   get: permissionedProcedure({ resource: "error_logs", action: "get" })
     .input(GetInputSchema)
     .output(ErrorLogOutputSchema.nullable())
-    .query(({ ctx, input }) => storeFromContext(ctx).get(ctx.orgId, input.id)),
+    .query(({ ctx, input }) => getErrorLog(appContext(ctx), input.id)),
 
   clear: permissionedProcedure({ resource: "error_logs", action: "clear" })
     .input(ClearInputSchema)
     .output(z.object({ ok: z.literal(true), deleted: z.number().int().nonnegative() }))
     .mutation(async ({ ctx, input }) => ({
       ok: true as const,
-      deleted: await storeFromContext(ctx).clear(ctx.orgId, input),
+      deleted: await clearErrorLogs(appContext(ctx), input),
     })),
 });
