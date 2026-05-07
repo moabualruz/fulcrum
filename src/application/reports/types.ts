@@ -22,3 +22,45 @@ export interface CreateReportSnapshotInput {
   completedCount?: number;
   pointsCompleted?: number;
 }
+
+export type ReportScopeType = "sprint" | "project" | "epic" | "workspace";
+
+export interface DateRange {
+  start: Date;
+  end: Date;
+}
+
+export interface BurndownPoint {
+  date: string;
+  pointsRemaining: number;
+  ideal: number;
+}
+
+export interface ReportBurndownInput {
+  projectId: string;
+  sprintId: string;
+}
+
+export interface ScopedReportInput {
+  scopeType: ReportScopeType;
+  scopeId?: string;
+  dateRange: DateRange;
+}
+
+export interface ReportExportCsvInput extends ScopedReportInput {
+  reportType:
+    | "burndown"
+    | "burnup"
+    | "velocity"
+    | "cfd"
+    | "cycleTime"
+    | "leadTime"
+    | "throughput"
+    | "wipOverTime"
+    | "workload"
+    | "blockedItems"
+    | "staleIssues"
+    | "progressRollup";
+  lastN: number;
+  thresholdDays: number;
+}
