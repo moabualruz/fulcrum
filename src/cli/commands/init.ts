@@ -1,71 +1,11 @@
-import { mkdir } from "node:fs/promises";
-
-import { PGlite } from "@electric-sql/pglite";
-import { Container } from "@needle-di/core";
-import { MikroORM, type Options } from "@mikro-orm/postgresql";
-import { Migrator } from "@mikro-orm/migrations";
-
-import { PGliteKyselyDialect } from "../../db/PGliteKyselyDriver.ts";
-import { registerDbBindings } from "../../db/db.module.ts";
-import { Org } from "../../db/entities/auth/Org.ts";
-import { createOrmConfig } from "../../db/mikro-orm.config.ts";
-import { MigratorService } from "../../db/migrator-service.ts";
-import { SeedService } from "../../db/seed.ts";
-import { registerSeedBindings } from "../../db/seed.module.ts";
-import { resolveDatabaseConfig } from "../../config/database.ts";
-
-function includeOrgEntity(config: Options): Options {
-  const entities = config.entities ?? [];
-  if (Array.isArray(entities) && !entities.includes(Org)) {
-    return { ...config, entities: [...entities, Org] };
-  }
-  return config;
-}
-
-async function openLocalOrm(): Promise<{ orm: MikroORM; pglite: PGlite }> {
-  const database = resolveDatabaseConfig();
-  if (database.backend !== "pglite") {
-    throw new Error("fulcrum init currently requires the pglite backend. Run fulcrum db migrate for PostgreSQL.");
-  }
-
-  await mkdir(database.dataDir, { recursive: true });
-  const pglite = new PGlite(database.dataDir);
-  await pglite.waitReady;
-  const dialect = new PGliteKyselyDialect(() => pglite);
-  const config = includeOrgEntity(createOrmConfig({ pglite, debug: false }));
-  const orm = await MikroORM.init({
-    ...config,
-    driverOptions: dialect,
-    extensions: [Migrator],
-    migrations: {
-      ...config.migrations,
-      transactional: false,
-      allOrNothing: false,
-    },
-  });
-  return { orm, pglite };
-}
+import { initializeLocalDatabase } from "../../application/init/queries.ts";
 
 export async function run(_argv: readonly string[] = []): Promise<void> {
-  const { orm, pglite } = await openLocalOrm();
-  try {
-    const container = new Container();
-    registerDbBindings(container, orm);
-    registerSeedBindings(container);
-
-    await container.get(MigratorService).migrate();
-
-    const orgRepo = orm.em.fork().getRepository(Org);
-    const hadOrg = (await orgRepo.count()) > 0;
-    await container.get(SeedService).run();
-    if (!hadOrg) {
-      console.log("✓ Local org bootstrapped");
-      return;
-    }
-
-    console.log("✓ Already initialized");
-  } finally {
-    await orm.close(true);
-    await pglite.close();
+  const status = await initializeLocalDatabase();
+  if (status === "bootstrapped") {
+    console.log("✓ Local org bootstrapped");
+    return;
   }
+
+  console.log("✓ Already initialized");
 }

@@ -1,5 +1,5 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
-import { Org } from "../../../../db/entities/auth/Org.ts";
+import { resolveOrgId } from "../../../../application/auth/org-context.ts";
 import { initDatabase } from "./db.ts";
 
 export async function requestEntityManager(): Promise<EntityManager> {
@@ -8,9 +8,7 @@ export async function requestEntityManager(): Promise<EntityManager> {
 }
 
 export async function resolveDefaultOrgId(em: EntityManager): Promise<string> {
-  const org = await em.findOne(Org, { slug: "default" } as never);
-  if (!org) throw new Error("default org not found — run fulcrum init first");
-  return org.id;
+  return resolveOrgId(em, "default");
 }
 
 export {
