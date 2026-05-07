@@ -5,7 +5,7 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { randomUUID } from "node:crypto";
 
-export function ormSqlConnection(manager: EntityManager) {
+export function sqlAccess(manager: EntityManager) {
   return manager.getConnection();
 }
 

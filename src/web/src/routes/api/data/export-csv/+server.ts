@@ -5,7 +5,7 @@ import type { RequestHandler } from "@sveltejs/kit";
 import { join } from "node:path";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
+import { requestAppScope } from "$lib/server/application-scope";
 import { isFeatureEnabled } from "../../../../../../data/features.ts";
 import { exportTasksToCsv } from "../../../../../../data/csv-export.ts";
 import { listTasks } from "../../../../../../application/tasks/queries.ts";
@@ -17,7 +17,7 @@ function jsonError(msg: string, status = 400): Response {
   });
 }
 
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async ({ url, locals }) => {
   if (!isFeatureEnabled("export-csv")) {
     return jsonError("Feature export-csv not enabled", 403);
   }
@@ -27,9 +27,8 @@ export const GET: RequestHandler = async ({ url }) => {
     return jsonError(`Unknown entity: ${entity}`);
   }
 
-  const em = await getEm();
-  const orgId = await getDefaultOrgIdOrm(em);
-  const rows = (await listTasks(em, { orgId, userId: null }, {}))
+  const { em, ctx } = await requestAppScope(locals);
+  const rows = (await listTasks(em, ctx, {}))
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id))
     .map((task) => ({
       id: task.id,

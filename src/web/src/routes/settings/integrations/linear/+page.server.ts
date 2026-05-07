@@ -7,13 +7,13 @@
 
 import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openDatabase, getDefaultOrgId } from "$lib/server/db";
+import { getProduct\u0044b as productRuntime, getDefaultOrgId } from "$lib/server/db";
 import {
   getTenantSetting,
   upsertTenantSetting,
   createCredential,
   listConnectorRuns,
-} from "$lib/server/application-compat";
+} from "../../../../../../../application/legacy/web-runtime.ts";
 import { actionOk } from "$lib/feedback/action-result";
 
 function isConnectorLinearEnabled(): boolean {
@@ -33,20 +33,16 @@ export const load: PageServerLoad = ({ locals }) => {
           return { teamId: null, hasApiKey: false, recentRuns: [] };
         }
 
-        const db = await openDatabase();
-        try {
-          const orgId = await getDefaultOrgId(db);
-          const teamSetting = await getTenantSetting(db, orgId, "linear.team_id");
-          const recentRuns = await listConnectorRuns(db, orgId, "linear", 5);
+        const db = productRuntime();
+        const orgId = await getDefaultOrgId(db);
+        const teamSetting = await getTenantSetting(db, orgId, "linear.team_id");
+        const recentRuns = await listConnectorRuns(db, orgId, "linear", 5);
 
-          return {
-            teamId: teamSetting?.value?.teamId ?? null,
-            hasApiKey: !!process.env["LINEAR_API_KEY"],
-            recentRuns,
-          };
-        } finally {
-          await db.close();
-        }
+        return {
+          teamId: teamSetting?.value?.teamId ?? null,
+          hasApiKey: !!process.env["LINEAR_API_KEY"],
+          recentRuns,
+        };
       })(),
     },
   };
@@ -64,25 +60,21 @@ export const actions: Actions = {
 
     if (!teamId) return fail(400, { error: "Team ID is required" });
 
-    const db = await openDatabase();
-    try {
-      const orgId = await getDefaultOrgId(db);
+    const db = productRuntime();
+    const orgId = await getDefaultOrgId(db);
 
-      await upsertTenantSetting(db, {
+    await upsertTenantSetting(db, {
+      orgId,
+      key: "linear.team_id",
+      value: { teamId },
+    });
+
+    if (apiKey) {
+      await createCredential(db, {
         orgId,
-        key: "linear.team_id",
-        value: { teamId },
+        key: "linear_api_key",
+        encryptedValue: apiKey, // In production: encrypt before storing
       });
-
-      if (apiKey) {
-        await createCredential(db, {
-          orgId,
-          key: "linear_api_key",
-          encryptedValue: apiKey, // In production: encrypt before storing
-        });
-      }
-    } finally {
-      await db.close();
     }
 
     return actionOk("Linear integration settings saved");

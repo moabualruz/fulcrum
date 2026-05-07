@@ -6,7 +6,7 @@ import type { RequestHandler } from "@sveltejs/kit";
 import { join } from "node:path";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
+import { requestAppScope } from "$lib/server/application-scope";
 import { isFeatureEnabled } from "../../../../../../data/features.ts";
 import { importCsv } from "../../../../../../data/csv-import.ts";
 import { createTask } from "../../../../../../application/tasks/commands.ts";
@@ -18,7 +18,7 @@ function jsonError(msg: string, status = 400): Response {
   });
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
   if (!isFeatureEnabled("import-csv")) {
     return jsonError("Feature import-csv not enabled", 403);
   }
@@ -62,12 +62,11 @@ export const POST: RequestHandler = async ({ request }) => {
       return jsonError((err as Error).message);
     }
 
-    const em = await getEm();
-    const orgId = await getDefaultOrgIdOrm(em);
+    const { em, ctx } = await requestAppScope(locals);
 
     let written = 0;
     for (const record of parsed.records) {
-      await createTask(em, { orgId, userId: null }, {
+      await createTask(em, ctx, {
         title: record["title"] as string,
         status: record["status"] ?? "pending",
         description: record["description"] ?? null,

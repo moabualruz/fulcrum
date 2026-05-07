@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { __resetDefaultOrmForTest, initOrm } from "../../../../db/mikro-orm.config.ts";
-import { ormSqlConnection } from "./orm-helpers.ts";
+import { sqlAccess } from "./orm-helpers.ts";
 
 export type OrmDbValue = string | number | boolean | null | Date | Uint8Array;
 
@@ -157,7 +157,7 @@ function createOrmDb(
   em: EntityManager,
   closeRuntime: () => Promise<void>,
 ): WebDatabaseHandle {
-  const conn = ormSqlConnection(em);
+  const conn = sqlAccess(em);
   return {
     async query<T = Record<string, unknown>>(
       sql: string,
@@ -180,7 +180,7 @@ function createOrmDb(
 
 async function hasExistingSchema(em: EntityManager): Promise<boolean> {
   try {
-    await ormSqlConnection(em).execute("SELECT 1 FROM orgs LIMIT 1");
+    await sqlAccess(em).execute("SELECT 1 FROM orgs LIMIT 1");
     return true;
   } catch {
     return false;

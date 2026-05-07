@@ -1,5 +1,5 @@
 import type { RequestHandler } from "@sveltejs/kit";
-import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
+import { requestAppScope } from "$lib/server/application-scope";
 import {
   installSkill,
   upgradeSkill,
@@ -23,7 +23,7 @@ function jsonOk(data: unknown, status = 200): Response {
   });
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
   let payload: Record<string, unknown>;
   try {
     payload = (await request.json()) as Record<string, unknown>;
@@ -34,8 +34,8 @@ export const POST: RequestHandler = async ({ request }) => {
   const action = payload.action as string | undefined;
   if (!action) return jsonError("action is required");
 
-  const em = await getEm();
-  const orgId = await getDefaultOrgIdOrm(em);
+  const { em, ctx } = await requestAppScope(locals);
+  const orgId = ctx.orgId;
 
   switch (action) {
     case "install": {

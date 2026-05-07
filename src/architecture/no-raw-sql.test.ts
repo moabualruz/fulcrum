@@ -42,27 +42,10 @@ const WEB_DATA_HANDLE_COMPOSITION_ROOTS = new Map([
 ]);
 
 const EXPECTED_WEB_DATA_HANDLE_FILES = [
-  "src/web/src/lib/server/em.ts",
-  "src/web/src/lib/server/feature-flags.ts",
-  "src/web/src/lib/server/orm-helpers.ts",
-  "src/web/src/lib/server/projects.ts",
-  "src/web/src/lib/server/settings.ts",
-  "src/web/src/lib/server/skills.ts",
-  "src/web/src/lib/server/sprints.ts",
-  "src/web/src/lib/server/task-detail.ts",
   "src/web/src/routes/agents/+page.server.ts",
   "src/web/src/routes/agents/[name]/+page.server.ts",
-  "src/web/src/routes/api/bell/+server.ts",
-  "src/web/src/routes/api/data/export-csv/+server.ts",
-  "src/web/src/routes/api/data/import-csv/+server.ts",
-  "src/web/src/routes/api/skills/+server.ts",
-  "src/web/src/routes/docs/+page.server.ts",
-  "src/web/src/routes/docs/[id]/edit/+page.server.ts",
   "src/web/src/routes/memory/[id]/+page.server.ts",
   "src/web/src/routes/projects/new/+page.server.ts",
-  "src/web/src/routes/runs/[id]/artifacts/+page.server.ts",
-  "src/web/src/routes/search/+page.server.ts",
-  "src/web/src/routes/settings/integrations/linear/+page.server.ts",
   "src/web/src/routes/settings/notifications/+page.server.ts",
   "src/web/src/routes/settings/skills/+page.server.ts",
 ];

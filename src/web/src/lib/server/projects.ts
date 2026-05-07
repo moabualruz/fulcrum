@@ -1,6 +1,5 @@
-import type { LegacyDatabaseHandle } from "./application-compat";
-import { createProject } from "./application-compat";
-import { eventDispatcher } from "./application-compat";
+import type { SqlExecutor } from "../../../../db/sql.ts";
+import { createProject, eventDispatcher } from "../../../../application/legacy/web-runtime.ts";
 
 export interface CreateProjectInput {
   orgId: string;
@@ -17,7 +16,7 @@ export interface UpdateProjectInput {
 }
 
 export async function createProjectAction(
-  db: LegacyDatabaseHandle,
+  db: SqlExecutor,
   input: CreateProjectInput,
 ): Promise<{ id: string }> {
   const project = await createProject(db, input);
@@ -25,7 +24,7 @@ export async function createProjectAction(
 }
 
 export async function updateProjectAction(
-  db: LegacyDatabaseHandle,
+  db: SqlExecutor,
   input: UpdateProjectInput,
 ): Promise<{ ok: true }> {
   if (!input.id) throw new Error("updateProjectAction: id is required");
@@ -69,7 +68,7 @@ export async function updateProjectAction(
 }
 
 export async function deleteProjectAction(
-  db: LegacyDatabaseHandle,
+  db: SqlExecutor,
   id: string,
   orgId: string,
 ): Promise<{ ok: true }> {

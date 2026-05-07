@@ -1,7 +1,7 @@
 import type { PageServerLoad } from "./$types";
 import { listDocs } from "../../../../application/docs/queries.ts";
 import { buildDocTree, type DocScope, type DocTreeNode } from "$lib/components/docs/doc-tree";
-import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
+import { requestAppScope } from "$lib/server/application-scope";
 
 interface DocRow {
   id: string;
@@ -55,9 +55,8 @@ export const load: PageServerLoad = ({ url, locals }) => {
     q,
     streamed: {
       data: (async () => {
-        const em = locals.em ?? await getEm();
-        const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
-        const allDocs = await listDocs(em, { orgId, userId: null, projectId: activeProjectId });
+        const { em, ctx } = await requestAppScope(locals, activeProjectId);
+        const allDocs = await listDocs(em, ctx);
         let documents = allDocs.map((doc) => toDocRow(doc, kind));
         if (kind) documents = documents.filter((doc) => doc.kind === kind);
         if (q.trim()) {

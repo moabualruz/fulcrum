@@ -1,5 +1,5 @@
 import type { PageServerLoad } from "./$types";
-import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
+import { requestAppScope } from "$lib/server/application-scope";
 import { listArtifacts } from "../../../../../../../application/artifacts/queries.ts";
 
 export const load: PageServerLoad = ({ params, locals }) => {
@@ -10,9 +10,8 @@ export const load: PageServerLoad = ({ params, locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const em = await getEm();
-        const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
-        const artifacts = (await listArtifacts(em, { orgId, userId: null, projectId: locals?.activeProjectId ?? null }))
+        const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+        const artifacts = (await listArtifacts(em, ctx))
           .map((artifact) => ({
             id: artifact.id,
             org_id: artifact.orgId,

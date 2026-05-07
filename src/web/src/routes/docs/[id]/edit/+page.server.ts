@@ -6,7 +6,7 @@ import { superValidate } from "sveltekit-superforms/server";
 import { valibot } from "sveltekit-superforms/adapters";
 import { DocumentFormSchema } from "../../../../lib/server/documents.schema.ts";
 import { updateDocumentAction } from "../../../../lib/server/documents.ts";
-import { getEm, getDefaultOrgIdOrm } from "../../../../lib/server/em.ts";
+import { requestAppScope } from "../../../../lib/server/application-scope.ts";
 import { parseLabels, serializeLabels } from "../../../../lib/markdown/labels.ts";
 import { createDocumentVersion, getNextVersionNumber } from "../../../../lib/server/doc-versions.ts";
 
@@ -24,10 +24,12 @@ interface DocRow {
 
 interface LoadEvent {
   params: { id: string };
+  locals: App.Locals;
 }
 
 interface ActionEvent {
   params: { id: string };
+  locals: App.Locals;
   request: Request;
 }
 
@@ -38,9 +40,9 @@ function extractLabels(fm: Record<string, unknown>): string[] {
     : [];
 }
 
-export const load = async ({ params }: LoadEvent) => {
-  const em = await getEm();
-  const orgId = await getDefaultOrgIdOrm(em);
+export const load = async ({ params, locals }: LoadEvent) => {
+  const { em, ctx } = await requestAppScope(locals);
+  const orgId = ctx.orgId;
   const rows = await em.getKysely<any>()
     .selectFrom("documents")
     .select(["id", "org_id", "project_id", "doc_type as kind", "title", "body_md as body", "content_json", "frontmatter", "updated_at"])
@@ -77,11 +79,11 @@ export const load = async ({ params }: LoadEvent) => {
 };
 
 export const actions = {
-  default: async ({ params, request }: ActionEvent) => {
+  default: async ({ params, request, locals }: ActionEvent) => {
     const form = await superValidate(request, valibot(DocumentFormSchema));
     if (!form.valid) return fail(400, { form });
-    const em = await getEm();
-    const orgId = await getDefaultOrgIdOrm(em);
+    const { em, ctx } = await requestAppScope(locals);
+    const orgId = ctx.orgId;
     // Re-read current frontmatter so non-form keys (e.g. `id`, `status`,
     // anything 04.2's `readFrontmatterForm` would route to `rawFrontmatter`)
     // survive the round-trip — issue 15 byte-stability follow-up depends

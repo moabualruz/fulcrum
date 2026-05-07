@@ -1,4 +1,4 @@
-import type { LegacyDatabaseHandle } from "./application-compat";
+import type { SqlExecutor } from "../../../../db/sql.ts";
 import {
   createSprint,
   listSprints,
@@ -12,7 +12,7 @@ import {
   type SprintRow,
   type TaskRow,
   type MetricsSnapshot,
-} from "./application-compat";
+} from "../../../../application/legacy/web-runtime.ts";
 
 export type SprintStatus = "planning" | "active" | "completed" | "cancelled";
 
@@ -31,7 +31,7 @@ export interface CreateSprintInput {
 }
 
 export async function createSprintAction(
-  db: LegacyDatabaseHandle,
+  db: SqlExecutor,
   input: CreateSprintInput,
 ): Promise<{ id: string }> {
   const sprint = await createSprint(db, input);
@@ -39,42 +39,42 @@ export async function createSprintAction(
 }
 
 export async function listSprintsAction(
-  db: LegacyDatabaseHandle,
+  db: SqlExecutor,
   projectId: string,
 ): Promise<SprintRow[]> {
   return listSprints(db, projectId);
 }
 
 export async function addTaskToSprintAction(
-  db: LegacyDatabaseHandle,
+  db: SqlExecutor,
   input: { sprintId: string; taskId: string },
 ): Promise<{ ok: true }> {
   return addTaskToSprint(db, input);
 }
 
 export async function removeTaskFromSprintAction(
-  db: LegacyDatabaseHandle,
+  db: SqlExecutor,
   input: { sprintId: string; taskId: string },
 ): Promise<{ ok: true }> {
   return removeTaskFromSprint(db, input);
 }
 
 export async function listBacklogTasksAction(
-  db: LegacyDatabaseHandle,
+  db: SqlExecutor,
   projectId: string,
 ): Promise<TaskRow[]> {
   return listBacklogTasks(db, projectId);
 }
 
 export async function listSprintTasksAction(
-  db: LegacyDatabaseHandle,
+  db: SqlExecutor,
   sprintId: string,
 ): Promise<TaskRow[]> {
   return listSprintTasks(db, sprintId);
 }
 
 export async function startSprintAction(
-  db: LegacyDatabaseHandle,
+  db: SqlExecutor,
   sprintId: string,
 ): Promise<{ id: string }> {
   const sprint = await updateSprint(db, { id: sprintId, status: "active" });
@@ -82,7 +82,7 @@ export async function startSprintAction(
 }
 
 export async function completeSprintAction(
-  db: LegacyDatabaseHandle,
+  db: SqlExecutor,
   sprintId: string,
 ): Promise<{ id: string; metrics: MetricsSnapshot }> {
   const { sprint, metrics } = await closeSprint(db, sprintId);
@@ -97,7 +97,7 @@ export interface CapacityInfo {
 }
 
 export async function getSprintCapacity(
-  db: LegacyDatabaseHandle,
+  db: SqlExecutor,
   sprintId: string,
   capacityPoints: number | null,
 ): Promise<CapacityInfo> {

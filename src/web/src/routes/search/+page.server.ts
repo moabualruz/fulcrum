@@ -1,5 +1,5 @@
 import type { ServerLoad, Actions } from "@sveltejs/kit";
-import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
+import { requestAppScope } from "$lib/server/application-scope";
 import {
   listSavedSearches,
   saveSearch,
@@ -18,17 +18,19 @@ function groupBySourceKind(hits: SearchHit[]): GroupedSearchHits {
   return grouped;
 }
 
-export const load: ServerLoad = async ({ url }) => {
+export const load: ServerLoad = async ({ url, locals }) => {
   const q = (url.searchParams.get("q") ?? "").trim();
   const kindsParam = url.searchParams.get("kinds") ?? "";
   const kinds = kindsParam.length > 0 ? kindsParam.split(",").map((k) => k.trim()).filter(Boolean) : [];
   const dateFrom = (url.searchParams.get("date_from") ?? "").trim();
   const dateTo = (url.searchParams.get("date_to") ?? "").trim();
 
-  const em = await getEm();
+  let em;
   let orgId: string;
   try {
-    orgId = await getDefaultOrgIdOrm(em);
+    const scope = await requestAppScope(locals);
+    em = scope.em;
+    orgId = scope.ctx.orgId;
   } catch {
     return { q, kinds, dateFrom, dateTo, hits: [], grouped: {}, savedSearches: [] };
   }
@@ -61,7 +63,7 @@ export const load: ServerLoad = async ({ url }) => {
 };
 
 export const actions: Actions = {
-  saveSearch: async ({ request }) => {
+  saveSearch: async ({ request, locals }) => {
     const form = await request.formData();
     const name = (form.get("name") as string ?? "").trim();
     const q = (form.get("q") as string ?? "").trim();
@@ -71,12 +73,11 @@ export const actions: Actions = {
 
     if (!name) return { error: "name required" };
 
-    const em = await getEm();
     try {
-      const orgId = await getDefaultOrgIdOrm(em);
+      const { em, ctx } = await requestAppScope(locals);
 
       const params: SearchParams = { q, kinds: kinds ? kinds.split(",") : [], dateFrom, dateTo };
-      await saveSearch(em, { orgId, userId: "local" }, { owner: "local", name, params });
+      await saveSearch(em, { ...ctx, userId: ctx.userId ?? "local" }, { owner: "local", name, params });
       return { saved: true };
     } catch {
       return { error: "no org" };
