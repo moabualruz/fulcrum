@@ -1,7 +1,7 @@
 /**
  * workflowsRouter — Phase 05 Plan 04.
  *
- * tRPC surface for WorkflowService: transition validation, methodology,
+ * tRPC adapter for workflow transition validation, methodology,
  * enabled task types.
  *
  * Security: permissionedProcedure enforces session + org scope.
@@ -10,14 +10,48 @@
 
 import { z } from "zod";
 
+import {
+  updateEnabledTaskTypes,
+  updateMethodology,
+  updateTransitions,
+} from "../../../application/workflows/commands.ts";
+import {
+  getDefaultWorkflow,
+  getEnabledTaskTypes,
+  getMethodology,
+  getTransitions,
+  validateTransition,
+  type Methodology,
+  type WorkflowAppContext,
+} from "../../../application/workflows/queries.ts";
+import { appErrorToTrpcError } from "../../../application/error-mapping.ts";
+import { AppError } from "../../../application/errors.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
-import { WorkflowService } from "../../../services/WorkflowService.ts";
 
 // ── Schemas ────────────────────────────────────────────────────────────────────
 
 const MethodologySchema = z.enum(["scrum", "kanban", "none"]);
 const TaskTypeSchema = z.enum(["epic", "task", "subtask", "bug"]);
+type EntityManager = import("@mikro-orm/postgresql").EntityManager;
+
+function requireEntityManager(em: EntityManager | null): EntityManager {
+  if (!em) throw new Error("No entity manager");
+  return em;
+}
+
+function appContext(ctx: { orgId: string; userId: string }): WorkflowAppContext {
+  return { orgId: ctx.orgId, userId: ctx.userId };
+}
+
+async function mapAppError<T>(fn: () => Promise<T> | T): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AppError) throw appErrorToTrpcError(error);
+    throw error;
+  }
+}
 
 // ── Router ─────────────────────────────────────────────────────────────────────
 
@@ -25,9 +59,7 @@ export const workflowsRouter = t.router({
   getTransitions: permissionedProcedure({ resource: "workflows", action: "list" })
     .input(z.object({ projectId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new WorkflowService(ctx.em);
-      return svc.getTransitionGraph(ctx.orgId, input.projectId);
+      return mapAppError(() => getTransitions(requireEntityManager(ctx["em"]), appContext(ctx), input));
     }),
 
   updateTransitions: permissionedProcedure({ resource: "workflows", action: "update" })
@@ -36,9 +68,7 @@ export const workflowsRouter = t.router({
       transitions: z.record(z.string(), z.array(z.string())),
     }))
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new WorkflowService(ctx.em);
-      await svc.updateTransitions(ctx.orgId, input.projectId, input.transitions);
+      await mapAppError(() => updateTransitions(requireEntityManager(ctx["em"]), appContext(ctx), input));
     }),
 
   validateTransition: permissionedProcedure({ resource: "workflows", action: "list" })
@@ -48,9 +78,7 @@ export const workflowsRouter = t.router({
       toStatus: z.string(),
     }))
     .query(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new WorkflowService(ctx.em);
-      return svc.validateTransition(ctx.orgId, input.projectId, input.fromStatus, input.toStatus);
+      return mapAppError(() => validateTransition(requireEntityManager(ctx["em"]), appContext(ctx), input));
     }),
 
   getDefault: permissionedProcedure({ resource: "workflows", action: "list" })
@@ -58,17 +86,13 @@ export const workflowsRouter = t.router({
       methodology: MethodologySchema.optional().default("kanban"),
     }))
     .query(({ input }) => {
-      // getDefaultWorkflow is pure — no DB needed
-      const svc = new WorkflowService(null as never);
-      return svc.getDefaultWorkflow(input.methodology);
+      return getDefaultWorkflow(input.methodology);
     }),
 
   getMethodology: permissionedProcedure({ resource: "workflows", action: "list" })
     .input(z.object({ projectId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new WorkflowService(ctx.em);
-      return svc.getMethodology(ctx.orgId, input.projectId);
+      return mapAppError(() => getMethodology(requireEntityManager(ctx["em"]), appContext(ctx), input));
     }),
 
   updateMethodology: permissionedProcedure({ resource: "workflows", action: "update" })
@@ -78,17 +102,16 @@ export const workflowsRouter = t.router({
       resetWorkflow: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new WorkflowService(ctx.em);
-      await svc.updateMethodology(ctx.orgId, input.projectId, input.methodology, input.resetWorkflow);
+      await mapAppError(() => updateMethodology(requireEntityManager(ctx["em"]), appContext(ctx), {
+        ...input,
+        methodology: input.methodology as Methodology,
+      }));
     }),
 
   getEnabledTaskTypes: permissionedProcedure({ resource: "workflows", action: "list" })
     .input(z.object({ projectId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new WorkflowService(ctx.em);
-      return svc.getEnabledTaskTypes(ctx.orgId, input.projectId);
+      return mapAppError(() => getEnabledTaskTypes(requireEntityManager(ctx["em"]), appContext(ctx), input));
     }),
 
   updateEnabledTaskTypes: permissionedProcedure({ resource: "workflows", action: "update" })
@@ -97,9 +120,7 @@ export const workflowsRouter = t.router({
       types: z.array(TaskTypeSchema),
     }))
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new WorkflowService(ctx.em);
-      await svc.updateEnabledTaskTypes(ctx.orgId, input.projectId, input.types);
+      await mapAppError(() => updateEnabledTaskTypes(requireEntityManager(ctx["em"]), appContext(ctx), input));
     }),
 });
 

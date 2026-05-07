@@ -1,7 +1,7 @@
 /**
  * automationsRouter — Phase 05 Plan 06
  *
- * tRPC surface for AutomationService: CRUD + predefined templates.
+ * tRPC adapter for automation CRUD + predefined templates.
  *
  * Security:
  *   T-05-15: Only project members can create/modify automations (permissionedProcedure).
@@ -11,10 +11,23 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import {
+  createAutomation,
+  deleteAutomation,
+  updateAutomation,
+  type AutomationCondition,
+} from "../../../application/automations/commands.ts";
+import {
+  getAutomationTemplates,
+  listAutomations,
+  type AutomationAppContext,
+} from "../../../application/automations/queries.ts";
+import { appErrorToTrpcError } from "../../../application/error-mapping.ts";
+import { AppError } from "../../../application/errors.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
-import { AutomationService } from "../../../services/AutomationService.ts";
-import { getEventBus } from "../../../subscriptions/event-bus.ts";
+
+type EntityManager = import("@mikro-orm/postgresql").EntityManager;
 
 // ── Schemas ────────────────────────────────────────────────────────
 
@@ -36,14 +49,27 @@ const AutomationConfigSchema = z.object({
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-function resolveService(ctx: { em: import("@mikro-orm/postgresql").EntityManager | null }): AutomationService {
-  if (!ctx.em) {
+function requireEntityManager(em: EntityManager | null): EntityManager {
+  if (!em) {
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
-      message: "AutomationService could not be resolved: no EntityManager in context.",
+      message: "EntityManager could not be resolved.",
     });
   }
-  return new AutomationService(ctx.em, getEventBus());
+  return em;
+}
+
+function appContext(ctx: { orgId: string; userId: string }): AutomationAppContext {
+  return { orgId: ctx.orgId, userId: ctx.userId };
+}
+
+async function mapAppError<T>(fn: () => Promise<T> | T): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AppError) throw appErrorToTrpcError(error);
+    throw error;
+  }
 }
 
 // ── Router ─────────────────────────────────────────────────────────
@@ -53,22 +79,22 @@ export const automationsRouter = t.router({
   list: permissionedProcedure({ resource: "automations", action: "list" })
     .input(z.object({ projectId: z.string().uuid() }))
     .query(({ ctx, input }) => {
-      return resolveService(ctx).list(ctx.orgId, input.projectId);
+      return mapAppError(() => listAutomations(requireEntityManager(ctx["em"]), appContext(ctx), input));
     }),
 
   // Create a new automation rule
   create: permissionedProcedure({ resource: "automations", action: "create" })
     .input(AutomationConfigSchema)
     .mutation(({ ctx, input }) => {
-      return resolveService(ctx).create(ctx.orgId, {
+      return mapAppError(() => createAutomation(requireEntityManager(ctx["em"]), appContext(ctx), {
         projectId: input.projectId,
         name: input.name,
         triggerType: input.triggerType,
         triggerConfig: input.triggerConfig ?? null,
-        condition: input.condition ?? null,
+        condition: input.condition as AutomationCondition | null | undefined ?? null,
         actionType: input.actionType,
         actionConfig: input.actionConfig ?? null,
-      });
+      }));
     }),
 
   // Update an existing automation rule
@@ -86,19 +112,22 @@ export const automationsRouter = t.router({
       }),
     )
     .mutation(({ ctx, input }) => {
-      return resolveService(ctx).update(ctx.orgId, input);
+      return mapAppError(() => updateAutomation(requireEntityManager(ctx["em"]), appContext(ctx), {
+        ...input,
+        condition: input.condition as AutomationCondition | null | undefined,
+      }));
     }),
 
   // Delete an automation rule
   delete: permissionedProcedure({ resource: "automations", action: "delete" })
     .input(z.object({ id: z.string().uuid() }))
     .mutation(({ ctx, input }) => {
-      return resolveService(ctx).delete(ctx.orgId, input.id);
+      return mapAppError(() => deleteAutomation(requireEntityManager(ctx["em"]), appContext(ctx), input));
     }),
 
   // Get predefined automation templates (D-92)
   templates: permissionedProcedure({ resource: "automations", action: "list" })
     .query(({ ctx }) => {
-      return resolveService(ctx).getTemplates();
+      return mapAppError(() => getAutomationTemplates(requireEntityManager(ctx["em"])));
     }),
 });
