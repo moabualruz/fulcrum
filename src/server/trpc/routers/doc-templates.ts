@@ -5,25 +5,15 @@
  *   docs.templates.list({ projectId? })   → DocTemplateRow[]
  *   docs.templates.resolve({ docType, projectId }) → DocTemplateRow | null
  *
- * Service resolution order:
- *   1. DOC_TEMPLATE_SERVICE_TOKEN bound in ctx.container (tests inject mock)
- *   2. EntityManagerDocTemplateService built from ctx.em (production)
- *
- * C6: No raw SQL.
- * C7: MikroORM EntityManager via EntityManagerDocTemplateService fallback.
- * C8: needle-di token for DI.
+ * Application layer owns service resolution and template persistence.
  */
 
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import { DocTypeEnum } from "../../../application/docs/types.ts";
+import { listDocTemplates, resolveDocTemplate } from "../../../application/templates/queries.ts";
 import { t } from "../../../trpc/trpc.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
-import {
-  DOC_TEMPLATE_SERVICE_TOKEN,
-  type DocTemplateService,
-} from "../../../docs/doc-template-service.ts";
-import { DocTypeEnum } from "../../../db/entities/docs/enums.ts";
 
 // ─── Output schema ────────────────────────────────────────────────────────────
 
@@ -39,34 +29,8 @@ const DocTemplateRowSchema = z.object({
   createdAt: z.union([z.string(), z.date().transform((date) => date.toISOString())]),
 });
 
-// ─── Service resolver ─────────────────────────────────────────────────────────
-
-async function resolveService(
-  ctx: {
-    container: import("@needle-di/core").Container | null;
-    em: import("@mikro-orm/postgresql").EntityManager | null;
-  },
-): Promise<DocTemplateService> {
-  if (ctx.container) {
-    try {
-      return ctx.container.get(DOC_TEMPLATE_SERVICE_TOKEN);
-    } catch {
-      // not bound — fall through to em-based impl
-    }
-  }
-
-  if (ctx.em) {
-    const { EntityManagerDocTemplateService } = await import(
-      "../../../docs/em-doc-template-service.ts"
-    );
-    return new EntityManagerDocTemplateService(ctx.em);
-  }
-
-  throw new TRPCError({
-    code: "INTERNAL_SERVER_ERROR",
-    message: "DocTemplateService is not available (no container token or EntityManager).",
-  });
-}
+type EntityManager = import("@mikro-orm/postgresql").EntityManager;
+type Container = import("@needle-di/core").Container;
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
@@ -83,8 +47,12 @@ export const docTemplatesRouter = t.router({
     )
     .output(z.array(DocTemplateRowSchema))
     .query(async ({ ctx, input }) => {
-      const svc = await resolveService(ctx);
-      return svc.list(ctx.orgId!, input.projectId);
+      return listDocTemplates(
+        (ctx as Record<string, unknown>)["em"] as EntityManager | null,
+        (ctx as Record<string, unknown>)["container"] as Container | null,
+        { orgId: ctx.orgId },
+        input.projectId,
+      );
     }),
 
   /**
@@ -100,8 +68,13 @@ export const docTemplatesRouter = t.router({
     )
     .output(DocTemplateRowSchema.nullable())
     .query(async ({ ctx, input }) => {
-      const svc = await resolveService(ctx);
-      return svc.resolve(ctx.orgId!, input.projectId, input.docType);
+      return resolveDocTemplate(
+        (ctx as Record<string, unknown>)["em"] as EntityManager | null,
+        (ctx as Record<string, unknown>)["container"] as Container | null,
+        { orgId: ctx.orgId },
+        input.projectId,
+        input.docType,
+      );
     }),
 });
 

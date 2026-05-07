@@ -6,17 +6,34 @@
 
 import { z } from "zod";
 
+import {
+  applyTemplate,
+  createTemplate,
+  deleteTemplate,
+  listTemplates,
+  setDefaultTemplate,
+} from "../../../application/templates/queries.ts";
+import type { AppContext } from "../../../application/templates/types.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
-import { TemplateService } from "../../../services/TemplateService.ts";
+
+type EntityManager = import("@mikro-orm/postgresql").EntityManager;
+
+function requireEntityManager(ctx: Record<string, unknown>): EntityManager {
+  const em = ctx["em"] as EntityManager | null | undefined;
+  if (!em) throw new Error("No entity manager");
+  return em;
+}
+
+function appContext(ctx: { orgId: string; userId: string }): AppContext {
+  return { orgId: ctx.orgId, userId: ctx.userId };
+}
 
 export const templatesRouter = t.router({
   list: permissionedProcedure({ resource: "tasks", action: "list" })
     .input(z.object({ projectId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new TemplateService(ctx.em);
-      return svc.list(ctx.orgId, input.projectId);
+      return listTemplates(requireEntityManager(ctx), appContext(ctx), input.projectId);
     }),
 
   create: permissionedProcedure({ resource: "tasks", action: "create" })
@@ -27,16 +44,7 @@ export const templatesRouter = t.router({
       description: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new TemplateService(ctx.em);
-      return svc.create(
-        ctx.orgId,
-        input.projectId ?? null,
-        input.name,
-        input.templateData,
-        ctx.userId,
-        input.description,
-      );
+      return createTemplate(requireEntityManager(ctx), appContext(ctx), input);
     }),
 
   applyTemplate: permissionedProcedure({ resource: "tasks", action: "list" })
@@ -45,17 +53,13 @@ export const templatesRouter = t.router({
       overrides: z.record(z.string(), z.unknown()).optional(),
     }))
     .query(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new TemplateService(ctx.em);
-      return svc.apply(ctx.orgId, input.templateId, input.overrides ?? {});
+      return applyTemplate(requireEntityManager(ctx), appContext(ctx), input.templateId, input.overrides ?? {});
     }),
 
   delete: permissionedProcedure({ resource: "tasks", action: "delete" })
     .input(z.object({ templateId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new TemplateService(ctx.em);
-      await svc.delete(ctx.orgId, input.templateId);
+      await deleteTemplate(requireEntityManager(ctx), appContext(ctx), input.templateId);
     }),
 
   setDefault: permissionedProcedure({ resource: "tasks", action: "update" })
@@ -64,9 +68,7 @@ export const templatesRouter = t.router({
       templateId: z.string().uuid(),
     }))
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.em) throw new Error("No entity manager");
-      const svc = new TemplateService(ctx.em);
-      await svc.setDefault(ctx.orgId, input.projectId, input.templateId);
+      await setDefaultTemplate(requireEntityManager(ctx), appContext(ctx), input.projectId, input.templateId);
     }),
 });
 

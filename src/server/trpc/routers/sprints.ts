@@ -1,9 +1,19 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import {
+  addTaskToSprint,
+  closeSprint,
+  createSprint,
+  deleteSprint,
+  removeTaskFromSprint,
+  startSprint,
+  updateSprint,
+} from "../../../application/sprints/commands.ts";
+import { getSprint, listSprints } from "../../../application/sprints/queries.ts";
+import type { AppContext } from "../../../application/sprints/types.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
-import { SprintService } from "../../../services/SprintService.ts";
 
 // ── Schemas ────────────────────────────────────────────────────────
 
@@ -87,11 +97,16 @@ const CloseSprintOutputSchema = z.object({
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-function requireService(ctx: { em: EntityManager | null }): SprintService {
-  if (!ctx.em) {
+function requireEntityManager(ctx: Record<string, unknown>): EntityManager {
+  const em = (ctx as Record<string, unknown>)["em"] as EntityManager | null | undefined;
+  if (!em) {
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "EntityManager could not be resolved." });
   }
-  return new SprintService(ctx.em);
+  return em;
+}
+
+function appContext(ctx: { orgId: string; userId: string }): AppContext {
+  return { orgId: ctx.orgId, userId: ctx.userId, projectId: null };
 }
 
 // ── Router (thin delegation layer) ─────────────────────────────────
@@ -101,64 +116,63 @@ export const sprintsRouter = t.router({
     .input(ListSprintsInputSchema)
     .output(z.array(SprintOutputSchema))
     .query(async ({ ctx, input }) => {
-      if (!ctx.em) return [];
-      return requireService(ctx).list(ctx.orgId, input ?? undefined);
+      return listSprints(requireEntityManager(ctx), appContext(ctx), input ?? undefined);
     }),
 
   get: permissionedProcedure({ resource: "sprints", action: "get" })
     .input(SprintIdInputSchema)
     .output(SprintOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
-      return requireService(ctx).get(ctx.orgId, input.id);
+      return getSprint(requireEntityManager(ctx), appContext(ctx), input.id);
     }),
 
   create: permissionedProcedure({ resource: "sprints", action: "create" })
     .input(CreateSprintInputSchema)
     .output(SprintOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      return requireService(ctx).create(ctx.orgId, input);
+      return createSprint(requireEntityManager(ctx), appContext(ctx), input);
     }),
 
   update: permissionedProcedure({ resource: "sprints", action: "update" })
     .input(UpdateSprintInputSchema)
     .output(SprintOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
-      return requireService(ctx).update(ctx.orgId, input);
+      return updateSprint(requireEntityManager(ctx), appContext(ctx), input);
     }),
 
   delete: permissionedProcedure({ resource: "sprints", action: "delete" })
     .input(SprintIdInputSchema)
     .output(SprintOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
-      return requireService(ctx).delete(ctx.orgId, input.id);
+      return deleteSprint(requireEntityManager(ctx), appContext(ctx), input.id);
     }),
 
   start: permissionedProcedure({ resource: "sprints", action: "start" })
     .input(SprintIdInputSchema)
     .output(SprintOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      return requireService(ctx).start(ctx, input.id);
+      return startSprint(requireEntityManager(ctx), appContext(ctx), input.id);
     }),
 
   close: permissionedProcedure({ resource: "sprints", action: "close" })
     .input(CloseSprintInputSchema)
     .output(CloseSprintOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      return requireService(ctx).close(ctx, input);
+      return closeSprint(requireEntityManager(ctx), appContext(ctx), input);
     }),
 
   addTask: permissionedProcedure({ resource: "sprints", action: "addTask" })
     .input(SprintTaskInputSchema)
     .output(MoveTaskOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      return requireService(ctx).addTask(ctx.orgId, input.sprintId, input.taskId);
+      return addTaskToSprint(requireEntityManager(ctx), appContext(ctx), input.sprintId, input.taskId);
     }),
 
   removeTask: permissionedProcedure({ resource: "sprints", action: "removeTask" })
     .input(SprintTaskInputSchema)
     .output(MoveTaskOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      return requireService(ctx).removeTask(ctx.orgId, input.sprintId, input.taskId);
+      return removeTaskFromSprint(requireEntityManager(ctx), appContext(ctx), input.sprintId, input.taskId);
     }),
 });
 
