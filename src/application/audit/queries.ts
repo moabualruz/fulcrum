@@ -14,10 +14,28 @@ import type {
   RetentionPolicyDto,
 } from "./types.ts";
 
+type AuditRouteQueryInput = AuditQueryInput & {
+  actor?: string;
+  since?: string;
+  until?: string;
+};
+
+export interface EventRow {
+  id: string;
+  org_id: string;
+  project_id: string | null;
+  actor: string;
+  subject_kind: string;
+  subject_id: string;
+  verb: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
 export async function queryAuditEvents(
   em: EntityManager,
   ctx: AppContext,
-  input: AuditQueryInput = {},
+  input: AuditRouteQueryInput = {},
 ): Promise<AuditQueryResult> {
   const orgId = input.orgId ?? ctx.orgId;
   const limit = input.limit ?? 50;
@@ -33,13 +51,30 @@ export async function queryAuditEvents(
   const filtered = [
     ...rows.filter((event) => projectMatches(event, input.projectId)).map(serializeEvent),
     ...legacyRows.filter((event) => !input.projectId || event.projectId === input.projectId).map(serializeAuditEvent),
-  ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id));
+  ]
+    .filter((event) => !input.actor || event.userId === input.actor)
+    .filter((event) => !input.verb || event.verb === input.verb)
+    .filter((event) => !input.since || event.createdAt >= new Date(input.since))
+    .filter((event) => !input.until || event.createdAt <= new Date(input.until))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id));
 
   return {
     items: filtered.slice(offset, offset + limit),
     total: filtered.length,
     limit,
     offset,
+  };
+}
+
+export async function queryAuditEventRows(
+  em: EntityManager,
+  ctx: AppContext,
+  input: AuditRouteQueryInput = {},
+): Promise<{ rows: EventRow[]; total: number }> {
+  const result = await queryAuditEvents(em, ctx, input);
+  return {
+    rows: result.items.map(toEventRow),
+    total: result.total,
   };
 }
 
@@ -133,8 +168,11 @@ export function serializeRetentionPolicy(policy: EventRetentionPolicy): Retentio
   };
 }
 
-function buildEventWhere(orgId: string, filter: AuditFilter = {}) {
-  const range = filter.dateRange ?? defaultDateRange();
+function buildEventWhere(orgId: string, filter: AuditRouteQueryInput = {}) {
+  const range = filter.dateRange ?? {
+    from: filter.since ? new Date(filter.since) : defaultDateRange().from,
+    to: filter.until ? new Date(filter.until) : undefined,
+  };
   const createdAt: Record<string, Date> = {};
   if (range.from) createdAt.$gte = range.from;
   if (range.to) createdAt.$lte = range.to;
@@ -155,6 +193,25 @@ function defaultDateRange(): { from: Date; to?: Date } {
 function projectMatches(event: Event, projectId: string | undefined): boolean {
   if (!projectId) return true;
   return event.payload?.["projectId"] === projectId;
+}
+
+function payloadProjectId(payload: Record<string, unknown> | null | undefined): string | null {
+  const projectId = payload?.["projectId"];
+  return typeof projectId === "string" ? projectId : null;
+}
+
+function toEventRow(event: AuditEventDto): EventRow {
+  return {
+    id: event.id,
+    org_id: event.orgId,
+    project_id: payloadProjectId(event.payload),
+    actor: event.userId ?? "system",
+    subject_kind: event.subjectKind,
+    subject_id: event.subjectId ?? "",
+    verb: event.verb,
+    payload: event.payload ?? {},
+    created_at: event.createdAt.toISOString(),
+  };
 }
 
 function csvEscape(value: unknown): string {
@@ -179,4 +236,24 @@ function toCsv(rows: AuditEventDto[]): string {
     row.createdAt,
   ].map(csvEscape).join(","));
   return [headers.join(","), ...lines].join("\n");
+}
+
+export function eventsToCsv(events: EventRow[]): string {
+  const headers = ["id", "org_id", "project_id", "actor", "subject_kind", "subject_id", "verb", "payload", "created_at"];
+  const lines = events.map((event) => [
+    event.id,
+    event.org_id,
+    event.project_id ?? "",
+    event.actor,
+    event.subject_kind,
+    event.subject_id,
+    event.verb,
+    event.payload,
+    event.created_at,
+  ].map(csvEscape).join(","));
+  return [headers.join(","), ...lines].join("\n") + "\n";
+}
+
+export function eventsToJson(events: EventRow[]): string {
+  return JSON.stringify(events);
 }

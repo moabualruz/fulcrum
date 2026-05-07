@@ -1,8 +1,7 @@
 import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { memoryApplicationScope } from "../../../../application/memory/queries.ts";
-import { listMemories, createMemoryAction, type MemoryScope, MEMORY_SCOPES } from "$lib/server/memory";
-import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
+import { createMemoryAction, listMemoryRows, MEMORY_SCOPES, type MemoryScope } from "../../../../application/memory/queries.ts";
+import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = ({ url, locals }) => {
   const activeProjectId = locals?.activeProjectId ?? null;
@@ -14,13 +13,10 @@ export const load: PageServerLoad = ({ url, locals }) => {
     kind,
     streamed: {
       data: (async () => {
-        const em = locals.em ?? await getEm();
-        const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
-        const ctx = memoryApplicationScope({ orgId, userId: null, projectId: activeProjectId });
-        const memories = await listMemories(em, {
-          orgId: ctx.orgId,
+        const { em, ctx } = await requestAppScope(locals, activeProjectId);
+        const memories = await listMemoryRows(em, ctx, {
           scope: scope && MEMORY_SCOPES.includes(scope as MemoryScope) ? scope as MemoryScope : undefined,
-          kind: kind || undefined,
+          kind: kind ? kind as Parameters<typeof listMemoryRows>[2]["kind"] : undefined,
           projectId: ctx.projectId,
         });
         return { memories };
@@ -40,12 +36,9 @@ export const actions: Actions = {
     if (!body) return fail(400, { error: "Body is required" });
     if (!MEMORY_SCOPES.includes(scope as MemoryScope)) return fail(400, { error: "Invalid scope" });
 
-    const em = locals.em ?? await getEm();
-    const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
     const projectId = locals?.activeProjectId ?? null;
-    const ctx = memoryApplicationScope({ orgId, userId: null, projectId });
-    const { id } = await createMemoryAction(em, {
-      orgId: ctx.orgId,
+    const { em, ctx } = await requestAppScope(locals, projectId);
+    const { id } = await createMemoryAction(em, ctx, {
       projectId: scope === "global" ? null : ctx.projectId ?? null,
       scope: scope as MemoryScope,
       kind,

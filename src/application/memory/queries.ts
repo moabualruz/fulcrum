@@ -1,15 +1,45 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 
 import { Memory } from "../../db/entities/memory/Memory.ts";
+import type { MemoryKind, MemorySource } from "../../db/entities/memory/enums.ts";
 import { rankMemoryMatches } from "../../memory/retrieval/scoring.ts";
+import { createMemory } from "./commands.ts";
 import { AppNotFoundError } from "../errors.ts";
 import type {
+  CreateMemoryInput,
   ListMemoriesInput,
   MemoryApplicationContext,
   MemoryDto,
   RankedMemoryDto,
   SearchMemoryInput,
 } from "./types.ts";
+
+export type MemoryScope = "project" | "global" | "task" | "user";
+
+export interface WebMemoryRow {
+  id: string;
+  org_id: string;
+  project_id: string | null;
+  scope: MemoryScope;
+  kind: MemoryKind;
+  key: string;
+  body: string;
+  source: MemorySource | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateMemoryActionInput {
+  projectId: string | null;
+  scope: MemoryScope;
+  kind: string;
+  key: string;
+  body: string;
+}
+
+export const MEMORY_SCOPES: readonly MemoryScope[] = [
+  "project", "global", "task", "user",
+] as const;
 
 export function memoryApplicationScope(ctx: MemoryApplicationContext): MemoryApplicationContext {
   return ctx;
@@ -34,6 +64,37 @@ export async function listMemories(
     offset: input.offset ?? 0,
   } as never);
   return filterTags(memories, input.tags).map(serializeMemory);
+}
+
+export async function listMemoryRows(
+  em: EntityManager,
+  ctx: MemoryApplicationContext,
+  input: ListMemoriesInput & { scope?: MemoryScope } = {},
+): Promise<WebMemoryRow[]> {
+  const global = input.scope === "global" ? true : input.scope === "project" ? false : input.global;
+  const projectId = input.scope === "global" ? null : input.projectId;
+  const memories = await listMemories(em, ctx, {
+    ...input,
+    global,
+    projectId,
+    limit: input.limit ?? 100,
+  });
+  return memories.map(toWebMemoryRow);
+}
+
+export async function createMemoryAction(
+  em: EntityManager,
+  ctx: MemoryApplicationContext,
+  input: CreateMemoryActionInput,
+): Promise<{ id: string }> {
+  const memory = await createMemory(em, ctx, {
+    projectId: input.scope === "global" ? null : input.projectId,
+    global: input.scope === "global",
+    kind: input.kind as CreateMemoryInput["kind"],
+    body: input.body,
+    sourceRef: { key: input.key, scope: input.scope },
+  });
+  return { id: memory.id };
 }
 
 export async function searchMemories(
@@ -85,6 +146,21 @@ export function serializeMemory(memory: Memory): MemoryDto {
     createdAt: memory.createdAt,
     updatedAt: memory.updatedAt,
     archived: memory.archived,
+  };
+}
+
+function toWebMemoryRow(memory: MemoryDto): WebMemoryRow {
+  return {
+    id: memory.id,
+    org_id: memory.orgId,
+    project_id: memory.projectId,
+    scope: memory.global ? "global" : "project",
+    kind: memory.kind,
+    key: typeof memory.sourceRef["key"] === "string" ? memory.sourceRef["key"] : memory.id,
+    body: memory.body,
+    source: memory.source ?? null,
+    created_at: memory.createdAt.toISOString(),
+    updated_at: memory.updatedAt.toISOString(),
   };
 }
 

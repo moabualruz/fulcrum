@@ -1,6 +1,6 @@
 import type { ServerLoad } from "@sveltejs/kit";
-import { queryAuditEvents } from "../../../../application/audit/queries.ts";
-import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
+import { queryAuditEventRows } from "../../../../application/audit/queries.ts";
+import { requestAppScope } from "$lib/server/application-scope";
 
 export interface EventRow {
   id: string;
@@ -36,25 +36,18 @@ export const load: ServerLoad = async ({ url, locals }) => {
   const pageRaw = parseInt(url.searchParams.get("page") ?? "1", 10);
   const page = Number.isNaN(pageRaw) || pageRaw < 1 ? 1 : pageRaw;
 
-  const em = locals.em ?? await getEm();
-  const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
-  const result = await queryAuditEvents(em, { orgId, userId: null, projectId: project || null }, {
+  const { em, ctx } = await requestAppScope(locals, project || null);
+  const result = await queryAuditEventRows(em, ctx, {
     subjectKind: kind || undefined,
+    verb: verb || undefined,
+    actor: actor || undefined,
+    projectId: project || undefined,
+    since: dateFrom || undefined,
+    until: dateTo || undefined,
+    limit: 50,
+    offset: (page - 1) * 50,
   });
-  const events = result.items
-    .filter((event) => !project || event.projectId === project)
-    .filter((event) => !verb || event.action === verb)
-    .map((event) => ({
-      id: event.id,
-      org_id: event.orgId,
-      project_id: event.projectId,
-      actor: actor || "system",
-      subject_kind: event.subjectKind,
-      subject_id: event.subjectId,
-      verb: event.action,
-      payload: {},
-      created_at: new Date().toISOString(),
-    }));
+  const events = result.rows;
 
-  return { events, total: events.length, page, actor, kind, verb, project, dateFrom, dateTo } satisfies AuditData;
+  return { events, total: result.total, page, actor, kind, verb, project, dateFrom, dateTo } satisfies AuditData;
 };
