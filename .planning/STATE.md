@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-last_updated: "2026-05-07T01:46:35.062Z"
+last_updated: "2026-05-07T01:51:37.605Z"
 progress:
   total_phases: 11
   completed_phases: 8
   total_plans: 151
-  completed_plans: 107
-  percent: 71
+  completed_plans: 110
+  percent: 73
 ---
 
 # Planning State
@@ -17,7 +17,7 @@ progress:
 ## Current Position
 
 Phase: 09.5 (architecture-data-layer-remediation-full-interface-fix) — EXECUTING
-Plan: 8 of 14
+Plan: 9 of 14
 
 - **Phase**: 09-cross-cutting-testing
 - **Plan**: 10 of 10 completed
@@ -100,3 +100,4 @@ Plan: 8 of 14
 - [Phase 09.5]: Composition-root exceptions are exact and limited to web DB bootstrap, tRPC context, CLI bootstrap, and web DB data-handle bootstrap.
 - [Phase 09.5-28]: Plan 28 routers keep tRPC schemas and permission metadata while application modules own persistence and DB-adjacent branching.
 - [Phase 09.5-28]: Admin/status persistence was centralized in src/application/admin/queries.ts to preserve existing DTOs without new services.
+- [Phase 09.5-21]: Docs/comments/templates/skills/sprints tRPC routers delegate persistence through application command/query wrappers while routers retain schema/permission/context mapping.
