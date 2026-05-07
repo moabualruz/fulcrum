@@ -2,19 +2,18 @@ import { error } from "@sveltejs/kit";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import type { RequestHandler } from "./$types";
-import { openDatabase, getDefaultOrgId } from "$lib/server/db";
-import { readArtifactDetail } from "$lib/server/artifacts";
+import { requestAppScope } from "$lib/server/application-scope";
+import { getArtifactDetail } from "../../../../../../application/artifacts/queries.ts";
 import { assertArtifactPathInRoot, resolveArtifactStoreRoot } from "../../../../../../artifacts/storage.ts";
 
 const require = createRequire(import.meta.url);
 const { lookup } = require("mime-types") as { lookup: (filename: string) => string | false };
 
-export const GET: RequestHandler = async ({ params }) => {
-  const db = await openDatabase();
+export const GET: RequestHandler = async ({ params, locals }) => {
+  const { em, ctx } = await requestAppScope(locals);
   try {
-    const orgId = await getDefaultOrgId(db);
-    const artifact = await readArtifactDetail(db, { orgId, id: params.id });
-    if (!artifact || !artifact.body_path) throw error(404, "Artifact not found");
+    const artifact = await getArtifactDetail(em, ctx, params.id);
+    if (!artifact.body_path) throw error(404, "Artifact not found");
     let safePath: string;
     try {
       safePath = assertArtifactPathInRoot(resolveArtifactStoreRoot(), artifact.body_path);
@@ -28,8 +27,9 @@ export const GET: RequestHandler = async ({ params }) => {
         "content-disposition": `attachment; filename="${downloadFilename(artifact.title)}"`,
       },
     });
-  } finally {
-    await db.close();
+  } catch (err) {
+    if (err && typeof err === "object" && "status" in err) throw err;
+    throw error(404, "Artifact not found");
   }
 };
 

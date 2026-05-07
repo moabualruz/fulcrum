@@ -1,10 +1,12 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 
+import { deleteArtifact } from "../../artifacts/storage.ts";
 import { Org } from "../../db/entities/auth/Org.ts";
 import { AgentRun } from "../../db/entities/orchestration/AgentRun.ts";
 import { Artifact } from "../../db/entities/sandbox/Artifact.ts";
+import { deleteArtifactAction } from "../../services/artifacts.ts";
 import { AppValidationError } from "../errors.ts";
-import { serializeArtifact } from "./queries.ts";
+import { getArtifactDetail, serializeArtifact } from "./queries.ts";
 import type { AppContext, ArtifactDto, CreateArtifactInput } from "./types.ts";
 
 export async function createArtifact(em: EntityManager, ctx: AppContext, input: CreateArtifactInput): Promise<ArtifactDto> {
@@ -28,4 +30,30 @@ export async function createArtifact(em: EntityManager, ctx: AppContext, input: 
     await txEm.flush();
     return serializeArtifact(artifact);
   });
+}
+
+export async function deleteArtifactForWeb(
+  em: EntityManager,
+  ctx: AppContext,
+  input: { id: string; hard: boolean; confirm?: boolean },
+): Promise<void> {
+  const artifact = await getArtifactDetail(em, ctx, input.id);
+  const guard = await deleteArtifact({
+    artifact: {
+      id: artifact.id,
+      orgId: artifact.org_id,
+      archived: artifact.archived,
+      bodyPath: artifact.body_path,
+    },
+    callerOrgId: ctx.orgId,
+    hard: input.hard,
+    confirm: input.confirm,
+  });
+  if (!guard.ok && guard.reason === "confirmation_required") {
+    throw new AppValidationError("Hard delete requires confirmation");
+  }
+  if (!guard.ok) return;
+  if (input.hard) {
+    await deleteArtifactAction(em, input.id, ctx.orgId);
+  }
 }

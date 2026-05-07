@@ -1,11 +1,11 @@
 import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openDatabase, getDefaultOrgId } from "$lib/server/db";
+import { requestAppScope } from "$lib/server/application-scope";
 import {
   loadOrchestrationConfig,
-  upsertOrchestrationConfig,
   listWorkflowDefs,
 } from "$lib/server/orchestration";
+import { upsertOrchestrationConfig } from "../../../../../../application/orchestration/commands.ts";
 import { actionOk } from "$lib/feedback/action-result";
 
 export const load: PageServerLoad = ({ locals }) => {
@@ -13,30 +13,25 @@ export const load: PageServerLoad = ({ locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const db = await openDatabase();
-        try {
-          const orgId = await getDefaultOrgId(db);
-          const config = await loadOrchestrationConfig(db, orgId);
-          const workflows = await listWorkflowDefs(db, orgId);
-          return {
-            config: config ?? {
-              poll_interval_s: 5,
-              max_concurrency: 4,
-              stall_timeout_s: 300,
-              workspace_root: null,
-            },
-            workflows,
-          };
-        } finally {
-          await db.close();
-        }
+        const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+        const config = await loadOrchestrationConfig(em, ctx);
+        const workflows = await listWorkflowDefs(em, ctx);
+        return {
+          config: config ?? {
+            poll_interval_s: 5,
+            max_concurrency: 4,
+            stall_timeout_s: 300,
+            workspace_root: null,
+          },
+          workflows,
+        };
       })(),
     },
   };
 };
 
 export const actions: Actions = {
-  save: async ({ request }) => {
+  save: async ({ request, locals }) => {
     const form = await request.formData();
     const pollIntervalS = Number(form.get("poll_interval_s") ?? 5);
     const maxConcurrency = Number(form.get("max_concurrency") ?? 4);
@@ -50,18 +45,13 @@ export const actions: Actions = {
     if (stallTimeoutS < 10 || stallTimeoutS > 86400)
       return fail(400, { error: "Stall timeout must be 10-86400s" });
 
-    const db = await openDatabase();
-    try {
-      const orgId = await getDefaultOrgId(db);
-      await upsertOrchestrationConfig(db, orgId, {
-        pollIntervalS,
-        maxConcurrency,
-        stallTimeoutS,
-        workspaceRoot,
-      });
-    } finally {
-      await db.close();
-    }
+    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    await upsertOrchestrationConfig(em, ctx, {
+      pollIntervalS,
+      maxConcurrency,
+      stallTimeoutS,
+      workspaceRoot,
+    });
     return actionOk("Orchestration config saved");
   },
 };

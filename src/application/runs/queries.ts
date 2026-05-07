@@ -80,10 +80,19 @@ export interface RunEventRow {
 
 export async function listProjectRuns(em: EntityManager, ctx: AppContext): Promise<ProjectRunRow[]> {
   const rows = await ormSqlConnection(em).execute<ProjectRunRow[]>(
-    `SELECT id, agent, model, status, symphony_state, started_at, ended_at,
-            last_error_kind, retry_count, workspace_path
-       FROM agent_runs
-      WHERE org_id = $1 AND project_id = $2
+    `SELECT ar.id,
+            ar.agent_name AS agent,
+            ar.agent_version AS model,
+            ar.status,
+            NULL::text AS symphony_state,
+            ar.started_at,
+            NULL::timestamptz AS ended_at,
+            ar.last_error_kind,
+            ar.attempt_count AS retry_count,
+            ar.workspace_path
+       FROM agent_runs ar
+       LEFT JOIN tasks t ON t.id = ar.task_id
+      WHERE ar.org_id = $1 AND t.project_id = $2
       ORDER BY started_at DESC`,
     [ctx.orgId, ctx.projectId ?? null],
   );
@@ -98,13 +107,48 @@ export async function getProjectRunPageData(
   em: EntityManager,
   ctx: AppContext,
   runId: string,
-): Promise<{ run: AgentRunDetailRow; transcript: string | null; events: Array<RunEventRow & { created_at: string }> }> {
+): Promise<{
+  run: AgentRunDetailRow;
+  transcript: string | null;
+  artifacts: Array<{
+    id: string;
+    org_id: string;
+    project_id: string | null;
+    run_id: string | null;
+    task_id: string | null;
+    kind: string;
+    title: string;
+    body_path: string | null;
+    sha256: string | null;
+    size: number | null;
+    mime: string | null;
+    archived: boolean;
+    created_at: string;
+    downloadHref: string;
+  }>;
+  events: Array<RunEventRow & { created_at: string }>;
+}> {
   const conn = ormSqlConnection(em);
   const rows = await conn.execute<AgentRunDetailRow[]>(
-    `SELECT id, org_id, project_id, agent, model, prompt, status,
-            symphony_state, parent_run_id, started_at, ended_at,
-            transcript_path, last_error_kind, retry_count, workspace_path
-       FROM agent_runs WHERE id = $1 AND org_id = $2 AND project_id = $3`,
+    `SELECT ar.id,
+            ar.org_id,
+            t.project_id,
+            ar.agent_name AS agent,
+            ar.agent_version AS model,
+            ar.thread_id AS prompt,
+            ar.status,
+            NULL::text AS symphony_state,
+            NULL::text AS parent_run_id,
+            ar.started_at,
+            NULL::timestamptz AS ended_at,
+            ar.transcript_path,
+            ar.last_error_kind,
+            ar.attempt_count AS retry_count,
+            ar.workspace_path
+       FROM agent_runs ar
+       LEFT JOIN tasks t ON t.id = ar.task_id
+      WHERE ar.id = $1 AND ar.org_id = $2
+        AND ($3::text IS NULL OR t.project_id = $3)`,
     [runId, ctx.orgId, ctx.projectId ?? null],
   );
   const raw = rows[0];
@@ -125,6 +169,47 @@ export async function getProjectRunPageData(
     }
   }
 
+  const artifacts = (await conn.execute<Array<{
+    id: string;
+    org_id: string;
+    project_id: string | null;
+    run_id: string | null;
+    task_id: string | null;
+    kind: string;
+    title: string;
+    body_path: string | null;
+    sha256: string | null;
+    size: number | null;
+    mime: string | null;
+    archived: boolean;
+    created_at: string | Date;
+  }>>(
+    `SELECT a.id,
+            a.org_id,
+            t.project_id,
+            a.run_id,
+            a.task_id,
+            'artifact'::text AS kind,
+            a.filename AS title,
+            a.path AS body_path,
+            a.checksum_sha256 AS sha256,
+            a.size_bytes AS size,
+            a.mime,
+            false AS archived,
+            a.created_at
+       FROM artifacts a
+       LEFT JOIN tasks t ON t.id = a.task_id
+      WHERE a.run_id = $1 AND a.org_id = $2
+      ORDER BY a.created_at DESC, a.id ASC`,
+    [run.id, ctx.orgId],
+  )).map((artifact) => ({
+    ...artifact,
+    archived: Boolean(artifact.archived),
+    size: artifact.size === null ? null : Number(artifact.size),
+    created_at: isoStamp(artifact.created_at),
+    downloadHref: `/artifacts/${artifact.id}/download`,
+  }));
+
   const eventRows = await conn.execute<RunEventRow[]>(
     `SELECT * FROM events
       WHERE subject_kind = 'agent_run' AND subject_id = $1
@@ -136,7 +221,7 @@ export async function getProjectRunPageData(
     ...event,
     created_at: isoStamp(event.created_at),
   }));
-  return { run, transcript, events };
+  return { run, transcript, artifacts, events };
 }
 
 function isoStamp(value: string | Date): string {

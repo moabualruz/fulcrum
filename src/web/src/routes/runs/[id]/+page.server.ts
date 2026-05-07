@@ -1,12 +1,11 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { cancelRunAction, retryRunAction, type RunStatus } from "$lib/server/runs";
 import { getWorkspaceDiff, paginateLogs } from "$lib/server/agents";
 import { actionOk } from "$lib/feedback/action-result";
-import { getEm, getDefaultOrgIdOrm } from "$lib/server/em";
-import { getRunDetail } from "../../../../../../application/runs/queries.ts";
-import { listArtifacts } from "../../../../../../application/artifacts/queries.ts";
-import { Event } from "../../../../../../db/entities/core/Event.ts";
+import { requestAppScope } from "$lib/server/application-scope";
+import { cancelRun, retryRun } from "../../../../../../application/runs/commands.ts";
+import { getProjectRunPageData } from "../../../../../../application/runs/queries.ts";
+import type { RunStatus } from "../../../../../../services/runs.ts";
 
 interface AgentRunDetail {
   id: string;
@@ -46,101 +45,33 @@ export const load: PageServerLoad = ({ params, locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const em = await getEm();
-        const orgId = locals.orgId ?? await getDefaultOrgIdOrm(em);
-        const ctx = { orgId, userId: null, projectId: locals?.activeProjectId ?? null };
-        let runDto;
+        const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+        let data;
         try {
-          runDto = await getRunDetail(em, ctx, params.id);
+          data = await getProjectRunPageData(em, ctx, params.id);
         } catch {
           throw error(404, "Run not found");
         }
-        const run: AgentRunDetail = {
-          id: runDto.id,
-          org_id: runDto.orgId,
-          project_id: runDto.projectId,
-          agent: runDto.agentName ?? "",
-          model: runDto.model,
-          prompt: runDto.prompt,
-          status: (runDto.status ?? "queued") as RunStatus,
-          parent_run_id: runDto.parentRunId,
-          started_at: runDto.startedAt,
-          ended_at: runDto.endedAt,
-          transcript_path: runDto.transcriptPath,
-        };
 
-        let transcript: string | null = null;
-        if (run.transcript_path) {
-          const fs = await import("node:fs/promises");
-          try {
-            transcript = await fs.readFile(run.transcript_path, "utf8");
-          } catch (err) {
-            const code = (err as NodeJS.ErrnoException).code;
-            if (code !== "ENOENT" && code !== "ENOTDIR") throw err;
-            transcript = null;
-          }
-        }
-
-        // Paginated JSONL logs from transcript
+        const run = { ...data.run, status: data.run.status as RunStatus };
+        const transcript = data.transcript;
         const logs = transcript ? paginateLogs(transcript, 0, 100) : null;
-
-        // Workspace diff
         const diff = await getWorkspaceDiff();
-
-        // Artifacts
-        const artifacts = (await listArtifacts(em, ctx))
-          .filter((artifact) => artifact.id === params.id || true)
-          .map((artifact) => ({
-            id: artifact.id,
-            org_id: artifact.orgId,
-            project_id: ctx.projectId ?? null,
-            run_id: params.id,
-            task_id: null,
-            kind: "artifact",
-            title: artifact.filename,
-            body_path: artifact.path,
-            sha256: null,
-            size: null,
-            mime: artifact.mime,
-            archived: false,
-            created_at: isoStamp(artifact.createdAt),
-            downloadHref: `/artifacts/${artifact.id}/download`,
-          }));
-
-        const eventRows = await em.find(Event, {
-          org: orgId,
-          subjectKind: "agent_run",
-          subjectId: run.id,
-        } as never, { orderBy: { createdAt: "DESC", id: "DESC" } });
-        const events: EventRow[] = eventRows.map((e) => ({
-          id: e.id,
-          org_id: orgId,
-          project_id: e.projectId ?? null,
-          subject_kind: e.subjectKind,
-          subject_id: e.subjectId ?? "",
-          verb: e.verb,
-          payload: e.payload ?? {},
-          actor: e.actor ?? "system",
-          created_at: isoStamp(e.createdAt),
-        }));
-
-        return { run: { ...run, started_at: isoStamp(run.started_at), ended_at: isoStamp(run.ended_at) }, transcript, logs, diff, artifacts, events };
+        return { run, transcript, logs, diff, artifacts: data.artifacts, events: data.events };
       })(),
     },
   };
 };
 
 export const actions: Actions = {
-  cancel: async ({ params }) => {
-    const em = await getEm();
-    const orgId = await getDefaultOrgIdOrm(em);
-    await cancelRunAction(em, params.id!, orgId);
+  cancel: async ({ params, locals }) => {
+    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    await cancelRun(em, ctx, params.id!);
     return actionOk("Run cancelled");
   },
-  retry: async ({ params }) => {
-    const em = await getEm();
-    const orgId = await getDefaultOrgIdOrm(em);
-    const result = await retryRunAction(em, params.id!, orgId);
+  retry: async ({ params, locals }) => {
+    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    const result = await retryRun(em, ctx, params.id!);
     const newId = result.id;
     throw redirect(303, `/runs/${newId}`);
   },

@@ -1,7 +1,8 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openDatabase, getDefaultOrgId } from "$lib/server/db";
-import { loadWorkflowDef, upsertWorkflowDef } from "$lib/server/orchestration";
+import { requestAppScope } from "$lib/server/application-scope";
+import { loadWorkflowDef } from "$lib/server/orchestration";
+import { upsertWorkflowDef } from "../../../../../../../application/orchestration/commands.ts";
 import { actionOk } from "$lib/feedback/action-result";
 
 export const load: PageServerLoad = ({ params, locals }) => {
@@ -10,22 +11,17 @@ export const load: PageServerLoad = ({ params, locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const db = await openDatabase();
-        try {
-          const orgId = await getDefaultOrgId(db);
-          const def = await loadWorkflowDef(db, orgId, params.id);
-          if (!def) throw error(404, "Workflow not found");
-          return { workflow: def };
-        } finally {
-          await db.close();
-        }
+        const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+        const def = await loadWorkflowDef(em, ctx, params.id);
+        if (!def) throw error(404, "Workflow not found");
+        return { workflow: def };
       })(),
     },
   };
 };
 
 export const actions: Actions = {
-  save: async ({ params, request }) => {
+  save: async ({ params, request, locals }) => {
     const form = await request.formData();
     const name = (form.get("name") as string)?.trim();
     const description = (form.get("description") as string)?.trim() || null;
@@ -34,19 +30,14 @@ export const actions: Actions = {
 
     if (!name) return fail(400, { error: "Name is required" });
 
-    const db = await openDatabase();
-    try {
-      const orgId = await getDefaultOrgId(db);
-      await upsertWorkflowDef(db, orgId, {
-        id: params.id,
-        name,
-        description,
-        yamlConfig,
-        promptTemplate,
-      });
-    } finally {
-      await db.close();
-    }
+    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    await upsertWorkflowDef(em, ctx, {
+      id: params.id,
+      name,
+      description,
+      yamlConfig,
+      promptTemplate,
+    });
     return actionOk("Workflow saved");
   },
 };

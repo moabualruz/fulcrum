@@ -1,21 +1,20 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openDatabase, getDefaultOrgId } from "$lib/server/db";
-import { deleteArtifactAction, readArtifactDetail } from "$lib/server/artifacts";
-import { deleteArtifact } from "../../../../../artifacts/storage.ts";
+import { requestAppScope } from "$lib/server/application-scope";
+import { deleteArtifactForWeb } from "../../../../../application/artifacts/commands.ts";
+import { getArtifactDetail } from "../../../../../application/artifacts/queries.ts";
+import { AppValidationError } from "../../../../../application/errors.ts";
 
-export const load: PageServerLoad = ({ params }) => {
+export const load: PageServerLoad = ({ params, locals }) => {
   return {
     streamed: {
       data: (async () => {
-        const db = await openDatabase();
+        const { em, ctx } = await requestAppScope(locals);
         try {
-          const orgId = await getDefaultOrgId(db);
-          const artifact = await readArtifactDetail(db, { orgId, id: params.id });
-          if (!artifact) throw error(404, "Artifact not found");
+          const artifact = await getArtifactDetail(em, ctx, params.id);
           return { artifact };
-        } finally {
-          await db.close();
+        } catch {
+          throw error(404, "Artifact not found");
         }
       })(),
     },
@@ -23,34 +22,18 @@ export const load: PageServerLoad = ({ params }) => {
 };
 
 export const actions: Actions = {
-  delete: async ({ params, request }) => {
-    const db = await openDatabase();
+  delete: async ({ params, request, locals }) => {
+    const { em, ctx } = await requestAppScope(locals);
     try {
-      const orgId = await getDefaultOrgId(db);
-      const artifact = await readArtifactDetail(db, { orgId, id: params.id! });
-      if (!artifact) throw error(404, "Artifact not found");
       const form = await request.formData().catch(() => new FormData());
-      const hard = form.get("hard") === "true";
-      const confirmed = form.get("confirm") === "true";
-      const guard = await deleteArtifact({
-        artifact: {
-          id: artifact.id,
-          orgId: artifact.org_id,
-          archived: artifact.archived,
-          bodyPath: artifact.body_path,
-        },
-        callerOrgId: orgId,
-        hard,
-        confirm: confirmed,
+      await deleteArtifactForWeb(em, ctx, {
+        id: params.id!,
+        hard: form.get("hard") === "true",
+        confirm: form.get("confirm") === "true",
       });
-      if (!guard.ok && guard.reason === "confirmation_required") {
-        throw error(400, "Hard delete requires confirmation");
-      }
-      if (!guard.ok) throw error(404, "Artifact not found");
-      if (hard) await deleteArtifactAction(db, params.id!, orgId);
-      else await db.query(`UPDATE artifacts SET archived = true WHERE id = $1 AND org_id = $2`, [params.id!, orgId]);
-    } finally {
-      await db.close();
+    } catch (err) {
+      if (err instanceof AppValidationError) throw error(400, err.message);
+      throw error(404, "Artifact not found");
     }
     throw redirect(303, "/artifacts");
   },

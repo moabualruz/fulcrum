@@ -1,7 +1,11 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
+import { randomUUID } from "node:crypto";
 
 import type { AgentRunRepository } from "../../db/repositories/orchestration/AgentRunRepository.ts";
 import type { EventRepository } from "../../db/repositories/core/EventRepository.ts";
+import { ormSqlConnection } from "../orm-helpers.ts";
+import type { OrchestrationApplicationContext } from "./types.ts";
+import type { OrchestrationConfigRow, WorkflowDefRow } from "./queries.ts";
 
 export class OrchestrationStateMutationConflict extends Error {
   constructor(public readonly taskId: string) {
@@ -114,4 +118,57 @@ export async function transitionRunForRetry(
     });
     await tx.flush();
   });
+}
+
+export async function upsertOrchestrationConfig(
+  em: EntityManager,
+  ctx: OrchestrationApplicationContext,
+  config: {
+    pollIntervalS: number;
+    maxConcurrency: number;
+    stallTimeoutS: number;
+    workspaceRoot: string | null;
+  },
+): Promise<OrchestrationConfigRow> {
+  const rows = await ormSqlConnection(em).execute<OrchestrationConfigRow[]>(
+    `INSERT INTO orchestration_config (id, org_id, poll_interval_s, max_concurrency, stall_timeout_s, workspace_root, updated_at)
+     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, now())
+     ON CONFLICT (org_id) DO UPDATE SET
+       poll_interval_s = EXCLUDED.poll_interval_s,
+       max_concurrency = EXCLUDED.max_concurrency,
+       stall_timeout_s = EXCLUDED.stall_timeout_s,
+       workspace_root = EXCLUDED.workspace_root,
+       updated_at = now()
+     RETURNING *`,
+    [ctx.orgId, config.pollIntervalS, config.maxConcurrency, config.stallTimeoutS, config.workspaceRoot],
+  );
+  return rows[0]!;
+}
+
+export async function upsertWorkflowDef(
+  em: EntityManager,
+  ctx: OrchestrationApplicationContext,
+  def: {
+    id?: string;
+    projectId?: string | null;
+    name: string;
+    description?: string | null;
+    yamlConfig: string;
+    promptTemplate: string;
+  },
+): Promise<WorkflowDefRow> {
+  const id = def.id ?? randomUUID();
+  const rows = await ormSqlConnection(em).execute<WorkflowDefRow[]>(
+    `INSERT INTO workflow_defs (id, org_id, project_id, name, description, yaml_config, prompt_template, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+     ON CONFLICT (id) DO UPDATE SET
+       name = EXCLUDED.name,
+       description = EXCLUDED.description,
+       yaml_config = EXCLUDED.yaml_config,
+       prompt_template = EXCLUDED.prompt_template,
+       updated_at = now()
+     RETURNING *`,
+    [id, ctx.orgId, def.projectId ?? null, def.name, def.description ?? null, def.yamlConfig, def.promptTemplate],
+  );
+  return rows[0]!;
 }
