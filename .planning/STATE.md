@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-last_updated: "2026-05-06T23:01:35.642Z"
+last_updated: "2026-05-07T01:33:16.659Z"
 progress:
   total_phases: 11
   completed_phases: 8
-  total_plans: 124
-  completed_plans: 103
-  percent: 83
+  total_plans: 151
+  completed_plans: 105
+  percent: 70
 ---
 
 # Planning State
@@ -17,7 +17,7 @@ progress:
 ## Current Position
 
 Phase: 09.5 (architecture-data-layer-remediation-full-interface-fix) — EXECUTING
-Plan: 5 of 14
+Plan: 6 of 14
 
 - **Phase**: 09-cross-cutting-testing
 - **Plan**: 10 of 10 completed
@@ -96,3 +96,5 @@ Plan: 5 of 14
 - [Phase 09.5]: Non-web compatibility debt is tracked with exact allowlists while global ProductDb removal remains broader phase work. — Prevents broad regex exceptions and makes residual boundary debt reviewable by file and rationale.
 - [Phase 09.5-architecture-data-layer-remediation-full-interface-fix]: 09.5-15 centralized low-level legacy store access behind neutral test-support helpers instead of direct product-kernel imports in tests. — Completes fixture boundary closure without weakening tests.
 - [Phase 09.5-architecture-data-layer-remediation-full-interface-fix]: 09.5-15 used application ORM/PGlite fixture seeding for Phase 9.5 Playwright tests while preserving real journeys. — Keeps E2E coverage real and avoids reintroducing skip helpers.
+- [Phase 09.5]: Residual architecture gates record exact current-debt file baselines instead of broad allowlists.
+- [Phase 09.5]: Composition-root exceptions are exact and limited to web DB bootstrap, tRPC context, CLI bootstrap, and web DB data-handle bootstrap.
