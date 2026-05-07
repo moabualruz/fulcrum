@@ -1232,7 +1232,7 @@ export async function buildCaller(
     container,
     userAgent: "fulcrum-tui",
   });
-  return enrichTuiCaller(caller as TuiCaller);
+  return enrichTuiCaller(caller as unknown as TuiCaller);
 }
 
 export async function buildTelemetrySink(
