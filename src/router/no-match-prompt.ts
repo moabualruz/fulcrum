@@ -1,20 +1,23 @@
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 
-import { RoutingRule } from "../db/entities/router/RoutingRule.ts";
-import type { RoutingRuleRepository } from "../db/repositories/router/RoutingRuleRepository.ts";
 import {
   routingApplication,
   type RoutingApplication,
 } from "../application/routing.ts";
 import type { TaskFacts } from "./types.ts";
 
+type LearnedRoutingRule = Awaited<ReturnType<RoutingApplication["learnRoutingRule"]>>;
+type RoutingRuleStore = Parameters<
+  RoutingApplication["learnRoutingRule"]
+>[0]["routingRuleRepository"];
+
 interface NoMatchPromptConfig {
-  routingRuleRepository?: RoutingRuleRepository | null;
+  routingRuleRepository?: RoutingRuleStore | null;
   application?: Pick<RoutingApplication, "learnRoutingRule"> | null;
 }
 
-let configuredRepository: RoutingRuleRepository | null = null;
+let configuredRepository: RoutingRuleStore | null = null;
 let application: Pick<RoutingApplication, "learnRoutingRule"> = routingApplication;
 
 export function configureNoMatchPrompt(config: NoMatchPromptConfig): void {
@@ -39,7 +42,7 @@ export async function learnRule(
   agent: string,
   orgId: string,
   projectId?: string,
-): Promise<RoutingRule> {
+): Promise<LearnedRoutingRule> {
   const input = {
     facts,
     agent,

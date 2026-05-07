@@ -6,11 +6,14 @@
  * is found.
  */
 
-import type { RoutingRuleRepository } from "../db/repositories/router/RoutingRuleRepository.ts";
 import {
   routingApplication,
   type RoutingApplication,
 } from "../application/routing.ts";
+
+type RoutingRuleStore = Parameters<
+  RoutingApplication["detectRoutingConflicts"]
+>[0]["routingRuleRepository"];
 
 export interface DetectConflictsInput {
   proposedConditions: Record<string, unknown>;
@@ -20,11 +23,11 @@ export interface DetectConflictsInput {
 }
 
 export interface DetectConflictsOptions {
-  routingRuleRepository?: RoutingRuleRepository | null;
+  routingRuleRepository?: RoutingRuleStore | null;
   application?: Pick<RoutingApplication, "detectRoutingConflicts"> | null;
 }
 
-let configuredRepository: RoutingRuleRepository | null = null;
+let configuredRepository: RoutingRuleStore | null = null;
 let application: Pick<RoutingApplication, "detectRoutingConflicts"> = routingApplication;
 
 export function configureConflictDetector(options: DetectConflictsOptions): void {

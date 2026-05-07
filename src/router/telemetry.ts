@@ -1,16 +1,19 @@
-import type { EventRepository } from "../db/repositories/core/EventRepository.ts";
 import {
   routingApplication,
   type RoutingApplication,
 } from "../application/routing.ts";
 import type { RoutingDecision } from "./types.ts";
 
+type RoutingEventRepository = Parameters<
+  RoutingApplication["recordRoutingEvent"]
+>[0]["eventRepository"];
+
 interface RoutingTelemetryConfig {
-  eventRepository?: EventRepository | null;
+  eventRepository?: RoutingEventRepository | null;
   application?: Pick<RoutingApplication, "recordRoutingEvent"> | null;
 }
 
-let eventRepository: EventRepository | null = null;
+let eventRepository: RoutingEventRepository | null = null;
 let application: Pick<RoutingApplication, "recordRoutingEvent"> = routingApplication;
 
 export function configureRoutingTelemetry(config: RoutingTelemetryConfig): void {

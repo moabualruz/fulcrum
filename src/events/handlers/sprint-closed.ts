@@ -6,8 +6,10 @@
  * in the documents table. If Pillar 7 ships a tRPC router, the handler
  * can be updated to call it instead.
  */
-import type { SqlExecutor } from "../../db/sql.ts";
-import { newUlid } from "../../shared/ids.ts";
+import {
+  createSqlEventHandlerPersistence,
+  type EventHandlerPersistence,
+} from "../../application/events/commands.ts";
 
 const HANDLER_NAME = "sprint-closed-retro-doc";
 
@@ -88,12 +90,13 @@ export interface HandleSprintClosedResult {
  *   creates document directly in the documents table.
  */
 export async function handleSprintClosed(
-  db: SqlExecutor,
+  db: Parameters<typeof createSqlEventHandlerPersistence>[0],
   event: SprintClosedEventRow,
   docsCreate?: DocsCreateFn | null,
+  persistence: EventHandlerPersistence = createSqlEventHandlerPersistence(db),
 ): Promise<HandleSprintClosedResult> {
   // Idempotency check
-  const alreadyHandled = await checkEventHandled(db, event.id, HANDLER_NAME);
+  const alreadyHandled = await persistence.wasEventHandled(event.id, HANDLER_NAME);
   if (alreadyHandled) {
     return { retro_doc_id: null, skipped: true };
   }
@@ -139,73 +142,16 @@ export async function handleSprintClosed(
       const msg = err instanceof Error ? err.message : String(err);
       // Pillar 7 not actually available (e.g. procedure missing)
       console.warn(`[sprint-closed] docs.create failed, falling back to direct insert: ${msg}`);
-      docId = await insertDocDirectly(db, { orgId, projectId, title, body, sprintId: event.subject_id });
+      docId = await persistence.insertSprintRetroDoc({ orgId, projectId, title, body, sprintId: event.subject_id });
     }
   } else {
     // Pillar 7 not shipped — insert directly
-    docId = await insertDocDirectly(db, { orgId, projectId, title, body, sprintId: event.subject_id });
+    docId = await persistence.insertSprintRetroDoc({ orgId, projectId, title, body, sprintId: event.subject_id });
   }
 
   // Mark handled + link retro doc to sprint
-  await markEventHandled(db, event.id, HANDLER_NAME);
-  await setSprintRetroDocId(db, event.subject_id, docId);
+  await persistence.markEventHandled(event.id, HANDLER_NAME);
+  await persistence.setSprintRetroDocId(event.subject_id, docId);
 
   return { retro_doc_id: docId, skipped: false };
-}
-
-async function insertDocDirectly(
-  db: SqlExecutor,
-  input: { orgId: string; projectId: string; title: string; body: string; sprintId: string },
-): Promise<string> {
-  const id = newUlid();
-  await db.query(
-    `INSERT INTO documents (id, org_id, project_id, kind, title, body, frontmatter)
-     VALUES ($1, $2, $3, 'postmortem', $4, $5, $6::jsonb)`,
-    [
-      id,
-      input.orgId,
-      input.projectId,
-      input.title,
-      input.body,
-      JSON.stringify({ sprint_id: input.sprintId }),
-    ],
-  );
-  return id;
-}
-
-async function checkEventHandled(
-  db: SqlExecutor,
-  eventId: string,
-  handler: string,
-): Promise<boolean> {
-  const rows = await db.query<{ event_id: string }>(
-    `SELECT event_id FROM event_handler_log WHERE event_id = $1 AND handler = $2`,
-    [eventId, handler],
-  );
-  return rows.length > 0;
-}
-
-async function markEventHandled(
-  db: SqlExecutor,
-  eventId: string,
-  handler: string,
-): Promise<void> {
-  await db.query(
-    `INSERT INTO event_handler_log (event_id, handler)
-     VALUES ($1, $2)
-     ON CONFLICT (event_id, handler) DO NOTHING`,
-    [eventId, handler],
-  );
-}
-
-async function setSprintRetroDocId(
-  db: SqlExecutor,
-  sprintId: string,
-  docId: string,
-): Promise<void> {
-  const rows = await db.query<{ id: string }>(
-    `UPDATE sprints SET retro_doc_id = $1, updated_at = now() WHERE id = $2 RETURNING id`,
-    [docId, sprintId],
-  );
-  if (rows.length === 0) throw new Error(`sprint not found: ${sprintId}`);
 }

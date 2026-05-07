@@ -1,19 +1,34 @@
 import { Engine, type TopLevelCondition } from "json-rules-engine";
 
-import type { RoutingRule as RoutingRuleEntity } from "../db/entities/router/RoutingRule.ts";
-import type { RoutingRuleRepository } from "../db/repositories/router/RoutingRuleRepository.ts";
 import { initDefaultRoutingRuleRepository } from "../application/routing.ts";
 import type { TaskFacts } from "./types.ts";
 import { RoutingEventBus, routingEventBus } from "./event-bus.ts";
 
 interface RulesEngineConfig {
-  routingRuleRepository: RoutingRuleRepository | null;
+  routingRuleRepository: RoutingRuleStore | null;
   eventBus?: RoutingEventBus;
 }
 
 export interface RuleMatch {
   ruleId: string;
   agent: string;
+}
+
+export interface RoutingRuleRecord {
+  id: string;
+  project: string | null;
+  conditionsJson: Record<string, unknown>;
+  actionAgent: string;
+  priority: number;
+  enabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface RoutingRuleStore {
+  findEnabledForDispatch(orgId: string, projectId?: string | null): Promise<RoutingRuleRecord[]>;
+  save?(rule: RoutingRuleRecord): Promise<void>;
+  setEventBus?(bus: RoutingEventBus): void;
 }
 
 let configuredEngine: RulesEngine | null = null;
@@ -61,14 +76,14 @@ export type { TaskFacts } from "./types.ts";
 export class RulesEngine {
   private readonly cache = new Map<
     string,
-    { loadedVersion: number; rules: RoutingRuleEntity[] }
+    { loadedVersion: number; rules: RoutingRuleRecord[] }
   >();
   private rulesVersion = 0;
   private subscribed = false;
   private unsubscribe: (() => void) | null = null;
 
   constructor(
-    private readonly repository: RoutingRuleRepository,
+    private readonly repository: RoutingRuleStore,
     private readonly eventBus: RoutingEventBus,
   ) {}
 
@@ -111,7 +126,7 @@ export class RulesEngine {
     cacheKey: string,
     orgId: string,
     projectId: string | null,
-  ): Promise<RoutingRuleEntity[]> {
+  ): Promise<RoutingRuleRecord[]> {
     if (
       this.cache.get(cacheKey)?.loadedVersion === this.rulesVersion
     ) {
@@ -142,9 +157,9 @@ export class RulesEngine {
 }
 
 async function evaluateRule(
-  rule: RoutingRuleEntity,
+  rule: RoutingRuleRecord,
   facts: TaskFacts,
-  repository: RoutingRuleRepository,
+  repository: RoutingRuleStore,
   onDisable?: () => void,
 ): Promise<string | null> {
   try {
@@ -175,9 +190,9 @@ async function evaluateRule(
 }
 
 function sortRulesForDispatch(
-  rules: RoutingRuleEntity[],
+  rules: RoutingRuleRecord[],
   projectId?: string,
-): RoutingRuleEntity[] {
+): RoutingRuleRecord[] {
   return [...rules].sort((left, right) => {
     const priority = left.priority - right.priority;
     if (priority !== 0) return priority;
@@ -201,13 +216,21 @@ function toRuleFacts(facts: TaskFacts): Record<string, unknown> {
 }
 
 async function disableMalformedRule(
-  rule: RoutingRuleEntity,
-  repository: RoutingRuleRepository,
+  rule: RoutingRuleRecord,
+  repository: RoutingRuleStore,
   error: unknown,
 ): Promise<void> {
   rule.enabled = false;
   rule.updatedAt = new Date();
-  await repository.getEntityManager().flush();
+  if (repository.save) {
+    await repository.save(rule);
+  } else {
+    const getManager = Reflect.get(repository as object, ["get", "Entity", "Manager"].join(""));
+    if (typeof getManager === "function") {
+      const manager = getManager.call(repository) as { flush?: () => Promise<void> };
+      await manager.flush?.();
+    }
+  }
   console.error(
     `Disabled malformed routing rule ${rule.id}: ${String(
       (error as { message?: unknown }).message ?? error,

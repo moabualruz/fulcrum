@@ -3,6 +3,9 @@
 // When ON: broadcaster pushes unreadCount to connected clients <2s after insert.
 // When OFF: clients fall back to 60s poll (BellCounterPoll handles this).
 
+import { unreadNotificationCount } from "../application/notifications/queries.ts";
+import type { AppContext } from "../application/notifications/types.ts";
+
 /** Minimal awareness server interface — satisfied by Hocuspocus Server. */
 export interface AwarenessServer {
   broadcastAwareness(userId: string, data: Record<string, unknown>): void;
@@ -17,6 +20,13 @@ export interface NotificationBroadcasterOptions {
   realtimeEnabled: boolean;
   awarenessServer: AwarenessServer;
   unreadCountForUser: (userId: string) => Promise<number>;
+}
+
+export function createApplicationUnreadCount(
+  em: Parameters<typeof unreadNotificationCount>[0],
+  ctx: Omit<AppContext, "userId">,
+): (userId: string) => Promise<number> {
+  return (userId) => unreadNotificationCount(em, { ...ctx, userId });
 }
 
 /**

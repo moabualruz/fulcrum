@@ -19,6 +19,12 @@ import type {
   NotificationRuleDto,
 } from "./types.ts";
 
+export interface DefaultNotificationRuleInput {
+  name: string;
+  subjectKind: string | null;
+  eventPattern: Record<string, unknown>;
+}
+
 export async function listNotifications(
   em: EntityManager,
   ctx: AppContext,
@@ -71,6 +77,44 @@ export async function unreadNotificationCount(em: EntityManager, ctx: AppContext
   return em.count(Notification, { org: ctx.orgId, userId: ctx.userId, readAt: null } as never);
 }
 
+export async function seedDefaultNotificationRules(
+  userId: string,
+  orgId: string,
+  em: EntityManager,
+  rules: readonly DefaultNotificationRuleInput[],
+  channels: string[],
+): Promise<void> {
+  const now = new Date();
+  const org = em.getReference((await import("../../db/entities/auth/Org.ts")).Org, orgId);
+
+  for (const rule of rules) {
+    let existing: NotificationRule | null;
+    try {
+      existing = await em.findOne(NotificationRule, {
+        userId,
+        name: rule.name,
+      } as never);
+    } catch (error) {
+      if (isMissingNotificationRuleColumns(error)) return;
+      throw error;
+    }
+    if (existing) continue;
+    em.persist(em.create(NotificationRule, {
+      org,
+      userId,
+      subjectKind: rule.subjectKind,
+      active: true,
+      name: rule.name,
+      eventPattern: rule.eventPattern,
+      channels,
+      enabled: true,
+      createdAt: now,
+      updatedAt: now,
+    }));
+  }
+  await em.flush();
+}
+
 export async function listNotificationMutes(em: EntityManager, ctx: AppContext): Promise<NotificationMuteDto[]> {
   const rows = await em.find(NotificationMute, { org: ctx.orgId, userId: ctx.userId } as never, { orderBy: { subjectKind: "ASC" } });
   return rows.map(serializeMute);
@@ -120,6 +164,20 @@ function notificationChannels(channels: string[] | null): NotificationChannel[] 
   return (channels ?? []).filter((channel): channel is NotificationChannel =>
     allowed.has(channel as NotificationChannel)
   );
+}
+
+function isMissingNotificationRuleColumns(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { cause?: unknown; code?: unknown; message?: unknown };
+  const message = String(candidate.message ?? "");
+  if (
+    (candidate.code === "42703" || message.includes("does not exist")) &&
+    (message.includes("notification_rules") || message.includes("n0")) &&
+    message.includes("user_id")
+  ) {
+    return true;
+  }
+  return isMissingNotificationRuleColumns(candidate.cause);
 }
 
 export function serializeMute(row: NotificationMute): NotificationMuteDto {
