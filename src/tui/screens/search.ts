@@ -70,21 +70,7 @@ export class SearchScreen {
 
   async submitQuery(query: string): Promise<void> {
     this.query = query;
-    // P11#16: NL→filter pre-processing when report-llm-narration flag ON
-    let resolvedQuery = query;
-    if (this.isNlFilterEnabled()) {
-      try {
-        const { translateNlToFilter, HttpNlFilterSidecar } = await import("../../search/nl-filter.ts");
-        const sidecar = new HttpNlFilterSidecar();
-        const result = await translateNlToFilter(query, sidecar);
-        if (result.translated && result.ast) {
-          resolvedQuery = result.ast.text || query;
-        }
-      } catch {
-        // fallback to plain text
-      }
-    }
-    this.results = await this.opts.caller.search.query({ query: resolvedQuery, facets: this.activeFacets });
+    this.results = await this.opts.caller.search.query({ query, facets: this.activeFacets });
     this.cursor = 0;
   }
 
@@ -160,14 +146,6 @@ export class SearchScreen {
       resultId: result.id,
       position,
     }).catch(() => {});
-  }
-
-  private isNlFilterEnabled(): boolean {
-    return (process.env["FULCRUM_FEATURES"] ?? "")
-      .split(",")
-      .map((f) => f.trim())
-      .filter(Boolean)
-      .includes("report-llm-narration");
   }
 
   private get activeFacets(): TuiSearchKind[] {
