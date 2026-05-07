@@ -22,9 +22,6 @@
  * P1#15: T15-01 (entrypoint), T15-12 (status bar), T15-56/T15-65/T15-67 (screens).
  */
 
-import { MikroORM, type EntityManager } from "@mikro-orm/postgresql";
-import { Container } from "@needle-di/core";
-import type { Session as BetterAuthSession } from "better-auth";
 import type { TuiOutput, TuiInput } from "./testing/fake-tty.ts";
 import { StdoutOutput } from "./testing/fake-tty.ts";
 import { Renderer, c } from "./renderer.ts";
@@ -45,7 +42,7 @@ import { ArtifactsScreen, type TuiArtifact, type TuiArtifactFilters, type TuiArt
 import { TuiRouter, type TuiRoute } from "./router.ts";
 import { JsonlCrashLog, type TuiCrashLog } from "./crashlog.ts";
 import { DbTelemetrySink, NullTelemetrySink, type TuiTelemetrySink } from "./telemetry.ts";
-import { ENTITY_MANAGER_TOKEN, registerDbBindings } from "../db/db.module.ts";
+import { createApplicationLocalCaller, requireCliTuiSessionContext } from "../application/cli-tui/caller-context.ts";
 import type { InferenceModel, ModelPullProgress } from "../inference/protocol.ts";
 import type { KeybindingMap, KeybindingAction } from "../keybindings/index.ts";
 import type { TuiTheme } from "./theme/index.ts";
@@ -1231,41 +1228,28 @@ export class TuiApp {
 export async function buildCaller(
   container: import("@needle-di/core").Container | null = null,
 ): Promise<TuiCaller> {
-  const { t } = await import("../trpc/trpc.ts");
-  const { appRouter } = await import("../trpc/router.ts");
-  const { createContext } = await import("../trpc/context.ts");
-
-  const tuiContext = buildTuiContext(container);
-  const session = await resolveActiveTuiSession(tuiContext.em);
-  const orgId = session?.activeOrganizationId ?? session?.orgId ?? null;
-  const userId = session?.userId ?? null;
-
-  const ctx = createContext({
-    session: session as unknown as BetterAuthSession | null,
-    orgId,
-    userId,
-    em: tuiContext.em,
-    container: tuiContext.container,
+  const caller = await createApplicationLocalCaller({
+    container,
+    userAgent: "fulcrum-tui",
   });
-  const factory = t.createCallerFactory(appRouter);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const caller = factory(ctx) as any;
-  return enrichTuiCaller(caller);
+  return enrichTuiCaller(caller as TuiCaller);
 }
 
 export async function buildTelemetrySink(
   container: import("@needle-di/core").Container | null = null,
 ): Promise<TuiTelemetrySink> {
-  const tuiContext = buildTuiContext(container);
-  const session = await resolveActiveTuiSession(tuiContext.em);
-  if (!tuiContext.em || !session) return new NullTelemetrySink();
-
   try {
-    const { Org, User } = await import("../db/entities/auth/index.ts");
+    const { em, session } = await requireCliTuiSessionContext({
+      container,
+      userAgent: "fulcrum-tui",
+    });
+    if (!em) return new NullTelemetrySink();
     const orgId = session.activeOrganizationId ?? session.orgId;
-    const org = tuiContext.em.getReference(Org, orgId);
-    const user = tuiContext.em.getReference(User, session.userId);
-    return new DbTelemetrySink({ em: tuiContext.em, org, user });
+    return new DbTelemetrySink({
+      em,
+      org: orgId as never,
+      user: session.userId as never,
+    });
   } catch {
     return new NullTelemetrySink();
   }
@@ -1310,67 +1294,6 @@ function tuiNotifyCaller(notify: NonNullable<TuiCaller["notify"]>) {
     mute: (input: { sourceKind: string; sourceId: string }) =>
       notify.mute?.({ subjectKind: input.sourceKind, subjectId: input.sourceId } as never) ?? Promise.resolve({ ok: false }),
   };
-}
-
-interface TuiCliSession {
-  id: string;
-  userId: string;
-  orgId: string;
-  activeOrganizationId?: string;
-  expiresAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
-  token: string;
-  ipAddress: string | null;
-  userAgent: string | null;
-}
-
-function buildTuiContext(container: Container | null): {
-  container: Container | null;
-  em: EntityManager | null;
-} {
-  if (!container) return { container: null, em: null };
-
-  try {
-    const orm = container.get(MikroORM);
-    const em = container.get(ENTITY_MANAGER_TOKEN).fork();
-    const requestContainer = new Container();
-    requestContainer.bind({ provide: MikroORM, useValue: orm });
-    registerDbBindings(requestContainer, orm, em);
-    return { container: requestContainer, em };
-  } catch {
-    return { container, em: null };
-  }
-}
-
-async function resolveActiveTuiSession(em: EntityManager | null): Promise<TuiCliSession | null> {
-  if (!em) return null;
-
-  const { Session } = await import("../db/entities/auth/Session.ts");
-  const now = new Date();
-
-  try {
-    const session = await em.getRepository(Session).findOne(
-      { expiresAt: { $gt: now } },
-      { orderBy: { createdAt: "DESC" } },
-    );
-    if (!session) return null;
-
-    return {
-      id: session.id,
-      token: session.id,
-      userId: session.userId,
-      orgId: session.orgId,
-      activeOrganizationId: session.activeOrganizationId ?? session.orgId,
-      expiresAt: session.expiresAt,
-      createdAt: session.createdAt,
-      updatedAt: session.createdAt,
-      ipAddress: session.ipAddress ?? null,
-      userAgent: session.userAgent ?? "fulcrum-tui",
-    };
-  } catch {
-    return null;
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1,6 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
-import type { Org, User } from "../db/entities/auth/index.ts";
-import { recordTuiRenderTelemetry } from "../application/telemetry/commands.ts";
+import { recordTuiRenderTelemetry, type RecordTuiRenderTelemetryInput } from "../application/telemetry/commands.ts";
 
 export interface TuiRenderTelemetryRow {
   kind: "local_telemetry";
@@ -27,9 +25,9 @@ export class NullTelemetrySink implements TuiTelemetrySink {
 }
 
 export interface DbTelemetrySinkOptions {
-  em: EntityManager;
-  org: Org;
-  user?: User | null;
+  em: Parameters<typeof recordTuiRenderTelemetry>[0];
+  org: RecordTuiRenderTelemetryInput["org"];
+  user?: RecordTuiRenderTelemetryInput["user"];
 }
 
 export class DbTelemetrySink implements TuiTelemetrySink {

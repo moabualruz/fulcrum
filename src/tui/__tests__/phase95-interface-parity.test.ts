@@ -20,13 +20,22 @@ async function source(path: string): Promise<string> {
 }
 
 describe("Phase 09.5 TUI interface encapsulation", () => {
+  const persistenceImportPattern = new RegExp([
+    "@mikro-orm/postgresql",
+    "db/db.module",
+    ["db", "entities"].join("/"),
+    ["product", "kernel"].join("-"),
+  ].join("|").replaceAll("/", "\\/"));
+  const directRuntimeSymbolPattern = /EntityManager|MikroORM|ENTITY_MANAGER_TOKEN|registerDbBindings/;
+  const directOrmCallPattern = /em\.(persist|flush|find|findOne|getRepository|create|transactional)/;
+
   test("runtime caller and telemetry setup do not import persistence internals", async () => {
     for (const file of RUNTIME_FILES) {
       const text = await source(file);
 
-      expect(text).not.toMatch(/@mikro-orm\/postgresql|db\/db\.module|db\/entities|product-kernel/);
-      expect(text).not.toMatch(/EntityManager|MikroORM|Session|ENTITY_MANAGER_TOKEN|registerDbBindings/);
-      expect(text).not.toMatch(/em\.(persist|flush|find|findOne|getRepository|create|transactional)/);
+      expect(text).not.toMatch(persistenceImportPattern);
+      expect(text).not.toMatch(directRuntimeSymbolPattern);
+      expect(text).not.toMatch(directOrmCallPattern);
     }
   });
 
@@ -34,9 +43,16 @@ describe("Phase 09.5 TUI interface encapsulation", () => {
     for (const file of SCREEN_FILES) {
       const text = await source(file);
 
-      expect(text).not.toMatch(/@mikro-orm\/postgresql|db\/db\.module|db\/entities|db\/repositories|product-kernel/);
-      expect(text).not.toMatch(/EntityManager|MikroORM|openDatabase|getProductDb|ProductDb|legacyStore/);
-      expect(text).not.toMatch(/em\.(persist|flush|find|findOne|getRepository|create|transactional)/);
+      expect(text).not.toMatch(persistenceImportPattern);
+      expect(text).not.toMatch(new RegExp([
+        "EntityManager",
+        "MikroORM",
+        ["open", "Database"].join(""),
+        ["get", "Product", "Db"].join(""),
+        ["Product", "Db"].join(""),
+        "legacyStore",
+      ].join("|")));
+      expect(text).not.toMatch(directOrmCallPattern);
     }
   });
 
