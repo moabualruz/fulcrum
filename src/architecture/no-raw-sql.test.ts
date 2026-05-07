@@ -14,6 +14,33 @@ const RUNTIME_ROOTS = [
   "src/api",
 ];
 
+const WEB_DATA_HANDLE_ROOTS = [
+  "src/web/src/routes",
+  "src/web/src/lib",
+];
+
+const SQL_INTERFACE_ROOTS = [
+  "src/web/src/routes",
+  "src/web/src/lib",
+  "src/cli",
+  "src/tui",
+  "src/api",
+  "src/router",
+  "src/trpc",
+  "src/server/trpc",
+];
+
+const WEB_DATA_HANDLE_PATTERN = /\b(openDatabase|getDatabase|getEm|getDefaultOrgIdOrm|ormSqlConnection|WebDatabaseHandle|LegacyDatabaseHandle|application-compat)\b/;
+
+const RAW_SQL_CALL_PATTERN = /\b(db|conn|connection|client|pglite)\.query\(|\.execute\(/;
+
+const WEB_DATA_HANDLE_COMPOSITION_ROOTS = new Map([
+  [
+    "src/web/src/lib/server/db.ts",
+    "web composition root owns current database singleton until route/helper callers move behind application services",
+  ],
+]);
+
 function ignored(path: string): boolean {
   return (
     path.endsWith(".test.ts") ||
@@ -55,9 +82,33 @@ async function rawEntityManagerViolations(): Promise<string[]> {
   return found.sort();
 }
 
+async function pathViolations(roots: readonly string[], pattern: RegExp, allowedPaths = new Map<string, string>()): Promise<string[]> {
+  const files = (await Promise.all(roots.map(collectSourceFiles))).flat();
+  const found: string[] = [];
+
+  for (const file of files) {
+    const relativePath = relative(process.cwd(), file);
+    if (allowedPaths.has(relativePath)) continue;
+    const text = await readFile(file, "utf8");
+    if (pattern.test(text)) found.push(relativePath);
+  }
+
+  return Array.from(new Set(found)).sort();
+}
+
 describe("Phase 9.5 raw EntityManager and SQL boundary", () => {
   test("interface/runtime code does not use raw EntityManager access", async () => {
     const found = await rawEntityManagerViolations();
+    expect(found).toEqual([]);
+  });
+
+  test("web routes and helpers do not use data-handle aliases outside composition roots", async () => {
+    const found = await pathViolations(WEB_DATA_HANDLE_ROOTS, WEB_DATA_HANDLE_PATTERN, WEB_DATA_HANDLE_COMPOSITION_ROOTS);
+    expect(found).toEqual([]);
+  });
+
+  test("interface roots do not use raw query or execute calls", async () => {
+    const found = await pathViolations(SQL_INTERFACE_ROOTS, RAW_SQL_CALL_PATTERN, WEB_DATA_HANDLE_COMPOSITION_ROOTS);
     expect(found).toEqual([]);
   });
 });
