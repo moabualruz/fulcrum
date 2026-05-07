@@ -29,7 +29,6 @@ const RESIDUAL_INTERFACE_ROOTS = [
 const TEST_FIXTURE_ROOTS = ["src", "src/web/tests"];
 
 const EXPECTED_RUNTIME_DIRECT_ACCESS_FILES = [
-  "src/web/src/routes/api/repos/[id]/tree/+server.ts",
   "src/web/src/routes/orchestration/+page.server.ts",
   "src/web/src/routes/audit/export/+server.ts",
   "src/web/src/lib/server/db.ts",
