@@ -9,8 +9,7 @@
  *   - orgs.members.remove(...)       → { ok: true }             (permissionedProcedure, owner/admin)
  *
  * C6: No raw SQL.
- * C7: MikroORM v7 em.findOne / em.find / em.flush / em.removeAndFlush.
- * C8: Repositories resolved from ctx.container or ctx.em.
+ * C7: Persistence and role checks live in application/orgs modules.
  */
 
 import { TRPCError } from "@trpc/server";
@@ -22,27 +21,10 @@ import {
   UpdateMemberRoleInputSchema,
   RemoveMemberInputSchema,
 } from "../../../trpc/schemas/orgs.ts";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Lazy entity/repo loaders (web-bundle-safe)
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function getOrgClass() {
-  const { Org } = await import("../../../db/entities/auth/Org.ts");
-  return Org;
-}
-
-async function getOrgMemberClass() {
-  const { OrgMember } = await import("../../../db/entities/auth/OrgMember.ts");
-  return OrgMember;
-}
-
-async function getOrgMemberRepository() {
-  const { OrgMemberRepository } = await import(
-    "../../../db/repositories/auth/OrgMemberRepository.ts"
-  );
-  return OrgMemberRepository;
-}
+import { removeOrgMember, updateOrg, updateOrgMemberRole } from "../../../application/orgs/commands.ts";
+import { getOrg, listOrgMembers, type OrgAppContext } from "../../../application/orgs/queries.ts";
+import { appErrorToTrpcError } from "../../../application/error-mapping.ts";
+import { AppError } from "../../../application/errors.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -50,65 +32,30 @@ async function getOrgMemberRepository() {
 
 type CtxWithEm = {
   em: import("@mikro-orm/postgresql").EntityManager | null;
-  container: import("@needle-di/core").Container | null;
   orgId: string;
   userId: string;
 };
 
-async function requireEm(ctx: { em: import("@mikro-orm/postgresql").EntityManager | null }) {
-  if (!ctx.em) {
+function requireEm(em: import("@mikro-orm/postgresql").EntityManager | null) {
+  if (!em) {
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
       message: "EntityManager not available in tRPC context.",
     });
   }
-  return ctx.em;
+  return em;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function resolveRepo<T>(ctx: CtxWithEm, RepoClass: new (...args: any[]) => T): Promise<T | null> {
-  if (ctx.container) {
-    try {
-      return ctx.container.get(RepoClass) as T;
-    } catch {
-      // fallthrough
-    }
-  }
-  return null;
+function appContext(ctx: CtxWithEm): OrgAppContext {
+  return { orgId: ctx.orgId, userId: ctx.userId };
 }
 
-/** Assert caller is owner or admin. Throws FORBIDDEN otherwise. */
-async function requireAdminOrOwner(ctx: CtxWithEm) {
-  const em = await requireEm(ctx);
-  const OrgMember = await getOrgMemberClass();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const membership = await em.findOne(OrgMember, {
-    orgId: ctx.orgId,
-    userId: ctx.userId,
-  } as any);
-  if (!membership || !["owner", "admin"].includes((membership as { role: string }).role)) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Only org owners and admins can perform this action.",
-    });
-  }
-  return membership as { role: string };
-}
-
-/** Assert caller is owner. Throws FORBIDDEN otherwise. */
-async function requireOwner(ctx: CtxWithEm) {
-  const em = await requireEm(ctx);
-  const OrgMember = await getOrgMemberClass();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const membership = await em.findOne(OrgMember, {
-    orgId: ctx.orgId,
-    userId: ctx.userId,
-  } as any);
-  if (!membership || (membership as { role: string }).role !== "owner") {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Only org owners can perform this action.",
-    });
+async function mapAppError<T>(fn: () => Promise<T> | T): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AppError) throw appErrorToTrpcError(error);
+    throw error;
   }
 }
 
@@ -122,18 +69,7 @@ const orgsMembersRouter = t.router({
    * Admin/owner only.
    */
   list: permissionedProcedure({ resource: "orgs", action: "list" }).query(async ({ ctx }) => {
-    await requireAdminOrOwner(ctx as unknown as CtxWithEm);
-    const em = await requireEm(ctx);
-    const OrgMember = await getOrgMemberClass();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const members = await em.find(OrgMember, { orgId: ctx.orgId } as any);
-    return (members as Array<{ id: string; userId: string; orgId: string; role: string; joinedAt: Date }>).map((m) => ({
-      id: m.id,
-      userId: m.userId,
-      orgId: m.orgId,
-      role: m.role,
-      joinedAt: m.joinedAt,
-    }));
+    return mapAppError(() => listOrgMembers(requireEm(ctx["em"]), appContext(ctx as unknown as CtxWithEm)));
   }),
 
   /**
@@ -143,23 +79,7 @@ const orgsMembersRouter = t.router({
   updateRole: permissionedProcedure({ resource: "orgs", action: "updateRole" })
     .input(UpdateMemberRoleInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await requireOwner(ctx as unknown as CtxWithEm);
-      const em = await requireEm(ctx);
-      const OrgMember = await getOrgMemberClass();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const member = await em.findOne(OrgMember, {
-        orgId: ctx.orgId,
-        userId: input.userId,
-      } as any);
-      if (!member) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: `User ${input.userId} is not a member of this org.`,
-        });
-      }
-      (member as { role: string }).role = input.role;
-      await em.flush();
-      return { ok: true };
+      return mapAppError(() => updateOrgMemberRole(requireEm(ctx["em"]), appContext(ctx as unknown as CtxWithEm), input));
     }),
 
   /**
@@ -169,37 +89,7 @@ const orgsMembersRouter = t.router({
   remove: permissionedProcedure({ resource: "orgs", action: "remove" })
     .input(RemoveMemberInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await requireAdminOrOwner(ctx as unknown as CtxWithEm);
-      const em = await requireEm(ctx);
-      const OrgMember = await getOrgMemberClass();
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const member = await em.findOne(OrgMember, {
-        orgId: ctx.orgId,
-        userId: input.userId,
-      } as any);
-      if (!member) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: `User ${input.userId} is not a member of this org.`,
-        });
-      }
-
-      // Guard: cannot remove last owner
-      if ((member as { role: string }).role === "owner") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const ownerCount = await em.count(OrgMember, { orgId: ctx.orgId, role: "owner" } as any);
-        if (ownerCount <= 1) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Cannot remove the last owner of an org.",
-          });
-        }
-      }
-
-      em.remove(member);
-      await em.flush();
-      return { ok: true };
+      return mapAppError(() => removeOrgMember(requireEm(ctx["em"]), appContext(ctx as unknown as CtxWithEm), input));
     }),
 });
 
@@ -212,24 +102,7 @@ export const orgsRouter = t.router({
    * orgs.get — returns the current org.
    */
   get: permissionedProcedure({ resource: "orgs", action: "get" }).query(async ({ ctx }) => {
-    const em = await requireEm(ctx);
-    const Org = await getOrgClass();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const org = await em.findOne(Org, { id: ctx.orgId } as any);
-    if (!org) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: `Org ${ctx.orgId} not found.`,
-      });
-    }
-    const o = org as { id: string; name: string; slug: string; createdAt: Date; updatedAt: Date };
-    return {
-      id: o.id,
-      name: o.name,
-      slug: o.slug,
-      createdAt: o.createdAt,
-      updatedAt: o.updatedAt,
-    };
+    return mapAppError(() => getOrg(requireEm(ctx["em"]), appContext(ctx as unknown as CtxWithEm)));
   }),
 
   /**
@@ -239,20 +112,7 @@ export const orgsRouter = t.router({
   update: permissionedProcedure({ resource: "orgs", action: "update" })
     .input(UpdateOrgInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await requireOwner(ctx as unknown as CtxWithEm);
-      const em = await requireEm(ctx);
-      const Org = await getOrgClass();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const org = await em.findOne(Org, { id: ctx.orgId } as any);
-      if (!org) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: `Org ${ctx.orgId} not found.`,
-        });
-      }
-      (org as { name: string }).name = input.name;
-      await em.flush();
-      return { ok: true };
+      return mapAppError(() => updateOrg(requireEm(ctx["em"]), appContext(ctx as unknown as CtxWithEm), input));
     }),
 
   /** orgs.members sub-router */
