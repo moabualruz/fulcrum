@@ -1,87 +1,45 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { openDatabase, getDefaultOrgId } from "$lib/server/db";
-import {
-  addTaskToSprintAction,
-  removeTaskFromSprintAction,
-} from "$lib/server/sprints";
+import { addTaskToSprint, removeTaskFromSprint } from "../../../../../../application/sprints/commands.ts";
+import { loadProjectBacklog } from "../../../../../../application/sprints/queries.ts";
+import { requestAppScope } from "$lib/server/application-scope";
 
-export const load: PageServerLoad = async ({ params }) => {
-  const db = await openDatabase();
+export const load: PageServerLoad = async ({ params, locals }) => {
   try {
-    const orgId = await getDefaultOrgId(db);
-    // Verify project exists
-    const projectRows = await db.query<{ id: string; name: string }>(
-      `SELECT id, name FROM projects WHERE id = $1 AND org_id = $2`,
-      [params.id, orgId],
-    );
-    if (projectRows.length === 0) throw error(404, "Project not found");
-    const project = projectRows[0]!;
-
-    // Load sprints for this project
-    const sprints = await db.query<{
-      id: string; name: string; status: string; capacity_points: number | null;
-    }>(
-      `SELECT id, name, status, capacity_points
-         FROM sprints WHERE project_id = $1 ORDER BY created_at DESC, id ASC`,
-      [params.id],
-    );
-
-    // Backlog = unsprinted, non-completed tasks
-    const backlogTasks = await db.query<{
-      id: string; title: string; status: string; priority: number;
-      estimate_points: number | null; sprint_id: string | null;
-    }>(
-      `SELECT id, title, status, priority, estimate_points, sprint_id
-         FROM tasks
-         WHERE project_id = $1 AND sprint_id IS NULL
-           AND status NOT IN ('completed', 'cancelled')
-         ORDER BY priority DESC, updated_at DESC, id ASC`,
-      [params.id],
-    );
-
-    // If a sprint is selected (via query param), load its tasks
-    return {
-      project: { id: project.id, name: project.name },
-      sprints,
-      backlogTasks,
-    };
-  } finally {
-    await db.close();
+    const { em, ctx } = await requestAppScope(locals, params.id);
+    return await loadProjectBacklog(em, ctx);
+  } catch {
+    throw error(404, "Project not found");
   }
 };
 
 export const actions: Actions = {
-  addTask: async ({ request, params }) => {
+  addTask: async ({ request, params, locals }) => {
     const fd = await request.formData();
     const sprintId = fd.get("sprintId") as string;
     const taskId = fd.get("taskId") as string;
     if (!sprintId || !taskId) return fail(400, { error: "sprintId and taskId required" });
 
-    const db = await openDatabase();
     try {
-      await addTaskToSprintAction(db, { sprintId, taskId });
+      const { em, ctx } = await requestAppScope(locals, params.id);
+      await addTaskToSprint(em, ctx, sprintId, taskId);
       return { ok: true };
     } catch (e) {
       return fail(400, { error: (e as Error).message });
-    } finally {
-      await db.close();
     }
   },
-  removeTask: async ({ request }) => {
+  removeTask: async ({ request, params, locals }) => {
     const fd = await request.formData();
     const sprintId = fd.get("sprintId") as string;
     const taskId = fd.get("taskId") as string;
     if (!sprintId || !taskId) return fail(400, { error: "sprintId and taskId required" });
 
-    const db = await openDatabase();
     try {
-      await removeTaskFromSprintAction(db, { sprintId, taskId });
+      const { em, ctx } = await requestAppScope(locals, params.id);
+      await removeTaskFromSprint(em, ctx, sprintId, taskId);
       return { ok: true };
     } catch (e) {
       return fail(400, { error: (e as Error).message });
-    } finally {
-      await db.close();
     }
   },
 };

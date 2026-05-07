@@ -54,6 +54,32 @@ export interface TaskRelationshipDto {
   type: string;
 }
 
+export interface ProjectOverviewData {
+  project: {
+    id: string;
+    slug: string;
+    name: string;
+    description: string | null;
+    updated_at: string;
+  };
+  summary: {
+    openTasks: number;
+    inProgress: number;
+    done: number;
+    sprintDaysRemaining: number;
+  };
+}
+
+export interface BoardTaskRow {
+  id: string;
+  title: string;
+  status: string | null;
+  priority: number | null;
+  project_id: string | null;
+  sprint_id?: string | null;
+  updated_at: string;
+}
+
 export async function getProjectOrNull(
   em: EntityManager,
   ctx: AppContext,
@@ -64,6 +90,58 @@ export async function getProjectOrNull(
     [projectId, ctx.orgId],
   );
   return rows[0] ?? null;
+}
+
+export async function loadProjectOverview(em: EntityManager, ctx: AppContext, projectId: string): Promise<ProjectOverviewData | null> {
+  const conn = ormSqlConnection(em);
+  const rows = await conn.execute<Array<ProjectRow & { description: string | null; updated_at: Date | string }>>(
+    `SELECT id, slug, name, description, updated_at FROM projects
+       WHERE id = $1 AND org_id = $2`,
+    [projectId, ctx.orgId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  const summaryRows = await conn.execute<Array<{ open_tasks: number | string; in_progress: number | string; done: number | string }>>(
+    `SELECT
+       COUNT(*) FILTER (WHERE status NOT IN ('completed', 'cancelled')) AS open_tasks,
+       COUNT(*) FILTER (WHERE status = 'in_progress') AS in_progress,
+       COUNT(*) FILTER (WHERE status = 'completed') AS done
+     FROM tasks
+     WHERE project_id = $1 AND org_id = $2`,
+    [projectId, ctx.orgId],
+  );
+  const summary = summaryRows[0] ?? { open_tasks: 0, in_progress: 0, done: 0 };
+  return {
+    project: {
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      description: row.description,
+      updated_at: isoStamp(row.updated_at),
+    },
+    summary: {
+      openTasks: Number(summary.open_tasks),
+      inProgress: Number(summary.in_progress),
+      done: Number(summary.done),
+      sprintDaysRemaining: 0,
+    },
+  };
+}
+
+export async function listProjectBoardTasks(em: EntityManager, ctx: AppContext): Promise<BoardTaskRow[]> {
+  const rows = await ormSqlConnection(em).execute<BoardTaskRow[]>(
+    `SELECT id, title, status, priority, project_id, sprint_id, updated_at
+       FROM tasks
+      WHERE org_id = $1
+        AND project_id = $2
+        AND deleted_at IS NULL
+      ORDER BY updated_at DESC, id ASC`,
+    [ctx.orgId, ctx.projectId ?? null],
+  );
+  return rows.map((task) => ({
+    ...task,
+    updated_at: isoStamp(task.updated_at),
+  }));
 }
 
 export async function listProjectActivityEvents(

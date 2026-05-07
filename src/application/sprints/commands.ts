@@ -1,7 +1,9 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 
+import { randomUUID } from "node:crypto";
 import { SprintService } from "../../services/SprintService.ts";
 import { AppValidationError } from "../errors.ts";
+import { ormSqlConnection } from "../orm-helpers.ts";
 import type {
   AppContext,
   CloseSprintDto,
@@ -50,4 +52,50 @@ export async function removeTaskFromSprint(
   taskId: string,
 ): Promise<{ moved: true }> {
   return new SprintService(em).removeTask(ctx.orgId, sprintId, taskId);
+}
+
+export async function createProjectSprint(
+  em: EntityManager,
+  ctx: AppContext,
+  input: { name: string; goal?: string | null; capacity?: number | null },
+): Promise<{ id: string }> {
+  const id = randomUUID();
+  const now = new Date();
+  const end = new Date(now.getTime() + 14 * 86400000);
+  await ormSqlConnection(em).execute(
+    `INSERT INTO sprints (id, org_id, project_id, name, goal, status, capacity_points, start_date, end_date, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, 'planning', $6, $7, $8, now(), now())`,
+    [id, ctx.orgId, ctx.projectId ?? null, input.name, input.goal ?? null, input.capacity ?? null, now.toISOString(), end.toISOString()],
+  );
+  return { id };
+}
+
+export async function startProjectSprint(em: EntityManager, ctx: AppContext, sprintId: string): Promise<{ ok: true }> {
+  await ormSqlConnection(em).execute(
+    `UPDATE sprints SET status = 'active', updated_at = now() WHERE id = $1 AND org_id = $2`,
+    [sprintId, ctx.orgId],
+  );
+  return { ok: true };
+}
+
+export async function completeProjectSprint(
+  em: EntityManager,
+  ctx: AppContext,
+  sprintId: string,
+): Promise<{ id: string; metrics: { velocity: number; completed_tasks: number } }> {
+  const conn = ormSqlConnection(em);
+  await conn.execute(`UPDATE sprints SET status = 'completed', updated_at = now() WHERE id = $1 AND org_id = $2`, [sprintId, ctx.orgId]);
+  await conn.execute(
+    `UPDATE tasks SET sprint_id = NULL, updated_at = now() WHERE sprint_id = $1 AND status NOT IN ('completed', 'cancelled')`,
+    [sprintId],
+  );
+  return { id: sprintId, metrics: { velocity: 0, completed_tasks: 0 } };
+}
+
+export async function updateSprintGoal(em: EntityManager, ctx: AppContext, sprintId: string, goal: string): Promise<{ ok: true }> {
+  await ormSqlConnection(em).execute(
+    `UPDATE sprints SET goal = $1, updated_at = now() WHERE id = $2 AND org_id = $3`,
+    [goal, sprintId, ctx.orgId],
+  );
+  return { ok: true };
 }
