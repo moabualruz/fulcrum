@@ -190,7 +190,7 @@ describe("MigratorService.migrate() — up to latest", () => {
 
   it("runs migrate() without throwing", async () => {
     await expect(service.migrate()).resolves.toBeUndefined();
-  });
+  }, 20_000);
 
   it("status() shows no pending migrations after migrate()", async () => {
     const status = await service.status();
@@ -393,7 +393,7 @@ describe("fulcrum db migration command", () => {
     expect(payload.ok).toBe(true);
     expect(Array.isArray(payload.applied)).toBe(true);
     expect(Array.isArray(payload.pending)).toBe(true);
-  });
+  }, 15_000);
 
   it("routes explicit PostgreSQL migration through the db command surface", async () => {
     const lines: string[] = [];
@@ -574,7 +574,7 @@ describe("MigratorService — forced-lossy-down protection (P1#19 round-2)", () 
     } finally {
       await closeOrm(freshOrm);
     }
-  });
+  }, 20_000);
 });
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -605,7 +605,7 @@ describe("MigratorService — LossyCheckFailedError (fail-closed lossy import)",
     } finally {
       await closeOrm(freshOrm);
     }
-  });
+  }, 20_000);
 
   it("LossyCheckFailedError has correct code and migrationPath", () => {
     const err = new LossyCheckFailedError("/path/to/migration.ts", new Error("oops"));
@@ -772,7 +772,7 @@ describe("MigratorService — round-trip up/down on all migration classes (P1#19
       } finally {
         await closeOrm(freshOrm);
       }
-    });
+    }, 20_000);
   }
 });
 

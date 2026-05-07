@@ -10,6 +10,8 @@ bun run dev
 
 Starts `vite` dev server on `http://localhost:5173` (configurable in `vite.config.ts`). Hot-reload on `.svelte` and `.ts` changes.
 
+Dependency resolution is owned by the root Bun workspace and root `bun.lock`; run install commands from the repo root.
+
 ## Build
 
 ```bash

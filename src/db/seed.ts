@@ -1,6 +1,6 @@
 import { inject, injectable } from "@needle-di/core";
 import type { EntityManager } from "@mikro-orm/postgresql";
-import { hashPassword } from "@better-auth/utils/password";
+import { hashPassword } from "better-auth/crypto";
 
 import { ENTITY_MANAGER_TOKEN } from "./db.module.ts";
 import { Org } from "./entities/auth/Org.ts";

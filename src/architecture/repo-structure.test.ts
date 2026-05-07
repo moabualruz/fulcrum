@@ -23,6 +23,16 @@ const GENERATED_OR_VENDOR_DIRS = new Set([
 
 const RUNNABLE_SURFACE_DIRS = ["cli", "tui", "web", "api", "router", "server", "trpc"];
 
+type PackageJson = {
+  name?: string;
+  workspaces?: string[];
+  scripts?: Record<string, string>;
+};
+
+async function readPackageJson(path: string): Promise<PackageJson> {
+  return JSON.parse(await readFile(join(ROOT, path), "utf8")) as PackageJson;
+}
+
 async function walkDirs(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
   const dirs: string[] = [];
@@ -114,5 +124,27 @@ describe("repository structure hygiene", () => {
     }
 
     expect(missingOrMisnamed).toEqual([]);
+  });
+
+  test("app packages are part of the root workspace and expose standard local scripts", async () => {
+    const rootPackage = await readPackageJson("package.json");
+    expect(rootPackage.workspaces).toEqual(["apps/*"]);
+
+    const expectedScripts = new Map<string, string[]>([
+      ["apps/cli/package.json", ["dev", "test", "typecheck"]],
+      ["apps/server/package.json", ["dev", "test", "typecheck"]],
+      ["apps/tui/package.json", ["dev", "test", "typecheck"]],
+      ["apps/web/package.json", ["dev", "build", "check", "test", "web:test"]],
+    ]);
+
+    const missingScripts: string[] = [];
+    for (const [path, scripts] of expectedScripts) {
+      const pkg = await readPackageJson(path);
+      for (const script of scripts) {
+        if (!pkg.scripts?.[script]) missingScripts.push(`${path}:${script}`);
+      }
+    }
+
+    expect(missingScripts.sort()).toEqual([]);
   });
 });

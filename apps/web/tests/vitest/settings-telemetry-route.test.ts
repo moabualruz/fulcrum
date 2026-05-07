@@ -16,11 +16,11 @@ vi.mock("$lib/server/application-scope", () => ({
   requestAppScope: async () => appScope,
 }));
 
-vi.mock("../../../application/settings/queries.ts", () => ({
+vi.mock("@/application/settings/queries.ts", () => ({
   getSettingsTelemetry,
 }));
 
-vi.mock("../../../application/settings/commands.ts", () => ({
+vi.mock("@/application/settings/commands.ts", () => ({
   purgeSettingsTelemetry,
   toggleSettingsTelemetryOptIn,
 }));

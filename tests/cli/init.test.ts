@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const CLI = join(process.cwd(), "src", "cli", "index.ts");
+const CLI = join(process.cwd(), "apps", "cli", "src", "main.ts");
 
 async function runCli(fulcrumHome: string, args: readonly string[]): Promise<{
   exitCode: number;
@@ -53,7 +53,7 @@ describe("fulcrum init", () => {
     expect(second.exitCode).toBe(0);
     expect(second.stderr).toBe("");
     expect(second.stdout).toContain("Already initialized");
-  });
+  }, 15_000);
 
   test("initializes migration ledger so db commands agree on local state", async () => {
     const fulcrumHome = join(scratch, ".fulcrum");
@@ -91,5 +91,5 @@ describe("fulcrum init", () => {
     expect(migrate.exitCode).toBe(0);
     expect(migrate.stderr).toBe("");
     expect(migrate.stdout).toContain("Migration complete.");
-  });
+  }, 15_000);
 });

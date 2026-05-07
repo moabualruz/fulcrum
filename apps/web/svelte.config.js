@@ -9,7 +9,9 @@ const config = {
 	kit: {
 		alias: {
 			'@': '../../src',
+			'@fulcrum/cli': '../cli/src',
 			'@fulcrum/server': '../server/src',
+			'@fulcrum/tui': '../tui/src',
 			'@fulcrum/web': './src'
 		},
 		// adapter-auto only supports some environments, see https://svelte.dev/docs/kit/adapter-auto for a list.

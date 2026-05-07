@@ -679,7 +679,7 @@ export class MikroOrmBetterAuthAdapter {
     const rows = await this.memStore.findMany(model, where);
     for (const row of rows) {
       const id = row["id"] as string;
-      await this.memStore.update(model, [{ field: "id", operator: "eq", value: id, connector: "AND", mode: "sensitive" }], update);
+      await this.memStore.update(model, [{ field: "id", operator: "eq", value: id, connector: "AND" }], update);
       count++;
     }
     return count;

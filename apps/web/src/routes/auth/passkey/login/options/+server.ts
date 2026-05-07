@@ -1,6 +1,6 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 
-import { generateAuthenticationOptions } from "../../../../../../../auth/passkey.ts";
+import { generateAuthenticationOptions } from "@/auth/passkey.ts";
 import { passkeyError, rpIdFromUrl, setLoginChallengeCookie } from "../../shared.ts";
 
 export const POST: RequestHandler = async ({ cookies, url }) => {

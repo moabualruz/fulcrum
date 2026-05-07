@@ -45,7 +45,7 @@
 - [x] **BUG-13**: JSON/TOML config uses targeted patchers, not whole-file rewrites
 - [x] **BUG-14**: Vendor mirrors do not overwrite top-level skill/command names
 - [x] **BUG-15**: Complexity hotspots (CCN 18-59) refactored below CCN 15 threshold
-- [x] **BUG-16**: cookie@0.6.0 advisory resolved in web lockfile
+- [x] **BUG-16**: cookie@0.6.0 advisory resolved in root lockfile
 - [x] **BUG-17**: Local main synced with origin
 - [x] **BUG-18**: Cmd+K keyboard shortcut bound in web layout (palette component exists but `svelte:window` keydown handler missing)
 

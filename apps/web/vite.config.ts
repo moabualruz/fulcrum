@@ -36,4 +36,13 @@ function transformRepoDecorators(): Plugin {
 
 export default defineConfig({
   plugins: [transformRepoDecorators(), tailwindcss(), sveltekit()],
+  resolve: {
+    alias: {
+      "@": new URL("../../src", import.meta.url).pathname,
+      "@fulcrum/cli": new URL("../cli/src", import.meta.url).pathname,
+      "@fulcrum/server": new URL("../server/src", import.meta.url).pathname,
+      "@fulcrum/tui": new URL("../tui/src", import.meta.url).pathname,
+      "@fulcrum/web": new URL("./src", import.meta.url).pathname,
+    },
+  },
 });

@@ -7,17 +7,19 @@
 ```
 fulcrum/
 ├── AGENTS.md                    # Project agent rules and current product direction
-├── package.json                 # Root Bun package, scripts, dependencies
+├── package.json                 # Root Bun package, workspaces, scripts, dependencies
 ├── justfile                     # Project recipes; currently `sync-symphony`
 ├── tsconfig.json                # Root TypeScript configuration
-├── src/                         # Main TypeScript monorepo source
-│   ├── index.ts                 # `fulcrum` binary entry point
+├── apps/                        # Runnable local apps / surfaces
+│   ├── cli/                     # Bun CLI app and `fulcrum` binary entrypoint
+│   ├── server/                  # Local REST/tRPC/router/Yjs server adapters
+│   ├── tui/                     # OpenTUI terminal client
+│   └── web/                     # SvelteKit web client and local web UI
+├── src/                         # Shared core TypeScript modules
 │   ├── agents/                  # Agent profile registry and per-agent profiles
-│   ├── api/                     # Hono public REST/OpenAPI API
 │   ├── artifacts/               # Artifact harvest, storage, preview, pruning
 │   ├── auth/                    # Better-Auth integration
 │   ├── backup/                  # Backup/restore runners and adapters
-│   ├── cli/                     # CLI command implementations
 │   ├── collab/                  # Collaboration server/domain helpers
 │   ├── components/              # Fulcrum installable component catalog/planner/ledger
 │   ├── config/                  # Runtime config resolution
@@ -48,18 +50,14 @@ fulcrum/
 │   ├── router/                  # Agent routing rules engine
 │   ├── search/                  # Search query/index/cache/filter system
 │   ├── secrets/                 # Credentials and secret storage
-│   ├── server/                  # Server-only tRPC routers and Yjs server
 │   ├── services/                # Domain service classes
 │   ├── skills/                  # Skill registry, sync, lock, marketplace client
 │   ├── subscriptions/           # EventBus, tRPC subscriptions, polling bridges
 │   ├── surfaces/                # Surface parity checks
 │   ├── test-utils/              # Shared test helpers
 │   ├── tests/                   # Root-level UAT/phase tests
-│   ├── trpc/                    # Root tRPC router/context/middleware/schemas
-│   ├── tui/                     # OpenTUI terminal app
 │   ├── types/                   # Shared ambient/domain types
 │   ├── utils/                   # General utilities
-│   ├── web/                     # SvelteKit web application package
 │   ├── webhooks/                # Webhook dispatcher
 │   └── workers/                 # Worker registry/jobs
 ├── docs/                        # Human project docs
@@ -80,24 +78,30 @@ fulcrum/
 ## Directory Purposes
 
 **`src/`:**
-- Purpose: All first-party runtime TypeScript except the SvelteKit package internals under `src/web/`.
-- Contains: CLI, API, services, DB, TUI, orchestration, integrations, tests.
-- Key files: `src/index.ts`, `src/cli/index.ts`, `src/trpc/router.ts`, `src/db/db.module.ts`.
+- Purpose: Shared core runtime TypeScript used by local apps.
+- Contains: application/domain services, DB, orchestration, integrations, platform modules, tests.
+- Key files: `src/application/`, `src/db/db.module.ts`, `src/orchestration/symphony/orchestrator.ts`, `src/agents/registry.ts`.
+
+**`apps/`:**
+- Purpose: First-class runnable local apps and server adapters.
+- Contains: `apps/cli`, `apps/server`, `apps/tui`, `apps/web`.
+- Key files: `apps/cli/src/main.ts`, `apps/cli/src/index.ts`, `apps/server/src/index.ts`, `apps/tui/src/index.ts`, `apps/web/src/hooks.server.ts`.
+- Package contract: root `package.json` declares `workspaces: ["apps/*"]`; each app package exposes local `dev`/`test`/`typecheck` scripts where applicable.
 
 **`src/agents/`:**
 - Purpose: Canonical agent support registry and profile definitions.
 - Contains: `types.ts`, `registry.ts`, `resolve-agent-run-config.ts`, `profiles/`.
 - Key files: `src/agents/registry.ts`, `src/agents/profiles/codex.ts`, `src/agents/profiles/claude-code.ts`.
 
-**`src/api/`:**
+**`apps/server/src/api/`:**
 - Purpose: Public REST/OpenAPI API surface.
 - Contains: Hono factory, API auth, rate limit, feature flag gate, route adapters.
-- Key files: `src/api/hono.ts`, `src/api/auth.ts`, `src/api/feature-flags.ts`, `src/api/routes/tasks.ts`, `src/api/routes/kernel-tasks.ts`.
+- Key files: `apps/server/src/api/hono.ts`, `apps/server/src/api/auth.ts`, `apps/server/src/api/feature-flags.ts`, `apps/server/src/api/routes/tasks.ts`, `apps/server/src/api/routes/kernel-tasks.ts`.
 
-**`src/cli/`:**
+**`apps/cli/src/`:**
 - Purpose: Implementation of `fulcrum <command>` subcommands.
 - Contains: command modules, generated domain command data, interactive helpers, Symphony CLI helpers.
-- Key files: `src/cli/index.ts`, `src/cli/install.ts`, `src/cli/product.ts`, `src/cli/component.ts`, `src/cli/mcp-cmd.ts`, `src/cli/compress.ts`.
+- Key files: `apps/cli/src/index.ts`, `apps/cli/src/install.ts`, `apps/cli/src/product.ts`, `apps/cli/src/component.ts`, `apps/cli/src/mcp-cmd.ts`, `apps/cli/src/compress.ts`.
 
 **`src/db/`:**
 - Purpose: Canonical MikroORM persistence layer.
@@ -121,40 +125,40 @@ fulcrum/
 - Key files: `src/product-kernel/db/types.ts`, `src/product-kernel/db/migrate.ts`, `src/product-kernel/db/pglite.ts`, `src/product-kernel/store/repositories.ts`.
 - Use: compatibility only for new architecture unless explicitly maintaining existing product-kernel callers.
 
-**`src/trpc/`:**
+**`apps/server/src/trpc/`:**
 - Purpose: Shared internal API boundary.
 - Contains: root router, context, base procedures, middleware, permissions metadata, domain routers, schemas.
-- Key files: `src/trpc/router.ts`, `src/trpc/context.ts`, `src/trpc/trpc.ts`, `src/trpc/middleware.ts`.
+- Key files: `apps/server/src/trpc/router.ts`, `apps/server/src/trpc/context.ts`, `apps/server/src/trpc/trpc.ts`, `apps/server/src/trpc/middleware.ts`.
 
-**`src/server/trpc/routers/`:**
+**`apps/server/src/runtime/trpc/routers/`:**
 - Purpose: Server-side domain tRPC procedure implementations.
 - Contains: auth, tasks, docs, sprints, flags, memory, audit, backup, custom fields, inference, routing, skills, telemetry, theme, orgs, comments, workflows, relationships, templates, recurrence, automations.
-- Key files: `src/server/trpc/routers/tasks.ts`, `src/server/trpc/routers/docs.ts`, `src/server/trpc/routers/auth.ts`.
+- Key files: `apps/server/src/runtime/trpc/routers/tasks.ts`, `apps/server/src/runtime/trpc/routers/docs.ts`, `apps/server/src/runtime/trpc/routers/auth.ts`.
 
 **`src/services/`:**
 - Purpose: Shared domain business services called by routers/surfaces.
 - Contains: service classes for tasks, docs, sprints, comments, workflow, automation, reports, relationships, templates, recurrence.
 - Key files: `src/services/TaskService.ts`, `src/services/DocService.ts`, `src/services/SprintService.ts`, `src/services/WorkflowService.ts`.
 
-**`src/web/`:**
+**`apps/web/`:**
 - Purpose: SvelteKit web app package with separate `package.json`.
 - Contains: SvelteKit config, Vite config, routes, components, lib modules, web tests.
-- Key files: `src/web/package.json`, `src/web/src/hooks.server.ts`, `src/web/src/routes/+layout.server.ts`, `src/web/src/routes/api/trpc/[...path]/+server.ts`.
+- Key files: `apps/web/package.json`, `apps/web/src/hooks.server.ts`, `apps/web/src/routes/+layout.server.ts`, `apps/web/src/routes/api/trpc/[...path]/+server.ts`.
 
-**`src/web/src/routes/`:**
+**`apps/web/src/routes/`:**
 - Purpose: File-based web routing.
 - Contains: page routes and API endpoints for dashboard, projects, tasks, docs, repos, runs, settings, auth, search, memory, artifacts, inference, audit, doctor.
-- Key files: `src/web/src/routes/projects/[id]/board/+page.server.ts`, `src/web/src/routes/tasks/[id]/+page.server.ts`, `src/web/src/routes/api/v1/+server.ts`.
+- Key files: `apps/web/src/routes/projects/[id]/board/+page.server.ts`, `apps/web/src/routes/tasks/[id]/+page.server.ts`, `apps/web/src/routes/api/v1/+server.ts`.
 
-**`src/web/src/lib/`:**
+**`apps/web/src/lib/`:**
 - Purpose: Web-only components, state, server helpers, i18n, theme, editor, UI primitives.
 - Contains: `components/`, `server/`, `state/`, `collab/`, `i18n/`, web-specific utilities.
-- Key files: `src/web/src/lib/server/db.ts`, `src/web/src/lib/state/active-project.ts`.
+- Key files: `apps/web/src/lib/server/db.ts`, `apps/web/src/lib/state/active-project.ts`.
 
-**`src/tui/`:**
+**`apps/tui/src/`:**
 - Purpose: Keyboard-first terminal UI.
 - Contains: app root, router, screens, OpenTUI adapter, renderer, testing FakeTTY, theme/widgets.
-- Key files: `src/tui/index.ts`, `src/tui/router.ts`, `src/tui/screens/index.ts`, `src/tui/testing/fake-tty.ts`.
+- Key files: `apps/tui/src/index.ts`, `apps/tui/src/router.ts`, `apps/tui/src/screens/index.ts`, `apps/tui/src/testing/fake-tty.ts`.
 
 **`src/orchestration/`:**
 - Purpose: Agent run lifecycle, Symphony state machine, sandbox dispatch, artifact harvest, token tracking.
@@ -219,26 +223,26 @@ fulcrum/
 ## Key File Locations
 
 **Entry Points:**
-- `src/index.ts`: Bun executable entry point and top-level command dispatcher.
-- `src/cli/index.ts`: broad CLI command hub, DB bootstrap, web/TUI launch.
-- `src/web/src/hooks.server.ts`: SvelteKit request hook, auth/tRPC/DB locals.
-- `src/tui/index.ts`: terminal UI app root.
-- `src/api/hono.ts`: canonical public REST/OpenAPI API factory.
-- `src/server/yjs-server.ts`: Yjs collaboration WebSocket server.
+- `apps/cli/src/main.ts`: Bun executable entry point and top-level command dispatcher.
+- `apps/cli/src/index.ts`: broad CLI command hub, DB bootstrap, web/TUI launch.
+- `apps/web/src/hooks.server.ts`: SvelteKit request hook, auth/tRPC/DB locals.
+- `apps/tui/src/index.ts`: terminal UI app root.
+- `apps/server/src/api/hono.ts`: canonical public REST/OpenAPI API factory.
+- `apps/server/src/runtime/yjs-server.ts`: Yjs collaboration WebSocket server.
 
 **Configuration:**
 - `package.json`: root Bun scripts and dependency set.
-- `src/web/package.json`: SvelteKit package scripts and web dependencies.
+- `apps/web/package.json`: SvelteKit package scripts and web dependencies.
 - `justfile`: project recipe for syncing Symphony submodule and conformance trace.
 - `tsconfig.json`: root TypeScript config.
-- `src/web/svelte.config.js`: SvelteKit config.
-- `src/web/vite.config.ts`: Vite config.
+- `apps/web/svelte.config.js`: SvelteKit config.
+- `apps/web/vite.config.ts`: Vite config.
 - `config/tool-output-policy.toml`: tool-output router policy.
 - `.symphony-spec.lock`: generated Symphony spec lock.
 
 **Core Logic:**
-- `src/trpc/router.ts`: root internal API router.
-- `src/trpc/context.ts`: request/session/data context.
+- `apps/server/src/trpc/router.ts`: root internal API router.
+- `apps/server/src/trpc/context.ts`: request/session/data context.
 - `src/db/db.module.ts`: DI repository/service binding.
 - `src/db/migrator-service.ts`: migration safety wrapper.
 - `src/services/TaskService.ts`: task domain service.
@@ -250,12 +254,12 @@ fulcrum/
 
 **Testing:**
 - `src/**/*.test.ts`: colocated Bun tests across core modules.
-- `src/web/src/routes/**/*.test.ts`: route loader/server tests.
-- `src/web/tests/e2e/`: Playwright e2e tests.
-- `src/web/tests/a11y/`: Playwright accessibility tests.
-- `src/web/tests/vitest/`: Vitest web tests.
+- `apps/web/src/routes/**/*.test.ts`: route loader/server tests.
+- `apps/web/tests/e2e/`: Playwright e2e tests.
+- `apps/web/tests/a11y/`: Playwright accessibility tests.
+- `apps/web/tests/vitest/`: Vitest web tests.
 - `src/test-utils/`: shared root test helpers.
-- `src/web/tests/mocks/`: web mocks.
+- `apps/web/tests/mocks/`: web mocks.
 
 **Planning/Knowledge:**
 - `.planning/STATE.md`: current milestone state and decisions.
@@ -270,7 +274,7 @@ fulcrum/
 - PascalCase service classes: `src/services/TaskService.ts`, `src/services/DocService.ts`.
 - PascalCase ORM entities: `src/db/entities/tasks/Task.ts`, `src/db/entities/docs/Document.ts`.
 - PascalCase repositories with `Repository` suffix: `src/db/repositories/tasks/TaskRepository.ts`.
-- kebab-case utility/domain modules: `src/router/rules-engine.ts`, `src/product-kernel/db/migrate.ts`, `src/api/rate-limit.ts`.
+- kebab-case utility/domain modules: `src/router/rules-engine.ts`, `src/product-kernel/db/migrate.ts`, `apps/server/src/api/rate-limit.ts`.
 - SvelteKit route files follow framework names: `+page.svelte`, `+page.server.ts`, `+server.ts`, `+layout.server.ts`.
 - Test files are colocated with `.test.ts` suffix: `src/services/TaskService.test.ts`, `src/router/rules-engine.test.ts`.
 - Migration files use timestamp/class pattern under ORM: `src/db/migrations/Migration20260502090000_tasks_schema_extension.ts`.
@@ -279,19 +283,19 @@ fulcrum/
 **Directories:**
 - Domain directories are lowercase/kebab-case where multiword: `src/product-kernel/`, `src/test-utils/`.
 - DB entity/repository domains mirror product domains: `auth/`, `tasks/`, `docs/`, `memory/`, `orchestration/`, `notifications/`, `repos/`, `search/`, `skills/`.
-- Web route directories follow URL path segments: `src/web/src/routes/projects/[id]/settings/workflow/`.
+- Web route directories follow URL path segments: `apps/web/src/routes/projects/[id]/settings/workflow/`.
 - Dynamic SvelteKit params use bracket syntax: `[id]`, `[runId]`, `[...path]`.
 
 ## Where to Add New Code
 
 **New Product Feature:**
 - Primary service: `src/services/<Feature>Service.ts` when behavior spans routers/surfaces.
-- tRPC API: `src/server/trpc/routers/<feature>.ts` for server routers or `src/trpc/routers/<feature>.ts` for already-rooted internal routers.
-- Router mount: add to `src/trpc/router.ts`.
-- Web UI: `src/web/src/routes/<feature>/` plus components under `src/web/src/lib/components/<feature>/`.
-- CLI: `src/cli/<feature>.ts` or `src/cli/commands/<feature>.ts`, dispatched from `src/cli/index.ts` or `src/index.ts`.
-- TUI: screen under `src/tui/screens/<feature>.ts`, route in `src/tui/index.ts`/`src/tui/screens/index.ts`.
-- Tests: colocated `.test.ts`; web route/component tests under matching `src/web/src/routes/` or `src/web/tests/`.
+- tRPC API: `apps/server/src/runtime/trpc/routers/<feature>.ts` for server routers or `apps/server/src/trpc/routers/<feature>.ts` for already-rooted internal routers.
+- Router mount: add to `apps/server/src/trpc/router.ts`.
+- Web UI: `apps/web/src/routes/<feature>/` plus components under `apps/web/src/lib/components/<feature>/`.
+- CLI: `apps/cli/src/<feature>.ts` or `apps/cli/src/commands/<feature>.ts`, dispatched from `apps/cli/src/index.ts` or `apps/cli/src/main.ts`.
+- TUI: screen under `apps/tui/src/screens/<feature>.ts`, route in `apps/tui/src/index.ts`/`apps/tui/src/screens/index.ts`.
+- Tests: colocated `.test.ts`; web route/component tests under matching `apps/web/src/routes/` or `apps/web/tests/`.
 
 **New Database Entity:**
 - Entity: `src/db/entities/<domain>/<Entity>.ts`.
@@ -302,39 +306,39 @@ fulcrum/
 - Avoid: new ProductDb SQL migrations unless maintaining legacy compatibility in `src/product-kernel/`.
 
 **New Public REST Endpoint:**
-- Route adapter: `src/api/routes/<resource>.ts`.
-- Registration: `src/api/hono.ts`.
-- Auth/gating: use `src/api/auth.ts`, `src/api/rate-limit.ts`, `src/api/feature-flags.ts`.
-- Web route compatibility: only add `src/web/src/routes/api/v1/**` if SvelteKit mount needs explicit handling.
-- Tests: `src/api/__tests__/` and route-specific tests near web API route if applicable.
+- Route adapter: `apps/server/src/api/routes/<resource>.ts`.
+- Registration: `apps/server/src/api/hono.ts`.
+- Auth/gating: use `apps/server/src/api/auth.ts`, `apps/server/src/api/rate-limit.ts`, `apps/server/src/api/feature-flags.ts`.
+- Web route compatibility: only add `apps/web/src/routes/api/v1/**` if SvelteKit mount needs explicit handling.
+- Tests: `apps/server/src/api/__tests__/` and route-specific tests near web API route if applicable.
 
 **New Web Page:**
-- Page route: `src/web/src/routes/<path>/+page.svelte`.
-- Server loader: `src/web/src/routes/<path>/+page.server.ts`.
-- Shared components: `src/web/src/lib/components/<domain>/`.
-- Web-only server helpers: `src/web/src/lib/server/`.
-- State: `src/web/src/lib/state/` when state is shared across routes.
+- Page route: `apps/web/src/routes/<path>/+page.svelte`.
+- Server loader: `apps/web/src/routes/<path>/+page.server.ts`.
+- Shared components: `apps/web/src/lib/components/<domain>/`.
+- Web-only server helpers: `apps/web/src/lib/server/`.
+- State: `apps/web/src/lib/state/` when state is shared across routes.
 
 **New CLI Command:**
-- Command implementation: `src/cli/<command>.ts` for broad command or `src/cli/commands/<command>.ts` for focused subcommand.
-- Dispatch: `src/index.ts` for top-level commands, `src/cli/index.ts` for grouped commands.
+- Command implementation: `apps/cli/src/<command>.ts` for broad command or `apps/cli/src/commands/<command>.ts` for focused subcommand.
+- Dispatch: `apps/cli/src/main.ts` for top-level commands, `apps/cli/src/index.ts` for grouped commands.
 - Shared behavior: call `src/services/` or tRPC local caller; keep output formatting in CLI module.
 
 **New TUI Screen:**
-- Screen: `src/tui/screens/<screen>.ts`.
-- Routing: `src/tui/router.ts` route data usage and app route list in `src/tui/index.ts`.
-- Widgets/theme helpers: `src/tui/widgets/`, `src/tui/theme/`, `src/tui/utils/`.
-- Tests: `src/tui/__tests__/` or colocated screen tests using `src/tui/testing/fake-tty.ts`.
+- Screen: `apps/tui/src/screens/<screen>.ts`.
+- Routing: `apps/tui/src/router.ts` route data usage and app route list in `apps/tui/src/index.ts`.
+- Widgets/theme helpers: `apps/tui/src/widgets/`, `apps/tui/src/theme/`, `apps/tui/src/utils/`.
+- Tests: `apps/tui/src/__tests__/` or colocated screen tests using `apps/tui/src/testing/fake-tty.ts`.
 
 **New Agent Profile:**
 - Profile: `src/agents/profiles/<agent>.ts`.
 - Registry: `src/agents/registry.ts`.
 - Types/capabilities: `src/agents/types.ts`.
-- Install/sync integration: relevant modules in `src/cli/` and `src/components/` if surface needs distribution.
+- Install/sync integration: relevant modules in `apps/cli/src/` and `src/components/` if surface needs distribution.
 
 **New Hook:**
 - Runtime hook: `src/hooks/<name>.ts`.
-- Top-level hook dispatch: `src/index.ts`.
+- Top-level hook dispatch: `apps/cli/src/main.ts`.
 - Hook recipe/snippet: `hooks/recipes/<name>.snippet.md` if distributed.
 - Docs/update references: `docs/hooks.md` if hook behavior changes.
 
@@ -342,7 +346,7 @@ fulcrum/
 - Connector logic: `src/connectors/` for sync/runtime connectors.
 - Importer mapping: `src/importers/` or `src/data/importers/` for data import paths.
 - Credentials: `src/secrets/` and DB entities/repositories if persisted.
-- Settings UI: `src/web/src/routes/settings/integrations/<id>/` or project settings connector route.
+- Settings UI: `apps/web/src/routes/settings/integrations/<id>/` or project settings connector route.
 
 **New Search Indexer:**
 - Indexer: `src/search/indexers/<domain>.ts`.
@@ -360,12 +364,12 @@ fulcrum/
 - Shared runtime utilities: `src/utils/` only when not domain-specific.
 - Platform/cross-cutting: `src/platform/`.
 - Test helpers: `src/test-utils/`.
-- Web-only utilities: `src/web/src/lib/`.
+- Web-only utilities: `apps/web/src/lib/`.
 - Avoid adding parallel helpers when an existing domain service/module already owns behavior.
 
 ## Special Directories
 
-**`src/web/.svelte-kit/`:**
+**`apps/web/.svelte-kit/`:**
 - Purpose: SvelteKit generated build/dev output.
 - Generated: Yes.
 - Committed: No.
@@ -415,12 +419,12 @@ fulcrum/
 - Generated: Mostly source metadata.
 - Committed: Yes.
 
-**`src/cli/generated/`:**
+**`apps/cli/src/generated/`:**
 - Purpose: generated CLI helper data.
 - Generated: Yes.
 - Committed: Yes if used by runtime/tests; regenerate through scripts rather than manual edits.
 
-**`src/web/static/`:**
+**`apps/web/static/`:**
 - Purpose: static web assets served by SvelteKit.
 - Generated: No for source assets.
 - Committed: Yes.

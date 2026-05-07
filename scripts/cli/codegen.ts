@@ -230,6 +230,14 @@ type ExtractorContext = {
   imports: Map<string, VariableDeclaration>;
 };
 
+const WORKSPACE_IMPORT_PREFIXES: Record<string, string> = {
+  "@/": "src/",
+  "@fulcrum/cli/": "apps/cli/src/",
+  "@fulcrum/server/": "apps/server/src/",
+  "@fulcrum/tui/": "apps/tui/src/",
+  "@fulcrum/web/": "apps/web/src/",
+};
+
 function createExtractorContext(source: SourceFile, project: Project): ExtractorContext {
   const variables = new Map<string, VariableDeclaration>();
   const schemas = new Map<string, AstSchema>();
@@ -248,10 +256,11 @@ function createExtractorContext(source: SourceFile, project: Project): Extractor
 
     for (const declaration of current.getImportDeclarations()) {
       const specifier = declaration.getModuleSpecifierValue();
-      if (!specifier.startsWith(".")) continue;
+      const importedPath = resolveImportPath(path, specifier);
+      if (importedPath === null) continue;
       let imported: SourceFile;
       try {
-        imported = project.addSourceFileAtPath(resolve(dirname(path), specifier));
+        imported = project.addSourceFileAtPath(importedPath);
       } catch {
         continue;
       }
@@ -277,6 +286,16 @@ function createExtractorContext(source: SourceFile, project: Project): Extractor
     }
   }
   return context;
+}
+
+function resolveImportPath(fromPath: string, specifier: string): string | null {
+  if (specifier.startsWith(".")) return resolve(dirname(fromPath), specifier);
+  for (const [prefix, target] of Object.entries(WORKSPACE_IMPORT_PREFIXES)) {
+    if (specifier.startsWith(prefix)) {
+      return resolve(process.cwd(), target, specifier.slice(prefix.length));
+    }
+  }
+  return null;
 }
 
 function bindingKey(source: SourceFile, name: string): string {

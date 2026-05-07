@@ -5,5 +5,10 @@
   "module": "src/main.ts",
   "bin": {
     "fulcrum": "src/main.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/main.ts",
+    "test": "bun test src",
+    "typecheck": "bun run --bun tsc --noEmit -p ../../tsconfig.json"
   }
 }

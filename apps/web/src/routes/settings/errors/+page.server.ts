@@ -1,5 +1,4 @@
-import type { PageServerLoad, Actions } from "./$types";
-import { fail } from "@sveltejs/kit";
+import { fail, type Actions, type ServerLoad } from "@sveltejs/kit";
 import { requestAppScope } from "$lib/server/application-scope";
 import { clearSettingsErrors } from "@/application/settings/commands.ts";
 import { listSettingsErrors } from "@/application/settings/queries.ts";
@@ -12,7 +11,7 @@ function appFail(error: unknown) {
   throw error;
 }
 
-export const load: PageServerLoad = ({ url, locals }) => {
+export const load: ServerLoad = ({ url, locals }) => {
   const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1", 10));
   return {
     page,

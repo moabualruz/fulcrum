@@ -1,6 +1,6 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 
-import { verifyAuthenticationResponse } from "../../../../../../../auth/passkey.ts";
+import { verifyAuthenticationResponse } from "@/auth/passkey.ts";
 import {
   clearLoginChallengeCookie,
   originFromUrl,

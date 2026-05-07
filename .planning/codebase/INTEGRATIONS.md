@@ -7,14 +7,14 @@
 **Public API:**
 - Hono/OpenAPI REST API - external clients use `/api/v1/*` when `FULCRUM_FEATURES=public-api`
   - SDK/Client: `hono`, `@hono/zod-openapi`
-  - Auth: Bearer API key stored as SHA-256 hash via `src/api/auth.ts`, `src/product-kernel/store/repositories.ts`
-  - Files: `src/api/hono.ts`, `src/api/routes/*`, `src/web/src/routes/api/v1/+server.ts`, `src/web/src/routes/api/v1/openapi.json/+server.ts`
+  - Auth: Bearer API key stored as SHA-256 hash via `apps/server/src/api/auth.ts`, `src/product-kernel/store/repositories.ts`
+  - Files: `apps/server/src/api/hono.ts`, `apps/server/src/api/routes/*`, `apps/web/src/routes/api/v1/+server.ts`, `apps/web/src/routes/api/v1/openapi.json/+server.ts`
 
 **Internal Web API:**
 - tRPC fetch adapter - SvelteKit, CLI, and TUI share procedures
   - SDK/Client: `@trpc/server`
   - Auth: Better-Auth session in web locals or local CLI session context
-  - Files: `src/trpc/router.ts`, `src/trpc/context.ts`, `src/web/src/hooks.server.ts`, `src/web/src/routes/api/trpc/[...path]/+server.ts`
+  - Files: `apps/server/src/trpc/router.ts`, `apps/server/src/trpc/context.ts`, `apps/web/src/hooks.server.ts`, `apps/web/src/routes/api/trpc/[...path]/+server.ts`
 
 **Project Management Connectors:**
 - GitHub Issues - pull/push issue sync via GitHub REST API
@@ -26,7 +26,7 @@
   - SDK/Client: native `fetch`
   - Auth: `LINEAR_API_KEY`
   - Config: `LINEAR_TEAM_ID`
-  - Files: `src/connectors/linear.ts`, `src/web/src/routes/settings/integrations/linear/+page.server.ts`
+  - Files: `src/connectors/linear.ts`, `apps/web/src/routes/settings/integrations/linear/+page.server.ts`
 - Notion - page/database import/sync
   - SDK/Client: native `fetch`
   - Auth: token provided to connector options / credential store
@@ -84,7 +84,7 @@
   - SDK/Client: `web-push`
   - Auth: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`
   - Config: `WEB_PUSH_SUBJECT`, `WEB_PUSH_TIMEOUT_MS`, `FULCRUM_FEATURES=notify-push`
-  - Files: `src/notifications/delivery-handlers/push.ts`, `src/web/src/service-worker.ts`
+  - Files: `src/notifications/delivery-handlers/push.ts`, `apps/web/src/service-worker.ts`
 - Slack webhook notifications
   - SDK/Client: native `fetch`
   - Auth: webhook URL secret in payload/credential storage
@@ -96,7 +96,7 @@
 - Generic outgoing webhooks
   - SDK/Client: native `fetch`
   - Auth: HMAC SHA-256 signing with per-webhook secret
-  - Files: `src/notifications/delivery-handlers/webhook.ts`, `src/webhooks/dispatcher.ts`
+  - Files: `src/notifications/delivery-handlers/webhook.ts`, `apps/webhooks/dispatcher.ts`
 
 **Telemetry:**
 - Remote telemetry batch endpoint
@@ -121,7 +121,7 @@
 - PGlite local-first PostgreSQL-compatible database
   - Connection: `FULCRUM_HOME` and persisted config; default data dir from `src/config/database.ts`
   - Client: `@electric-sql/pglite`, custom PGlite Kysely/MikroORM dialect in `src/db/PGliteKyselyDriver.ts`
-  - Files: `src/config/database.ts`, `src/product-kernel/db/pglite.ts`, `src/web/src/lib/server/db.ts`
+  - Files: `src/config/database.ts`, `src/product-kernel/db/pglite.ts`, `apps/web/src/lib/server/db.ts`
 - PostgreSQL server mode
   - Connection: `DATABASE_URL`
   - Client: `pg`, MikroORM PostgreSQL driver, product-kernel SQL wrapper
@@ -133,7 +133,7 @@
 
 **File Storage:**
 - Local filesystem artifacts and state under `FULCRUM_HOME`
-  - Files: `src/product-kernel/paths.ts`, `src/artifacts/storage.ts`, `src/web/src/lib/tauri/ipc.ts`
+  - Files: `src/product-kernel/paths.ts`, `src/artifacts/storage.ts`, `apps/web/src/lib/tauri/ipc.ts`
 - Pluggable object storage backends exist for S3, GCS, Azure, GitHub, GitLab, Bitbucket metadata
   - Files: `src/product-kernel/store/s3-backend.ts`, `src/product-kernel/store/gcs-backend.ts`, `src/product-kernel/store/azure-backend.ts`, `src/product-kernel/store/storage-factory.ts`
 
@@ -141,7 +141,7 @@
 - Inference model cache in Rust sidecar via `rusqlite`
   - Files: `inference/inference-server/src/cache.rs`
 - Search/index caching through product DB search tables and web Orama index
-  - Files: `src/product-kernel/search.ts`, `src/search/indexers/`, `src/web/src/lib/search/OramaIndex.ts`
+  - Files: `src/product-kernel/search.ts`, `src/search/indexers/`, `apps/web/src/lib/search/OramaIndex.ts`
 - Metrics/cache entities in product database
   - Files: `src/db/entities/tasks/MetricsCache.ts`
 
@@ -151,13 +151,13 @@
 - Better-Auth for web sessions and SaaS auth wiring
   - Implementation: MikroORM adapter, email/password always enabled, organization plugin always enabled, OAuth/magic-link/email-OTP gated behind `saas-auth`
   - Env: `BETTER_AUTH_SECRET`, `FULCRUM_TRUSTED_ORIGINS`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
-  - Files: `src/auth/index.ts`, `src/auth/adapter.ts`, `src/web/src/hooks.server.ts`
+  - Files: `src/auth/index.ts`, `src/auth/adapter.ts`, `apps/web/src/hooks.server.ts`
 - Passkeys/WebAuthn support
   - Implementation: passkey routes and helpers
-  - Files: `src/auth/passkey.ts`, `src/web/src/routes/auth/passkey/*`
+  - Files: `src/auth/passkey.ts`, `apps/web/src/routes/auth/passkey/*`
 - Public API keys
   - Implementation: Bearer token hashed with SHA-256 and looked up in `api_keys`
-  - Files: `src/api/auth.ts`, `src/product-kernel/store/repositories.ts`, `src/web/src/routes/settings/api/+page.server.ts`
+  - Files: `apps/server/src/api/auth.ts`, `src/product-kernel/store/repositories.ts`, `apps/web/src/routes/settings/api/+page.server.ts`
 - Authorization
   - Implementation: Casbin ABAC enforcer backed by MikroORM adapter
   - Files: `src/permissions/enforcer.ts`, `src/permissions/casbin-adapter.ts`, `src/db/entities/flags/CasbinRule.ts`
@@ -166,11 +166,11 @@
 
 **Error Tracking:**
 - Internal database-backed error logs
-  - Files: `src/db/entities/platform/ErrorLog.ts`, `src/server/trpc/routers/error-logs.ts`, `src/web/src/routes/settings/errors/+page.server.ts`
+  - Files: `src/db/entities/platform/ErrorLog.ts`, `apps/server/src/runtime/trpc/routers/error-logs.ts`, `apps/web/src/routes/settings/errors/+page.server.ts`
 - External error tracking service: Not detected
 
 **Logs:**
-- Console logging for web startup/collab failures in `src/web/src/hooks.server.ts` and `src/collab/server.ts`
+- Console logging for web startup/collab failures in `apps/web/src/hooks.server.ts` and `src/collab/server.ts`
 - Audit/event records in database through `src/db/entities/core/Event.ts`, `src/product-kernel/event-dispatcher.ts`, `src/product-kernel/store/audit.ts`
 - Telemetry events and remote outbox in `src/db/entities/platform/TelemetryEvent.ts`, `src/db/entities/platform/TelemetryOutbox.ts`, `src/platform/remote-telemetry.ts`
 
@@ -178,7 +178,7 @@
 
 **Hosting:**
 - CLI binary distributed from Bun compile outputs in `dist/` via `scripts/build-all.ts`
-- Web app uses `@sveltejs/adapter-auto` in `src/web/svelte.config.js`; exact hosting platform not pinned
+- Web app uses `@sveltejs/adapter-auto` in `apps/web/svelte.config.js`; exact hosting platform not pinned
 - Desktop app uses Tauri 2 wrapper in `src-tauri/`
 - Docker compose exists only in vendored `vendor/openai-symphony/elixir/test/support/live_e2e_docker/`; no first-party deployment compose detected
 
@@ -213,23 +213,23 @@
 
 **Incoming:**
 - Better-Auth HTTP callbacks under `/api/auth/**`
-  - Files: `src/web/src/hooks.server.ts`, `src/web/src/routes/auth/*`
+  - Files: `apps/web/src/hooks.server.ts`, `apps/web/src/routes/auth/*`
 - Public API endpoints under `/api/v1/**`
-  - Files: `src/api/hono.ts`, `src/web/src/routes/api/v1/+server.ts`
+  - Files: `apps/server/src/api/hono.ts`, `apps/web/src/routes/api/v1/+server.ts`
 - tRPC endpoints under `/api/trpc/**`
-  - Files: `src/web/src/routes/api/trpc/[...path]/+server.ts`
+  - Files: `apps/web/src/routes/api/trpc/[...path]/+server.ts`
 - Yjs WebSocket server for collaboration
-  - Files: `src/server/yjs-server.ts`
+  - Files: `apps/server/src/runtime/yjs-server.ts`
 - Hocuspocus-style collaboration server hook is dynamically imported but package dependency is not declared in manifests
   - Files: `src/collab/server.ts`
 
 **Outgoing:**
 - Generic signed webhooks with retry/backoff
-  - Files: `src/webhooks/dispatcher.ts`, `src/notifications/delivery-handlers/webhook.ts`
+  - Files: `apps/webhooks/dispatcher.ts`, `src/notifications/delivery-handlers/webhook.ts`
 - SMTP email
   - Files: `src/notifications/delivery-handlers/smtp.ts`
 - Web Push
-  - Files: `src/notifications/delivery-handlers/push.ts`, `src/web/src/service-worker.ts`
+  - Files: `src/notifications/delivery-handlers/push.ts`, `apps/web/src/service-worker.ts`
 - Slack and Discord webhook delivery
   - Files: `src/product-kernel/notifications/slack.ts`, `src/product-kernel/notifications/discord.ts`
 - Remote telemetry HMAC batch POST

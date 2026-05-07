@@ -2,5 +2,10 @@
   "name": "@fulcrum/tui",
   "private": true,
   "type": "module",
-  "module": "src/index.ts"
+  "module": "src/index.ts",
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "test": "bun test src",
+    "typecheck": "bun run --bun tsc --noEmit -p ../../tsconfig.json"
+  }
 }

@@ -37,7 +37,7 @@ cd fulcrum
 bun install
 
 # Run the web app (local dev — no auth required)
-cd apps/web && bun run dev
+bun --cwd apps/web run dev
 # → http://localhost:5173
 
 # Or use the CLI
@@ -72,6 +72,8 @@ Runtime surfaces are first-class local apps:
 | `src/db` | ORM entities, repositories, migrations, DB composition. |
 | `src/domain` | Domain enums/value types and pure domain helpers. |
 | `tests` | Cross-interface, e2e, integration, migration, and parity tests. |
+
+Root `package.json` declares `apps/*` as the Bun workspace set. Clients stay local-first: CLI and TUI use in-process callers by default; web runs through local SvelteKit dev or `fulcrum web`; server code provides local REST/tRPC/Yjs adapters without requiring a remote service.
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -184,8 +186,8 @@ fulcrum tui
 bun install                  # Install deps
 bun run --bun tsc --noEmit   # Typecheck
 bun run scripts/test-root.ts # Run root tests
-cd apps/web && bun run dev    # Dev server
-cd apps/web && bun run web:e2e # Playwright e2e tests
+bun --cwd apps/web run dev    # Dev server
+bun --cwd apps/web run web:e2e # Playwright e2e tests
 ```
 
 ## Docs

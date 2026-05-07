@@ -41,6 +41,11 @@ export function createTasksCommand(): Command {
   const createCommand = command.command("create");
   createCommand.description("tasks create");
   createCommand.option("--json", "Emit JSON output");
+  createCommand.option("--assignee-id <string>", "assignee-id");
+  createCommand.option("--description <string>", "description");
+  createCommand.option("--description-text <string>", "description-text");
+  createCommand.option("--points <number>", "points", Number.parseFloat);
+  createCommand.option("--priority <number>", "priority", Number.parseFloat);
   createCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for tasks.create requires an explicit surface adapter.");
@@ -92,6 +97,7 @@ export function createTasksCommand(): Command {
   const listCommand = command.command("list");
   listCommand.description("tasks list");
   listCommand.option("--json", "Emit JSON output");
+  listCommand.option("--include-deleted", "include-deleted");
   listCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for tasks.list requires an explicit surface adapter.");

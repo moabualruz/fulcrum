@@ -1,6 +1,6 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 
-import { verifyRegistrationResponse } from "../../../../../../../auth/passkey.ts";
+import { verifyRegistrationResponse } from "@/auth/passkey.ts";
 import { currentPasskeyUser, originFromUrl, passkeyError, rpIdFromUrl } from "../../shared.ts";
 
 export const POST: RequestHandler = async ({ locals, request, url }) => {

@@ -91,7 +91,7 @@ describe("Phase 08 surface parity matrix", () => {
   });
 
   test("reports missing Web routes from SvelteKit route inventory", async () => {
-    const routesRoot = new URL("../web/src/routes/", import.meta.url).pathname;
+    const routesRoot = new URL("../../apps/web/src/routes/", import.meta.url).pathname;
     const candidates = [
       "projects/+page.svelte",
       "projects/[id]/sprints/+page.svelte",

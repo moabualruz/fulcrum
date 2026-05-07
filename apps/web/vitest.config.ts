@@ -12,6 +12,11 @@ export default defineConfig({
       "$app/navigation": new URL("./tests/mocks/app-navigation.ts", import.meta.url).pathname,
       "$app/state": new URL("./tests/mocks/app-state.ts", import.meta.url).pathname,
       $lib: new URL("./src/lib", import.meta.url).pathname,
+      "@": new URL("../../src", import.meta.url).pathname,
+      "@fulcrum/cli": new URL("../cli/src", import.meta.url).pathname,
+      "@fulcrum/server": new URL("../server/src", import.meta.url).pathname,
+      "@fulcrum/tui": new URL("../tui/src", import.meta.url).pathname,
+      "@fulcrum/web": new URL("./src", import.meta.url).pathname,
     },
   },
   test: {

@@ -6,25 +6,25 @@
 
 **Root tRPC surface still contains generated placeholder routers:**
 - Issue: Placeholder CRUD procedures return `[]`, `null`, or `{ ok: true }` for mounted API domains.
-- Files: `src/trpc/routers/stub-helpers.ts`, `src/trpc/router.ts`, `src/trpc/routers/connectors.ts`, `src/trpc/routers/agent-runs.ts`, `src/trpc/routers/repo-commits.ts`, `src/trpc/routers/saved-views.ts`, `src/trpc/routers/context.ts`
+- Files: `apps/server/src/trpc/routers/stub-helpers.ts`, `apps/server/src/trpc/router.ts`, `apps/server/src/trpc/routers/connectors.ts`, `apps/server/src/trpc/routers/agent-runs.ts`, `apps/server/src/trpc/routers/repo-commits.ts`, `apps/server/src/trpc/routers/saved-views.ts`, `apps/server/src/trpc/routers/context.ts`
 - Impact: Consumers can call procedures that appear successful without persistence or domain behavior. This hides missing work and creates false parity between real routers and placeholders.
 - Fix approach: Replace each placeholder router with service-backed procedures or make unsupported procedures fail loudly with typed `TRPCError` codes. Do not add new routers through `crudRouter()` unless the domain is intentionally read-only and documented.
 
 **Two database models coexist for product state:**
 - Issue: Web/server code mixes raw `ProductDb` access, MikroORM `EntityManager`, and service wrappers.
-- Files: `src/trpc/context.ts`, `src/web/src/lib/server/db.ts`, `src/web/src/lib/server/em.ts`, `src/web/src/lib/product-queries.ts`, `src/services/tasks.ts`, `src/services/artifacts.ts`, `src/services/runs.ts`
+- Files: `apps/server/src/trpc/context.ts`, `apps/web/src/lib/server/db.ts`, `apps/web/src/lib/server/em.ts`, `apps/web/src/lib/product-queries.ts`, `src/services/tasks.ts`, `src/services/artifacts.ts`, `src/services/runs.ts`
 - Impact: Schema ownership is split between `src/product-kernel/db/migrations/*.sql` and `src/db/migrations/*.ts`, so route code can depend on columns or behaviors not present in one path.
 - Fix approach: Use `EntityManager` as the write/read boundary for web and tRPC. Keep `ProductDb` only behind strict compatibility shims until each remaining raw query has an owning repository/service.
 
 **Feature-flag parsing is duplicated across surfaces:**
 - Issue: Several modules parse `FULCRUM_FEATURES` directly instead of using one registry/helper.
-- Files: `src/api/feature-flags.ts`, `src/api/routes/tasks.ts`, `src/server/trpc/routers/routing.ts`, `src/web/src/lib/collab/feature-flags.ts`, `src/web/src/routes/settings/connectors/+page.server.ts`, `src/web/src/routes/settings/importers/+page.server.ts`
+- Files: `apps/server/src/api/feature-flags.ts`, `apps/server/src/api/routes/tasks.ts`, `apps/server/src/runtime/trpc/routers/routing.ts`, `apps/web/src/lib/collab/feature-flags.ts`, `apps/web/src/routes/settings/connectors/+page.server.ts`, `apps/web/src/routes/settings/importers/+page.server.ts`
 - Impact: Server, API, web, and client-gated behavior can drift on whitespace, environment source, and flag names.
-- Fix approach: Route server-side flags through `src/api/feature-flags.ts` or the canonical registry; expose client-safe derived flags via SvelteKit load data or `VITE_FULCRUM_FEATURES`.
+- Fix approach: Route server-side flags through `apps/server/src/api/feature-flags.ts` or the canonical registry; expose client-safe derived flags via SvelteKit load data or `VITE_FULCRUM_FEATURES`.
 
 **Large multipurpose modules concentrate unrelated responsibilities:**
 - Issue: Several files exceed 700-1,400 lines and combine parsing, I/O, rendering, orchestration, and command behavior.
-- Files: `src/tui/index.ts`, `src/product-kernel/store/repositories.ts`, `src/cli/doctor.ts`, `src/cli/vendor-packages.ts`, `src/cli/install.ts`, `src/auth/adapter.ts`, `src/web/src/lib/components/tasks/TaskDetailPanel.svelte`, `src/web/src/lib/components/tasks/TaskComments.svelte`
+- Files: `apps/tui/src/index.ts`, `src/product-kernel/store/repositories.ts`, `apps/cli/src/doctor.ts`, `apps/cli/src/vendor-packages.ts`, `apps/cli/src/install.ts`, `src/auth/adapter.ts`, `apps/web/src/lib/components/tasks/TaskDetailPanel.svelte`, `apps/web/src/lib/components/tasks/TaskComments.svelte`
 - Impact: Small changes have high review cost and high regression surface. Tests tend to target whole modules instead of smaller behavioral units.
 - Fix approach: Extract narrow domain modules only when touching related behavior. Preserve public exports and add characterization tests before splitting shared command or UI modules.
 
@@ -38,25 +38,25 @@
 
 **Database migrations settings page is hard-unimplemented:**
 - Symptoms: Settings database migration route throws HTTP 501 for both page load and form action.
-- Files: `src/web/src/routes/settings/database/migrations/+page.server.ts`
+- Files: `apps/web/src/routes/settings/database/migrations/+page.server.ts`
 - Trigger: Navigate to settings database migrations page or submit its migrate action.
 - Workaround: Use CLI/local migration commands instead of the web page.
 
 **Settings connector configuration is process-local and stores plaintext tokens:**
 - Symptoms: Saved connector config disappears on process restart and token values are stored in module-level memory.
-- Files: `src/web/src/routes/settings/connectors/+page.server.ts`
+- Files: `apps/web/src/routes/settings/connectors/+page.server.ts`
 - Trigger: Enable `connector-confluence`, `connector-notion`, or `connector-github-issues`, save connector config, restart server.
 - Workaround: Use production connector service/credential storage where available; do not rely on this settings route for durable secrets.
 
 **Settings importers simulate external import success:**
 - Symptoms: Linear/Jira/Plane preflight returns fixed row data, confirm import records a success entry without external API calls or durable writes.
-- Files: `src/web/src/routes/settings/importers/+page.server.ts`
+- Files: `apps/web/src/routes/settings/importers/+page.server.ts`
 - Trigger: Enable `import-linear`, `import-jira`, or `import-plane`, submit API key preflight/import flow.
 - Workaround: Treat this route as UI shell only until importer actions delegate to `src/importers/*` and task services.
 
 **Yjs server accepts any non-empty bearer token by default:**
 - Symptoms: Default auth returns an authenticated user for any non-empty `Authorization: Bearer <token>` value.
-- Files: `src/server/yjs-server.ts`
+- Files: `apps/server/src/runtime/yjs-server.ts`
 - Trigger: Start the Yjs WebSocket server without injecting a custom `validateSession` implementation.
 - Workaround: Always pass a session validator that checks the database/session provider before enabling collaborative editing outside tests.
 
@@ -70,13 +70,13 @@
 
 **Raw HTML rendering has multiple trust boundaries:**
 - Risk: Svelte `{@html ...}` is used for rendered docs, diffs, markdown previews, Mermaid output, comments, and highlighted search snippets.
-- Files: `src/web/src/routes/docs/[id]/history/+page.svelte`, `src/web/src/routes/repos/[id]/commits/[sha]/+page.svelte`, `src/web/src/lib/components/docs/ReadOnlyRenderer.svelte`, `src/web/src/lib/components/docs/DocVersionTimeline.svelte`, `src/web/src/lib/components/docs/MermaidNode.svelte`, `src/web/src/lib/components/markdown/MarkdownPreview.svelte`, `src/web/src/lib/components/tasks/TaskComments.svelte`, `src/web/src/lib/components/search/SearchPage.svelte`, `src/docs/sanitize.ts`
+- Files: `apps/web/src/routes/docs/[id]/history/+page.svelte`, `apps/web/src/routes/repos/[id]/commits/[sha]/+page.svelte`, `apps/web/src/lib/components/docs/ReadOnlyRenderer.svelte`, `apps/web/src/lib/components/docs/DocVersionTimeline.svelte`, `apps/web/src/lib/components/docs/MermaidNode.svelte`, `apps/web/src/lib/components/markdown/MarkdownPreview.svelte`, `apps/web/src/lib/components/tasks/TaskComments.svelte`, `apps/web/src/lib/components/search/SearchPage.svelte`, `src/docs/sanitize.ts`
 - Current mitigation: Some paths sanitize through `DOMPurify` or `src/docs/sanitize.ts`; `ReadOnlyRenderer.svelte` explicitly uses `DOMPurify.sanitize()`.
 - Recommendations: Require every `{@html}` source to pass through a named sanitizer adjacent to the renderer. Add a static test that blocks new `{@html}` usage without an allowlist entry.
 
 **Settings connector tokens bypass credential storage:**
 - Risk: Connector tokens are stored as plaintext in a module-level `Map`.
-- Files: `src/web/src/routes/settings/connectors/+page.server.ts`, `src/db/entities/platform/Credential.ts`, `src/secrets/credentials-router.ts`
+- Files: `apps/web/src/routes/settings/connectors/+page.server.ts`, `src/db/entities/platform/Credential.ts`, `src/secrets/credentials-router.ts`
 - Current mitigation: Route requires a session and feature flag.
 - Recommendations: Store connector secrets only through `Credential`/credentials router, redact token fields from load data, and delete the in-memory `_configs` store.
 
@@ -88,9 +88,9 @@
 
 **Session-bearing API routes depend on default-org fallbacks:**
 - Risk: Several static OpenAPI/demo route modules use a fixed org ID, while real routes use authenticated org context.
-- Files: `src/api/routes/tasks.ts`, `src/api/routes/docs.ts`, `src/api/routes/audit.ts`, `src/api/routes/notifications.ts`, `src/api/routes/sprints.ts`, `src/api/routes/saved-views.ts`
+- Files: `apps/server/src/api/routes/tasks.ts`, `apps/server/src/api/routes/docs.ts`, `apps/server/src/api/routes/audit.ts`, `apps/server/src/api/routes/notifications.ts`, `apps/server/src/api/routes/sprints.ts`, `apps/server/src/api/routes/saved-views.ts`
 - Current mitigation: Comments mark these as static/spec or feature-gated route seeds.
-- Recommendations: Keep fixed-org modules out of authenticated runtime mounts. Add tests that runtime `src/api/hono.ts` routes always derive org from auth/context.
+- Recommendations: Keep fixed-org modules out of authenticated runtime mounts. Add tests that runtime `apps/server/src/api/hono.ts` routes always derive org from auth/context.
 
 ## Performance Bottlenecks
 
@@ -102,38 +102,38 @@
 
 **Web DB singleton forks one long-lived EntityManager:**
 - Problem: `initProductDb()` creates a singleton DB handle around `orm.em.fork()` and returns no-op close proxies to legacy callers.
-- Files: `src/web/src/lib/server/db.ts`, `src/web/src/hooks.server.ts`
+- Files: `apps/web/src/lib/server/db.ts`, `apps/web/src/hooks.server.ts`
 - Cause: Backward-compatible migration from per-request `openProductDb()` to singleton avoids repeated DB startup but keeps mutable EM state alive.
 - Improvement path: Use singleton ORM/connection with request-scoped forked `EntityManager` for work units; keep `openProductDb()` as a temporary compatibility API only.
 
 **Large UI components perform many client-side responsibilities in one component:**
 - Problem: Task detail/comments components combine fetch, editor setup, nested rendering, optimistic state, and form actions.
-- Files: `src/web/src/lib/components/tasks/TaskDetailPanel.svelte`, `src/web/src/lib/components/tasks/TaskComments.svelte`
+- Files: `apps/web/src/lib/components/tasks/TaskDetailPanel.svelte`, `apps/web/src/lib/components/tasks/TaskComments.svelte`
 - Cause: Feature growth is concentrated in single Svelte files.
-- Improvement path: Extract data adapters and editor subcomponents under `src/web/src/lib/components/tasks/` with tests around helpers before moving markup.
+- Improvement path: Extract data adapters and editor subcomponents under `apps/web/src/lib/components/tasks/` with tests around helpers before moving markup.
 
 ## Fragile Areas
 
 **Schema compatibility across ProductDb and MikroORM:**
-- Files: `src/product-kernel/db/migrations/*.sql`, `src/db/migrations/*.ts`, `src/db/entities/orchestration/AgentRun.ts`, `src/web/src/routes/runs/+page.server.ts`, `src/web/src/routes/runs/[id]/+page.server.ts`
+- Files: `src/product-kernel/db/migrations/*.sql`, `src/db/migrations/*.ts`, `src/db/entities/orchestration/AgentRun.ts`, `apps/web/src/routes/runs/+page.server.ts`, `apps/web/src/routes/runs/[id]/+page.server.ts`
 - Why fragile: Web routes query columns such as `sandbox_mode` and `iteration_count` while compatibility migrations and ORM migrations define overlapping schemas.
 - Safe modification: Before changing agent run columns, update both migration systems or remove the compatibility path entirely. Run route tests for `/runs` and product-kernel migration tests.
 - Test coverage: Route-level tests exist, but drift risk remains because two schema systems are accepted.
 
 **Direct SQL string construction is widespread in services:**
-- Files: `src/services/AutomationService.ts`, `src/services/SprintService.ts`, `src/services/TaskService.ts`, `src/server/trpc/routers/backup.ts`, `src/server/trpc/routers/json-import-export.ts`, `src/web/src/lib/product-queries.ts`, `src/web/src/lib/server/orm-helpers.ts`
+- Files: `src/services/AutomationService.ts`, `src/services/SprintService.ts`, `src/services/TaskService.ts`, `apps/server/src/runtime/trpc/routers/backup.ts`, `apps/server/src/runtime/trpc/routers/json-import-export.ts`, `apps/web/src/lib/product-queries.ts`, `apps/web/src/lib/server/orm-helpers.ts`
 - Why fragile: SQL shape, column names, and tenant predicates are manually maintained outside typed entity/repository APIs.
 - Safe modification: Add or update repository methods first, then replace route/service SQL calls. Keep raw SQL only for batch/report/query shapes with explicit tests.
 - Test coverage: Many route and service tests exist; no global boundary gate prevents new raw ProductDb queries.
 
 **OpenAPI/spec placeholder routes sit near real runtime routes:**
-- Files: `src/api/routes/tasks.ts`, `src/api/routes/sprints.ts`, `src/api/routes/saved-views.ts`, `src/api/hono.ts`
-- Why fragile: Static specification routes can be mistaken for runtime service-backed routes because they live under the same `src/api/routes/` namespace.
-- Safe modification: Keep comments and tests asserting `src/api/hono.ts` mounts real routes when deps exist. Prefer separate `src/api/spec-routes/` namespace for future static-only surfaces.
-- Test coverage: `src/api/__tests__/phase08-api-parity.test.ts` checks for stub patterns, but fixed-org/static paths still require review discipline.
+- Files: `apps/server/src/api/routes/tasks.ts`, `apps/server/src/api/routes/sprints.ts`, `apps/server/src/api/routes/saved-views.ts`, `apps/server/src/api/hono.ts`
+- Why fragile: Static specification routes can be mistaken for runtime service-backed routes because they live under the same `apps/server/src/api/routes/` namespace.
+- Safe modification: Keep comments and tests asserting `apps/server/src/api/hono.ts` mounts real routes when deps exist. Prefer separate `apps/server/src/api/spec-routes/` namespace for future static-only surfaces.
+- Test coverage: `apps/server/src/api/__tests__/phase08-api-parity.test.ts` checks for stub patterns, but fixed-org/static paths still require review discipline.
 
 **Feature-gated pages can imply production readiness while using local stubs:**
-- Files: `src/web/src/routes/settings/connectors/+page.server.ts`, `src/web/src/routes/settings/importers/+page.server.ts`, `src/web/src/routes/workspace/portfolio/+page.svelte`, `src/web/src/lib/components/tasks/FieldDependencyConfig.svelte`
+- Files: `apps/web/src/routes/settings/connectors/+page.server.ts`, `apps/web/src/routes/settings/importers/+page.server.ts`, `apps/web/src/routes/workspace/portfolio/+page.svelte`, `apps/web/src/lib/components/tasks/FieldDependencyConfig.svelte`
 - Why fragile: Flags turn on UI and actions even when persistence/integration is incomplete.
 - Safe modification: Gate incomplete pages with explicit disabled states or route actions that fail with typed “not implemented” errors until service-backed.
 - Test coverage: Page tests verify flag visibility; they do not prove durable external integration.
@@ -200,19 +200,19 @@
 
 **Skipped isolated E2E routes hide SSR/integration failures:**
 - What's not tested: Several route tests skip on 500/auth/service setup failures.
-- Files: `src/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts`, `src/web/tests/e2e/phase08-surface-delivery.spec.ts`, `src/web/tests/e2e/phase09-accessibility.spec.ts`, `src/web/tests/a11y/phase08-routes.test.ts`, `src/web/tests/a11y/phase09-cross-cutting.test.ts`
+- Files: `apps/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts`, `apps/web/tests/e2e/phase08-surface-delivery.spec.ts`, `apps/web/tests/e2e/phase09-accessibility.spec.ts`, `apps/web/tests/a11y/phase08-routes.test.ts`, `apps/web/tests/a11y/phase09-cross-cutting.test.ts`
 - Risk: Broken SSR routes can pass CI when skipped under isolated setup.
 - Priority: High
 
 **Editor/rendering placeholder tests remain todo:**
 - What's not tested: Editor content JSON losslessness, KaTeX rendering, Mermaid rendering, docs tree reordering, search facets, command palette behavior.
-- Files: `src/docs/editor.test.ts`, `src/web/src/lib/editor/katex.test.ts`, `src/web/src/lib/editor/mermaid.test.ts`, `src/web/src/lib/docs/tree.test.ts`, `src/web/src/lib/components/search/search.test.ts`, `src/web/src/lib/components/command-palette/palette.test.ts`
+- Files: `src/docs/editor.test.ts`, `apps/web/src/lib/editor/katex.test.ts`, `apps/web/src/lib/editor/mermaid.test.ts`, `apps/web/src/lib/docs/tree.test.ts`, `apps/web/src/lib/components/search/search.test.ts`, `apps/web/src/lib/components/command-palette/palette.test.ts`
 - Risk: Rich document and navigation features can regress without executable assertions.
 - Priority: Medium
 
 **No global gate for new placeholder routers or in-memory production stores:**
 - What's not tested: New `crudRouter()` mounts, `query(() => [])`, `query(() => null)`, and module-level `_configs`/`_history` stores in runtime code.
-- Files: `src/trpc/routers/stub-helpers.ts`, `src/web/src/routes/settings/connectors/+page.server.ts`, `src/web/src/routes/settings/importers/+page.server.ts`
+- Files: `apps/server/src/trpc/routers/stub-helpers.ts`, `apps/web/src/routes/settings/connectors/+page.server.ts`, `apps/web/src/routes/settings/importers/+page.server.ts`
 - Risk: Future phases can add apparently successful no-op routes.
 - Priority: High
 

@@ -1,9 +1,9 @@
-import type { PageServerLoad, Actions } from "./$types";
+import type { Actions, ServerLoad } from "@sveltejs/kit";
 import { requestAppScope } from "$lib/server/application-scope";
 import { purgeSettingsTelemetry, toggleSettingsTelemetryOptIn } from "@/application/settings/commands.ts";
 import { getSettingsTelemetry } from "@/application/settings/queries.ts";
 
-export const load: PageServerLoad = ({ locals }) => {
+export const load: ServerLoad = ({ locals }) => {
   return {
     streamed: {
       data: (async () => {

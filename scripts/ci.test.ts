@@ -86,7 +86,7 @@ describe("ci STEPS — Phase 02 stable web gates", () => {
 
 describe("web lockfile — vulnerable cookie resolution", () => {
   it("does not resolve cookie@0.6.0", () => {
-    const lockfile = readFileSync("apps/web/bun.lock", "utf8");
+    const lockfile = readFileSync("bun.lock", "utf8");
     expect(lockfile).not.toContain('"cookie": ["cookie@0.6.0"');
   });
 });

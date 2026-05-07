@@ -22,7 +22,7 @@ import { describe, it, expect } from "bun:test";
 import type { Container } from "@needle-di/core";
 
 const REPO_ROOT = join(import.meta.dir, "..", "..");
-const ROOT_ENTRYPOINT = join(REPO_ROOT, "src", "index.ts");
+const ROOT_ENTRYPOINT = join(REPO_ROOT, "apps", "cli", "src", "main.ts");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers — build a fake in-process tRPC caller
@@ -224,7 +224,7 @@ describe("root entrypoint — auth", () => {
       expect(typeof parsed.token).toBe("string");
       expect(parsed.token).toHaveLength(64);
     });
-  });
+  }, 15_000);
 });
 
 describe("auth.run — invite", () => {

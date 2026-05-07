@@ -7,6 +7,7 @@ export function createAuthCommand(): Command {
   const acceptInviteCommand = command.command("accept-invite");
   acceptInviteCommand.description("auth acceptInvite");
   acceptInviteCommand.option("--json", "Emit JSON output");
+  acceptInviteCommand.option("--token <string>", "Plaintext token from the invitation email.");
   acceptInviteCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for auth.acceptInvite requires an explicit surface adapter.");
@@ -24,6 +25,8 @@ export function createAuthCommand(): Command {
   const inviteCommand = command.command("invite");
   inviteCommand.description("auth invite");
   inviteCommand.option("--json", "Emit JSON output");
+  inviteCommand.option("--email <string>", "Email address of the person to invite.");
+  inviteCommand.addOption(new Option("--role <choice>", "Role to assign to the invited user.").choices(["owner","admin","member","guest"]));
   inviteCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for auth.invite requires an explicit surface adapter.");

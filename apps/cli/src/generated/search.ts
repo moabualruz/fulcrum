@@ -51,6 +51,9 @@ export function createSearchCommand(): Command {
   const savedCreateCommand = command.command("saved-create");
   savedCreateCommand.description("search savedCreate");
   savedCreateCommand.option("--json", "Emit JSON output");
+  savedCreateCommand.option("--project-id <string>", "project-id");
+  savedCreateCommand.option("--query-json-text <string>", "query-json-text");
+  savedCreateCommand.addOption(new Option("--scope <choice>", "scope").choices([]));
   savedCreateCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for search.savedCreate requires an explicit surface adapter.");
@@ -68,6 +71,7 @@ export function createSearchCommand(): Command {
   const savedDeleteCommand = command.command("saved-delete");
   savedDeleteCommand.description("search savedDelete");
   savedDeleteCommand.option("--json", "Emit JSON output");
+  savedDeleteCommand.option("--id <string>", "id");
   savedDeleteCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for search.savedDelete requires an explicit surface adapter.");
@@ -102,6 +106,10 @@ export function createSearchCommand(): Command {
   const savedUpdateCommand = command.command("saved-update");
   savedUpdateCommand.description("search savedUpdate");
   savedUpdateCommand.option("--json", "Emit JSON output");
+  savedUpdateCommand.option("--id <string>", "id");
+  savedUpdateCommand.option("--project-id <string>", "project-id");
+  savedUpdateCommand.option("--query-json-text <string>", "query-json-text");
+  savedUpdateCommand.addOption(new Option("--scope <choice>", "scope").choices([]));
   savedUpdateCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for search.savedUpdate requires an explicit surface adapter.");
