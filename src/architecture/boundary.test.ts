@@ -15,6 +15,17 @@ const RUNTIME_ADAPTER_ROOTS = [
   "src/trpc",
 ];
 
+const RESIDUAL_INTERFACE_ROOTS = [
+  "src/web/src/routes",
+  "src/web/src/lib",
+  "src/cli",
+  "src/tui",
+  "src/api",
+  "src/router",
+  "src/trpc",
+  "src/server/trpc",
+];
+
 const TEST_FIXTURE_ROOTS = ["src", "src/web/tests"];
 
 const EXPECTED_RUNTIME_DIRECT_ACCESS_FILES = [
@@ -60,6 +71,30 @@ const FORBIDDEN_TEST_FIXTURE_ACCESS = new RegExp(
   ].join("|"),
 );
 
+const FORBIDDEN_RESIDUAL_DIRECT_ACCESS = new RegExp(
+  [
+    String.raw`\bctx\.em\b`,
+    String.raw`\bem\.(find|findOne|create|persist|flush|transactional)\b`,
+    String.raw`\bgetRepository\(`,
+    String.raw`from\s+["'][^"']*(db/entities|db/repositories|db\.module|mikro-orm\.config)[^"']*["']`,
+  ].join("|"),
+);
+
+const RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS = new Map([
+  [
+    "src/web/src/lib/server/db.ts",
+    "web composition root owns current database singleton until route/helper callers move behind application services",
+  ],
+  [
+    "src/trpc/context.ts",
+    "tRPC context composition root still carries EntityManager during staged router migration",
+  ],
+  [
+    "src/cli/index.ts",
+    "CLI composition root may wire database bindings while command files migrate to caller/application adapters",
+  ],
+]);
+
 async function collectSourceFiles(root: string): Promise<string[]> {
   const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
   const files = await Promise.all(entries.map(async (entry) => {
@@ -99,6 +134,18 @@ async function violations(roots: readonly string[], pattern: RegExp): Promise<st
   return found.sort();
 }
 
+async function residualDirectAccessViolations(): Promise<string[]> {
+  const files = (await Promise.all(RESIDUAL_INTERFACE_ROOTS.map(collectSourceFiles))).flat();
+  const found: string[] = [];
+  for (const file of files) {
+    const relativePath = relative(process.cwd(), file);
+    if (RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS.has(relativePath)) continue;
+    const text = await readFile(file, "utf8");
+    if (FORBIDDEN_RESIDUAL_DIRECT_ACCESS.test(text)) found.push(relativePath);
+  }
+  return Array.from(new Set(found)).sort();
+}
+
 async function testFixtureViolations(roots: readonly string[], pattern: RegExp): Promise<string[]> {
   const files = Array.from(new Set((await Promise.all(roots.map(collectTestFiles))).flat()));
   const found: string[] = [];
@@ -134,5 +181,10 @@ describe("Phase 9.5 interface boundary", () => {
     expect(await violations(["src/subscriptions"], /\bPGlite\b|\bpglite\b/)).toEqual([
       "src/subscriptions/index.ts",
     ]);
+  });
+
+  test("interface adapters do not use ORM/entity/repository access outside exact composition roots", async () => {
+    const found = await residualDirectAccessViolations();
+    expect(found).toEqual([]);
   });
 });
