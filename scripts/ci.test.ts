@@ -27,12 +27,16 @@ describe("ci STEPS — web:test always-on", () => {
 });
 
 describe("ci STEPS — web:e2e full suite opt-in", () => {
-  // Module is evaluated once per process. In this test run FULCRUM_RUN_E2E is
-  // not set to "1", so the full e2e suite must be explicitly marked skipped.
-  it("marks full e2e skipped when FULCRUM_RUN_E2E is not '1'", () => {
+  // Module is evaluated once per process, so STEPS reflects this process env.
+  it("STEPS reflects the current FULCRUM_RUN_E2E opt-in state", () => {
     const step = STEPS.find((s) => s.name === "web:e2e:full");
     expect(step).toBeDefined();
-    expect(step!.skipReason).toContain("FULCRUM_RUN_E2E=1");
+
+    if (process.env.FULCRUM_RUN_E2E === "1") {
+      expect(step!.skipReason).toBeUndefined();
+    } else {
+      expect(step!.skipReason).toContain("FULCRUM_RUN_E2E=1");
+    }
   });
 
   // Verify the conditional logic directly — env "1" → full suite step included.

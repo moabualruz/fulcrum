@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect, afterEach } from "bun:test";
 
 // Tests for gated connectors settings page.
 
@@ -14,24 +14,24 @@ describe("/settings/connectors", () => {
     test("OFF by default for all connectors", async () => {
       delete process.env["FULCRUM_FEATURES"];
       const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-      expect(mod.isConnectorEnabled("confluence")).toBe(false);
-      expect(mod.isConnectorEnabled("notion")).toBe(false);
-      expect(mod.isConnectorEnabled("github-issues")).toBe(false);
+      expect(mod._isConnectorEnabled("confluence")).toBe(false);
+      expect(mod._isConnectorEnabled("notion")).toBe(false);
+      expect(mod._isConnectorEnabled("github-issues")).toBe(false);
     });
 
     test("ON when connector flag present", async () => {
       process.env["FULCRUM_FEATURES"] = "connector-confluence";
       const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-      expect(mod.isConnectorEnabled("confluence")).toBe(true);
-      expect(mod.isConnectorEnabled("notion")).toBe(false);
+      expect(mod._isConnectorEnabled("confluence")).toBe(true);
+      expect(mod._isConnectorEnabled("notion")).toBe(false);
     });
 
     test("mixed flags enable only named connectors", async () => {
       process.env["FULCRUM_FEATURES"] = "connector-notion,connector-github-issues";
       const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-      expect(mod.isConnectorEnabled("notion")).toBe(true);
-      expect(mod.isConnectorEnabled("github-issues")).toBe(true);
-      expect(mod.isConnectorEnabled("confluence")).toBe(false);
+      expect(mod._isConnectorEnabled("notion")).toBe(true);
+      expect(mod._isConnectorEnabled("github-issues")).toBe(true);
+      expect(mod._isConnectorEnabled("confluence")).toBe(false);
     });
   });
 
@@ -72,49 +72,21 @@ describe("/settings/connectors", () => {
     });
   });
 
-  describe("setConnectorConfig / getConnectorConfig round-trip", () => {
-    test("stores and retrieves config", async () => {
+  describe("listSyncLog()", () => {
+    test("returns application-owned empty log when no global connector runtime exists", async () => {
       const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-      mod.setConnectorConfig({ name: "confluence", host: "https://acme.atlassian.net", email: "a@b.com", token: "tok" });
-      const cfg = mod.getConnectorConfig("confluence");
-      expect(cfg?.host).toBe("https://acme.atlassian.net");
-      expect(cfg?.token).toBe("tok");
-    });
-  });
-
-  describe("addSyncLogEntry / getSyncLog round-trip", () => {
-    test("stores sync log entries", async () => {
-      const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-      const before = mod.getSyncLog().length;
-      mod.addSyncLogEntry({
-        id: "sl-1",
-        connectorName: "notion",
-        startedAt: new Date().toISOString(),
-        status: "success",
-        message: "Synced 42 pages",
-      });
-      expect(mod.getSyncLog().length).toBe(before + 1);
-      const entry = mod.getSyncLog().find((e: { id: string }) => e.id === "sl-1");
-      expect(entry?.message).toBe("Synced 42 pages");
+      expect(mod._listSyncLog()).toEqual([]);
     });
   });
 
   describe("actions.sync()", () => {
-    test("adds sync log entry when connector enabled", async () => {
+    test("returns 501 when global connector runtime is not configured", async () => {
       process.env["FULCRUM_FEATURES"] = "connector-github-issues";
       const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-      const before = mod.getSyncLog().length;
       const formData = new FormData();
       formData.append("name", "github-issues");
-      let result: unknown;
-      try {
-        result = await mod.actions.sync({ locals: { session: { userId: "u1" } }, request: { formData: async () => formData } });
-      } catch {
-        // noop
-      }
-      const r = result as { syncOk?: boolean };
-      expect(r?.syncOk).toBe(true);
-      expect(mod.getSyncLog().length).toBe(before + 1);
+      const result = await mod.actions.sync({ locals: { session: { userId: "u1" } }, request: { formData: async () => formData } }) as { status?: number };
+      expect(result.status).toBe(501);
     });
 
     test("throws 403 when connector not enabled", async () => {
@@ -130,6 +102,70 @@ describe("/settings/connectors", () => {
       }
       const err = thrown as { status?: number };
       expect(err?.status).toBe(403);
+    });
+  });
+
+  describe("actions.save()", () => {
+    test("returns 501 when global connector persistence is not configured", async () => {
+      process.env["FULCRUM_FEATURES"] = "connector-confluence";
+      const mod = await import(`./+page.server.ts?t=${Date.now()}`);
+      const formData = new FormData();
+      formData.append("name", "confluence");
+      formData.append("host", "https://acme.atlassian.net");
+      formData.append("email", "a@b.com");
+      formData.append("token", "tok");
+
+      const result = await mod.actions.save({ locals: { session: { userId: "u1" } }, request: { formData: async () => formData } }) as { status?: number };
+
+      expect(result.status).toBe(501);
+    });
+
+    test("fails 400 when host or token is missing", async () => {
+      process.env["FULCRUM_FEATURES"] = "connector-confluence";
+      const mod = await import(`./+page.server.ts?t=${Date.now()}`);
+      const formData = new FormData();
+      formData.append("name", "confluence");
+      formData.append("token", "tok");
+
+      const missingHost = await mod.actions.save({ locals: { session: { userId: "u1" } }, request: { formData: async () => formData } }) as { status?: number };
+      expect(missingHost.status).toBe(400);
+
+      const tokenless = new FormData();
+      tokenless.append("name", "confluence");
+      tokenless.append("host", "https://acme.atlassian.net");
+      const missingToken = await mod.actions.save({ locals: { session: { userId: "u1" } }, request: { formData: async () => tokenless } }) as { status?: number };
+      expect(missingToken.status).toBe(400);
+    });
+
+    test("throws 403 when connector is disabled", async () => {
+      delete process.env["FULCRUM_FEATURES"];
+      const mod = await import(`./+page.server.ts?t=${Date.now()}`);
+      const formData = new FormData();
+      formData.append("name", "confluence");
+      formData.append("host", "https://acme.atlassian.net");
+      formData.append("token", "tok");
+      let thrown: unknown;
+
+      try {
+        await mod.actions.save({ locals: { session: { userId: "u1" } }, request: { formData: async () => formData } });
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect((thrown as { status?: number })?.status).toBe(403);
+    });
+
+    test("fails 400 when scalar fields are uploaded as files", async () => {
+      process.env["FULCRUM_FEATURES"] = "connector-confluence";
+      const mod = await import(`./+page.server.ts?t=${Date.now()}`);
+      const formData = new FormData();
+      formData.append("name", "confluence");
+      formData.append("host", new File(["https://acme.atlassian.net"], "host.txt"));
+      formData.append("token", "tok");
+
+      const result = await mod.actions.save({ locals: { session: { userId: "u1" } }, request: { formData: async () => formData } }) as { status?: number };
+
+      expect(result.status).toBe(400);
     });
   });
 });

@@ -5,7 +5,7 @@ import {
   loadOrchestrationConfig,
   listWorkflowDefs,
 } from "$lib/server/orchestration";
-import { upsertOrchestrationConfig } from "../../../../../../application/orchestration/commands.ts";
+import { upsertOrchestrationConfig } from "../../../../../application/orchestration/commands.ts";
 import { actionOk } from "$lib/feedback/action-result";
 
 export const load: PageServerLoad = ({ locals }) => {

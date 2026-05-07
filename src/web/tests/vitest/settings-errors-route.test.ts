@@ -1,7 +1,7 @@
 import { fireEvent, render, waitFor } from "@testing-library/svelte";
 import { describe, expect, test, vi } from "vitest";
 
-const { db, errors, queries } = vi.hoisted(() => {
+const { appScope, clearSettingsErrors, errors, listSettingsErrors } = vi.hoisted(() => {
   const errors = [
     {
       id: "err-1",
@@ -13,21 +13,25 @@ const { db, errors, queries } = vi.hoisted(() => {
       context: { source: "unhandledRejection" },
     },
   ];
-  const queries: Array<{ sql: string; params?: unknown[] }> = [];
-  const db = {
-    query: vi.fn(async (sql: string, params?: unknown[]) => {
-      queries.push({ sql, params });
-      if (sql.includes("SELECT count(*) as count FROM error_logs")) return [{ count: "1" }];
-      if (sql.includes("SELECT id, message")) return errors;
-      return [];
-    }),
-    close: vi.fn(async () => {}),
+  const appScope = {
+    em: { kind: "entity-manager" },
+    ctx: { orgId: "org-1", userId: "user-1", projectId: null },
   };
-  return { db, errors, queries };
+  const listSettingsErrors = vi.fn(async () => ({ errors, total: 1, page: 1, pageSize: 20 }));
+  const clearSettingsErrors = vi.fn(async () => ({ success: true as const }));
+  return { appScope, clearSettingsErrors, errors, listSettingsErrors };
 });
 
-vi.mock("$lib/server/db", () => ({
-  openIsolatedStore: async () => db,
+vi.mock("$lib/server/application-scope", () => ({
+  requestAppScope: async () => appScope,
+}));
+
+vi.mock("../../../application/settings/queries.ts", () => ({
+  listSettingsErrors,
+}));
+
+vi.mock("../../../application/settings/commands.ts", () => ({
+  clearSettingsErrors,
 }));
 
 const { actions, load } = await import("../../src/routes/settings/errors/+page.server");
@@ -45,14 +49,14 @@ function event(fetchFn: typeof fetch) {
 
 describe("/settings/errors route", () => {
   test("load fetches paginated local error rows", async () => {
-    queries.length = 0;
+    listSettingsErrors.mockClear();
 
     const data = await load(event(vi.fn() as unknown as typeof fetch));
     const payload = await data.streamed.data;
 
     expect(payload.errors).toEqual(errors);
     expect(payload.total).toBe(1);
-    expect(queries.some((query) => query.sql.includes("ORDER BY occurred_at DESC LIMIT $1 OFFSET $2"))).toBe(true);
+    expect(listSettingsErrors).toHaveBeenCalledWith(appScope.em, appScope.ctx, { page: 1, pageSize: 20 });
   });
 
   test("renders crashlog rows with stack details", async () => {
@@ -70,7 +74,7 @@ describe("/settings/errors route", () => {
   });
 
   test("clearBefore action deletes local rows", async () => {
-    queries.length = 0;
+    clearSettingsErrors.mockClear();
     const formData = new FormData();
     formData.set("before", "2026-05-03T00:00:00.000Z");
 
@@ -83,6 +87,8 @@ describe("/settings/errors route", () => {
     });
 
     expect(result).toEqual({ success: true });
-    expect(queries.some((query) => query.sql.includes("DELETE FROM error_logs WHERE occurred_at < $1"))).toBe(true);
+    expect(clearSettingsErrors).toHaveBeenCalledWith(appScope.em, appScope.ctx, {
+      before: "2026-05-03T00:00:00.000Z",
+    });
   });
 });

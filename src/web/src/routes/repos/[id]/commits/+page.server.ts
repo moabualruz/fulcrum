@@ -4,9 +4,9 @@ import { requestAppScope } from "$lib/server/application-scope";
 import { getRepoCommitsPage } from "../../../../../../application/repos/queries.ts";
 import { AppError } from "../../../../../../application/errors.ts";
 
-export const PAGE_SIZE = 50;
+export const _PAGE_SIZE = 50;
 
-export interface CommitEntry {
+interface CommitEntry {
   sha: string;
   shortSha: string;
   author: string;
@@ -18,7 +18,7 @@ export interface CommitEntry {
 export const load: PageServerLoad = ({ params, url, locals }) => {
   const pageParam = parseInt(url.searchParams.get("page") ?? "1", 10);
   const page = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
-  const skip = (page - 1) * PAGE_SIZE;
+  const skip = (page - 1) * _PAGE_SIZE;
 
   return {
     activeProjectId: locals?.activeProjectId ?? null,
@@ -27,7 +27,7 @@ export const load: PageServerLoad = ({ params, url, locals }) => {
       data: (async () => {
         try {
           const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
-          return await getRepoCommitsPage(em, ctx, { repoId: params.id, page, pageSize: PAGE_SIZE });
+          return await getRepoCommitsPage(em, ctx, { repoId: params.id, page, pageSize: _PAGE_SIZE });
         } catch (e) {
           if (e instanceof AppError && e.kind === "not_found") throw error(404, e.message);
           throw e;

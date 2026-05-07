@@ -1,21 +1,31 @@
 import { Editor } from "@tiptap/core";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test } from "vitest";
 import { createDocEditorExtensions } from "../../src/lib/components/editor/slash-menu";
+
+const editors: Editor[] = [];
 
 function editorWithText(text: string): Editor {
   const paragraph = text
     ? { type: "paragraph", content: [{ type: "text", text }] }
     : { type: "paragraph" };
-  return new Editor({
+  const editor = new Editor({
     extensions: createDocEditorExtensions(),
     content: {
       type: "doc",
       content: [paragraph],
     },
   });
+  editors.push(editor);
+  return editor;
 }
 
 describe("DocEditor mention nodes", () => {
+  afterEach(() => {
+    while (editors.length > 0) {
+      editors.pop()?.destroy();
+    }
+  });
+
   test.each([
     ["@user:alice", "user", "alice", "@alice", "mention-chip--user"],
     ["@team:platform", "team", "platform", "@platform", "mention-chip--team"],
@@ -42,6 +52,7 @@ describe("DocEditor mention nodes", () => {
       extensions: createDocEditorExtensions(),
       content: "<p>Hello <span data-mention-kind=\"user\" data-mention-id=\"alice\" data-mention-label=\"@Alice\">@Alice</span></p>",
     });
+    editors.push(editor);
 
     expect(editor.getJSON()).toEqual({
       type: "doc",

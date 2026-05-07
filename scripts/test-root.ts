@@ -42,6 +42,7 @@ if (files.length === 0) {
 
 const coverageArgs = coverage ? ["--coverage"] : [];
 const proc = Bun.spawn(["bun", "test", "--conditions=svelte", ...coverageArgs, ...files], {
+  env: coverage ? { ...process.env, FULCRUM_COVERAGE: "1" } : process.env,
   stdout: "inherit",
   stderr: "inherit",
   stdin: "inherit",

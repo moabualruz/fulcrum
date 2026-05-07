@@ -14,26 +14,26 @@ describe("/settings/importers", () => {
     test("OFF by default for all importers", async () => {
       delete process.env["FULCRUM_FEATURES"];
       const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-      expect(mod.isImporterEnabled("csv")).toBe(false);
-      expect(mod.isImporterEnabled("linear")).toBe(false);
-      expect(mod.isImporterEnabled("jira")).toBe(false);
-      expect(mod.isImporterEnabled("plane")).toBe(false);
+      expect(mod._isImporterEnabled("csv")).toBe(false);
+      expect(mod._isImporterEnabled("linear")).toBe(false);
+      expect(mod._isImporterEnabled("jira")).toBe(false);
+      expect(mod._isImporterEnabled("plane")).toBe(false);
     });
 
     test("ON when import-csv flag present", async () => {
       process.env["FULCRUM_FEATURES"] = "import-csv";
       const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-      expect(mod.isImporterEnabled("csv")).toBe(true);
-      expect(mod.isImporterEnabled("linear")).toBe(false);
+      expect(mod._isImporterEnabled("csv")).toBe(true);
+      expect(mod._isImporterEnabled("linear")).toBe(false);
     });
 
     test("mixed flags enable only named importers", async () => {
       process.env["FULCRUM_FEATURES"] = "import-linear,import-jira";
       const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-      expect(mod.isImporterEnabled("linear")).toBe(true);
-      expect(mod.isImporterEnabled("jira")).toBe(true);
-      expect(mod.isImporterEnabled("csv")).toBe(false);
-      expect(mod.isImporterEnabled("plane")).toBe(false);
+      expect(mod._isImporterEnabled("linear")).toBe(true);
+      expect(mod._isImporterEnabled("jira")).toBe(true);
+      expect(mod._isImporterEnabled("csv")).toBe(false);
+      expect(mod._isImporterEnabled("plane")).toBe(false);
     });
   });
 
@@ -95,6 +95,39 @@ describe("/settings/importers", () => {
       expect(result.columns).toContain("status");
     });
 
+    test("parses quoted CSV headers without splitting quoted commas", async () => {
+      process.env["FULCRUM_FEATURES"] = "import-csv";
+      const mod = await import(`./+page.server.ts?t=${Date.now()}`);
+      const file = new File(["\ufefftitle,\"description, long\",status\nTask 1,\"a,b\",todo"], "tasks.csv", { type: "text/csv" });
+      const formData = new FormData();
+      formData.append("importerName", "csv");
+      formData.append("file", file);
+
+      const result = await mod.actions.preflight({
+        locals: { session: { userId: "u1" } },
+        request: { formData: async () => formData },
+      }) as { preflightOk?: boolean; rowCount?: number; columns?: string[] };
+
+      expect(result.preflightOk).toBe(true);
+      expect(result.rowCount).toBe(1);
+      expect(result.columns).toEqual(["title", "description, long", "status"]);
+    });
+
+    test("fails with 400 when file field is not a File", async () => {
+      process.env["FULCRUM_FEATURES"] = "import-csv";
+      const mod = await import(`./+page.server.ts?t=${Date.now()}`);
+      const formData = new FormData();
+      formData.append("importerName", "csv");
+      formData.append("file", "not-a-file");
+
+      const result = await mod.actions.preflight({
+        locals: { session: { userId: "u1" } },
+        request: { formData: async () => formData },
+      }) as { status?: number };
+
+      expect(result.status).toBe(400);
+    });
+
     test("fails with 400 when no file", async () => {
       process.env["FULCRUM_FEATURES"] = "import-csv";
       const mod = await import(`./+page.server.ts?t=${Date.now()}`);
@@ -130,7 +163,7 @@ describe("/settings/importers", () => {
   });
 
   describe("actions.preflight() — Linear", () => {
-    test("returns rowCount for valid API key", async () => {
+    test("returns 501 when importer application service is not configured", async () => {
       process.env["FULCRUM_FEATURES"] = "import-linear";
       const mod = await import(`./+page.server.ts?t=${Date.now()}`);
       const formData = new FormData();
@@ -140,10 +173,9 @@ describe("/settings/importers", () => {
       const result = await mod.actions.preflight({
         locals: { session: { userId: "u1" } },
         request: { formData: async () => formData },
-      }) as { preflightOk?: boolean; rowCount?: number };
+      }) as { status?: number };
 
-      expect(result.preflightOk).toBe(true);
-      expect(typeof result.rowCount).toBe("number");
+      expect(result.status).toBe(501);
     });
 
     test("fails 400 when no apiKey", async () => {
@@ -159,13 +191,27 @@ describe("/settings/importers", () => {
 
       expect(result.status).toBe(400);
     });
+
+    test("fails 400 when apiKey is uploaded as a file", async () => {
+      process.env["FULCRUM_FEATURES"] = "import-linear";
+      const mod = await import(`./+page.server.ts?t=${Date.now()}`);
+      const formData = new FormData();
+      formData.append("importerName", "linear");
+      formData.append("apiKey", new File(["lin_api_abc123"], "token.txt"));
+
+      const result = await mod.actions.preflight({
+        locals: { session: { userId: "u1" } },
+        request: { formData: async () => formData },
+      }) as { status?: number };
+
+      expect(result.status).toBe(400);
+    });
   });
 
   describe("actions.import()", () => {
-    test("creates import history entry", async () => {
+    test("returns 501 instead of route-local fake import success", async () => {
       process.env["FULCRUM_FEATURES"] = "import-jira";
       const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-      const before = mod.getImportHistory().length;
       const formData = new FormData();
       formData.append("importerName", "jira");
       formData.append("rowCount", "25");
@@ -173,11 +219,9 @@ describe("/settings/importers", () => {
       const result = await mod.actions.import({
         locals: { session: { userId: "u1" } },
         request: { formData: async () => formData },
-      }) as { importOk?: boolean; rowCount?: number };
+      }) as { status?: number };
 
-      expect(result.importOk).toBe(true);
-      expect(result.rowCount).toBe(25);
-      expect(mod.getImportHistory().length).toBe(before + 1);
+      expect(result.status).toBe(501);
     });
 
     test("throws 403 when import-plane not enabled", async () => {
@@ -200,21 +244,10 @@ describe("/settings/importers", () => {
     });
   });
 
-  describe("addImportResult / getImportHistory round-trip", () => {
-    test("stores results", async () => {
+  describe("listImportHistory()", () => {
+    test("returns application-owned empty history when no importer persistence exists", async () => {
       const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-      const before = mod.getImportHistory().length;
-      mod.addImportResult({
-        id: "ir-test",
-        importerName: "csv",
-        importedAt: new Date().toISOString(),
-        rowCount: 100,
-        status: "success",
-        message: "Imported 100 tasks from csv",
-      });
-      expect(mod.getImportHistory().length).toBe(before + 1);
-      const entry = mod.getImportHistory().find((e: { id: string }) => e.id === "ir-test");
-      expect(entry?.rowCount).toBe(100);
+      expect(mod._listImportHistory()).toEqual([]);
     });
   });
 });

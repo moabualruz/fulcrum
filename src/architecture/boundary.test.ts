@@ -77,6 +77,18 @@ const FORBIDDEN_RESIDUAL_DIRECT_ACCESS = new RegExp(
   ].join("|"),
 );
 
+const FORBIDDEN_INTERFACE_STUB_DATA_PROVIDERS = new RegExp(
+  [
+    String.raw`\bIn-memory stub store`,
+    String.raw`\bIn-memory stub stores`,
+    String.raw`\bconst\s+_[A-Za-z0-9_]+\s*:\s*Map\b`,
+    String.raw`\bconst\s+_[A-Za-z0-9_]+\s*:\s*[^=]*\[\]\s*=`,
+    String.raw`\bconst\s+_[A-Za-z0-9_]+\s*=\s*\[\]`,
+    String.raw`\bnew\s+Map(?:<.*>)?\(\)`,
+    String.raw`\bpretend we fetched\b`,
+  ].join("|"),
+);
+
 const RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS = new Map([
   [
     "src/web/src/lib/server/db.ts",
@@ -249,6 +261,10 @@ describe("Phase 9.5 interface boundary", () => {
     const found = await residualDirectAccessViolations();
     expect(RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS.size).toBe(4);
     expect(found).toEqual(EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES);
+  });
+
+  test("web routes do not own stub data providers or fake persistence stores", async () => {
+    expect(await violations(["src/web/src/routes"], FORBIDDEN_INTERFACE_STUB_DATA_PROVIDERS)).toEqual([]);
   });
 
   test("Plan 21 docs comments templates skills and sprints tRPC routers delegate persistence to application modules", async () => {

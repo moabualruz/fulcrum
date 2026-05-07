@@ -6,7 +6,7 @@ import { openIsolatedStore } from "../../../../../../test-support/product-fixtur
 import { migrateIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
 import { createLocalOrg } from "../../../../../../test-support/product-fixtures.ts";
 import { makeId } from "../../../../../../test-support/product-fixtures.ts";
-import { PAGE_SIZE } from "./+page.server.ts";
+import { _PAGE_SIZE } from "./+page.server.ts";
 
 let scratch: string;
 
@@ -44,7 +44,7 @@ afterEach(() => {
 
 describe("/repos/[id]/commits +page.server.ts", () => {
   test("PAGE_SIZE constant is 50", () => {
-    expect(PAGE_SIZE).toBe(50);
+    expect(_PAGE_SIZE).toBe(50);
   });
 
   test("returns empty commits when git repo does not exist", async () => {
@@ -98,7 +98,7 @@ describe("/repos/[id]/commits +page.server.ts", () => {
     }>(result);
 
     expect(payload.commits.length).toBeGreaterThan(0);
-    expect(payload.commits.length).toBeLessThanOrEqual(PAGE_SIZE);
+    expect(payload.commits.length).toBeLessThanOrEqual(_PAGE_SIZE);
     expect(payload.total).toBeGreaterThan(0);
     expect(payload.page).toBe(1);
 

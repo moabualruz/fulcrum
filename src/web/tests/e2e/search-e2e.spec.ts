@@ -11,17 +11,6 @@ const isPlaywrightCli = process.argv.some((arg) => arg.includes("playwright"));
 
 if (isPlaywrightCli) {
   const { test, expect } = await import("./fixtures.ts");
-  const { indexSearchDocument } = await import(
-    "../../../test-support/product-fixtures.ts"
-  );
-  const { openIsolatedStore } = await import("../../../test-support/product-fixtures.ts");
-  const { migrateIsolatedStore } = await import(
-    "../../../test-support/product-fixtures.ts"
-  );
-  const { createLocalOrg } = await import(
-    "../../../test-support/product-fixtures.ts"
-  );
-  const { join } = await import("node:path");
 
   const COMMON = "e2esearchable";
   const KINDS = [
@@ -35,34 +24,11 @@ if (isPlaywrightCli) {
     "sprint",
   ] as const;
 
-  async function seedAllKinds(home: string): Promise<void> {
-    const dbPath = join(home, "state", "product", "db", "main");
-    const db = await openIsolatedStore(dbPath);
-    try {
-      await migrateIsolatedStore(db);
-      const org = await createLocalOrg(db, {
-        slug: "default",
-        name: "Default",
-      });
-      for (const kind of KINDS) {
-        await indexSearchDocument(db, {
-          orgId: org.id,
-          sourceKind: kind,
-          sourceId: `${kind}-e2e-1`,
-          title: `${COMMON} ${kind} title`,
-          body: `${COMMON} ${kind} body`,
-        });
-      }
-    } finally {
-      await db.close();
-    }
-  }
-
   test("search page returns all 8 kinds for common query", async ({
     page,
     fulcrumHome,
   }) => {
-    await seedAllKinds(fulcrumHome.home);
+    await fulcrumHome.seedSearchKinds(COMMON, KINDS);
     await page.goto(`/search?q=${COMMON}`);
     await expect(page.locator("[data-search-hit]")).toHaveCount(8, {
       timeout: 15000,
@@ -73,7 +39,7 @@ if (isPlaywrightCli) {
     page,
     fulcrumHome,
   }) => {
-    await seedAllKinds(fulcrumHome.home);
+    await fulcrumHome.seedSearchKinds(COMMON, KINDS);
     // The search page uses source_kind groups; verify the doc group has 1 hit
     await page.goto(`/search?q=${COMMON}`);
     const docGroup = page.locator(

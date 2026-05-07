@@ -1,0 +1,155 @@
+import { indexSearchDocument } from "../../product-kernel/search.ts";
+import type { ProductDb } from "../../product-kernel/db/types.ts";
+
+export interface E2eSeedTaskInput {
+  projectId: string;
+  title: string;
+  status?: string;
+  priority?: number;
+}
+
+export interface E2eSeedArtifactInput {
+  projectId?: string | null;
+  taskId?: string | null;
+  title: string;
+  kind?: string;
+  mime?: string;
+  size?: number;
+  bodyPath?: string | null;
+  sha256?: string | null;
+  archived?: boolean;
+}
+
+export interface E2eSeedDocInput {
+  projectId: string | null;
+  title: string;
+  body?: string;
+  kind?: string;
+}
+
+export interface E2eCleanupInput {
+  artifactIds?: readonly string[];
+  docIds?: readonly string[];
+  taskIds?: readonly string[];
+  projectIds?: readonly string[];
+  runIds?: readonly string[];
+  searchSourceIds?: readonly string[];
+}
+
+export async function seedE2eProject(
+  db: ProductDb,
+  orgId: string,
+  slug: string,
+  name?: string,
+): Promise<{ id: string }> {
+  const id = crypto.randomUUID();
+  await db.query(
+    `INSERT INTO projects (id, org_id, name) VALUES ($1, $2, $3)`,
+    [id, orgId, name ?? slug],
+  );
+  return { id };
+}
+
+export async function seedE2eTask(
+  db: ProductDb,
+  orgId: string,
+  input: E2eSeedTaskInput,
+): Promise<{ id: string }> {
+  const id = crypto.randomUUID();
+  await db.query(
+    `INSERT INTO tasks (id, org_id, project_id, title, status, priority)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [id, orgId, input.projectId, input.title, input.status ?? "todo", input.priority ?? 0],
+  );
+  return { id };
+}
+
+export async function seedE2eDoc(
+  db: ProductDb,
+  orgId: string,
+  input: E2eSeedDocInput,
+): Promise<{ id: string }> {
+  const id = crypto.randomUUID();
+  await db.query(
+    `INSERT INTO documents (id, org_id, project_id, doc_type, title, body_md)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [id, orgId, input.projectId, input.kind ?? "note", input.title, input.body ?? ""],
+  );
+  return { id };
+}
+
+export async function seedE2eArtifact(
+  db: ProductDb,
+  orgId: string,
+  input: E2eSeedArtifactInput,
+): Promise<{ id: string; runId: string }> {
+  const id = crypto.randomUUID();
+  const runId = crypto.randomUUID();
+  await db.query(
+    `INSERT INTO agent_runs (id, org_id, agent_name, status) VALUES ($1, $2, $3, $4)`,
+    [runId, orgId, "e2e-fixture", "succeeded"],
+  );
+  await db.query(
+    `INSERT INTO artifacts (id, org_id, run_id, task_id, path, filename, mime, size_bytes, checksum_sha256, archived_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, ${input.archived ? "now()" : "NULL"})`,
+    [
+      id,
+      orgId,
+      runId,
+      input.taskId ?? null,
+      input.bodyPath ?? input.title,
+      input.title,
+      input.mime ?? "application/octet-stream",
+      input.size ?? null,
+      input.sha256 ?? null,
+    ],
+  );
+  return { id, runId };
+}
+
+export async function seedE2eSearchKinds(
+  db: ProductDb,
+  orgId: string,
+  input: { common: string; kinds: readonly string[] },
+): Promise<{ sourceIds: string[] }> {
+  const sourceIds: string[] = [];
+  for (const kind of input.kinds) {
+    const sourceId = `${kind}-e2e-${crypto.randomUUID()}`;
+    await indexSearchDocument(db, {
+      orgId,
+      sourceKind: kind,
+      sourceId,
+      title: `${input.common} ${kind} title`,
+      body: `${input.common} ${kind} body`,
+    });
+    sourceIds.push(sourceId);
+  }
+  return { sourceIds };
+}
+
+export async function cleanupE2eFixtures(
+  db: ProductDb,
+  input: E2eCleanupInput,
+): Promise<void> {
+  await deleteByIds(db, "artifacts", input.artifactIds);
+  await deleteByIds(db, "documents", input.docIds);
+  await deleteByIds(db, "tasks", input.taskIds);
+  await deleteByIds(db, "search_documents", input.searchSourceIds, "source_id");
+
+  for (const id of input.projectIds ?? []) {
+    await db.query("DELETE FROM events WHERE project_id = $1", [id]);
+    await db.query("DELETE FROM projects WHERE id = $1", [id]);
+  }
+  await deleteByIds(db, "agent_runs", input.runIds);
+}
+
+async function deleteByIds(
+  db: ProductDb,
+  table: string,
+  ids: readonly string[] | undefined,
+  column = "id",
+): Promise<void> {
+  for (const id of ids ?? []) {
+    await db.query(`DELETE FROM ${table} WHERE ${column} = $1`, [id]);
+  }
+}

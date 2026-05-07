@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { __resetDefaultOrmForTest, initOrm } from "../../../../db/mikro-orm.config.ts";
+import { DEFAULT_ORG_ID, DEFAULT_ORG_NAME, DEFAULT_ORG_SLUG } from "../../../../db/seed.ts";
 import { sqlAccess } from "./orm-helpers.ts";
 
 export type OrmDbValue = string | number | boolean | null | Date | Uint8Array;
@@ -188,12 +189,11 @@ async function hasExistingSchema(em: EntityManager): Promise<boolean> {
 }
 
 async function ensureDefaultOrg(db: WebDatabaseHandle): Promise<void> {
-  const rows = await db.query<{ id: string }>("SELECT id FROM orgs WHERE slug = $1", ["default"]);
+  const rows = await db.query<{ id: string }>("SELECT id FROM orgs WHERE id = $1", [DEFAULT_ORG_ID]);
   if (rows.length === 0) {
-    const id = crypto.randomUUID();
     await db.query(
       "INSERT INTO orgs (id, slug, name) VALUES ($1, $2, $3)",
-      [id, "default", "Local"],
+      [DEFAULT_ORG_ID, DEFAULT_ORG_SLUG, DEFAULT_ORG_NAME],
     );
   }
 }
@@ -204,10 +204,16 @@ async function ensureDefaultOrg(db: WebDatabaseHandle): Promise<void> {
  * path requires an org for tenancy scoping.
  */
 export async function getDefaultOrgId(db: Pick<WebDatabaseHandle, "query">): Promise<string> {
-  const rows = await db.query<{ id: string }>(
-    `SELECT id FROM orgs WHERE slug = $1`,
-    ["default"],
+  let rows = await db.query<{ id: string }>(
+    `SELECT id FROM orgs WHERE id = $1 LIMIT 1`,
+    [DEFAULT_ORG_ID],
   );
+  if (rows.length === 0) {
+    rows = await db.query<{ id: string }>(
+      `SELECT id FROM orgs WHERE slug = $1 OR slug = $2 LIMIT 1`,
+      [DEFAULT_ORG_SLUG, "default"],
+    );
+  }
   const id = rows[0]?.id;
   if (!id) throw new Error("default org not found — run `fulcrum product init`");
   return id;

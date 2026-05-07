@@ -7,7 +7,7 @@ import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
 import { createLocalOrg, createProject } from "../test-support/product-fixtures.ts";
 import { indexSearchDocument, searchProductDocuments } from "./search.ts";
 import { seedSearchTestData } from "../../scripts/seed-search-test-data.ts";
-import { scoreCommand } from "../web/src/lib/components/command-palette/score.ts";
+import { scoreCommand } from "../search/command-score.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-search-"));
 

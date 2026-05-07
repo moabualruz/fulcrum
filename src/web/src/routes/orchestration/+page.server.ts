@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from "./$types";
 import { requestAppScope } from "$lib/server/application-scope";
 import { loadOrchestrationDashboard, listOrchestrationProjectOptions } from "$lib/server/orchestration";
-import { cancelRun, dispatchTaskRun, retryRun } from "../../../../../application/runs/commands.ts";
+import { cancelRun, dispatchTaskRun, retryRun } from "../../../../application/runs/commands.ts";
 import { actionOk } from "$lib/feedback/action-result";
 
 export const load: PageServerLoad = ({ url, locals }) => {

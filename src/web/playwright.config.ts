@@ -19,6 +19,7 @@ export default defineConfig({
 		port,
 		env: {
 			FULCRUM_HOME: fulcrumHome,
+			FULCRUM_E2E: "1",
 		},
 		reuseExistingServer: false,
 	},

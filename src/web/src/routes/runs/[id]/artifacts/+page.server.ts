@@ -1,6 +1,6 @@
 import type { PageServerLoad } from "./$types";
 import { requestAppScope } from "$lib/server/application-scope";
-import { listArtifacts } from "../../../../../../../application/artifacts/queries.ts";
+import { listArtifacts } from "../../../../../../application/artifacts/queries.ts";
 
 export const load: PageServerLoad = ({ params, locals }) => {
   const runId = params.id;
