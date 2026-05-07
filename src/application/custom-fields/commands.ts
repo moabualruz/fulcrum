@@ -6,6 +6,8 @@ import { Task } from "../../db/entities/tasks/Task.ts";
 import { AppValidationError } from "../errors.ts";
 import type { CustomFieldAppContext } from "./queries.ts";
 
+export * from "./project-settings.ts";
+
 export const TaskCustomFieldsOutputSchema = z.object({
   taskId: z.uuid(),
   customFields: z.record(z.string(), z.unknown()),
