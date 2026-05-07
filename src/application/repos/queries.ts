@@ -40,6 +40,8 @@ export function serializeRepo(repo: Repo): RepoDto {
     currentBranch: repo.currentBranch ?? null,
     lastSyncAt: repo.lastSyncAt ?? null,
     syncStatus: repo.syncStatus ?? null,
+    lastTouchedAt: repo.lastTouchedAt ?? null,
+    archived: repo.archived,
   };
 }
 
