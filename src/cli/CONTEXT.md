@@ -44,4 +44,4 @@ Package-specific helpers live in `repomix-package.ts`, `vendor-packages.ts` (Clo
 
 ## ADRs
 
-Context-scoped decisions live under `src/cli/docs/adr/`. None recorded yet.
+Context-scoped decisions will live under `src/cli/docs/adr/` when recorded. None recorded yet; create the directory lazily from `docs/adr/0000-template.md`.

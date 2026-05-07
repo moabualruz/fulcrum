@@ -31,4 +31,4 @@
 
 ## ADRs
 
-Context-scoped decisions live under `src/agents/docs/adr/`. None recorded yet.
+Context-scoped decisions will live under `src/agents/docs/adr/` when recorded. None recorded yet; create the directory lazily from `docs/adr/0000-template.md`.

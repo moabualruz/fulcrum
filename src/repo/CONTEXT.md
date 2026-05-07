@@ -44,4 +44,4 @@ fulcrum repo get <slug-or-id> <key>
 
 ## ADRs
 
-Context-scoped decisions live under `src/repo/docs/adr/`. None recorded yet.
+Context-scoped decisions will live under `src/repo/docs/adr/` when recorded. None recorded yet; create the directory lazily from `docs/adr/0000-template.md`.
