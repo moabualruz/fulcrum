@@ -26,41 +26,17 @@ describe("ci STEPS — web:test always-on", () => {
   });
 });
 
-describe("ci STEPS — web:e2e full suite opt-in", () => {
-  // Module is evaluated once per process, so STEPS reflects this process env.
-  it("STEPS reflects the current FULCRUM_RUN_E2E opt-in state", () => {
+describe("ci STEPS — web:e2e full suite", () => {
+  it("STEPS includes full e2e without env opt-in", () => {
     const step = STEPS.find((s) => s.name === "web:e2e:full");
     expect(step).toBeDefined();
-
-    if (process.env.FULCRUM_RUN_E2E === "1") {
-      expect(step!.skipReason).toBeUndefined();
-    } else {
-      expect(step!.skipReason).toContain("FULCRUM_RUN_E2E=1");
-    }
-  });
-
-  // Verify the conditional logic directly — env "1" → full suite step included.
-  it("conditional produces full e2e step when env is '1'", () => {
-    const runE2E = "1";
-    const steps = runE2E === "1"
-      ? [{ name: "web:e2e:full", cmd: ["bun", "run", "web:e2e:full"], cwd: "src/web" }]
-      : [];
-    expect(steps.map((s) => s.name)).toContain("web:e2e:full");
-    expect(steps[0]!.cwd).toBe("src/web");
-    expect(steps[0]!.cmd).toEqual(["bun", "run", "web:e2e:full"]);
-  });
-
-  it("builder produces explicit skip metadata when env is not '1'", () => {
-    const step = buildAllSteps({ ...process.env, FULCRUM_RUN_E2E: "", HOME: "/tmp/fulcrum-home" })
-      .find((s) => s.name === "web:e2e:full");
-    expect(step).toBeDefined();
-    expect(step!.skipReason).toContain("FULCRUM_RUN_E2E=1");
+    expect("skipReason" in step!).toBe(false);
   });
 });
 
 describe("ci STEPS — WR-03 explicit full E2E semantics", () => {
-  it("WR-03 includes web:e2e:full in e2e tier when FULCRUM_RUN_E2E=1", () => {
-    const steps = buildAllSteps({ ...process.env, FULCRUM_RUN_E2E: "1", HOME: "/tmp/fulcrum-home" });
+  it("WR-03 includes web:e2e:full in e2e tier", () => {
+    const steps = buildAllSteps({ ...process.env, FULCRUM_RUN_E2E: "", HOME: "/tmp/fulcrum-home" });
     const step = steps.find((s) => s.name === "web:e2e:full");
 
     expect(step).toBeDefined();
@@ -68,24 +44,14 @@ describe("ci STEPS — WR-03 explicit full E2E semantics", () => {
     expect(step!.domain).toBe("web");
     expect(step!.cwd).toBe("src/web");
     expect(step!.cmd).toEqual(["bun", "run", "web:e2e:full"]);
-    expect(step!.skipReason).toBeUndefined();
+    expect("skipReason" in step!).toBe(false);
   });
 
-  it("WR-03 full CI with FULCRUM_RUN_E2E=1 includes web:e2e:full", () => {
-    const names = buildAllSteps({ ...process.env, FULCRUM_RUN_E2E: "1", HOME: "/tmp/fulcrum-home" })
+  it("WR-03 full CI includes web:e2e:full", () => {
+    const names = buildAllSteps({ ...process.env, FULCRUM_RUN_E2E: "", HOME: "/tmp/fulcrum-home" })
       .map((s) => s.name);
 
     expect(names).toContain("web:e2e:full");
-  });
-
-  it("WR-03 full E2E omission without FULCRUM_RUN_E2E=1 is explicit", () => {
-    const step = buildAllSteps({ ...process.env, FULCRUM_RUN_E2E: "", HOME: "/tmp/fulcrum-home" })
-      .find((s) => s.name === "web:e2e:full");
-
-    expect(step).toBeDefined();
-    expect(step!.tier).toBe("e2e");
-    expect(step!.domain).toBe("web");
-    expect(step!.skipReason).toContain("FULCRUM_RUN_E2E=1");
   });
 });
 

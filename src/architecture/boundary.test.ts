@@ -121,6 +121,8 @@ const PLAN21_ROUTER_FILES = [
 
 const PLAN44_CLI_FILES = [
   "src/cli/docs-templates.ts",
+  "src/cli/commands/export.ts",
+  "src/cli/commands/import.ts",
   "src/cli/commands/auth.ts",
   "src/cli/commands/flags.ts",
   "src/cli/commands/project-config.ts",
@@ -157,7 +159,7 @@ async function collectSourceFiles(root: string): Promise<string[]> {
     const path = join(root, entry.name);
     if (entry.isDirectory()) return collectSourceFiles(path);
     if (!entry.isFile()) return [];
-    if (!path.endsWith(".ts")) return [];
+    if (!path.endsWith(".ts") && !path.endsWith(".svelte")) return [];
     if (path.endsWith(".test.ts") || path.endsWith(".spec.ts") || path.includes("/__tests__/")) return [];
     if (path.includes("/node_modules/") || path.includes("/.svelte-kit/")) return [];
     return [path];

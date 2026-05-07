@@ -18,8 +18,8 @@
  */
 
 import { dbMigrate, dbStatus, dbHistory } from "../../db/db.router.ts";
-import { openDatabase, resolveDatabaseConfig, type DbBackend } from "../../config/database.ts";
-import { applyProductMigrations } from "../../db/product-migrations.ts";
+import type { DbBackend } from "../../config/database.ts";
+import { defaultProductDbStatus, runExplicitProductMigration } from "../../application/db/commands.ts";
 
 /** Help text for the `db` subcommand. */
 const HELP = `fulcrum db
@@ -59,46 +59,17 @@ function readBackend(argv: readonly string[]): DbBackend | undefined {
   throw new Error(`unsupported database backend: ${value}`);
 }
 
-async function runExplicitProductMigration(rest: readonly string[]): Promise<void> {
+async function runExplicitProductMigrationCli(rest: readonly string[]): Promise<void> {
   const backend = readBackend(rest);
   const json = hasFlag(rest, "--json");
-  const config = resolveDatabaseConfig({
-    cli: {
-      backend,
-      url: readFlag(rest, "--url"),
-    },
-  });
-  const db = await openDatabase(config);
-  try {
-    const applied = await applyProductMigrations(db);
-    const rows = await db.query<{ name: string }>(
-      "SELECT name FROM schema_migrations ORDER BY name ASC",
-    );
-    const current = rows.at(-1)?.name ?? null;
-    const payload = {
-      backend: config.backend,
-      applied,
-      pending: [] as string[],
-      current,
-      ok: true,
-    };
-    if (json) console.log(JSON.stringify(payload));
-    else console.log(`Migration complete (${config.backend}).`);
-  } finally {
-    await db.close();
-  }
+  const payload = await runExplicitProductMigration({ backend, url: readFlag(rest, "--url") });
+  if (json) console.log(JSON.stringify(payload));
+  else console.log(`Migration complete (${payload.backend}).`);
 }
 
 function printDefaultStatus(rest: readonly string[]): void {
   const json = hasFlag(rest, "--json");
-  const config = resolveDatabaseConfig();
-  const payload = {
-    backend: config.backend,
-    current: null,
-    pending: [] as string[],
-    pastDue: 0,
-    ok: true,
-  };
+  const payload = defaultProductDbStatus();
   if (json) console.log(JSON.stringify(payload));
   else console.log(JSON.stringify(payload, null, 2));
 }
@@ -118,7 +89,7 @@ export async function run(
   switch (sub) {
     case "migrate": {
       if (readBackend(rest)) {
-        await runExplicitProductMigration(rest);
+        await runExplicitProductMigrationCli(rest);
         return;
       }
 

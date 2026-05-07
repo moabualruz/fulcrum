@@ -13,7 +13,6 @@ export interface Step {
   soft?: boolean;
   cwd?: string;
   env?: NodeJS.ProcessEnv;
-  skipReason?: string;
 }
 
 const sandboxHome = join(tmpdir(), `fulcrum-ci-home-${process.pid}`);
@@ -113,9 +112,6 @@ export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[
     env: home ? { HOME: home } : undefined,
     tier: "e2e",
     domain: "web",
-    ...(env["FULCRUM_RUN_E2E"] === "1"
-      ? {}
-      : { skipReason: "Set FULCRUM_RUN_E2E=1 to run web:e2e:full for Phase 9.5 closure." }),
   };
 
   return [
@@ -164,12 +160,6 @@ interface Result { step: string; ok: boolean; soft?: boolean; skipped?: boolean;
 
 function run(step: Step): Promise<{ ok: boolean; ms: number; stderr?: string }> {
   return new Promise((resolve) => {
-    if (step.skipReason) {
-      console.log(`SKIP ${step.name}: ${step.skipReason}`);
-      resolve({ ok: true, ms: 0 });
-      return;
-    }
-
     const t0 = Date.now();
     let stderr = "";
     const proc = spawn(step.cmd[0]!, step.cmd.slice(1), { stdio: "pipe", cwd: step.cwd, env: envForStep(step) });

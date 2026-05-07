@@ -25,7 +25,7 @@ import { getActiveProject } from "./lib/state/active-project.ts";
 import type { FlagRegistry } from "../../../src/flags/registry.ts";
 import { dirForLocale, isI18nEnabled, normalizeLocale } from "$lib/i18n/index.ts";
 import { initDatabase, getDatabase } from "$lib/server/db";
-import { getDefaultOrgIdOrm } from "$lib/server/em";
+import { resolveDefaultOrgId } from "../../../src/application/auth/default-org.ts";
 
 // ─── Startup: initialise PGlite singleton (runs migrations once) ─────────────
 // This top-level await runs when the server module is first loaded, before any
@@ -193,7 +193,7 @@ async function localDevSession(requestRuntime: WebRequestRuntime | null): Promis
       userId: "local-admin",
       expiresAt: new Date(Date.now() + 86400000),
     } as App.Locals["session"],
-    orgId: requestRuntime?.em ? await getDefaultOrgIdOrm(requestRuntime.em) : null,
+    orgId: requestRuntime?.em ? await resolveDefaultOrgId(requestRuntime.em) : null,
     userId: "local-admin",
   };
 }

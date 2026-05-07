@@ -1,6 +1,6 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
-  import type { SearchHit } from "../../../../product-kernel/search";
+  import type { SearchHit } from "../../../../application/search/types";
   import type { SavedSearch } from "./+page.server.ts";
 
   interface Props {

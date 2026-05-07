@@ -32,7 +32,7 @@ const SQL_INTERFACE_ROOTS = [
 
 const WEB_DATA_HANDLE_PATTERN = /\b(openDatabase|getDatabase|getEm|getDefaultOrgIdOrm|ormSqlConnection|WebDatabaseHandle|LegacyDatabaseHandle|application-compat)\b/;
 
-const RAW_SQL_CALL_PATTERN = /\b(db|conn|connection|pglite)\.query\(|\b(db|conn|connection|client|pglite)\.execute\(|\.getKysely\b/;
+const RAW_SQL_CALL_PATTERN = /\b(db|conn|connection|pglite)\.query\s*(?:<[^>]+>)?\(|\b(db|conn|connection|client|pglite)\.execute\s*(?:<[^>]+>)?\(|\.getKysely\b/;
 
 const WEB_DATA_HANDLE_COMPOSITION_ROOTS = new Map([
   [

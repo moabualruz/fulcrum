@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import { json, type Cookies } from "@sveltejs/kit";
 
+import { loadBetterAuthPasskeyContext } from "../../../../../application/auth/passkey-context.ts";
 import type { PasskeyUser } from "../../../../../auth/passkey.ts";
 
 export const PASSKEY_LOGIN_CHALLENGE_COOKIE = "fulcrum.passkey_challenge";
@@ -102,14 +103,7 @@ export async function setBetterAuthSessionCookie(
 
 async function getAuthContext(): Promise<AuthContext> {
   if (!authContextPromise) {
-    authContextPromise = (async () => {
-      const { AuthService } = await import("../../../../../auth/index.ts");
-      const { initOrm } = await import("../../../../../db/mikro-orm.config.ts");
-      const orm = await initOrm();
-      const service = new AuthService(orm.em);
-      await service.init();
-      return await service.instance.$context as AuthContext;
-    })();
+    authContextPromise = loadBetterAuthPasskeyContext() as Promise<AuthContext>;
   }
   return authContextPromise;
 }

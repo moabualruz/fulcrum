@@ -13,6 +13,8 @@
 
 import { readFileSync } from "node:fs";
 
+import { createLocalCaller } from "../local-caller.ts";
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => Promise<any>;
 
@@ -215,21 +217,5 @@ function splitCsvRow(line: string): string[] {
 
 async function resolveCaller(opts: ImportRunOptions): Promise<Required<ImportRunOptions>["caller"]> {
   if (opts.caller) return opts.caller;
-
-  const { t } = await import("../../trpc/trpc.ts");
-  const { appRouter } = await import("../../trpc/router.ts");
-  const { createContext } = await import("../../trpc/context.ts");
-  const { MikroORM } = await import("@mikro-orm/postgresql");
-  const { Container } = await import("@needle-di/core");
-  const { registerDbBindings } = await import("../../db/db.module.ts");
-
-  const orm = new MikroORM({} as never);
-  const container = new Container();
-  container.bind({ provide: MikroORM, useValue: orm });
-  const em = orm.em.fork();
-  registerDbBindings(container, orm, em);
-
-  const ctx = createContext({ session: null as never, orgId: "", userId: "", em, container });
-  const factory = t.createCallerFactory(appRouter);
-  return factory(ctx) as unknown as Required<ImportRunOptions>["caller"];
+  return await createLocalCaller({ requireSession: true }) as unknown as Required<ImportRunOptions>["caller"];
 }
