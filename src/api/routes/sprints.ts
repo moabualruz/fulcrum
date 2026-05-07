@@ -1,9 +1,11 @@
 /**
  * P13#05 — REST routes for the sprints domain.
- * Runtime application routes are mounted when deps are present; this file keeps static OpenAPI generation deterministic.
+ * Runtime sprint routes are mounted from the application-backed kernel adapter when deps are present.
  */
 
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { appErrorToHttpResponse } from "../../application/error-mapping.ts";
+import { AppInvariantError } from "../../application/errors.ts";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -41,32 +43,6 @@ const SprintIdParamSchema = z.object({ id: z.string().uuid() });
 const ErrorSchema = z
   .object({ error: z.string(), code: z.string() })
   .openapi("RestError");
-
-// ── Static OpenAPI seed data ─────────────────────────────────────────────────
-
-const FIXED_ORG = "11111111-1111-4111-8111-111111111111";
-
-function createFallbackStore(): Map<string, z.infer<typeof SprintSchema>> {
-  return new Map([
-    [
-      "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-      {
-        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-        orgId: FIXED_ORG,
-        name: "Seed sprint",
-        status: "planning" as const,
-        createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
-      },
-    ],
-  ]);
-}
-
-function extractOrgId(auth: string | null): string | null {
-  if (!auth) return null;
-  const token = auth.replace(/^Bearer\s+/, "");
-  if (token.startsWith("test-jwt:")) return token.slice("test-jwt:".length);
-  return null;
-}
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 
@@ -131,47 +107,28 @@ const deleteRoute = createRoute({
 });
 
 export function registerSprintRoutes(api: OpenAPIHono): void {
-  const store = createFallbackStore();
-
   api.openapi(listRoute, (c) => {
-    return c.json([...store.values()], 200);
+    return applicationRequired(c);
   });
 
-  api.openapi(createRoute_, async (c) => {
-    const body = c.req.valid("json");
-    const sprint: z.infer<typeof SprintSchema> = {
-      id: crypto.randomUUID(),
-      orgId: body.orgId,
-      name: body.name,
-      status: body.status,
-      createdAt: new Date().toISOString(),
-    };
-    store.set(sprint.id, sprint);
-    return c.json(sprint, 201);
+  api.openapi(createRoute_, (c) => {
+    return applicationRequired(c);
   });
 
   api.openapi(getRoute, (c) => {
-    const { id } = c.req.valid("param");
-    const sprint = store.get(id);
-    if (!sprint) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
-    return c.json(sprint, 200);
+    return applicationRequired(c);
   });
 
-  api.openapi(patchRoute, async (c) => {
-    const { id } = c.req.valid("param");
-    const sprint = store.get(id);
-    if (!sprint) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
-    const patch = c.req.valid("json");
-    const updated = { ...sprint, ...patch };
-    store.set(id, updated);
-    return c.json(updated, 200);
+  api.openapi(patchRoute, (c) => {
+    return applicationRequired(c);
   });
 
   api.openapi(deleteRoute, (c) => {
-    const { id } = c.req.valid("param");
-    const sprint = store.get(id);
-    if (!sprint) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
-    store.delete(id);
-    return new Response(null, { status: 204 });
+    return applicationRequired(c);
   });
+}
+
+function applicationRequired(c: any): any {
+  const mapped = appErrorToHttpResponse(new AppInvariantError("Application-backed REST sprint route is required."));
+  return c.json(mapped.body, mapped.status as never);
 }

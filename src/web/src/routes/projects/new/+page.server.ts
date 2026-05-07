@@ -3,8 +3,8 @@ import { superValidate } from "sveltekit-superforms";
 import { valibot } from "sveltekit-superforms/adapters";
 import type { Actions, PageServerLoad } from "./$types";
 import { ProjectFormSchema } from "$lib/server/projects.schema";
-import { createProjectAction } from "$lib/server/projects";
-import { openDatabase } from "$lib/server/db";
+import { createProject } from "../../../../../application/projects/commands.ts";
+import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = async () => {
   const form = await superValidate(valibot(ProjectFormSchema));
@@ -12,36 +12,15 @@ export const load: PageServerLoad = async () => {
 };
 
 export const actions: Actions = {
-  default: async ({ request }) => {
+  default: async ({ request, locals }) => {
     const form = await superValidate(request, valibot(ProjectFormSchema));
     if (!form.valid) return fail(400, { form });
-    const db = await openDatabase();
-    try {
-      const orgRows = await db.query<{ id: string }>(
-        `SELECT id FROM orgs WHERE slug = $1`,
-        ["default"],
-      );
-      if (orgRows.length === 0) {
-        return fail(500, {
-          form: {
-            ...form,
-            errors: {
-              ...form.errors,
-              _errors: ["Default org not found. Run fulcrum product init."],
-            },
-          },
-        });
-      }
-      const orgId = orgRows[0]!.id;
-      await createProjectAction(db, {
-        orgId,
-        slug: form.data.slug,
-        name: form.data.name,
-        description: form.data.description ?? null,
-      });
-    } finally {
-      await db.close();
-    }
+    const { em, ctx } = await requestAppScope(locals);
+    await createProject(em, ctx, {
+      slug: form.data.slug,
+      name: form.data.name,
+      description: form.data.description ?? null,
+    });
     throw redirect(303, "/projects");
   },
 };

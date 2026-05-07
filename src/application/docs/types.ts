@@ -3,7 +3,7 @@ import type {
   DocOutput,
   VersionOutput,
 } from "../../services/DocService.ts";
-export { DocTypeEnum, ScopeEnum } from "../../db/entities/docs/enums.ts";
+export { DocTypeEnum, ScopeEnum } from "../../domain/docs/enums.ts";
 
 export interface AppContext {
   orgId: string;

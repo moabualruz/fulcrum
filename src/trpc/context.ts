@@ -68,3 +68,7 @@ export function requireTrpcEntityManager(
   if (ctx.em) return ctx.em;
   throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
 }
+
+export function optionalTrpcEntityManager(ctx: Pick<TrpcContext, "em">): EntityManager | null {
+  return ctx.em;
+}

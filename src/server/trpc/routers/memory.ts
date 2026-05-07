@@ -8,8 +8,8 @@ import {
   MEMORY_IMPORTANCE,
   MEMORY_KINDS,
   MEMORY_SOURCES,
-} from "../../../db/entities/memory/enums.ts";
-import { requireTrpcEntityManager } from "../../../trpc/context.ts";
+} from "../../../domain/memory/enums.ts";
+import { optionalTrpcEntityManager, requireTrpcEntityManager } from "../../../trpc/context.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 
@@ -133,9 +133,11 @@ export const memoryRouter = t.router({
   list: permissionedProcedure({ resource: "memories", action: "list" })
     .input(ListMemoriesInputSchema)
     .output(z.array(MemoryOutputSchema))
-    .query(({ ctx, input }) =>
-      mapAppError(() => memoryApplication.listMemories(requireTrpcEntityManager(ctx), appContext(ctx), input ?? {}))
-    ),
+    .query(({ ctx, input }) => {
+      const em = optionalTrpcEntityManager(ctx);
+      if (!em) return [];
+      return mapAppError(() => memoryApplication.listMemories(em, appContext(ctx), input ?? {}));
+    }),
 
   update: permissionedProcedure({ resource: "memories", action: "update" })
     .input(UpdateMemoryInputSchema)

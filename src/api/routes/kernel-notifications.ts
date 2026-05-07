@@ -8,7 +8,8 @@ import type { KernelNotificationApplication } from "../application.ts";
 import type { ApiEnv } from "../auth.ts";
 
 const ErrorResponse = z.object({ error: z.string() });
-const NotificationListResponse = z.object({ data: z.array(z.unknown()) });
+const JsonScalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const NotificationListResponse = z.object({ data: z.array(z.record(z.string(), JsonScalar)) });
 
 const listNotificationsRoute = createRoute({
   method: "get",
@@ -27,6 +28,23 @@ const listNotificationsRoute = createRoute({
   },
 });
 
+const markNotificationReadRoute = createRoute({
+  method: "patch",
+  path: "/notifications/{id}/mark-read",
+  tags: ["notifications"],
+  summary: "Mark notification as read",
+  request: {
+    params: z.object({ id: z.string().uuid() }),
+  },
+  responses: {
+    204: { description: "Marked as read" },
+    404: {
+      content: { "application/json": { schema: ErrorResponse } },
+      description: "Notification not found",
+    },
+  },
+});
+
 export function registerKernelNotificationRoutes(
   api: OpenAPIHono<ApiEnv>,
   options: { application?: KernelNotificationApplication } = {},
@@ -41,6 +59,21 @@ export function registerKernelNotificationRoutes(
       }
       const result = await listNotifications(resolveEntityManager(c), { orgId, userId }, { limit: 50, offset: 0 });
       return c.json({ data: result.items } as never, 200);
+    }) as never;
+  });
+
+  api.openapi(markNotificationReadRoute, async (c) => {
+    const application = options.application ?? c.get("application")?.notifications;
+    const orgId = c.get("orgId");
+    const userId = c.get("userId");
+    const { id } = c.req.valid("param");
+    return await mapHttpError(c, async () => {
+      if (!application?.markRead) {
+        throw new AppInvariantError("Application-backed REST notifications mark-read route is required.");
+      }
+      const result = await application.markRead({ orgId, userId, id });
+      if (!result) return c.json({ error: "Notification not found." } as never, 404);
+      return new Response(null, { status: 204 });
     }) as never;
   });
 }

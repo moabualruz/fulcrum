@@ -161,16 +161,16 @@ async function getAgentRunForApi(
   lastErrorKind: string | null;
 } | null> {
   const run = await getRunDetail(manager, appCtx, runId);
-  const state = null;
+  const state = run.orchestrationState;
   return {
     id: run.id,
     state,
     orchestrationState: state,
-    workspacePath: run.workspaceDiffPath ?? null,
+    workspacePath: run.workspacePath,
     renderedPrompt: null,
-    attemptCount: 0,
-    nextRetryAt: null,
-    lastErrorKind: null,
+    attemptCount: run.attemptCount,
+    nextRetryAt: run.nextRetryAt,
+    lastErrorKind: run.lastErrorKind,
   };
 }
 
@@ -182,6 +182,7 @@ export const orchestrationRouter = router({
     .input(z.void())
     .output(z.array(SymphonyRunSchema))
     .query(async ({ ctx }) => {
+      if (!ctx.legacyStore) return [];
       return listRuns(requireLegacyStore(ctx), requireOrgId(ctx));
     }),
 

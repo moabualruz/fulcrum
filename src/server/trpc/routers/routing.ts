@@ -16,7 +16,7 @@ import {
 } from "../../../application/routing.ts";
 import { appErrorToTrpcError } from "../../../application/error-mapping.ts";
 import { AppError } from "../../../application/errors.ts";
-import { RoutingRuleSource } from "../../../db/entities/router/RoutingRule.ts";
+import { RoutingRuleSource } from "../../../domain/routing/types.ts";
 import { requireTrpcEntityManager } from "../../../trpc/context.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";

@@ -12,6 +12,7 @@ import {
 } from "../../../application/sprints/commands.ts";
 import { getSprint, listSprints } from "../../../application/sprints/queries.ts";
 import type { AppContext } from "../../../application/sprints/types.ts";
+import { optionalTrpcEntityManager } from "../../../trpc/context.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 
@@ -116,7 +117,9 @@ export const sprintsRouter = t.router({
     .input(ListSprintsInputSchema)
     .output(z.array(SprintOutputSchema))
     .query(async ({ ctx, input }) => {
-      return listSprints(requireEntityManager(ctx), appContext(ctx), input ?? undefined);
+      const em = optionalTrpcEntityManager(ctx);
+      if (!em) return [];
+      return listSprints(em, appContext(ctx), input ?? undefined);
     }),
 
   get: permissionedProcedure({ resource: "sprints", action: "get" })

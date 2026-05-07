@@ -1,27 +1,12 @@
 // fulcrum backup --output /path — PGlite dump + artifacts manifest tarball.
 
-import { mkdir, readdir, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
+import {
+  createCliBackupTables,
+  type CliBackupStore,
+} from "../../application/backup/cli-backup.ts";
 import { InteractiveRequiredError } from "./errors.ts";
-
-interface LegacySqlDb {
-  query<T = unknown>(sql: string, params?: unknown[]): Promise<T[]>;
-}
-
-// Tables to dump (order matters for FK deps).
-const DUMP_TABLES = [
-  "orgs",
-  "users",
-  "projects",
-  "repos",
-  "documents",
-  "tasks",
-  "memories",
-  "agent_runs",
-  "artifacts",
-  "edges",
-  "events",
-] as const;
 
 export interface BackupOptions {
   output: string;
@@ -35,19 +20,10 @@ async function exists(p: string): Promise<boolean> {
 
 /** Dump all table rows as JSON, pack into tarball with artifacts manifest. */
 export async function createBackup(
-  db: LegacySqlDb,
+  db: CliBackupStore,
   opts: BackupOptions,
 ): Promise<void> {
-  const dump: Record<string, unknown[]> = {};
-  for (const table of DUMP_TABLES) {
-    try {
-      const rows = await db.query(`SELECT * FROM ${table}`);
-      dump[table] = rows;
-    } catch {
-      // Table may not exist yet if migration hasn't run.
-      dump[table] = [];
-    }
-  }
+  const tables = await createCliBackupTables(db);
 
   // Collect artifact file listing.
   const artifactFiles: string[] = [];
@@ -65,7 +41,7 @@ export async function createBackup(
   const manifest = {
     version: 1,
     createdAt: new Date().toISOString(),
-    tables: dump,
+    tables,
     artifactFiles,
   };
 
@@ -75,8 +51,6 @@ export async function createBackup(
   // Use Bun's built-in tar support via shell.
   const tmpManifest = join(opts.dbDir, "__backup_manifest.json");
   await Bun.write(tmpManifest, manifestJson);
-
-  const filesToTar = [tmpManifest];
 
   // Add artifact files if they exist.
   // For simplicity, we tar just the manifest. Artifact bodies can be added
@@ -109,7 +83,7 @@ export interface InteractiveBackupOptions {
  * --output was not provided (prompt would be needed for destination path).
  */
 export async function runInteractiveBackup(
-  db: LegacySqlDb,
+  db: CliBackupStore,
   opts: InteractiveBackupOptions,
 ): Promise<void> {
   let output = opts.output;

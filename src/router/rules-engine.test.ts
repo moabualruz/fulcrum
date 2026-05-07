@@ -95,7 +95,7 @@ describe("evaluateRules", () => {
     await expect(evaluateRules(FACTS, DEFAULT_ORG_ID, projectId)).resolves.toBe("codex");
   });
 
-  it("disables malformed rules and continues evaluating the next rule", async () => {
+  it("skips malformed rules without mutating or persisting them", async () => {
     const malformed = createRule({
       name: "bad",
       actionAgent: "broken",
@@ -111,8 +111,8 @@ describe("evaluateRules", () => {
 
     await expect(evaluateRules(FACTS, DEFAULT_ORG_ID)).resolves.toBe("codex");
 
-    expect(malformed.enabled).toBe(false);
-    expect(flushed).toBe(1);
+    expect(malformed.enabled).toBe(true);
+    expect(flushed).toBe(0);
   });
 
   function repository(): RoutingRuleRepository {

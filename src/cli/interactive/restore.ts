@@ -2,26 +2,11 @@
 
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
+import {
+  restoreCliBackupTables,
+  type CliBackupStore,
+} from "../../application/backup/cli-backup.ts";
 import { InteractiveRequiredError } from "./errors.ts";
-
-interface LegacySqlDb {
-  query<T = unknown>(sql: string, params?: unknown[]): Promise<T[]>;
-}
-
-// Restore order: parents before children (FK deps).
-const RESTORE_ORDER = [
-  "orgs",
-  "users",
-  "projects",
-  "repos",
-  "documents",
-  "tasks",
-  "memories",
-  "agent_runs",
-  "artifacts",
-  "edges",
-  "events",
-] as const;
 
 async function exists(p: string): Promise<boolean> {
   try { await stat(p); return true; } catch { return false; }
@@ -35,7 +20,7 @@ export interface RestoreOptions {
 
 /** Restore DB rows from backup tarball manifest. */
 export async function restoreBackup(
-  db: LegacySqlDb,
+  db: CliBackupStore,
   opts: RestoreOptions,
 ): Promise<void> {
   if (!(await exists(opts.input))) {
@@ -69,31 +54,7 @@ export async function restoreBackup(
       throw new Error(`unsupported backup version: ${manifest.version}`);
     }
 
-    // Re-insert rows table by table.
-    for (const table of RESTORE_ORDER) {
-      const rows = manifest.tables[table];
-      if (!rows || rows.length === 0) continue;
-
-      for (const row of rows) {
-        const cols = Object.keys(row);
-        const placeholders = cols.map((_, i) => `$${i + 1}`).join(", ");
-        const values = cols.map((c) => {
-          const v = row[c];
-          if (v === null || v === undefined) return null;
-          if (typeof v === "object") return JSON.stringify(v);
-          return v;
-        });
-
-        try {
-          await db.query(
-            `INSERT INTO ${table} (${cols.join(", ")}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`,
-            values as (string | number | boolean | null)[],
-          );
-        } catch {
-          // Skip rows that conflict or reference missing FKs.
-        }
-      }
-    }
+    await restoreCliBackupTables(db, manifest.tables);
   } finally {
     await rm(tmpDir, { recursive: true, force: true });
   }
@@ -113,7 +74,7 @@ export interface InteractiveRestoreOptions {
  * (exit 7) because confirmation prompt cannot be shown.
  */
 export async function runInteractiveRestore(
-  db: LegacySqlDb,
+  db: CliBackupStore,
   opts: InteractiveRestoreOptions,
 ): Promise<void> {
   if (opts.nonInteractive) {

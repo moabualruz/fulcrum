@@ -1,11 +1,7 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "../../../../../test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "../../../../../test-support/product-fixtures.ts";
-import { createLocalOrg } from "../../../../../test-support/product-fixtures.ts";
-import { installSkill } from "../../../lib/server/skills.ts";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
 let scratch: string;
 
@@ -35,31 +31,22 @@ afterEach(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-async function seedSkills(): Promise<void> {
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(join(dbDir, "main"));
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  await installSkill(db, { orgId: org.id, slug: "jq" });
-  await installSkill(db, { orgId: org.id, slug: "bat", upstreamRepo: "https://github.com/ex/bat" });
-  await db.close();
-}
-
-async function seedEmpty(): Promise<void> {
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(join(dbDir, "main"));
-  await migrateIsolatedStore(db);
-  await createLocalOrg(db, { slug: "default", name: "Default" });
-  await db.close();
-}
-
 describe("/settings/skills +page.server.ts load()", () => {
   test("returns seeded skills sorted by slug ASC", async () => {
-    await seedSkills();
+    mock.module("$lib/server/application-scope", () => ({
+      requestAppScope: async () => ({ ctx: { orgId: "org1" } }),
+    }));
+    mock.module("../../../../../application/skills/queries.ts", () => ({
+      listRegistrySkills: async () => [],
+      listSkillConflicts: async () => [],
+      serializeSkill: (skill: unknown) => skill,
+      listSkills: async () => [
+        { id: "bat", name: "bat", slug: "bat", source: "upstream", upstreamRepo: "https://github.com/ex/bat", upstreamRef: null, enabledAgents: [] },
+        { id: "jq", name: "jq", slug: "jq", source: "local", upstreamRepo: null, upstreamRef: null, enabledAgents: [] },
+      ],
+    }));
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = mod.load({} as Parameters<typeof mod.load>[0]);
+    const result = mod.load({ locals: {} } as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<SkillsPayload>(result);
     expect(Array.isArray(payload.skills)).toBe(true);
     expect(payload.skills).toHaveLength(2);
@@ -68,9 +55,17 @@ describe("/settings/skills +page.server.ts load()", () => {
   });
 
   test("returns empty array when no skills installed", async () => {
-    await seedEmpty();
+    mock.module("$lib/server/application-scope", () => ({
+      requestAppScope: async () => ({ ctx: { orgId: "org1" } }),
+    }));
+    mock.module("../../../../../application/skills/queries.ts", () => ({
+      listRegistrySkills: async () => [],
+      listSkillConflicts: async () => [],
+      serializeSkill: (skill: unknown) => skill,
+      listSkills: async () => [],
+    }));
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    const result = mod.load({} as Parameters<typeof mod.load>[0]);
+    const result = mod.load({ locals: {} } as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<SkillsPayload>(result);
     expect(payload.skills).toEqual([]);
   });

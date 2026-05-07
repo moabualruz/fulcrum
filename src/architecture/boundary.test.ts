@@ -96,17 +96,7 @@ const RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS = new Map([
   ],
 ]);
 
-const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES = [
-  "src/server/trpc/routers/audit.ts",
-  "src/server/trpc/routers/auth.ts",
-  "src/server/trpc/routers/memory.ts",
-  "src/server/trpc/routers/routing.ts",
-  "src/server/trpc/routers/tasks.ts",
-  "src/trpc/routers/repos.ts",
-  "src/trpc/routers/webhooks.ts",
-  "src/web/src/lib/components/docs/frontmatter-ui.ts",
-  "src/web/src/lib/server/em.ts",
-];
+const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES: string[] = [];
 
 const PLAN21_ROUTER_FILES = [
   "src/server/trpc/routers/comments.ts",

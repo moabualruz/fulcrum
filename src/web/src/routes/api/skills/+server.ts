@@ -34,8 +34,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   const action = payload.action as string | undefined;
   if (!action) return jsonError("action is required");
 
-  const { em, ctx } = await requestAppScope(locals);
-  const orgId = ctx.orgId;
+  const scope = await requestAppScope(locals);
 
   switch (action) {
     case "install": {
@@ -43,7 +42,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (!slug || slug.trim() === "") return jsonError("slug is required");
       const upstreamRepo = (payload.upstream_repo as string) || undefined;
       try {
-        const skill = await installSkill(em, { orgId, slug, upstreamRepo });
+        const skill = await installSkill(scope, { slug, upstreamRepo });
         return jsonOk(skill, 201);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "install failed";
@@ -56,10 +55,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (!slug) return jsonError("slug is required");
       try {
         if (slug === "all") {
-          const skills = await upgradeAllSkills(em, orgId);
+          const skills = await upgradeAllSkills(scope);
           return jsonOk(skills);
         }
-        const skill = await upgradeSkill(em, orgId, slug);
+        const skill = await upgradeSkill(scope, slug);
         return jsonOk(skill);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "upgrade failed";
@@ -71,7 +70,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       const slug = payload.slug as string | undefined;
       if (!slug) return jsonError("slug is required");
       try {
-        await uninstallSkill(em, orgId, slug);
+        await uninstallSkill(scope, slug);
         return new Response(null, { status: 204 });
       } catch (e) {
         const msg = e instanceof Error ? e.message : "uninstall failed";
@@ -85,7 +84,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (!slug) return jsonError("slug is required");
       if (!Array.isArray(agents)) return jsonError("enabled_agents must be an array");
       try {
-        const skill = await updateEnabledAgents(em, orgId, slug, agents);
+        const skill = await updateEnabledAgents(scope, slug, agents);
         return jsonOk(skill);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "update failed";
@@ -101,7 +100,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         return jsonError("resolution must be 'keep_local' or 'use_upstream'");
       }
       try {
-        const skill = await resolveConflict(em, { orgId, slug, resolution });
+        const skill = await resolveConflict(scope, { slug, resolution });
         return jsonOk(skill);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "resolve failed";

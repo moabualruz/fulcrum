@@ -23,6 +23,7 @@ import { FlagRegistry } from "../../src/flags/registry.ts";
 import { CasbinRuleRepository } from "../../src/db/repositories/flags/CasbinRuleRepository.ts";
 import { protectedProcedure } from "../../src/trpc/middleware.ts";
 import { __setTaskApplicationForTest } from "../../src/server/trpc/routers/tasks.ts";
+import { __setMemoryApplicationForTest } from "../../src/server/trpc/routers/memory.ts";
 import {
   DOC_TEMPLATE_SERVICE_TOKEN,
   type DocTemplateService,
@@ -33,6 +34,7 @@ const LOCAL_ORG_ID = "00000000-0000-0000-0000-000000000001";
 const LOCAL_BYPASS_FLAG = "trpc-permission-local-dev-bypass";
 const previousFeatures = process.env["FULCRUM_FEATURES"];
 let restoreTaskApplication: (() => void) | null = null;
+let restoreMemoryApplication: (() => void) | null = null;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: build a mock session object that satisfies the TRPCContext shape
@@ -132,6 +134,8 @@ function testCallerForRouter(
 afterEach(() => {
   restoreTaskApplication?.();
   restoreTaskApplication = null;
+  restoreMemoryApplication?.();
+  restoreMemoryApplication = null;
   if (previousFeatures === undefined) delete process.env["FULCRUM_FEATURES"];
   else process.env["FULCRUM_FEATURES"] = previousFeatures;
 });
@@ -486,7 +490,10 @@ describe("authenticated calls", () => {
   });
 
   it("memory.list returns empty array for authenticated caller", async () => {
-    const caller = authenticatedCaller();
+    const listMemories = mock(async () => []);
+    restoreMemoryApplication = __setMemoryApplicationForTest({ listMemories });
+    const em = {} as Parameters<typeof createContext>[0]["em"];
+    const caller = authenticatedCaller("user-test-001", LOCAL_ORG_ID, em);
     const result = await caller.memories.list();
     expect(Array.isArray(result)).toBe(true);
   });

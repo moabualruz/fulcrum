@@ -1,4 +1,4 @@
-import type { MemoryImportance, MemoryKind, MemorySource } from "../../db/entities/memory/enums.ts";
+import type { MemoryImportance, MemoryKind, MemorySource } from "../../domain/memory/enums.ts";
 
 export interface MemoryApplicationContext {
   orgId: string;

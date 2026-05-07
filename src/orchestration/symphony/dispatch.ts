@@ -124,7 +124,22 @@ export async function reconcileRunningIssues(
  * runtime config before attempting candidate fetch and dispatch.
  * Throws if config is structurally invalid.
  */
-export function validateRuntimeConfig(config: WorkflowConfig): void {
+type DispatchPreflightConfig = WorkflowConfig & {
+  tracker?: {
+    kind?: unknown;
+    api_key?: unknown;
+    project_slug?: unknown;
+  };
+  codex?: {
+    command?: unknown;
+  };
+};
+
+function hasRuntimePreflightSections(config: DispatchPreflightConfig): boolean {
+  return config.tracker !== undefined || config.codex !== undefined;
+}
+
+export function validateRuntimeConfig(config: DispatchPreflightConfig): void {
   if (!config || typeof config !== "object") {
     throw new Error("validateRuntimeConfig: config must be a non-null object");
   }
@@ -136,6 +151,26 @@ export function validateRuntimeConfig(config: WorkflowConfig): void {
   }
   if (typeof config.maxAttempts !== "number" || config.maxAttempts < 1) {
     throw new Error("validateRuntimeConfig: maxAttempts must be >= 1");
+  }
+  if (!hasRuntimePreflightSections(config)) return;
+
+  const tracker = config.tracker;
+  if (!tracker || typeof tracker.kind !== "string" || tracker.kind.trim() === "") {
+    throw new Error("validateRuntimeConfig: tracker.kind must be present");
+  }
+  if (tracker.kind !== "linear") {
+    throw new Error(`validateRuntimeConfig: tracker.kind unsupported: ${tracker.kind}`);
+  }
+  if (typeof tracker.api_key !== "string" || tracker.api_key.trim() === "") {
+    throw new Error("validateRuntimeConfig: tracker.api_key must be present");
+  }
+  if (typeof tracker.project_slug !== "string" || tracker.project_slug.trim() === "") {
+    throw new Error("validateRuntimeConfig: tracker.project_slug must be present for linear");
+  }
+
+  const codex = config.codex;
+  if (!codex || typeof codex.command !== "string" || codex.command.trim() === "") {
+    throw new Error("validateRuntimeConfig: codex.command must be present");
   }
 }
 

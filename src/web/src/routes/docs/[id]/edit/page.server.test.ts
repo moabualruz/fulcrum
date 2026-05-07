@@ -1,20 +1,24 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "../../../../../../test-support/product-fixtures.ts";
-import { createLocalOrg } from "../../../../../../test-support/product-fixtures.ts";
-import { createDocumentAction } from "$lib/server/documents";
+import { __setApplicationScopeForTest } from "../../../../lib/server/application-scope.ts";
+import { Document } from "../../../../../../db/entities/docs/Document.ts";
+import { createTestOrm, type TestOrm } from "../../../../../../test-utils/db.ts";
+import { createDoc } from "../../../../../../application/docs/commands.ts";
 
 let scratch: string;
+let cleanups: Array<() => Promise<void> | void> = [];
 
 beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-docs-edit-"));
   process.env["FULCRUM_HOME"] = scratch;
 });
 
-afterEach(() => {
+afterEach(async () => {
+  for (const cleanup of cleanups.splice(0).reverse()) {
+    await cleanup();
+  }
   delete process.env["FULCRUM_HOME"];
   rmSync(scratch, { recursive: true, force: true });
 });
@@ -26,29 +30,45 @@ async function seedDoc(
     body?: string;
     labels?: string[];
   } = {},
-): Promise<{ id: string }> {
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(join(dbDir, "main"));
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const created = await createDocumentAction(db, {
-    orgId: org.id,
+): Promise<{ id: string; db: TestOrm }> {
+  const db = await createTestOrm();
+  const created = await createDoc(db.em.fork(), {
+    orgId: db.seed.orgId,
+    userId: db.seed.userId,
+  }, {
     projectId: null,
-    kind: overrides.kind ?? "spec",
+    docType: overrides.kind ?? "spec",
     title: overrides.title ?? "Original",
-    body: overrides.body ?? "body line one\nbody line two\n",
+    bodyMd: overrides.body ?? "body line one\nbody line two\n",
     frontmatter: {
       title: overrides.title ?? "Original",
       kind: overrides.kind ?? "spec",
       labels: overrides.labels ?? ["a", "b"],
     },
   });
-  await db.close();
-  return { id: created.id };
+  const restoreScope = __setApplicationScopeForTest({
+    em: db.em.fork(),
+    orgId: db.seed.orgId,
+    userId: db.seed.userId,
+  });
+  cleanups.push(async () => {
+    restoreScope();
+    await db.close();
+  });
+  return { id: created.id, db };
+}
+
+async function getDoc(db: TestOrm, id: string): Promise<Document | null> {
+  return db.em.fork().findOne(Document, { id } as never);
 }
 
 describe("/docs/[id]/edit +page.server.ts", () => {
+  test("server route delegates persistence to application edit facade", () => {
+    const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
+    expect(source).toContain("application/docs/web-edit");
+    expect(source).not.toMatch(/getKysely|selectFrom|insertInto|updateTable|deleteFrom|\.execute\(/);
+  });
+
   test("load returns the doc and a populated SuperValidated form", async () => {
     const { id } = await seedDoc({
       title: "EditMe",
@@ -68,7 +88,7 @@ describe("/docs/[id]/edit +page.server.ts", () => {
   });
 
   test("default action saves changes and returns { form }", async () => {
-    const { id } = await seedDoc({
+    const { id, db } = await seedDoc({
       title: "Before",
       kind: "spec",
       body: "old body\n",
@@ -89,35 +109,19 @@ describe("/docs/[id]/edit +page.server.ts", () => {
       request,
     } as Parameters<typeof mod.actions.default>[0]);
     expect((result as { form?: unknown }).form).toBeDefined();
-    const dbDir = join(scratch, "state", "product", "db");
-    const db = await openIsolatedStore(join(dbDir, "main"));
-    await migrateIsolatedStore(db);
-    try {
-      const rows = await db.query<{
-        title: string;
-        kind: string;
-        body: string;
-        frontmatter: Record<string, unknown>;
-      }>(
-        `SELECT title, kind, body, frontmatter FROM documents WHERE id = $1`,
-        [id],
-      );
-      expect(rows[0]?.title).toBe("After");
-      expect(rows[0]?.kind).toBe("decision");
-      expect(rows[0]?.body).toBe("new body\n");
-      expect(rows[0]?.frontmatter).toEqual({
-        title: "After",
-        kind: "decision",
-        labels: ["a", "b"],
-      });
-    } finally {
-      await db.close();
-    }
+    const doc = await getDoc(db, id);
+    expect(doc?.docType).toBe("adr");
+    expect(doc?.bodyMd).toBe("new body\n");
+    expect(doc?.frontmatter).toEqual({
+      title: "After",
+      kind: "decision",
+      labels: ["a", "b"],
+    });
   });
 
   test("byte-identical body when unchanged: load → resubmit unchanged → body bytes preserved", async () => {
     const originalBody = "Line one with    spaces\nline\ttwo\n   trailing  \n";
-    const { id } = await seedDoc({
+    const { id, db } = await seedDoc({
       title: "Stable",
       kind: "note",
       body: originalBody,
@@ -140,17 +144,7 @@ describe("/docs/[id]/edit +page.server.ts", () => {
     await mod.actions.default({ params: { id }, request } as Parameters<
       typeof mod.actions.default
     >[0]);
-    const dbDir = join(scratch, "state", "product", "db");
-    const db = await openIsolatedStore(join(dbDir, "main"));
-    await migrateIsolatedStore(db);
-    try {
-      const rows = await db.query<{ body: string }>(
-        `SELECT body FROM documents WHERE id = $1`,
-        [id],
-      );
-      expect(rows[0]?.body).toBe(originalBody);
-    } finally {
-      await db.close();
-    }
+    const doc = await getDoc(db, id);
+    expect(doc?.bodyMd).toBe(originalBody);
   });
 });

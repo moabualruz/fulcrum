@@ -36,10 +36,10 @@ describe("P13#14 CSV import/export for tasks", () => {
   it("exports tasks to CSV with download headers", async () => {
     const app = createPublicApiRouter();
 
-    await app.fetch(req("POST", "/api/v1/tasks", {
-      orgId: ORG_ID,
-      title: "CSV export task",
-      status: "in_progress",
+    await app.fetch(req("POST", "/api/v1/connectors/import-csv", {
+      entity: "tasks",
+      projectId: ORG_ID,
+      csv: "external_id,title,status\nEXT-0,CSV export task,in_progress",
     }));
 
     const res = await app.fetch(req("GET", `/api/v1/connectors/export-csv?entity=tasks&projectId=${ORG_ID}`));

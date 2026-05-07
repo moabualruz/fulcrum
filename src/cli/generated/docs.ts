@@ -220,7 +220,6 @@ export function createDocsCommand(): Command {
   const templatesResolveCommand = command.command("templates resolve");
   templatesResolveCommand.description("docs templates resolve");
   templatesResolveCommand.option("--json", "Emit JSON output");
-  templatesResolveCommand.addOption(new Option("--doc-type <choice>", "doc-type").choices([]));
   templatesResolveCommand.option("--project-id <string>", "project-id");
   templatesResolveCommand.action(async (options) => {
     try {

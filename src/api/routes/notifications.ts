@@ -6,6 +6,9 @@
 
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 
+import { appErrorToHttpResponse } from "../../application/error-mapping.ts";
+import { AppInvariantError } from "../../application/errors.ts";
+
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
 const NotificationSchema = z
@@ -25,27 +28,6 @@ const NotifIdParamSchema = z.object({ id: z.string().uuid() });
 const ErrorSchema = z
   .object({ error: z.string(), code: z.string() })
   .openapi("NotifyError");
-
-// ── Stub store ────────────────────────────────────────────────────────────────
-
-const FIXED_ORG = "11111111-1111-4111-8111-111111111111";
-
-function makeNotifStore(): Map<string, z.infer<typeof NotificationSchema>> {
-  return new Map([
-    [
-      "ffffffff-ffff-4fff-8fff-ffffffffffff",
-      {
-        id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
-        orgId: FIXED_ORG,
-        userId: "user-1",
-        kind: "mention",
-        title: "You were mentioned",
-        read: false,
-        createdAt: "2026-01-20T10:00:00.000Z",
-      },
-    ],
-  ]);
-}
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
@@ -77,18 +59,49 @@ const markReadRoute = createRoute({
   },
 });
 
+type NotificationsFacade = {
+  listNotifications?(input: { orgId?: string; userId?: string }): Promise<unknown>;
+  list?(input: { orgId?: string; userId?: string }): Promise<unknown>;
+  markRead(input: { id: string; orgId?: string; userId?: string }): Promise<unknown>;
+};
+
 export function registerNotificationRoutes(api: OpenAPIHono): void {
-  const store = makeNotifStore();
-
-  api.openapi(listRoute, (c) => {
-    return c.json([...store.values()], 200);
+  api.openapi(listRoute, async (c) => {
+    const facade = getNotificationsFacade(c);
+    if (!facade) return applicationRequired(c);
+    const context = c as any;
+    const input = { orgId: context.get("orgId") as string | undefined, userId: context.get("userId") as string | undefined };
+    const result = facade.listNotifications ? await facade.listNotifications(input) : await facade.list?.(input);
+    const notifications = Array.isArray(result) ? result : (result as { data?: unknown[] } | undefined)?.data;
+    return c.json(z.array(NotificationSchema).parse(toJsonDates(notifications ?? [])), 200);
   });
 
-  api.openapi(markReadRoute, (c) => {
+  api.openapi(markReadRoute, async (c) => {
     const { id } = c.req.valid("param");
-    const notif = store.get(id);
-    if (!notif) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
-    store.set(id, { ...notif, read: true });
-    return new Response(null, { status: 204 });
+    const facade = getNotificationsFacade(c);
+    if (!facade) return applicationRequired(c);
+    const result = await facade.markRead({
+      id,
+      orgId: (c as any).get("orgId") as string | undefined,
+      userId: (c as any).get("userId") as string | undefined,
+    });
+    if (!result) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+    return new Response(null, { status: 204 }) as any;
   });
+}
+
+function getNotificationsFacade(c: any): NotificationsFacade | undefined {
+  const application = c.get("application") as { notifications?: NotificationsFacade } | undefined;
+  if (application?.notifications?.markRead) return application.notifications;
+  const trpc = c.get("trpc") as { notify?: NotificationsFacade; notifications?: NotificationsFacade } | undefined;
+  return trpc?.notify ?? trpc?.notifications;
+}
+
+function toJsonDates(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function applicationRequired(c: any): any {
+  const mapped = appErrorToHttpResponse(new AppInvariantError("Application-backed REST notifications route is required."));
+  return c.json(mapped.body, mapped.status as never);
 }

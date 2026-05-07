@@ -2,7 +2,7 @@ import { parse, stringify } from "yaml";
 import { z } from "zod";
 
 import { FrontmatterSchemaMap } from "../../../../../docs/frontmatter-schemas.ts";
-import type { DocType } from "../../../../../db/entities/docs/enums.ts";
+import type { DocType } from "../../../../../domain/docs/enums.ts";
 
 export type FrontmatterValue = Record<string, unknown>;
 

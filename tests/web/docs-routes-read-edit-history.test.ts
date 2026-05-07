@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { openIsolatedStore, migrateIsolatedStore, createLocalOrg } from "../../src/test-support/product-fixtures.ts";
 import { createDocumentAction } from "../../src/web/src/lib/server/documents.ts";
 import { __resetDefaultOrmForTest, initOrm } from "../../src/db/mikro-orm.config.ts";
+import { __setApplicationScopeForTest } from "../../src/web/src/lib/server/application-scope.ts";
 import * as serverDb from "../../src/web/src/lib/server/db.ts";
 
 mock.module("$app/forms", () => ({
@@ -15,6 +16,7 @@ mock.module("$app/forms", () => ({
 }));
 
 let scratch: string;
+let testCleanups: Array<() => Promise<void> | void> = [];
 
 beforeEach(async () => {
   resetLegacyStore();
@@ -24,6 +26,9 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  for (const cleanup of testCleanups.splice(0).reverse()) {
+    await cleanup();
+  }
   await closeLegacyStore();
   await __resetDefaultOrmForTest();
   delete process.env["FULCRUM_HOME"];
@@ -65,6 +70,7 @@ async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: str
   };
   await migrateIsolatedStore(db);
   await db.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS content_json jsonb NOT NULL DEFAULT '{}'::jsonb`);
+  await db.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS context_summary text`);
   await db.query(
     `CREATE TABLE IF NOT EXISTS doc_links (
       id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -141,8 +147,16 @@ async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: str
       JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Second body" }] }] }),
     ],
   );
-  await orm.close(true);
-  await db.close();
+  const restoreScope = __setApplicationScopeForTest({
+    em: orm.em.fork(),
+    orgId: org.id,
+    userId: null,
+  });
+  testCleanups.push(async () => {
+    restoreScope();
+    await orm.close(true);
+    await db.close();
+  });
   return { docId: created.id, linkedId: linked.id, orgId: org.id };
 }
 

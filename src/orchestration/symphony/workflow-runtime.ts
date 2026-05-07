@@ -11,7 +11,8 @@
  */
 
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
@@ -58,7 +59,7 @@ export class WorkflowConfigError extends Error {
 // ---------------------------------------------------------------------------
 
 const TrackerConfigSchema = z.object({
-  kind: z.string().optional(),
+  kind: z.string().default("linear"),
   endpoint: z.string().optional(),
   api_key: z.string().optional(),
   project_slug: z.string().optional(),
@@ -79,14 +80,14 @@ const HooksConfigSchema = z.object({
   before_run: z.string().optional(),
   after_run: z.string().optional(),
   before_remove: z.string().optional(),
-  timeout_ms: z.number().int().positive().optional(),
+  timeout_ms: z.number().int().positive().default(60_000),
 }).passthrough();
 
 const AgentConfigSchema = z.object({
   max_concurrent_agents: z.number().int().positive().default(10),
   max_turns: z.number().int().positive().default(20),
   max_retry_backoff_ms: z.number().int().positive().default(300_000),
-  max_concurrent_agents_by_state: z.record(z.string(), z.number().int().positive()).default({}),
+  max_concurrent_agents_by_state: z.record(z.string(), z.unknown()).default({}),
 }).passthrough();
 
 const CodexConfigSchema = z.object({
@@ -118,7 +119,9 @@ export type WorkflowRuntimeConfig = {
   polling?: z.infer<typeof PollingConfigSchema>;
   workspace?: z.infer<typeof WorkspaceConfigSchema>;
   hooks?: z.infer<typeof HooksConfigSchema>;
-  agent: z.infer<typeof AgentConfigSchema>;
+  agent: Omit<z.infer<typeof AgentConfigSchema>, "max_concurrent_agents_by_state"> & {
+    max_concurrent_agents_by_state: Record<string, number>;
+  };
   codex: z.infer<typeof CodexConfigSchema>;
   [key: string]: unknown;
 };
@@ -205,6 +208,31 @@ function expandTilde(value: string, homeDir: string): string {
   return value;
 }
 
+function resolveWorkspaceRoot(root: string, workflowPath: string): string {
+  return isAbsolute(root) ? resolve(root) : resolve(dirname(workflowPath), root);
+}
+
+function applyLinearTrackerDefaults(
+  tracker: z.infer<typeof TrackerConfigSchema>,
+): z.infer<typeof TrackerConfigSchema> {
+  if (tracker.kind !== "linear") return tracker;
+  return {
+    ...tracker,
+    endpoint: tracker.endpoint ?? "https://api.linear.app/graphql",
+    active_states: tracker.active_states ?? ["Todo", "In Progress"],
+    terminal_states: tracker.terminal_states ?? ["Closed", "Cancelled", "Canceled", "Duplicate", "Done"],
+  };
+}
+
+function normalizePerStateConcurrency(input: Record<string, unknown>): Record<string, number> {
+  const normalized: Record<string, number> = {};
+  for (const [state, value] of Object.entries(input)) {
+    if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) continue;
+    normalized[state.toLowerCase()] = value;
+  }
+  return normalized;
+}
+
 // ---------------------------------------------------------------------------
 // Expand env/path values in tracker and workspace sections
 // ---------------------------------------------------------------------------
@@ -216,41 +244,39 @@ function expandConfig(
   workflowPath: string,
 ): WorkflowRuntimeConfig {
   // Tracker: expand api_key $VAR
-  let tracker: WorkflowRuntimeConfig["tracker"] = undefined;
-  if (raw.tracker !== undefined) {
-    const t = { ...raw.tracker };
-    if (typeof t.api_key === "string" && t.api_key.startsWith("$")) {
-      t.api_key = expandVar(t.api_key, env, workflowPath);
-    }
-    tracker = t as z.infer<typeof TrackerConfigSchema>;
+  let tracker = TrackerConfigSchema.parse(raw.tracker ?? {});
+  if (typeof tracker.api_key === "string" && tracker.api_key.startsWith("$")) {
+    tracker.api_key = expandVar(tracker.api_key, env, workflowPath);
   }
+  tracker = applyLinearTrackerDefaults(tracker);
 
   // Workspace: expand root ~ and $VAR
-  let workspace: WorkflowRuntimeConfig["workspace"] = undefined;
-  if (raw.workspace !== undefined) {
-    const w = { ...raw.workspace };
-    if (typeof w.root === "string") {
-      let root = w.root;
-      if (root.startsWith("$")) {
-        root = expandVar(root, env, workflowPath);
-      }
-      root = expandTilde(root, homeDir);
-      w.root = root;
-    }
-    workspace = w as z.infer<typeof WorkspaceConfigSchema>;
+  const workspace = WorkspaceConfigSchema.parse(raw.workspace ?? {});
+  let workspaceRoot = workspace.root ?? join(tmpdir(), "symphony_workspaces");
+  if (workspaceRoot.startsWith("$")) {
+    workspaceRoot = expandVar(workspaceRoot, env, workflowPath);
   }
+  workspace.root = resolveWorkspaceRoot(expandTilde(workspaceRoot, homeDir), workflowPath);
+
+  const hooks = HooksConfigSchema.parse(raw.hooks ?? {});
+
+  const agentRaw = AgentConfigSchema.parse(raw.agent ?? {});
+  const agent: WorkflowRuntimeConfig["agent"] = {
+    ...agentRaw,
+    max_concurrent_agents_by_state: normalizePerStateConcurrency(
+      agentRaw.max_concurrent_agents_by_state,
+    ),
+  };
 
   // Codex with default command
   const codexRaw = raw.codex ?? {};
   const codex = CodexConfigSchema.parse(codexRaw);
 
-  // Agent with defaults
-  const agent = AgentConfigSchema.parse(raw.agent ?? {});
-
   return {
     ...raw,
     tracker,
     workspace,
+    hooks,
     codex,
     agent,
   };

@@ -7,6 +7,7 @@ import { RoutingEventBus, routingEventBus } from "./event-bus.ts";
 interface RulesEngineConfig {
   routingRuleRepository: RoutingRuleStore | null;
   eventBus?: RoutingEventBus;
+  onMalformedRule?: MalformedRuleHandler | null;
 }
 
 export interface RuleMatch {
@@ -27,9 +28,13 @@ export interface RoutingRuleRecord {
 
 export interface RoutingRuleStore {
   findEnabledForDispatch(orgId: string, projectId?: string | null): Promise<RoutingRuleRecord[]>;
-  save?(rule: RoutingRuleRecord): Promise<void>;
   setEventBus?(bus: RoutingEventBus): void;
 }
+
+export type MalformedRuleHandler = (
+  rule: RoutingRuleRecord,
+  error: unknown,
+) => Promise<void> | void;
 
 let configuredEngine: RulesEngine | null = null;
 let defaultEngine: RulesEngine | null = null;
@@ -49,7 +54,11 @@ export function configureRulesEngine(config: RulesEngineConfig): void {
 
   const bus = config.eventBus ?? routingEventBus;
   config.routingRuleRepository.setEventBus?.(bus);
-  configuredEngine = new RulesEngine(config.routingRuleRepository, bus);
+  configuredEngine = new RulesEngine(
+    config.routingRuleRepository,
+    bus,
+    config.onMalformedRule ?? null,
+  );
   configuredEngine.initialize();
 }
 
@@ -85,6 +94,7 @@ export class RulesEngine {
   constructor(
     private readonly repository: RoutingRuleStore,
     private readonly eventBus: RoutingEventBus,
+    private readonly onMalformedRule: MalformedRuleHandler | null = null,
   ) {}
 
   initialize(): void {
@@ -109,13 +119,38 @@ export class RulesEngine {
     const rules = await this.rulesFor(cacheKey, orgId, projectId ?? null);
 
     for (const rule of sortRulesForDispatch(rules, projectId)) {
-      const agent = await evaluateRule(rule, facts, this.repository, () => {
-        this.markStale();
-      });
-      if (agent) return { ruleId: rule.id, agent };
+      const result = await evaluateRule(rule, facts);
+      if (result.agent) return { ruleId: rule.id, agent: result.agent };
+      if (result.error) await this.reportMalformedRule(rule, result.error);
     }
 
     return null;
+  }
+
+  private async reportMalformedRule(
+    rule: RoutingRuleRecord,
+    error: unknown,
+  ): Promise<void> {
+    if (!this.onMalformedRule) {
+      console.error(
+        `Skipped malformed routing rule ${rule.id}: ${String(
+          (error as { message?: unknown }).message ?? error,
+        )}`,
+      );
+      return;
+    }
+
+    try {
+      await this.onMalformedRule(rule, error);
+    } catch (handlerError) {
+      console.error(
+        `Malformed routing rule handler failed for ${rule.id}: ${String(
+          (handlerError as { message?: unknown }).message ?? handlerError,
+        )}`,
+      );
+    } finally {
+      this.markStale();
+    }
   }
 
   private markStale(): void {
@@ -127,6 +162,10 @@ export class RulesEngine {
     orgId: string,
     projectId: string | null,
   ): Promise<RoutingRuleRecord[]> {
+    if (this.onMalformedRule) {
+      return this.repository.findEnabledForDispatch(orgId, projectId);
+    }
+
     if (
       this.cache.get(cacheKey)?.loadedVersion === this.rulesVersion
     ) {
@@ -159,9 +198,7 @@ export class RulesEngine {
 async function evaluateRule(
   rule: RoutingRuleRecord,
   facts: TaskFacts,
-  repository: RoutingRuleStore,
-  onDisable?: () => void,
-): Promise<string | null> {
+): Promise<{ agent: string | null; error: unknown | null }> {
   try {
     const engine = new Engine([], { allowUndefinedFacts: true });
     engine.addRule({
@@ -172,20 +209,9 @@ async function evaluateRule(
     });
 
     const result = await engine.run(toRuleFacts(facts));
-    return result.events.length > 0 ? rule.actionAgent : null;
+    return { agent: result.events.length > 0 ? rule.actionAgent : null, error: null };
   } catch (error) {
-    try {
-      await disableMalformedRule(rule, repository, error);
-    } catch (disableError) {
-      console.error(
-        `Failed to disable malformed routing rule ${rule.id}: ${String(
-          (disableError as { message?: unknown }).message ?? disableError,
-        )}`,
-      );
-    } finally {
-      onDisable?.();
-    }
-    return null;
+    return { agent: null, error };
   }
 }
 
@@ -213,29 +239,6 @@ function toRuleFacts(facts: TaskFacts): Record<string, unknown> {
     "task.tags": facts.task.tags,
     "task.title": facts.task.title,
   };
-}
-
-async function disableMalformedRule(
-  rule: RoutingRuleRecord,
-  repository: RoutingRuleStore,
-  error: unknown,
-): Promise<void> {
-  rule.enabled = false;
-  rule.updatedAt = new Date();
-  if (repository.save) {
-    await repository.save(rule);
-  } else {
-    const getManager = Reflect.get(repository as object, ["get", "Entity", "Manager"].join(""));
-    if (typeof getManager === "function") {
-      const manager = getManager.call(repository) as { flush?: () => Promise<void> };
-      await manager.flush?.();
-    }
-  }
-  console.error(
-    `Disabled malformed routing rule ${rule.id}: ${String(
-      (error as { message?: unknown }).message ?? error,
-    )}`,
-  );
 }
 
 async function getRulesEngine(): Promise<RulesEngine> {

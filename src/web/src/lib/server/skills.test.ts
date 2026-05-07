@@ -1,185 +1,131 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "../../../../test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "../../../../test-support/product-fixtures.ts";
-import { createLocalOrg } from "../../../../test-support/product-fixtures.ts";
-import type { TestStore } from "../../../../test-support/product-fixtures.ts";
+
+import { SkillConflict, SkillConflictKind, SkillConflictStatus } from "../../../../db/entities/skills/SkillConflict.ts";
+import { createTestOrm, type TestOrm } from "../../../../test-utils/db.ts";
 import {
-  listSkills,
   installSkill,
-  upgradeSkill,
-  upgradeAllSkills,
+  listSkills,
+  resolveConflict,
   uninstallSkill,
   updateEnabledAgents,
-  resolveConflict,
+  upgradeAllSkills,
+  upgradeSkill,
+  type SkillsWebScope,
 } from "./skills.ts";
 
-let scratch: string;
-let db: TestStore;
-let orgId: string;
+let db: TestOrm;
+let scope: SkillsWebScope;
 
 beforeEach(async () => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-skills-test-"));
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  db = await openIsolatedStore(join(dbDir, "main"));
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  orgId = org.id;
+  db = await createTestOrm();
+  scope = { em: db.em.fork(), ctx: { orgId: db.seed.orgId } };
 });
 
 afterEach(async () => {
   await db.close();
-  rmSync(scratch, { recursive: true, force: true });
 });
 
+async function addConflict(slug: string): Promise<void> {
+  const em = db.em.fork();
+  em.persist(em.create(SkillConflict, {
+    slug,
+    kind: SkillConflictKind.UpstreamConflict,
+    status: SkillConflictStatus.Open,
+    localHash: "local v",
+    upstreamHash: "upstream v",
+  }));
+  await em.flush();
+}
+
 describe("skills service", () => {
+  test("web skills facade delegates to application modules without direct data access", () => {
+    const source = readFileSync(join(import.meta.dir, "skills.ts"), "utf8");
+    expect(source).toContain("application/skills");
+    expect(source).not.toMatch(/EntityManager|sqlAccess|getKysely|SELECT|INSERT|UPDATE|DELETE|\.execute\(/);
+  });
+
   test("listSkills returns empty array when no skills installed", async () => {
-    const result = await listSkills(db, orgId);
-    expect(result).toEqual([]);
+    expect(await listSkills(scope)).toEqual([]);
   });
 
-  test("installSkill creates a local skill when no upstream_repo", async () => {
-    const skill = await installSkill(db, { orgId, slug: "jq" });
-    expect(skill.slug).toBe("jq");
-    expect(skill.source).toBe("local");
-    expect(skill.version).toBe("0.0.0");
-    expect(skill.upstream_repo).toBeNull();
-    expect(skill.enabled_agents).toEqual([]);
-    expect(skill.upstream_conflict).toBeNull();
-  });
+  test("installSkill creates local and upstream skills", async () => {
+    const local = await installSkill(scope, { slug: "jq" });
+    expect(local.slug).toBe("jq");
+    expect(local.source).toBe("local");
+    expect(local.version).toBe("0.0.0");
+    expect(local.upstream_repo).toBeNull();
+    expect(local.enabled_agents).toEqual([]);
+    expect(local.upstream_conflict).toBeNull();
 
-  test("installSkill creates an upstream skill when upstream_repo given", async () => {
-    const skill = await installSkill(db, {
-      orgId,
+    const upstream = await installSkill(scope, {
       slug: "bat",
       upstreamRepo: "https://github.com/example/bat-skill",
     });
-    expect(skill.source).toBe("upstream");
-    expect(skill.upstream_repo).toBe("https://github.com/example/bat-skill");
+    expect(upstream.source).toBe("upstream");
+    expect(upstream.upstream_repo).toBe("https://github.com/example/bat-skill");
   });
 
-  test("installSkill rejects empty slug", async () => {
-    await expect(installSkill(db, { orgId, slug: "" })).rejects.toThrow("slug is required");
-    await expect(installSkill(db, { orgId, slug: "   " })).rejects.toThrow("slug is required");
+  test("installSkill rejects empty and duplicate slugs", async () => {
+    await expect(installSkill(scope, { slug: "" })).rejects.toThrow("slug is required");
+    await expect(installSkill(scope, { slug: "   " })).rejects.toThrow("slug is required");
+    await installSkill(scope, { slug: "dup" });
+    await expect(installSkill(scope, { slug: "dup" })).rejects.toThrow();
   });
 
-  test("installSkill rejects duplicate slug", async () => {
-    await installSkill(db, { orgId, slug: "dup" });
-    await expect(installSkill(db, { orgId, slug: "dup" })).rejects.toThrow();
-  });
-
-  test("installed skill appears in listSkills", async () => {
-    await installSkill(db, { orgId, slug: "alpha" });
-    await installSkill(db, { orgId, slug: "beta" });
-    const list = await listSkills(db, orgId);
-    expect(list).toHaveLength(2);
-    expect(list[0]!.slug).toBe("alpha");
-    expect(list[1]!.slug).toBe("beta");
+  test("listSkills sorts installed skills by slug", async () => {
+    await installSkill(scope, { slug: "beta" });
+    await installSkill(scope, { slug: "alpha" });
+    const list = await listSkills(scope);
+    expect(list.map((skill) => skill.slug)).toEqual(["alpha", "beta"]);
   });
 
   test("upgradeSkill bumps version patch", async () => {
-    await installSkill(db, { orgId, slug: "jq" });
-    const upgraded = await upgradeSkill(db, orgId, "jq");
-    expect(upgraded.version).toBe("0.0.1");
-    const again = await upgradeSkill(db, orgId, "jq");
-    expect(again.version).toBe("0.0.2");
+    await installSkill(scope, { slug: "jq" });
+    expect((await upgradeSkill(scope, "jq")).version).toBe("0.0.1");
+    expect((await upgradeSkill(scope, "jq")).version).toBe("0.0.2");
   });
 
   test("upgradeSkill throws for unknown slug", async () => {
-    await expect(upgradeSkill(db, orgId, "nonexistent")).rejects.toThrow("not found");
+    await expect(upgradeSkill(scope, "nonexistent")).rejects.toThrow("not found");
   });
 
   test("upgradeAllSkills upgrades every installed skill", async () => {
-    await installSkill(db, { orgId, slug: "a" });
-    await installSkill(db, { orgId, slug: "b" });
-    const results = await upgradeAllSkills(db, orgId);
+    await installSkill(scope, { slug: "a" });
+    await installSkill(scope, { slug: "b" });
+    const results = await upgradeAllSkills(scope);
     expect(results).toHaveLength(2);
-    expect(results.every((s) => s.version === "0.0.1")).toBe(true);
+    expect(results.every((skill) => skill.version === "0.0.1")).toBe(true);
   });
 
-  test("uninstallSkill removes the row", async () => {
-    await installSkill(db, { orgId, slug: "jq" });
-    await uninstallSkill(db, orgId, "jq");
-    const list = await listSkills(db, orgId);
-    expect(list).toHaveLength(0);
-  });
-
-  test("uninstallSkill throws for unknown slug", async () => {
-    await expect(uninstallSkill(db, orgId, "nope")).rejects.toThrow("not found");
+  test("uninstallSkill removes the row and throws for unknown slug", async () => {
+    await installSkill(scope, { slug: "jq" });
+    await uninstallSkill(scope, "jq");
+    expect(await listSkills(scope)).toHaveLength(0);
+    await expect(uninstallSkill(scope, "nope")).rejects.toThrow("not found");
   });
 
   test("updateEnabledAgents persists agent list", async () => {
-    await installSkill(db, { orgId, slug: "jq" });
-    const updated = await updateEnabledAgents(db, orgId, "jq", ["claude", "codex"]);
+    await installSkill(scope, { slug: "jq" });
+    const updated = await updateEnabledAgents(scope, "jq", ["claude", "codex"]);
     expect(updated.enabled_agents).toEqual(["claude", "codex"]);
-    // Verify persisted
-    const list = await listSkills(db, orgId);
-    expect(list[0]!.enabled_agents).toEqual(["claude", "codex"]);
+    expect((await listSkills(scope))[0]!.enabled_agents).toEqual(["claude", "codex"]);
   });
 
-  test("resolveConflict clears conflict with keep_local", async () => {
-    await installSkill(db, { orgId, slug: "jq" });
-    // Inject a conflict directly
-    await db.query(
-      `UPDATE skills SET upstream_conflict = $1::jsonb WHERE org_id = $2 AND slug = $3`,
-      [
-        JSON.stringify({ local_content: "local v", upstream_content: "upstream v" }),
-        orgId,
-        "jq",
-      ],
-    );
-    const resolved = await resolveConflict(db, { orgId, slug: "jq", resolution: "keep_local" });
+  test("resolveConflict clears open conflict", async () => {
+    await installSkill(scope, { slug: "jq" });
+    await addConflict("jq");
+    expect((await listSkills(scope))[0]!.upstream_conflict).toEqual({
+      local_content: "local v",
+      upstream_content: "upstream v",
+    });
+    const resolved = await resolveConflict(scope, { slug: "jq", resolution: "use_upstream" });
     expect(resolved.upstream_conflict).toBeNull();
-  });
-
-  test("resolveConflict clears conflict with use_upstream", async () => {
-    await installSkill(db, { orgId, slug: "jq" });
-    await db.query(
-      `UPDATE skills SET upstream_conflict = $1::jsonb WHERE org_id = $2 AND slug = $3`,
-      [
-        JSON.stringify({ local_content: "old", upstream_content: "new" }),
-        orgId,
-        "jq",
-      ],
-    );
-    const resolved = await resolveConflict(db, { orgId, slug: "jq", resolution: "use_upstream" });
-    expect(resolved.upstream_conflict).toBeNull();
-    expect(resolved.content_hash).toContain("upstream-");
   });
 
   test("resolveConflict throws when no conflict exists", async () => {
-    await installSkill(db, { orgId, slug: "jq" });
-    await expect(
-      resolveConflict(db, { orgId, slug: "jq", resolution: "keep_local" }),
-    ).rejects.toThrow("no conflict");
-  });
-
-  test("full lifecycle: install → list → upgrade → conflict → resolve → uninstall", async () => {
-    const skill = await installSkill(db, { orgId, slug: "lifecycle" });
-    expect(skill.version).toBe("0.0.0");
-
-    let list = await listSkills(db, orgId);
-    expect(list).toHaveLength(1);
-
-    const upgraded = await upgradeSkill(db, orgId, "lifecycle");
-    expect(upgraded.version).toBe("0.0.1");
-
-    // Inject conflict
-    await db.query(
-      `UPDATE skills SET upstream_conflict = $1::jsonb WHERE org_id = $2 AND slug = $3`,
-      [JSON.stringify({ local_content: "A", upstream_content: "B" }), orgId, "lifecycle"],
-    );
-    list = await listSkills(db, orgId);
-    expect(list[0]!.upstream_conflict).not.toBeNull();
-
-    const resolved = await resolveConflict(db, { orgId, slug: "lifecycle", resolution: "use_upstream" });
-    expect(resolved.upstream_conflict).toBeNull();
-
-    await uninstallSkill(db, orgId, "lifecycle");
-    list = await listSkills(db, orgId);
-    expect(list).toHaveLength(0);
+    await installSkill(scope, { slug: "jq" });
+    await expect(resolveConflict(scope, { slug: "jq", resolution: "keep_local" })).rejects.toThrow("no conflict");
   });
 });

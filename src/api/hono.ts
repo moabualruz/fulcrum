@@ -120,19 +120,20 @@ export function createPublicApi(deps?: PublicApiDeps): OpenAPIHono {
 export function createPublicApiRouter(deps?: PublicApiDeps): Hono {
   const router = new Hono();
   const api = createPublicApi(deps);
-  const staticSpec = api.getOpenAPI31Document({
-    openapi: "3.1.0",
-    info: {
-      title: "Fulcrum Public API",
-      version: "1",
-      description:
-        "REST API for Fulcrum — gated by the `public-api` feature flag. " +
-        "All procedures are also accessible via tRPC for internal consumers.",
-    },
-  });
+  let staticSpec: unknown;
 
   // Guard middleware — 404 when flag is OFF.
   router.get("/api/openapi.json", (c) => {
+    staticSpec ??= api.getOpenAPI31Document({
+      openapi: "3.1.0",
+      info: {
+        title: "Fulcrum Public API",
+        version: "1",
+        description:
+          "REST API for Fulcrum — gated by the `public-api` feature flag. " +
+          "All procedures are also accessible via tRPC for internal consumers.",
+      },
+    });
     return c.json(staticSpec);
   });
 

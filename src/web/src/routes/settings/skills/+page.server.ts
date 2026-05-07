@@ -1,19 +1,14 @@
 import type { PageServerLoad } from "./$types";
-import { openDatabase, getDefaultOrgId } from "$lib/server/db";
-import { listSkills } from "$lib/server/skills";
+import { listSkills } from "../../../../../application/skills/queries.ts";
+import { requestAppScope } from "$lib/server/application-scope";
 
-export const load: PageServerLoad = () => {
+export const load: PageServerLoad = ({ locals }) => {
   return {
     streamed: {
       data: (async () => {
-        const db = await openDatabase();
-        try {
-          const orgId = await getDefaultOrgId(db);
-          const skills = await listSkills(db, orgId);
-          return { skills };
-        } finally {
-          await db.close();
-        }
+        const { ctx } = await requestAppScope(locals);
+        const skills = await listSkills({ orgId: ctx.orgId });
+        return { skills };
       })(),
     },
   };

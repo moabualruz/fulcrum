@@ -21,6 +21,7 @@ export interface KernelAuditApplication {
 
 export interface KernelNotificationApplication {
   listNotifications(input: { orgId: string; userId: string }): Promise<{ data: unknown[] }>;
+  markRead?(input: { orgId: string; userId: string; id: string }): Promise<unknown>;
 }
 
 export interface KernelSprintApplication {

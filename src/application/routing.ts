@@ -3,15 +3,13 @@ import { Engine, type TopLevelCondition } from "json-rules-engine";
 
 import { Org } from "../db/entities/auth/Org.ts";
 import { Event } from "../db/entities/core/Event.ts";
-import {
-  RoutingRule,
-  RoutingRuleSource,
-  type RoutingConditions,
-} from "../db/entities/router/RoutingRule.ts";
+import { RoutingRule } from "../db/entities/router/RoutingRule.ts";
 import { Task } from "../db/entities/tasks/Task.ts";
 import type { EventRepository } from "../db/repositories/core/EventRepository.ts";
 import type { RoutingRuleRepository } from "../db/repositories/router/RoutingRuleRepository.ts";
+import { RoutingRuleSource, type RoutingConditions } from "../domain/routing/types.ts";
 import { ROUTING_EVENT_VERB, RoutingEventPayloadSchema } from "../router/routing-event-payload.ts";
+import type { RoutingRuleRecord } from "../router/rules-engine.ts";
 import type { TaskFacts } from "../router/types.ts";
 import type { RoutingDecision } from "../router/types.ts";
 import { AppNotFoundError, AppValidationError } from "./errors.ts";
@@ -73,16 +71,24 @@ export interface LearnRoutingRuleInput {
   routingRuleRepository?: RoutingRuleRepository | null;
 }
 
+export interface DisableMalformedRoutingRuleInput {
+  rule: RoutingRule | RoutingRuleRecord;
+  repository: RoutingRuleRepository;
+  error: unknown;
+}
+
 export interface RoutingApplication {
   recordRoutingEvent(input: RecordRoutingEventInput): Promise<void>;
   detectRoutingConflicts(input: DetectRoutingConflictsInput): Promise<string[]>;
   learnRoutingRule(input: LearnRoutingRuleInput): Promise<RoutingRule>;
+  disableMalformedRoutingRule(input: DisableMalformedRoutingRuleInput): Promise<void>;
 }
 
 export const routingApplication: RoutingApplication = {
   recordRoutingEvent,
   detectRoutingConflicts,
   learnRoutingRule,
+  disableMalformedRoutingRule,
 };
 
 export async function recordRoutingEvent(input: RecordRoutingEventInput): Promise<void> {
@@ -152,6 +158,20 @@ export async function learnRoutingRule(input: LearnRoutingRuleInput): Promise<Ro
   }
 
   return rule;
+}
+
+export async function disableMalformedRoutingRule(
+  input: DisableMalformedRoutingRuleInput,
+): Promise<void> {
+  const rule = input.rule as RoutingRule;
+  rule.enabled = false;
+  rule.updatedAt = new Date();
+  await input.repository.save(rule);
+  console.error(
+    `Disabled malformed routing rule ${rule.id}: ${String(
+      (input.error as { message?: unknown }).message ?? input.error,
+    )}`,
+  );
 }
 
 export async function validateRoutingConditions(conditions: Record<string, unknown>): Promise<void> {
@@ -410,8 +430,13 @@ async function configureRouting(em: EntityManager): Promise<void> {
     import("../router/rules-engine.ts"),
     import("../router/telemetry.ts"),
   ]);
+  const routingRules = routingRuleRepository(em);
   configureAutoAssign({});
-  configureRulesEngine({ routingRuleRepository: routingRuleRepository(em) });
+  configureRulesEngine({
+    routingRuleRepository: routingRules,
+    onMalformedRule: (rule, error) =>
+      disableMalformedRoutingRule({ rule, repository: routingRules, error }),
+  });
   configureRoutingTelemetry({ eventRepository: eventRepository(em) });
 }
 

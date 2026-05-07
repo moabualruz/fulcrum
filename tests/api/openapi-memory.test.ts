@@ -14,6 +14,88 @@ function req(method: string, path: string, body?: unknown, orgId = ORG_ID): Requ
   });
 }
 
+function appWithMemoryFacade() {
+  type MemoryRow = {
+    id: string;
+    orgId: string;
+    projectId: string | null;
+    global: boolean;
+    kind: "note" | "decision" | "blocker" | "file_ref" | "section_anchor" | "link" | "fact";
+    body: string;
+    tags: string[];
+    importance: "low" | "medium" | "high";
+    source: "heuristic" | "llm" | "manual";
+    sourceRef: Record<string, unknown>;
+    createdAt: string;
+    updatedAt: string;
+    archived: boolean;
+  };
+
+  const rows = new Map<string, MemoryRow>();
+  const memories = {
+    list: async () => [...rows.values()],
+    create: async (input: Partial<MemoryRow>) => {
+      const now = new Date().toISOString();
+      const memory: MemoryRow = {
+        id: crypto.randomUUID(),
+        orgId: ORG_ID,
+        projectId: input.projectId ?? null,
+        global: input.global ?? false,
+        kind: input.kind ?? "note",
+        body: input.body ?? "",
+        tags: input.tags ?? [],
+        importance: input.importance ?? "medium",
+        source: input.source ?? "manual",
+        sourceRef: input.sourceRef ?? {},
+        createdAt: now,
+        updatedAt: now,
+        archived: false,
+      };
+      rows.set(memory.id, memory);
+      return memory;
+    },
+    get: async ({ id }: { id: string }) => rows.get(id) ?? null,
+    update: async ({ id, ...patch }: Partial<MemoryRow> & { id: string }) => {
+      const current = rows.get(id);
+      if (!current) return null;
+      const updated = { ...current, ...patch, updatedAt: new Date().toISOString() };
+      rows.set(id, updated);
+      return updated;
+    },
+    delete: async ({ id }: { id: string }) => {
+      rows.delete(id);
+      return { deleted: true as const };
+    },
+    promote: async ({ id }: { id: string }) => rows.get(id) ?? null,
+    archive: async ({ id }: { id: string }) => {
+      const current = rows.get(id);
+      if (!current) return null;
+      const updated = { ...current, archived: true, updatedAt: new Date().toISOString() };
+      rows.set(id, updated);
+      return updated;
+    },
+    restore: async ({ id }: { id: string }) => {
+      const current = rows.get(id);
+      if (!current) return null;
+      const updated = { ...current, archived: false, updatedAt: new Date().toISOString() };
+      rows.set(id, updated);
+      return updated;
+    },
+  };
+
+  return createPublicApiRouter({
+    apiAuth: {
+      findApiKeyByHash: async () => ({ org_id: ORG_ID, user_id: "user-1" }),
+    },
+    trpc: { memories },
+    application: {
+      context: {
+        preview: async (input: unknown) => ({ procedure: "context.preview", input }),
+      },
+    } as never,
+  });
+}
+
 describe("P8#14 memory REST OpenAPI routes", () => {
   let originalFeatures: string | undefined;
 
@@ -59,7 +141,7 @@ describe("P8#14 memory REST OpenAPI routes", () => {
   });
 
   it("creates, lists, and deletes memory rows", async () => {
-    const app = createPublicApiRouter();
+    const app = appWithMemoryFacade();
 
     const createdRes = await app.fetch(req("POST", "/api/v1/memory", {
       body: "REST memory should call the same memory surface.",
@@ -86,7 +168,7 @@ describe("P8#14 memory REST OpenAPI routes", () => {
   });
 
   it("returns 400 when deleting without confirm=true", async () => {
-    const app = createPublicApiRouter();
+    const app = appWithMemoryFacade();
     const createdRes = await app.fetch(req("POST", "/api/v1/memory", { body: "Delete me" }));
     const created = await createdRes.json() as { id: string };
 
@@ -97,7 +179,7 @@ describe("P8#14 memory REST OpenAPI routes", () => {
   });
 
   it("returns 422 with details for invalid PATCH input", async () => {
-    const app = createPublicApiRouter();
+    const app = appWithMemoryFacade();
     const createdRes = await app.fetch(req("POST", "/api/v1/memory", { body: "Patch me" }));
     const created = await createdRes.json() as { id: string };
 
@@ -110,7 +192,7 @@ describe("P8#14 memory REST OpenAPI routes", () => {
   });
 
   it("supports memory actions and context preview", async () => {
-    const app = createPublicApiRouter();
+    const app = appWithMemoryFacade();
     const createdRes = await app.fetch(req("POST", "/api/v1/memory", { body: "Action me" }));
     const created = await createdRes.json() as { id: string };
 

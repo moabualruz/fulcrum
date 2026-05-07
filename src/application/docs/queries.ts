@@ -54,6 +54,7 @@ export async function listDocVersions(
   ctx: AppContext,
   docId: string,
 ): Promise<DocVersionListDto[]> {
+  await assertDocBelongsToOrg(em, ctx, docId);
   const versions = await em.find(DocVersion, {
     org: ctx.orgId,
     doc: docId,
@@ -133,6 +134,15 @@ export async function listDocForwardLinks(
 
 function requiredUserContext(ctx: AppContext): { orgId: string; userId: string; em: EntityManager | null } {
   return { orgId: ctx.orgId, userId: uuidOrNull(ctx.userId ?? "") ?? "", em: null };
+}
+
+async function assertDocBelongsToOrg(em: EntityManager, ctx: AppContext, docId: string): Promise<void> {
+  const doc = await em.findOne(Document, {
+    id: docId,
+    org: ctx.orgId,
+    archived: false,
+  } as never);
+  if (!doc) throw new AppNotFoundError(`Document not found: ${docId}`);
 }
 
 function serializeVersionForApplication(version: DocVersion): DocVersionListDto {

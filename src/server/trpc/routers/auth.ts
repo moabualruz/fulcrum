@@ -23,7 +23,7 @@
 import { t } from "../../../trpc/trpc.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { publicProcedure } from "../../../trpc/trpc.ts";
-import { requireTrpcEntityManager } from "../../../trpc/context.ts";
+import { optionalTrpcEntityManager, requireTrpcEntityManager } from "../../../trpc/context.ts";
 import { appErrorToTrpcError } from "../../../application/error-mapping.ts";
 import { AppError } from "../../../application/errors.ts";
 import {
@@ -71,7 +71,7 @@ export const authRouter = t.router({
    */
   whoami: permissionedProcedure({ resource: "auth", action: "whoami" }).query(async ({ ctx }) => {
     return mapAppError(() =>
-      authApplication.resolveApplicationSessionContext(requireTrpcEntityManager(ctx), appContext(ctx))
+      authApplication.resolveApplicationSessionContext(optionalTrpcEntityManager(ctx), appContext(ctx))
     );
   }),
 
@@ -83,7 +83,11 @@ export const authRouter = t.router({
     .input(InviteInputSchema)
     .mutation(async ({ ctx, input }) => {
       return mapAppError(() =>
-        authApplication.createInvitation(requireTrpcEntityManager(ctx), appContext(ctx), input)
+        authApplication.createInvitation(
+          requireTrpcEntityManager(ctx, "OrgMember repository could not be resolved."),
+          appContext(ctx),
+          input,
+        )
       );
     }),
 

@@ -1,8 +1,30 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 
 import { randomUUID } from "node:crypto";
-import { ormSqlConnection } from "../orm-helpers.ts";
+import { appendEventOrm, ormSqlConnection } from "../orm-helpers.ts";
 import type { AppContext } from "../tasks/types.ts";
+
+export async function createProject(
+  em: EntityManager,
+  ctx: AppContext,
+  input: { slug: string; name: string; description?: string | null },
+): Promise<{ id: string }> {
+  const id = randomUUID();
+  await ormSqlConnection(em).execute(
+    `INSERT INTO projects (id, org_id, slug, name, description, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, now(), now())`,
+    [id, ctx.orgId, input.slug, input.name, input.description ?? null],
+  );
+  await appendEventOrm(em, {
+    orgId: ctx.orgId,
+    projectId: id,
+    actor: "system",
+    subjectKind: "project",
+    subjectId: id,
+    verb: "created",
+  });
+  return { id };
+}
 
 export async function updateProject(
   em: EntityManager,

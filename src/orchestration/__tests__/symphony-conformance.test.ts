@@ -28,7 +28,7 @@ import {
 } from "../symphony/tracker.ts";
 import { scanForStalledRuns } from "../symphony/stall.ts";
 import { sanitizeWorkspaceKey, workspaceRoot, createWorkspace, assertWorkspacePathInOrgRoot } from "../symphony/workspace.ts";
-import { tick, type TickDeps } from "../symphony/dispatch.ts";
+import { tick, validateRuntimeConfig, type TickDeps } from "../symphony/dispatch.ts";
 import {
   loadWorkflowRuntime,
   createWorkflowRuntimeReloader,
@@ -577,6 +577,74 @@ maxAttempts: 5
       expect(runtime.config.codex.command).toBe("codex app-server");
     });
 
+    test("REQUIRED: Linear tracker defaults are applied from SPEC 6.1", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      const wf = join(tmpDir, "WORKFLOW.md");
+      await writeFile(wf, "---\ntracker:\n  kind: linear\n---\nPrompt");
+      const runtime = await loadWorkflowRuntime({ cwd: tmpDir, env: {}, homeDir: "/home/user" });
+
+      expect(runtime.config.tracker).toMatchObject({
+        kind: "linear",
+        endpoint: "https://api.linear.app/graphql",
+        active_states: ["Todo", "In Progress"],
+        terminal_states: ["Closed", "Cancelled", "Canceled", "Duplicate", "Done"],
+      });
+    });
+
+    test("REQUIRED: default workspace.root uses system temp symphony_workspaces", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      const wf = join(tmpDir, "WORKFLOW.md");
+      await writeFile(wf, "---\n---\nPrompt");
+      const runtime = await loadWorkflowRuntime({ cwd: tmpDir, env: {}, homeDir: "/home/user" });
+
+      expect(runtime.config.workspace?.root).toBe(join(tmpdir(), "symphony_workspaces"));
+    });
+
+    test("REQUIRED: relative workspace.root resolves relative to WORKFLOW.md directory", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      const nested = join(tmpDir, "nested");
+      await mkdir(nested, { recursive: true });
+      const wf = join(nested, "WORKFLOW.md");
+      await writeFile(wf, "---\nworkspace:\n  root: ./worktrees\n---\nPrompt");
+      const runtime = await loadWorkflowRuntime({
+        workflowPath: wf,
+        cwd: tmpDir,
+        env: {},
+        homeDir: "/home/user",
+      });
+
+      expect(runtime.config.workspace?.root).toBe(join(nested, "worktrees"));
+    });
+
+    test("REQUIRED: hooks.timeout_ms defaults to 60000", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      const wf = join(tmpDir, "WORKFLOW.md");
+      await writeFile(wf, "---\n---\nPrompt");
+      const runtime = await loadWorkflowRuntime({ cwd: tmpDir, env: {}, homeDir: "/home/user" });
+
+      expect(runtime.config.hooks?.timeout_ms).toBe(60_000);
+    });
+
+    test("REQUIRED: invalid per-state concurrency entries are ignored and valid keys normalize", async () => {
+      tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
+      await mkdir(tmpDir, { recursive: true });
+      const wf = join(tmpDir, "WORKFLOW.md");
+      await writeFile(wf, `---
+agent:
+  max_concurrent_agents_by_state:
+    "In Progress": 2
+    Done: 0
+    Todo: "many"
+---
+Prompt`);
+      const runtime = await loadWorkflowRuntime({ cwd: tmpDir, env: {}, homeDir: "/home/user" });
+
+      expect(runtime.config.agent.max_concurrent_agents_by_state).toEqual({ "in progress": 2 });
+    });
+
     test("REQUIRED: $VAR env reference is resolved from env", async () => {
       tmpDir = join(tmpdir(), `sym-test-${randomUUID()}`);
       await mkdir(tmpDir, { recursive: true });
@@ -611,6 +679,28 @@ maxAttempts: 5
       await expect(
         loadWorkflowRuntime({ cwd: tmpDir, env: {}, homeDir: "/home/user" }),
       ).rejects.toThrow(WorkflowConfigError);
+    });
+
+    test("REQUIRED: dispatch preflight validates tracker and codex launch config", () => {
+      const validRuntimeConfig = {
+        ...DEFAULT_CONFIG,
+        tracker: {
+          kind: "linear",
+          api_key: "linear-token",
+          project_slug: "FUL",
+        },
+        codex: { command: "codex app-server" },
+      };
+
+      expect(() => validateRuntimeConfig(validRuntimeConfig)).not.toThrow();
+      expect(() => validateRuntimeConfig({ ...validRuntimeConfig, tracker: { ...validRuntimeConfig.tracker, kind: "" } }))
+        .toThrow(/tracker.kind/);
+      expect(() => validateRuntimeConfig({ ...validRuntimeConfig, tracker: { ...validRuntimeConfig.tracker, api_key: "" } }))
+        .toThrow(/tracker.api_key/);
+      expect(() => validateRuntimeConfig({ ...validRuntimeConfig, tracker: { ...validRuntimeConfig.tracker, project_slug: "" } }))
+        .toThrow(/tracker.project_slug/);
+      expect(() => validateRuntimeConfig({ ...validRuntimeConfig, codex: { command: "" } }))
+        .toThrow(/codex.command/);
     });
   });
 

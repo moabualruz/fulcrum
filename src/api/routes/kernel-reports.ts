@@ -3,7 +3,8 @@ import type { KernelReportApplication } from "../application.ts";
 import type { ApiEnv } from "../auth.ts";
 
 const ErrorResponse = z.object({ error: z.string() });
-const ReportResponse = z.object({ data: z.array(z.unknown()) });
+const JsonScalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const ReportResponse = z.object({ data: z.array(z.record(z.string(), JsonScalar)) });
 
 const burndownRoute = createRoute({
   method: "get",

@@ -9,15 +9,26 @@ interface ApplicationScopeLocals {
   userId?: string | null;
 }
 
-export async function requestAppScope(locals: ApplicationScopeLocals, projectId?: string | null) {
-  const em = locals.em;
+let testScopeOverride: ApplicationScopeLocals | null = null;
+
+export function __setApplicationScopeForTest(scope: ApplicationScopeLocals | null): () => void {
+  const previous = testScopeOverride;
+  testScopeOverride = scope;
+  return () => {
+    testScopeOverride = previous;
+  };
+}
+
+export async function requestAppScope(locals?: ApplicationScopeLocals, projectId?: string | null) {
+  const scope = locals?.em ? locals : testScopeOverride ?? locals;
+  const em = scope?.em;
   if (!em) throw error(500, "Application runtime unavailable");
-  const orgId = await resolveOrgId(em, locals.orgId);
+  const orgId = await resolveOrgId(em, scope?.orgId);
   return {
     em,
     ctx: {
       orgId,
-      userId: locals.userId ?? null,
+      userId: scope?.userId ?? null,
       projectId: projectId ?? null,
     },
   };

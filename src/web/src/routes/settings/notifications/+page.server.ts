@@ -1,32 +1,22 @@
 import type { PageServerLoad, Actions } from "./$types";
-import { openDatabase, getDefaultOrgId } from "$lib/server/db";
-import { getRetentionPolicy, upsertRetentionPolicy } from "$lib/server/audit";
+import { getRetentionPolicy, upsertRetentionPolicy } from "../../../../../application/audit/web-queries.ts";
+import { requestAppScope } from "$lib/server/application-scope";
 
-export const load: PageServerLoad = async () => {
-  const db = await openDatabase();
-  try {
-    const orgId = await getDefaultOrgId(db);
-    const policy = await getRetentionPolicy(db, orgId);
-    return {
-      retainDays: policy?.retain_days ?? 0,
-      saved: false,
-    };
-  } finally {
-    await db.close();
-  }
+export const load: PageServerLoad = async ({ locals }) => {
+  const { em, ctx } = await requestAppScope(locals);
+  const policy = await getRetentionPolicy(em, ctx.orgId);
+  return {
+    retainDays: policy?.retain_days ?? 0,
+    saved: false,
+  };
 };
 
 export const actions: Actions = {
-  retention: async ({ request }) => {
+  retention: async ({ request, locals }) => {
     const formData = await request.formData();
     const retainDays = parseInt(formData.get("retain_days")?.toString() ?? "0", 10);
-    const db = await openDatabase();
-    try {
-      const orgId = await getDefaultOrgId(db);
-      await upsertRetentionPolicy(db, orgId, isNaN(retainDays) ? 0 : retainDays);
-      return { retainDays: isNaN(retainDays) ? 0 : retainDays, saved: true };
-    } finally {
-      await db.close();
-    }
+    const { em, ctx } = await requestAppScope(locals);
+    await upsertRetentionPolicy(em, ctx.orgId, isNaN(retainDays) ? 0 : retainDays);
+    return { retainDays: isNaN(retainDays) ? 0 : retainDays, saved: true };
   },
 };

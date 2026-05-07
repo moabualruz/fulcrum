@@ -1,3 +1,5 @@
+import type { AgentRunOrchestrationState } from "../../db/entities/orchestration/AgentRun.ts";
+
 export interface AppContext {
   orgId: string;
   userId: string | null;
@@ -21,6 +23,12 @@ export interface RunDetailDto extends RunDto {
   endedAt: Date | null;
   transcriptPath: string | null;
   workspaceDiffPath: string | null;
+  orchestrationState: AgentRunOrchestrationState | null;
+  workspacePath: string | null;
+  renderedPrompt: string | null;
+  attemptCount: number;
+  nextRetryAt: Date | null;
+  lastErrorKind: string | null;
 }
 
 export interface DispatchRunInput {

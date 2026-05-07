@@ -112,6 +112,9 @@ export function createInferenceCommand(): Command {
   const generateCommand = command.command("generate");
   generateCommand.description("inference generate");
   generateCommand.option("--json", "Emit JSON output");
+  generateCommand.option("--options-max-tokens <number>", "options-max-tokens", Number.parseFloat);
+  generateCommand.option("--options-model <string>", "options-model");
+  generateCommand.option("--options-temperature <number>", "options-temperature", Number.parseFloat);
   generateCommand.option("--prompt <string>", "prompt");
   generateCommand.action(async (options) => {
     try {

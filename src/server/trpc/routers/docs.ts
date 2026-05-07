@@ -23,6 +23,8 @@ import {
 } from "../../../application/docs/queries.ts";
 import type { AppContext } from "../../../application/docs/types.ts";
 import { DocTypeEnum, ScopeEnum } from "../../../application/docs/types.ts";
+import { appErrorToTrpcError } from "../../../application/error-mapping.ts";
+import { AppError } from "../../../application/errors.ts";
 import { permissionedProcedure } from "../../../trpc/middleware.ts";
 import { t } from "../../../trpc/trpc.ts";
 import { docTemplatesRouter } from "./doc-templates.ts";
@@ -195,6 +197,15 @@ function appContext(ctx: { orgId: string; userId: string }): AppContext {
   return { orgId: ctx.orgId, userId: ctx.userId, projectId: null };
 }
 
+async function mapAppError<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AppError) throw appErrorToTrpcError(error);
+    throw error;
+  }
+}
+
 // ── Router (thin delegation layer) ─────────────────────────────────
 
 export const docsRouter = t.router({
@@ -204,7 +215,7 @@ export const docsRouter = t.router({
     .query(async ({ ctx, input }) => {
       const em = optionalEntityManager(ctx);
       if (!em) return [];
-      return listDocs(em, appContext(ctx), input ?? undefined);
+      return mapAppError(() => listDocs(em, appContext(ctx), input ?? undefined));
     }),
 
   get: permissionedProcedure({ resource: "docs", action: "get" })
@@ -213,28 +224,28 @@ export const docsRouter = t.router({
     .query(async ({ ctx, input }) => {
       const em = optionalEntityManager(ctx);
       if (!em) return null;
-      return getDoc(em, appContext(ctx), input);
+      return mapAppError(() => getDoc(em, appContext(ctx), input));
     }),
 
   create: permissionedProcedure({ resource: "docs", action: "create" })
     .input(CreateDocInputSchema)
     .output(DocOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      return createDoc(requireEntityManager(ctx), appContext(ctx), input);
+      return mapAppError(() => createDoc(requireEntityManager(ctx), appContext(ctx), input));
     }),
 
   update: permissionedProcedure({ resource: "docs", action: "update" })
     .input(UpdateDocInputSchema)
     .output(DocOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
-      return updateDoc(requireEntityManager(ctx), appContext(ctx), input);
+      return mapAppError(() => updateDoc(requireEntityManager(ctx), appContext(ctx), input));
     }),
 
   delete: permissionedProcedure({ resource: "docs", action: "delete" })
     .input(DeleteDocInputSchema)
     .output(z.union([DocOutputSchema, HardDeleteOutputSchema]).nullable())
     .mutation(async ({ ctx, input }) => {
-      return deleteDoc(requireEntityManager(ctx), appContext(ctx), input.id, input.hard);
+      return mapAppError(() => deleteDoc(requireEntityManager(ctx), appContext(ctx), input.id, input.hard));
     }),
 
   comments: t.router({
@@ -281,26 +292,28 @@ export const docsRouter = t.router({
       .input(VersionDocInputSchema)
       .output(z.array(VersionListOutputSchema))
       .query(async ({ ctx, input }) => {
-        return listDocVersions(requireEntityManager(ctx), appContext(ctx), input.docId);
+        return mapAppError(() => listDocVersions(requireEntityManager(ctx), appContext(ctx), input.docId));
       }),
 
     get: permissionedProcedure({ resource: "docs", action: "get" })
       .input(VersionGetInputSchema)
       .output(VersionOutputSchema.nullable())
       .query(async ({ ctx, input }) => {
-        return getDocVersion(requireEntityManager(ctx), appContext(ctx), input.docId, input.versionNum);
+        return mapAppError(() => getDocVersion(requireEntityManager(ctx), appContext(ctx), input.docId, input.versionNum));
       }),
 
     diff: permissionedProcedure({ resource: "docs", action: "diff" })
       .input(VersionDiffInputSchema)
       .output(VersionDiffOutputSchema)
       .query(async ({ ctx, input }) => {
-        return diffDocVersions(
-          requireEntityManager(ctx),
-          appContext(ctx),
-          input.docId,
-          input.fromVersionNum,
-          input.toVersionNum,
+        return mapAppError(() =>
+          diffDocVersions(
+            requireEntityManager(ctx),
+            appContext(ctx),
+            input.docId,
+            input.fromVersionNum,
+            input.toVersionNum,
+          )
         );
       }),
 
@@ -308,7 +321,7 @@ export const docsRouter = t.router({
       .input(VersionGetInputSchema)
       .output(DocOutputSchema)
       .mutation(async ({ ctx, input }) => {
-        return restoreDocVersion(requireEntityManager(ctx), appContext(ctx), input.docId, input.versionNum);
+        return mapAppError(() => restoreDocVersion(requireEntityManager(ctx), appContext(ctx), input.docId, input.versionNum));
       }),
   }),
 

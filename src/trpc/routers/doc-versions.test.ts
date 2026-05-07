@@ -33,6 +33,15 @@ function makeVersion(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function makeDocument(overrides: Record<string, unknown> = {}) {
+  return {
+    id: DOC_ID,
+    org: ORG_ID,
+    archived: false,
+    ...overrides,
+  };
+}
+
 /** Build a minimal tRPC caller for the docVersionsRouter with an injected mock em. */
 async function buildCaller(emOverrides: Record<string, unknown> = {}) {
   // Dynamic import to avoid top-level side-effects from the DB decorators
@@ -51,7 +60,7 @@ async function buildCaller(emOverrides: Record<string, unknown> = {}) {
   const ctx = {
     em: {
       find: async () => [],
-      findOne: async () => null,
+      findOne: async () => makeDocument(),
       create: (entity: string, data: Record<string, unknown>) => ({ ...data }),
       persistAndFlush: async () => undefined,
       flush: async () => undefined,

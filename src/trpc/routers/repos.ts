@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import * as repoApplication from "../../application/repos/trpc-adapter.ts";
 import type { AppContext } from "../../application/repos/types.ts";
-import { requireTrpcEntityManager, type TRPCContext } from "../context.ts";
+import { optionalTrpcEntityManager, requireTrpcEntityManager, type TRPCContext } from "../context.ts";
 import { permissionedProcedure } from "../middleware.ts";
 import { t } from "../trpc.ts";
 import {
@@ -49,7 +49,9 @@ export const reposRouter = t.router({
     .input(ListReposInputSchema)
     .output(z.array(RepoOutputSchema))
     .query(async ({ ctx, input }) => {
-      return repoApplication.listTrpcRepos(requireTrpcEntityManager(ctx), appContext(ctx), input);
+      const em = optionalTrpcEntityManager(ctx);
+      if (!em) return [];
+      return repoApplication.listTrpcRepos(em, appContext(ctx), input);
     }),
 
   get: permissionedProcedure({ resource: "repos", action: "get" })

@@ -20,7 +20,7 @@ import {
 } from "../../application/webhooks/queries.ts";
 import type { WebhookAppContext } from "../../application/webhooks/types.ts";
 import { FlagRegistry } from "../../flags/registry.ts";
-import { requireTrpcEntityManager, type TrpcContext } from "../context.ts";
+import { optionalTrpcEntityManager, requireTrpcEntityManager, type TrpcContext } from "../context.ts";
 import { permissionedProcedure } from "../middleware.ts";
 import {
   DeliveryOutputSchema,
@@ -88,8 +88,10 @@ const deliveriesRouter = t.router({
     .output(z.array(DeliveryOutputSchema))
     .query(async ({ ctx, input }) => {
       await assertOutboundWebhooksEnabled(ctx);
+      const em = optionalTrpcEntityManager(ctx);
+      if (!em) return [];
       return mapAppError(() =>
-        listWebhookDeliveries(requireTrpcEntityManager(ctx, "No database connection."), appContext(ctx), input)
+        listWebhookDeliveries(em, appContext(ctx), input)
       );
     }),
 
@@ -98,8 +100,10 @@ const deliveriesRouter = t.router({
     .output(DeliveryOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
       await assertOutboundWebhooksEnabled(ctx);
+      const em = optionalTrpcEntityManager(ctx);
+      if (!em) return null;
       return nullableNotFound(() =>
-        getWebhookDelivery(requireTrpcEntityManager(ctx, "No database connection."), appContext(ctx), input.id)
+        getWebhookDelivery(em, appContext(ctx), input.id)
       );
     }),
 });
@@ -110,8 +114,10 @@ export const webhooksRouter = t.router({
     .output(z.array(WebhookOutputSchema))
     .query(async ({ ctx }) => {
       await assertOutboundWebhooksEnabled(ctx);
+      const em = optionalTrpcEntityManager(ctx);
+      if (!em) return [];
       return mapAppError(() =>
-        listWebhooks(requireTrpcEntityManager(ctx, "No database connection."), appContext(ctx))
+        listWebhooks(em, appContext(ctx))
       );
     }),
 
@@ -120,8 +126,10 @@ export const webhooksRouter = t.router({
     .output(WebhookOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
       await assertOutboundWebhooksEnabled(ctx);
+      const em = optionalTrpcEntityManager(ctx);
+      if (!em) return null;
       return nullableNotFound(() =>
-        getWebhook(requireTrpcEntityManager(ctx, "No database connection."), appContext(ctx), input.id)
+        getWebhook(em, appContext(ctx), input.id)
       );
     }),
 

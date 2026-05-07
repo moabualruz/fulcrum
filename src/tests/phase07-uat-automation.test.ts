@@ -62,7 +62,7 @@ const CHECKPOINTS: UatCheckpoint[] = [
     layers: ["integration"],
     evidence: [
       { path: "src/api/__tests__/repos.api.test.ts", patterns: [/tRPC caller/, /queued status/, /404/] },
-      { path: "src/trpc/routers/repos.ts", patterns: [/syncRepo/, /statusRepo/, /repo\.sync/] },
+      { path: "src/trpc/routers/repos.ts", patterns: [/syncRepo/, /statusRepo/, /resource: "repos", action: "sync"/] },
     ],
   },
   {

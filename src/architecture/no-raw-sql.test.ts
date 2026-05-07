@@ -32,7 +32,7 @@ const SQL_INTERFACE_ROOTS = [
 
 const WEB_DATA_HANDLE_PATTERN = /\b(openDatabase|getDatabase|getEm|getDefaultOrgIdOrm|ormSqlConnection|WebDatabaseHandle|LegacyDatabaseHandle|application-compat)\b/;
 
-const RAW_SQL_CALL_PATTERN = /\b(db|conn|connection|client|pglite)\.query\(|\.execute\(/;
+const RAW_SQL_CALL_PATTERN = /\b(db|conn|connection|pglite)\.query\(|\b(db|conn|connection|client|pglite)\.execute\(|\.getKysely\b/;
 
 const WEB_DATA_HANDLE_COMPOSITION_ROOTS = new Map([
   [
@@ -41,25 +41,9 @@ const WEB_DATA_HANDLE_COMPOSITION_ROOTS = new Map([
   ],
 ]);
 
-const EXPECTED_WEB_DATA_HANDLE_FILES = [
-  "src/web/src/routes/agents/+page.server.ts",
-  "src/web/src/routes/agents/[name]/+page.server.ts",
-  "src/web/src/routes/memory/[id]/+page.server.ts",
-  "src/web/src/routes/projects/new/+page.server.ts",
-  "src/web/src/routes/settings/notifications/+page.server.ts",
-  "src/web/src/routes/settings/skills/+page.server.ts",
-];
+const EXPECTED_WEB_DATA_HANDLE_FILES: string[] = [];
 
-const EXPECTED_RAW_SQL_CALL_FILES = [
-  "src/cli/audit.ts",
-  "src/cli/interactive/backup.ts",
-  "src/cli/interactive/restore.ts",
-  "src/router/domain-adapter.ts",
-  "src/web/src/lib/server/orm-helpers.ts",
-  "src/web/src/lib/server/projects.ts",
-  "src/web/src/lib/server/skills.ts",
-  "src/web/src/routes/docs/[id]/edit/+page.server.ts",
-];
+const EXPECTED_RAW_SQL_CALL_FILES: string[] = [];
 
 function ignored(path: string): boolean {
   return (

@@ -5,22 +5,10 @@ import { error, fail } from "@sveltejs/kit";
 import { superValidate } from "sveltekit-superforms/server";
 import { valibot } from "sveltekit-superforms/adapters";
 import { DocumentFormSchema } from "../../../../lib/server/documents.schema.ts";
-import { updateDocumentAction } from "../../../../lib/server/documents.ts";
 import { requestAppScope } from "../../../../lib/server/application-scope.ts";
 import { parseLabels, serializeLabels } from "../../../../lib/markdown/labels.ts";
-import { createDocumentVersion, getNextVersionNumber } from "../../../../lib/server/doc-versions.ts";
-
-interface DocRow {
-  id: string;
-  org_id: string;
-  project_id: string | null;
-  kind: string;
-  title: string;
-  body: string;
-  content_json?: Record<string, unknown>;
-  frontmatter: Record<string, unknown>;
-  updated_at: Date | string;
-}
+import { AppNotFoundError } from "../../../../../../application/errors.ts";
+import { loadWebEditDoc, saveWebEditDoc } from "../../../../../../application/docs/web-edit.ts";
 
 interface LoadEvent {
   params: { id: string };
@@ -41,30 +29,8 @@ function extractLabels(fm: Record<string, unknown>): string[] {
 }
 
 export const load = async ({ params, locals }: LoadEvent) => {
-  const { em, ctx } = await requestAppScope(locals);
-  const orgId = ctx.orgId;
-  const rows = await em.getKysely<any>()
-    .selectFrom("documents")
-    .select(["id", "org_id", "project_id", "doc_type as kind", "title", "body_md as body", "content_json", "frontmatter", "updated_at"])
-    .where("id", "=", params.id)
-    .where("org_id", "=", orgId)
-    .execute() as DocRow[];
-  if (rows.length === 0) throw error(404, "Document not found");
-  const row = rows[0]!;
-  const doc = {
-    id: row.id,
-    org_id: row.org_id,
-    project_id: row.project_id,
-    kind: row.kind,
-    title: row.title,
-    body: row.body,
-    contentJson: row.content_json ?? {},
-    frontmatter: row.frontmatter ?? {},
-    updated_at:
-      row.updated_at instanceof Date
-        ? row.updated_at.toISOString()
-        : row.updated_at,
-  };
+  const scope = await requestAppScope(locals);
+  const doc = await loadWebEditDoc(scope, params.id).catch(mapNotFound);
   const form = await superValidate(
     {
       title: doc.title,
@@ -82,46 +48,19 @@ export const actions = {
   default: async ({ params, request, locals }: ActionEvent) => {
     const form = await superValidate(request, valibot(DocumentFormSchema));
     if (!form.valid) return fail(400, { form });
-    const { em, ctx } = await requestAppScope(locals);
-    const orgId = ctx.orgId;
-    // Re-read current frontmatter so non-form keys (e.g. `id`, `status`,
-    // anything 04.2's `readFrontmatterForm` would route to `rawFrontmatter`)
-    // survive the round-trip — issue 15 byte-stability follow-up depends
-    // on this.
-    const rows = await em.getKysely<any>()
-      .selectFrom("documents")
-      .select(["frontmatter"])
-      .where("id", "=", params.id)
-      .where("org_id", "=", orgId)
-      .execute() as Array<{ frontmatter: Record<string, unknown> }>;
-    if (rows.length === 0) throw error(404, "Document not found");
-    const rawFm = rows[0]?.frontmatter ?? {};
-    const labels = parseLabels(form.data.labels ?? "");
-    const mergedFm = {
-      ...rawFm,
-      title: form.data.title,
-      kind: form.data.kind,
-      labels,
-    };
-    await updateDocumentAction(em, {
+    const scope = await requestAppScope(locals);
+    await saveWebEditDoc(scope, {
       id: params.id!,
-      orgId,
       title: form.data.title,
       kind: form.data.kind,
+      labels: parseLabels(form.data.labels ?? ""),
       body: form.data.body,
-      frontmatter: mergedFm,
-    });
-    // Record version snapshot after save
-    const nextVer = await getNextVersionNumber(em, params.id!);
-    await createDocumentVersion(em, {
-      docId: params.id!,
-      orgId,
-      version: nextVer,
-      title: form.data.title,
-      body: form.data.body,
-      frontmatter: mergedFm,
-      author: "user",
-    });
+    }).catch(mapNotFound);
     return { form };
   },
 };
+
+function mapNotFound(errorValue: unknown): never {
+  if (errorValue instanceof AppNotFoundError) throw error(404, "Document not found");
+  throw errorValue;
+}

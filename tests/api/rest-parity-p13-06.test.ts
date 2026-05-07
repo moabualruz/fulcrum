@@ -38,6 +38,15 @@ function req(
   });
 }
 
+function appWithApplication(application: Record<string, unknown>) {
+  return createPublicApiRouter({
+    apiAuth: {
+      findApiKeyByHash: async () => ({ org_id: ORG_ID, user_id: "user-1" }),
+    },
+    application: application as never,
+  });
+}
+
 describe("P13#06 — REST parity (search / notify / audit / runs / artifacts / repos)", () => {
   let originalFeatures: string | undefined;
 
@@ -64,19 +73,26 @@ describe("P13#06 — REST parity (search / notify / audit / runs / artifacts / r
 
   // ── search ─────────────────────────────────────────────────────────────────
   it("GET /api/v1/search?q=foo → 200 + SearchResult[]", async () => {
-    const app = createPublicApiRouter();
+    const app = appWithApplication({
+      search: {
+        query: async () => [{ kind: "task", id: "task-1", title: "Task", snippet: "foo", rank: 1 }],
+      },
+    });
     const res = await app.fetch(req("GET", "/api/v1/search?q=foo"));
     expect(res.status).toBe(200);
     const body = await res.json() as unknown[];
     expect(Array.isArray(body)).toBe(true);
   });
 
-  it("GET /api/v1/search?q=stub → results contain kind/id/title/snippet", async () => {
-    const app = createPublicApiRouter();
-    const res = await app.fetch(req("GET", "/api/v1/search?q=stub"));
+  it("GET /api/v1/search delegates to injected search facade", async () => {
+    const app = appWithApplication({
+      search: {
+        query: async () => [{ kind: "task", id: "task-1", title: "Task", snippet: "facade result", rank: 1 }],
+      },
+    });
+    const res = await app.fetch(req("GET", "/api/v1/search?q=facade"));
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>[];
-    // stub store has at least one result matching "stub"
     expect(body.length).toBeGreaterThan(0);
     const first = body[0];
     expect(first).toHaveProperty("kind");
@@ -86,7 +102,12 @@ describe("P13#06 — REST parity (search / notify / audit / runs / artifacts / r
   });
 
   it("GET /api/v1/search?q=foo&kind=task → 200 filtered", async () => {
-    const app = createPublicApiRouter();
+    const app = appWithApplication({
+      search: {
+        query: async (input: { kind?: string }) =>
+          input.kind === "task" ? [{ kind: "task", id: "task-1", title: "Task", snippet: "foo", rank: 1 }] : [],
+      },
+    });
     const res = await app.fetch(req("GET", "/api/v1/search?q=foo&kind=task"));
     expect(res.status).toBe(200);
     const body = await res.json() as unknown[];
@@ -170,15 +191,35 @@ describe("P13#06 — REST parity (search / notify / audit / runs / artifacts / r
 
   // ── notifications ──────────────────────────────────────────────────────────
   it("GET /api/v1/notifications → 200 + Notification[]", async () => {
-    const app = createPublicApiRouter();
+    const app = appWithApplication({
+      notifications: {
+        listNotifications: async () => ({
+          data: [{
+            id: NOTIF_ID,
+            orgId: ORG_ID,
+            userId: "user-1",
+            kind: "mention",
+            title: "Mention",
+            read: false,
+            createdAt: "2026-01-20T10:00:00.000Z",
+          }],
+        }),
+        markRead: async () => ({ ok: true }),
+      },
+    });
     const res = await app.fetch(req("GET", "/api/v1/notifications"));
     expect(res.status).toBe(200);
-    const body = await res.json() as unknown[];
-    expect(Array.isArray(body)).toBe(true);
+    const body = await res.json() as { data: unknown[] };
+    expect(Array.isArray(body.data)).toBe(true);
   });
 
   it("PATCH /api/v1/notifications/:id/mark-read → 204", async () => {
-    const app = createPublicApiRouter();
+    const app = appWithApplication({
+      notifications: {
+        listNotifications: async () => ({ data: [] }),
+        markRead: async ({ id }: { id: string }) => id === NOTIF_ID ? { ok: true } : null,
+      },
+    });
     const res = await app.fetch(
       req("PATCH", `/api/v1/notifications/${NOTIF_ID}/mark-read`),
     );
@@ -186,7 +227,12 @@ describe("P13#06 — REST parity (search / notify / audit / runs / artifacts / r
   });
 
   it("PATCH /api/v1/notifications/:id/mark-read → 404 on unknown ID", async () => {
-    const app = createPublicApiRouter();
+    const app = appWithApplication({
+      notifications: {
+        listNotifications: async () => ({ data: [] }),
+        markRead: async () => null,
+      },
+    });
     const res = await app.fetch(
       req("PATCH", "/api/v1/notifications/00000000-0000-0000-0000-000000000000/mark-read"),
     );

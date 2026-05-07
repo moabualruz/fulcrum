@@ -21,7 +21,7 @@ const AuditQueryParams = z.object({
   offset: z.coerce.number().int().min(0).optional(),
 });
 const AuditListResponse = z.object({
-  data: z.array(z.unknown()),
+  data: z.array(z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))),
   total: z.number().int().nonnegative(),
 });
 

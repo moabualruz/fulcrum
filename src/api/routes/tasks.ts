@@ -5,11 +5,13 @@
  * Auth: Bearer token format "test-jwt:<orgId>" (real JWT in production).
  * Error mapping: orgId mismatch → 403, unknown ID → 404.
  *
- * WHY spec seed: real application routes are mounted when runtime deps are present; this route keeps static OpenAPI generation deterministic.
+ * Runtime task routes are mounted from the application-backed kernel adapter when deps are present.
  */
 
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
-import { CsvValidationError, exportTasksCsv, importTasksCsv } from "../../connectors/csv.ts";
+import { appErrorToHttpResponse } from "../../application/error-mapping.ts";
+import { AppInvariantError } from "../../application/errors.ts";
+import { CsvValidationError, createTaskCsvApplication } from "../../application/tasks/csv.ts";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -69,34 +71,6 @@ const ImportCsvResultSchema = z
     })),
   })
   .openapi("ImportCsvResult");
-
-// ── Static OpenAPI seed data ─────────────────────────────────────────────────
-
-const FIXED_ORG = "11111111-1111-4111-8111-111111111111";
-
-/** Factory — each call returns a fresh Map so tests don't share state. */
-function createFallbackStore(): Map<string, z.infer<typeof TaskSchema>> {
-  return new Map([
-    [
-      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      {
-        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        orgId: FIXED_ORG,
-        title: "Seed task",
-        status: "todo" as const,
-        createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
-      },
-    ],
-  ]);
-}
-
-/** Extract orgId from test JWT; in production a real JWT verifier replaces this. */
-function extractOrgId(auth: string | null): string | null {
-  if (!auth) return null;
-  const token = auth.replace(/^Bearer\s+/, "");
-  if (token.startsWith("test-jwt:")) return token.slice("test-jwt:".length);
-  return null; // real JWT path: decode + verify
-}
 
 function isFeatureEnabled(flag: string): boolean {
   return (process.env["FULCRUM_FEATURES"] ?? "")
@@ -196,87 +170,58 @@ const importCsvRoute = createRoute({
   responses: {
     200: { content: { "application/json": { schema: ImportCsvResultSchema } }, description: "Import result" },
     403: { content: { "application/json": { schema: ErrorSchema } }, description: "Feature disabled" },
-    422: { content: { "application/json": { schema: z.object({ error: z.unknown() }) } }, description: "Invalid CSV" },
+    422: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            error: z.object({
+              code: z.string(),
+              columns: z.array(z.string()).optional(),
+            }),
+          }),
+        },
+      },
+      description: "Invalid CSV",
+    },
   },
 });
 
 // ── Router factory ───────────────────────────────────────────────────────────
 
 export function registerTaskRoutes(api: OpenAPIHono): void {
-  // Fresh store per registration — each createPublicApi() call is isolated.
-  const store = createFallbackStore();
+  const csvApplication = createTaskCsvApplication();
 
   api.openapi(listRoute, (c) => {
-    return c.json([...store.values()], 200);
+    return applicationRequired(c);
   });
 
-  api.openapi(createRoute_, async (c) => {
-    const body = c.req.valid("json");
-    const task: z.infer<typeof TaskSchema> = {
-      id: crypto.randomUUID(),
-      orgId: body.orgId,
-      title: body.title,
-      status: body.status,
-      createdAt: new Date().toISOString(),
-    };
-    store.set(task.id, task);
-    return c.json(task, 201);
+  api.openapi(createRoute_, (c) => {
+    return applicationRequired(c);
   });
 
   api.openapi(getRoute, (c) => {
-    const { id } = c.req.valid("param");
-    const callerOrg = extractOrgId(c.req.header("Authorization") ?? null);
-    const task = store.get(id);
-    if (!task) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
-    if (callerOrg !== task.orgId) return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
-    return c.json(task, 200);
+    return applicationRequired(c);
   });
 
-  api.openapi(patchRoute, async (c) => {
-    const { id } = c.req.valid("param");
-    const callerOrg = extractOrgId(c.req.header("Authorization") ?? null);
-    const task = store.get(id);
-    if (!task) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
-    if (callerOrg !== task.orgId) return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
-    const patch = c.req.valid("json");
-    const updated = { ...task, ...patch };
-    store.set(id, updated);
-    return c.json(updated, 200);
+  api.openapi(patchRoute, (c) => {
+    return applicationRequired(c);
   });
 
   api.openapi(deleteRoute, (c) => {
-    const { id } = c.req.valid("param");
-    const callerOrg = extractOrgId(c.req.header("Authorization") ?? null);
-    const task = store.get(id);
-    if (!task) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
-    if (callerOrg !== task.orgId) return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
-    store.delete(id);
-    return new Response(null, { status: 204 });
+    return applicationRequired(c);
   });
 
-  api.openapi(exportCsvRoute, (c) => {
+  api.openapi(exportCsvRoute, async (c) => {
     if (!isFeatureEnabled("export-csv")) {
       return c.json({ error: "Feature disabled", code: "FEATURE_DISABLED" }, 403);
     }
-
-    const { projectId } = c.req.valid("query");
-    const csv = exportTasksCsv(
-      [...store.values()]
-        .filter((task) => task.orgId === projectId)
-        .map((task) => ({
-          id: task.id,
-          externalId: task.externalId,
-          title: task.title,
-          status: task.status,
-          createdAt: task.createdAt,
-        })),
-    );
-
+    const query = c.req.valid("query");
+    const csv = await csvApplication.exportTasks({ projectId: query.projectId });
     return new Response(csv, {
       status: 200,
       headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": "attachment; filename=\"tasks.csv\"",
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": "attachment; filename=\"tasks.csv\"",
       },
     });
   });
@@ -285,27 +230,9 @@ export function registerTaskRoutes(api: OpenAPIHono): void {
     if (!isFeatureEnabled("import-csv")) {
       return c.json({ error: "Feature disabled", code: "FEATURE_DISABLED" }, 403);
     }
-
     const body = c.req.valid("json");
     try {
-      const result = importTasksCsv(
-        body.csv,
-        ({ externalId, title, status }) => {
-          const parsedStatus = TaskStatusSchema.safeParse(status);
-          const task: z.infer<typeof TaskSchema> = {
-            id: crypto.randomUUID(),
-            orgId: body.projectId,
-            externalId,
-            title,
-            status: parsedStatus.success ? parsedStatus.data : "todo",
-            createdAt: new Date().toISOString(),
-          };
-          store.set(task.id, task);
-        },
-        (externalId) => [...store.values()].some((task) =>
-          task.orgId === body.projectId && task.externalId === externalId
-        ),
-      );
+      const result = await csvApplication.importTasks({ projectId: body.projectId, csv: body.csv });
       return c.json(result, 200);
     } catch (error) {
       if (error instanceof CsvValidationError) {
@@ -314,4 +241,9 @@ export function registerTaskRoutes(api: OpenAPIHono): void {
       throw error;
     }
   });
+}
+
+function applicationRequired(c: any): any {
+  const mapped = appErrorToHttpResponse(new AppInvariantError("Application-backed REST task route is required."));
+  return c.json(mapped.body, mapped.status as never);
 }

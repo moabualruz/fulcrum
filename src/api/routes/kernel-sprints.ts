@@ -8,7 +8,8 @@ import type { KernelSprintApplication } from "../application.ts";
 import type { ApiEnv } from "../auth.ts";
 
 const ErrorResponse = z.object({ error: z.string() });
-const SprintListResponse = z.object({ data: z.array(z.unknown()) });
+const JsonScalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const SprintListResponse = z.object({ data: z.array(z.record(z.string(), JsonScalar)) });
 
 const listSprintsRoute = createRoute({
   method: "get",

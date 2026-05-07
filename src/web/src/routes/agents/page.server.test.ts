@@ -47,17 +47,17 @@ const FAKE_PROFILES = [
 ];
 
 beforeEach(() => {
-  mock.module("$lib/server/db", () => ({
-    openIsolatedStore: async () => ({
-      query: async (sql: string) => {
-        if (sql.includes("agent_profiles")) return FAKE_PROFILES;
-        if (sql.includes("FROM projects")) return [];
-        if (sql.includes("FROM tasks")) return [];
-        return [];
-      },
-      close: async () => {},
+  mock.module("$lib/server/application-scope", () => ({
+    requestAppScope: async () => ({ em: {} as never, ctx: { orgId: "org1", userId: null, projectId: null } }),
+  }));
+  mock.module("../../../../application/agents/queries.ts", () => ({
+    listAgentProfilesPageData: async () => ({
+      profiles: FAKE_PROFILES.map(maskProfileForTest),
+      projects: [],
+      tasks: [],
     }),
-    getDefaultOrgId: async () => "org1",
+    maskProfile: maskProfileForTest,
+    testProfile: async () => ({ test_passed: true }),
   }));
 });
 
@@ -83,12 +83,10 @@ describe("/agents +page.server.ts", () => {
   });
 
   test("load returns empty array when no profiles", async () => {
-    mock.module("$lib/server/db", () => ({
-      openIsolatedStore: async () => ({
-        query: async () => [],
-        close: async () => {},
-      }),
-      getDefaultOrgId: async () => "org1",
+    mock.module("../../../../application/agents/queries.ts", () => ({
+      listAgentProfilesPageData: async () => ({ profiles: [], projects: [], tasks: [] }),
+      maskProfile: maskProfileForTest,
+      testProfile: async () => ({ test_passed: true }),
     }));
 
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
@@ -137,3 +135,24 @@ describe("/agents +page.server.ts", () => {
     expect(masked.capabilities).toContain("code");
   });
 });
+
+function maskProfileForTest(row: (typeof FAKE_PROFILES)[number]) {
+  const auth_env: Record<string, string> = {};
+  for (const entry of row.auth_env_vars) {
+    const [key, value = ""] = entry.split("=");
+    auth_env[key!] = value.length > 4 ? `****${value.slice(-4)}` : "****";
+  }
+  const capabilities = row.name.includes("claude") || row.name.includes("codex")
+    ? ["LLM", "code"]
+    : ["general"];
+  return {
+    id: row.id,
+    name: row.name,
+    cli_path: row.cli_path,
+    capabilities,
+    sessions_count: 0,
+    tested_at: row.last_tested_at,
+    test_passed: row.test_passed,
+    auth_env,
+  };
+}

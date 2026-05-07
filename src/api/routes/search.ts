@@ -51,6 +51,17 @@ const searchRoute = createRoute({
   },
 });
 
+type SearchFacade = {
+  query(input: {
+    q: string;
+    orgId?: string;
+    kind?: z.infer<typeof SearchKindSchema>;
+    projectId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<unknown>;
+};
+
 export function registerSearchRoutes(api: OpenAPIHono): void {
   api.openapi(searchRoute, async (c) => {
     const { q, kind, project, limit, offset } = c.req.valid("query");
@@ -66,7 +77,21 @@ export function registerSearchRoutes(api: OpenAPIHono): void {
     }
 
     return await mapHttpError(c, async () => {
-      const hits = await searchDocuments(resolveEntityManager(c), q, {
+      const em = optionalEntityManager(c);
+      const searchFacade = getSearchFacade(c);
+      if (searchFacade) {
+        const results = await searchFacade.query({
+          q,
+          orgId,
+          kind,
+          projectId: project ?? undefined,
+          limit: limit ?? 20,
+          offset: offset ?? 0,
+        });
+        return c.json(z.array(SearchResultSchema).parse(toJsonDates(results)), 200);
+      }
+      if (!em) throw new AppInvariantError("Application-backed REST search route is required.");
+      const hits = await searchDocuments(em, q, {
         orgId,
         projectId: project ?? undefined,
         sourceKinds: kind ? [kind] : undefined,
@@ -84,12 +109,21 @@ export function registerSearchRoutes(api: OpenAPIHono): void {
   });
 }
 
+function getSearchFacade(c: { get(key: string): unknown }): SearchFacade | undefined {
+  const application = c.get("application") as { search?: SearchFacade } | undefined;
+  return application?.search;
+}
+
+function toJsonDates(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value));
+}
+
 function orgIdFromAuthorization(header: string | undefined): string | undefined {
   if (!header?.startsWith("Bearer test-jwt:")) return undefined;
   return header.slice("Bearer test-jwt:".length);
 }
 
-function resolveEntityManager(c: { get(key: string): unknown }): EntityManager {
+function optionalEntityManager(c: { get(key: string): unknown }): EntityManager | null {
   const db = c.get("db");
   if (db && typeof db === "object" && "transactional" in db) return db as EntityManager;
   if (db && typeof db === "object" && "em" in db) {
@@ -98,7 +132,7 @@ function resolveEntityManager(c: { get(key: string): unknown }): EntityManager {
       return entityManager as EntityManager;
     }
   }
-  throw new AppInvariantError("EntityManager could not be resolved.");
+  return null;
 }
 
 async function mapHttpError(c: any, fn: () => Promise<Response>): Promise<Response> {

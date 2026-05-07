@@ -18,20 +18,16 @@ import {
 } from "@mikro-orm/decorators/es";
 import { Org } from "../auth/Org.ts";
 import { RoutingRuleRepository } from "../../repositories/router/RoutingRuleRepository.ts";
-
-export enum RoutingRuleSource {
-  Manual = "manual",
-  Learned = "learned",
-  Imported = "imported",
-}
-
-export const ROUTING_RULE_SOURCES = [
-  RoutingRuleSource.Manual,
-  RoutingRuleSource.Learned,
-  RoutingRuleSource.Imported,
-] as const;
-
-export type RoutingConditions = Record<string, unknown>;
+import {
+  ROUTING_RULE_SOURCES,
+  RoutingRuleSource,
+  type RoutingConditions,
+} from "../../../domain/routing/types.ts";
+export {
+  ROUTING_RULE_SOURCES,
+  RoutingRuleSource,
+  type RoutingConditions,
+} from "../../../domain/routing/types.ts";
 
 @Entity({ tableName: "routing_rules", repository: () => RoutingRuleRepository })
 @Index({

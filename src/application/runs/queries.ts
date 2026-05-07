@@ -33,6 +33,12 @@ export async function getRunDetail(em: EntityManager, ctx: AppContext, id: strin
     endedAt: null,
     transcriptPath: run.transcriptPath ?? null,
     workspaceDiffPath: run.workspaceDiffPath ?? null,
+    orchestrationState: run.orchestrationState ?? null,
+    workspacePath: run.workspacePath ?? null,
+    renderedPrompt: null,
+    attemptCount: run.attemptCount,
+    nextRetryAt: run.nextRetryAt ?? null,
+    lastErrorKind: run.lastErrorKind ?? null,
   };
 }
 
