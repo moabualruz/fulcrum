@@ -20,13 +20,9 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { platform } from "node:os";
 import { TRPCError } from "@trpc/server";
-import { Container } from "@needle-di/core";
-import { MikroORM, type EntityManager } from "@mikro-orm/postgresql";
-import type { Session as BetterAuthSession } from "better-auth";
-import {
-  ENTITY_MANAGER_TOKEN,
-  registerDbBindings,
-} from "../../db/db.module.ts";
+import type { Container } from "@needle-di/core";
+
+import { createLocalCaller } from "../local-caller.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -473,39 +469,10 @@ async function writeCronEntry(opts: SkillsRunOptions): Promise<void> {
 
 async function resolveCaller(opts: SkillsRunOptions): Promise<SkillsCaller> {
   if (opts.caller) return opts.caller;
-
-  const { t } = await import("../../trpc/trpc.ts");
-  const { appRouter } = await import("../../trpc/router.ts");
-  const { createContext } = await import("../../trpc/context.ts");
-
-  const cliContext = buildCliContext(opts.container ?? null);
-  const { container, em } = cliContext;
-  const session = await resolveActiveCliSession(em);
-  if (!session) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "No active CLI session. Run `fulcrum init` or `fulcrum auth login` first.",
-    });
-  }
-
-  const orgId = session.activeOrganizationId ?? session.orgId;
-  const userId = session.userId;
-  if (!orgId || !userId) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "Active CLI session missing orgId or userId. Re-authenticate.",
-    });
-  }
-
-  const ctx = createContext({
-    session: session as unknown as BetterAuthSession,
-    orgId,
-    userId,
-    em,
-    container,
+  const caller = await createLocalCaller({
+    container: opts.container,
+    requireSession: true,
   });
-  const factory = t.createCallerFactory(appRouter);
-  const caller = factory(ctx);
   return {
     list: () => caller.fulcrum_skills.list(),
     install: (input) => caller.fulcrum_skills.install(input),
@@ -514,63 +481,6 @@ async function resolveCaller(opts: SkillsRunOptions): Promise<SkillsCaller> {
     sync: (input) => caller.fulcrum_skills.sync(input),
     resolveConflict: (input) => caller.fulcrum_skills.resolveConflict(input),
   };
-}
-
-function buildCliContext(container: Container | null): { container: Container | null; em: EntityManager | null } {
-  if (!container) return { container: null, em: null };
-
-  try {
-    const orm = container.get(MikroORM);
-    const em = container.get(ENTITY_MANAGER_TOKEN).fork();
-    const requestContainer = new Container();
-    requestContainer.bind({ provide: MikroORM, useValue: orm });
-    registerDbBindings(requestContainer, orm, em);
-    return { container: requestContainer, em };
-  } catch {
-    return { container, em: null };
-  }
-}
-
-async function resolveActiveCliSession(em: EntityManager | null): Promise<{
-  id: string;
-  token: string;
-  userId: string;
-  orgId: string;
-  activeOrganizationId: string;
-  expiresAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
-  ipAddress: string | null;
-  userAgent: string | null;
-} | null> {
-  if (!em) return null;
-
-  const { Session } = await import("../../db/entities/auth/Session.ts");
-  const now = new Date();
-
-  try {
-    const session = await em.findOne(
-      Session,
-      { expiresAt: { $gt: now } },
-      { orderBy: { createdAt: "DESC" } },
-    );
-    if (!session) return null;
-
-    return {
-      id: session.id,
-      token: session.id,
-      userId: session.userId,
-      orgId: session.orgId,
-      activeOrganizationId: session.activeOrganizationId ?? session.orgId,
-      expiresAt: session.expiresAt,
-      createdAt: session.createdAt,
-      updatedAt: session.createdAt,
-      ipAddress: session.ipAddress ?? null,
-      userAgent: session.userAgent ?? "fulcrum-cli",
-    };
-  } catch {
-    return null;
-  }
 }
 
 // ---------------------------------------------------------------------------

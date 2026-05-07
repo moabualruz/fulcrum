@@ -1,14 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { TRPCError } from "@trpc/server";
-import { Container } from "@needle-di/core";
-import { MikroORM, type EntityManager } from "@mikro-orm/postgresql";
-import type { Session as BetterAuthSession } from "better-auth";
+import type { Container } from "@needle-di/core";
 
-import {
-  ENTITY_MANAGER_TOKEN,
-  registerDbBindings,
-} from "../../db/db.module.ts";
-import { Session } from "../../db/entities/auth/Session.ts";
+import { createLocalCaller } from "../local-caller.ts";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -470,84 +464,8 @@ async function withErrors(
 
 async function resolveCaller(opts: RoutingRunOptions): Promise<RoutingCaller> {
   if (opts.caller) return opts.caller;
-
-  const { t } = await import("../../trpc/trpc.ts");
-  const { appRouter } = await import("../../trpc/router.ts");
-  const { createContext } = await import("../../trpc/context.ts");
-
-  const cliContext = buildCliContext(opts.container ?? null);
-  const { container, em } = cliContext;
-  const session = await resolveActiveCliSession(em);
-  if (!session) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "No active CLI session found. Run `fulcrum init` or `fulcrum auth login` before routing commands.",
-    });
-  }
-
-  const orgId = stringValue(session.activeOrganizationId ?? session.orgId);
-  const userId = stringValue(session.userId);
-  if (!orgId || !userId) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "Active CLI session is missing orgId or userId. Re-authenticate.",
-    });
-  }
-
-  const ctx = createContext({
-    session: session as unknown as BetterAuthSession,
-    orgId,
-    userId,
-    em,
-    container,
-  });
-  const factory = t.createCallerFactory(appRouter);
-  return factory(ctx) as unknown as RoutingCaller;
-}
-
-function buildCliContext(container: Container | null): { container: Container; em: EntityManager } {
-  if (container) {
-    try {
-      const orm = container.get(MikroORM);
-      const em = container.get(ENTITY_MANAGER_TOKEN).fork();
-      const requestContainer = new Container();
-      requestContainer.bind({ provide: MikroORM, useValue: orm });
-      registerDbBindings(requestContainer, orm, em);
-      return { container: requestContainer, em };
-    } catch {
-      const orm = container.get(MikroORM);
-      registerDbBindings(container, orm);
-      return { container, em: container.get(ENTITY_MANAGER_TOKEN).fork() };
-    }
-  }
-
-  throw new TRPCError({
-    code: "INTERNAL_SERVER_ERROR",
-    message: "Routing commands require an initialized CLI container.",
-  });
-}
-
-async function resolveActiveCliSession(em: EntityManager): Promise<Record<string, unknown> | null> {
-  const session = await em.findOne(
-    Session,
-    { expiresAt: { $gt: new Date() } },
-    { orderBy: { createdAt: "DESC" } },
-  );
-  if (!session) return null;
-  return {
-    id: session.id,
-    token: session.id,
-    userId: session.userId,
-    orgId: session.orgId,
-    activeOrganizationId: session.activeOrganizationId ?? session.orgId,
-    expiresAt: session.expiresAt,
-    createdAt: session.createdAt,
-    updatedAt: session.createdAt,
-    ipAddress: session.ipAddress ?? null,
-    userAgent: session.userAgent ?? "fulcrum-cli",
-  };
-}
-
-function stringValue(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
+  return await createLocalCaller({
+    container: opts.container,
+    requireSession: true,
+  }) as unknown as RoutingCaller;
 }
