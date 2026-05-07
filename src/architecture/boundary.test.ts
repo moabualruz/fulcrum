@@ -106,8 +106,6 @@ const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES = [
   "src/server/trpc/routers/tasks.ts",
   "src/trpc/routers/repos.ts",
   "src/trpc/routers/webhooks.ts",
-  "src/tui/index.ts",
-  "src/tui/telemetry.ts",
   "src/web/src/lib/components/docs/frontmatter-ui.ts",
   "src/web/src/lib/server/em.ts",
 ];

@@ -34,9 +34,31 @@ export class Job {
   @ManyToOne(() => Org, { fieldName: "org_id", nullable: false })
   org!: Org;
 
+  @Property({ type: "uuid", fieldName: "project_id", nullable: true })
+  projectId?: string | null = null;
+
+  @Property({ type: "string", default: "default" })
+  queue: string = "default";
+
+  @Property({ type: "string", default: "generic" })
+  kind: string = "generic";
+
+  @Property({ type: "json", defaultRaw: "'{}'::jsonb" })
+  payload: Record<string, unknown> = {};
+
   /** Lifecycle: "pending" | "running" | "succeeded" | "failed" (set by Pillar 12). */
   @Property({ type: "string" })
   status: string = "pending";
+
+  @Property({ type: "integer", fieldName: "max_attempts", default: 3 })
+  maxAttempts: number = 3;
+
+  @Property({
+    type: "datetime",
+    fieldName: "available_at",
+    defaultRaw: "now()",
+  })
+  availableAt!: Date;
 
   /** When the job is eligible to run. */
   @Property({
