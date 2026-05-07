@@ -44,10 +44,13 @@ describe("Plan 28 tRPC adapter extraction", () => {
     const listRecurrenceRules = mock(async () => [{ id: RULE_ID }]);
     const createRecurrenceRule = mock(async () => ({ id: RULE_ID }));
     const { __setRecurrenceApplicationForTest, recurrenceRouter } = await import("./recurrence.ts");
-    restore = __setRecurrenceApplicationForTest({ listRecurrenceRules, createRecurrenceRule });
+    restore = __setRecurrenceApplicationForTest({
+      listRecurrenceRules: listRecurrenceRules as never,
+      createRecurrenceRule: createRecurrenceRule as never,
+    });
     const caller = t.createCallerFactory(recurrenceRouter)(ctx());
 
-    await expect(caller.list({ taskId: TASK_ID })).resolves.toEqual([{ id: RULE_ID }]);
+    await expect(caller.list({ taskId: TASK_ID })).resolves.toEqual([{ id: RULE_ID }] as never);
     await caller.create({ taskId: TASK_ID, triggerType: "schedule", intervalDays: 7 });
 
     expect(listRecurrenceRules).toHaveBeenCalledWith(em, { orgId: ORG_ID, userId: USER_ID }, TASK_ID);
@@ -67,11 +70,14 @@ describe("Plan 28 tRPC adapter extraction", () => {
     const createRelationship = mock(async () => ({ id: RELATIONSHIP_ID }));
     const listRelationshipsForTask = mock(async () => [{ id: RELATIONSHIP_ID }]);
     const { __setRelationshipsApplicationForTest, relationshipsRouter } = await import("./relationships.ts");
-    restore = __setRelationshipsApplicationForTest({ createRelationship, listRelationshipsForTask });
+    restore = __setRelationshipsApplicationForTest({
+      createRelationship: createRelationship as never,
+      listRelationshipsForTask: listRelationshipsForTask as never,
+    });
     const caller = t.createCallerFactory(relationshipsRouter)(ctx());
 
     await caller.create({ sourceTaskId: TASK_ID, targetTaskId: RULE_ID, type: "blocks" });
-    await expect(caller.listForTask({ taskId: TASK_ID })).resolves.toEqual([{ id: RELATIONSHIP_ID }]);
+    await expect(caller.listForTask({ taskId: TASK_ID })).resolves.toEqual([{ id: RELATIONSHIP_ID }] as never);
 
     expect(createRelationship).toHaveBeenCalledWith(em, { orgId: ORG_ID, userId: USER_ID }, {
       sourceTaskId: TASK_ID,
@@ -84,9 +90,9 @@ describe("Plan 28 tRPC adapter extraction", () => {
 
   test("import/export router delegates manifest work to application commands", async () => {
     const createExportManifest = mock(async () => ({
-      format: "fulcrum.json-export.v1",
+      format: "fulcrum.json-export.v1" as const,
       manifest: {
-        schema_version: 1,
+        schema_version: 1 as const,
         fulcrum_version: "0.1.0",
         exported_at: "2026-05-07T00:00:00.000Z",
         counts: { tasks: 1 },
@@ -95,7 +101,7 @@ describe("Plan 28 tRPC adapter extraction", () => {
       tasks: [{ id: TASK_ID }],
     }));
     const { __setImportExportApplicationForTest, dataExportRouter } = await import("./json-import-export.ts");
-    restore = __setImportExportApplicationForTest({ createExportManifest });
+    restore = __setImportExportApplicationForTest({ createExportManifest: createExportManifest as never });
     const caller = t.createCallerFactory(dataExportRouter)(ctx());
 
     const result = await caller.create({ pretty: true });
