@@ -1,7 +1,10 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 
+import { DocVersion } from "../../db/entities/docs/DocVersion.ts";
+import { reconstructDocVersion } from "../../docs/version-reconstructor.ts";
 import { DocService } from "../../services/DocService.ts";
-import { AppValidationError } from "../errors.ts";
+import { AppNotFoundError, AppValidationError } from "../errors.ts";
+import { getDocVersionById } from "./queries.ts";
 import type {
   AppContext,
   CreateDocCommentInput,
@@ -70,6 +73,44 @@ export async function restoreDocVersion(
   versionNum: number,
 ): Promise<DocDto> {
   return new DocService(em).restoreVersion(requiredUserContext(ctx), docId, versionNum);
+}
+
+export async function restoreDocVersionById(
+  em: EntityManager,
+  ctx: AppContext,
+  docId: string,
+  versionId: string,
+): Promise<{ id: string; versionNum: number; restoredFromVersionId: string }> {
+  const target = await getDocVersionById(em, ctx, docId, versionId);
+  if (!target) throw new AppNotFoundError("Version not found.");
+  const reconstructed = await reconstructDocVersion(em, {
+    orgId: ctx.orgId,
+    docId,
+    versionNum: target.versionNum,
+  });
+  const latest = await em.findOne(DocVersion, {
+    org: ctx.orgId,
+    doc: docId,
+  } as never, {
+    orderBy: { versionNum: "DESC" } as never,
+  });
+  const nextVersionNum = (latest?.versionNum ?? 0) + 1;
+  const newVersion = em.create(DocVersion, {
+    org: ctx.orgId,
+    doc: docId,
+    versionNum: nextVersionNum,
+    snapshot: reconstructed.contentJson,
+    bodyMdSnapshot: reconstructed.bodyMd,
+    author: ctx.userId ?? null,
+    restoreOf: versionId,
+  } as never);
+  if ("persistAndFlush" in em && typeof em.persistAndFlush === "function") {
+    await em.persistAndFlush(newVersion as never);
+  } else {
+    em.persist(newVersion as never);
+    await em.flush();
+  }
+  return { id: newVersion.id, versionNum: nextVersionNum, restoredFromVersionId: versionId };
 }
 
 function requiredUserContext(ctx: AppContext): { orgId: string; userId: string; em: EntityManager | null } {

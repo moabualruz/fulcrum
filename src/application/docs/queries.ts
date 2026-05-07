@@ -1,7 +1,9 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { TRPCError } from "@trpc/server";
 
+import { DocVersion } from "../../db/entities/docs/DocVersion.ts";
 import { Document } from "../../db/entities/docs/Document.ts";
+import { diffDocVersionsHtml, reconstructDocVersion } from "../../docs/version-reconstructor.ts";
 import { DocService } from "../../services/DocService.ts";
 import { serializeDoc } from "../../services/DocService.ts";
 import { AppForbiddenError, AppNotFoundError } from "../errors.ts";
@@ -52,7 +54,14 @@ export async function listDocVersions(
   ctx: AppContext,
   docId: string,
 ): Promise<DocVersionListDto[]> {
-  return new DocService(em).listVersions(requiredUserContext(ctx), docId);
+  const versions = await em.find(DocVersion, {
+    org: ctx.orgId,
+    doc: docId,
+  } as never, {
+    populate: ["author", "restoreOf"] as never,
+    orderBy: { versionNum: "DESC" },
+  });
+  return versions.map(serializeVersionForApplication);
 }
 
 export async function getDocVersion(
@@ -64,6 +73,22 @@ export async function getDocVersion(
   return new DocService(em).getVersion(requiredUserContext(ctx), docId, versionNum);
 }
 
+export async function getDocVersionById(
+  em: EntityManager,
+  ctx: AppContext,
+  docId: string,
+  versionId: string,
+): Promise<DocVersionListDto | null> {
+  const version = await em.findOne(DocVersion, {
+    id: versionId,
+    org: ctx.orgId,
+    doc: docId,
+  } as never, {
+    populate: ["author", "restoreOf"] as never,
+  });
+  return version ? serializeVersionForApplication(version) : null;
+}
+
 export async function diffDocVersions(
   em: EntityManager,
   ctx: AppContext,
@@ -72,6 +97,22 @@ export async function diffDocVersions(
   toVersionNum: number,
 ): Promise<{ html: string }> {
   return new DocService(em).diffVersions(requiredUserContext(ctx), docId, fromVersionNum, toVersionNum);
+}
+
+export async function diffDocVersionById(
+  em: EntityManager,
+  ctx: AppContext,
+  docId: string,
+  versionId: string,
+): Promise<{ html: string; hasDiff: boolean }> {
+  const version = await getDocVersionById(em, ctx, docId, versionId);
+  if (!version) throw new AppNotFoundError("Version not found.");
+  if (version.versionNum <= 1) return { html: "", hasDiff: false };
+  const [current, previous] = await Promise.all([
+    reconstructDocVersion(em, { orgId: ctx.orgId, docId, versionNum: version.versionNum }),
+    reconstructDocVersion(em, { orgId: ctx.orgId, docId, versionNum: version.versionNum - 1 }),
+  ]);
+  return { html: diffDocVersionsHtml(previous.contentJson, current.contentJson), hasDiff: true };
 }
 
 export async function listDocBacklinks(
@@ -92,6 +133,18 @@ export async function listDocForwardLinks(
 
 function requiredUserContext(ctx: AppContext): { orgId: string; userId: string; em: EntityManager | null } {
   return { orgId: ctx.orgId, userId: uuidOrNull(ctx.userId ?? "") ?? "", em: null };
+}
+
+function serializeVersionForApplication(version: DocVersion): DocVersionListDto {
+  return {
+    id: version.id,
+    versionNum: version.versionNum,
+    isSnapshot: version.snapshot !== null,
+    authorId: version.author?.id ?? null,
+    authorName: version.author?.name ?? version.author?.email ?? null,
+    createdAt: version.createdAt,
+    isRestoreOf: version.restoreOf?.id ?? null,
+  } as DocVersionListDto & { authorName: string | null; isRestoreOf: string | null };
 }
 
 function uuidOrNull(value: string): string | null {

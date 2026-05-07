@@ -8,10 +8,10 @@ import { TRPCError } from "@trpc/server";
 
 import { appErrorToTrpcError } from "../../application/error-mapping.ts";
 import { AppError } from "../../application/errors.ts";
-import { restoreDocVersion } from "../../application/docs/commands.ts";
+import { restoreDocVersionById } from "../../application/docs/commands.ts";
 import {
-  diffDocVersions,
-  getDocVersion,
+  diffDocVersionById,
+  getDocVersionById,
   listDocVersions,
 } from "../../application/docs/queries.ts";
 import type { AppContext, DocVersionListDto } from "../../application/docs/types.ts";
@@ -45,8 +45,7 @@ async function versionById(
   documentId: string,
   versionId: string,
 ): Promise<DocVersionListDto> {
-  const versions = await listDocVersions(manager, ctx, documentId);
-  const version = versions.find((candidate) => candidate.id === versionId);
+  const version = await getDocVersionById(manager, ctx, documentId, versionId);
   if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "Version not found" });
   return version;
 }
@@ -57,8 +56,8 @@ function listShape(version: DocVersionListDto) {
     versionNum: version.versionNum,
     createdAt: version.createdAt,
     authorId: version.authorId,
-    authorName: null,
-    isRestoreOf: null,
+    authorName: (version as DocVersionListDto & { authorName?: string | null }).authorName ?? null,
+    isRestoreOf: (version as DocVersionListDto & { isRestoreOf?: string | null }).isRestoreOf ?? null,
   };
 }
 
@@ -94,15 +93,7 @@ export const docVersionsRouter = t.router({
       return mapAppError(async () => {
         const manager = requireEntityManager(ctx);
         const appCtx = appContext(ctx);
-        const version = await versionById(manager, appCtx, input.documentId, input.versionId);
-        const restored = await restoreDocVersion(manager, appCtx, input.documentId, version.versionNum);
-        const versions = await listDocVersions(manager, appCtx, restored.id);
-        const newVersion = versions.at(0);
-        return {
-          id: newVersion?.id ?? restored.id,
-          versionNum: newVersion?.versionNum ?? version.versionNum,
-          restoredFromVersionId: input.versionId,
-        };
+        return restoreDocVersionById(manager, appCtx, input.documentId, input.versionId);
       });
     }),
 
@@ -115,10 +106,7 @@ export const docVersionsRouter = t.router({
       return mapAppError(async () => {
         const manager = requireEntityManager(ctx);
         const appCtx = appContext(ctx);
-        const version = await versionById(manager, appCtx, input.documentId, input.versionId);
-        if (version.versionNum <= 1) return { html: "", hasDiff: false };
-        const diff = await diffDocVersions(manager, appCtx, input.documentId, version.versionNum - 1, version.versionNum);
-        return { html: diff.html, hasDiff: true };
+        return diffDocVersionById(manager, appCtx, input.documentId, input.versionId);
       });
     }),
 });

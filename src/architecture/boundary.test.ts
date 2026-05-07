@@ -30,10 +30,8 @@ const TEST_FIXTURE_ROOTS = ["src", "src/web/tests"];
 
 const EXPECTED_RUNTIME_DIRECT_ACCESS_FILES = [
   "src/web/src/routes/orchestration/+page.server.ts",
-  "src/web/src/routes/audit/export/+server.ts",
   "src/web/src/lib/server/db.ts",
   "src/trpc/context.ts",
-  "src/trpc/routers/orchestration.ts",
 ];
 
 const NON_WEB_INVENTORY_ROOTS = [
@@ -118,11 +116,6 @@ const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES = [
   "src/server/trpc/routers/memory.ts",
   "src/server/trpc/routers/routing.ts",
   "src/server/trpc/routers/tasks.ts",
-  "src/trpc/routers/agents.ts",
-  "src/trpc/routers/doc-comments.ts",
-  "src/trpc/routers/doc-versions.ts",
-  "src/trpc/routers/documents.ts",
-  "src/trpc/routers/orchestration.ts",
   "src/trpc/routers/repos.ts",
   "src/trpc/routers/webhooks.ts",
   "src/tui/index.ts",
