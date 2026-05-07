@@ -1,62 +1,27 @@
 import type { PageServerLoad, Actions } from "./$types";
-import { openDatabase } from "$lib/server/db";
+import { requestAppScope } from "$lib/server/application-scope";
+import { purgeSettingsTelemetry, toggleSettingsTelemetryOptIn } from "../../../../../application/settings/commands.ts";
+import { getSettingsTelemetry } from "../../../../../application/settings/queries.ts";
 
-export const load: PageServerLoad = () => {
+export const load: PageServerLoad = ({ locals }) => {
   return {
     streamed: {
       data: (async () => {
-        const db = await openDatabase();
-        try {
-          await db.query(`
-            CREATE TABLE IF NOT EXISTS telemetry_settings (
-              id TEXT PRIMARY KEY DEFAULT 'singleton',
-              opt_in BOOLEAN NOT NULL DEFAULT false,
-              updated_at TEXT NOT NULL DEFAULT now()::text
-            )
-          `);
-          await db.query(`
-            INSERT INTO telemetry_settings (id, opt_in) VALUES ('singleton', false)
-            ON CONFLICT (id) DO NOTHING
-          `);
-          await db.query(`
-            CREATE TABLE IF NOT EXISTS telemetry_events (
-              id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-              event TEXT NOT NULL,
-              occurred_at TEXT NOT NULL DEFAULT now()::text
-            )
-          `);
-          const settings = await db.query<{ opt_in: boolean }>(`SELECT opt_in FROM telemetry_settings WHERE id = 'singleton'`);
-          const count = await db.query<{ count: string }>(`SELECT count(*) as count FROM telemetry_events`);
-          return {
-            optIn: settings[0]?.opt_in ?? false,
-            rowCount: parseInt(count[0]?.count ?? "0", 10),
-          };
-        } finally {
-          await db.close();
-        }
+        const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+        return getSettingsTelemetry(em, ctx);
       })(),
     },
   };
 };
 
-export const actions = {
-  toggleOptIn: async () => {
-    const db = await openDatabase();
-    try {
-      await db.query(`UPDATE telemetry_settings SET opt_in = NOT opt_in, updated_at = now()::text WHERE id = 'singleton'`);
-      return { success: true };
-    } finally {
-      await db.close();
-    }
+export const actions: Actions = {
+  toggleOptIn: async ({ locals }) => {
+    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    return await toggleSettingsTelemetryOptIn(em, ctx);
   },
 
-  purge: async () => {
-    const db = await openDatabase();
-    try {
-      await db.query(`DELETE FROM telemetry_events`);
-      return { success: true, rowCount: 0 };
-    } finally {
-      await db.close();
-    }
+  purge: async ({ locals }) => {
+    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    return await purgeSettingsTelemetry(em, ctx);
   },
 };

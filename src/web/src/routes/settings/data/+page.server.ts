@@ -1,75 +1,60 @@
 import type { PageServerLoad, Actions } from "./$types";
-import { openDatabase } from "$lib/server/db";
 import { fail } from "@sveltejs/kit";
+import { requestAppScope } from "$lib/server/application-scope";
+import { importSettingsData, preflightSettingsDataImport } from "../../../../../application/settings/commands.ts";
+import { createSettingsDataExport, SETTINGS_ENTITY_KINDS, type SettingsEntityKind } from "../../../../../application/settings/queries.ts";
+import { AppError } from "../../../../../application/errors.ts";
 
-const ENTITY_KINDS = ["projects", "tasks", "credentials", "feature_flags", "backups"] as const;
-type EntityKind = (typeof ENTITY_KINDS)[number];
+function appFail(error: unknown) {
+  if (error instanceof AppError) return fail(error.kind === "validation" ? 400 : 500, { error: error.message });
+  throw error;
+}
+
+async function parseJsonFile(file: File | null): Promise<unknown> {
+  if (!file || file.size === 0) throw new AppError("validation", "file required");
+  try {
+    return JSON.parse(await file.text());
+  } catch (cause) {
+    throw new AppError("validation", "invalid JSON", { cause });
+  }
+}
 
 export const load: PageServerLoad = () => {
-  return { entityKinds: ENTITY_KINDS };
+  return { entityKinds: SETTINGS_ENTITY_KINDS };
 };
 
 export const actions: Actions = {
-  export: async ({ request }) => {
+  export: async ({ request, locals }) => {
     const form = await request.formData();
-    const kinds = form.getAll("kinds") as EntityKind[];
-    const selected = kinds.length > 0 ? kinds : [...ENTITY_KINDS];
-    const db = await openDatabase();
+    const kinds = form.getAll("kinds").filter((kind): kind is SettingsEntityKind =>
+      typeof kind === "string" && (SETTINGS_ENTITY_KINDS as readonly string[]).includes(kind)
+    );
     try {
-      const result: Record<string, unknown[]> = {};
-      for (const kind of selected) {
-        try {
-          const rows = await db.query(`SELECT * FROM ${kind} LIMIT 5000`);
-          result[kind] = rows;
-        } catch {
-          result[kind] = [];
-        }
-      }
+      const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+      const result = await createSettingsDataExport(em, ctx, { kinds });
       return { exported: true, data: JSON.stringify(result, null, 2), filename: `fulcrum-export-${Date.now()}.json` };
-    } finally {
-      await db.close();
+    } catch (error) {
+      return appFail(error);
     }
   },
 
   preflight: async ({ request }) => {
     const form = await request.formData();
-    const file = form.get("file") as File | null;
-    if (!file || file.size === 0) return fail(400, { error: "file required" });
-    let parsed: unknown;
     try {
-      parsed = JSON.parse(await file.text());
-    } catch {
-      return fail(400, { error: "invalid JSON" });
+      return preflightSettingsDataImport(await parseJsonFile(form.get("file") as File | null));
+    } catch (error) {
+      return appFail(error);
     }
-    const obj = parsed as Record<string, unknown>;
-    const summary: Record<string, number> = {};
-    for (const [k, v] of Object.entries(obj)) {
-      if (Array.isArray(v)) summary[k] = v.length;
-    }
-    return { preflightSummary: summary };
   },
 
-  import: async ({ request }) => {
+  import: async ({ request, locals }) => {
     const form = await request.formData();
-    const file = form.get("file") as File | null;
-    if (!file || file.size === 0) return fail(400, { error: "file required" });
-    let parsed: unknown;
     try {
-      parsed = JSON.parse(await file.text());
-    } catch {
-      return fail(400, { error: "invalid JSON" });
-    }
-    const obj = parsed as Record<string, unknown[]>;
-    const db = await openDatabase();
-    let totalRows = 0;
-    try {
-      for (const [, rows] of Object.entries(obj)) {
-        if (Array.isArray(rows)) totalRows += rows.length;
-      }
-      // Real import would upsert rows here
-      return { imported: true, totalRows };
-    } finally {
-      await db.close();
+      const parsed = await parseJsonFile(form.get("file") as File | null);
+      const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+      return await importSettingsData(em, ctx, parsed);
+    } catch (error) {
+      return appFail(error);
     }
   },
 };
