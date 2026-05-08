@@ -10,6 +10,16 @@ export interface TuiRun {
   projectName?: string | null;
   startedAt?: string | Date | null;
   logLines?: string[];
+  observability?: TuiRunObservability;
+}
+
+export interface TuiRunObservability {
+  context?: { sourceRefs?: Array<{ kind?: string; id?: string; reason?: string; scope?: string }> };
+  artifacts?: Array<{ filename?: string; title?: string; lifecycleState?: string }>;
+  memoryCandidates?: Array<{ key?: string; title?: string } | Record<string, unknown>>;
+  followUpTasks?: Array<{ title?: string; id?: string } | Record<string, unknown>>;
+  audit?: Array<{ verb?: string; actor?: string } | Record<string, unknown>>;
+  recovery?: { retryable?: boolean; retryCount?: number; lastErrorKind?: string | null; nextRetryAt?: string | Date | null };
 }
 
 export interface RunsScreenOptions {
@@ -172,6 +182,7 @@ export class RunDetailScreen {
     renderer.writeln();
     renderer.writeln(c.bold("  Transcript / log"));
     for (const line of this.logLines) renderer.writeln(`  ${line}`);
+    this.renderObservability(renderer, this.run.observability);
     renderer.writeln();
     renderer.writeln(c.dim("  x cancel  q back"));
   }
@@ -197,6 +208,43 @@ export class RunDetailScreen {
         if (payload.logLine) this.logLines.push(payload.logLine);
       }),
     );
+  }
+
+  private renderObservability(renderer: Renderer, observability: TuiRunObservability | undefined): void {
+    if (!observability) return;
+    renderer.writeln();
+    renderer.writeln(c.bold("  Context"));
+    for (const ref of observability.context?.sourceRefs ?? []) {
+      renderer.writeln(`  ${ref.kind ?? "ref"}:${ref.id ?? ""}  ${ref.reason ?? ""}`);
+    }
+    renderer.writeln();
+    renderer.writeln(c.bold("  Artifacts"));
+    for (const artifact of observability.artifacts ?? []) {
+      renderer.writeln(`  ${artifact.filename ?? artifact.title ?? "artifact"}  ${artifact.lifecycleState ?? ""}`);
+    }
+    renderer.writeln();
+    renderer.writeln(c.bold("  Memory"));
+    for (const candidate of observability.memoryCandidates ?? []) {
+      renderer.writeln(`  ${String(candidate["key"] ?? candidate["title"] ?? "candidate")}`);
+    }
+    renderer.writeln();
+    renderer.writeln(c.bold("  Follow-ups"));
+    for (const task of observability.followUpTasks ?? []) {
+      renderer.writeln(`  ${String(task["title"] ?? task["id"] ?? "task")}`);
+    }
+    renderer.writeln();
+    renderer.writeln(c.bold("  Audit"));
+    for (const event of observability.audit ?? []) {
+      renderer.writeln(`  ${String(event["verb"] ?? "event")}  ${String(event["actor"] ?? "")}`);
+    }
+    renderer.writeln();
+    renderer.writeln(c.bold("  Recovery"));
+    const recovery = observability.recovery;
+    if (recovery) {
+      renderer.writeln(
+        `  retryable:${String(recovery.retryable ?? false)} attempt:${String(recovery.retryCount ?? 0)} ${recovery.lastErrorKind ?? ""}`,
+      );
+    }
   }
 }
 

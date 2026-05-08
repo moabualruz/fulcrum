@@ -71,6 +71,7 @@ export async function runPillar14Command(
 
 async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io) {
   const runsCaller = caller.agent_runs ?? caller.runs;
+  const orchestrationCaller = caller.orchestration;
   if (sub === "list") {
     const status = optionValue(argv, "--status");
     const result = await runsCaller.list(status ? { status } : undefined);
@@ -98,6 +99,29 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
     const id = positional(argv)[0] ?? optionValue(argv, "--id");
     requireValue(id, "runs retry: missing run id");
     emitJson(await runsCaller.retry({ id }), io);
+    return;
+  }
+  if (sub === "dispatch") {
+    const taskId = optionValue(argv, "--task") ?? positional(argv)[0];
+    requireValue(taskId, "runs dispatch: missing --task");
+    const agentName = optionValue(argv, "--agent");
+    const dispatch = orchestrationCaller?.dispatchRun ?? runsCaller?.dispatch;
+    if (!dispatch) throw new Error("runs dispatch: orchestration.dispatchRun is unavailable");
+    emitJson(await dispatch({ taskId, agentName }), io);
+    return;
+  }
+  if (sub === "watch") {
+    const id = positional(argv)[0] ?? optionValue(argv, "--id");
+    requireValue(id, "runs watch: missing run id");
+    const getRun = orchestrationCaller?.getRun
+      ? (input: { runId: string }) => orchestrationCaller.getRun(input)
+      : (input: { runId: string }) => runsCaller.get({ id: input.runId });
+    const run = await getRun({ runId: id });
+    if (!run) {
+      emitError(new Error(`run '${id}' not found`), hasFlag(argv, "--json"), io);
+      return;
+    }
+    emitJson(run, io);
     return;
   }
   if (sub === "logs") {
