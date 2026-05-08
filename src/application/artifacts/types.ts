@@ -10,6 +10,7 @@ export interface ArtifactDto {
   filename: string;
   path: string;
   mime: string | null;
+  metadataJson: Record<string, unknown>;
   createdAt: Date;
 }
 
@@ -17,4 +18,5 @@ export interface CreateArtifactInput {
   filename: string;
   path: string;
   mime?: string | null;
+  metadataJson?: Record<string, unknown>;
 }

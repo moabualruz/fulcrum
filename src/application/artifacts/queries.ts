@@ -237,6 +237,7 @@ export function serializeArtifact(artifact: Artifact): ArtifactDto {
     filename: artifact.filename,
     path: artifact.path,
     mime: artifact.mime ?? null,
+    metadataJson: artifact.metadataJson ?? {},
     createdAt: artifact.createdAt,
   };
 }

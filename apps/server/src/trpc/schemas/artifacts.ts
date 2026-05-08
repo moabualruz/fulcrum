@@ -22,6 +22,16 @@ const UuidSchema = z.string().uuid();
 const BigIntStringSchema = z.string().regex(/^\d+$/);
 export const ArtifactPreviewKindSchema = z.enum(["image", "text", "markdown", "code", "download"]);
 export const ArtifactRetentionStatusSchema = z.enum(["active", "expired", "archived", "pruned", "forever"]);
+export const ArtifactLifecycleStateSchema = z.enum([
+  "created",
+  "pending_review",
+  "accepted",
+  "rejected",
+  "linked",
+  "promoted",
+  "archived",
+  "expired",
+]);
 
 export const ArtifactAttestationSchema = z.object({
   subjectDigest: z.string().nullable(),
@@ -44,6 +54,7 @@ export const ArtifactSchema = z.object({
   checksumSha256: z.string().min(1).nullable().describe("SHA-256 checksum, when known."),
   digest: z.string().min(1).nullable().default(null).describe("Digest shown to users."),
   metadataJson: z.record(z.string(), z.unknown()).describe("Artifact metadata."),
+  lifecycleState: ArtifactLifecycleStateSchema.default("created").describe("Review lifecycle state."),
   archived: z.boolean().describe("Whether the artifact is archived."),
   pruned: z.boolean().default(false).describe("Whether artifact blob was pruned."),
   retentionStatus: ArtifactRetentionStatusSchema.default("active").describe("Retention lifecycle state."),
@@ -120,5 +131,6 @@ export type Artifact = z.infer<typeof ArtifactSchema>;
 export type ArtifactType = z.infer<typeof ArtifactTypeSchema>;
 export type ArtifactPreviewKind = z.infer<typeof ArtifactPreviewKindSchema>;
 export type ArtifactRetentionStatus = z.infer<typeof ArtifactRetentionStatusSchema>;
+export type ArtifactLifecycleState = z.infer<typeof ArtifactLifecycleStateSchema>;
 export type ListArtifactsInput = z.infer<typeof ListArtifactsInputSchema>;
 export type UploadArtifactInput = z.infer<typeof UploadArtifactInputSchema>;

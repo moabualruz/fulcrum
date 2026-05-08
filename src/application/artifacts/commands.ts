@@ -9,6 +9,8 @@ import { AppValidationError } from "../errors.ts";
 import { getArtifactDetail, serializeArtifact } from "./queries.ts";
 import type { AppContext, ArtifactDto, CreateArtifactInput } from "./types.ts";
 
+export type ArtifactLifecycleState = "created" | "pending_review" | "accepted" | "rejected" | "linked" | "promoted" | "archived" | "expired";
+
 export async function createArtifact(em: EntityManager, ctx: AppContext, input: CreateArtifactInput): Promise<ArtifactDto> {
   if (!input.filename?.trim()) throw new AppValidationError("Artifact filename is required.");
   if (!input.path?.trim()) throw new AppValidationError("Artifact path is required.");
@@ -25,11 +27,33 @@ export async function createArtifact(em: EntityManager, ctx: AppContext, input: 
       filename: input.filename,
       path: input.path,
       mime: input.mime ?? null,
+      metadataJson: {
+        ...(input.metadataJson ?? {}),
+        lifecycleState: String(input.metadataJson?.["lifecycleState"] ?? "created"),
+      },
     });
     txEm.persist(artifact);
     await txEm.flush();
     return serializeArtifact(artifact);
   });
+}
+
+export async function transitionArtifactLifecycle(
+  em: EntityManager,
+  ctx: AppContext,
+  input: { id: string; state: ArtifactLifecycleState },
+): Promise<ArtifactDto> {
+  const artifact = await em.findOne(Artifact, { id: input.id } as never);
+  if (!artifact) throw new AppValidationError(`Artifact not found: ${input.id}`);
+  if (artifact.org.id !== ctx.orgId) throw new AppValidationError(`Artifact not found: ${input.id}`);
+  artifact.metadataJson = {
+    ...(artifact.metadataJson ?? {}),
+    lifecycleState: input.state,
+    lifecycleChangedAt: new Date().toISOString(),
+  };
+  em.persist(artifact);
+  await em.flush();
+  return serializeArtifact(artifact);
 }
 
 export async function deleteArtifactForWeb(

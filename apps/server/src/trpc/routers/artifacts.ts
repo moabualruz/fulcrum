@@ -7,6 +7,7 @@ import { permissionedProcedure } from "../middleware.ts";
 import {
   createArtifact as createApplicationArtifact,
   deleteArtifactForWeb,
+  transitionArtifactLifecycle,
 } from "@/application/artifacts/commands.ts";
 import {
   getArtifact as getApplicationArtifact,
@@ -143,6 +144,7 @@ function toArtifact(record: ArtifactRecord): Artifact {
     checksumSha256: record.checksumSha256 ?? null,
     digest: digestOf(record),
     metadataJson: record.metadataJson ?? {},
+    lifecycleState: stringOrNull(record.metadataJson?.["lifecycleState"]) ?? "created",
     archived: record.archived ?? false,
     pruned: record.pruned ?? Boolean(record.metadataJson?.["prunedAt"]),
     retentionStatus: retentionStatusOf(record),
@@ -168,7 +170,7 @@ function appArtifactToRecord(artifact: ArtifactDto): ArtifactRecord {
     path: artifact.path,
     sizeBytes: 0,
     checksumSha256: null,
-    metadataJson: {},
+    metadataJson: artifact.metadataJson,
     archived: false,
     pruned: false,
     retentionUntil: null,
@@ -304,6 +306,7 @@ export const artifactsRouter = t.router({
           filename: input.filename,
           path: stored.path,
           mime: input.mime,
+          metadataJson: input.metadataJson ?? {},
         })));
         await recordEvent(ctx, "artifact.uploaded", artifact, uploadPayload(input));
         return artifact;
@@ -334,6 +337,42 @@ export const artifactsRouter = t.router({
       const artifact = toArtifact(await findArtifact(ctx, input.id));
       const url = await deps(ctx).storage.url?.({ path: artifact.path }) ?? artifact.path;
       return { artifact, url };
+    }),
+
+  accept: permissionedProcedure({ resource: "artifacts", action: "accept" })
+    .input(ArtifactIdInputSchema)
+    .output(ArtifactSchema)
+    .mutation(async ({ ctx, input }) => {
+      const manager = optionalEntityManager(ctx);
+      const artifact = manager
+        ? toArtifact(appArtifactToRecord(await transitionArtifactLifecycle(manager, appContext(ctx), {
+          id: input.id,
+          state: "accepted",
+        })))
+        : toArtifact(await deps(ctx).repository.update?.({
+          id: input.id,
+          data: { metadataJson: { lifecycleState: "accepted" } },
+        }) ?? { ...await findArtifact(ctx, input.id), metadataJson: { lifecycleState: "accepted" } });
+      await recordEvent(ctx, "artifact.accepted", artifact);
+      return artifact;
+    }),
+
+  reject: permissionedProcedure({ resource: "artifacts", action: "reject" })
+    .input(ArtifactIdInputSchema)
+    .output(ArtifactSchema)
+    .mutation(async ({ ctx, input }) => {
+      const manager = optionalEntityManager(ctx);
+      const artifact = manager
+        ? toArtifact(appArtifactToRecord(await transitionArtifactLifecycle(manager, appContext(ctx), {
+          id: input.id,
+          state: "rejected",
+        })))
+        : toArtifact(await deps(ctx).repository.update?.({
+          id: input.id,
+          data: { metadataJson: { lifecycleState: "rejected" } },
+        }) ?? { ...await findArtifact(ctx, input.id), metadataJson: { lifecycleState: "rejected" } });
+      await recordEvent(ctx, "artifact.rejected", artifact);
+      return artifact;
     }),
 
   archive: permissionedProcedure({ resource: "artifacts", action: "archive" })
