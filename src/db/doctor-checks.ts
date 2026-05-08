@@ -36,6 +36,15 @@ export interface DoctorCheckResult {
   hint?: string;
 }
 
+export type LocalReadinessLevel = "pass" | "repairable" | "reset-required";
+
+export interface LocalReadinessCheck {
+  status: LocalReadinessLevel;
+  check: string;
+  detail: string;
+  repairCommand?: string;
+}
+
 /**
  * Compile-time constant: the highest migration version this binary knows about.
  * Update this whenever a new migration class is added to src/db/migrations/.
@@ -44,6 +53,34 @@ export interface DoctorCheckResult {
  * Pillar 14's doctor aggregator compares this against schema_migrations.MAX(version).
  */
 export const MAX_KNOWN_MIGRATION_VERSION = 20260506095000;
+
+export function classifyLocalReadiness(checks: DoctorCheckResult[]): LocalReadinessCheck {
+  const failing = checks.find((check) => check.status === "fail");
+  if (failing) {
+    return {
+      status: "reset-required",
+      check: failing.check,
+      detail: failing.detail,
+      repairCommand: "fulcrum db reset-local-state --fulcrum-home <path> --yes-reset-local-state",
+    };
+  }
+
+  const warning = checks.find((check) => check.status === "warn");
+  if (warning) {
+    return {
+      status: "repairable",
+      check: warning.check,
+      detail: warning.detail,
+      repairCommand: warning.hint,
+    };
+  }
+
+  return {
+    status: "pass",
+    check: "local.readiness",
+    detail: "Local database readiness checks passed.",
+  };
+}
 
 /**
  * db.migrationVersion — returns the highest applied migration version + name.

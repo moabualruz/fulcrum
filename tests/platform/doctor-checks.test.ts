@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { runPlatformDoctorChecks, type PlatformDoctorCheck } from "../../src/platform/doctor-checks.ts";
+import { classifyLocalReadiness } from "../../src/db/doctor-checks.ts";
 
 async function tempDir(name: string): Promise<string> {
   return mkdtemp(join(tmpdir(), `fulcrum-platform-doctor-${name}-`));
@@ -18,6 +19,21 @@ function expectShape(check: PlatformDoctorCheck): void {
 }
 
 describe("platform doctor checks", () => {
+  test("local readiness classifier distinguishes pass, repairable, and reset-required", () => {
+    expect(classifyLocalReadiness([
+      { check: "db.migrationVersion", status: "pass", detail: "ok" },
+    ])).toMatchObject({ status: "pass" });
+    expect(classifyLocalReadiness([
+      { check: "db.migrationVersion", status: "warn", detail: "missing", hint: "fulcrum db migrate" },
+    ])).toMatchObject({ status: "repairable", repairCommand: "fulcrum db migrate" });
+    expect(classifyLocalReadiness([
+      { check: "db.canRunOnCurrentBinary", status: "fail", detail: "schema too new" },
+    ])).toMatchObject({
+      status: "reset-required",
+      repairCommand: "fulcrum db reset-local-state --fulcrum-home <path> --yes-reset-local-state",
+    });
+  });
+
   test("theme check passes when tenant settings are readable and accent is HEX", async () => {
     const checks = await runPlatformDoctorChecks({
       theme: { readSettings: async () => ({ accent: "#4f46e5" }) },
