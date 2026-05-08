@@ -7,6 +7,11 @@ export function createProjectsCommand(): Command {
   const createCommand = command.command("create");
   createCommand.description("projects create");
   createCommand.option("--json", "Emit JSON output");
+  createCommand.addOption(new Option("--kind <choice>", "kind").choices(["workspace","project","subproject"]));
+  createCommand.option("--name <string>", "name");
+  createCommand.option("--repo-path <string>", "repo-path");
+  createCommand.option("--slug <string>", "slug");
+  createCommand.option("--template <string>", "template");
   createCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for projects.create requires an explicit surface adapter.");
@@ -95,6 +100,8 @@ export function createProjectsCommand(): Command {
   const updateCommand = command.command("update");
   updateCommand.description("projects update");
   updateCommand.option("--json", "Emit JSON output");
+  updateCommand.option("--id <string>", "id");
+  updateCommand.option("--name <string>", "name");
   updateCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for projects.update requires an explicit surface adapter.");

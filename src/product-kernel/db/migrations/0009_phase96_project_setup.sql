@@ -20,6 +20,9 @@ CREATE INDEX IF NOT EXISTS repos_org_project_idx
   ON repos (org_id, project_id);
 
 ALTER TABLE tasks
+  ADD COLUMN IF NOT EXISTS task_type text NOT NULL DEFAULT 'task';
+
+ALTER TABLE tasks
   DROP CONSTRAINT IF EXISTS tasks_task_type_check;
 
 ALTER TABLE tasks

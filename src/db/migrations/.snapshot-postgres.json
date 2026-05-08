@@ -17425,10 +17425,13 @@
           "default": "'task'",
           "comment": null,
           "enumItems": [
+            "initiative",
             "epic",
+            "story",
             "task",
             "subtask",
-            "bug"
+            "bug",
+            "chore"
           ],
           "mappedType": "enum"
         },
@@ -17681,8 +17684,8 @@
       "checks": [
         {
           "name": "tasks_task_type_check",
-          "expression": "\"task_type\" in ('epic', 'task', 'subtask', 'bug')",
-          "definition": "check (\"task_type\" in ('epic', 'task', 'subtask', 'bug'))",
+          "expression": "\"task_type\" in ('initiative', 'epic', 'story', 'task', 'subtask', 'bug', 'chore')",
+          "definition": "check (\"task_type\" in ('initiative', 'epic', 'story', 'task', 'subtask', 'bug', 'chore'))",
           "columnName": "task_type"
         }
       ],
