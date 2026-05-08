@@ -21,6 +21,7 @@ mock.module("$app/state", () => ({
 type AppTopbarProps = {
   pathname: string;
   activeProjectId: string | null;
+  densityMode?: "default" | "advanced";
   bellCount?: number;
   bellItems?: Array<{ id: string; kind: string; title: string }>;
 };
@@ -121,6 +122,18 @@ describe("AppTopbar component", () => {
     expect(body).toMatch(
       /<span[^>]*data-active-project[^>]*>fulcrum<\/span>/,
     );
+  });
+
+  test("renders scope indicator and density mode switch without changing permissions", () => {
+    const { body } = render(AppTopbar, {
+      props: { pathname: "/projects/fulcrum/board", activeProjectId: "fulcrum", densityMode: "advanced" },
+    });
+    expect(body).toMatch(/data-scope-indicator/);
+    expect(body).toContain("fulcrum");
+    expect(body).toMatch(/data-density-switch/);
+    expect(body).toMatch(/data-density-mode="advanced"/);
+    expect(body).toMatch(/aria-label="default density"/);
+    expect(body).toMatch(/aria-label="advanced density"/);
   });
 
   test("bell badge renders count, top-five unread items, and See all inbox link", () => {

@@ -6,19 +6,28 @@
 	import { cn } from "$lib/utils.js";
 
 	export type InferenceStatus = "healthy" | "degraded" | "unreachable" | "unknown";
+	export type DensityMode = "default" | "advanced";
 
 	interface Props {
 		pathname: string;
 		activeProjectId: string | null;
 		onThemeToggle?: () => void;
+		densityMode?: DensityMode;
+		onDensityModeChange?: (mode: DensityMode) => void;
 		inferenceStatus?: InferenceStatus;
+		bellCount?: number;
+		bellItems?: Array<{ id: string; kind: string; title: string }>;
 	}
 
 	let {
 		pathname,
 		activeProjectId,
 		onThemeToggle = () => {},
+		densityMode = "default",
+		onDensityModeChange = () => {},
 		inferenceStatus = "unknown",
+		bellCount = 0,
+		bellItems = [],
 	}: Props = $props();
 
 	function badgeColor(s: InferenceStatus): string {
@@ -52,6 +61,7 @@
 	}
 
 	let crumbs = $derived(crumbsFor(pathname));
+	let scopeLabel = $derived(activeProjectId ?? "All projects");
 </script>
 
 <header
@@ -93,6 +103,31 @@
 
 	<div class={cn("ml-auto flex items-center gap-2")}>
 		<span
+			data-scope-indicator
+			class={cn("inline-flex h-7 items-center rounded-md border border-border px-2 text-xs text-muted-foreground")}
+		>{scopeLabel}</span>
+		<div
+			data-density-switch
+			data-density-mode={densityMode}
+			class={cn("inline-flex h-8 overflow-hidden rounded-md border border-border")}
+			aria-label="density mode"
+		>
+			<button
+				type="button"
+				aria-label="default density"
+				aria-pressed={densityMode === "default"}
+				onclick={() => onDensityModeChange("default")}
+				class={cn("px-2 text-xs", densityMode === "default" && "bg-muted text-foreground")}
+			>Default</button>
+			<button
+				type="button"
+				aria-label="advanced density"
+				aria-pressed={densityMode === "advanced"}
+				onclick={() => onDensityModeChange("advanced")}
+				class={cn("px-2 text-xs", densityMode === "advanced" && "bg-muted text-foreground")}
+			>Advanced</button>
+		</div>
+		<span
 			data-inference-badge
 			data-inference-status={inferenceStatus}
 			aria-label="inference backend status: {inferenceStatus}"
@@ -107,6 +142,28 @@
 			)}
 			aria-label="open command palette">⌘K</kbd
 		>
+		<button
+			type="button"
+			data-notification-bell
+			aria-label="notifications"
+			class={cn(buttonVariants({ variant: "ghost", size: "icon" }), "relative")}
+		>
+			<span aria-hidden="true">!</span>
+			{#if bellCount > 0}
+				<span
+					data-notification-badge
+					class={cn("absolute -right-1 -top-1 rounded-full bg-primary px-1 text-[10px] text-primary-foreground")}
+				>{bellCount}</span>
+			{/if}
+		</button>
+		{#if bellItems.length > 0}
+			<div data-notification-menu class={cn("sr-only")}>
+				{#each bellItems.slice(0, 5) as item (item.id)}
+					<div>{item.title}</div>
+				{/each}
+				<a href="/inbox">See all</a>
+			</div>
+		{/if}
 		<button
 			type="button"
 			data-slot="button"
