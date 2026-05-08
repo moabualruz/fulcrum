@@ -33,6 +33,31 @@ interface EventRow {
   created_at: string | Date;
 }
 
+interface RunObservabilityPayload {
+  context: {
+    sourceRefs: Array<{ kind: string; id: string; reason: string; scope: string }>;
+    warnings: string[];
+    scope: { projectId: string | null; taskId: string | null; includeGlobal: boolean };
+  };
+  artifacts: Array<{
+    id: string;
+    filename: string;
+    path: string | null;
+    mime: string | null;
+    lifecycleState: string;
+    createdAt: string;
+  }>;
+  memoryCandidates: Array<Record<string, unknown>>;
+  followUpTasks: Array<Record<string, unknown>>;
+  audit: Array<{ id: string; verb: string; actor: string; payload: Record<string, unknown>; createdAt: string }>;
+  recovery: {
+    retryable: boolean;
+    retryCount: number;
+    nextRetryAt: string | Date | null;
+    lastErrorKind: string | null;
+  };
+}
+
 function isoStamp(value: string | Date): string;
 function isoStamp(value: string | Date | null): string | null;
 function isoStamp(value: string | Date | null): string | null {
@@ -57,7 +82,37 @@ export const load: PageServerLoad = ({ params, locals }) => {
         const transcript = data.transcript;
         const logs = transcript ? paginateLogs(transcript, 0, 100) : null;
         const diff = await getWorkspaceDiff();
-        return { run, transcript, logs, diff, artifacts: data.artifacts, events: data.events };
+        const observability: RunObservabilityPayload = {
+          context: {
+            sourceRefs: [],
+            warnings: [],
+            scope: { projectId: run.project_id, taskId: null, includeGlobal: false },
+          },
+          artifacts: data.artifacts.map((artifact) => ({
+            id: artifact.id,
+            filename: artifact.title,
+            path: artifact.body_path,
+            mime: artifact.mime,
+            lifecycleState: "created",
+            createdAt: artifact.created_at,
+          })),
+          memoryCandidates: [],
+          followUpTasks: [],
+          audit: data.events.map((event) => ({
+            id: event.id,
+            verb: event.verb,
+            actor: event.actor,
+            payload: event.payload,
+            createdAt: event.created_at,
+          })),
+          recovery: {
+            retryable: run.status !== "succeeded" && run.status !== "cancelled",
+            retryCount: Number(data.run.retry_count ?? 0),
+            nextRetryAt: null,
+            lastErrorKind: data.run.last_error_kind,
+          },
+        };
+        return { run, transcript, logs, diff, artifacts: data.artifacts, events: data.events, observability };
       })(),
     },
   };

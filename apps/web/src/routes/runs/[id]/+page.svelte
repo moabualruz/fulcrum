@@ -14,8 +14,8 @@
 
   let { data }: Props = $props();
 
-  type Tab = "transcript" | "diff" | "artifacts" | "payload" | "events";
-  let tab = $state<Tab>("transcript");
+  type Tab = "review" | "transcript" | "diff" | "artifacts" | "advanced" | "payload" | "events";
+  let tab = $state<Tab>("review");
   let showCancel = $state(false);
   let showRetry = $state(false);
 
@@ -55,6 +55,7 @@
   {@const diff = payload.diff}
   {@const artifacts = payload.artifacts}
   {@const events = payload.events}
+  {@const observability = payload.observability}
   <header
     data-runs-detail-header
     class={cn("flex items-baseline justify-between gap-4 border-b border-border pb-4 mb-4")}
@@ -107,11 +108,42 @@
   {/if}
 
   <div data-runs-tabs role="tablist" class={cn("mb-2 flex items-center gap-2 border-b border-border")}>
+    <button type="button" role="tab" data-tab="review" data-active={tab === "review"} onclick={() => selectTab("review")} class={cn("h-9 px-3 text-sm", tab === "review" && "font-semibold border-b-2 border-primary")}>Review</button>
     <button type="button" role="tab" data-tab="transcript" data-active={tab === "transcript"} onclick={() => selectTab("transcript")} class={cn("h-9 px-3 text-sm", tab === "transcript" && "font-semibold border-b-2 border-primary")}>Transcript</button>
     <button type="button" role="tab" data-tab="diff" data-active={tab === "diff"} onclick={() => selectTab("diff")} class={cn("h-9 px-3 text-sm", tab === "diff" && "font-semibold border-b-2 border-primary")}>Diff</button>
     <button type="button" role="tab" data-tab="artifacts" data-active={tab === "artifacts"} onclick={() => selectTab("artifacts")} class={cn("h-9 px-3 text-sm", tab === "artifacts" && "font-semibold border-b-2 border-primary")}>Artifacts</button>
+    <button type="button" role="tab" data-tab="advanced" data-active={tab === "advanced"} onclick={() => selectTab("advanced")} class={cn("h-9 px-3 text-sm", tab === "advanced" && "font-semibold border-b-2 border-primary")}>Advanced trace</button>
     <button type="button" role="tab" data-tab="payload" data-active={tab === "payload"} onclick={() => selectTab("payload")} class={cn("h-9 px-3 text-sm", tab === "payload" && "font-semibold border-b-2 border-primary")}>Payload</button>
     <button type="button" role="tab" data-tab="events" data-active={tab === "events"} onclick={() => selectTab("events")} class={cn("h-9 px-3 text-sm", tab === "events" && "font-semibold border-b-2 border-primary")}>Events</button>
+  </div>
+
+  <div role="tabpanel" data-runs-tabpanel="review" hidden={tab !== "review"}>
+    <section data-runs-review class={cn("grid gap-3 md:grid-cols-2")}>
+      <div class={cn("rounded-md border border-border p-3")}>
+        <h2 class={cn("text-sm font-semibold")}>Context</h2>
+        <p class={cn("mt-1 text-xs text-muted-foreground")}>{observability.context.sourceRefs.length} source refs</p>
+      </div>
+      <div class={cn("rounded-md border border-border p-3")}>
+        <h2 class={cn("text-sm font-semibold")}>Artifacts</h2>
+        <p class={cn("mt-1 text-xs text-muted-foreground")}>{observability.artifacts.length} produced artifacts</p>
+      </div>
+      <div class={cn("rounded-md border border-border p-3")}>
+        <h2 class={cn("text-sm font-semibold")}>Memory</h2>
+        <p class={cn("mt-1 text-xs text-muted-foreground")}>{observability.memoryCandidates.length} candidates</p>
+      </div>
+      <div class={cn("rounded-md border border-border p-3")}>
+        <h2 class={cn("text-sm font-semibold")}>Recovery</h2>
+        <p data-runs-retry-schedule class={cn("mt-1 text-xs text-muted-foreground")}>
+          Attempt {observability.recovery.retryCount}
+          {#if observability.recovery.nextRetryAt}
+            · {observability.recovery.nextRetryAt}
+          {/if}
+          {#if observability.recovery.lastErrorKind}
+            · {observability.recovery.lastErrorKind}
+          {/if}
+        </p>
+      </div>
+    </section>
   </div>
 
   <!-- Transcript tab: collapsible JSONL turns -->
@@ -186,6 +218,10 @@
 
   <div role="tabpanel" data-runs-tabpanel="payload" hidden={tab !== "payload"}>
     <pre data-runs-payload class={cn("max-h-[60vh] overflow-auto rounded-md border border-border bg-muted/30 p-3 text-xs whitespace-pre-wrap")}>{JSON.stringify(run, null, 2)}</pre>
+  </div>
+
+  <div role="tabpanel" data-runs-tabpanel="advanced" hidden={tab !== "advanced"}>
+    <pre data-runs-advanced-trace class={cn("max-h-[60vh] overflow-auto rounded-md border border-border bg-muted/30 p-3 text-xs whitespace-pre-wrap")}>{JSON.stringify(observability, null, 2)}</pre>
   </div>
 
   <div role="tabpanel" data-runs-tabpanel="events" hidden={tab !== "events"}>
