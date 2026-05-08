@@ -238,7 +238,17 @@ export const docsRouter = t.router({
     .input(CreateDocInputSchema)
     .output(DocOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      return mapAppError(() => createDoc(requireEntityManager(ctx), appContext(ctx), input));
+      const normalizedInput = {
+        ...input,
+        links: input.links?.map((link) => ({
+          kind: link.targetKind,
+          id: link.targetId,
+          targetKind: link.targetKind,
+          targetId: link.targetId,
+          linkKind: link.linkKind,
+        })),
+      };
+      return mapAppError(() => createDoc(requireEntityManager(ctx), appContext(ctx), normalizedInput));
     }),
 
   update: permissionedProcedure({ resource: "docs", action: "update" })

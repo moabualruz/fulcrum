@@ -96,6 +96,8 @@ export function createDocsCommand(): Command {
   createCommand.option("--json", "Emit JSON output");
   createCommand.option("--body-md <string>", "body-md");
   createCommand.option("--sort-position <number>", "sort-position", Number.parseFloat);
+  createCommand.option("--source-id <string>", "source-id");
+  createCommand.option("--source-kind <string>", "source-kind");
   createCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for docs.create requires an explicit surface adapter.");

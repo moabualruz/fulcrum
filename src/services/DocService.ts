@@ -8,7 +8,7 @@ import { DocComment } from "../db/entities/docs/DocComment.ts";
 import { DocLink } from "../db/entities/docs/DocLink.ts";
 import { Document } from "../db/entities/docs/Document.ts";
 import { DocVersion } from "../db/entities/docs/DocVersion.ts";
-import type { DocType, Scope } from "../db/entities/docs/enums.ts";
+import type { DocType, LinkKind, Scope } from "../db/entities/docs/enums.ts";
 import { archiveDocIndex, indexDoc, removeDocIndex } from "../docs/search-indexer.ts";
 import { applyNarrationToDoc } from "../docs/llm-narrator.ts";
 import { diffDocVersionsHtml, reconstructDocVersion } from "../docs/version-reconstructor.ts";

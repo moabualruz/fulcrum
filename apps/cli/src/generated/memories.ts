@@ -79,6 +79,23 @@ export function createMemoriesCommand(): Command {
     }
   });
 
+  const promoteCommand = command.command("promote");
+  promoteCommand.description("memories promote");
+  promoteCommand.option("--json", "Emit JSON output");
+  promoteCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for memories.promote requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   const searchCommand = command.command("search");
   searchCommand.description("memories search");
   searchCommand.option("--json", "Emit JSON output");

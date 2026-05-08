@@ -4,6 +4,7 @@
   import { onMount } from "svelte";
   import { oramaIndex } from "$lib/search/OramaIndex.ts";
   import {
+    ALL_COMMANDS,
     BULK_COMMANDS,
     type PaletteCommand,
   } from "./navigation-commands.ts";
@@ -34,7 +35,7 @@
   let query = $state("");
   let searchHits = $state<SearchHit[]>([]);
   let searchPending = $state(false);
-  let inputElement: HTMLInputElement | null = null;
+  let inputElement = $state<HTMLInputElement | null>(null);
   let selectedIndex = $state(0);
 
   onMount(() => {
@@ -53,6 +54,9 @@
   const isCommandMode = $derived(query.trimStart().startsWith(">"));
   const commandQuery = $derived(isCommandMode ? query.trimStart().slice(1).trim() : query);
   const scopedCommands = $derived(filterAndSort(items, commandQuery));
+  const builtInCommands = $derived(
+    filterCommands(ALL_COMMANDS.filter((cmd) => !cmd.requiresSelection), commandQuery),
+  );
   const bulkCommands = $derived(
     hasSelection ? filterCommands(BULK_COMMANDS, commandQuery) : [],
   );
@@ -130,6 +134,7 @@
   function visibleCommandItems(): CommandItem[] {
     return [
       ...scopedCommands,
+      ...builtInCommands.map((cmd) => ({ id: cmd.id, label: cmd.label })),
       ...bulkCommands.map((cmd) => ({ id: cmd.id, label: cmd.label })),
     ];
   }
@@ -191,17 +196,44 @@
             {/each}
           {/if}
 
+          <!-- Built-in navigation and creation commands -->
+          {#if builtInCommands.length > 0}
+            {#if !isCommandMode}
+              <div
+                data-section="Commands"
+                class={cn("mt-1 px-2 py-1 text-xs font-normal text-muted-foreground")}
+              >Commands</div>
+            {/if}
+            {#each builtInCommands as cmd, i (cmd.id)}
+              <button
+                type="button"
+                data-command-palette-item
+                data-testid="command-item"
+                data-selected={selectedIndex === scopedCommands.length + i ? "true" : "false"}
+                data-id={cmd.id}
+                onclick={() => selectCommand(cmd)}
+                class={cn(
+                  "flex h-11 w-full items-center rounded-md px-3 text-left text-sm",
+                  "hover:bg-accent hover:text-accent-foreground",
+                )}
+              >
+                {cmd.label}
+              </button>
+            {/each}
+          {/if}
+
           <!-- Bulk Actions section (conditional on selection) -->
           {#if bulkCommands.length > 0}
             <div
               data-section="Bulk Actions"
               class={cn("mt-1 px-2 py-1 text-xs font-normal text-muted-foreground")}
             >Bulk Actions</div>
-            {#each bulkCommands as cmd (cmd.id)}
+            {#each bulkCommands as cmd, i (cmd.id)}
               <button
                 type="button"
                 data-command-palette-item
                 data-testid="command-item"
+                data-selected={selectedIndex === scopedCommands.length + builtInCommands.length + i ? "true" : "false"}
                 data-id={cmd.id}
                 onclick={() => selectCommand(cmd)}
                 class={cn(

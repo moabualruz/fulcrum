@@ -459,7 +459,7 @@ function serializeAutomation(automation: ProjectAutomation): AutomationOutput {
 async function evaluateCondition(condition: AutomationCondition | JsonRulesCondition, payload: Record<string, unknown>): Promise<boolean> {
   if (isJsonRulesCondition(condition)) {
     const conditions = "fact" in condition ? { all: [condition] } : condition;
-    const engine = new Engine([{ conditions, event: { type: "automation.condition.matched" } }]);
+    const engine = new Engine([{ conditions: conditions as never, event: { type: "automation.condition.matched" } }]);
     const result = await engine.run(payload);
     return result.events.length > 0;
   }

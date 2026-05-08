@@ -1,5 +1,5 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
-import type { SqlExecutor } from "../../db/sql.ts";
+import type { SqlExecutor, SqlValue } from "../../db/sql.ts";
 
 import { Project } from "../../db/entities/tasks/Project.ts";
 import { listDocs } from "../docs/queries.ts";
@@ -185,8 +185,8 @@ async function loadDashboardFromSql(
 async function dashboardProjectIds(db: EntityManager | SqlExecutor, orgId: string, projectId: string): Promise<string[]> {
   try {
     const query = "find" in db
-      ? async (sql: string, params: readonly unknown[]) => ormSqlConnection(db).execute<Array<{ id: string }>>(sql, params)
-      : (sql: string, params: readonly unknown[]) => db.query<{ id: string }>(sql, params);
+      ? async (sql: string, params: readonly SqlValue[]) => ormSqlConnection(db).execute<Array<{ id: string }>>(sql, params)
+      : (sql: string, params: readonly SqlValue[]) => db.query<{ id: string }>(sql, params);
     const rows = await query(
       `WITH RECURSIVE descendants AS (
          SELECT id FROM projects WHERE org_id = $1 AND id = $2

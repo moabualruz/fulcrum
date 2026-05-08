@@ -10,6 +10,7 @@ export function createSearchCommand(): Command {
   queryCommand.option("--facets", "facets");
   queryCommand.option("--filters-date-range-from <string>", "filters-date-range-from");
   queryCommand.option("--filters-date-range-to <string>", "filters-date-range-to");
+  queryCommand.addOption(new Option("--filters-scope <choice>", "filters-scope").choices(["current","all","global"]));
   queryCommand.option("--limit <number>", "limit", Number.parseFloat);
   queryCommand.option("--offset <number>", "offset", Number.parseFloat);
   queryCommand.option("--term <string>", "term");

@@ -26,7 +26,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     artifacts)
-      local -a values=('archive:fulcrum artifacts archive' 'delete:fulcrum artifacts delete' 'download:fulcrum artifacts download' 'get:fulcrum artifacts get' 'list:fulcrum artifacts list' 'unarchive:fulcrum artifacts unarchive' 'upload:fulcrum artifacts upload' '--json:option')
+      local -a values=('accept:fulcrum artifacts accept' 'archive:fulcrum artifacts archive' 'delete:fulcrum artifacts delete' 'download:fulcrum artifacts download' 'get:fulcrum artifacts get' 'list:fulcrum artifacts list' 'reject:fulcrum artifacts reject' 'unarchive:fulcrum artifacts unarchive' 'upload:fulcrum artifacts upload' '--json:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
         _values 'ids' $(_fulcrum_dynamic_ids 'artifacts')
         return
@@ -186,7 +186,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     memories)
-      local -a values=('create:fulcrum memories create' 'delete:fulcrum memories delete' 'get:fulcrum memories get' 'list:fulcrum memories list' 'search:fulcrum memories search' 'update:fulcrum memories update' '--json:option')
+      local -a values=('create:fulcrum memories create' 'delete:fulcrum memories delete' 'get:fulcrum memories get' 'list:fulcrum memories list' 'promote:fulcrum memories promote' 'search:fulcrum memories search' 'update:fulcrum memories update' '--json:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
         _values 'ids' $(_fulcrum_dynamic_ids 'memories')
         return

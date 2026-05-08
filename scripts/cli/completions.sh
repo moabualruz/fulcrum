@@ -39,7 +39,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     artifacts)
-      local verbs='archive delete download get list unarchive upload'
+      local verbs='accept archive delete download get list reject unarchive upload'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -324,7 +324,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     memories)
-      local verbs='create delete get list search update'
+      local verbs='create delete get list promote search update'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )

@@ -30,6 +30,7 @@ export async function getRunDetail(em: EntityManager, ctx: AppContext, id: strin
   return {
     ...serializeRun(run),
     projectId,
+    state: run.orchestrationState ?? null,
     model: run.agentVersion ?? null,
     parentRunId: null,
     startedAt: run.startedAt,
@@ -81,26 +82,23 @@ async function buildRunObservability(
 ): Promise<RunDetailDto["observability"]> {
   const conn = ormSqlConnection(em);
   const context = input.taskId
-    ? await previewContext(em, ctx, { projectId: input.projectId, taskId: input.taskId, includeGlobal: false })
+    ? await optionalContext(em, ctx, { projectId: input.projectId, taskId: input.taskId, includeGlobal: false })
     : {
         sourceRefs: [],
         warnings: ["run has no task context"],
         scope: { projectId: input.projectId, taskId: null, includeGlobal: false },
       };
-  const artifacts = (await conn.execute<Array<{
+  const artifacts = (await optionalRows(conn, `SELECT id, filename, path, mime, metadata_json, created_at
+       FROM artifacts
+      WHERE run_id = $1 AND org_id = $2
+      ORDER BY created_at DESC, id ASC`, [input.runId, ctx.orgId]) as Array<{
     id: string;
     filename: string;
     path: string | null;
     mime: string | null;
     metadata_json: Record<string, unknown> | null;
     created_at: string | Date;
-  }>>(
-    `SELECT id, filename, path, mime, metadata_json, created_at
-       FROM artifacts
-      WHERE run_id = $1 AND org_id = $2
-      ORDER BY created_at DESC, id ASC`,
-    [input.runId, ctx.orgId],
-  )).map((artifact) => ({
+  }>).map((artifact) => ({
     id: artifact.id,
     filename: artifact.filename,
     path: artifact.path,
@@ -110,19 +108,16 @@ async function buildRunObservability(
       : "created",
     createdAt: isoStamp(artifact.created_at),
   }));
-  const audit = (await conn.execute<Array<{
+  const audit = (await optionalRows(conn, `SELECT id, verb, actor, payload, created_at
+       FROM events
+      WHERE subject_kind = 'agent_run' AND subject_id = $1 AND org_id = $2
+      ORDER BY created_at DESC, id DESC`, [input.runId, ctx.orgId]) as Array<{
     id: string;
     verb: string;
     actor: string;
     payload: Record<string, unknown> | null;
     created_at: string | Date;
-  }>>(
-    `SELECT id, verb, actor, payload, created_at
-       FROM events
-      WHERE subject_kind = 'agent_run' AND subject_id = $1 AND org_id = $2
-      ORDER BY created_at DESC, id DESC`,
-    [input.runId, ctx.orgId],
-  )).map((event) => ({
+  }>).map((event) => ({
     id: event.id,
     verb: event.verb,
     actor: event.actor,
@@ -147,6 +142,45 @@ async function buildRunObservability(
       lastErrorKind: input.lastErrorKind,
     },
   };
+}
+
+async function optionalContext(
+  em: EntityManager,
+  ctx: AppContext,
+  input: { projectId: string | null; taskId: string; includeGlobal: boolean },
+): ReturnType<typeof previewContext> {
+  try {
+    return await previewContext(em, ctx, input);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/relation .* does not exist|table .* does not exist|column .* does not exist/i.test(message)) throw error;
+    return {
+      bundle: {
+        memories: [],
+        documents: [],
+        recentRuns: [],
+        artifacts: [],
+        tokenBudget: { used: 0, total: 0 },
+      },
+      sourceRefs: [],
+      warnings: ["context preview unavailable for this schema"],
+      scope: { projectId: input.projectId, taskId: input.taskId, includeGlobal: input.includeGlobal },
+    };
+  }
+}
+
+async function optionalRows<T>(
+  conn: ReturnType<typeof ormSqlConnection>,
+  sql: string,
+  params: unknown[],
+): Promise<T[]> {
+  try {
+    return await conn.execute<T[]>(sql, params as never);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/relation .* does not exist|table .* does not exist|column .* does not exist/i.test(message)) return [];
+    throw error;
+  }
 }
 
 export interface ProjectRunRow {

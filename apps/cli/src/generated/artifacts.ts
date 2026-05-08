@@ -4,6 +4,24 @@ export function createArtifactsCommand(): Command {
   const command = new Command("artifacts");
   command.description("Generated artifacts commands.");
 
+  const acceptCommand = command.command("accept");
+  acceptCommand.description("artifacts accept");
+  acceptCommand.option("--json", "Emit JSON output");
+  acceptCommand.option("--id <string>", "Artifact identifier.");
+  acceptCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for artifacts.accept requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   const archiveCommand = command.command("archive");
   archiveCommand.description("artifacts archive");
   archiveCommand.option("--json", "Emit JSON output");
@@ -89,6 +107,24 @@ export function createArtifactsCommand(): Command {
   listCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for artifacts.list requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const rejectCommand = command.command("reject");
+  rejectCommand.description("artifacts reject");
+  rejectCommand.option("--json", "Emit JSON output");
+  rejectCommand.option("--id <string>", "Artifact identifier.");
+  rejectCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for artifacts.reject requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

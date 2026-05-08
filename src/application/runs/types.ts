@@ -18,6 +18,7 @@ export interface RunDto {
 
 export interface RunDetailDto extends RunDto {
   projectId: string | null;
+  state: AgentRunOrchestrationState | null;
   model: string | null;
   parentRunId: string | null;
   startedAt: Date;

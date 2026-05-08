@@ -24,6 +24,7 @@ export function createContextCommand(): Command {
   const previewCommand = command.command("preview");
   previewCommand.description("context preview");
   previewCommand.option("--json", "Emit JSON output");
+  previewCommand.option("--include-global", "include-global");
   previewCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for context.preview requires an explicit surface adapter.");

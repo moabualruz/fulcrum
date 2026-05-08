@@ -153,30 +153,8 @@ async function getAgentRunForApi(
   manager: EntityManager,
   appCtx: RunsAppContext,
   runId: string,
-): Promise<{
-  id: string;
-  state: AgentRunOrchestrationState | null;
-  orchestrationState: AgentRunOrchestrationState | null;
-  workspacePath: string | null;
-  renderedPrompt: null;
-  attemptCount: number;
-  nextRetryAt: Date | null;
-  lastErrorKind: string | null;
-  observability: Awaited<ReturnType<typeof getRunDetail>>["observability"];
-} | null> {
-  const run = await getRunDetail(manager, appCtx, runId);
-  const state = run.orchestrationState;
-  return {
-    id: run.id,
-    state,
-    orchestrationState: state,
-    workspacePath: run.workspacePath,
-    renderedPrompt: null,
-    attemptCount: run.attemptCount,
-    nextRetryAt: run.nextRetryAt,
-    lastErrorKind: run.lastErrorKind,
-    observability: run.observability,
-  };
+): ReturnType<typeof getRunDetail> {
+  return getRunDetail(manager, appCtx, runId);
 }
 
 // ---------------------------------------------------------------------------
