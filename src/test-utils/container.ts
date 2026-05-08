@@ -1,5 +1,5 @@
 import { Container } from "@needle-di/core";
-import type { MikroORM } from "@mikro-orm/postgresql";
+import { MikroORM } from "@mikro-orm/postgresql";
 
 import { registerDbBindings } from "../db/db.module.ts";
 import type { SeedResult } from "../db/seed.ts";
@@ -20,4 +20,8 @@ export function createTestContainer(input: MikroORM | TestOrm): TestContainer {
   registerDbBindings(container, orm);
   container.__fulcrumTestSeed = seed;
   return container;
+}
+
+export function bindTestRuntimeOrm(container: Container, input: MikroORM | TestOrm): void {
+  container.bind({ provide: MikroORM, useValue: unwrapOrm(input).orm });
 }

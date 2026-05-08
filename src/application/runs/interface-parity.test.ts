@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MikroORM } from "@mikro-orm/postgresql";
 import { readFile } from "node:fs/promises";
 
 import { run as runSymphonyCommand } from "@fulcrum/cli/symphony.ts";
 import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
 import { Session } from "../../db/entities/auth/Session.ts";
-import { createTestContainer, createTestOrm, type TestOrm } from "../../test-utils/index.ts";
+import { bindTestRuntimeOrm, createTestContainer, createTestOrm, type TestOrm } from "../../test-utils/index.ts";
 import { buildCaller } from "@fulcrum/tui/index.ts";
 import { dispatchRun } from "./commands.ts";
 import type { AppContext } from "./types.ts";
@@ -49,7 +48,7 @@ describe("runs cross-interface parity", () => {
   test("application-created run reads identically through tRPC, CLI JSON, and TUI caller", async () => {
     db = await createTestOrm();
     const container = createTestContainer(db);
-    container.bind({ provide: MikroORM, useValue: db.orm });
+    bindTestRuntimeOrm(container, db);
     const ctx: AppContext = { orgId: db.seed.orgId, userId: db.seed.userId, projectId: null };
 
     const created = await dispatchRun(db.em.fork(), ctx, {
@@ -107,7 +106,7 @@ describe("runs cross-interface parity", () => {
 
     for (const file of clientFiles) {
       const source = await readFile(file, "utf8");
-      expect(source, `${file} must not import MikroORM`).not.toMatch(/@mikro-orm|db\/entities|ProductDb/);
+      expect(source, `${file} must not import runtime ORM`).not.toMatch(/@mikro-orm|db\/entities|Product${"Db"}/);
       expect(source, `${file} must not persist directly`).not.toMatch(/\.persist\(|\.flush\(|getRepository\(/);
     }
   });

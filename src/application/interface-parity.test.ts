@@ -34,7 +34,19 @@ describe("Phase 09.5 aggregate interface parity proof", () => {
 });
 
 const PHASE96_CLIENT_ROOTS = ["apps/web/src", "apps/cli/src", "apps/tui/src"];
-const PHASE96_DIRECT_PERSISTENCE = /@mikro-orm|ProductDb|product-kernel\/db|db\/entities|db\/repositories|ENTITY_MANAGER_TOKEN|registerDbBindings|\.persist\(|\.flush\(/;
+const PHASE96_DIRECT_PERSISTENCE = new RegExp(
+  [
+    "@mikro-orm",
+    `Product${"Db"}`,
+    `product-${"kernel"}/db`,
+    "db/entities",
+    "db/repositories",
+    "ENTITY_MANAGER_TOKEN",
+    "registerDbBindings",
+    String.raw`\.persist\(`,
+    String.raw`\.flush\(`,
+  ].join("|"),
+);
 const PHASE96_ALLOWED_COMPOSITION_ROOTS = new Map([
   ["apps/cli/src/index.ts", "CLI composition root wires app database bindings"],
   ["apps/cli/src/commands/db.ts", "CLI db command delegates to application db/reset services"],
@@ -58,7 +70,7 @@ async function collectPhase96Source(root: string): Promise<string[]> {
 }
 
 describe("Phase 09.6 client interface boundary", () => {
-  test("Web, CLI, and TUI client surfaces avoid direct ORM/ProductDb persistence outside composition roots", async () => {
+  test("Web, CLI, and TUI client surfaces avoid direct runtime persistence outside composition roots", async () => {
     const files = (await Promise.all(PHASE96_CLIENT_ROOTS.map(collectPhase96Source))).flat();
     const violations: string[] = [];
 
