@@ -22,6 +22,7 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
 - [x] **Phase 8: Surface Delivery** - CLI wiring, TUI rewrite, Web completion, API surface
 - [x] **Phase 9: Cross-Cutting + Testing** - i18n, theming, accessibility, telemetry, backup, comprehensive test coverage (completed 2026-05-06)
 - [ ] **Phase 9.5: Full Architecture Overhaul + Integration Preservation** (INSERTED) - Deep research all gray areas, overhaul architecture, implement one unified data manipulation layer, remove interface logic duplication, repair web/CLI/TUI/API integration, preserve every feature/logic/benefit, and replace fake tests with real Playwright + integration gates
+- [ ] **Phase 9.6: Product Workflow Completeness + Human/Agent Journey Repair** (INSERTED) - User UAT blocker: replace disconnected CRUD surfaces with one project-first workflow product across Web, CLI, TUI, server/API, docs, memory, context, orchestration, artifacts, automations, and doctor/startup gates. Phase 10 blocked until human and agent journeys pass end-to-end.
 - [ ] **Phase 10: SaaS Hardening + Milestone Closure** - Multi-org isolation, PostgreSQL pooling, job coordination, all deferred item closure, Huashu Web/CLI/TUI UX gate
 
 ## Phase Details
@@ -318,9 +319,22 @@ Artifacts:
 Plans:
 - [ ] TBD (run /gsd-plan-phase 9.5 after research/inventory completion)
 
+### Phase 9.6: Product Workflow Completeness + Human/Agent Journey Repair (INSERTED)
+**Goal:** Stop Phase 10 until Fulcrum behaves like one integrated local-first Agent OS product instead of many disconnected CRUD surfaces. Project hierarchy, local repo paths, tasks/boards, docs, runs, context, memory, artifacts, automations, notifications, search, CLI, TUI, web, and server/API must share one relationship model and support complete human and agent journeys.
+**Depends on:** Phase 9.5
+**Requirements:** Locked in `.planning/phases/09.6-product-workflow-completeness-human-agent-journeys/09.6-SPEC.md`
+**TDD:** Journey-first tests before/with fixes: fresh local startup/doctor, human project-to-ship workflow, agent task-to-run-to-artifact-to-memory workflow, CLI/TUI/Web parity, and no-disconnected-CRUD relationship assertions.
+**Success Criteria:**
+  1. Fresh `FULCRUM_HOME` starts server/web/CLI/TUI without hidden env workarounds; doctor green or actionable with no false schema errors.
+  2. Web primary shell is project-first with persistent project selector, project setup local path, project dashboard, contextual nav/palette, and relationship panels.
+  3. Human journeys H1-H6 pass across Web, CLI, and TUI using same data.
+  4. Agent journeys A1-A5 pass from task dispatch through context preview, run supervision, artifacts, memory promotion, audit, notifications, and follow-up tasks.
+  5. Completion proof cites E2E tests, CLI JSON checks, TUI checks, and server/API relationship graph checks.
+**Plans:** Phase-level plan in `09.6-PLAN.md`; execution must split into vertical journey workstreams, not per-screen CRUD cleanup.
+
 ### Phase 10: SaaS Hardening + Milestone Closure
 **Goal**: Multi-tenant SaaS validated and all prior deferred items closed
-**Depends on**: Phase 9.5
+**Depends on**: Phase 9.6
 **Requirements**: SAS-01..06, CLOSURE-01..18
 **TDD**: Integration tests against PostgreSQL plus closure feature, integration, and Huashu UI/UX parity tests
 **Success Criteria**:
@@ -347,8 +361,9 @@ Plans:
 | 7. Repos + Artifacts + Notifications | 10/10 | Complete | 2026-05-05 |
 | 8. Surface Delivery | 7/7 | Complete | 2026-05-06 |
 | 9. Cross-Cutting + Testing | 10/10 | Complete | 2026-05-06 |
+| 9.6. Product Workflow Completeness + Human/Agent Journey Repair | 0/1 | Blocking | Phase 10 blocked |
 | 10. SaaS Hardening + Milestone Closure | 0/19 | Planned | - |
 
 ---
 *Roadmap created: 2026-05-04*
-*Last corrected: 2026-05-06 — expanded Phase 10 to include all prior deferred closure items and Huashu Web/CLI/TUI gate*
+*Last corrected: 2026-05-08 — inserted Phase 9.6 after user UAT found workflow/product completeness blockers across Web, CLI, TUI, server/API, doctor, and local startup*
