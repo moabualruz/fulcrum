@@ -1,19 +1,50 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 
 import { randomUUID } from "node:crypto";
+import { access } from "node:fs/promises";
+import { resolve } from "node:path";
 import { appendEventOrm, ormSqlConnection } from "../orm-helpers.ts";
 import type { AppContext } from "../tasks/types.ts";
+import { addProjectRepo, linkProjectRepoToProject } from "../repos/commands.ts";
+import { loadTemplateSource, normalizeTemplate, type NormalizedTemplate } from "../templates/engine.ts";
+import type { TemplateTrustMode } from "../project-policy/trust.ts";
 
 export async function createProject(
   em: EntityManager,
   ctx: AppContext,
-  input: { slug: string; name: string; description?: string | null },
-): Promise<{ id: string }> {
+  input: {
+    slug: string;
+    name: string;
+    description?: string | null;
+    parentId?: string | null;
+    kind?: "workspace" | "project" | "subproject";
+    modulePolicy?: Record<string, unknown>;
+    templateId?: string | null;
+    workflowId?: string | null;
+  },
+): Promise<{ id: string; slug: string; name: string; parentId: string | null; kind: string; path: string; depth: number }> {
   const id = randomUUID();
+  const parent = input.parentId ? await loadProjectHierarchyParent(em, ctx, input.parentId) : null;
+  const kind = input.kind ?? (parent ? "subproject" : "project");
+  const path = parent ? `${parent.path}/${input.slug}` : input.slug;
+  const depth = parent ? parent.depth + 1 : 0;
   await ormSqlConnection(em).execute(
-    `INSERT INTO projects (id, org_id, slug, name, description, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, now(), now())`,
-    [id, ctx.orgId, input.slug, input.name, input.description ?? null],
+    `INSERT INTO projects (id, org_id, slug, name, description, parent_id, kind, path, depth, module_policy, template_id, workflow_id, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, now(), now())`,
+    [
+      id,
+      ctx.orgId,
+      input.slug,
+      input.name,
+      input.description ?? null,
+      input.parentId ?? null,
+      kind,
+      path,
+      depth,
+      JSON.stringify(input.modulePolicy ?? {}),
+      input.templateId ?? null,
+      input.workflowId ?? null,
+    ],
   );
   await appendEventOrm(em, {
     orgId: ctx.orgId,
@@ -23,7 +54,71 @@ export async function createProject(
     subjectId: id,
     verb: "created",
   });
-  return { id };
+  return { id, slug: input.slug, name: input.name, parentId: input.parentId ?? null, kind, path, depth };
+}
+
+export interface ProjectSetupInput {
+  name: string;
+  slug?: string;
+  description?: string | null;
+  kind?: "workspace" | "project" | "subproject";
+  parentId?: string | null;
+  repoPath?: string | null;
+  template?: string | null;
+  trustMode?: TemplateTrustMode;
+}
+
+export interface ProjectSetupResult {
+  links: {
+    project: { id: string; slug: string; path: string };
+    repo: { id: string; localPath: string | null; syncStatus: string };
+    workflow: { id: string };
+  };
+  template: NormalizedTemplate;
+  trace: { audit: string };
+}
+
+export async function createProjectFromSetup(
+  em: EntityManager,
+  ctx: AppContext,
+  input: ProjectSetupInput,
+): Promise<ProjectSetupResult> {
+  const templateId = input.template ?? "agent-os-software-project";
+  const template = normalizeTemplate(await loadTemplateSource({ kind: "built-in", id: templateId }));
+  const project = await createProject(em, ctx, {
+    slug: input.slug ?? slugFromName(input.name),
+    name: input.name,
+    description: input.description ?? null,
+    parentId: input.parentId ?? null,
+    kind: input.kind,
+    templateId: template.id,
+    workflowId: template.workflow.id,
+    modulePolicy: { trustMode: input.trustMode ?? "manual", inherited: input.parentId ? true : false },
+  });
+  const resolvedRepoPath = input.repoPath ? await normalizeExistingDirectory(input.repoPath) : null;
+  const repo = resolvedRepoPath
+    ? await addProjectRepo(em, { ...ctx, projectId: project.id }, { kind: "local", path: resolvedRepoPath, name: input.name })
+    : { id: "" };
+  if (repo.id) await linkProjectRepoToProject(em, { ...ctx, projectId: project.id }, repo.id);
+  const audit = `evt-${randomUUID()}`;
+  await appendEventOrm(em, {
+    orgId: ctx.orgId,
+    projectId: project.id,
+    actor: ctx.userId ?? "system",
+    subjectKind: "project_setup",
+    subjectId: project.id,
+    verb: "project.setup.completed",
+    payload: { repoId: repo.id || null, templateId: template.id, trustMode: input.trustMode ?? "manual", audit },
+  });
+  return {
+    links: {
+      project: { id: project.id, slug: project.slug, path: project.path },
+      repo: { id: repo.id, localPath: resolvedRepoPath, syncStatus: repo.id ? "idle" : "missing" },
+      workflow: { id: template.workflow.id },
+    },
+    template,
+    trace: { audit },
+  };
 }
 
 export async function updateProject(
@@ -49,6 +144,30 @@ export async function updateProject(
     params,
   );
   return { ok: true };
+}
+
+async function loadProjectHierarchyParent(
+  em: EntityManager,
+  ctx: AppContext,
+  parentId: string,
+): Promise<{ id: string; path: string; depth: number }> {
+  const rows = await ormSqlConnection(em).execute<Array<{ id: string; path: string | null; depth: number | string; slug: string }>>(
+    `SELECT id, path, depth, slug FROM projects WHERE id = $1 AND org_id = $2`,
+    [parentId, ctx.orgId],
+  );
+  const row = rows[0];
+  if (!row) throw new Error("parent project not found");
+  return { id: row.id, path: row.path ?? row.slug, depth: Number(row.depth) };
+}
+
+async function normalizeExistingDirectory(path: string): Promise<string> {
+  const resolved = resolve(path);
+  await access(resolved);
+  return resolved;
+}
+
+function slugFromName(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project";
 }
 
 export async function deleteProject(em: EntityManager, ctx: AppContext, id: string): Promise<{ ok: true }> {

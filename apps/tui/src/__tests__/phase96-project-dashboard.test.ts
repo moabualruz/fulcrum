@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import type { Renderer } from "../renderer.ts";
 import { ProjectDetailScreen } from "../screens/project-detail.ts";
 import { ProjectsScreen } from "../screens/projects.ts";
 
@@ -65,7 +66,7 @@ describe("Phase 09.6 TUI project setup parity", () => {
     });
     const renderer = new BufferRenderer();
 
-    screen.render(renderer);
+    screen.render(renderer as unknown as Renderer);
 
     expect(renderer.text()).toContain("proj_1");
     expect(renderer.text()).toContain("repo_1");

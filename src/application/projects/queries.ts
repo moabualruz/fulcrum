@@ -7,6 +7,10 @@ export interface ProjectRow {
   id: string;
   slug: string;
   name: string;
+  parentId?: string | null;
+  kind?: string;
+  path?: string;
+  depth?: number;
 }
 
 export interface ProjectActivityFilter {
@@ -70,6 +74,16 @@ export interface ProjectOverviewData {
   };
 }
 
+export interface ProjectHierarchyNode {
+  id: string;
+  slug: string;
+  name: string;
+  parentId: string | null;
+  kind: string;
+  path: string;
+  depth: number;
+}
+
 export interface ProjectListing {
   id: string;
   slug: string;
@@ -119,6 +133,35 @@ export async function listProjectRows(em: EntityManager, ctx: AppContext): Promi
   }));
 }
 
+export async function getProjectHierarchy(
+  em: EntityManager,
+  ctx: AppContext,
+  projectId: string,
+): Promise<{ project: ProjectHierarchyNode; descendants: ProjectHierarchyNode[] } | null> {
+  const conn = ormSqlConnection(em);
+  const projectRows = await conn.execute<Array<ProjectHierarchyNode & { parent_id: string | null }>>(
+    `SELECT id, slug, name, parent_id, kind, COALESCE(path, slug) AS path, depth
+       FROM projects
+      WHERE id = $1 AND org_id = $2`,
+    [projectId, ctx.orgId],
+  );
+  const project = projectRows[0];
+  if (!project) return null;
+  const descendants = await conn.execute<Array<ProjectHierarchyNode & { parent_id: string | null }>>(
+    `SELECT id, slug, name, parent_id, kind, COALESCE(path, slug) AS path, depth
+       FROM projects
+      WHERE org_id = $1
+        AND COALESCE(path, slug) LIKE $2
+        AND id <> $3
+      ORDER BY depth ASC, path ASC`,
+    [ctx.orgId, `${project.path}/%`, project.id],
+  );
+  return {
+    project: mapHierarchyNode(project),
+    descendants: descendants.map(mapHierarchyNode),
+  };
+}
+
 export async function listProjectOptions(em: EntityManager, ctx: AppContext): Promise<ProjectOption[]> {
   const rows = await ormSqlConnection(em).execute<ProjectOption[]>(
     `SELECT id, name
@@ -144,7 +187,12 @@ export async function getProjectOrNull(
   return rows[0] ?? null;
 }
 
-export async function loadProjectOverview(em: EntityManager, ctx: AppContext, projectId: string): Promise<ProjectOverviewData | null> {
+export async function loadProjectOverview(
+  em: EntityManager,
+  ctx: AppContext,
+  projectId: string,
+  options: { includeDescendants?: boolean } = {},
+): Promise<ProjectOverviewData | null> {
   const conn = ormSqlConnection(em);
   const rows = await conn.execute<Array<ProjectRow & { description: string | null; updated_at: Date | string }>>(
     `SELECT id, slug, name, description, updated_at FROM projects
@@ -153,14 +201,16 @@ export async function loadProjectOverview(em: EntityManager, ctx: AppContext, pr
   );
   const row = rows[0];
   if (!row) return null;
+  const targetProjectIds = options.includeDescendants ? await descendantProjectIds(em, ctx, projectId) : [projectId];
+  const projectPlaceholders = targetProjectIds.map((_, index) => `$${index + 1}`).join(", ");
   const summaryRows = await conn.execute<Array<{ open_tasks: number | string; in_progress: number | string; done: number | string }>>(
     `SELECT
        COUNT(*) FILTER (WHERE status NOT IN ('completed', 'cancelled')) AS open_tasks,
        COUNT(*) FILTER (WHERE status = 'in_progress') AS in_progress,
        COUNT(*) FILTER (WHERE status = 'completed') AS done
      FROM tasks
-     WHERE project_id = $1 AND org_id = $2`,
-    [projectId, ctx.orgId],
+     WHERE project_id IN (${projectPlaceholders}) AND org_id = $${targetProjectIds.length + 1}`,
+    [...targetProjectIds, ctx.orgId],
   );
   const summary = summaryRows[0] ?? { open_tasks: 0, in_progress: 0, done: 0 };
   return {
@@ -177,6 +227,23 @@ export async function loadProjectOverview(em: EntityManager, ctx: AppContext, pr
       done: Number(summary.done),
       sprintDaysRemaining: 0,
     },
+  };
+}
+
+async function descendantProjectIds(em: EntityManager, ctx: AppContext, projectId: string): Promise<string[]> {
+  const hierarchy = await getProjectHierarchy(em, ctx, projectId);
+  return hierarchy ? [hierarchy.project.id, ...hierarchy.descendants.map((node) => node.id)] : [projectId];
+}
+
+function mapHierarchyNode(row: ProjectHierarchyNode & { parent_id?: string | null }): ProjectHierarchyNode {
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    parentId: row.parent_id ?? row.parentId ?? null,
+    kind: row.kind,
+    path: row.path,
+    depth: Number(row.depth),
   };
 }
 

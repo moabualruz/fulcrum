@@ -27,7 +27,7 @@ const HELP = `fulcrum projects
 Usage:
   fulcrum projects list [--json]
   fulcrum projects get <id> [--json]
-  fulcrum projects create --name <name> [--json]
+  fulcrum projects create --name <name> [--repo-path <path>] [--template <id>] [--parent <id>] [--json]
   fulcrum projects update <id> [--name <name>] [--json]
   fulcrum projects delete <id> [--json]
   fulcrum projects stats <id> [--json]
@@ -49,7 +49,12 @@ export async function run(argv: readonly string[], opts: ProjectsRunOptions = {}
       case "get":
         return printOutput(await caller!.projects.get({ id: requiredArg(rest, "get", "<id>") }), rest, io.print);
       case "create":
-        return printOutput(await caller!.projects.create({ name: requiredFlag(rest, "--name") }), rest, io.print);
+        return printOutput(await caller!.projects.create(compact({
+          name: requiredFlag(rest, "--name"),
+          repoPath: flagValue(rest, "--repo-path"),
+          template: flagValue(rest, "--template"),
+          parentId: flagValue(rest, "--parent"),
+        })), rest, io.print);
       case "update":
         return printOutput(await caller!.projects.update(compact({
           id: requiredArg(rest, "update", "<id>"),

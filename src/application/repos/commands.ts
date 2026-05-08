@@ -47,12 +47,13 @@ export async function addProjectRepo(
   const displayName = name || (kind === "local" ? basename(resolvedPath ?? "repo") : slugFromRemoteUrl(url));
   const id = randomUUID();
   const rows = await ormSqlConnection(em).execute<Array<{ id: string }>>(
-    `INSERT INTO repos (id, org_id, slug, default_branch, remote_url, name, kind, local_path, current_branch, sync_status, last_touched_at)
-     VALUES ($1, $2, $3, 'main', $4, $5, $6, $7, 'main', 'idle', now())
+    `INSERT INTO repos (id, org_id, project_id, slug, default_branch, remote_url, name, kind, local_path, current_branch, sync_status, last_touched_at)
+     VALUES ($1, $2, $3, $4, 'main', $5, $6, $7, $8, 'main', 'idle', now())
      RETURNING id`,
     [
       id,
       ctx.orgId,
+      ctx.projectId ?? null,
       slug,
       kind === "remote" ? url : null,
       displayName,
@@ -70,6 +71,10 @@ export async function linkProjectRepoToProject(
 ): Promise<{ ok: true }> {
   if (!repoId) throw new AppValidationError("repoId required");
   await getRepo(em, ctx, repoId);
+  await ormSqlConnection(em).execute(
+    `UPDATE repos SET project_id = $1, last_touched_at = now() WHERE id = $2 AND org_id = $3`,
+    [ctx.projectId ?? null, repoId, ctx.orgId],
+  );
   return { ok: true };
 }
 

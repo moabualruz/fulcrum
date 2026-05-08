@@ -26,6 +26,13 @@ export class ProjectDetailScreen {
   render(renderer: Renderer): void {
     renderer.writeln();
     renderer.writeln(c.bold(`  Project › ${this.opts.project.name}`));
+    renderer.writeln(`  Project ID: ${this.opts.project.id}  Slug: ${this.opts.project.slug}`);
+    if (this.opts.project.repo) {
+      renderer.writeln(`  Repo: ${this.opts.project.repo.id}  ${this.opts.project.repo.localPath ?? "No local repo linked"}  ${this.opts.project.repo.syncStatus ?? "unknown"}`);
+    }
+    if (this.opts.project.workflow) {
+      renderer.writeln(`  Workflow: ${this.opts.project.workflow.id}`);
+    }
     renderer.separator();
     renderer.writeln();
     renderer.writeln(`  ${PROJECT_DETAIL_TABS.map((tab) => this.formatTab(tab)).join("  ")}`);

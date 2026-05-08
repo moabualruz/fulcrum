@@ -7,13 +7,22 @@ export interface ProjectListItem {
   slug: string;
   status?: string | null;
   updatedAt?: string | Date | null;
+  repo?: { id: string; localPath: string | null; syncStatus?: string | null } | null;
+  workflow?: { id: string } | null;
+}
+
+export interface ProjectSetupInput {
+  name: string;
+  repoPath?: string | null;
+  template?: string | null;
+  parentId?: string | null;
 }
 
 export interface ProjectsScreenOptions {
   caller: {
     projects: {
       list: () => Promise<ProjectListItem[]>;
-      create: (input: { name: string }) => Promise<ProjectListItem>;
+      create: (input: ProjectSetupInput) => Promise<ProjectListItem>;
       delete: (input: { id: string }) => Promise<{ ok: boolean }>;
     };
   };
@@ -114,10 +123,11 @@ export class ProjectsScreen {
     return false;
   }
 
-  async submitCreate(name: string): Promise<void> {
-    const trimmed = name.trim();
+  async submitCreate(name: string | ProjectSetupInput): Promise<void> {
+    const input = typeof name === "string" ? { name } : name;
+    const trimmed = input.name.trim();
     if (!trimmed) return;
-    const project = await this.opts.caller.projects.create({ name: trimmed });
+    const project = await this.opts.caller.projects.create({ ...input, name: trimmed });
     this.projects = [...this.projects, project];
     this.cursor = this.projects.length - 1;
     this.overlay = "none";

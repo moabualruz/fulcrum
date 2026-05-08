@@ -116,10 +116,9 @@ describe("Phase 09.6 template normalization and trust policy", () => {
     const markdown = normalizeTemplate(await loadTemplateSource({ kind: "markdown", path: markdownPath }));
     const directory = normalizeTemplate(await loadTemplateSource({ kind: "directory", path: directoryPath }), { removeModules: ["repo"] });
 
-    expect(builtIn).toMatchObject({
-      id: AGENT_OS_SOFTWARE_PROJECT_TEMPLATE_ID,
-      modules: expect.arrayContaining([{ id: "repo" }, { id: "workflow" }]),
-    });
+    expect(builtIn.id).toBe(AGENT_OS_SOFTWARE_PROJECT_TEMPLATE_ID);
+    expect(builtIn.modules).toContainEqual({ id: "repo", label: "Repo" });
+    expect(builtIn.modules).toContainEqual({ id: "workflow", label: "Workflow" });
     expect(markdown).toMatchObject({ id: "local-markdown", modules: [{ id: "docs" }, { id: "work" }] });
     expect(directory.modules.map((module) => module.id)).toEqual(["docs"]);
   });
