@@ -21,7 +21,7 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
 - [x] **Phase 7: Repos + Artifacts + Notifications** - Git sync, artifact pipeline, notification delivery
 - [x] **Phase 8: Surface Delivery** - CLI wiring, TUI rewrite, Web completion, API surface
 - [x] **Phase 9: Cross-Cutting + Testing** - i18n, theming, accessibility, telemetry, backup, comprehensive test coverage (completed 2026-05-06)
-- [ ] **Phase 9.5: Full Architecture Overhaul + Integration Preservation** (INSERTED) - Deep research all gray areas, overhaul architecture, implement one unified data manipulation layer, remove interface logic duplication, repair web/CLI/TUI/API integration, preserve every feature/logic/benefit, and replace fake tests with real Playwright + integration gates
+- [x] **Phase 9.5: Full Architecture Overhaul + Integration Preservation** (INSERTED) - Deep research all gray areas, overhaul architecture, implement one unified data manipulation layer, remove interface logic duplication, repair web/CLI/TUI/API integration, preserve every feature/logic/benefit, and replace fake tests with real Playwright + integration gates (closed for now 2026-05-08; remaining workflow/product gaps moved to Phase 9.6)
 - [ ] **Phase 9.6: Product Workflow Completeness + Human/Agent Journey Repair** (INSERTED) - User UAT blocker: replace disconnected CRUD surfaces with one project-first workflow product across Web, CLI, TUI, server/API, docs, memory, context, orchestration, artifacts, automations, and doctor/startup gates. Phase 10 blocked until human and agent journeys pass end-to-end.
 - [ ] **Phase 10: SaaS Hardening + Milestone Closure** - Multi-org isolation, PostgreSQL pooling, job coordination, all deferred item closure, Huashu Web/CLI/TUI UX gate
 
@@ -303,7 +303,8 @@ Plans:
   7. CLI and TUI parity repaired for all shipped feature workflows; same data and same application services as web/API.
   8. Playwright E2E is real and mandatory using Tiered Mandatory policy: normal CI hard-fails smoke/critical journeys, and full Playwright workflows gate Phase 9.5 acceptance and release/closure.
   9. Phase 10 remains blocked until Phase 9.5 verification passes.
-**Plans:** 0 plans — plan after research + inventories are written.
+**Status:** Complete for now — closed by user decision on 2026-05-08. Architecture/data-layer remediation evidence lives in `09.5-VERIFICATION.md`; product workflow and journey gaps are explicitly carried by Phase 9.6.
+**Plans:** Complete — execution artifacts 09.5-00 through 09.5-61 plus verification/closure artifacts.
 
 Artifacts:
 - `.planning/INTEGRATION-FAILURE-AUDIT.md`
@@ -317,7 +318,7 @@ Artifacts:
 - `.planning/phases/09.5-architecture-data-layer-remediation-full-interface-fix/09.5-UI-SPEC.md`
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 9.5 after research/inventory completion)
+- [x] Phase 9.5 execution set closed for now; next blocker is Phase 9.6.
 
 ### Phase 9.6: Product Workflow Completeness + Human/Agent Journey Repair (INSERTED)
 **Goal:** Stop Phase 10 until Fulcrum behaves like one integrated local-first Agent OS product instead of many disconnected CRUD surfaces. Project hierarchy, local repo paths, tasks/boards, docs, runs, context, memory, artifacts, automations, notifications, search, CLI, TUI, web, and server/API must share one relationship model and support complete human and agent journeys.
@@ -361,6 +362,7 @@ Plans:
 | 7. Repos + Artifacts + Notifications | 10/10 | Complete | 2026-05-05 |
 | 8. Surface Delivery | 7/7 | Complete | 2026-05-06 |
 | 9. Cross-Cutting + Testing | 10/10 | Complete | 2026-05-06 |
+| 9.5. Full Architecture Overhaul + Integration Preservation | 61/61 | Complete for now | 2026-05-08 |
 | 9.6. Product Workflow Completeness + Human/Agent Journey Repair | 0/1 | Blocking | Phase 10 blocked |
 | 10. SaaS Hardening + Milestone Closure | 0/19 | Planned | - |
 
