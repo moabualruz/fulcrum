@@ -281,6 +281,7 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'relationships'" -a 'delete'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'relationships'" -a 'list-blocked-by' -d 'relationships list-blocked-by'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'relationships'" -a 'list-for-task' -d 'relationships list-for-task'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'relationships'" -a 'mark-as-duplicate' -d 'relationships mark-as-duplicate'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'relationships'" -a 'summary' -d 'relationships summary'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'relationships'" -l json -d option
 complete -c fulcrum -n "__fish_use_subcommand" -a 'repo_branches' -d 'fulcrum repo_branches'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repo_branches'" -a 'get' -d 'repo_branches get'

@@ -403,7 +403,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     relationships)
-      local verbs='blocked-items blockers create delete list-blocked-by list-for-task mark-as-duplicate'
+      local verbs='blocked-items blockers create delete list-blocked-by list-for-task mark-as-duplicate summary'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )

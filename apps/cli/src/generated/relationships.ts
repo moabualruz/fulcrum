@@ -135,5 +135,25 @@ export function createRelationshipsCommand(): Command {
     }
   });
 
+  const summaryCommand = command.command("summary");
+  summaryCommand.description("relationships summary");
+  summaryCommand.option("--json", "Emit JSON output");
+  summaryCommand.option("--entity-id <string>", "entity-id");
+  summaryCommand.addOption(new Option("--entity-kind <choice>", "entity-kind").choices(["workspace","project","parent_project","subproject","repo","work_item","doc","context_bundle","routing_decision","run","live_session","artifact","memory","automation","audit"]));
+  summaryCommand.option("--entity-label <string>", "entity-label");
+  summaryCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for relationships.summary requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   return command;
 }

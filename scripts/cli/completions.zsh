@@ -230,7 +230,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     relationships)
-      local -a values=('blocked-items:fulcrum relationships blocked-items' 'blockers:fulcrum relationships blockers' 'create:fulcrum relationships create' 'delete:fulcrum relationships delete' 'list-blocked-by:fulcrum relationships list-blocked-by' 'list-for-task:fulcrum relationships list-for-task' 'mark-as-duplicate:fulcrum relationships mark-as-duplicate' '--json:option')
+      local -a values=('blocked-items:fulcrum relationships blocked-items' 'blockers:fulcrum relationships blockers' 'create:fulcrum relationships create' 'delete:fulcrum relationships delete' 'list-blocked-by:fulcrum relationships list-blocked-by' 'list-for-task:fulcrum relationships list-for-task' 'mark-as-duplicate:fulcrum relationships mark-as-duplicate' 'summary:fulcrum relationships summary' '--json:option')
       _describe 'command or option' values
       ;;
     repo_branches)
