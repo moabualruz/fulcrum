@@ -26,6 +26,19 @@ export interface CreateDocInput {
   frontmatter?: Record<string, unknown>;
   contentJson?: Record<string, unknown>;
   sortPosition?: number;
+  source?: DocSourceRef;
+  links?: DocSourceLinkInput[];
+}
+
+export interface DocSourceRef {
+  kind: "task" | "run" | "artifact" | "memory" | "doc" | string;
+  id: string;
+}
+
+export interface DocSourceLinkInput extends DocSourceRef {
+  targetKind?: string;
+  targetId?: string;
+  linkKind?: "task_ref" | "run_ref" | "mention" | "wikilink";
 }
 
 export interface ListDocsInput {

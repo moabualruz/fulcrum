@@ -130,6 +130,14 @@ export class DocService {
     bodyMd?: string;
     contentJson?: Record<string, unknown>;
     sortPosition?: number;
+    source?: { kind: string; id: string };
+    links?: Array<{
+      kind?: string;
+      id?: string;
+      targetKind?: string;
+      targetId?: string;
+      linkKind?: LinkKind;
+    }>;
   }): Promise<DocOutput> {
     const bodyMd = input.bodyMd ?? "";
     const parent = await resolveParent(this.em, ctx.orgId, input.parentId);
@@ -152,6 +160,7 @@ export class DocService {
     this.em.persist(doc);
     await writeDocVersion(this.em, { orgId: ctx.orgId, doc, authorId: ctx.userId });
     await upsertSearchDocument(this.em, ctx.orgId, doc.id, ctx.userId);
+    persistExplicitDocLinks(this.em, ctx.orgId, doc, input.links);
     await this.em.flush();
     return serializeDoc(doc);
   }
@@ -453,6 +462,39 @@ export class DocService {
 }
 
 // ── Pure helpers (moved from router) ─────────────────────────────
+
+function persistExplicitDocLinks(
+  em: EntityManager,
+  orgId: string,
+  doc: Document,
+  links: Array<{
+    kind?: string;
+    id?: string;
+    targetKind?: string;
+    targetId?: string;
+    linkKind?: LinkKind;
+  }> | undefined,
+): void {
+  for (const link of links ?? []) {
+    const targetKind = link.targetKind ?? link.kind;
+    const targetId = link.targetId ?? link.id;
+    if (!targetKind || !targetId) continue;
+    const linkKind = link.linkKind ?? linkKindForTarget(targetKind);
+    em.persist(em.create(DocLink, {
+      org: em.getReference(Org, orgId),
+      fromDoc: doc,
+      toDoc: null,
+      toSlug: `${targetKind}:${targetId}`,
+      linkKind,
+    }));
+  }
+}
+
+function linkKindForTarget(targetKind: string): LinkKind {
+  if (targetKind === "task") return "task_ref";
+  if (targetKind === "run" || targetKind === "agent_run") return "run_ref";
+  return "mention";
+}
 
 export function serializeDoc(doc: Document): DocOutput {
   const frontmatter = doc.frontmatter ?? {};

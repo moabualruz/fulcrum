@@ -23,6 +23,7 @@ import {
 } from "@/application/docs/queries.ts";
 import type { AppContext } from "@/application/docs/types.ts";
 import { DocTypeEnum, ScopeEnum } from "@/application/docs/types.ts";
+import { LinkKindEnum } from "@/domain/docs/enums.ts";
 import { appErrorToTrpcError } from "@/application/error-mapping.ts";
 import { AppError } from "@/application/errors.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
@@ -75,6 +76,12 @@ const CreateDocInputSchema = z.object({
   bodyMd: z.string().optional(),
   contentJson: JsonRecordSchema.optional(),
   sortPosition: z.number().optional(),
+  source: z.object({ kind: z.string().min(1), id: z.string().min(1) }).optional(),
+  links: z.array(z.object({
+    targetKind: z.string().min(1),
+    targetId: z.string().min(1),
+    linkKind: LinkKindEnum.optional(),
+  })).optional(),
 });
 
 const UpdateDocInputSchema = z.object({

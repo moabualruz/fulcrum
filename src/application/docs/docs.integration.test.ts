@@ -45,6 +45,36 @@ describe("application docs commands and queries", () => {
     await expect(getDoc(em, ctx(), created.id)).resolves.toMatchObject({ id: created.id });
   });
 
+  test("createDoc persists explicit task source links for backlinks and context source refs", async () => {
+    const testDb = await freshDb();
+    const em = testDb.em.fork();
+
+    const created = await createDoc(em, ctx(), {
+      title: "Task handoff",
+      bodyMd: "Implementation notes",
+      links: [{ targetKind: "task", targetId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", linkKind: "task_ref" }],
+    });
+
+    const rows = await em.getConnection().execute<Array<{
+      from_doc_id: string;
+      to_doc_id: string | null;
+      to_slug: string;
+      link_kind: string;
+    }>>(
+      `select from_doc_id, to_doc_id, to_slug, link_kind
+         from doc_links
+        where org_id = ? and from_doc_id = ?`,
+      [DEFAULT_ORG_ID, created.id],
+    );
+
+    expect(rows).toEqual([{
+      from_doc_id: created.id,
+      to_doc_id: null,
+      to_slug: "task:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      link_kind: "task_ref",
+    }]);
+  });
+
   test("createDoc validation failure throws AppValidationError", async () => {
     const testDb = await freshDb();
     await expect(createDoc(testDb.em.fork(), ctx(), { title: "" })).rejects.toBeInstanceOf(AppValidationError);
