@@ -20,7 +20,7 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-	label: "Work" | "Agent OS" | "System" | "Settings";
+	label: "Current Scope" | "Portfolio" | "System";
 	items: readonly NavItem[];
 }
 
@@ -28,21 +28,20 @@ export interface NavGroup {
 // requires updating the test snapshot.
 export const NAV_GROUPS: readonly NavGroup[] = [
 	{
-		label: "Work",
+		label: "Current Scope",
 		items: [
 			{ href: "/", label: "Dashboard", iconName: "LayoutDashboard" },
-			{ href: "/projects", label: "Projects", iconName: "Folder" },
 			{ href: "/boards", label: "Board", iconName: "Kanban" },
 			{ href: "/docs", label: "Docs", iconName: "FileText" },
+			{ href: "/runs", label: "Runs", iconName: "Activity" },
+			{ href: "/artifacts", label: "Artifacts", iconName: "FileText" },
 		],
 	},
 	{
-		label: "Agent OS",
+		label: "Portfolio",
 		items: [
-			{ href: "/agents", label: "Agents", iconName: "Activity" },
-			{ href: "/runs", label: "Runs", iconName: "Activity" },
-			{ href: "/artifacts", label: "Artifacts", iconName: "FileText" },
-			{ href: "/orchestration", label: "Orchestration", iconName: "Kanban" },
+			{ href: "/projects", label: "All projects", iconName: "Folder" },
+			{ href: "/search", label: "Search", iconName: "Search" },
 			{ href: "/memory", label: "Memory", iconName: "FileText" },
 			{ href: "/context/preview", label: "Context", iconName: "FileText" },
 		],
@@ -50,14 +49,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
 	{
 		label: "System",
 		items: [
-			{ href: "/search", label: "Search", iconName: "Search" },
+			{ href: "/agents", label: "Agents", iconName: "Activity" },
+			{ href: "/orchestration", label: "Orchestration", iconName: "Kanban" },
 			{ href: "/audit", label: "Audit", iconName: "FileText" },
 			{ href: "/doctor", label: "Doctor", iconName: "Activity" },
+			{ href: "/settings/inference", label: "Settings", iconName: "Settings" },
 		],
-	},
-	{
-		label: "Settings",
-		items: [{ href: "/settings/inference", label: "Settings", iconName: "Settings" }],
 	},
 ] as const;
 

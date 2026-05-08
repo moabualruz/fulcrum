@@ -4,28 +4,27 @@ import { LUCIDE_ICONS, NAV_GROUPS, NAV_ITEMS, type NavItem } from "./nav-items.t
 
 describe("NAV_ITEMS surface", () => {
   test("declares grouped primary surface", () => {
-    expect(NAV_GROUPS.map((group) => group.label)).toEqual(["Work", "Agent OS", "System", "Settings"]);
+    expect(NAV_GROUPS.map((group) => group.label)).toEqual(["Current Scope", "Portfolio", "System"]);
     expect(NAV_GROUPS.map((group) => group.items.map((item) => item.href))).toEqual([
-      ["/", "/projects", "/boards", "/docs"],
-      ["/agents", "/runs", "/artifacts", "/orchestration", "/memory", "/context/preview"],
-      ["/search", "/audit", "/doctor"],
-      ["/settings/inference"],
+      ["/", "/boards", "/docs", "/runs", "/artifacts"],
+      ["/projects", "/search", "/memory", "/context/preview"],
+      ["/agents", "/orchestration", "/audit", "/doctor", "/settings/inference"],
     ]);
   });
 
   test("exposes hrefs in declared order", () => {
     expect(NAV_ITEMS.map((i) => i.href)).toEqual([
       "/",
-      "/projects",
       "/boards",
       "/docs",
-      "/agents",
       "/runs",
       "/artifacts",
-      "/orchestration",
+      "/projects",
+      "/search",
       "/memory",
       "/context/preview",
-      "/search",
+      "/agents",
+      "/orchestration",
       "/audit",
       "/doctor",
       "/settings/inference",
@@ -35,16 +34,16 @@ describe("NAV_ITEMS surface", () => {
   test("exposes labels in declared order", () => {
     expect(NAV_ITEMS.map((i) => i.label)).toEqual([
       "Dashboard",
-      "Projects",
       "Board",
       "Docs",
-      "Agents",
       "Runs",
       "Artifacts",
-      "Orchestration",
+      "All projects",
+      "Search",
       "Memory",
       "Context",
-      "Search",
+      "Agents",
+      "Orchestration",
       "Audit",
       "Doctor",
       "Settings",
@@ -65,16 +64,16 @@ describe("NAV_ITEMS surface", () => {
   test("locks the icon assignment per entry", () => {
     const pairs: Array<[string, NavItem["iconName"]]> = [
       ["/", "LayoutDashboard"],
-      ["/projects", "Folder"],
       ["/boards", "Kanban"],
       ["/docs", "FileText"],
-      ["/agents", "Activity"],
       ["/runs", "Activity"],
       ["/artifacts", "FileText"],
-      ["/orchestration", "Kanban"],
+      ["/projects", "Folder"],
+      ["/search", "Search"],
       ["/memory", "FileText"],
       ["/context/preview", "FileText"],
-      ["/search", "Search"],
+      ["/agents", "Activity"],
+      ["/orchestration", "Kanban"],
       ["/audit", "FileText"],
       ["/doctor", "Activity"],
       ["/settings/inference", "Settings"],
