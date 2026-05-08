@@ -3,6 +3,7 @@ import type { EntityManager } from "@mikro-orm/postgresql";
 import { AppValidationError } from "../errors.ts";
 import { ormSqlConnection } from "../orm-helpers.ts";
 import { previewContext, type ContextSourceRef } from "../context/queries.ts";
+import { resolveEffectiveAgentAuthority } from "../project-policy/trust.ts";
 import type { AppContext } from "../runs/types.ts";
 
 export type DispatchTrustMode = "manual" | "assisted" | "trusted" | "full-auto";
@@ -22,6 +23,8 @@ export interface DispatchTrace {
   authority: {
     trustMode: DispatchTrustMode;
     approvalRequired: boolean;
+    reason: string;
+    sources: Record<string, DispatchTrustMode | null>;
   };
 }
 
@@ -57,7 +60,12 @@ export async function buildDispatchTrace(
     includeGlobal,
   });
   const selectedAgent = input.agentName?.trim() || "codex";
-  const trustMode = input.trustMode ?? "assisted";
+  const authority = resolveEffectiveAgentAuthority({
+    agentProfile: { trustMode: "assisted" },
+    workflowDefault: { trustMode: "assisted" },
+    projectPolicy: { trustMode: "assisted" },
+    runOverride: input.trustMode ? { trustMode: input.trustMode } : null,
+  });
   return {
     taskId: input.taskId,
     projectId,
@@ -71,8 +79,10 @@ export async function buildDispatchTrace(
       reason: input.agentName?.trim() ? "explicit-agent" : "default-agent",
     },
     authority: {
-      trustMode,
-      approvalRequired: trustMode === "manual",
+      trustMode: authority.trustMode,
+      approvalRequired: authority.approvalRequired,
+      reason: authority.reason,
+      sources: authority.sources,
     },
   };
 }

@@ -451,6 +451,8 @@ export const orchestrationRouter = router({
           authority: z.object({
             trustMode: z.enum(["manual", "assisted", "trusted", "full-auto"]),
             approvalRequired: z.boolean(),
+            reason: z.string(),
+            sources: z.record(z.string(), z.enum(["manual", "assisted", "trusted", "full-auto"]).nullable()),
           }),
         }),
       }),

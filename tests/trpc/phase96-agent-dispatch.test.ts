@@ -88,7 +88,17 @@ describe("Phase 09.6 agent run dispatch", () => {
           repoId: REPO_ID,
           context: { sourceRefs: expect.any(Array), includeGlobal: true },
           routing: { selectedAgent: "codex", reason: "explicit-agent" },
-          authority: { trustMode: "assisted", approvalRequired: false },
+          authority: {
+            trustMode: "assisted",
+            approvalRequired: false,
+            reason: "most-restrictive-policy",
+            sources: {
+              agentProfile: "assisted",
+              workflowDefault: "assisted",
+              projectPolicy: "assisted",
+              runOverride: null,
+            },
+          },
         },
       });
     } finally {
