@@ -1,6 +1,8 @@
 import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20260508090000_phase96_project_setup extends Migration {
+  static readonly isLossy = true;
+
   override async up(): Promise<void> {
     this.addSql(`alter table "projects" add column if not exists "parent_id" uuid null references "projects" ("id")`);
     this.addSql(`alter table "projects" add column if not exists "kind" text not null default 'project'`);
