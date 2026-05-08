@@ -22,6 +22,15 @@ export const ProjectFormSchema = v.object({
   description: v.optional(
     v.pipe(v.string(), v.maxLength(280, "Description is too long")),
   ),
+  repoPath: v.optional(
+    v.pipe(v.string(), v.trim(), v.maxLength(500, "Repository path is too long")),
+  ),
+  template: v.optional(
+    v.pipe(v.string(), v.trim(), v.maxLength(120, "Template id is too long")),
+  ),
+  parentId: v.optional(
+    v.pipe(v.string(), v.trim(), v.maxLength(80, "Parent project id is too long")),
+  ),
 });
 
 export type ProjectFormValues = v.InferOutput<typeof ProjectFormSchema>;

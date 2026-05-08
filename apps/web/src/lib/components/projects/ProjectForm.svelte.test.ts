@@ -15,7 +15,14 @@ interface ProjectFormShape {
   valid: boolean;
   posted: boolean;
   errors: Record<string, string[] | undefined>;
-  data: { name: string; slug: string; description?: string | null };
+  data: {
+    name: string;
+    slug: string;
+    description?: string | null;
+    repoPath?: string | null;
+    template?: string | null;
+    parentId?: string | null;
+  };
   message?: unknown;
   constraints: Record<string, unknown>;
   shape?: unknown;
@@ -53,7 +60,33 @@ describe("ProjectForm component (SSR)", () => {
     expect(body).toContain("data-project-name");
     expect(body).toContain("data-project-slug");
     expect(body).toContain("data-project-description");
+    expect(body).toContain("data-project-repo-path");
+    expect(body).toContain("data-project-template");
+    expect(body).toContain("data-project-parent");
     expect(body).toContain("data-project-submit");
+  });
+
+  test("renders Agent OS setup fields seeded from form data", () => {
+    const { body } = render(ProjectForm, {
+      props: {
+        form: makeForm({
+          data: {
+            name: "Demo",
+            slug: "demo",
+            description: "",
+            repoPath: "/tmp/demo",
+            template: "agent-os-software-project",
+            parentId: "parent-1",
+          },
+        }),
+      },
+    });
+    expect(body).toContain('name="repoPath"');
+    expect(body).toContain('value="/tmp/demo"');
+    expect(body).toContain('name="template"');
+    expect(body).toContain('value="agent-os-software-project"');
+    expect(body).toContain('name="parentId"');
+    expect(body).toContain('value="parent-1"');
   });
 
   test("form element posts via method=POST", () => {

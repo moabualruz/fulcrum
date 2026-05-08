@@ -3,7 +3,7 @@ import { superValidate } from "sveltekit-superforms";
 import { valibot } from "sveltekit-superforms/adapters";
 import type { Actions, PageServerLoad } from "./$types";
 import { ProjectFormSchema } from "$lib/server/projects.schema";
-import { createProject } from "@/application/projects/commands.ts";
+import { createProject, createProjectFromSetup } from "@/application/projects/commands.ts";
 import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = async () => {
@@ -16,6 +16,20 @@ export const actions: Actions = {
     const form = await superValidate(request, valibot(ProjectFormSchema));
     if (!form.valid) return fail(400, { form });
     const { em, ctx } = await requestAppScope(locals);
+    const repoPath = form.data.repoPath?.trim() || null;
+    const template = form.data.template?.trim() || null;
+    const parentId = form.data.parentId?.trim() || null;
+    if (repoPath || template || parentId) {
+      await createProjectFromSetup(em, ctx, {
+        slug: form.data.slug,
+        name: form.data.name,
+        description: form.data.description ?? null,
+        repoPath,
+        template,
+        parentId,
+      });
+      throw redirect(303, "/projects");
+    }
     await createProject(em, ctx, {
       slug: form.data.slug,
       name: form.data.name,

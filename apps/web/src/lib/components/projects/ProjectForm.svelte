@@ -20,11 +20,17 @@
 	let nameValue = $state(untrack(() => form.data.name ?? ""));
 	let slugValue = $state(untrack(() => form.data.slug ?? ""));
 	let descriptionValue = $state(untrack(() => form.data.description ?? ""));
+	let repoPathValue = $state(untrack(() => form.data.repoPath ?? ""));
+	let templateValue = $state(untrack(() => form.data.template ?? "agent-os-software-project"));
+	let parentIdValue = $state(untrack(() => form.data.parentId ?? ""));
 	let slugTouched = $state(false);
 
 	const nameError = $derived<string | undefined>(form.errors?.name?.[0]);
 	const slugError = $derived<string | undefined>(form.errors?.slug?.[0]);
 	const descriptionError = $derived<string | undefined>(form.errors?.description?.[0]);
+	const repoPathError = $derived<string | undefined>(form.errors?.repoPath?.[0]);
+	const templateError = $derived<string | undefined>(form.errors?.template?.[0]);
+	const parentIdError = $derived<string | undefined>(form.errors?.parentId?.[0]);
 
 	function onNameInput(event: Event): void {
 		const target = event.target as HTMLInputElement;
@@ -106,6 +112,63 @@
 		></textarea>
 		{#if descriptionError}
 			<p data-error-description class="text-destructive text-xs">{descriptionError}</p>
+		{/if}
+	</div>
+
+	<div class="grid gap-4 md:grid-cols-2">
+		<div class="flex flex-col gap-1.5">
+			<label for="project-repo-path" class="text-sm font-medium">Repository path</label>
+			<input
+				id="project-repo-path"
+				name="repoPath"
+				type="text"
+				data-project-repo-path
+				data-slot="input"
+				bind:value={repoPathValue}
+				aria-invalid={repoPathError ? "true" : undefined}
+				placeholder="/Users/me/workspace/repo"
+				maxlength="500"
+				class="border-input bg-background h-9 rounded-md border px-3 py-1 text-sm font-mono shadow-xs"
+			/>
+			{#if repoPathError}
+				<p data-error-repo-path class="text-destructive text-xs">{repoPathError}</p>
+			{/if}
+		</div>
+
+		<div class="flex flex-col gap-1.5">
+			<label for="project-template" class="text-sm font-medium">Template</label>
+			<select
+				id="project-template"
+				name="template"
+				data-project-template
+				data-slot="select"
+				bind:value={templateValue}
+				aria-invalid={templateError ? "true" : undefined}
+				class="border-input bg-background h-9 rounded-md border px-3 py-1 text-sm shadow-xs"
+			>
+				<option value="agent-os-software-project">Agent OS Software Project</option>
+			</select>
+			{#if templateError}
+				<p data-error-template class="text-destructive text-xs">{templateError}</p>
+			{/if}
+		</div>
+	</div>
+
+	<div class="flex flex-col gap-1.5">
+		<label for="project-parent-id" class="text-sm font-medium">Parent project ID</label>
+		<input
+			id="project-parent-id"
+			name="parentId"
+			type="text"
+			data-project-parent
+			data-slot="input"
+			bind:value={parentIdValue}
+			aria-invalid={parentIdError ? "true" : undefined}
+			maxlength="80"
+			class="border-input bg-background h-9 rounded-md border px-3 py-1 text-sm font-mono shadow-xs"
+		/>
+		{#if parentIdError}
+			<p data-error-parent-id class="text-destructive text-xs">{parentIdError}</p>
 		{/if}
 	</div>
 
