@@ -46,13 +46,17 @@ export async function run(argv: readonly string[], opts: WorkRunOptions = {}): P
     switch (verb) {
       case "create": {
         const caller = await resolveCaller(opts);
+        const projectId = flagValue(rest, "--project");
+        const allProjects = rest.includes("--all-projects");
+        if (!projectId && !allProjects) throw new Error("missing required scope: pass --project or --all-projects");
         const input = compact({
           title: requiredFlag(rest, "--title"),
           taskType: flagValue(rest, "--type"),
           parentId: flagValue(rest, "--parent"),
           cycleId: flagValue(rest, "--cycle"),
           moduleId: flagValue(rest, "--module"),
-          projectId: flagValue(rest, "--project"),
+          projectId,
+          scope: allProjects ? "all" : undefined,
         });
         return printOutput(await createWork(caller, input), rest, io.print);
       }

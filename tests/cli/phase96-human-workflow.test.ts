@@ -84,4 +84,43 @@ describe("Phase 09.6 CLI human workflow", () => {
       projectId: "proj_1",
     });
   });
+
+  test("work create rejects missing project scope unless all-projects is explicit", async () => {
+    const { run } = await import("../../apps/cli/src/commands/work.ts");
+    const calls: unknown[] = [];
+    const errors: string[] = [];
+    let exitCode: number | undefined;
+    const caller = {
+      work: {
+        create: async (input: unknown) => {
+          calls.push(input);
+          return { task: { id: "task_3" }, trace: { projectId: null } };
+        },
+      },
+    };
+
+    await run(["create", "--title", "Global by accident", "--json"], {
+      caller,
+      print: () => {},
+      printErr: (line) => errors.push(line),
+      exit: (code) => {
+        exitCode = code;
+      },
+    });
+
+    expect(exitCode).toBe(1);
+    expect(calls).toEqual([]);
+    expect(errors.join("\n")).toContain("--project or --all-projects");
+
+    await run(["create", "--title", "Global explicit", "--all-projects", "--json"], {
+      caller,
+      print: () => {},
+      printErr: (line) => errors.push(line),
+      exit: (code) => {
+        exitCode = code;
+      },
+    });
+
+    expect(calls.at(-1)).toMatchObject({ title: "Global explicit", scope: "all" });
+  });
 });
