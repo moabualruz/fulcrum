@@ -331,7 +331,7 @@ Plans:
   3. Human journeys H1-H6 pass across Web, CLI, and TUI using same data.
   4. Agent journeys A1-A5 pass from task dispatch through context preview, run supervision, artifacts, memory promotion, audit, notifications, and follow-up tasks.
   5. Completion proof cites E2E tests, CLI JSON checks, TUI checks, and server/API relationship graph checks.
-**Plans:** Phase-level plan in `09.6-PLAN.md`; execution must split into vertical journey workstreams, not per-screen CRUD cleanup.
+**Plans:** 09.6-00 through 09.6-08 executed as vertical workflow slices. Closure evidence: `.planning/phases/09.6-product-workflow-completeness-human-agent-journeys/09.6-CLOSURE-PROOF.md`. Final user UAT remains the Phase 10 gate.
 
 ### Phase 10: SaaS Hardening + Milestone Closure
 **Goal**: Multi-tenant SaaS validated and all prior deferred items closed
@@ -363,9 +363,9 @@ Plans:
 | 8. Surface Delivery | 7/7 | Complete | 2026-05-06 |
 | 9. Cross-Cutting + Testing | 10/10 | Complete | 2026-05-06 |
 | 9.5. Full Architecture Overhaul + Integration Preservation | 61/61 | Complete for now | 2026-05-08 |
-| 9.6. Product Workflow Completeness + Human/Agent Journey Repair | 0/1 | Blocking | Phase 10 blocked |
+| 9.6. Product Workflow Completeness + Human/Agent Journey Repair | 9/9 | User UAT pending | Phase 10 blocked |
 | 10. SaaS Hardening + Milestone Closure | 0/19 | Planned | - |
 
 ---
 *Roadmap created: 2026-05-04*
-*Last corrected: 2026-05-08 — inserted Phase 9.6 after user UAT found workflow/product completeness blockers across Web, CLI, TUI, server/API, doctor, and local startup*
+*Last corrected: 2026-05-08 — executed Phase 9.6 plans 00-08; Phase 10 remains blocked until closure proof is accepted in final user UAT*

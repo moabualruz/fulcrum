@@ -43,7 +43,7 @@ bun --cwd apps/web run dev
 # Or use the CLI
 bun run apps/cli/src/main.ts doctor
 bun run apps/cli/src/main.ts projects list --json
-bun run apps/cli/src/main.ts tasks create --title "My first task" --json
+bun run apps/cli/src/main.ts work create --project <project-id> --title "My first task" --json
 ```
 
 ## Supported Agents
@@ -130,6 +130,7 @@ keyring-windows, report-llm-narration, notify-webhook
 ```bash
 # Project management
 fulcrum projects list|create|delete --json
+fulcrum work create --project <project-id> --title <title> --json
 fulcrum tasks list|create|update|delete --json
 fulcrum sprints list|create|close --json
 
@@ -138,6 +139,8 @@ fulcrum docs list|create|update --json
 
 # Search
 fulcrum search "query" --json
+fulcrum search "query" --all-projects --json
+fulcrum search "query" --global --json
 
 # Agent operations
 fulcrum agent list|test --json
@@ -162,8 +165,8 @@ The SvelteKit web app runs at `http://localhost:5173` in dev mode.
 **No login required in local/dev mode.** Set `FULCRUM_REQUIRE_AUTH=1` for SaaS mode with Better-Auth.
 
 Key pages:
-- `/` — Dashboard with project/task/doc/run metrics
-- `/projects` — Project list and creation
+- `/` — Current-scope dashboard with project/task/doc/run metrics
+- `/projects` — Project hierarchy, portfolio view, and creation
 - `/projects/<id>/board` — Kanban board
 - `/docs` — Document browser and TipTap editor
 - `/search` — Full-text search with facets
@@ -178,7 +181,7 @@ Key pages:
 fulcrum tui
 ```
 
-44 screens covering all features. Keyboard-driven: `j/k` navigate, `Enter` selects, `q` goes back, `Tab` switches panes.
+Project-first workbench covering tasks, docs, runs, search, notifications, memory, and reports. Keyboard-driven: `j/k` navigate, `Enter` selects, `q` goes back, `Tab` switches panes. Global or all-project views are explicit modes, not silent defaults.
 
 ## Development
 
@@ -195,7 +198,7 @@ bun --cwd apps/web run web:e2e # Playwright e2e tests
 - [User Guide](docs/user-guide.md)
 - [Developer Guide](docs/developer-guide.md)
 - [Test Gaps](docs/TEST-GAPS.md) — documented integration/e2e test coverage gaps
-- [HANDOVER](HANDOVER.md) — live state snapshot
+- [Roadmap](.planning/ROADMAP.md) — phase status and blockers
 - [AGENTS](AGENTS.md) — project rules for AI agents
 
 ## License
