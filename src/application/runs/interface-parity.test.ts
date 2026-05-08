@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { MikroORM } from "@mikro-orm/postgresql";
+import { readFile } from "node:fs/promises";
 
 import { run as runSymphonyCommand } from "@fulcrum/cli/symphony.ts";
 import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
@@ -94,6 +95,20 @@ describe("runs cross-interface parity", () => {
         workspacePath: null,
         attemptCount: 0,
       });
+    }
+  });
+
+  test("run interfaces expose orchestration through callers, not direct ORM access", async () => {
+    const clientFiles = [
+      "apps/cli/src/commands/symphony.ts",
+      "apps/tui/src/screens/runs.ts",
+      "apps/web/src/routes/runs/+page.server.ts",
+    ];
+
+    for (const file of clientFiles) {
+      const source = await readFile(file, "utf8");
+      expect(source, `${file} must not import MikroORM`).not.toMatch(/@mikro-orm|db\/entities|ProductDb/);
+      expect(source, `${file} must not persist directly`).not.toMatch(/\.persist\(|\.flush\(|getRepository\(/);
     }
   });
 });

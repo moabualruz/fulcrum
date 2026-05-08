@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { MikroORM } from "@mikro-orm/postgresql";
+import { readFile } from "node:fs/promises";
 
 import { run as runTasksCommand } from "@fulcrum/cli/commands/tasks.ts";
 import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
@@ -72,6 +73,20 @@ describe("tasks cross-interface parity", () => {
         projectId: null,
         orgId: db.seed.orgId,
       });
+    }
+  });
+
+  test("task interfaces keep business logic in application services", async () => {
+    const clientFiles = [
+      "apps/web/src/lib/components/tasks/TaskDetailPanel.svelte",
+      "apps/cli/src/commands/tasks.ts",
+      "apps/tui/src/screens/task-detail.ts",
+    ];
+
+    for (const file of clientFiles) {
+      const source = await readFile(file, "utf8");
+      expect(source, `${file} must not import MikroORM`).not.toMatch(/@mikro-orm|db\/entities|ProductDb/);
+      expect(source, `${file} must not persist directly`).not.toMatch(/\.persist\(|\.flush\(|getRepository\(/);
     }
   });
 });
