@@ -26,6 +26,9 @@ export const TaskDtoSchema = z.object({
   labels: z.array(z.string()),
   parentId: z.uuid().nullable(),
   dependencies: DependenciesSchema,
+  taskType: z.string(),
+  cycleId: z.string().nullable(),
+  moduleId: z.string().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
   deletedAt: z.date().nullable(),
@@ -61,6 +64,10 @@ export const CreateTaskInputSchema = z.object({
   points: z.number().int().nonnegative().nullable().optional(),
   assigneeId: z.string().nullable().optional(),
   projectId: z.uuid().nullable().optional(),
+  parentId: z.uuid().nullable().optional(),
+  taskType: z.string().trim().min(1).optional(),
+  cycleId: z.string().trim().min(1).nullable().optional(),
+  moduleId: z.string().trim().min(1).nullable().optional(),
 });
 
 export const UpdateTaskInputSchema = TaskIdInputSchema.extend({
@@ -73,6 +80,10 @@ export const UpdateTaskInputSchema = TaskIdInputSchema.extend({
   points: z.number().int().nonnegative().nullable().optional(),
   assigneeId: z.string().nullable().optional(),
   projectId: z.uuid().nullable().optional(),
+  parentId: z.uuid().nullable().optional(),
+  taskType: z.string().trim().min(1).optional(),
+  cycleId: z.string().trim().min(1).nullable().optional(),
+  moduleId: z.string().trim().min(1).nullable().optional(),
 });
 
 export const BulkTaskPatchSchema = z.object({

@@ -22,6 +22,9 @@ export interface TaskDto {
   labels: string[];
   parentId: string | null;
   dependencies: TaskDependencies;
+  taskType: string;
+  cycleId: string | null;
+  moduleId: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -37,6 +40,10 @@ export interface CreateTaskInput {
   points?: number | null;
   assigneeId?: string | null;
   projectId?: string | null;
+  parentId?: string | null;
+  taskType?: string;
+  cycleId?: string | null;
+  moduleId?: string | null;
 }
 
 export interface UpdateTaskInput {
@@ -49,6 +56,10 @@ export interface UpdateTaskInput {
   points?: number | null;
   assigneeId?: string | null;
   projectId?: string | null;
+  parentId?: string | null;
+  taskType?: string;
+  cycleId?: string | null;
+  moduleId?: string | null;
 }
 
 export interface BulkTaskPatch extends UpdateTaskInput {

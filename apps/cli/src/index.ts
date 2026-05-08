@@ -33,6 +33,7 @@ Usage:
   fulcrum auth <whoami|invite|login|logout> [options]
   fulcrum projects <list|stats> [--json]
   fulcrum tasks <list|get|create|update|delete> [--json]
+  fulcrum work <create|inspect|move|link|report> [--json]
   fulcrum sprints <list|get|create|update|delete|add-task|remove-task> [--json]
   fulcrum flags <list|set> [options]
   fulcrum routing rules <list|add|edit|delete> [options]
@@ -304,6 +305,22 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       const { container, cleanup } = await buildDbContainer();
       try {
         await runTasks(rest, { container });
+      } finally {
+        await cleanup();
+      }
+      return;
+    }
+    case "work": {
+      const { run: runWork } = await import("./commands/work.ts");
+      const [sub = "help"] = rest;
+      if (sub === "help" || sub === "--help" || sub === "-h") {
+        await runWork(rest);
+        return;
+      }
+
+      const { container, cleanup } = await buildDbContainer();
+      try {
+        await runWork(rest, { container });
       } finally {
         await cleanup();
       }

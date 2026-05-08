@@ -3,8 +3,14 @@ import { c } from "../renderer.ts";
 
 interface TaskLink {
   id: string;
-  title: string;
+  title?: string;
   status?: string | null;
+}
+
+interface TaskMode {
+  id: string;
+  title: string;
+  count?: number;
 }
 
 interface TaskComment {
@@ -36,6 +42,14 @@ interface DetailTask {
   subtasks?: TaskLink[] | null;
   blockedBy?: TaskLink[] | null;
   breadcrumb?: TaskLink[] | null;
+  taskType?: string | null;
+  links?: Record<string, TaskLink[] | null | undefined> | null;
+  modes?: TaskMode[] | null;
+  trace?: {
+    projectId?: string | null;
+    entity?: { kind: string; id: string } | null;
+    audit?: TaskLink[] | null;
+  } | null;
 }
 
 type Overlay = "none" | "title" | "status" | "assignee" | "child" | "dependency";
@@ -120,6 +134,9 @@ export class TaskDetailScreen {
     this.writeList(renderer, "Watchers", this.task.watchers ?? []);
     this.writeTaskLinks(renderer, "Subtasks", this.task.subtasks ?? []);
     this.writeTaskLinks(renderer, "Blocking", this.task.blockedBy ?? []);
+    this.writeModes(renderer, this.task.modes ?? []);
+    this.writeRelationshipLinks(renderer, this.task.links ?? {});
+    this.writeTrace(renderer);
     renderer.writeln();
     renderer.writeln(c.dim("  e title  a assign  s status  p priority  d due  l labels  c child  q back"));
 
@@ -243,7 +260,43 @@ export class TaskDetailScreen {
     renderer.writeln();
     renderer.writeln(c.bold(`  ${label}`));
     if (values.length === 0) renderer.writeln(c.dim("  none"));
-    for (const value of values) renderer.writeln(`  - ${value.id}: ${value.title}${value.status ? ` [${value.status}]` : ""}`);
+    for (const value of values) renderer.writeln(`  - ${value.id}: ${value.title ?? value.id}${value.status ? ` [${value.status}]` : ""}`);
+  }
+
+  private writeModes(renderer: Renderer, modes: TaskMode[]): void {
+    renderer.writeln();
+    renderer.writeln(c.bold("  Modes"));
+    if (modes.length === 0) renderer.writeln(c.dim("  none"));
+    for (const mode of modes) {
+      const count = mode.count === undefined ? "" : ` (${mode.count})`;
+      renderer.writeln(`  - ${mode.title}${count}`);
+    }
+  }
+
+  private writeRelationshipLinks(renderer: Renderer, links: Record<string, TaskLink[] | null | undefined>): void {
+    renderer.writeln();
+    renderer.writeln(c.bold("  Relationships"));
+    const entries = Object.entries(links).filter(([, values]) => Array.isArray(values) && values.length > 0);
+    if (entries.length === 0) renderer.writeln(c.dim("  none"));
+    for (const [kind, values] of entries) {
+      renderer.writeln(`  ${kind}`);
+      for (const value of values ?? []) renderer.writeln(`  - ${value.id}: ${value.title ?? value.id}`);
+    }
+  }
+
+  private writeTrace(renderer: Renderer): void {
+    renderer.writeln();
+    renderer.writeln(c.bold("  Trace"));
+    if (!this.task?.trace) {
+      renderer.writeln(c.dim("  none"));
+      return;
+    }
+    if (this.task.trace.projectId) renderer.writeln(`  Project: ${this.task.trace.projectId}`);
+    const entity = this.task.trace.entity;
+    if (entity) renderer.writeln(`  Entity: ${entity.kind}:${entity.id}`);
+    for (const event of this.task.trace.audit ?? []) {
+      renderer.writeln(`  - ${event.id}: ${event.title ?? event.id}`);
+    }
   }
 
   private get breadcrumbText(): string {

@@ -18,3 +18,10 @@ CREATE INDEX IF NOT EXISTS projects_org_path_idx
 
 CREATE INDEX IF NOT EXISTS repos_org_project_idx
   ON repos (org_id, project_id);
+
+ALTER TABLE tasks
+  DROP CONSTRAINT IF EXISTS tasks_task_type_check;
+
+ALTER TABLE tasks
+  ADD CONSTRAINT tasks_task_type_check
+  CHECK (task_type IN ('initiative','epic','story','task','subtask','bug','chore'));

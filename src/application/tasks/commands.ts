@@ -18,6 +18,10 @@ export async function createTask(
   const parsed = parseOrThrow(CreateTaskInputSchema, input);
   return await em.transactional(async (txEm) => {
     const repo = txEm.getRepository(Task) as TaskRepository;
+    const parent = parsed.parentId ? await findVisibleTask(txEm, ctx, parsed.parentId) : null;
+    const projectId = parsed.projectId ?? ctx.projectId ?? null;
+    assertProjectCompatible(projectId, parent);
+    assertAllowedParent(parsed.taskType ?? "task", parent?.taskType ?? null);
     const task = repo.create({
       orgId: ctx.orgId,
       title: parsed.title,
@@ -29,7 +33,10 @@ export async function createTask(
       points: parsed.points,
     });
     task.assigneeId = parsed.assigneeId ?? null;
-    task.projectId = parsed.projectId ?? ctx.projectId ?? null;
+    task.projectId = projectId;
+    task.parent = parent;
+    task.taskType = parsed.taskType ?? "task";
+    task.customFields = withWorkGrouping(task.customFields, parsed);
     txEm.persist(task);
     await txEm.flush();
     return serializeTask(task);
@@ -128,6 +135,8 @@ export async function setParent(
     const task = await findVisibleTask(txEm, ctx, taskId);
     const parent = parentId ? await findVisibleTask(txEm, ctx, parentId) : null;
     await assertParentDoesNotCycle(txEm, ctx, task.id, parentId);
+    assertProjectCompatible(task.projectId ?? null, parent);
+    assertAllowedParent(task.taskType ?? "task", parent?.taskType ?? null);
     const previousParentId = task.parent?.id ?? null;
     task.parent = parent;
     task.updatedAt = new Date();
@@ -223,7 +232,53 @@ function applyTaskPatch(task: Task, patch: UpdateTaskInput): void {
   if (patch.points !== undefined) task.points = patch.points;
   if (patch.assigneeId !== undefined) task.assigneeId = patch.assigneeId;
   if (patch.projectId !== undefined) task.projectId = patch.projectId;
+  if (patch.taskType !== undefined) task.taskType = patch.taskType;
+  if (patch.cycleId !== undefined || patch.moduleId !== undefined) {
+    task.customFields = withWorkGrouping(task.customFields, patch);
+  }
   task.updatedAt = new Date();
+}
+
+const ALLOWED_PARENT_TYPES: Record<string, readonly string[]> = {
+  initiative: [],
+  epic: ["initiative"],
+  story: ["epic", "initiative"],
+  task: ["epic", "story", "initiative"],
+  bug: ["epic", "story", "task"],
+  chore: ["epic", "story", "task"],
+  subtask: ["story", "task", "bug", "chore"],
+};
+
+function assertAllowedParent(childType: string, parentType: string | null): void {
+  if (!parentType) return;
+  const allowed = ALLOWED_PARENT_TYPES[childType] ?? ["initiative", "epic", "story", "task", "bug", "chore"];
+  if (!allowed.includes(parentType)) {
+    throw new AppValidationError(`Work item type '${childType}' cannot be parented by '${parentType}'.`);
+  }
+}
+
+function assertProjectCompatible(projectId: string | null, parent: Task | null): void {
+  if (!parent) return;
+  const parentProjectId = parent.projectId ?? null;
+  if (projectId !== parentProjectId) {
+    throw new AppConflictError("Work item parent must belong to the same project unless an explicit relation is used.");
+  }
+}
+
+function withWorkGrouping(
+  existing: Record<string, unknown> | null | undefined,
+  patch: { cycleId?: string | null; moduleId?: string | null },
+): Record<string, unknown> {
+  const next = { ...(existing ?? {}) };
+  if (patch.cycleId !== undefined) {
+    if (patch.cycleId === null) delete next["cycleId"];
+    else next["cycleId"] = patch.cycleId;
+  }
+  if (patch.moduleId !== undefined) {
+    if (patch.moduleId === null) delete next["moduleId"];
+    else next["moduleId"] = patch.moduleId;
+  }
+  return next;
 }
 
 function applyBulkPatch(task: Task, patch: BulkTaskPatch): void {

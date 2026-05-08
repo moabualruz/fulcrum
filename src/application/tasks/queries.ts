@@ -116,8 +116,16 @@ export function serializeTask(task: Task): TaskDto {
     labels: task.labels ?? [],
     parentId: task.parent?.id ?? null,
     dependencies: task.dependencies ?? { blocks: [], blocked_by: [] },
+    taskType: task.taskType ?? "task",
+    cycleId: stringCustomField(task.customFields, "cycleId"),
+    moduleId: stringCustomField(task.customFields, "moduleId"),
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
     deletedAt: task.deletedAt,
   };
+}
+
+function stringCustomField(fields: Record<string, unknown> | null | undefined, key: string): string | null {
+  const value = fields?.[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
 }

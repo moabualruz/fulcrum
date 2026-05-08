@@ -12,6 +12,8 @@ export class Migration20260508090000_phase96_project_setup extends Migration {
     this.addSql(`alter table "projects" add column if not exists "template_id" text null`);
     this.addSql(`alter table "projects" add column if not exists "workflow_id" text null`);
     this.addSql(`alter table "repos" add column if not exists "project_id" uuid null references "projects" ("id")`);
+    this.addSql(`alter table "tasks" drop constraint if exists "tasks_task_type_check"`);
+    this.addSql(`alter table "tasks" add constraint "tasks_task_type_check" check ("task_type" in ('initiative','epic','story','task','subtask','bug','chore'))`);
     this.addSql(`create index if not exists "projects_org_parent_idx" on "projects" ("org_id", "parent_id")`);
     this.addSql(`create index if not exists "projects_org_path_idx" on "projects" ("org_id", "path")`);
     this.addSql(`create index if not exists "repos_org_project_idx" on "repos" ("org_id", "project_id")`);
@@ -21,6 +23,8 @@ export class Migration20260508090000_phase96_project_setup extends Migration {
     this.addSql(`drop index if exists "repos_org_project_idx"`);
     this.addSql(`drop index if exists "projects_org_path_idx"`);
     this.addSql(`drop index if exists "projects_org_parent_idx"`);
+    this.addSql(`alter table "tasks" drop constraint if exists "tasks_task_type_check"`);
+    this.addSql(`alter table "tasks" add constraint "tasks_task_type_check" check ("task_type" in ('epic','task','subtask','bug'))`);
     this.addSql(`alter table "projects" drop column if exists "workflow_id"`);
     this.addSql(`alter table "projects" drop column if exists "template_id"`);
     this.addSql(`alter table "projects" drop column if exists "module_policy"`);
