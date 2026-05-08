@@ -17,6 +17,7 @@
  */
 
 import type { EntityManager } from "@mikro-orm/postgresql";
+import { Engine } from "json-rules-engine";
 
 import { ProjectAutomation } from "../db/entities/tasks/ProjectAutomation.ts";
 import { Org } from "../db/entities/auth/Org.ts";
@@ -37,6 +38,26 @@ export interface AutomationCondition {
   field: string;
   operator: "equals" | "not_equals" | "contains" | "is_empty" | "is_not_empty";
   value?: unknown;
+}
+
+type JsonRulesCondition = {
+  fact?: string;
+  operator?: string;
+  value?: unknown;
+  all?: JsonRulesCondition[];
+  any?: JsonRulesCondition[];
+};
+
+interface ProjectAutomationInheritance {
+  scope?: "self" | "children" | "descendants" | "selected";
+  descendantProjectIds?: string[];
+  locked?: boolean;
+}
+
+interface ProjectAutomationProject {
+  id: string;
+  path: string;
+  depth: number;
 }
 
 export interface AutomationTemplate {
@@ -109,22 +130,49 @@ export class AutomationService {
       return;
     }
 
-    // Find enabled automations matching this trigger
+    const projectScope = await this.resolveAutomationProjectScope(orgId, projectId);
     const automations = await this.em.find(ProjectAutomation, {
       org: { id: orgId },
-      projectId,
+      projectId: { $in: projectScope.map((project) => project.id) },
       triggerType: event.verb,
       enabled: true,
     } as never);
+    const projectById = new Map(projectScope.map((project) => [project.id, project]));
+    const targetProject = projectById.get(projectId) ?? { id: projectId, path: "", depth: 0 };
 
     for (const automation of automations) {
+      if (!automationAppliesToProject(automation, targetProject, projectById.get(automation.projectId))) {
+        continue;
+      }
       // Evaluate condition if present
-      if (automation.condition && !evaluateCondition(automation.condition as AutomationCondition, event.payload)) {
+      if (automation.condition && !await evaluateCondition(automation.condition as AutomationCondition | JsonRulesCondition, event.payload)) {
         continue;
       }
 
       // Execute the action
       await this.executeAction(automation, event, orgId, depth);
+    }
+  }
+
+  private async resolveAutomationProjectScope(orgId: string, projectId: string): Promise<ProjectAutomationProject[]> {
+    try {
+      const rows = await this.em.getConnection().execute<ProjectAutomationProject[]>(
+        `WITH RECURSIVE ancestors AS (
+           SELECT id, parent_id, COALESCE(path, id::text) AS path, COALESCE(depth, 0) AS depth
+             FROM projects
+            WHERE org_id = ? AND id = ?
+           UNION ALL
+           SELECT p.id, p.parent_id, COALESCE(p.path, p.id::text) AS path, COALESCE(p.depth, 0) AS depth
+             FROM projects p
+             JOIN ancestors a ON p.id = a.parent_id
+            WHERE p.org_id = ?
+         )
+         SELECT id, path, depth FROM ancestors ORDER BY depth ASC, path ASC`,
+        [orgId, projectId, orgId],
+      );
+      return rows.length > 0 ? rows : [{ id: projectId, path: projectId, depth: 0 }];
+    } catch {
+      return [{ id: projectId, path: projectId, depth: 0 }];
     }
   }
 
@@ -408,7 +456,13 @@ function serializeAutomation(automation: ProjectAutomation): AutomationOutput {
  * Evaluate an automation condition against the event payload.
  * Returns true if condition passes (action should fire).
  */
-function evaluateCondition(condition: AutomationCondition, payload: Record<string, unknown>): boolean {
+async function evaluateCondition(condition: AutomationCondition | JsonRulesCondition, payload: Record<string, unknown>): Promise<boolean> {
+  if (isJsonRulesCondition(condition)) {
+    const conditions = "fact" in condition ? { all: [condition] } : condition;
+    const engine = new Engine([{ conditions, event: { type: "automation.condition.matched" } }]);
+    const result = await engine.run(payload);
+    return result.events.length > 0;
+  }
   const fieldValue = payload[condition.field];
 
   switch (condition.operator) {
@@ -425,4 +479,36 @@ function evaluateCondition(condition: AutomationCondition, payload: Record<strin
     default:
       return false;
   }
+}
+
+function isJsonRulesCondition(condition: AutomationCondition | JsonRulesCondition): condition is JsonRulesCondition {
+  return "all" in condition || "any" in condition || "fact" in condition;
+}
+
+function automationAppliesToProject(
+  automation: ProjectAutomation,
+  targetProject: ProjectAutomationProject,
+  automationProject: ProjectAutomationProject | undefined,
+): boolean {
+  if (automation.projectId === targetProject.id) return true;
+  if (!automationProject) return false;
+  const inheritance = automationInheritance(automation);
+  if (inheritance.scope === "descendants") {
+    return targetProject.path.startsWith(`${automationProject.path}/`);
+  }
+  if (inheritance.scope === "children") {
+    return targetProject.path.startsWith(`${automationProject.path}/`) && targetProject.depth === automationProject.depth + 1;
+  }
+  if (inheritance.scope === "selected") {
+    return Boolean(inheritance.descendantProjectIds?.includes(targetProject.id));
+  }
+  return false;
+}
+
+function automationInheritance(automation: ProjectAutomation): ProjectAutomationInheritance {
+  const raw = automation.triggerConfig;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { scope: "self" };
+  const inheritance = (raw as Record<string, unknown>)["inheritance"];
+  if (!inheritance || typeof inheritance !== "object" || Array.isArray(inheritance)) return { scope: "self" };
+  return inheritance as ProjectAutomationInheritance;
 }

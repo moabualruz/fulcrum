@@ -7,7 +7,10 @@
 import { describe, it, expect, beforeEach, vi } from "bun:test";
 
 // Minimal mock for EntityManager
-function makeEm(automations: object[] = []): Record<string, ReturnType<typeof vi.fn>> {
+function makeEm(
+  automations: object[] = [],
+  options: { projectAncestry?: Array<{ id: string; path: string; depth: number }> } = {},
+): Record<string, ReturnType<typeof vi.fn>> {
   return {
     find: vi.fn().mockResolvedValue(automations),
     findOne: vi.fn().mockResolvedValue(null),
@@ -16,6 +19,12 @@ function makeEm(automations: object[] = []): Record<string, ReturnType<typeof vi
     flush: vi.fn().mockResolvedValue(undefined),
     remove: vi.fn(),
     getReference: vi.fn((_, id) => ({ id })),
+    getConnection: vi.fn(() => ({
+      execute: vi.fn((sql: string) => {
+        if (sql.includes("FROM projects")) return Promise.resolve(options.projectAncestry ?? []);
+        return Promise.resolve([]);
+      }),
+    })),
   };
 }
 
@@ -122,6 +131,58 @@ describe("AutomationService", () => {
       // The action should not fire — executionCount stays 0
       // flush may not be called if condition fails
       expect(automation.executionCount).toBe(0);
+    });
+
+    it("inherits locked parent automation to descendant projects and keeps child project automations local", async () => {
+      const parentAutomation = {
+        id: "auto-parent",
+        projectId: "proj-parent",
+        triggerType: "task.assigned",
+        triggerConfig: { inheritance: { scope: "descendants", locked: true } },
+        condition: { fact: "priority", operator: "equal", value: "high" },
+        actionType: "set_assignee",
+        actionConfig: { assigneeId: "reviewer-1" },
+        enabled: true,
+        executionCount: 0,
+        org: { id: "org-1" },
+      };
+      const siblingAutomation = {
+        ...parentAutomation,
+        id: "auto-sibling",
+        projectId: "proj-sibling",
+        triggerConfig: { inheritance: { scope: "self" } },
+      };
+      const childAutomation = {
+        ...parentAutomation,
+        id: "auto-child",
+        projectId: "proj-child",
+        triggerConfig: { inheritance: { scope: "self" } },
+      };
+      const em = makeEm([parentAutomation, siblingAutomation, childAutomation], {
+        projectAncestry: [
+          { id: "proj-parent", path: "workspace/parent", depth: 1 },
+          { id: "proj-child", path: "workspace/parent/child", depth: 2 },
+        ],
+      });
+      const service = new AutomationService(em as never, makeEventBus());
+
+      await service.evaluate({
+        verb: "task.assigned",
+        taskId: "task-1",
+        orgId: "org-1",
+        projectId: "proj-child",
+        payload: { priority: "high" },
+      }, "org-1", "proj-child");
+
+      expect(parentAutomation.executionCount).toBe(1);
+      expect(childAutomation.executionCount).toBe(1);
+      expect(siblingAutomation.executionCount).toBe(0);
+      expect(em.find).toHaveBeenCalledWith(expect.anything(), {
+        org: { id: "org-1" },
+        projectId: { $in: ["proj-parent", "proj-child"] },
+        triggerType: "task.assigned",
+        enabled: true,
+      });
     });
   });
 
