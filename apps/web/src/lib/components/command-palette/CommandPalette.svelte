@@ -4,8 +4,6 @@
   import { onMount } from "svelte";
   import { oramaIndex } from "$lib/search/OramaIndex.ts";
   import {
-    NAVIGATION_COMMANDS,
-    CREATION_COMMANDS,
     BULK_COMMANDS,
     type PaletteCommand,
   } from "./navigation-commands.ts";
@@ -54,8 +52,7 @@
   // ── Visible command sections ─────────────────────────────────────────────────
   const isCommandMode = $derived(query.trimStart().startsWith(">"));
   const commandQuery = $derived(isCommandMode ? query.trimStart().slice(1).trim() : query);
-  const navCommands = $derived(filterCommands(NAVIGATION_COMMANDS, commandQuery));
-  const createCommands = $derived(filterCommands(CREATION_COMMANDS, commandQuery));
+  const scopedCommands = $derived(filterAndSort(items, commandQuery));
   const bulkCommands = $derived(
     hasSelection ? filterCommands(BULK_COMMANDS, commandQuery) : [],
   );
@@ -83,11 +80,6 @@
     if (!open || !inputElement) return;
     queueMicrotask(() => inputElement?.focus());
   });
-
-  // ── Legacy items fallback (backward compat with layout.svelte paletteItems) ──
-  const legacyFiltered = $derived(
-    items.length > 0 ? filterAndSort(items, query) : [],
-  );
 
   // ── Keyboard nav ─────────────────────────────────────────────────────────────
   function handleInputKeydown(event: KeyboardEvent) {
@@ -137,10 +129,8 @@
 
   function visibleCommandItems(): CommandItem[] {
     return [
-      ...navCommands.map((cmd) => ({ id: cmd.id, label: cmd.label })),
-      ...createCommands.map((cmd) => ({ id: cmd.id, label: cmd.label })),
+      ...scopedCommands,
       ...bulkCommands.map((cmd) => ({ id: cmd.id, label: cmd.label })),
-      ...legacyFiltered,
     ];
   }
 </script>
@@ -177,50 +167,26 @@
             >Commands</div>
           {/if}
 
-          <!-- Navigation section -->
-          {#if navCommands.length > 0}
+          <!-- Scoped commands section -->
+          {#if scopedCommands.length > 0}
             <div
-              data-section="Navigation"
+              data-section="Current scope"
               class={cn("px-2 py-1 text-xs font-normal text-muted-foreground", isCommandMode && "mt-1")}
-            >Navigation</div>
-            {#each navCommands as cmd, i (cmd.id)}
+            >Current scope</div>
+            {#each scopedCommands as item, i (item.id)}
               <button
                 type="button"
                 data-command-palette-item
                 data-testid="command-item"
                 data-selected={selectedIndex === i ? "true" : "false"}
-                data-id={cmd.id}
-                onclick={() => selectCommand(cmd)}
+                data-id={item.id}
+                onclick={() => selectLegacyItem(item)}
                 class={cn(
                   "flex h-11 w-full items-center rounded-md px-3 text-left text-sm",
                   "hover:bg-accent hover:text-accent-foreground",
                 )}
               >
-                {cmd.label}
-              </button>
-            {/each}
-          {/if}
-
-          <!-- Create section -->
-          {#if createCommands.length > 0}
-            <div
-              data-section="Create"
-              class={cn("px-2 py-1 text-xs font-normal text-muted-foreground", navCommands.length > 0 && "mt-1")}
-            >Create</div>
-            {#each createCommands as cmd, i (cmd.id)}
-              <button
-                type="button"
-                data-command-palette-item
-                data-testid="command-item"
-                data-selected={selectedIndex === navCommands.length + i ? "true" : "false"}
-                data-id={cmd.id}
-                onclick={() => selectCommand(cmd)}
-                class={cn(
-                  "flex h-11 w-full items-center rounded-md px-3 text-left text-sm",
-                  "hover:bg-accent hover:text-accent-foreground",
-                )}
-              >
-                {cmd.label}
+                {item.label}
               </button>
             {/each}
           {/if}
@@ -244,24 +210,6 @@
                 )}
               >
                 {cmd.label}
-              </button>
-            {/each}
-          {/if}
-
-          <!-- Legacy items (backward compat) -->
-          {#if legacyFiltered.length > 0 && NAVIGATION_COMMANDS.length === 0}
-            {#each legacyFiltered as item (item.id)}
-              <button
-                type="button"
-                data-command-palette-item
-                data-id={item.id}
-                onclick={() => selectLegacyItem(item)}
-                class={cn(
-                  "flex h-11 w-full items-center rounded-md px-3 text-left text-sm",
-                  "hover:bg-accent hover:text-accent-foreground",
-                )}
-              >
-                {item.label}
               </button>
             {/each}
           {/if}
