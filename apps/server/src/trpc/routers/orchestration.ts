@@ -19,6 +19,9 @@ import {
 import {
   dispatchTaskRun,
 } from "@/application/runs/commands.ts";
+import { buildDispatchTrace } from "@/application/orchestration/dispatch-trace.ts";
+import { appErrorToTrpcError } from "@/application/error-mapping.ts";
+import { AppError } from "@/application/errors.ts";
 import {
   getRunDetail,
 } from "@/application/runs/queries.ts";
@@ -416,6 +419,8 @@ export const orchestrationRouter = router({
         workflowPath: z.string().optional(),
         sandboxMode: z.string().optional(),
         projectId: z.string().optional(),
+        includeGlobal: z.boolean().optional(),
+        trustMode: z.enum(["manual", "assisted", "trusted", "full-auto"]).optional(),
       }),
     )
     .output(
@@ -426,17 +431,55 @@ export const orchestrationRouter = router({
         sandboxMode: z.string(),
         transcriptPath: z.string().nullable().optional(),
         artifactCount: z.number().optional(),
+        trace: z.object({
+          taskId: z.string(),
+          projectId: z.string(),
+          repoId: z.string(),
+          context: z.object({
+            sourceRefs: z.array(z.object({
+              kind: z.enum(["task", "doc", "memory", "run", "artifact"]),
+              id: z.string(),
+              reason: z.string(),
+              scope: z.enum(["project", "global"]),
+            })),
+            includeGlobal: z.boolean(),
+          }),
+          routing: z.object({
+            selectedAgent: z.string(),
+            reason: z.enum(["explicit-agent", "default-agent"]),
+          }),
+          authority: z.object({
+            trustMode: z.enum(["manual", "assisted", "trusted", "full-auto"]),
+            approvalRequired: z.boolean(),
+          }),
+        }),
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const agentName = input.agentName ?? "codex";
-      const rawSandbox = input.sandboxMode ?? "noSandbox";
-      const sandboxMode = rawSandbox === "docker" || rawSandbox === "podman" ? rawSandbox : "noSandbox";
-      const run = await dispatchTaskRun(requireEm(ctx), {
+      const manager = requireEm(ctx);
+      const appCtx = {
         ...runsAppContext(ctx),
         orgId: inputOrgId(ctx, input.orgId),
         projectId: input.projectId ?? null,
-      }, {
+      };
+      const trace = await (async () => {
+        try {
+          return await buildDispatchTrace(manager, appCtx, {
+            taskId: input.taskId,
+            projectId: input.projectId ?? null,
+            agentName: input.agentName,
+            includeGlobal: input.includeGlobal,
+            trustMode: input.trustMode,
+          });
+        } catch (error) {
+          if (error instanceof AppError) throw appErrorToTrpcError(error);
+          throw error;
+        }
+      })();
+      const agentName = trace.routing.selectedAgent;
+      const rawSandbox = input.sandboxMode ?? "noSandbox";
+      const sandboxMode = rawSandbox === "docker" || rawSandbox === "podman" ? rawSandbox : "noSandbox";
+      const run = await dispatchTaskRun(manager, appCtx, {
         taskId: input.taskId,
         agent: agentName,
       });
@@ -448,6 +491,7 @@ export const orchestrationRouter = router({
         sandboxMode,
         transcriptPath: null,
         artifactCount: 0,
+        trace,
       };
     }),
 });
