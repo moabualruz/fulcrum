@@ -58,6 +58,7 @@ export function serializeRun(run: AgentRun): RunDto {
   return {
     id: run.id,
     orgId: run.org.id,
+    projectId: run.task?.projectId ?? null,
     agentName: run.agentName ?? null,
     status: run.status ?? null,
     prompt: run.threadId ?? null,

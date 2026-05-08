@@ -157,6 +157,40 @@ describe("loadDashboard", () => {
     } finally { await db.close(); }
   });
 
+  test("projectId filter includes descendant projects for parent dashboard aggregates", async () => {
+    const { db, orgId } = await freshDb("project-descendant-filter");
+    try {
+      const parent = await createProject(db, { orgId, slug: "parent", name: "Parent" });
+      const child = await createProject(db, { orgId, slug: "child", name: "Child" });
+      const sibling = await createProject(db, { orgId, slug: "sibling", name: "Sibling" });
+      await db.query(
+        `UPDATE projects SET parent_id = $1, path = $2, depth = $3 WHERE id = $4`,
+        [parent.id, "parent/child", 1, child.id],
+      );
+      await db.query(
+        `UPDATE projects SET path = $1, depth = $2 WHERE id = $3`,
+        ["parent", 0, parent.id],
+      );
+      await db.query(
+        `UPDATE projects SET path = $1, depth = $2 WHERE id = $3`,
+        ["sibling", 0, sibling.id],
+      );
+
+      await seedTask(db, orgId, parent.id, "pending", 5, "parent-task");
+      await seedTask(db, orgId, child.id, "pending", 9, "child-task");
+      await seedTask(db, orgId, sibling.id, "pending", 99, "sibling-task");
+      await seedDoc(db, orgId, child.id, "child-doc", new Date().toISOString());
+      await seedRun(db, orgId, child.id, new Date().toISOString(), "child-agent");
+
+      const data = await loadDashboard(db, orgId, parent.id);
+      expect(data.counters.openTasks).toBe(2);
+      expect(data.counters.docs).toBe(1);
+      expect(data.counters.runsLast7d).toBe(1);
+      expect(data.topTasks.map((t) => t.title)).toEqual(["child-task", "parent-task"]);
+      expect(data.topTasks.map((t) => t.title)).not.toContain("sibling-task");
+    } finally { await db.close(); }
+  });
+
   test("projectTiles returns project name, open task count, and last activity", async () => {
     const { db, orgId } = await freshDb("project-tiles");
     try {

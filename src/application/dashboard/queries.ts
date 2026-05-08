@@ -3,6 +3,7 @@ import type { SqlExecutor } from "../../db/sql.ts";
 
 import { Project } from "../../db/entities/tasks/Project.ts";
 import { listDocs } from "../docs/queries.ts";
+import { ormSqlConnection } from "../orm-helpers.ts";
 import { listRuns } from "../runs/queries.ts";
 import { listTasks } from "../tasks/queries.ts";
 
@@ -35,7 +36,8 @@ export async function loadDashboard(
     return loadDashboardFromSql(em, orgId, projectId);
   }
   const manager = em as EntityManager;
-  const ctx = { orgId, userId: null, projectId };
+  const projectIds = typeof projectId === "string" ? await dashboardProjectIds(manager, orgId, projectId) : [];
+  const ctx = { orgId, userId: null, projectId: undefined };
   const [projects, docs, runs, tasks] = await Promise.all([
     manager.find(Project, { org: orgId } as never, { orderBy: { createdAt: "ASC", id: "ASC" } }),
     listDocs(manager, ctx),
@@ -45,14 +47,23 @@ export async function loadDashboard(
 
   const visibleTasks = projectId === undefined
     ? tasks
-    : tasks.filter((task) => task.projectId === projectId);
+    : projectId === null
+      ? tasks.filter((task) => task.projectId === null)
+      : tasks.filter((task) => task.projectId !== null && projectIds.includes(task.projectId));
   const visibleDocs = projectId === undefined
     ? docs
-    : docs.filter((doc) => doc.projectId === projectId);
+    : projectId === null
+      ? docs.filter((doc) => doc.projectId === null)
+      : docs.filter((doc) => doc.projectId !== null && projectIds.includes(doc.projectId));
 
   const openTasks = visibleTasks.filter((task) => !["completed", "cancelled"].includes(task.status ?? ""));
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const runsLast7d = runs.filter((run) => run.createdAt.getTime() >= sevenDaysAgo).length;
+  const visibleRuns = projectId === undefined
+    ? runs
+    : projectId === null
+      ? runs.filter((run) => run.projectId === null)
+      : runs.filter((run) => run.projectId !== null && projectIds.includes(run.projectId));
+  const runsLast7d = visibleRuns.filter((run) => run.createdAt.getTime() >= sevenDaysAgo).length;
 
   return {
     counters: {
@@ -61,7 +72,7 @@ export async function loadDashboard(
       docs: visibleDocs.length,
       runsLast7d,
     },
-    recentRuns: runs.slice(0, 5).map((run) => ({
+    recentRuns: visibleRuns.slice(0, 5).map((run) => ({
       id: run.id,
       agent: run.agentName ?? "",
       status: run.status ?? "",
@@ -100,8 +111,9 @@ async function loadDashboardFromSql(
   orgId: string,
   projectId?: string | null,
 ): Promise<DashboardData> {
-  const projectWhere = projectId === undefined ? "" : projectId === null ? " AND project_id IS NULL" : " AND project_id = $2";
-  const projectParams = projectId === undefined || projectId === null ? [orgId] : [orgId, projectId];
+  const projectIds = typeof projectId === "string" ? await dashboardProjectIds(db, orgId, projectId) : [];
+  const projectWhere = dashboardProjectWhere(projectId, projectIds);
+  const projectParams = dashboardProjectParams(orgId, projectId, projectIds);
   const [projects, docs, runs, tasks, unread] = await Promise.all([
     db.query<{ id: string; name: string }>(
       `SELECT id, name FROM projects WHERE org_id = $1 ORDER BY created_at ASC, id ASC`,
@@ -168,4 +180,38 @@ async function loadDashboardFromSql(
     })),
     unreadCount: Number(unread[0]?.count ?? 0),
   };
+}
+
+async function dashboardProjectIds(db: EntityManager | SqlExecutor, orgId: string, projectId: string): Promise<string[]> {
+  try {
+    const query = "find" in db
+      ? async (sql: string, params: readonly unknown[]) => ormSqlConnection(db).execute<Array<{ id: string }>>(sql, params)
+      : (sql: string, params: readonly unknown[]) => db.query<{ id: string }>(sql, params);
+    const rows = await query(
+      `WITH RECURSIVE descendants AS (
+         SELECT id FROM projects WHERE org_id = $1 AND id = $2
+         UNION ALL
+         SELECT p.id
+           FROM projects p
+           JOIN descendants d ON p.parent_id = d.id
+          WHERE p.org_id = $1
+       )
+       SELECT id FROM descendants`,
+      [orgId, projectId],
+    );
+    return rows.length > 0 ? rows.map((row) => row.id) : [projectId];
+  } catch {
+    return [projectId];
+  }
+}
+
+function dashboardProjectWhere(projectId: string | null | undefined, projectIds: readonly string[]): string {
+  if (projectId === undefined) return "";
+  if (projectId === null) return " AND project_id IS NULL";
+  return ` AND project_id IN (${projectIds.map((_, index) => `$${index + 2}`).join(", ")})`;
+}
+
+function dashboardProjectParams(orgId: string, projectId: string | null | undefined, projectIds: readonly string[]): readonly string[] {
+  if (projectId === undefined || projectId === null) return [orgId];
+  return [orgId, ...projectIds];
 }

@@ -9,6 +9,7 @@ export interface AppContext {
 export interface RunDto {
   id: string;
   orgId: string;
+  projectId: string | null;
   agentName: string | null;
   status: string | null;
   prompt: string | null;
