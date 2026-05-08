@@ -123,6 +123,23 @@ async function seedRun(
   return run;
 }
 
+async function attachDispatchTrace(db: TestOrm, task: Task): Promise<void> {
+  const projectId = randomUUID();
+  const repoId = randomUUID();
+  const conn = db.em.getConnection();
+  await conn.execute(`INSERT INTO projects (id, org_id, name) VALUES (?, ?, ?)`, [projectId, ORG_ID, "Symphony Project"]);
+  await conn.execute(
+    `INSERT INTO repos (id, org_id, name, slug, kind, local_path) VALUES (?, ?, ?, ?, ?, ?)`,
+    [repoId, ORG_ID, "Symphony Repo", `symphony-${repoId.slice(0, 8)}`, "local", "/tmp/symphony-repo"],
+  );
+  await conn.execute(`UPDATE tasks SET project_id = ?, repo_id = ? WHERE id = ? AND org_id = ?`, [
+    projectId,
+    repoId,
+    task.id,
+    ORG_ID,
+  ]);
+}
+
 describe("Symphony conformance suite", () => {
   test("REQUIRED: conformance file contains zero todo or skip tests", async () => {
     const source = await readFile(CONFORMANCE_TEST_PATH, "utf8");
@@ -1463,7 +1480,7 @@ Prompt`);
       try {
         const caller = orchestrationRouter.createCaller(
           createContext({
-            em: db.em,
+            em: db.em.fork(),
             orgId: ORG_ID,
             session: {
               id: "s1",
@@ -1483,6 +1500,7 @@ Prompt`);
 
         // Seed a task so we have a valid taskId
         const task = await seedTask(db);
+        await attachDispatchTrace(db, task);
 
         // Use type-safe access via unknown cast
         const dispatchRun = (caller as unknown as { dispatchRun: (input: { taskId: string; orgId?: string }) => Promise<{ runId: string; state: string; agent: string; sandboxMode: string }> })["dispatchRun"];
@@ -1506,7 +1524,7 @@ Prompt`);
       try {
         const caller = orchestrationRouter.createCaller(
           createContext({
-            em: db.em,
+            em: db.em.fork(),
             orgId: ORG_ID,
             session: {
               id: "s1",
@@ -1525,6 +1543,7 @@ Prompt`);
         );
 
         const task = await seedTask(db);
+        await attachDispatchTrace(db, task);
 
         // Use type-safe access via unknown cast
         const dispatchRun = (caller as unknown as { dispatchRun: (input: { taskId: string; orgId?: string }) => Promise<unknown> })["dispatchRun"];
