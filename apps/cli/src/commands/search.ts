@@ -23,6 +23,7 @@ interface SearchQueryInput {
   q: string;
   kind?: SearchKind;
   project?: string;
+  scope?: "all" | "global";
   status?: string;
   assignee?: string;
   tag?: string;
@@ -45,8 +46,8 @@ const HELP = `fulcrum search
 Search commands.
 
 Usage:
-  fulcrum search <query> [--kind <kind>] [--project <id>] [--status <status>] [--assignee <id|me>] [--tag <tag>] [--date-range <ISO>/<ISO>] [--author <id>] [--limit <n>] [--offset <n>] [--semantic] [--json]
-  fulcrum search query <query> [--kind <kind>] [--project <id>] [--status <status>] [--assignee <id|me>] [--tag <tag>] [--date-range <ISO>/<ISO>] [--author <id>] [--limit <n>] [--offset <n>] [--semantic] [--json]
+  fulcrum search <query> [--kind <kind>] [--project <id>] [--all-projects|--global] [--status <status>] [--assignee <id|me>] [--tag <tag>] [--date-range <ISO>/<ISO>] [--author <id>] [--limit <n>] [--offset <n>] [--semantic] [--json]
+  fulcrum search query <query> [--kind <kind>] [--project <id>] [--all-projects|--global] [--status <status>] [--assignee <id|me>] [--tag <tag>] [--date-range <ISO>/<ISO>] [--author <id>] [--limit <n>] [--offset <n>] [--semantic] [--json]
   fulcrum search suggest <partial> [--kind <kind>] [--json]
   fulcrum search saved list [--project <id>] [--json]
   fulcrum search saved create --name <name> --query-json <json> [--json]
@@ -183,6 +184,7 @@ async function runQuery(argv: readonly string[], opts: ResolvedOptions): Promise
     q: resolvedQuery,
     kind: resolvedKind,
     project: flags.get("project"),
+    scope: argv.includes("--global") ? "global" : argv.includes("--all-projects") ? "all" : undefined,
     status: resolvedStatus,
     assignee: resolvedAssignee,
     tag: resolvedTag,

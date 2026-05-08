@@ -68,7 +68,7 @@ describe("SearchScreen", () => {
     });
 
     await screen.submitQuery("notification");
-    expect(searches).toEqual([{ query: "notification", facets: ["tasks", "docs", "memories", "runs", "artifacts"] }]);
+    expect(searches).toEqual([{ query: "notification", facets: ["tasks", "docs", "memories", "runs", "artifacts"], scope: "current" }]);
 
     const rendered = renderPlain((renderer) => screen.render(renderer));
     for (const heading of ["tasks", "docs", "memories", "runs", "artifacts"]) expect(rendered).toContain(heading);
@@ -77,10 +77,35 @@ describe("SearchScreen", () => {
     await screen.handleKey("\t");
     await screen.handleKey(" ");
     await screen.submitQuery("notification");
-    expect(searches.at(-1)).toEqual({ query: "notification", facets: ["tasks", "memories", "runs", "artifacts"] });
+    expect(searches.at(-1)).toEqual({ query: "notification", facets: ["tasks", "memories", "runs", "artifacts"], scope: "current" });
 
     await screen.handleKey("\r");
     expect(opened).toEqual([{ kind: "tasks", id: "task-1" }]);
+  });
+
+  test("cycles scope from current project to all projects and global-only", async () => {
+    const searches: unknown[] = [];
+    const screen = new SearchScreen({
+      caller: {
+        search: {
+          query: async (input) => {
+            searches.push(input);
+            return [];
+          },
+        },
+      },
+    });
+
+    await screen.submitQuery("notification");
+    await screen.handleKey("g");
+    await screen.handleKey("g");
+
+    expect(searches).toEqual([
+      { query: "notification", facets: ["tasks", "docs", "memories", "runs", "artifacts"], scope: "current" },
+      { query: "notification", facets: ["tasks", "docs", "memories", "runs", "artifacts"], scope: "all" },
+      { query: "notification", facets: ["tasks", "docs", "memories", "runs", "artifacts"], scope: "global" },
+    ]);
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Scope: Global only");
   });
 
   test("refreshes full-screen result count when facets are toggled", async () => {

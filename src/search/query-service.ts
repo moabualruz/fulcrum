@@ -14,6 +14,7 @@ export interface SearchQueryInput {
   filters?: {
     kinds?: string[];
     projectIds?: string[];
+    scope?: "current" | "all" | "global";
     statuses?: string[];
     dateRange?: { from?: string; to?: string };
   };
@@ -83,7 +84,9 @@ export class SearchQueryService {
       whereClauses.push(`entity_kind = ANY($${params.length}::text[])`);
     }
 
-    if (filters?.projectIds?.length) {
+    if (filters?.scope === "global") {
+      whereClauses.push("project_id IS NULL");
+    } else if (filters?.projectIds?.length && filters.scope !== "all") {
       params.push(filters.projectIds);
       whereClauses.push(`project_id = ANY($${params.length}::text[])`);
     }

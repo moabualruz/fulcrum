@@ -72,6 +72,23 @@ describe("SearchQueryService", () => {
       expect(sql).toMatch(/entity_kind/i);
     });
 
+    test("filters current project by default and supports explicit all/global scopes", async () => {
+      const db = makeDb(fakeRows);
+      svc = new SearchQueryService(db);
+
+      await svc.query("org1", { term: "test", filters: { projectIds: ["p1"] } });
+      await svc.query("org1", { term: "test", filters: { projectIds: ["p1"], scope: "all" } });
+      await svc.query("org1", { term: "test", filters: { projectIds: ["p1"], scope: "global" } });
+
+      const currentSql = queryCalls(db)[0]?.[0] as string;
+      const allSql = queryCalls(db)[1]?.[0] as string;
+      const globalSql = queryCalls(db)[2]?.[0] as string;
+      expect(currentSql).toContain("project_id = ANY");
+      expect(allSql).not.toContain("project_id = ANY");
+      expect(allSql).not.toContain("project_id IS NULL");
+      expect(globalSql).toContain("project_id IS NULL");
+    });
+
     test("Test 3: returns facetCounts when facets=true", async () => {
       // First call returns main results, subsequent calls return facet aggregates
       const query = mock()

@@ -15,12 +15,14 @@ export interface TuiSearchResult {
 export interface SearchScreenOptions {
   caller: {
     search: {
-      query: (input: { query: string; facets: TuiSearchKind[] }) => Promise<TuiSearchResult[]>;
+      query: (input: { query: string; facets: TuiSearchKind[]; scope: TuiSearchScope }) => Promise<TuiSearchResult[]>;
       suggest?: (input: { query: string }) => Promise<string[]>;
     };
   };
   onOpenEntity?: (entity: { kind: TuiSearchKind; id: string }) => void;
 }
+
+export type TuiSearchScope = "current" | "all" | "global";
 
 export class SearchScreen {
   private query = "";
@@ -29,6 +31,7 @@ export class SearchScreen {
   private paletteResults: TuiSearchResult[] = [];
   private enabledFacets = new Set<TuiSearchKind>(SEARCH_KINDS);
   private focusedFacet = 0;
+  private scope: TuiSearchScope = "current";
   private cursor = 0;
   private paletteCursor = 0;
   private paletteOpen = false;
@@ -41,6 +44,7 @@ export class SearchScreen {
     renderer.writeln(c.bold(this.fullScreen ? "  Full-screen search" : "  Search"));
     renderer.separator();
     renderer.writeln(`  Query: ${this.query || c.dim("(empty)")}`);
+    renderer.writeln(`  Scope: ${this.scopeLabel}`);
     renderer.writeln();
     renderer.writeln(`  Facets: ${SEARCH_KINDS.map((kind, index) => this.renderFacet(kind, index)).join(" ")}`);
     renderer.writeln();
@@ -63,20 +67,20 @@ export class SearchScreen {
     if (this.results.length === 0) renderer.writeln(c.dim("  No results."));
 
     renderer.writeln();
-    renderer.writeln(c.dim("  Cmd+K palette  S full search  Tab facet  Space toggle  Enter open  q back"));
+    renderer.writeln(c.dim("  Cmd+K palette  S full search  g scope  Tab facet  Space toggle  Enter open  q back"));
 
     if (this.paletteOpen) this.renderPalette(renderer);
   }
 
   async submitQuery(query: string): Promise<void> {
     this.query = query;
-    this.results = await this.opts.caller.search.query({ query, facets: this.activeFacets });
+    this.results = await this.opts.caller.search.query({ query, facets: this.activeFacets, scope: this.scope });
     this.cursor = 0;
   }
 
   async submitPaletteQuery(query: string): Promise<void> {
     this.paletteQuery = query;
-    this.paletteResults = await this.opts.caller.search.query({ query, facets: [...SEARCH_KINDS] });
+    this.paletteResults = await this.opts.caller.search.query({ query, facets: [...SEARCH_KINDS], scope: this.scope });
     this.paletteCursor = 0;
   }
 
@@ -96,6 +100,12 @@ export class SearchScreen {
 
     if (key === "\t") {
       this.focusedFacet = (this.focusedFacet + 1) % SEARCH_KINDS.length;
+      return true;
+    }
+
+    if (key === "g") {
+      this.scope = this.nextScope();
+      if (this.query) await this.submitQuery(this.query);
       return true;
     }
 
@@ -150,6 +160,18 @@ export class SearchScreen {
 
   private get activeFacets(): TuiSearchKind[] {
     return SEARCH_KINDS.filter((kind) => this.enabledFacets.has(kind));
+  }
+
+  private get scopeLabel(): string {
+    if (this.scope === "all") return "All projects";
+    if (this.scope === "global") return "Global only";
+    return "Current project";
+  }
+
+  private nextScope(): TuiSearchScope {
+    if (this.scope === "current") return "all";
+    if (this.scope === "all") return "global";
+    return "current";
   }
 
   private renderFacet(kind: TuiSearchKind, index: number): string {

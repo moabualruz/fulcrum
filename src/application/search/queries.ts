@@ -18,9 +18,16 @@ export async function searchDocuments(
 ): Promise<SearchHit[]> {
   const limit = filters.limit ?? 25;
   const normalized = query.trim().toLowerCase();
+  const scopeFilter = filters.scope ?? "current";
   const rows = await em.find(SearchDocument, {
     org: filters.orgId,
-    ...(filters.projectId !== undefined ? { projectId: filters.projectId } : {}),
+    ...(scopeFilter === "all"
+      ? {}
+      : scopeFilter === "global"
+        ? { projectId: null }
+        : filters.projectId !== undefined
+          ? { projectId: filters.projectId }
+          : {}),
     ...(filters.sourceKinds && filters.sourceKinds.length > 0 ? { entityKind: { $in: [...filters.sourceKinds] } } : {}),
   } as never, { orderBy: { updatedAt: "DESC", id: "ASC" }, limit: Math.max(limit * 4, limit) });
 
@@ -91,7 +98,31 @@ function toSearchHit(row: SearchDocument, normalizedQuery: string): SearchHit {
     body,
     score: normalizedQuery.length === 0 ? 1 : score(haystack, normalizedQuery),
     updated_at: (row.updatedAt ?? new Date(0)).toISOString(),
+    projectId: row.projectId ?? null,
+    scope: row.projectId ? "project" : "global",
+    provenance: {
+      entityKind: row.entityKind,
+      entityId: row.entityId,
+      projectId: row.projectId ?? null,
+    },
+    linkedCounts: linkedCounts(row.metadata),
   };
+}
+
+function linkedCounts(metadata: Record<string, unknown> | undefined): SearchHit["linkedCounts"] {
+  const raw = metadata?.["linkedCounts"];
+  const input = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+  return {
+    docs: numericCount(input["docs"]),
+    runs: numericCount(input["runs"]),
+    artifacts: numericCount(input["artifacts"]),
+    memory: numericCount(input["memory"]),
+    audit: numericCount(input["audit"]),
+  };
+}
+
+function numericCount(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 function score(haystack: string, query: string): number {

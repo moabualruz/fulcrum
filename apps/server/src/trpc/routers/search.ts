@@ -28,6 +28,7 @@ import { SnapshotService } from "@/search/snapshot-service.ts";
 const SearchFiltersSchema = z.object({
   kinds: z.array(z.string()).optional(),
   projectIds: z.array(z.string()).optional(),
+  scope: z.enum(["current", "all", "global"]).optional(),
   statuses: z.array(z.string()).optional(),
   dateRange: z
     .object({

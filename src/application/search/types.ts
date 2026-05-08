@@ -12,11 +12,26 @@ export interface SearchHit {
   body: string;
   score: number;
   updated_at: string;
+  projectId: string | null;
+  scope: "project" | "global";
+  provenance: {
+    entityKind: string;
+    entityId: string;
+    projectId: string | null;
+  };
+  linkedCounts: {
+    docs: number;
+    runs: number;
+    artifacts: number;
+    memory: number;
+    audit: number;
+  };
 }
 
 export interface SearchFilters {
   orgId: string;
   projectId?: string | null;
+  scope?: "current" | "all" | "global";
   sourceKinds?: readonly string[];
   limit?: number;
 }
