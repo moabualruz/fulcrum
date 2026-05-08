@@ -22,7 +22,7 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
 - [x] **Phase 8: Surface Delivery** - CLI wiring, TUI rewrite, Web completion, API surface
 - [x] **Phase 9: Cross-Cutting + Testing** - i18n, theming, accessibility, telemetry, backup, comprehensive test coverage (completed 2026-05-06)
 - [x] **Phase 9.5: Full Architecture Overhaul + Integration Preservation** (INSERTED) - Deep research all gray areas, overhaul architecture, implement one unified data manipulation layer, remove interface logic duplication, repair web/CLI/TUI/API integration, preserve every feature/logic/benefit, and replace fake tests with real Playwright + integration gates (closed for now 2026-05-08; remaining workflow/product gaps moved to Phase 9.6)
-- [ ] **Phase 9.6: Product Workflow Completeness + Human/Agent Journey Repair** (INSERTED) - Automated implementation, CI, security, UI, eval, and alignment review gates are complete. Final user UAT acceptance still gates Phase 10.
+- [x] **Phase 9.6: Product Workflow Completeness + Human/Agent Journey Repair** (INSERTED) - Automated implementation, CI, security, UI, eval, alignment review, and final user UAT accepted on 2026-05-08. Phase 10 is unblocked.
 - [ ] **Phase 10: SaaS Hardening + Milestone Closure** - Multi-org isolation, PostgreSQL pooling, job coordination, all deferred item closure, Huashu Web/CLI/TUI UX gate
 
 ## Phase Details
@@ -302,7 +302,7 @@ Plans:
   6. Web route/navigation/action inventory repaired: no orphan feature pages, stale primary nav, stale command palette, dead forms, or unconfigured route services.
   7. CLI and TUI parity repaired for all shipped feature workflows; same data and same application services as web/API.
   8. Playwright E2E is real and mandatory using Tiered Mandatory policy: normal CI hard-fails smoke/critical journeys, and full Playwright workflows gate Phase 9.5 acceptance and release/closure.
-  9. Phase 10 remains blocked until Phase 9.5 verification passes.
+  9. Phase 9.5 blocks Phase 10 until architecture verification passes; this was superseded by Phase 9.6 closure on 2026-05-08.
 **Status:** Complete for now — closed by user decision on 2026-05-08. Architecture/data-layer remediation evidence lives in `09.5-VERIFICATION.md`; product workflow and journey gaps are explicitly carried by Phase 9.6.
 **Plans:** Complete — execution artifacts 09.5-00 through 09.5-61 plus verification/closure artifacts.
 
@@ -331,7 +331,7 @@ Plans:
   3. Human journeys H1-H6 pass across Web, CLI, and TUI using same data.
   4. Agent journeys A1-A5 pass from task dispatch through context preview, run supervision, artifacts, memory promotion, audit, notifications, and follow-up tasks.
   5. Completion proof cites E2E tests, CLI JSON checks, TUI checks, and server/API relationship graph checks.
-**Plans:** 09.6-00 through 09.6-08 executed as vertical workflow slices. Closure evidence: `.planning/phases/09.6-product-workflow-completeness-human-agent-journeys/09.6-CLOSURE-PROOF.md`. Final user UAT remains the Phase 10 gate.
+**Plans:** 09.6-00 through 09.6-08 executed as vertical workflow slices. Closure evidence: `.planning/phases/09.6-product-workflow-completeness-human-agent-journeys/09.6-CLOSURE-PROOF.md`. Final user UAT accepted on 2026-05-08; Phase 10 can start.
 
 ### Phase 10: SaaS Hardening + Milestone Closure
 **Goal**: Multi-tenant SaaS validated and all prior deferred items closed
@@ -363,9 +363,9 @@ Plans:
 | 8. Surface Delivery | 7/7 | Complete | 2026-05-06 |
 | 9. Cross-Cutting + Testing | 10/10 | Complete | 2026-05-06 |
 | 9.5. Full Architecture Overhaul + Integration Preservation | 61/61 | Complete for now | 2026-05-08 |
-| 9.6. Product Workflow Completeness + Human/Agent Journey Repair | 9/9 | Automated gates complete; user UAT pending | Phase 10 blocked pending user acceptance |
+| 9.6. Product Workflow Completeness + Human/Agent Journey Repair | 9/9 | Complete; user UAT accepted | 2026-05-08 |
 | 10. SaaS Hardening + Milestone Closure | 0/19 | Planned | - |
 
 ---
 *Roadmap created: 2026-05-04*
-*Last corrected: 2026-05-08 — executed Phase 9.6 plans 00-08 and completed CI/security/UI/eval/alignment review; Phase 10 remains blocked until closure proof is accepted in final user UAT*
+*Last corrected: 2026-05-08 — accepted Phase 9.6 closure proof in final user UAT after CI/security/UI/eval/alignment review; Phase 10 unblocked*
