@@ -243,7 +243,7 @@ const ALLOWED_PARENT_TYPES: Record<string, readonly string[]> = {
   initiative: [],
   epic: ["initiative"],
   story: ["epic", "initiative"],
-  task: ["epic", "story", "initiative"],
+  task: ["epic", "story", "task", "initiative"],
   bug: ["epic", "story", "task"],
   chore: ["epic", "story", "task"],
   subtask: ["story", "task", "bug", "chore"],
