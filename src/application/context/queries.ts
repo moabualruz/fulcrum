@@ -1,7 +1,7 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 
 import { listDocs } from "../docs/queries.ts";
-import { listMemories } from "../memory/web-queries.ts";
+import { listMemoryRows } from "../memory/queries.ts";
 import { ormSqlConnection } from "../orm-helpers.ts";
 import type { AppContext } from "../tasks/types.ts";
 
@@ -50,6 +50,20 @@ export interface ContextBundle {
   tokenBudget: { used: number; total: number };
 }
 
+export interface ContextSourceRef {
+  kind: "task" | "doc" | "memory" | "run" | "artifact";
+  id: string;
+  reason: string;
+  scope: "project" | "global";
+}
+
+export interface ContextPreview {
+  bundle: ContextBundle;
+  sourceRefs: ContextSourceRef[];
+  scope: { projectId: string | null; taskId: string; includeGlobal: boolean };
+  warnings: string[];
+}
+
 export async function loadContextPreviewOptions(
   em: EntityManager,
   ctx: AppContext,
@@ -74,14 +88,20 @@ export async function loadContextPreviewOptions(
 export async function loadContextBundle(
   em: EntityManager,
   ctx: AppContext,
-  input: { selectedProjectId: string | null; selectedTaskId: string },
+  input: { selectedProjectId: string | null; selectedTaskId: string; includeGlobal?: boolean },
 ): Promise<ContextBundle> {
   const conn = ormSqlConnection(em);
-  const memories = (await listMemories(em, {
-    orgId: ctx.orgId,
-    projectId: input.selectedProjectId,
-    limit: 20,
-  })).map((memory) => ({
+  const memoryRows = [
+    ...(input.includeGlobal
+      ? await listMemoryRows(em, ctx, { scope: "global", limit: 20 })
+      : []),
+    ...(await listMemoryRows(em, ctx, {
+      projectId: input.selectedProjectId,
+      scope: "project",
+      limit: 20,
+    })),
+  ];
+  const memories = memoryRows.map((memory) => ({
     id: memory.id,
     key: memory.key,
     body: memory.body,
@@ -132,6 +152,52 @@ export async function loadContextBundle(
     recentRuns,
     artifacts,
     tokenBudget: { used: Math.min(estimateTokens(allText), totalBudget), total: totalBudget },
+  };
+}
+
+export async function previewContext(
+  em: EntityManager,
+  ctx: AppContext,
+  input: { projectId: string | null; taskId: string; includeGlobal?: boolean },
+): Promise<ContextPreview> {
+  const includeGlobal = input.includeGlobal ?? false;
+  const bundle = await loadContextBundle(em, ctx, {
+    selectedProjectId: input.projectId,
+    selectedTaskId: input.taskId,
+    includeGlobal,
+  });
+  const sourceRefs: ContextSourceRef[] = [
+    { kind: "task", id: input.taskId, reason: "selected-task", scope: "project" },
+    ...bundle.documents.map((doc) => ({
+      kind: "doc" as const,
+      id: doc.id,
+      reason: "project-doc",
+      scope: "project" as const,
+    })),
+    ...bundle.memories.map((memory) => ({
+      kind: "memory" as const,
+      id: memory.id,
+      reason: memory.scope === "global" ? "global-memory" : "project-memory",
+      scope: memory.scope === "global" ? "global" as const : "project" as const,
+    })),
+    ...bundle.recentRuns.map((run) => ({
+      kind: "run" as const,
+      id: run.id,
+      reason: "recent-run",
+      scope: "project" as const,
+    })),
+    ...bundle.artifacts.map((artifact) => ({
+      kind: "artifact" as const,
+      id: artifact.id,
+      reason: "task-artifact",
+      scope: "project" as const,
+    })),
+  ];
+  return {
+    bundle,
+    sourceRefs,
+    scope: { projectId: input.projectId, taskId: input.taskId, includeGlobal },
+    warnings: [],
   };
 }
 
