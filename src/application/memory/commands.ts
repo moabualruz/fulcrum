@@ -55,6 +55,27 @@ export async function updateMemory(
   return serializeMemory(memory);
 }
 
+export async function promoteMemory(
+  em: EntityManager,
+  ctx: MemoryApplicationContext,
+  id: string,
+): Promise<MemoryDto> {
+  const memory = await findMemoryOrThrow(em, ctx.orgId, id);
+  const promotedFromProjectId = memory.projectId;
+  memory.projectId = null;
+  memory.global = true;
+  memory.importance = "high";
+  memory.tags = Array.from(new Set([...memory.tags, "accepted"]));
+  memory.sourceRef = {
+    ...memory.sourceRef,
+    ...(promotedFromProjectId ? { promotedFromProjectId } : {}),
+  };
+  memory.updatedAt = new Date();
+  em.persist(memory);
+  await em.flush();
+  return serializeMemory(memory);
+}
+
 export async function deleteMemory(
   em: EntityManager,
   ctx: MemoryApplicationContext,

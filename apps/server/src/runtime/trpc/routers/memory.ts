@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { createMemory, deleteMemory, updateMemory } from "@/application/memory/commands.ts";
+import { createMemory, deleteMemory, promoteMemory, updateMemory } from "@/application/memory/commands.ts";
 import { getMemory, listMemories, searchMemories } from "@/application/memory/queries.ts";
 import { appErrorToTrpcError } from "@/application/error-mapping.ts";
 import { AppError } from "@/application/errors.ts";
@@ -92,6 +92,7 @@ const memoryApplication = {
   getMemory,
   listMemories,
   updateMemory,
+  promoteMemory,
   deleteMemory,
   searchMemories,
 };
@@ -144,6 +145,13 @@ export const memoryRouter = t.router({
     .output(MemoryOutputSchema)
     .mutation(({ ctx, input }) =>
       mapAppError(() => memoryApplication.updateMemory(requireTrpcEntityManager(ctx), appContext(ctx), input))
+    ),
+
+  promote: permissionedProcedure({ resource: "memories", action: "promote" })
+    .input(IdInputSchema)
+    .output(MemoryOutputSchema)
+    .mutation(({ ctx, input }) =>
+      mapAppError(() => memoryApplication.promoteMemory(requireTrpcEntityManager(ctx), appContext(ctx), input.id))
     ),
 
   delete: permissionedProcedure({ resource: "memories", action: "delete" })
