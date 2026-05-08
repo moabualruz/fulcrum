@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 
 import { AgentRun } from "../../db/entities/orchestration/AgentRun.ts";
 import { AppForbiddenError, AppNotFoundError } from "../errors.ts";
+import { previewContext } from "../context/queries.ts";
 import { ormSqlConnection } from "../orm-helpers.ts";
 import { listProjectOptions, type ProjectOption } from "../projects/queries.ts";
 import { listOpenTaskOptions, type TaskOption } from "../tasks/queries.ts";
@@ -24,9 +25,11 @@ export async function getRunDetail(em: EntityManager, ctx: AppContext, id: strin
   const run = await em.findOne(AgentRun, { id } as never, { populate: ["task"] as never });
   if (!run) throw new AppNotFoundError(`Run not found: ${id}`);
   if (run.org.id !== ctx.orgId) throw new AppForbiddenError(`Run does not belong to org: ${ctx.orgId}`);
+  const projectId = run.task?.projectId ?? ctx.projectId ?? null;
+  const taskId = run.task?.id ?? null;
   return {
     ...serializeRun(run),
-    projectId: run.task?.projectId ?? ctx.projectId ?? null,
+    projectId,
     model: run.agentVersion ?? null,
     parentRunId: null,
     startedAt: run.startedAt,
@@ -39,6 +42,15 @@ export async function getRunDetail(em: EntityManager, ctx: AppContext, id: strin
     attemptCount: run.attemptCount,
     nextRetryAt: run.nextRetryAt ?? null,
     lastErrorKind: run.lastErrorKind ?? null,
+    observability: await buildRunObservability(em, ctx, {
+      runId: run.id,
+      status: run.status ?? null,
+      projectId,
+      taskId,
+      attemptCount: run.attemptCount,
+      nextRetryAt: run.nextRetryAt ?? null,
+      lastErrorKind: run.lastErrorKind ?? null,
+    }),
   };
 }
 
@@ -50,6 +62,89 @@ export function serializeRun(run: AgentRun): RunDto {
     status: run.status ?? null,
     prompt: run.threadId ?? null,
     createdAt: run.createdAt,
+  };
+}
+
+async function buildRunObservability(
+  em: EntityManager,
+  ctx: AppContext,
+  input: {
+    runId: string;
+    status: string | null;
+    projectId: string | null;
+    taskId: string | null;
+    attemptCount: number;
+    nextRetryAt: Date | null;
+    lastErrorKind: string | null;
+  },
+): Promise<RunDetailDto["observability"]> {
+  const conn = ormSqlConnection(em);
+  const context = input.taskId
+    ? await previewContext(em, ctx, { projectId: input.projectId, taskId: input.taskId, includeGlobal: false })
+    : {
+        sourceRefs: [],
+        warnings: ["run has no task context"],
+        scope: { projectId: input.projectId, taskId: null, includeGlobal: false },
+      };
+  const artifacts = (await conn.execute<Array<{
+    id: string;
+    filename: string;
+    path: string | null;
+    mime: string | null;
+    metadata_json: Record<string, unknown> | null;
+    created_at: string | Date;
+  }>>(
+    `SELECT id, filename, path, mime, metadata_json, created_at
+       FROM artifacts
+      WHERE run_id = $1 AND org_id = $2
+      ORDER BY created_at DESC, id ASC`,
+    [input.runId, ctx.orgId],
+  )).map((artifact) => ({
+    id: artifact.id,
+    filename: artifact.filename,
+    path: artifact.path,
+    mime: artifact.mime,
+    lifecycleState: typeof artifact.metadata_json?.lifecycleState === "string"
+      ? artifact.metadata_json.lifecycleState
+      : "created",
+    createdAt: isoStamp(artifact.created_at),
+  }));
+  const audit = (await conn.execute<Array<{
+    id: string;
+    verb: string;
+    actor: string;
+    payload: Record<string, unknown> | null;
+    created_at: string | Date;
+  }>>(
+    `SELECT id, verb, actor, payload, created_at
+       FROM events
+      WHERE subject_kind = 'agent_run' AND subject_id = $1 AND org_id = $2
+      ORDER BY created_at DESC, id DESC`,
+    [input.runId, ctx.orgId],
+  )).map((event) => ({
+    id: event.id,
+    verb: event.verb,
+    actor: event.actor,
+    payload: event.payload ?? {},
+    createdAt: isoStamp(event.created_at),
+  }));
+
+  return {
+    context: {
+      sourceRefs: context.sourceRefs,
+      warnings: context.warnings,
+      scope: context.scope,
+    },
+    artifacts,
+    memoryCandidates: [],
+    followUpTasks: [],
+    audit,
+    recovery: {
+      retryable: input.status !== "succeeded" && input.status !== "cancelled",
+      retryCount: input.attemptCount,
+      nextRetryAt: input.nextRetryAt,
+      lastErrorKind: input.lastErrorKind,
+    },
   };
 }
 

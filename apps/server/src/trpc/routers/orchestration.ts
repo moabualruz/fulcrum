@@ -162,6 +162,7 @@ async function getAgentRunForApi(
   attemptCount: number;
   nextRetryAt: Date | null;
   lastErrorKind: string | null;
+  observability: Awaited<ReturnType<typeof getRunDetail>>["observability"];
 } | null> {
   const run = await getRunDetail(manager, appCtx, runId);
   const state = run.orchestrationState;
@@ -174,6 +175,7 @@ async function getAgentRunForApi(
     attemptCount: run.attemptCount,
     nextRetryAt: run.nextRetryAt,
     lastErrorKind: run.lastErrorKind,
+    observability: run.observability,
   };
 }
 

@@ -29,6 +29,43 @@ export interface RunDetailDto extends RunDto {
   attemptCount: number;
   nextRetryAt: Date | null;
   lastErrorKind: string | null;
+  observability: RunObservabilityDto;
+}
+
+export interface RunObservabilityDto {
+  context: {
+    sourceRefs: Array<{
+      kind: "task" | "doc" | "memory" | "run" | "artifact";
+      id: string;
+      reason: string;
+      scope: "project" | "global";
+    }>;
+    warnings: string[];
+    scope: { projectId: string | null; taskId: string | null; includeGlobal: boolean };
+  };
+  artifacts: Array<{
+    id: string;
+    filename: string;
+    path: string | null;
+    mime: string | null;
+    lifecycleState: string;
+    createdAt: string;
+  }>;
+  memoryCandidates: Array<Record<string, unknown>>;
+  followUpTasks: Array<Record<string, unknown>>;
+  audit: Array<{
+    id: string;
+    verb: string;
+    actor: string;
+    payload: Record<string, unknown>;
+    createdAt: string;
+  }>;
+  recovery: {
+    retryable: boolean;
+    retryCount: number;
+    nextRetryAt: Date | null;
+    lastErrorKind: string | null;
+  };
 }
 
 export interface DispatchRunInput {
