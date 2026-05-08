@@ -22,7 +22,7 @@ Fulcrum v1.0 delivers all 16 pillars of the Agent OS to production-ready state. 
 - [x] **Phase 8: Surface Delivery** - CLI wiring, TUI rewrite, Web completion, API surface
 - [x] **Phase 9: Cross-Cutting + Testing** - i18n, theming, accessibility, telemetry, backup, comprehensive test coverage (completed 2026-05-06)
 - [x] **Phase 9.5: Full Architecture Overhaul + Integration Preservation** (INSERTED) - Deep research all gray areas, overhaul architecture, implement one unified data manipulation layer, remove interface logic duplication, repair web/CLI/TUI/API integration, preserve every feature/logic/benefit, and replace fake tests with real Playwright + integration gates (closed for now 2026-05-08; remaining workflow/product gaps moved to Phase 9.6)
-- [ ] **Phase 9.6: Product Workflow Completeness + Human/Agent Journey Repair** (INSERTED) - User UAT blocker: replace disconnected CRUD surfaces with one project-first workflow product across Web, CLI, TUI, server/API, docs, memory, context, orchestration, artifacts, automations, and doctor/startup gates. Phase 10 blocked until human and agent journeys pass end-to-end.
+- [ ] **Phase 9.6: Product Workflow Completeness + Human/Agent Journey Repair** (INSERTED) - Automated implementation, CI, security, UI, eval, and alignment review gates are complete. Final user UAT acceptance still gates Phase 10.
 - [ ] **Phase 10: SaaS Hardening + Milestone Closure** - Multi-org isolation, PostgreSQL pooling, job coordination, all deferred item closure, Huashu Web/CLI/TUI UX gate
 
 ## Phase Details
@@ -363,9 +363,9 @@ Plans:
 | 8. Surface Delivery | 7/7 | Complete | 2026-05-06 |
 | 9. Cross-Cutting + Testing | 10/10 | Complete | 2026-05-06 |
 | 9.5. Full Architecture Overhaul + Integration Preservation | 61/61 | Complete for now | 2026-05-08 |
-| 9.6. Product Workflow Completeness + Human/Agent Journey Repair | 9/9 | User UAT pending | Phase 10 blocked |
+| 9.6. Product Workflow Completeness + Human/Agent Journey Repair | 9/9 | Automated gates complete; user UAT pending | Phase 10 blocked pending user acceptance |
 | 10. SaaS Hardening + Milestone Closure | 0/19 | Planned | - |
 
 ---
 *Roadmap created: 2026-05-04*
-*Last corrected: 2026-05-08 — executed Phase 9.6 plans 00-08; Phase 10 remains blocked until closure proof is accepted in final user UAT*
+*Last corrected: 2026-05-08 — executed Phase 9.6 plans 00-08 and completed CI/security/UI/eval/alignment review; Phase 10 remains blocked until closure proof is accepted in final user UAT*
