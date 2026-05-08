@@ -15,10 +15,13 @@ interface ContextBundle {
 }
 
 export interface ContextPreviewScreenOptions {
+  projectId?: string;
   taskId: string;
+  includeGlobal?: boolean;
   caller: {
     context: {
-      assemble: (input: { taskId: string }) => Promise<{ bundle: ContextBundle; snapshotId?: string }>;
+      assemble?: (input: { taskId: string }) => Promise<{ bundle: ContextBundle; snapshotId?: string }>;
+      preview?: (input: { projectId?: string; taskId: string; includeGlobal?: boolean }) => Promise<{ bundle: ContextBundle; snapshotId?: string }>;
     };
   };
 }
@@ -37,7 +40,13 @@ export class ContextPreviewScreen {
   constructor(private readonly opts: ContextPreviewScreenOptions) {}
 
   async load(): Promise<void> {
-    const result = await this.opts.caller.context.assemble({ taskId: this.opts.taskId });
+    const result = this.opts.caller.context.preview
+      ? await this.opts.caller.context.preview({
+          projectId: this.opts.projectId,
+          taskId: this.opts.taskId,
+          includeGlobal: this.opts.includeGlobal,
+        })
+      : await this.opts.caller.context.assemble!({ taskId: this.opts.taskId });
     this.bundle = result.bundle;
     this.snapshotId = result.snapshotId ?? null;
   }

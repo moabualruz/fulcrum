@@ -4,7 +4,8 @@ import { createLocalCaller } from "../local-caller.ts";
 
 type ContextCaller = {
   context: {
-    assemble: (input: Record<string, unknown>) => Promise<unknown>;
+    assemble?: (input: Record<string, unknown>) => Promise<unknown>;
+    preview?: (input: Record<string, unknown>) => Promise<unknown>;
   };
 };
 
@@ -22,6 +23,7 @@ Context commands.
 
 Usage:
   fulcrum context assemble --task <description> [--json]
+  fulcrum context preview --project <id> --task <id> [--include-global] [--json]
 
 Options:
   --json      Output as machine-readable JSON.
@@ -42,6 +44,8 @@ export async function run(
   switch (sub) {
     case "assemble":
       return runAssemble(rest, resolved);
+    case "preview":
+      return runPreview(rest, resolved);
     case "help":
     case "--help":
     case "-h":
@@ -66,6 +70,7 @@ async function runAssemble(argv: readonly string[], opts: ResolvedOptions): Prom
 
   try {
     const caller = await resolveCaller(opts);
+    if (!caller.context.assemble) throw new Error("context.assemble procedure is not available");
     const result = await caller.context.assemble({ task });
     const jsonMode = argv.includes("--json");
     if (jsonMode) {
@@ -76,6 +81,29 @@ async function runAssemble(argv: readonly string[], opts: ResolvedOptions): Prom
   } catch (err) {
     const msg = formatCliError(err);
     opts.printErr(`fulcrum context assemble: ${msg}`);
+    opts.exit(1);
+  }
+}
+
+async function runPreview(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
+  const projectId = flagValue(argv, "--project");
+  const taskId = flagValue(argv, "--task");
+  if (!projectId || !taskId) {
+    opts.printErr("fulcrum context preview: missing required flags --project <id> --task <id>");
+    opts.exit(1);
+    return;
+  }
+
+  try {
+    const caller = await resolveCaller(opts);
+    const input = { projectId, taskId, includeGlobal: argv.includes("--include-global") };
+    const result = caller.context.preview
+      ? await caller.context.preview(input)
+      : await caller.context.assemble(input);
+    opts.print(argv.includes("--json") ? JSON.stringify(result) : JSON.stringify(result, null, 2));
+  } catch (err) {
+    const msg = formatCliError(err);
+    opts.printErr(`fulcrum context preview: ${msg}`);
     opts.exit(1);
   }
 }

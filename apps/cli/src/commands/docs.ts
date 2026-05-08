@@ -226,6 +226,7 @@ function parseListInput(argv: readonly string[]): Record<string, unknown> {
 function parseCreateInput(argv: readonly string[]): Record<string, unknown> {
   const title = flagValue(argv, "--title");
   if (!title) throw new Error("fulcrum docs create: missing required flag --title <title>");
+  const fromTask = flagValue(argv, "--from-task");
 
   return compact({
     title,
@@ -234,7 +235,19 @@ function parseCreateInput(argv: readonly string[]): Record<string, unknown> {
     projectId: flagValue(argv, "--project"),
     parentId: flagValue(argv, "--parent"),
     bodyMd: flagValue(argv, "--body"),
+    source: fromTask ? { kind: "task", id: fromTask } : undefined,
+    links: parseLinks(argv),
   });
+}
+
+function parseLinks(argv: readonly string[]): Array<{ targetKind: string; targetId: string; linkKind: string }> | undefined {
+  const links = flagValues(argv, "--link")
+    .map((value) => {
+      const [targetKind, targetId] = value.split(":", 2);
+      if (!targetKind || !targetId) throw new Error("--link must use <kind>:<id>");
+      return { targetKind, targetId, linkKind: "source" };
+    });
+  return links.length > 0 ? links : undefined;
 }
 
 function docLookup(value: string): Record<string, string> {
@@ -245,6 +258,14 @@ function flagValue(argv: readonly string[], flag: string): string | undefined {
   const index = argv.indexOf(flag);
   if (index < 0) return undefined;
   return argv[index + 1];
+}
+
+function flagValues(argv: readonly string[], flag: string): string[] {
+  const values: string[] = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] === flag && argv[index + 1]) values.push(argv[index + 1]!);
+  }
+  return values;
 }
 
 function numberFlag(argv: readonly string[], flag: string): number | undefined {
