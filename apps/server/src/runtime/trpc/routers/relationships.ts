@@ -10,8 +10,11 @@ import {
   listTaskBlockers,
   listTasksBlockedBy,
   markTaskAsDuplicate,
+  summarizeEntityRelationships,
   type RelationshipsAppContext,
 } from "@/application/relationships/commands.ts";
+import { relationshipBucketSchema } from "@/application/relationships/summary.ts";
+import { traceRefSchema, traceSpineSchema } from "@/application/trace/schemas.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 
@@ -23,6 +26,7 @@ const relationshipsApplication = {
   listBlockedItems,
   listTasksBlockedBy,
   markTaskAsDuplicate,
+  summarizeEntityRelationships,
 };
 
 export function __setRelationshipsApplicationForTest(overrides: Partial<typeof relationshipsApplication>): () => void {
@@ -101,6 +105,15 @@ export const relationshipsRouter = t.router({
         transferWatchers: input.transferWatchers,
       });
     }),
+
+  summary: permissionedProcedure({ resource: "tasks", action: "list" })
+    .input(z.object({
+      entity: traceRefSchema,
+      trace: traceSpineSchema,
+      refs: z.array(traceRefSchema),
+      include: z.array(relationshipBucketSchema).optional(),
+    }))
+    .query(({ input }) => relationshipsApplication.summarizeEntityRelationships(input)),
 });
 
 export type RelationshipsRouter = typeof relationshipsRouter;

@@ -20,6 +20,7 @@
 import { dbMigrate, dbStatus, dbHistory } from "@/db/db.router.ts";
 import type { DbBackend } from "@/config/database.ts";
 import { defaultProductDbStatus, runExplicitProductMigration } from "@/application/db/commands.ts";
+import { resetPlanForFulcrumHome } from "@/application/init/local-state.ts";
 
 /** Help text for the `db` subcommand. */
 const HELP = `fulcrum db
@@ -31,6 +32,7 @@ Usage:
   fulcrum db migrate [--target-version <version>] [--force]
   fulcrum db status [--json]
   fulcrum db history [--json]
+  fulcrum db reset-local-state --fulcrum-home <path> --yes-reset-local-state [--json]
 
 Options:
   --target-version <v>  Migrate to specific version (name or numeric timestamp).
@@ -72,6 +74,17 @@ function printDefaultStatus(rest: readonly string[]): void {
   const payload = defaultProductDbStatus();
   if (json) console.log(JSON.stringify(payload));
   else console.log(JSON.stringify(payload, null, 2));
+}
+
+function runLocalStateResetPlan(rest: readonly string[]): void {
+  const json = hasFlag(rest, "--json");
+  const fulcrumHome = readFlag(rest, "--fulcrum-home") ?? process.env["FULCRUM_HOME"];
+  if (!fulcrumHome) throw new Error("missing --fulcrum-home or FULCRUM_HOME for local reset");
+  const payload = resetPlanForFulcrumHome(fulcrumHome, {
+    confirm: hasFlag(rest, "--yes-reset-local-state"),
+  });
+  if (json) console.log(JSON.stringify(payload));
+  else console.log(payload.message);
 }
 
 /**
@@ -120,6 +133,11 @@ export async function run(
     case "history": {
       const history = await dbHistory(container);
       console.log(JSON.stringify(history, null, 2));
+      return;
+    }
+
+    case "reset-local-state": {
+      runLocalStateResetPlan(rest);
       return;
     }
 

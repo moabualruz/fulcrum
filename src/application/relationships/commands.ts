@@ -1,6 +1,8 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 
 import { RelationshipService, type RelationshipType } from "../../services/RelationshipService.ts";
+import { summarizeRelationships, type RelationshipBucket } from "./summary.ts";
+import type { TraceRef, TraceSpine } from "../trace/schemas.ts";
 
 export interface RelationshipsAppContext {
   orgId: string;
@@ -84,4 +86,13 @@ export async function markTaskAsDuplicate(
     autoClose: input.autoClose,
     transferWatchers: input.transferWatchers,
   });
+}
+
+export function summarizeEntityRelationships(input: {
+  entity: TraceRef;
+  trace: TraceSpine;
+  refs: TraceRef[];
+  include?: RelationshipBucket[];
+}) {
+  return summarizeRelationships(input);
 }
