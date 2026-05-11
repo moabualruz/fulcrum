@@ -3,7 +3,7 @@
 // install.ts iterates BUILTIN_MCPS and calls registerServer for each entry.
 // uninstall.ts relies on the registry alone (already does; no change needed).
 //
-// Wave 2: github, repomix (previously inline in install.ts — hoisted here).
+// Wave 2: github (previously inline in install.ts — hoisted here).
 // Wave 3: semgrep, context7, tavily, playwright, dart, cloudflare-* suite.
 
 import type { McpServerSpec } from "./mcp-registry.ts";
@@ -14,10 +14,6 @@ const ALL_VISIBLE = {
 
 const NON_CLAUDE_VISIBLE = {
   "claude-code": false, codex: true, gemini: true, opencode: true, pi: true,
-} as const;
-
-const REPOMIX_REGISTRY_VISIBLE = {
-  "claude-code": false, codex: true, gemini: false, opencode: true, pi: true,
 } as const;
 
 // ── Wave 2 ─────────────────────────────────────────────────────────────────
@@ -40,19 +36,6 @@ export const DEFAULT_GITHUB_SERVER: McpServerSpec = {
   default_enabled: false,
   auth_env_vars: ["GITHUB_TOKEN"],
   agent_visibility: { ...ALL_VISIBLE },
-};
-
-export const DEFAULT_REPOMIX_SERVER: McpServerSpec = {
-  transport: "stdio",
-  command: "npx -y repomix@latest --mcp",
-  description: "Repomix MCP server — pack repo into AI-friendly format",
-  vendor: "yamadashy",
-  default_enabled: false,
-  auth_env_vars: [],
-  // Claude Code and Gemini get Repomix MCP through package/extension surfaces
-  // that also carry commands/agents/skills. Registry owns only agents without
-  // a native package surface carrying the MCP.
-  agent_visibility: { ...REPOMIX_REGISTRY_VISIBLE },
 };
 
 // ── Wave 3 ─────────────────────────────────────────────────────────────────
@@ -215,7 +198,6 @@ export const BUILTIN_MCPS: Array<{ name: string; spec: McpServerSpec }> = [
   // Wave 2
   { name: "deepwiki",                     spec: DEFAULT_DEEPWIKI_SERVER },
   { name: "github",                       spec: DEFAULT_GITHUB_SERVER },
-  { name: "repomix",                      spec: DEFAULT_REPOMIX_SERVER },
   // Wave 3
   { name: "semgrep",                      spec: DEFAULT_SEMGREP_SERVER },
   { name: "context7",                     spec: DEFAULT_CONTEXT7_SERVER },
@@ -235,4 +217,4 @@ export const BUILTIN_MCPS: Array<{ name: string; spec: McpServerSpec }> = [
   { name: "dart",                         spec: DEFAULT_DART_SERVER },
 ];
 
-export const MINIMAL_DEFAULT_MCPS = ["deepwiki", "repomix"] as const;
+export const MINIMAL_DEFAULT_MCPS = ["deepwiki"] as const;

@@ -46,7 +46,6 @@ fulcrum/
 │       ├── audit-log.ts                # PostToolUse Bash — append command + exit code to log
 │       ├── format.ts                   # PostToolUse Write|Edit — run language formatter
 │       ├── index-check.ts              # SessionStart — warn if tags/graphify stale
-│       ├── index-rebuild.ts            # Stop — rebuild ctags + graphify + repomix on HEAD change
 │       ├── lint-gate.ts                # PostToolUse Write|Edit — block if lint fails (exit 2)
 │       ├── pm-policy.ts                # PreToolUse Bash — refuse wrong package manager (exit 2)
 │       ├── test-on-edit.ts             # PostToolUse Write|Edit — run project-configured tests (opt-in)
@@ -179,9 +178,6 @@ The minimal profile covers rules, policy, MCP registry setup, and recommended MC
 4. **Caveman ultra lock** — write `~/.config/caveman/config.json` with `{"defaultMode":"ultra"}` (idempotent).
 5. **Authored skills** — `fulcrum skills sync` distributes per-agent: Claude Code via `claude plugin marketplace add moabualruz/fulcrum && claude plugin install fulcrum@fulcrum` (skills surface as `/fulcrum:<name>`); OpenCode/Pi mirror to `<skills-root>/fulcrum/<name>/`; Gemini to `~/.gemini/extensions/fulcrum-skills/skills/<name>/`; Codex global scope is opt-in (`--codex-global`) or project-local (`--codex-project <dir>`). Legacy `~/.claude/skills/fulcrum/*` is removed after plugin install succeeds. Generated mirrors exclude `.original.md`, `_archive`, `_template`, `.git`, `node_modules`, and worktree folders.
 6. **Upstream skills** — `fulcrum skills upstream` clones pinned repos, verifies `subpath_sha256`, installs to vendor placement (`<agent>/skills/<name>/`, Gemini `~/.gemini/skills/<name>/`). The component/full-profile path excludes sources owned by installed packages, currently Cloudflare, so package-mounted skills do not duplicate standalone upstream skills.
-7. **Recommended MCPs** — DeepWiki and Repomix are registry builtins and recommended defaults; Pi entries go through `pi-mcp-adapter` auto-install.
-8. **Builtin MCPs** — register 17 builtin entries in `~/.fulcrum/state/global/mcp-registry.toml`; recommended default state enables `deepwiki` and `repomix`, while `--no-default-mcps` registers without changing enable state and `--enable-all-mcps` enables all builtins.
-9. **Vendor packages** — install Caveman, Repomix, Cloudflare, and Superpowers through official installers first, then mirror complete plugin/extension/package payloads to supported CLIs that lack a first-party or generic installer. Package adapters also write loadable skill mirrors and native MCP config for package `.mcp.json` / `mcp.json` manifests. Repomix MCP is default-enabled; other package MCPs stay disabled by default when CLI/skill surfaces cover the same work. Package parity reports cover payload mirrors plus adapted skills, rules/context, MCPs, commands/prompts, agents, hooks, tools/scripts, metadata, and assets.
 
 `fulcrum uninstall` is conservative by default: removes managed rules blocks, hook registrations, hook snippets/markers, `skills/fulcrum/`, legacy `skills/fulcrum-upstream/` namespaces, Gemini managed extensions, Gemini `@AGENTS.md` import, and registry MCP entries. Keeps edited policy files, vendor-placed third-party skills, and caveman unless `--purge` / `--include-caveman` flags are passed.
 
@@ -226,7 +222,6 @@ Adapters own surface-specific behavior:
 - `adapters/mcp.ts` delegates to the MCP registry.
 - `adapters/sentinel.ts` manages rules sentinel blocks.
 - `adapters/files.ts` manages policy files and remove-vs-purge behavior.
-- `adapters/vendor.ts` delegates to skills, upstream skills, caveman, Repomix, Cloudflare, and Superpowers helpers.
 
 The public CLI is `fulcrum component list/info/plan/status/install/remove/enable/disable`. `fulcrum install` and `fulcrum uninstall` are compatibility wrappers over component profiles; install defaults to `profile.minimal`, while `--profile full` keeps the historical `profile.default` bootstrap.
 

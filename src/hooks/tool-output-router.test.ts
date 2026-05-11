@@ -29,7 +29,7 @@ tier = "raw"
 profile = "raw_then_head"
 threshold_bytes = 50
 
-[tools.repomix]
+[tools.graphify]
 profile = "always_file"
 
 [tools.mise]
@@ -112,11 +112,11 @@ describe("tool-output-router", () => {
     expect(stdout).toContain(`bytes=${big.length}`);
   });
 
-  test("file-only tier — repomix output goes to file, only summary returned", async () => {
+  test("file-only tier — graphify output goes to file, only summary returned", async () => {
     const huge = "x".repeat(5000);
     const env = {
       tool_name: "Bash",
-      tool_input: { command: "repomix --compress ." },
+      tool_input: { command: "graphify build ." },
       tool_response: { stdout: huge, exit_code: 0 },
     };
     const { stdout } = await runRouterWith(env);

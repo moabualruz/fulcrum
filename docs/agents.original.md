@@ -17,7 +17,6 @@
 | MCP | Yes — `config.toml` | Yes — `settings.json` | Yes — `opencode.json` | Via `pi-mcp-adapter` |
 | DeepWiki | Yes | Yes | Yes | Yes — installed/configured via `pi-mcp-adapter` (Fulcrum-managed) |
 
-Managed package mirrors are audited by per-package status commands such as `fulcrum component status package.repomix --json` and by `fulcrum doctor --json`. Parity checks both payload mirrors and adapted native surfaces, so package skills must be loadable and package `.mcp.json` entries must appear in native MCP config. Unsupported primitives are listed with a reason.
 
 ---
 

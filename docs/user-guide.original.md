@@ -203,7 +203,6 @@ fulcrum mcp disable github --all-agents
 
 Set the required env vars before enabling an MCP that needs auth (see [docs/mcp.md §5](mcp.md)).
 
-Available builtin MCPs: `deepwiki`, `github`, `repomix`, `semgrep`, `context7`, `tavily`, `playwright`, `dart`, `cloudflare-docs`, `cloudflare-workers-bindings`, `cloudflare-workers-builds`, `cloudflare-observability`, `cloudflare-radar`, `cloudflare-logpush`, `cloudflare-browser`, `cloudflare-containers`, `cloudflare-ai-gateway`.
 
 ### Doctor
 

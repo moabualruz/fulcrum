@@ -116,7 +116,6 @@ Every recipe = subcommand of `fulcrum` binary: `fulcrum hook <name>`. Enable: `f
 | Recipe | Lifecycle | Purpose | Blocks? |
 |---|---|---|---|
 | `index-check` | SessionStart-equivalent | Warn if `tags` / `graphify-out/` stale or missing. | no |
-| `index-rebuild` | Stop-equivalent | Rebuild ctags + graphify + repomix when HEAD changed or working tree dirty. | no |
 | `format` | PostToolUse `Write\|Edit` | Run language-appropriate formatter on just-edited file (ruff / biome / prettier / gofmt / rustfmt / google-java-format / ktlint / dart format). Fail-open. | no |
 | `lint-gate` | PostToolUse `Write\|Edit` | Block next turn if `ruff check` / `biome check` / `golangci-lint run` reports violations on edited file. Stderr feeds back. | yes (exit 2) |
 | `pm-policy` | PreToolUse `Bash` | Refuse `npm`/`yarn` when repo declares pnpm; refuse `npm` when bun declared. Detects `pnpm-lock.yaml` / `bun.lock(b)` / `yarn.lock`. | yes (exit 2) |
@@ -126,7 +125,6 @@ Every recipe = subcommand of `fulcrum` binary: `fulcrum hook <name>`. Enable: `f
 
 ### 5.1 Index maintenance — `index-check` + `index-rebuild`
 
-Rebuilds `tags`, `graphify-out/`, repomix pack only when HEAD changed or working tree dirty. SHA cached in `/tmp/<slug>.index-sha` — never touches repo. `index-check` runs at session start, warns if index stale; `index-rebuild` runs on Stop.
 
 ### 5.2 Editor productivity — `format` + `lint-gate`
 

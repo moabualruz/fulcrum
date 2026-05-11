@@ -601,17 +601,6 @@ async function cleanupClaudeManagedPluginSettings(home: string): Promise<void> {
         changed = true;
       }
     }
-    if ("repomix" in marketplaces) {
-      const owned = await hasMarker("repomix-mcp@repomix")
-        || await hasMarker("repomix-explorer@repomix")
-        || await hasMarker("repomix-commands@repomix");
-      if (owned) {
-        delete (marketplaces as Record<string, unknown>)["repomix"];
-        changed = true;
-      } else {
-        console.log("     · keep Claude Code marketplace repomix (not-owned-by-fulcrum)");
-      }
-    }
     if (Object.keys(marketplaces as Record<string, unknown>).length === 0) {
       delete root["extraKnownMarketplaces"];
     }
@@ -622,9 +611,6 @@ async function cleanupClaudeManagedPluginSettings(home: string): Promise<void> {
     for (const key of [
       "fulcrum@fulcrum",
       "caveman@caveman",
-      "repomix-mcp@repomix",
-      "repomix-commands@repomix",
-      "repomix-explorer@repomix",
       "cloudflare@cloudflare",
       "superpowers@claude-plugins-official",
     ]) {
@@ -657,8 +643,6 @@ async function removeClaudePluginCacheLeftovers(home: string): Promise<void> {
     [`${home}/.claude/plugins/marketplaces/fulcrum`, "Claude Code fulcrum marketplace cache", ["fulcrum@fulcrum"]],
     [`${home}/.claude/plugins/cache/caveman`, "Claude Code caveman plugin cache", ["caveman@caveman"]],
     [`${home}/.claude/plugins/marketplaces/caveman`, "Claude Code caveman marketplace cache", ["caveman@caveman"]],
-    [`${home}/.claude/plugins/cache/repomix`, "Repomix Claude plugin cache", ["repomix-mcp@repomix", "repomix-explorer@repomix", "repomix-commands@repomix"]],
-    [`${home}/.claude/plugins/marketplaces/repomix`, "Repomix Claude marketplace cache", ["repomix-mcp@repomix", "repomix-explorer@repomix", "repomix-commands@repomix"]],
     [`${home}/.claude/plugins/cache/cloudflare`, "Cloudflare Claude plugin cache", ["cloudflare@cloudflare"]],
     [`${home}/.claude/plugins/marketplaces/cloudflare`, "Cloudflare Claude marketplace cache", ["cloudflare@cloudflare"]],
     [`${home}/.claude/plugins/cache/claude-plugins-official/superpowers`, "Superpowers Claude plugin cache", ["superpowers@claude-plugins-official"]],
@@ -677,19 +661,15 @@ async function removeClaudePluginCacheLeftovers(home: string): Promise<void> {
 async function removePackageMirrorLeftovers(home: string): Promise<void> {
   const paths: Array<[string, string]> = [
     [`${home}/.codex/plugins/cache/caveman`, "Codex CLI caveman package cache root"],
-    [`${home}/.codex/plugins/cache/repomix`, "Codex CLI repomix package cache root"],
     [`${home}/.codex/plugins/cache/cloudflare`, "Codex CLI cloudflare package cache root"],
     [`${home}/.codex/plugins/cache/superpowers`, "Codex CLI superpowers package cache root"],
     [`${home}/.gemini/extensions/caveman`, "Gemini CLI caveman extension"],
-    [`${home}/.gemini/extensions/repomix`, "Gemini CLI repomix extension"],
     [`${home}/.gemini/extensions/cloudflare`, "Gemini CLI cloudflare extension"],
     [`${home}/.gemini/extensions/superpowers`, "Gemini CLI superpowers extension"],
     [`${home}/.config/opencode/packages/caveman`, "OpenCode caveman package mirror"],
-    [`${home}/.config/opencode/packages/repomix`, "OpenCode repomix package mirror"],
     [`${home}/.config/opencode/packages/cloudflare`, "OpenCode cloudflare package mirror"],
     [`${home}/.config/opencode/packages/superpowers`, "OpenCode superpowers package mirror"],
     [`${home}/.pi/agent/packages/caveman`, "Pi CLI caveman package mirror"],
-    [`${home}/.pi/agent/packages/repomix`, "Pi CLI repomix package mirror"],
     [`${home}/.pi/agent/packages/cloudflare`, "Pi CLI cloudflare package mirror"],
     [`${home}/.pi/agent/packages/superpowers`, "Pi CLI superpowers package mirror"],
   ];
@@ -761,10 +741,6 @@ async function uninstallMcpRegistryEntries(home: string, keepState: boolean, dry
     // Registry may not exist if install was never run
     console.log("     · MCP registry not present (skip)");
   }
-
-  const { uninstallRepomixClaudePlugins: uninstallRepomixClaudePluginPackage, uninstallRepomixPackageMirrors } = await import("./repomix-package.ts");
-  await uninstallRepomixClaudePluginPackage({ dryRun });
-  await uninstallRepomixPackageMirrors({ dryRun });
 
   // Delete registry file unless keepState.
   if (!keepState) {

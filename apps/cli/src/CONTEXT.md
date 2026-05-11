@@ -6,7 +6,6 @@
 
 - **Subcommand** — top-level verb after `fulcrum` (e.g. `install`, `doctor`, `component`, `mcp`, `skills`, `hooks`, `init`).
 - **Profile** — named install plan: `minimal`, `rules-only`, `full`. Drives default-profile component plans.
-- **Package** — vendor plugin/extension/skill bundle managed as a `package.<name>` component (Caveman, Repomix, Cloudflare, Superpowers).
 - **Surface** — agent-visible artifact a package ships: skill, rule, MCP, command, agent, hook, tool, metadata, asset (`S/R/M/C/A/H/T/P`).
 - **Mirror** — full-package copy into a non-native agent's directory tree when no first-party installer exists.
 - **Parity report** — per-package, per-agent count of source vs installed surfaces, missing targets, unsupported primitives, and source-only leaks.
@@ -26,7 +25,6 @@
 | `fulcrum doctor`      | `doctor.ts`                   |
 | `fulcrum compress`    | `compress.ts`                 |
 
-Package-specific helpers live in `repomix-package.ts`, `vendor-packages.ts` (Cloudflare + Superpowers), and shared package surface modules: `package-surfaces.ts`, `package-mirror.ts`, `package-parity.ts`.
 
 ## Invariants
 

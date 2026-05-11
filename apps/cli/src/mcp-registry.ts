@@ -5,8 +5,8 @@
 // removeFromAgents — which push entries into each agent's native MCP config.
 //
 // The canonical list of managed servers lives in mcp-builtins.ts (BUILTIN_MCPS).
-// DEFAULT_GITHUB_SERVER and DEFAULT_REPOMIX_SERVER are re-exported from there
-// for backward compatibility with existing tests and callers.
+// DEFAULT_GITHUB_SERVER is re-exported from there for backward compatibility
+// with existing tests and callers.
 
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -37,7 +37,7 @@ export interface McpServerSpec {
   transport: "http" | "stdio";
   /** Present when transport=http */
   url?: string;
-  /** Present when transport=stdio — raw command string, e.g. "npx -y repomix@latest --mcp" */
+  /** Present when transport=stdio — raw command string. */
   command?: string;
   description: string;
   vendor: string;
@@ -803,4 +803,4 @@ export async function applyDisabledToAgents(
 
 // ── default servers (re-exported from mcp-builtins for backward compat) ───
 
-export { DEFAULT_GITHUB_SERVER, DEFAULT_REPOMIX_SERVER } from "./mcp-builtins.ts";
+export { DEFAULT_GITHUB_SERVER } from "./mcp-builtins.ts";

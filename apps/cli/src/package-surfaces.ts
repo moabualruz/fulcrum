@@ -49,7 +49,6 @@ export interface AgentSurfaceTarget {
 
 export const MANAGED_PACKAGE_IDS = [
   "package.caveman",
-  "package.repomix",
   "package.cloudflare",
   "package.superpowers",
 ] as const;
@@ -88,15 +87,6 @@ const PACKAGE_DEFINITIONS: Record<ManagedPackageId, Omit<PackageSurfaceManifest,
       },
     },
   },
-  "package.repomix": {
-    packageId: "package.repomix",
-    source: {
-      repo: "https://github.com/yamadashy/repomix",
-      officialInstallers: {
-        "claude-code": ["claude", "plugin", "install", "repomix-mcp@repomix"],
-      },
-    },
-  },
   "package.cloudflare": {
     packageId: "package.cloudflare",
     source: {
@@ -131,21 +121,6 @@ const FALLBACK_SURFACES: Record<ManagedPackageId, Array<{ kind: PackageSurfaceKi
     { kind: "hook", name: "caveman-activate", relativePath: "hooks/caveman-activate.js" },
     { kind: "rule", name: "AGENTS", relativePath: "AGENTS.md" },
     { kind: "metadata", name: "claude-plugin", relativePath: ".claude-plugin/plugin.json" },
-  ],
-  "package.repomix": [
-    { kind: "skill", name: "repomix-pack-local", relativePath: "skills/repomix-pack-local/SKILL.md" },
-    { kind: "skill", name: "repomix-pack-remote", relativePath: "skills/repomix-pack-remote/SKILL.md" },
-    { kind: "skill", name: "repomix-explorer", relativePath: "skills/repomix-explorer/SKILL.md" },
-    { kind: "skill", name: "repomix-explore-local", relativePath: "skills/repomix-explore-local/SKILL.md" },
-    { kind: "skill", name: "repomix-explore-remote", relativePath: "skills/repomix-explore-remote/SKILL.md" },
-    { kind: "mcp", name: "repomix", relativePath: ".mcp.json" },
-    { kind: "command", name: "pack-local", relativePath: "commands/pack-local.md" },
-    { kind: "command", name: "pack-remote", relativePath: "commands/pack-remote.md" },
-    { kind: "command", name: "explore-local", relativePath: "commands/explore-local.md" },
-    { kind: "command", name: "explore-remote", relativePath: "commands/explore-remote.md" },
-    { kind: "agent", name: "repomix-explorer", relativePath: "agents/explorer.md" },
-    { kind: "rule", name: "base", relativePath: "rules/base.md" },
-    { kind: "metadata", name: "codex-plugin", relativePath: ".codex-plugin/plugin.json" },
   ],
   "package.cloudflare": [
     { kind: "skill", name: "workers-best-practices", relativePath: "skills/workers-best-practices/SKILL.md" },
@@ -187,8 +162,6 @@ export function packageCacheSourceRoot(packageId: ManagedPackageId, home: string
       return `${fulcrumHome}/cache/caveman`;
     case "package.cloudflare":
       return `${fulcrumHome}/cache/cloudflare-skills`;
-    case "package.repomix":
-      return `${fulcrumHome}/cache/repomix`;
     case "package.superpowers":
       return `${fulcrumHome}/cache/superpowers`;
   }

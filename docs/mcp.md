@@ -13,7 +13,6 @@ Per-agent install method follows the vendor's docs verbatim:
 - Pi CLI: `pi install npm:<pkg>` / `~/.pi/agent/mcp.json` (via `pi-mcp-adapter` for stdio/HTTP MCPs)
 - Codex CLI: `~/.codex/config.toml` MCP block / `~/.codex/hooks.json` / canonical `npx skills add <repo> -a codex` for skill packs that publish that path
 
-Ownership rule: if a server, skill, hook, command, rule, script, agent, or mixed surface is delivered through a managed plugin / extension / package, that package owns the surface for that agent. Agents with the vendor's native package primitive use that primitive. Agents without it get nearest-native adapters: package payload mirrors, loadable skill mirrors when the package cache is not a skill loader, and native MCP config generated from package `.mcp.json` / `mcp.json`. Registry `enable` / `disable` / `unregister` touch only the agent surfaces the registry owns; hidden native-package surfaces are skipped. Current examples: Repomix Claude Code plugins own Repomix MCP/commands/agent on Claude; Cloudflare Claude plugin owns bundled Cloudflare MCP/skills/commands/rules/assets on Claude while non-Claude agents receive a full package mirror, loadable skills, and disabled package MCP config; Superpowers native packages own Claude/Gemini/OpenCode/Pi surfaces while Codex gets a full package mirror.
 
 Mirror policy: when an asset is published only for some agents (e.g. Claude plugin only, no Gemini extension), copy the vendor's exact package surfaces into the other agents' nearest native paths: skills, rules/context, MCP manifests plus native config, commands/prompts, agents/subagents, hooks, tools/scripts, package manifests, assets/templates/themes/docs, and unknown runtime assets. Do NOT rewrite, summarise, or "improve" upstream content — that introduces drift and authoring debt. Source backups (`.original.md`, `.backup.md`) and dev-only folders stay out of generated agent mirrors.
 
@@ -21,7 +20,6 @@ Mirror policy: when an asset is published only for some agents (e.g. Claude plug
 
 ## 1a. Cost rationale (default state)
 
-MCPs spawn long-running processes; 5+ active can eat 55–100k tokens at session start before the first message. The "official-first" policy above does not mean every MCP is always-on — it means we **manage** every official MCP (install/uninstall correctly) but keep the **enable** state intentional. Default recommended state: `deepwiki` and `repomix` are enabled by `fulcrum install`. DeepWiki has no CLI fallback; Repomix is a product-level exception because its MCP, commands, skills, and explorer package are part of the recommended repository-inspection baseline. Context7, Cloudflare, GitHub, Semgrep, Tavily, Playwright, Dart, and similar MCPs stay disabled by default when a CLI/skill/rule covers the same work. Use `fulcrum install --no-default-mcps` to register all builtin MCP config while skipping Fulcrum's recommended default enable step; it does not remove or disable existing MCP state. Package installs register and mirror the MCPs shipped by that package; Repomix package MCP surfaces are enabled by default, while other package MCPs are disabled unless policy or the user enables them. Agents with native disabled-state support still get disabled config for disabled servers: Codex stores `enabled = false` in each `mcp_servers.<name>` TOML block; Gemini stores enablement in `~/.gemini/mcp-server-enablement.json`; OpenCode stores `"enabled": false` inside each `opencode.json` MCP entry. Claude Code and Pi currently lack an equivalent safe disabled config bit, so disabled registry MCPs remain visible through `fulcrum mcp list`, not their native MCP lists.
 
 ## 2. Disable claude.ai defaults
 
@@ -96,29 +94,17 @@ Auth note: pass token via `Authorization: Bearer $GITHUB_TOKEN` header — the r
 
 Supersedes: `skills/gh/SKILL.md` (moved to `skills/_archive/gh-authored/`; skill is still functional as fallback when MCP is disabled).
 
-### 3.5 repomix (W2.2)
 
-Repomix MCP server via `yamadashy/repomix`. **Installed/registered and default-enabled** as part of Fulcrum's recommended repository-inspection baseline.
 
-- Transport: stdio `npx -y repomix@latest --mcp`
 - Auth: none required
 - Vendor: `yamadashy`
-- Claude Code gets 3 official vendor plugins: `repomix-mcp`, `repomix-commands`, `repomix-explorer`; Fulcrum treats that Claude surface as plugin-owned, so the registry marks `claude-code` hidden and skips it during `fulcrum mcp enable/disable/unregister repomix`.
-- Gemini gets a Fulcrum-built extension mirror that bundles vendor-derived Repomix MCP config, pack/explore commands, skills, explorer agent, and vendor rules; the registry marks `gemini` hidden so it never disables or duplicates the extension-owned MCP.
 - OpenCode gets vendor-derived skills plus explorer agent mirror; registry owns the MCP surface and writes it enabled by default.
 - Codex gets vendor-derived skills, a Codex plugin-cache package mirror with MCP metadata, commands, explorer agent, rules, and enabled plugin config, plus registry-owned enabled MCP config.
-- Pi gets vendor-derived skills and enabled Repomix MCP config via the Pi MCP adapter path.
 
-To disable registry-owned Repomix MCP config for Codex/OpenCode/Pi: `fulcrum mcp disable repomix --agent codex --agent opencode --agent pi`
 
-Doctor treats enabled Repomix MCP state as expected recommended-default state, not drift.
 
 Plugin install (Claude Code, idempotent):
 ```bash
-claude plugin marketplace add yamadashy/repomix
-claude plugin install repomix-mcp@repomix
-claude plugin install repomix-commands@repomix
-claude plugin install repomix-explorer@repomix
 ```
 
 Uninstall removes all 3 plugins and the registry entry. Registry removal only cleans registry-owned non-Claude MCP config; plugin uninstall owns Claude cleanup.
@@ -239,7 +225,6 @@ fulcrum mcp disable myserver [--all-agents]
 
 Agent IDs: `claude-code`, `codex`, `gemini`, `opencode`, `pi`.
 
-`fulcrum install` registers all 17 builtin servers (deepwiki, github, repomix, semgrep, context7, tavily, playwright, cloudflare-* ×9, dart). It writes disabled native config for registry-owned disabled servers on Codex, Gemini, and OpenCode so their MCP managers show configured-but-disabled servers. Package-owned surfaces are mirrored through their package adapters; Repomix package MCP surfaces are default-enabled, while other package MCP manifests are registered disabled unless policy or the user enables them. Recommended default state enables `deepwiki` and `repomix`. `--no-default-mcps` registers all definitions without changing enable state; `--enable-all-mcps` explicitly enables every registry-owned builtin. `fulcrum uninstall` removes all registry entries from all agents and deletes the registry file unless `--keep-state` is passed.
 
 Servers can hide an agent when that agent surface is unsupported or owned by another Fulcrum-managed primitive. `fulcrum mcp list --json` reports that state as `"hidden"`; enable/disable skip hidden agents instead of writing registry state for them.
 
@@ -267,7 +252,6 @@ Add a single source line to your shell rc:
 |---|---|---|
 | `deepwiki` | none | minimal default |
 | `github` | `GITHUB_TOKEN` (or `gh auth login` — many tools read either) | [github.com/settings/tokens](https://github.com/settings/tokens) — fine-grained PAT with `repo`, `read:org`, `gist` |
-| `repomix` | none | minimal default; stdio MCP via `npx`; no auth |
 | `semgrep` | none for local scans; `SEMGREP_APP_TOKEN` only for Semgrep AppSec Platform | [semgrep.dev/orgs/-/settings/tokens](https://semgrep.dev/orgs/-/settings/tokens) (only if using cloud features) |
 | `context7` | `CONTEXT7_API_KEY` (optional — free tier works without; key raises rate limit) | [context7.com](https://context7.com) → run `npx ctx7@latest login` and copy generated key |
 | `tavily` | `TAVILY_API_KEY` (required) | [app.tavily.com](https://app.tavily.com) → API Keys |

@@ -12,7 +12,6 @@
 
 ## Scope
 
-This is not a Repomix-only repair and not a Codex-only repair. Scope covers all Fulcrum-managed packages and all supported agents:
 
 ```text
 Agents:
@@ -24,7 +23,6 @@ Agents:
 
 Managed package/component families:
   package.caveman
-  package.repomix
   package.cloudflare
   package.superpowers
   skills.authored
@@ -75,8 +73,6 @@ a78d8ab:docs/mcp.md        package ownership hidden from registry remove/disable
 f9880ed:docs/mcp.md        disabled MCP configs for Gemini/OpenCode; context7 added
 4bf868d:docs/mcp.md        Codex disabled MCP support with enabled = false
 e8b5cd4:HANDOVER.md        W2/W3 cross-agent MCP and vendor asset mirror gaps
-f4269cd:docs/mcp.md        pre-latest Repomix package-default behavior
-b889a4b, 890e30d           latest Repomix docs/code edits that narrowed the visible gap
 ```
 
 ## Official Source Map
@@ -97,13 +93,10 @@ These official references define the native package model. Workers must re-check
 
 | Requirement | Current state | Gap |
 |---|---|---|
-| Full package surface across all five agents | Repomix is close only for Codex/Gemini. OpenCode/Pi receive only a subset. Caveman, Cloudflare, and Superpowers mirrors are mostly skill-first outside native agents. | Need one surface manifest and parity audit for every package/agent pair. |
 | Official-first, then mirror everything | Current code has package-specific helpers, but each helper decides independently what "everything" means. | Need shared `PackageSurfaceManifest` plus target map so omission is testable. |
 | Disabled setup for required MCPs | Registry-owned disabled configs are written for Codex/Gemini/OpenCode. Claude/Pi are skipped because no safe disabled bit is documented. Component adapter disable currently removes config in some paths. | Need explicit install-vs-enable semantics, component disable preserving disabled config where possible, and doctor output for unsupported disabled config. |
-| Package-owned MCPs hidden from generic registry | Partially implemented for Repomix and some Cloudflare/Superpowers paths. | Need package ownership encoded in the package manifest and audit output so generic MCP status cannot fight package status. |
 | All shipped surfaces: skills, rules, tools, commands, agents, hooks | Current tests mostly count skills and a few MCP/config files. | Need tests that assert `S/R/M/C/A/H/T/P` per package and per agent, with unsupported reasons. |
 | Graphify/ast-grep/Tavily lifecycle | `fulcrum init` runs vendor commands, but component lifecycle cannot inspect/remove/verify those installed package surfaces. | Add component/audit entries for project integrations and upstream skill installers so setup is not fire-and-forget. |
-| Docs as truth | Recent docs say broader coverage than code proves. `docs/skills.md` and `HANDOVER.md` conflict on Superpowers and Repomix. | Docs update only after tests and live artifact audit pass. |
 
 ### Current package matrix
 
@@ -112,7 +105,6 @@ Legend: `ok` means verified or intentionally native; `partial` means some surfac
 | Package | Claude Code | Codex | Gemini | OpenCode | Pi | Gap |
 |---|---|---|---|---|---|---|
 | Caveman | ok native plugin `S/H/R/P` | partial `S/H/P` mirror | ok native extension | partial `S` mirror | partial `S` mirror | OpenCode/Pi lack full commands/hooks/rules/package config if upstream ships them. Codex mirror must be manifest-audited, not assumed. |
-| Repomix | ok native plugins `S/M/C/A/R/P` | partial-to-ok `S/M/C/A/R/P` mirror | partial-to-ok extension `S/M/C/A/R/P` | partial `S/M/A` | partial `S/M` | OpenCode lacks commands/rules/package metadata. Pi lacks commands/agent/rules/package metadata. |
 | Cloudflare | ok native Claude plugin `S/M/C/P` | partial `S/M` | partial `S/M` | partial `S/M` | partial `S/M` | Non-Claude agents lack plugin metadata, commands, rules/context, assets, and any runtime package config if shipped. |
 | Superpowers | ok native Claude plugin `S/C/A/H/P` | partial `S` | ok native Gemini extension | ok native OpenCode plugin | ok native Pi package, fallback partial `S` | Codex lacks commands/agents/hooks/package metadata. Pi fallback lacks commands/agents/hooks/package metadata. |
 | Graphify | ok vendor CLI for Claude/Codex/Gemini/OpenCode | ok vendor CLI | ok vendor CLI | ok vendor CLI | partial skill fallback | Pi lacks official installer; component lifecycle cannot inspect/remove/verify graphify surfaces. |
@@ -125,11 +117,6 @@ Legend: `ok` means verified or intentionally native; `partial` means some surfac
 
 | Agent | Observed state | Drift |
 |---|---|---|
-| Claude Code | Fulcrum rules sentinel present; native Caveman, Cloudflare, Superpowers, Repomix plugins installed. | Claude native side mostly healthy; package audit must include plugin commands/hooks/agents/MCP metadata, not just skill counts. |
-| Codex | Fulcrum rules sentinel present; Caveman and Repomix plugin config present; Cloudflare/Superpowers skills present but no active Codex plugin config. | Cloudflare/Superpowers Codex package surfaces incomplete. |
-| Gemini | `GEMINI.md` imports `@AGENTS.md`; Repomix/Superpowers/Caveman extensions present; Cloudflare skills top-level only. | Need verify import target and Cloudflare extension/package surface. |
-| OpenCode | Fulcrum rules sentinel present; Superpowers plugin configured; Repomix skills/agent/MCP present; Cloudflare/Caveman skills only. | Repomix commands/rules and Cloudflare/Caveman package surfaces incomplete. |
-| Pi | Fulcrum rules sentinel present; Superpowers package installed; Repomix/Cloudflare/Caveman skills and MCP config present. | Repomix commands/agent/rules and Cloudflare/Caveman fallback package surfaces incomplete; disabled MCP support unresolved. |
 
 ### MCP setup drift
 
@@ -145,7 +132,6 @@ fulcrum install --profile minimal:
 fulcrum install --profile full:
   does minimal
   installs package surfaces
-  some package-owned MCPs are active by package default, especially Repomix where Fulcrum owns the mirror
 ```
 
 Required fix:
@@ -379,7 +365,6 @@ Parent starts with failing tests and interface skeletons, then dispatches indepe
 - [x] Task A1: Add `apps/cli/src/package-surfaces.test.ts`.
   - Owns package fixture/source discovery tests.
   - Assertions:
-    - Repomix manifest includes `S/M/C/A/R/P`.
     - Caveman manifest includes every upstream package surface present in source, including commands/hooks/rules/package metadata when present.
     - Cloudflare manifest includes skills, commands, MCP metadata, plugin metadata, and assets from official source.
     - Superpowers manifest includes skills, commands, agents, hooks, package metadata, and assets.
@@ -392,22 +377,18 @@ Parent starts with failing tests and interface skeletons, then dispatches indepe
 - [x] Task A2: Add parity expectations to existing package tests.
   - Owns:
     ```text
-    apps/cli/src/repomix-package.test.ts
     apps/cli/src/vendor-packages.test.ts
     apps/cli/src/install.test.ts
     apps/cli/src/uninstall.test.ts
     apps/cli/src/mirror-policy.test.ts
     ```
   - New expectations:
-    - OpenCode Repomix mirror includes skills, MCP config, explorer agent, commands, rules/context, package metadata where supported.
-    - Pi Repomix mirror includes skills, MCP config, commands, explorer agent or unsupported reason, rules/context, package metadata where supported.
     - Codex Superpowers mirror includes skills, commands, agents, hooks, package metadata/assets, not skills-only.
     - Pi Superpowers fallback includes skills, commands, agents, hooks, package metadata/assets, not skills-only.
     - Cloudflare non-Claude mirrors include all supported official package surfaces, not skills-only.
     - Caveman non-native mirrors include all supported official package surfaces, not skills-only.
   - Verify:
     ```bash
-    bun test apps/cli/src/repomix-package.test.ts apps/cli/src/vendor-packages.test.ts apps/cli/src/install.test.ts apps/cli/src/uninstall.test.ts apps/cli/src/mirror-policy.test.ts
     ```
 
 - [x] Task A3: Add disabled MCP semantic tests.
@@ -438,7 +419,6 @@ Dispatch after A1 test skeleton lands.
     apps/cli/src/package-surfaces.ts
     apps/cli/src/package-surfaces.test.ts
     ```
-  - Must implement deterministic discovery, SHA-256 hashing, mirror filtering, and package source descriptors for Caveman, Repomix, Cloudflare, and Superpowers.
   - Verify:
     ```bash
     bun test apps/cli/src/package-surfaces.test.ts
@@ -480,18 +460,13 @@ bun test apps/cli/src/package-surfaces.test.ts apps/cli/src/package-mirror.test.
 
 Dispatch only after shared interfaces compile. Keep write sets separate.
 
-- [x] Worker C1: Refactor Repomix package onto manifest/mirror/parity.
-  - Worktree: `~/.config/superpowers/worktrees/fulcrum/package-repomix`
   - Owns:
     ```text
-    apps/cli/src/repomix-package.ts
-    apps/cli/src/repomix-package.test.ts
     apps/cli/src/mirror-policy.test.ts
     ```
   - Must repair OpenCode/Pi missing surfaces and keep Codex/Gemini full mirrors.
   - Verify:
     ```bash
-    bun test apps/cli/src/repomix-package.test.ts apps/cli/src/mirror-policy.test.ts
     ```
 
 - [x] Worker C2: Refactor Cloudflare package.
@@ -610,14 +585,12 @@ Parent resolves conflicts between C2/C3 because both touch `apps/cli/src/vendor-
     README.md
     ```
   - Must remove contradictions:
-    - Repomix not skill-only.
     - Superpowers not skill-only on Codex/Pi fallback.
     - Cloudflare non-Claude package surface behavior exact.
     - Disabled MCP setup mode exact.
   - Must cite official docs listed in this plan where package model is described.
   - Verify:
     ```bash
-    rg -n "Repomix|Superpowers|Cloudflare|disabled" HANDOVER.md docs README.md
     bun run apps/cli/src/main.ts component list --json
     bun run apps/cli/src/main.ts doctor --json
     ```
@@ -657,7 +630,6 @@ Focused test gates:
 
 ```bash
 bun test apps/cli/src/package-surfaces.test.ts apps/cli/src/package-mirror.test.ts apps/cli/src/package-parity.test.ts
-bun test apps/cli/src/repomix-package.test.ts apps/cli/src/vendor-packages.test.ts
 bun test apps/cli/src/install.test.ts apps/cli/src/uninstall.test.ts apps/cli/src/mirror-policy.test.ts
 bun test apps/cli/src/mcp-registry.test.ts apps/cli/src/mcp-cmd.test.ts src/components/adapters/mcp.test.ts
 bun test apps/cli/src/component.test.ts apps/cli/src/doctor.test.ts src/components/adapters/vendor.test.ts src/components/catalog.test.ts
@@ -673,7 +645,6 @@ git status --short
 git diff --stat
 find ~/.codex ~/.gemini ~/.config/opencode ~/.pi/agent ~/.claude -name '*.original.md' -o -name '*.backup.md'
 bun run apps/cli/src/main.ts component list --json
-bun run apps/cli/src/main.ts component status package.repomix --json
 bun run apps/cli/src/main.ts component status package.cloudflare --json
 bun run apps/cli/src/main.ts component status package.superpowers --json
 bun run apps/cli/src/main.ts component status package.caveman --json
@@ -683,8 +654,6 @@ bun run apps/cli/src/main.ts doctor --json
 Remove/install smoke commands:
 
 ```bash
-bun run apps/cli/src/main.ts component remove package.repomix --all-agents
-bun run apps/cli/src/main.ts component install package.repomix --all-agents
 bun run apps/cli/src/main.ts component remove package.cloudflare --all-agents
 bun run apps/cli/src/main.ts component install package.cloudflare --all-agents
 bun run apps/cli/src/main.ts component remove package.superpowers --all-agents
@@ -714,7 +683,6 @@ bun run ci
 - [x] Every managed package has a `PackageSurfaceManifest` with source hashes and surface counts.
 - [x] Every package/agent pair has a parity report in `component status --json`.
 - [x] No package is represented as "done" by skill count alone.
-- [x] Repomix OpenCode/Pi mirrors include supported commands, rules/context, agents, MCP, metadata, and skills, or unsupported reasons.
 - [x] Cloudflare non-Claude mirrors include all supported official package surfaces, or unsupported reasons.
 - [x] Superpowers Codex and Pi fallback mirrors include commands, agents, hooks, metadata/assets, and skills.
 - [x] Caveman OpenCode/Pi mirrors include supported non-skill surfaces.

@@ -1,10 +1,4 @@
 import { installCaveman } from "@fulcrum/cli/install.ts";
-import {
-  installRepomixClaudePlugins,
-  installRepomixPackageMirrors,
-  uninstallRepomixClaudePlugins,
-  uninstallRepomixPackageMirrors,
-} from "@fulcrum/cli/repomix-package.ts";
 import { removeAuthoredSkills, syncSkills } from "@fulcrum/cli/skills.ts";
 import { removeUpstreamSkills, syncUpstreamSkills } from "@fulcrum/cli/upstream-skills.ts";
 import { removeCavemanCopies } from "@fulcrum/cli/uninstall.ts";
@@ -30,7 +24,6 @@ export type VendorComponent =
   | "skills-authored"
   | "skills-upstream"
   | "caveman"
-  | "repomix"
   | "cloudflare"
   | "superpowers"
   | "graphify"
@@ -46,8 +39,6 @@ export function classifyVendorComponent(componentId: string): VendorComponent {
       return "skills-upstream";
     case "package.caveman":
       return "caveman";
-    case "package.repomix":
-      return "repomix";
     case "package.cloudflare":
       return "cloudflare";
     case "package.superpowers":
@@ -97,10 +88,6 @@ async function installVendor(
     case "caveman":
       await installCaveman(process.env["HOME"] ?? "", { dryRun });
       return;
-    case "repomix":
-      await installRepomixClaudePlugins({ dryRun, agents });
-      await installRepomixPackageMirrors({ dryRun, agents });
-      return;
     case "cloudflare":
       await removeUpstreamSkillsIfLockExists({ dryRun, agents, source: CLOUDFLARE_SKILLS_SOURCE });
       await installCloudflarePackage({ dryRun, agents });
@@ -137,10 +124,6 @@ async function removeVendor(
       return;
     case "caveman":
       await removeCavemanCopies(process.env["HOME"] ?? "", { dryRun });
-      return;
-    case "repomix":
-      await uninstallRepomixClaudePlugins({ dryRun, agents });
-      await uninstallRepomixPackageMirrors({ dryRun, agents });
       return;
     case "cloudflare":
       await uninstallCloudflarePackage({ dryRun, agents });

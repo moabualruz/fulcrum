@@ -45,15 +45,6 @@ function planSurfaceTarget(
     };
   }
 
-  if (manifest.packageId === "package.repomix" && agentId === "pi" && surface.kind === "agent") {
-    return {
-      agentId,
-      surface,
-      support: "unsupported",
-      unsupportedReason: "Pi has no Fulcrum-safe standalone explorer-agent primitive; Fulcrum installs skills/prompts/rules/MCP plus an unsupported-agent note",
-    };
-  }
-
   if (!SUPPORT_MATRIX[agentId].has(surface.kind)) {
     return {
       agentId,
@@ -112,9 +103,6 @@ function packageSpecificTarget(
       return fullPackageRoot(agentId, slug, surface.relativePath);
     }
   }
-  if (packageId === "package.repomix") {
-    return repomixTarget(agentId, surface);
-  }
   return null;
 }
 
@@ -124,63 +112,6 @@ function fullPackageRoot(agentId: AgentId, slug: string, relativePath: string): 
   if (agentId === "opencode") return `${MIRROR_ROOTS.opencode}/packages/${slug}/${relativePath}`;
   if (agentId === "pi") return `${MIRROR_ROOTS.pi}/packages/${slug}/${relativePath}`;
   return `${MIRROR_ROOTS["claude-code"]}/${slug}/${relativePath}`;
-}
-
-function repomixTarget(agentId: AgentId, surface: PackageSurface): string | null {
-  if (agentId === "codex") {
-    if (surface.kind === "agent") {
-      return `${MIRROR_ROOTS.codex}/repomix/repomix/1.0.0/agents/${surface.name}.md`;
-    }
-    return `${MIRROR_ROOTS.codex}/repomix/repomix/1.0.0/${surface.relativePath}`;
-  }
-  if (agentId === "gemini") {
-    switch (surface.kind) {
-      case "command":
-        return `${MIRROR_ROOTS.gemini}/repomix/commands/${surface.name}.toml`;
-      case "mcp":
-      case "metadata":
-        return `${MIRROR_ROOTS.gemini}/repomix/gemini-extension.json`;
-      default:
-        return `${MIRROR_ROOTS.gemini}/repomix/${surface.relativePath}`;
-    }
-  }
-  if (agentId === "opencode") {
-    switch (surface.kind) {
-      case "skill":
-        return `${MIRROR_ROOTS.opencode}/skills/${surface.name}/SKILL.md`;
-      case "command":
-        return `${MIRROR_ROOTS.opencode}/commands/${surface.name}.md`;
-      case "agent":
-        return `${MIRROR_ROOTS.opencode}/agents/${surface.name}.md`;
-      case "mcp":
-        return `${MIRROR_ROOTS.opencode}/opencode.json`;
-      case "rule":
-        return `${MIRROR_ROOTS.opencode}/rules/repomix/base.md`;
-      case "metadata":
-        return `${MIRROR_ROOTS.opencode}/packages/repomix/package.json`;
-      default:
-        return `${MIRROR_ROOTS.opencode}/packages/repomix/${surface.relativePath}`;
-    }
-  }
-  if (agentId === "pi") {
-    switch (surface.kind) {
-      case "skill":
-        return `${MIRROR_ROOTS.pi}/skills/${surface.name}/SKILL.md`;
-      case "command":
-        return `${MIRROR_ROOTS.pi}/prompts/${surface.name}.md`;
-      case "agent":
-        return `${MIRROR_ROOTS.pi}/agents/repomix-explorer.unsupported.md`;
-      case "mcp":
-        return `${MIRROR_ROOTS.pi}/mcp.json`;
-      case "rule":
-        return `${MIRROR_ROOTS.pi}/rules/repomix/base.md`;
-      case "metadata":
-        return `${MIRROR_ROOTS.pi}/packages/repomix/package.json`;
-      default:
-        return `${MIRROR_ROOTS.pi}/packages/repomix/${surface.relativePath}`;
-    }
-  }
-  return null;
 }
 
 function opencodeTarget(slug: string, surface: PackageSurface): string {

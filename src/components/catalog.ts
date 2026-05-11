@@ -16,13 +16,11 @@ const DEFAULT_PROFILE_MEMBERS = [
   "policy.tool-output",
   "rules.global",
   "package.caveman",
-  "package.repomix",
   "skills.authored",
   "skills.upstream",
   "package.cloudflare",
   "package.superpowers",
   "mcp.deepwiki",
-  "mcp.repomix",
   "mcp.registry",
 ] as const;
 
@@ -33,7 +31,6 @@ const MINIMAL_PROFILE_MEMBERS = [
   "rules.global",
   "mcp.registry",
   "mcp.deepwiki",
-  "mcp.repomix",
 ] as const;
 
 function hookComponent(name: (typeof HOOKS)[number]): ComponentSpec {
@@ -182,7 +179,6 @@ export const ALL_COMPONENTS: readonly ComponentSpec[] = [
     ],
   },
   vendorPackageComponent("caveman"),
-  vendorPackageComponent("repomix"),
   vendorPackageComponent("cloudflare"),
   vendorPackageComponent("superpowers"),
   vendorPackageComponent("graphify"),
@@ -260,7 +256,6 @@ export function expandProfile(id: string): ComponentSpec[] {
 function vendorPackageComponent(
   name:
     | "caveman"
-    | "repomix"
     | "cloudflare"
     | "superpowers"
     | "graphify"

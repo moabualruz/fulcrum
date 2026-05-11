@@ -12,7 +12,6 @@
 | `status-only` | `exit=<code> <first stderr line or "ok">` | Tools where exit code = signal. Formatters, `mise install`, `direnv`, `sd`. |
 | `summary+head` | `exit + bytes + lines + first 20 lines` | Output long but head usually answers. Search hits (`rg`, `ast-grep`), build logs, compiler errors (`clippy`, `dart analyze`). |
 | `summary+file` | `exit + bytes + path + head` | Output = structured findings list — agent rarely needs every row, sometimes drill in. `semgrep`, `ruff`, `biome`, `phpstan`, `tvly`, MCP wiki contents. |
-| `file-only` | `exit + bytes + path` | Multi-megabyte artifacts. `repomix`, `graphify build`, playwright traces. |
 | `leave-as-is` | no-op (default) | Interactive TTY tools (`fzf`, `tmux`, `bat`, `watchexec`); unknown tools. |
 
 Files from `summary+file` + `file-only` land at `~/.fulcrum/state/<project>/<tool>-<timestamp>.out`.
@@ -25,7 +24,6 @@ Files from `summary+file` + `file-only` land at `~/.fulcrum/state/<project>/<too
 | Small structured | `raw_then_head` (flip to summary+head over 16KB) | `rg`, `ast-grep`, `lizard` |
 | Medium structured | `raw_then_file` (flip over 32-64KB) | `gh`, `jq`, `yq`, `xh`, `gitleaks`, `ruff`, `biome`, `golangci-lint` |
 | Findings list | `summary+file` | `semgrep`, `phpstan`, `tvly`, `pmd`, `spotbugs` |
-| Huge dumps | `file-only` | `repomix`, `graphify`, playwright traces |
 | Fire-and-forget | `status-only` | `mise install`, `direnv allow`, `sd`, formatters |
 | Interactive | `leave-as-is` | `fzf`, `tmux`, `bat`, `watchexec` |
 

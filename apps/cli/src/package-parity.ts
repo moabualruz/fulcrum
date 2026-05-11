@@ -157,7 +157,6 @@ async function nativePackageInstalled(packageId: string, agentId: AgentId, home:
         `${home}/.claude/plugins/cache/caveman`,
         `${home}/.claude/plugins/cache/caveman/caveman`,
       ],
-      "package.repomix": [`${home}/.claude/plugins/cache/repomix`],
       "package.cloudflare": [`${home}/.claude/plugins/cache/cloudflare`],
       "package.superpowers": [
         `${home}/.claude/plugins/cache/claude-plugins-official/superpowers`,

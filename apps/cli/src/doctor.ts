@@ -130,7 +130,6 @@ const TOOLS: ToolCheck[] = [
   { cmd: "git",                    usedBy: "index-rebuild (HEAD diff; rebuilds every session without git)", required: false },
   { cmd: "ctags",                  usedBy: "index-rebuild + index-check",            required: false },
   { cmd: "graphify",               usedBy: "index-rebuild + index-check",            required: false },
-  { cmd: "repomix",                usedBy: "index-rebuild (compress index)",         required: false },
 
   // Format / lint hooks (per-language).
   { cmd: "biome",                  usedBy: "format/lint-gate (ts/js/json/md)",       required: false },

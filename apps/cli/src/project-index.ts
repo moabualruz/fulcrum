@@ -1,7 +1,7 @@
 // project-index.ts — run vendor-default project-index commands in a directory.
 //
 // Scope: tools that produce a precomputed index artifact for the project
-// (graphify-out/, repomix-output.xml, etc). Live pattern-matchers (rg, fd,
+// (graphify-out/, etc). Live pattern-matchers (rg, fd,
 // ast-grep, grep, etc) are NOT here — they have no index to build.
 //
 // Rules:
@@ -9,7 +9,7 @@
 //   - Skip silently when the binary is missing (BYO toolchain).
 //   - Fail-soft per tool: log warning and continue on any error.
 //   - Idempotent: vendor commands are themselves incremental (`graphify
-//     update .`, `repomix` overwriting its own default file).
+//     update .`).
 
 import { which, run as runProc } from "@/utils/proc.ts";
 
@@ -26,9 +26,6 @@ const INDEX_COMMANDS: IndexCommand[] = [
   // graphify: vendor docs say `graphify update .` is the canonical incremental
   // build; first run creates graphify-out/, subsequent runs do diff updates.
   { label: "graphify update .", bin: "graphify", args: ["update", "."] },
-  // repomix: no flags = pack project to repomix-output.xml in cwd. --compress
-  // shrinks tokens; vendor-recommended for AI consumption.
-  { label: "repomix --compress", bin: "repomix", args: ["--compress"] },
 ];
 
 /** Run every vendor-default project-index command in dir. */

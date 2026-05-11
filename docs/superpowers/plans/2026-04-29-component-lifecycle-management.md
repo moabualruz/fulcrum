@@ -67,13 +67,11 @@ hooks.tool-output-router
 skills.authored
 skills.upstream
 package.caveman
-package.repomix
 package.cloudflare
 package.superpowers
 mcp.deepwiki
 mcp.registry
 mcp.github
-mcp.repomix
 mcp.semgrep
 mcp.context7
 mcp.tavily
@@ -117,7 +115,6 @@ Current package matrix to preserve:
 | `skills.authored` | Claude Code plugin `fulcrum@fulcrum`; Gemini extension `fulcrum-skills` | Codex/OpenCode/Pi under `<agent>/skills/fulcrum/<name>/`; refresh Claude plugin cache/marketplace package after install |
 | `skills.upstream` | Per-entry `claude_plugin`; per-entry `vendor_canonical_agents` skip list | Vendor-placement skill copies into Codex/OpenCode/Pi and Gemini `~/.gemini/skills`; Pi may use frontmatter name when it differs from lock entry |
 | `package.caveman` | Claude Code plugin `caveman@caveman`; Gemini extension from `JuliusBrussee/caveman` | Codex/OpenCode/Pi direct official repo mirrors, including skills, rules, commands, hooks, scripts, metadata, assets, and shared caveman config `defaultMode: "ultra"` |
-| `package.repomix` | Claude Code plugins `repomix-mcp`, `repomix-commands`, `repomix-explorer` | Codex/Gemini/OpenCode/Pi mirrors for skills, MCP config, commands/prompts, rules, metadata, and explorer support; Pi records standalone explorer-agent as unsupported |
 | `package.cloudflare` | Claude Code plugin `cloudflare@cloudflare` | Full non-Claude package mirrors plus vendor-placement skills; package parity verifies commands, rules, MCP metadata, skills, metadata, and runtime assets |
 | `package.superpowers` | Claude Code plugin, Gemini extension, OpenCode plugin, Pi `pi install` packages when `pi` exists | Codex full package mirror; Pi full package mirror when `pi` is not available |
 
@@ -157,16 +154,12 @@ Next runtime wave — maximize parallelism:
     Owns: apps/cli/src/skills.ts, apps/cli/src/upstream-skills.ts, related tests
     Verifies: bun test apps/cli/src/skills.test.ts apps/cli/src/upstream-skills.test.ts
 
-  Worker F2: vendor package helpers + Repomix package relocation
     Worktree: ~/.config/superpowers/worktrees/fulcrum/component-package-vendors
-    Owns: apps/cli/src/vendor-packages.ts, apps/cli/src/repomix-package.ts, apps/cli/src/install.ts, apps/cli/src/uninstall.ts, related tests
-    Verifies: bun test apps/cli/src/vendor-packages.test.ts apps/cli/src/repomix-package.test.ts apps/cli/src/install.test.ts apps/cli/src/uninstall.test.ts
 
   Worker F3: component vendor adapter + executor dispatch
     Worktree: ~/.config/superpowers/worktrees/fulcrum/component-vendor-adapter
     Depends on: F1/F2 helper signatures, but can start with failing tests and type-only imports while helpers are in flight.
     Owns: src/components/adapters/vendor.ts, src/components/adapters/vendor.test.ts, src/components/executor.ts
-    Verifies: bun test src/components/adapters/vendor.test.ts apps/cli/src/skills.test.ts apps/cli/src/upstream-skills.test.ts apps/cli/src/vendor-packages.test.ts apps/cli/src/repomix-package.test.ts apps/cli/src/install.test.ts apps/cli/src/uninstall.test.ts
 
   Parent in main while F workers run:
     Keep plan/checklist current, resolve helper-interface conflicts, review worker diffs, run focused integration tests after merge-back.
@@ -215,8 +208,6 @@ Final report: changed files, commands run, pass/fail output, unresolved risks, d
 ```bash
 fulcrum component list
 fulcrum component list --json
-fulcrum component info package.repomix
-fulcrum component info package.repomix --json
 ```
 
 Human list output:
@@ -229,7 +220,6 @@ Fulcrum components:
   skills.authored        Fulcrum-authored skills
   skills.upstream        pinned vendor skills
   package.caveman        caveman cross-agent output compression
-  package.repomix        Repomix plugin/package surfaces
   mcp.context7           Context7 MCP registry entry
 
 Use: fulcrum component info <id>
@@ -240,9 +230,7 @@ JSON list output:
 ```json
 [
   {
-    "id": "package.repomix",
     "kind": "package",
-    "description": "Repomix managed plugin, skill, agent, and MCP surfaces",
     "defaultProfile": true
   }
 ]
@@ -251,8 +239,6 @@ JSON list output:
 ### Planning
 
 ```bash
-fulcrum component plan install package.repomix --agent codex --json
-fulcrum component plan remove package.repomix --agent codex --json
 ```
 
 Plan JSON shape:
@@ -260,20 +246,15 @@ Plan JSON shape:
 ```json
 {
   "operation": "install",
-  "target": "package.repomix",
   "profile": null,
   "agents": ["codex"],
   "actions": [
     {
-      "id": "package.repomix:codex:skill-mirror",
-      "componentId": "package.repomix",
       "agentId": "codex",
       "kind": "directory-copy",
       "phase": "apply",
-      "target": "~/.codex/skills/repomix",
       "change": "create-or-update",
       "risk": "managed",
-      "reason": "Repomix vendor-derived skills are mirrored to Codex because Codex has no Repomix plugin primitive."
     }
   ],
   "warnings": []
@@ -283,8 +264,6 @@ Plan JSON shape:
 ### Applying
 
 ```bash
-fulcrum component install package.repomix --agent codex
-fulcrum component remove package.repomix --agent codex
 fulcrum component install profile.default
 fulcrum component install profile.verify-all
 ```
@@ -295,21 +274,17 @@ fulcrum component install profile.verify-all
 
 ```bash
 fulcrum component status
-fulcrum component status package.repomix
-fulcrum component status package.repomix --agent codex --json
 ```
 
 Status JSON shape:
 
 ```json
 {
-  "componentId": "package.repomix",
   "status": "installed",
   "surfaces": [
     {
       "agentId": "codex",
       "kind": "directory-copy",
-      "target": "~/.codex/skills/repomix",
       "state": "present",
       "managed": true,
       "modified": false
@@ -378,7 +353,6 @@ apps/cli/src/mcp-registry.ts
 apps/cli/src/skills.ts
 apps/cli/src/upstream-skills.ts
 apps/cli/src/vendor-packages.ts
-apps/cli/src/repomix-package.ts
 apps/cli/src/doctor.ts
 apps/cli/src/doctor.test.ts
 docs/user-guide.md
@@ -578,7 +552,6 @@ describe("component catalog", () => {
     expect(ids).toContain("skills.authored");
     expect(ids).toContain("skills.upstream");
     expect(ids).toContain("package.caveman");
-    expect(ids).toContain("package.repomix");
     expect(ids).toContain("package.cloudflare");
     expect(ids).toContain("package.superpowers");
     expect(ids).toContain("mcp.deepwiki");
@@ -784,15 +757,9 @@ export const ALL_COMPONENTS: readonly ComponentSpec[] = [
     }],
   },
   {
-    id: "package.repomix",
     kind: "package",
-    description: "Repomix plugin/package surfaces",
     surfaces: [{
-      id: "package.repomix:install",
-      componentId: "package.repomix",
       kind: "vendor-command",
-      target: "agent-repomix-surfaces",
-      ownerKey: "fulcrum:package:repomix",
       removePolicy: "managed-only",
     }],
   },
@@ -1415,13 +1382,10 @@ describe("fulcrum component CLI", () => {
     await run(["list", "--json"]);
     const parsed = JSON.parse(output.join("\n")) as Array<{ id: string }>;
     expect(parsed.some((entry) => entry.id === "profile.default")).toBe(true);
-    expect(parsed.some((entry) => entry.id === "package.repomix")).toBe(true);
   });
 
   test("info --json prints one component", async () => {
-    await run(["info", "package.repomix", "--json"]);
     const parsed = JSON.parse(output.join("\n")) as { id: string; surfaces: unknown[] };
-    expect(parsed.id).toBe("package.repomix");
     expect(parsed.surfaces.length).toBeGreaterThan(0);
   });
 
@@ -2202,7 +2166,6 @@ git commit -m "feat(component): manage rules and policy surfaces"
 - Modify: `apps/cli/src/skills.ts`
 - Modify: `apps/cli/src/upstream-skills.ts`
 - Modify: `apps/cli/src/vendor-packages.ts`
-- Modify: `apps/cli/src/repomix-package.ts`
 - Modify: `apps/cli/src/install.ts`
 - Modify: `apps/cli/src/uninstall.ts`
 
@@ -2264,37 +2227,24 @@ describe("vendor component adapter", () => {
     expect(classifyVendorComponent("skills.authored")).toBe("skills-authored");
     expect(classifyVendorComponent("skills.upstream")).toBe("skills-upstream");
     expect(classifyVendorComponent("package.caveman")).toBe("caveman");
-    expect(classifyVendorComponent("package.repomix")).toBe("repomix");
     expect(classifyVendorComponent("package.cloudflare")).toBe("cloudflare");
     expect(classifyVendorComponent("package.superpowers")).toBe("superpowers");
   });
 
-  test("Repomix package installs Claude plugins and mirrors non-Claude surfaces", async () => {
     await mkdir(join(home, ".claude"), { recursive: true });
     await mkdir(join(home, ".codex"), { recursive: true });
     await mkdir(join(home, ".gemini"), { recursive: true });
     await mkdir(join(home, ".config", "opencode"), { recursive: true });
     await mkdir(join(home, ".pi", "agent"), { recursive: true });
-    await mkdir(join(home, ".claude", "plugins", "cache", "repomix", "repomix-commands", "1.0.2", "commands"), { recursive: true });
-    await mkdir(join(home, ".claude", "plugins", "cache", "repomix", "repomix-explorer", "1.1.0", "agents"), { recursive: true });
-    await writeFile(join(home, ".claude", "plugins", "cache", "repomix", "repomix-commands", "1.0.2", "commands", "pack-local.md"), "---\ndescription: Pack local\n---\n\nRun local repomix.\n");
-    await writeFile(join(home, ".claude", "plugins", "cache", "repomix", "repomix-commands", "1.0.2", "commands", "pack-remote.md"), "---\ndescription: Pack remote\n---\n\nRun remote repomix.\n");
-    await writeFile(join(home, ".claude", "plugins", "cache", "repomix", "repomix-explorer", "1.1.0", "agents", "explorer.md"), "---\nname: explorer\n---\n\nExplore with repomix.\n");
 
     const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => cmd === "claude" ? "/usr/local/bin/claude" : null);
     const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
     try {
-      await applyVendorAction(action("package.repomix"), false);
     } finally {
       whichSpy.mockRestore();
       runSpy.mockRestore();
     }
 
-    expect(runSpy.mock.calls.map((call) => call[0])).toContainEqual(["claude", "plugin", "install", "repomix-mcp@repomix"]);
-    expect(await readFile(join(home, ".codex", "skills", "repomix-pack-local", "SKILL.md"), "utf8")).toContain("Run local repomix.");
-    expect(await readFile(join(home, ".gemini", "extensions", "repomix", "gemini-extension.json"), "utf8")).toContain("\"repomix\"");
-    expect(await readFile(join(home, ".config", "opencode", "agents", "repomix-explorer.md"), "utf8")).toContain("Explore with repomix.");
-    expect(await readFile(join(home, ".pi", "agent", "skills", "repomix-explorer", "SKILL.md"), "utf8")).toContain("Explore with repomix.");
   });
 
   test("Cloudflare package uses Claude plugin and mirrors only Cloudflare upstream skills to non-Claude agents", async () => {
@@ -2401,11 +2351,6 @@ export async function uninstallCloudflarePackage(opts?: { dryRun?: boolean }): P
 export async function installSuperpowersPackage(opts?: { dryRun?: boolean }): Promise<void>
 export async function uninstallSuperpowersPackage(opts?: { dryRun?: boolean }): Promise<void>
 
-// apps/cli/src/repomix-package.ts
-export async function installRepomixClaudePlugins(opts?: { dryRun?: boolean }): Promise<void>
-export async function uninstallRepomixClaudePlugins(opts?: { dryRun?: boolean }): Promise<void>
-export async function installRepomixPackageMirrors(opts?: { dryRun?: boolean }): Promise<void>
-export async function uninstallRepomixPackageMirrors(opts?: { dryRun?: boolean }): Promise<void>
 
 // apps/cli/src/install.ts
 export async function installCaveman(home: string, opts?: { dryRun?: boolean }): Promise<void>
@@ -2414,7 +2359,6 @@ export async function installCaveman(home: string, opts?: { dryRun?: boolean }):
 export async function removeCavemanCopies(home: string, opts?: { dryRun?: boolean }): Promise<void>
 ```
 
-Keep current aggregate functions by calling these exported units. Move Repomix Claude plugin installation/removal out of private install/uninstall helpers into `apps/cli/src/repomix-package.ts` so `package.repomix` can install/remove the full Repomix package surface without requiring `mcp.registry`.
 
 - [x] **Step 4: Add upstream filtering tests**
 
@@ -2487,18 +2431,12 @@ import {
   uninstallSuperpowersPackage,
 } from "../../cli/vendor-packages.ts";
 import {
-  installRepomixClaudePlugins,
-  installRepomixPackageMirrors,
-  uninstallRepomixClaudePlugins,
-  uninstallRepomixPackageMirrors,
-} from "../../cli/repomix-package.ts";
 import type { ComponentAction } from "../types.ts";
 
 type VendorComponent =
   | "skills-authored"
   | "skills-upstream"
   | "caveman"
-  | "repomix"
   | "cloudflare"
   | "superpowers";
 
@@ -2506,7 +2444,6 @@ export function classifyVendorComponent(componentId: string): VendorComponent {
   if (componentId === "skills.authored") return "skills-authored";
   if (componentId === "skills.upstream") return "skills-upstream";
   if (componentId === "package.caveman") return "caveman";
-  if (componentId === "package.repomix") return "repomix";
   if (componentId === "package.cloudflare") return "cloudflare";
   if (componentId === "package.superpowers") return "superpowers";
   throw new Error(`unsupported vendor component: ${componentId}`);
@@ -2521,14 +2458,9 @@ export async function applyVendorAction(action: ComponentAction, dryRun: boolean
   if (kind === "caveman") return installing
     ? installCaveman(process.env["HOME"] ?? "", { dryRun })
     : removeCavemanCopies(process.env["HOME"] ?? "", { dryRun });
-  if (kind === "repomix") {
     if (installing) {
-      await installRepomixClaudePlugins({ dryRun });
-      await installRepomixPackageMirrors({ dryRun });
       return;
     }
-    await uninstallRepomixClaudePlugins({ dryRun });
-    await uninstallRepomixPackageMirrors({ dryRun });
     return;
   }
   if (kind === "cloudflare") {
@@ -2560,7 +2492,6 @@ if (action.kind === "skill-sync" || action.kind === "upstream-skill-sync" || act
 Run:
 
 ```bash
-bun run --bun apps/cli/src/main.ts component install package.repomix --agent codex --dry-run
 bun run --bun apps/cli/src/main.ts component install package.cloudflare --all-agents --dry-run
 bun run --bun apps/cli/src/main.ts component remove package.superpowers --agent pi --dry-run
 ```
@@ -2568,7 +2499,6 @@ bun run --bun apps/cli/src/main.ts component remove package.superpowers --agent 
 Expected:
 
 ```text
-DRY RUN package.repomix:install:codex:install create-or-update vendor-command agent-repomix-surfaces
 DRY RUN package.cloudflare:install:claude-code:install create-or-update vendor-command agent-cloudflare-surfaces
 DRY RUN package.superpowers:install:pi:remove remove vendor-command agent-superpowers-surfaces
 ```
@@ -2580,7 +2510,6 @@ The exact action IDs may differ if the planner uses surface IDs, but output must
 Run:
 
 ```bash
-bun test src/components/adapters/vendor.test.ts apps/cli/src/skills.test.ts apps/cli/src/upstream-skills.test.ts apps/cli/src/vendor-packages.test.ts apps/cli/src/repomix-package.test.ts apps/cli/src/install.test.ts apps/cli/src/uninstall.test.ts
 ```
 
 Expected: PASS.
@@ -2588,7 +2517,6 @@ Expected: PASS.
 - [x] **Step 8: Commit**
 
 ```bash
-git add src/components/adapters/vendor.ts src/components/adapters/vendor.test.ts src/components/executor.ts apps/cli/src/skills.ts apps/cli/src/upstream-skills.ts apps/cli/src/vendor-packages.ts apps/cli/src/repomix-package.ts apps/cli/src/install.ts apps/cli/src/uninstall.ts
 git commit -m "feat(component): manage skills and vendor packages"
 ```
 
@@ -2927,10 +2855,6 @@ Use `fulcrum install` for normal default setup. Use `fulcrum component` when you
 
 ```bash
 fulcrum component list
-fulcrum component info package.repomix
-fulcrum component status package.repomix --json
-fulcrum component install package.repomix --agent codex
-fulcrum component remove package.repomix --agent codex --dry-run
 fulcrum component disable mcp.github --all-agents
 fulcrum component enable hooks.format --agent gemini
 ```
@@ -2954,7 +2878,6 @@ Adapters own surface-specific behavior:
 - `adapters/mcp.ts` delegates to MCP registry and DeepWiki helpers.
 - `adapters/sentinel.ts` manages rules sentinel blocks.
 - `adapters/files.ts` manages policy files and remove-vs-purge behavior.
-- `adapters/vendor.ts` delegates to skills, upstream skills, caveman, Repomix, Cloudflare, and Superpowers helpers.
 
 Add new managed parts by adding a catalog entry, adapter support if the surface kind is new, planner tests, executor tests, and doctor status coverage.
 ```
@@ -3023,7 +2946,6 @@ bun test \
   apps/cli/src/skills.test.ts \
   apps/cli/src/upstream-skills.test.ts \
   apps/cli/src/vendor-packages.test.ts \
-  apps/cli/src/repomix-package.test.ts \
   apps/cli/src/doctor.test.ts
 ```
 

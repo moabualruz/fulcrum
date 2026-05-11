@@ -44,7 +44,6 @@ fulcrum/
 │       ├── audit-log.ts                # PostToolUse Bash — append command + exit code to log
 │       ├── format.ts                   # PostToolUse Write|Edit — run language formatter
 │       ├── index-check.ts              # SessionStart — warn if tags/graphify stale
-│       ├── index-rebuild.ts            # Stop — rebuild ctags + graphify + repomix on HEAD change
 │       ├── lint-gate.ts                # PostToolUse Write|Edit — block if lint fails (exit 2)
 │       ├── pm-policy.ts                # PreToolUse Bash — refuse wrong package manager (exit 2)
 │       ├── test-on-edit.ts             # PostToolUse Write|Edit — run project-configured tests (opt-in)
@@ -177,7 +176,6 @@ Detection-aware logic: if `agent.rootDir` does not exist, skip writes for that a
 6. **Upstream skills** — `fulcrum skills upstream` clones pinned repos, verifies `subpath_sha256`, installs to vendor placement (`<agent>/skills/<name>/`, Gemini `~/.gemini/skills/<name>/`). The component/full-profile path excludes sources owned by installed packages, currently Cloudflare, so package-mounted skills do not duplicate standalone upstream skills.
 7. **DeepWiki MCP** — registry builtin, registered through the same MCP lifecycle path as every other builtin (Pi via `pi-mcp-adapter` auto-install).
 8. **Builtin MCPs** — register 17 builtin entries in `~/.fulcrum/state/global/mcp-registry.toml`; minimal default state enables `deepwiki` and `context7` only where no user state exists, while `--no-default-mcps` registers without changing enable state and `--enable-all-mcps` enables all builtins.
-9. **Vendor packages** — install Caveman, Repomix, Cloudflare, and Superpowers through official installers first, then mirror complete plugin/extension/package payloads to supported CLIs that lack a first-party or generic installer. Package adapters also write loadable skill mirrors and native MCP config for package `.mcp.json` / `mcp.json` manifests. Package parity reports cover payload mirrors plus adapted skills, rules/context, MCPs, commands/prompts, agents, hooks, tools/scripts, metadata, and assets.
 
 `fulcrum uninstall` is conservative by default: removes managed rules blocks, hook registrations, hook snippets/markers, `skills/fulcrum/`, legacy `skills/fulcrum-upstream/` namespaces, Gemini managed extensions, Gemini `@AGENTS.md` import, and DeepWiki. Keeps edited policy files, vendor-placed third-party skills, and caveman unless `--purge` / `--include-caveman` flags are passed.
 

@@ -117,10 +117,6 @@ profile = "raw_then_file"
 profile = "raw_then_file"
 threshold_bytes = 65536
 
-# ── Code intelligence ──────────────────────────────────────────────────
-[tools.repomix]
-profile = "always_file"
-
 [tools.graphify]
 profile = "always_file"
 

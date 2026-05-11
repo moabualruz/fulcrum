@@ -67,7 +67,6 @@
 
 ## 8. Codebase exploration
 
-- `repomix --compress .` (or a focused subdir) — when starting on an unfamiliar repo and the user asks a cross-cutting question. Instead of opening 30+ files sequentially. Why: each `Read` consumes context permanently; one packed digest is cheaper. [source: https://code.claude.com/docs/en/best-practices]
 - `graphify build .` then queries — when the question is structural ("who calls X", "what implements Y"). Instead of `rg` walks across many files. Why: a code graph answers in one query what `rg` answers in many.
 - `ctags -R` — when navigating a large C/C++/Go/Rust tree without LSP. Instead of repeated `rg` for symbols. Why: `ctags` indexes definitions; `rg` finds every textual match including comments and strings.
 
@@ -95,6 +94,5 @@ Rule text owned here; same content spliced into every agent via FULCRUM sentinel
 
 - **graphify** — when a `graphify-out/` directory exists in the project, read `graphify-out/GRAPH_REPORT.md` before answering architecture or codebase questions; navigate `graphify-out/wiki/index.md` instead of reading raw files when it exists. Why: graph answers structural questions in 71× fewer tokens than grepping raw files. Trigger: architecture question + `graphify-out/` present. [source: https://github.com/safishamsi/graphify]
   - (graphify also installs a PreToolUse hook that fires before every Glob/Grep call — that hook config is managed by `graphify install`, not by this file.)
-- **repomix** — (TBD: vendor publishes no standalone behavioral rule for agent rules files; rule is `repomix --compress .` in §8 above.)
 - **ast-grep** — (TBD: vendor skill installs a slash-command trigger; no separate rules-file behavioral rule published.)
 - **caveman** — (rule is §0b above: always-on caveman ultra; vendor config lock in `~/.config/caveman/config.json`.)

@@ -4,7 +4,6 @@
 
 ## Vocabulary
 
-- **Component** — a managed unit of agent OS state (`rules.global`, `hooks.format`, `mcp.context7`, `package.repomix`, `profile.default`, …). Identified by stable id `<kind>.<name>`.
 - **ComponentKind** — `profile | rules | policy | hook | skill | package | mcp`.
 - **Surface** — concrete artifact a component installs (`SurfaceSpec`): a sentinel block, a hook registration, an MCP entry, a skill sync, a vendor command, a directory copy, a JSON patch, …
 - **SurfaceKind** — discriminator for adapter dispatch: `sentinel-block | policy-seed | hook-registration | skill-sync | upstream-skill-sync | mcp-registry-entry | mcp-agent-config | vendor-command | directory-copy | file-copy | json-patch | toml-block`.
@@ -24,7 +23,6 @@
 - `adapters/sentinel.ts` — sentinel-block actions (rules splice).
 - `adapters/hooks.ts` — hook registration/enable/disable.
 - `adapters/mcp.ts` — MCP registry/agent-config actions, including disabled-config preservation.
-- `adapters/vendor.ts` — vendor-command + skill-sync + upstream-skill-sync (Caveman, Repomix, Cloudflare, Superpowers, authored, upstream).
 
 ## Invariants
 
@@ -39,7 +37,6 @@
 ## Cross-context coupling
 
 - Reads `AGENTS` from `src/agents/`.
-- Reuses helpers from `apps/cli/src/install.ts` / `uninstall.ts` / `skills.ts` / `upstream-skills.ts` / `vendor-packages.ts` / `repomix-package.ts` / `mcp-registry.ts`.
 - The CLI handler in `apps/cli/src/component.ts` is the only command surface; this directory is engine-only.
 
 ## ADRs

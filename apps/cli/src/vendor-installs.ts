@@ -4,7 +4,7 @@
 // Scope: per-agent skill / plugin / extension / hook installs whose vendor
 // publishes a CLI installer (`graphify install --platform <agent>`,
 // `npx skills add <pkg>`, `pi-mcp-adapter init`). Project-INDEX builds
-// (`graphify update .`, `repomix --compress`) live in `project-index.ts` —
+// (`graphify update .`) live in `project-index.ts` —
 // different concern.
 //
 // Rules:
@@ -220,8 +220,6 @@ export async function runVendorIntegrations(
   opts: { dryRun: boolean },
 ): Promise<void> {
   const { dryRun } = opts;
-  const hasClaude = !!(await which("claude"));
-  const detected = await detectedAgentIds(home);
 
   console.log("\nVendor integrations:");
 
@@ -242,14 +240,6 @@ export async function runVendorIntegrations(
   // ── tavily skills ─────────────────────────────────────────────────────────
   // Single canonical command covers all 7 tavily skills.
   await runTavilyIntegration(dir, dryRun);
-
-  // ── repomix ───────────────────────────────────────────────────────────────
-  // Claude Code plugins handled by install.ts (W2 logic — 3 plugins via
-  // `claude plugin install`). MCP registration via mcp-registry for all agents.
-  // Project-index BUILD (`repomix --compress`) lives in project-index.ts.
-  if (hasClaude && detected.has("claude-code")) {
-    console.log("  · repomix: Claude Code plugins handled by fulcrum install (W2)");
-  }
 
   // ── context7 ─────────────────────────────────────────────────────────────
   // OAuth setup is interactive; never spawn it here. Print deferred note.

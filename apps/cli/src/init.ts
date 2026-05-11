@@ -1,5 +1,4 @@
 // fulcrum init [DIR]          — bootstrap a project with cross-agent rules + skills paths.
-// fulcrum init reindex [DIR]  — run `repomix --compress` in DIR (vendor default output).
 //
 // Idempotent: skips files that already exist.
 
@@ -73,7 +72,6 @@ async function af(path: string, data: string): Promise<void> {
   await appendFile(path, data);
 }
 
-// Project-index commands (repomix, graphify update) live in project-index.ts.
 
 export async function run(args: string[]): Promise<void> {
   // Handle `fulcrum init reindex [DIR]` subcommand.
@@ -168,7 +166,6 @@ export async function run(args: string[]): Promise<void> {
   await runVendorIntegrations(dir, home, { dryRun: DRY_RUN });
 
   // Project indices — vendor-default index builds for tools that produce a
-  // precomputed artifact (graphify-out/, repomix-output.xml). Live pattern-
   // matchers (rg, fd, ast-grep, …) need no index, so they are NOT here.
   const { runProjectIndex } = await import("./project-index.ts");
   await runProjectIndex(dir, { dryRun: DRY_RUN });

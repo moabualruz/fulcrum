@@ -12,7 +12,6 @@ Fulcrum is local-first Agent OS for supervising repositories, project hierarchy,
 - Splices a shared rules block into each agent's primary config file (idempotent, preserves your content).
 - Installs hook recipes (`format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `tool-output-router`, and two index hooks) as binary subcommands of a single `fulcrum` binary.
 - Syncs Fulcrum-authored skills into the `fulcrum/` namespace when explicitly requested; Codex global authored skills are opt-in.
-- Registers managed MCPs (all builtin/package MCPs installed; DeepWiki and Repomix are recommended-default enabled; other CLI/skill-covered MCPs stay disabled until explicit opt-in).
 - Installs managed packages with full payload mirrors plus loadable skill and native MCP adapters where target agent lacks vendor package primitive.
 - Installs caveman output-compression cross-agent with `defaultMode: ultra`.
 - Reports environment, component, package-parity, MCP, skill-budget, and toolchain health via `fulcrum doctor`.
@@ -85,10 +84,6 @@ Use `fulcrum install` for minimal default setup, or `fulcrum install --profile f
 
 ```bash
 fulcrum component list
-fulcrum component info package.repomix
-fulcrum component status package.repomix --json
-fulcrum component install package.repomix --agent codex
-fulcrum component remove package.repomix --agent codex --dry-run
 fulcrum component remove policy.tool-output --purge
 fulcrum component disable mcp.github --all-agents
 fulcrum component enable hooks.format --agent gemini
@@ -133,7 +128,6 @@ Use `--dry-run` to preview without writing:
 fulcrum init --dry-run ~/code/myproject
 ```
 
-To reindex the project with repomix (no `--output` override — vendor default `repomix-output.xml`):
 
 ```bash
 fulcrum init reindex ~/code/myproject
@@ -223,7 +217,6 @@ Fulcrum skills install through each agent's native namespace. Claude Code uses p
 
 ### MCPs
 
-Fulcrum registers 17 builtin registry MCPs. Default install enables `deepwiki` and `repomix`; the rest stay installed but disabled to avoid startup token cost (~55–300k tokens with 5+ active MCPs). Package MCPs follow the same rule except Repomix, whose package MCP surfaces are part of the recommended default. Use `--no-default-mcps` to register everything without changing enabled state.
 
 ```bash
 fulcrum mcp list                            # see all registered MCPs + state
@@ -234,7 +227,6 @@ fulcrum mcp disable github --all-agents
 
 Set the required env vars before enabling an MCP that needs auth (see [docs/mcp.md §5](mcp.md)).
 
-Available builtin MCPs: `deepwiki`, `github`, `repomix`, `semgrep`, `context7`, `tavily`, `playwright`, `dart`, `cloudflare-docs`, `cloudflare-workers-bindings`, `cloudflare-workers-builds`, `cloudflare-observability`, `cloudflare-radar`, `cloudflare-logpush`, `cloudflare-browser`, `cloudflare-containers`, `cloudflare-ai-gateway`.
 
 ### Doctor
 

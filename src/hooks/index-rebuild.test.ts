@@ -1,4 +1,3 @@
-// Tests for the index-rebuild hook — rebuilds tags/graph/repomix on HEAD change.
 
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";

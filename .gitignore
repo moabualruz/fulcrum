@@ -14,9 +14,6 @@ eval-results/
 
 # Vendor project-index outputs (vendor-controlled paths).
 /graphify-out/
-/repomix-output.xml
-/repomix-output.txt
-/repomix-output.md
 .claude/settings.local.json
 .claude/.cache/
 .codex/
