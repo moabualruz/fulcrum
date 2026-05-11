@@ -1,4 +1,0 @@
-[test]
-coverage = false
-coverageThreshold = 0.0
-preload = ["./apps/web/src/lib/test/svelte-ssr-preload.ts"]

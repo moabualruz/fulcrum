@@ -20,3 +20,4 @@ eval-results/
 .claude/settings.local.json
 .claude/.cache/
 .codex/
+coverage/
