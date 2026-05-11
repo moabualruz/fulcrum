@@ -2,6 +2,7 @@ import type { Container } from "@needle-di/core";
 
 import { initializeLocalProductReadiness } from "@/application/cli-tui/caller-context.ts";
 import { createLocalCaller } from "./local-caller.ts";
+import { buildDbContainer } from "./index.ts";
 
 type ProductCaller = {
   projects?: { list(input?: Record<string, unknown>): Promise<unknown[]> };
@@ -107,27 +108,32 @@ export async function run(argv: readonly string[], opts: ProductRunOptions = {})
   }
 
   try {
-    const caller = verb === "init" ? null : await resolveCaller(opts);
-    switch (verb) {
-      case "init":
-        return await runInit(rest, io);
-      case "projects":
-        return await runProjects(caller!, rest, io);
-      case "tasks":
-        return await runTasks(caller!, rest, io);
-      case "sprints":
-        return await runSprints(caller!, rest, io);
-      case "custom-fields":
-      case "saved-views":
-        return printValue([], rest, io.print);
-      case "search":
-        return await runSearch(caller!, rest, io);
-      case "context":
-        return await runContext(caller!, rest, io);
-      default:
-        io.printErr(`fulcrum product: unknown verb '${verb}'`);
-        io.printErr(HELP);
-        io.exit(2);
+    const resolved = verb === "init" ? null : await resolveCaller(opts);
+    try {
+      const caller = resolved?.caller ?? null;
+      switch (verb) {
+        case "init":
+          return await runInit(rest, io);
+        case "projects":
+          return await runProjects(caller!, rest, io);
+        case "tasks":
+          return await runTasks(caller!, rest, io);
+        case "sprints":
+          return await runSprints(caller!, rest, io);
+        case "custom-fields":
+        case "saved-views":
+          return printValue([], rest, io.print);
+        case "search":
+          return await runSearch(caller!, rest, io);
+        case "context":
+          return await runContext(caller!, rest, io);
+        default:
+          io.printErr(`fulcrum product: unknown verb '${verb}'`);
+          io.printErr(HELP);
+          io.exit(2);
+      }
+    } finally {
+      await resolved?.cleanup();
     }
   } catch (error) {
     io.printErr(`fulcrum product ${verb}: ${(error as Error).message}`);
@@ -224,9 +230,19 @@ async function runContext(caller: ProductCaller, argv: readonly string[], io: Io
   printValue(await caller.context?.assemble?.({ taskId }) ?? { taskId, body: "" }, rest, io.print);
 }
 
-async function resolveCaller(opts: ProductRunOptions): Promise<ProductCaller> {
-  if (opts.caller) return opts.caller;
-  return await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as ProductCaller;
+async function resolveCaller(opts: ProductRunOptions): Promise<{ caller: ProductCaller; cleanup: () => Promise<void> }> {
+  if (opts.caller) return { caller: opts.caller, cleanup: async () => {} };
+  if (opts.container) {
+    return {
+      caller: await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as ProductCaller,
+      cleanup: async () => {},
+    };
+  }
+  const runtime = await buildDbContainer();
+  return {
+    caller: await createLocalCaller({ container: runtime.container, requireSession: true }) as unknown as ProductCaller,
+    cleanup: runtime.cleanup,
+  };
 }
 
 function requireTasks(caller: ProductCaller): NonNullable<ProductCaller["tasks"]> {

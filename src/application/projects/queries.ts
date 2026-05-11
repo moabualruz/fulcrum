@@ -133,6 +133,19 @@ export async function listProjectRows(em: EntityManager, ctx: AppContext): Promi
   }));
 }
 
+export async function resolveProjectIdByKey(
+  em: EntityManager,
+  ctx: AppContext,
+  projectKey: string | null,
+): Promise<string | null> {
+  if (!projectKey) return null;
+  const rows = await ormSqlConnection(em).execute<Array<{ id: string }>>(
+    `SELECT id FROM projects WHERE org_id = $1 AND (id = $2 OR slug = $2) LIMIT 1`,
+    [ctx.orgId, projectKey],
+  );
+  return rows[0]?.id ?? null;
+}
+
 export async function getProjectHierarchy(
   em: EntityManager,
   ctx: AppContext,

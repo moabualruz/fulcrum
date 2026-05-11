@@ -40,9 +40,8 @@ if (isPlaywrightCli) {
     await expect(page).toHaveTitle(/Fulcrum/i);
   });
 
-  // ── Step 2: navigate to /projects, create project "Demo" ─────────────────
-  // The form POST redirects to /projects on success; we assert the new row
-  // appears in the table using the data-project-row selector.
+  // ── Step 2: navigate to /projects/new, create project "Demo" ─────────────
+  // The form POST redirects to the new project detail page on success.
   test("step 2 — create project Demo via UI", async ({ page }) => {
     await page.goto("/projects/new");
     // Fill name; slug is auto-derived from name ("demo").
@@ -50,11 +49,9 @@ if (isPlaywrightCli) {
     // Wait for slug to auto-populate before submit.
     await expect(page.locator("[data-project-slug]")).toHaveValue("demo");
     await page.locator("[data-project-submit]").click();
-    // Redirect lands on /projects; new row must be visible.
-    await page.waitForURL("**/projects");
-    await expect(
-      page.locator("[data-project-row]").filter({ hasText: "Demo" }),
-    ).toBeVisible();
+    await page.waitForURL(/\/projects\/[0-9a-f-]+$/);
+    await expect(page.locator("[data-project-detail-header]")).toContainText("Demo");
+    await expect(page.locator("[data-project-slug-pill]")).toHaveText("demo");
   });
 
   // ── Step 3: navigate to /boards, create task in pending column ────────────

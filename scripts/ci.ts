@@ -131,7 +131,7 @@ export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[
     // ── T2: Integration (~90s) — DB, web build, coverage ──
     { name: "migration:downgrade", cmd: ["bun", "test", "tests/db/migration-downgrade.test.ts"], tier: "integration", domain: "all" },
     { name: "graceful:shutdown",   cmd: ["bun", "test", "tests/platform/graceful-shutdown.test.ts"], tier: "integration", domain: "all" },
-    { name: "coverage:root",    cmd: ["bun", "run", "scripts/test-root.ts", "--coverage"], tier: "integration", domain: "all" },
+    { name: "coverage:root",    cmd: ["bun", "run", "scripts/test-root.ts", "--root-coverage"], tier: "integration", domain: "all" },
     { name: "build:all",        cmd: ["bun", "run", "scripts/build-all.ts"], tier: "integration", domain: "all" },
     { name: "web:install",      cmd: ["bun", "install", "--frozen-lockfile"], cwd: "apps/web", env: { BUN_INSTALL_CACHE_DIR: webInstallCache }, tier: "integration", domain: "web" },
     { name: "web:check",        cmd: ["bun", "run", "check"], cwd: "apps/web", env: { NODE_OPTIONS: "--max-old-space-size=12288" }, tier: "integration", domain: "web" },

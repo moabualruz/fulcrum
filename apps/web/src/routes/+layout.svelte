@@ -114,7 +114,7 @@
 				return;
 			}
 		}
-		if (event.key.toLowerCase() === "k" && tag !== "input" && tag !== "textarea" && target?.isContentEditable !== true) {
+		if (typeof event.key === "string" && event.key.toLowerCase() === "k" && tag !== "input" && tag !== "textarea" && target?.isContentEditable !== true) {
 			event.preventDefault();
 			paletteOpen = !paletteOpen;
 			return;

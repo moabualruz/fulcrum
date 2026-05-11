@@ -71,6 +71,7 @@ export const CreateTaskInputSchema = z.object({
 });
 
 export const UpdateTaskInputSchema = TaskIdInputSchema.extend({
+  expectedStatus: z.string().trim().min(1).nullable().optional(),
   title: z.string().trim().min(1).optional(),
   description: z.string().nullable().optional(),
   descriptionText: z.string().optional(),

@@ -64,8 +64,26 @@ describe("fulcrum product CLI", () => {
     expect(JSON.parse(io.out[0]!)).toEqual(expect.objectContaining({
       ok: true,
       engine: "pglite",
-      org: expect.objectContaining({ slug: "default", name: "Local", created: true }),
+      org: expect.objectContaining({ slug: "local", name: "Local", created: true }),
     }));
+  });
+
+  test("product init creates the local session required by product commands", async () => {
+    const prevHome = process.env["FULCRUM_HOME"];
+    process.env["FULCRUM_HOME"] = join(await mkdtemp(join(tmpdir(), "fulcrum-product-session-test-")), ".fulcrum");
+    try {
+      const initIo = testIo();
+      await runProduct(["init", "--json"], initIo.opts);
+      expect(initIo.exits).toEqual([]);
+
+      const listIo = testIo();
+      await runProduct(["projects", "list", "--json"], listIo.opts);
+      expect(listIo.exits).toEqual([]);
+      expect(JSON.parse(listIo.out[0]!)).toEqual([]);
+    } finally {
+      if (prevHome === undefined) delete process.env["FULCRUM_HOME"];
+      else process.env["FULCRUM_HOME"] = prevHome;
+    }
   });
 
   test("product projects list --json uses caller fixture", async () => {

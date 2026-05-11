@@ -27,13 +27,14 @@ export const load: PageServerLoad = async ({ url, parent, locals }) => {
     typeof parent === "function"
       ? await parent()
       : ({ activeProjectId: null } as { activeProjectId: string | null });
-  const project = url.searchParams.get("project") ?? parentData.activeProjectId ?? "";
+  const projectKey = url.searchParams.get("project") ?? parentData.activeProjectId ?? "";
+  const { em, ctx } = await requestAppScope(locals, projectKey || null);
+  const project = ctx.projectId ?? "";
   return {
     project,
     activeProjectId: parentData.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestAppScope(locals, project || null);
         return { tasks: await listBoardTaskRows(em, ctx) };
       })(),
     },
@@ -128,7 +129,10 @@ export const actions: Actions = {
     if (!parsed.success) return fail(400, actionFail("invalid input"));
     const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
     try {
-      await updateTask(em, ctx, parsed.output.id, { status: parsed.output.status });
+      await updateTask(em, ctx, parsed.output.id, {
+        expectedStatus: parsed.output.from,
+        status: parsed.output.to,
+      });
       return actionOk("Task moved");
     } catch (err) {
       const msg = (err as Error).message;

@@ -39,6 +39,12 @@ export async function createTask(
     task.customFields = withWorkGrouping(task.customFields, parsed);
     txEm.persist(task);
     await txEm.flush();
+    emitTaskEvent(txEm, ctx, {
+      verb: "created",
+      taskId: task.id,
+      payload: { title: task.title, status: task.status },
+    });
+    await txEm.flush();
     return serializeTask(task);
   });
 }
@@ -52,8 +58,20 @@ export async function updateTask(
   const parsed = parseOrThrow(UpdateTaskInputSchema.omit({ id: true }), input);
   return await em.transactional(async (txEm) => {
     const task = await findVisibleTask(txEm, ctx, taskId);
-    applyTaskPatch(task, parsed);
+    const { expectedStatus, ...patch } = parsed;
+    if (expectedStatus !== undefined && task.status !== expectedStatus) {
+      throw new AppConflictError(`status conflict: expected ${expectedStatus}, got ${task.status ?? "missing"}`);
+    }
+    const previousStatus = task.status;
+    applyTaskPatch(task, patch);
     txEm.persist(task);
+    if (patch.status !== undefined && patch.status !== previousStatus) {
+      emitTaskEvent(txEm, ctx, {
+        verb: "status_changed",
+        taskId: task.id,
+        payload: { from: previousStatus, to: patch.status, task: task.id },
+      });
+    }
     await txEm.flush();
     return serializeTask(task);
   });
@@ -396,7 +414,7 @@ function emitTaskEvent(
   em: EntityManager,
   ctx: AppContext,
   input: {
-    verb: "parent_changed" | "dependency_updated" | "bulk_updated" | "bulk_deleted";
+    verb: "created" | "status_changed" | "parent_changed" | "dependency_updated" | "bulk_updated" | "bulk_deleted";
     taskId: string;
     payload: Record<string, unknown>;
   },

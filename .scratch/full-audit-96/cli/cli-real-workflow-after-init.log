@@ -1,0 +1,15 @@
+$ fulcrum init /tmp/fulcrum-cli-audit-project-96
+[migrator] Processing 'Migration20260501104413_auth'
+fulcrum: fatal: relation "feature_flags" already exists
+
+$ fulcrum projects create --name CLI Audit Project --json
+fulcrum projects create: UNAUTHORIZED: No active CLI session found. Run `fulcrum init` or `fulcrum auth login` first.
+
+$ fulcrum tasks create --title CLI Audit Task --json
+fulcrum tasks create: UNAUTHORIZED: No active CLI session found. Run `fulcrum init` or `fulcrum auth login` first.
+
+$ fulcrum projects list --json
+fulcrum projects list: UNAUTHORIZED: No active CLI session found. Run `fulcrum init` or `fulcrum auth login` first.
+
+$ fulcrum tasks list --json
+fulcrum tasks list: UNAUTHORIZED: No active CLI session found. Run `fulcrum init` or `fulcrum auth login` first.

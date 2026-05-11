@@ -697,14 +697,12 @@ describe("doctor --json product kernel section", () => {
         subsystem: "product-kernel-db",
       }),
     );
-  });
+  }, 20_000);
 
   test("reports product kernel rows after fulcrum product init", async () => {
     const home = join(TMP, "product-kernel-after-init");
     await mkdir(home, { recursive: true });
     const fulcrumHome = join(home, ".fulcrum");
-    await runDbMigrate(home, fulcrumHome);
-    // Run fulcrum product init out-of-band
     const initProc = Bun.spawn(["bun", "apps/cli/src/main.ts", "product", "init", "--json"], {
       cwd: process.cwd(),
       stdout: "pipe",
@@ -712,14 +710,14 @@ describe("doctor --json product kernel section", () => {
       env: { ...process.env, HOME: home, FULCRUM_HOME: fulcrumHome },
     });
     await new Response(initProc.stdout).text();
-    await initProc.exited;
+    expect(await initProc.exited).toBe(0);
     const report = await runDoctor(home, { FULCRUM_HOME: fulcrumHome });
     const pk = report["productKernel"] as Record<string, unknown>;
     expect(pk["engine"]).toBe("pglite");
     expect((pk["schemaApplied"] as number) >= 3).toBe(true);
     const rows = pk["rows"] as Record<string, number>;
     expect(rows["orgs"]).toBe(1);
-  });
+  }, 20_000);
 });
 
 describe("doctor --json repos section", () => {

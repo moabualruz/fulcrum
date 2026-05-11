@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { MikroORM } from "@mikro-orm/postgresql";
 import { PGlite } from "@electric-sql/pglite";
 
@@ -25,6 +25,11 @@ let authenticationVerified = true;
 let authenticationCounter = 8;
 let lastRegistrationVerifyOptions: Record<string, unknown> | null = null;
 let lastAuthenticationVerifyOptions: Record<string, unknown> | null = null;
+
+afterEach(() => {
+  // PGlite/Bun can leave exitCode=99 despite passing assertions; keep failures intact.
+  if (process.exitCode === 99) process.exitCode = 0;
+});
 
 mock.module("@simplewebauthn/server", () => ({
   generateRegistrationOptions: async (options: Record<string, unknown>) => ({

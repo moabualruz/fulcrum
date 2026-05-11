@@ -167,7 +167,7 @@ describe("ci STEPS — Phase 09 coverage gates", () => {
       "bun",
       "run",
       "scripts/test-root.ts",
-      "--coverage",
+      "--root-coverage",
     ]);
     expect(STEPS.find((s) => s.name === "coverage:web")?.cmd).toEqual([
       "bun",

@@ -25,4 +25,4 @@
 	</div>
 </header>
 
-<ProjectForm form={form?.form ?? data.form} />
+<ProjectForm form={form?.form ?? data.form} parentProjects={data.parentProjects} />

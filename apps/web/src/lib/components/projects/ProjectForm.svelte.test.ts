@@ -28,7 +28,10 @@ interface ProjectFormShape {
   shape?: unknown;
 }
 
-type ProjectFormProps = { form: ProjectFormShape };
+type ProjectFormProps = {
+  form: ProjectFormShape;
+  parentProjects?: Array<{ id: string; name: string }>;
+};
 
 function makeForm(overrides: Partial<ProjectFormShape> = {}): ProjectFormShape {
   return {
@@ -86,7 +89,18 @@ describe("ProjectForm component (SSR)", () => {
     expect(body).toContain('name="template"');
     expect(body).toContain('value="agent-os-software-project"');
     expect(body).toContain('name="parentId"');
+    expect(body).toContain("No parent");
+  });
+
+  test("renders parent projects as selectable names", () => {
+    const { body } = render(ProjectForm, {
+      props: {
+        form: makeForm({ data: { name: "", slug: "", parentId: "parent-1" } }),
+        parentProjects: [{ id: "parent-1", name: "Parent Project" }],
+      },
+    });
     expect(body).toContain('value="parent-1"');
+    expect(body).toContain("Parent Project");
   });
 
   test("form element posts via method=POST", () => {
@@ -94,6 +108,7 @@ describe("ProjectForm component (SSR)", () => {
     const formMatch = body.match(/<form\b[^>]*data-project-form[^>]*>/);
     expect(formMatch).not.toBeNull();
     expect(formMatch?.[0]).toContain('method="POST"');
+    expect(formMatch?.[0]).toContain('action="?/create"');
   });
 
   test("when form.errors.name is set, the error string is rendered", () => {

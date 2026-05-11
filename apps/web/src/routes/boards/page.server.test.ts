@@ -1,15 +1,22 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "@/test-support/product-fixtures.ts";
-import {
-  createLocalOrg,
-  createProject,
-  createTask,
-  type EventRow,
-} from "@/test-support/product-fixtures.ts";
+import { createProject } from "@/application/projects/commands.ts";
+import { createTask } from "@/application/tasks/commands.ts";
+import { initDatabase, closeDatabase } from "$lib/server/db";
+
+interface EventRow {
+  id: string;
+  org_id: string;
+  project_id: string | null;
+  actor: string;
+  subject_kind: string;
+  subject_id: string;
+  verb: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
 
 // `+page.server.ts` opens `${productDbDir()}/main`, which honours
 // `FULCRUM_HOME`. Seed three tasks across two projects so the project
@@ -39,7 +46,8 @@ beforeEach(() => {
   process.env["FULCRUM_HOME"] = scratch;
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await closeDatabase();
   delete process.env["FULCRUM_HOME"];
   rmSync(scratch, { recursive: true, force: true });
 });
@@ -54,30 +62,33 @@ interface SeededIds {
 }
 
 async function seedTasks(): Promise<SeededIds> {
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(join(dbDir, "main"));
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const alpha = await createProject(db, { orgId: org.id, slug: "alpha", name: "Alpha" });
-  const beta = await createProject(db, { orgId: org.id, slug: "beta", name: "Beta" });
-  const taskAlphaPending = await createTask(db, {
-    orgId: org.id,
+  const db = await initDatabase();
+  const org = (await db.query<{ id: string }>("SELECT id FROM orgs ORDER BY created_at ASC LIMIT 1"))[0]!;
+  const ctx = { orgId: org.id, userId: "test-user", projectId: null };
+  const em = db.em.fork();
+  const alpha = await createProject(em, ctx, { slug: "alpha", name: "Alpha" });
+  const beta = await createProject(em, ctx, { slug: "beta", name: "Beta" });
+  const taskAlphaPending = await createTask(em, {
+    ...ctx,
     projectId: alpha.id,
+  }, {
     title: "Alpha pending",
+    status: "pending",
   });
-  const taskAlphaInProgress = await createTask(db, {
-    orgId: org.id,
+  const taskAlphaInProgress = await createTask(em, {
+    ...ctx,
     projectId: alpha.id,
+  }, {
     title: "Alpha in_progress",
     status: "in_progress",
   });
-  const taskBetaPending = await createTask(db, {
-    orgId: org.id,
+  const taskBetaPending = await createTask(em, {
+    ...ctx,
     projectId: beta.id,
+  }, {
     title: "Beta pending",
+    status: "pending",
   });
-  await db.close();
   return {
     orgId: org.id,
     alphaProjectId: alpha.id,
@@ -153,23 +164,17 @@ describe("/boards +page.server.ts actions", () => {
     expect(result).toBeDefined();
     expect((result as { status?: number }).status ?? 200).toBeLessThan(400);
 
-    const dbDir = join(scratch, "state", "product", "db");
-    const db = await openIsolatedStore(join(dbDir, "main"));
-    await migrateIsolatedStore(db);
-    try {
-      const rows = await db.query<{ id: string; title: string }>(
-        `SELECT id, title FROM tasks WHERE title = $1`,
-        ["Brand new task"],
-      );
-      expect(rows).toHaveLength(1);
-      const events = await db.query<EventRow>(
-        `SELECT * FROM events WHERE subject_kind = 'task' AND subject_id = $1`,
-        [rows[0]!.id],
-      );
-      expect(events.find((e) => e.verb === "created")).toBeDefined();
-    } finally {
-      await db.close();
-    }
+    const db = await initDatabase();
+    const rows = await db.query<{ id: string; title: string }>(
+      `SELECT id, title FROM tasks WHERE title = $1`,
+      ["Brand new task"],
+    );
+    expect(rows).toHaveLength(1);
+    const events = await db.query<EventRow>(
+      `SELECT * FROM events WHERE subject_kind = 'task' AND subject_id = $1`,
+      [rows[0]!.id],
+    );
+    expect(events.find((e) => e.verb === "created")).toBeDefined();
   });
 
   test("move action updates status and emits task.status_changed", async () => {
@@ -188,28 +193,22 @@ describe("/boards +page.server.ts actions", () => {
     >[0]);
     expect((result as { status?: number }).status ?? 200).toBeLessThan(400);
 
-    const dbDir = join(scratch, "state", "product", "db");
-    const db = await openIsolatedStore(join(dbDir, "main"));
-    await migrateIsolatedStore(db);
-    try {
-      const rows = await db.query<{ status: string }>(
-        `SELECT status FROM tasks WHERE id = $1`,
-        [ids.taskAlphaPendingId],
-      );
-      expect(rows[0]?.status).toBe("in_progress");
-      const events = await db.query<EventRow>(
-        `SELECT * FROM events WHERE subject_kind = 'task' AND subject_id = $1 AND verb = 'status_changed'`,
-        [ids.taskAlphaPendingId],
-      );
-      expect(events).toHaveLength(1);
-      expect(events[0]?.payload).toEqual({
-        from: "pending",
-        to: "in_progress",
-        task: ids.taskAlphaPendingId,
-      });
-    } finally {
-      await db.close();
-    }
+    const db = await initDatabase();
+    const rows = await db.query<{ status: string }>(
+      `SELECT status FROM tasks WHERE id = $1`,
+      [ids.taskAlphaPendingId],
+    );
+    expect(rows[0]?.status).toBe("in_progress");
+    const events = await db.query<EventRow>(
+      `SELECT * FROM events WHERE subject_kind = 'task' AND subject_id = $1 AND verb = 'status_changed'`,
+      [ids.taskAlphaPendingId],
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0]?.payload).toEqual({
+      from: "pending",
+      to: "in_progress",
+      task: ids.taskAlphaPendingId,
+    });
   });
 
   test("move action with stale `from` returns fail(409, …)", async () => {

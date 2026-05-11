@@ -1,0 +1,116 @@
+cd /Users/mkh/workspace/fulcrum && FULCRUM_HOME=/tmp/fulcrum-cli-audit-97 bun run apps/cli/src/main.ts tui
+[1m[7m%[27m[1m[0m                                                                                                                        [0m[27m[24m[Jmkh@Mohds-MacBook-Pro fulcrum % [K[?2004hccd /Users/mkh/workspace/fulcrum && FULCRUM_HOME=/tmp/fulcrum-cli-audit-97 bun run apps/c [Klli/src/main.ts tui[?2004l
+[2J[H[?25l[44m[37m Local  admin@local                                                      Bell:0  [32mInference:ok[37m  q:quit  ?:help [39m[49m
+
+[1m  Fulcrum TUI[22m
+[2m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[22m
+
+[1m  Domain nav[22m
+[7m  Projects                                                                                                              [27m
+  Tasks                                                                                                                 
+  Sprints                                                                                                               
+  Docs                                                                                                                  
+  Memory                                                                                                                
+  Runs                                                                                                                  
+  Repos                                                                                                                 
+  Artifacts                                                                                                             
+  Search                                                                                                                
+  Notifications                                                                                                         
+  Notification Rules                                                                                                    
+  Skills                                                                                                                
+  Routing                                                                                                               
+  Routing/Skills                                                                                                        
+  Inference                                                                                                             
+  Components                                                                                                            
+  Doctor                                                                                                                
+  Doctor/Settings                                                                                                       
+  Auth                                                                                                                  
+  Feature Flags                                                                                                         
+  Activity                                                                                                              
+  Audit                                                                                                                 
+
+[1m  Detail / log pane[22m
+  Projects ready. Use Enter to open, / for command palette.
+
+[1m  Status footer[22m
+[2m  j/k or arrows navigate  Enter open  Esc back  / commands  q quit[22m
+[2m  Command palette: /  Create task | Create doc | Search | Dispatch run | Settings[22m
+[2J[H[?25l[44m[37m Local  admin@local                                                      Bell:0  [32mInference:ok[37m  q:quit  ?:help [39m[49m
+
+[1m  Fulcrum TUI[22m
+[2m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[22m
+
+[1m  Domain nav[22m
+  Projects                                                                                                              
+[7m  Tasks                                                                                                                 [27m
+  Sprints                                                                                                               
+  Docs                                                                                                                  
+  Memory                                                                                                                
+  Runs                                                                                                                  
+  Repos                                                                                                                 
+  Artifacts                                                                                                             
+  Search                                                                                                                
+  Notifications                                                                                                         
+  Notification Rules                                                                                                    
+  Skills                                                                                                                
+  Routing                                                                                                               
+  Routing/Skills                                                                                                        
+  Inference                                                                                                             
+  Components                                                                                                            
+  Doctor                                                                                                                
+  Doctor/Settings                                                                                                       
+  Auth                                                                                                                  
+  Feature Flags                                                                                                         
+  Activity                                                                                                              
+  Audit                                                                                                                 
+
+[1m  Detail / log pane[22m
+  Tasks ready. Use Enter to open, / for command palette.
+
+[1m  Status footer[22m
+[2m  j/k or arrows navigate  Enter open  Esc back  / commands  q quit[22m
+[2m  Command palette: /  Create task | Create doc | Search | Dispatch run | Settings[22m
+[2J[H[?25l[44m[37m Local  admin@local                                                      Bell:0  [32mInference:ok[37m  q:quit  ?:help [39m[49m
+
+[1m  Fulcrum TUI[22m
+[2m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[22m
+
+[1m  Domain nav[22m
+  Projects                                                                                                              
+[7m  Tasks                                                                                                                 [27m
+  Sprints                                                                                                               
+  Docs                                                                                                                  
+  Memory                                                                                                                
+  Runs                                                                                                                  
+  Repos                                                                                                                 
+  Artifacts                                                                                                             
+  Search                                                                                                                
+  Notifications                                                                                                         
+  Notification Rules                                                                                                    
+  Skills                                                                                                                
+  Routing                                                                                                               
+  Routing/Skills                                                                                                        
+  Inference                                                                                                             
+  Components                                                                                                            
+  Doctor                                                                                                                
+  Doctor/Settings                                                                                                       
+  Auth                                                                                                                  
+  Feature Flags                                                                                                         
+  Activity                                                                                                              
+  Audit                                                                                                                 
+
+[1m  Detail / log pane[22m
+  Tasks ready. Use Enter to open, / for command palette.
+
+[1m  Status footer[22m
+[2m  j/k or arrows navigate  Enter open  Esc back  / commands  q quit[22m
+[2m  Command palette: /  Create task | Create doc | Search | Dispatch run | Settings[22m
+
+[1m  Tasks[22m
+[2m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[22m
+[1m  Detail / log pane[22m
+  CLI Audit Task  [todo]  76e64152-f0ba-4584-b743-2c04fb6accca
+
+[1m  Status footer[22m
+[2m  Esc back  / commands  q root quit[22m
+[1m[7m%[27m[1m[0m                                                                                                                        [0m[27m[24m[Jmkh@Mohds-MacBook-Pro fulcrum % [K[?2004h

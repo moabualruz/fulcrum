@@ -7,6 +7,7 @@ import { InferenceLifecycle } from "./lifecycle.ts";
 
 let scratch = "";
 let lifecycle: InferenceLifecycle | undefined;
+const readinessTimeoutMs = process.env.FULCRUM_COVERAGE ? 5000 : 1000;
 
 beforeEach(async () => {
   scratch = await mkdtemp(join(tmpdir(), "fulcrum-inference-lifecycle-"));
@@ -81,13 +82,13 @@ setInterval(() => {}, 1000);
 }
 
 describe("InferenceLifecycle", () => {
-  test("ensureRunning spawns once and returns cached PID within 1 second", async () => {
+  test("ensureRunning spawns once and returns cached PID within readiness window", async () => {
     const { path, logPath } = await writeMockServer();
     lifecycle = new InferenceLifecycle({
       homeDir: join(scratch, ".fulcrum"),
       serverPath: path,
       readinessIntervalMs: 20,
-      readinessTimeoutMs: 1000,
+      readinessTimeoutMs,
     });
 
     const first = await lifecycle.ensureRunning();
@@ -104,7 +105,7 @@ describe("InferenceLifecycle", () => {
       homeDir: join(scratch, ".fulcrum"),
       serverPath: path,
       readinessIntervalMs: 20,
-      readinessTimeoutMs: 1000,
+      readinessTimeoutMs,
     });
     const running = await lifecycle.ensureRunning();
 

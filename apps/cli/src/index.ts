@@ -94,7 +94,7 @@ export function resolveClientAssetPath(clientRoot: string, requestPath: string):
  *
  * Returns the container and a cleanup function to close the ORM.
  */
-async function buildDbContainer(): Promise<{ container: Container; cleanup: () => Promise<void> }> {
+export async function buildDbContainer(): Promise<{ container: Container; cleanup: () => Promise<void> }> {
   const database = resolveDatabaseConfig();
   if (database.backend === "postgres") {
     const config = createOrmConfig({ debug: false });

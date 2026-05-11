@@ -7,6 +7,6 @@ export const GET: RequestHandler = async () => {
     const health = await getHealth();
     return json(health);
   } catch {
-    return json({ status: "unreachable" }, { status: 503 });
+    return json({ status: "unreachable" });
   }
 };

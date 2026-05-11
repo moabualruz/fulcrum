@@ -7,9 +7,10 @@
 
 	interface Props {
 		form: SuperValidated<ProjectFormValues>;
+		parentProjects?: Array<{ id: string; name: string }>;
 	}
 
-	let { form }: Props = $props();
+	let { form, parentProjects = [] }: Props = $props();
 
 	// Local reactive copies seeded from the server-validated form. Plain Svelte
 	// runes are sufficient here — the heavy `superForm` client wiring is not
@@ -53,6 +54,7 @@
 
 <form
 	method="POST"
+	action="?/create"
 	data-project-form
 	use:enhance
 	class="flex flex-col gap-4 max-w-xl"
@@ -88,7 +90,7 @@
 			bind:value={slugValue}
 			oninput={onSlugInput}
 			aria-invalid={slugError ? "true" : undefined}
-			pattern="[a-z0-9][a-z0-9-]{'{0,63}'}"
+			pattern="[a-z0-9][a-z0-9-]{0,63}"
 			required
 			class="border-input bg-background h-9 rounded-md border px-3 py-1 text-sm font-mono shadow-xs"
 		/>
@@ -155,18 +157,21 @@
 	</div>
 
 	<div class="flex flex-col gap-1.5">
-		<label for="project-parent-id" class="text-sm font-medium">Parent project ID</label>
-		<input
+		<label for="project-parent-id" class="text-sm font-medium">Parent project</label>
+		<select
 			id="project-parent-id"
 			name="parentId"
-			type="text"
 			data-project-parent
-			data-slot="input"
+			data-slot="select"
 			bind:value={parentIdValue}
 			aria-invalid={parentIdError ? "true" : undefined}
-			maxlength="80"
-			class="border-input bg-background h-9 rounded-md border px-3 py-1 text-sm font-mono shadow-xs"
-		/>
+			class="border-input bg-background h-9 rounded-md border px-3 py-1 text-sm shadow-xs"
+		>
+			<option value="">No parent</option>
+			{#each parentProjects as project (project.id)}
+				<option value={project.id}>{project.name}</option>
+			{/each}
+		</select>
 		{#if parentIdError}
 			<p data-error-parent-id class="text-destructive text-xs">{parentIdError}</p>
 		{/if}

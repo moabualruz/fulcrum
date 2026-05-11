@@ -1,0 +1,120 @@
+{
+  "base": "http://127.0.0.1:5174",
+  "videoPath": "/Users/mkh/workspace/fulcrum/.scratch/full-audit-96/web/videos/page@6e12996c1d6b10a8cf3470dacc616b52.webm",
+  "events": [
+    {
+      "at": "2026-05-08T22:02:14.458Z",
+      "type": "console",
+      "level": "error",
+      "text": "Pattern attribute value [a-z0-9][a-z0-9-]63 is not a valid regular expression: Uncaught SyntaxError: Invalid regular expression: /[a-z0-9][a-z0-9-]63/v: Invalid character class"
+    },
+    {
+      "at": "2026-05-08T22:02:14.526Z",
+      "type": "workflow",
+      "name": "project-create",
+      "ok": true,
+      "url": "http://127.0.0.1:5174/projects/8a3938cb-72b8-4773-a30a-40bbaa678e7c"
+    },
+    {
+      "at": "2026-05-08T22:02:14.625Z",
+      "type": "workflow",
+      "name": "project-board-create-task",
+      "ok": true,
+      "url": "http://127.0.0.1:5174/projects/8a3938cb-72b8-4773-a30a-40bbaa678e7c/board"
+    },
+    {
+      "at": "2026-05-08T22:02:15.244Z",
+      "type": "nav",
+      "name": "dashboard",
+      "url": "http://127.0.0.1:5174/",
+      "title": "Fulcrum"
+    },
+    {
+      "at": "2026-05-08T22:02:15.863Z",
+      "type": "nav",
+      "name": "projects",
+      "url": "http://127.0.0.1:5174/projects",
+      "title": "Fulcrum"
+    },
+    {
+      "at": "2026-05-08T22:02:16.475Z",
+      "type": "nav",
+      "name": "board",
+      "url": "http://127.0.0.1:5174/boards",
+      "title": "Fulcrum"
+    },
+    {
+      "at": "2026-05-08T22:02:17.076Z",
+      "type": "nav",
+      "name": "docs",
+      "url": "http://127.0.0.1:5174/docs",
+      "title": "Fulcrum"
+    },
+    {
+      "at": "2026-05-08T22:02:17.683Z",
+      "type": "nav",
+      "name": "runs",
+      "url": "http://127.0.0.1:5174/runs",
+      "title": "Fulcrum"
+    },
+    {
+      "at": "2026-05-08T22:02:18.275Z",
+      "type": "nav",
+      "name": "memory",
+      "url": "http://127.0.0.1:5174/memory",
+      "title": "Fulcrum"
+    },
+    {
+      "at": "2026-05-08T22:02:18.867Z",
+      "type": "nav",
+      "name": "search",
+      "url": "http://127.0.0.1:5174/search",
+      "title": "Fulcrum"
+    },
+    {
+      "at": "2026-05-08T22:02:19.475Z",
+      "type": "nav",
+      "name": "artifacts",
+      "url": "http://127.0.0.1:5174/artifacts",
+      "title": "Fulcrum"
+    },
+    {
+      "at": "2026-05-08T22:02:20.120Z",
+      "type": "nav",
+      "name": "settings-inference",
+      "url": "http://127.0.0.1:5174/settings/inference",
+      "title": "Fulcrum"
+    },
+    {
+      "at": "2026-05-08T22:02:20.742Z",
+      "type": "nav",
+      "name": "agents",
+      "url": "http://127.0.0.1:5174/agents",
+      "title": "Fulcrum"
+    },
+    {
+      "at": "2026-05-08T22:02:20.812Z",
+      "type": "pageerror",
+      "message": "Object"
+    },
+    {
+      "at": "2026-05-08T22:02:20.841Z",
+      "type": "pageerror",
+      "message": "Object"
+    },
+    {
+      "at": "2026-05-08T22:02:21.382Z",
+      "type": "nav",
+      "name": "orchestration",
+      "url": "http://127.0.0.1:5174/orchestration",
+      "title": "Fulcrum"
+    },
+    {
+      "at": "2026-05-08T22:02:22.522Z",
+      "type": "nav",
+      "name": "doctor",
+      "url": "http://127.0.0.1:5174/doctor",
+      "title": "Fulcrum"
+    }
+  ]
+}

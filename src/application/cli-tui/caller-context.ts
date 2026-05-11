@@ -3,16 +3,13 @@ import { MikroORM, type EntityManager } from "@mikro-orm/postgresql";
 import { TRPCError } from "@trpc/server";
 import type { Session as BetterAuthSession } from "better-auth";
 
-import { openDatabase, resolveDatabaseConfig } from "../../config/database.ts";
 import { ENTITY_MANAGER_TOKEN, registerDbBindings } from "../../db/db.module.ts";
 import { Session } from "../../db/entities/auth/Session.ts";
-import { applyProductMigrations } from "../../db/product-migrations.ts";
+import { initializeLocalDatabase } from "../init/queries.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
-
-const DEFAULT_ORG_SLUG = "default";
-const DEFAULT_ORG_NAME = "Local";
+import { DEFAULT_ORG_ID, DEFAULT_ORG_NAME, DEFAULT_ORG_SLUG } from "../../db/seed.ts";
 
 export interface CliTuiSession {
   id: string;
@@ -136,33 +133,16 @@ export async function initializeLocalProductReadiness(): Promise<{
   schemaApplied: readonly string[];
   org: { id: string; slug: string; name: string; created: boolean };
 }> {
-  const db = await openDatabase(resolveDatabaseConfig());
-  try {
-    const schemaApplied = await applyProductMigrations(db);
-    const org = await ensureLocalOrg(db);
-    return { ok: true, engine: db.engine, schemaApplied, org };
-  } finally {
-    await db.close();
-  }
-}
-
-async function ensureLocalOrg(db: Awaited<ReturnType<typeof openDatabase>>): Promise<{
-  id: string;
-  slug: string;
-  name: string;
-  created: boolean;
-}> {
-  const existing = await db.query<{ id: string; slug: string; name: string }>(
-    "SELECT id, slug, name FROM orgs WHERE slug = $1",
-    [DEFAULT_ORG_SLUG],
-  );
-  if (existing[0]) return { ...existing[0], created: false };
-
-  const rows = await db.query<{ id: string; slug: string; name: string }>(
-    "INSERT INTO orgs (id, slug, name) VALUES ($1, $2, $3) RETURNING id, slug, name",
-    [crypto.randomUUID(), DEFAULT_ORG_SLUG, DEFAULT_ORG_NAME],
-  );
-  const org = rows[0];
-  if (!org) throw new Error("failed to create local org");
-  return { ...org, created: true };
+  const status = await initializeLocalDatabase();
+  return {
+    ok: true,
+    engine: "pglite",
+    schemaApplied: [status],
+    org: {
+      id: DEFAULT_ORG_ID,
+      slug: DEFAULT_ORG_SLUG,
+      name: DEFAULT_ORG_NAME,
+      created: status === "bootstrapped",
+    },
+  };
 }

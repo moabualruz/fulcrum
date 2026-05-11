@@ -74,9 +74,11 @@ export async function loadOrchestrationDashboard(
   projectId?: string,
 ): Promise<OrchestrationDashboardData> {
   const conn = ormSqlConnection(em);
-  const configRows = await conn.execute<OrchestrationConfigRow[]>(
-    `SELECT * FROM orchestration_config WHERE org_id = $1`,
-    [ctx.orgId],
+  const configRows = await optionalRows<OrchestrationConfigRow>(() =>
+    conn.execute<OrchestrationConfigRow[]>(
+      `SELECT * FROM orchestration_config WHERE org_id = $1`,
+      [ctx.orgId],
+    ),
   );
   const maxConcurrency = configRows[0]?.max_concurrency ?? 4;
   const activeRows = await conn.execute<{ c: string | number }[]>(
@@ -85,17 +87,20 @@ export async function loadOrchestrationDashboard(
     [ctx.orgId],
   );
   const concurrencyUsed = Number(activeRows[0]?.c ?? 0);
-  const lastTickRows = await conn.execute<{ ended_at: string | Date | null }[]>(
-    `SELECT ended_at FROM agent_runs
-       WHERE org_id = $1 AND ended_at IS NOT NULL
-       ORDER BY ended_at DESC LIMIT 1`,
-    [ctx.orgId],
+  const lastTickRows = await optionalRows<{ started_at: string | Date | null }>(() =>
+    conn.execute<{ started_at: string | Date | null }[]>(
+      `SELECT started_at FROM agent_runs
+       WHERE org_id = $1
+       ORDER BY started_at DESC LIMIT 1`,
+      [ctx.orgId],
+    ),
   );
-  const lastTickAt = lastTickRows[0]?.ended_at ? isoStamp(lastTickRows[0].ended_at) : null;
+  const lastTickAt = lastTickRows[0]?.started_at ? isoStamp(lastTickRows[0].started_at) : null;
   const dispatchParams: unknown[] = projectId ? [ctx.orgId, projectId] : [ctx.orgId];
   const dispatchWhere = projectId ? `WHERE ar.org_id = $1 AND t.project_id = $2` : `WHERE ar.org_id = $1`;
-  const dispatches = await conn.execute<DispatchRow[]>(
-    `SELECT ar.id,
+  const dispatches = await optionalRows<DispatchRow>(() =>
+    conn.execute<DispatchRow[]>(
+      `SELECT ar.id,
             ar.agent_name AS agent,
             ar.status,
             NULL::text AS symphony_state,
@@ -108,14 +113,17 @@ export async function loadOrchestrationDashboard(
        LEFT JOIN tasks t ON t.id = ar.task_id
        ${dispatchWhere}
        ORDER BY ar.started_at DESC LIMIT 50`,
-    dispatchParams,
+      dispatchParams,
+    ),
   );
-  const retryQueue = await conn.execute<RetryQueueRow[]>(
-    `SELECT id, agent_name AS agent, last_error_kind, attempt_count AS retry_count, started_at
+  const retryQueue = await optionalRows<RetryQueueRow>(() =>
+    conn.execute<RetryQueueRow[]>(
+      `SELECT id, agent_name AS agent, last_error_kind, attempt_count AS retry_count, started_at
        FROM agent_runs
        WHERE org_id = $1 AND status = 'failed'
        ORDER BY started_at DESC LIMIT 10`,
-    [ctx.orgId],
+      [ctx.orgId],
+    ),
   );
   return {
     status: {
@@ -151,9 +159,12 @@ export async function loadOrchestrationConfig(
   em: EntityManager,
   ctx: OrchestrationApplicationContext,
 ): Promise<OrchestrationConfigRow | null> {
-  const rows = await ormSqlConnection(em).execute<OrchestrationConfigRow[]>(
-    `SELECT * FROM orchestration_config WHERE org_id = $1`,
-    [ctx.orgId],
+  const conn = ormSqlConnection(em);
+  const rows = await optionalRows<OrchestrationConfigRow>(() =>
+    conn.execute<OrchestrationConfigRow[]>(
+      `SELECT * FROM orchestration_config WHERE org_id = $1`,
+      [ctx.orgId],
+    ),
   );
   return rows[0] ?? null;
 }
@@ -162,9 +173,12 @@ export async function listWorkflowDefs(
   em: EntityManager,
   ctx: OrchestrationApplicationContext,
 ): Promise<WorkflowDefRow[]> {
-  return ormSqlConnection(em).execute<WorkflowDefRow[]>(
-    `SELECT * FROM workflow_defs WHERE org_id = $1 ORDER BY updated_at DESC`,
-    [ctx.orgId],
+  const conn = ormSqlConnection(em);
+  return optionalRows<WorkflowDefRow>(() =>
+    conn.execute<WorkflowDefRow[]>(
+      `SELECT * FROM workflow_defs WHERE org_id = $1 ORDER BY updated_at DESC`,
+      [ctx.orgId],
+    ),
   );
 }
 
@@ -182,4 +196,19 @@ export async function loadWorkflowDef(
 
 function isoStamp(value: string | Date): string {
   return value instanceof Date ? value.toISOString() : value;
+}
+
+async function optionalRows<T>(query: () => Promise<T[]>): Promise<T[]> {
+  try {
+    return await query();
+  } catch (err) {
+    if (isMissingRelation(err)) return [];
+    throw err;
+  }
+}
+
+function isMissingRelation(err: unknown): boolean {
+  const code = (err as { code?: string })?.code;
+  const message = (err as Error)?.message ?? "";
+  return code === "42P01" || message.includes("does not exist");
 }

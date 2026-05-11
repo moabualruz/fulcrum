@@ -38,7 +38,7 @@
 		{ label: "Sprints", href: `/projects/${data.project.id}/sprints` },
 		{ label: "Reports", href: `/projects/${data.project.id}/reports` },
 		{ label: "Repos", href: `/projects/${data.project.id}/repos` },
-		{ label: "Docs", href: `/projects/${data.project.id}/docs` },
+		{ label: "Docs", href: `/docs?project=${data.project.id}` },
 	]);
 	const summary = $derived([
 		{ key: "openTasks", label: "Open tasks", value: data.summary.openTasks },
@@ -54,7 +54,7 @@
 >
 	<div class={cn("flex items-baseline gap-3")}>
 		<a href="/projects" data-back-projects class={cn("text-sm text-muted-foreground hover:underline")}>← Projects</a>
-		<h1 class={cn("text-2xl font-semibold tracking-tight")}>{data.project.name}</h1>
+		<h1 class={cn("min-w-0 text-2xl font-semibold tracking-tight")}>{data.project.name}</h1>
 		<span data-project-slug-pill class={cn("rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground")}>{data.project.slug}</span>
 		<SetActiveButton slug={data.project.slug} active={data.activeProjectId === data.project.slug} />
 	</div>
