@@ -383,8 +383,9 @@ export class RoutingRulesScreen {
     }
     if (key === "a" && this.selectedDraft?.draftId) {
       // Approve draft
-      await this.opts.caller.routing.drafts.approve({ draftId: this.selectedDraft.draftId });
-      this.drafts = this.drafts.filter((d) => d.draftId !== this.selectedDraft?.draftId);
+      const draftId = this.selectedDraft.draftId;
+      await this.opts.caller.routing.drafts.approve({ draftId });
+      this.drafts = this.drafts.filter((d) => d.draftId !== draftId);
       this.draftCursor = Math.min(this.draftCursor, Math.max(0, this.drafts.length - 1));
       return true;
     }

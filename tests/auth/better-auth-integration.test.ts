@@ -166,6 +166,197 @@ describe("MikroOrmBetterAuthAdapter", () => {
     expect(adapter).toBeDefined();
     expect(typeof adapter.createAdapter).toBe("function");
   });
+
+  it("round-trips user and session models with joins, token aliases, sorting, updates, and deleteMany", async () => {
+    const mikro = new MikroOrmBetterAuthAdapter(orm.em);
+    const adapter = mikro.createAdapter() as any;
+    const email = `adapter-user-${crypto.randomUUID()}@example.com`;
+
+    const user = await adapter.create({
+      model: "user",
+      data: {
+        email,
+        name: "Adapter User",
+        image: "https://example.com/avatar.png",
+        role: "owner",
+      },
+    });
+    expect(user).toMatchObject({
+      email,
+      name: "Adapter User",
+      image: "https://example.com/avatar.png",
+      role: "owner",
+    });
+
+    const account = await adapter.create({
+      model: "account",
+      data: {
+        userId: user.id,
+        providerId: "github",
+        accountId: `gh-${crypto.randomUUID()}`,
+        accessToken: "access-token",
+      },
+    });
+    const joinedUser = await adapter.findOne({
+      model: "user",
+      where: [{ field: "email", operator: "eq", value: email, connector: "AND", mode: "sensitive" }],
+      join: { account: true },
+    });
+    expect(joinedUser.account).toEqual([expect.objectContaining({ id: account.id, providerId: "github" })]);
+
+    const updatedUser = await adapter.update({
+      model: "user",
+      where: [{ field: "email", operator: "eq", value: email, connector: "AND", mode: "sensitive" }],
+      update: { name: "Updated Adapter User", image: null },
+    });
+    expect(updatedUser).toMatchObject({ id: user.id, name: "Updated Adapter User", image: null });
+
+    const session = await adapter.create({
+      model: "session",
+      data: {
+        token: `session-${crypto.randomUUID()}`,
+        userId: user.id,
+        activeOrganizationId: user.orgId,
+        expiresAt: new Date(Date.now() + 60_000),
+        ipAddress: "127.0.0.1",
+        userAgent: "bun-test",
+      },
+    });
+    const joinedSession = await adapter.findOne({
+      model: "session",
+      where: [{ field: "token", operator: "eq", value: session.token, connector: "AND", mode: "sensitive" }],
+      join: { user: true },
+    });
+    expect(joinedSession).toMatchObject({
+      token: session.token,
+      user: expect.objectContaining({ id: user.id, email }),
+    });
+
+    const sessionUpdateCount = await adapter.updateMany({
+      model: "session",
+      where: [{ field: "userId", operator: "eq", value: user.id, connector: "AND", mode: "sensitive" }],
+      update: { userAgent: "updated-agent" },
+    });
+    expect(sessionUpdateCount).toBe(1);
+    const sessions = await adapter.findMany({
+      model: "session",
+      where: [{ field: "userId", operator: "eq", value: user.id, connector: "AND", mode: "sensitive" }],
+      limit: 10,
+      sortBy: { field: "createdAt", direction: "desc" },
+      offset: 0,
+    });
+    expect(sessions).toEqual([expect.objectContaining({ token: session.token, userAgent: "updated-agent" })]);
+
+    expect(await adapter.deleteMany({
+      model: "session",
+      where: [{ field: "userId", operator: "eq", value: user.id, connector: "AND", mode: "sensitive" }],
+    })).toBe(1);
+    expect(await adapter.deleteMany({
+      model: "user",
+      where: [{ field: "id", operator: "eq", value: user.id, connector: "AND", mode: "sensitive" }],
+    })).toBe(1);
+  });
+
+  it("round-trips organization member and invitation models through DB-backed update/delete paths", async () => {
+    const mikro = new MikroOrmBetterAuthAdapter(orm.em);
+    const adapter = mikro.createAdapter() as any;
+    const email = `adapter-member-${crypto.randomUUID()}@example.com`;
+    const user = await adapter.create({ model: "user", data: { email, name: "Member User" } });
+
+    const member = await adapter.create({
+      model: "member",
+      data: {
+        organizationId: user.orgId,
+        userId: user.id,
+        role: "member",
+      },
+    });
+    expect(member).toMatchObject({ organizationId: user.orgId, userId: user.id, role: "member" });
+    expect(await adapter.update({
+      model: "member",
+      where: [{ field: "id", operator: "eq", value: member.id, connector: "AND", mode: "sensitive" }],
+      update: { role: "admin" },
+    })).toMatchObject({ id: member.id, role: "admin" });
+    expect(await adapter.findMany({
+      model: "member",
+      where: [{ field: "organizationId", operator: "eq", value: user.orgId, connector: "AND", mode: "sensitive" }],
+      limit: 20,
+    })).toContainEqual(expect.objectContaining({ id: member.id, role: "admin" }));
+
+    const inviteToken = `invite-${crypto.randomUUID()}`;
+    const invitation = await adapter.create({
+      model: "invitation",
+      data: {
+        organizationId: user.orgId,
+        email: `invite-${crypto.randomUUID()}@example.com`,
+        role: "member",
+        token: inviteToken,
+        inviterId: user.id,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    expect(invitation).toMatchObject({ token: inviteToken, status: "pending", inviterId: user.id });
+    expect(await adapter.updateMany({
+      model: "invitation",
+      where: [{ field: "token", operator: "eq", value: inviteToken, connector: "AND", mode: "sensitive" }],
+      update: { role: "admin" },
+    })).toBe(1);
+    expect(await adapter.findOne({
+      model: "invitation",
+      where: [{ field: "token", operator: "eq", value: inviteToken, connector: "AND", mode: "sensitive" }],
+    })).toMatchObject({ id: invitation.id, role: "admin" });
+
+    await adapter.delete({
+      model: "member",
+      where: [{ field: "id", operator: "eq", value: member.id, connector: "AND", mode: "sensitive" }],
+    });
+    expect(await adapter.findOne({
+      model: "member",
+      where: [{ field: "id", operator: "eq", value: member.id, connector: "AND", mode: "sensitive" }],
+    })).toBeNull();
+    expect(await adapter.deleteMany({
+      model: "invitation",
+      where: [{ field: "token", operator: "eq", value: inviteToken, connector: "AND", mode: "sensitive" }],
+    })).toBe(1);
+    await adapter.deleteMany({
+      model: "user",
+      where: [{ field: "id", operator: "eq", value: user.id, connector: "AND", mode: "sensitive" }],
+    });
+  });
+
+  it("uses the in-memory fallback for unknown models with real Better Auth where operators", async () => {
+    const adapter = new MikroOrmBetterAuthAdapter(orm.em).createAdapter() as any;
+    await adapter.create({ model: "rateLimit", data: { id: "rl-1", key: "login:ada", attempts: 1, bucket: "auth" } });
+    await adapter.create({ model: "rateLimit", data: { id: "rl-2", key: "login:grace", attempts: 3, bucket: "auth" } });
+    await adapter.create({ model: "rateLimit", data: { id: "rl-3", key: "api:ada", attempts: 5, bucket: "api" } });
+
+    expect(await adapter.findOne({
+      model: "rateLimit",
+      where: [{ field: "key", operator: "contains", value: "grace", connector: "AND", mode: "sensitive" }],
+    })).toMatchObject({ id: "rl-2" });
+    expect(await adapter.findMany({
+      model: "rateLimit",
+      where: [{ field: "key", operator: "starts_with", value: "login:", connector: "AND", mode: "sensitive" }],
+      limit: 10,
+    })).toHaveLength(2);
+    expect(await adapter.updateMany({
+      model: "rateLimit",
+      where: [{ field: "id", operator: "in", value: ["rl-1", "rl-2"], connector: "AND", mode: "sensitive" }],
+      update: { bucket: "locked" },
+    })).toBe(2);
+    expect(await adapter.count({
+      model: "rateLimit",
+      where: [{ field: "bucket", operator: "eq", value: "locked", connector: "AND", mode: "sensitive" }],
+    })).toBe(2);
+    await adapter.delete({
+      model: "rateLimit",
+      where: [{ field: "key", operator: "ends_with", value: "grace", connector: "AND", mode: "sensitive" }],
+    });
+    expect(await adapter.deleteMany({
+      model: "rateLimit",
+      where: [{ field: "bucket", operator: "not_in", value: ["missing"], connector: "AND", mode: "sensitive" }],
+    })).toBe(2);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────

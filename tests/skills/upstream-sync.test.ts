@@ -17,6 +17,9 @@ import {
 import { Org } from "../../src/db/entities/auth/Org.ts";
 import {
   FulcrumSkill,
+  SkillConflict,
+  SkillConflictKind,
+  SkillConflictStatus,
   SkillSource,
   SkillVersion,
 } from "../../src/db/entities/skills/index.ts";
@@ -25,10 +28,11 @@ import {
   __setSkillsLoaderOrmForTest,
   installSkill,
 } from "../../src/skills/loader.ts";
-import { readSkillsLockFile } from "../../src/skills/lock.ts";
+import { readSkillsLockFile, writeSkillsLockFile } from "../../src/skills/lock.ts";
 import {
   __setSkillsUpstreamSyncOrmForTest,
   syncUpstream,
+  upgradeSkills,
 } from "../../src/skills/upstream-sync.ts";
 
 let scratch: string;
@@ -99,6 +103,20 @@ async function createUpstreamRepo(slug: string, content: string): Promise<string
   return repo;
 }
 
+async function createUpstreamRepoWithPath(
+  slug: string,
+  relativePath: string,
+  content: string,
+): Promise<string> {
+  const repo = join(scratch, "upstream", slug);
+  await mkdir(join(repo, relativePath, ".."), { recursive: true });
+  await writeFile(join(repo, relativePath), content, "utf8");
+  await $`git init --quiet ${repo}`;
+  await $`git -C ${repo} add .`;
+  await $`git -C ${repo} -c user.name=Fulcrum -c user.email=fulcrum@local commit --quiet -m "seed ${slug}"`;
+  return repo;
+}
+
 async function markUpstream(slug: string, upstreamRepo: string): Promise<void> {
   const em = testDb.orm.em.fork();
   const skill = await em.findOneOrFail(FulcrumSkill, {
@@ -121,6 +139,22 @@ async function latestHashVerified(slug: string): Promise<string | null | undefin
 }
 
 describe("syncUpstream", () => {
+  it("returns an empty result without touching ORM or lock state when fetch is disabled", async () => {
+    const initial = skillContent("upstream-disabled", "1.0.0", "Initial body.");
+    await installSkill(await writeLocalSource("upstream-disabled", initial), testDb.seed.orgId);
+
+    const result = await syncUpstream(testDb.seed.orgId, {
+      fetchUpstream: false,
+    });
+
+    expect(result).toEqual({ merged: [], conflicts: [], errors: [] });
+    expect(await readFile(installedPath("upstream-disabled"), "utf8")).toBe(initial);
+    const lock = await readSkillsLockFile({
+      fulcrumHome: process.env["FULCRUM_HOME"],
+    });
+    expect(lock["upstream-disabled"]?.hash).toBe(sha256(initial));
+  });
+
   it("auto-merges a clean skill and updates lock + hash_verified", async () => {
     const initial = skillContent("upstream-clean", "1.0.0", "Initial body.");
     const updated = skillContent("upstream-clean", "1.0.0", "Updated body.");
@@ -174,6 +208,16 @@ describe("syncUpstream", () => {
     expect(lock["upstream-conflict"]?.hash).toBe(sha256(initial));
     expect(lock["upstream-conflict"]?.upstream_conflict).toContain("Upstream edit.");
     expect(lock["upstream-conflict"]?.upstream_conflict).toContain("Local edit.");
+
+    const em = testDb.orm.em.fork();
+    const conflict = await em.findOneOrFail(SkillConflict, {
+      slug: "upstream-conflict",
+      kind: SkillConflictKind.UpstreamConflict,
+      status: SkillConflictStatus.Open,
+    });
+    expect(conflict.localHash).toBe(sha256(localEdit));
+    expect(conflict.upstreamHash).toBe(sha256(upstreamEdit));
+    expect(conflict.baseHash).toBe(sha256(initial));
   });
 
   it("records unreachable upstream as error and preserves local skill + valid lock", async () => {
@@ -200,5 +244,108 @@ describe("syncUpstream", () => {
     });
     expect(lock["upstream-missing"]?.hash).toBe(sha256(initial));
     expect(lock["upstream-missing"]?.upstream_conflict).toBeUndefined();
+  });
+
+  it("records missing lock entries or upstream repo metadata as sync errors", async () => {
+    const noRepo = skillContent("upstream-no-repo", "1.0.0", "Initial body.");
+    await installSkill(await writeLocalSource("upstream-no-repo", noRepo), testDb.seed.orgId);
+    const em = testDb.orm.em.fork();
+    const skill = await em.findOneOrFail(FulcrumSkill, {
+      org: testDb.seed.orgId,
+      slug: "upstream-no-repo",
+    });
+    skill.source = SkillSource.Upstream;
+    await em.flush();
+
+    const noLock = skillContent("upstream-no-lock", "1.0.0", "Initial body.");
+    await installSkill(await writeLocalSource("upstream-no-lock", noLock), testDb.seed.orgId);
+    await markUpstream(
+      "upstream-no-lock",
+      await createUpstreamRepo("upstream-no-lock", noLock),
+    );
+    const lock = await readSkillsLockFile({
+      fulcrumHome: process.env["FULCRUM_HOME"],
+    });
+    delete lock["upstream-no-lock"];
+    await writeSkillsLockFile(lock, {
+      fulcrumHome: process.env["FULCRUM_HOME"],
+    });
+
+    const result = await syncUpstream(testDb.seed.orgId, {
+      fetchUpstream: true,
+    });
+
+    expect(result.merged).toEqual([]);
+    expect(result.conflicts).toEqual([]);
+    expect(result.errors.sort()).toEqual(["upstream-no-lock", "upstream-no-repo"]);
+  });
+
+  it("records malformed or missing upstream skill files as errors without corrupting local installs", async () => {
+    const initial = skillContent("upstream-bad-frontmatter", "1.0.0", "Initial body.");
+    await installSkill(await writeLocalSource("upstream-bad-frontmatter", initial), testDb.seed.orgId);
+    await markUpstream(
+      "upstream-bad-frontmatter",
+      await createUpstreamRepo("upstream-bad-frontmatter", "---\nname: upstream-bad-frontmatter\n---\n# Missing Version\n"),
+    );
+
+    const missingFile = skillContent("upstream-no-skill-md", "1.0.0", "Initial body.");
+    await installSkill(await writeLocalSource("upstream-no-skill-md", missingFile), testDb.seed.orgId);
+    await markUpstream(
+      "upstream-no-skill-md",
+      await createUpstreamRepoWithPath("upstream-no-skill-md", "docs/README.md", "# no skill here\n"),
+    );
+
+    const result = await syncUpstream(testDb.seed.orgId, {
+      fetchUpstream: true,
+    });
+
+    expect(result.merged).toEqual([]);
+    expect(result.conflicts).toEqual([]);
+    expect(result.errors.sort()).toEqual(["upstream-bad-frontmatter", "upstream-no-skill-md"]);
+    expect(await readFile(installedPath("upstream-bad-frontmatter"), "utf8")).toBe(initial);
+    expect(await readFile(installedPath("upstream-no-skill-md"), "utf8")).toBe(missingFile);
+  });
+});
+
+describe("upgradeSkills", () => {
+  it("upgrades all or one upstream skill from real local git repos and preserves upstream metadata", async () => {
+    const alphaInitial = skillContent("upgrade-alpha", "1.0.0", "Initial alpha.");
+    const alphaUpgrade = skillContent("upgrade-alpha", "2.0.0", "Upgraded alpha.");
+    const betaInitial = skillContent("upgrade-beta", "1.0.0", "Initial beta.");
+    const betaUpgrade = skillContent("upgrade-beta", "2.0.0", "Upgraded beta.");
+    await installSkill(await writeLocalSource("upgrade-alpha", alphaInitial), testDb.seed.orgId);
+    await installSkill(await writeLocalSource("upgrade-beta", betaInitial), testDb.seed.orgId);
+    const alphaRepo = await createUpstreamRepo("upgrade-alpha", alphaUpgrade);
+    const betaRepo = await createUpstreamRepo("upgrade-beta", betaUpgrade);
+    await markUpstream("upgrade-alpha", alphaRepo);
+    await markUpstream("upgrade-beta", betaRepo);
+
+    const onlyAlpha = await upgradeSkills(testDb.seed.orgId, "upgrade-alpha");
+
+    expect(onlyAlpha.map((skill) => skill.slug)).toEqual(["upgrade-alpha"]);
+    expect(await readFile(installedPath("upgrade-alpha"), "utf8")).toBe(alphaUpgrade);
+    expect(await readFile(installedPath("upgrade-beta"), "utf8")).toBe(betaInitial);
+
+    const all = await upgradeSkills(testDb.seed.orgId, "all");
+    expect(all.map((skill) => skill.slug).sort()).toEqual(["upgrade-alpha", "upgrade-beta"]);
+    expect(await readFile(installedPath("upgrade-beta"), "utf8")).toBe(betaUpgrade);
+
+    const em = testDb.orm.em.fork();
+    const alpha = await em.findOneOrFail(FulcrumSkill, {
+      org: testDb.seed.orgId,
+      slug: "upgrade-alpha",
+    });
+    expect(alpha.source).toBe(SkillSource.Upstream);
+    expect(alpha.upstreamRepo).toBe(alphaRepo);
+  });
+
+  it("skips local skills and always removes temporary upgrade clones", async () => {
+    const local = skillContent("upgrade-local", "1.0.0", "Local body.");
+    await installSkill(await writeLocalSource("upgrade-local", local), testDb.seed.orgId);
+
+    const upgraded = await upgradeSkills(testDb.seed.orgId, "all");
+
+    expect(upgraded).toEqual([]);
+    expect(await readFile(installedPath("upgrade-local"), "utf8")).toBe(local);
   });
 });

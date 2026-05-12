@@ -56,7 +56,7 @@ export async function loadProjectBacklog(
     [projectId],
   );
   const backlogTasks = await conn.execute<BacklogTaskRow[]>(
-    `SELECT id, title, status, priority, estimate_points, sprint_id
+    `SELECT id, title, status, priority, points AS estimate_points, sprint_id
        FROM tasks
       WHERE project_id = $1 AND sprint_id IS NULL
         AND status NOT IN ('completed', 'cancelled')

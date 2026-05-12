@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { Org } from "../../db/entities/auth/Org.ts";
 import { SearchDocument } from "../../db/entities/search/SearchDocument.ts";
 import { createTestOrm, type TestOrm } from "../../test-utils/index.ts";
-import { searchDocuments } from "./queries.ts";
+import { listSavedSearches, saveSearch, searchDocuments } from "./queries.ts";
 
 let db: TestOrm | null = null;
 
@@ -77,6 +77,68 @@ describe("phase 9.6 scoped search", () => {
       projectId: null,
       scope: "global",
       provenance: { entityKind: "task", entityId: "global-doc", projectId: null },
+    });
+  });
+
+  test("scores partial term matches, source-kind filters, linked counts, and saved search upsert", async () => {
+    db = await createTestOrm();
+    const em = db.em.fork();
+    const phrase = `phase96-${crypto.randomUUID()}`;
+    const projectId = `project-${crypto.randomUUID()}`;
+
+    em.persist(em.create(SearchDocument, {
+      org: em.getReference(Org, db.seed.orgId),
+      entityKind: "doc",
+      entityId: "doc-full",
+      title: `Alpha ${phrase}`,
+      body: "beta gamma",
+      projectId,
+      labels: ["docs"],
+      metadata: { linkedCounts: { docs: 2, artifacts: 1, memory: 3, audit: "ignored" } },
+      updatedAt: new Date("2026-05-09T00:00:00.000Z"),
+    }));
+    em.persist(em.create(SearchDocument, {
+      org: em.getReference(Org, db.seed.orgId),
+      entityKind: "task",
+      entityId: "task-partial",
+      title: `Alpha ${phrase}`,
+      body: "unrelated",
+      projectId,
+      labels: ["tasks"],
+      metadata: {},
+      updatedAt: new Date("2026-05-10T00:00:00.000Z"),
+    }));
+    await em.flush();
+
+    const hits = await searchDocuments(db.em.fork(), `alpha beta ${phrase}`, {
+      orgId: db.seed.orgId,
+      projectId,
+      scope: "current",
+      sourceKinds: ["doc"],
+      limit: 5,
+    });
+
+    expect(hits.map((hit) => hit.source_id)).toEqual(["doc-full"]);
+    expect(hits[0]!.score).toBeGreaterThan(0);
+    expect(hits[0]!.linkedCounts).toEqual({ docs: 2, runs: 0, artifacts: 1, memory: 3, audit: 0 });
+
+    const ctx = { orgId: db.seed.orgId, projectId };
+    const ownerOne = db.seed.userId;
+    await saveSearch(db.em.fork(), ctx, {
+      owner: ownerOne,
+      name: "Mine",
+      params: { q: "alpha", kinds: ["doc"], dateFrom: "2026-05-01", dateTo: "2026-05-31" },
+    });
+    await saveSearch(db.em.fork(), ctx, {
+      owner: ownerOne,
+      name: "Mine",
+      params: { q: "beta", kinds: ["task"], dateFrom: "", dateTo: "" },
+    });
+    const saved = await listSavedSearches(db.em.fork(), ctx, ownerOne);
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({
+      name: "Mine",
+      params: { q: "beta", kinds: ["task"], dateFrom: "", dateTo: "" },
     });
   });
 });

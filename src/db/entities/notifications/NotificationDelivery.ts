@@ -61,7 +61,6 @@ export class NotificationDelivery {
     items: () => DeliveryStatus,
     fieldName: "status",
     default: DeliveryStatus.Pending,
-    check: "status in ('pending','sent','failed','retrying','suppressed')",
   })
   status: DeliveryStatus = DeliveryStatus.Pending;
 

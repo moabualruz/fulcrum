@@ -159,7 +159,7 @@ export async function getTaskDetail(
   );
 
   const edges = await conn.execute<EdgeRow[]>(
-    `SELECT id, from_kind, from_id, to_kind, to_id, rel FROM edges
+    `SELECT id, from_kind, from_id, to_kind, to_id, kind AS rel FROM edges
        WHERE (from_kind = 'task' AND from_id = $1)
           OR (to_kind = 'task' AND to_id = $1)
        ORDER BY created_at ASC, id ASC`,

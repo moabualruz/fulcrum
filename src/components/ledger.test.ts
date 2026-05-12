@@ -261,6 +261,86 @@ describe("ComponentLedger", () => {
     ]);
     ledger.close();
   });
+
+  test("persists component, surface, operation, and step workflow across reopen", () => {
+    const dbPath = join(scratch, "state", "global", "components.db");
+    const first = ComponentLedger.open(dbPath);
+    first.recordComponent({ id: "skills.sync", kind: "skill", status: "installed", version: "1.2.3" });
+    first.recordSurface({
+      id: "skills.sync:codex",
+      componentId: "skills.sync",
+      agentId: "codex",
+      kind: "skill-mirror",
+      target: "~/.codex/skills/fulcrum/sync",
+      ownerKey: "fulcrum:skill:sync",
+      desiredEnabled: true,
+      removePolicy: "managed-only",
+    });
+    const operationId = first.beginOperation("install", "skills.sync");
+    first.recordOperationStep({
+      operationId,
+      actionId: "copy-skill",
+      componentId: "skills.sync",
+      agentId: "codex",
+      action: "create-or-update",
+      status: "ok",
+    });
+    first.endOperation(operationId, "ok");
+    first.close();
+
+    const second = ComponentLedger.open(dbPath);
+    expect(second.componentStatus("skills.sync")).toEqual({
+      id: "skills.sync",
+      kind: "skill",
+      status: "installed",
+    });
+    expect(second.surfacesForComponent("skills.sync")).toEqual([
+      {
+        id: "skills.sync:codex",
+        component_id: "skills.sync",
+        agent_id: "codex",
+        kind: "skill-mirror",
+        target: "~/.codex/skills/fulcrum/sync",
+      },
+    ]);
+    expect(second.operationSteps(operationId)).toEqual([{ action_id: "copy-skill", status: "ok" }]);
+    second.close();
+  });
+
+  test("upserts operation steps with latest action metadata and error state", () => {
+    const ledger = ComponentLedger.open();
+    const operationId = ledger.beginOperation("install", "hooks.lint");
+    ledger.recordOperationStep({
+      operationId,
+      actionId: "write-hook",
+      componentId: "hooks.lint",
+      agentId: "codex",
+      action: "create-or-update",
+      status: "pending",
+    });
+    ledger.recordOperationStep({
+      operationId,
+      actionId: "write-hook",
+      componentId: "hooks.lint",
+      agentId: "codex",
+      action: "create-or-update",
+      status: "error",
+      error: "permission denied",
+    });
+
+    expect(ledger.operationSteps(operationId)).toEqual([{ action_id: "write-hook", status: "error" }]);
+
+    const db = new Database(join(scratch, "state", "global", "components.db"), { readonly: true });
+    const row = db
+      .query<{ error: string | null; component_id: string; agent_id: string | null }, [string]>(
+        "SELECT error, component_id, agent_id FROM operation_steps WHERE operation_id = ?",
+      )
+      .get(operationId);
+    db.close();
+
+    expect(row).toEqual({ error: "permission denied", component_id: "hooks.lint", agent_id: "codex" });
+    ledger.close();
+  });
 });
 
 type TableColumn = {

@@ -168,7 +168,11 @@ async function uploadS3(
 ): Promise<void> {
   if (!opts.s3Put) throw new Error("s3Put not configured");
   const body = createReadStream(archivePath);
-  await opts.s3Put({ Bucket: bucket, Key: key, Body: body });
+  try {
+    await opts.s3Put({ Bucket: bucket, Key: key, Body: body });
+  } finally {
+    body.destroy();
+  }
 }
 
 // ---------------------------------------------------------------------------

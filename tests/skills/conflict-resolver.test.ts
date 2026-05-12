@@ -194,4 +194,113 @@ describe("resolveConflict", () => {
     });
     expect(lock["resolve-noop"]?.upstream_conflict).toBeUndefined();
   });
+
+  it("manual editor resolution reads edited installed content and updates lock + hash_verified", async () => {
+    const originalEditor = process.env["EDITOR"];
+    const initial = skillContent("resolve-editor", "1.0.0", "Initial body.");
+    const edited = skillContent("resolve-editor", "2.0.0", "Edited body.");
+    await installSkill(await writeLocalSource("resolve-editor", initial), testDb.seed.orgId);
+    await seedConflict("resolve-editor", initial);
+    const editorPath = join(scratch, "editor.sh");
+    const editedPath = join(scratch, "edited-skill.md");
+    await writeFile(editedPath, edited, "utf8");
+    await writeFile(editorPath, [
+      "#!/bin/sh",
+      `cp ${JSON.stringify(editedPath)} "$1"`,
+      "",
+    ].join("\n"), "utf8");
+    await $`chmod +x ${editorPath}`;
+    process.env["EDITOR"] = editorPath;
+
+    try {
+      const skill = await resolveConflict("resolve-editor", "editor", testDb.seed.orgId);
+
+      expect(skill.slug).toBe("resolve-editor");
+      expect(await readFile(installedPath("resolve-editor"), "utf8")).toBe(edited);
+      expect(await latestHashVerified("resolve-editor")).toBe(sha256(edited));
+      const lock = await readSkillsLockFile({
+        fulcrumHome: process.env["FULCRUM_HOME"],
+      });
+      expect(lock["resolve-editor"]?.hash).toBe(sha256(edited));
+      expect(lock["resolve-editor"]?.version).toBe("2.0.0");
+      expect(lock["resolve-editor"]?.upstream_conflict).toBeUndefined();
+    } finally {
+      if (originalEditor === undefined) delete process.env["EDITOR"];
+      else process.env["EDITOR"] = originalEditor;
+    }
+  });
+
+  it("rejects editor resolution when EDITOR is missing or exits non-zero", async () => {
+    const originalEditor = process.env["EDITOR"];
+    const initial = skillContent("resolve-editor-failure", "1.0.0", "Initial body.");
+    await installSkill(await writeLocalSource("resolve-editor-failure", initial), testDb.seed.orgId);
+    await seedConflict("resolve-editor-failure", initial);
+    delete process.env["EDITOR"];
+
+    try {
+      await expect(resolveConflict("resolve-editor-failure", "editor", testDb.seed.orgId)).rejects.toThrow(
+        /EDITOR is required/,
+      );
+
+      const failingEditor = join(scratch, "failing-editor.sh");
+      await writeFile(failingEditor, "#!/bin/sh\nexit 7\n", "utf8");
+      await $`chmod +x ${failingEditor}`;
+      process.env["EDITOR"] = failingEditor;
+      await expect(resolveConflict("resolve-editor-failure", "editor", testDb.seed.orgId)).rejects.toThrow(
+        /EDITOR exited 7/,
+      );
+
+      expect(await readFile(installedPath("resolve-editor-failure"), "utf8")).toBe(initial);
+      const lock = await readSkillsLockFile({
+        fulcrumHome: process.env["FULCRUM_HOME"],
+      });
+      expect(lock["resolve-editor-failure"]?.upstream_conflict).toBeDefined();
+    } finally {
+      if (originalEditor === undefined) delete process.env["EDITOR"];
+      else process.env["EDITOR"] = originalEditor;
+    }
+  });
+
+  it("rejects upstream resolution when upstream metadata or upstream skill file is missing", async () => {
+    const noRepo = skillContent("resolve-upstream-no-repo", "1.0.0", "Initial body.");
+    await installSkill(await writeLocalSource("resolve-upstream-no-repo", noRepo), testDb.seed.orgId);
+    await seedConflict("resolve-upstream-no-repo", noRepo);
+    await expect(resolveConflict("resolve-upstream-no-repo", "upstream", testDb.seed.orgId)).rejects.toThrow(
+      /missing upstream_repo/,
+    );
+
+    const missingFile = skillContent("resolve-upstream-no-file", "1.0.0", "Initial body.");
+    await installSkill(await writeLocalSource("resolve-upstream-no-file", missingFile), testDb.seed.orgId);
+    await markUpstream(
+      "resolve-upstream-no-file",
+      await createUpstreamRepo("different-skill", skillContent("different-skill", "2.0.0", "Other.")),
+    );
+    await seedConflict("resolve-upstream-no-file", missingFile);
+
+    await expect(resolveConflict("resolve-upstream-no-file", "upstream", testDb.seed.orgId)).rejects.toThrow(
+      /missing SKILL\.md/,
+    );
+    expect(await readFile(installedPath("resolve-upstream-no-file"), "utf8")).toBe(missingFile);
+  });
+
+  it("rejects conflict resolution when lock agents exclude every supported installer", async () => {
+    const initial = skillContent("resolve-no-agent", "1.0.0", "Initial body.");
+    await installSkill(await writeLocalSource("resolve-no-agent", initial), testDb.seed.orgId);
+    const lock = await readSkillsLockFile({
+      fulcrumHome: process.env["FULCRUM_HOME"],
+    });
+    lock["resolve-no-agent"] = {
+      ...lock["resolve-no-agent"]!,
+      hash: sha256(initial),
+      upstream_conflict: "--- local\n+++ upstream\n",
+      enabled_agents: ["unsupported-agent" as never],
+    };
+    await writeSkillsLockFile(lock, {
+      fulcrumHome: process.env["FULCRUM_HOME"],
+    });
+
+    await expect(resolveConflict("resolve-no-agent", "editor", testDb.seed.orgId)).rejects.toThrow(
+      /no enabled agents/,
+    );
+  });
 });

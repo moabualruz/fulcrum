@@ -55,7 +55,7 @@ export class TemplateService {
     description?: string,
   ): Promise<TemplateOutput> {
     const template = this.em.create(TaskTemplate, {
-      org: { id: orgId },
+      org: this.em.getReference(Org, orgId),
       projectId: projectId ?? null,
       name,
       description: description ?? null,

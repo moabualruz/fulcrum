@@ -542,7 +542,6 @@ export class ReportService {
     void reportType; // used for potential future header customization
     if (data.length === 0) return "";
 
-    const headers = Object.keys(data[0]!);
     const escape = (v: unknown): string => {
       const s = String(v ?? "");
       // Quote fields containing comma, quote, or newline
@@ -551,9 +550,10 @@ export class ReportService {
       }
       return s;
     };
+    const headers = Object.keys(data[0]!);
 
     const lines = [
-      headers.join(","),
+      headers.map(escape).join(","),
       ...data.map((row) => headers.map((h) => escape(row[h])).join(",")),
     ];
     return lines.join("\n");

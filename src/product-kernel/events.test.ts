@@ -78,8 +78,9 @@ describe("repositories + event log", () => {
       });
       const events = await listEventsForProject(db, project.id);
       expect(events).toHaveLength(2);
-      expect(events[1]?.actor).toBe("agent:codex");
-      expect(events[1]?.payload).toEqual({ tag: "review" });
+      const noted = events.find((event: { verb: string }) => event.verb === "noted");
+      expect(noted?.actor).toBe("agent:codex");
+      expect(noted?.payload).toEqual({ tag: "review" });
     } finally {
       await db.close();
     }

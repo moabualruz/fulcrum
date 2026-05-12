@@ -4,6 +4,7 @@
  * Dependency direction: services use neutral persistence protocols (never web).
  */
 import type { EntityManager } from "@mikro-orm/postgresql";
+import { randomUUID } from "node:crypto";
 import type { SqlExecutor } from "../db/sql.ts";
 import { newUlid } from "../shared/ids.ts";
 
@@ -48,9 +49,9 @@ export async function createTaskAction(
   input: CreateTaskInput,
 ): Promise<{ id: string }> {
   if (input.status !== undefined) assertStatus(input.status, "createTaskAction");
-  const id = newUlid();
   const status = input.status ?? "pending";
   if (isSqlExecutor(db)) {
+    const id = newUlid();
     await db.query(
       `INSERT INTO tasks (id, org_id, project_id, title, description, status, priority)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -68,6 +69,7 @@ export async function createTaskAction(
   }
   const em = assertEm(db);
   const conn = em.getConnection();
+  const id = randomUUID();
   await conn.execute(
     `INSERT INTO tasks (id, org_id, project_id, title, description, status, priority)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -117,8 +119,8 @@ async function appendServiceEvent(
     payload?: Record<string, unknown>;
   },
 ): Promise<void> {
-  const id = newUlid();
   if (isSqlExecutor(db)) {
+    const id = newUlid();
     await db.query(
       `INSERT INTO events (id, org_id, project_id, actor, subject_kind, subject_id, verb, payload, created_at)
        VALUES ($1, $2, $3, 'system', $4, $5, $6, $7::jsonb, now())`,
@@ -127,6 +129,7 @@ async function appendServiceEvent(
     return;
   }
   const em = assertEm(db);
+  const id = randomUUID();
   await em.getConnection().execute(
     `INSERT INTO events (id, org_id, project_id, actor, subject_kind, subject_id, verb, payload, created_at)
      VALUES (?, ?, ?, 'system', ?, ?, ?, ?::jsonb, now())`,

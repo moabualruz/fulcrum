@@ -133,13 +133,20 @@ function score(haystack: string, query: string): number {
 }
 
 function toSearchParams(value: unknown): SearchParams {
-  const input = value as Partial<SearchParams> & { text?: string; filters?: Record<string, unknown> };
-  const filters = input.filters ?? {};
+  const input = value as Partial<SearchParams> & { text?: string; filters?: Record<string, unknown> | Array<{ field?: unknown; value?: unknown }> };
+  const filterObject = input.filters && typeof input.filters === "object" && !Array.isArray(input.filters)
+    ? input.filters as Record<string, unknown>
+    : {};
+  const filterArray = Array.isArray(input.filters) ? input.filters : [];
+  const filterValue = (field: string, op?: string): unknown => {
+    if (field in filterObject) return filterObject[field];
+    return filterArray.find((filter) => filter?.field === field && (op === undefined || (filter as { op?: unknown }).op === op))?.value;
+  };
   return {
     q: String(input.q ?? input.text ?? ""),
-    kinds: Array.isArray(input.kinds) ? input.kinds.map(String) : Array.isArray(filters["kinds"]) ? (filters["kinds"] as unknown[]).map(String) : [],
-    dateFrom: String(input.dateFrom ?? filters["dateFrom"] ?? ""),
-    dateTo: String(input.dateTo ?? filters["dateTo"] ?? ""),
+    kinds: Array.isArray(input.kinds) ? input.kinds.map(String) : Array.isArray(filterValue("kind")) ? (filterValue("kind") as unknown[]).map(String) : [],
+    dateFrom: String(input.dateFrom ?? filterValue("dateFrom") ?? filterValue("updated_at", "gt") ?? ""),
+    dateTo: String(input.dateTo ?? filterValue("dateTo") ?? filterValue("updated_at", "lt") ?? ""),
   };
 }
 

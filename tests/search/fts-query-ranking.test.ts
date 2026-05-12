@@ -47,7 +47,7 @@ async function insertDoc(
       input.entityId,
       input.title,
       input.body ?? "",
-      `{${(input.labels ?? []).join(",")}}`,
+      `{${(input.labels ?? []).map((label) => `"${label.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(",")}}`,
       JSON.stringify(input.metadata ?? {}),
       input.embedding === undefined ? null : JSON.stringify(input.embedding),
       input.updatedAt ?? "2026-05-03T00:00:00.000Z",
@@ -191,6 +191,76 @@ describe("P11#05 FTS query + ranking", () => {
     }
   });
 
+  test("metadata and date filters compose with clamped pagination against real search rows", async () => {
+    const db = await freshDb("metadata-date-filters");
+    try {
+      await insertDoc(db, {
+        id: "matching-run",
+        kind: "run",
+        entityId: "run-1",
+        title: "Deploy verification",
+        labels: ["release", "prod"],
+        metadata: {
+          sprint_id: "sprint-1",
+          status: "succeeded",
+          assignee_id: "agent-1",
+          repo_id: "repo-1",
+        },
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      });
+      await insertDoc(db, {
+        id: "wrong-sprint",
+        kind: "run",
+        entityId: "run-2",
+        title: "Deploy verification",
+        labels: ["release", "prod"],
+        metadata: {
+          sprint_id: "sprint-2",
+          status: "succeeded",
+          assignee_id: "agent-1",
+          repo_id: "repo-1",
+        },
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      });
+      await insertDoc(db, {
+        id: "too-old",
+        kind: "run",
+        entityId: "run-3",
+        title: "Deploy verification",
+        labels: ["release", "prod"],
+        metadata: {
+          sprint_id: "sprint-1",
+          status: "succeeded",
+          assignee_id: "agent-1",
+          repo_id: "repo-1",
+        },
+        updatedAt: "2026-04-01T00:00:00.000Z",
+      });
+
+      const result = await querySearchDocuments(db, {
+        orgId: "org-search",
+        q: "deploy",
+        sprintId: "sprint-1",
+        status: "succeeded",
+        assigneeId: "agent-1",
+        repoId: "repo-1",
+        tags: ["release", "prod"],
+        createdFrom: new Date("2026-05-01T00:00:00.000Z"),
+        createdTo: new Date("2026-05-31T00:00:00.000Z"),
+        limit: 999,
+        offset: -10,
+      });
+
+      expect(result.total).toBe(1);
+      expect(result.results.map((row) => row.id)).toEqual(["matching-run"]);
+      expect(result.facetCounts.status).toEqual({ succeeded: 1 });
+      expect(result.facetCounts.repoId).toEqual({ "repo-1": 1 });
+      expect(result.facetCounts.assigneeId).toEqual({ "agent-1": 1 });
+    } finally {
+      await db.close();
+    }
+  });
+
   test("empty query returns top N by recency and deduplicates on org-kind-entity", async () => {
     const db = await freshDb("empty-dedupe");
     try {
@@ -314,6 +384,186 @@ describe("P11#05 FTS query + ranking", () => {
 
       expect(result.results.map((row) => row.id)).toEqual(["semantic", "exact"]);
       expect(result.results[0]!.score).toBeGreaterThan(result.results[1]!.score);
+    } finally {
+      if (previousFeatures === undefined) delete process.env["FULCRUM_FEATURES"];
+      else process.env["FULCRUM_FEATURES"] = previousFeatures;
+      await db.close();
+    }
+  });
+
+  test("empty query applies deterministic domain boosts across memory, docs, and runs", async () => {
+    const db = await freshDb("domain-boosts-empty-query");
+    try {
+      await insertDoc(db, {
+        id: "plain-doc",
+        kind: "doc",
+        entityId: "plain-doc",
+        title: "Plain note",
+        metadata: { doc_type: "note" },
+        updatedAt: "2026-05-01T00:00:00.000Z",
+      });
+      await insertDoc(db, {
+        id: "spec-doc",
+        kind: "doc",
+        entityId: "spec-doc",
+        title: "Spec note",
+        metadata: { doc_type: "spec" },
+        updatedAt: "2026-05-01T00:00:00.000Z",
+      });
+      await insertDoc(db, {
+        id: "low-memory",
+        kind: "memory",
+        entityId: "low-memory",
+        title: "Memory note",
+        metadata: { importance: "low" },
+        updatedAt: "2026-05-01T00:00:00.000Z",
+      });
+      await insertDoc(db, {
+        id: "high-memory",
+        kind: "memory",
+        entityId: "high-memory",
+        title: "Critical memory",
+        metadata: { importance: "high" },
+        updatedAt: "2026-05-01T00:00:00.000Z",
+      });
+      await insertDoc(db, {
+        id: "failed-run",
+        kind: "run",
+        entityId: "failed-run",
+        title: "Failed run",
+        metadata: { status: "failed" },
+        updatedAt: "2026-05-01T00:00:00.000Z",
+      });
+      await insertDoc(db, {
+        id: "success-run",
+        kind: "run",
+        entityId: "success-run",
+        title: "Successful run",
+        metadata: { status: "success" },
+        updatedAt: "2026-05-01T00:00:00.000Z",
+      });
+
+      const result = await querySearchDocuments(db, {
+        orgId: "org-search",
+        now: new Date("2026-05-01T00:00:00.000Z"),
+      });
+
+      expect(result.results.map((row) => row.id).slice(0, 3)).toEqual([
+        "high-memory",
+        "spec-doc",
+        "success-run",
+      ]);
+      expect(result.results.find((row) => row.id === "high-memory")!.score).toBeGreaterThan(
+        result.results.find((row) => row.id === "low-memory")!.score,
+      );
+      expect(result.results.find((row) => row.id === "spec-doc")!.score).toBeGreaterThan(
+        result.results.find((row) => row.id === "plain-doc")!.score,
+      );
+      expect(result.results.find((row) => row.id === "success-run")!.score).toBeGreaterThan(
+        result.results.find((row) => row.id === "failed-run")!.score,
+      );
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("project, doc type, and quoted tag filters are enforced by the database query", async () => {
+    const db = await freshDb("project-doc-tag-filters");
+    try {
+      await insertDoc(db, {
+        id: "matching",
+        projectId: "project-a",
+        kind: "doc",
+        entityId: "doc-a",
+        title: "Alpha design",
+        labels: ["needs review", "quote\"tag"],
+        metadata: { doc_type: "adr", status: "published", author_id: "author-a" },
+      });
+      await insertDoc(db, {
+        id: "wrong-project",
+        projectId: "project-b",
+        kind: "doc",
+        entityId: "doc-b",
+        title: "Alpha design",
+        labels: ["needs review", "quote\"tag"],
+        metadata: { doc_type: "adr", status: "published", author_id: "author-a" },
+      });
+      await insertDoc(db, {
+        id: "wrong-doc-type",
+        projectId: "project-a",
+        kind: "doc",
+        entityId: "doc-c",
+        title: "Alpha design",
+        labels: ["needs review", "quote\"tag"],
+        metadata: { doc_type: "runbook", status: "published", author_id: "author-a" },
+      });
+
+      const result = await querySearchDocuments(db, {
+        orgId: "org-search",
+        q: "alpha",
+        projectId: "project-a",
+        docType: "adr",
+        tags: ["needs review", "quote\"tag"],
+      });
+
+      expect(result.total).toBe(1);
+      expect(result.results[0]).toMatchObject({
+        id: "matching",
+        projectId: "project-a",
+        kind: "doc",
+        entityId: "doc-a",
+      });
+      expect(result.results[0]!.labels).toEqual(["needs review", 'quote"tag']);
+      expect(result.facetCounts.docType).toEqual({ adr: 1 });
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("hybrid search ignores malformed and opposite embeddings while preserving facets", async () => {
+    const db = await freshDb("embeddings-hybrid-invalid-vectors");
+    const previousFeatures = process.env["FULCRUM_FEATURES"];
+    process.env["FULCRUM_FEATURES"] = "embeddings";
+    try {
+      await insertDoc(db, {
+        id: "semantic-hit",
+        kind: "doc",
+        entityId: "semantic-hit",
+        title: "Alpha rollout",
+        metadata: { doc_type: "adr", status: "published", author_id: "author-a" },
+        embedding: [1, 0],
+      });
+      await insertDoc(db, {
+        id: "opposite",
+        kind: "doc",
+        entityId: "opposite",
+        title: "Alpha rollout",
+        metadata: { doc_type: "adr", status: "published", author_id: "author-b" },
+        embedding: [-1, 0],
+      });
+      await insertDoc(db, {
+        id: "malformed",
+        kind: "doc",
+        entityId: "malformed",
+        title: "Alpha rollout",
+        metadata: { doc_type: "runbook", status: "draft", author_id: "author-c" },
+        embedding: null,
+      });
+      await db.query(`UPDATE search_documents SET embedding = $1 WHERE id = $2`, ["not-json", "malformed"]);
+
+      const result = await querySearchDocuments(db, {
+        orgId: "org-search",
+        q: "alpha",
+        embedQuery: async () => [1, 0],
+      });
+
+      expect(result.results.map((row) => row.id)).toEqual(["semantic-hit", "malformed", "opposite"]);
+      expect(result.total).toBe(3);
+      expect(result.results[0]!.score).toBeGreaterThan(result.results[1]!.score);
+      expect(result.facetCounts.kind).toEqual({ doc: 3 });
+      expect(result.facetCounts.docType).toEqual({ adr: 2, runbook: 1 });
+      expect(result.facetCounts.status).toEqual({ published: 2, draft: 1 });
+      expect(result.facetCounts.authorId).toEqual({ "author-a": 1, "author-b": 1, "author-c": 1 });
     } finally {
       if (previousFeatures === undefined) delete process.env["FULCRUM_FEATURES"];
       else process.env["FULCRUM_FEATURES"] = previousFeatures;

@@ -5,11 +5,30 @@
  * RED phase: these tests will fail because the probe/production code is
  * still in stub form. GREEN phase wires real probe calls.
  */
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { InferenceService } from "./service.ts";
 import { ensureRunningIfEmbedded } from "./lifecycle.ts";
 import { probeConfiguredBackends, type BackendHealth } from "./backend-probes.ts";
 import type { BackendId } from "./backends/types.ts";
+
+const ORIGINAL_ENV = {
+  FULCRUM_FEATURES: process.env["FULCRUM_FEATURES"],
+  FULCRUM_INFERENCE_BACKENDS: process.env["FULCRUM_INFERENCE_BACKENDS"],
+  FULCRUM_INFERENCE_BACKEND: process.env["FULCRUM_INFERENCE_BACKEND"],
+  OLLAMA_URL: process.env["OLLAMA_URL"],
+  OLLAMA_MODEL: process.env["OLLAMA_MODEL"],
+  LM_STUDIO_URL: process.env["LM_STUDIO_URL"],
+  LM_STUDIO_MODEL: process.env["LM_STUDIO_MODEL"],
+};
+const originalFetch = globalThis.fetch;
+
+afterEach(() => {
+  for (const [key, value] of Object.entries(ORIGINAL_ENV)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  globalThis.fetch = originalFetch;
+});
 
 // ---------------------------------------------------------------------------
 // 1. BackendHealth type shape
@@ -58,6 +77,95 @@ describe("BackendHealth type shape", () => {
         expect(r.reason).toBeTruthy();
       }
     }
+  });
+
+  test("selected Ollama backend runs real embed and generate probe requests", async () => {
+    process.env["FULCRUM_FEATURES"] = "ollama";
+    process.env["FULCRUM_INFERENCE_BACKEND"] = "ollama";
+    process.env["OLLAMA_URL"] = "http://ollama.test";
+    process.env["OLLAMA_MODEL"] = "nomic-test";
+    const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+
+    globalThis.fetch = async (input, init) => {
+      requests.push({
+        url: String(input),
+        body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
+      });
+      if (String(input).endsWith("/v1/embeddings")) {
+        return Response.json({
+          model: "nomic-test",
+          data: [{ embedding: [0.1, 0.2, 0.3] }],
+        });
+      }
+      return Response.json({ choices: [{ message: { content: "ok" } }] });
+    };
+
+    const ollama = (await probeConfiguredBackends()).find((backend) => backend.backend === "ollama");
+
+    expect(ollama).toMatchObject({
+      configured: true,
+      enabled: true,
+      status: "running",
+      model: "nomic-test",
+      dimensions: 3,
+      reason: null,
+    });
+    expect(ollama?.embedProbe).toMatchObject({ ok: true, model: "nomic-test", dimensions: 3 });
+    expect(ollama?.generateProbe).toMatchObject({ ok: true, model: "nomic-test" });
+    expect(requests.map((request) => request.url)).toEqual([
+      "http://ollama.test/v1/embeddings",
+      "http://ollama.test/v1/chat/completions",
+    ]);
+    expect(requests[0]?.body).toMatchObject({ model: "nomic-test", input: "hello world" });
+    expect(requests[1]?.body).toMatchObject({ model: "nomic-test", max_tokens: 10 });
+  });
+
+  test("configured but unselected external backend reports stopped without probing", async () => {
+    process.env["FULCRUM_FEATURES"] = "lm-studio";
+    process.env["FULCRUM_INFERENCE_BACKEND"] = "ollama";
+    let fetchCalls = 0;
+    globalThis.fetch = async () => {
+      fetchCalls += 1;
+      return Response.json({});
+    };
+
+    const lmStudio = (await probeConfiguredBackends()).find((backend) => backend.backend === "lm-studio");
+
+    expect(lmStudio).toMatchObject({
+      configured: true,
+      enabled: false,
+      status: "stopped",
+      reason: "backend not selected in config",
+      embedProbe: null,
+      generateProbe: null,
+      dimensions: null,
+    });
+    expect(fetchCalls).toBe(0);
+  });
+
+  test("probe failures distinguish degraded from unavailable backends", async () => {
+    process.env["FULCRUM_FEATURES"] = "ollama";
+    process.env["FULCRUM_INFERENCE_BACKEND"] = "ollama";
+    let scenario: "degraded" | "unavailable" = "degraded";
+
+    globalThis.fetch = async (input) => {
+      const isEmbed = String(input).endsWith("/v1/embeddings");
+      if (scenario === "degraded" && isEmbed) {
+        return Response.json({ model: "llama3.2", data: [{ embedding: [1, 2] }] });
+      }
+      return new Response("nope", { status: 503 });
+    };
+
+    const degraded = (await probeConfiguredBackends()).find((backend) => backend.backend === "ollama");
+    expect(degraded?.status).toBe("degraded");
+    expect(degraded?.reason).toContain("generate: HTTP 503");
+    expect(degraded?.dimensions).toBe(2);
+
+    scenario = "unavailable";
+    const unavailable = (await probeConfiguredBackends()).find((backend) => backend.backend === "ollama");
+    expect(unavailable?.status).toBe("unavailable");
+    expect(unavailable?.reason).toContain("embed: HTTP 503");
+    expect(unavailable?.reason).toContain("generate: HTTP 503");
   });
 });
 

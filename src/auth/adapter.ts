@@ -258,6 +258,15 @@ class InMemoryStore {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           if (Array.isArray(cmp) && (cmp as any[]).includes(val)) return false;
           break;
+        case "contains":
+          if (typeof val !== "string" || !val.includes(String(cmp))) return false;
+          break;
+        case "starts_with":
+          if (typeof val !== "string" || !val.startsWith(String(cmp))) return false;
+          break;
+        case "ends_with":
+          if (typeof val !== "string" || !val.endsWith(String(cmp))) return false;
+          break;
         default:
           if (val !== cmp) return false;
       }
@@ -838,16 +847,25 @@ export class MikroOrmBetterAuthAdapter {
 
   private mapUserFromBetterAuth(data: Record<string, unknown>): Record<string, unknown> {
     const now = new Date();
-    return {
+    const mapped: Record<string, unknown> = {
       ...(data["id"] !== undefined && { id: data["id"] }),
-      email: data["email"] as string,
-      name: data["name"] as string | undefined,
-      avatarUrl: (data["image"] ?? data["avatarUrl"]) as string | undefined,
-      orgId: (data["orgId"] ?? DEFAULT_ORG_ID) as string,
-      role: (data["role"] ?? "member") as string,
-      createdAt: (data["createdAt"] as Date | undefined) ?? now,
-      updatedAt: (data["updatedAt"] as Date | undefined) ?? now,
+      ...(data["email"] !== undefined && { email: data["email"] as string }),
+      ...(data["name"] !== undefined && { name: data["name"] as string | undefined }),
+      ...((data["image"] !== undefined || data["avatarUrl"] !== undefined) && {
+        avatarUrl: (data["image"] ?? data["avatarUrl"]) as string | undefined,
+      }),
+      ...(data["orgId"] !== undefined && { orgId: data["orgId"] as string }),
+      ...(data["role"] !== undefined && { role: data["role"] as string }),
+      ...(data["createdAt"] !== undefined && { createdAt: data["createdAt"] as Date }),
+      ...(data["updatedAt"] !== undefined && { updatedAt: data["updatedAt"] as Date }),
     };
+    if (data["email"] !== undefined) {
+      if (mapped["orgId"] === undefined) mapped["orgId"] = DEFAULT_ORG_ID;
+      if (mapped["role"] === undefined) mapped["role"] = "member";
+      if (mapped["createdAt"] === undefined) mapped["createdAt"] = now;
+      if (mapped["updatedAt"] === undefined) mapped["updatedAt"] = now;
+    }
+    return mapped;
   }
 
   private mapUserToBetterAuth(user: User): Record<string, unknown> {
@@ -866,17 +884,24 @@ export class MikroOrmBetterAuthAdapter {
 
   private mapSessionFromBetterAuth(data: Record<string, unknown>): Record<string, unknown> {
     const now = new Date();
-    return {
-      // Better-Auth may pass "token" or "id" as the session identifier
-      id: (data["token"] ?? data["id"]) as string,
-      userId: data["userId"] as string,
-      orgId: (data["orgId"] ?? data["activeOrganizationId"] ?? DEFAULT_ORG_ID) as string,
-      activeOrganizationId: (data["activeOrganizationId"] ?? data["orgId"] ?? DEFAULT_ORG_ID) as string | undefined,
-      expiresAt: data["expiresAt"] as Date,
-      ipAddress: data["ipAddress"] as string | undefined,
-      userAgent: data["userAgent"] as string | undefined,
-      createdAt: (data["createdAt"] as Date | undefined) ?? now,
+    const mapped: Record<string, unknown> = {
+      ...((data["token"] !== undefined || data["id"] !== undefined) && { id: (data["token"] ?? data["id"]) as string }),
+      ...(data["userId"] !== undefined && { userId: data["userId"] as string }),
+      ...((data["orgId"] !== undefined || data["activeOrganizationId"] !== undefined) && {
+        orgId: (data["orgId"] ?? data["activeOrganizationId"]) as string,
+        activeOrganizationId: (data["activeOrganizationId"] ?? data["orgId"]) as string,
+      }),
+      ...(data["expiresAt"] !== undefined && { expiresAt: data["expiresAt"] as Date }),
+      ...(data["ipAddress"] !== undefined && { ipAddress: data["ipAddress"] as string | undefined }),
+      ...(data["userAgent"] !== undefined && { userAgent: data["userAgent"] as string | undefined }),
+      ...(data["createdAt"] !== undefined && { createdAt: data["createdAt"] as Date }),
     };
+    if (data["userId"] !== undefined) {
+      if (mapped["orgId"] === undefined) mapped["orgId"] = DEFAULT_ORG_ID;
+      if (mapped["activeOrganizationId"] === undefined) mapped["activeOrganizationId"] = mapped["orgId"];
+      if (mapped["createdAt"] === undefined) mapped["createdAt"] = now;
+    }
+    return mapped;
   }
 
   private mapSessionToBetterAuth(session: Session): Record<string, unknown> {
@@ -894,12 +919,18 @@ export class MikroOrmBetterAuthAdapter {
   }
 
   private mapMemberFromBetterAuth(data: Record<string, unknown>): Record<string, unknown> {
-    return {
+    const mapped: Record<string, unknown> = {
       ...(data["id"] !== undefined && { id: data["id"] }),
-      orgId: (data["organizationId"] ?? data["orgId"]) as string,
-      userId: data["userId"] as string,
-      role: (data["role"] ?? "member") as string,
+      ...((data["organizationId"] !== undefined || data["orgId"] !== undefined) && {
+        orgId: (data["organizationId"] ?? data["orgId"]) as string,
+      }),
+      ...(data["userId"] !== undefined && { userId: data["userId"] as string }),
+      ...(data["role"] !== undefined && { role: data["role"] as string }),
     };
+    if ((mapped["orgId"] !== undefined || mapped["userId"] !== undefined) && mapped["role"] === undefined) {
+      mapped["role"] = "member";
+    }
+    return mapped;
   }
 
   private mapMemberToBetterAuth(member: OrgMember): Record<string, unknown> {
@@ -913,15 +944,24 @@ export class MikroOrmBetterAuthAdapter {
   }
 
   private mapInvitationFromBetterAuth(data: Record<string, unknown>): Record<string, unknown> {
-    return {
+    const mapped: Record<string, unknown> = {
       ...(data["id"] !== undefined && { id: data["id"] }),
-      orgId: (data["organizationId"] ?? data["orgId"]) as string,
-      email: data["email"] as string,
-      role: (data["role"] ?? "member") as string,
-      token: data["token"] as string,
-      invitedById: data["inviterId"] as string | undefined,
-      expiresAt: (data["expiresAt"] ?? new Date(Date.now() + 7 * 86400_000)) as Date,
+      ...((data["organizationId"] !== undefined || data["orgId"] !== undefined) && {
+        orgId: (data["organizationId"] ?? data["orgId"]) as string,
+      }),
+      ...(data["email"] !== undefined && { email: data["email"] as string }),
+      ...(data["role"] !== undefined && { role: data["role"] as string }),
+      ...(data["token"] !== undefined && { token: data["token"] as string }),
+      ...(data["inviterId"] !== undefined && { invitedById: data["inviterId"] as string | undefined }),
+      ...(data["expiresAt"] !== undefined && { expiresAt: data["expiresAt"] as Date }),
     };
+    if ((mapped["orgId"] !== undefined || mapped["email"] !== undefined || mapped["token"] !== undefined) && mapped["role"] === undefined) {
+      mapped["role"] = "member";
+    }
+    if ((mapped["orgId"] !== undefined || mapped["email"] !== undefined || mapped["token"] !== undefined) && mapped["expiresAt"] === undefined) {
+      mapped["expiresAt"] = new Date(Date.now() + 7 * 86400_000);
+    }
+    return mapped;
   }
 
   private mapInvitationToBetterAuth(inv: Invitation): Record<string, unknown> {
@@ -940,21 +980,26 @@ export class MikroOrmBetterAuthAdapter {
 
   private mapAccountFromBetterAuth(data: Record<string, unknown>): Record<string, unknown> {
     const now = new Date();
-    return {
+    const mapped: Record<string, unknown> = {
       ...(data["id"] !== undefined && { id: data["id"] }),
-      userId: data["userId"] as string,
-      providerId: data["providerId"] as string,
-      accountId: data["accountId"] as string,
-      accessToken: (data["accessToken"] ?? null) as string | undefined,
-      refreshToken: (data["refreshToken"] ?? null) as string | undefined,
-      accessTokenExpiresAt: (data["accessTokenExpiresAt"] ?? null) as Date | undefined,
-      refreshTokenExpiresAt: (data["refreshTokenExpiresAt"] ?? null) as Date | undefined,
-      scope: (data["scope"] ?? null) as string | undefined,
-      idToken: (data["idToken"] ?? null) as string | undefined,
-      password: (data["password"] ?? null) as string | undefined,
-      createdAt: (data["createdAt"] as Date | undefined) ?? now,
-      updatedAt: (data["updatedAt"] as Date | undefined) ?? now,
+      ...(data["userId"] !== undefined && { userId: data["userId"] as string }),
+      ...(data["providerId"] !== undefined && { providerId: data["providerId"] as string }),
+      ...(data["accountId"] !== undefined && { accountId: data["accountId"] as string }),
+      ...(data["accessToken"] !== undefined && { accessToken: (data["accessToken"] ?? null) as string | undefined }),
+      ...(data["refreshToken"] !== undefined && { refreshToken: (data["refreshToken"] ?? null) as string | undefined }),
+      ...(data["accessTokenExpiresAt"] !== undefined && { accessTokenExpiresAt: (data["accessTokenExpiresAt"] ?? null) as Date | undefined }),
+      ...(data["refreshTokenExpiresAt"] !== undefined && { refreshTokenExpiresAt: (data["refreshTokenExpiresAt"] ?? null) as Date | undefined }),
+      ...(data["scope"] !== undefined && { scope: (data["scope"] ?? null) as string | undefined }),
+      ...(data["idToken"] !== undefined && { idToken: (data["idToken"] ?? null) as string | undefined }),
+      ...(data["password"] !== undefined && { password: (data["password"] ?? null) as string | undefined }),
+      ...(data["createdAt"] !== undefined && { createdAt: data["createdAt"] as Date }),
+      ...(data["updatedAt"] !== undefined && { updatedAt: data["updatedAt"] as Date }),
     };
+    if (data["userId"] !== undefined) {
+      if (mapped["createdAt"] === undefined) mapped["createdAt"] = now;
+      if (mapped["updatedAt"] === undefined) mapped["updatedAt"] = now;
+    }
+    return mapped;
   }
 
   private mapAccountToBetterAuth(account: Account): Record<string, unknown> {
@@ -977,14 +1022,19 @@ export class MikroOrmBetterAuthAdapter {
 
   private mapVerificationFromBetterAuth(data: Record<string, unknown>): Record<string, unknown> {
     const now = new Date();
-    return {
+    const mapped: Record<string, unknown> = {
       ...(data["id"] !== undefined && { id: data["id"] }),
-      identifier: data["identifier"] as string,
-      value: data["value"] as string,
-      expiresAt: data["expiresAt"] as Date,
-      createdAt: (data["createdAt"] as Date | undefined) ?? now,
-      updatedAt: (data["updatedAt"] as Date | undefined) ?? now,
+      ...(data["identifier"] !== undefined && { identifier: data["identifier"] as string }),
+      ...(data["value"] !== undefined && { value: data["value"] as string }),
+      ...(data["expiresAt"] !== undefined && { expiresAt: data["expiresAt"] as Date }),
+      ...(data["createdAt"] !== undefined && { createdAt: data["createdAt"] as Date }),
+      ...(data["updatedAt"] !== undefined && { updatedAt: data["updatedAt"] as Date }),
     };
+    if (data["identifier"] !== undefined || data["value"] !== undefined) {
+      if (mapped["createdAt"] === undefined) mapped["createdAt"] = now;
+      if (mapped["updatedAt"] === undefined) mapped["updatedAt"] = now;
+    }
+    return mapped;
   }
 
   private mapVerificationToBetterAuth(verification: Verification): Record<string, unknown> {
