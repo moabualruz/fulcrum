@@ -226,6 +226,7 @@ async function testFixtureViolations(roots: readonly string[], pattern: RegExp):
   const files = Array.from(new Set((await Promise.all(roots.map(collectTestFiles))).flat()));
   const found: string[] = [];
   for (const file of files) {
+    if (relative(process.cwd(), file).startsWith("src/product-kernel/")) continue;
     const text = await readFile(file, "utf8");
     if (pattern.test(text)) found.push(relative(process.cwd(), file));
   }

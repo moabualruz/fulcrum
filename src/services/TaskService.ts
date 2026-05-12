@@ -160,6 +160,7 @@ export class TaskService {
     // HIGH-03: Inline field dependency validation
     if (input.projectId ?? current.projectId) {
       const projectId = (input.projectId ?? current.projectId)!;
+      await this.em.populate(task, ["customFields"] as never);
       await validateFieldDependencies(this.em, orgId, projectId, task);
     }
 

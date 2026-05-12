@@ -39,8 +39,8 @@ export class ProjectAutomation {
   @Property({ type: "string", fieldName: "trigger_type" })
   triggerType!: string;
 
-  @Property({ type: "json", fieldName: "trigger_config", nullable: true })
-  triggerConfig: object | null = null;
+  @Property({ type: "json", fieldName: "trigger_config" })
+  triggerConfig: object = {};
 
   @Property({ type: "json", nullable: true })
   condition: object | null = null;
@@ -48,8 +48,8 @@ export class ProjectAutomation {
   @Property({ type: "string", fieldName: "action_type" })
   actionType!: string;
 
-  @Property({ type: "json", fieldName: "action_config", nullable: true })
-  actionConfig: object | null = null;
+  @Property({ type: "json", fieldName: "action_config" })
+  actionConfig: object = {};
 
   @Property({ type: "boolean", default: true })
   enabled: boolean = true;

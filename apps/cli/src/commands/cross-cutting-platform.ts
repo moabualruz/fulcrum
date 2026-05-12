@@ -29,6 +29,10 @@ function has(argv: readonly string[], flag: string): boolean {
   return argv.includes(flag);
 }
 
+function isHelp(argv: readonly string[]): boolean {
+  return argv[0] === "help" || has(argv, "--help") || has(argv, "-h");
+}
+
 function option(argv: readonly string[], flag: string): string | undefined {
   const index = argv.indexOf(flag);
   if (index === -1) return undefined;
@@ -110,6 +114,11 @@ export async function runI18n(argv: readonly string[], opts: CliOptions = {}): P
 export async function runSecrets(argv: readonly string[], opts: CliOptions = {}): Promise<void> {
   const { print } = io(opts);
   const [sub = "help"] = argv;
+  if (isHelp(argv)) {
+    print("fulcrum secrets\n\nUsage:\n  fulcrum secrets <set|get|rotate|init-keyring> [options]");
+    return;
+  }
+
   const args = positionals(argv.slice(1));
   const name = option(argv, "--name") ?? args[0];
   if (!name) return fail(opts, `fulcrum secrets ${sub}: missing required argument <name>`, 2);
@@ -324,6 +333,11 @@ export async function runSecretsInitKeyring(
   opts: CliOptions = {},
 ): Promise<void> {
   const { print, printErr, exit } = io(opts);
+  if (isHelp(argv)) {
+    print("fulcrum secrets init-keyring\n\nUsage:\n  fulcrum secrets init-keyring");
+    return;
+  }
+
   const loader = opts.loaderFactory ?? productionAdapterFactory;
 
   let adapter: NativeKeyringAdapter | null = null;

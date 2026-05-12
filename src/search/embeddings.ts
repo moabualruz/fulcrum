@@ -23,7 +23,12 @@ export function parseEmbedding(value: unknown): number[] | null {
   if (value == null) return null;
   if (Array.isArray(value)) return value.map(Number);
   if (typeof value !== "string" || value.trim() === "") return null;
-  const parsed = JSON.parse(value) as unknown;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
   if (!Array.isArray(parsed)) return null;
   return parsed.map(Number);
 }

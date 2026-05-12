@@ -16,6 +16,7 @@ import {
 import {
   parseGithubRemote,
   syncGithubRepo,
+  handleGithubSyncJob,
   enqueueGithubSyncForAllRepos,
   type GithubClient,
   type GithubPrData,
@@ -104,6 +105,40 @@ describe("syncGithubRepo feature gate", () => {
       );
       expect(result.skipped).toBe(true);
       expect(result.prsUpserted).toBe(0);
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("skips invalid GitHub remotes after the flag is enabled without calling the client", async () => {
+    process.env.FULCRUM_FEATURES = "connector-github";
+    const db = await freshDb("invalid-remote");
+    try {
+      const org = await createLocalOrg(db, { slug: "o", name: "O" });
+      const repoId = await insertRepo(db, org.id, "r", "https://example.com/foo/bar");
+      const client: GithubClient = {
+        listOpenPrs: async () => {
+          throw new Error("client should not be called for invalid remotes");
+        },
+        listOpenIssues: async () => {
+          throw new Error("client should not be called for invalid remotes");
+        },
+      };
+
+      const result = await syncGithubRepo(
+        db,
+        client,
+        repoId,
+        org.id,
+        "https://example.com/foo/bar",
+      );
+
+      expect(result).toEqual({
+        prsUpserted: 0,
+        issuesUpserted: 0,
+        branchesUpserted: 0,
+        skipped: true,
+      });
     } finally {
       await db.close();
     }
@@ -240,6 +275,30 @@ describe("org_settings github token", () => {
       // Update token
       await setGithubOauthToken(db, org.id, "ghp_updated");
       expect(await getGithubOauthToken(db, org.id)).toBe("ghp_updated");
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("job handler skips real GitHub sync when no org OAuth token exists", async () => {
+    process.env.FULCRUM_FEATURES = "connector-github";
+    const db = await freshDb("job-no-token");
+    try {
+      const org = await createLocalOrg(db, { slug: "o", name: "O" });
+      const repoId = await insertRepo(db, org.id, "r", "https://github.com/foo/bar");
+
+      const result = await handleGithubSyncJob(db, {
+        repoId,
+        orgId: org.id,
+        remoteUrl: "https://github.com/foo/bar",
+      });
+
+      expect(result).toEqual({
+        prsUpserted: 0,
+        issuesUpserted: 0,
+        branchesUpserted: 0,
+        skipped: true,
+      });
     } finally {
       await db.close();
     }

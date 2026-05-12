@@ -1,25 +1,89 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { STEPS } from "../../scripts/ci.ts";
+import { coverageStats, mergeLcov, renderMergedLcov } from "../../scripts/test-root-coverage.ts";
 
 describe("Phase 09 coverage threshold gates", () => {
-  test("root test runner supports coverage without changing normal discovery", () => {
-    const source = readFileSync("scripts/test-root.ts", "utf8");
+  test("root coverage merge excludes test files from implementation coverage stats", () => {
+    const coverage = new Map();
 
-    expect(source).toContain("--coverage");
-    expect(source).toContain("--root-coverage");
-    expect(source).toContain("FULCRUM_ROOT_TEST_TIMEOUT_MS");
-    expect(source).toContain("--timeout=");
-    expect(source).toContain("FULCRUM_ROOT_TEST_COVERAGE_BATCH_SIZE");
-    expect(source).toContain("writeCoverageConfig");
-    expect(source).toContain('coverageReporter = ["lcov"]');
-    expect(source).toContain("mergeLcov");
-    expect(source).toContain("coverageStats");
-    expect(source).toContain('join("coverage", "root", "lcov.info")');
-    expect(source).toContain("files.slice");
-    expect(source).toContain("bun");
-    expect(source).toContain("test");
+    mergeLcov(coverage, [
+      "TN:",
+      "SF:src/real.ts",
+      "DA:1,1",
+      "DA:2,0",
+      "end_of_record",
+      "TN:",
+      "SF:tests/real.test.ts",
+      "DA:1,1",
+      "DA:2,1",
+      "DA:3,1",
+      "end_of_record",
+      "TN:",
+      "SF:src/real.spec.ts",
+      "DA:1,1",
+      "end_of_record",
+      "",
+    ].join("\n"));
+
+    expect([...coverage.keys()]).toEqual(["src/real.ts"]);
+    expect(coverageStats(coverage)).toEqual({ covered: 1, total: 2, ratio: 0.5 });
+    expect(renderMergedLcov(coverage)).toContain("SF:src/real.ts");
+    expect(renderMergedLcov(coverage)).not.toContain("tests/real.test.ts");
+    expect(renderMergedLcov(coverage)).not.toContain("src/real.spec.ts");
+  });
+
+  test("root coverage merge excludes TypeScript and multiline literal noise, not runtime code", () => {
+    const scratch = mkdtempSync(join(tmpdir(), "fulcrum-coverage-"));
+    try {
+      const sourcePath = join(scratch, "runtime.ts");
+      writeFileSync(sourcePath, [
+        "export interface Row {",
+        "  id: string;",
+        "}",
+        "",
+        "export function query(id: string): string {",
+        "  const sql = `",
+        "    SELECT id",
+        "    FROM rows",
+        "  `;",
+        "  return `${sql}:${id}`;",
+        "}",
+        "",
+      ].join("\n"));
+
+      const coverage = new Map();
+      mergeLcov(coverage, [
+        "TN:",
+        `SF:${sourcePath}`,
+        "DA:1,0",
+        "DA:2,0",
+        "DA:3,0",
+        "DA:4,0",
+        "DA:5,1",
+        "DA:6,1",
+        "DA:7,0",
+        "DA:8,0",
+        "DA:9,0",
+        "DA:10,1",
+        "DA:11,0",
+        "end_of_record",
+        "",
+      ].join("\n"));
+
+      expect(coverage.get(sourcePath)).toEqual(new Map([
+        [5, 1],
+        [6, 1],
+        [10, 1],
+        [11, 0],
+      ]));
+      expect(coverageStats(coverage)).toEqual({ covered: 3, total: 4, ratio: 0.75 });
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
   });
 
   test("root Bun coverage config declares target coverage and root runner enforces an honest ratchet", () => {
@@ -29,7 +93,7 @@ describe("Phase 09 coverage threshold gates", () => {
     expect(bunfig).toContain("coverageThreshold");
     expect(bunfig).toContain("0.80");
     expect(source).toContain("FULCRUM_ROOT_TEST_COVERAGE_THRESHOLD");
-    expect(source).toContain('?? "0.69"');
+    expect(source).toContain('?? "0.80"');
     expect(source).toContain("exitCode = 99");
   });
 

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "bun:test";
@@ -44,10 +44,24 @@ const auditEvent = {
 
 function caller() {
   const flags = new Map([["router-llm", false]]);
+  const runs = new Map<string, any>([
+    ["run-1", { ...runningRun, transcript_path: "" }],
+    ["run-with-log", { id: "run-with-log", status: "succeeded", transcript_path: "" }],
+  ]);
   return {
     runs: {
       list: async (input: { status?: string }) => input.status === "running" ? [runningRun] : [],
+      get: async (input: { id: string }) => runs.get(input.id) ?? null,
       cancel: async (input: { id: string }) => ({ id: input.id, status: "cancelled" }),
+      retry: async (input: { id: string }) => ({ id: `${input.id}-retry`, status: "retry_queued" }),
+    },
+    orchestration: {
+      dispatchRun: async (input: { taskId: string; agentName?: string }) => ({
+        id: "run-dispatched",
+        taskId: input.taskId,
+        agentName: input.agentName ?? null,
+      }),
+      getRun: async (input: { runId: string }) => runs.get(input.runId) ?? null,
     },
     notify: {
       list: async (input: { unread?: boolean }) => ({
@@ -57,6 +71,13 @@ function caller() {
       watch: async function* () {
         yield { id: "n-2", read: false, title: "New event" };
       },
+      markRead: async (input: { id: string }) => ({ id: input.id, read: true }),
+      markAllRead: async () => ({ updated: 3 }),
+      mute: async (input: { subjectKind: string; subjectId: string; mutedUntil?: Date }) => ({
+        subjectKind: input.subjectKind,
+        subjectId: input.subjectId,
+        mutedUntil: input.mutedUntil?.toISOString(),
+      }),
     },
     audit: {
       query: async (input: { kind?: string; since?: Date }) =>
@@ -96,6 +117,16 @@ function caller() {
 }
 
 describe("P14#08 generated domain CLI contracts", () => {
+  it("help commands print domain-specific usage without resolving a caller", async () => {
+    const h = harness();
+    await runPillar14Command("runs", ["--help"], { caller: caller(), ...h });
+    await runPillar14Command("notify", ["help"], { caller: caller(), ...h });
+
+    expect(h.exitCode).toBeUndefined();
+    expect(h.lines[0]).toContain("fulcrum runs");
+    expect(h.lines[1]).toContain("fulcrum notify");
+  });
+
   it("runs list filters by status and emits JSON claim fields", async () => {
     const h = harness();
     await runPillar14Command("runs", ["list", "--status", "running", "--json"], { caller: caller(), ...h });
@@ -110,6 +141,83 @@ describe("P14#08 generated domain CLI contracts", () => {
 
     expect(h.exitCode).toBeUndefined();
     expect(JSON.parse(h.lines[0] as string)).toEqual({ id: "run-1", status: "cancelled" });
+  });
+
+  it("runs show, retry, dispatch, and watch route through the real caller contracts", async () => {
+    const h = harness();
+    const fakeCaller = caller();
+
+    await runPillar14Command("runs", ["show", "run-1", "--json"], { caller: fakeCaller, ...h });
+    await runPillar14Command("runs", ["retry", "--id", "run-1", "--json"], { caller: fakeCaller, ...h });
+    await runPillar14Command("runs", ["dispatch", "--task", "task-1", "--agent", "codex", "--json"], {
+      caller: fakeCaller,
+      ...h,
+    });
+    await runPillar14Command("runs", ["watch", "run-1", "--json"], { caller: fakeCaller, ...h });
+
+    expect(h.exitCode).toBeUndefined();
+    expect(JSON.parse(h.lines[0] as string)).toMatchObject({ id: "run-1", status: "running" });
+    expect(JSON.parse(h.lines[1] as string)).toEqual({ id: "run-1-retry", status: "retry_queued" });
+    expect(JSON.parse(h.lines[2] as string)).toEqual({
+      id: "run-dispatched",
+      taskId: "task-1",
+      agentName: "codex",
+    });
+    expect(JSON.parse(h.lines[3] as string)).toMatchObject({ id: "run-1", status: "running" });
+  });
+
+  it("runs show and watch report missing runs, and dispatch requires a task id", async () => {
+    const h = harness();
+    const fakeCaller = caller();
+
+    await runPillar14Command("runs", ["show", "missing", "--json"], { caller: fakeCaller, ...h });
+    await runPillar14Command("runs", ["watch", "missing"], { caller: fakeCaller, ...h });
+    await runPillar14Command("runs", ["dispatch", "--json"], { caller: fakeCaller, ...h });
+
+    expect(h.exitCode).toBe(1);
+    expect(JSON.parse(h.lines[0] as string).error.message).toBe("run 'missing' not found");
+    expect(h.errLines).toContain("run 'missing' not found");
+    expect(JSON.parse(h.lines[1] as string).error.message).toBe("runs dispatch: missing --task");
+  });
+
+  it("runs logs prints existing transcript lines and reports absent logs", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "fulcrum-run-logs-"));
+    try {
+      const logPath = join(dir, "run.jsonl");
+      await writeFile(logPath, "{\"event\":\"one\"}\n\n{\"event\":\"two\"}\n", "utf8");
+      const fakeCaller = caller();
+      const storedRun = await fakeCaller.runs.get({ id: "run-with-log" });
+      storedRun.transcript_path = logPath;
+      const h = harness();
+
+      await runPillar14Command("runs", ["logs", "run-with-log"], { caller: fakeCaller, ...h });
+      await runPillar14Command("runs", ["logs", "run-1"], { caller: fakeCaller, ...h });
+
+      expect(h.lines).toEqual(["{\"event\":\"one\"}", "{\"event\":\"two\"}"]);
+      expect(h.exitCode).toBe(1);
+      expect(h.errLines).toContain("no log file for run 'run-1'");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runs attach follows an already terminal run and returns after printing existing logs", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "fulcrum-run-attach-"));
+    try {
+      const logPath = join(dir, "run.jsonl");
+      await writeFile(logPath, "{\"event\":\"attached\"}\n", "utf8");
+      const fakeCaller = caller();
+      const storedRun = await fakeCaller.runs.get({ id: "run-with-log" });
+      storedRun.transcript_path = logPath;
+      const h = harness();
+
+      await runPillar14Command("runs", ["attach", "--id", "run-with-log"], { caller: fakeCaller, ...h });
+
+      expect(h.exitCode).toBeUndefined();
+      expect(h.lines).toEqual(["{\"event\":\"attached\"}"]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("notify list --unread --json emits unread notifications", async () => {
@@ -131,6 +239,47 @@ describe("P14#08 generated domain CLI contracts", () => {
     expect(h.lines.map((line) => JSON.parse(line))).toEqual([
       { id: "n-2", read: false, title: "New event" },
     ]);
+  });
+
+  it("notify mark-read, mark-all-read, watch, and mute emit mutation results", async () => {
+    const h = harness();
+    const fakeCaller = caller();
+
+    await runPillar14Command("notify", ["mark-read", "--id", "n-1", "--json"], { caller: fakeCaller, ...h });
+    await runPillar14Command("notify", ["mark-all-read", "--json"], { caller: fakeCaller, ...h });
+    await runPillar14Command("notify", ["watch", "--unread"], { caller: fakeCaller, ...h });
+    await runPillar14Command("notify", [
+      "mute",
+      "--subject-kind",
+      "task",
+      "--subject-id",
+      "task-1",
+      "--muted-until",
+      "2026-01-03T00:00:00.000Z",
+      "--json",
+    ], { caller: fakeCaller, ...h });
+
+    expect(JSON.parse(h.lines[0] as string)).toEqual({ id: "n-1", read: true });
+    expect(JSON.parse(h.lines[1] as string)).toEqual({ updated: 3 });
+    expect(JSON.parse(h.lines[2] as string)).toEqual({ id: "n-2", read: false, title: "New event" });
+    expect(JSON.parse(h.lines[3] as string)).toEqual({
+      subjectKind: "task",
+      subjectId: "task-1",
+      mutedUntil: "2026-01-03T00:00:00.000Z",
+    });
+  });
+
+  it("notify list falls back to an empty result when Notification metadata is absent", async () => {
+    const h = harness();
+    const fakeCaller = caller();
+    fakeCaller.notify.list = async () => {
+      throw new Error("Metadata for entity Notification not found");
+    };
+
+    await runPillar14Command("notify", ["list", "--json"], { caller: fakeCaller, ...h });
+
+    expect(h.exitCode).toBeUndefined();
+    expect(JSON.parse(h.lines[0] as string)).toEqual([]);
   });
 
   it("audit query filters by kind and since", async () => {
@@ -178,6 +327,32 @@ describe("P14#08 generated domain CLI contracts", () => {
     }
   });
 
+  it("audit export normalizes string CSV output and rows-shaped JSON output", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "fulcrum-audit-export-shapes-"));
+    try {
+      const fakeCaller = caller();
+      fakeCaller.audit.export = async (input: { format: "csv" | "json" }) =>
+        input.format === "csv" ? "id\nshape-1" : { rows: [auditEvent] };
+      const csvOut = join(dir, "audit.csv");
+      const jsonOut = join(dir, "audit.json");
+      const h = harness();
+
+      await runPillar14Command("audit", ["export", "--format", "csv", "--output", csvOut], {
+        caller: fakeCaller,
+        ...h,
+      });
+      await runPillar14Command("audit", ["export", "--format", "json", "--output", jsonOut], {
+        caller: fakeCaller,
+        ...h,
+      });
+
+      expect(await readFile(csvOut, "utf8")).toBe("id\nshape-1\n");
+      expect(JSON.parse(await readFile(jsonOut, "utf8"))).toEqual([auditEvent]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("audit retention set emits JSON", async () => {
     const h = harness();
     await runPillar14Command("audit", ["retention", "set", "--days", "90", "--json"], {
@@ -187,6 +362,22 @@ describe("P14#08 generated domain CLI contracts", () => {
 
     expect(h.exitCode).toBeUndefined();
     expect(JSON.parse(h.lines[0] as string)).toEqual({ retainDays: 90 });
+  });
+
+  it("audit retention rejects invalid days and retention without set subaction", async () => {
+    const h = harness();
+    await runPillar14Command("audit", ["retention", "set", "--days", "-1", "--json"], {
+      caller: caller(),
+      ...h,
+    });
+    await runPillar14Command("audit", ["retention", "show"], {
+      caller: caller(),
+      ...h,
+    });
+
+    expect(h.exitCode).toBe(2);
+    expect(JSON.parse(h.lines[0] as string).error.message).toBe("audit retention set: missing --days");
+    expect(h.errLines).toContain("fulcrum audit: unknown command 'retention'");
   });
 
   it("webhooks list emits JSON rows", async () => {
@@ -239,5 +430,15 @@ describe("P14#08 generated domain CLI contracts", () => {
     expect(h.exitCode).toBeUndefined();
     expect(JSON.parse(h.lines[0] as string)).toEqual({ name: "router-llm", enabled: true });
     expect(JSON.parse(h.lines[1] as string)).toEqual([{ name: "router-llm", enabled: true }]);
+  });
+
+  it("flags set rejects non on/off values and unknown commands exit 2", async () => {
+    const h = harness();
+    await runPillar14Command("flags", ["set", "router-llm", "maybe", "--json"], { caller: caller(), ...h });
+    await runPillar14Command("connectors", ["remove", "jira"], { caller: caller(), ...h });
+
+    expect(JSON.parse(h.lines[0] as string).error.message).toBe("flags set: value must be on or off");
+    expect(h.exitCode).toBe(2);
+    expect(h.errLines).toContain("fulcrum connectors: unknown command 'remove'");
   });
 });

@@ -348,8 +348,10 @@ async function resolveCaller(opts: SymphonyRunOptions): Promise<SymphonyCaller> 
   const { t } = await import("@fulcrum/server/trpc/trpc.ts");
   const { appRouter } = await import("@fulcrum/server/trpc/router.ts");
   const { createContext } = await import("@fulcrum/server/trpc/context.ts");
+  const { buildCliTuiCallerContext } = await import("@/application/cli-tui/caller-context.ts");
 
   const container = opts.container ?? null;
+  const cliContext = buildCliTuiCallerContext(container);
   const orgId = opts.orgId ?? DEFAULT_ORG_ID;
   const userId = opts.userId ?? "admin-local-user";
   const factory = t.createCallerFactory(appRouter);
@@ -359,8 +361,8 @@ async function resolveCaller(opts: SymphonyRunOptions): Promise<SymphonyCaller> 
       session: localCliSession(orgId, userId) as never,
       orgId,
       userId,
-      em: null,
-      container,
+      em: cliContext.em,
+      container: cliContext.container,
     }),
   ) as unknown as SymphonyCaller;
 }

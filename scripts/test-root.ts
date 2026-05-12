@@ -3,6 +3,7 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { coverageStats, mergeLcov, renderMergedLcov, type CoverageMap } from "./test-root-coverage.ts";
 
 const ROOTS = ["scripts", "src", "tests"] as const;
 const TEST_FILE = /\.(test|spec)\.(ts|tsx)$/;
@@ -12,9 +13,7 @@ const args = process.argv.slice(2);
 const coverage = args.includes("--coverage") || args.includes("--root-coverage");
 const timeoutMs = coverage ? process.env.FULCRUM_ROOT_TEST_TIMEOUT_MS ?? "30000" : null;
 const coverageBatchSize = Number.parseInt(process.env.FULCRUM_ROOT_TEST_COVERAGE_BATCH_SIZE ?? "3", 10);
-const coverageThreshold = Number.parseFloat(process.env.FULCRUM_ROOT_TEST_COVERAGE_THRESHOLD ?? "0.69");
-
-type CoverageMap = Map<string, Map<number, number>>;
+const coverageThreshold = Number.parseFloat(process.env.FULCRUM_ROOT_TEST_COVERAGE_THRESHOLD ?? "0.80");
 
 async function collect(root: string): Promise<string[]> {
   let entries: string[];
@@ -81,51 +80,6 @@ async function writeCoverageConfig(dir: string, coverageDir: string): Promise<st
   return configPath;
 }
 
-function mergeLcov(target: CoverageMap, lcov: string): void {
-  let currentFile = "";
-  for (const line of lcov.split(/\r?\n/)) {
-    if (line.startsWith("SF:")) {
-      currentFile = line.slice(3);
-      if (!target.has(currentFile)) target.set(currentFile, new Map());
-      continue;
-    }
-    if (!currentFile || !line.startsWith("DA:")) continue;
-    const [lineNumberText, hitsText] = line.slice(3).split(",");
-    const lineNumber = Number.parseInt(lineNumberText ?? "", 10);
-    const hits = Number.parseInt(hitsText ?? "", 10);
-    if (!Number.isFinite(lineNumber) || !Number.isFinite(hits)) continue;
-    const fileLines = target.get(currentFile)!;
-    fileLines.set(lineNumber, Math.max(fileLines.get(lineNumber) ?? 0, hits));
-  }
-}
-
-function renderMergedLcov(coverageMap: CoverageMap): string {
-  const records: string[] = [];
-  for (const [file, lines] of [...coverageMap.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    const sortedLines = [...lines.entries()].sort(([a], [b]) => a - b);
-    const hitLines = sortedLines.filter(([, hits]) => hits > 0).length;
-    records.push("TN:");
-    records.push(`SF:${file}`);
-    for (const [lineNumber, hits] of sortedLines) records.push(`DA:${lineNumber},${hits}`);
-    records.push(`LF:${sortedLines.length}`);
-    records.push(`LH:${hitLines}`);
-    records.push("end_of_record");
-  }
-  return `${records.join("\n")}\n`;
-}
-
-function coverageStats(coverageMap: CoverageMap): { covered: number; total: number; ratio: number } {
-  let total = 0;
-  let covered = 0;
-  for (const lines of coverageMap.values()) {
-    total += lines.size;
-    for (const hits of lines.values()) {
-      if (hits > 0) covered += 1;
-    }
-  }
-  return { covered, total, ratio: total === 0 ? 0 : covered / total };
-}
-
 const batchSize = Number.isFinite(coverageBatchSize) && coverageBatchSize > 0
   ? coverageBatchSize
   : 3;
@@ -138,12 +92,13 @@ try {
     const batchDir = join(tempRoot, `batch-${Math.floor(index / batchSize)}`);
     const configPath = await writeCoverageConfig(batchDir, join(batchDir, "coverage"));
     const code = await runBatch(batch, configPath);
-    if (code !== 0) {
+    const lcovPath = join(batchDir, "coverage", "lcov.info");
+    const lcovPresent = await stat(lcovPath).then((info) => info.isFile(), () => false);
+    if (code !== 0 && !(code === 99 && lcovPresent)) {
       console.error(`test-root: coverage batch failed with exit ${code}: ${batch.join(" ")}`);
       exitCode = code;
       break;
     }
-    const lcovPath = join(batchDir, "coverage", "lcov.info");
     mergeLcov(mergedCoverage, await readFile(lcovPath, "utf8"));
   }
 

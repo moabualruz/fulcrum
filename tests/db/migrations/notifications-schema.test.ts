@@ -25,6 +25,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { createTestOrm } from "../../../src/test-utils/db.ts";
 import { createOrmConfig } from "../../../src/db/mikro-orm.config.ts";
 import { DEFAULT_ORG_ID, SeedService } from "../../../src/db/seed.ts";
+import { Org } from "../../../src/db/entities/auth/Org.ts";
 import {
   NotificationRule,
   Notification,
@@ -343,6 +344,50 @@ describe("Notifications migration: unique constraints", () => {
 // ─── Migration: check constraints ────────────────────────────────────────────
 
 describe("Notifications migration: check constraints", () => {
+  it("NotificationDelivery persists defaults, retry state, payload, and timestamps through MikroORM", async () => {
+    const db = await createOrmWithFullMigration();
+    try {
+      await db.pglite.query(
+        `insert into "users" ("id", "org_id", "email", "role") values ('${TEST_USER_ID}', '${TEST_ORG_ID}', 'delivery-orm@example.com', 'member')`,
+      );
+      const ruleId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+      await db.pglite.query(
+        `insert into "notification_rules" ("id", "org_id", "subject_kind", "active") values ('${ruleId}', '${TEST_ORG_ID}', 'task', true)`,
+      );
+
+      const em = db.orm.em.fork();
+      const org = await em.findOneOrFail(Org, { id: TEST_ORG_ID });
+      const retryAfter = new Date("2026-05-12T12:00:00.000Z");
+      const delivery = em.create(NotificationDelivery, {
+        org,
+        ruleId,
+        userId: TEST_USER_ID,
+        channel: "email",
+        status: DeliveryStatus.Retrying,
+        attemptCount: 2,
+        lastError: "smtp timeout",
+        retryAfter,
+        payload: { subject: "Build failed", severity: "high" },
+      });
+      em.persist(delivery);
+      await em.flush();
+      em.clear();
+
+      const saved = await em.findOneOrFail(NotificationDelivery, {
+        id: delivery.id,
+      });
+      expect(saved.status).toBe(DeliveryStatus.Retrying);
+      expect(saved.attemptCount).toBe(2);
+      expect(saved.lastError).toBe("smtp timeout");
+      expect(saved.notificationId).toBeNull();
+      expect(saved.retryAfter?.toISOString()).toBe(retryAfter.toISOString());
+      expect(saved.payload).toEqual({ subject: "Build failed", severity: "high" });
+      expect(saved.createdAt).toBeInstanceOf(Date);
+    } finally {
+      await db.close();
+    }
+  });
+
   it("notification_deliveries rejects invalid status values", async () => {
     const db = await createOrmWithFullMigration();
     try {

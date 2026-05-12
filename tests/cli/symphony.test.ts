@@ -288,3 +288,240 @@ describe("symphony.run — runs show <runId> --verbose", () => {
     expect(printed.join("\n")).toContain("Fix login flow");
   });
 });
+
+describe("symphony.run — human output and error paths", () => {
+  it("prints candidate runs as a table when --json is omitted", async () => {
+    const { run } = await import("@fulcrum/cli/commands/symphony.ts");
+    const printed: string[] = [];
+
+    await run(["runs", "list", "--state", "ready", "--limit", "2"], {
+      caller: {
+        orchestration: {
+          fetchCandidateIssues: async () => [
+            {
+              id: "10000000-0000-0000-0000-000000000001",
+              identifier: "TASK-1",
+              title: "TASK-1",
+              state: "ready",
+              status: "ready",
+              priority: 7,
+              createdAt: new Date("2026-05-01T00:00:00.000Z"),
+              blockedByIds: [],
+              workflowId: null,
+            },
+          ],
+        },
+      },
+      print: (line: string) => printed.push(line),
+      printErr: (line: string) => {
+        throw new Error(line);
+      },
+      exit: (code: number) => {
+        throw new Error(`unexpected exit ${code}`);
+      },
+    });
+
+    expect(printed).toEqual([
+      "ID                                    STATE  PRIORITY  CREATED_AT",
+      "10000000-0000-0000-0000-000000000001  ready  7         2026-05-01T00:00:00.000Z",
+    ]);
+  });
+
+  it("prints active run states as a table when --json is omitted", async () => {
+    const { run } = await import("@fulcrum/cli/commands/symphony.ts");
+    const printed: string[] = [];
+
+    await run(["runs", "list", "--state", "running"], {
+      caller: {
+        orchestration: {
+          fetchCandidateIssues: async () => [],
+          fetchIssuesByStates: async () => [
+            {
+              id: "20000000-0000-0000-0000-000000000001",
+              state: "running",
+              orchestrationState: "running",
+              task: {
+                id: "task-1",
+                status: "ready",
+                priority: 1,
+                createdAt: new Date("2026-05-01T00:00:00.000Z"),
+                blockedByIds: [],
+                workflowId: null,
+              },
+              startedAt: new Date("2026-05-01T01:00:00.000Z"),
+              attemptCount: 2,
+              nextRetryAt: null,
+              workspacePath: null,
+              lastErrorKind: null,
+            },
+          ],
+        },
+      },
+      print: (line: string) => printed.push(line),
+      printErr: (line: string) => {
+        throw new Error(line);
+      },
+      exit: (code: number) => {
+        throw new Error(`unexpected exit ${code}`);
+      },
+    });
+
+    expect(printed).toEqual([
+      "ID                                    STATE         ATTEMPT  STARTED_AT",
+      "20000000-0000-0000-0000-000000000001  running       2        2026-05-01T01:00:00.000Z",
+    ]);
+  });
+
+  it("exits for invalid list limits before calling orchestration", async () => {
+    const { run } = await import("@fulcrum/cli/commands/symphony.ts");
+    const errors: string[] = [];
+    const exits: number[] = [];
+
+    await run(["runs", "list", "--limit", "0"], {
+      caller: {
+        orchestration: {
+          fetchCandidateIssues: async () => {
+            throw new Error("should not query for invalid limit");
+          },
+        },
+      },
+      print: () => {},
+      printErr: (line: string) => errors.push(line),
+      exit: (code: number) => exits.push(code),
+    });
+
+    expect(errors).toEqual(["fulcrum symphony runs list: --limit must be a positive integer"]);
+    expect(exits).toEqual([1]);
+  });
+
+  it("prints not-found and unavailable-service errors from runs show/list", async () => {
+    const { run } = await import("@fulcrum/cli/commands/symphony.ts");
+    const errors: string[] = [];
+    const exits: number[] = [];
+
+    await run(["runs", "show", "missing-run"], {
+      caller: {
+        orchestration: {
+          fetchCandidateIssues: async () => [],
+          getRun: async () => null,
+        },
+      },
+      print: () => {},
+      printErr: (line: string) => errors.push(line),
+      exit: (code: number) => exits.push(code),
+    });
+    await run(["runs", "list", "--state", "running"], {
+      caller: {
+        orchestration: {
+          fetchCandidateIssues: async () => [],
+        },
+      },
+      print: () => {},
+      printErr: (line: string) => errors.push(line),
+      exit: (code: number) => exits.push(code),
+    });
+
+    expect(errors).toEqual([
+      "fulcrum symphony runs show: run not found 'missing-run'",
+      "fulcrum symphony runs list: Error: orchestration.fetchIssuesByStates is unavailable",
+    ]);
+    expect(exits).toEqual([1, 1]);
+  });
+
+  it("prints non-json run detail with retry metadata and prompt excerpt", async () => {
+    const { run } = await import("@fulcrum/cli/commands/symphony.ts");
+    const printed: string[] = [];
+    const longPrompt = "x".repeat(260);
+
+    await run(["runs", "show", "run-1", "--verbose"], {
+      caller: {
+        orchestration: {
+          fetchCandidateIssues: async () => [],
+          getRun: async () => ({
+            id: "run-1",
+            orchestrationState: "retry_queued",
+            workspacePath: "/tmp/work",
+            renderedPrompt: longPrompt,
+            attemptCount: 4,
+            nextRetryAt: "2026-05-11T10:00:00.000Z",
+            lastErrorKind: "worker_failed",
+          }),
+        },
+      },
+      print: (line: string) => printed.push(line),
+      printErr: (line: string) => {
+        throw new Error(line);
+      },
+      exit: (code: number) => {
+        throw new Error(`unexpected exit ${code}`);
+      },
+    });
+
+    expect(printed.slice(0, 6)).toEqual([
+      "ID     run-1",
+      "STATE  retry_queued",
+      "ATTEMPT  4",
+      "NEXT_RETRY_AT  2026-05-11T10:00:00.000Z",
+      "LAST_ERROR_KIND  worker_failed",
+      "WORKSPACE  /tmp/work",
+    ]);
+    expect(printed).toContain("RENDERED PROMPT");
+    expect(printed.at(-1)).toHaveLength(240);
+    expect(printed.at(-1)?.endsWith("...")).toBe(true);
+  });
+
+  it("prints help and exits 2 for unknown command groups", async () => {
+    const { run } = await import("@fulcrum/cli/commands/symphony.ts");
+    const printed: string[] = [];
+    const errors: string[] = [];
+    const exits: number[] = [];
+    const opts = {
+      print: (line: string) => printed.push(line),
+      printErr: (line: string) => errors.push(line),
+      exit: (code: number) => exits.push(code),
+    };
+
+    await run(["--help"], opts);
+    await run(["unknown"], opts);
+    await run(["runs", "unknown"], opts);
+
+    expect(printed[0]).toContain("fulcrum symphony");
+    expect(errors).toContain("fulcrum symphony: unknown command 'unknown'");
+    expect(errors).toContain("fulcrum symphony runs: unknown command 'unknown'");
+    expect(exits).toEqual([2, 2]);
+  });
+
+  it("reports unsupported or unavailable Linear connector paths", async () => {
+    const { run } = await import("@fulcrum/cli/commands/symphony.ts");
+    const printed: string[] = [];
+    const errors: string[] = [];
+    const exits: number[] = [];
+
+    await run(["connector", "github", "sync"], {
+      print: (line: string) => printed.push(line),
+      printErr: (line: string) => errors.push(line),
+      exit: (code: number) => exits.push(code),
+    });
+    await run(["connector", "linear", "pull"], {
+      print: (line: string) => printed.push(line),
+      printErr: (line: string) => errors.push(line),
+      exit: (code: number) => exits.push(code),
+    });
+    await run(["connector", "linear", "sync", "--json"], {
+      print: (line: string) => printed.push(line),
+      printErr: (line: string) => errors.push(line),
+      exit: (code: number) => exits.push(code),
+    });
+
+    expect(errors).toEqual([
+      "fulcrum symphony connector: unsupported connector 'github'",
+      "fulcrum symphony connector linear: unknown action 'pull'",
+      "Usage: fulcrum symphony connector linear sync [--json]",
+    ]);
+    expect(JSON.parse(printed.at(-1) as string)).toEqual({
+      ok: false,
+      error: "Linear connector not available. Set FULCRUM_FEATURES=connector-linear and LINEAR_API_KEY.",
+    });
+    expect(exits).toEqual([2, 2, 1]);
+  });
+});

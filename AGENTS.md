@@ -32,7 +32,7 @@ Layers foundation prep for. **Not built yet** — do not assume exist or write c
 - **Context engine** — selecting + assembling what each run sees, beyond existing rules splice.
 - **Memory** — persistent facts, decisions, references across sessions.
 - **Artifacts** — outputs of runs (diffs, plans, reports) tracked, addressable, queryable.
-- **Plugins / extensions** — generic `fulcrum plugins …` UX for third-party drop-ins. Package-specific lifecycle mirroring already exists for Caveman, Repomix, Cloudflare, and Superpowers.
+- **Plugins / extensions** — generic `fulcrum plugins …` UX for third-party drop-ins. Package-specific lifecycle mirroring already exists for Caveman, Cloudflare, and Superpowers.
 
 ## Skill namespacing — the `fulcrum:` prefix
 

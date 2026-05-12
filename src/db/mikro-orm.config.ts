@@ -40,6 +40,12 @@ import { Sprint } from "./entities/tasks/Sprint.ts";
 import { MetricsCache } from "./entities/tasks/MetricsCache.ts";
 import { CustomFieldDef } from "./entities/tasks/CustomFieldDef.ts";
 import { SavedView } from "./entities/tasks/SavedView.ts";
+import { TaskTemplate } from "./entities/tasks/TaskTemplate.ts";
+import { TaskRecurrenceRule } from "./entities/tasks/TaskRecurrenceRule.ts";
+import { TaskRelationship } from "./entities/tasks/TaskRelationship.ts";
+import { TaskWatcher } from "./entities/tasks/TaskWatcher.ts";
+import { ProjectAutomation } from "./entities/tasks/ProjectAutomation.ts";
+import { FieldDependencyRule } from "./entities/tasks/FieldDependencyRule.ts";
 import { Document } from "./entities/docs/Document.ts";
 import { DocLink } from "./entities/docs/DocLink.ts";
 import { DocVersion } from "./entities/docs/DocVersion.ts";
@@ -70,6 +76,7 @@ import { ConnectorCredential } from "./entities/settings/index.ts";
 import { CasbinRule } from "./entities/flags/CasbinRule.ts";
 import { WebhookSubscription } from "./entities/flags/WebhookSubscription.ts";
 import { Notification } from "./entities/notifications/Notification.ts";
+import { NotificationDelivery } from "./entities/notifications/NotificationDelivery.ts";
 import { NotificationRule } from "./entities/notifications/NotificationRule.ts";
 
 // Webhook entities (P13#07).
@@ -112,6 +119,12 @@ export {
   MetricsCache,
   CustomFieldDef,
   SavedView,
+  TaskTemplate,
+  TaskRecurrenceRule,
+  TaskRelationship,
+  TaskWatcher,
+  ProjectAutomation,
+  FieldDependencyRule,
   Document,
   DocLink,
   DocVersion,
@@ -148,6 +161,7 @@ export {
   CasbinRule,
   WebhookSubscription,
   Notification,
+  NotificationDelivery,
   NotificationRule,
   Webhook,
   WebhookDelivery,
@@ -218,6 +232,12 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     MetricsCache,
     CustomFieldDef,
     SavedView,
+    TaskTemplate,
+    TaskRecurrenceRule,
+    TaskRelationship,
+    TaskWatcher,
+    ProjectAutomation,
+    FieldDependencyRule,
     Document,
     DocLink,
     DocVersion,
@@ -254,6 +274,7 @@ export function createOrmConfig(opts: OrmConfigOptions = {}): Options {
     CasbinRule,
     WebhookSubscription,
     Notification,
+    NotificationDelivery,
     NotificationRule,
     Webhook,
     WebhookDelivery,

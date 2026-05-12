@@ -178,6 +178,22 @@ describe("keyringHealthCheck — platform.keyring", () => {
 // ─── CLI: fulcrum secrets init-keyring ────────────────────────────────────────
 
 describe("runSecretsInitKeyring", () => {
+  it("prints help without loading the native adapter", async () => {
+    const lines: string[] = [];
+    let loaderCalled = false;
+    await runSecretsInitKeyring(["--help"], {
+      print: (l) => lines.push(l),
+      printErr: () => {},
+      exit: () => {},
+      loaderFactory: async () => {
+        loaderCalled = true;
+        throw new Error("should not load");
+      },
+    });
+    expect(loaderCalled).toBe(false);
+    expect(lines.join("\n")).toContain("fulcrum secrets init-keyring");
+  });
+
   it("prints success when native adapter loads", async () => {
     const lines: string[] = [];
     const mockAdapter = { getPassword: async () => null, setPassword: async () => {} };

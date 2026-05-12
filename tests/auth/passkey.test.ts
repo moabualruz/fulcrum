@@ -6,7 +6,9 @@ import { PGliteKyselyDialect } from "../../src/db/PGliteKyselyDriver.ts";
 import { Account } from "../../src/db/entities/auth/Account.ts";
 import { Verification } from "../../src/db/entities/auth/Verification.ts";
 import {
+  checkPasskeyAvailability,
   generateAuthenticationOptions,
+  generatePasskeyRegistrationOptions,
   generateRegistrationOptions,
   MikroOrmPasskeyStore,
   verifyAuthenticationResponse,
@@ -240,6 +242,63 @@ describe("passkey WebAuthn helpers", () => {
 
     expect(result).toMatchObject({ verified: true, credentialId: "AQIDBA" });
     expect(lastRegistrationVerifyOptions?.["requireUserVerification"]).toBe(false);
+  });
+
+  test("checkPasskeyAvailability enforces secure origins before loading WebAuthn", async () => {
+    expect(await checkPasskeyAvailability("http://example.com")).toBe(false);
+    expect(await checkPasskeyAvailability("http://localhost:5173")).toBe(true);
+    expect(await checkPasskeyAvailability("https://app.example.com")).toBe(true);
+  });
+
+  test("legacy generatePasskeyRegistrationOptions returns expected challenge and duplicate exclusions", async () => {
+    const result = await generatePasskeyRegistrationOptions({
+      userId: "user-legacy",
+      userName: "legacy@example.com",
+      userDisplayName: "Legacy User",
+      rpName: "Fulcrum Test",
+      rpId: "localhost",
+      excludeCredentialIds: ["credential-a", "credential-b"],
+    });
+
+    expect(result.expectedChallenge).toBe("registration-challenge");
+    expect(result.options).toMatchObject({
+      rpName: "Fulcrum Test",
+      rpID: "localhost",
+      userName: "legacy@example.com",
+      userDisplayName: "Legacy User",
+      timeout: 60_000,
+      attestationType: "none",
+      excludeCredentials: [
+        { id: "credential-a", type: "public-key" },
+        { id: "credential-b", type: "public-key" },
+      ],
+    });
+  });
+
+  test("verifyPasskeyRegistration returns unverified when WebAuthn registration rejects the ceremony", async () => {
+    registrationVerified = false;
+
+    const result = await verifyPasskeyRegistration({
+      response: { id: "client-credential" },
+      expectedChallenge: "registration-challenge",
+      expectedOrigin: "http://localhost:5173",
+      rpId: "localhost",
+    });
+
+    expect(result).toEqual({ verified: false });
+  });
+
+  test("verifyRegistrationResponse fails before WebAuthn verification when registration challenge is missing", async () => {
+    const store = new MemoryPasskeyStore();
+
+    await expect(verifyRegistrationResponse({
+      store,
+      userId: "missing-user",
+      response: { id: "client-credential" },
+      expectedOrigin: "http://localhost:5173",
+      rpId: "localhost",
+    })).rejects.toThrow("Passkey registration challenge not found");
+    expect(lastRegistrationVerifyOptions).toBeNull();
   });
 
   test("verifyRegistrationResponse uses one scoped store for challenge save and cleanup", async () => {

@@ -34,6 +34,12 @@ export class Migration20260502090300_sprints_schema extends Migration {
       `create unique index if not exists "sprints_one_active_per_project" on "sprints" ("project_id") where "status" = 'active'`,
     );
     this.addSql(
+      `create table if not exists "event_handler_log" ("event_id" uuid not null, "handler" text not null, "handled_at" timestamptz not null default now(), primary key ("event_id", "handler"))`,
+    );
+    this.addSql(
+      `do $$ begin if to_regclass('public.events') is not null and not exists (select 1 from pg_constraint where conname = 'event_handler_log_event_id_foreign') then alter table "event_handler_log" add constraint "event_handler_log_event_id_foreign" foreign key ("event_id") references "events" ("id") on delete cascade; end if; end $$`,
+    );
+    this.addSql(
       `do $$ begin if to_regclass('public.tasks') is not null and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'tasks' and column_name = 'sprint_id') and not exists (select 1 from pg_constraint where conname = 'tasks_sprint_id_foreign') then alter table "tasks" add constraint "tasks_sprint_id_foreign" foreign key ("sprint_id") references "sprints" ("id") on delete set null; end if; end $$`,
     );
   }
@@ -42,6 +48,7 @@ export class Migration20260502090300_sprints_schema extends Migration {
     this.addSql(
       `alter table "tasks" drop constraint if exists "tasks_sprint_id_foreign"`,
     );
+    this.addSql(`drop table if exists "event_handler_log" cascade`);
     this.addSql(`drop index if exists "sprints_one_active_per_project"`);
     this.addSql(`drop index if exists "sprints_org_project_status"`);
     this.addSql(`drop table if exists "sprints" cascade`);

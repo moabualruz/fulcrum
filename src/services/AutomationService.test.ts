@@ -31,6 +31,8 @@ function makeEm(
 // We need to import after defining mocks
 import { AutomationService } from "./AutomationService.ts";
 import type { EventBus } from "../subscriptions/event-bus.ts";
+import { createTestOrm } from "../test-utils/db.ts";
+import { Org } from "../db/entities/auth/Org.ts";
 
 function makeEventBus(): EventBus {
   return {
@@ -235,6 +237,87 @@ describe("AutomationService", () => {
       const result = await service.list("org-1", "proj-1");
       expect(result).toHaveLength(1);
       expect(result[0]?.id).toBe("auto-1");
+    });
+
+    it("persists, updates, lists, and deletes automations through the real database", async () => {
+      const testDb = await createTestOrm();
+      try {
+        const em = testDb.em.fork();
+        const org = em.create(Org, {
+          slug: "automation-real-org",
+          name: "Automation Real Org",
+        });
+        em.persist(org);
+        await em.flush();
+        const projectId = "11111111-2222-4333-8444-555555555555";
+        const service = new AutomationService(em, makeEventBus());
+
+        const created = await service.create(org.id, {
+          projectId,
+          name: "Move urgent work",
+          triggerType: "task.created",
+          triggerConfig: { inheritance: { scope: "children", locked: true } },
+          condition: { field: "priority", operator: "equals", value: "urgent" },
+          actionType: "set_status",
+          actionConfig: { status: "in_progress" },
+        });
+
+        expect(created).toMatchObject({
+          orgId: org.id,
+          projectId,
+          name: "Move urgent work",
+          triggerType: "task.created",
+          triggerConfig: { inheritance: { scope: "children", locked: true } },
+          condition: { field: "priority", operator: "equals", value: "urgent" },
+          actionType: "set_status",
+          actionConfig: { status: "in_progress" },
+          enabled: true,
+          executionCount: 0,
+        });
+        expect(created.id).toMatch(/^[0-9a-f-]{36}$/);
+        expect(created.createdAt).toBeInstanceOf(Date);
+
+        const listed = await service.list(org.id, projectId);
+        expect(listed.map((automation) => automation.id)).toEqual([created.id]);
+
+        const updated = await service.update(org.id, {
+          id: created.id,
+          name: "Move critical work",
+          triggerConfig: null,
+          condition: null,
+          actionType: "add_comment",
+          actionConfig: { status: "review" },
+          enabled: false,
+        });
+        expect(updated).toMatchObject({
+          id: created.id,
+          name: "Move critical work",
+          triggerType: "task.created",
+          triggerConfig: {},
+          condition: null,
+          actionType: "add_comment",
+          actionConfig: { status: "review" },
+          enabled: false,
+        });
+
+        const afterUpdate = await service.list(org.id, projectId);
+        expect(afterUpdate).toHaveLength(1);
+        expect(afterUpdate[0]).toMatchObject({
+          id: created.id,
+          name: "Move critical work",
+          enabled: false,
+        });
+
+        expect(await service.update(org.id, {
+          id: "11111111-1111-4111-8111-111111111111",
+          name: "Missing",
+        })).toBeNull();
+        expect(await service.delete(org.id, "11111111-1111-4111-8111-111111111111")).toBeNull();
+        expect(await service.delete(org.id, created.id)).toEqual({ deleted: true });
+        expect(await service.list(org.id, projectId)).toEqual([]);
+      } finally {
+        await testDb.close();
+      }
     });
   });
 });

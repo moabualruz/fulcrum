@@ -377,10 +377,10 @@ export class AutomationService {
       projectId: input.projectId,
       name: input.name,
       triggerType: input.triggerType,
-      triggerConfig: input.triggerConfig ?? null,
+      triggerConfig: input.triggerConfig ?? {},
       condition: input.condition ?? null,
       actionType: input.actionType,
-      actionConfig: input.actionConfig ?? null,
+      actionConfig: input.actionConfig ?? {},
       enabled: true,
       executionCount: 0,
       createdAt: new Date(),
@@ -409,10 +409,10 @@ export class AutomationService {
 
     if (input.name !== undefined) automation.name = input.name;
     if (input.triggerType !== undefined) automation.triggerType = input.triggerType;
-    if (input.triggerConfig !== undefined) automation.triggerConfig = input.triggerConfig;
+    if (input.triggerConfig !== undefined) automation.triggerConfig = input.triggerConfig ?? {};
     if (input.condition !== undefined) automation.condition = input.condition;
     if (input.actionType !== undefined) automation.actionType = input.actionType;
-    if (input.actionConfig !== undefined) automation.actionConfig = input.actionConfig;
+    if (input.actionConfig !== undefined) automation.actionConfig = input.actionConfig ?? {};
     if (input.enabled !== undefined) automation.enabled = input.enabled;
     automation.updatedAt = new Date();
 

@@ -118,7 +118,7 @@ export class RecurrenceService {
     };
 
     const rule = this.em.create(TaskRecurrenceRule, {
-      org: { id: orgId },
+      org: this.em.getReference(Org, orgId),
       sourceTaskId,
       triggerType: config.triggerType,
       cronExpression: config.cronExpression ?? null,

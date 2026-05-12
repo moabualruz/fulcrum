@@ -155,7 +155,7 @@ async function pendingMigrations(migrator: MigratorCompat): Promise<MigrationInf
 
 async function verifyMigrationCompatibility(
   orm: MikroORM,
-  container: Container,
+  _container: Container,
 ): Promise<void> {
   const pending = await pendingMigrations(orm.migrator as MigratorCompat);
   if (pending.length > 0) {
@@ -163,7 +163,9 @@ async function verifyMigrationCompatibility(
     throw new Error(`migrations pending: ${names}. Run \`fulcrum db migrate\` before \`fulcrum web\`.`);
   }
 
-  const schemaMigrationRepo = container.get(SchemaMigrationRepository);
+  const compatibilityContainer = new Container();
+  registerDbBindings(compatibilityContainer, orm, orm.em.fork());
+  const schemaMigrationRepo = compatibilityContainer.get(SchemaMigrationRepository);
   const binaryCheck = await dbCanRunOnCurrentBinary(schemaMigrationRepo);
   if (binaryCheck.status === "fail") {
     throw new Error(binaryCheck.detail);
@@ -178,90 +180,98 @@ async function exists(path: string): Promise<boolean> {
 
 async function runWeb(_argv: readonly string[]): Promise<void> {
   const { container, cleanup } = await buildDbContainer();
-  console.log("MikroORM initialized");
-  console.log("needle-di container ready");
+  let cleanupOnStartupFailure = true;
 
-  const orm = container.get(MikroORM);
-  await verifyMigrationCompatibility(orm, container);
+  try {
+    console.log("MikroORM initialized");
+    console.log("needle-di container ready");
 
-  const outputRoot = join(process.cwd(), "apps", "web", ".svelte-kit", "output");
-  const serverIndex = join(outputRoot, "server", "index.js");
-  const manifestPath = join(outputRoot, "server", "manifest.js");
-  const clientRoot = join(outputRoot, "client");
+    const orm = container.get(MikroORM);
+    await verifyMigrationCompatibility(orm, container);
 
-  if (!(await exists(serverIndex)) || !(await exists(manifestPath))) {
-    await cleanup();
-    throw new Error("web build missing. Run `bun --cwd apps/web run build` before `fulcrum web`.");
-  }
+    const outputRoot = join(process.cwd(), "apps", "web", ".svelte-kit", "output");
+    const serverIndex = join(outputRoot, "server", "index.js");
+    const manifestPath = join(outputRoot, "server", "manifest.js");
+    const clientRoot = join(outputRoot, "client");
 
-  const [{ Server }, { manifest }] = await Promise.all([
-    import(pathToFileURL(serverIndex).href) as Promise<{
-      Server: new (manifest: unknown) => {
-        init(opts: {
-          env: Record<string, string | undefined>;
-          read: (file: string) => ReadableStream<Uint8Array>;
-        }): Promise<void>;
-        respond(request: Request, options: {
-          platform: Record<string, never>;
-          getClientAddress: () => string;
-        }): Promise<Response>;
-      };
-    }>,
-    import(pathToFileURL(manifestPath).href) as Promise<{ manifest: unknown }>,
-  ]);
+    if (!(await exists(serverIndex)) || !(await exists(manifestPath))) {
+      throw new Error("web build missing. Run `bun --cwd apps/web run build` before `fulcrum web`.");
+    }
 
-  const server = new Server(manifest);
-  await server.init({
-    env: process.env,
-    read: (file: string) => {
-      const assetPath = resolveClientAssetPath(clientRoot, file);
-      if (!assetPath) throw new Error(`invalid client asset path: ${file}`);
-      return Bun.file(assetPath).stream();
-    },
-  });
-
-  const port = Number(process.env["PORT"] ?? "3000");
-  const listener = Bun.serve({
-    port,
-    async fetch(request) {
-      const url = new URL(request.url);
-      const pathname = url.pathname;
-      if (pathname !== "/" && !pathname.endsWith("/")) {
-        const assetPath = resolveClientAssetPath(clientRoot, pathname);
-        if (!assetPath) return new Response("Not found", { status: 404 });
-        const asset = Bun.file(assetPath);
-        if (await asset.exists()) return new Response(asset);
-      }
-
-      return server.respond(request, {
-        platform: {},
-        getClientAddress: () => "127.0.0.1",
-      });
-    },
-  });
-
-  const [{ DEFAULT_ORG_ID }, { WorkflowConfigSchema }, { startSymphonyOrchestrator }] =
-    await Promise.all([
-      import("@/db/seed.ts"),
-      import("@/orchestration/symphony/schemas.ts"),
-      import("@/orchestration/symphony/orchestrator.ts"),
+    const [{ Server }, { manifest }] = await Promise.all([
+      import(pathToFileURL(serverIndex).href) as Promise<{
+        Server: new (manifest: unknown) => {
+          init(opts: {
+            env: Record<string, string | undefined>;
+            read: (file: string) => ReadableStream<Uint8Array>;
+          }): Promise<void>;
+          respond(request: Request, options: {
+            platform: Record<string, never>;
+            getClientAddress: () => string;
+          }): Promise<Response>;
+        };
+      }>,
+      import(pathToFileURL(manifestPath).href) as Promise<{ manifest: unknown }>,
     ]);
-  const symphony = startSymphonyOrchestrator(
-    orm.em,
-    DEFAULT_ORG_ID,
-    WorkflowConfigSchema.parse({}),
-  );
 
-  console.log(`Web server listening on http://localhost:${listener.port}`);
-  await new Promise<void>((resolve) => {
-    const stop = () => resolve();
-    process.once("SIGINT", stop);
-    process.once("SIGTERM", stop);
-  }).finally(async () => {
-    symphony.stop();
-    listener.stop(true);
-    await cleanup();
-  });
+    const server = new Server(manifest);
+    await server.init({
+      env: process.env,
+      read: (file: string) => {
+        const assetPath = resolveClientAssetPath(clientRoot, file);
+        if (!assetPath) throw new Error(`invalid client asset path: ${file}`);
+        return Bun.file(assetPath).stream();
+      },
+    });
+
+    const port = Number(process.env["PORT"] ?? "3000");
+    const listener = Bun.serve({
+      port,
+      async fetch(request) {
+        const url = new URL(request.url);
+        const pathname = url.pathname;
+        if (pathname !== "/" && !pathname.endsWith("/")) {
+          const assetPath = resolveClientAssetPath(clientRoot, pathname);
+          if (!assetPath) return new Response("Not found", { status: 404 });
+          const asset = Bun.file(assetPath);
+          if (await asset.exists()) return new Response(asset);
+        }
+
+        return server.respond(request, {
+          platform: {},
+          getClientAddress: () => "127.0.0.1",
+        });
+      },
+    });
+
+    const [{ DEFAULT_ORG_ID }, { WorkflowConfigSchema }, { startSymphonyOrchestrator }] =
+      await Promise.all([
+        import("@/db/seed.ts"),
+        import("@/orchestration/symphony/schemas.ts"),
+        import("@/orchestration/symphony/orchestrator.ts"),
+      ]);
+    const symphony = startSymphonyOrchestrator(
+      orm.em,
+      DEFAULT_ORG_ID,
+      WorkflowConfigSchema.parse({}),
+    );
+
+    cleanupOnStartupFailure = false;
+    console.log(`Web server listening on http://localhost:${listener.port}`);
+    await new Promise<void>((resolve) => {
+      const stop = () => resolve();
+      process.once("SIGINT", stop);
+      process.once("SIGTERM", stop);
+    }).finally(async () => {
+      symphony.stop();
+      listener.stop(true);
+      await cleanup();
+    });
+  } finally {
+    if (cleanupOnStartupFailure) {
+      await cleanup();
+    }
+  }
 }
 
 export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<void> {
@@ -613,14 +623,16 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       process.exit(2);
     }
     case "secrets": {
-      const [{ runSecrets, runSecretsInitKeyring }, { createLocalCaller }] = await Promise.all([
-        import("./commands/cross-cutting-platform.ts"),
-        import("./local-caller.ts"),
-      ]);
+      const { runSecrets, runSecretsInitKeyring } = await import("./commands/cross-cutting-platform.ts");
+      if (rest[0] === "help" || rest[0] === "--help" || rest[0] === "-h") {
+        await runSecrets(rest);
+        return;
+      }
       if (rest[0] === "init-keyring") {
         await runSecretsInitKeyring(rest.slice(1));
         return;
       }
+      const { createLocalCaller } = await import("./local-caller.ts");
       const { container, cleanup } = await buildDbContainer();
       try {
         await runSecrets(rest, { caller: await createLocalCaller({ container }) });

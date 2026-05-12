@@ -116,4 +116,54 @@ describe("Phase 09.6 work item model and relationship hub", () => {
     expect(views.items.map((item) => item.id).sort()).toEqual([child.id, epic.id, story.id].sort());
     expect(views.trace.scope.projectId).toBe(PROJECT_A_ID);
   });
+
+  test("task detail loads current edge schema, child rows, events, and bulk mutations", async () => {
+    const testDb = await freshDb();
+    const em = testDb.em.fork();
+    const parent = await createTask(em, projectCtx(PROJECT_A_ID), {
+      title: "Parent task",
+      taskType: "task",
+      status: "todo",
+    });
+    const child = await createTask(em, projectCtx(PROJECT_A_ID), {
+      title: "Child task",
+      taskType: "subtask",
+      parentId: parent.id,
+      status: "todo",
+    });
+    const linkedDocId = "44444444-4444-4444-8444-444444444444";
+    await testDb.pglite.query(
+      `insert into edges (org_id, from_kind, from_id, to_kind, to_id, kind)
+       values ($1, 'task', $2, 'doc', $3, 'references')`,
+      [DEFAULT_ORG_ID, parent.id, linkedDocId],
+    );
+
+    const detail = await taskDetail.getTaskDetail(em, parent.id, DEFAULT_ORG_ID);
+    expect(detail?.task.id).toBe(parent.id);
+    expect(detail?.subtasks.map((row) => row.id)).toEqual([child.id]);
+    expect(detail?.edges).toMatchObject([
+      {
+        from_kind: "task",
+        from_id: parent.id,
+        to_kind: "doc",
+        to_id: linkedDocId,
+        rel: "references",
+      },
+    ]);
+    expect(detail?.events.some((event) => event.verb === "created")).toBe(true);
+
+    await expect(taskDetail.getTaskDetail(em, "55555555-5555-4555-8555-555555555555", DEFAULT_ORG_ID)).resolves.toBeNull();
+    await expect(taskDetail.bulkUpdateStatus(em, [parent.id, child.id], "bogus" as never, DEFAULT_ORG_ID)).rejects.toThrow("invalid status");
+    expect(await taskDetail.bulkUpdateStatus(em, [], "completed", DEFAULT_ORG_ID)).toEqual({ updated: 0 });
+    expect(await taskDetail.bulkUpdateStatus(em, [parent.id, child.id], "completed", DEFAULT_ORG_ID)).toEqual({ updated: 2 });
+    expect(await taskDetail.bulkDeleteTasks(em, [], DEFAULT_ORG_ID)).toEqual({ deleted: 0 });
+    expect(await taskDetail.bulkDeleteTasks(em, [parent.id, child.id], DEFAULT_ORG_ID)).toEqual({ deleted: 2 });
+
+    const events = await testDb.pglite.query<{ rows: Array<{ verb: string }> }>(
+      `select verb from events where subject_id in ($1, $2) order by created_at asc`,
+      [parent.id, child.id],
+    );
+    expect(events.rows.map((row) => row.verb)).toContain("status_changed");
+    expect(events.rows.map((row) => row.verb)).toContain("deleted");
+  });
 });

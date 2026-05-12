@@ -459,6 +459,52 @@ describe("inference tRPC router", () => {
     ]);
   });
 
+  test("backend discovery reflects feature flags and configured active backend without bound client", async () => {
+    const previousFeatures = process.env["FULCRUM_FEATURES"];
+    const previousBackend = process.env["FULCRUM_INFERENCE_BACKEND"];
+    process.env["FULCRUM_FEATURES"] = "embeddings,router-llm,external-llm-provider";
+    process.env["FULCRUM_INFERENCE_BACKEND"] = "openai-compatible";
+    try {
+      const caller = createCaller(null, false);
+
+      await expect(caller.inference.backends.list()).resolves.toEqual([
+        { id: "embedded", available: true, active: false, reason: null },
+        { id: "ollama", available: true, active: false, reason: null },
+        { id: "lm-studio", available: true, active: false, reason: null },
+        { id: "openai-compatible", available: true, active: true, reason: null },
+      ]);
+    } finally {
+      if (previousFeatures === undefined) delete process.env["FULCRUM_FEATURES"];
+      else process.env["FULCRUM_FEATURES"] = previousFeatures;
+      if (previousBackend === undefined) delete process.env["FULCRUM_INFERENCE_BACKEND"];
+      else process.env["FULCRUM_INFERENCE_BACKEND"] = previousBackend;
+    }
+  });
+
+  test("config and provider mutations persist routing and provider environment", async () => {
+    const previousUrl = process.env["FULCRUM_INFERENCE_URL"];
+    const previousKey = process.env["FULCRUM_INFERENCE_API_KEY"];
+    try {
+      const caller = createCaller();
+
+      await expect(caller.inference.config.set({ feature: "embeddings", backend: "embedded" }))
+        .resolves.toEqual({ ok: true });
+      await expect(caller.inference.config.get()).resolves.toMatchObject({ embeddings: "embedded" });
+
+      await expect(caller.inference.provider.set({
+        url: "https://llm.example.test/v1",
+        key: "sk-test",
+      })).resolves.toEqual({ ok: true });
+      expect(process.env["FULCRUM_INFERENCE_URL"]).toBe("https://llm.example.test/v1");
+      expect(process.env["FULCRUM_INFERENCE_API_KEY"]).toBe("sk-test");
+    } finally {
+      if (previousUrl === undefined) delete process.env["FULCRUM_INFERENCE_URL"];
+      else process.env["FULCRUM_INFERENCE_URL"] = previousUrl;
+      if (previousKey === undefined) delete process.env["FULCRUM_INFERENCE_API_KEY"];
+      else process.env["FULCRUM_INFERENCE_API_KEY"] = previousKey;
+    }
+  });
+
   test("non-backend procedures without a container resolve the default client lazily", async () => {
     const caller = createCaller(null, false);
 

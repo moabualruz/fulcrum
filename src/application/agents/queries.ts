@@ -107,7 +107,7 @@ export async function getAgentProfilePageData(
     started_at: string | Date;
     ended_at: string | Date | null;
   }>>(
-    `SELECT id, status, started_at, ended_at
+    `SELECT id, status, started_at, NULL::timestamptz AS ended_at
        FROM agent_runs
       WHERE org_id = $1 AND agent_name = $2
       ORDER BY started_at DESC
@@ -139,19 +139,25 @@ export async function upsertProfileAction(
   input: UpsertProfileInput,
 ): Promise<{ id: string }> {
   const id = randomUUID();
-  const conn = ormSqlConnection(em);
-  const rows = await conn.execute<{ id: string }[]>(
-    `INSERT INTO agent_profiles (id, org_id, name, cli_path, default_flags, auth_env_vars)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     ON CONFLICT (org_id, name) DO UPDATE
-       SET cli_path = EXCLUDED.cli_path,
-           default_flags = EXCLUDED.default_flags,
-           auth_env_vars = EXCLUDED.auth_env_vars,
-           updated_at = now()
-     RETURNING id`,
-    [id, orgId, input.name, input.cliPath, input.defaultFlags, JSON.stringify(input.authEnvVars)],
-  );
-  return { id: rows[0]!.id };
+  const rows = await em.getKysely<any>()
+    .insertInto("agent_profiles")
+    .values({
+      id,
+      org_id: orgId,
+      name: input.name,
+      cli_path: input.cliPath,
+      default_flags: [input.defaultFlags].filter(Boolean),
+      auth_env_vars: input.authEnvVars,
+    })
+    .onConflict((oc) => oc.columns(["org_id", "name"]).doUpdateSet({
+      cli_path: input.cliPath,
+      default_flags: [input.defaultFlags].filter(Boolean),
+      auth_env_vars: input.authEnvVars,
+      updated_at: new Date(),
+    }))
+    .returning("id")
+    .execute();
+  return { id: String(rows[0]!.id) };
 }
 
 export async function testProfileAction(

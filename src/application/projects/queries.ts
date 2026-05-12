@@ -139,8 +139,11 @@ export async function resolveProjectIdByKey(
   projectKey: string | null,
 ): Promise<string | null> {
   if (!projectKey) return null;
+  const idPredicate = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(projectKey)
+    ? " OR id = $2"
+    : "";
   const rows = await ormSqlConnection(em).execute<Array<{ id: string }>>(
-    `SELECT id FROM projects WHERE org_id = $1 AND (id = $2 OR slug = $2) LIMIT 1`,
+    `SELECT id FROM projects WHERE org_id = $1 AND (slug = $2${idPredicate}) LIMIT 1`,
     [ctx.orgId, projectKey],
   );
   return rows[0]?.id ?? null;
@@ -376,12 +379,16 @@ export async function loadProjectGantt(
 
   let relationships: TaskRelationshipDto[] = [];
   try {
+    const relationshipColumns = await taskRelationshipColumns(em);
+    const relationshipDeletedPredicate = relationshipColumns.has("deleted_at")
+      ? "AND (r.deleted_at IS NULL OR r.deleted_at > now())"
+      : "";
     const rows = await conn.execute<Array<{ id: string; source_task_id: string; target_task_id: string; type: string }>>(
       `SELECT r.id, r.source_task_id, r.target_task_id, r.type
          FROM task_relationships r
          INNER JOIN tasks t ON t.id = r.source_task_id
         WHERE t.project_id = $1
-          AND (r.deleted_at IS NULL OR r.deleted_at > now())`,
+          ${relationshipDeletedPredicate}`,
       [projectId],
     );
     relationships = rows.map((row) => ({
@@ -416,6 +423,16 @@ async function projectColumns(em: EntityManager): Promise<Set<string>> {
     .select(["column_name"])
     .where("table_schema", "=", "public")
     .where("table_name", "=", "projects")
+    .execute() as Array<{ column_name: string }>;
+  return new Set(rows.map((row) => row.column_name));
+}
+
+async function taskRelationshipColumns(em: EntityManager): Promise<Set<string>> {
+  const rows = await em.getKysely<any>()
+    .selectFrom("information_schema.columns")
+    .select(["column_name"])
+    .where("table_schema", "=", "public")
+    .where("table_name", "=", "task_relationships")
     .execute() as Array<{ column_name: string }>;
   return new Set(rows.map((row) => row.column_name));
 }

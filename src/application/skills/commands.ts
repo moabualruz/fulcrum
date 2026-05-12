@@ -95,9 +95,11 @@ async function recordLockOverrideAudit(
     if (!org) return;
     const event = auditEm.create(Event, {
       org,
+      actor: "system",
       verb: "lock_override",
+      subjectKind: "skill",
       subjectId: `${input.slug}:${input.expectedSha256}->${input.actualSha256}`,
-      metadata: {
+      payload: {
         slug: input.slug,
         expectedSha256: input.expectedSha256,
         actualSha256: input.actualSha256,

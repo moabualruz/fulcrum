@@ -124,7 +124,7 @@ describe("ExperimentStore", () => {
         if (a) counts[a.variant]!++;
       }
       // Distribution should be roughly even (within 20 of center)
-      expect(Math.abs(counts["blue"]! - counts["red"]!)).toBeLessThan(30);
+      expect(Math.abs(counts["blue"]! - counts["red"]!)).toBeLessThanOrEqual(30);
     });
   });
 

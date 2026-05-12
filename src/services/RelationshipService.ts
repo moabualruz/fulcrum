@@ -259,7 +259,7 @@ export class RelationshipService {
             org: { id: orgId },
             taskId: targetTaskId,
             userId: watcher.userId,
-            source: "duplicate_merge",
+            source: "manual",
           } as never);
           this.em.persist(newWatcher);
     await this.em.flush();

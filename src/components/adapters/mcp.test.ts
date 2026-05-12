@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { BUILTIN_MCPS } from "@fulcrum/cli/mcp-builtins.ts";
 import { loadRegistry } from "@fulcrum/cli/mcp-registry.ts";
 import type { ComponentAction } from "../types.ts";
 import { applyMcpAction, registerBuiltinMcpByName } from "./mcp.ts";
@@ -160,7 +161,10 @@ describe("applyMcpAction", () => {
     );
 
     const reg = await loadRegistry();
-    expect(Object.keys(reg.servers)).toHaveLength(17);
+    expect(Object.keys(reg.servers)).toHaveLength(BUILTIN_MCPS.length);
+    for (const { name } of BUILTIN_MCPS) {
+      expect(reg.servers[name]).toBeDefined();
+    }
     expect(reg.servers["deepwiki"]?.url).toBe("https://mcp.deepwiki.com/mcp");
 
     const codexToml = await readFile(join(tmp, ".codex", "config.toml"), "utf8");

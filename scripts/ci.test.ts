@@ -79,7 +79,7 @@ describe("ci STEPS — Phase 02 stable web gates", () => {
   it("declares smoke and full e2e scripts in the web package", () => {
     expect(webPackageJson.scripts).toMatchObject({
       "web:e2e:smoke": "playwright test tests/e2e/_smoke.spec.ts",
-      "web:e2e:full": "playwright test tests/e2e/",
+      "web:e2e:full": "playwright test tests/e2e/ --workers=1",
     });
   });
 });
