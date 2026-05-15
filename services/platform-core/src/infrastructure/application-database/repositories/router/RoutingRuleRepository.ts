@@ -5,6 +5,7 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull } from "typeorm";
+import type { EntityManager, DeepPartial } from "typeorm";
 import { RoutingRule } from "../../entities/router/RoutingRule.ts";
 import { routingEventBus, type RoutingEventBus } from "@fulcrum/server/router/event-bus.ts";
 
@@ -48,5 +49,24 @@ export class RoutingRuleRepository {
   async removeRule(rule: RoutingRule): Promise<void> {
     await this.routingRules.remove(rule);
     this.eventBus.emitRulesChanged();
+  }
+
+  get manager(): EntityManager {
+    return this.routingRules.manager;
+  }
+
+  create(data?: DeepPartial<RoutingRule>): RoutingRule {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return this.routingRules.create(data as any);
+  }
+
+  save(entity: RoutingRule): Promise<RoutingRule> {
+    type SaveSingle = (entity: RoutingRule) => Promise<RoutingRule>;
+    return (this.routingRules.save as unknown as SaveSingle)(entity);
+  }
+
+  remove(entity: RoutingRule): Promise<RoutingRule> {
+    type RemoveSingle = (entity: RoutingRule) => Promise<RoutingRule>;
+    return (this.routingRules.remove as unknown as RemoveSingle)(entity);
   }
 }
