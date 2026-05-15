@@ -175,7 +175,11 @@ function run(step: Step): Promise<{ ok: boolean; ms: number; stderr?: string; st
       // bun test exits non-zero for unhandled errors between tests even with 0 failures.
       // Treat as pass if stdout shows "0 fail" (all tests passed).
       if (!ok && step.cmd[0] === "bun" && step.cmd[1] === "test") {
-        if (/\b0 fail\b/.test(stdout)) ok = true;
+        const zeroFail = /\b0 fail\b/.test(stdout);
+        if (zeroFail) {
+          console.log(`[ci] bun test exited ${code} but 0 fail detected — treating as pass`);
+          ok = true;
+        }
       }
       resolve({ ok, ms: Date.now() - t0, stderr, stdout });
     });
