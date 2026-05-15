@@ -417,8 +417,8 @@ describe("Planning preview Nest materialization service", () => {
       }))).toEqual([
         {
           path: "apps/web/src/routes/planning/workbench-prototype.tsx",
-          mode: "web-route",
-          urlPath: "/planning",
+          mode: "source-module",
+          urlPath: undefined,
         },
         {
           path: "services/planning-review/src/application/technical-planning-cycle.ts",
@@ -478,21 +478,19 @@ describe("Planning preview Nest materialization service", () => {
       if (!prototypeRow) throw new Error("Expected generated prototype row.");
       expect(prototypeRow.metadata.preview).toMatchObject({
         path: "apps/web/src/routes/planning/workbench-prototype.tsx",
-        mode: "web-route",
-        urlPath: "/planning",
+        mode: "source-module",
       });
 
       const execution = await service.recordArtifactExecution({
         planId: "plan-build-plan",
         artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
         prototypeId: prototypeRow.id,
-        artifactId: prototypeRow.artifactId ?? undefined,
+        artifactId: "stale-artifact-id",
         status: "passed",
         traceId: "trace-build-plan",
         command: "bun",
-        args: ["run", "--cwd", "apps/web", "test"],
-        urlPath: "/planning",
-        summary: "Planning route preview was reviewed with trace context visible.",
+        args: ["-e", 'await import("./apps/web/src/routes/planning/workbench-prototype.tsx")'],
+        summary: "Planning prototype module was reviewed with trace context visible.",
         checks: ["trace context visible", "review checks visible"],
         executedAt: "2026-05-15T12:00:00.000Z",
       });
@@ -509,15 +507,42 @@ describe("Planning preview Nest materialization service", () => {
       expect(persistedPrototype.status).toBe("validated");
       expect(persistedPrototype.metadata.preview).toMatchObject({
         path: "apps/web/src/routes/planning/workbench-prototype.tsx",
-        mode: "web-route",
+        mode: "source-module",
       });
       expect(persistedPrototype.metadata.execution).toMatchObject({
         status: "passed",
         prototypeId: prototypeRow.id,
         artifactId: prototypeRow.artifactId,
-        summary: "Planning route preview was reviewed with trace context visible.",
+        summary: "Planning prototype module was reviewed with trace context visible.",
       });
       expect(persistedPrototype.metadata.executions).toHaveLength(1);
+
+      const boilerplateRow = sortedPrototypes.find((prototype) =>
+        prototype.outputRef === "services/planning-review/src/application/technical-planning-cycle.ts"
+      );
+      if (!boilerplateRow) throw new Error("Expected generated boilerplate row.");
+      const boilerplateExecution = await service.recordArtifactExecution({
+        planId: "plan-build-plan",
+        artifactPath: "services/planning-review/src/application/technical-planning-cycle.ts",
+        status: "blocked",
+        traceId: "trace-build-plan",
+        summary: "Import blocked by review dependency.",
+        executedAt: "2026-05-15T12:01:00.000Z",
+      });
+      expect(boilerplateExecution).toMatchObject({
+        prototypeId: boilerplateRow.id,
+        artifactId: boilerplateRow.artifactId,
+        status: "blocked",
+        prototypeStatus: "blocked",
+      });
+      const persistedBoilerplate = await dataSource.getRepository(FulcrumPlanPrototypeEntity).findOneByOrFail({
+        id: boilerplateRow.id,
+      });
+      expect(persistedBoilerplate.metadata.execution).toMatchObject({
+        status: "blocked",
+        prototypeId: boilerplateRow.id,
+        artifactId: boilerplateRow.artifactId,
+      });
     } finally {
       await dataSource.destroy();
     }

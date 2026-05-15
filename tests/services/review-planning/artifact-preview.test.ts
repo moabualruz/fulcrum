@@ -8,6 +8,12 @@ describe("planning artifact previews", () => {
       artifacts: [
         {
           kind: "prototype",
+          path: "apps/web/src/routes/planning/+page.svelte",
+          sourcePlanId: "technical-plan",
+          traceId: "trace-1",
+        },
+        {
+          kind: "prototype",
           path: "apps/web/src/routes/planning/workbench-prototype.tsx",
           sourcePlanId: "technical-plan",
           traceId: "trace-1",
@@ -34,10 +40,20 @@ describe("planning artifact previews", () => {
     }))).toEqual([
       {
         kind: "prototype",
-        path: "apps/web/src/routes/planning/workbench-prototype.tsx",
+        path: "apps/web/src/routes/planning/+page.svelte",
         mode: "web-route",
         urlPath: "/planning",
         run: { command: "bun", args: ["run", "--cwd", "apps/web", "test"] },
+      },
+      {
+        kind: "prototype",
+        path: "apps/web/src/routes/planning/workbench-prototype.tsx",
+        mode: "source-module",
+        urlPath: undefined,
+        run: {
+          command: "bun",
+          args: ["-e", 'await import("./apps/web/src/routes/planning/workbench-prototype.tsx")'],
+        },
       },
       {
         kind: "boilerplate",

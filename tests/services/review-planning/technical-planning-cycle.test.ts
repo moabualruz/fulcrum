@@ -94,9 +94,12 @@ describe("technical planning cycle", () => {
       {
         kind: "prototype",
         path: "apps/web/src/routes/planning/workbench-prototype.tsx",
-        mode: "web-route",
-        urlPath: "/planning",
-        run: { command: "bun", args: ["run", "--cwd", "apps/web", "test"] },
+        mode: "source-module",
+        urlPath: undefined,
+        run: {
+          command: "bun",
+          args: ["-e", 'await import("./apps/web/src/routes/planning/workbench-prototype.tsx")'],
+        },
       },
       {
         kind: "boilerplate",

@@ -81,7 +81,7 @@ export interface PlanningTechnicalCycleResult extends TechnicalPlanningCycleDraf
 
 export type { PlanningArtifactExecutionInput, PlanningArtifactExecutionRecord };
 
-export interface PersistedPlanningArtifactExecutionRecord extends PlanningArtifactExecutionRecord {
+export interface PersistedPlanningArtifactExecutionRecord extends Omit<PlanningArtifactExecutionRecord, "artifactId"> {
   prototypeId: string;
   artifactId?: string | null;
 }

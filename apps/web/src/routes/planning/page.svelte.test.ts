@@ -358,9 +358,8 @@ describe("/planning +page.svelte", () => {
               kind: "prototype",
               path: "apps/web/src/routes/planning/workbench-prototype.tsx",
               label: "prototype: workbench-prototype.tsx",
-              mode: "web-route",
-              urlPath: "/planning",
-              run: { command: "bun", args: ["run", "--cwd", "apps/web", "test"] },
+              mode: "source-module",
+              run: { command: "bun", args: ["-e", 'await import("./apps/web/src/routes/planning/workbench-prototype.tsx")'] },
               reviewChecks: ["Prototype demonstrates the intended user flow before task materialization."],
             }],
             breakdown: BREAKDOWN,
@@ -378,8 +377,8 @@ describe("/planning +page.svelte", () => {
     expect(body).toContain("data-planning-artifact-previews");
     expect(body).toContain('data-planning-artifact-preview="prototype-apps-web-src-routes-planning-workbench-prototype-tsx"');
     expect(body).toContain("prototype: workbench-prototype.tsx");
-    expect(body).toContain("web-route");
-    expect(body).toContain("bun run --cwd apps/web test");
+    expect(body).toContain("source-module");
+    expect(body).toContain("bun -e await import");
     expect(body).toContain("Prototype demonstrates the intended user flow");
     expect(body).toContain("Review this generated technical plan");
     expect(body).toContain("Build planning route");
