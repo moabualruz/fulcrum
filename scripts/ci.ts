@@ -120,15 +120,15 @@ export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[
     // ── T1: Unit (~30s) — fast unit tests, no DB ──
     { name: "symphony:lock",    cmd: ["bun", "test", "tests/execution-orchestration/symphony/spec-lock.test.ts"], tier: "unit", domain: "all" },
     { name: "symphony:conformance", cmd: ["bun", "test", "services/execution-orchestration/src/infrastructure/agent-runtime/__tests__/symphony-conformance.test.ts"], tier: "unit", domain: "all" },
-    { name: "trpc:permissions", cmd: ["bun", "test", "tests/trpc/app-router-scaffold.test.ts", "tests/trpc/router.test.ts"], tier: "unit", domain: "api" },
+    { name: "trpc:permissions", cmd: ["bun", "test", "apps/server/src/trpc/__tests__/app-router-scaffold.test.ts", "apps/server/src/trpc/__tests__/router.test.ts"], tier: "unit", domain: "api" },
     { name: "application:unit",  cmd: ["bun", "test", "services"], tier: "unit", domain: "application" },
     { name: "test",             cmd: ["bun", "run", "scripts/test-root.ts"], tier: "unit", domain: "all" },
     { name: "license-audit",    cmd: ["bun", "run", "scripts/license-audit.ts"], tier: "unit", domain: "all" },
     { name: "ci:codegen",       cmd: ["bun", "run", "scripts/ci/codegen.ts"], tier: "unit", domain: "all" },
 
     // ── T2: Integration (~90s) — DB, web build, coverage ──
-    { name: "migration:downgrade", cmd: ["bun", "test", "tests/db/migration-downgrade.test.ts"], tier: "integration", domain: "all" },
-    { name: "graceful:shutdown",   cmd: ["bun", "test", "tests/platform-core/platform-operations/shutdown-coordinator.test.ts"], tier: "integration", domain: "all" },
+    { name: "migration:downgrade", cmd: ["bun", "test", "services/platform-core/src/infrastructure/application-database/migration-downgrade.test.ts"], tier: "integration", domain: "all" },
+    { name: "graceful:shutdown",   cmd: ["bun", "test", "services/platform-core/src/application/platform-operations/shutdown-coordinator.test.ts"], tier: "integration", domain: "all" },
     { name: "coverage:root",    cmd: ["bun", "run", "scripts/test-root.ts", "--root-coverage"], tier: "integration", domain: "all" },
     { name: "build:all",        cmd: ["bun", "run", "scripts/build-all.ts"], tier: "integration", domain: "all" },
     { name: "web:install",      cmd: ["bun", "install", "--frozen-lockfile"], cwd: "apps/web", tier: "integration", domain: "web" },
