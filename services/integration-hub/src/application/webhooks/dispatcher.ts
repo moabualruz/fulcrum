@@ -89,7 +89,7 @@ export async function dispatchWebhookEvent(input: DispatchWebhookEventInput): Pr
       payload: input.payload,
       fetch: fetchImpl,
       now,
-      flush: () => input.em.flush(),
+      flush: async () => {},
     });
   }
 
