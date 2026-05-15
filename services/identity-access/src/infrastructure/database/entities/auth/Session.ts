@@ -14,7 +14,7 @@ import {
 @Index("idx_sessions_org", ["orgId"])
 export class Session {
   // Sessions use text PK (opaque token) compatible with Better-Auth
-  @PrimaryColumn()
+  @PrimaryColumn({ type: "varchar" })
   id!: string;
 
   @Column({ type: "varchar", name: "user_id" })
