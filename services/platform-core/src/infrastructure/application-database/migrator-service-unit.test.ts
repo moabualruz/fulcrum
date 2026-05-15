@@ -83,11 +83,12 @@ function buildFakeService(options: FakeServiceOptions = {}) {
   const pendingMigrations = options.pending ?? [];
 
   const dataSource = {
-    // _getPendingMigrations reads this array
-    migrations: pendingMigrations.map((m) => ({ name: m.name, timestamp: 0, up: async () => {}, down: async () => {} })),
+    options: { migrationsTableName: "schema_migrations" },
+    // TypeORM needs ALL migrations (pending + executed) in this array
+    migrations: [...executedMigrations, ...pendingMigrations].map((m) => ({ name: m.name, timestamp: 0, up: async () => {}, down: async () => {} })),
     // _getExecutedMigrations queries migrations table
     query: mock(async (sql: string) => {
-      if (sql.includes("FROM migrations") || sql.includes("from migrations")) {
+      if (sql.includes("FROM") && (sql.includes("migrations") || sql.includes("schema_migrations"))) {
         return executedMigrations.map((m) => ({ name: m.name, timestamp: 0 }));
       }
       return [];

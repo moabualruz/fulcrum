@@ -275,8 +275,8 @@ describe("doctor-checks", () => {
     );
     const repo = Object.create(SchemaMigrationRepository.prototype) as InstanceType<typeof SchemaMigrationRepository>;
     Object.defineProperty(repo, "schemaMigrations", { value: ds.getRepository(SchemaMigration) });
-    // Clear ledger rows for this check
-    await ds.getRepository(SchemaMigration).delete({});
+    // Clear ledger rows for this check (clear() avoids empty-criteria rejection from TypeORM)
+    await ds.getRepository(SchemaMigration).clear();
     const result = await dbMigrationVersion(repo);
     expect(result.check).toBe("db.migrationVersion");
     expect(result.status).toBe("warn");
@@ -345,19 +345,25 @@ describe("db.router — PermissionNotAvailableError", () => {
 });
 
 describe("fulcrum db migration command", () => {
-  it("routes explicit PGlite migration through the db command surface", async () => {
+  it("status with null container outputs pglite JSON via db command surface", async () => {
     const lines: string[] = [];
     const original = console.log;
     console.log = (line: unknown) => { lines.push(String(line)); };
     try {
-      await runDbCommand(["migrate", "--backend", "pglite", "--json"], null);
+      await runDbCommand(["status", "--json"], null);
     } finally {
       console.log = original;
     }
 
     const payload = JSON.parse(lines.join("\n"));
-    expect(payload.backend).toBe("pglite");
+    expect(typeof payload.backend).toBe("string");
     expect(payload.ok).toBe(true);
-    expect(Array.isArray(payload.applied)).toBe(true);
-  }, 15_000);
+    expect(Array.isArray(payload.pending)).toBe(true);
+  });
+
+  it("migrate rejects removed --backend flag", async () => {
+    await expect(
+      runDbCommand(["migrate", "--backend", "pglite", "--json"], null),
+    ).rejects.toThrow(/explicit database backend flags were removed/);
+  });
 });

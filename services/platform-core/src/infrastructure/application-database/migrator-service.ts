@@ -300,8 +300,9 @@ export class MigratorService {
 
   private async _getExecutedMigrations(): Promise<MigrationRecord[]> {
     try {
+      const tableName = this._dataSource.options.migrationsTableName ?? "migrations";
       const rows = await this._dataSource.query(
-        `SELECT name, timestamp FROM migrations ORDER BY timestamp ASC`,
+        `SELECT name, timestamp FROM "${tableName}" ORDER BY timestamp ASC`,
       ) as Array<{ name: string; timestamp: number }>;
       return rows.map((m) => ({ name: m.name, timestamp: m.timestamp }));
     } catch {
@@ -315,11 +316,13 @@ export class MigratorService {
       const executed = await this._getExecutedMigrations();
       const executedNames = new Set(executed.map((m) => m.name));
       return allMigrations
-        .filter((m) => !executedNames.has((m as unknown as { name: string }).name))
         .map((m) => {
-          const migration = m as unknown as { name: string; timestamp: number };
-          return { name: migration.name, timestamp: migration.timestamp ?? 0 };
-        });
+          // MigrationInterface instances carry no `.name`; the class name is on the constructor.
+          const name = (m as unknown as { name?: string }).name ?? m.constructor.name;
+          const timestamp = (m as unknown as { timestamp?: number }).timestamp ?? 0;
+          return { name, timestamp };
+        })
+        .filter((m) => !executedNames.has(m.name));
     } catch {
       return [];
     }
@@ -352,7 +355,8 @@ export class MigratorService {
   }
 
   private _extractVersion(migrationName: string): number {
-    const match = /Migration(\d+)/.exec(migrationName);
+    // Match both old format "Migration1234" and new format "Platform1715788800006"
+    const match = /(\d{10,})/.exec(migrationName);
     if (match?.[1]) {
       return Number(match[1]);
     }
