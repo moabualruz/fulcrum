@@ -88,28 +88,22 @@ export async function transitionRunForRetry(
     import("@platform-core/infrastructure/application-database/entities/core/Event.ts"),
     import("@identity-access/infrastructure/database/entities/auth/Org.ts"),
   ]);
-  await em.transaction(async (tx) => {
-    const params: unknown[] = [input.nextState, input.nextAttempt, input.nextRetryAt, input.lastErrorKind];
-    let sql = `UPDATE agent_runs SET orchestration_state = $1, attempt_count = $2, next_retry_at = $3, last_error_kind = $4`;
-    if (input.exhausted) {
-      params.push("failed");
-      sql += `, status = $${params.length}`;
-    }
-    params.push(run.id, run.orchestrationState);
-    sql += ` WHERE id = $${params.length - 1} AND orchestration_state = $${params.length}`;
-    await tx.query(sql, params);
-    // Verify update took effect (PGlite doesn't return affected count)
-    const agentRunRepo = tx.getRepository(AgentRun);
-    const verify = await agentRunRepo.findOne({ where: { id: run.id, orchestrationState: input.nextState } as never });
-    if (!verify) return;
-    await tx.save(Event, {
-      org: { id: run.orgId } as typeof Org.prototype,
-      subjectKind: "agent_run",
-      subjectId: run.id,
-      verb: "state_changed",
-      payload: { from: run.orchestrationState, to: input.nextState },
-      createdAt: input.now,
-    });
+  const params: unknown[] = [input.nextState, input.nextAttempt, input.nextRetryAt, input.lastErrorKind];
+  let sql = `UPDATE agent_runs SET orchestration_state = $1, attempt_count = $2, next_retry_at = $3, last_error_kind = $4`;
+  if (input.exhausted) {
+    params.push("failed");
+    sql += `, status = $${params.length}`;
+  }
+  params.push(run.id, run.orchestrationState);
+  sql += ` WHERE id = $${params.length - 1} AND orchestration_state = $${params.length}`;
+  await em.query(sql, params);
+  await em.save(Event, {
+    org: { id: run.orgId } as typeof Org.prototype,
+    subjectKind: "agent_run",
+    subjectId: run.id,
+    verb: "state_changed",
+    payload: { from: run.orchestrationState, to: input.nextState },
+    createdAt: input.now,
   });
 }
 
