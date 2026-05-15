@@ -1,8 +1,8 @@
-# MikroORM → TypeORM Big-Bang Migration
+# MikroORM → TypeORM Migration + NestJS Architecture Cleanup
 
 **Date:** 2026-05-15
 **Status:** Approved
-**Scope:** Full ORM migration + NestJS toolchain consolidation + project cleanup
+**Scope:** Full ORM migration + god module split + DTO extraction + tRPC consolidation + stub removal + test co-location
 
 ## Context
 
@@ -79,12 +79,37 @@ Bulk replace all `@mikro-orm/*` imports with `typeorm` equivalents across codeba
 ### Phase 8: Test Fix (~50 test files)
 Update all DB-touching tests to use TypeORM DataSource. Replace MikroORM EntityManager test utilities.
 
-### Phase 9: Project Cleanup
-- Remove empty `inference-runtime/` service
-- Clarify or remove `agent-client-protocol/` stub (8 files)
-- Consolidate tRPC router locations (`trpc/routers/` + `runtime/trpc/routers/` → single location)
+### Phase 9: Split platform-core God Module (93 entities → domain-owned)
+platform-core currently owns all 93 entities and 40 repositories centrally. Every service imports from it → no locality, change one entity rebuilds all. Split entities and repositories to the owning service's `src/infrastructure/database/` directory. platform-core keeps only shared infra (DataSource config, base entity classes, cross-cutting entities like Org/User/OrgMember). Each service registers its own entities via `TypeOrmModule.forFeature()`.
+
+Entity ownership by service:
+- **identity-access**: User, Org, OrgMember, Session, Account, Verification, Invitation (~8 entities)
+- **work-management**: Task, Project, Sprint, CustomField, SavedView, Template, Automation, FieldDependency, Relationship (~17 entities)
+- **knowledge-workspace**: Document, DocumentVersion, Memory, Search (~6 entities)
+- **execution-orchestration**: AgentRun, RoutingRule, Sandbox, SandboxSession (~6 entities)
+- **integration-hub**: Repo, RepoBranch, Connector, Webhook, DataPortability (~6 entities)
+- **notification-center**: Notification, NotificationPreference (~10 entities)
+- **workflow-coordination**: Artifact, ArtifactRetentionPolicy, WorkflowCycle, Audit (~6 entities)
+- **platform-core** (shared): Org, TenantSetting, FeatureFlag, FlagOverride, SchemaMigration, Job (~10 entities)
+
+### Phase 10: Extract DTOs from Controllers (60+ controllers)
+class-validator decorators are inline in controller handler methods across 60+ files. Extract to proper `dto/` folders per feature module. Each controller endpoint gets `CreateXDto`, `UpdateXDto`, `QueryXDto` classes with validation decorators. Controllers become thin — accept DTO, delegate to service, return response DTO. Never expose entities directly as API responses.
+
+### Phase 11: Consolidate tRPC → NestJS Controllers
+33 tRPC routers split across `apps/server/src/trpc/routers/` and `apps/server/src/runtime/trpc/routers/`. Some contain business logic. Consolidate to single location first, then incrementally convert to NestJS controllers (long-term — full conversion is future work, but consolidation + removing business logic from routers is in scope).
+
+### Phase 12: Remove Stub/Empty Services
+- Delete empty `inference-runtime/` service (0 files, deletion test passes)
+- Evaluate `agent-client-protocol/` (8 files) — remove if stub, document timeline if placeholder
+
+### Phase 13: Co-locate Tests
+30+ test files in root `tests/` directory duplicate or mirror tests co-located in services. Migrate root tests to co-located `*.spec.ts` / `*.test.ts` beside source files. Architecture tests (`tests/architecture/`) stay at root (they span multiple services by design). Delete emptied root test directories.
+
+### Phase 14: Final Verification + Cleanup
 - Remove orphaned files, empty directories
-- Verify all tests pass, `bun run ci` green
+- Verify `bun run ci` passes all 6 stages
+- Verify zero `@mikro-orm/*` imports
+- Verify entity ownership matches service boundaries
 
 ## Risks
 
@@ -107,3 +132,8 @@ Update all DB-touching tests to use TypeORM DataSource. Replace MikroORM EntityM
 - [ ] `DATABASE_URL` switches to full PostgreSQL
 - [ ] `bun run ci` passes
 - [ ] No orphaned deps in package.json
+- [ ] Entities owned by their service (not centralized in platform-core)
+- [ ] DTOs extracted to `dto/` folders, controllers are thin
+- [ ] tRPC routers consolidated to single location, no business logic in routers
+- [ ] No empty/stub services without documented timeline
+- [ ] Tests co-located with source (except architecture tests at root)

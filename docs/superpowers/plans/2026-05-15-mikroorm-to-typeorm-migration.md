@@ -1,8 +1,8 @@
-# MikroORM → TypeORM Big-Bang Migration Plan
+# MikroORM → TypeORM Migration + NestJS Architecture Cleanup Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace MikroORM v7 with TypeORM as the sole ORM, wire NestJS-native TypeORM integration, use PGlite via `typeorm-pglite` as default local DB.
+**Goal:** Replace MikroORM v7 with TypeORM, split platform-core god module, extract DTOs, consolidate tRPC, remove stubs, co-locate tests. Full NestJS architecture cleanup.
 
 **Architecture:** All 93 MikroORM entities get TypeORM decorators. 40 custom repositories become TypeORM `Repository<T>` or custom repository classes. needle-di bindings in db.module.ts replaced with NestJS `TypeOrmModule.forFeature()`. Fresh TypeORM migrations replace 52 MikroORM migrations. PGlite stays as default local DB via `typeorm-pglite` driver.
 
@@ -613,70 +613,375 @@ git commit -m "test(db): update all test files for TypeORM DataSource"
 
 ---
 
-## Task 10: Project Cleanup
+## Task 10: Split platform-core God Module — Move Entities to Owning Services
 
 **Files:**
-- Delete: Empty `inference-runtime/` service
-- Modify: `agent-client-protocol/` — clarify or remove
-- Consolidate: tRPC router locations
-- Remove: Orphaned/empty directories
+- Move: `services/platform-core/src/infrastructure/application-database/entities/<domain>/` → `services/<owning-service>/src/infrastructure/database/entities/`
+- Move: `services/platform-core/src/infrastructure/application-database/repositories/<domain>/` → `services/<owning-service>/src/infrastructure/database/repositories/`
+- Modify: All import paths referencing moved entities
 
-- [ ] **Step 1: Remove empty inference-runtime service**
+Entity ownership mapping:
+
+| Service | Entities to move |
+|---|---|
+| identity-access | `auth/` entities (Session, Account, Verification, Invitation + User, OrgMember) |
+| work-management | `tasks/` entities (Task, Project, Sprint, CustomField, SavedView, Template, Automation, FieldDependency, Relationship) |
+| knowledge-workspace | `docs/` entities (Document, DocumentVersion), `memory/` entities, `search/` entities |
+| execution-orchestration | `orchestration/` entities (AgentRun, RoutingRule), `sandbox/` entities |
+| integration-hub | `connectors/` entities, `repos/` entities |
+| notification-center | `notifications/` entities |
+| workflow-coordination | `artifacts/` entities |
+| platform-core (keep) | `core/` (Org, TenantSetting), `flags/`, `skills/`, `jobs/`, SchemaMigration |
+
+- [ ] **Step 1: Create infrastructure/database/ directory in each service**
+
+```bash
+for svc in identity-access work-management knowledge-workspace execution-orchestration integration-hub notification-center workflow-coordination; do
+  mkdir -p services/$svc/src/infrastructure/database/entities
+  mkdir -p services/$svc/src/infrastructure/database/repositories
+done
+```
+
+- [ ] **Step 2: Move entity files to owning services**
+
+Move each entity subdirectory to its owning service. Example for work-management:
+
+```bash
+mv services/platform-core/src/infrastructure/application-database/entities/tasks/ \
+   services/work-management/src/infrastructure/database/entities/
+mv services/platform-core/src/infrastructure/application-database/repositories/tasks/ \
+   services/work-management/src/infrastructure/database/repositories/
+```
+
+Repeat for each service per the mapping above.
+
+- [ ] **Step 3: Update all import paths**
+
+For each moved entity, find all files importing it and update the path:
+
+```bash
+rg -l "from.*platform-core.*entities/tasks" services/ apps/ --type ts
+```
+
+Update imports to point to new location in the owning service.
+
+- [ ] **Step 4: Update TypeOrmModule.forFeature() in each service module**
+
+Each service module now imports its own entities directly:
+
+```typescript
+// services/work-management/src/interface/http/work-management.module.ts
+import { Task } from "../../infrastructure/database/entities/Task.js";
+// ...
+@Module({
+  imports: [TypeOrmModule.forFeature([Task, Project, Sprint, ...])],
+})
+```
+
+- [ ] **Step 5: Update platform-core's ApplicationDatabaseModule**
+
+Remove moved entities from `getCoreEntities()`. Keep only shared entities (Org, TenantSetting, FeatureFlag, etc.).
+
+- [ ] **Step 6: Verify TypeScript compiles**
+
+```bash
+bunx tsc --noEmit
+```
+
+- [ ] **Step 7: Run tests**
+
+```bash
+bun test
+```
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add -A
+git commit -m "refactor(arch): split platform-core god module — entities owned by domain services"
+```
+
+---
+
+## Task 11: Extract DTOs from Controllers (60+ Controllers)
+
+**Files:**
+- Create: `services/<service>/src/interface/http/dto/` directories
+- Modify: All `*-public-api.controller.ts` files
+
+Currently class-validator decorators are inline in controller methods. Extract to proper DTO classes.
+
+- [ ] **Step 1: Create dto/ directories in each service**
+
+```bash
+for svc in identity-access work-management knowledge-workspace execution-orchestration integration-hub notification-center workflow-coordination platform-core; do
+  mkdir -p services/$svc/src/interface/http/dto
+done
+```
+
+- [ ] **Step 2: Extract DTOs from controllers — pattern**
+
+Before (inline in controller):
+```typescript
+@Post()
+async create(@Body() body: { name: string; @IsString() description: string }) {
+  return this.service.create(body);
+}
+```
+
+After (separate DTO file):
+```typescript
+// dto/create-task.dto.ts
+import { IsString, IsOptional, MinLength } from "class-validator";
+
+export class CreateTaskDto {
+  @IsString()
+  @MinLength(1)
+  name!: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+}
+
+// controller
+@Post()
+async create(@Body() body: CreateTaskDto) {
+  return this.service.create(body);
+}
+```
+
+- [ ] **Step 3: Extract DTOs for each service**
+
+Work through each service's controllers:
+1. Identify all `@Body()`, `@Query()`, `@Param()` inline types
+2. Extract to `dto/create-*.dto.ts`, `dto/update-*.dto.ts`, `dto/query-*.dto.ts`
+3. Use `PartialType()` from `@nestjs/mapped-types` for update DTOs
+4. Add Swagger decorators (`@ApiProperty()`) to each DTO field
+
+- [ ] **Step 4: Create response DTOs — never expose entities directly**
+
+For each entity returned by a controller, create a response DTO:
+
+```typescript
+// dto/task-response.dto.ts
+export class TaskResponseDto {
+  id!: string;
+  name!: string;
+  status!: string;
+  createdAt!: Date;
+}
+```
+
+Map entity → response DTO in controller or via `ClassSerializerInterceptor`.
+
+- [ ] **Step 5: Verify TypeScript compiles**
+
+```bash
+bunx tsc --noEmit
+```
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add services/*/src/interface/http/dto/
+git add services/*/src/interface/http/*-public-api.controller.ts
+git commit -m "refactor(api): extract DTOs from controllers, add response DTOs"
+```
+
+---
+
+## Task 12: Consolidate tRPC Routers
+
+**Files:**
+- Modify/Move: `apps/server/src/runtime/trpc/routers/` → merge into `apps/server/src/trpc/routers/`
+- Modify: `apps/server/src/trpc/router.ts` (main AppRouter)
+
+- [ ] **Step 1: Audit both tRPC directories**
+
+```bash
+ls -la apps/server/src/trpc/routers/
+ls -la apps/server/src/runtime/trpc/routers/ 2>/dev/null
+```
+
+Identify overlapping routers, routers with business logic, and routers that are thin adapters.
+
+- [ ] **Step 2: Merge runtime/trpc/routers/ into trpc/routers/**
+
+For each router in `runtime/trpc/routers/`:
+- If duplicate exists in `trpc/routers/`, merge logic into the primary
+- If unique, move file to `trpc/routers/`
+- Extract any business logic to service layer
+
+- [ ] **Step 3: Remove runtime/trpc/ directory**
+
+```bash
+rm -rf apps/server/src/runtime/trpc/
+```
+
+- [ ] **Step 4: Update AppRouter imports**
+
+Update `apps/server/src/trpc/router.ts` to only import from single `routers/` directory.
+
+- [ ] **Step 5: Verify TypeScript compiles and tests pass**
+
+```bash
+bunx tsc --noEmit && bun test
+```
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add apps/server/src/trpc/ apps/server/src/runtime/
+git commit -m "refactor(api): consolidate tRPC routers to single directory"
+```
+
+---
+
+## Task 13: Remove Stub/Empty Services
+
+**Files:**
+- Delete: `services/inference-runtime/` (empty — 0 files)
+- Evaluate: `services/agent-client-protocol/` (8 files, minimal)
+
+- [ ] **Step 1: Remove empty inference-runtime**
 
 ```bash
 rm -rf services/inference-runtime/
 ```
 
-- [ ] **Step 2: Consolidate tRPC routers**
+- [ ] **Step 2: Evaluate agent-client-protocol**
 
 ```bash
-# Check what's in runtime/trpc/routers/ vs trpc/routers/
-ls apps/server/src/runtime/trpc/routers/ 2>/dev/null
-ls apps/server/src/trpc/routers/
+find services/agent-client-protocol/ -type f | head -20
+wc -l services/agent-client-protocol/src/**/*.ts 2>/dev/null
 ```
 
-Merge into single `apps/server/src/trpc/routers/` location. Update imports.
+If stub with no real implementation → remove. If placeholder with clear future use → document timeline in AGENTS.md under "Where we are going" section.
 
-- [ ] **Step 3: Remove any empty directories**
+- [ ] **Step 3: Update app.module.ts**
+
+Remove imports for deleted service modules.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add -A
+git commit -m "chore: remove empty/stub services (inference-runtime, agent-client-protocol)"
+```
+
+---
+
+## Task 14: Co-locate Tests
+
+**Files:**
+- Move: `tests/<domain>/` → co-located `*.test.ts` beside source in `services/`
+- Keep: `tests/architecture/` at root (spans multiple services)
+
+- [ ] **Step 1: List root test files and their corresponding source**
+
+```bash
+find tests/ -name "*.test.ts" -not -path "tests/architecture/*" | sort
+```
+
+For each test file, identify the source file it tests and move the test beside it.
+
+- [ ] **Step 2: Move domain tests to services**
+
+Example:
+```bash
+# tests/platform-core/health-checks/tui-checks.test.ts
+# → services/platform-core/src/application/health-checks/tui-checks.test.ts
+mv tests/platform-core/health-checks/tui-checks.test.ts \
+   services/platform-core/src/application/health-checks/
+```
+
+Repeat for all non-architecture test files.
+
+- [ ] **Step 3: Update import paths in moved tests**
+
+Each moved test file may need updated relative imports.
+
+- [ ] **Step 4: Keep architecture tests at root**
+
+```bash
+ls tests/architecture/
+```
+
+These test cross-service constraints and belong at root. Do not move.
+
+- [ ] **Step 5: Clean empty test directories**
+
+```bash
+find tests/ -type d -empty -delete
+```
+
+- [ ] **Step 6: Verify all tests pass**
+
+```bash
+bun test
+```
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add -A
+git commit -m "refactor(test): co-locate domain tests beside source files"
+```
+
+---
+
+## Task 15: Final Verification + Documentation
+
+**Files:**
+- Modify: `AGENTS.md`
+- Modify: `CONTEXT-MAP.md`
+- Remove: Orphaned/empty directories
+
+- [ ] **Step 1: Remove empty directories**
 
 ```bash
 find services/ apps/ -type d -empty -delete
 ```
 
-- [ ] **Step 4: Final verification**
+- [ ] **Step 2: Verify zero MikroORM imports**
+
+```bash
+rg "@mikro-orm" services/ apps/ --type ts | grep -v "_archived"
+```
+
+Expected: No results.
+
+- [ ] **Step 3: Verify entity ownership**
+
+```bash
+# platform-core should only have shared entities
+ls services/platform-core/src/infrastructure/application-database/entities/
+# Each service should own its domain entities
+for svc in identity-access work-management knowledge-workspace execution-orchestration integration-hub notification-center workflow-coordination; do
+  echo "=== $svc ===" && ls services/$svc/src/infrastructure/database/entities/ 2>/dev/null
+done
+```
+
+- [ ] **Step 4: Update AGENTS.md**
+
+Verify no stale MikroORM references. Update service list if services were removed.
+
+- [ ] **Step 5: Update CONTEXT-MAP.md**
+
+Remove entries for deleted services. Add infrastructure/database context notes for services that now own their entities.
+
+- [ ] **Step 6: Run full CI**
 
 ```bash
 bun run ci
 ```
 
-Expected: All 6 stages pass (install / typecheck / test / build:all / skills:lint / compress:check).
+Expected: All 6 stages pass.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 7: Final commit**
 
 ```bash
 git add -A
-git commit -m "chore: remove empty services, consolidate tRPC routers, clean project structure"
-```
-
----
-
-## Task 11: Update AGENTS.md and Documentation
-
-**Files:**
-- Modify: `AGENTS.md`
-- Modify: `CONTEXT-MAP.md` (remove inference-runtime if deleted)
-
-- [ ] **Step 1: Verify AGENTS.md ORM references are correct**
-
-AGENTS.md already says "Single NestJS/TypeORM server target" — verify no stale MikroORM references remain.
-
-- [ ] **Step 2: Update CONTEXT-MAP.md**
-
-Remove any references to deleted services.
-
-- [ ] **Step 3: Final commit**
-
-```bash
-git add AGENTS.md CONTEXT-MAP.md
-git commit -m "docs: update AGENTS.md and CONTEXT-MAP.md post-migration"
+git commit -m "docs: update AGENTS.md, CONTEXT-MAP.md post-architecture-cleanup"
 ```
