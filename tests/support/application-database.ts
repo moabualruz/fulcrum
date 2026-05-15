@@ -37,6 +37,7 @@ function buildEphemeralPgDriver() {
     return instance;
   }
   class EphemeralPool extends EventEmitter {
+    constructor() { super(); this.setMaxListeners(100); }
     doneCallback() {}
     async connect(callback: Function) {
       try { await getInstance(); callback(null, this, this.doneCallback); }
