@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { Container } from "@needle-di/core";
 
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
@@ -9,6 +8,7 @@ import { Document } from "@knowledge-workspace/infrastructure/database/entities/
 import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
 import { ContextSnapshot } from "@knowledge-workspace/infrastructure/database/entities/memory/ContextSnapshot.ts";
 import { MemoryRetriever } from "@knowledge-workspace/application/memory/retriever.ts";
+import { MemoryRepository } from "@knowledge-workspace/infrastructure/database/repositories/memory/MemoryRepository.ts";
 import {
   CONTEXT_SLICE_WEIGHTS,
   ContextAssembler,
@@ -202,9 +202,8 @@ describe("ContextAssembler", () => {
     const db = await createTestOrm();
     try {
       await seedIntegrationRows(db);
-      const container = null;
-      registerDbBindings(container, db.orm, db.orm.em);
-      const assembler = container.get(ContextAssembler);
+      registerDbBindings(null);
+      const assembler = buildAssembler(db);
 
       const { bundle, snapshotId } = await assembler.assemble(TASK_ID);
 
@@ -230,10 +229,8 @@ describe("ContextAssembler", () => {
         { body: "Lazy custom fields memory.", kind: "note" },
       ]);
       await seedLazyTaskRows(db);
-      const container = null;
-      registerDbBindings(container, db.orm, db.orm.em);
-      container.bind({ provide: MemoryRetriever, useValue: retriever as unknown as MemoryRetriever });
-      const assembler = container.get(ContextAssembler);
+      registerDbBindings(null);
+      const assembler = buildAssembler(db, retriever);
 
       const { bundle } = await assembler.assemble(TASK_ID);
 
@@ -440,8 +437,7 @@ async function seedIntegrationRows(db: TestOrm): Promise<void> {
     createdAt: new Date("2026-05-02T00:00:00.000Z"),
     updatedAt: new Date("2026-05-02T00:00:00.000Z"),
   }));
-  /* flushed */
-  em.clear();
+  await (em as any).flush();
 }
 
 async function seedLazyTaskRows(db: TestOrm): Promise<void> {
@@ -473,6 +469,72 @@ async function seedLazyTaskRows(db: TestOrm): Promise<void> {
     externalId: null,
     updatedAt: new Date("2026-05-02T00:00:00.000Z"),
   }));
-  /* flushed */
-  em.clear();
+  await (em as any).flush();
+}
+
+/**
+ * Build a ContextAssembler backed by the test DB.
+ * Bypasses NestJS DI container (which is null in tests) by wiring repos directly.
+ */
+function buildAssembler(db: TestOrm, retrieverOverride?: { retrieve: Function }): ContextAssembler {
+  const em = db.orm.em;
+
+  // MemoryRetriever backed by real DB MemoryRepository
+  let retriever: any;
+  if (retrieverOverride) {
+    retriever = retrieverOverride;
+  } else {
+    const memRepo = Object.create(MemoryRepository.prototype) as MemoryRepository;
+    // @ts-expect-error — inject underlying TypeORM repo directly
+    memRepo["memories"] = db.ds.getRepository(Memory);
+    retriever = new MemoryRetriever(memRepo);
+  }
+
+  // Task repo adapter: wraps em.findOneOrFail
+  const taskRepository = {
+    findOneOrFail: async (criteria: unknown) => {
+      return em.findOneOrFail(Task, criteria as any);
+    },
+  };
+
+  // Document repo adapter: wraps em.find
+  const documentRepository = {
+    find: async (where?: unknown, _opts?: unknown) => {
+      // Ignore MikroORM $or — just find by projectId + not archived
+      const w: any = { archived: false };
+      if (where && typeof where === "object") {
+        const criteria = where as any;
+        if (criteria.org?.id) w.org = { id: criteria.org.id };
+        if (criteria.projectId) w.projectId = criteria.projectId;
+      }
+      return em.find(Document, { where: w, order: { updatedAt: "DESC" } });
+    },
+  };
+
+  // Run repo adapter: wraps em.find
+  const runRepository = {
+    find: async (_where?: unknown, _opts?: unknown) => {
+      return [];
+    },
+  };
+
+  // Repo repo adapter
+  const repoRepository = {
+    findOne: async () => null,
+  };
+
+  // Skill repo adapter
+  const skillRepository = {
+    find: async () => [],
+  };
+
+  return new ContextAssembler(
+    retriever,
+    taskRepository as any,
+    documentRepository as any,
+    runRepository as any,
+    em, // snapshotWriterOrEm — EntityManager is accepted directly
+    repoRepository as any,
+    skillRepository as any,
+  );
 }

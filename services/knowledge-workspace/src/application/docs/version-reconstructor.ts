@@ -1,4 +1,5 @@
 import type { EntityManager } from "typeorm";
+import { Not, IsNull, LessThanOrEqual, MoreThan, Between } from "typeorm";
 import { Node, Schema } from "@tiptap/pm/model";
 import { Transform, Step } from "@tiptap/pm/transform";
 
@@ -72,21 +73,21 @@ export async function reconstructDocVersion(
 ): Promise<ReconstructedDocVersion> {
   const pmSchema = schema ?? makeDefaultSchema();
 
-  const target = await em.findOne(DocVersion, {
+  const target = await em.findOne(DocVersion, { where: {
     org: { id: input.orgId },
-    doc: input.docId,
+    doc: { id: input.docId },
     versionNum: input.versionNum,
-  } as never);
+  } });
   if (!target) {
     throw new AppNotFoundError("Document version not found.");
   }
 
   const snapshot = await em.findOne(DocVersion, { where: {
     org: { id: input.orgId },
-    doc: input.docId,
-    versionNum: { $lte: input.versionNum },
-    snapshot: { $ne: null },
-  } as never, order: { versionNum: "DESC" } });
+    doc: { id: input.docId },
+    versionNum: LessThanOrEqual(input.versionNum),
+    snapshot: Not(IsNull()),
+  }, order: { versionNum: "DESC" } });
   if (!snapshot?.snapshot) {
     throw new AppInvariantError("No snapshot found for document version.");
   }
@@ -94,9 +95,9 @@ export async function reconstructDocVersion(
   let contentJson = jsonClone(snapshot.snapshot);
   const deltas = await em.find(DocVersion, { where: {
     org: { id: input.orgId },
-    doc: input.docId,
-    versionNum: { $gt: snapshot.versionNum, $lte: input.versionNum },
-  } as never, order: { versionNum: "ASC" } });
+    doc: { id: input.docId },
+    versionNum: Between(snapshot.versionNum + 1, input.versionNum),
+  }, order: { versionNum: "ASC" } });
   for (const version of deltas) {
     contentJson = version.snapshot ? jsonClone(version.snapshot) : applyDelta(contentJson, version.delta, pmSchema);
   }

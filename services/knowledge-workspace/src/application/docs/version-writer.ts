@@ -77,7 +77,7 @@ export async function writeDocVersion(
   }
 
   const author = input.authorId
-    ? await em.findOne(User, { where: { org: { id: input.orgId }, id: input.authorId  } as never })
+    ? await em.findOne(User, { where: { orgId: input.orgId, id: input.authorId } })
     : null;
   const version = em.create(DocVersion, {
     id: randomUUID(),

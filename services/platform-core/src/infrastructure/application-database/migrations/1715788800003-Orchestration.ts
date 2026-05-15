@@ -146,6 +146,7 @@ export class Orchestration1715788800003 implements MigrationInterface {
         "org_id"          uuid NOT NULL REFERENCES "orgs" ("id") ON DELETE CASCADE,
         "run_id"          uuid NOT NULL REFERENCES "agent_runs" ("id") ON DELETE CASCADE,
         "task_id"         uuid REFERENCES "tasks" ("id") ON DELETE SET NULL,
+        "project_id"      varchar,
         "filename"        varchar NOT NULL,
         "mime"            varchar,
         "size_bytes"      bigint,

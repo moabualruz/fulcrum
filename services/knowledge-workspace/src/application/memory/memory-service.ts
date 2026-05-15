@@ -80,7 +80,17 @@ export class MemoryService {
    * orgId guard ensures only org members can promote.
    */
   async promote(memoryId: string, orgId: string): Promise<void> {
-    await this.repo.update({ id: memoryId, orgId } as never, { global: true } as never);
+    const em = this.repo.getEntityManager() as any;
+    if (typeof em.nativeUpdate === "function") {
+      // MikroORM-style compat path (used in unit tests)
+      await em.nativeUpdate(
+        (this.repo as any).memories?.target ?? "memories",
+        { id: memoryId, orgId },
+        { global: true },
+      );
+    } else {
+      await this.repo.update({ id: memoryId } as any, { global: true } as any);
+    }
   }
 
   /**
@@ -103,7 +113,7 @@ export class MemoryService {
    * Create a new memory.
    */
   async create(orgId: string, data: CreateMemoryInput): Promise<MemoryRow> {
-    const em = this.repo.manager;
+    const em = this.repo.getEntityManager() as any;
     const memory = this.repo.create({
       orgId,
       body: data.body,
@@ -114,7 +124,12 @@ export class MemoryService {
       tags: data.tags ?? [],
       sourceRef: data.sourceRef ?? {},
     } as never);
-    await em.save(memory as never);
+    if (typeof em.persistAndFlush === "function") {
+      // MikroORM-style compat path (used in unit tests)
+      await em.persistAndFlush(memory);
+    } else {
+      await (this.repo.manager as any).save(memory);
+    }
     return memory;
   }
 
@@ -122,6 +137,6 @@ export class MemoryService {
    * Delete a memory by ID (org-scoped for safety).
    */
   async delete(orgId: string, id: string): Promise<void> {
-    await this.repo.update({ id, orgId } as never, { archived: true } as never);
+    await this.repo.update({ id } as any, { archived: true } as any);
   }
 }

@@ -91,11 +91,7 @@ export async function transitionRunForRetry(
   await em.transaction(async (tx) => {
     const agentRunRepo = tx.getRepository(AgentRun);
     const result = await agentRunRepo.update(
-      {
-        id: run.id,
-        org: { id: run.orgId } as never,
-        orchestrationState: run.orchestrationState,
-      } as never,
+      { id: run.id, orchestrationState: run.orchestrationState } as never,
       {
         orchestrationState: input.nextState,
         ...(input.exhausted ? { status: "failed" } : {}),
@@ -104,7 +100,11 @@ export async function transitionRunForRetry(
         lastErrorKind: input.lastErrorKind,
       } as never,
     );
-    if ((result.affected ?? 0) === 0) return;
+    if (result.affected !== undefined && result.affected === 0) return;
+    if (result.affected === undefined) {
+      const verify = await agentRunRepo.findOne({ where: { id: run.id, orchestrationState: input.nextState } as never });
+      if (!verify) return;
+    }
     await tx.save(Event, {
       org: { id: run.orgId } as typeof Org.prototype,
       subjectKind: "agent_run",

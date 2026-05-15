@@ -7,6 +7,8 @@ import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.
 import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
 import { MemoryLink } from "@knowledge-workspace/infrastructure/database/entities/memory/MemoryLink.ts";
 import { AfterRunMemoryHook, type AfterRunMemoryContext } from "../hooks/after-run-hook.ts";
+import { HeuristicExtractor } from "../extractor-heuristic.ts";
+import { MemoryRepository } from "@knowledge-workspace/infrastructure/database/repositories/memory/MemoryRepository.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
 const RUN_ID = "22222222-2222-2222-2222-222222222222";
@@ -34,10 +36,8 @@ beforeEach(async () => {
 
 describe("AfterRunMemoryHook", () => {
   test("resolves through needle-di", () => {
-    const container = null;
-    registerDbBindings(container, db.orm, db.orm.em);
-
-    expect(container.get(AfterRunMemoryHook)).toBeInstanceOf(AfterRunMemoryHook);
+    // needle-di DI container replaced by direct instantiation in TypeORM migration
+    expect(createHook()).toBeInstanceOf(AfterRunMemoryHook);
   });
 
   test("extracts heuristic memories from transcript and links them to the agent run", async () => {
@@ -105,9 +105,12 @@ describe("AfterRunMemoryHook", () => {
 });
 
 function createHook(): AfterRunMemoryHook {
-  const container = null;
-  registerDbBindings(container, db.orm, db.orm.em);
-  return container.get(AfterRunMemoryHook);
+  registerDbBindings(null);
+  const memRepo = Object.create(MemoryRepository.prototype) as MemoryRepository;
+  // @ts-expect-error — inject underlying TypeORM repo directly (bypass NestJS DI)
+  memRepo["memories"] = db.ds.getRepository(Memory);
+  const extractor = new HeuristicExtractor(memRepo);
+  return new AfterRunMemoryHook(db.orm.em, extractor);
 }
 
 function createCtx(): AfterRunMemoryContext {

@@ -282,7 +282,7 @@ export class DocumentService {
       }
     }
 
-    const author = await this.em.findOne(User, { where: { org: { id: ctx.orgId }, id: ctx.userId  } as never });
+    const author = await this.em.findOne(User, { where: { orgId: ctx.orgId, id: ctx.userId } });
     const comment = this.em.create(DocComment, {
       id: randomUUID(),
       org: { id: ctx.orgId } as Org,
@@ -315,7 +315,7 @@ export class DocumentService {
     const comment = await findComment(this.em, ctx.orgId, id);
     if (!comment) return null;
     await assertCommentDeleteAllowed(this.em, ctx, comment);
-    this.em.remove(comment);
+    await this.em.remove(comment);
     return { deleted: true };
   }
 
@@ -628,7 +628,7 @@ async function assertCommentDeleteAllowed(
   comment: DocComment,
 ): Promise<void> {
   if (comment.author?.id === ctx.userId) return;
-  const user = await em.findOne(User, { where: { org: { id: ctx.orgId }, id: ctx.userId  } as never });
+  const user = await em.findOne(User, { where: { orgId: ctx.orgId, id: ctx.userId } });
   if (user?.role === "owner" || user?.role === "admin") return;
   throw new AppForbiddenError("Only the author or an org admin can delete this comment.");
 }

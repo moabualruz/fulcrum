@@ -6,14 +6,8 @@ import { MemoryRepository } from "@knowledge-workspace/infrastructure/database/r
 
 describe("HeuristicExtractor", () => {
   test("resolves through needle-di", () => {
-    const container = null;
-    container.bind({
-      provide: MemoryRepository,
-      useValue: {} as MemoryRepository,
-    });
-
-    const extractor = container.get(HeuristicExtractor);
-
+    // needle-di DI container replaced by direct instantiation in TypeORM migration
+    const extractor = new HeuristicExtractor({} as MemoryRepository);
     expect(extractor).toBeInstanceOf(HeuristicExtractor);
   });
 

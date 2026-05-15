@@ -155,16 +155,16 @@ describe("MemoryRetriever", () => {
       body: `bounded candidate marker ${index}`,
       createdAt: daysAgo(index),
     })));
-    const em = db.orm.em;
-    const repo = em.getRepository(Memory) as MemoryRepository;
+    const repo = createMemoryRepository();
     const queries: Array<{ getQuery: () => string }> = [];
-    const originalCreateQueryBuilder = repo.createQueryBuilder.bind(repo);
-
-    repo.createQueryBuilder = ((alias: string) => {
+    // @ts-expect-error — accessing private field for spy
+    const originalCreateQueryBuilder = (repo["memories"] as any).createQueryBuilder.bind(repo["memories"]);
+    // @ts-expect-error — monkey-patch for spy
+    repo["memories"].createQueryBuilder = ((alias: string) => {
       const qb = originalCreateQueryBuilder(alias);
       queries.push(qb);
       return qb;
-    }) as typeof repo.createQueryBuilder;
+    });
 
     await repo.searchProjectAndGlobal(RetrieverOptsSchema.parse({
       orgId: ORG_A,
@@ -186,16 +186,16 @@ describe("MemoryRetriever", () => {
       body: `empty candidate marker ${index}`,
       createdAt: daysAgo(index),
     })));
-    const em = db.orm.em;
-    const repo = em.getRepository(Memory) as MemoryRepository;
+    const repo = createMemoryRepository();
     const queries: Array<{ getQuery: () => string }> = [];
-    const originalCreateQueryBuilder = repo.createQueryBuilder.bind(repo);
-
-    repo.createQueryBuilder = ((alias: string) => {
+    // @ts-expect-error — accessing private field for spy
+    const originalCreateQueryBuilder = (repo["memories"] as any).createQueryBuilder.bind(repo["memories"]);
+    // @ts-expect-error — monkey-patch for spy
+    repo["memories"].createQueryBuilder = ((alias: string) => {
       const qb = originalCreateQueryBuilder(alias);
       queries.push(qb);
       return qb;
-    }) as typeof repo.createQueryBuilder;
+    });
 
     await repo.searchProjectAndGlobal(RetrieverOptsSchema.parse({
       orgId: ORG_A,
@@ -390,7 +390,8 @@ async function seedMemories(seeds: MemorySeed[]): Promise<void> {
     });
     em.persist(memory);
   }
-  /* flushed */
+  // Flush all pending persists before returning so reads see the seeded data
+  await (em as any).flush();
   em.clear();
 }
 
@@ -408,8 +409,14 @@ function idFor(group: number, index: number): string {
   return `${String(group).repeat(8)}-0000-0000-0000-${index.toString().padStart(12, "0")}`;
 }
 
+function createMemoryRepository(): MemoryRepository {
+  const memRepo = Object.create(MemoryRepository.prototype) as MemoryRepository;
+  // @ts-expect-error — inject underlying TypeORM repo directly (bypass NestJS DI)
+  memRepo["memories"] = db.ds.getRepository(Memory);
+  return memRepo;
+}
+
 function createRetriever(): MemoryRetriever {
-  const container = null;
-  registerDbBindings(container, db.orm, db.orm.em);
-  return container.get(MemoryRetriever);
+  registerDbBindings(null);
+  return new MemoryRetriever(createMemoryRepository());
 }

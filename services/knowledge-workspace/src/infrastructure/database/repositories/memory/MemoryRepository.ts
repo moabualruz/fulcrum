@@ -61,6 +61,10 @@ export class MemoryRepository {
     return this.memories.manager;
   }
 
+  getEntityManager(): EntityManager {
+    return this.memories.manager;
+  }
+
   findOne(where: FindOptionsWhere<Memory>): Promise<Memory | null> {
     return this.memories.findOne({ where });
   }

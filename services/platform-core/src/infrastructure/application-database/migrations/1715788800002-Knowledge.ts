@@ -43,11 +43,13 @@ export class Knowledge1715788800002 implements MigrationInterface {
         "org_id"       uuid NOT NULL REFERENCES "orgs" ("id"),
         "doc_id"       uuid NOT NULL REFERENCES "documents" ("id") ON DELETE CASCADE,
         "author_id"    uuid REFERENCES "users" ("id") ON DELETE SET NULL,
-        "version_num"  integer NOT NULL,
-        "delta_json"   jsonb,
-        "snapshot_md"  text,
-        "yjs_state"    bytea,
-        "created_at"   timestamptz NOT NULL DEFAULT now(),
+        "version_num"     integer NOT NULL,
+        "snapshot"        jsonb,
+        "delta"           jsonb,
+        "body_md_snapshot" text,
+        "yjs_state"       bytea,
+        "restore_of"      uuid REFERENCES "doc_versions" ("id") ON DELETE SET NULL,
+        "created_at"      timestamptz NOT NULL DEFAULT now(),
         CONSTRAINT "doc_versions_doc_version_unique" UNIQUE ("doc_id", "version_num")
       )
     `);

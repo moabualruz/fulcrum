@@ -40,6 +40,11 @@ export class Memory {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
+  /** MikroORM compat: access org FK id directly as orgId. */
+  get orgId(): string | undefined {
+    return (this.org as any)?.id;
+  }
+
   @Column({ type: "varchar", name: "project_id", nullable: true })
   projectId: string | null = null;
 
