@@ -147,7 +147,7 @@ export class WorkItemRelationshipService {
       throw new AppNotFoundError(`Relationship ${relationshipId} not found`);
     }
 
-    this.em.remove(rel);
+    await this.em.remove(rel);
   }
 
   async listForTask(orgId: string, taskId: string): Promise<RelationshipOutput[]> {
