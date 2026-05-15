@@ -62,12 +62,12 @@ export async function saveSearch(
   ctx: SearchApplicationContext,
   input: { owner: string; name: string; params: SearchParams },
 ): Promise<void> {
-  const existing = await em.findOne(SavedView, {
+  const existing = await em.findOne(SavedView, { where: {
     org: ctx.orgId,
     viewType: "search",
     createdById: input.owner,
     name: input.name,
-  } as never);
+  } as never });
   if (existing) {
     existing.queryJson = paramsToQueryJson(input.params);
     existing.updatedAt = new Date();

@@ -12,7 +12,7 @@ export async function listSprints(em: EntityManager, ctx: AppContext, input?: Li
 }
 
 export async function getSprint(em: EntityManager, ctx: AppContext, id: string): Promise<SprintDto | null> {
-  const sprint = await em.findOne(Sprint, { id } as never);
+  const sprint = await em.findOne(Sprint, { where: { id } as never });
   if (!sprint) throw new AppNotFoundError(`Sprint not found: ${id}`);
   if (sprint.org.id !== ctx.orgId) throw new AppForbiddenError("Sprint is outside org scope.");
   return new WorkCycleService(em).get(ctx.orgId, id);

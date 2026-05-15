@@ -26,7 +26,7 @@ export async function listReportSnapshots(
 }
 
 export async function getReportSnapshot(em: EntityManager, ctx: AppContext, id: string): Promise<ReportSnapshotDto> {
-  const row = await em.findOne(MetricsCache, { id } as never);
+  const row = await em.findOne(MetricsCache, { where: { id } as never });
   if (!row) throw new AppNotFoundError(`Report snapshot not found: ${id}`);
   return serializeReportSnapshot(row, ctx.orgId);
 }
@@ -64,11 +64,11 @@ export async function getSprintBurndown(
   ctx: AppContext,
   input: { projectId: string; sprintId: string },
 ): Promise<BurndownPoint[]> {
-  const sprint = await em.findOne(Sprint, {
+  const sprint = await em.findOne(Sprint, { where: {
     id: input.sprintId,
     org: ctx.orgId,
     projectId: input.projectId,
-  } as never);
+  } as never });
   if (!sprint) return [];
 
   const tasks = await em.createQueryBuilder(Task, "task")

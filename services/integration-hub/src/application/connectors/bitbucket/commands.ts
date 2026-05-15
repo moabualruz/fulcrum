@@ -8,7 +8,7 @@ import type { AppContext, BitbucketPullRequestDto, UpsertBitbucketPullRequestInp
 export async function upsertBitbucketPullRequest(em: EntityManager, ctx: AppContext, input: UpsertBitbucketPullRequestInput): Promise<BitbucketPullRequestDto> {
   if (!input.repoSlug || !input.pullRequestId || !input.title) throw new AppValidationError("Bitbucket pull request repoSlug, pullRequestId, and title are required.");
   return await em.transaction(async (txEm: EntityManager) => {
-    let row = await txEm.findOne(BitbucketPullRequest, { org: ctx.orgId, repoSlug: input.repoSlug, pullRequestId: input.pullRequestId } as never);
+    let row = await txEm.findOne(BitbucketPullRequest, { where: { org: ctx.orgId, repoSlug: input.repoSlug, pullRequestId: input.pullRequestId } as never });
     row ??= txEm.create(BitbucketPullRequest, { org: { id: ctx.orgId } as Org, projectId: ctx.projectId ?? "00000000-0000-4000-8000-000000000000", repoSlug: input.repoSlug, pullRequestId: input.pullRequestId, title: input.title, state: input.state });
     row.title = input.title;
     row.state = input.state;

@@ -201,7 +201,7 @@ export async function getFileByPath(
   path: string,
 ): Promise<RepoFileRow | null> {
   await getRepo(em, ctx, repoId);
-  const row = await em.findOne(RepoTreeEntry, { org: ctx.orgId, repo: repoId, path } as never);
+  const row = await em.findOne(RepoTreeEntry, { where: { org: ctx.orgId, repo: repoId, path } as never });
   return row ? serializeTreeEntry(row, branch) : null;
 }
 
@@ -213,7 +213,7 @@ export async function getFileContent(
   path: string,
 ): Promise<RepoFileContentRow | null> {
   await getRepo(em, ctx, repoId);
-  const row = await em.findOne(RepoTreeEntry, { org: ctx.orgId, repo: repoId, path } as never);
+  const row = await em.findOne(RepoTreeEntry, { where: { org: ctx.orgId, repo: repoId, path } as never });
   if (!row) return null;
   const payload = row.payload ?? {};
   const content = typeof payload["content"] === "string" ? payload["content"] : null;

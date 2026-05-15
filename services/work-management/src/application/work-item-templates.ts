@@ -84,10 +84,10 @@ export class WorkItemTemplateService {
     templateId: string,
     overrides: Record<string, unknown> = {},
   ): Promise<Record<string, unknown>> {
-    const template = await this.em.findOne(TaskTemplate, {
+    const template = await this.em.findOne(TaskTemplate, { where: {
       id: templateId,
       org: { id: orgId },
-    } as never);
+    } as never });
 
     if (!template) {
       throw new AppNotFoundError(`Template ${templateId} not found`);
@@ -100,10 +100,10 @@ export class WorkItemTemplateService {
   }
 
   async delete(orgId: string, templateId: string): Promise<void> {
-    const template = await this.em.findOne(TaskTemplate, {
+    const template = await this.em.findOne(TaskTemplate, { where: {
       id: templateId,
       org: { id: orgId },
-    } as never);
+    } as never });
 
     if (!template) {
       throw new AppNotFoundError(`Template ${templateId} not found`);
@@ -118,20 +118,20 @@ export class WorkItemTemplateService {
     templateId: string,
   ): Promise<void> {
     // Clear existing defaults for this scope
-    const existing = await this.em.find(TaskTemplate, {
+    const existing = await this.em.find(TaskTemplate, { where: {
       org: { id: orgId },
       projectId,
       isDefault: true,
-    } as never);
+    } as never });
 
     for (const t of existing) {
       t.isDefault = false;
     }
 
-    const template = await this.em.findOne(TaskTemplate, {
+    const template = await this.em.findOne(TaskTemplate, { where: {
       id: templateId,
       org: { id: orgId },
-    } as never);
+    } as never });
 
     if (!template) {
       throw new AppNotFoundError(`Template ${templateId} not found`);

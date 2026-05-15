@@ -392,7 +392,7 @@ export async function updateLlmGateConfig(
   if (input.inputMode !== undefined) process.env["FULCRUM_LLM_INPUT_MODE"] = input.inputMode;
 
   try {
-    const org = await em.findOne(Org, { id: ctx.orgId } as never);
+    const org = await em.findOne(Org, { where: { id: ctx.orgId } as never });
     if (org) {
       const event = em.create(Event, {
         org,

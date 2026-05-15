@@ -18,6 +18,15 @@ export class WorkManagement1715788800001 implements MigrationInterface {
         "workflow_config"   jsonb,
         "methodology"       varchar,
         "enabled_task_types" jsonb,
+        "slug"              varchar,
+        "description"       text,
+        "parent_id"         uuid REFERENCES "projects" ("id") ON DELETE SET NULL,
+        "kind"              varchar NOT NULL DEFAULT 'project',
+        "path"              varchar,
+        "depth"             integer NOT NULL DEFAULT 0,
+        "module_policy"     jsonb NOT NULL DEFAULT '{}',
+        "template_id"       varchar,
+        "workflow_id"       varchar,
         "created_at"        timestamptz NOT NULL DEFAULT now(),
         "updated_at"        timestamptz NOT NULL DEFAULT now()
       )
@@ -254,6 +263,7 @@ export class WorkManagement1715788800001 implements MigrationInterface {
         "name"            varchar NOT NULL,
         "trigger_type"    varchar NOT NULL,
         "trigger_config"  jsonb NOT NULL DEFAULT '{}',
+        "condition"       jsonb,
         "action_type"     varchar NOT NULL,
         "action_config"   jsonb NOT NULL DEFAULT '{}',
         "enabled"         boolean NOT NULL DEFAULT true,
@@ -312,6 +322,10 @@ export class WorkManagement1715788800001 implements MigrationInterface {
         "points_completed" integer NOT NULL DEFAULT 0,
         "points_remaining" integer NOT NULL DEFAULT 0,
         "wip_count"        integer NOT NULL DEFAULT 0,
+        "scope_type"       varchar NOT NULL DEFAULT 'sprint',
+        "points_total"     integer NOT NULL DEFAULT 0,
+        "tasks_total"      integer NOT NULL DEFAULT 0,
+        "status_counts"    jsonb NOT NULL DEFAULT '{}',
         "updated_at"       timestamptz NOT NULL DEFAULT now(),
         CONSTRAINT "metrics_cache_project_sprint_date_unique" UNIQUE ("project_id", "sprint_id", "date")
       )

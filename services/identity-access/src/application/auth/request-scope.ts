@@ -31,7 +31,7 @@ async function inferOrgIdFromRun(
 ): Promise<string | null> {
   const id = runId?.trim();
   if (!id) return null;
-  const run = await em.findOne(AgentRun, { id } as never);
+  const run = await em.findOne(AgentRun, { where: { id } as never });
   return run?.org.id ?? null;
 }
 
@@ -41,7 +41,7 @@ async function inferOrgIdFromProject(
 ): Promise<string | null> {
   const id = projectId?.trim();
   if (!id) return null;
-  const project = await em.findOne(Project, { id } as never);
+  const project = await em.findOne(Project, { where: { id } as never });
   return project?.org.id ?? null;
 }
 
@@ -51,6 +51,6 @@ async function inferOrgIdFromTask(
 ): Promise<string | null> {
   const id = taskId?.trim();
   if (!id) return null;
-  const task = await em.findOne(Task, { id } as never);
+  const task = await em.findOne(Task, { where: { id } as never });
   return task?.org.id ?? null;
 }

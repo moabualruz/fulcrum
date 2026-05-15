@@ -291,7 +291,7 @@ export function serializeSprint(sprint: Sprint): SprintOutput {
 }
 
 async function findSprint(em: EntityManager, orgId: string, id: string): Promise<Sprint | null> {
-  return em.findOne(Sprint, { org: orgId, id } as never);
+  return em.findOne(Sprint, { where: { org: orgId, id } as never });
 }
 
 async function emitSprintEvent(ctx: SprintContext, input: {

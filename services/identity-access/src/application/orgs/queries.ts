@@ -26,7 +26,7 @@ export interface OrgMemberOutput {
 }
 
 async function currentMembership(em: EntityManager, ctx: OrgAppContext): Promise<OrgMember | null> {
-  return em.findOne(OrgMember, { orgId: ctx.orgId, userId: ctx.userId } as never);
+  return em.findOne(OrgMember, { where: { orgId: ctx.orgId, userId: ctx.userId } as never });
 }
 
 export async function requireAdminOrOwner(em: EntityManager, ctx: OrgAppContext): Promise<OrgMember> {
@@ -46,7 +46,7 @@ export async function requireOwner(em: EntityManager, ctx: OrgAppContext): Promi
 }
 
 export async function getOrg(em: EntityManager, ctx: OrgAppContext): Promise<OrgOutput> {
-  const org = await em.findOne(Org, { id: ctx.orgId } as never);
+  const org = await em.findOne(Org, { where: { id: ctx.orgId } as never });
   if (!org) throw new AppNotFoundError(`Org ${ctx.orgId} not found.`);
   return {
     id: org.id,

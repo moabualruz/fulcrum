@@ -161,7 +161,7 @@ async function handleMetricsRollup(
     existingWhere["scopeId"] = scope_id;
   }
 
-  let row = await em.findOne(MetricsCache, existingWhere as never) as unknown as Record<string, unknown> | null;
+  let row = await em.findOne(MetricsCache, { where: existingWhere as never }) as unknown as Record<string, unknown> | null;
 
   if (row) {
     // Update existing row

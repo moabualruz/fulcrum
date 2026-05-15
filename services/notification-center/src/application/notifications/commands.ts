@@ -42,7 +42,7 @@ async function writeNotificationOutboxEvent(
 export async function createNotification(em: EntityManager, ctx: AppContext, input: CreateNotificationInput): Promise<NotificationDto> {
   if (!ctx.userId || !input.eventId || !input.entityKind || !input.entityId || !input.title) throw new AppValidationError("Notification user, eventId, entityKind, entityId, and title are required.");
   return await em.transaction(async (txEm: EntityManager) => {
-    const event = await txEm.findOne(Event, { id: input.eventId } as never) ??
+    const event = await txEm.findOne(Event, { where: { id: input.eventId } as never }) ??
       txEm.create(Event, {
         id: input.eventId,
         org: { id: ctx.orgId } as Org,
@@ -61,7 +61,7 @@ export async function createNotification(em: EntityManager, ctx: AppContext, inp
 
 export async function markNotificationRead(em: EntityManager, ctx: AppContext, id: string): Promise<NotificationDto> {
   return await em.transaction(async (txEm: EntityManager) => {
-    const row = await txEm.findOne(Notification, { id, org: ctx.orgId, userId: ctx.userId } as never);
+    const row = await txEm.findOne(Notification, { where: { id, org: ctx.orgId, userId: ctx.userId } as never });
     if (!row) throw new AppNotFoundError("Notification not found.");
     if (row.readAt !== null) return serializeNotification(row);
     row.readAt = new Date();
@@ -107,12 +107,12 @@ export async function muteNotificationSubject(
   input: NotificationMuteInput,
 ): Promise<NotificationMuteDto> {
   return em.transaction(async (txEm: EntityManager) => {
-    const existing = await txEm.findOne(NotificationMute, {
+    const existing = await txEm.findOne(NotificationMute, { where: {
       org: ctx.orgId,
       userId: ctx.userId,
       subjectKind: input.subjectKind,
       subjectId: input.subjectId,
-    } as never);
+    } as never });
     const row = existing ?? txEm.create(NotificationMute, {
       org: { id: ctx.orgId } as Org,
       userId: ctx.userId!,
@@ -138,12 +138,12 @@ export async function unmuteNotificationSubject(
   input: NotificationSubjectInput,
 ): Promise<{ ok: true }> {
   return em.transaction(async (txEm: EntityManager) => {
-    const row = await txEm.findOne(NotificationMute, {
+    const row = await txEm.findOne(NotificationMute, { where: {
       org: ctx.orgId,
       userId: ctx.userId,
       subjectKind: input.subjectKind,
       subjectId: input.subjectId,
-    } as never);
+    } as never });
     if (row) txEm.remove(row);
     await writeNotificationOutboxEvent(txEm, {
       orgId: ctx.orgId,

@@ -22,7 +22,7 @@ export async function listDocs(em: EntityManager, ctx: AppContext, input?: ListD
 export async function getDoc(em: EntityManager, ctx: AppContext, input: GetDocInput | string): Promise<DocDto | null> {
   const normalized = typeof input === "string" ? { id: input } : input;
   if (normalized.id) {
-    const doc = await em.findOne(Document, { id: normalized.id } as never);
+    const doc = await em.findOne(Document, { where: { id: normalized.id } as never });
     if (!doc) throw new AppNotFoundError(`Document not found: ${normalized.id}`);
     if (doc.org.id !== ctx.orgId) throw new AppForbiddenError(`Document does not belong to org: ${ctx.orgId}`);
     if (doc.archived) throw new AppNotFoundError(`Document not found: ${normalized.id}`);

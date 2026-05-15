@@ -88,7 +88,7 @@ export async function listCredentials(em: EntityManager, ctx: AppContext, input:
 }
 
 export async function getCredential(em: EntityManager, ctx: AppContext, id: string): Promise<CredentialDto> {
-  const row = await em.findOne(ConnectorCredential, { id } as never);
+  const row = await em.findOne(ConnectorCredential, { where: { id } as never });
   if (!row) throw new AppNotFoundError(`Credential not found: ${id}`);
   if (row.org.id !== ctx.orgId) throw new AppForbiddenError("Credential is outside org scope.");
   return serializeCredential(row);

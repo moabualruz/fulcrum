@@ -235,7 +235,8 @@ export class Integration1715788800004 implements MigrationInterface {
         "label"            varchar NOT NULL,
         "encrypted_secret" text NOT NULL,
         "metadata"         jsonb NOT NULL DEFAULT '{}',
-        "created_at"       timestamptz NOT NULL DEFAULT now()
+        "created_at"       timestamptz NOT NULL DEFAULT now(),
+        "updated_at"       timestamptz NOT NULL DEFAULT now()
       )
     `);
     await queryRunner.query(`CREATE INDEX "connector_credentials_org_project" ON "connector_credentials" ("org_id", "project_id")`);
