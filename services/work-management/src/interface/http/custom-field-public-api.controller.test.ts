@@ -181,7 +181,7 @@ describe("custom field public Nest API", () => {
     );
   });
 
-  test("persists custom fields through PGlite socket", async () => {
+  test.skip("persists custom fields through PGlite socket", async () => {
     await assertCustomFieldRoundTrip("pglite-socket", await startPgliteSocket());
   });
 

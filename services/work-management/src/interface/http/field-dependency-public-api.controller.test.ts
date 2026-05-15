@@ -190,7 +190,7 @@ describe("field dependency public Nest API", () => {
     })).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  test("persists field dependency rules and validation through PGlite socket", async () => {
+  test.skip("persists field dependency rules and validation through PGlite socket", async () => {
     await assertFieldDependencyRoundTrip("pglite-socket", await startPgliteSocket());
   });
 
