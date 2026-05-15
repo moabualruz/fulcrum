@@ -83,7 +83,7 @@ export type { PlanningArtifactExecutionInput, PlanningArtifactExecutionRecord };
 
 export interface PersistedPlanningArtifactExecutionRecord extends PlanningArtifactExecutionRecord {
   prototypeId: string;
-  artifactId?: string;
+  artifactId?: string | null;
 }
 
 export interface ApprovedPlanMaterializeInput extends BuildApprovedPlanBreakdownInput {
@@ -351,13 +351,18 @@ export class PlanningPreviewService {
         record.artifactId,
       );
       if (!prototype) throw new Error(`Planning artifact not found: ${record.artifactPath}`);
+      const persistedRecord = buildPlanningArtifactExecutionRecord({
+        ...record,
+        prototypeId: prototype.id,
+        artifactId: prototype.artifactId ?? undefined,
+      });
       await manager.getRepository(FulcrumPlanPrototypeEntity).save({
         ...prototype,
-        status: record.prototypeStatus,
-        metadata: mergePlanningArtifactExecutionMetadata(prototype.metadata, record),
+        status: persistedRecord.prototypeStatus,
+        metadata: mergePlanningArtifactExecutionMetadata(prototype.metadata, persistedRecord),
       });
       return {
-        ...record,
+        ...persistedRecord,
         prototypeId: prototype.id,
         artifactId: prototype.artifactId,
       };

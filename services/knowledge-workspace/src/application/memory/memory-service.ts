@@ -95,7 +95,7 @@ export class MemoryService {
    * Get a single memory by ID (org-scoped).
    */
   async get(orgId: string, id: string): Promise<MemoryRow | null> {
-    return this.repo.findOne({ where: { id, org: { id: orgId } } as never });
+    return this.repo.findOne({ where: { id, org: { id: orgId } } } as any);
   }
 
 

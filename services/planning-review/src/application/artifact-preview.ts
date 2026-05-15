@@ -46,13 +46,14 @@ export function buildPlanningArtifactPreviews(input: {
 }
 
 function previewMode(path: string): PlanningArtifactPreviewMode {
-  if (path.includes("/src/routes/")) return "web-route";
   if (/(\.test|\.spec)\.[cm]?[tj]sx?$/.test(path)) return "test-file";
+  if (isOpenableRouteEntry(path)) return "web-route";
   if (/\.[cm]?[tj]sx?$/.test(path)) return "source-module";
   return "unknown";
 }
 
 function urlPathFor(path: string): string | undefined {
+  if (!isOpenableRouteEntry(path)) return undefined;
   const marker = "/src/routes/";
   const index = path.indexOf(marker);
   if (index === -1) return undefined;
@@ -63,6 +64,11 @@ function urlPathFor(path: string): string | undefined {
   if (last.startsWith("+")) segments.pop();
   else if (last.includes(".")) segments.pop();
   return `/${segments.join("/")}`.replace(/\/$/, "") || "/";
+}
+
+function isOpenableRouteEntry(path: string): boolean {
+  const fileName = path.split(/[\\/]/g).at(-1) ?? "";
+  return path.includes("/src/routes/") && fileName === "+page.svelte";
 }
 
 function runFor(
