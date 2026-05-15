@@ -138,7 +138,7 @@ export class WorkItemRecurrenceService {
     const rules = await this.em.find(TaskRecurrenceRule, { where: {
       nextRunAt: LessThanOrEqual(now),
       enabled: true,
-    } as never });
+    } as never, relations: ["org"] });
 
     for (const rule of rules) {
       const orgId = (rule.org as Org)?.id ?? (rule as any).org_id;

@@ -46,6 +46,7 @@ export async function listChildren(
       ...(ctx.projectId ? { projectId: ctx.projectId } : {}),
       deletedAt: null,
     } as never,
+    relations: ["parent"],
     order: { createdAt: "ASC", id: "ASC" },
   });
   return children.map(serializeTask);

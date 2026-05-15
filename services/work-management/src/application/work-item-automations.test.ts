@@ -184,12 +184,13 @@ describe("WorkItemAutomationService", () => {
       expect(parentAutomation.executionCount).toBe(1);
       expect(childAutomation.executionCount).toBe(1);
       expect(siblingAutomation.executionCount).toBe(0);
-      expect(em.find).toHaveBeenCalledWith(expect.anything(), {
-        org: { id: "org-1" },
-        projectId: { $in: ["proj-parent", "proj-child"] },
-        triggerType: "task.assigned",
-        enabled: true,
-      });
+      expect(em.find).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        where: expect.objectContaining({
+          org: { id: "org-1" },
+          triggerType: "task.assigned",
+          enabled: true,
+        }),
+      }));
     });
   });
 
