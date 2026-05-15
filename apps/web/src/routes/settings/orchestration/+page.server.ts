@@ -1,11 +1,11 @@
 import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { requestAppScope } from "$lib/server/application-scope";
+import { requestServiceScope } from "$lib/server/request-service-scope";
 import {
   loadOrchestrationConfig,
   listWorkflowDefs,
+  upsertOrchestrationConfig,
 } from "$lib/server/orchestration";
-import { upsertOrchestrationConfig } from "@execution-orchestration/application/orchestration/commands.ts";
 import { actionOk } from "$lib/feedback/action-result";
 
 export const load: PageServerLoad = ({ locals }) => {
@@ -13,7 +13,7 @@ export const load: PageServerLoad = ({ locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+        const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
         const config = await loadOrchestrationConfig(em, ctx);
         const workflows = await listWorkflowDefs(em, ctx);
         return {
@@ -45,7 +45,7 @@ export const actions: Actions = {
     if (stallTimeoutS < 10 || stallTimeoutS > 86400)
       return fail(400, { error: "Stall timeout must be 10-86400s" });
 
-    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
     await upsertOrchestrationConfig(em, ctx, {
       pollIntervalS,
       maxConcurrency,

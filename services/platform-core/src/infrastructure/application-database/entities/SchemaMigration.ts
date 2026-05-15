@@ -10,7 +10,7 @@ import {
 
 export type MigrationDirection = "up" | "down";
 
-@Entity("schema_migrations")
+@Entity("fulcrum_schema_migrations")
 export class SchemaMigration {
   @PrimaryColumn({ type: "bigint" })
   version!: number;

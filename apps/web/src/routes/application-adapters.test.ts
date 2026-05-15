@@ -43,7 +43,8 @@ const SURFACES: Surface[] = [
   {
     name: "projects",
     file: "projects/+page.server.ts",
-    applicationModule: "application/projects/queries",
+    applicationModule: null,
+    helperModule: "@work-management/interface/project-lifecycle",
     keys: ["activeProjectId", "streamed", "data", "projects"],
   },
   {
@@ -98,7 +99,8 @@ const SURFACES: Surface[] = [
   {
     name: "memory",
     file: "memory/+page.server.ts",
-    applicationModule: "application/memory/queries",
+    applicationModule: null,
+    helperModule: "@knowledge-workspace/interface/memory-records",
     keys: ["activeProjectId", "scope", "kind", "streamed", "data", "memories"],
   },
   {
@@ -181,13 +183,15 @@ const SURFACES: Surface[] = [
   {
     name: "tasks",
     file: "tasks/[id]/+page.server.ts",
-    applicationModule: "application/tasks/queries",
+    applicationModule: null,
+    helperModule: "@work-management/interface/work-item-detail",
     keys: ["task", "children"],
   },
   {
     name: "boards",
     file: "boards/+page.server.ts",
-    applicationModule: "application/tasks/queries",
+    applicationModule: null,
+    helperModule: "@work-management/interface/work-item-detail",
     keys: ["project", "activeProjectId", "streamed", "data", "tasks"],
   },
 ];

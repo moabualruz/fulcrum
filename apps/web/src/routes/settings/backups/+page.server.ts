@@ -1,8 +1,8 @@
 import type { PageServerLoad, Actions } from "./$types";
 import { fail } from "@sveltejs/kit";
-import { requestAppScope } from "$lib/server/application-scope";
-import { createSettingsBackup, preflightSettingsBackup, restoreSettingsBackup } from "@platform-core/application/settings/commands.ts";
-import { listBackupSummaries, summarizeImportManifest } from "@platform-core/application/settings/queries.ts";
+import { requestServiceScope } from "$lib/server/request-service-scope";
+import { createSettingsBackup, preflightSettingsBackup, restoreSettingsBackup } from "@platform-core/interface/settings-workbench.ts";
+import { listBackupSummaries, summarizeImportManifest } from "@platform-core/interface/settings-workbench.ts";
 import { AppError } from "@platform-core/domain/errors.ts";
 
 function appFail(error: unknown) {
@@ -23,7 +23,7 @@ export const load: PageServerLoad = ({ locals }) => {
   return {
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+        const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
         return listBackupSummaries(em, ctx);
       })(),
     },
@@ -33,7 +33,7 @@ export const load: PageServerLoad = ({ locals }) => {
 export const actions: Actions = {
   create: async ({ locals }) => {
     try {
-      const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+      const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
       return await createSettingsBackup(em, ctx);
     } catch (error) {
       return appFail(error);
@@ -57,7 +57,7 @@ export const actions: Actions = {
       const backupJson = data.get("backupJson");
       const parsed = typeof backupJson === "string" && backupJson ? JSON.parse(backupJson) : null;
       const { manifest } = summarizeImportManifest(parsed);
-      const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+      const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
       return await restoreSettingsBackup(em, ctx, { manifest });
     } catch (error) {
       return appFail(error);

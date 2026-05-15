@@ -1,20 +1,35 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock DB
-const mockDb = {
-  query: vi.fn(),
-  close: vi.fn(),
+const scope = {
+  em: { marker: "em" },
+  ctx: { orgId: "org-1", userId: "user-1", projectId: "project-1" },
 };
-vi.mock("$lib/server/db", () => ({
-  openIsolatedStore: vi.fn(() => Promise.resolve(mockDb)),
+const mocks = {
+  scope,
+  requestServiceScope: vi.fn(async () => scope),
+  addSettingsSecret: vi.fn(async () => ({ success: true })),
+  rotateSettingsSecret: vi.fn(async () => ({ success: true })),
+  toggleSettingsSecretArchive: vi.fn(async () => ({ success: true })),
+  deleteSettingsSecret: vi.fn(async () => ({ success: true })),
+  listSettingsSecrets: vi.fn(async () => ({ credentials: [] })),
+};
+
+vi.mock("$lib/server/request-service-scope", () => ({
+  requestServiceScope: mocks.requestServiceScope,
+}));
+
+vi.mock("@platform-core/interface/settings-workbench.ts", () => ({
+  addSettingsSecret: mocks.addSettingsSecret,
+  rotateSettingsSecret: mocks.rotateSettingsSecret,
+  toggleSettingsSecretArchive: mocks.toggleSettingsSecretArchive,
+  deleteSettingsSecret: mocks.deleteSettingsSecret,
+  listSettingsSecrets: mocks.listSettingsSecrets,
 }));
 
 import { actions } from "./+page.server.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockDb.query.mockResolvedValue([]);
-  mockDb.close.mockResolvedValue(undefined);
 });
 
 function makeRequest(body: Record<string, string>) {
@@ -30,13 +45,13 @@ describe("/settings/secrets actions", () => {
   });
 
   it("add: inserts credential", async () => {
-    mockDb.query.mockResolvedValue([]);
     const result = await actions.add(makeRequest({ name: "MY_KEY", value: "secret123", provider: "aws" }));
     expect(result).toMatchObject({ success: true });
-    expect(mockDb.query).toHaveBeenCalledWith(
-      expect.stringContaining("INSERT INTO credentials"),
-      expect.arrayContaining(["MY_KEY", "aws"]),
-    );
+    expect(mocks.addSettingsSecret).toHaveBeenCalledWith(mocks.scope.em, mocks.scope.ctx, {
+      name: "MY_KEY",
+      value: "secret123",
+      provider: "aws",
+    });
   });
 
   it("rotate: requires id and value", async () => {
@@ -47,39 +62,28 @@ describe("/settings/secrets actions", () => {
   it("rotate: updates value_hash and last_used_at", async () => {
     const result = await actions.rotate(makeRequest({ id: "abc", value: "newvalue" }));
     expect(result).toMatchObject({ success: true });
-    expect(mockDb.query).toHaveBeenCalledWith(
-      expect.stringContaining("last_used_at"),
-      expect.arrayContaining(["abc"]),
-    );
+    expect(mocks.rotateSettingsSecret).toHaveBeenCalledWith(mocks.scope.em, mocks.scope.ctx, {
+      id: "abc",
+      value: "newvalue",
+    });
   });
 
   it("archive: toggles archived", async () => {
     const result = await actions.archive(makeRequest({ id: "abc" }));
     expect(result).toMatchObject({ success: true });
-    expect(mockDb.query).toHaveBeenCalledWith(
-      expect.stringContaining("archived = NOT archived"),
-      ["abc"],
-    );
+    expect(mocks.toggleSettingsSecretArchive).toHaveBeenCalledWith(mocks.scope.em, mocks.scope.ctx, { id: "abc" });
   });
 
   it("delete: removes row", async () => {
     const result = await actions.delete(makeRequest({ id: "abc" }));
     expect(result).toMatchObject({ success: true });
-    expect(mockDb.query).toHaveBeenCalledWith(
-      expect.stringContaining("DELETE FROM credentials"),
-      ["abc"],
-    );
+    expect(mocks.deleteSettingsSecret).toHaveBeenCalledWith(mocks.scope.em, mocks.scope.ctx, { id: "abc" });
   });
 
-  it("add: value never stored as plaintext in DB call args", async () => {
+  it("add: route delegates plaintext handling to settings service only", async () => {
     await actions.add(makeRequest({ name: "TEST", value: "plaintext-secret", provider: "" }));
-    const calls = mockDb.query.mock.calls;
-    for (const [, args] of calls) {
-      if (Array.isArray(args)) {
-        for (const arg of args) {
-          expect(arg).not.toBe("plaintext-secret");
-        }
-      }
-    }
+    expect(mocks.addSettingsSecret).toHaveBeenCalledTimes(1);
+    expect(mocks.rotateSettingsSecret).not.toHaveBeenCalled();
+    expect(mocks.deleteSettingsSecret).not.toHaveBeenCalled();
   });
 });

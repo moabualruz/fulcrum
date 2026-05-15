@@ -6,13 +6,14 @@ import { superValidate } from "sveltekit-superforms/server";
 import { valibot } from "sveltekit-superforms/adapters";
 import type { Actions, PageServerLoad } from "./$types";
 import { DocumentFormSchema } from "$lib/server/documents.schema";
-import { createDocumentAction } from "@knowledge-workspace/application/document-actions.ts";
+import { createDocumentAction } from "@knowledge-workspace/interface/document-actions.ts";
 import { parseLabels } from "$lib/markdown/labels";
-import { TEMPLATE_BODY_MAP } from "@knowledge-workspace/application/docs/template-seeds.ts";
 import {
   DOC_TEMPLATE_SERVICE_TOKEN,
-} from "@knowledge-workspace/application/docs/doc-template-service.ts";
-import { requestAppScope } from "$lib/server/application-scope";
+  TEMPLATE_BODY_MAP,
+  type DocTemplateService,
+} from "@knowledge-workspace/interface/document-pages.ts";
+import { requestServiceScope } from "$lib/server/request-service-scope";
 
 // ─── Load ────────────────────────────────────────────────────────────────────
 
@@ -36,7 +37,7 @@ export const load: PageServerLoad = async (event) => {
 
   if (container && orgId) {
     try {
-      const svc = container.get(DOC_TEMPLATE_SERVICE_TOKEN);
+      const svc = container.get<DocTemplateService>(DOC_TEMPLATE_SERVICE_TOKEN);
       const rows = await svc.list(orgId);
       for (const row of rows) {
         templates[String(row.docType)] = row.bodyTemplate;
@@ -57,7 +58,7 @@ export const actions: Actions = {
     if (!form.valid) return fail(400, { form });
     let id: string;
     {
-      const { em, ctx } = await requestAppScope(locals, form.data.projectId ?? null);
+      const { em, ctx } = await requestServiceScope(locals, form.data.projectId ?? null);
       const labels = parseLabels(form.data.labels ?? "");
       const created = await createDocumentAction(em, {
         orgId: ctx.orgId,

@@ -2,7 +2,7 @@ import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { cancelRun, retryRun } from "@execution-orchestration/interface/run-actions.ts";
 import { getProjectRunPageData } from "@execution-orchestration/interface/run-pages.ts";
-import { requestAppScope } from "$lib/server/application-scope";
+import { requestServiceScope } from "$lib/server/request-service-scope";
 import { actionOk } from "$lib/feedback/action-result";
 
 interface AgentRunDetail {
@@ -41,7 +41,7 @@ export const load: PageServerLoad = ({ params, locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestAppScope(locals, params.id);
+        const { em, ctx } = await requestServiceScope(locals, params.id);
         try {
           return await getProjectRunPageData(em, ctx, params.runId);
         } catch {
@@ -54,12 +54,12 @@ export const load: PageServerLoad = ({ params, locals }) => {
 
 export const actions: Actions = {
   cancel: async ({ params, locals }) => {
-    const { em, ctx } = await requestAppScope(locals, params.id);
+    const { em, ctx } = await requestServiceScope(locals, params.id);
     await cancelRun(em, ctx, params.runId!);
     return actionOk("Run cancelled");
   },
   retry: async ({ params, locals }) => {
-    const { em, ctx } = await requestAppScope(locals, params.id);
+    const { em, ctx } = await requestServiceScope(locals, params.id);
     const result = await retryRun(em, ctx, params.runId!);
     const newId = result.id;
     throw redirect(303, `/projects/${params.id}/runs/${newId}`);

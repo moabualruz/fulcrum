@@ -34,7 +34,7 @@ export class Platform1715788800006 implements MigrationInterface {
 
     // schema_migrations (audit ledger)
     await queryRunner.query(`
-      CREATE TABLE "schema_migrations" (
+      CREATE TABLE "fulcrum_schema_migrations" (
         "version"    bigint PRIMARY KEY,
         "name"       varchar NOT NULL UNIQUE,
         "applied_at" timestamptz NOT NULL DEFAULT now(),
@@ -378,7 +378,7 @@ export class Platform1715788800006 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS "error_logs"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "domain_event_outbox"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "credentials"`);
-    await queryRunner.query(`DROP TABLE IF EXISTS "schema_migrations"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "fulcrum_schema_migrations"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "events"`);
   }
 }

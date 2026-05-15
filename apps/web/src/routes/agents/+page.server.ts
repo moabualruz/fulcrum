@@ -2,7 +2,8 @@ import { redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { listAgentProfilesPageData, testProfile } from "@execution-orchestration/interface/agent-profile-pages.ts";
 import { dispatchTaskRun } from "@execution-orchestration/interface/run-actions.ts";
-import { requestAppScope } from "$lib/server/application-scope";
+import { createIdleSessionWorkbenchModel } from "@agent-client-protocol/interface/session-workbench.ts";
+import { requestServiceScope } from "$lib/server/request-service-scope";
 import { actionOk } from "$lib/feedback/action-result";
 
 export const load: PageServerLoad = ({ locals }) => {
@@ -10,8 +11,11 @@ export const load: PageServerLoad = ({ locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestAppScope(locals);
-        return listAgentProfilesPageData(em, ctx);
+        const { em, ctx } = await requestServiceScope(locals);
+        return {
+          ...(await listAgentProfilesPageData(em, ctx)),
+          sessionWorkbench: createIdleSessionWorkbenchModel(),
+        };
       })(),
     },
   };
@@ -22,7 +26,7 @@ export const actions: Actions = {
     const form = await request.formData();
     const name = form.get("name") as string;
     if (!name) return { success: false, message: "Missing profile name" };
-    const { em, ctx } = await requestAppScope(locals);
+    const { em, ctx } = await requestServiceScope(locals);
     const result = await testProfile(em, ctx.orgId, name);
     return actionOk(
       result.test_passed ? `${name}: test passed` : `${name}: test failed`,
@@ -36,7 +40,7 @@ export const actions: Actions = {
     const projectId = (form.get("project_id") as string | null) || null;
     if (!agent || !taskId)
       return { success: false, message: "agent and task_id are required" };
-    const { em, ctx } = await requestAppScope(locals, projectId);
+    const { em, ctx } = await requestServiceScope(locals, projectId);
     const run = await dispatchTaskRun(em, ctx, { taskId, agent });
     throw redirect(303, `/runs/${run.id}`);
   },

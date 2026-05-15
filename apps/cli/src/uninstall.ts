@@ -7,7 +7,7 @@
 
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { AGENTS } from "@execution-orchestration/application/agent-catalog/registry.ts";
+import { AGENTS } from "@execution-orchestration/interface/agent-catalog.ts";
 import { which, run as runProc } from "@platform-core/application/runtime-support/process-runner.ts";
 
 const BEGIN = "<!-- BEGIN FULCRUM RULES -->";

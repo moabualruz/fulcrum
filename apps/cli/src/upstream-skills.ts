@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parse as parseToml } from "smol-toml";
-import { AGENTS } from "@execution-orchestration/application/agent-catalog/registry.ts";
+import { AGENTS } from "@execution-orchestration/interface/agent-catalog.ts";
 import type { AgentId } from "./mcp-registry.ts";
 import { ALL_AGENT_IDS } from "./mcp-registry.ts";
 import { run as runProc, which } from "@platform-core/application/runtime-support/process-runner.ts";

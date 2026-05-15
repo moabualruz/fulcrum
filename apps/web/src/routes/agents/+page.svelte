@@ -1,6 +1,7 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
   import type { PageData } from "./$types";
+  import AgentSessionWorkbench from "$lib/components/agents/AgentSessionWorkbench.svelte";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import { cn } from "$lib/utils.js";
   import { buttonVariants } from "$lib/components/ui/button";
@@ -36,6 +37,10 @@
 {#await data.streamed.data}
   <RouteSkeleton kind="list" />
 {:then payload}
+  <div class={cn("mb-4")}>
+    <AgentSessionWorkbench model={payload.sessionWorkbench} />
+  </div>
+
   {#if payload.profiles.length === 0}
     <div data-agents-empty class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}>
       No agent profiles registered. Use <code>fulcrum agents add</code> to register one.

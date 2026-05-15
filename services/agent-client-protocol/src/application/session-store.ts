@@ -104,6 +104,7 @@ class MutableAcpSessionState implements AcpSessionState {
     this.availableCommands = [];
     this.availableModels = [];
     this.currentModelId = "";
+    this.pendingPermission = null;
   }
 
   clearError(): void {

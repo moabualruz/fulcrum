@@ -1,19 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const mockDb = {
-  query: vi.fn(),
-  close: vi.fn(),
+const scope = {
+  em: { marker: "em" },
+  ctx: { orgId: "org-1", userId: "user-1", projectId: "project-1" },
 };
-vi.mock("$lib/server/db", () => ({
-  openIsolatedStore: vi.fn(() => Promise.resolve(mockDb)),
+const mocks = {
+  scope,
+  requestServiceScope: vi.fn(async () => scope),
+  toggleSettingsFeatureFlag: vi.fn(async () => ({ success: true })),
+  setSettingsFeatureFlagRollout: vi.fn(async () => ({ success: true })),
+  setSettingsFeatureFlagCohortRules: vi.fn(async () => ({ success: true })),
+  listSettingsFeatureFlags: vi.fn(async () => ({ flags: [] })),
+};
+
+vi.mock("$lib/server/request-service-scope", () => ({
+  requestServiceScope: mocks.requestServiceScope,
+}));
+
+vi.mock("@platform-core/interface/settings-workbench.ts", () => ({
+  toggleSettingsFeatureFlag: mocks.toggleSettingsFeatureFlag,
+  setSettingsFeatureFlagRollout: mocks.setSettingsFeatureFlagRollout,
+  setSettingsFeatureFlagCohortRules: mocks.setSettingsFeatureFlagCohortRules,
+  listSettingsFeatureFlags: mocks.listSettingsFeatureFlags,
 }));
 
 import { actions } from "./+page.server.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockDb.query.mockResolvedValue([]);
-  mockDb.close.mockResolvedValue(undefined);
 });
 
 function makeRequest(body: Record<string, string>) {
@@ -31,10 +45,7 @@ describe("/settings/feature-flags actions", () => {
   it("toggle: flips enabled", async () => {
     const result = await actions.toggle(makeRequest({ id: "flag-1" }));
     expect(result).toMatchObject({ success: true });
-    expect(mockDb.query).toHaveBeenCalledWith(
-      expect.stringContaining("enabled = NOT enabled"),
-      ["flag-1"],
-    );
+    expect(mocks.toggleSettingsFeatureFlag).toHaveBeenCalledWith(mocks.scope.em, mocks.scope.ctx, { id: "flag-1" });
   });
 
   it("setRollout: rejects invalid percent", async () => {
@@ -45,10 +56,10 @@ describe("/settings/feature-flags actions", () => {
   it("setRollout: saves rollout_percent", async () => {
     const result = await actions.setRollout(makeRequest({ id: "flag-1", rollout_percent: "50" }));
     expect(result).toMatchObject({ success: true });
-    expect(mockDb.query).toHaveBeenCalledWith(
-      expect.stringContaining("rollout_percent"),
-      [50, "flag-1"],
-    );
+    expect(mocks.setSettingsFeatureFlagRollout).toHaveBeenCalledWith(mocks.scope.em, mocks.scope.ctx, {
+      id: "flag-1",
+      rolloutPercent: 50,
+    });
   });
 
   it("setCohortRules: rejects invalid JSON", async () => {
@@ -59,9 +70,9 @@ describe("/settings/feature-flags actions", () => {
   it("setCohortRules: saves valid JSON", async () => {
     const result = await actions.setCohortRules(makeRequest({ id: "flag-1", cohort_rules: '{"users":["alice"]}' }));
     expect(result).toMatchObject({ success: true });
-    expect(mockDb.query).toHaveBeenCalledWith(
-      expect.stringContaining("cohort_rules"),
-      expect.arrayContaining(["flag-1"]),
-    );
+    expect(mocks.setSettingsFeatureFlagCohortRules).toHaveBeenCalledWith(mocks.scope.em, mocks.scope.ctx, {
+      id: "flag-1",
+      rules: { users: ["alice"] },
+    });
   });
 });

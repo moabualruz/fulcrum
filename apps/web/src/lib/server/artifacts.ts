@@ -12,4 +12,4 @@ export {
   readArtifactDetail,
   deleteArtifactAction,
   getArtifactStats,
-} from "@workflow-coordination/application/artifact-service-actions.ts";
+} from "@workflow-coordination/interface/artifact-records.ts";

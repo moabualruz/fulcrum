@@ -1,6 +1,7 @@
 import type { EntityManager } from "typeorm";
 
 import type {
+  ProjectListing,
   ProjectOption,
   ProjectOverviewData,
 } from "@work-management/application/projects/queries.ts";
@@ -11,11 +12,17 @@ import type {
 import type { AppContext } from "@work-management/application/tasks/types.ts";
 
 export type {
+  ProjectListing,
   ProjectOption,
   ProjectOverviewData,
   ProjectSetupInput,
   ProjectSetupResult,
 };
+
+export async function listProjectRows(em: EntityManager, ctx: AppContext): Promise<ProjectListing[]> {
+  const queries = await import("@work-management/application/projects/queries.ts");
+  return queries.listProjectRows(em, ctx);
+}
 
 export async function listProjectOptions(em: EntityManager, ctx: AppContext): Promise<ProjectOption[]> {
   const queries = await import("@work-management/application/projects/queries.ts");

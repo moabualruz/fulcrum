@@ -70,7 +70,7 @@ function buildEphemeralPgDriver() {
     }
     end(errorCallback: Function) {
       if (instance) {
-        instance.close().then(() => { instance = null; errorCallback(null); }).catch(errorCallback);
+        instance.close().then(() => { instance = null; errorCallback(null); }).catch((e: unknown) => errorCallback(e));
       } else {
         errorCallback(null);
       }

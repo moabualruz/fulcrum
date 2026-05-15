@@ -1,7 +1,7 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { addTaskToSprint, loadProjectBacklog, removeTaskFromSprint } from "@work-management/interface/project-backlog.ts";
-import { requestProjectScope } from "../project-request-scope";
+import { requestProjectScope } from "../../project-request-scope";
 
 export const load: PageServerLoad = async ({ params, locals }) => {
   try {

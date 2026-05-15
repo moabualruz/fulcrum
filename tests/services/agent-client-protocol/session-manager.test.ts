@@ -18,6 +18,7 @@ import type {
   LoadSessionResponse,
   NewSessionRequest,
   NewSessionResponse,
+  PermissionRequest,
   PromptRequest,
   PromptResponse,
   SessionNotification,
@@ -26,6 +27,7 @@ import type {
 class FakeBridge implements AcpBridgeClient {
   initializeCalls: InitializeRequest[] = [];
   newSessionCalls: NewSessionRequest[] = [];
+  loadSessionCalls: LoadSessionRequest[] = [];
   promptCalls: PromptRequest[] = [];
   cancelCalls: CancelNotification[] = [];
   setModeCalls: { sessionId: string; modeId: string }[] = [];
@@ -35,11 +37,14 @@ class FakeBridge implements AcpBridgeClient {
   cancelPermissionCalls = 0;
   onSessionUpdate: ((notification: SessionNotification) => void) | null = null;
   onTransportClose: ((reason?: string) => void) | null = null;
-  pendingPermissionRequest = null;
+  onPermissionRequest: ((request: PermissionRequest) => void) | null = null;
+  onPermissionSettled: (() => void) | null = null;
+  pendingPermissionRequest: PermissionRequest | null = null;
 
   constructor(
     private readonly initializeResponse: InitializeResponse,
     private readonly newSessionResponse: NewSessionResponse,
+    public loadSessionResponse: LoadSessionResponse = { sessionId: "agent-session-1" },
   ) {}
 
   async initialize(params: InitializeRequest): Promise<InitializeResponse> {
@@ -52,8 +57,9 @@ class FakeBridge implements AcpBridgeClient {
     return this.newSessionResponse;
   }
 
-  async loadSession(_params: LoadSessionRequest): Promise<LoadSessionResponse> {
-    throw new Error("not implemented in fake");
+  async loadSession(params: LoadSessionRequest): Promise<LoadSessionResponse> {
+    this.loadSessionCalls.push(params);
+    return this.loadSessionResponse;
   }
 
   async prompt(params: PromptRequest): Promise<PromptResponse> {
@@ -83,10 +89,14 @@ class FakeBridge implements AcpBridgeClient {
 
   resolvePermission(optionId: string): void {
     this.resolvePermissionCalls.push(optionId);
+    this.pendingPermissionRequest = null;
+    this.onPermissionSettled?.();
   }
 
   cancelPermission(): void {
     this.cancelPermissionCalls += 1;
+    this.pendingPermissionRequest = null;
+    this.onPermissionSettled?.();
   }
 }
 
@@ -198,8 +208,31 @@ describe("ACP ported session manager", () => {
     await manager.setMode("review");
     await manager.setModel("gpt-5.4");
     await manager.cancelOperation();
+    bridge.onPermissionRequest?.({
+      sessionId: "agent-session-1",
+      toolCall: {
+        toolCallId: "tool-1",
+        title: "Write file",
+        kind: "write",
+        status: "pending",
+      },
+      options: [{ kind: "allow", name: "Allow", optionId: "allow" }],
+    });
+    expect(state.pendingPermission?.toolCall.title).toBe("Write file");
     manager.resolvePermission("allow");
+    expect(state.pendingPermission).toBeNull();
+    bridge.onPermissionRequest?.({
+      sessionId: "agent-session-1",
+      toolCall: {
+        toolCallId: "tool-2",
+        title: "Run command",
+        kind: "execute",
+        status: "pending",
+      },
+      options: [{ kind: "reject", name: "Reject", optionId: "reject" }],
+    });
     manager.cancelPermission();
+    expect(state.pendingPermission).toBeNull();
     bridge.onTransportClose?.("network down");
 
     expect(bridge.setModeCalls).toEqual([{ sessionId: "agent-session-1", modeId: "review" }]);
@@ -220,11 +253,17 @@ describe("ACP ported session manager", () => {
       createBridge: async () => bridge,
     });
     await manager.createSession("codex", "/repo");
+    state.pendingPermission = {
+      sessionId: "agent-session-1",
+      toolCall: { toolCallId: "tool-1", title: "Edit file", kind: "edit", status: "pending" },
+      options: [{ kind: "allow", name: "Allow", optionId: "allow" }],
+    };
 
     await manager.disconnect();
 
     expect(bridge.disconnectCalls).toBe(1);
     expect(state.currentSession).toBeNull();
     expect(state.isConnected).toBe(false);
+    expect(state.pendingPermission).toBeNull();
   });
 });

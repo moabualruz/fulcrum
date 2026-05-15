@@ -2,7 +2,7 @@ import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { loadProjectCalendar, rescheduleProjectTask } from "@work-management/interface/project-timeline.ts";
 import { actionFail, actionOk } from "../../../../lib/feedback/action-result";
-import { requestProjectScope } from "../project-request-scope";
+import { requestProjectScope } from "../../project-request-scope";
 
 export const load: PageServerLoad = async ({ params, locals }) => {
   const projectId = params.id;

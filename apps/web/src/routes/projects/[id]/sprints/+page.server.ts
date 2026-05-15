@@ -4,9 +4,9 @@ import type { Actions, PageServerLoad } from "./$types";
 import {
   completeProjectSprint,
   createProjectSprint,
+  loadProjectSprints,
   startProjectSprint,
-} from "@work-management/application/sprints/commands.ts";
-import { loadProjectSprints } from "@work-management/application/sprints/queries.ts";
+} from "@work-management/interface/project-sprints.ts";
 import {
   CreateSprintSchema,
   StartSprintSchema,
@@ -15,7 +15,7 @@ import {
 import { actionOk, actionFail } from "$lib/feedback/action-result";
 import { generateNarration } from "$lib/server/reports";
 import { isFeatureEnabled } from "$lib/server/feature-flags";
-import { requestAppScope } from "$lib/server/application-scope";
+import { requestProjectScope } from "../../project-request-scope";
 
 export const load: PageServerLoad = async ({ params, locals }) => {
   const projectId = params.id;
@@ -23,7 +23,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     projectId,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestAppScope(locals, projectId);
+        const { em, ctx } = await requestProjectScope(locals, projectId);
         return loadProjectSprints(em, ctx);
       })(),
     },
@@ -47,7 +47,7 @@ export const actions: Actions = {
     const parsed = v.safeParse(CreateSprintSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestProjectScope(locals, params.id);
       await createProjectSprint(em, ctx, {
         name: parsed.output.name,
         goal: parsed.output.goal,
@@ -64,7 +64,7 @@ export const actions: Actions = {
     const parsed = v.safeParse(StartSprintSchema, fdToRecord(fd));
     if (!parsed.success) return fail(400, actionFail("invalid input"));
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestProjectScope(locals, params.id);
       await startProjectSprint(em, ctx, parsed.output.id);
       return actionOk("Sprint started");
     } catch (err) {
@@ -77,7 +77,7 @@ export const actions: Actions = {
     const parsed = v.safeParse(CompleteSprintSchema, fdToRecord(fd));
     if (!parsed.success) return fail(400, actionFail("invalid input"));
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestProjectScope(locals, params.id);
       const { id: sprintId, metrics } = await completeProjectSprint(em, ctx, parsed.output.id);
 
       // LLM narrative step — gated behind FULCRUM_FEATURES=report-llm-narration

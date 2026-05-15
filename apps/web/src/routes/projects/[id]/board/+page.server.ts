@@ -2,18 +2,20 @@ import { fail } from "@sveltejs/kit";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
 import {
-  createProjectTask,
-  deleteProjectTask,
-  updateProjectTask,
-} from "@work-management/application/projects/commands.ts";
+  buildProjectTaskWorkbench,
+  createProjectBoardWorkItem,
+  deleteProjectBoardWorkItem,
+  listProjectBoardWorkItems,
+  TASK_STATE_GROUP_ORDER,
+  type ManualTaskWorkbenchViewMode,
+  type TaskStateGroup,
+  updateProjectBoardWorkItem,
+} from "@work-management/interface/project-board.ts";
 import {
   dispatchDependencyRunForTasks,
   previewDependencyRunForTasks,
-} from "@execution-orchestration/application/dependency-run-actions.ts";
-import { recordTaskQaReview } from "@execution-orchestration/application/qa-review-actions.ts";
-import { buildManualTaskWorkbench, type ManualTaskWorkbenchViewMode } from "@work-management/application/manual-task-workbench.ts";
-import { TASK_STATE_GROUP_ORDER, type TaskStateGroup } from "@work-management/application/task-view-filtering.ts";
-import { listProjectBoardTasks } from "@work-management/application/projects/queries.ts";
+} from "@execution-orchestration/interface/dependency-run-actions.ts";
+import { recordTaskQaReview } from "@execution-orchestration/interface/task-run-reviews.ts";
 import {
   BoardCreateSchema,
   BoardDeleteSchema,
@@ -21,7 +23,7 @@ import {
   BoardUpdateSchema,
 } from "../../../../lib/server/boards.schema";
 import { actionFail, actionOk } from "../../../../lib/feedback/action-result";
-import { requestAppScope } from "$lib/server/application-scope";
+import { requestServiceScope } from "$lib/server/request-service-scope";
 import { createWebWorkflowApiCaller, workflowApiProjectMetadata } from "$lib/server/workflow-api";
 
 export const load: PageServerLoad = async ({ params, url, locals }) => {
@@ -32,10 +34,10 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
     sprintFilter,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestAppScope(locals, projectId);
+        const { em, ctx } = await requestServiceScope(locals, projectId);
         return {
-          tasks: await listProjectBoardTasks(em, ctx),
-          manualWorkbench: await buildManualTaskWorkbench(em, ctx, {
+          tasks: await listProjectBoardWorkItems(em, ctx),
+          manualWorkbench: await buildProjectTaskWorkbench(em, ctx, {
             projectId,
             traceId: url.searchParams.get("trace")?.trim() || undefined,
             viewMode: viewModeParam(url.searchParams.get("view")),
@@ -99,8 +101,8 @@ export const actions: Actions = {
     const parsed = v.safeParse(BoardCreateSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
     try {
-      const { em, ctx } = await requestAppScope(locals, params?.id, parsed.output.id);
-      await createProjectTask(em, ctx, {
+      const { em, ctx } = await requestServiceScope(locals, params.id);
+      await createProjectBoardWorkItem(em, ctx, {
         title: parsed.output.title,
         status: parsed.output.status,
       });
@@ -110,7 +112,7 @@ export const actions: Actions = {
     }
   },
 
-  update: async ({ request, locals }) => {
+  update: async ({ params, request, locals }) => {
     const fd = await request.formData();
     const candidate: Record<string, unknown> = { ...fdToRecord(fd) };
     if ("priority" in candidate && candidate["priority"] !== null) {
@@ -120,21 +122,21 @@ export const actions: Actions = {
     const parsed = v.safeParse(BoardUpdateSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
     try {
-      const { em, ctx } = await requestAppScope(locals);
+      const { em, ctx } = await requestServiceScope(locals, params.id, parsed.output.id);
       const { id, ...patch } = parsed.output;
-      await updateProjectTask(em, ctx, id, patch);
+      await updateProjectBoardWorkItem(em, ctx, id, patch);
       return actionOk("Task updated");
     } catch (err) {
       return fail(400, actionFail((err as Error).message));
     }
   },
 
-  delete: async ({ request, locals }) => {
+  delete: async ({ params, request, locals }) => {
     const fd = await request.formData();
     const parsed = v.safeParse(BoardDeleteSchema, fdToRecord(fd));
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const { em, ctx } = await requestAppScope(locals);
-    await deleteProjectTask(em, ctx, parsed.output.id);
+    const { em, ctx } = await requestServiceScope(locals, params.id, parsed.output.id);
+    await deleteProjectBoardWorkItem(em, ctx, parsed.output.id);
     return actionOk("Task deleted");
   },
 
@@ -143,8 +145,8 @@ export const actions: Actions = {
     const parsed = v.safeParse(BoardMoveSchema, fdToRecord(fd));
     if (!parsed.success) return fail(400, actionFail("invalid input"));
     try {
-      const { em, ctx } = await requestAppScope(locals, params?.id, parsed.output.id);
-      await updateProjectTask(em, ctx, parsed.output.id, { status: parsed.output.to });
+      const { em, ctx } = await requestServiceScope(locals, params.id, parsed.output.id);
+      await updateProjectBoardWorkItem(em, ctx, parsed.output.id, { status: parsed.output.to });
       return actionOk("Task moved");
     } catch (err) {
       const msg = (err as Error).message;
@@ -170,7 +172,7 @@ export const actions: Actions = {
         });
         return { ok: true, mode: "runPreview", preview };
       }
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestServiceScope(locals, params.id);
       const preview = await previewDependencyRunForTasks(em, ctx, {
         mode: taskIds.length > 1 ? "board" : "task",
         targetTaskIds: taskIds,
@@ -203,7 +205,7 @@ export const actions: Actions = {
         });
         return { ok: true, mode: "run", dispatch };
       }
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestServiceScope(locals, params.id);
       const dispatch = await dispatchDependencyRunForTasks(em, ctx, {
         mode: taskIds.length > 1 ? "board" : "task",
         targetTaskIds: taskIds,
@@ -242,7 +244,7 @@ export const actions: Actions = {
         });
         return { ok: true, mode: "qaReview", review };
       }
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestServiceScope(locals, params.id);
       const review = await recordTaskQaReview(em, ctx, {
         taskId,
         runId: raw["runId"] ?? raw["run"] ?? undefined,

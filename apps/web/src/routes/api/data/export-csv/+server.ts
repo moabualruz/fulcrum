@@ -35,6 +35,6 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 };
 
 async function requestScopedApp(locals: App.Locals) {
-  const { requestAppScope } = await import("$lib/server/application-scope");
-  return requestAppScope(locals);
+  const { requestServiceScope } = await import("$lib/server/request-service-scope");
+  return requestServiceScope(locals);
 }

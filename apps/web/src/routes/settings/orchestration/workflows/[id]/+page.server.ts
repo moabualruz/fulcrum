@@ -1,8 +1,7 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { requestAppScope } from "$lib/server/application-scope";
-import { loadWorkflowDef } from "$lib/server/orchestration";
-import { upsertWorkflowDef } from "@execution-orchestration/application/orchestration/commands.ts";
+import { requestServiceScope } from "$lib/server/request-service-scope";
+import { loadWorkflowDef, upsertWorkflowDef } from "$lib/server/orchestration";
 import { actionOk } from "$lib/feedback/action-result";
 
 export const load: PageServerLoad = ({ params, locals }) => {
@@ -11,7 +10,7 @@ export const load: PageServerLoad = ({ params, locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+        const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
         const def = await loadWorkflowDef(em, ctx, params.id);
         if (!def) throw error(404, "Workflow not found");
         return { workflow: def };
@@ -30,7 +29,7 @@ export const actions: Actions = {
 
     if (!name) return fail(400, { error: "Name is required" });
 
-    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
     await upsertWorkflowDef(em, ctx, {
       id: params.id,
       name,

@@ -67,7 +67,7 @@ describe("migration downgrade smoke", () => {
       expect(executed.at(-1)!.name).toBe(latest);
 
       const schemaMigrationMeta = orm.getMetadata().get(SchemaMigration);
-      expect(schemaMigrationMeta.tableName).toBe("schema_migrations");
+      expect(schemaMigrationMeta.tableName).toBe("fulcrum_schema_migrations");
 
       const orgRows = await orm.em.execute<{ count: string }[]>(
         `select count(*)::text as count from orgs`,

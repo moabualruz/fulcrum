@@ -62,10 +62,13 @@ export class AcpClientBridge {
   private unlistenMessage: Unsubscribe | null = null;
   private unlistenClose: Unsubscribe | null = null;
   private permissionResolver: PermissionResolver | null = null;
+  private transportClosed = false;
 
   public pendingPermissionRequest: PermissionRequest | null = null;
   public onSessionUpdate: ((notification: SessionNotification) => void) | null = null;
   public onTransportClose: ((reason?: string) => void) | null = null;
+  public onPermissionRequest: ((request: PermissionRequest) => void) | null = null;
+  public onPermissionSettled: (() => void) | null = null;
 
   constructor(transport: AcpTransport, options: AcpClientBridgeOptions = {}) {
     this.transport = transport;
@@ -82,6 +85,8 @@ export class AcpClientBridge {
   }
 
   async disconnect(): Promise<void> {
+    this.transportClosed = true;
+    this.resolvePendingPermission({ outcome: { outcome: "cancelled" } });
     if (this.unlistenMessage) {
       this.unlistenMessage();
       this.unlistenMessage = null;
@@ -128,7 +133,10 @@ export class AcpClientBridge {
 
   async requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
     return await new Promise((resolve) => {
-      this.pendingPermissionRequest = {
+      if (this.permissionResolver) {
+        this.resolvePendingPermission({ outcome: { outcome: "cancelled" } });
+      }
+      const request: PermissionRequest = {
         sessionId: params.sessionId,
         toolCall: {
           toolCallId: params.toolCall.toolCallId,
@@ -143,22 +151,27 @@ export class AcpClientBridge {
           optionId: option.optionId,
         })),
       };
+      this.pendingPermissionRequest = request;
       this.permissionResolver = resolve;
+      this.onPermissionRequest?.(request);
     });
   }
 
   resolvePermission(optionId: string): void {
-    if (!this.permissionResolver) return;
-    this.permissionResolver({ outcome: { outcome: "selected", optionId } });
-    this.permissionResolver = null;
-    this.pendingPermissionRequest = null;
+    this.resolvePendingPermission({ outcome: { outcome: "selected", optionId } });
   }
 
   cancelPermission(): void {
+    this.resolvePendingPermission({ outcome: { outcome: "cancelled" } });
+  }
+
+  private resolvePendingPermission(response: RequestPermissionResponse): void {
     if (!this.permissionResolver) return;
-    this.permissionResolver({ outcome: { outcome: "cancelled" } });
+    const resolve = this.permissionResolver;
     this.permissionResolver = null;
     this.pendingPermissionRequest = null;
+    this.onPermissionSettled?.();
+    resolve(response);
   }
 
   async sessionUpdate(_params: SessionNotification): Promise<void> {
@@ -278,6 +291,7 @@ export class AcpClientBridge {
     const response: JsonRpcSuccessResponse | JsonRpcErrorResponse = error
       ? { jsonrpc: "2.0", id, error }
       : { jsonrpc: "2.0", id, result };
+    if (this.transportClosed) return;
     this.trafficRecorder.addEntry({
       direction: "out",
       type: "response",
@@ -344,6 +358,8 @@ export class AcpClientBridge {
   }
 
   private handleTransportClose(reason?: string): void {
+    this.transportClosed = true;
+    this.resolvePendingPermission({ outcome: { outcome: "cancelled" } });
     this.rejectPendingRequests(new Error(`transport closed: ${reason ?? "unknown reason"}`));
     if (this.onTransportClose) this.onTransportClose(reason);
   }

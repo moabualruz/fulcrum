@@ -4,7 +4,7 @@
 
 import { stat, readdir } from "node:fs/promises";
 import { which, exists } from "@platform-core/application/runtime-support/process-runner.ts";
-import { AGENTS } from "@execution-orchestration/application/agent-catalog/registry.ts";
+import { AGENTS } from "@execution-orchestration/interface/agent-catalog.ts";
 import { ALL_COMPONENTS } from "@platform-core/application/component-lifecycle/catalog.ts";
 import { ComponentLedger, dbPath as componentLedgerPath } from "@platform-core/application/component-lifecycle/ledger.ts";
 import { loadRegistry, ALL_AGENT_IDS, isEnabled, type AgentId } from "./mcp-registry.ts";
@@ -14,7 +14,7 @@ import { auditPackageParity, type PackageParityReport } from "./package-parity.t
 import { planPackageMirrorTargets } from "./package-mirror.ts";
 import { getPackageSurfaceManifest, MANAGED_PACKAGE_IDS, packageCacheSourceRoot } from "./package-surfaces.ts";
 import { runPlatformDoctorChecks, type PlatformDoctorCheck } from "@platform-core/application/platform-operations/readiness-checks.ts";
-import { listProfiles } from "@execution-orchestration/application/agent-catalog/registry.ts";
+import { listProfiles } from "@execution-orchestration/interface/agent-catalog.ts";
 import {
   buildMemoryEngineDoctorReport,
   buildProductKernelDoctorReport,

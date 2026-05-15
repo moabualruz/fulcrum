@@ -1,8 +1,8 @@
 import type { PageServerLoad, Actions } from "./$types";
 import { fail } from "@sveltejs/kit";
-import { requestAppScope } from "$lib/server/application-scope";
-import { importSettingsData, preflightSettingsDataImport } from "@platform-core/application/settings/commands.ts";
-import { createSettingsDataExport, SETTINGS_ENTITY_KINDS, type SettingsEntityKind } from "@platform-core/application/settings/queries.ts";
+import { requestServiceScope } from "$lib/server/request-service-scope";
+import { importSettingsData, preflightSettingsDataImport } from "@platform-core/interface/settings-workbench.ts";
+import { createSettingsDataExport, SETTINGS_ENTITY_KINDS, type SettingsEntityKind } from "@platform-core/interface/settings-workbench.ts";
 import { AppError } from "@platform-core/domain/errors.ts";
 
 function appFail(error: unknown) {
@@ -30,7 +30,7 @@ export const actions: Actions = {
       typeof kind === "string" && (SETTINGS_ENTITY_KINDS as readonly string[]).includes(kind)
     );
     try {
-      const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+      const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
       const result = await createSettingsDataExport(em, ctx, { kinds });
       return { exported: true, data: JSON.stringify(result, null, 2), filename: `fulcrum-export-${Date.now()}.json` };
     } catch (error) {
@@ -51,7 +51,7 @@ export const actions: Actions = {
     const form = await request.formData();
     try {
       const parsed = await parseJsonFile(form.get("file") as File | null);
-      const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+      const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
       return await importSettingsData(em, ctx, parsed);
     } catch (error) {
       return appFail(error);

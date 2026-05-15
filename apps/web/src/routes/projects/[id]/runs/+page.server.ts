@@ -1,6 +1,6 @@
 import type { PageServerLoad } from "./$types";
 import { listProjectRuns } from "@execution-orchestration/interface/run-pages.ts";
-import { requestAppScope } from "$lib/server/application-scope";
+import { requestServiceScope } from "$lib/server/request-service-scope";
 import { ensureProjectExists } from "$lib/server/project-api";
 
 export const load: PageServerLoad = (event) => {
@@ -11,7 +11,7 @@ export const load: PageServerLoad = (event) => {
     streamed: {
       data: (async () => {
         await ensureProjectExists(event, params.id);
-        const { em, ctx } = await requestAppScope(locals, params.id);
+        const { em, ctx } = await requestServiceScope(locals, params.id);
         const runs = await listProjectRuns(em, ctx);
         return { runs };
       })(),

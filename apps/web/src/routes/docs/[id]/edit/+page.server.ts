@@ -5,10 +5,10 @@ import { error, fail } from "@sveltejs/kit";
 import { superValidate } from "sveltekit-superforms/server";
 import { valibot } from "sveltekit-superforms/adapters";
 import { DocumentFormSchema } from "../../../../lib/server/documents.schema.ts";
-import { requestAppScope } from "../../../../lib/server/application-scope.ts";
+import { requestServiceScope } from "$lib/server/request-service-scope";
 import { parseLabels, serializeLabels } from "../../../../lib/markdown/labels.ts";
 import { AppNotFoundError } from "@platform-core/domain/errors.ts";
-import { loadWebEditDoc, saveWebEditDoc } from "@knowledge-workspace/application/docs/web-edit.ts";
+import { loadWebEditDoc, saveWebEditDoc } from "@knowledge-workspace/interface/document-pages.ts";
 
 interface LoadEvent {
   params: { id: string };
@@ -29,7 +29,7 @@ function extractLabels(fm: Record<string, unknown>): string[] {
 }
 
 export const load = async ({ params, locals }: LoadEvent) => {
-  const scope = await requestAppScope(locals);
+  const scope = await requestServiceScope(locals);
   const doc = await loadWebEditDoc(scope, params.id).catch(mapNotFound);
   const form = await superValidate(
     {
@@ -48,7 +48,7 @@ export const actions = {
   default: async ({ params, request, locals }: ActionEvent) => {
     const form = await superValidate(request, valibot(DocumentFormSchema));
     if (!form.valid) return fail(400, { form });
-    const scope = await requestAppScope(locals);
+    const scope = await requestServiceScope(locals);
     await saveWebEditDoc(scope, {
       id: params.id!,
       title: form.data.title,

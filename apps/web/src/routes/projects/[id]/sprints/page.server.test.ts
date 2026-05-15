@@ -1,86 +1,117 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import {
-  createLocalOrg,
-  createProject,
-  createSprint,
-} from "@test-support/product-workspace-fixtures.ts";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-let scratch: string;
+const calls: string[] = [];
+const pageData = {
+  sprints: [{ id: "sprint-1", name: "Sprint 1", status: "planning", capacity_points: 20 }],
+  velocity: [],
+};
 
-beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-sprints-"));
-  process.env["FULCRUM_HOME"] = scratch;
-});
-
-afterEach(() => {
-  delete process.env["FULCRUM_HOME"];
-  rmSync(scratch, { recursive: true, force: true });
-});
-
-async function seedProject(): Promise<{ projectId: string; orgId: string }> {
-  const dbDir = join(scratch, "pglite.data");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(dbDir);
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const project = await createProject(db, { orgId: org.id, slug: "alpha", name: "Alpha" });
-  await createSprint(db, { orgId: org.id, projectId: project.id, name: "Sprint 1", capacity: 20 });
-  await db.close();
-  return { projectId: project.id, orgId: org.id };
+function form(data: Record<string, string>): Request {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(data)) fd.set(key, value);
+  return new Request("http://localhost/projects/project-1/sprints", { method: "POST", body: fd });
 }
 
+mock.module("$lib/server/application-scope", () => ({
+  requestAppScope: async (_locals: unknown, projectId: string) => ({
+    em: { kind: "mock-em" },
+    ctx: { orgId: "org-1", userId: "user-1", projectId },
+  }),
+}));
+
+mock.module("@work-management/interface/project-sprints.ts", () => ({
+  loadProjectSprints: async () => pageData,
+  loadProjectSprintDetail: async () => ({
+    project: { id: "project-1", name: "Project" },
+    sprint: {
+      id: "sprint-1",
+      name: "Sprint 1",
+      goal: "Ship it",
+      start_date: "2026-05-01",
+      end_date: "2026-05-14",
+      status: "active",
+    },
+    tasks: [{ id: "task-1", title: "In sprint", status: "pending", priority: 2, project_id: "project-1", sprint_id: "sprint-1", updated_at: "2026-05-01T00:00:00.000Z" }],
+  }),
+  createProjectSprint: async (_em: unknown, _ctx: unknown, input: { name: string; capacity?: number | null }) => {
+    calls.push(`create:${input.name}:${input.capacity ?? ""}`);
+    return { id: "sprint-new" };
+  },
+  createProjectTask: async (_em: unknown, _ctx: unknown, input: { title: string; status?: string | null; sprintId?: string | null }) => {
+    calls.push(`create-task:${input.title}:${input.status}:${input.sprintId}`);
+    return { id: "task-new" };
+  },
+  updateProjectTask: async (_em: unknown, _ctx: unknown, taskId: string, patch: { status?: string | null }) => {
+    calls.push(`move:${taskId}:${patch.status}`);
+    return { ok: true };
+  },
+  startProjectSprint: async (_em: unknown, _ctx: unknown, sprintId: string) => {
+    calls.push(`start:${sprintId}`);
+    return { ok: true };
+  },
+  completeProjectSprint: async (_em: unknown, _ctx: unknown, sprintId: string) => {
+    calls.push(`complete:${sprintId}`);
+    return { id: sprintId, metrics: { velocity: 3, completed_tasks: 2 } };
+  },
+  updateSprintGoal: async (_em: unknown, _ctx: unknown, sprintId: string, goal: string) => {
+    calls.push(`goal:${sprintId}:${goal}`);
+    return { ok: true };
+  },
+}));
+
+beforeEach(() => {
+  calls.splice(0, calls.length);
+  delete process.env["FULCRUM_FEATURES"];
+});
+
 describe("/projects/[id]/sprints +page.server.ts", () => {
+  test("server route uses the work-management interface instead of direct application imports", () => {
+    const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
+    expect(source).toContain("@work-management/interface/project-sprints");
+    expect(source).not.toContain("@work-management/application/sprints");
+    expect(source).not.toContain("$lib/server/application-scope");
+  });
+
   test("load returns sprints and velocity data", async () => {
-    const { projectId } = await seedProject();
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.load({ params: { id: projectId } } as Parameters<typeof mod.load>[0]);
-    expect(result.projectId).toBe(projectId);
+    const result = await mod.load({
+      params: { id: "project-1" },
+      locals: {},
+    } as Parameters<typeof mod.load>[0]);
+    expect(result.projectId).toBe("project-1");
     const data = await result.streamed.data;
-    expect(data.sprints).toHaveLength(1);
-    expect(data.sprints[0].name).toBe("Sprint 1");
-    expect(data.velocity).toHaveLength(0); // no completed sprints
+    expect(data.sprints[0]?.name).toBe("Sprint 1");
+    expect(data.velocity).toEqual([]);
   });
 
-  test("createSprint action creates a new sprint", async () => {
-    const { projectId } = await seedProject();
+  test("createSprint action creates a new sprint through the service boundary", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    const fd = new FormData();
-    fd.set("name", "Sprint 2");
-    fd.set("capacity", "30");
-    const request = new Request("http://localhost", { method: "POST", body: fd });
-    const result = await mod.actions.createSprint({ request, params: { id: projectId } } as Parameters<typeof mod.actions.createSprint>[0]);
-    expect((result as { ok: boolean }).ok).toBe(true);
-
-    // Verify 2 sprints now
-    const data = await (await mod.load({ params: { id: projectId } } as Parameters<typeof mod.load>[0])).streamed.data;
-    expect(data.sprints).toHaveLength(2);
+    const result = await mod.actions.createSprint({
+      request: form({ name: "Sprint 2", capacity: "30" }),
+      params: { id: "project-1" },
+      locals: {},
+    } as Parameters<typeof mod.actions.createSprint>[0]);
+    expect(result).toEqual({ ok: true, message: "Sprint created" });
+    expect(calls).toEqual(["create:Sprint 2:30"]);
   });
 
-  test("startSprint action transitions planned → active", async () => {
-    const { projectId } = await seedProject();
-    const dbDir = join(scratch, "pglite.data");
-    const db = await openIsolatedStore(dbDir);
-    await migrateIsolatedStore(db);
-    const sprints = await db.query<{ id: string }>(`SELECT id FROM sprints WHERE project_id = $1`, [projectId]);
-    const sprintId = sprints[0]!.id;
-    await db.close();
-
+  test("startSprint and completeSprint actions call the service boundary", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
-    const fd = new FormData();
-    fd.set("id", sprintId);
-    const request = new Request("http://localhost", { method: "POST", body: fd });
-    const result = await mod.actions.startSprint({ request, params: { id: projectId } } as Parameters<typeof mod.actions.startSprint>[0]);
-    expect((result as { ok: boolean }).ok).toBe(true);
+    const start = await mod.actions.startSprint({
+      request: form({ id: "sprint-1" }),
+      params: { id: "project-1" },
+      locals: {},
+    } as Parameters<typeof mod.actions.startSprint>[0]);
+    const complete = await mod.actions.completeSprint({
+      request: form({ id: "sprint-1" }),
+      params: { id: "project-1" },
+      locals: {},
+    } as Parameters<typeof mod.actions.completeSprint>[0]);
 
-    const db2 = await openIsolatedStore(dbDir);
-    await migrateIsolatedStore(db2);
-    const rows = await db2.query<{ status: string }>(`SELECT status FROM sprints WHERE id = $1`, [sprintId]);
-    expect(rows[0]?.status).toBe("active");
-    await db2.close();
+    expect(start).toEqual({ ok: true, message: "Sprint started" });
+    expect(complete).toEqual({ ok: true, message: "Sprint completed" });
+    expect(calls).toEqual(["start:sprint-1", "complete:sprint-1"]);
   });
 });

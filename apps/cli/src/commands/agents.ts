@@ -10,9 +10,9 @@
  * C3: --json flag on every command.
  */
 
-import { listProfiles, getProfile, UnknownAgentError } from "@execution-orchestration/application/agent-catalog/registry.ts";
+import { listProfiles, getProfile, UnknownAgentError } from "@execution-orchestration/interface/agent-catalog.ts";
 import { which } from "@platform-core/application/runtime-support/process-runner.ts";
-import type { AgentProfile } from "@execution-orchestration/application/agent-catalog/types.ts";
+import type { AgentProfile } from "@execution-orchestration/interface/agent-catalog.ts";
 
 const HELP = `fulcrum agents <list|profile|test> [options]
 

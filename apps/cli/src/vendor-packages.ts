@@ -1,6 +1,6 @@
 import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { AGENTS } from "@execution-orchestration/application/agent-catalog/registry.ts";
+import { AGENTS } from "@execution-orchestration/interface/agent-catalog.ts";
 import { cloneOrUpdate, run as runProc, which } from "@platform-core/application/runtime-support/process-runner.ts";
 import type { AgentId, McpServerSpec, McpServerVisibility } from "./mcp-registry.ts";
 

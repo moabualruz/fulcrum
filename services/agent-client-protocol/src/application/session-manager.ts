@@ -22,6 +22,8 @@ export interface AcpBridgeClient {
   pendingPermissionRequest: PermissionRequest | null;
   onSessionUpdate: ((notification: SessionNotification) => void) | null;
   onTransportClose: ((reason?: string) => void) | null;
+  onPermissionRequest: ((request: PermissionRequest) => void) | null;
+  onPermissionSettled: (() => void) | null;
   initialize(params: InitializeRequest): Promise<InitializeResponse>;
   newSession(params: NewSessionRequest): Promise<NewSessionResponse>;
   loadSession(params: LoadSessionRequest): Promise<LoadSessionResponse>;
@@ -82,20 +84,7 @@ export class AcpSessionManager {
       this.installBridgeHandlers(bridge);
       this.acpClient = bridge;
 
-      const initResponse = await bridge.initialize({
-        protocolVersion: PROTOCOL_VERSION,
-        clientCapabilities: {
-          fs: {
-            readTextFile: this.canAccessFs,
-            writeTextFile: this.canAccessFs,
-          },
-        },
-        clientInfo: {
-          name: "fulcrum",
-          title: "Fulcrum",
-          version: this.appVersion,
-        },
-      });
+      const initResponse = await bridge.initialize(this.initializeRequest());
 
       const sessionResponse = await bridge.newSession({
         cwd,
@@ -120,6 +109,62 @@ export class AcpSessionManager {
       applyModes(this.state, sessionResponse);
       applyModels(this.state, sessionResponse);
       return session;
+    } catch (error) {
+      this.state.error = error instanceof Error ? error.message : String(error);
+      if (bridge) {
+        try {
+          await bridge.disconnect();
+        } catch {
+          /* ignore cleanup failure */
+        }
+      }
+      this.acpClient = null;
+      throw error;
+    } finally {
+      this.state.isLoading = false;
+      this.state.isConnecting = false;
+    }
+  }
+
+  async resumeSession(savedSessionId: string): Promise<SavedSession> {
+    this.state.isLoading = true;
+    this.state.isConnecting = true;
+    this.state.error = null;
+
+    let bridge: AcpBridgeClient | null = null;
+    try {
+      const savedSession = this.state.savedSessions.find((session) => session.id === savedSessionId);
+      if (!savedSession) throw new Error(`Saved session '${savedSessionId}' not found`);
+      if (savedSession.supportsLoadSession !== true) throw new Error(`Saved session '${savedSessionId}' cannot be resumed`);
+
+      const agentConfig = this.config.getAgent(savedSession.agentName);
+      if (!agentConfig) throw new Error(`Agent '${savedSession.agentName}' not found in config`);
+
+      if (this.acpClient) {
+        await this.acpClient.disconnect();
+        this.acpClient = null;
+      }
+
+      bridge = await this.createBridge({ name: savedSession.agentName, config: agentConfig });
+      this.installBridgeHandlers(bridge);
+      this.acpClient = bridge;
+
+      const initResponse = await bridge.initialize(this.initializeRequest());
+      if (!readLoadSessionCapability(initResponse)) {
+        throw new Error(`Agent '${savedSession.agentName}' does not support loading sessions`);
+      }
+
+      const sessionResponse = await bridge.loadSession({ sessionId: savedSession.sessionId });
+      savedSession.sessionId = sessionResponse.sessionId;
+      savedSession.lastUpdated = this.state.now();
+      savedSession.supportsLoadSession = true;
+      this.state.currentSession = savedSession;
+      this.state.isConnected = true;
+      this.state.messages = [];
+      this.state.toolCalls.clear();
+      applyModes(this.state, sessionResponse);
+      applyModels(this.state, sessionResponse);
+      return savedSession;
     } catch (error) {
       this.state.error = error instanceof Error ? error.message : String(error);
       if (bridge) {
@@ -203,6 +248,12 @@ export class AcpSessionManager {
     bridge.onSessionUpdate = (notification) => {
       applySessionNotification(this.state, notification);
     };
+    bridge.onPermissionRequest = (request) => {
+      this.state.pendingPermission = request;
+    };
+    bridge.onPermissionSettled = () => {
+      this.state.pendingPermission = null;
+    };
     bridge.onTransportClose = (reason) => {
       this.acpClient = null;
       this.state.isConnected = false;
@@ -220,6 +271,23 @@ export class AcpSessionManager {
   private requireSession(): SavedSession {
     if (!this.state.currentSession) throw new Error("No active session");
     return this.state.currentSession;
+  }
+
+  private initializeRequest(): InitializeRequest {
+    return {
+      protocolVersion: PROTOCOL_VERSION,
+      clientCapabilities: {
+        fs: {
+          readTextFile: this.canAccessFs,
+          writeTextFile: this.canAccessFs,
+        },
+      },
+      clientInfo: {
+        name: "fulcrum",
+        title: "Fulcrum",
+        version: this.appVersion,
+      },
+    };
   }
 }
 

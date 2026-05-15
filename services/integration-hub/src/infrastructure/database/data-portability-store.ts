@@ -425,7 +425,7 @@ function entityEntries(manifest: DataExportManifest): Array<[string, Array<Recor
 
 function isImportableTable(table: string): boolean {
   const normalized = table.toLowerCase();
-  return normalized !== "schema_migrations" && !normalized.includes("credential");
+  return normalized !== "fulcrum_schema_migrations" && !normalized.includes("credential");
 }
 
 function quoteIdent(identifier: string): string {

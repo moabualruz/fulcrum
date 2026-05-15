@@ -1,31 +1,29 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { AppNotFoundError } from "@platform-core/domain/errors.ts";
-import { buildFinalQaReport } from "@planning-review/application/reports/final-qa-actions.ts";
-import { buildFinalQaFeedbackGate } from "@planning-review/application/reports/final-qa-feedback-gate.ts";
-import { runGeneratedE2eRegressionTests } from "@planning-review/application/reports/generated-e2e-run-actions.ts";
-import { loadProjectReportsPage } from "@work-management/application/reports/queries.ts";
-import { applyConfiguredUatCodeReviewDecision } from "@planning-review/application/reports/uat-auto-decision-actions.ts";
-import { recordUatCodeReviewDecision } from "@planning-review/application/reports/uat-decision-actions.ts";
-import { buildUatCodeReviewHandoff } from "@planning-review/application/reports/uat-handoff-actions.ts";
-import { buildReviewWorkbenchModel } from "@planning-review/application/reviews/review-workbench.ts";
 import {
   appendReviewWorkbenchAnnotation,
+  applyConfiguredUatCodeReviewDecision,
+  buildFinalQaFeedbackGate,
+  buildFinalQaReport,
+  buildReviewWorkbenchModel,
+  buildUatCodeReviewHandoff,
   loadReviewWorkbenchSession,
+  recordUatCodeReviewDecision,
+  runGeneratedE2eRegressionTests,
   saveReviewWorkbenchSession,
   type AppendReviewWorkbenchAnnotationInput,
+  type GeneratedE2eRegressionRunner,
   type ReviewWorkbenchSessionType,
-} from "@planning-review/application/reviews/review-workbench-session-actions.ts";
-import type {
-  GeneratedE2eRegressionRunner,
-  UatCodeReviewDecision,
-  UatCodeReviewSessionType,
-} from "@planning-review/domain/review-acceptance.ts";
-import { requestAppScope } from "$lib/server/application-scope";
+  type UatCodeReviewDecision,
+  type UatCodeReviewSessionType,
+} from "@planning-review/interface/project-review-reports.ts";
+import { loadProjectReportsPage } from "@work-management/interface/project-reports.ts";
+import { requestServiceScope } from "$lib/server/request-service-scope";
 
 export const load: PageServerLoad = async ({ params, url, locals }) => {
   const sprintId = url.searchParams.get("sprint") ?? undefined;
-  const { em, ctx } = await requestAppScope(locals, params.id);
+  const { em, ctx } = await requestServiceScope(locals, params.id);
   try {
     return await loadProjectReportsPage(em, ctx, { projectId: params.id, sprintId });
   } catch (err) {
@@ -134,7 +132,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestServiceScope(locals, params.id);
       const report = await buildFinalQaReport(em, ctx, {
         projectId: params.id,
         traceId: raw["traceId"]?.trim() || undefined,
@@ -149,7 +147,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestServiceScope(locals, params.id);
       const maxIterations = raw["maxIterations"]?.trim()
         ? requiredInt(raw["maxIterations"], "maxIterations")
         : undefined;
@@ -174,7 +172,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestServiceScope(locals, params.id);
       const handoff = await buildUatCodeReviewHandoff(em, ctx, {
         projectId: params.id,
         traceId: raw["traceId"]?.trim() || undefined,
@@ -189,7 +187,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestServiceScope(locals, params.id);
       const decision = await recordUatCodeReviewDecision(em, ctx, {
         projectId: params.id,
         traceId: raw["traceId"]?.trim() || undefined,
@@ -208,7 +206,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestServiceScope(locals, params.id);
       const autoDecision = await applyConfiguredUatCodeReviewDecision(em, ctx, {
         projectId: params.id,
         traceId: raw["traceId"]?.trim() || undefined,
@@ -223,7 +221,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestServiceScope(locals, params.id);
       const e2eRun = await runGeneratedE2eRegressionTests(em, ctx, {
         projectId: params.id,
         traceId: raw["traceId"]?.trim() || undefined,
@@ -239,7 +237,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const raw = fdToRecord(fd);
     try {
-      const reviewWorkbench = buildReviewWorkbenchModel({
+      const reviewWorkbench = await buildReviewWorkbenchModel({
         projectId: params.id,
         traceId: raw["traceId"]?.trim() || undefined,
         reviewId: raw["reviewId"]?.trim() || undefined,
@@ -266,7 +264,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestServiceScope(locals, params.id);
       const reviewSession = await saveReviewWorkbenchSession(em, ctx, {
         projectId: params.id,
         traceId: raw["traceId"]?.trim() || undefined,
@@ -296,7 +294,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestServiceScope(locals, params.id);
       const reviewSession = await loadReviewWorkbenchSession(em, ctx, {
         projectId: params.id,
         reviewId: raw["reviewId"]?.trim() || undefined,
@@ -316,7 +314,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestServiceScope(locals, params.id);
       const reviewSession = await appendReviewWorkbenchAnnotation(em, ctx, {
         projectId: params.id,
         reviewId: raw["reviewId"]?.trim() || undefined,

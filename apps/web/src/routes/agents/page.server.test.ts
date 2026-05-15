@@ -7,6 +7,11 @@ function streamedData<T>(result: unknown): Promise<T> {
 }
 
 interface ProfilesPayload {
+  sessionWorkbench: {
+    connection: { status: string };
+    session: unknown;
+    controls: { canPrompt: boolean };
+  };
   profiles: Array<{
     id: string;
     name: string;
@@ -106,6 +111,11 @@ describe("/agents +page.server.ts", () => {
     expect(payload.profiles).toHaveLength(2);
     expect(payload.profiles[0]!.name).toBe("claude-code");
     expect(payload.profiles[1]!.name).toBe("codex");
+    expect(payload.sessionWorkbench).toMatchObject({
+      connection: { status: "idle" },
+      session: null,
+      controls: { canPrompt: false },
+    });
     // Auth env masked
     expect(payload.profiles[0]!.auth_env.ANTHROPIC_API_KEY).toBe("****1234");
     // Capability chips inferred
@@ -141,7 +151,7 @@ describe("/agents +page.server.ts", () => {
     } as Parameters<typeof mod.actions.test>[0]);
 
     expect(result).toEqual({ ok: true, message: "codex: test passed" });
-    expect(scopeProjectIds).toEqual([undefined]);
+    expect(scopeProjectIds).toEqual([null]);
     expect(testedProfiles).toEqual(["codex"]);
   });
 

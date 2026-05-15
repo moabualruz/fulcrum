@@ -19,10 +19,12 @@ const allowedExternalIntegrationPaths = [
   /^services\/integration-hub\/src\/application\/importers\/sources\/plane(\.fieldmap)?\.ts$/,
   /^services\/integration-hub\/src\/application\/importers\/sources\/importers\.test\.ts$/,
   /^services\/integration-hub\/src\/application\/importers\/web-actions\.ts$/,
+  /^services\/integration-hub\/src\/interface\/project-importers\.ts$/,
   /^tests\/integration-hub\/external-connectors\/plane\.test\.ts$/,
   /^apps\/cli\/src\/import\.ts$/,
   /^apps\/cli\/src\/import-pm\.ts$/,
   /^apps\/web\/src\/routes\/settings\/importers\//,
+  /^apps\/web\/src\/routes\/projects\/\[id\]\/settings\/import\/\+page\.svelte$/,
 ];
 
 const forbiddenNamePatterns = [

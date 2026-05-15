@@ -137,6 +137,14 @@ describe("ACP ported protocol foundation", () => {
   test("exposes permission requests and sends selected permission response", async () => {
     const transport = new FakeTransport();
     const bridge = new AcpClientBridge(transport, { requestTimeoutMs: 1000 });
+    let observedRequest: PermissionRequest | null = null;
+    let settledCount = 0;
+    bridge.onPermissionRequest = (request) => {
+      observedRequest = request;
+    };
+    bridge.onPermissionSettled = () => {
+      settledCount += 1;
+    };
     const permission: PermissionRequest = {
       sessionId: "session-1",
       toolCall: {
@@ -158,6 +166,7 @@ describe("ACP ported protocol foundation", () => {
     await Promise.resolve();
 
     expect(bridge.pendingPermissionRequest).toEqual(permission);
+    expect(observedRequest).toEqual(permission);
     bridge.resolvePermission("allow");
     await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -167,6 +176,36 @@ describe("ACP ported protocol foundation", () => {
       result: { outcome: { outcome: "selected", optionId: "allow" } },
     });
     expect(bridge.pendingPermissionRequest).toBeNull();
+    expect(settledCount).toBe(1);
+  });
+
+  test("clears pending permission requests when the transport closes", async () => {
+    const transport = new FakeTransport();
+    const bridge = new AcpClientBridge(transport, { requestTimeoutMs: 1000 });
+    let settledCount = 0;
+    bridge.onPermissionSettled = () => {
+      settledCount += 1;
+    };
+
+    transport.emitMessage({
+      jsonrpc: "2.0",
+      id: "permission-1",
+      method: "session/request_permission",
+      params: {
+        sessionId: "session-1",
+        toolCall: { toolCallId: "tool-1", title: "Edit file", kind: "edit", status: "pending" },
+        options: [{ kind: "allow", name: "Allow", optionId: "allow" }],
+      },
+    });
+    await Promise.resolve();
+
+    expect(bridge.pendingPermissionRequest?.toolCall.title).toBe("Edit file");
+    transport.emitClose("agent exited");
+    await Promise.resolve();
+
+    expect(bridge.pendingPermissionRequest).toBeNull();
+    expect(settledCount).toBe(1);
+    expect(transport.sent).toEqual([]);
   });
 
   test("rejects in-flight requests when transport closes unexpectedly", async () => {

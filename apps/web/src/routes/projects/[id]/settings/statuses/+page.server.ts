@@ -62,6 +62,6 @@ export const actions: Actions = {
 };
 
 async function requestScopedApp(locals: App.Locals, projectId?: string) {
-  const { requestAppScope } = await import("$lib/server/application-scope");
-  return requestAppScope(locals, projectId);
+  const { requestServiceScope } = await import("$lib/server/request-service-scope");
+  return requestServiceScope(locals, projectId);
 }

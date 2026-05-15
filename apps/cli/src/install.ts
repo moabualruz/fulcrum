@@ -28,7 +28,7 @@ import { dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { which, run as runProc } from "@platform-core/application/runtime-support/process-runner.ts";
 import { pruneSourceBackupFiles } from "@platform-core/application/runtime-support/source-backup-pruner.ts";
-import { AGENTS } from "@execution-orchestration/application/agent-catalog/registry.ts";
+import { AGENTS } from "@execution-orchestration/interface/agent-catalog.ts";
 import { patchJsonOwnedKey, patchTomlOwnedKey } from "@platform-core/application/runtime-support/configuration-patcher.ts";
 import { FULCRUM_RULES_BEGIN as BEGIN, FULCRUM_RULES_END as END, replaceSentinelBlock } from "./vendor-rules.ts";
 

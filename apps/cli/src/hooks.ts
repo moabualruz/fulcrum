@@ -12,7 +12,7 @@
 
 import { mkdir, writeFile, unlink, readdir, readFile, stat } from "node:fs/promises";
 import { dirname } from "node:path";
-import { AGENTS } from "@execution-orchestration/application/agent-catalog/registry.ts";
+import { AGENTS } from "@execution-orchestration/interface/agent-catalog.ts";
 import type { AgentId } from "./mcp-registry.ts";
 
 export type RecipeName = (typeof RECIPE_NAMES)[number];

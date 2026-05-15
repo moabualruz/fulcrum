@@ -16,7 +16,7 @@
 //   - Fail-soft per tool: log warning and continue on any error.
 
 import { stat } from "node:fs/promises";
-import { AGENTS } from "@execution-orchestration/application/agent-catalog/registry.ts";
+import { AGENTS } from "@execution-orchestration/interface/agent-catalog.ts";
 import type { AgentId } from "./mcp-registry.ts";
 import { which, run as runProc } from "@platform-core/application/runtime-support/process-runner.ts";
 import { getComponent } from "@platform-core/application/component-lifecycle/catalog.ts";

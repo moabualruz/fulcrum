@@ -1,7 +1,7 @@
 import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { createMemoryAction, listMemoryRows, MEMORY_SCOPES, type MemoryScope } from "@knowledge-workspace/application/memory/queries.ts";
-import { requestAppScope } from "$lib/server/application-scope";
+import { createScopedMemoryAction, listMemoryRows, MEMORY_SCOPES, type MemoryScope } from "@knowledge-workspace/interface/memory-records.ts";
+import { requestServiceScope } from "$lib/server/request-service-scope";
 
 export const load: PageServerLoad = ({ url, locals }) => {
   const activeProjectId = locals?.activeProjectId ?? null;
@@ -13,7 +13,7 @@ export const load: PageServerLoad = ({ url, locals }) => {
     kind,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestAppScope(locals, activeProjectId);
+        const { em, ctx } = await requestServiceScope(locals, activeProjectId);
         const memories = await listMemoryRows(em, ctx, {
           scope: scope && MEMORY_SCOPES.includes(scope as MemoryScope) ? scope as MemoryScope : undefined,
           kind: kind ? kind as Parameters<typeof listMemoryRows>[2]["kind"] : undefined,
@@ -37,8 +37,8 @@ export const actions: Actions = {
     if (!MEMORY_SCOPES.includes(scope as MemoryScope)) return fail(400, { error: "Invalid scope" });
 
     const projectId = locals?.activeProjectId ?? null;
-    const { em, ctx } = await requestAppScope(locals, projectId);
-    const { id } = await createMemoryAction(em, ctx, {
+    const { em, ctx } = await requestServiceScope(locals, projectId);
+    const { id } = await createScopedMemoryAction(em, ctx, {
       projectId: scope === "global" ? null : ctx.projectId ?? null,
       scope: scope as MemoryScope,
       kind,

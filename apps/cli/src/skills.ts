@@ -6,7 +6,7 @@
 
 import { mkdir, readdir, readFile, copyFile, writeFile, stat, rm, rename } from "node:fs/promises";
 import { join, basename, dirname, resolve } from "node:path";
-import { AGENTS } from "@execution-orchestration/application/agent-catalog/registry.ts";
+import { AGENTS } from "@execution-orchestration/interface/agent-catalog.ts";
 import type { AgentId } from "./mcp-registry.ts";
 import { which, run as runProc } from "@platform-core/application/runtime-support/process-runner.ts";
 import { pruneSourceBackupFiles } from "@platform-core/application/runtime-support/source-backup-pruner.ts";

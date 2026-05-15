@@ -65,7 +65,7 @@ async function getDoc(db: TestOrm, id: string): Promise<Document | null> {
 describe("/docs/[id]/edit +page.server.ts", () => {
   test("server route delegates persistence to application edit facade", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
-    expect(source).toContain("application/docs/web-edit");
+    expect(source).toContain("@knowledge-workspace/interface/document-pages");
     expect(source).not.toMatch(/getKysely|selectFrom|insertInto|updateTable|deleteFrom|\.execute\(/);
   });
 

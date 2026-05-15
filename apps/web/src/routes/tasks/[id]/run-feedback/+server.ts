@@ -99,6 +99,6 @@ export const GET: RequestHandler = async (event) => {
 };
 
 async function requestScopedApp(locals: App.Locals, projectId?: string | null, taskId?: string) {
-  const { requestAppScope } = await import("$lib/server/application-scope");
-  return requestAppScope(locals, projectId, taskId);
+  const { requestServiceScope } = await import("$lib/server/request-service-scope");
+  return requestServiceScope(locals, projectId, taskId);
 }
