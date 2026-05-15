@@ -112,12 +112,6 @@ export async function createTestOrm(
 
   // MikroORM compat: patch em with getConnection/persist/flush/create/getReference/transactional/getMetadata
   const em = ds.manager as EntityManager & Record<string, unknown>;
-  if (!em.getConnection) {
-    (em as any).getConnection = () => ({
-      execute: <T = unknown>(sql: string, params?: unknown[]): Promise<T> =>
-        ds.query(sql, params) as Promise<T>,
-    });
-  }
   if (!em.persist) {
     (em as any).persist = (entity: unknown) => {
       (em as any).__pendingPersist = (em as any).__pendingPersist || [];
@@ -148,13 +142,6 @@ export async function createTestOrm(
   if (!em.transactional) {
     (em as any).transactional = async (cb: (txEm: EntityManager) => Promise<unknown>) => {
       return ds.transaction(async (txEm: EntityManager) => {
-        // Patch the txEm too
-        if (!(txEm as any).getConnection) {
-          (txEm as any).getConnection = () => ({
-            execute: <T = unknown>(sql: string, params?: unknown[]): Promise<T> =>
-              txEm.query(sql, params) as Promise<T>,
-          });
-        }
         return cb(txEm);
       });
     };
