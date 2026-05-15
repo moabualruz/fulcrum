@@ -57,6 +57,9 @@ export class Orchestration1715788800003 implements MigrationInterface {
     `);
     await queryRunner.query(`CREATE INDEX "idx_agent_runs_org_started" ON "agent_runs" ("org_id", "started_at")`);
     await queryRunner.query(`CREATE INDEX "agent_runs_agent_org" ON "agent_runs" ("org_id", "agent_name", "status", "created_at")`);
+    await queryRunner.query(`CREATE UNIQUE INDEX "agent_runs_claimed_unique" ON "agent_runs" ("task_id") WHERE "orchestration_state" = 'claimed'`);
+    await queryRunner.query(`CREATE INDEX "agent_runs_dispatch_poll" ON "agent_runs" ("org_id", "orchestration_state", "next_retry_at") WHERE "orchestration_state" IN ('unclaimed', 'retry_pending')`);
+    await queryRunner.query(`CREATE INDEX "agent_runs_stall_scan" ON "agent_runs" ("org_id", "orchestration_state", "last_codex_timestamp", "started_at") WHERE "orchestration_state" = 'running'`);
 
     // routing_rules
     await queryRunner.query(`

@@ -41,7 +41,7 @@ export class SeedService {
       orgId: defaultOrg.id,
       role: "owner",
       updatedAt: now,
-    }, ["email"]);
+    }, ["orgId", "email"]);
     const adminUser = await this.em.findOneOrFail(User, { where: { email: DEFAULT_ADMIN_EMAIL, orgId: defaultOrg.id } });
 
     await this.em.upsert(OrgMember, {

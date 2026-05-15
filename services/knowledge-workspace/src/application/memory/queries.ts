@@ -128,7 +128,7 @@ export async function findMemoryOrThrow(
   orgId: string,
   id: string,
 ): Promise<Memory> {
-  const memory = await em.findOne(Memory, { org: orgId, id } as never);
+  const memory = await em.findOne(Memory, { where: { org: { id: orgId }, id } } as never);
   if (!memory) throw new AppNotFoundError("Memory not found.");
   return memory;
 }
@@ -168,7 +168,7 @@ function toWebMemoryRow(memory: MemoryDto): WebMemoryRow {
 
 function listWhere(orgId: string, input: ListMemoriesInput | SearchMemoryInput = {}) {
   return {
-    org: orgId,
+    org: { id: orgId },
     ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
     ...(input.global !== undefined ? { global: input.global } : {}),
     ...(input.kind ? { kind: input.kind } : {}),

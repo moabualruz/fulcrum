@@ -132,11 +132,11 @@ export async function destroyWorkspace(
   }
 
   await rm(workspacePath, { recursive: true, force: true });
-  run.workspacePath = undefined;
+  run.workspacePath = null as any;
 
   if (opts.em) {
     const managedRun = await findManagedRun(opts.em, run.id);
-    managedRun.workspacePath = undefined;
+    managedRun.workspacePath = null as any;
     await opts.em.save(managedRun);
   }
 }
@@ -237,7 +237,7 @@ export async function sweepTerminalWorkspaces(
       try {
         await rm(workspacePath, { recursive: true, force: true });
         const managed = await findManagedRun(em, run.id);
-        managed.workspacePath = undefined;
+        managed.workspacePath = null as any;
         await em.save(managed);
       } catch {
         // Non-fatal: log and continue sweep

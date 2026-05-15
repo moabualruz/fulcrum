@@ -94,7 +94,7 @@ async function seedTask(
 ): Promise<Task> {
   const em = db.em;
   const task = em.create(Task, {
-    org: em.getReference(Org, ORG_ID),
+    org: { id: ORG_ID } as Org,
     status: "ready",
     priority: null,
     blockedByIds: [],
@@ -111,8 +111,8 @@ async function seedRun(
   const em = db.em;
   const task = input.task ?? await seedTask(db);
   const run = em.create(AgentRun, {
-    org: em.getReference(Org, ORG_ID),
-    task: em.getReference(Task, task.id),
+    org: { id: ORG_ID } as Org,
+    task: { id: task.id } as Task,
     orchestrationState: "unclaimed",
     attemptCount: 0,
     ...input,
@@ -124,13 +124,12 @@ async function seedRun(
 async function attachDispatchTrace(db: TestOrm, task: Task): Promise<void> {
   const projectId = randomUUID();
   const repoId = randomUUID();
-  const conn = db.em.getConnection();
-  await conn.execute(`INSERT INTO projects (id, org_id, name) VALUES (?, ?, ?)`, [projectId, ORG_ID, "Symphony Project"]);
-  await conn.execute(
-    `INSERT INTO repos (id, org_id, name, slug, kind, local_path) VALUES (?, ?, ?, ?, ?, ?)`,
+  await db.ds.query(`INSERT INTO projects (id, org_id, name) VALUES ($1, $2, $3)`, [projectId, ORG_ID, "Symphony Project"]);
+  await db.ds.query(
+    `INSERT INTO repos (id, org_id, name, slug, kind, local_path) VALUES ($1, $2, $3, $4, $5, $6)`,
     [repoId, ORG_ID, "Symphony Repo", `symphony-${repoId.slice(0, 8)}`, "local", "/tmp/symphony-repo"],
   );
-  await conn.execute(`UPDATE tasks SET project_id = ?, repo_id = ? WHERE id = ? AND org_id = ?`, [
+  await db.ds.query(`UPDATE tasks SET project_id = $1, repo_id = $2 WHERE id = $3 AND org_id = $4`, [
     projectId,
     repoId,
     task.id,
@@ -219,11 +218,11 @@ maxAttempts: 5
   test("REQUIRED: migration creates Symphony partial indexes for claim, dispatch poll, and stall scan", async () => {
     const db = await testDb();
 
-    const indexes = await db.pglite.query<{ indexname: string }>(
+    const indexes = await db.ds.query(
       `select indexname from pg_indexes where schemaname = 'public' and tablename = 'agent_runs' order by indexname`,
     );
 
-    expect(indexes.rows.map((row) => row.indexname)).toEqual(
+    expect(indexes.map((row: any) => row.indexname)).toEqual(
       expect.arrayContaining([
         "agent_runs_claimed_unique",
         "agent_runs_dispatch_poll",
@@ -412,7 +411,7 @@ maxAttempts: 5
       { now: () => now },
     );
 
-    const updated = await db.em.findOneOrFail(AgentRun, run.id);
+    const updated = await db.em.findOneOrFail(AgentRun, { where: { id: run.id } });
     expect(updated.orchestrationState).toBe("retry_queued");
     expect(updated.attemptCount).toBe(2);
     expect(updated.lastErrorKind).toBe("turn_failed");
@@ -450,7 +449,7 @@ maxAttempts: 5
     const task = await seedTask(db);
     const run = await seedRun(db, { task });
     const em = db.em;
-    const managedRun = await em.findOneOrFail(AgentRun, run.id, { populate: ["task"] });
+    const managedRun = await em.findOneOrFail(AgentRun, { where: { id: run.id }, relations: ["task", "org"] });
     const managedTask = managedRun.task!;
 
     await expect(
@@ -1051,9 +1050,9 @@ Prompt`);
 
       // Mutate directly on AgentRun entity
       const em = db.em;
-      const managed = await em.findOneOrFail(AgentRun, run.id);
+      const managed = await em.findOneOrFail(AgentRun, { where: { id: run.id } });
       managed.orchestrationState = "running";
-      /* flushed */
+      await em.save(managed);
 
       const refreshed = await refreshRunningIssues(db.em, ORG_ID);
       const found = refreshed.active.find((r) => r.id === run.id);
@@ -1169,7 +1168,7 @@ Prompt`);
       const db = await testDb();
       const run = await seedRun(db);
       const em = db.em;
-      const managed = await em.findOneOrFail(AgentRun, run.id);
+      const managed = await em.findOneOrFail(AgentRun, { where: { id: run.id } });
       // Field must exist (may be undefined/null initially)
       expect("attemptLifecycleState" in managed).toBe(true);
     });
@@ -1193,26 +1192,26 @@ Prompt`);
       const db = await testDb();
       const run = await seedRun(db);
       const em = db.em;
-      const managed = await em.findOneOrFail(AgentRun, run.id);
+      const managed = await em.findOneOrFail(AgentRun, { where: { id: run.id } });
       expect("lastCodexTimestamp" in managed).toBe(true);
     });
 
     test("REQUIRED: migration adds last_codex_timestamp column to agent_runs", async () => {
       const db = await testDb();
-      const cols = await db.pglite.query<{ column_name: string }>(
+      const cols = await db.ds.query(
         `select column_name from information_schema.columns where table_name = 'agent_runs' order by column_name`,
       );
-      const names = cols.rows.map((r) => r.column_name);
+      const names = cols.map((r: any) => r.column_name);
       expect(names).toContain("last_codex_timestamp");
       expect(names).toContain("attempt_lifecycle_state");
     });
 
     test("REQUIRED: agent_runs_stall_scan index includes last_codex_timestamp and started_at", async () => {
       const db = await testDb();
-      const idxDef = await db.pglite.query<{ indexdef: string }>(
+      const idxDef = await db.ds.query(
         `select indexdef from pg_indexes where schemaname = 'public' and indexname = 'agent_runs_stall_scan'`,
       );
-      const def = idxDef.rows[0]?.indexdef ?? "";
+      const def = idxDef[0]?.indexdef ?? "";
       // The updated index must cover last_codex_timestamp for stall cutoff preference
       expect(def).toMatch(/last_codex_timestamp|started_at/);
     });
@@ -1237,7 +1236,7 @@ Prompt`);
         { now: () => now },
       );
 
-      const updated = await db.em.findOneOrFail(AgentRun, run.id);
+      const updated = await db.em.findOneOrFail(AgentRun, { where: { id: run.id } });
       expect(updated.orchestrationState).toBe("retry_queued");
       // Continuation retry uses fixed 1000ms delay, not exponential
       expect(updated.nextRetryAt?.toISOString()).toBe("2026-05-03T12:00:01.000Z");
@@ -1351,9 +1350,9 @@ Prompt`);
       expect(await pathExists(terminalDryRunPath)).toBe(false);
       expect(await pathExists(runningPath)).toBe(true);
 
-      const refreshedRunning = await db.em.findOneOrFail(AgentRun, running.id);
+      const refreshedRunning = await db.em.findOneOrFail(AgentRun, { where: { id: running.id } });
       expect(refreshedRunning.workspacePath).toBe(runningPath);
-      const refreshedSucceeded = await db.em.findOneOrFail(AgentRun, succeeded.id);
+      const refreshedSucceeded = await db.em.findOneOrFail(AgentRun, { where: { id: succeeded.id } });
       expect(refreshedSucceeded.workspacePath).toBeNull();
 
       await rm(scratchRoot, { recursive: true, force: true });
@@ -1654,10 +1653,10 @@ Prompt`);
 
       // Update lastCodexTimestamp to be very recent (within stall window)
       const em = db.em;
-      const managed = await em.findOneOrFail(AgentRun, run.id);
+      const managed = await em.findOneOrFail(AgentRun, { where: { id: run.id } });
       (managed as AgentRun & { lastCodexTimestamp?: Date }).lastCodexTimestamp =
         new Date("2026-05-03T11:59:59.000Z");
-      /* flushed */
+      await em.save(managed);
 
       const onStalled = mock(async () => undefined);
 
@@ -1686,7 +1685,7 @@ Prompt`);
 
       // Ensure lastCodexTimestamp is null (default)
       const em = db.em;
-      const managed = await em.findOneOrFail(AgentRun, run.id);
+      const managed = await em.findOneOrFail(AgentRun, { where: { id: run.id } });
       expect((managed as AgentRun & { lastCodexTimestamp?: Date }).lastCodexTimestamp).toBeFalsy();
 
       const onStalled = mock(async () => undefined);

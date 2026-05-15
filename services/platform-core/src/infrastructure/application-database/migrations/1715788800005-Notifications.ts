@@ -11,13 +11,17 @@ export class Notifications1715788800005 implements MigrationInterface {
     // notification_rules (notifications domain — full expansion)
     await queryRunner.query(`
       CREATE TABLE "notification_rules" (
-        "id"           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        "org_id"       uuid NOT NULL REFERENCES "orgs" ("id") ON DELETE CASCADE,
-        "user_id"      varchar,
-        "subject_kind" varchar,
-        "active"       boolean NOT NULL DEFAULT true,
-        "name"         varchar,
-        "enabled"      boolean NOT NULL DEFAULT true,
+        "id"            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "org_id"        uuid NOT NULL REFERENCES "orgs" ("id") ON DELETE CASCADE,
+        "user_id"       varchar,
+        "subject_kind"  varchar,
+        "active"        boolean NOT NULL DEFAULT true,
+        "name"          varchar,
+        "event_pattern" jsonb,
+        "channels"      text,
+        "enabled"       boolean NOT NULL DEFAULT true,
+        "created_at"    timestamptz,
+        "updated_at"    timestamptz,
         CONSTRAINT "uq_notification_rules_user_name" UNIQUE ("user_id", "name")
       )
     `);

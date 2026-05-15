@@ -47,7 +47,7 @@ export class CoreAndAuth1715788800000 implements MigrationInterface {
         "org_id"     varchar NOT NULL,
         "user_id"    varchar NOT NULL,
         "role"       varchar NOT NULL DEFAULT 'member',
-        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "joined_at"  timestamptz NOT NULL DEFAULT now(),
         CONSTRAINT "uq_org_members_org_user" UNIQUE ("org_id", "user_id")
       )
     `);
