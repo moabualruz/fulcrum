@@ -35,14 +35,13 @@ function jsonLine<T>(lines: string[]): T {
 async function createOrg(db: TestOrm): Promise<string> {
   const em = db.em;
   const orgId = crypto.randomUUID();
-  em.persist(em.create(Org, {
+  await em.save(Org, {
     id: orgId,
     name: "Artifact Parity",
     slug: `artifact-parity-${orgId.slice(0, 8)}`,
     createdAt: new Date(),
     updatedAt: new Date(),
-  }));
-  /* flushed */
+  } as never);
   return orgId;
 }
 

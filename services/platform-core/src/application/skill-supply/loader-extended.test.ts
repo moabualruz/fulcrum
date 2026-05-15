@@ -99,9 +99,10 @@ async function latestVersion(slug: string): Promise<SkillVersion | null> {
   const skill = await em.findOne(
     FulcrumSkill,
     { org: testDb.seed.orgId, slug },
-    { populate: ["versions"] },
+    { relations: ["versions"] },
   );
-  return skill?.versions.getItems().at(-1) ?? null;
+  const versions = skill?.versions ?? [];
+  return versions.at(-1) ?? null;
 }
 
 describe("installSkill", () => {
@@ -181,11 +182,11 @@ describe("installSkill", () => {
       org: testDb.seed.orgId,
       slug: "copy-fail",
     }, {
-      populate: ["versions"],
+      relations: ["versions"],
     });
     expect(skill.source).toBe(SkillSource.Local);
     expect(skill.enabledAgents).toEqual(["codex"]);
-    expect(skill.versions.getItems()[0]?.hashVerified).toBeNull();
+    expect((skill.versions ?? [])[0]?.hashVerified).toBeNull();
   });
 
   it("updates existing skill source to local on install", async () => {

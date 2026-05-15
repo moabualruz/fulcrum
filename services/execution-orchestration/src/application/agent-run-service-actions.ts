@@ -70,7 +70,7 @@ function assertEm(db: DbHandle) {
 }
 
 function isSqlExecutor(db: DbHandle): db is SqlExecutor {
-  return !("em" in db) && "query" in db && typeof (db as { query: unknown }).query === "function";
+  return !("em" in db) && !("save" in db) && "query" in db && typeof (db as { query: unknown }).query === "function";
 }
 
 async function tableColumns(db: DbHandle, tableName: string): Promise<Set<string>> {

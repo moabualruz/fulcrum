@@ -29,7 +29,7 @@ describe("migration downgrade smoke", () => {
     try {
       db = await createTestOrm();
       // Verify we can query the schema_migrations table
-      const meta = db.ds.getMetadata().find(
+      const meta = db.ds.entityMetadatas.find(
         (m) => m.tableName === "fulcrum_schema_migrations",
       );
       expect(meta).toBeDefined();

@@ -339,9 +339,10 @@ function patchEntityManager(target: EntityManager & Record<string, unknown>, ds:
   };
   const origFindOneOrFail = target.findOneOrFail?.bind(target);
   if (origFindOneOrFail) {
-    (target as any).findOneOrFail = async (entityClass: Function, criteria: any) => {
+    (target as any).findOneOrFail = async (entityClass: Function, criteria: any, thirdArg?: any) => {
       await drainPersist(target, ds);
-      return origFindOneOrFail(entityClass as any, normalizeFindOptions(entityClass, criteria));
+      const combined = thirdArg !== undefined ? mergeThreeArgOptions(criteria, thirdArg) : criteria;
+      return origFindOneOrFail(entityClass as any, normalizeFindOptions(entityClass, combined));
     };
   }
   const origTransaction = target.transaction.bind(target);
@@ -351,4 +352,47 @@ function patchEntityManager(target: EntityManager & Record<string, unknown>, ds:
       return cb(txEm);
     });
   };
+  // MikroORM em.getReference(Entity, id) → create a proxy with just the id set
+  if (!target.getReference) {
+    (target as any).getReference = (entityClass: Function, id: unknown) => {
+      const instance = Object.create(entityClass.prototype);
+      instance.id = id;
+      return instance;
+    };
+  }
+  // MikroORM em.persist(entity) → immediate save via TypeORM
+  if (!target.persist) {
+    (target as any).persist = (entity: unknown) => {
+      (target as any).__pendingPersist = (target as any).__pendingPersist || [];
+      (target as any).__pendingPersist.push(entity);
+      const saveEntity = async (e: unknown) => {
+        if (Array.isArray(e)) {
+          for (const item of e) await ds.manager.save(item);
+        } else {
+          await ds.manager.save(e);
+        }
+      };
+      (target as any).__persistPromise = ((target as any).__persistPromise ?? Promise.resolve())
+        .then(() => saveEntity(entity))
+        .catch(() => {});
+      return target;
+    };
+  }
+  // MikroORM em.flush() → drain pending persist saves
+  if (!target.flush) {
+    (target as any).flush = async () => {
+      if ((target as any).__persistPromise) {
+        await (target as any).__persistPromise;
+      }
+      const pending = (target as any).__pendingPersist || [];
+      for (const entity of pending) {
+        if (Array.isArray(entity)) {
+          for (const e of entity) await ds.manager.save(e);
+        } else {
+          await ds.manager.save(entity);
+        }
+      }
+      (target as any).__pendingPersist = [];
+    };
+  }
 }

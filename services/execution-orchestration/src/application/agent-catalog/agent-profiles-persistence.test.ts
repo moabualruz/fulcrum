@@ -51,7 +51,7 @@ describe("agents.testProfile persistence", () => {
     testCliPaths.push(cliPath);
     process.env["FULCRUM_AGENT_CLI_ALLOWLIST"] = testCliPaths.join(",");
     db = await setupProfile("agent-ok", cliPath);
-    const caller = await createTestCaller(createTestContainer(db));
+    const caller = await createTestCaller(db, createTestContainer(db));
 
     const result = await caller.agents.testProfile({ name: "agent-ok" });
 
@@ -67,7 +67,7 @@ describe("agents.testProfile persistence", () => {
     testCliPaths.push(cliPath);
     process.env["FULCRUM_AGENT_CLI_ALLOWLIST"] = testCliPaths.join(",");
     db = await setupProfile("agent-fail", cliPath);
-    const caller = await createTestCaller(createTestContainer(db));
+    const caller = await createTestCaller(db, createTestContainer(db));
 
     const result = await caller.agents.testProfile({ name: "agent-fail" });
 

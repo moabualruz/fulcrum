@@ -51,7 +51,7 @@ describe("CLI application caller parity", () => {
   });
 
   test("runtime boundary allowlist is limited to named migration/bootstrap infrastructure", () => {
-    expect(CLI_BOUNDARY_ALLOWLIST).toEqual([]);
+    expect(CLI_BOUNDARY_ALLOWLIST).toHaveLength(0);
   });
 
   test.each([...CLI_RUNTIME_BOUNDARY_SURFACES])(

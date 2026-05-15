@@ -24,31 +24,21 @@ describe("schema data integrity", () => {
     const db = await createTestOrm();
     try {
       const em = db.em;
-      const now = new Date();
-      const org = em.create(Org, {
-        name: "Router Cascade",
-        slug: "router-cascade",
-        createdAt: now,
-        updatedAt: now,
-      });
-      await em.save(org);
-      const rule = em.create(RoutingRule, {
-        org,
-        name: "Bugfix to Codex",
-        conditionsJson: { taskType: "bug-fix" },
-        actionAgent: "codex",
-        actionSkillSet: [],
-        priority: 100,
-        enabled: true,
-        source: RoutingRuleSource.Manual,
-        createdAt: now,
-        updatedAt: now,
-      });
-      await em.save(rule);
+      const orgId = randomUUID();
+      await em.query(
+        `INSERT INTO orgs (id, name, slug, created_at, updated_at) VALUES ($1, $2, $3, now(), now())`,
+        [orgId, "Router Cascade", "router-cascade"],
+      );
+      await em.query(
+        `INSERT INTO routing_rules (org_id, name, conditions_json, action_agent, action_skill_set, priority, enabled, source, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), now())`,
+        [orgId, "Bugfix to Codex", JSON.stringify({ taskType: "bug-fix" }), "codex", "", 100, true, "manual"],
+      );
 
-      await em.remove(org);
+      await em.query(`DELETE FROM orgs WHERE id = $1`, [orgId]);
 
-      expect(await em.count(RoutingRule, { where: { org: { id: org.id } } })).toBe(0);
+      const rows = await em.query(`SELECT count(*)::text AS count FROM routing_rules WHERE org_id = $1`, [orgId]);
+      expect(Number(rows[0]?.count)).toBe(0);
     } finally {
       await db.close();
     }

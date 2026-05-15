@@ -1,4 +1,4 @@
-import type { EntityManager } from "typeorm";
+import { LessThan, type EntityManager } from "typeorm";
 import { FeatureFlag } from "@identity-access/infrastructure/database/entities/auth/FeatureFlag.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
@@ -63,6 +63,7 @@ async function upsertTenantJsonSetting(em: EntityManager, orgId: string, key: st
   if (setting) {
     setting.value = value;
     setting.updatedAt = new Date();
+    await em.save(setting);
   } else {
     setting = em.create(TenantSetting, { orgId, key, value });
     await em.save(setting);
@@ -128,8 +129,8 @@ export async function clearSettingsErrors(
   if (!input.before) throw new AppValidationError("before date required");
   const before = new Date(input.before);
   if (Number.isNaN(before.getTime())) throw new AppValidationError("before date is invalid");
-  const rows = await em.find(ErrorLog, { org: { id: ctx.orgId }, occurredAt: { $lt: before } } as never);
-  em.remove(rows);
+  const rows = await em.find(ErrorLog, { where: { org: { id: ctx.orgId }, occurredAt: LessThan(before) } as never });
+  if (rows.length > 0) await em.remove(rows);
   return { success: true as const };
 }
 
@@ -142,6 +143,7 @@ export async function toggleSettingsFeatureFlag(
   const row = await em.findOne(FeatureFlag, { where: { id: input.id, orgId: ctx.orgId, userId: null } as never });
   if (!row) throw new AppNotFoundError(`Feature flag not found: ${input.id}`);
   row.enabled = !row.enabled;
+  await em.save(row);
   return { success: true as const };
 }
 
@@ -174,6 +176,7 @@ export async function setSettingsFeatureFlagRollout(
   const rollout = await rolloutForFlag(em, ctx, input.id);
   rollout.rolloutPercent = input.rolloutPercent;
   rollout.updatedAt = new Date();
+  await em.save(rollout);
   return { success: true as const };
 }
 
@@ -186,6 +189,7 @@ export async function setSettingsFeatureFlagCohortRules(
   const rollout = await rolloutForFlag(em, ctx, input.id);
   rollout.cohortRules = input.rules;
   rollout.updatedAt = new Date();
+  await em.save(rollout);
   return { success: true as const };
 }
 
@@ -224,6 +228,7 @@ export async function rotateSettingsSecret(
   if (!credential) throw new AppNotFoundError(`Credential not found: ${input.id}`);
   credential.encryptedValue = encodedSecret(input.value);
   credential.lastUsedAt = new Date();
+  await em.save(credential);
   return { success: true as const };
 }
 
@@ -232,6 +237,7 @@ export async function toggleSettingsSecretArchive(em: EntityManager, ctx: AppCon
   const credential = await em.findOne(Credential, { where: { id: input.id, org: { id: ctx.orgId } } as never });
   if (!credential) throw new AppNotFoundError(`Credential not found: ${input.id}`);
   credential.archived = !credential.archived;
+  await em.save(credential);
   return { success: true as const };
 }
 
@@ -239,7 +245,7 @@ export async function deleteSettingsSecret(em: EntityManager, ctx: AppContext, i
   if (!input.id) throw new AppValidationError("id required");
   const credential = await em.findOne(Credential, { where: { id: input.id, org: { id: ctx.orgId } } as never });
   if (!credential) throw new AppNotFoundError(`Credential not found: ${input.id}`);
-  em.remove(credential);
+  await em.remove(credential);
   return { success: true as const };
 }
 

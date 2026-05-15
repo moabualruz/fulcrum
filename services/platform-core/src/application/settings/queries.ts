@@ -78,7 +78,7 @@ async function tenantSetting(em: EntityManager, orgId: string, key: string): Pro
 }
 
 export async function getTenantSetting(em: EntityManager, ctx: AppContext, key: string): Promise<TenantSettingDto> {
-  const row = await em.findOne(FeatureFlag, { where: { org: { id: ctx.orgId }, flag: key, userId: null  } as never });
+  const row = await em.findOne(FeatureFlag, { where: { orgId: ctx.orgId, flag: key, userId: null  } as never });
   if (!row) throw new AppNotFoundError(`Tenant setting not found: ${key}`);
   return serializeTenantSetting(row);
 }
@@ -158,8 +158,8 @@ export async function listSettingsErrors(
       message: row.errorMessage,
       stack_trace: row.stackTrace ?? null,
       context: row.context ?? {},
-      os: row.os ?? null,
-      version: row.fulcrumVersion ?? row.bunVersion ?? null,
+      os: row.environment ?? null,
+      version: row.appVersion ?? null,
       occurred_at: row.occurredAt.toISOString(),
     })),
     total,

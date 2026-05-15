@@ -8,6 +8,8 @@ import {
   FULCRUM_CONTEXT_MEMORY_RUN_EVENT_ENTITIES,
   FulcrumRunEventEntity,
 } from "@execution-orchestration/infrastructure/database/run-context.entities.ts";
+import { FULCRUM_JOB_QUEUE_ENTITIES } from "@platform-core/infrastructure/database/job-queue.entities.ts";
+import { JobQueue1778751000000 } from "@platform-core/infrastructure/database/job-queue.migration.ts";
 import {
   FULCRUM_REVIEW_WORKFLOW_ENTITIES,
   FulcrumGeneratedE2ETestEntity,
@@ -78,11 +80,13 @@ describe("Workflow acceptance cycle service", () => {
           ...FULCRUM_WORKFLOW_SPINE_ENTITIES,
           ...FULCRUM_REVIEW_WORKFLOW_ENTITIES,
           ...FULCRUM_CONTEXT_MEMORY_RUN_EVENT_ENTITIES,
+          ...FULCRUM_JOB_QUEUE_ENTITIES,
         ],
         migrations: [
           WorkflowSpine1778623200001,
           ReviewWorkflow1778623200002,
           RunContext1778623200005,
+          JobQueue1778751000000,
         ],
       }),
     );

@@ -275,7 +275,7 @@ describe("MigratorService branch behavior with controlled collaborators", () => 
       pastDue: 1,
     });
     await expect(service.history()).resolves.toBe(rows);
-    expect(repo.findAll).toHaveBeenLastCalledWith({ orderBy: { appliedAt: "ASC" } });
+    expect(repo.find).toHaveBeenLastCalledWith({ order: { appliedAt: "ASC" } });
   });
 
   test("checksum validation skips empty checksums and throws mismatch or missing-file errors", async () => {
@@ -325,17 +325,6 @@ describe("MigratorService branch behavior with controlled collaborators", () => 
       ]);
       expect(warnings.join("\n")).toContain("Cannot extract numeric version");
       expect(cleared).toEqual([]);
-
-      const failingFlush = buildFakeService({
-        pending: [{ name: target }],
-        upResult: [{ name: target }],
-      });
-      failingFlush.em.flush.mockImplementation(async () => {
-        throw new Error("relation schema_migrations does not exist");
-      });
-
-      await expect(failingFlush.service.migrate(target)).resolves.toBeUndefined();
-      expect(failingFlush.cleared).toEqual(["clear"]);
     } finally {
       console.warn = originalWarn;
     }

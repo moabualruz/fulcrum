@@ -79,8 +79,7 @@ describe("application artifacts commands and queries", () => {
   test("cross-org artifact access throws AppForbiddenError", async () => {
     const testDb = await freshDb();
     const em = testDb.em;
-    em.persist(em.create(Org, { id: OTHER_ORG_ID, name: "Other", slug: "other", createdAt: new Date(), updatedAt: new Date() }));
-    /* flushed */
+    await em.save(Org, { id: OTHER_ORG_ID, name: "Other", slug: "other", createdAt: new Date(), updatedAt: new Date() } as never);
     const other = await createArtifact(em, ctx(OTHER_ORG_ID), { filename: "other.txt", path: "/tmp/other.txt" });
     await expect(getArtifact(em, ctx(), other.id)).rejects.toBeInstanceOf(AppForbiddenError);
   });
@@ -96,10 +95,10 @@ describe("application artifacts commands and queries", () => {
     const visibleId = crypto.randomUUID();
     const archivedId = crypto.randomUUID();
     await em.getConnection().execute(
-      `INSERT INTO artifacts (id, org_id, project_id, run_id, task_id, filename, title, path, body_path, mime, size_bytes, size, checksum_sha256, sha256, archived, metadata_json, created_at)
+      `INSERT INTO artifacts (id, org_id, project_id, run_id, task_id, filename, title, kind, path, body_path, mime, size_bytes, size, checksum_sha256, sha256, archived, metadata_json, created_at)
        VALUES
-         (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false, ?::jsonb, now()),
-         (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true, ?::jsonb, now() - interval '1 hour')`,
+         (?, ?, ?, ?, ?, ?, ?, 'file', ?, ?, ?, ?, ?, ?, ?, false, ?::jsonb, now()),
+         (?, ?, ?, ?, ?, ?, ?, 'file', ?, ?, ?, ?, ?, ?, ?, true, ?::jsonb, now() - interval '1 hour')`,
       [
         visibleId,
         DEFAULT_ORG_ID,

@@ -119,7 +119,7 @@ async function markUpstream(slug: string, upstreamRepo: string): Promise<void> {
   });
   skill.source = SkillSource.Upstream;
   skill.upstreamRepo = upstreamRepo;
-  /* flushed */
+  await em.save(skill);
 }
 
 async function latestHashVerified(slug: string): Promise<string | null | undefined> {
@@ -127,9 +127,10 @@ async function latestHashVerified(slug: string): Promise<string | null | undefin
   const skill = await em.findOne(
     FulcrumSkill,
     { org: testDb.seed.orgId, slug },
-    { populate: ["versions"] },
+    { relations: ["versions"] },
   );
-  return skill?.versions.getItems().at(-1)?.hashVerified;
+  const versions = skill?.versions ?? [];
+  return versions.at(-1)?.hashVerified;
 }
 
 describe("syncUpstream", () => {
@@ -249,7 +250,7 @@ describe("syncUpstream", () => {
       slug: "upstream-no-repo",
     });
     skill.source = SkillSource.Upstream;
-    /* flushed */
+    await em.save(skill);
 
     const noLock = skillContent("upstream-no-lock", "1.0.0", "Initial body.");
     await installSkill(await writeLocalSource("upstream-no-lock", noLock), testDb.seed.orgId);
