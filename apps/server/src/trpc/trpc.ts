@@ -2,7 +2,7 @@ import { initTRPC } from "@trpc/server";
 import type { TrpcContext } from "./context.ts";
 import { ensureRequestId } from "./context.ts";
 import type { TrpcProcedureMeta } from "./permissions.ts";
-import { runWithTRPCSpan } from "../runtime/trpc/middleware/otel.ts";
+import { runWithTRPCSpan } from "./middleware/otel.ts";
 
 export const t = initTRPC.context<TrpcContext>().meta<TrpcProcedureMeta>().create({
   errorFormatter({ shape, ctx }) {

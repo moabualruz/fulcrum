@@ -27,7 +27,7 @@ const SQL_INTERFACE_ROOTS = [
   "apps/server/src/api",
   "apps/server/src/router",
   "apps/server/src/trpc",
-  "apps/server/src/runtime/trpc",
+  "apps/server/src/trpc",
 ];
 
 const WEB_DATA_HANDLE_PATTERN = /\b(openDatabase|getDatabase|getEm|getDefaultOrgIdOrm|ormSqlConnection|WebDatabaseHandle|LegacyDatabaseHandle|application-compat)\b/;

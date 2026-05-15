@@ -4,7 +4,7 @@ import { Container } from "@needle-di/core";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
-import { TelemetryStore, writeTelemetryEvent } from "@fulcrum/server/runtime/trpc/routers/telemetry.ts";
+import { TelemetryStore, writeTelemetryEvent } from "@fulcrum/server/trpc/routers/telemetry.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
 const USER_ID = "11111111-1111-4111-8111-111111111111";

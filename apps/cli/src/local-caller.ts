@@ -4,7 +4,7 @@ import {
   buildCliTuiCallerContext,
   createApplicationLocalCaller,
   requireCliTuiSessionContext,
-} from "@fulcrum/server/runtime/trpc/local-caller.ts";
+} from "@fulcrum/server/trpc/local-caller.ts";
 
 type ConfiguredWorkflowApiCaller = Exclude<ReturnType<typeof createWorkflowApiCallerFromEnv>, null>;
 type MergedCaller<Base extends object, Overlay extends object> = Omit<Base, keyof Overlay> & Overlay;

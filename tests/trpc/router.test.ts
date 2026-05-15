@@ -22,8 +22,8 @@ import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
 import { CasbinRuleRepository } from "@platform-core/infrastructure/application-database/repositories/flags/CasbinRuleRepository.ts";
 import { protectedProcedure } from "@fulcrum/server/trpc/middleware.ts";
-import { __setTaskApplicationForTest } from "@fulcrum/server/runtime/trpc/routers/tasks.ts";
-import { __setMemoryApplicationForTest } from "@fulcrum/server/runtime/trpc/routers/memory.ts";
+import { __setTaskApplicationForTest } from "@fulcrum/server/trpc/routers/tasks.ts";
+import { __setMemoryApplicationForTest } from "@fulcrum/server/trpc/routers/memory.ts";
 import {
   DOC_TEMPLATE_SERVICE_TOKEN,
   type DocTemplateService,

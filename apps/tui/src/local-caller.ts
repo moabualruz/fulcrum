@@ -7,7 +7,7 @@ import { createWorkflowApiCallerFromEnv } from "@workflow-coordination/interface
 import {
   createApplicationLocalCaller,
   requireCliTuiSessionContext,
-} from "@fulcrum/server/runtime/trpc/local-caller.ts";
+} from "@fulcrum/server/trpc/local-caller.ts";
 
 type ConfiguredApiCaller<T extends (...args: never[]) => unknown> = Exclude<ReturnType<T>, null>;
 type MergedCaller<Base extends object, Overlay extends object> = Omit<Base, keyof Overlay> & Overlay;

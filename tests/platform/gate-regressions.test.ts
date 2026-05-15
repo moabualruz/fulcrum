@@ -88,7 +88,7 @@ describe("architecture platform gate regressions", () => {
     const offenders = [
       ...sourceFiles(join(root, "apps/server/src/trpc/schemas")),
       ...sourceFiles(join(root, "apps/server/src/trpc/routers")),
-      ...sourceFiles(join(root, "apps/server/src/runtime/trpc/routers")),
+      ...sourceFiles(join(root, "apps/server/src/trpc/routers")),
     ]
       .filter((file) => readFileSync(file, "utf8").includes("z.any("))
       .map((file) => relative(root, file))

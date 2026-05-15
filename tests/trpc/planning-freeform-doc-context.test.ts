@@ -320,7 +320,7 @@ afterEach(() => {
 });
 
 async function caller() {
-  const { __setPlanningApplicationForTest } = await import("@fulcrum/server/runtime/trpc/routers/planning.ts");
+  const { __setPlanningApplicationForTest } = await import("@fulcrum/server/trpc/routers/planning.ts");
   restoreApplication = __setPlanningApplicationForTest({
     buildFreeformPlanningPromptFromDocs,
     startFreeformWorkFromDocs,

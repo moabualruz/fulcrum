@@ -8,7 +8,7 @@ import { t } from "@fulcrum/server/trpc/trpc.ts";
 import {
   ErrorLogStore,
   type ErrorLogRecord,
-} from "@fulcrum/server/runtime/trpc/routers/error-logs.ts";
+} from "@fulcrum/server/trpc/routers/error-logs.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
 const USER_ID = "00000000-0000-0000-0000-000000000010";

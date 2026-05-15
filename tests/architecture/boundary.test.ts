@@ -23,7 +23,7 @@ const RESIDUAL_INTERFACE_ROOTS = [
   "apps/server/src/api",
   "apps/server/src/router",
   "apps/server/src/trpc",
-  "apps/server/src/runtime/trpc",
+  "apps/server/src/trpc",
 ];
 
 const TEST_FIXTURE_ROOTS = ["tests/support", "apps/web/tests"];
@@ -105,12 +105,12 @@ const RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS = new Map([
 const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES: string[] = [];
 
 const SERVICE_ROUTER_FILES = [
-  "apps/server/src/runtime/trpc/routers/comments.ts",
-  "apps/server/src/runtime/trpc/routers/doc-templates.ts",
-  "apps/server/src/runtime/trpc/routers/docs.ts",
-  "apps/server/src/runtime/trpc/routers/skills.ts",
-  "apps/server/src/runtime/trpc/routers/sprints.ts",
-  "apps/server/src/runtime/trpc/routers/templates.ts",
+  "apps/server/src/trpc/routers/comments.ts",
+  "apps/server/src/trpc/routers/doc-templates.ts",
+  "apps/server/src/trpc/routers/docs.ts",
+  "apps/server/src/trpc/routers/skills.ts",
+  "apps/server/src/trpc/routers/sprints.ts",
+  "apps/server/src/trpc/routers/templates.ts",
 ];
 
 const LEGACY_CLI_FILES = [

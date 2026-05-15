@@ -4,7 +4,7 @@ import { Container } from "@needle-di/core";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
-import { __setTaskApplicationForTest } from "@fulcrum/server/runtime/trpc/routers/tasks.ts";
+import { __setTaskApplicationForTest } from "@fulcrum/server/trpc/routers/tasks.ts";
 import type { AppContext } from "@work-management/application/tasks/types.ts";
 import type {
   DispatchDependencyRunForTasksInput,

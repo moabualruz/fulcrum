@@ -10,7 +10,7 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-const LEGACY_TRPC_PLANNING_BOILERPLATE_PATH = "apps/server/src/runtime/trpc/routers/planning.ts";
+const LEGACY_TRPC_PLANNING_BOILERPLATE_PATH = "apps/server/src/trpc/routers/planning.ts";
 
 const PLANNING_BOILERPLATE_TARGET_FILES = [
   "services/planning-review/src/application/technical-planning-cycle.ts",
@@ -91,8 +91,8 @@ describe("server stack convergence", () => {
   });
 
   test("unused tRPC compatibility re-export files are removed", async () => {
-    expect(await fileExists("apps/server/src/runtime/trpc/router.ts")).toBe(false);
-    expect(await fileExists("apps/server/src/runtime/trpc/routers/artifacts.ts")).toBe(false);
+    expect(await fileExists("apps/server/src/trpc/router.ts")).toBe(false);
+    expect(await fileExists("apps/server/src/trpc/routers/artifacts.ts")).toBe(false);
   });
 
   test("unused direct CLI tRPC HTTP client is removed", async () => {

@@ -9,7 +9,7 @@ import {
   ThemeSettingsRepository,
   THEME_DEFAULTS,
   type ThemeKey,
-} from "@fulcrum/server/runtime/trpc/routers/theme.ts";
+} from "@fulcrum/server/trpc/routers/theme.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
 const USER_ID = "00000000-0000-0000-0000-000000000010";
