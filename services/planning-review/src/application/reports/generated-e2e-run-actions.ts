@@ -131,8 +131,7 @@ async function loadGeneratedE2eArtifacts(
   const runnerFilter = runner === "bun"
     ? "and coalesce(metadata_json->>'runner', 'bun') = 'bun'"
     : "and metadata_json->>'runner' = 'playwright'";
-  return await em.getConnection().execute<GeneratedE2eArtifactRow[]>(
-    `select id, body_path
+  return await em.query(`select id, body_path
        from artifacts
       where org_id = ?
         and project_id = ?
@@ -140,7 +139,5 @@ async function loadGeneratedE2eArtifacts(
         and metadata_json->>'lifecycleState' = 'accepted'
         ${runnerFilter}
         ${traceFilter}
-      order by created_at asc, id asc`,
-    params,
-  );
+      order by created_at asc, id asc`, params, );
 }

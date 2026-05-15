@@ -10,8 +10,8 @@
 
 import type { EntityManager } from "typeorm";
 
-import { FieldDependencyRule } from "@platform-core/infrastructure/application-database/entities/tasks/FieldDependencyRule.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { FieldDependencyRule } from "@work-management/infrastructure/database/entities/tasks/FieldDependencyRule.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { AppNotFoundError, AppValidationError } from "@platform-core/domain/errors.ts";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -38,10 +38,10 @@ export class WorkItemFieldDependencyService {
    * Returns all field dependency rules for a project, scoped to orgId.
    */
   async listRules(orgId: string, projectId: string): Promise<FieldDependencyRule[]> {
-    return this.em.find(FieldDependencyRule, {
+    return this.em.find(FieldDependencyRule, { where: {
       projectId,
       org: { id: orgId },
-    });
+    } as never });
   }
 
   // ── Validation ────────────────────────────────────────────────────────────────
@@ -92,7 +92,7 @@ export class WorkItemFieldDependencyService {
    * Creates a new field dependency rule.
    */
   async createRule(orgId: string, input: CreateRuleInput): Promise<FieldDependencyRule> {
-    const org = this.em.getReference(Org, orgId);
+    const org = { id: orgId } as Org;
     const rule = new FieldDependencyRule();
     rule.org = org as Org;
     rule.projectId = input.projectId;
@@ -100,8 +100,7 @@ export class WorkItemFieldDependencyService {
     rule.sourceValue = input.sourceValue;
     rule.targetFieldId = input.targetFieldId;
     rule.action = input.action;
-    this.em.persist(rule);
-    await this.em.flush();
+    await this.em.save(rule);
     return rule;
   }
 
@@ -110,14 +109,13 @@ export class WorkItemFieldDependencyService {
    * Throws if not found.
    */
   async deleteRule(orgId: string, ruleId: string): Promise<void> {
-    const rule = await this.em.findOne(FieldDependencyRule, {
+    const rule = await this.em.findOne(FieldDependencyRule, { where: {
       id: ruleId,
       org: { id: orgId },
-    });
+    } as never });
     if (!rule) {
       throw new AppNotFoundError(`Rule ${ruleId} not found`);
     }
     this.em.remove(rule);
-    await this.em.flush();
   }
 }

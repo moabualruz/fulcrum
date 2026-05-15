@@ -29,7 +29,7 @@ async function seedDb() {
 }
 
 function em(db: TestOrm) {
-  return db.em.fork();
+  return db.em;
 }
 
 describe("document versions", () => {

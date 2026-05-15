@@ -64,7 +64,7 @@ async function seedTasks(): Promise<SeededIds> {
   const db = await initDatabase();
   const org = (await db.query<{ id: string }>("SELECT id FROM orgs ORDER BY created_at ASC LIMIT 1"))[0]!;
   const ctx = { orgId: org.id, userId: "test-user", projectId: null };
-  const em = db.em.fork();
+  const em = db.em;
   const alpha = await createProject(em, ctx, { slug: "alpha", name: "Alpha" });
   const beta = await createProject(em, ctx, { slug: "beta", name: "Beta" });
   const taskAlphaPending = await createTask(em, {

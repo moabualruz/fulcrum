@@ -143,7 +143,7 @@ describe("/tasks/[id] dependency run actions", () => {
   test("returns dependency-aware dependency disclosure for the task detail action", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Task Detail Preview Project"],
@@ -194,7 +194,7 @@ describe("/tasks/[id] dependency run actions", () => {
   test("dispatches a task detail dependency run through the shared application action", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Task Detail Dispatch Project"],
@@ -246,7 +246,7 @@ describe("/tasks/[id] dependency run actions", () => {
   test("loads task detail dependency-run live feedback through the shared application action", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Task Detail Feedback Project"],
@@ -296,7 +296,7 @@ describe("/tasks/[id] dependency run actions", () => {
   test("streams task detail dependency-run feedback through a server event response", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Task Detail Feedback Stream Project"],

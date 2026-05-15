@@ -22,7 +22,7 @@ async function freshDb(): Promise<TestOrm> {
 describe("guided ACP planning application action", () => {
   test("starts a trace-linked guided planning session from selected docs and records ACP traffic", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const ctx = { orgId: DEFAULT_ORG_ID, userId: USER_ID, projectId: null };
     const sourceDoc = await createDoc(em, ctx, {
       title: "Replacement workflow brief",

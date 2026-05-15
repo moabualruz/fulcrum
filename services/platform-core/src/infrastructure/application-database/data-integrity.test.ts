@@ -2,12 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 
 import { createTestOrm } from "@test-support/application-database.ts";
-import { Account } from "./entities/auth/Account.ts";
-import { FeatureFlag } from "./entities/auth/FeatureFlag.ts";
-import { Org } from "./entities/auth/Org.ts";
-import { Verification } from "./entities/auth/Verification.ts";
-import { DocTemplate } from "./entities/docs/DocTemplate.ts";
-import { RoutingRule, RoutingRuleSource } from "./entities/router/RoutingRule.ts";
+import { Account } from "@identity-access/infrastructure/database/entities/auth/Account.ts";
+import { FeatureFlag } from "@identity-access/infrastructure/database/entities/auth/FeatureFlag.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Verification } from "@identity-access/infrastructure/database/entities/auth/Verification.ts";
+import { DocTemplate } from "@knowledge-workspace/infrastructure/database/entities/docs/DocTemplate.ts";
+import { RoutingRule, RoutingRuleSource } from "@execution-orchestration/infrastructure/database/entities/router/RoutingRule.ts";
 
 function metadataFor(db: Awaited<ReturnType<typeof createTestOrm>>, entity: unknown) {
   return db.em.getMetadata().get(entity as never) as unknown as {
@@ -23,7 +23,7 @@ describe("schema data integrity", () => {
   test("deleting an org cascades routing rules", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const now = new Date();
       const org = em.create(Org, {
         name: "Router Cascade",
@@ -43,11 +43,10 @@ describe("schema data integrity", () => {
         createdAt: now,
         updatedAt: now,
       });
-      em.persist([org, rule]);
-      await em.flush();
+      await em.save([org, rule]);
 
       em.remove(org);
-      await em.flush();
+      /* flushed */
 
       expect(await em.count(RoutingRule, { org })).toBe(0);
     } finally {
@@ -58,7 +57,7 @@ describe("schema data integrity", () => {
   test("doc template global names are unique when project is null", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const now = new Date();
       const org = em.create(Org, {
         name: "Docs Global Templates",
@@ -66,8 +65,7 @@ describe("schema data integrity", () => {
         createdAt: now,
         updatedAt: now,
       });
-      em.persist(org);
-      await em.flush();
+      await em.save(org);
 
       em.persist([
         em.create(DocTemplate, {
@@ -93,7 +91,7 @@ describe("schema data integrity", () => {
   test("global feature flag rows are unique when org and user are null", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const now = new Date();
       em.persist([
         em.create(FeatureFlag, {
@@ -131,7 +129,7 @@ describe("schema data integrity", () => {
       expect(verificationMeta.properties["org"]?.nullable).toBe(true);
       expect(verificationMeta.indexes?.some((idx) => idx.name === "idx_verifications_org_identifier")).toBe(true);
 
-      const em = db.em.fork();
+      const em = db.em;
       const now = new Date();
       const localAccount = em.create(Account, {
         userId: db.seed.userId,
@@ -147,8 +145,7 @@ describe("schema data integrity", () => {
         createdAt: now,
         updatedAt: now,
       });
-      em.persist([localAccount, localVerification]);
-      await em.flush();
+      await em.save([localAccount, localVerification]);
 
       em.clear();
       const savedAccount = await em.findOneOrFail(Account, { accountId: "admin@local" });
@@ -163,7 +160,7 @@ describe("schema data integrity", () => {
   test("accounts reject duplicate provider identities", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const now = new Date();
       em.persist([
         em.create(Account, {
@@ -191,7 +188,7 @@ describe("schema data integrity", () => {
   test("accounts reject orphan users and cascade when the user is deleted", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const now = new Date();
       em.persist(em.create(Account, {
         userId: randomUUID(),
@@ -210,8 +207,7 @@ describe("schema data integrity", () => {
         createdAt: now,
         updatedAt: now,
       });
-      em.persist(account);
-      await em.flush();
+      await em.save(account);
 
       await db.pglite.query(`delete from "users" where "id" = $1`, [db.seed.userId]);
       expect(await em.count(Account, { accountId: "cascade-subject" })).toBe(0);
@@ -223,7 +219,7 @@ describe("schema data integrity", () => {
   test("account token fields are encrypted at rest and decrypted on entity load", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const now = new Date();
       const account = em.create(Account, {
         userId: db.seed.userId,
@@ -235,8 +231,7 @@ describe("schema data integrity", () => {
         createdAt: now,
         updatedAt: now,
       });
-      em.persist(account);
-      await em.flush();
+      await em.save(account);
       em.clear();
 
       const raw = await db.pglite.query<{

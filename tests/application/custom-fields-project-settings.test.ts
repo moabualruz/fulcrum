@@ -12,7 +12,7 @@ describe("custom field project settings application service", () => {
   it("creates, lists, updates, archives, and emits events against the current custom_field_defs schema", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const projectId = "22222222-2222-4222-8222-222222222222";
       await em.getConnection().execute(
         `insert into projects (id, org_id, name, workflow_config, methodology, enabled_task_types)
@@ -92,7 +92,7 @@ describe("custom field project settings application service", () => {
   it("rejects invalid field types, empty updates, and missing records before mutating data", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await expect(createCustomField(em, {
         orgId: db.seed.orgId,
         projectId: "22222222-2222-4222-8222-222222222222",

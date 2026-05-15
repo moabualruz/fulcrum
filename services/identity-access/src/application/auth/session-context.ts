@@ -1,11 +1,11 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { EntityManager } from "typeorm";
 
-import { Account } from "@platform-core/infrastructure/application-database/entities/auth/Account.ts";
-import { Invitation } from "@platform-core/infrastructure/application-database/entities/auth/Invitation.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { OrgMember } from "@platform-core/infrastructure/application-database/entities/auth/OrgMember.ts";
-import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
+import { Account } from "@identity-access/infrastructure/database/entities/auth/Account.ts";
+import { Invitation } from "@identity-access/infrastructure/database/entities/auth/Invitation.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { OrgMember } from "@identity-access/infrastructure/database/entities/auth/OrgMember.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
 import {
   AppForbiddenError,
   AppInvariantError,
@@ -34,11 +34,11 @@ export async function resolveApplicationSessionContext(
 
   if (!em) return base;
 
-  const user = await em.findOne(User, { id: ctx.userId } as never);
+  const user = await em.findOne(User, { where: { id: ctx.userId } as never });
   if (!user) return base;
 
   const [org, passkeyCount] = await Promise.all([
-    em.findOne(Org, { id: ctx.orgId } as never),
+    em.findOne(Org, { where: { id: ctx.orgId } as never }),
     hasEntityMetadata(em, "Account")
       ? em.count(Account, { userId: ctx.userId, providerId: "passkey" } as never)
       : Promise.resolve(0),
@@ -73,8 +73,7 @@ export async function createInvitation(
     expiresAt,
     createdAt: new Date(),
   } as never);
-  em.persist(invitation);
-  await em.flush();
+  await em.save(invitation);
 
   return {
     invitationId: invitation.id,
@@ -86,7 +85,7 @@ export async function acceptInvitation(
   em: EntityManager,
   input: AcceptInviteInput,
 ): Promise<AcceptInviteOutput> {
-  const invitation = await em.findOne(Invitation, { token: hashToken(input.token) } as never);
+  const invitation = await em.findOne(Invitation, { where: { token: hashToken(input.token) } as never });
   if (!invitation) throw new AppValidationError("Invalid or unknown invitation token.");
 
   const inv = invitation as Invitation & {
@@ -100,7 +99,7 @@ export async function acceptInvitation(
   if (new Date() > inv.expiresAt) throw new AppValidationError("Invitation token has expired.");
   if (inv.acceptedAt) throw new AppValidationError("Invitation token has already been used.");
 
-  let user = await em.findOne(User, { email: inv.email, orgId: inv.orgId } as never);
+  let user = await em.findOne(User, { where: { email: inv.email, orgId: inv.orgId } as never });
   if (!user) {
     user = em.create(User, {
       orgId: inv.orgId,
@@ -110,13 +109,12 @@ export async function acceptInvitation(
       createdAt: new Date(),
       updatedAt: new Date(),
     } as never);
-    em.persist(user);
-    await em.flush();
+    await em.save(user);
   }
 
-  const existing = await em.findOne(OrgMember, { orgId: inv.orgId, userId: user.id } as never);
+  const existing = await em.findOne(OrgMember, { where: { orgId: inv.orgId, userId: user.id } as never });
   if (!existing) {
-    em.persist(em.create(OrgMember, {
+    await em.save(em.create(OrgMember, {
       orgId: inv.orgId,
       userId: user.id,
       role: inv.role,
@@ -125,7 +123,6 @@ export async function acceptInvitation(
   }
 
   (invitation as { acceptedAt: Date }).acceptedAt = new Date();
-  await em.flush();
 
   return {
     userId: user.id,
@@ -142,7 +139,7 @@ async function requireInvitePermission(
   ctx: AuthApplicationContext,
   invitedRole: InviteInput["role"],
 ): Promise<void> {
-  const membership = await em.findOne(OrgMember, { orgId: ctx.orgId, userId: ctx.userId } as never);
+  const membership = await em.findOne(OrgMember, { where: { orgId: ctx.orgId, userId: ctx.userId } as never });
   if (!membership || (membership.role !== "owner" && membership.role !== "admin")) {
     throw new AppForbiddenError("Only org owners and admins can invite members.");
   }
@@ -154,11 +151,7 @@ async function requireInvitePermission(
 
 function hasEntityMetadata(em: EntityManager, entityName: string): boolean {
   try {
-    const metadata = em.getMetadata() as unknown as {
-      find?: (name: string) => unknown;
-      get?: (name: string) => unknown;
-    };
-    return Boolean(metadata.find?.(entityName) ?? metadata.get?.(entityName));
+    return em.connection.entityMetadatas.some((m) => m.name === entityName || m.tableName === entityName);
   } catch {
     return false;
   }

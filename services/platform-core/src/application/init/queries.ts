@@ -1,6 +1,6 @@
 import type { EntityManager } from "typeorm";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { SchemaMigration } from "@platform-core/infrastructure/application-database/entities/SchemaMigration.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 import { initDataSource, __resetDataSourceForTest } from "@platform-core/infrastructure/application-database/typeorm.config.ts";

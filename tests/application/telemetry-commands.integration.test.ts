@@ -8,7 +8,7 @@ import {
   scrubTelemetryPayload,
   writeTelemetryEvent,
 } from "@platform-core/application/telemetry/commands.ts";
-import { Org, User } from "@platform-core/infrastructure/application-database/entities/auth/index.ts";
+import { Org, User } from "@identity-access/infrastructure/database/entities/auth/index.ts";
 import { TenantSetting } from "@platform-core/infrastructure/application-database/entities/TenantSetting.ts";
 import { TelemetryEvent } from "@platform-core/infrastructure/application-database/entities/platform/TelemetryEvent.ts";
 import { DomainEventOutbox } from "@platform-core/infrastructure/application-database/entities/platform/DomainEventOutbox.ts";
@@ -30,7 +30,7 @@ async function freshDb(): Promise<TestOrm> {
 describe("telemetry application commands", () => {
   test("records TUI render telemetry and scrubs sensitive payload fields", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const org = em.getReference(Org, DEFAULT_ORG_ID);
     const user = em.getReference(User, testDb.seed.userId);
 
@@ -72,7 +72,7 @@ describe("telemetry application commands", () => {
 
   test("MikroTelemetryStore persists opt-in, writes scrubbed events, counts, purges, and audits", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const store = new MikroTelemetryStore({
       em,
       orgId: DEFAULT_ORG_ID,
@@ -87,7 +87,7 @@ describe("telemetry application commands", () => {
     expect(await store.count()).toBe(0);
 
     await store.setOptedIn(true);
-    expect(await em.findOne(TenantSetting, { orgId: DEFAULT_ORG_ID, key: TELEMETRY_OPT_IN_KEY })).toMatchObject({
+    expect(await em.findOne(TenantSetting, { where: { orgId: DEFAULT_ORG_ID, key: TELEMETRY_OPT_IN_KEY } })).toMatchObject({
       value: true,
     });
 
@@ -120,7 +120,7 @@ describe("telemetry application commands", () => {
   test("createTelemetryStore returns injected store and rejects missing EntityManager", async () => {
     const testDb = await freshDb();
     const injected = new MikroTelemetryStore({
-      em: testDb.em.fork(),
+      em: testDb.em,
       orgId: DEFAULT_ORG_ID,
       userId: testDb.seed.userId,
     });

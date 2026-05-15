@@ -1,7 +1,11 @@
 import { Command } from "commander";
-import { getProfile, listProfiles, UnknownAgentError } from "@execution-orchestration/application/agent-catalog/registry.ts";
-import type { AgentProfile } from "@execution-orchestration/application/agent-catalog/types.ts";
-import { which } from "@platform-core/application/runtime-support/process-runner.ts";
+import {
+  getProfile,
+  listProfiles,
+  UnknownAgentError,
+  type AgentProfile,
+} from "@execution-orchestration/interface/agent-catalog.ts";
+import { which } from "@platform-core/interface/process-runner.ts";
 
 interface AgentCommandOptions {
   json?: boolean;

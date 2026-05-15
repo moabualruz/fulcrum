@@ -82,7 +82,7 @@ const CHECKPOINTS: UatCheckpoint[] = [
     layers: ["unit"],
     evidence: [
       { path: "services/workflow-coordination/src/infrastructure/artifacts/__tests__/pruner.test.ts", patterns: [/defaults project artifacts to forever/, /scratch artifacts to 90 days/] },
-      { path: "services/platform-core/src/infrastructure/application-database/entities/artifacts/ArtifactRetentionPolicy.ts", patterns: [/retentionDays/, /keepLatestPerRef/, /keepPinned/] },
+      { path: "services/workflow-coordination/src/infrastructure/database/entities/artifacts/ArtifactRetentionPolicy.ts", patterns: [/retentionDays/, /keepLatestPerRef/, /keepPinned/] },
     ],
   },
   {

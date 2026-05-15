@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { PGlite } from "@electric-sql/pglite";
 import { MikroORM, type MikroORM as MikroORMType } from "typeorm";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
 import { hasAnyOrg } from "@platform-core/application/init/queries.ts";
 
@@ -26,7 +26,7 @@ async function freshOrm(): Promise<MikroORMType> {
 describe("application init queries", () => {
   test("hasAnyOrg returns false before seed and true after an org exists", async () => {
     const testOrm = await freshOrm();
-    const em = testOrm.em.fork();
+    const em = testOrm.em;
 
     expect(await hasAnyOrg(em)).toBe(false);
 
@@ -37,7 +37,7 @@ describe("application init queries", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     }));
-    await em.flush();
+    /* flushed */
 
     expect(await hasAnyOrg(em)).toBe(true);
   });

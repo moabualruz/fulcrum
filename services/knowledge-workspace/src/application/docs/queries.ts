@@ -1,7 +1,7 @@
 import type { EntityManager } from "typeorm";
 
-import { DocVersion } from "@platform-core/infrastructure/application-database/entities/docs/DocVersion.ts";
-import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
+import { DocVersion } from "@knowledge-workspace/infrastructure/database/entities/docs/DocVersion.ts";
+import { Document } from "@knowledge-workspace/infrastructure/database/entities/docs/Document.ts";
 import { diffDocVersionsHtml, reconstructDocVersion } from "@knowledge-workspace/application/docs/version-reconstructor.ts";
 import { DocumentService, serializeDoc } from "@knowledge-workspace/application/document-service.ts";
 import { AppForbiddenError, AppNotFoundError } from "@platform-core/domain/errors.ts";
@@ -46,13 +46,10 @@ export async function listDocVersions(
   docId: string,
 ): Promise<DocVersionListDto[]> {
   await assertDocBelongsToOrg(em, ctx, docId);
-  const versions = await em.find(DocVersion, {
+  const versions = await em.find(DocVersion, { where: {
     org: ctx.orgId,
     doc: docId,
-  } as never, {
-    populate: ["author", "restoreOf"] as never,
-    orderBy: { versionNum: "DESC" },
-  });
+  } as never, relations: ["author", "restoreOf"], order: { versionNum: "DESC" } });
   return versions.map(serializeVersionForApplication);
 }
 
@@ -71,13 +68,11 @@ export async function getDocVersionById(
   docId: string,
   versionId: string,
 ): Promise<DocVersionListDto | null> {
-  const version = await em.findOne(DocVersion, {
+  const version = await em.findOne(DocVersion, { where: {
     id: versionId,
     org: ctx.orgId,
     doc: docId,
-  } as never, {
-    populate: ["author", "restoreOf"] as never,
-  });
+  } as never, relations: ["author", "restoreOf"] });
   return version ? serializeVersionForApplication(version) : null;
 }
 

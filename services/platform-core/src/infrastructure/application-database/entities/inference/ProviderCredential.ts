@@ -10,7 +10,7 @@ import {
   Column,
   JoinColumn,
 } from "typeorm";
-import { Org } from "../auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 
 export type InferenceProvider = "ollama" | "lm-studio" | "openai-compatible";
 

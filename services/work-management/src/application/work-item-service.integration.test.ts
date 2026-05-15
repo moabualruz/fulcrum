@@ -2,8 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 
 import { AppConflictError, AppNotFoundError, AppValidationError } from "@platform-core/domain/errors.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { FieldDependencyRule } from "@platform-core/infrastructure/application-database/entities/tasks/FieldDependencyRule.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { FieldDependencyRule } from "@work-management/infrastructure/database/entities/tasks/FieldDependencyRule.ts";
 import { WorkItemService, normalizedUnique } from "@work-management/application/work-item-service.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
@@ -33,7 +33,7 @@ async function createProject(em: TestOrm["em"], name = "WorkItemService class pr
 describe("WorkItemService class with real MikroORM persistence", () => {
   test("creates, lists, gets, updates, soft-deletes, and includes deleted tasks only when requested", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const service = new WorkItemService(em);
 
     const created = await service.create(DEFAULT_ORG_ID, {
@@ -82,7 +82,7 @@ describe("WorkItemService class with real MikroORM persistence", () => {
 
   test("sets parents, rejects cycles, and returns children in creation order", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const service = new WorkItemService(em);
 
     const parent = await service.create(DEFAULT_ORG_ID, { title: "Parent" });
@@ -105,7 +105,7 @@ describe("WorkItemService class with real MikroORM persistence", () => {
 
   test("sets dependency edges bidirectionally, normalizes ids, rejects self/cyclic/missing dependencies", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const service = new WorkItemService(em);
 
     const a = await service.create(DEFAULT_ORG_ID, { title: "A" });
@@ -150,7 +150,7 @@ describe("WorkItemService class with real MikroORM persistence", () => {
 
   test("bulk updates and deletes real rows, writes events, and enforces the 200 item cap", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const service = new WorkItemService(em);
     const projectId = await createProject(em);
 
@@ -206,7 +206,7 @@ describe("WorkItemService class with real MikroORM persistence", () => {
 
   test("validates field dependency rules during project-scoped updates", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const service = new WorkItemService(em);
     const projectId = await createProject(em, "Dependency rule project");
     const task = await service.create(DEFAULT_ORG_ID, { title: "Dependency rule task" });
@@ -223,7 +223,7 @@ describe("WorkItemService class with real MikroORM persistence", () => {
       action: "require",
       createdAt: new Date(),
     } as never));
-    await em.flush();
+    /* flushed */
 
     await em.getConnection().execute(
       `UPDATE tasks SET custom_fields = ?::jsonb WHERE id = ?`,

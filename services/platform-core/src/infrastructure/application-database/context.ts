@@ -1,4 +1,4 @@
-import type { Session } from "./entities/auth/index.ts";
+import type { Session } from "@identity-access/infrastructure/database/entities/auth/index.ts";
 
 export function getOrgId(session: Session): string {
   return session.activeOrganizationId ?? session.orgId;

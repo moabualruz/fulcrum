@@ -104,7 +104,7 @@ describe("/projects/[id]/board dependency run preview action", () => {
   test("loads manual task workbench data through the shared application action", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Task Workbench Project"],
@@ -144,7 +144,7 @@ describe("/projects/[id]/board dependency run preview action", () => {
   test("returns dependency-aware dependency disclosure for selected board tasks", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Board Preview Project"],
@@ -194,7 +194,7 @@ describe("/projects/[id]/board dependency run preview action", () => {
   test("dispatches selected board dependency runs through the shared application action", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Board Dispatch Project"],
@@ -247,7 +247,7 @@ describe("/projects/[id]/board dependency run preview action", () => {
   test("records QA review verdicts through the shared application action", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Board QA Project"],

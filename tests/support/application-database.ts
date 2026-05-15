@@ -1,14 +1,15 @@
-import type { EntityManager, MikroORM, Options } from "@mikro-orm/postgresql";
-import { MikroORM as MikroORMRuntime } from "@mikro-orm/postgresql";
-import { PGlite } from "@electric-sql/pglite";
+import { DataSource, type DataSourceOptions, type EntityManager } from "typeorm";
+import { PGliteDriver } from "typeorm-pglite";
 
-import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import {
+  createDataSourceOptions,
+} from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 import { SeedService, type SeedResult } from "@platform-core/infrastructure/application-database/seed.ts";
 
 export interface TestOrm {
-  orm: MikroORM;
+  ds: DataSource;
+  /** TypeORM EntityManager (replaces MikroORM orm.em) */
   em: EntityManager;
-  pglite: PGlite;
   seed: SeedResult;
   close: () => Promise<void>;
 }
@@ -20,28 +21,27 @@ export interface CreateTestOrmOptions {
 export async function createTestOrm(
   opts: CreateTestOrmOptions = {},
 ): Promise<TestOrm> {
-  const pglite = new PGlite();
-  const config = createOrmConfig({ pglite, debug: opts.debug ?? false });
+  // in-memory PGlite (no dataDir = ephemeral)
+  const driver = new PGliteDriver().driver;
 
-  config.migrations = {
-    ...((config.migrations ?? {}) as NonNullable<Options["migrations"]>),
-    transactional: false,
-    snapshot: false,
-  };
+  const baseOptions = createDataSourceOptions([], {});
+  const ds = new DataSource({
+    ...baseOptions,
+    driver,
+    logging: opts.debug ?? false,
+  } as DataSourceOptions);
 
-  const orm = await MikroORMRuntime.init(config);
-  await orm.migrator.up();
+  await ds.initialize();
+  await ds.runMigrations({ transaction: "none" });
 
-  const seed = await new SeedService(orm.em).run();
+  const seed = await new SeedService(ds.manager).run();
 
   return {
-    orm,
-    em: orm.em,
-    pglite,
+    ds,
+    em: ds.manager,
     seed,
     close: async () => {
-      await orm.close(true);
-      await (pglite as { close?: () => Promise<void> }).close?.();
+      await ds.destroy();
     },
   };
 }

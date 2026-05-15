@@ -7,8 +7,8 @@
  */
 
 import { z } from "zod";
-import type { FilterQuery } from "typeorm";
-import type { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import type { FindOptionsWhere as FilterQuery } from "typeorm";
+import type { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 
 // ─── Operator vocabulary ────────────────────────────────────────────────────
 

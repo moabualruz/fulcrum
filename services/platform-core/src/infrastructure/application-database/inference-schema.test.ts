@@ -6,10 +6,10 @@ import type { EntityManager } from "typeorm";
 import { createTestOrm } from "@test-support/application-database.ts";
 import { DEFAULT_ORG_ID } from "./seed.ts";
 import { ModelCache, ProviderCredential } from "./entities/inference/index.ts";
-import { Document } from "./entities/docs/Document.ts";
-import { Memory } from "./entities/memory/Memory.ts";
-import { SearchDocument } from "./entities/search/SearchDocument.ts";
-import { Org } from "./entities/auth/Org.ts";
+import { Document } from "@knowledge-workspace/infrastructure/database/entities/docs/Document.ts";
+import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
+import { SearchDocument } from "@knowledge-workspace/infrastructure/database/entities/search/SearchDocument.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 
 function metadataFor(em: EntityManager, entity: EntityName<unknown>) {
   return em.getMetadata().get(entity) as unknown as {
@@ -59,7 +59,7 @@ describe("inference cache schema", () => {
   test("model cache, provider credentials, and embedding properties round-trip through PGlite", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const org = await em.findOneOrFail(Org, { id: DEFAULT_ORG_ID });
       const model = em.create(ModelCache, {
         org,
@@ -102,8 +102,7 @@ describe("inference cache schema", () => {
         embedding: [0.7, 0.8, 0.9],
       });
 
-      em.persist([model, credential, memory, document, searchDocument]);
-      await em.flush();
+      await em.save([model, credential, memory, document, searchDocument]);
       em.clear();
 
       const savedModel = await em.findOneOrFail(ModelCache, { modelId: "BAAI/bge-small-en-v1.5" });
@@ -121,8 +120,8 @@ describe("inference cache schema", () => {
       expect(savedSearchDocument.embedding).toEqual([0.7, 0.8, 0.9]);
 
       em.remove([savedModel, savedCredential, savedMemory, savedDocument, savedSearchDocument]);
-      await em.flush();
-      expect(await em.findOne(ModelCache, { modelId: "BAAI/bge-small-en-v1.5" })).toBeNull();
+      /* flushed */
+      expect(await em.findOne(ModelCache, { where: { modelId: "BAAI/bge-small-en-v1.5" } })).toBeNull();
     } finally {
       await db.close();
     }

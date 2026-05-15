@@ -1,8 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import type { EntityManager } from "typeorm";
+import { MoreThan } from "typeorm";
 import { hashPassword } from "better-auth/crypto";
-import { Org } from "./entities/auth/Org.ts";
-import { Account, OrgMember, Session, User } from "./entities/auth/index.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Account, OrgMember, Session, User } from "@identity-access/infrastructure/database/entities/auth/index.ts";
 import { seedDefaultRules } from "@notification-center/application/delivery-runtime/defaults.ts";
 
 export const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
@@ -18,10 +19,6 @@ export interface SeedResult {
   sessionToken: string;
 }
 
-type SeedEntityManager = EntityManager & {
-  persistAndFlush?: (entity: Session) => Promise<void>;
-};
-
 @Injectable()
 export class SeedService {
   constructor(
@@ -29,55 +26,38 @@ export class SeedService {
   ) {}
 
   async run(): Promise<SeedResult> {
-    const em = this.em.fork() as SeedEntityManager;
-    // MikroORM v7 dropped this helper at runtime; P1#04 requires the call site.
-    em.persistAndFlush ??= async (entity: Session) => {
-      em.persist(entity);
-      await em.flush();
-    };
-
     const now = new Date();
-    const defaultOrg = await em.upsert(
-      Org,
-      {
-        id: DEFAULT_ORG_ID,
-        name: DEFAULT_ORG_NAME,
-        slug: DEFAULT_ORG_SLUG,
-        updatedAt: now,
-      },
-      { onConflictFields: ["id"] },
-    );
 
-    const adminUser = await em.upsert(
-      User,
-      {
-        email: DEFAULT_ADMIN_EMAIL,
-        orgId: defaultOrg.id,
-        role: "owner",
-        updatedAt: now,
-      },
-      { onConflictFields: ["orgId", "email"] },
-    );
+    await this.em.upsert(Org, {
+      id: DEFAULT_ORG_ID,
+      name: DEFAULT_ORG_NAME,
+      slug: DEFAULT_ORG_SLUG,
+      updatedAt: now,
+    }, ["id"]);
+    const defaultOrg = await this.em.findOneOrFail(Org, { where: { id: DEFAULT_ORG_ID } });
 
-    await em.upsert(
-      OrgMember,
-      {
-        orgId: defaultOrg.id,
-        userId: adminUser.id,
-        role: "owner",
-      },
-      { onConflictFields: ["orgId", "userId"] },
-    );
+    await this.em.upsert(User, {
+      email: DEFAULT_ADMIN_EMAIL,
+      orgId: defaultOrg.id,
+      role: "owner",
+      updatedAt: now,
+    }, ["email"]);
+    const adminUser = await this.em.findOneOrFail(User, { where: { email: DEFAULT_ADMIN_EMAIL, orgId: defaultOrg.id } });
 
-    await seedDefaultRules(adminUser.id, defaultOrg.id, em);
-
-    const credentialAccount = await em.findOne(Account, {
+    await this.em.upsert(OrgMember, {
+      orgId: defaultOrg.id,
       userId: adminUser.id,
-      providerId: "credential",
+      role: "owner",
+    }, ["orgId", "userId"]);
+
+    await seedDefaultRules(adminUser.id, defaultOrg.id, this.em);
+
+    const credentialAccount = await this.em.findOne(Account, {
+      where: { userId: adminUser.id, providerId: "credential" },
     });
 
     if (!credentialAccount) {
-      const account = em.create(Account, {
+      const account = this.em.create(Account, {
         userId: adminUser.id,
         providerId: "credential",
         accountId: adminUser.id,
@@ -85,13 +65,11 @@ export class SeedService {
         createdAt: now,
         updatedAt: now,
       });
-      em.persist(account);
-      await em.flush();
+      await this.em.save(account);
     }
 
-    const activeSession = await em.findOne(Session, {
-      userId: adminUser.id,
-      expiresAt: { $gt: now },
+    const activeSession = await this.em.findOne(Session, {
+      where: { userId: adminUser.id, expiresAt: MoreThan(now) },
     });
 
     if (activeSession) {
@@ -103,7 +81,7 @@ export class SeedService {
     }
 
     const sessionToken = crypto.randomUUID();
-    const session = em.create(Session, {
+    const session = this.em.create(Session, {
       id: sessionToken,
       userId: adminUser.id,
       orgId: defaultOrg.id,
@@ -111,7 +89,7 @@ export class SeedService {
       expiresAt: new Date(now.getTime() + SESSION_TTL_MS),
       createdAt: now,
     });
-    await em.persistAndFlush(session);
+    await this.em.save(session);
 
     return {
       orgId: defaultOrg.id,

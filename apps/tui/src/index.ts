@@ -70,13 +70,13 @@ import {
   withWorkflowApiCaller,
   withWebhookApiCaller,
 } from "./local-caller.ts";
-import type { InferenceModel, ModelPullProgress } from "@platform-core/application/inference/protocol.ts";
-import type { KeybindingMap, KeybindingAction } from "@platform-core/application/input-bindings/index.ts";
+import type { InferenceModel, ModelPullProgress } from "@platform-core/interface/http/inference-api-client.ts";
+import type { KeybindingMap, KeybindingAction } from "@platform-core/interface/input-bindings.ts";
 import type { TuiTheme } from "./theme/index.ts";
 import type { SubscriptionBridge } from "./subscriptions.ts";
 import type {
   WorkflowAcceptanceCycleInput,
-} from "@workflow-coordination/application/workflow-acceptance-cycle.ts";
+} from "@workflow-coordination/interface/workflow-cycle.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -121,25 +121,25 @@ export interface TuiCaller {
       mode: "task" | "board";
       targetTaskIds: string[];
       agent: string;
-    }) => Promise<import("@execution-orchestration/application/dependency-run-actions.ts").DispatchDependencyRunForTasksOutput>;
+    }) => Promise<import("@execution-orchestration/interface/dependency-run-contracts.ts").DispatchDependencyRunForTasksOutput>;
     dependencyRunLiveFeedback?: (
-      input: import("@execution-orchestration/application/dependency-run-live-feedback.ts").DependencyRunLiveFeedbackInput,
-    ) => Promise<import("@execution-orchestration/application/dependency-run-live-feedback.ts").DependencyRunLiveFeedbackOutput>;
+      input: import("@execution-orchestration/interface/dependency-run-contracts.ts").DependencyRunLiveFeedbackInput,
+    ) => Promise<import("@execution-orchestration/interface/dependency-run-contracts.ts").DependencyRunLiveFeedbackOutput>;
     dependencyRunLiveFeedbackStream?: (
-      input: import("@execution-orchestration/application/dependency-run-live-feedback.ts").DependencyRunLiveFeedbackInput,
+      input: import("@execution-orchestration/interface/dependency-run-contracts.ts").DependencyRunLiveFeedbackInput,
     ) => Promise<{
       subscribe(observer: {
-        next(value: import("@execution-orchestration/application/dependency-run-live-feedback.ts").DependencyRunLiveFeedbackOutput): void;
+        next(value: import("@execution-orchestration/interface/dependency-run-contracts.ts").DependencyRunLiveFeedbackOutput): void;
         error?(error: unknown): void;
         complete?(): void;
       }): { unsubscribe(): void };
     }>;
     recordQaReview?: (
-      input: import("@execution-orchestration/application/qa-review-actions.ts").RecordTaskQaReviewInput,
-    ) => Promise<import("@execution-orchestration/application/qa-review-actions.ts").TaskQaReviewOutput>;
+      input: import("@execution-orchestration/interface/dependency-run-contracts.ts").RecordTaskQaReviewInput,
+    ) => Promise<import("@execution-orchestration/interface/dependency-run-contracts.ts").TaskQaReviewOutput>;
     manualWorkbench?: (
-      input: import("@work-management/application/manual-task-workbench.ts").ManualTaskWorkbenchInput,
-    ) => Promise<import("@work-management/application/manual-task-workbench.ts").ManualTaskWorkbenchOutput>;
+      input: import("@work-management/interface/manual-workbench.ts").ManualTaskWorkbenchInput,
+    ) => Promise<import("@work-management/interface/manual-workbench.ts").ManualTaskWorkbenchOutput>;
   };
   projects?: { list: () => Promise<unknown[]> };
   sprints?: { list: () => Promise<unknown[]> };
@@ -1494,7 +1494,7 @@ export class TuiApp {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function buildCaller(
-  container: import("@platform-core/application/runtime/di-container.ts").DiContainer | null = null,
+  container: import("@platform-core/interface/runtime-container.ts").DiContainer | null = null,
 ): Promise<TuiCaller> {
   const caller = await createTuiLocalCaller({
     container,
@@ -1513,7 +1513,7 @@ export async function buildCaller(
 }
 
 export async function buildTelemetrySink(
-  container: import("@platform-core/application/runtime/di-container.ts").DiContainer | null = null,
+  container: import("@platform-core/interface/runtime-container.ts").DiContainer | null = null,
 ): Promise<TuiTelemetrySink> {
   try {
     const { em, session } = await requireTuiSessionContext({

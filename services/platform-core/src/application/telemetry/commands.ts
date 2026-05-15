@@ -1,7 +1,7 @@
 import type { EntityManager } from "typeorm";
 
 import { TenantSetting } from "@platform-core/infrastructure/application-database/entities/TenantSetting.ts";
-import type { Org, User } from "@platform-core/infrastructure/application-database/entities/auth/index.ts";
+import type { Org, User } from "@identity-access/infrastructure/database/entities/auth/index.ts";
 import { TelemetryEvent } from "@platform-core/infrastructure/application-database/entities/platform/TelemetryEvent.ts";
 import { writeOutboxEvent } from "@workflow-coordination/application/outbox.ts";
 
@@ -30,8 +30,7 @@ export async function recordTuiRenderTelemetry(
     },
     occurredAt: input.occurredAt,
   });
-  em.persist(event);
-  await em.flush();
+  await em.save(event);
 }
 
 export interface TelemetryWriteInput {
@@ -73,20 +72,19 @@ export class MikroTelemetryStore extends TelemetryStore {
   }
 
   async getOptedIn(orgId = this.context.orgId): Promise<boolean> {
-    const setting = await this.em().findOne(TenantSetting, { orgId, key: TELEMETRY_OPT_IN_KEY });
+    const setting = await this.em().findOne(TenantSetting, { where: { orgId, key: TELEMETRY_OPT_IN_KEY } as never });
     return setting?.value === true;
   }
 
   async setOptedIn(value: boolean, orgId = this.context.orgId): Promise<void> {
     const em = this.em();
-    const existing = await em.findOne(TenantSetting, { orgId, key: TELEMETRY_OPT_IN_KEY });
+    const existing = await em.findOne(TenantSetting, { where: { orgId, key: TELEMETRY_OPT_IN_KEY } as never });
     if (existing) {
       existing.value = value;
       existing.updatedAt = new Date();
     } else {
-      em.persist(em.create(TenantSetting, { orgId, key: TELEMETRY_OPT_IN_KEY, value }));
+      await em.save(em.create(TenantSetting, { orgId, key: TELEMETRY_OPT_IN_KEY, value }));
     }
-    await em.flush();
   }
 
   async count(orgId = this.context.orgId): Promise<number> {
@@ -101,15 +99,13 @@ export class MikroTelemetryStore extends TelemetryStore {
       kind: event.kind,
       payload: event.payload,
     } as never);
-    em.persist(entity);
-    await em.flush();
+    await em.save(entity);
   }
 
   async purge(orgId = this.context.orgId): Promise<number> {
     const em = this.em();
     const rows = await em.find(TelemetryEvent, { org: orgId } as never);
     em.remove(rows);
-    await em.flush();
     return rows.length;
   }
 

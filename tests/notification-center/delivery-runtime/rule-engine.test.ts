@@ -6,7 +6,7 @@ import {
   evaluateRules,
   type NotificationRuleEngineRepositories,
 } from "@notification-center/application/delivery-runtime/rule-engine.ts";
-import { DeliveryStatus } from "@platform-core/infrastructure/application-database/entities/notifications/index.ts";
+import { DeliveryStatus } from "@notification-center/infrastructure/database/entities/notifications/index.ts";
 
 const ORG_A = "00000000-0000-0000-0000-00000000000a";
 const ORG_B = "00000000-0000-0000-0000-00000000000b";
@@ -251,7 +251,7 @@ describe("notification rule engine", () => {
   });
 
   it("is resolvable from a needle-di container without decorator syntax", () => {
-    const container = new Container();
+    const container = null;
 
     container.bind({ provide: NotificationRuleEngine, useValue: new NotificationRuleEngine() });
 

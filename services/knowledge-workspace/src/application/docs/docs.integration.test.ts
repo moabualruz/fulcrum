@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { AppForbiddenError, AppNotFoundError, AppValidationError } from "@platform-core/domain/errors.ts";
@@ -29,7 +29,7 @@ function ctx(orgId = DEFAULT_ORG_ID): AppContext {
 describe("application docs commands and queries", () => {
   test("createDoc, listDocs, and getDoc round-trip through MikroORM", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
 
     const created = await createDoc(em, ctx(), {
       title: "Application docs",
@@ -47,7 +47,7 @@ describe("application docs commands and queries", () => {
 
   test("createDoc persists explicit task source links for backlinks and context source refs", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
 
     const created = await createDoc(em, ctx(), {
       title: "Task handoff",
@@ -83,19 +83,19 @@ describe("application docs commands and queries", () => {
 
   test("createDoc validation failure throws AppValidationError", async () => {
     const testDb = await freshDb();
-    await expect(createDoc(testDb.em.fork(), ctx(), { title: "" })).rejects.toBeInstanceOf(AppValidationError);
+    await expect(createDoc(testDb.em, ctx(), { title: "" })).rejects.toBeInstanceOf(AppValidationError);
   });
 
   test("getDoc not-found throws AppNotFoundError", async () => {
     const testDb = await freshDb();
-    await expect(getDoc(testDb.em.fork(), ctx(), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")).rejects.toBeInstanceOf(AppNotFoundError);
+    await expect(getDoc(testDb.em, ctx(), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")).rejects.toBeInstanceOf(AppNotFoundError);
   });
 
   test("cross-org doc access throws AppForbiddenError", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     em.persist(em.create(Org, { id: OTHER_ORG_ID, name: "Other", slug: "other", createdAt: new Date(), updatedAt: new Date() }));
-    await em.flush();
+    /* flushed */
 
     const other = await createDoc(em, ctx(OTHER_ORG_ID), { title: "Other doc" });
     await expect(getDoc(em, ctx(), other.id)).rejects.toBeInstanceOf(AppForbiddenError);

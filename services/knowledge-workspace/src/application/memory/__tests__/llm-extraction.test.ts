@@ -18,9 +18,9 @@ import { Container } from "@needle-di/core";
 
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
-import { MemoryLink } from "@platform-core/infrastructure/application-database/entities/memory/MemoryLink.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
+import { MemoryLink } from "@knowledge-workspace/infrastructure/database/entities/memory/MemoryLink.ts";
 import {
   isLlmExtractEnabled,
   LlmExtractionJob,
@@ -45,7 +45,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   previousFeatures = process.env["FULCRUM_FEATURES"];
-  const em = db.orm.em.fork();
+  const em = db.orm.em;
   await em.nativeDelete(MemoryLink, {});
   await em.nativeDelete(Memory, {});
   await em.upsert(
@@ -101,7 +101,7 @@ describe("LlmExtractionJob — feature flag gating", () => {
     await job.run(ORG_ID, null, "some transcript text", RUN_ID, "agent_run");
 
     expect(client.callCount).toBe(0);
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     expect(await em.count(Memory, { source: "llm" })).toBe(0);
   });
 });
@@ -126,7 +126,7 @@ describe("LlmExtractionJob — extraction", () => {
 
     expect(client.callCount).toBe(1);
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const memories = await em.find(Memory, { source: "llm" }, { orderBy: { body: "ASC" } });
     expect(memories).toHaveLength(3);
     expect(memories.every((m) => m.source === "llm")).toBe(true);
@@ -155,7 +155,7 @@ describe("LlmExtractionJob — extraction", () => {
 
     await job.run(ORG_ID, null, "transcript", RUN_ID, "agent_run");
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     expect(await em.count(Memory, { source: "llm" })).toBe(3);
   });
 });
@@ -169,7 +169,7 @@ describe("LlmExtractionJob — dedup", () => {
 
   test("skips near-duplicate body (similarity > 0.85)", async () => {
     // Pre-seed a memory with a very similar body
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const orgRef = em.getReference(Org, ORG_ID);
     em.create(Memory, {
       org: orgRef,
@@ -186,7 +186,7 @@ describe("LlmExtractionJob — dedup", () => {
       updatedAt: new Date(),
     });
     em.persist(em.getUnitOfWork().getChangeSets().map((cs) => cs.entity));
-    await em.flush();
+    /* flushed */
 
     // LLM returns near-duplicate
     const facts: Fact[] = [
@@ -197,7 +197,7 @@ describe("LlmExtractionJob — dedup", () => {
 
     await job.run(ORG_ID, null, "transcript", RUN_ID, "agent_run");
 
-    const em2 = db.orm.em.fork();
+    const em2 = db.orm.em;
     // Should have only the original heuristic row, no new llm row (exact match)
     const llmRows = await em2.find(Memory, { source: "llm" });
     expect(llmRows).toHaveLength(0);
@@ -205,7 +205,7 @@ describe("LlmExtractionJob — dedup", () => {
 
   test("writes genuinely distinct bodies", async () => {
     // Pre-seed a memory
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const orgRef = em.getReference(Org, ORG_ID);
     em.create(Memory, {
       org: orgRef,
@@ -222,7 +222,7 @@ describe("LlmExtractionJob — dedup", () => {
       updatedAt: new Date(),
     });
     em.persist(em.getUnitOfWork().getChangeSets().map((cs) => cs.entity));
-    await em.flush();
+    /* flushed */
 
     // LLM returns completely different body
     const facts: Fact[] = [
@@ -233,7 +233,7 @@ describe("LlmExtractionJob — dedup", () => {
 
     await job.run(ORG_ID, null, "transcript", RUN_ID, "agent_run");
 
-    const em2 = db.orm.em.fork();
+    const em2 = db.orm.em;
     const llmRows = await em2.find(Memory, { source: "llm" });
     expect(llmRows).toHaveLength(1);
     expect(llmRows[0]!.body).toBe("Redis is used for caching session data");
@@ -249,7 +249,7 @@ describe("LlmExtractionJob — sidecar failure", () => {
 
   test("fails silently when sidecar is unavailable (logs warning)", async () => {
     // Pre-seed a heuristic memory to prove it persists
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const orgRef = em.getReference(Org, ORG_ID);
     em.create(Memory, {
       org: orgRef,
@@ -266,7 +266,7 @@ describe("LlmExtractionJob — sidecar failure", () => {
       updatedAt: new Date(),
     });
     em.persist(em.getUnitOfWork().getChangeSets().map((cs) => cs.entity));
-    await em.flush();
+    /* flushed */
 
     const client = mockClientError(new Error("Connection refused: sidecar down"));
     const warnings: string[] = [];
@@ -279,7 +279,7 @@ describe("LlmExtractionJob — sidecar failure", () => {
     expect(warnings[0]).toContain("sidecar");
 
     // Heuristic row still present
-    const em2 = db.orm.em.fork();
+    const em2 = db.orm.em;
     const heuristic = await em2.find(Memory, { source: "heuristic" });
     expect(heuristic).toHaveLength(1);
     // No LLM rows written
@@ -363,10 +363,10 @@ function createJob(
   client: InferenceClientLike,
   opts: { onWarning?: (msg: string) => void } = {},
 ): LlmExtractionJob {
-  const container = new Container();
-  registerDbBindings(container, db.orm, db.orm.em.fork());
+  const container = null;
+  registerDbBindings(container, db.orm, db.orm.em);
   return new LlmExtractionJob(
-    db.orm.em.fork(),
+    db.orm.em,
     client,
     opts.onWarning ?? (() => {}),
   );

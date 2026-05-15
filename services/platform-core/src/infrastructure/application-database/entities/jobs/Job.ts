@@ -10,7 +10,7 @@ import {
   Index,
   JoinColumn,
 } from "typeorm";
-import { Org } from "../auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 
 @Entity("jobs")
 @Index("idx_jobs_org_status_scheduled", ["org", "status", "scheduledFor"])

@@ -4,8 +4,8 @@
    * Presets: My Work, Due Today, Overdue, Unassigned, Blocked.
    */
   import { createEventDispatcher } from "svelte";
-  import type { SavedViewQuery } from "@work-management/application/saved-views/filter-query.ts";
-  import { SavedViewQuerySchema } from "@work-management/application/saved-views/filter-query.ts";
+  import type { SavedViewQuery } from "@work-management/interface/saved-view-filters.ts";
+  import { SavedViewQuerySchema } from "@work-management/interface/saved-view-filters.ts";
   import { Button } from "$lib/components/ui/button/index.js";
 
   interface Props {

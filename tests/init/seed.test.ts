@@ -21,7 +21,7 @@ import { MikroORM } from ${JSON.stringify(moduleUrl("node_modules/@mikro-orm/pos
 
 import { PGliteKyselyDialect } from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/PGliteKyselyDriver.ts"))};
 import { ENTITY_MANAGER_TOKEN } from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/db.module.ts"))};
-import { Org } from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/entities/auth/Org.ts"))};
+import { Org } from ${JSON.stringify(moduleUrl("services/identity-access/src/infrastructure/database/entities/auth/Org.ts"))};
 import {
   Account,
   FeatureFlag,
@@ -29,10 +29,10 @@ import {
   OrgMember,
   Session,
   User,
-} from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/entities/auth/index.ts"))};
+} from ${JSON.stringify(moduleUrl("services/identity-access/src/infrastructure/database/entities/auth/index.ts"))};
 import { SeedService } from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/seed.ts"))};
 import { registerSeedBindings } from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/seed.module.ts"))};
-import { NotificationRule } from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/entities/notifications/NotificationRule.ts"))};
+import { NotificationRule } from ${JSON.stringify(moduleUrl("services/notification-center/src/infrastructure/database/entities/notifications/NotificationRule.ts"))};
 
 const dbDir = process.argv[2];
 if (!dbDir) throw new Error("missing db dir");
@@ -49,7 +49,7 @@ const orm = await MikroORM.init({
 
 try {
   await orm.schema.create();
-  const container = new Container();
+  const container = null;
   container.bind({
     provide: ENTITY_MANAGER_TOKEN,
     useValue: orm.em,
@@ -58,7 +58,7 @@ try {
 
   const seed = container.get(SeedService);
   const first = await seed.run();
-  const afterFirstEm = orm.em.fork();
+  const afterFirstEm = orm.em;
   const afterFirst = {
     orgs: await afterFirstEm.count(Org, {}),
     users: await afterFirstEm.count(User, {}),
@@ -69,7 +69,7 @@ try {
   };
 
   const second = await seed.run();
-  const afterSecondEm = orm.em.fork();
+  const afterSecondEm = orm.em;
   const afterSecond = {
     orgs: await afterSecondEm.count(Org, {}),
     users: await afterSecondEm.count(User, {}),

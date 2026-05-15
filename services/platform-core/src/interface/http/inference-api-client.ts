@@ -12,6 +12,15 @@ import type {
   TokenizeResult,
 } from "@platform-core/application/inference/protocol.ts";
 
+export type {
+  FeatureBackendMap,
+  GenerateOptions,
+  HealthResult,
+  InferenceBackendInfo,
+  InferenceModel,
+  ModelPullProgress,
+} from "@platform-core/application/inference/protocol.ts";
+
 export interface InferenceApiEnvironment {
   FULCRUM_SERVER_URL?: string;
   FULCRUM_PUBLIC_API_URL?: string;

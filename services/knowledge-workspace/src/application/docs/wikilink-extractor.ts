@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { EntityManager } from "typeorm";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { DocLink } from "@platform-core/infrastructure/application-database/entities/docs/DocLink.ts";
-import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { DocLink } from "@knowledge-workspace/infrastructure/database/entities/docs/DocLink.ts";
+import { Document } from "@knowledge-workspace/infrastructure/database/entities/docs/Document.ts";
 
 type JsonNode = {
   type?: string;
@@ -33,11 +33,11 @@ export async function syncDocWikilinks(
   contentJson: Record<string, unknown>,
 ): Promise<void> {
   const slugs = extractWikilinkSlugs(contentJson);
-  const existing = await em.find(DocLink, {
+  const existing = await em.find(DocLink, { where: {
     org: orgId,
     fromDoc: fromDoc.id,
     linkKind: "wikilink",
-  } as never, { populate: ["toDoc"] });
+  } as never, relations: ["toDoc"] });
   const wanted = new Set(slugs);
 
   for (const link of existing) {
@@ -46,16 +46,16 @@ export async function syncDocWikilinks(
 
   for (const slug of slugs) {
     const current = existing.find((link) => link.toSlug === slug);
-    const target = await em.findOne(Document, { org: orgId, externalId: slug, archived: false } as never);
+    const target = await em.findOne(Document, { where: { org: orgId, externalId: slug, archived: false } as never });
     if (current) {
       current.toDoc = target;
-      em.persist(current);
+      await em.save(current);
       continue;
     }
 
-    em.persist(em.create(DocLink, {
+    await em.save(em.create(DocLink, {
       id: randomUUID(),
-      org: em.getReference(Org, orgId),
+      org: { id: orgId } as Org,
       fromDoc,
       toDoc: target,
       toSlug: slug,

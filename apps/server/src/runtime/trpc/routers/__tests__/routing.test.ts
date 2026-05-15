@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
-import { Container } from "@needle-di/core";
 
 import { createTestOrm } from "@test-support/application-database.ts";
-import { RoutingRule, RoutingRuleSource } from "@platform-core/infrastructure/application-database/entities/router/RoutingRule.ts";
-import { RoutingRuleRepository } from "@platform-core/infrastructure/application-database/repositories/router/RoutingRuleRepository.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { RoutingRule, RoutingRuleSource } from "@execution-orchestration/infrastructure/database/entities/router/RoutingRule.ts";
+import { RoutingRuleRepository } from "@execution-orchestration/infrastructure/database/repositories/router/RoutingRuleRepository.ts";
+import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
@@ -31,11 +31,20 @@ function mockSession() {
   };
 }
 
+function makeSimpleContainer(): DiContainer {
+  const map = new Map<unknown, unknown>();
+  return {
+    get(token: unknown) { return map.get(token); },
+    has(token: unknown) { return map.has(token); },
+    bind(binding: { provide: unknown; useValue: unknown }) { map.set(binding.provide, binding.useValue); },
+  } as DiContainer;
+}
+
 function callerFor(em: import("typeorm").EntityManager) {
-  const container = new Container();
+  const container = makeSimpleContainer();
   container.bind({
     provide: RoutingRuleRepository,
-    useValue: em.getRepository(RoutingRule) as RoutingRuleRepository,
+    useValue: em.getRepository(RoutingRule) as unknown as RoutingRuleRepository,
   });
 
   return createCaller(
@@ -53,7 +62,7 @@ describe("routing tRPC drafts procedures", () => {
   test("drafts.list returns empty array when no drafts exist", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       const drafts = await (caller.routing as Record<string, unknown>).drafts as {
@@ -69,7 +78,7 @@ describe("routing tRPC drafts procedures", () => {
   test("drafts.approve returns ok for review_needed draft", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       const drafts = await (caller.routing as unknown as Record<string, unknown>).drafts as {
@@ -85,7 +94,7 @@ describe("routing tRPC drafts procedures", () => {
   test("drafts.approve requires permissionedProcedure and returns ok", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       const drafts = await (caller.routing as Record<string, unknown>).drafts as {
@@ -101,7 +110,7 @@ describe("routing tRPC drafts procedures", () => {
   test("drafts.delete returns ok for conflict draft (conflict delete with sha_mismatch scenario)", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       const drafts = await (caller.routing as unknown as Record<string, unknown>).drafts as {
@@ -117,7 +126,7 @@ describe("routing tRPC drafts procedures", () => {
   test("drafts.delete requires permissionedProcedure and returns ok", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       const drafts = await (caller.routing as Record<string, unknown>).drafts as {
@@ -133,7 +142,7 @@ describe("routing tRPC drafts procedures", () => {
   test("drafts.update requires permissionedProcedure and returns ok", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       const drafts = await (caller.routing as Record<string, unknown>).drafts as {
@@ -151,7 +160,7 @@ describe("routing tRPC config procedures", () => {
   test("config.updateLlmGate requires permissionedProcedure and returns ok", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       const config = await (caller.routing as Record<string, unknown>).config as {
@@ -169,7 +178,7 @@ describe("routing tRPC enriched test response", () => {
   test("test returns enriched schema with backend, model, whyUnmatched, evidence", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       const rule = await caller.routing.create({
@@ -186,8 +195,7 @@ describe("routing tRPC enriched test response", () => {
         priority: 1,
         customFields: { tags: ["test"] },
       } as never);
-      em.persist(task);
-      await em.flush();
+      await em.save(task);
 
       const decision = await caller.routing.test({ taskId: task.id });
 
@@ -212,7 +220,7 @@ describe("routing tRPC enriched test response", () => {
   test("dryRun returns enriched schema with backend, model, whyUnmatched", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       await caller.routing.create({

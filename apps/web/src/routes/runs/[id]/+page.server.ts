@@ -3,9 +3,9 @@ import type { Actions, PageServerLoad } from "./$types";
 import { getWorkspaceDiff, paginateLogs } from "$lib/server/agents";
 import { actionOk } from "$lib/feedback/action-result";
 import { requestAppScope } from "$lib/server/application-scope";
-import { cancelRun, retryRun } from "@execution-orchestration/application/runs/commands.ts";
-import { getProjectRunPageData } from "@execution-orchestration/application/runs/queries.ts";
-import type { RunStatus } from "@execution-orchestration/application/agent-run-service-actions.ts";
+import { cancelRun, retryRun } from "@execution-orchestration/interface/run-actions.ts";
+import { getProjectRunPageData } from "@execution-orchestration/interface/run-pages.ts";
+import type { RunStatus } from "$lib/server/runs";
 
 interface AgentRunDetail {
   id: string;

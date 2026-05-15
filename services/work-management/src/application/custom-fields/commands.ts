@@ -1,8 +1,8 @@
 import type { EntityManager } from "typeorm";
 import { z } from "zod";
 
-import { CustomFieldConfigSchema, CustomFieldDef } from "@platform-core/infrastructure/application-database/entities/tasks/CustomFieldDef.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { CustomFieldConfigSchema, CustomFieldDef } from "@work-management/infrastructure/database/entities/tasks/CustomFieldDef.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import { AppValidationError } from "@platform-core/domain/errors.ts";
 import type { CustomFieldAppContext } from "@work-management/application/custom-fields/queries.ts";
 
@@ -16,11 +16,11 @@ export const TaskCustomFieldsOutputSchema = z.object({
 export type TaskCustomFieldsOutput = z.infer<typeof TaskCustomFieldsOutputSchema>;
 
 async function findFieldDef(em: EntityManager, orgId: string, id: string): Promise<CustomFieldDef | null> {
-  return em.findOne(CustomFieldDef, { id, org: orgId, archived: false } as never);
+  return em.findOne(CustomFieldDef, { where: { id, org: orgId, archived: false } as never });
 }
 
 async function findTask(em: EntityManager, orgId: string, id: string): Promise<Task | null> {
-  return em.findOne(Task, { id, org: orgId, deletedAt: null } as never);
+  return em.findOne(Task, { where: { id, org: orgId, deletedAt: null } as never });
 }
 
 function failValidation(field: CustomFieldDef, reason: string): never {
@@ -102,8 +102,7 @@ export async function setTaskCustomField(
   const value = validateValue(field, input.value);
   task.customFields = { ...task.customFields, [field.slug]: value };
   task.updatedAt = new Date();
-  em.persist(task);
-  await em.flush();
+  await em.save(task);
   return { taskId: task.id, customFields: task.customFields };
 }
 
@@ -123,7 +122,6 @@ export async function clearTaskCustomField(
   const { [field.slug]: _removed, ...customFields } = task.customFields;
   task.customFields = customFields;
   task.updatedAt = new Date();
-  em.persist(task);
-  await em.flush();
+  await em.save(task);
   return { taskId: task.id, customFields: task.customFields };
 }

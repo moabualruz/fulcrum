@@ -16,10 +16,10 @@ export interface DocRow {
 }
 
 async function tableColumns(em: EntityManager, tableName: string): Promise<Set<string>> {
-  const rows = await em.getConnection().execute<Array<{ column_name: string }>>(
-    `SELECT column_name FROM information_schema.columns WHERE table_name = ?`,
+  const rows = await em.query(
+    `SELECT column_name FROM information_schema.columns WHERE table_name = $1`,
     [tableName],
-  );
+  ) as Array<{ column_name: string }>;
   return new Set(rows.map((row) => row.column_name));
 }
 
@@ -45,12 +45,12 @@ export async function indexDoc(
 ): Promise<void> {
   const columns = await tableColumns(em, "search_documents");
   if (!columns.has("source_kind") || !columns.has("title") || !columns.has("body")) {
-    await em.getConnection().execute(
+    await em.query(
       `DELETE FROM search_documents
         WHERE org_id = ? AND entity_kind = 'doc' AND entity_id = ?`,
       [doc.org.id, doc.id],
     );
-    await em.getConnection().execute(
+    await em.query(
       `INSERT INTO search_documents (id, org_id, entity_kind, entity_id)
        VALUES (?, ?, 'doc', ?)`,
       [randomUUID(), doc.org.id, doc.id],
@@ -58,7 +58,7 @@ export async function indexDoc(
     return;
   }
 
-  await em.getConnection().execute(
+  await em.query(
     `INSERT INTO search_documents
        (id, org_id, project_id, entity_kind, entity_id, source_kind, source_id, title, body, labels, metadata, archived)
      VALUES (?, ?, ?, 'doc', ?, 'doc', ?, ?, ?, ?::text[], ?::jsonb, ?)
@@ -90,7 +90,7 @@ export async function indexDoc(
 export async function archiveDocIndex(em: EntityManager, orgId: string, docId: string): Promise<void> {
   const columns = await tableColumns(em, "search_documents");
   if (!columns.has("source_kind") || !columns.has("archived")) return;
-  await em.getConnection().execute(
+  await em.query(
     `UPDATE search_documents
         SET archived = true,
             updated_at = now()
@@ -103,7 +103,7 @@ export async function removeDocIndex(em: EntityManager, orgId: string, docId: st
   const columns = await tableColumns(em, "search_documents");
   const kindColumn = columns.has("source_kind") ? "source_kind" : "entity_kind";
   const idColumn = columns.has("source_id") ? "source_id" : "entity_id";
-  await em.getConnection().execute(
+  await em.query(
     `DELETE FROM search_documents
       WHERE org_id = ? AND ${kindColumn} = 'doc' AND ${idColumn} = ?`,
     [orgId, docId],

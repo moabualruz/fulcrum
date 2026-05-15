@@ -81,15 +81,15 @@ export class FulcrumCasbinAdapter implements Adapter {
   /**
    * savePolicy — flush model's current policy to DB.
    * Clears all existing rows first, then inserts one row per policy entry.
-   * Runs in an em.transactional() block.
+   * Runs in an em.transaction() block.
    */
   async savePolicy(model: Model): Promise<boolean> {
     // Get the underlying EM from the repo to run a transaction
     const em: EntityManager = (this._repo as unknown as { em: EntityManager }).em;
 
-    await em.transactional(async (txEm) => {
+    await em.transaction(async (txEm: EntityManager) => {
       // Clear existing policies via entity class reference.
-      await txEm.nativeDelete(CasbinRule, {});
+      await txEm.delete(CasbinRule, {} as never);
 
       // Re-insert from model
       const sections = ["p", "g"];
@@ -100,12 +100,11 @@ export class FulcrumCasbinAdapter implements Adapter {
           for (const rule of assertion.policy) {
             const fields = ruleToFieldMap(ptype, rule);
             const entity = txEm.create(CasbinRule, fields);
-            txEm.persist(entity);
+            await txEm.save(entity);
           }
         }
       }
 
-      await txEm.flush();
     });
 
     return true;
@@ -119,8 +118,7 @@ export class FulcrumCasbinAdapter implements Adapter {
     const fields = ruleToFieldMap(ptype, rule);
     const em: EntityManager = (this._repo as unknown as { em: EntityManager }).em;
     const entity = em.create(CasbinRule, fields);
-    em.persist(entity);
-    await em.flush();
+    await em.save(entity);
   }
 
   /**
@@ -128,7 +126,7 @@ export class FulcrumCasbinAdapter implements Adapter {
    */
   async removePolicy(_sec: string, ptype: string, rule: string[]): Promise<void> {
     const filter = ruleToFieldMap(ptype, rule);
-    await this._repo.nativeDelete(filter);
+    await this._repo.delete(filter);
   }
 
   /**
@@ -150,6 +148,6 @@ export class FulcrumCasbinAdapter implements Adapter {
         filter[col as string] = fieldValues[i];
       }
     }
-    await this._repo.nativeDelete(filter);
+    await this._repo.delete(filter as never);
   }
 }

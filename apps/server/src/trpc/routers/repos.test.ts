@@ -38,7 +38,7 @@ describe("reposRouter", () => {
         session: session(db.seed.userId, db.seed.orgId),
         orgId: db.seed.orgId,
         userId: db.seed.userId,
-        em: db.em.fork(),
+        em: db.em,
         container,
       }));
 
@@ -49,14 +49,10 @@ describe("reposRouter", () => {
       const queued = await caller.syncRepo({ repoId: registered.id });
       const status = await caller.statusRepo({ repoId: registered.id });
       const archived = await caller.unregister({ id: registered.id });
-      const events = await db.em.fork().getConnection().execute<Array<{ verb: string }>>(
-        `SELECT verb
-           FROM events
-          WHERE org_id = ?
-            AND subject_id = ?
-          ORDER BY created_at ASC`,
+      const events = await db.em.query(
+        `SELECT verb FROM events WHERE org_id = $1 AND subject_id = $2 ORDER BY created_at ASC`,
         [db.seed.orgId, registered.id],
-      );
+      ) as Array<{ verb: string }>;
 
       expect(listed.map((repo) => repo.id)).toContain(registered.id);
       expect(fetched).toMatchObject({ id: registered.id, slug: "fulcrum" });

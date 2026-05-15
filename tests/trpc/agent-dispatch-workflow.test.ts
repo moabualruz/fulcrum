@@ -58,7 +58,7 @@ describe("workflow agent run dispatch", () => {
   test("dispatch returns run id with context, routing, repo, and authority trace", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await seedDispatchTask(em);
       const caller = callerFor(em);
 
@@ -109,7 +109,7 @@ describe("workflow agent run dispatch", () => {
   test("dispatch rejects tasks without a repo trace", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await seedDispatchTask(em, false);
       const caller = callerFor(em);
 

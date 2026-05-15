@@ -1,7 +1,7 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { cancelRun, retryRun } from "@execution-orchestration/application/runs/commands.ts";
-import { getProjectRunPageData } from "@execution-orchestration/application/runs/queries.ts";
+import { cancelRun, retryRun } from "@execution-orchestration/interface/run-actions.ts";
+import { getProjectRunPageData } from "@execution-orchestration/interface/run-pages.ts";
 import { requestAppScope } from "$lib/server/application-scope";
 import { actionOk } from "$lib/feedback/action-result";
 

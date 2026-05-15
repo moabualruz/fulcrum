@@ -1,10 +1,10 @@
-import { PGlite } from "@electric-sql/pglite";
-import { MikroORM as MikroORMRuntime } from "@mikro-orm/postgresql";
+import { DataSource, type DataSourceOptions } from "typeorm";
+import { PGliteDriver } from "typeorm-pglite";
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod/v4";
 import { fulcrumHome } from "@platform-core/application/db/database-config.ts";
-import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { createDataSourceOptions } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 import { applyProductMigrations } from "@platform-core/infrastructure/application-database/product-migrations.ts";
 import { SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
 import { createTestOrm } from "./application-database.ts";
@@ -52,16 +52,19 @@ export async function createApplicationStoreFixture(dataDir: string): Promise<{
   close: () => Promise<void>;
 }> {
   await mkdir(dirname(dataDir), { recursive: true });
-  const pglite = new PGlite(dataDir);
-  const orm = await MikroORMRuntime.init(createOrmConfig({ pglite }));
-  await orm.migrator.up();
-  const seed = await new SeedService(orm.em).run();
+  const driver = new PGliteDriver({ dataDir }).driver;
+  const ds = new DataSource({
+    ...createDataSourceOptions([], {}),
+    driver,
+  } as DataSourceOptions);
+  await ds.initialize();
+  await ds.runMigrations({ transaction: "none" });
+  const seed = await new SeedService(ds.manager).run();
   return {
-    store: pglite as unknown as TestStore,
+    store: ds.manager as unknown as TestStore,
     orgId: seed.orgId,
     close: async () => {
-      await orm.close(true);
-      await pglite.close();
+      await ds.destroy();
     },
   };
 }

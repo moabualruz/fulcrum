@@ -5,7 +5,7 @@ import {
   type NotificationRuleEngineRepositories,
   type RuleMatch,
 } from "./rule-engine.ts";
-import { DeliveryStatus } from "@platform-core/infrastructure/application-database/entities/notifications/index.ts";
+import { DeliveryStatus } from "@notification-center/infrastructure/database/entities/notifications/index.ts";
 import type { WorkerRegistry } from "@platform-core/application/jobs/registry.ts";
 import { assertRecordPayload, assertStringField } from "@platform-core/application/jobs/registry.ts";
 

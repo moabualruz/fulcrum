@@ -23,7 +23,7 @@ import { InjectDataSource } from "@nestjs/typeorm";
 import { DataSource, type MigrationInterface } from "typeorm";
 import { SchemaMigration } from "./entities/SchemaMigration.ts";
 import { Event } from "./entities/core/Event.ts";
-import { Org } from "./entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import type { SchemaMigrationRepository } from "./repositories/SchemaMigrationRepository.ts";
 import type { EventRepository } from "./repositories/core/EventRepository.ts";
 import { checksumFile } from "./migration-checksums.ts";
@@ -176,15 +176,15 @@ export interface MigratorServiceOptions {
 
 @Injectable()
 export class MigratorService {
-  readonly #dataSource: DataSource;
-  readonly #schemaMigrationRepo: SchemaMigrationRepository;
-  readonly #eventRepo: EventRepository;
+  private readonly _dataSource: DataSource;
+  private readonly _schemaMigrationRepo: SchemaMigrationRepository;
+  private readonly _eventRepo: EventRepository;
   /** Absolute path to the migrations directory. */
-  readonly #migrationsPath: string;
+  private readonly _migrationsPath: string;
   /** Lossy-check resolver — can be overridden in tests via MigratorServiceOptions. */
-  readonly #isLossyResolver: (migrationPath: string) => Promise<boolean>;
+  private readonly _isLossyResolver: (migrationPath: string) => Promise<boolean>;
   /** Checksum file reader — can be overridden in tests via MigratorServiceOptions. */
-  readonly #checksumReader: (filePath: string) => Promise<string>;
+  private readonly _checksumReader: (filePath: string) => Promise<string>;
 
   constructor(
     @InjectDataSource() dataSource: DataSource,
@@ -192,12 +192,12 @@ export class MigratorService {
     eventRepo: EventRepository,
     options: MigratorServiceOptions = {},
   ) {
-    this.#dataSource = dataSource;
-    this.#schemaMigrationRepo = schemaMigrationRepo;
-    this.#eventRepo = eventRepo;
-    this.#isLossyResolver = options.isLossyResolver ?? isMigrationLossy;
-    this.#checksumReader = options.checksumReader ?? checksumFile;
-    this.#migrationsPath = new URL("./migrations", import.meta.url).pathname;
+    this._dataSource = dataSource;
+    this._schemaMigrationRepo = schemaMigrationRepo;
+    this._eventRepo = eventRepo;
+    this._isLossyResolver = options.isLossyResolver ?? isMigrationLossy;
+    this._checksumReader = options.checksumReader ?? checksumFile;
+    this._migrationsPath = new URL("./migrations", import.meta.url).pathname;
   }
 
   /**
@@ -211,15 +211,15 @@ export class MigratorService {
     force = false,
   ): Promise<void> {
     // Pre-flight: validate checksums of all previously-applied migrations.
-    await this.#validateChecksums();
+    await this._validateChecksums();
 
-    const pending = await this.#getPendingMigrations();
-    const executed = await this.#getExecutedMigrations();
+    const pending = await this._getPendingMigrations();
+    const executed = await this._getExecutedMigrations();
 
     if (targetVersion === undefined) {
       // Migrate fully up.
-      const applied = await this.#dataSource.runMigrations({ transaction: "each" });
-      await this.#recordResults(applied.map(m => ({ name: m.name, timestamp: 0 })), "up");
+      const applied = await this._dataSource.runMigrations({ transaction: "each" });
+      await this._recordResults(applied.map(m => ({ name: m.name, timestamp: 0 })), "up");
       return;
     }
 
@@ -232,8 +232,8 @@ export class MigratorService {
     if (isPending) {
       // TypeORM runMigrations runs all pending — filter by name not directly supported.
       // Run all up to latest; the TypeORM runner stops at the correct place.
-      const applied = await this.#dataSource.runMigrations({ transaction: "each" });
-      await this.#recordResults(applied.map(m => ({ name: m.name, timestamp: 0 })), "up");
+      const applied = await this._dataSource.runMigrations({ transaction: "each" });
+      await this._recordResults(applied.map(m => ({ name: m.name, timestamp: 0 })), "up");
       return;
     }
 
@@ -248,19 +248,19 @@ export class MigratorService {
       const toRevert = executed.slice(targetIdx + 1);
 
       for (const m of toRevert) {
-        const migPath = `${this.#migrationsPath}/${m.name}.ts`;
-        if (await this.#isLossyResolver(migPath)) {
+        const migPath = `${this._migrationsPath}/${m.name}.ts`;
+        if (await this._isLossyResolver(migPath)) {
           if (!force) {
             throw new LossyDownProtectedError(m.name);
           }
-          await this.#emitLossyForcedEvent(m.name);
+          await this._emitLossyForcedEvent(m.name);
         }
       }
 
       // TypeORM undoLastMigration() reverts one at a time.
       for (const m of toRevert.reverse()) {
-        await this.#dataSource.undoLastMigration({ transaction: "each" });
-        await this.#recordResults([{ name: m.name, timestamp: 0 }], "down");
+        await this._dataSource.undoLastMigration({ transaction: "each" });
+        await this._recordResults([{ name: m.name, timestamp: 0 }], "down");
       }
       return;
     }
@@ -274,8 +274,8 @@ export class MigratorService {
    * Returns current migration state.
    */
   async status(): Promise<MigrationStatus> {
-    const executed = await this.#getExecutedMigrations();
-    const pending = await this.#getPendingMigrations();
+    const executed = await this._getExecutedMigrations();
+    const pending = await this._getPendingMigrations();
 
     const current =
       executed.length > 0 ? (executed[executed.length - 1]?.name ?? null) : null;
@@ -292,38 +292,43 @@ export class MigratorService {
    * Returns the full Fulcrum audit ledger (schema_migrations rows).
    */
   async history(): Promise<SchemaMigration[]> {
-    const repo = this.#dataSource.getRepository(SchemaMigration);
+    const repo = this._dataSource.getRepository(SchemaMigration);
     return repo.find({ order: { appliedAt: "ASC" } });
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────
 
-  async #getExecutedMigrations(): Promise<MigrationRecord[]> {
+  private async _getExecutedMigrations(): Promise<MigrationRecord[]> {
     try {
-      const queryRunner = this.#dataSource.createQueryRunner();
-      const executed = await queryRunner.getExecutedMigrations();
-      await queryRunner.release();
-      return executed.map(m => ({ name: m.name, timestamp: m.timestamp }));
+      const rows = await this._dataSource.query(
+        `SELECT name, timestamp FROM migrations ORDER BY timestamp ASC`,
+      ) as Array<{ name: string; timestamp: number }>;
+      return rows.map((m) => ({ name: m.name, timestamp: m.timestamp }));
     } catch {
       return [];
     }
   }
 
-  async #getPendingMigrations(): Promise<MigrationRecord[]> {
+  private async _getPendingMigrations(): Promise<MigrationRecord[]> {
     try {
-      const queryRunner = this.#dataSource.createQueryRunner();
-      const pending = await queryRunner.getPendingMigrations();
-      await queryRunner.release();
-      return pending.map(m => ({ name: m.name, timestamp: m.timestamp }));
+      const allMigrations = this._dataSource.migrations ?? [];
+      const executed = await this._getExecutedMigrations();
+      const executedNames = new Set(executed.map((m) => m.name));
+      return allMigrations
+        .filter((m) => !executedNames.has((m as unknown as { name: string }).name))
+        .map((m) => {
+          const migration = m as unknown as { name: string; timestamp: number };
+          return { name: migration.name, timestamp: migration.timestamp ?? 0 };
+        });
     } catch {
       return [];
     }
   }
 
-  async #validateChecksums(): Promise<void> {
+  private async _validateChecksums(): Promise<void> {
     let rows: SchemaMigration[];
     try {
-      const repo = this.#dataSource.getRepository(SchemaMigration);
+      const repo = this._dataSource.getRepository(SchemaMigration);
       rows = await repo.find({ order: { version: "ASC" } });
     } catch {
       return;
@@ -332,10 +337,10 @@ export class MigratorService {
     for (const row of rows) {
       if (!row.checksum) continue;
 
-      const migPath = `${this.#migrationsPath}/${row.name}.ts`;
+      const migPath = `${this._migrationsPath}/${row.name}.ts`;
       let currentChecksum: string;
       try {
-        currentChecksum = await this.#checksumReader(migPath);
+        currentChecksum = await this._checksumReader(migPath);
       } catch (cause) {
         throw new MigrationFileMissingError(row.name, cause);
       }
@@ -346,7 +351,7 @@ export class MigratorService {
     }
   }
 
-  static #extractVersion(migrationName: string): number {
+  private _extractVersion(migrationName: string): number {
     const match = /Migration(\d+)/.exec(migrationName);
     if (match?.[1]) {
       return Number(match[1]);
@@ -357,24 +362,24 @@ export class MigratorService {
     return Date.now();
   }
 
-  async #recordResults(
+  private async _recordResults(
     results: MigrationRecord[],
     direction: "up" | "down",
   ): Promise<void> {
     if (results.length === 0) return;
 
-    const repo = this.#dataSource.getRepository(SchemaMigration);
+    const repo = this._dataSource.getRepository(SchemaMigration);
 
     for (const info of results) {
-      const migPath = `${this.#migrationsPath}/${info.name}.ts`;
+      const migPath = `${this._migrationsPath}/${info.name}.ts`;
       let checksum = "";
       try {
-        checksum = await this.#checksumReader(migPath);
+        checksum = await this._checksumReader(migPath);
       } catch {
         checksum = "";
       }
 
-      const version = MigratorService.#extractVersion(info.name);
+      const version = this._extractVersion(info.name);
 
       try {
         const existing = await repo.findOne({ where: { name: info.name } });
@@ -399,9 +404,9 @@ export class MigratorService {
     }
   }
 
-  async #emitLossyForcedEvent(migrationName: string): Promise<void> {
-    const eventRepo = this.#dataSource.getRepository(Event);
-    const orgRepo = this.#dataSource.getRepository(Org);
+  private async _emitLossyForcedEvent(migrationName: string): Promise<void> {
+    const eventRepo = this._dataSource.getRepository(Event);
+    const orgRepo = this._dataSource.getRepository(Org);
     const WELL_KNOWN_ORG_ID = "00000000-0000-0000-0000-000000000001";
 
     const org = { id: WELL_KNOWN_ORG_ID } as Org;

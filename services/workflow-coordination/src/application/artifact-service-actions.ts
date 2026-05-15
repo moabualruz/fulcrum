@@ -42,12 +42,12 @@ function isoStamp(value: string | Date): string {
 }
 
 function assertEm(db: DbHandle) {
-  if ("persist" in db && typeof (db as { persist: unknown }).persist === "function") {
+  if ("save" in db && typeof (db as { save: unknown }).save === "function") {
     return db as EntityManager;
   }
   if ("em" in db) {
     const em = (db as { em?: unknown }).em;
-    if (em && typeof (em as { persist?: unknown }).persist === "function") {
+    if (em && typeof (em as { save?: unknown }).save === "function") {
       return em as EntityManager;
     }
   }
@@ -88,36 +88,35 @@ export async function listArtifacts(
     }));
   }
   const em = assertEm(db);
-  const conn = em.getConnection();
-  const conditions = ["org_id = ?"];
   const params: (string | null)[] = [orgId];
+  const conditions = ["org_id = $1"];
 
   if (!filter?.includeArchived) {
     conditions.push("(archived = false OR archived IS NULL)");
   }
   if (filter?.projectId) {
     params.push(filter.projectId);
-    conditions.push(`project_id = ?`);
+    conditions.push(`project_id = $${params.length}`);
   }
   if (filter?.runId) {
     params.push(filter.runId);
-    conditions.push(`run_id = ?`);
+    conditions.push(`run_id = $${params.length}`);
   }
   if (filter?.taskId) {
     params.push(filter.taskId);
-    conditions.push(`task_id = ?`);
+    conditions.push(`task_id = $${params.length}`);
   }
   if (filter?.mime) {
     params.push(filter.mime);
-    conditions.push(`mime = ?`);
+    conditions.push(`mime = $${params.length}`);
   }
   if (filter?.kind) {
     params.push(filter.kind);
-    conditions.push(`kind = ?`);
+    conditions.push(`kind = $${params.length}`);
   }
 
   const where = conditions.join(" AND ");
-  const rows = await conn.execute(
+  const rows = await em.query(
     `SELECT id, org_id, project_id, run_id, task_id, kind, title,
             body_path, sha256, size, mime, COALESCE(archived, false) AS archived, created_at
        FROM artifacts
@@ -153,12 +152,11 @@ export async function readArtifactDetail(
     return artifactDetailFromRow(row);
   }
   const em = assertEm(db);
-  const conn = em.getConnection();
-  const rows = await conn.execute(
+  const rows = await em.query(
     `SELECT id, org_id, project_id, run_id, task_id, kind, title,
             body_path, sha256, size, mime, COALESCE(archived, false) AS archived, created_at
        FROM artifacts
-      WHERE id = ? AND org_id = ?`,
+      WHERE id = $1 AND org_id = $2`,
     [input.id, input.orgId],) as Array<ArtifactRow & { created_at: string | Date }>;
   const row = rows[0];
   if (!row) return null;
@@ -198,9 +196,8 @@ export async function deleteArtifactAction(
   id: string,
   orgId: string,): Promise<void> {
   const em = assertEm(db);
-  const conn = em.getConnection();
-  await conn.execute(
-    `DELETE FROM artifacts WHERE id = ? AND org_id = ?`,
+  await em.query(
+    `DELETE FROM artifacts WHERE id = $1 AND org_id = $2`,
     [id, orgId],);
 }
 
@@ -221,11 +218,10 @@ export async function getArtifactStats(
     };
   }
   const em = assertEm(db);
-  const conn = em.getConnection();
-  const rows = await conn.execute(
+  const rows = await em.query(
     `SELECT COALESCE(SUM(size), 0) AS total_bytes, COUNT(*)::int AS count
        FROM artifacts
-      WHERE org_id = ? AND project_id = ?`,
+      WHERE org_id = $1 AND project_id = $2`,
     [orgId, projectId],) as Array<{ total_bytes: string | number | null; count: string | number }>;
   const row = rows[0]!;
   return {

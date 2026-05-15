@@ -5,7 +5,6 @@
  * RED first per TDD discipline.
  */
 
-import { Container } from "@needle-di/core";
 import { describe, expect, test } from "bun:test";
 import type { Session } from "better-auth";
 
@@ -22,10 +21,11 @@ import { TuiApp } from "@fulcrum/tui/index.ts";
 import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 import { TEMPLATE_BODY_MAP, TEMPLATE_SEEDS } from "@knowledge-workspace/application/docs/template-seeds.ts";
 import { createTestOrm } from "@test-support/application-database.ts";
+import type { TestContainer } from "@test-support/application-container.ts";
 import { DEFAULT_ORG_ID as SEEDED_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import { EntityManagerDocTemplateService } from "@knowledge-workspace/application/docs/em-doc-template-service.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { DocTemplate } from "@platform-core/infrastructure/application-database/entities/docs/DocTemplate.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { DocTemplate } from "@knowledge-workspace/infrastructure/database/entities/docs/DocTemplate.ts";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -104,9 +104,14 @@ function makeService(templates: DocTemplateRow[]): DocTemplateService {
   };
 }
 
-function makeContainer(service: DocTemplateService): Container {
-  const container = new Container();
-  container.bind({ provide: DOC_TEMPLATE_SERVICE_TOKEN, useValue: service });
+function makeContainer(service: DocTemplateService): TestContainer {
+  // Dummy TestOrm for container creation (no DB needed for in-memory service tests)
+  const container = {
+    _map: new Map<unknown, unknown>([[DOC_TEMPLATE_SERVICE_TOKEN, service]]),
+    get(token: unknown) { return (this._map as Map<unknown, unknown>).get(token); },
+    has(token: unknown) { return (this._map as Map<unknown, unknown>).has(token); },
+    bind(binding: { provide: unknown; useValue: unknown }) { (this._map as Map<unknown, unknown>).set(binding.provide, binding.useValue); },
+  } as unknown as TestContainer;
   return container;
 }
 
@@ -125,7 +130,7 @@ function mockSession(): Session {
   } as Session;
 }
 
-function createCaller(container: Container) {
+function createCaller(container: TestContainer) {
   const factory = t.createCallerFactory(appRouter);
   return factory(
     createContext({
@@ -191,18 +196,17 @@ describe("EntityManagerDocTemplateService", () => {
   test("list(projectId) returns project templates plus static org-default fallback", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
-      const org = em.getReference(Org, SEEDED_ORG_ID);
-      em.persist(em.create(DocTemplate, {
-        org,
+      const em = db.em;
+      const org = em.getRepository(Org).create({ id: SEEDED_ORG_ID } as Org);
+      await em.save(DocTemplate, {
+        org: { id: SEEDED_ORG_ID } as Org,
         projectId: PROJECT_ID,
         docType: "adr",
         name: "Project ADR",
         frontmatterTemplate: { status: "proposed", project: "my-svc" },
         bodyTemplate: "## Project-only ADR",
         isDefault: true,
-      }));
-      await em.flush();
+      });
 
       const service = new EntityManagerDocTemplateService(em);
       const rows = await service.list(SEEDED_ORG_ID, PROJECT_ID);
@@ -220,7 +224,7 @@ describe("EntityManagerDocTemplateService", () => {
   test("resolve falls back to immutable built-in templates when no DB default exists", async () => {
     const db = await createTestOrm();
     try {
-      const service = new EntityManagerDocTemplateService(db.em.fork());
+      const service = new EntityManagerDocTemplateService(db.em);
       const template = await service.resolve(SEEDED_ORG_ID, null, "rfc");
 
       expect(template).not.toBeNull();

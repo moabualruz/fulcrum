@@ -20,7 +20,7 @@ describe("dependency orchestration dependency run actions", () => {
   test("builds a trace-linked dependency disclosure preview from persisted Fulcrum tasks", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Run Preview Project"],);
@@ -106,7 +106,7 @@ describe("dependency orchestration dependency run actions", () => {
   test("dispatches dependency-tree runs in preview order while skipping satisfied tasks", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Dependency Dispatch Project"],);
@@ -208,7 +208,7 @@ describe("dependency orchestration dependency run actions", () => {
   test("records and loads run-audit live dependency-run feedback from current agent runs and events", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Dependency Live Feedback Project"],);
@@ -354,7 +354,7 @@ describe("dependency orchestration dependency run actions", () => {
   test("does not dispatch when an included dependency is already in progress", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Blocked Dependency Dispatch Project"],);
@@ -395,7 +395,7 @@ describe("dependency orchestration dependency run actions", () => {
   test("worker tick executes queued dependency runs in dependency order and records live output", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Dependency Worker Project"],);

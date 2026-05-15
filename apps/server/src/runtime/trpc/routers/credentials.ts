@@ -78,24 +78,24 @@ async function getCredentialClass() {
 }
 
 async function getOrgMemberClass() {
-  const { OrgMember } = await import("@platform-core/infrastructure/application-database/entities/auth/OrgMember.ts");
+  const { OrgMember } = await import("@identity-access/infrastructure/database/entities/auth/OrgMember.ts");
   return OrgMember;
 }
 
 async function getOrgMemberRepository() {
   const { OrgMemberRepository } = await import(
-    "@platform-core/infrastructure/application-database/repositories/auth/OrgMemberRepository.ts"
+    "@identity-access/infrastructure/database/repositories/auth/OrgMemberRepository.ts"
   );
   return OrgMemberRepository;
 }
 
 async function getOrgClass() {
-  const { Org } = await import("@platform-core/infrastructure/application-database/entities/auth/Org.ts");
+  const { Org } = await import("@identity-access/infrastructure/database/entities/auth/Org.ts");
   return Org;
 }
 
 async function getUserClass() {
-  const { User } = await import("@platform-core/infrastructure/application-database/entities/auth/User.ts");
+  const { User } = await import("@identity-access/infrastructure/database/entities/auth/User.ts");
   return User;
 }
 
@@ -184,7 +184,7 @@ async function findCred(
   name: string,
 ) {
   const Credential = await getCredentialClass();
-  return em.findOne(Credential, { org: orgId, user: userId, name } as object) as Promise<
+  return em.findOne(Credential, { where: { org: { id: orgId }, user: { id: userId }, name } } as object) as Promise<
     | (import("@platform-core/infrastructure/application-database/entities/platform/Credential.ts").Credential & {
         org: { id: string };
         user: { id: string };
@@ -224,12 +224,13 @@ export const credentialsRouter = t.router({
       const em = requireEm(ctx);
       const Credential = await getCredentialClass();
       const where: Record<string, unknown> = {
-        org: ctx.orgId,
-        user: ctx.userId,
+        org: { id: ctx.orgId },
+        user: { id: ctx.userId },
       };
       if (!input?.includeArchived) where.archived = false;
-      const rows = (await em.find(Credential, where as object, {
-        orderBy: { createdAt: "DESC" } as object,
+      const rows = (await em.find(Credential, {
+        where: where as object,
+        order: { createdAt: "DESC" },
       })) as Array<Parameters<typeof rowFor>[0]>;
       return rows.map(rowFor);
     }),
@@ -270,14 +271,12 @@ export const credentialsRouter = t.router({
         existing.encryptedValue = Buffer.from(ct);
         existing.algo = ALGO_LABEL;
         existing.kdf = KDF_LABEL;
-        await em.flush();
+        await em.save(Credential, existing);
         return { id: existing.id, name: existing.name };
       }
-      const Org = await getOrgClass();
-      const User = await getUserClass();
-      const created = em.create(Credential, {
-        org: em.getReference(Org, ctx.orgId),
-        user: em.getReference(User, ctx.userId),
+      const created = await em.save(Credential, {
+        org: { id: ctx.orgId },
+        user: { id: ctx.userId },
         name: input.name,
         encryptedValue: Buffer.from(ct),
         algo: ALGO_LABEL,
@@ -286,8 +285,6 @@ export const credentialsRouter = t.router({
         archived: false,
         createdAt: new Date(),
       } as any);
-      em.persist(created);
-      await em.flush();
       return { id: (created as { id: string }).id, name: input.name };
     }),
 
@@ -311,7 +308,7 @@ export const credentialsRouter = t.router({
       cred.algo = ALGO_LABEL;
       cred.kdf = KDF_LABEL;
       cred.lastUsedAt = new Date();
-      await em.flush();
+      await em.save(await getCredentialClass(), cred);
       return { ok: true as const };
     }),
 
@@ -330,7 +327,7 @@ export const credentialsRouter = t.router({
         });
       }
       cred.archived = true;
-      await em.flush();
+      await em.save(await getCredentialClass(), cred);
       return { ok: true as const };
     }),
 
@@ -348,8 +345,7 @@ export const credentialsRouter = t.router({
           message: `Credential '${input.name}' not found.`,
         });
       }
-      em.remove(cred);
-      await em.flush();
+      await em.remove(cred);
       return { ok: true as const };
     }),
 

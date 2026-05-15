@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { DependenciesSchema } from "@platform-core/infrastructure/application-database/entities/tasks/schemas.ts";
+import { DependenciesSchema } from "@work-management/infrastructure/database/entities/tasks/schemas.ts";
 import type { TipTapJson } from "@platform-core/infrastructure/application-database/tasks-rich-text.ts";
 
 export const TipTapContentSchema: z.ZodType<TipTapJson> = z.lazy(() =>

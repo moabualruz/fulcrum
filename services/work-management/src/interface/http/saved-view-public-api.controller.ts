@@ -25,7 +25,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { IsIn, IsOptional, IsString, IsUUID, MinLength } from "class-validator";
+import { IsBoolean, IsIn, IsObject, IsOptional, IsString, IsUUID, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
 
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
@@ -65,6 +65,9 @@ export class CreateSavedViewBodyDto {
   name!: string;
   scope?: PublicSavedViewScope;
   viewType?: PublicSavedViewType;
+  filters?: Record<string, unknown>;
+  sortBy?: string | null;
+  isDefault?: boolean;
 }
 
 export class SavedViewIdParamsDto {
@@ -75,6 +78,9 @@ export class PatchSavedViewBodyDto {
   name?: string;
   scope?: PublicSavedViewScope;
   viewType?: PublicSavedViewType;
+  filters?: Record<string, unknown>;
+  sortBy?: string | null;
+  isDefault?: boolean;
 }
 
 export class SavedViewPublicApiService {
@@ -95,6 +101,9 @@ export class SavedViewPublicApiService {
       name: body.name,
       scope: body.scope ?? "private",
       viewType: body.viewType ?? "list",
+      filters: body.filters,
+      sortBy: body.sortBy,
+      isDefault: body.isDefault,
     });
     if (!view) {
       throw new InternalServerErrorException("Saved-view public API create facade returned no saved view.");
@@ -203,11 +212,14 @@ function definedScope(input: { orgId?: string; projectId?: string }): Record<str
   return scope;
 }
 
-function definedPatch(input: PatchSavedViewBodyDto): Record<string, string> {
-  const patch: Record<string, string> = {};
+function definedPatch(input: PatchSavedViewBodyDto): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
   if (input.name !== undefined) patch["name"] = input.name;
   if (input.scope !== undefined) patch["scope"] = input.scope;
   if (input.viewType !== undefined) patch["viewType"] = input.viewType;
+  if (input.filters !== undefined) patch["filters"] = input.filters;
+  if (input.sortBy !== undefined) patch["sortBy"] = input.sortBy;
+  if (input.isDefault !== undefined) patch["isDefault"] = input.isDefault;
   return patch;
 }
 
@@ -230,6 +242,12 @@ IsOptional()(CreateSavedViewBodyDto.prototype, "scope");
 IsIn(SAVED_VIEW_SCOPES)(CreateSavedViewBodyDto.prototype, "scope");
 IsOptional()(CreateSavedViewBodyDto.prototype, "viewType");
 IsIn(SAVED_VIEW_TYPES)(CreateSavedViewBodyDto.prototype, "viewType");
+IsOptional()(CreateSavedViewBodyDto.prototype, "filters");
+IsObject()(CreateSavedViewBodyDto.prototype, "filters");
+IsOptional()(CreateSavedViewBodyDto.prototype, "sortBy");
+IsString()(CreateSavedViewBodyDto.prototype, "sortBy");
+IsOptional()(CreateSavedViewBodyDto.prototype, "isDefault");
+IsBoolean()(CreateSavedViewBodyDto.prototype, "isDefault");
 
 IsUUID()(SavedViewIdParamsDto.prototype, "id");
 
@@ -240,6 +258,12 @@ IsOptional()(PatchSavedViewBodyDto.prototype, "scope");
 IsIn(SAVED_VIEW_SCOPES)(PatchSavedViewBodyDto.prototype, "scope");
 IsOptional()(PatchSavedViewBodyDto.prototype, "viewType");
 IsIn(SAVED_VIEW_TYPES)(PatchSavedViewBodyDto.prototype, "viewType");
+IsOptional()(PatchSavedViewBodyDto.prototype, "filters");
+IsObject()(PatchSavedViewBodyDto.prototype, "filters");
+IsOptional()(PatchSavedViewBodyDto.prototype, "sortBy");
+IsString()(PatchSavedViewBodyDto.prototype, "sortBy");
+IsOptional()(PatchSavedViewBodyDto.prototype, "isDefault");
+IsBoolean()(PatchSavedViewBodyDto.prototype, "isDefault");
 
 const listSavedViewsDescriptor = Object.getOwnPropertyDescriptor(
   SavedViewPublicApiController.prototype,

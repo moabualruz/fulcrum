@@ -1,7 +1,7 @@
 import type { EntityManager } from "typeorm";
 
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
-import { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
+import { TaskRepository } from "@work-management/infrastructure/database/repositories/tasks/TaskRepository.ts";
 import { tipTapDocToText, type TipTapJson } from "@platform-core/infrastructure/application-database/tasks-rich-text.ts";
 import { AppForbiddenError, AppNotFoundError } from "@platform-core/domain/errors.ts";
 import type { AppContext, ListTasksInput, TaskDto } from "@work-management/domain/work-item.ts";
@@ -11,12 +11,11 @@ export async function listTasks(
   ctx: AppContext,
   input: ListTasksInput = {},
 ): Promise<TaskDto[]> {
-  const repo = em.getRepository(Task) as TaskRepository;
+  const repo = em.getRepository(Task) as unknown as TaskRepository;
   const tasks = await repo.list({ orgId: ctx.orgId, includeDeleted: input.includeDeleted });
   const scopedTasks = ctx.projectId
     ? tasks.filter((task) => task.projectId === ctx.projectId)
     : tasks;
-  await em.populate(scopedTasks, ["customFields", "points", "parent", "dependencies"] as never);
   return scopedTasks.map(serializeTask);
 }
 
@@ -34,16 +33,15 @@ export async function listChildren(
   taskId: string,
 ): Promise<TaskDto[]> {
   const parent = await findVisibleTask(em, ctx, taskId);
-  const repo = em.getRepository(Task) as TaskRepository;
-  const children = await repo.find(
-    {
-      org: ctx.orgId,
-      parent: parent.id,
+  const children = await em.find(Task, {
+    where: {
+      org: { id: ctx.orgId },
+      parent: { id: parent.id },
       ...(ctx.projectId ? { projectId: ctx.projectId } : {}),
       deletedAt: null,
     } as never,
-    { orderBy: { createdAt: "ASC", id: "ASC" } },
-  );
+    order: { createdAt: "ASC", id: "ASC" },
+  });
   return children.map(serializeTask);
 }
 
@@ -98,7 +96,6 @@ export async function findVisibleTask(
   if (ctx.projectId && task.projectId !== ctx.projectId) {
     throw new AppNotFoundError(`Task not found: ${taskId}`);
   }
-  await em.populate(task, ["customFields", "points", "parent", "dependencies"] as never);
   return task;
 }
 

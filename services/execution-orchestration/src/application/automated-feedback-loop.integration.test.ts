@@ -14,7 +14,7 @@ describe("execution orchestration automated feedback loop", () => {
   test("runs feedback tasks until QA approves and no queued feedback remains", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Automated Feedback Project"],);
@@ -122,7 +122,7 @@ describe("execution orchestration automated feedback loop", () => {
   test("runs a default reviewer agent when no review callback is injected", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Default Reviewer Project"],);
@@ -209,7 +209,7 @@ describe("execution orchestration automated feedback loop", () => {
   test("stops without fabricating approval when no reviewer is available", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Reviewer Unavailable Project"],);
@@ -269,7 +269,7 @@ describe("execution orchestration automated feedback loop", () => {
   test("caps automated feedback when reviews keep scheduling corrective runs", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Feedback Cap Project"],);

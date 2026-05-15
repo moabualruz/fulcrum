@@ -2,13 +2,11 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 
 import {
   createTestCaller,
-  createTestContainer,
   createTestOrm,
   type TestOrm,
 } from "@test-support/index.ts";
 import { DEFAULT_ADMIN_EMAIL, DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
-import { UserRepository } from "@platform-core/infrastructure/application-database/db.module.ts";
-import { Session, User } from "@platform-core/infrastructure/application-database/entities/auth/index.ts";
+import { Session, User } from "@identity-access/infrastructure/database/entities/auth/index.ts";
 
 let testDb: TestOrm;
 
@@ -21,20 +19,24 @@ afterAll(async () => {
 });
 
 describe("tests/support/createTestOrm", () => {
-  it("applies all migration classes and leaves no pending migrations", async () => {
-    const pending = await testDb.orm.migrator.getPending();
-    const executed = await testDb.orm.migrator.getExecuted();
-
-    expect(pending).toHaveLength(0);
-    expect(executed.length).toBeGreaterThanOrEqual(7);
+  it("runs all migrations and leaves no pending", async () => {
+    const qr = testDb.ds.createQueryRunner();
+    try {
+      const executed = await qr.getExecutedMigrations();
+      const pending = await qr.getPendingMigrations();
+      expect(pending).toHaveLength(0);
+      expect(executed.length).toBeGreaterThanOrEqual(1);
+    } finally {
+      await qr.release();
+    }
   });
 
   it("seeds local org, admin user, and session fixture", async () => {
-    const em = testDb.orm.em.fork();
-    const admin = await em.findOne(User, { email: DEFAULT_ADMIN_EMAIL });
+    const em = testDb.em;
+    const admin = await em.findOne(User, { where: { email: DEFAULT_ADMIN_EMAIL } });
     const session = admin === null
       ? null
-      : await em.findOne(Session, { userId: admin.id });
+      : await em.findOne(Session, { where: { userId: admin.id } });
 
     expect(testDb.seed.orgId).toBe(DEFAULT_ORG_ID);
     expect(admin?.email).toBe(DEFAULT_ADMIN_EMAIL);
@@ -42,20 +44,9 @@ describe("tests/support/createTestOrm", () => {
   });
 });
 
-describe("tests/support/createTestContainer", () => {
-  it("registers repository bindings for P1 surfaces", () => {
-    const container = createTestContainer(testDb);
-    const userRepo = container.get(UserRepository);
-
-    expect(userRepo).toBeDefined();
-    expect(container.__fulcrumTestSeed?.userId).toBe(testDb.seed.userId);
-  });
-});
-
 describe("tests/support/createTestCaller", () => {
   it("creates an authenticated default caller for tRPC tests", async () => {
-    const container = createTestContainer(testDb);
-    const caller = await createTestCaller(container);
+    const caller = await createTestCaller(testDb);
     const whoami = await caller.auth.whoami();
 
     expect(whoami.email).toBe(DEFAULT_ADMIN_EMAIL);

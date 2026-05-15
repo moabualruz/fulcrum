@@ -5,7 +5,7 @@ import {
   NotificationMute,
   NotificationQuietHours,
   NotificationRule,
-} from "@platform-core/infrastructure/application-database/entities/notifications/index.ts";
+} from "@notification-center/infrastructure/database/entities/notifications/index.ts";
 import { AppForbiddenError, AppNotFoundError } from "@platform-core/domain/errors.ts";
 import type {
   AppContext,
@@ -30,11 +30,12 @@ export async function listNotifications(
   ctx: AppContext,
   input: ListNotificationsInput = { limit: 50, offset: 0 },
 ): Promise<NotificationListDto> {
-  const rows = await em.findAndCount(
-    Notification,
-    { org: ctx.orgId, userId: ctx.userId, ...(input.unread ? { readAt: null } : {}) } as never,
-    { limit: input.limit, offset: input.offset, orderBy: { createdAt: "DESC", id: "ASC" } },
-  );
+  const rows = await em.findAndCount(Notification, {
+    where: { org: { id: ctx.orgId }, userId: ctx.userId, ...(input.unread ? { readAt: null } : {}) } as never,
+    take: input.limit,
+    skip: input.offset,
+    order: { createdAt: "DESC", id: "ASC" },
+  });
   return { items: rows[0].map(serializeNotification), total: rows[1] };
 }
 
@@ -43,14 +44,14 @@ export async function countRecentNotifications(
   ctx: AppContext,
   input: { since: Date },
 ): Promise<number> {
+  const { MoreThanOrEqual } = await import("typeorm");
   return await em.count(Event, {
-    org: ctx.orgId,
-    createdAt: { $gte: input.since },
-  } as never);
+    where: { org: { id: ctx.orgId }, createdAt: MoreThanOrEqual(input.since) } as never,
+  });
 }
 
 export async function getNotification(em: EntityManager, ctx: AppContext, id: string): Promise<NotificationDto> {
-  const row = await em.findOne(Notification, { id } as never);
+  const row = await em.findOne(Notification, { where: { id } as never });
   if (!row) throw new AppNotFoundError(`Notification not found: ${id}`);
   if (row.org.id !== ctx.orgId || row.userId !== ctx.userId) throw new AppForbiddenError("Notification is outside user scope.");
   return serializeNotification(row);
@@ -85,21 +86,22 @@ export async function seedDefaultNotificationRules(
   channels: string[],
 ): Promise<void> {
   const now = new Date();
-  const org = em.getReference((await import("@platform-core/infrastructure/application-database/entities/auth/Org.ts")).Org, orgId);
+  const { Org } = await import("@identity-access/infrastructure/database/entities/auth/Org.ts");
+  const org = { id: orgId } as InstanceType<typeof Org>;
 
   for (const rule of rules) {
     let existing: NotificationRule | null;
     try {
-      existing = await em.findOne(NotificationRule, {
+      existing = await em.findOne(NotificationRule, { where: {
         userId,
         name: rule.name,
-      } as never);
+      } as never });
     } catch (error) {
       if (isMissingNotificationRuleColumns(error)) return;
       throw error;
     }
     if (existing) continue;
-    em.persist(em.create(NotificationRule, {
+    await em.save(em.create(NotificationRule, {
       org,
       userId,
       subjectKind: rule.subjectKind,
@@ -112,21 +114,20 @@ export async function seedDefaultNotificationRules(
       updatedAt: now,
     }));
   }
-  await em.flush();
 }
 
 export async function listNotificationMutes(em: EntityManager, ctx: AppContext): Promise<NotificationMuteDto[]> {
-  const rows = await em.find(NotificationMute, { org: ctx.orgId, userId: ctx.userId } as never, { orderBy: { subjectKind: "ASC" } });
+  const rows = await em.find(NotificationMute, { where: { org: ctx.orgId, userId: ctx.userId } as never, order: { subjectKind: "ASC" } });
   return rows.map(serializeMute);
 }
 
 export async function listNotificationRules(em: EntityManager, ctx: AppContext): Promise<NotificationRuleDto[]> {
-  const rows = await em.find(NotificationRule, { org: ctx.orgId, userId: ctx.userId } as never, { orderBy: { name: "ASC" } });
+  const rows = await em.find(NotificationRule, { where: { org: ctx.orgId, userId: ctx.userId } as never, order: { name: "ASC" } });
   return rows.map(serializeRule);
 }
 
 export async function getNotificationRule(em: EntityManager, ctx: AppContext, id: string): Promise<NotificationRuleDto | null> {
-  const row = await em.findOne(NotificationRule, { id, org: ctx.orgId, userId: ctx.userId } as never);
+  const row = await em.findOne(NotificationRule, { where: { id, org: ctx.orgId, userId: ctx.userId } as never });
   return row ? serializeRule(row) : null;
 }
 
@@ -134,7 +135,7 @@ export async function getNotificationQuietHours(
   em: EntityManager,
   ctx: AppContext,
 ): Promise<NotificationQuietHoursDto | null> {
-  const row = await em.findOne(NotificationQuietHours, { org: ctx.orgId, userId: ctx.userId } as never);
+  const row = await em.findOne(NotificationQuietHours, { where: { org: ctx.orgId, userId: ctx.userId } as never });
   return row ? serializeQuietHours(row) : null;
 }
 

@@ -1,10 +1,10 @@
 import type { EntityManager } from "typeorm";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { Repo } from "@platform-core/infrastructure/application-database/entities/repos/Repo.ts";
-import { RepoBranch } from "@platform-core/infrastructure/application-database/entities/repos/RepoBranch.ts";
-import { RepoCommit } from "@platform-core/infrastructure/application-database/entities/repos/RepoCommit.ts";
-import { RepoTreeEntry } from "@platform-core/infrastructure/application-database/entities/repos/RepoTreeEntry.ts";
+import { Repo } from "@integration-hub/infrastructure/database/entities/repos/Repo.ts";
+import { RepoBranch } from "@integration-hub/infrastructure/database/entities/repos/RepoBranch.ts";
+import { RepoCommit } from "@integration-hub/infrastructure/database/entities/repos/RepoCommit.ts";
+import { RepoTreeEntry } from "@integration-hub/infrastructure/database/entities/repos/RepoTreeEntry.ts";
 import { AppForbiddenError, AppNotFoundError } from "@platform-core/domain/errors.ts";
 import { ormSqlConnection } from "@platform-core/application/orm-helpers.ts";
 import type { AppContext, RepoDto, RepoTreeEntryDto } from "@integration-hub/domain/repository.ts";
@@ -12,11 +12,11 @@ import type { AppContext, RepoDto, RepoTreeEntryDto } from "@integration-hub/dom
 const execFileAsync = promisify(execFile);
 
 export async function listRepos(em: EntityManager, ctx: AppContext): Promise<RepoDto[]> {
-  return (await em.find(Repo, { org: ctx.orgId, archived: false } as never, { orderBy: { slug: "ASC" } })).map(serializeRepo);
+  return (await em.find(Repo, { where: { org: ctx.orgId, archived: false } as never, order: { slug: "ASC" } })).map(serializeRepo);
 }
 
 export async function getRepo(em: EntityManager, ctx: AppContext, id: string): Promise<RepoDto> {
-  const repo = await em.findOne(Repo, { id } as never);
+  const repo = await em.findOne(Repo, { where: { id } as never });
   if (!repo) throw new AppNotFoundError(`Repo not found: ${id}`);
   if (repo.org.id !== ctx.orgId) throw new AppForbiddenError("Repo is outside org scope.");
   return serializeRepo(repo);
@@ -24,7 +24,7 @@ export async function getRepo(em: EntityManager, ctx: AppContext, id: string): P
 
 export async function listRepoTree(em: EntityManager, ctx: AppContext, input: { repoId: string; commitSha: string }): Promise<RepoTreeEntryDto[]> {
   await getRepo(em, ctx, input.repoId);
-  return (await em.find(RepoTreeEntry, { org: ctx.orgId, repo: input.repoId, commitSha: input.commitSha } as never, { orderBy: { path: "ASC" } })).map(serializeRepoTreeEntry);
+  return (await em.find(RepoTreeEntry, { where: { org: ctx.orgId, repo: input.repoId, commitSha: input.commitSha } as never, order: { path: "ASC" } })).map(serializeRepoTreeEntry);
 }
 
 export function serializeRepo(repo: Repo): RepoDto {
@@ -205,7 +205,7 @@ export async function isRepoWriteOpsEnabled(em: EntityManager, ctx: AppContext):
 export async function getRepoBranchesPage(em: EntityManager, ctx: AppContext, repoId: string): Promise<RepoBranchPageData> {
   const repo = await getRepo(em, ctx, repoId);
   if (repo.syncStatus === "archived") throw new AppNotFoundError(`Repo not found: ${repoId}`);
-  const branches = await em.find(RepoBranch, { org: ctx.orgId, repo: repoId } as never, { orderBy: { name: "ASC" } });
+  const branches = await em.find(RepoBranch, { where: { org: ctx.orgId, repo: repoId } as never, order: { name: "ASC" } });
   return {
     repo: {
       id: repo.id,
@@ -280,7 +280,7 @@ export async function getRepoCommitDetail(
   input: { repoId: string; sha: string; view: "split" | "unified" },
 ): Promise<RepoCommitDetailData> {
   const repo = await getRepo(em, ctx, input.repoId);
-  const commit = await em.findOne(RepoCommit, { org: ctx.orgId, repo: input.repoId, sha: input.sha } as never);
+  const commit = await em.findOne(RepoCommit, { where: { org: ctx.orgId, repo: input.repoId, sha: input.sha } as never });
   const gitCommit = commit ? null : await readGitCommit(repo.localPath, input.sha);
   const resolved = commit ?? gitCommit;
   if (!resolved) throw new AppNotFoundError("commit not found");

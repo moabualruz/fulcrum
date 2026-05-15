@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
 
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Repo } from "@platform-core/infrastructure/application-database/entities/repos/Repo.ts";
-import { RepoRepository } from "@platform-core/infrastructure/application-database/repositories/repos/RepoRepository.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Repo } from "@integration-hub/infrastructure/database/entities/repos/Repo.ts";
+import { RepoRepository } from "@integration-hub/infrastructure/database/repositories/repos/RepoRepository.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
@@ -31,7 +31,7 @@ function mockSession(userId: string, orgId: string) {
 }
 
 function callerFor(db: Awaited<ReturnType<typeof createTestOrm>>, orgId = ORG_ID) {
-  const em = db.em.fork();
+  const em = db.em;
   return createCaller(
     createContext({
       session: mockSession(USER_ID, orgId) as unknown as import("better-auth").Session,
@@ -78,7 +78,7 @@ describe("repos tRPC procedures", () => {
         remoteUrl: "https://example.test/beta.git",
       });
 
-      const events = await db.em.fork().find(Event, {
+      const events = await db.em.find(Event, {
         org: ORG_ID,
         verb: "repo.registered",
       } as never);
@@ -93,7 +93,7 @@ describe("repos tRPC procedures", () => {
   test("list and get are org-scoped and hide archived repos by default", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Repo) as RepoRepository;
+      const repo = db.em.getRepository(Repo) as RepoRepository;
       const now = new Date();
       repo.getEntityManager().persist(repo.getEntityManager().create(Org, {
         id: OTHER_ORG_ID,
@@ -139,7 +139,7 @@ describe("repos tRPC procedures", () => {
   test("sync marks repo syncing and emits an event", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Repo) as RepoRepository;
+      const repo = db.em.getRepository(Repo) as RepoRepository;
       const caller = callerFor(db);
       const alpha = repo.create({
         orgId: ORG_ID,
@@ -155,7 +155,7 @@ describe("repos tRPC procedures", () => {
         id: alpha.id,
         syncStatus: "syncing",
       });
-      const events = await db.em.fork().find(Event, {
+      const events = await db.em.find(Event, {
         org: ORG_ID,
         verb: "repo.sync.requested",
         subjectKind: "repo",
@@ -170,7 +170,7 @@ describe("repos tRPC procedures", () => {
   test("unregister archives repo and emits an event", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Repo) as RepoRepository;
+      const repo = db.em.getRepository(Repo) as RepoRepository;
       const caller = callerFor(db);
       const alpha = repo.create({
         orgId: ORG_ID,
@@ -187,7 +187,7 @@ describe("repos tRPC procedures", () => {
         archived: true,
       });
       expect(await caller.repos.list()).toEqual([]);
-      const events = await db.em.fork().find(Event, {
+      const events = await db.em.find(Event, {
         org: ORG_ID,
         verb: "repo.unregistered",
         subjectKind: "repo",

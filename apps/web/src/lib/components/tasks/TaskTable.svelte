@@ -1,6 +1,6 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
-  import { formatDate } from "@platform-core/application/localization/index.ts";
+  import { formatDate } from "@platform-core/interface/localization.ts";
   import type { TaskColumn, TaskSortDirection, TaskViewRow } from "./task-view-types";
   import {
     buildBulkMutationRequest,

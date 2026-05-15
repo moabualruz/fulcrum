@@ -20,14 +20,14 @@ import { PGlite } from "@electric-sql/pglite";
 import { Container } from "@needle-di/core";
 
 import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
-import { FeatureFlag } from "@platform-core/infrastructure/application-database/entities/auth/FeatureFlag.ts";
+import { FeatureFlag } from "@identity-access/infrastructure/database/entities/auth/FeatureFlag.ts";
 import { FEATURE_FLAGS } from "@platform-core/application/feature-flags/registry.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
-import { OrgMember } from "@platform-core/infrastructure/application-database/entities/auth/OrgMember.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
+import { OrgMember } from "@identity-access/infrastructure/database/entities/auth/OrgMember.ts";
 import { FeatureFlagRollout } from "@platform-core/infrastructure/application-database/entities/platform/FeatureFlagRollout.ts";
-import { FeatureFlagRepository } from "@platform-core/infrastructure/application-database/repositories/auth/FeatureFlagRepository.ts";
-import { OrgMemberRepository } from "@platform-core/infrastructure/application-database/repositories/auth/OrgMemberRepository.ts";
+import { FeatureFlagRepository } from "@identity-access/infrastructure/database/repositories/auth/FeatureFlagRepository.ts";
+import { OrgMemberRepository } from "@identity-access/infrastructure/database/repositories/auth/OrgMemberRepository.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
@@ -63,7 +63,7 @@ function mockSession(userId: string, orgId: string) {
 
 function makeCaller(userId: string, orgId: string) {
   const session = mockSession(userId, orgId);
-  const em = orm.em.fork();
+  const em = orm.em;
   const flagRepo = em.getRepository(FeatureFlag) as FeatureFlagRepository;
   const orgMemberRepo = em.getRepository(OrgMember) as OrgMemberRepository;
 
@@ -76,7 +76,7 @@ function makeCaller(userId: string, orgId: string) {
     userId,
     em: em as unknown as import("@mikro-orm/postgresql").EntityManager,
     container: (() => {
-      const c = new Container();
+      const c = null;
       c.bind({ provide: FeatureFlagRepository, useValue: flagRepo });
       c.bind({ provide: OrgMemberRepository, useValue: orgMemberRepo });
       c.bind({ provide: FlagRegistry, useValue: freshRegistry });
@@ -89,7 +89,7 @@ function makeCaller(userId: string, orgId: string) {
 
 function makeCallerWithoutContainer(userId: string, orgId: string) {
   const session = mockSession(userId, orgId);
-  const em = orm.em.fork();
+  const em = orm.em;
 
   return createCaller(
     createContext({
@@ -128,7 +128,7 @@ beforeAll(async () => {
   await orm.schema.create();
 
   // Seed with a forked EM
-  const seedEm = orm.em.fork();
+  const seedEm = orm.em;
 
   const now = new Date();
 
@@ -219,7 +219,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   // Wipe feature flags between tests
-  const em = orm.em.fork();
+  const em = orm.em;
   await em.nativeDelete(FeatureFlagRollout, {});
   await em.nativeDelete(FeatureFlag, {});
   delete process.env["FULCRUM_FEATURES"];
@@ -289,17 +289,17 @@ describe("flags.set — owner/admin", () => {
     const result = await caller.flags.set({ flag: "router-llm", enabled: true });
     expect(result.ok).toBe(true);
 
-    const em = orm.em.fork();
-    const orgFlag = await em.findOne(FeatureFlag, {
+    const em = orm.em;
+    const orgFlag = await em.findOne(FeatureFlag, { where: {
       orgId: TEST_ORG_ID,
       userId: null,
       flag: "router-llm",
-    });
-    const globalFlag = await em.findOne(FeatureFlag, {
+    } });
+    const globalFlag = await em.findOne(FeatureFlag, { where: {
       orgId: null,
       userId: null,
       flag: "router-llm",
-    });
+    } });
     expect(orgFlag?.enabled).toBe(true);
     expect(globalFlag).toBeNull();
   });
@@ -345,12 +345,12 @@ describe("flags.set — owner/admin", () => {
     expect(error).not.toBeNull();
     expect(error?.code).toBe("FORBIDDEN");
 
-    const em = orm.em.fork();
-    const foreignFlag = await em.findOne(FeatureFlag, {
+    const em = orm.em;
+    const foreignFlag = await em.findOne(FeatureFlag, { where: {
       orgId: OTHER_ORG_ID,
       userId: null,
       flag: "router-llm",
-    });
+    } });
     expect(foreignFlag).toBeNull();
   });
 
@@ -371,12 +371,12 @@ describe("flags.set — owner/admin", () => {
     expect(error).not.toBeNull();
     expect(error?.code).toBe("FORBIDDEN");
 
-    const em = orm.em.fork();
-    const foreignUserFlag = await em.findOne(FeatureFlag, {
+    const em = orm.em;
+    const foreignUserFlag = await em.findOne(FeatureFlag, { where: {
       orgId: TEST_ORG_ID,
       userId: OTHER_USER_ID,
       flag: "embeddings",
-    });
+    } });
     expect(foreignUserFlag).toBeNull();
   });
 });

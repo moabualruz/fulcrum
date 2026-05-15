@@ -40,7 +40,7 @@ describe("memories.promote tRPC", () => {
   test("promotes a project memory to accepted global context without losing source", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
       const memory = await caller.memories.create({
         projectId: PROJECT_ID,

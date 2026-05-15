@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { OrgMember } from "@platform-core/infrastructure/application-database/entities/auth/OrgMember.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { OrgMember } from "@identity-access/infrastructure/database/entities/auth/OrgMember.ts";
 import {
   SavedView,
   SAVED_VIEW_SCOPES,
   type SavedViewScope,
-} from "@platform-core/infrastructure/application-database/entities/tasks/SavedView.ts";
+} from "@work-management/infrastructure/database/entities/tasks/SavedView.ts";
 import { AppForbiddenError, AppInvariantError, AppNotFoundError } from "@platform-core/domain/errors.ts";
 
 export interface SavedSearchContext {
@@ -69,10 +69,10 @@ function requireEntityManager(ctx: SavedSearchContext) {
 
 async function requireOrgMember(ctx: SavedSearchContext): Promise<void> {
   const em = requireEntityManager(ctx);
-  const membership = await em.findOne(OrgMember, {
+  const membership = await em.findOne(OrgMember, { where: {
     orgId: ctx.orgId,
     userId: ctx.userId,
-  });
+  } as never });
   if (!membership) {
     throw new AppForbiddenError("Org membership required.");
   }
@@ -106,11 +106,11 @@ async function findVisibleSearch(
   id: string,
 ): Promise<SavedView> {
   const em = requireEntityManager(ctx);
-  const view = await em.findOne(SavedView, {
+  const view = await em.findOne(SavedView, { where: {
     id,
     org: ctx.orgId,
     viewType: "search",
-  });
+  } as never });
   if (!view) {
     throw new AppNotFoundError("Saved search not found.");
   }
@@ -126,23 +126,19 @@ export async function listSavedSearches(
   ctx: SavedSearchContext,
 ): Promise<SavedSearchOutput[]> {
   const em = requireEntityManager(ctx);
-  const membership = await em.findOne(OrgMember, {
+  const membership = await em.findOne(OrgMember, { where: {
     orgId: ctx.orgId,
     userId: ctx.userId,
-  });
+  } as never });
   const scopes: SavedViewScope[] = membership ? ["project", "org"] : [];
-  const views = await em.find(
-    SavedView,
-    {
-      org: ctx.orgId,
-      viewType: "search",
-      $or: [
-        { scope: "private", createdById: ctx.userId },
-        ...scopes.map((scope) => ({ scope })),
-      ],
-    },
-    { orderBy: { createdAt: "asc" } },
-  );
+  const { In: InOp } = await import("typeorm");
+  const views = await em.find(SavedView, {
+    where: [
+      { org: { id: ctx.orgId }, viewType: "search", scope: "private", createdById: ctx.userId },
+      ...(scopes.length > 0 ? [{ org: { id: ctx.orgId }, viewType: "search", scope: InOp(scopes) }] : []),
+    ] as never,
+    order: { createdAt: "ASC" },
+  });
   return views.map(toOutput);
 }
 
@@ -153,7 +149,7 @@ export async function createSavedSearch(
   await assertScopeAllowed(ctx, input.scope);
   const em = requireEntityManager(ctx);
   const view = em.create(SavedView, {
-    org: em.getReference(Org, ctx.orgId),
+    org: { id: ctx.orgId } as Org,
     projectId: input.scope === "project" ? input.projectId ?? null : null,
     scope: input.scope,
     name: input.name,
@@ -161,8 +157,7 @@ export async function createSavedSearch(
     viewType: "search",
     createdById: ctx.userId,
   });
-  em.persist(view);
-  await em.flush();
+  await em.save(view);
   return toOutput(view);
 }
 
@@ -180,7 +175,7 @@ export async function updateSavedSearch(
   if (input.projectId !== undefined) view.projectId = input.projectId;
   if (input.scope && input.scope !== "project") view.projectId = null;
   if (input.queryJson !== undefined) view.queryJson = input.queryJson as never;
-  await requireEntityManager(ctx).flush();
+  await requireEntityManager(ctx).save(view);
   return toOutput(view);
 }
 
@@ -194,6 +189,5 @@ export async function deleteSavedSearch(
   }
   const em = requireEntityManager(ctx);
   em.remove(view);
-  await em.flush();
   return { ok: true };
 }

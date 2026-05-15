@@ -29,8 +29,8 @@ interface DocLinkColumns {
 
 export async function upsertDocLink(em: EntityManager, input: UpsertDocLinkInput): Promise<void> {
   const columns = await resolveDocLinkColumns(em);
-  const existing = await em.getConnection().execute<Array<{ id: string }>>(
-    `select "id" from "doc_links" where "org_id" = ? and "${columns.sourceDocId}" = ? and "${columns.targetDocId}" = ? and "${columns.linkType}" = ? limit 1`,
+  const existing = await em.query<Array<{ id: string }>>(
+    `select "id" from "doc_links" where "org_id" = $1 and "${columns.sourceDocId}" = $2 and "${columns.targetDocId}" = $3 and "${columns.linkType}" = $4 limit 1`,
     [input.orgId, input.sourceDocId, input.targetDocId, input.linkType],
   );
   if (existing.length > 0) return;
@@ -42,8 +42,8 @@ export async function upsertDocLink(em: EntityManager, input: UpsertDocLinkInput
     values.push(input.targetDocId);
   }
 
-  await em.getConnection().execute(
-    `insert into "doc_links" (${columnNames.map((column) => `"${column}"`).join(", ")}) values (${values.map(() => "?").join(", ")})`,
+  await em.query(
+    `insert into "doc_links" (${columnNames.map((column) => `"${column}"`).join(", ")}) values (${values.map((_, i) => `$${i + 1}`).join(", ")})`,
     values,
   );
 }
@@ -51,10 +51,7 @@ export async function upsertDocLink(em: EntityManager, input: UpsertDocLinkInput
 /** Get all documents linking TO a given document (backlinks). */
 export async function getBacklinks(em: EntityManager, targetDocId: string): Promise<Backlink[]> {
   const columns = await resolveDocLinkColumns(em);
-  const rows = await em.getConnection().execute<BacklinkRow[]>(
-    `select dl."${columns.sourceDocId}" as "source_doc_id", d."title" as "title", dl."${columns.linkType}" as "link_type" from "doc_links" as dl inner join "documents" as d on d."id" = dl."${columns.sourceDocId}" where dl."${columns.targetDocId}" = ? order by d."title" asc`,
-    [targetDocId],
-  );
+  const rows = await em.query<BacklinkRow[]>(`select dl."${columns.sourceDocId}" as "source_doc_id", d."title" as "title", dl."${columns.linkType}" as "link_type" from "doc_links" as dl inner join "documents" as d on d."id" = dl."${columns.sourceDocId}" where dl."${columns.targetDocId}" = $1 order by d."title" asc`, [targetDocId]);
   return rows.map((row) => ({
     source_doc_id: row.source_doc_id ?? "",
     title: row.title,
@@ -63,7 +60,7 @@ export async function getBacklinks(em: EntityManager, targetDocId: string): Prom
 }
 
 async function resolveDocLinkColumns(em: EntityManager): Promise<DocLinkColumns> {
-  const rows = await em.getConnection().execute<Array<{ column_name: string }>>(
+  const rows = await em.query<Array<{ column_name: string }>>(
     "select column_name from information_schema.columns where table_name = 'doc_links'",
   );
   const names = new Set(rows.map((row) => row.column_name));

@@ -6,8 +6,8 @@
  */
 
 import { describe, expect, test, mock, beforeEach } from "bun:test";
-import type { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
-import type { MemoryRepository } from "@platform-core/infrastructure/application-database/repositories/memory/MemoryRepository.ts";
+import type { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
+import type { MemoryRepository } from "@knowledge-workspace/infrastructure/database/repositories/memory/MemoryRepository.ts";
 import { MemoryService } from "./memory-service.ts";
 import { HeuristicExtractor } from "./extractor-heuristic.ts";
 

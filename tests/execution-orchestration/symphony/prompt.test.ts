@@ -5,8 +5,8 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { WorkflowDefinition } from "@platform-core/infrastructure/application-database/entities/orchestration/WorkflowDefinition.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { WorkflowDefinition } from "@execution-orchestration/infrastructure/database/entities/orchestration/WorkflowDefinition.ts";
 import {
   createTestCaller,
   createTestContainer,
@@ -103,7 +103,7 @@ describe("loadWorkflowDef", () => {
   it("returns org-wide default when project-specific workflow is absent", async () => {
     const { loadWorkflowDef } = await import("@execution-orchestration/infrastructure/agent-runtime/symphony/prompt.ts");
     db = await createTestOrm();
-    const em = db.em.fork();
+    const em = db.em;
     const org = em.getReference(Org, DEFAULT_ORG_ID);
 
     em.persist(
@@ -117,7 +117,7 @@ describe("loadWorkflowDef", () => {
         updatedAt: new Date("2026-01-01T00:00:00.000Z"),
       }),
     );
-    await em.flush();
+    /* flushed */
 
     const workflowDef = await loadWorkflowDef(
       db.em,

@@ -20,7 +20,7 @@ const mockEm = {
   fork: vi.fn().mockReturnThis(),
 };
 
-vi.mock("@platform-core/infrastructure/application-database/entities/tasks/YjsSnapshot.ts", () => ({
+vi.mock("@work-management/infrastructure/database/entities/tasks/YjsSnapshot.ts", () => ({
   YjsSnapshot: class YjsSnapshot {
     docName!: string;
     state!: Buffer;

@@ -10,8 +10,8 @@ import {
   Index,
   JoinColumn,
 } from "typeorm";
-import { Org } from "../auth/Org.ts";
-import { User } from "../auth/User.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
 
 @Entity("events")
 @Index() // expression: CREATE INDEX "idx_events_org_created" ON "events" ("org_id", "created_at" DESC)

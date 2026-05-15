@@ -1,7 +1,7 @@
 import type { EntityManager } from "typeorm";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
 import { AppForbiddenError } from "@platform-core/domain/errors.ts";
 import { findMemoryOrThrow, serializeMemory } from "@knowledge-workspace/application/memory/queries.ts";
 import type {
@@ -18,7 +18,7 @@ export async function createMemory(
 ): Promise<MemoryDto> {
   const now = new Date();
   const memory = em.create(Memory, {
-    org: em.getReference(Org, ctx.orgId),
+    org: { id: ctx.orgId } as Org,
     projectId: input.projectId ?? null,
     global: input.global ?? false,
     kind: input.kind ?? "note",
@@ -31,8 +31,7 @@ export async function createMemory(
     updatedAt: now,
     archived: false,
   });
-  em.persist(memory);
-  await em.flush();
+  await em.save(memory);
   return serializeMemory(memory);
 }
 
@@ -50,8 +49,7 @@ export async function updateMemory(
   if (input.tags !== undefined) memory.tags = input.tags;
   if (input.importance !== undefined) memory.importance = input.importance;
   memory.updatedAt = new Date();
-  em.persist(memory);
-  await em.flush();
+  await em.save(memory);
   return serializeMemory(memory);
 }
 
@@ -71,8 +69,7 @@ export async function promoteMemory(
     ...(promotedFromProjectId ? { promotedFromProjectId } : {}),
   };
   memory.updatedAt = new Date();
-  em.persist(memory);
-  await em.flush();
+  await em.save(memory);
   return serializeMemory(memory);
 }
 
@@ -83,6 +80,5 @@ export async function deleteMemory(
 ): Promise<{ deleted: true }> {
   const memory = await findMemoryOrThrow(em, ctx.orgId, id);
   em.remove(memory);
-  await em.flush();
   return { deleted: true };
 }

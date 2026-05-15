@@ -1,6 +1,6 @@
 import type { EntityManager } from "typeorm";
 
-import { Sprint } from "@platform-core/infrastructure/application-database/entities/tasks/Sprint.ts";
+import { Sprint } from "@work-management/infrastructure/database/entities/tasks/Sprint.ts";
 import { WorkCycleService } from "@work-management/application/work-cycle-service.ts";
 import { AppForbiddenError, AppNotFoundError } from "@platform-core/domain/errors.ts";
 import { getProjectOrNull, listProjectBoardTasks, type BoardTaskRow } from "@work-management/application/projects/queries.ts";

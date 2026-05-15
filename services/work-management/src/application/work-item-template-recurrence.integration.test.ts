@@ -34,7 +34,7 @@ describe("template, recurrence, and task services with migrated PGlite data", ()
 
   test("WorkItemTemplateService creates workspace/project templates, applies overrides, sets defaults, and deletes", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const service = new WorkItemTemplateService(em);
     const projectId = randomUUID();
     const userId = testDb.seed.userId;
@@ -80,7 +80,7 @@ describe("template, recurrence, and task services with migrated PGlite data", ()
 
   test("WorkItemRecurrenceService creates scheduled/on-complete rules, clones due tasks, disables maxed rules, and deletes", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const taskService = new WorkItemService(em);
     const recurrence = new WorkItemRecurrenceService(em, taskService);
 
@@ -128,7 +128,7 @@ describe("template, recurrence, and task services with migrated PGlite data", ()
 
   test("WorkItemService bulk operations, parent hierarchy, dependency graph, and delete persist events", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const service = new WorkItemService(em);
     const ctx = { orgId: DEFAULT_ORG_ID, userId: testDb.seed.userId, em };
 

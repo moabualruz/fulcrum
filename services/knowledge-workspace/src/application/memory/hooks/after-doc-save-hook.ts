@@ -17,10 +17,10 @@
 
 import { Injectable } from "@nestjs/common";
 import type { EntityManager } from "typeorm";
-import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
-import { MemoryLink } from "@platform-core/infrastructure/application-database/entities/memory/MemoryLink.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import type { MemoryImportance, MemoryKind } from "@platform-core/infrastructure/application-database/entities/memory/enums.ts";
+import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
+import { MemoryLink } from "@knowledge-workspace/infrastructure/database/entities/memory/MemoryLink.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import type { MemoryImportance, MemoryKind } from "@knowledge-workspace/infrastructure/database/entities/memory/enums.ts";
 
 export interface DocSaveCtx {
   orgId: string;
@@ -72,7 +72,7 @@ export class AfterDocSaveMemoryHook {
 
     if (candidates.length === 0) return;
 
-    const orgRef = (this.em as EntityManager).getReference(Org, ctx.orgId);
+    const orgRef = { id: ctx.orgId } as Org;
     const now = new Date();
 
     for (const candidate of candidates) {
@@ -103,16 +103,17 @@ export class AfterDocSaveMemoryHook {
           createdAt: now,
           updatedAt: now,
         });
-        (this.em as EntityManager).persist(memory);
-        await (this.em as EntityManager).flush();
+        await (this.em as EntityManager).save(memory);
       }
 
       // Find-or-create MemoryLink — idempotent by (memory, targetKind, targetId).
       const existingLink = await (this.em as EntityManager).findOne(MemoryLink, {
-        memory: memory.id,
-        targetKind: "doc",
-        targetId: docId,
-      } as never);
+        where: {
+          memory: { id: memory.id },
+          targetKind: "doc",
+          targetId: docId,
+        } as never,
+      });
 
       if (!existingLink) {
         const link = (this.em as EntityManager).create(MemoryLink, {
@@ -121,8 +122,7 @@ export class AfterDocSaveMemoryHook {
           targetKind: "doc" as const,
           targetId: docId,
         });
-        (this.em as EntityManager).persist(link);
-        await (this.em as EntityManager).flush();
+        await (this.em as EntityManager).save(link);
       }
     }
   }

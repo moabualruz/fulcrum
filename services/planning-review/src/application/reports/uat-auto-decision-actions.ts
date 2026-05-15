@@ -22,10 +22,10 @@ export async function applyConfiguredUatCodeReviewDecision(
   ctx: AppContext,
   input: ApplyConfiguredUatCodeReviewDecisionInput,
 ): Promise<ConfiguredUatCodeReviewDecisionOutput> {
-  const setting = await em.findOne(TenantSetting, {
+  const setting = await em.findOne(TenantSetting, { where: {
     orgId: ctx.orgId,
     key: UAT_CODE_REVIEW_AUTO_DECISION_SETTING_KEY,
-  });
+  } as never });
   if (!setting) {
     return skipped(em, ctx, input, {
       status: "not_configured",

@@ -19,8 +19,8 @@
 import type { EntityManager } from "typeorm";
 import { Engine } from "json-rules-engine";
 
-import { ProjectAutomation } from "@platform-core/infrastructure/application-database/entities/tasks/ProjectAutomation.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { ProjectAutomation } from "@work-management/infrastructure/database/entities/tasks/ProjectAutomation.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import type { EventBus, SubscriptionEvent } from "@platform-core/application/subscriptions/event-bus.ts";
 import { WorkItemCommentService } from "@work-management/application/work-item-comments.ts";
 
@@ -156,8 +156,7 @@ export class WorkItemAutomationService {
 
   private async resolveAutomationProjectScope(orgId: string, projectId: string): Promise<ProjectAutomationProject[]> {
     try {
-      const rows = await this.em.getConnection().execute<ProjectAutomationProject[]>(
-        `WITH RECURSIVE ancestors AS (
+      const rows = await this.em.query(`WITH RECURSIVE ancestors AS (
            SELECT id, parent_id, COALESCE(path, id::text) AS path, COALESCE(depth, 0) AS depth
              FROM projects
             WHERE org_id = ? AND id = ?
@@ -167,9 +166,7 @@ export class WorkItemAutomationService {
              JOIN ancestors a ON p.id = a.parent_id
             WHERE p.org_id = ?
          )
-         SELECT id, path, depth FROM ancestors ORDER BY depth ASC, path ASC`,
-        [orgId, projectId, orgId],
-      );
+         SELECT id, path, depth FROM ancestors ORDER BY depth ASC, path ASC`, [orgId, projectId, orgId], );
       return rows.length > 0 ? rows : [{ id: projectId, path: projectId, depth: 0 }];
     } catch {
       return [{ id: projectId, path: projectId, depth: 0 }];
@@ -189,7 +186,7 @@ export class WorkItemAutomationService {
         case "set_status": {
           const status = config["status"] as string | undefined;
           if (status && event.taskId) {
-            await this.em.getConnection().execute(
+            await this.em.query(
               `update tasks set status = ?, updated_at = now() where org_id = ? and id = ? and deleted_at is null`,
               [status, orgId, event.taskId],
             );
@@ -208,12 +205,12 @@ export class WorkItemAutomationService {
           const assigneeId = config["assigneeId"] as string | null | undefined;
           if (event.taskId) {
             if (assigneeId) {
-              await this.em.getConnection().execute(
+              await this.em.query(
                 `update tasks set assignee_id = ?, updated_at = now() where org_id = ? and id = ? and deleted_at is null`,
                 [assigneeId, orgId, event.taskId],
               );
             } else {
-              await this.em.getConnection().execute(
+              await this.em.query(
                 `update tasks set assignee_id = null, updated_at = now() where org_id = ? and id = ? and deleted_at is null`,
                 [orgId, event.taskId],
               );
@@ -225,7 +222,7 @@ export class WorkItemAutomationService {
         case "add_label": {
           const label = config["label"] as string | undefined;
           if (label && event.taskId) {
-            await this.em.getConnection().execute(
+            await this.em.query(
               `update tasks set custom_fields = jsonb_set(coalesce(custom_fields, '{}'), '{label}', to_jsonb(?::text), true), updated_at = now() where org_id = ? and id = ? and deleted_at is null`,
               [label, orgId, event.taskId],
             );
@@ -235,7 +232,7 @@ export class WorkItemAutomationService {
 
         case "remove_label": {
           if (event.taskId) {
-            await this.em.getConnection().execute(
+            await this.em.query(
               `update tasks set custom_fields = custom_fields - 'label', updated_at = now() where org_id = ? and id = ? and deleted_at is null`,
               [orgId, event.taskId],
             );
@@ -267,12 +264,12 @@ export class WorkItemAutomationService {
           const sprintId = config["sprintId"] as string | null | undefined;
           if (event.taskId) {
             if (sprintId) {
-              await this.em.getConnection().execute(
+              await this.em.query(
                 `update tasks set sprint_id = ?, updated_at = now() where org_id = ? and id = ? and deleted_at is null`,
                 [sprintId, orgId, event.taskId],
               );
             } else {
-              await this.em.getConnection().execute(
+              await this.em.query(
                 `update tasks set sprint_id = null, updated_at = now() where org_id = ? and id = ? and deleted_at is null`,
                 [orgId, event.taskId],
               );
@@ -289,8 +286,7 @@ export class WorkItemAutomationService {
       // Increment execution count
       automation.executionCount = (automation.executionCount ?? 0) + 1;
       automation.updatedAt = new Date();
-      this.em.persist(automation);
-      await this.em.flush();
+      await this.em.save(automation);
     } catch (err) {
       console.error(`[WorkItemAutomationService] Action '${automation.actionType}' failed for automation '${automation.id}':`, err);
     }
@@ -356,10 +352,10 @@ export class WorkItemAutomationService {
   // ── CRUD ───────────────────────────────────────────────────────
 
   async list(orgId: string, projectId: string): Promise<AutomationOutput[]> {
-    const automations = await this.em.find(ProjectAutomation, {
+    const automations = await this.em.find(ProjectAutomation, { where: {
       org: { id: orgId },
       projectId,
-    } as never, { orderBy: { createdAt: "ASC" } });
+    } as never, order: { createdAt: "ASC" } });
     return automations.map(serializeAutomation);
   }
 
@@ -373,7 +369,7 @@ export class WorkItemAutomationService {
     actionConfig?: object | null;
   }): Promise<AutomationOutput> {
     const automation = this.em.create(ProjectAutomation, {
-      org: this.em.getReference(Org, orgId),
+      org: { id: orgId } as Org,
       projectId: input.projectId,
       name: input.name,
       triggerType: input.triggerType,
@@ -386,8 +382,7 @@ export class WorkItemAutomationService {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-    this.em.persist(automation);
-    await this.em.flush();
+    await this.em.save(automation);
     return serializeAutomation(automation);
   }
 
@@ -416,7 +411,6 @@ export class WorkItemAutomationService {
     if (input.enabled !== undefined) automation.enabled = input.enabled;
     automation.updatedAt = new Date();
 
-    await this.em.flush();
     return serializeAutomation(automation);
   }
 
@@ -427,7 +421,6 @@ export class WorkItemAutomationService {
     } as never);
     if (!automation) return null;
     this.em.remove(automation);
-    await this.em.flush();
     return { deleted: true };
   }
 }

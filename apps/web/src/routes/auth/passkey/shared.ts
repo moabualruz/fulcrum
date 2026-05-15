@@ -1,8 +1,10 @@
 import { Buffer } from "node:buffer";
 import { json, type Cookies } from "@sveltejs/kit";
 
-import { loadBetterAuthPasskeyContext } from "@identity-access/application/auth/passkey-context.ts";
-import type { PasskeyUser } from "@identity-access/application/auth/passkey.ts";
+import {
+  loadBetterAuthPasskeyContext,
+  type PasskeyUser,
+} from "@identity-access/interface/passkey.ts";
 
 export const PASSKEY_LOGIN_CHALLENGE_COOKIE = "fulcrum.passkey_challenge";
 

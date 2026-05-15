@@ -1,1 +1,1 @@
-export * from "@work-management/application/saved-views/queries.ts";
+export * from "@work-management/interface/saved-view-records.ts";

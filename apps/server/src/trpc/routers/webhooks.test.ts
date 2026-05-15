@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Webhook } from "@platform-core/infrastructure/application-database/entities/notifications/Webhook.ts";
-import { WebhookDelivery, WebhookDeliveryStatus } from "@platform-core/infrastructure/application-database/entities/notifications/WebhookDelivery.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Webhook } from "@notification-center/infrastructure/database/entities/notifications/Webhook.ts";
+import { WebhookDelivery, WebhookDeliveryStatus } from "@notification-center/infrastructure/database/entities/notifications/WebhookDelivery.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { adminSession } from "@test-support/auth-session.ts";
 import { createContext } from "../context.ts";
@@ -24,20 +24,19 @@ async function freshCaller(): Promise<ReturnType<typeof webhooksRouter.createCal
   process.env["FULCRUM_FEATURES"] = "outbound-webhooks";
   process.env["FULCRUM_WEBHOOK_SECRET_KEY"] = "webhook-test-secret-key";
   db = await createTestOrm();
-  const seedManager = db.em.fork();
-  seedManager.persist(seedManager.create(Org, {
+  const seedManager = db.em;
+  await seedManager.save(Org, {
     id: ROUTER_ORG_ID,
     name: "Router Org",
     slug: "router-org",
     createdAt: new Date(),
     updatedAt: new Date(),
-  }));
-  await seedManager.flush();
+  });
   return webhooksRouter.createCaller(createContext({
     session: adminSession({ ...db.seed, orgId: ROUTER_ORG_ID }),
     orgId: ROUTER_ORG_ID,
     userId: db.seed.userId,
-    em: db.em.fork(),
+    em: db.em,
     container: null,
   }));
 }
@@ -84,10 +83,10 @@ describe("webhooks tRPC router", () => {
       url: "https://example.com/delivery-router",
       secret: "delivery-router-secret",
     });
-    const em = db!.em.fork();
-    const delivery = em.create(WebhookDelivery, {
-      org: em.getReference(Org, ROUTER_ORG_ID),
-      webhook: em.getReference(Webhook, created.id),
+    const em = db!.em;
+    const delivery = await em.save(WebhookDelivery, {
+      org: { id: ROUTER_ORG_ID } as Org,
+      webhook: { id: created.id } as Webhook,
       eventId: "33333333-3333-4333-8333-333333333333",
       status: WebhookDeliveryStatus.Failed,
       attempt: 1,
@@ -95,8 +94,6 @@ describe("webhooks tRPC router", () => {
       error: "boom",
       nextRetryAt: null,
     });
-    em.persist(delivery);
-    await em.flush();
 
     const listed = await caller.deliveries.list({ webhookId: created.id, limit: 10 });
     expect(listed).toHaveLength(1);

@@ -1,4 +1,3 @@
-import { Container } from "@needle-di/core";
 import { describe, expect, test } from "bun:test";
 import type { Session } from "better-auth";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -23,6 +22,16 @@ import {
   load as loadInferenceSettings,
 } from "@fulcrum/web/routes/settings/inference/+page.server.ts";
 import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
+import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
+
+function makeSimpleContainer(): DiContainer {
+  const map = new Map<unknown, unknown>();
+  return {
+    get(token: unknown) { return map.get(token); },
+    has(token: unknown) { return map.has(token); },
+    bind(binding: { provide: unknown; useValue: unknown }) { map.set(binding.provide, binding.useValue); },
+  } as DiContainer;
+}
 
 function stubFlagRegistry(enabled: string[] = ["embeddings"]): FlagRegistry {
   return { isEnabled: async (flag: string) => enabled.includes(flag) } as unknown as FlagRegistry;
@@ -45,8 +54,8 @@ const progressEvents: ModelPullProgress[] = [
   { pct: 100, downloaded: 100, total: 100 },
 ];
 
-function makeContainer(): Container {
-  const container = new Container();
+function makeContainer(): DiContainer {
+  const container = makeSimpleContainer();
   container.bind({
     provide: INFERENCE_CLIENT_TOKEN,
     useValue: {
@@ -101,7 +110,7 @@ function mockSession(): Session {
   } as Session;
 }
 
-function createCaller(container: Container | null = makeContainer(), authenticated = true) {
+function createCaller(container: DiContainer | null = makeContainer(), authenticated = true) {
   const factory = t.createCallerFactory(appRouter);
   return factory(createContext({
     session: authenticated ? mockSession() : null,
@@ -447,7 +456,7 @@ describe("inference tRPC router", () => {
   });
 
   test("class-token binding remains supported for existing callers", async () => {
-    const container = new Container();
+    const container = makeSimpleContainer();
     container.bind({
       provide: InferenceClient,
       useValue: {
@@ -586,7 +595,7 @@ describe("inference tRPC router", () => {
   });
 
   test("empty containers use backend defaults and default client fallback", async () => {
-    const caller = createCaller(new Container(), false);
+    const caller = createCaller(null, false);
 
     await expect(caller.inference.backends.list()).resolves.toEqual([
       { id: "embedded", available: true, active: true, reason: null },

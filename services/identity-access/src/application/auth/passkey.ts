@@ -275,8 +275,8 @@ export class MikroOrmPasskeyStore implements PasskeyStore {
   async saveChallenge(challenge: PasskeyChallengeRecord): Promise<void> {
     const Verification = await getVerificationClass();
     const identifier = challengeIdentifier(challenge.challengeId, challenge.purpose);
-    await this.em.transactional(async (em) => {
-      await em.nativeDelete(Verification, { identifier } as never);
+    await this.em.transaction(async (em) => {
+      await em.delete(Verification, { identifier } as never as never);
       const row = em.create(Verification, {
         identifier,
         value: JSON.stringify({
@@ -288,8 +288,7 @@ export class MikroOrmPasskeyStore implements PasskeyStore {
         createdAt: challenge.createdAt,
         updatedAt: new Date(),
       } as never);
-      em.persist(row);
-      await em.flush();
+      await em.save(row);
     });
   }
 
@@ -299,7 +298,7 @@ export class MikroOrmPasskeyStore implements PasskeyStore {
   }): Promise<PasskeyChallengeRecord | null> {
     const Verification = await getVerificationClass();
     const identifier = challengeIdentifier(params.challengeId, params.purpose);
-    const row = await this.em.findOne(Verification, { identifier } as never);
+    const row = await this.em.findOne(Verification, { where: { identifier } as never });
     if (!row) return null;
     const parsed = parseChallengeValue((row as { value: string }).value);
     return {
@@ -317,9 +316,9 @@ export class MikroOrmPasskeyStore implements PasskeyStore {
     purpose: PasskeyChallengePurpose;
   }): Promise<void> {
     const Verification = await getVerificationClass();
-    await this.em.nativeDelete(Verification, {
+    await this.em.delete(Verification, {
       identifier: challengeIdentifier(params.challengeId, params.purpose),
-    } as never);
+    } as never as never);
   }
 
   async listCredentialsByUser(userId: string): Promise<PasskeyCredentialRecord[]> {
@@ -333,20 +332,20 @@ export class MikroOrmPasskeyStore implements PasskeyStore {
 
   async getCredentialById(credentialId: string): Promise<PasskeyCredentialRecord | null> {
     const Account = await getAccountClass();
-    const row = await this.em.findOne(Account, {
+    const row = await this.em.findOne(Account, { where: {
       providerId: "passkey",
       accountId: credentialId,
-    } as never);
+    } as never });
     return row ? accountToCredential(row) : null;
   }
 
   async saveCredential(credential: PasskeyCredentialRecord): Promise<void> {
     const Account = await getAccountClass();
-    await this.em.transactional(async (em) => {
-      const existing = await em.findOne(Account, {
+    await this.em.transaction(async (em) => {
+      const existing = await em.findOne(Account, { where: {
         providerId: "passkey",
         accountId: credential.id,
-      } as never);
+      } as never });
       const now = new Date();
       const metadata = credentialMetadataToString(credential);
       if (existing) {
@@ -366,26 +365,24 @@ export class MikroOrmPasskeyStore implements PasskeyStore {
           createdAt: now,
           updatedAt: now,
         } as never);
-        em.persist(row);
+        await em.save(row);
       }
-      await em.flush();
     });
   }
 
   async updateCredentialCounter(credentialId: string, counter: number): Promise<void> {
     const Account = await getAccountClass();
-    await this.em.transactional(async (em) => {
-      const row = await em.findOne(Account, {
+    await this.em.transaction(async (em) => {
+      const row = await em.findOne(Account, { where: {
         providerId: "passkey",
         accountId: credentialId,
-      } as never);
+      } as never });
       if (!row) return;
       const credential = accountToCredential(row);
       Object.assign(row, {
         accessToken: credentialMetadataToString({ ...credential, counter }),
         updatedAt: new Date(),
       });
-      await em.flush();
     });
   }
 }
@@ -707,12 +704,12 @@ function readStringArray(value: unknown): string[] | undefined {
 }
 
 async function getAccountClass() {
-  const { Account } = await import("@platform-core/infrastructure/application-database/entities/auth/Account.ts");
+  const { Account } = await import("@identity-access/infrastructure/database/entities/auth/Account.ts");
   return Account;
 }
 
 async function getVerificationClass() {
-  const { Verification } = await import("@platform-core/infrastructure/application-database/entities/auth/Verification.ts");
+  const { Verification } = await import("@identity-access/infrastructure/database/entities/auth/Verification.ts");
   return Verification;
 }
 

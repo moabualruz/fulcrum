@@ -35,7 +35,7 @@ beforeAll(async () => {
   orm = await MikroORM.init(createOrmConfig({ pglite }));
   await orm.schema.create();
 
-  container = new Container();
+  container = null;
   registerDbBindings(container, orm);
 
   // Register + init AuthService (async init required for flag check)
@@ -63,10 +63,10 @@ afterEach(() => {
 
 describe("SeedService + SessionRepository integration", () => {
   it("sessionRepo.findOne returns a session for admin@local userId", async () => {
-    const em = orm.em.fork();
+    const em = orm.em;
 
     // Find user first (admin@local)
-    const { User, Session } = await import("@platform-core/infrastructure/application-database/entities/auth/index.ts");
+    const { User, Session } = await import("@identity-access/infrastructure/database/entities/auth/index.ts");
     const adminUser = await em.findOne(User, { email: "admin@local" });
     expect(adminUser).not.toBeNull();
 
@@ -133,8 +133,8 @@ describe("auth.handler GET /api/auth/session", () => {
     expect(body.user?.email).toBe("admin@local");
     expect(typeof body.token).toBe("string");
 
-    const em = orm.em.fork();
-    const { Session } = await import("@platform-core/infrastructure/application-database/entities/auth/index.ts");
+    const em = orm.em;
+    const { Session } = await import("@identity-access/infrastructure/database/entities/auth/index.ts");
     const session = await em.findOne(Session, { id: body.token! });
     expect(session).not.toBeNull();
     expect(session!.expiresAt.getTime()).toBeGreaterThan(Date.now());
@@ -362,8 +362,8 @@ describe("MikroOrmBetterAuthAdapter", () => {
 describe("MikroOrmBetterAuthAdapter — account model (DB-backed)", () => {
   it("create/findOne/update/delete round-trip via DB", async () => {
     // Seed a user first so we have a valid userId
-    const { User } = await import("@platform-core/infrastructure/application-database/entities/auth/index.ts");
-    const em = orm.em.fork();
+    const { User } = await import("@identity-access/infrastructure/database/entities/auth/index.ts");
+    const em = orm.em;
     const adminUser = await em.findOne(User, { email: "admin@local" });
     expect(adminUser).not.toBeNull();
     const userId = adminUser!.id;

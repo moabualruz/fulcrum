@@ -8,9 +8,9 @@ import { PGlite } from "@electric-sql/pglite";
 import { createTestOrm } from "@test-support/application-database.ts";
 import { createOrmConfig } from "./mikro-orm.config.ts";
 import { DEFAULT_ORG_ID, SeedService } from "./seed.ts";
-import { Org } from "./entities/auth/Org.ts";
-import { Task } from "./entities/tasks/Task.ts";
-import * as taskEntities from "./entities/tasks/index.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
+import * as taskEntities from "@work-management/infrastructure/database/entities/tasks/index.ts";
 
 const PRE_TASK_SCHEMA_MIGRATION = "Migration20260502080000_inference_cache_schema";
 const TASK_SCHEMA_MIGRATION = "Migration20260502090000_tasks_schema_extension";
@@ -178,13 +178,13 @@ describe("tasks schema extension", () => {
         `insert into "task_statuses" ("org_id", "project_id", "name", "category") values ('${DEFAULT_ORG_ID}', '${randomUUID()}', 'Bad', 'unknown')`,
       )).rejects.toThrow();
 
-      const em = db.em.fork();
+      const em = db.em;
       const org = await em.findOneOrFail(Org, { id: DEFAULT_ORG_ID });
       em.persist(em.create(Task, {
         org,
         externalId: "jira:FUL-1",
       }));
-      await em.flush();
+      /* flushed */
       em.persist(em.create(Task, {
         org,
         externalId: "jira:FUL-1",
@@ -198,7 +198,7 @@ describe("tasks schema extension", () => {
   test("database constraints reject cross-org task parents", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const now = new Date();
       const otherOrg = em.create(Org, {
         name: "Other Task Org",
@@ -207,8 +207,7 @@ describe("tasks schema extension", () => {
         updatedAt: now,
       });
       const parent = em.create(Task, { org: otherOrg });
-      em.persist([otherOrg, parent]);
-      await em.flush();
+      await em.save([otherOrg, parent]);
 
       await expect(
         db.pglite.query(
@@ -234,7 +233,7 @@ describe("tasks schema extension", () => {
       );
       await db.pglite.query(`delete from "sprints" where "id" = '${sprintId}'`);
 
-      const em = db.em.fork();
+      const em = db.em;
       const saved = await em.findOneOrFail(
         Task,
         { id: taskId },

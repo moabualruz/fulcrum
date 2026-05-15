@@ -54,7 +54,7 @@ describe("skill application commands with real lock file and audit persistence",
 
   test("overrideSkillConflict marks missing and local conflicts without resolving upstream", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const conflictId = randomUUID();
     const conflict = em.create(SkillConflict, {
       id: conflictId,
@@ -68,8 +68,7 @@ describe("skill application commands with real lock file and audit persistence",
       suggestedResolution: "local",
       auditNote: null,
     } as never);
-    em.persist(conflict);
-    await em.flush();
+    await em.save(conflict);
 
     await expect(
       overrideSkillConflict(em, { orgId: DEFAULT_ORG_ID }, {

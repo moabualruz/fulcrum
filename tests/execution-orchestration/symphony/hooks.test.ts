@@ -9,9 +9,9 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
-import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
+import { AgentRun } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 import { createTestOrm, type TestOrm } from "@test-support/index.ts";
 import {
@@ -32,7 +32,7 @@ afterEach(async () => {
 
 async function seedHookContext(): Promise<LifecycleHookContext> {
   db = await createTestOrm();
-  const em = db.em.fork();
+  const em = db.em;
   const org = em.getReference(Org, DEFAULT_ORG_ID);
   const task = em.create(Task, {
     id: "30000000-0000-0000-0000-000000000901",
@@ -55,8 +55,7 @@ async function seedHookContext(): Promise<LifecycleHookContext> {
     iterationCount: 0,
   });
 
-  em.persist([task, run]);
-  await em.flush();
+  await em.save([task, run]);
 
   return {
     run,
@@ -68,7 +67,7 @@ async function seedHookContext(): Promise<LifecycleHookContext> {
 
 async function hookEvents(runId: string): Promise<Event[]> {
   if (!db) throw new Error("missing test db");
-  return db.em.fork().find(Event, {
+  return db.em.find(Event, {
     subjectKind: "agent_run",
     subjectId: runId,
     verb: "hook_dispatched",

@@ -2,14 +2,14 @@ import type { EntityManager } from "typeorm";
 import { readFile } from "node:fs/promises";
 
 import { assertArtifactPathInRoot, resolveArtifactStoreRoot } from "@workflow-coordination/infrastructure/artifacts/storage.ts";
-import { Artifact } from "@platform-core/infrastructure/application-database/entities/sandbox/Artifact.ts";
+import { Artifact } from "@execution-orchestration/infrastructure/database/entities/sandbox/Artifact.ts";
 import type { ArtifactDetail } from "@workflow-coordination/application/artifact-service-actions.ts";
 import { AppForbiddenError, AppNotFoundError } from "@platform-core/domain/errors.ts";
 import { ormSqlConnection } from "@platform-core/application/orm-helpers.ts";
 import type { AppContext, ArtifactDto } from "@workflow-coordination/domain/artifact.ts";
 
 export async function listArtifacts(em: EntityManager, ctx: AppContext): Promise<ArtifactDto[]> {
-  const artifacts = await em.find(Artifact, { org: ctx.orgId } as never, { orderBy: { createdAt: "DESC", id: "ASC" } });
+  const artifacts = await em.find(Artifact, { where: { org: { id: ctx.orgId } } as never, order: { createdAt: "DESC", id: "ASC" } });
   return artifacts.map(serializeArtifact);
 }
 
@@ -59,31 +59,31 @@ export async function listArtifactRows(
   const sizeExpr = columns.has("size") ? "a.size" : columns.has("size_bytes") ? "a.size_bytes" : "NULL::bigint";
   const archivedExpr = columns.has("archived") ? "COALESCE(a.archived, false)" : "false";
   const joins = columns.has("task_id") ? "LEFT JOIN tasks t ON t.id = a.task_id" : "";
-  const conditions = ["a.org_id = ?"];
   const params: unknown[] = [ctx.orgId];
+  const conditions = ["a.org_id = $1"];
 
   if (!filter.includeArchived && columns.has("archived")) {
     conditions.push("(a.archived = false OR a.archived IS NULL)");
   }
   if (filter.projectId) {
     params.push(filter.projectId);
-    conditions.push(`${projectExpr} = ?`);
+    conditions.push(`${projectExpr} = $${params.length}`);
   }
   if (filter.runId && columns.has("run_id")) {
     params.push(filter.runId);
-    conditions.push("a.run_id = ?");
+    conditions.push(`a.run_id = $${params.length}`);
   }
   if (filter.taskId && columns.has("task_id")) {
     params.push(filter.taskId);
-    conditions.push("a.task_id = ?");
+    conditions.push(`a.task_id = $${params.length}`);
   }
   if (filter.mime) {
     params.push(filter.mime);
-    conditions.push("a.mime = ?");
+    conditions.push(`a.mime = $${params.length}`);
   }
   if (filter.kind && columns.has("kind")) {
     params.push(filter.kind);
-    conditions.push("a.kind = ?");
+    conditions.push(`a.kind = $${params.length}`);
   } else if (filter.kind && filter.kind !== "file") {
     return [];
   }
@@ -144,7 +144,7 @@ export async function getArtifactStats(
     `SELECT COALESCE(SUM(${sizeExpr}), 0) AS total_bytes, COUNT(*)::int AS count
        FROM artifacts a
        ${joins}
-      WHERE a.org_id = ? AND ${projectExpr} = ?`,
+      WHERE a.org_id = $1 AND ${projectExpr} = $2`,
     [ctx.orgId, projectId],
   );
   const row = rows[0] ?? { total_bytes: 0, count: 0 };
@@ -155,7 +155,7 @@ export async function getArtifactStats(
 }
 
 export async function getArtifact(em: EntityManager, ctx: AppContext, id: string): Promise<ArtifactDto> {
-  const artifact = await em.findOne(Artifact, { id } as never);
+  const artifact = await em.findOne(Artifact, { where: { id } as never });
   if (!artifact) throw new AppNotFoundError(`Artifact not found: ${id}`);
   if (artifact.org.id !== ctx.orgId) throw new AppForbiddenError(`Artifact does not belong to org: ${ctx.orgId}`);
   return serializeArtifact(artifact);
@@ -200,7 +200,7 @@ export async function getArtifactDetail(em: EntityManager, ctx: AppContext, id: 
             a.created_at
        FROM artifacts a
        LEFT JOIN tasks t ON t.id = a.task_id
-      WHERE a.id = ? AND a.org_id = ?`,
+      WHERE a.id = $1 AND a.org_id = $2`,
     [id, ctx.orgId],
   );
   const artifact = rows[0];

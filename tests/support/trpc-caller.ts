@@ -3,40 +3,39 @@ import type { Session } from "better-auth";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
-import { ENTITY_MANAGER_TOKEN } from "@platform-core/infrastructure/application-database/db.module.ts";
-import { Session as SessionEntity, User } from "@platform-core/infrastructure/application-database/entities/auth/index.ts";
+import { User, Session as SessionEntity } from "@identity-access/infrastructure/database/entities/auth/index.ts";
 import { DEFAULT_ADMIN_EMAIL, DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import { adminSession, type TestSession } from "./auth-session.ts";
 import type { TestContainer } from "./application-container.ts";
+import type { TestOrm } from "./application-database.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 
 async function resolveDefaultSession(
-  container: TestContainer,
+  orm: TestOrm,
 ): Promise<TestSession> {
-  const em = container.get(ENTITY_MANAGER_TOKEN).fork();
-  const admin = await em.findOne(User, { email: DEFAULT_ADMIN_EMAIL });
+  const admin = await orm.em.findOne(User, { where: { email: DEFAULT_ADMIN_EMAIL } });
 
   if (admin === null) {
-    return adminSession(container.__fulcrumTestSeed);
+    return adminSession(orm.seed);
   }
 
-  const active = await em.findOne(SessionEntity, { userId: admin.id });
+  const active = await orm.em.findOne(SessionEntity, { where: { userId: admin.id } });
   return adminSession({
-    orgId: admin.orgId ?? DEFAULT_ORG_ID,
+    orgId: (admin as { orgId?: string }).orgId ?? DEFAULT_ORG_ID,
     userId: admin.id,
     sessionToken: active?.id,
   });
 }
 
 export async function createTestCaller(
-  container: TestContainer,
+  orm: TestOrm,
+  container?: TestContainer,
   session?: Session | null,
 ) {
   const resolvedSession = session === undefined
-    ? await resolveDefaultSession(container)
+    ? await resolveDefaultSession(orm)
     : session;
-  const em = container.get(ENTITY_MANAGER_TOKEN).fork();
   const contextSession = resolvedSession as TestSession | null;
   const orgId = contextSession?.activeOrganizationId ?? contextSession?.orgId ?? null;
   const userId = contextSession?.userId ?? null;
@@ -46,8 +45,8 @@ export async function createTestCaller(
       session: resolvedSession,
       orgId,
       userId,
-      em,
-      container,
+      em: orm.em,
+      container: container ?? null,
     }),
   );
 }

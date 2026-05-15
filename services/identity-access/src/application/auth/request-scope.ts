@@ -1,8 +1,8 @@
 import type { EntityManager } from "typeorm";
 
-import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
-import { Project } from "@platform-core/infrastructure/application-database/entities/tasks/Project.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { AgentRun } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
+import { Project } from "@work-management/infrastructure/database/entities/tasks/Project.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import { resolveOrgId } from "@identity-access/application/auth/org-context.ts";
 
 export interface RequestScopeReferences {

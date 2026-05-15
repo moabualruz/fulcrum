@@ -13,6 +13,16 @@ export interface NotificationApiEnvironment {
   FULCRUM_USER_ID?: string;
 }
 
+export class NotificationApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "NotificationApiError";
+  }
+}
+
 type NotificationSubjectInput =
   | { subjectKind: string; subjectId: string; mutedUntil?: Date | string | null }
   | { sourceKind: string; sourceId: string; mutedUntil?: Date | string | null };
@@ -26,8 +36,10 @@ export function createNotificationApiCaller(options: NotificationApiCallerOption
     notify: {
       unreadCount: async () => await request<{ count: number }>("/api/v1/notifications/unread-count"),
       list: async (input: { unread?: boolean; limit?: number; offset?: number } = {}) => {
-        const body = await request<{ data?: unknown[] }>("/api/v1/notifications", { query: input });
-        return Array.isArray(body.data) ? body.data : body;
+        const body = await request<{ data?: unknown[]; items?: unknown[] }>("/api/v1/notifications", { query: input });
+        if (Array.isArray(body.data)) return body.data;
+        if (Array.isArray(body.items)) return body.items;
+        return body;
       },
       markRead: async (input: { id: string }) => {
         await request(`/api/v1/notifications/${encodeURIComponent(input.id)}/mark-read`, { method: "PATCH" });
@@ -121,7 +133,9 @@ function notificationRequest(options: NotificationApiCallerOptions) {
       body: init.body ? JSON.stringify(compact(init.body)) : undefined,
     });
     const body = response.status === 204 ? null : await response.json().catch(() => null);
-    if (!response.ok) throw new Error(extractErrorMessage(body, response.status));
+    if (!response.ok) {
+      throw new NotificationApiError(extractErrorMessage(body, response.status), response.status);
+    }
     return body as T;
   };
 }

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Session } from "better-auth";
 
-import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
+import { Document } from "@knowledge-workspace/infrastructure/database/entities/docs/Document.ts";
 import { configureDocNarrator } from "@knowledge-workspace/application/docs/llm-narrator.ts";
 import { createTestOrm } from "@test-support/application-database.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
@@ -66,7 +66,7 @@ describe("docs.update LLM narration gate", () => {
 
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
       const created = await caller.docs.create({
         title: "Narrated ADR",
@@ -107,7 +107,7 @@ describe("docs.update LLM narration gate", () => {
 
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
       const created = await caller.docs.create({ title: "Plain ADR", docType: "adr", bodyMd: "Body" });
       const updated = await caller.docs.update({ id: created.id, bodyMd: "Updated body" });

@@ -4,9 +4,9 @@ import { Container } from "@needle-di/core";
 
 import { createTestOrm } from "@test-support/application-database.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
-import { RoutingRule, RoutingRuleSource } from "@platform-core/infrastructure/application-database/entities/router/RoutingRule.ts";
-import { RoutingRuleRepository } from "@platform-core/infrastructure/application-database/repositories/router/RoutingRuleRepository.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { RoutingRule, RoutingRuleSource } from "@execution-orchestration/infrastructure/database/entities/router/RoutingRule.ts";
+import { RoutingRuleRepository } from "@execution-orchestration/infrastructure/database/repositories/router/RoutingRuleRepository.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
@@ -33,7 +33,7 @@ function mockSession() {
 }
 
 function callerFor(em: import("@mikro-orm/postgresql").EntityManager) {
-  const container = new Container();
+  const container = null;
   container.bind({
     provide: RoutingRuleRepository,
     useValue: em.getRepository(RoutingRule) as RoutingRuleRepository,
@@ -54,7 +54,7 @@ describe("routing tRPC router", () => {
   test("create, list, get, update, and delete rules inside the caller org", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       const createdLow = await caller.routing.create({
@@ -133,7 +133,7 @@ describe("routing tRPC router", () => {
   test("test returns autoAssign decision for saved task and records one event", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       const rule = await caller.routing.create({
@@ -149,8 +149,7 @@ describe("routing tRPC router", () => {
         priority: 1,
         customFields: { tags: ["backend"] },
       } as never);
-      em.persist(task);
-      await em.flush();
+      await em.save(task);
 
       const decision = await caller.routing.test({ taskId: task.id });
 
@@ -177,7 +176,7 @@ describe("routing tRPC router", () => {
   test("dryRun returns autoAssign decision for task JSON without recording events", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       const rule = await caller.routing.create({
@@ -214,7 +213,7 @@ describe("routing tRPC router", () => {
   test("create and update reject conditions with unknown operators", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
       const badConditions = {
         all: [{ fact: "task.kind", operator: "not-a-json-rules-engine-operator", value: "bug" }],

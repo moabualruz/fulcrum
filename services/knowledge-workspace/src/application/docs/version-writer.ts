@@ -1,10 +1,10 @@
 import type { EntityManager } from "typeorm";
 import { randomUUID } from "node:crypto";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
-import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
-import { DocVersion } from "@platform-core/infrastructure/application-database/entities/docs/DocVersion.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
+import { Document } from "@knowledge-workspace/infrastructure/database/entities/docs/Document.ts";
+import { DocVersion } from "@knowledge-workspace/infrastructure/database/entities/docs/DocVersion.ts";
 
 export interface DocJsonDelta {
   ops: Array<{ path: string[]; value: Record<string, unknown> }>;
@@ -52,12 +52,10 @@ export async function writeDocVersion(
   input: WriteDocVersionInput,
 ): Promise<DocVersion> {
   const now = input.now ?? new Date();
-  const latest = await em.findOne(DocVersion, {
+  const latest = await em.findOne(DocVersion, { where: {
     org: input.orgId,
     doc: input.doc.id,
-  } as never, {
-    orderBy: { versionNum: "DESC" },
-  });
+  } as never, order: { versionNum: "DESC" } });
   const versionNum = (latest?.versionNum ?? 0) + 1;
   const cadence = snapshotEvery(input.snapshotEvery);
   const firstSaveOfDay = latest ? calendarDay(latest.createdAt) !== calendarDay(now) : true;
@@ -79,11 +77,11 @@ export async function writeDocVersion(
   }
 
   const author = input.authorId
-    ? await em.findOne(User, { orgId: input.orgId, id: input.authorId })
+    ? await em.findOne(User, { where: { org: { id: input.orgId }, id: input.authorId  } as never })
     : null;
   const version = em.create(DocVersion, {
     id: randomUUID(),
-    org: em.getReference(Org, input.orgId),
+    org: { id: input.orgId } as Org,
     doc: input.doc,
     versionNum,
     snapshot: shouldSnapshot ? jsonClone(input.doc.contentJson) : null,
@@ -93,6 +91,6 @@ export async function writeDocVersion(
     restoreOf: input.restoreOf ?? null,
     createdAt: now,
   } as never);
-  em.persist(version);
+  await em.save(version);
   return version;
 }

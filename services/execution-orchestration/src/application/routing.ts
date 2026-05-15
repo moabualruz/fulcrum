@@ -1,12 +1,12 @@
 import type { EntityManager } from "typeorm";
 import { Engine, type TopLevelCondition } from "json-rules-engine";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
-import { RoutingRule } from "@platform-core/infrastructure/application-database/entities/router/RoutingRule.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { RoutingRule } from "@execution-orchestration/infrastructure/database/entities/router/RoutingRule.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import type { EventRepository } from "@platform-core/infrastructure/application-database/repositories/core/EventRepository.ts";
-import type { RoutingRuleRepository } from "@platform-core/infrastructure/application-database/repositories/router/RoutingRuleRepository.ts";
+import type { RoutingRuleRepository } from "@execution-orchestration/infrastructure/database/repositories/router/RoutingRuleRepository.ts";
 import { RoutingRuleSource, type RoutingConditions } from "@execution-orchestration/domain/routing.ts";
 import { ROUTING_EVENT_VERB, RoutingEventPayloadSchema } from "@fulcrum/server/router/routing-event-payload.ts";
 import type { RoutingRuleRecord } from "@fulcrum/server/router/rules-engine.ts";
@@ -104,17 +104,16 @@ export async function recordRoutingEvent(input: RecordRoutingEventInput): Promis
     confidence: input.decision.confidence,
   });
 
-  const manager = input.eventRepository.getEntityManager();
+  const manager = input.eventRepository.manager;
   const event = input.eventRepository.create({
-    org: manager.getReference(Org, input.orgId),
+    org: { id: input.orgId } as Org,
     verb: ROUTING_EVENT_VERB,
     subjectKind: "task",
     subjectId: input.taskId,
     payload,
   } as never);
 
-  manager.persist(event as Event);
-  await manager.flush();
+  await manager.save(event as Event);
 }
 
 export async function detectRoutingConflicts(input: DetectRoutingConflictsInput): Promise<string[]> {
@@ -137,9 +136,9 @@ export async function detectRoutingConflicts(input: DetectRoutingConflictsInput)
 export async function learnRoutingRule(input: LearnRoutingRuleInput): Promise<RoutingRule> {
   const repository = input.routingRuleRepository;
   if (!repository) throw new Error("routing rule repository is not configured");
-  const manager = repository.getEntityManager();
+  const manager = repository.manager;
   const rule = repository.create({
-    org: manager.getReference(Org, input.orgId),
+    org: { id: input.orgId } as Org,
     project: input.projectId ?? null,
     name: `Learned ${input.facts.task.kind} routing`,
     conditionsJson: conditionsFromFacts(input.facts),
@@ -153,8 +152,7 @@ export async function learnRoutingRule(input: LearnRoutingRuleInput): Promise<Ro
   if ("save" in repository && typeof repository.save === "function") {
     await repository.save(rule);
   } else {
-    manager.persist(rule);
-    await manager.flush();
+    await manager.save(rule);
   }
 
   return rule;
@@ -221,13 +219,10 @@ export async function listRoutingRules(
   ctx: RoutingAppContext,
   input: { orgId?: string; projectId?: string } = {},
 ): Promise<RoutingRuleDto[]> {
-  const rows = await em.find(RoutingRule, {
-    org: input.orgId ?? ctx.orgId,
+  const rows = await em.find(RoutingRule, { where: {
+    org: { id: input.orgId ?? ctx.orgId },
     ...(input.projectId !== undefined ? { project: input.projectId } : {}),
-  }, {
-    populate: ["org"],
-    orderBy: { priority: "ASC", createdAt: "ASC" },
-  });
+  } as never, relations: ["org"], order: { priority: "ASC", createdAt: "ASC" } });
   return rows.map(serializeRoutingRule);
 }
 
@@ -257,7 +252,7 @@ export async function createRoutingRule(
 ): Promise<RoutingRuleDto> {
   await validateRoutingConditions(input.conditionsJson);
   const rule = em.create(RoutingRule, {
-    org: em.getReference(Org, input.orgId ?? ctx.orgId),
+    org: { id: input.orgId ?? ctx.orgId } as Org,
     project: input.projectId ?? null,
     name: input.name,
     conditionsJson: input.conditionsJson,
@@ -323,7 +318,7 @@ export async function testRoutingRule(
 ): Promise<RoutingEnrichedDto> {
   await configureRouting(em);
   const { autoAssign } = await import("@fulcrum/server/router/auto-assign.ts");
-  const task = await em.findOne(Task, { id: input.taskId, org: ctx.orgId });
+  const task = await em.findOne(Task, { where: { id: input.taskId, org: ctx.orgId  } as never });
   if (!task) throw new AppNotFoundError("Task not found.");
 
   const taskFacts = taskFactsFromTask(task);
@@ -405,8 +400,7 @@ export async function updateLlmGateConfig(
         subjectId: ctx.orgId,
         metadata: input as Record<string, unknown>,
       } as never);
-      em.persist(event);
-      await em.flush();
+      await em.save(event);
     }
   } catch {
     // Audit event is best-effort; config update remains source of truth.
@@ -433,11 +427,11 @@ export function serializeRoutingRule(rule: RoutingRule): RoutingRuleDto {
 }
 
 function routingRuleRepository(em: EntityManager): RoutingRuleRepository {
-  return em.getRepository(RoutingRule) as RoutingRuleRepository;
+  return em.getRepository(RoutingRule) as unknown as RoutingRuleRepository;
 }
 
 function eventRepository(em: EntityManager): EventRepository {
-  return em.getRepository(Event) as EventRepository;
+  return em.getRepository(Event) as unknown as EventRepository;
 }
 
 async function configureRouting(em: EntityManager): Promise<void> {
@@ -457,7 +451,7 @@ async function configureRouting(em: EntityManager): Promise<void> {
 }
 
 function findRoutingRule(em: EntityManager, orgId: string, id: string): Promise<RoutingRule | null> {
-  return em.findOne(RoutingRule, { id, org: orgId }, { populate: ["org"] });
+  return em.findOne(RoutingRule, { where: { id, org: { id: orgId } } as never, relations: ["org"] });
 }
 
 function taskFactsFromTask(task: Task): TaskFacts {

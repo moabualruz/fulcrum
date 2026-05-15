@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { ZodError } from "zod";
 
-import { DOC_TYPES } from "@platform-core/infrastructure/application-database/entities/docs/enums.ts";
+import { DOC_TYPES } from "@knowledge-workspace/infrastructure/database/entities/docs/enums.ts";
 import {
   AdrFrontmatterSchema,
   FrontmatterSchema,

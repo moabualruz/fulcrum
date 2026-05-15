@@ -11,7 +11,7 @@ import {
   Unique,
   JoinColumn,
 } from "typeorm";
-import { Org } from "../auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { SkillVersion } from "./SkillVersion.ts";
 
 export enum SkillSource {

@@ -7,8 +7,8 @@
 
 import type { EntityManager } from "typeorm";
 
-import { TaskTemplate } from "@platform-core/infrastructure/application-database/entities/tasks/TaskTemplate.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { TaskTemplate } from "@work-management/infrastructure/database/entities/tasks/TaskTemplate.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { AppNotFoundError } from "@platform-core/domain/errors.ts";
 
 // ── Output types ──────────────────────────────────────────────────────────────
@@ -55,7 +55,7 @@ export class WorkItemTemplateService {
     description?: string,
   ): Promise<TemplateOutput> {
     const template = this.em.create(TaskTemplate, {
-      org: this.em.getReference(Org, orgId),
+      org: { id: orgId } as Org,
       projectId: projectId ?? null,
       name,
       description: description ?? null,
@@ -63,8 +63,7 @@ export class WorkItemTemplateService {
       createdBy,
     } as never);
 
-    this.em.persist(template);
-    await this.em.flush();
+    await this.em.save(template);
     return this.serialize(template);
   }
 
@@ -111,7 +110,6 @@ export class WorkItemTemplateService {
     }
 
     this.em.remove(template);
-    await this.em.flush();
   }
 
   async setDefault(
@@ -140,6 +138,5 @@ export class WorkItemTemplateService {
     }
 
     template.isDefault = true;
-    await this.em.flush();
   }
 }

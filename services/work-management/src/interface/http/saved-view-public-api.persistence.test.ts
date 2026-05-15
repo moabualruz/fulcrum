@@ -150,6 +150,9 @@ async function assertSavedViewPublicApiRoundTrip(
       name: "Created view",
       scope: "private",
       viewType: "table",
+      filters: { status: "pending", priority: "high" },
+      sortBy: "-updated_at",
+      isDefault: true,
     });
     expect(created).toEqual(expect.objectContaining({
       id: expect.any(String),
@@ -157,6 +160,9 @@ async function assertSavedViewPublicApiRoundTrip(
       name: "Created view",
       scope: "private",
       viewType: "table",
+      filters: { status: "pending", priority: "high" },
+      sortBy: "-updated_at",
+      isDefault: true,
     }));
 
     const createdId = (created as { id: string }).id;
@@ -165,12 +171,13 @@ async function assertSavedViewPublicApiRoundTrip(
     );
     await expect(controller.patchSavedView(
       { id: createdId },
-      { name: "Created view revised", scope: "project", viewType: "calendar" },
+      { name: "Created view revised", scope: "project", viewType: "calendar", isDefault: false },
     )).resolves.toEqual(expect.objectContaining({
       id: createdId,
       name: "Created view revised",
       scope: "project",
       viewType: "calendar",
+      isDefault: false,
     }));
     await expect(controller.deleteSavedView({ id: createdId })).resolves.toBeUndefined();
     await expect(controller.deleteSavedView({ id: createdId })).rejects.toBeInstanceOf(NotFoundException);

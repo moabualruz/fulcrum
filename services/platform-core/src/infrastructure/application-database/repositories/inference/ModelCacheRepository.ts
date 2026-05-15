@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { ModelCache, type ModelCacheKind, type ModelCacheSource } from "../../entities/inference/ModelCache.ts";
-import type { Org } from "../../entities/auth/Org.ts";
+import type { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 
 @Injectable()
 export class ModelCacheRepository {

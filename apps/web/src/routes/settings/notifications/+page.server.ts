@@ -1,4 +1,6 @@
 import type { PageServerLoad, Actions } from "./$types";
+import { createAuditApiClient } from "@workflow-coordination/interface/http/audit-api-client";
+import { activeOrgId, cookieHeaders, publicApiBaseUrl } from "$lib/server/public-api";
 
 interface RetentionPolicyEvent {
   locals: { orgId?: string | null };
@@ -12,43 +14,13 @@ interface RetentionPolicyResponse {
   retain_days?: unknown;
 }
 
-const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
-
-function publicApiBaseUrl(url: URL, env: Record<string, string | undefined> = process.env): string {
-  const raw = env["FULCRUM_SERVER_URL"] ?? env["FULCRUM_PUBLIC_API_URL"];
-  return (raw ?? `${url.protocol}//${url.host}`).replace(/\/+$/, "");
-}
-
-function publicRetentionPolicyUrl(event: RetentionPolicyEvent): string {
-  const base = publicApiBaseUrl(event.url);
-  const url = new URL("/api/v1/audit/retention-policy", base);
-  url.searchParams.set("orgId", event.locals.orgId || DEFAULT_ORG_ID);
-  return url.toString();
-}
-
-function extractMessage(body: unknown): string {
-  const error = (body as { error?: { json?: { message?: string }; message?: string } })?.error;
-  return error?.json?.message ?? error?.message ?? "Retention policy request failed.";
-}
-
-async function publicRetentionPolicyRequest(
-  event: RetentionPolicyEvent,
-  method: "GET" | "PATCH",
-  retainDays?: number,
-): Promise<RetentionPolicyResponse | null> {
-  const target = publicRetentionPolicyUrl(event);
-  const response = await event.fetch(target, {
-    method,
-    credentials: "include",
-    headers: {
-      "content-type": "application/json",
-      cookie: event.request.headers.get("cookie") ?? "",
-    },
-    body: method === "PATCH" ? JSON.stringify({ retainDays }) : undefined,
+function createRetentionPolicyApi(event: RetentionPolicyEvent) {
+  return createAuditApiClient({
+    baseUrl: publicApiBaseUrl(event.url),
+    orgId: activeOrgId(event.locals as App.Locals),
+    fetch: event.fetch,
+    headers: cookieHeaders(event.request as Request),
   });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(extractMessage(body));
-  return body as RetentionPolicyResponse | null;
 }
 
 function retainDaysOf(policy: RetentionPolicyResponse | null | undefined, fallback = 0): number {
@@ -58,7 +30,7 @@ function retainDaysOf(policy: RetentionPolicyResponse | null | undefined, fallba
 }
 
 export const load: PageServerLoad = async (event) => {
-  const publicPolicy = await publicRetentionPolicyRequest(event as RetentionPolicyEvent, "GET");
+  const publicPolicy = await createRetentionPolicyApi(event as RetentionPolicyEvent).retentionPolicy.get();
   return {
     retainDays: retainDaysOf(publicPolicy),
     saved: false,
@@ -71,7 +43,9 @@ export const actions: Actions = {
     const formData = await request.formData();
     const retainDays = parseInt(formData.get("retain_days")?.toString() ?? "0", 10);
     const sanitizedRetainDays = isNaN(retainDays) ? 0 : retainDays;
-    const publicPolicy = await publicRetentionPolicyRequest(event as RetentionPolicyEvent, "PATCH", sanitizedRetainDays);
+    const publicPolicy = await createRetentionPolicyApi(event as RetentionPolicyEvent).retentionPolicy.set({
+      retainDays: sanitizedRetainDays,
+    });
     return { retainDays: retainDaysOf(publicPolicy, sanitizedRetainDays), saved: true };
   },
 };

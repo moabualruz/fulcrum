@@ -21,12 +21,12 @@ import { PGlite } from "@electric-sql/pglite";
 import { Container } from "@needle-di/core";
 
 import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
-import { OrgMember } from "@platform-core/infrastructure/application-database/entities/auth/OrgMember.ts";
-import { Invitation } from "@platform-core/infrastructure/application-database/entities/auth/Invitation.ts";
-import { OrgMemberRepository } from "@platform-core/infrastructure/application-database/repositories/auth/OrgMemberRepository.ts";
-import { InvitationRepository } from "@platform-core/infrastructure/application-database/repositories/auth/InvitationRepository.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
+import { OrgMember } from "@identity-access/infrastructure/database/entities/auth/OrgMember.ts";
+import { Invitation } from "@identity-access/infrastructure/database/entities/auth/Invitation.ts";
+import { OrgMemberRepository } from "@identity-access/infrastructure/database/repositories/auth/OrgMemberRepository.ts";
+import { InvitationRepository } from "@identity-access/infrastructure/database/repositories/auth/InvitationRepository.ts";
 import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
@@ -59,7 +59,7 @@ function mockSession(userId: string, orgId: string) {
 
 function makeCaller(userId: string, orgId: string) {
   const session = mockSession(userId, orgId);
-  const em = orm.em.fork();
+  const em = orm.em;
   const orgMemberRepo = em.getRepository(OrgMember) as OrgMemberRepository;
   const invitationRepo = em.getRepository(Invitation) as InvitationRepository;
 
@@ -69,7 +69,7 @@ function makeCaller(userId: string, orgId: string) {
     userId,
     em: em as unknown as import("@mikro-orm/postgresql").EntityManager,
     container: (() => {
-      const c = new Container();
+      const c = null;
       c.bind({ provide: OrgMemberRepository, useValue: orgMemberRepo });
       c.bind({ provide: InvitationRepository, useValue: invitationRepo });
       c.bind({
@@ -87,7 +87,7 @@ function makeCaller(userId: string, orgId: string) {
 
 function makeCallerWithoutContainer(userId: string, orgId: string) {
   const session = mockSession(userId, orgId);
-  const em = orm.em.fork();
+  const em = orm.em;
 
   return createCaller(
     createContext({
@@ -139,7 +139,7 @@ beforeAll(async () => {
 
   await orm.schema.create();
 
-  const seedEm = orm.em.fork();
+  const seedEm = orm.em;
   const now = new Date();
 
   const org = seedEm.create(Org, {
@@ -212,7 +212,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   // Wipe invitations between tests
-  const em = orm.em.fork();
+  const em = orm.em;
   await em.nativeDelete(Invitation, {});
 });
 
@@ -297,8 +297,8 @@ describe("auth.invite", () => {
     const result = await caller.auth.invite({ email: "check@test.local", role: "member" });
 
     // Verify via fresh EM
-    const em = orm.em.fork();
-    const inv = await em.findOne(Invitation, { id: result.invitationId });
+    const em = orm.em;
+    const inv = await em.findOne(Invitation, { where: { id: result.invitationId } });
     expect(inv).not.toBeNull();
     expect((inv as { email: string }).email).toBe("check@test.local");
     expect((inv as { orgId: string }).orgId).toBe(TEST_ORG_ID);
@@ -359,7 +359,7 @@ describe("auth.acceptInvite", () => {
     });
 
     // Accept as unauthenticated caller (publicProcedure)
-    const acceptEm = orm.em.fork();
+    const acceptEm = orm.em;
     const acceptCaller = createCaller(
       createContext({
         session: null,
@@ -375,7 +375,7 @@ describe("auth.acceptInvite", () => {
     expect(result.orgId).toBe(TEST_ORG_ID);
 
     // Verify OrgMember row created
-    const verifyEm = orm.em.fork();
+    const verifyEm = orm.em;
     const member = await verifyEm.findOne(OrgMember, {
       orgId: TEST_ORG_ID,
       userId: result.userId,
@@ -390,7 +390,7 @@ describe("auth.acceptInvite", () => {
 
   it("expired token → BAD_REQUEST", async () => {
     // Manually insert an expired invitation
-    const em = orm.em.fork();
+    const em = orm.em;
     const pastDate = new Date(Date.now() - 1000); // 1 second ago
     const plainToken = "expired-plain-token-12345678901234567890";
     const { createHash } = await import("node:crypto");
@@ -404,10 +404,9 @@ describe("auth.acceptInvite", () => {
       expiresAt: pastDate,
       createdAt: new Date(),
     });
-    em.persist(inv);
-    await em.flush();
+    await em.save(inv);
 
-    const acceptEm = orm.em.fork();
+    const acceptEm = orm.em;
     const caller = createCaller(
       createContext({
         session: null,
@@ -429,7 +428,7 @@ describe("auth.acceptInvite", () => {
   });
 
   it("invalid/unknown token → BAD_REQUEST", async () => {
-    const acceptEm = orm.em.fork();
+    const acceptEm = orm.em;
     const caller = createCaller(
       createContext({
         session: null,
@@ -458,7 +457,7 @@ describe("auth.acceptInvite", () => {
       role: "member",
     });
 
-    const firstAcceptEm = orm.em.fork();
+    const firstAcceptEm = orm.em;
     const firstCaller = createCaller(
       createContext({
         session: null,
@@ -471,7 +470,7 @@ describe("auth.acceptInvite", () => {
     await firstCaller.auth.acceptInvite({ token });
 
     // Try to accept again
-    const secondAcceptEm = orm.em.fork();
+    const secondAcceptEm = orm.em;
     const secondCaller = createCaller(
       createContext({
         session: null,

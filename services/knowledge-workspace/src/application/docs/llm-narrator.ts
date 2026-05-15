@@ -1,5 +1,5 @@
 import { InferenceClient } from "@platform-core/application/inference/client.ts";
-import type { DocType } from "@platform-core/infrastructure/application-database/entities/docs/enums.ts";
+import type { DocType } from "@knowledge-workspace/infrastructure/database/entities/docs/enums.ts";
 import type { GenerateResult } from "@platform-core/application/inference/protocol.ts";
 
 const FLAG = "report-llm-narration";

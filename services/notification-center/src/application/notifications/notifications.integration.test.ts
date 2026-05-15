@@ -12,7 +12,7 @@ describe("application notifications", () => {
   test("handles CRUD, not-found, validation, and scoping", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const notification = await createNotification(em, ctx, { eventId: "33333333-3333-4333-8333-333333333333", entityKind: "task", entityId: "44444444-4444-4444-8444-444444444444", title: "Assigned" });
       expect(await listNotifications(em, ctx, { unread: true, limit: 50, offset: 0 })).toMatchObject({ total: 1 });
       await markNotificationRead(em, ctx, notification.id);

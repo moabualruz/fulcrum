@@ -13,4 +13,11 @@ export class SchemaMigrationRepository {
     @InjectRepository(SchemaMigration)
     private readonly schemaMigrations: Repository<SchemaMigration>,
   ) {}
+
+  findAll(opts?: { orderBy?: Partial<Record<keyof SchemaMigration, "ASC" | "DESC">>; limit?: number }): Promise<SchemaMigration[]> {
+    return this.schemaMigrations.find({
+      order: opts?.orderBy as never,
+      take: opts?.limit,
+    });
+  }
 }

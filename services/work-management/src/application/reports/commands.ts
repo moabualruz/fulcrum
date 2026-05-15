@@ -1,6 +1,6 @@
 import type { EntityManager } from "typeorm";
 
-import { MetricsCache } from "@platform-core/infrastructure/application-database/entities/tasks/MetricsCache.ts";
+import { MetricsCache } from "@work-management/infrastructure/database/entities/tasks/MetricsCache.ts";
 import { AppValidationError } from "@platform-core/domain/errors.ts";
 import { serializeReportSnapshot } from "@work-management/application/reports/queries.ts";
 import type { AppContext, CreateReportSnapshotInput, ReportSnapshotDto } from "@work-management/application/reports/types.ts";
@@ -11,7 +11,7 @@ export async function createReportSnapshot(
   input: CreateReportSnapshotInput,
 ): Promise<ReportSnapshotDto> {
   if (!input.projectId) throw new AppValidationError("Report projectId is required.");
-  return await em.transactional(async (txEm) => {
+  return await em.transaction(async (txEm: EntityManager) => {
     const row = txEm.create(MetricsCache, {
       projectId: input.projectId,
       date: input.date,
@@ -19,8 +19,7 @@ export async function createReportSnapshot(
       completedCount: input.completedCount ?? 0,
       pointsCompleted: input.pointsCompleted ?? 0,
     });
-    txEm.persist(row);
-    await txEm.flush();
+    await txEm.save(row);
     return serializeReportSnapshot(row, ctx.orgId);
   });
 }

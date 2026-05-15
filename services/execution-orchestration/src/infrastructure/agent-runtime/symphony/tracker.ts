@@ -6,11 +6,10 @@
  */
 
 import type { EntityManager } from "typeorm";
+import { In } from "typeorm";
 
-import type { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
-import type { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
-import type { AgentRunRepository } from "@platform-core/infrastructure/application-database/repositories/orchestration/AgentRunRepository.ts";
-import type { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
+import type { AgentRun } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
+import type { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import {
   AgentRunIssueListSchema,
   AgentRunIssueSchema,
@@ -126,18 +125,13 @@ export async function refreshRunningIssues(
   orgId: string,
   limit = 200,
 ): Promise<RunningIssuesSnapshot> {
-  const { AgentRun } = await import("@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts");
-  const fork = em.fork();
-  const agentRunRepo = fork.getRepository(AgentRun) as AgentRunRepository;
-
-  const runs = await agentRunRepo.find(
-    { org: orgId } as never,
-    {
-      limit,
-      populate: ["task"],
-      orderBy: { startedAt: "asc", id: "asc" },
-    },
-  );
+  const { AgentRun } = await import("@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts");
+  const runs = await em.find(AgentRun, {
+    where: { org: { id: orgId } } as never,
+    take: limit,
+    relations: { task: true } as never,
+    order: { startedAt: "asc", id: "asc" } as never,
+  });
 
   const issues = AgentRunIssueListSchema.parse(runs.map(toAgentRunIssue));
 
@@ -192,15 +186,15 @@ export function resolvePerStateConcurrency(
   return result;
 }
 
-export function buildCandidateIssuesBaseQuery(
-  taskRepo: TaskRepository,
+export async function buildCandidateIssuesBaseQuery(
+  em: EntityManager,
   orgId: string,
-) {
-  return taskRepo
-    .createQueryBuilder("task")
-    .select("*")
-    .where({ org: orgId, status: READY_TASK_STATUS } as never)
-    .orderBy({ priority: "asc", createdAt: "asc", id: "asc" });
+): Promise<import("@work-management/infrastructure/database/entities/tasks/Task.ts").Task[]> {
+  const { Task } = await import("@work-management/infrastructure/database/entities/tasks/Task.ts");
+  return em.find(Task, {
+    where: { org: { id: orgId }, status: READY_TASK_STATUS } as never,
+    order: { priority: "asc", createdAt: "asc", id: "asc" } as never,
+  });
 }
 
 export async function fetchCandidateIssues(
@@ -209,27 +203,16 @@ export async function fetchCandidateIssues(
   limit = 50,
 ): Promise<CandidateIssue[]> {
   const input = FetchCandidateIssuesInputSchema.parse({ orgId, limit });
-  const [{ AgentRun }, { Task }] = await Promise.all([
-    import("@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts"),
-    import("@platform-core/infrastructure/application-database/entities/tasks/Task.ts"),
-  ]);
-  const fork = em.fork();
-  const taskRepo = fork.getRepository(Task) as TaskRepository;
-  const agentRunRepo = fork.getRepository(AgentRun) as AgentRunRepository;
-
-  const readyTasks = await buildCandidateIssuesBaseQuery(
-    taskRepo,
-    input.orgId,
-  ).getResultList();
+  const readyTasks = await buildCandidateIssuesBaseQuery(em, input.orgId);
   if (readyTasks.length === 0) return [];
 
   const claimedTaskIds = await fetchClaimedTaskIds(
-    agentRunRepo,
+    em,
     input.orgId,
     readyTasks.map((task) => task.id),
   );
   const blockerStatusById = await fetchBlockerStatusById(
-    taskRepo,
+    em,
     input.orgId,
     readyTasks,
   );
@@ -259,22 +242,11 @@ export async function fetchSymphonyIssues(
   limit = 50,
 ): Promise<SymphonyIssue[]> {
   const input = FetchCandidateIssuesInputSchema.parse({ orgId, limit });
-  const [{ AgentRun }, { Task }] = await Promise.all([
-    import("@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts"),
-    import("@platform-core/infrastructure/application-database/entities/tasks/Task.ts"),
-  ]);
-  const fork = em.fork();
-  const taskRepo = fork.getRepository(Task) as TaskRepository;
-  const agentRunRepo = fork.getRepository(AgentRun) as AgentRunRepository;
-
-  const readyTasks = await buildCandidateIssuesBaseQuery(
-    taskRepo,
-    input.orgId,
-  ).getResultList();
+  const readyTasks = await buildCandidateIssuesBaseQuery(em, input.orgId);
   if (readyTasks.length === 0) return [];
 
   const claimedTaskIds = await fetchClaimedTaskIds(
-    agentRunRepo,
+    em,
     input.orgId,
     readyTasks.map((task) => task.id),
   );
@@ -286,7 +258,7 @@ export async function fetchSymphonyIssues(
 
   // Batch-load all blocker tasks to construct full refs
   const blockerTasksById = await fetchBlockerTasksById(
-    taskRepo,
+    em,
     input.orgId,
     allBlockerIds,
   );
@@ -324,22 +296,17 @@ export async function fetchIssuesByStates(
   if (input.states.length === 0) return [];
 
   const { AgentRun } = await import(
-    "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts"
+    "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts"
   );
-  const fork = em.fork();
-  const agentRunRepo = fork.getRepository(AgentRun) as AgentRunRepository;
-
-  const runs = await agentRunRepo.find(
-    {
-      org: input.orgId,
-      orchestrationState: { $in: input.states },
+  const runs = await em.find(AgentRun, {
+    where: {
+      org: { id: input.orgId },
+      orchestrationState: In([...input.states]),
     } as never,
-    {
-      limit: input.limit,
-      populate: ["task"],
-      orderBy: issueStateOrderBy(input.states),
-    },
-  );
+    take: input.limit,
+    relations: { task: true } as never,
+    order: issueStateOrderBy(input.states),
+  });
 
   return AgentRunIssueListSchema.parse(runs.map(toAgentRunIssue));
 }
@@ -373,21 +340,16 @@ export async function fetchIssueStatesByIds(
   if (input.runIds.length === 0) return [];
 
   const { AgentRun } = await import(
-    "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts"
+    "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts"
   );
-  const fork = em.fork();
-  const agentRunRepo = fork.getRepository(AgentRun) as AgentRunRepository;
-
-  const runs = await agentRunRepo.find(
-    {
-      id: { $in: input.runIds },
-      org: input.orgId,
+  const runs = await em.find(AgentRun, {
+    where: {
+      id: In([...input.runIds]),
+      org: { id: input.orgId },
     } as never,
-    {
-      fields: ["id", "orchestrationState"],
-      orderBy: { id: "asc" },
-    },
-  );
+    select: ["id", "orchestrationState"] as never,
+    order: { id: "asc" },
+  });
 
   const states = runs
     .filter((run) => run.orchestrationState !== undefined)
@@ -400,30 +362,30 @@ export async function fetchIssueStatesByIds(
 }
 
 async function fetchClaimedTaskIds(
-  agentRunRepo: AgentRunRepository,
+  em: EntityManager,
   orgId: string,
   taskIds: readonly string[],
 ): Promise<Set<string>> {
   if (taskIds.length === 0) return new Set();
-
-  const claimedRuns = await agentRunRepo.find(
-    {
-      org: orgId,
-      orchestrationState: { $in: OCCUPIED_TASK_ORCHESTRATION_STATES },
-      task: { id: { $in: [...taskIds] } },
+  const { AgentRun } = await import("@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts");
+  const claimedRuns = await em.find(AgentRun, {
+    where: {
+      org: { id: orgId },
+      orchestrationState: In([...OCCUPIED_TASK_ORCHESTRATION_STATES]),
+      task: { id: In([...taskIds]) },
     } as never,
-    { populate: ["task"] },
-  );
+    relations: { task: true } as never,
+  });
 
   return new Set(
     claimedRuns
-      .map((run) => run.task?.id)
+      .map((run) => (run as { task?: { id?: string } }).task?.id)
       .filter((taskId): taskId is string => typeof taskId === "string"),
   );
 }
 
 async function fetchBlockerStatusById(
-  taskRepo: TaskRepository,
+  em: EntityManager,
   orgId: string,
   tasks: readonly Task[],
 ): Promise<Map<string, string | null>> {
@@ -431,11 +393,11 @@ async function fetchBlockerStatusById(
     ...new Set(tasks.flatMap((task) => task.blockedByIds ?? [])),
   ];
   if (blockerIds.length === 0) return new Map();
+  const { Task: TaskEntity } = await import("@work-management/infrastructure/database/entities/tasks/Task.ts");
 
-  const blockers = await taskRepo.find({
-    org: orgId,
-    id: { $in: blockerIds },
-  } as never);
+  const blockers = await em.find(TaskEntity, {
+    where: { org: { id: orgId }, id: In(blockerIds) } as never,
+  });
 
   return new Map(blockers.map((task) => [task.id, task.status]));
 }
@@ -507,16 +469,15 @@ function toTrackerTask(task: Task): TrackerTask {
  * Returns a Map<id, Task> for tasks found in org scope.
  */
 async function fetchBlockerTasksById(
-  taskRepo: TaskRepository,
+  em: EntityManager,
   orgId: string,
   blockerIds: readonly string[],
 ): Promise<Map<string, Task>> {
   if (blockerIds.length === 0) return new Map();
-
-  const blockers = await taskRepo.find({
-    org: orgId,
-    id: { $in: [...blockerIds] },
-  } as never);
+  const { Task: TaskEntity } = await import("@work-management/infrastructure/database/entities/tasks/Task.ts");
+  const blockers = await em.find(TaskEntity, {
+    where: { org: { id: orgId }, id: In([...blockerIds]) } as never,
+  }) as Task[];
 
   return new Map(blockers.map((task) => [task.id, task]));
 }

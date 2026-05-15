@@ -17,6 +17,7 @@ export interface SavedViewPublicRow {
   filters: Record<string, unknown>;
   groupBy: string | null;
   sortBy: string | null;
+  isDefault: boolean;
   displayProperties: Record<string, unknown>;
   traceId: string;
   createdAt: string | null;
@@ -48,6 +49,9 @@ export class SavedViewPublicStore {
     name: string;
     scope?: string;
     viewType?: string;
+    filters?: Record<string, unknown>;
+    sortBy?: string | null;
+    isDefault?: boolean;
   }): Promise<SavedViewPublicRow | null> {
     if (!input.projectId) return null;
     const project = await this.dataSource.getRepository(FulcrumProjectEntity).findOneBy({
@@ -56,16 +60,21 @@ export class SavedViewPublicStore {
     });
     if (!project) return null;
 
+    if (input.isDefault) await this.clearDefault(input.projectId);
+
     const id = randomUUID();
     const saved = await this.repository().save({
       id,
       projectId: input.projectId,
       name: input.name,
       layout: input.viewType ?? "list",
-      filters: { scope: input.scope ?? "private" },
+      filters: objectValue(input.filters),
       groupBy: null,
-      sortBy: null,
-      displayProperties: {},
+      sortBy: input.sortBy ?? null,
+      displayProperties: {
+        scope: input.scope ?? "private",
+        isDefault: input.isDefault === true,
+      },
       traceId: `trace-saved-view-${id}`,
     });
     return toPublicRow(saved, input.orgId ?? project.workspaceId, input.scope ?? "private");
@@ -81,13 +90,26 @@ export class SavedViewPublicStore {
     name?: string;
     scope?: string;
     viewType?: string;
+    filters?: Record<string, unknown>;
+    sortBy?: string | null;
+    isDefault?: boolean;
   }): Promise<SavedViewPublicRow | null> {
     const view = await this.repository().findOneBy({ id: input.id });
     if (!view) return null;
 
+    if (input.isDefault) await this.clearDefault(view.projectId, view.id);
+
     if (input.name !== undefined) view.name = input.name;
-    if (input.scope !== undefined) view.filters = { ...view.filters, scope: input.scope };
+    if (input.filters !== undefined) view.filters = objectValue(input.filters);
     if (input.viewType !== undefined) view.layout = input.viewType;
+    if (input.sortBy !== undefined) view.sortBy = input.sortBy;
+    if (input.scope !== undefined || input.isDefault !== undefined) {
+      view.displayProperties = {
+        ...objectValue(view.displayProperties),
+        ...(input.scope !== undefined ? { scope: input.scope } : {}),
+        ...(input.isDefault !== undefined ? { isDefault: input.isDefault } : {}),
+      };
+    }
     return toPublicRow(await this.repository().save(view), null, input.scope ?? "project");
   }
 
@@ -116,22 +138,39 @@ export class SavedViewPublicStore {
   private repository() {
     return this.dataSource.getRepository(WorkManagementSavedViewEntity);
   }
+
+  private async clearDefault(projectId: string, exceptId?: string): Promise<void> {
+    const views = await this.repository().findBy({ projectId });
+    for (const view of views) {
+      if (view.id === exceptId) continue;
+      const displayProperties = objectValue(view.displayProperties);
+      if (displayProperties["isDefault"] !== true) continue;
+      view.displayProperties = { ...displayProperties, isDefault: false };
+    }
+    await this.repository().save(views);
+  }
 }
 
 function toPublicRow(view: WorkManagementSavedView, orgId: string | null, scope: string): SavedViewPublicRow {
+  const displayProperties = objectValue(view.displayProperties);
   return {
     id: view.id,
     orgId,
     projectId: view.projectId,
     name: view.name,
-    scope: typeof view.filters["scope"] === "string" ? view.filters["scope"] as string : scope,
+    scope: typeof displayProperties["scope"] === "string" ? displayProperties["scope"] as string : scope,
     viewType: view.layout,
-    filters: view.filters,
+    filters: objectValue(view.filters),
     groupBy: view.groupBy,
     sortBy: view.sortBy,
-    displayProperties: view.displayProperties,
+    isDefault: displayProperties["isDefault"] === true,
+    displayProperties,
     traceId: view.traceId,
     createdAt: view.createdAt?.toISOString() ?? null,
     updatedAt: view.updatedAt?.toISOString() ?? null,
   };
+}
+
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }

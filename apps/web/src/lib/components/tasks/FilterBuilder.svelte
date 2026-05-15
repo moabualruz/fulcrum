@@ -3,8 +3,8 @@
    * FilterBuilder — chip-based filter UI (Linear-style).
    */
   import { createEventDispatcher } from "svelte";
-  import type { SavedViewQuery, FilterClause, FilterOp } from "@work-management/application/saved-views/filter-query.ts";
-  import { SavedViewQuerySchema } from "@work-management/application/saved-views/filter-query.ts";
+  import type { SavedViewQuery, FilterClause, FilterOp } from "@work-management/interface/saved-view-filters.ts";
+  import { SavedViewQuerySchema } from "@work-management/interface/saved-view-filters.ts";
 
   import * as Popover from "$lib/components/ui/popover/index.js";
   import { Button } from "$lib/components/ui/button/index.js";

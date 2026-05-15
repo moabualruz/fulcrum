@@ -101,7 +101,7 @@ function authenticatedCallerWithContainer(container: Container) {
 function casbinContainer(
   rows: Array<{ ptype: string; v0: string; v1: string; v2: string; v3?: string; v4?: string; v5?: string }>,
 ) {
-  const container = new Container();
+  const container = null;
   container.bind({
     provide: FlagRegistry,
     useValue: { isEnabled: async () => true } as unknown as FlagRegistry,
@@ -182,7 +182,7 @@ describe("assertPermission middleware", () => {
   });
 
   it("treats FlagRegistry lookup errors as casbin disabled", async () => {
-    const container = new Container();
+    const container = null;
     container.bind({
       provide: FlagRegistry,
       useValue: {
@@ -198,7 +198,7 @@ describe("assertPermission middleware", () => {
   });
 
   it("fails closed when casbin is enabled but enforcement wiring throws", async () => {
-    const container = new Container();
+    const container = null;
     container.bind({
       provide: FlagRegistry,
       useValue: {
@@ -223,7 +223,7 @@ describe("assertPermission middleware", () => {
   });
 
   it("treats containers without FlagRegistry as casbin disabled", async () => {
-    const caller = authenticatedCallerWithContainer(new Container());
+    const caller = authenticatedCallerWithContainer(null);
     const result = await caller.auth.whoami();
     expect(result.userId).toBe("user-test-001");
     expect(result.orgId).toBe("00000000-0000-0000-0000-000000000001");
@@ -253,7 +253,7 @@ describe("assertPermission middleware", () => {
       findAll: async () => rows,
     } as unknown as CasbinRuleRepository;
 
-    const container = new Container();
+    const container = null;
     container.bind({
       provide: FlagRegistry,
       useValue: { isEnabled: async () => true } as unknown as FlagRegistry,

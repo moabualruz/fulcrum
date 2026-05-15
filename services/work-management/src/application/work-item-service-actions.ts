@@ -68,9 +68,8 @@ export async function createTaskAction(
     return { id };
   }
   const em = assertEm(db);
-  const conn = em.getConnection();
-  const id = randomUUID();
-  await conn.execute(
+    const id = randomUUID();
+  await em.query(
     `INSERT INTO tasks (id, org_id, project_id, title, description, status, priority)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [id, input.orgId, input.projectId, input.title, input.description ?? null, status, input.priority ?? 0],
@@ -130,7 +129,7 @@ async function appendServiceEvent(
   }
   const em = assertEm(db);
   const id = randomUUID();
-  await em.getConnection().execute(
+  await em.query(
     `INSERT INTO events (id, org_id, project_id, actor, subject_kind, subject_id, verb, payload, created_at)
      VALUES (?, ?, ?, 'system', ?, ?, ?, ?::jsonb, now())`,
     [id, input.orgId, input.projectId ?? null, input.subjectKind, input.subjectId, input.verb, JSON.stringify(input.payload ?? {})],
@@ -183,9 +182,7 @@ export async function updateTaskAction(
     return { ok: true };
   }
   const em = assertEm(db);
-  const conn = em.getConnection();
-
-  const sets: string[] = [];
+    const sets: string[] = [];
   const params: (string | number | null)[] = [];
   const changed: string[] = [];
   const push = (col: string, val: string | number | null) => {
@@ -206,7 +203,7 @@ export async function updateTaskAction(
 
   sets.push(`updated_at = now()`);
   params.push(input.id);
-  const rows = await conn.execute(
+  const rows = await em.query(
     `UPDATE tasks SET ${sets.join(", ")} WHERE id = ?
        RETURNING org_id, project_id`,
     params,
@@ -247,8 +244,7 @@ export async function deleteTaskAction(
     return { ok: true };
   }
   const em = assertEm(db);
-  const conn = em.getConnection();
-  const rows = await conn.execute(
+    const rows = await em.query(
     `DELETE FROM tasks WHERE id = ? RETURNING org_id, project_id`,
     [id],
   ) as Array<TaskScopeRow>;
@@ -292,8 +288,7 @@ export async function moveTaskStatusAction(
     return { ok: true };
   }
   const em = assertEm(db);
-  const conn = em.getConnection();
-  const rows = await conn.execute(
+    const rows = await em.query(
     `UPDATE tasks SET status = ?, updated_at = now()
        WHERE id = ? AND status = ? RETURNING org_id, project_id`,
     [input.to, input.id, input.from],

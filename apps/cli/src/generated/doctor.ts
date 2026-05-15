@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { buildDoctorReport, discoverChecks } from "@platform-core/application/health-checks/index.ts";
+import { buildDoctorReport, discoverChecks } from "@platform-core/interface/doctor-checks.ts";
 
 export function createDoctorCommand(): Command {
   const command = new Command("doctor");

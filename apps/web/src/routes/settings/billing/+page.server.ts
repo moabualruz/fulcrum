@@ -7,7 +7,7 @@
  */
 
 import { error, redirect } from "@sveltejs/kit";
-import { isSaasAuthFeatureEnabled } from "@identity-access/application/auth/saas-auth-feature.ts";
+import { isSaasAuthFeatureEnabled } from "@identity-access/interface/auth-feature.ts";
 import type { PageServerLoad } from "./$types";
 
 export function _isSaasAuthEnabled(): boolean {

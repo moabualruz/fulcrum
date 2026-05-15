@@ -1,10 +1,10 @@
 import type { EntityManager } from "typeorm";
 import { randomUUID } from "node:crypto";
 import { basename, resolve } from "node:path";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Repo } from "@platform-core/infrastructure/application-database/entities/repos/Repo.ts";
-import { RepoBranch } from "@platform-core/infrastructure/application-database/entities/repos/RepoBranch.ts";
-import { RepoTreeEntry } from "@platform-core/infrastructure/application-database/entities/repos/RepoTreeEntry.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Repo } from "@integration-hub/infrastructure/database/entities/repos/Repo.ts";
+import { RepoBranch } from "@integration-hub/infrastructure/database/entities/repos/RepoBranch.ts";
+import { RepoTreeEntry } from "@integration-hub/infrastructure/database/entities/repos/RepoTreeEntry.ts";
 import { AppForbiddenError, AppValidationError } from "@platform-core/domain/errors.ts";
 import { ormSqlConnection } from "@platform-core/application/orm-helpers.ts";
 import { getRepo, isRepoWriteOpsEnabled, serializeRepo, serializeRepoTreeEntry } from "@integration-hub/application/repos/queries.ts";
@@ -12,20 +12,18 @@ import type { AppContext, InsertRepoTreeEntryInput, RegisterRepoInput, RepoDto, 
 
 export async function registerRepo(em: EntityManager, ctx: AppContext, input: RegisterRepoInput): Promise<RepoDto> {
   if (!input.slug || !input.name) throw new AppValidationError("Repo slug and name are required.");
-  return await em.transactional(async (txEm) => {
-    const repo = txEm.create(Repo, { org: txEm.getReference(Org, ctx.orgId), slug: input.slug, name: input.name, kind: input.kind, localPath: input.localPath ?? null, remoteUrl: input.remoteUrl ?? null });
-    txEm.persist(repo);
-    await txEm.flush();
+  return await em.transaction(async (txEm: EntityManager) => {
+    const repo = txEm.create(Repo, { org: { id: ctx.orgId } as Org, slug: input.slug, name: input.name, kind: input.kind, localPath: input.localPath ?? null, remoteUrl: input.remoteUrl ?? null });
+    await txEm.save(repo);
     return serializeRepo(repo);
   });
 }
 
 export async function insertRepoTreeEntry(em: EntityManager, ctx: AppContext, input: InsertRepoTreeEntryInput): Promise<RepoTreeEntryDto> {
   if (!input.repoId || !input.commitSha || !input.path || !input.kind) throw new AppValidationError("Repo tree repoId, commitSha, path, and kind are required.");
-  return await em.transactional(async (txEm) => {
-    const row = txEm.create(RepoTreeEntry, { org: txEm.getReference(Org, ctx.orgId), projectId: ctx.projectId ?? "00000000-0000-4000-8000-000000000000", repo: txEm.getReference(Repo, input.repoId), commitSha: input.commitSha, path: input.path, kind: input.kind });
-    txEm.persist(row);
-    await txEm.flush();
+  return await em.transaction(async (txEm: EntityManager) => {
+    const row = txEm.create(RepoTreeEntry, { org: { id: ctx.orgId } as Org, projectId: ctx.projectId ?? "00000000-0000-4000-8000-000000000000", repo: { id: input.repoId } as Repo, commitSha: input.commitSha, path: input.path, kind: input.kind });
+    await txEm.save(row);
     return serializeRepoTreeEntry(row);
   });
 }
@@ -90,16 +88,15 @@ export async function touchRepoSync(em: EntityManager, ctx: AppContext, repoId: 
 export async function createRepoBranch(em: EntityManager, ctx: AppContext, input: { repoId: string; name: string }): Promise<{ ok: true }> {
   await requireRepoWriteOps(em, ctx);
   if (!input.name) throw new AppValidationError("branch name required");
-  await em.transactional(async (txEm) => {
+  await em.transaction(async (txEm: EntityManager) => {
     const branch = txEm.create(RepoBranch, {
-      org: txEm.getReference(Org, ctx.orgId),
-      repo: txEm.getReference(Repo, input.repoId),
+      org: { id: ctx.orgId } as Org,
+      repo: { id: input.repoId } as Repo,
       name: input.name,
       sha: null,
       isDefault: false,
     });
-    txEm.persist(branch);
-    await txEm.flush();
+    await txEm.save(branch);
   });
   return { ok: true };
 }

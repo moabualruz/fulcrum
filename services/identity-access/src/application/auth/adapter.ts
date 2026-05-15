@@ -21,12 +21,12 @@ import { Injectable } from "@nestjs/common";
 import type { EntityManager } from "typeorm";
 import type { CustomAdapter, CleanedWhere, JoinConfig } from "@better-auth/core/db/adapter";
 
-import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
-import { Session } from "@platform-core/infrastructure/application-database/entities/auth/Session.ts";
-import { Account } from "@platform-core/infrastructure/application-database/entities/auth/Account.ts";
-import { Verification } from "@platform-core/infrastructure/application-database/entities/auth/Verification.ts";
-import { OrgMember } from "@platform-core/infrastructure/application-database/entities/auth/OrgMember.ts";
-import { Invitation } from "@platform-core/infrastructure/application-database/entities/auth/Invitation.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
+import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
+import { Account } from "@identity-access/infrastructure/database/entities/auth/Account.ts";
+import { Verification } from "@identity-access/infrastructure/database/entities/auth/Verification.ts";
+import { OrgMember } from "@identity-access/infrastructure/database/entities/auth/OrgMember.ts";
+import { Invitation } from "@identity-access/infrastructure/database/entities/auth/Invitation.ts";
 import { DEFAULT_ADMIN_EMAIL, DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 
 const BETTER_AUTH_LOCAL_ADMIN_EMAIL = "admin@local.fulcrum";
@@ -318,15 +318,14 @@ export class MikroOrmBetterAuthAdapter {
     data: T;
     select?: string[];
   }): Promise<T> {
-    const em = this.em.fork();
+    const em = this.em;
 
     if (model === "user") {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mapped = this.mapUserFromBetterAuth(data as any);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const user = em.create(User, mapped as any);
-      em.persist(user);
-      await em.flush();
+      await em.save(user);
       return this.mapUserToBetterAuth(user) as unknown as T;
     }
 
@@ -335,8 +334,7 @@ export class MikroOrmBetterAuthAdapter {
       const mapped = this.mapSessionFromBetterAuth(data as any);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const session = em.create(Session, mapped as any);
-      em.persist(session);
-      await em.flush();
+      await em.save(session);
       return this.mapSessionToBetterAuth(session) as unknown as T;
     }
 
@@ -345,8 +343,7 @@ export class MikroOrmBetterAuthAdapter {
       const mapped = this.mapMemberFromBetterAuth(data as any);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const member = em.create(OrgMember, mapped as any);
-      em.persist(member);
-      await em.flush();
+      await em.save(member);
       return this.mapMemberToBetterAuth(member) as unknown as T;
     }
 
@@ -355,8 +352,7 @@ export class MikroOrmBetterAuthAdapter {
       const mapped = this.mapInvitationFromBetterAuth(data as any);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const inv = em.create(Invitation, mapped as any);
-      em.persist(inv);
-      await em.flush();
+      await em.save(inv);
       return this.mapInvitationToBetterAuth(inv) as unknown as T;
     }
 
@@ -365,8 +361,7 @@ export class MikroOrmBetterAuthAdapter {
       const mapped = this.mapAccountFromBetterAuth(data as any);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const account = em.create(Account, mapped as any);
-      em.persist(account);
-      await em.flush();
+      await em.save(account);
       return this.mapAccountToBetterAuth(account) as unknown as T;
     }
 
@@ -375,8 +370,7 @@ export class MikroOrmBetterAuthAdapter {
       const mapped = this.mapVerificationFromBetterAuth(data as any);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const verification = em.create(Verification, mapped as any);
-      em.persist(verification);
-      await em.flush();
+      await em.save(verification);
       return this.mapVerificationToBetterAuth(verification) as unknown as T;
     }
 
@@ -398,7 +392,7 @@ export class MikroOrmBetterAuthAdapter {
     select?: string[];
     join?: JoinConfig;
   }): Promise<T | null> {
-    const em = this.em.fork();
+    const em = this.em;
 
     if (model === "user") {
       const query = buildWhere(where, USER_FIELD_MAP);
@@ -414,7 +408,7 @@ export class MikroOrmBetterAuthAdapter {
       if (!user) return null;
       const output = this.mapUserToBetterAuth(user);
       if (join?.account) {
-        const accounts = await em.find(Account, { userId: user.id });
+        const accounts = await em.find(Account, { where: { userId: user.id } as never });
         output["account"] = accounts.map((account) => this.mapAccountToBetterAuth(account));
       }
       return output as unknown as T;
@@ -432,7 +426,7 @@ export class MikroOrmBetterAuthAdapter {
       if (!session) return null;
       const output = this.mapSessionToBetterAuth(session);
       if (join?.user) {
-        const user = await em.findOne(User, { id: session.userId });
+        const user = await em.findOne(User, { where: { id: session.userId } as never });
         if (user) output["user"] = this.mapUserToBetterAuth(user);
       }
       return output as unknown as T;
@@ -493,49 +487,49 @@ export class MikroOrmBetterAuthAdapter {
     offset?: number;
     join?: JoinConfig;
   }): Promise<T[]> {
-    const em = this.em.fork();
+    const em = this.em;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const orderBy: any = sortBy ? { [sortBy.field]: sortBy.direction } : undefined;
 
     if (model === "user") {
       const query = where ? buildWhere(where, USER_FIELD_MAP) : {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const users = await em.find(User, query as any, { limit, offset, orderBy });
+      const users = await em.find(User, { where: query as never, take: limit ?? undefined, skip: offset ?? undefined, order: orderBy as never });
       return users.map((u) => this.mapUserToBetterAuth(u)) as unknown as T[];
     }
 
     if (model === "session") {
       const query = where ? buildWhere(where, SESSION_FIELD_MAP) : {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sessions = await em.find(Session, query as any, { limit, offset, orderBy });
+      const sessions = await em.find(Session, { where: query as never, take: limit ?? undefined, skip: offset ?? undefined, order: orderBy as never });
       return sessions.map((s) => this.mapSessionToBetterAuth(s)) as unknown as T[];
     }
 
     if (model === "member") {
       const query = where ? buildWhere(where, MEMBER_FIELD_MAP) : {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const members = await em.find(OrgMember, query as any, { limit, offset, orderBy });
+      const members = await em.find(OrgMember, { where: query as never, take: limit ?? undefined, skip: offset ?? undefined, order: orderBy as never });
       return members.map((m) => this.mapMemberToBetterAuth(m)) as unknown as T[];
     }
 
     if (model === "invitation") {
       const query = where ? buildWhere(where, INVITATION_FIELD_MAP) : {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const invitations = await em.find(Invitation, query as any, { limit, offset, orderBy });
+      const invitations = await em.find(Invitation, { where: query as never, take: limit ?? undefined, skip: offset ?? undefined, order: orderBy as never });
       return invitations.map((i) => this.mapInvitationToBetterAuth(i)) as unknown as T[];
     }
 
     if (model === "account") {
       const query = where ? buildWhere(where, ACCOUNT_FIELD_MAP) : {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const accounts = await em.find(Account, query as any, { limit, offset, orderBy });
+      const accounts = await em.find(Account, { where: query as never, take: limit ?? undefined, skip: offset ?? undefined, order: orderBy as never });
       return accounts.map((a) => this.mapAccountToBetterAuth(a)) as unknown as T[];
     }
 
     if (model === "verification") {
       const query = where ? buildWhere(where, VERIFICATION_FIELD_MAP) : {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const verifications = await em.find(Verification, query as any, { limit, offset, orderBy });
+      const verifications = await em.find(Verification, { where: query as never, take: limit ?? undefined, skip: offset ?? undefined, order: orderBy as never });
       return verifications.map((v) => this.mapVerificationToBetterAuth(v)) as unknown as T[];
     }
 
@@ -556,7 +550,7 @@ export class MikroOrmBetterAuthAdapter {
     where: CleanedWhere[];
     update: T;
   }): Promise<T | null> {
-    const em = this.em.fork();
+    const em = this.em;
     const upd = update as Record<string, unknown>;
 
     if (model === "user") {
@@ -567,7 +561,6 @@ export class MikroOrmBetterAuthAdapter {
       if (!user) return null;
       const mapped = this.mapUserFromBetterAuth(upd);
       Object.assign(user, mapped);
-      await em.flush();
       return this.mapUserToBetterAuth(user) as unknown as T;
     }
 
@@ -579,7 +572,6 @@ export class MikroOrmBetterAuthAdapter {
       if (!session) return null;
       const mapped = this.mapSessionFromBetterAuth(upd);
       Object.assign(session, mapped);
-      await em.flush();
       return this.mapSessionToBetterAuth(session) as unknown as T;
     }
 
@@ -590,7 +582,6 @@ export class MikroOrmBetterAuthAdapter {
       if (!member) return null;
       const mapped = this.mapMemberFromBetterAuth(upd);
       Object.assign(member, mapped);
-      await em.flush();
       return this.mapMemberToBetterAuth(member) as unknown as T;
     }
 
@@ -601,7 +592,6 @@ export class MikroOrmBetterAuthAdapter {
       if (!inv) return null;
       const mapped = this.mapInvitationFromBetterAuth(upd);
       Object.assign(inv, mapped);
-      await em.flush();
       return this.mapInvitationToBetterAuth(inv) as unknown as T;
     }
 
@@ -612,7 +602,6 @@ export class MikroOrmBetterAuthAdapter {
       if (!account) return null;
       const mapped = this.mapAccountFromBetterAuth(upd);
       Object.assign(account, mapped);
-      await em.flush();
       return this.mapAccountToBetterAuth(account) as unknown as T;
     }
 
@@ -623,7 +612,6 @@ export class MikroOrmBetterAuthAdapter {
       if (!verification) return null;
       const mapped = this.mapVerificationFromBetterAuth(upd);
       Object.assign(verification, mapped);
-      await em.flush();
       return this.mapVerificationToBetterAuth(verification) as unknown as T;
     }
 
@@ -644,41 +632,41 @@ export class MikroOrmBetterAuthAdapter {
     where: CleanedWhere[];
     update: Record<string, unknown>;
   }): Promise<number> {
-    const em = this.em.fork();
+    const em = this.em;
 
     if (model === "session") {
       const query = buildWhere(where, SESSION_FIELD_MAP);
       const mapped = this.mapSessionFromBetterAuth(update);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return em.nativeUpdate(Session, query as any, mapped as any);
+      return (await em.update(Session, query as any, mapped as any)).affected ?? 0;
     }
 
     if (model === "member") {
       const query = buildWhere(where, MEMBER_FIELD_MAP);
       const mapped = this.mapMemberFromBetterAuth(update);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return em.nativeUpdate(OrgMember, query as any, mapped as any);
+      return (await em.update(OrgMember, query as any, mapped as any)).affected ?? 0;
     }
 
     if (model === "invitation") {
       const query = buildWhere(where, INVITATION_FIELD_MAP);
       const mapped = this.mapInvitationFromBetterAuth(update);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return em.nativeUpdate(Invitation, query as any, mapped as any);
+      return (await em.update(Invitation, query as any, mapped as any)).affected ?? 0;
     }
 
     if (model === "account") {
       const query = buildWhere(where, ACCOUNT_FIELD_MAP);
       const mapped = this.mapAccountFromBetterAuth(update);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return em.nativeUpdate(Account, query as any, mapped as any);
+      return (await em.update(Account, query as any, mapped as any)).affected ?? 0;
     }
 
     if (model === "verification") {
       const query = buildWhere(where, VERIFICATION_FIELD_MAP);
       const mapped = this.mapVerificationFromBetterAuth(update);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return em.nativeUpdate(Verification, query as any, mapped as any);
+      return (await em.update(Verification, query as any, mapped as any)).affected ?? 0;
     }
 
     // in-memory fallback for rate-limit / unrecognised models
@@ -697,48 +685,48 @@ export class MikroOrmBetterAuthAdapter {
   // ──────────────────────────────────────────────────────────────
 
   private async delete({ model, where }: { model: string; where: CleanedWhere[] }): Promise<void> {
-    const em = this.em.fork();
+    const em = this.em;
 
     if (model === "session") {
       const query = buildWhere(where, SESSION_FIELD_MAP);
       if (query["token"]) { query["id"] = query["token"]; delete query["token"]; }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await em.nativeDelete(Session, query as any);
+      await em.delete(Session, query as any as never);
       return;
     }
 
     if (model === "user") {
       const query = buildWhere(where, USER_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await em.nativeDelete(User, query as any);
+      await em.delete(User, query as any as never);
       return;
     }
 
     if (model === "member") {
       const query = buildWhere(where, MEMBER_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await em.nativeDelete(OrgMember, query as any);
+      await em.delete(OrgMember, query as any as never);
       return;
     }
 
     if (model === "invitation") {
       const query = buildWhere(where, INVITATION_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await em.nativeDelete(Invitation, query as any);
+      await em.delete(Invitation, query as any as never);
       return;
     }
 
     if (model === "account") {
       const query = buildWhere(where, ACCOUNT_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await em.nativeDelete(Account, query as any);
+      await em.delete(Account, query as any as never);
       return;
     }
 
     if (model === "verification") {
       const query = buildWhere(where, VERIFICATION_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await em.nativeDelete(Verification, query as any);
+      await em.delete(Verification, query as any as never);
       return;
     }
 
@@ -750,42 +738,42 @@ export class MikroOrmBetterAuthAdapter {
   // ──────────────────────────────────────────────────────────────
 
   private async deleteMany({ model, where }: { model: string; where: CleanedWhere[] }): Promise<number> {
-    const em = this.em.fork();
+    const em = this.em;
 
     if (model === "session") {
       const query = buildWhere(where, SESSION_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return em.nativeDelete(Session, query as any);
+      return (await em.delete(Session, query as any)).affected ?? 0;
     }
 
     if (model === "user") {
       const query = buildWhere(where, USER_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return em.nativeDelete(User, query as any);
+      return (await em.delete(User, query as any)).affected ?? 0;
     }
 
     if (model === "member") {
       const query = buildWhere(where, MEMBER_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return em.nativeDelete(OrgMember, query as any);
+      return (await em.delete(OrgMember, query as any)).affected ?? 0;
     }
 
     if (model === "invitation") {
       const query = buildWhere(where, INVITATION_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return em.nativeDelete(Invitation, query as any);
+      return (await em.delete(Invitation, query as any)).affected ?? 0;
     }
 
     if (model === "account") {
       const query = buildWhere(where, ACCOUNT_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return em.nativeDelete(Account, query as any);
+      return (await em.delete(Account, query as any)).affected ?? 0;
     }
 
     if (model === "verification") {
       const query = buildWhere(where, VERIFICATION_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return em.nativeDelete(Verification, query as any);
+      return (await em.delete(Verification, query as any)).affected ?? 0;
     }
 
     const rows = await this.memStore.findMany(model, where);
@@ -798,7 +786,7 @@ export class MikroOrmBetterAuthAdapter {
   // ──────────────────────────────────────────────────────────────
 
   private async count({ model, where }: { model: string; where?: CleanedWhere[] }): Promise<number> {
-    const em = this.em.fork();
+    const em = this.em;
 
     if (model === "user") {
       const query = where ? buildWhere(where, USER_FIELD_MAP) : {};

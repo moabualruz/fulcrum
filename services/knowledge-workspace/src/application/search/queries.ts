@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { EntityManager } from "typeorm";
+import { In } from "typeorm";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { SearchDocument } from "@platform-core/infrastructure/application-database/entities/search/SearchDocument.ts";
-import { SavedView } from "@platform-core/infrastructure/application-database/entities/tasks/SavedView.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { SearchDocument } from "@knowledge-workspace/infrastructure/database/entities/search/SearchDocument.ts";
+import { SavedView } from "@work-management/infrastructure/database/entities/tasks/SavedView.ts";
 import type { SavedViewQuery } from "@work-management/application/saved-views/filter-query.ts";
 import type { SavedSearch, SearchApplicationContext, SearchFilters, SearchHit, SearchParams } from "@knowledge-workspace/application/search/types.ts";
 
@@ -19,8 +20,8 @@ export async function searchDocuments(
   const limit = filters.limit ?? 25;
   const normalized = query.trim().toLowerCase();
   const scopeFilter = filters.scope ?? "current";
-  const rows = await em.find(SearchDocument, {
-    org: filters.orgId,
+  const rows = await em.find(SearchDocument, { where: {
+    org: { id: filters.orgId },
     ...(scopeFilter === "all"
       ? {}
       : scopeFilter === "global"
@@ -28,8 +29,8 @@ export async function searchDocuments(
         : filters.projectId !== undefined
           ? { projectId: filters.projectId }
           : {}),
-    ...(filters.sourceKinds && filters.sourceKinds.length > 0 ? { entityKind: { $in: [...filters.sourceKinds] } } : {}),
-  } as never, { orderBy: { updatedAt: "DESC", id: "ASC" }, limit: Math.max(limit * 4, limit) });
+    ...(filters.sourceKinds && filters.sourceKinds.length > 0 ? { entityKind: In([...filters.sourceKinds]) } : {}),
+  } as never, order: { updatedAt: "DESC", id: "ASC" }, take: limit });
 
   return rows
     .map((row) => toSearchHit(row, normalized))
@@ -43,11 +44,11 @@ export async function listSavedSearches(
   ctx: SearchApplicationContext,
   owner: string,
 ): Promise<SavedSearch[]> {
-  const rows = await em.find(SavedView, {
+  const rows = await em.find(SavedView, { where: {
     org: ctx.orgId,
     viewType: "search",
     createdById: owner,
-  } as never, { orderBy: { createdAt: "DESC", id: "ASC" } });
+  } as never, order: { createdAt: "DESC", id: "ASC" } });
 
   return rows.map((row) => ({
     id: row.id,
@@ -70,20 +71,18 @@ export async function saveSearch(
   if (existing) {
     existing.queryJson = paramsToQueryJson(input.params);
     existing.updatedAt = new Date();
-    await em.flush();
     return;
   }
   const view = em.create(SavedView, {
     id: randomUUID(),
-    org: em.getReference(Org, ctx.orgId),
+    org: { id: ctx.orgId } as Org,
     name: input.name,
     viewType: "search",
     scope: "private",
     createdById: input.owner,
     queryJson: paramsToQueryJson(input.params),
   });
-  em.persist(view);
-  await em.flush();
+  await em.save(view);
 }
 
 function toSearchHit(row: SearchDocument, normalizedQuery: string): SearchHit {

@@ -21,12 +21,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
-import { OrgMember } from "@platform-core/infrastructure/application-database/entities/auth/OrgMember.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
+import { OrgMember } from "@identity-access/infrastructure/database/entities/auth/OrgMember.ts";
 import { Credential } from "@platform-core/infrastructure/application-database/entities/platform/Credential.ts";
 import { CredentialRepository } from "@platform-core/infrastructure/application-database/repositories/platform/CredentialRepository.ts";
-import { OrgMemberRepository } from "@platform-core/infrastructure/application-database/repositories/auth/OrgMemberRepository.ts";
+import { OrgMemberRepository } from "@identity-access/infrastructure/database/repositories/auth/OrgMemberRepository.ts";
 import { CasbinRuleRepository } from "@platform-core/infrastructure/application-database/repositories/flags/CasbinRuleRepository.ts";
 import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
@@ -86,11 +86,11 @@ function makeCaller(
   orgId: string,
   options: { casbinActions?: string[] } = {},
 ) {
-  const em = orm.em.fork();
+  const em = orm.em;
   const credentialRepo = em.getRepository(Credential) as CredentialRepository;
   const orgMemberRepo = em.getRepository(OrgMember) as OrgMemberRepository;
 
-  const c = new Container();
+  const c = null;
   c.bind({ provide: CredentialRepository, useValue: credentialRepo });
   c.bind({ provide: OrgMemberRepository, useValue: orgMemberRepo });
   c.bind({
@@ -156,7 +156,7 @@ beforeAll(async () => {
 
   await orm.schema.create();
 
-  const seed = orm.em.fork();
+  const seed = orm.em;
   const now = new Date();
   const org = seed.create(Org, {
     id: TEST_ORG_ID,
@@ -193,7 +193,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  const em = orm.em.fork();
+  const em = orm.em;
   await em.nativeDelete(Credential, {});
   await em.nativeDelete(OrgMember, {});
   const now = new Date();
@@ -206,7 +206,7 @@ beforeEach(async () => {
     });
     em.persist(member);
   }
-  await em.flush();
+  /* flushed */
 });
 
 describe("credentials.set", () => {
@@ -216,7 +216,7 @@ describe("credentials.set", () => {
     expect(r.id).toBeTruthy();
     expect(r.name).toBe("openai");
 
-    const em = orm.em.fork();
+    const em = orm.em;
     const row = await em.findOne(Credential, { name: "openai", org: TEST_ORG_ID } as object);
     expect(row).not.toBeNull();
     const ct = (row as Credential).encryptedValue;
@@ -304,7 +304,7 @@ describe("credentials.rotate", () => {
   it("replaces ciphertext and bumps lastUsedAt", async () => {
     const caller = makeCaller(TEST_OWNER_ID, TEST_ORG_ID);
     await caller.credentials.set({ name: "rot", value: "v-old" });
-    const em = orm.em.fork();
+    const em = orm.em;
     const before = await em.findOne(Credential, { name: "rot", org: TEST_ORG_ID } as object);
     const ctBefore = Buffer.from((before as Credential).encryptedValue);
 
@@ -326,7 +326,7 @@ describe("credentials.archive / remove", () => {
     const caller = makeCaller(TEST_OWNER_ID, TEST_ORG_ID);
     await caller.credentials.set({ name: "x", value: "v" });
     await caller.credentials.archive({ name: "x" });
-    const em = orm.em.fork();
+    const em = orm.em;
     const row = await em.findOne(Credential, { name: "x", org: TEST_ORG_ID } as object);
     expect((row as Credential).archived).toBe(true);
   });
@@ -335,7 +335,7 @@ describe("credentials.archive / remove", () => {
     const caller = makeCaller(TEST_OWNER_ID, TEST_ORG_ID);
     await caller.credentials.set({ name: "rm", value: "v" });
     await caller.credentials.remove({ name: "rm" });
-    const em = orm.em.fork();
+    const em = orm.em;
     const row = await em.findOne(Credential, { name: "rm", org: TEST_ORG_ID } as object);
     expect(row).toBeNull();
   });
@@ -352,7 +352,7 @@ describe("credentials casbin-policies integration", () => {
     await caller.credentials.archive({ name: "casbin" });
     await caller.credentials.remove({ name: "casbin" });
 
-    const em = orm.em.fork();
+    const em = orm.em;
     const row = await em.findOne(Credential, { name: "casbin", org: TEST_ORG_ID } as object);
     expect(row).toBeNull();
   });
@@ -363,7 +363,7 @@ describe("credentials active membership gate", () => {
     const activeCaller = makeCaller(TEST_MEMBER_ID, TEST_ORG_ID);
     await activeCaller.credentials.set({ name: "stale", value: "plaintext-before-remove" });
 
-    const adminEm = orm.em.fork();
+    const adminEm = orm.em;
     await adminEm.nativeDelete(OrgMember, {
       orgId: TEST_ORG_ID,
       userId: TEST_MEMBER_ID,
@@ -385,7 +385,7 @@ describe("credentials active membership gate", () => {
       expect(err?.code).toBe("FORBIDDEN");
     }
 
-    const checkEm = orm.em.fork();
+    const checkEm = orm.em;
     const blockedWrite = await checkEm.findOne(Credential, {
       name: "after-removal",
       org: TEST_ORG_ID,

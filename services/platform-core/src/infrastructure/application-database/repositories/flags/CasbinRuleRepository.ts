@@ -9,6 +9,7 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
+import type { EntityManager, FindOptionsWhere } from "typeorm";
 import { CasbinRule } from "../../entities/flags/CasbinRule.ts";
 
 @Injectable()
@@ -17,4 +18,16 @@ export class CasbinRuleRepository {
     @InjectRepository(CasbinRule)
     private readonly casbinRules: Repository<CasbinRule>,
   ) {}
+
+  get em(): EntityManager {
+    return this.casbinRules.manager;
+  }
+
+  findAll(): Promise<CasbinRule[]> {
+    return this.casbinRules.find();
+  }
+
+  delete(where: FindOptionsWhere<CasbinRule>): Promise<unknown> {
+    return this.casbinRules.delete(where);
+  }
 }

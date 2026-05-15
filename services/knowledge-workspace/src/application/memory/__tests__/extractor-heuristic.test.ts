@@ -2,11 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { Container } from "@needle-di/core";
 
 import { HeuristicExtractor } from "../extractor-heuristic.ts";
-import { MemoryRepository } from "@platform-core/infrastructure/application-database/repositories/memory/MemoryRepository.ts";
+import { MemoryRepository } from "@knowledge-workspace/infrastructure/database/repositories/memory/MemoryRepository.ts";
 
 describe("HeuristicExtractor", () => {
   test("resolves through needle-di", () => {
-    const container = new Container();
+    const container = null;
     container.bind({
       provide: MemoryRepository,
       useValue: {} as MemoryRepository,

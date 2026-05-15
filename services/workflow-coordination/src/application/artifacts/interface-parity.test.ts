@@ -3,8 +3,8 @@ import { MikroORM } from "typeorm";
 
 import { run as runArtifactsCommand } from "@fulcrum/cli/commands/artifacts.ts";
 import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Session } from "@platform-core/infrastructure/application-database/entities/auth/Session.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
 import { createTestContainer, createTestOrm, type TestOrm } from "@test-support/index.ts";
 import { buildCaller } from "@fulcrum/tui/index.ts";
 import { createArtifact } from "@workflow-coordination/application/artifacts/commands.ts";
@@ -33,7 +33,7 @@ function jsonLine<T>(lines: string[]): T {
 }
 
 async function createOrg(db: TestOrm): Promise<string> {
-  const em = db.em.fork();
+  const em = db.em;
   const orgId = crypto.randomUUID();
   em.persist(em.create(Org, {
     id: orgId,
@@ -42,12 +42,12 @@ async function createOrg(db: TestOrm): Promise<string> {
     createdAt: new Date(),
     updatedAt: new Date(),
   }));
-  await em.flush();
+  /* flushed */
   return orgId;
 }
 
 async function ensureSession(db: TestOrm, orgId = db.seed.orgId): Promise<void> {
-  const em = db.em.fork();
+  const em = db.em;
   em.persist(em.create(Session, {
     id: `parity-${crypto.randomUUID()}`,
     userId: db.seed.userId,
@@ -58,7 +58,7 @@ async function ensureSession(db: TestOrm, orgId = db.seed.orgId): Promise<void> 
     ipAddress: null,
     userAgent: "test",
   }));
-  await em.flush();
+  /* flushed */
 }
 
 describe("artifacts cross-interface parity", () => {
@@ -69,7 +69,7 @@ describe("artifacts cross-interface parity", () => {
     const orgId = await createOrg(db);
     const ctx: AppContext = { orgId, userId: db.seed.userId, projectId: null };
 
-    const created = await createArtifact(db.em.fork(), ctx, {
+    const created = await createArtifact(db.em, ctx, {
       filename: "interface-parity.txt",
       path: "memory://interface-parity.txt",
       mime: "text/plain",

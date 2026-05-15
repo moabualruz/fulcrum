@@ -1,4 +1,4 @@
-import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
+import type { DiContainer } from "@platform-core/interface/runtime-container.ts";
 import { InferenceClient, type InferenceLifecycleLike } from "@platform-core/application/inference/client.ts";
 import {
   createInferenceApiCallerFromEnv,

@@ -1,11 +1,11 @@
 import { createHmac } from "node:crypto";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Webhook } from "@platform-core/infrastructure/application-database/entities/notifications/Webhook.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Webhook } from "@notification-center/infrastructure/database/entities/notifications/Webhook.ts";
 import {
   WebhookDelivery,
   WebhookDeliveryStatus,
-} from "@platform-core/infrastructure/application-database/entities/notifications/WebhookDelivery.ts";
+} from "@notification-center/infrastructure/database/entities/notifications/WebhookDelivery.ts";
 import { requireMasterKey } from "@platform-core/application/secrets/keyring.ts";
 import { decrypt } from "@platform-core/application/secrets/vault.ts";
 

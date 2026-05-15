@@ -11,8 +11,8 @@ import {
   Unique,
   JoinColumn,
 } from "typeorm";
-import { Org } from "../auth/Org.ts";
-import { User } from "../auth/User.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
 
 @Entity("experiment_assignment")
 @Unique("uq_experiment_assignment_org_user_experiment", ["org", "user", "experimentId"])

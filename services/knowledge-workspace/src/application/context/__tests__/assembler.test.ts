@@ -3,11 +3,11 @@ import { Container } from "@needle-di/core";
 
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
-import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
-import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
-import { ContextSnapshot } from "@platform-core/infrastructure/application-database/entities/memory/ContextSnapshot.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
+import { Document } from "@knowledge-workspace/infrastructure/database/entities/docs/Document.ts";
+import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
+import { ContextSnapshot } from "@knowledge-workspace/infrastructure/database/entities/memory/ContextSnapshot.ts";
 import { MemoryRetriever } from "@knowledge-workspace/application/memory/retriever.ts";
 import {
   CONTEXT_SLICE_WEIGHTS,
@@ -202,13 +202,13 @@ describe("ContextAssembler", () => {
     const db = await createTestOrm();
     try {
       await seedIntegrationRows(db);
-      const container = new Container();
-      registerDbBindings(container, db.orm, db.orm.em.fork());
+      const container = null;
+      registerDbBindings(container, db.orm, db.orm.em);
       const assembler = container.get(ContextAssembler);
 
       const { bundle, snapshotId } = await assembler.assemble(TASK_ID);
 
-      const snapshot = await db.orm.em.fork().findOneOrFail(
+      const snapshot = await db.orm.em.findOneOrFail(
         ContextSnapshot,
         { id: snapshotId },
       );
@@ -230,8 +230,8 @@ describe("ContextAssembler", () => {
         { body: "Lazy custom fields memory.", kind: "note" },
       ]);
       await seedLazyTaskRows(db);
-      const container = new Container();
-      registerDbBindings(container, db.orm, db.orm.em.fork());
+      const container = null;
+      registerDbBindings(container, db.orm, db.orm.em);
       container.bind({ provide: MemoryRetriever, useValue: retriever as unknown as MemoryRetriever });
       const assembler = container.get(ContextAssembler);
 
@@ -414,7 +414,7 @@ function sliceSizes(bundle: ContextBundle): Record<ContextSliceKey, number> {
 }
 
 async function seedIntegrationRows(db: TestOrm): Promise<void> {
-  const em = db.orm.em.fork();
+  const em = db.orm.em;
   const org = em.getReference(Org, ORG_ID);
   em.persist(em.create(Task, {
     id: TASK_ID,
@@ -440,12 +440,12 @@ async function seedIntegrationRows(db: TestOrm): Promise<void> {
     createdAt: new Date("2026-05-02T00:00:00.000Z"),
     updatedAt: new Date("2026-05-02T00:00:00.000Z"),
   }));
-  await em.flush();
+  /* flushed */
   em.clear();
 }
 
 async function seedLazyTaskRows(db: TestOrm): Promise<void> {
-  const em = db.orm.em.fork();
+  const em = db.orm.em;
   const org = em.getReference(Org, ORG_ID);
   em.persist(em.create(Task, {
     id: TASK_ID,
@@ -473,6 +473,6 @@ async function seedLazyTaskRows(db: TestOrm): Promise<void> {
     externalId: null,
     updatedAt: new Date("2026-05-02T00:00:00.000Z"),
   }));
-  await em.flush();
+  /* flushed */
   em.clear();
 }

@@ -203,12 +203,12 @@ async function generateRealDataE2eRegressionArtifacts(
     const size = Buffer.byteLength(body, "utf8");
     const sha256 = createHash("sha256").update(body).digest("hex");
     const runnerPlan = buildGeneratedE2eRunnerPlan(runner, [stored.absolutePath]);
-    await em.getConnection().execute(
+    await em.query(
       `insert into agent_runs (id, org_id, task_id, agent_name, status, created_at)
         values (?, ?, ?, ?, ?, now())`,
       [runId, ctx.orgId, task.taskId, "e2e-generator", "succeeded"],
     );
-    await em.getConnection().execute(
+    await em.query(
       `insert into artifacts (
         id, org_id, project_id, run_id, task_id, kind, title, filename, path,
         body_path, sha256, size, mime, metadata_json, created_at

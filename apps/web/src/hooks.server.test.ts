@@ -85,7 +85,7 @@ describe("hooks.server handle", () => {
 
   test("request locals receive web runtime EntityManager and container", async () => {
     const em = { marker: "em" } as never;
-    const container = new Container();
+    const container = null;
     __setWebRuntimeForTest({
       authHandler: null,
       orm: { close: async () => undefined } as never,
@@ -109,7 +109,7 @@ describe("hooks.server handle", () => {
       orm: { close: async () => undefined } as never,
       createRequestContext: () => ({
         em: { marker: `fork-${++forkCount}` } as never,
-        container: new Container(),
+        container: null,
       }),
     });
 
@@ -140,7 +140,7 @@ describe("hooks.server handle", () => {
         contextCalls += 1;
         return {
           em: { clear: () => undefined } as never,
-          container: new Container(),
+          container: null,
         };
       },
     });
@@ -164,7 +164,7 @@ describe("hooks.server handle", () => {
       orm: { close: async () => undefined } as never,
       createRequestContext: () => ({
         em: { clear: () => undefined } as never,
-        container: new Container(),
+        container: null,
       }),
     });
 
@@ -196,7 +196,7 @@ describe("hooks.server handle", () => {
             clearCalls += 1;
           },
         } as never,
-        container: new Container(),
+        container: null,
       }),
     });
 

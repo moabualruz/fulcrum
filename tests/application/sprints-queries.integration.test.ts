@@ -25,7 +25,7 @@ async function freshDb(): Promise<TestOrm> {
 describe("sprint application queries with migrated PGlite data", () => {
   test("loads backlog, sprint list, detail tasks, and not-found paths through real tables", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const conn = em.getConnection();
     const projectId = randomUUID();
     const sprintId = randomUUID();

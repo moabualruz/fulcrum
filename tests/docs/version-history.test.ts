@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import type { Session } from "better-auth";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
-import { DocVersion } from "@platform-core/infrastructure/application-database/entities/docs/DocVersion.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Document } from "@knowledge-workspace/infrastructure/database/entities/docs/Document.ts";
+import { DocVersion } from "@knowledge-workspace/infrastructure/database/entities/docs/DocVersion.ts";
 import { reconstructDocVersion } from "@knowledge-workspace/application/docs/version-reconstructor.ts";
 import { writeDocVersion } from "@knowledge-workspace/application/docs/version-writer.ts";
 import { createTestOrm } from "@test-support/application-database.ts";
@@ -58,8 +58,7 @@ async function createDoc(em: EntityManager): Promise<Document> {
     externalId: "versioned-doc",
     updatedAt: new Date("2026-05-03T10:00:00Z"),
   });
-  em.persist(doc);
-  await em.flush();
+  await em.save(doc);
   return doc;
 }
 
@@ -67,7 +66,7 @@ describe("doc version history engine", () => {
   test("writer stores first and every tenth save as snapshots and other saves as deltas", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const doc = await createDoc(em);
 
       for (let i = 1; i <= 12; i += 1) {
@@ -78,7 +77,7 @@ describe("doc version history engine", () => {
           doc,
           now: new Date("2026-05-03T10:00:00Z"),
         });
-        await em.flush();
+        /* flushed */
       }
 
       const versions = await em.find(DocVersion, { doc: doc.id } as never, {
@@ -98,7 +97,7 @@ describe("doc version history engine", () => {
   test("reconstructor rebuilds arbitrary versions byte-stably from nearest prior snapshot", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const doc = await createDoc(em);
       const originals = new Map<number, Record<string, unknown>>();
 
@@ -112,7 +111,7 @@ describe("doc version history engine", () => {
           doc,
           now: new Date("2026-05-03T10:00:00Z"),
         });
-        await em.flush();
+        /* flushed */
       }
 
       for (const versionNum of [1, 5, 10, 12]) {
@@ -132,7 +131,7 @@ describe("doc version history engine", () => {
   test("writer falls back to snapshot when large-document delta computation exceeds threshold", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const doc = await createDoc(em);
       const slowDeltaCount = { value: 0 };
 
@@ -143,7 +142,7 @@ describe("doc version history engine", () => {
         doc,
         now: new Date("2026-05-03T10:00:00Z"),
       });
-      await em.flush();
+      /* flushed */
 
       doc.bodyMd = "B".repeat(510_000);
       doc.contentJson = { text: "B".repeat(510_000) };
@@ -154,7 +153,7 @@ describe("doc version history engine", () => {
         deltaElapsedMs: () => 201,
         slowDeltaCount,
       });
-      await em.flush();
+      /* flushed */
 
       const version = await em.findOneOrFail(DocVersion, { doc: doc.id, versionNum: 2 } as never);
       expect(version.snapshot).toEqual(doc.contentJson);
@@ -168,7 +167,7 @@ describe("doc version history engine", () => {
   test("docs.versions list/get/diff/restore are org-scoped and restore is non-destructive", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
       const doc = await caller.docs.create({
         title: "Restore Doc",
@@ -224,7 +223,7 @@ describe("doc version history engine", () => {
   test("restore over 50 versions stays under the PGlite latency budget", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
       const doc = await caller.docs.create({
         title: "Performance Doc",

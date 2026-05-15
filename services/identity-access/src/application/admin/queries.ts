@@ -16,7 +16,7 @@ export interface AdminAppContext {
   orgId: string;
   userId: string;
   em: EntityManager | null;
-  container: { get<T>(token: new (...args: unknown[]) => T): T } | null;
+  container: { get<T>(token: new (...args: unknown[]) => T): T; has?: (token: unknown) => boolean } | null;
 }
 
 export const BACKUP_FORMAT = "fulcrum.db-dump.v1" as const;
@@ -49,7 +49,7 @@ async function execute<T extends Record<string, unknown>>(
   sql: string,
   params: unknown[] = [],
 ): Promise<T[]> {
-  return await em.getConnection().execute(sql, params) as T[];
+  return await em.query(sql, params) as T[];
 }
 
 async function tableNames(em: EntityManager): Promise<string[]> {
@@ -216,31 +216,30 @@ class MikroErrorLogStore extends ErrorLogStore {
   }
 
   async list(orgId: string, input: { limit: number; since?: Date }) {
-    const where = input.since ? { org: orgId, occurredAt: { $gte: input.since } } : { org: orgId };
-    const rows = await this.repo().find(where as never, {
-      orderBy: { occurredAt: "DESC" },
-      limit: input.limit,
-    });
+    const { MoreThanOrEqual } = await import("typeorm");
+    const where = input.since ? { org: { id: orgId }, occurredAt: MoreThanOrEqual(input.since) } : { org: { id: orgId } };
+    const rows = await this.repo().find({ where: where as never, order: { occurredAt: "DESC" }, take: input.limit });
     return rows.map(errorEntityToRecord);
   }
 
   async get(orgId: string, id: string) {
-    const row = await this.repo().findOne({ id, org: orgId } as never);
+    const row = await this.repo().findOne({ where: { id, org: { id: orgId } } as never });
     return row ? errorEntityToRecord(row) : null;
   }
 
   async clear(orgId: string, input: { before?: Date }) {
     const em = requireEm(this.ctx);
-    const where = input.before ? { org: orgId, occurredAt: { $lt: input.before } } : { org: orgId };
-    const rows = await this.repo().find(where as never);
+    const { LessThan } = await import("typeorm");
+    const where = input.before ? { org: { id: orgId }, occurredAt: LessThan(input.before) } : { org: { id: orgId } };
+    const rows = await this.repo().find({ where: where as never });
     em.remove(rows);
-    await em.flush();
     return rows.length;
   }
 }
 
 function errorStoreFromContext(ctx: AdminAppContext): ErrorLogStore {
-  if (ctx.container?.has(ErrorLogStore)) return ctx.container.get(ErrorLogStore);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (ctx.container?.has?.(ErrorLogStore)) return ctx.container.get(ErrorLogStore as any);
   return new MikroErrorLogStore(ctx);
 }
 
@@ -325,10 +324,11 @@ export function validateThemeValue(key: ThemeKey, value: string): string {
 }
 
 function themeRepo(ctx: AdminAppContext): ThemeSettingsRepository {
-  if (!ctx.container?.has(ThemeSettingsRepository)) {
+  if (!ctx.container?.has?.(ThemeSettingsRepository)) {
     throw new AppInvariantError("Theme settings repository is not configured.");
   }
-  return ctx.container.get(ThemeSettingsRepository);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ctx.container.get(ThemeSettingsRepository as any);
 }
 
 function legacyKey(key: keyof LegacyThemeSettings): string {
@@ -396,22 +396,22 @@ export async function setThemeSetting(ctx: AdminAppContext, input: { key: string
 }
 
 async function getFeatureFlagClass() {
-  const { FeatureFlag } = await import("@platform-core/infrastructure/application-database/entities/auth/FeatureFlag.ts");
+  const { FeatureFlag } = await import("@identity-access/infrastructure/database/entities/auth/FeatureFlag.ts");
   return FeatureFlag;
 }
 
 async function getFeatureFlagRepository() {
-  const { FeatureFlagRepository } = await import("@platform-core/infrastructure/application-database/repositories/auth/FeatureFlagRepository.ts");
+  const { FeatureFlagRepository } = await import("@identity-access/infrastructure/database/repositories/auth/FeatureFlagRepository.ts");
   return FeatureFlagRepository;
 }
 
 async function getOrgMemberRepository() {
-  const { OrgMemberRepository } = await import("@platform-core/infrastructure/application-database/repositories/auth/OrgMemberRepository.ts");
+  const { OrgMemberRepository } = await import("@identity-access/infrastructure/database/repositories/auth/OrgMemberRepository.ts");
   return OrgMemberRepository;
 }
 
 async function getOrgClass() {
-  const { Org } = await import("@platform-core/infrastructure/application-database/entities/auth/Org.ts");
+  const { Org } = await import("@identity-access/infrastructure/database/entities/auth/Org.ts");
   return Org;
 }
 
@@ -423,7 +423,8 @@ async function getFeatureFlagRolloutClass() {
 async function resolveFlagRegistry(ctx: AdminAppContext): Promise<FlagRegistry> {
   if (ctx.container) {
     try {
-      return ctx.container.get(FlagRegistry);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ctx.container.get(FlagRegistry as any);
     } catch {}
   }
   if (ctx.em) {
@@ -439,7 +440,8 @@ async function resolveOrgMemberRepo(ctx: AdminAppContext): Promise<unknown | nul
   if (ctx.container) {
     const OrgMemberRepository = await getOrgMemberRepository();
     try {
-      return ctx.container.get(OrgMemberRepository);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ctx.container.get(OrgMemberRepository as any);
     } catch {
       return null;
     }
@@ -453,8 +455,8 @@ async function findOrgMembership(ctx: AdminAppContext, orgId: string, userId: st
     return (orgMemberRepo as { findOne(input: unknown): Promise<{ role: string } | null> }).findOne({ orgId, userId });
   }
   const em = requireEm(ctx);
-  const { OrgMember } = await import("@platform-core/infrastructure/application-database/entities/auth/OrgMember.ts");
-  return em.findOne(OrgMember, { orgId, userId } as never) as Promise<{ role: string } | null>;
+  const { OrgMember } = await import("@identity-access/infrastructure/database/entities/auth/OrgMember.ts");
+  return em.findOne(OrgMember, { where: { orgId, userId } as never }) as Promise<{ role: string } | null>;
 }
 
 async function requireOwnerOrAdmin(ctx: AdminAppContext): Promise<void> {
@@ -489,7 +491,7 @@ function readOrgOverrides(cohortRules: Record<string, unknown> | null | undefine
 
 async function findScopedFeatureFlag(em: EntityManager, flag: FeatureFlagName, orgId: string) {
   const FeatureFlag = await getFeatureFlagClass();
-  return em.findOne(FeatureFlag, { flag, orgId, userId: null } as never);
+  return em.findOne(FeatureFlag, { where: { flag, orgId, userId: null } as never });
 }
 
 async function ensureScopedFeatureFlag(em: EntityManager, flag: FeatureFlagName, orgId: string) {
@@ -497,7 +499,7 @@ async function ensureScopedFeatureFlag(em: EntityManager, flag: FeatureFlagName,
   if (existing) return existing;
   const FeatureFlag = await getFeatureFlagClass();
   const row = em.create(FeatureFlag, { flag, enabled: true, orgId, userId: null, createdAt: new Date() } as never);
-  em.persist(row);
+  await em.save(row);
   return row;
 }
 
@@ -505,7 +507,7 @@ async function findRollout(em: EntityManager, flag: FeatureFlagName, orgId: stri
   const FeatureFlagRollout = await getFeatureFlagRolloutClass();
   const flagRow = await findScopedFeatureFlag(em, flag, orgId);
   if (!flagRow) return null;
-  return em.findOne(FeatureFlagRollout, { org: orgId, flag: (flagRow as { id: string }).id } as never, { refresh: true });
+  return em.findOne(FeatureFlagRollout, { where: { org: { id: orgId }, flag: (flagRow as { id: string }).id } as never });
 }
 
 async function upsertRollout(
@@ -514,20 +516,20 @@ async function upsertRollout(
 ) {
   const FeatureFlagRollout = await getFeatureFlagRolloutClass();
   const Org = await getOrgClass();
-  const { User } = await import("@platform-core/infrastructure/application-database/entities/auth/User.ts");
+  const { User } = await import("@identity-access/infrastructure/database/entities/auth/User.ts");
   const flagRow = await ensureScopedFeatureFlag(em, input.flag, input.orgId);
   let rollout = await findRollout(em, input.flag, input.orgId);
 
   if (!rollout) {
     rollout = em.create(FeatureFlagRollout, {
-      org: em.getReference(Org, input.orgId),
+      org: { id: input.orgId } as InstanceType<typeof Org>,
       flag: flagRow,
       rolloutPercent: input.rolloutPercent ?? 100,
       cohortRules: {},
-      updatedBy: input.updatedBy ? em.getReference(User, input.updatedBy) : undefined,
+      updatedBy: input.updatedBy ? { id: input.updatedBy } as InstanceType<typeof User> : undefined,
       updatedAt: new Date(),
     } as never);
-    em.persist(rollout);
+    await em.save(rollout);
   }
 
   if (typeof input.rolloutPercent === "number") (rollout as { rolloutPercent: number }).rolloutPercent = input.rolloutPercent;
@@ -539,7 +541,6 @@ async function upsertRollout(
     };
   }
   (rollout as { updatedAt: Date }).updatedAt = new Date();
-  await em.flush();
 }
 
 export async function listFeatureFlags(ctx: AdminAppContext) {
@@ -562,10 +563,9 @@ export async function setFeatureFlag(
   const em = requireEm(ctx);
   const FeatureFlag = await getFeatureFlagClass();
   const scopedUserId = input.userId ?? null;
-  const existing = await em.findOne(FeatureFlag, { flag: input.flag, orgId: targetOrgId, userId: scopedUserId } as never);
+  const existing = await em.findOne(FeatureFlag, { where: { flag: input.flag, orgId: targetOrgId, userId: scopedUserId } as never });
   if (existing) {
     (existing as { enabled: boolean }).enabled = input.enabled;
-    await em.flush();
   } else {
     const row = em.create(FeatureFlag, {
       flag: input.flag,
@@ -574,8 +574,7 @@ export async function setFeatureFlag(
       userId: scopedUserId ?? undefined,
       createdAt: new Date(),
     } as never);
-    em.persist(row);
-    await em.flush();
+    await em.save(row);
   }
   (await resolveFlagRegistry(ctx)).bustFlag(input.flag);
   return { ok: true };
@@ -626,7 +625,7 @@ export async function markInferenceModelDownloaded(
 ): Promise<void> {
   if (!ctx.em || !model) return;
   const Org = await getOrgClass();
-  const org = await ctx.em.findOne(Org, { id: ctx.orgId } as never);
+  const org = await ctx.em.findOne(Org, { where: { id: ctx.orgId } as never });
   if (!org) return;
   const { ModelCache } = await import("@platform-core/infrastructure/application-database/entities/inference/ModelCache.ts");
   const repo = ctx.em.getRepository(ModelCache) as unknown as {
@@ -643,7 +642,7 @@ export async function markInferenceModelDownloaded(
 export async function markInferenceModelMissing(ctx: AdminAppContext, modelId: string): Promise<void> {
   if (!ctx.em) return;
   const Org = await getOrgClass();
-  const org = await ctx.em.findOne(Org, { id: ctx.orgId } as never);
+  const org = await ctx.em.findOne(Org, { where: { id: ctx.orgId } as never });
   if (!org) return;
   const { ModelCache } = await import("@platform-core/infrastructure/application-database/entities/inference/ModelCache.ts");
   const repo = ctx.em.getRepository(ModelCache) as unknown as {

@@ -6,7 +6,7 @@
  * EntityManagerDocTemplateService fallback when the token is not bound.
  */
 
-import type { DocType } from "@platform-core/infrastructure/application-database/entities/docs/enums.ts";
+import type { DocType } from "@knowledge-workspace/infrastructure/database/entities/docs/enums.ts";
 
 // ─── Row shape ────────────────────────────────────────────────────────────────
 

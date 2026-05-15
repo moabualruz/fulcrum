@@ -20,7 +20,7 @@ async function freshDb(): Promise<TestOrm> {
 describe("EntityManagerDocTemplateService with migrated PGlite data", () => {
   test("lists DB templates plus built-in defaults in deterministic order", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const projectId = randomUUID();
 
     await em.getConnection().execute(
@@ -62,7 +62,7 @@ describe("EntityManagerDocTemplateService with migrated PGlite data", () => {
 
   test("resolves project default, org fallback, then built-in fallback", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const projectId = randomUUID();
 
     await em.getConnection().execute(

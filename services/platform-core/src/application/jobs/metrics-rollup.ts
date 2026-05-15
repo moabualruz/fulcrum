@@ -13,8 +13,8 @@ import {
   createWorkerRegistry,
 } from "./registry.ts";
 import type { EventBus } from "@platform-core/application/subscriptions/event-bus.ts";
-import { MetricsCache } from "@platform-core/infrastructure/application-database/entities/tasks/MetricsCache.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { MetricsCache } from "@work-management/infrastructure/database/entities/tasks/MetricsCache.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 
 // ── Payload types ──────────────────────────────────────────────────
 
@@ -199,8 +199,7 @@ async function handleMetricsRollup(
     return;
   }
 
-  em.persist(row as never);
-  await em.flush();
+  await em.save(row as never);
 }
 
 // ── Exported job ───────────────────────────────────────────────────

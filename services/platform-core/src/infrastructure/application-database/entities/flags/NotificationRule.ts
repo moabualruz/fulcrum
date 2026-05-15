@@ -10,7 +10,7 @@ import {
   Index,
   JoinColumn,
 } from "typeorm";
-import { Org } from "../auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 
 @Entity("notification_rules")
 @Index("idx_notification_rules_org_active_subject", ["org", "active", "subjectKind"])

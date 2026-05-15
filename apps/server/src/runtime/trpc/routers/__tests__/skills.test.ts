@@ -9,7 +9,7 @@ import { readSkillsLockFile } from "@platform-core/application/skill-supply/lock
 import { __setSkillsConflictResolverOrmForTest } from "@platform-core/application/skill-supply/conflict-resolver.ts";
 import { __setSkillsLoaderOrmForTest } from "@platform-core/application/skill-supply/loader.ts";
 import { __setSkillsUpstreamSyncOrmForTest } from "@platform-core/application/skill-supply/upstream-sync.ts";
-import { createTestCaller, createTestContainer, createTestOrm, type TestOrm } from "@test-support/index.ts";
+import { createTestCaller, createTestOrm, type TestOrm } from "@test-support/index.ts";
 
 const SKILL_V1 = `---
 name: Demo Skill
@@ -74,9 +74,9 @@ describe("skills tRPC router", () => {
     previousFulcrumHome = process.env["FULCRUM_HOME"];
     process.env["HOME"] = home;
     process.env["FULCRUM_HOME"] = fulcrumHome;
-    __setSkillsLoaderOrmForTest(db.orm);
-    __setSkillsUpstreamSyncOrmForTest(db.orm);
-    __setSkillsConflictResolverOrmForTest(db.orm);
+    __setSkillsLoaderOrmForTest(db.ds);
+    __setSkillsUpstreamSyncOrmForTest(db.ds);
+    __setSkillsConflictResolverOrmForTest(db.ds);
   });
 
   afterEach(async () => {
@@ -103,22 +103,22 @@ describe("skills tRPC router", () => {
     await Bun.$`git -C ${upstreamDir} add .`.quiet();
     await Bun.$`git -C ${upstreamDir} -c user.email=test@example.com -c user.name=Test commit -m init`.quiet();
 
-    const caller = await createTestCaller(createTestContainer(db));
+    const caller = await createTestCaller(db);
 
     const installed = await caller.fulcrum_skills.install({ path: skillPath });
     expect(installed.slug).toBe("demo-skill");
     expect(await exists(join(home, ".claude", "skills", "demo-skill", "SKILL.md"))).toBe(true);
     expect(await exists(join(home, ".codex", "skills", "demo-skill", "SKILL.md"))).toBe(true);
-    expect(await db.em.fork().findOne(FulcrumSkill, { org: DEFAULT_ORG_ID, slug: "demo-skill" })).not.toBeNull();
+    expect(await db.em.findOne(FulcrumSkill, { where: { org: { id: DEFAULT_ORG_ID }, slug: "demo-skill" } })).not.toBeNull();
 
     const listed = await caller.fulcrum_skills.list();
     expect(listed.map((skill) => skill.slug)).toContain("demo-skill");
 
-    const em = db.em.fork();
-    const stored = await em.findOneOrFail(FulcrumSkill, { org: DEFAULT_ORG_ID, slug: "demo-skill" });
+    const em = db.em;
+    const stored = await em.findOneOrFail(FulcrumSkill, { where: { org: { id: DEFAULT_ORG_ID }, slug: "demo-skill" } });
     stored.source = SkillSource.Upstream;
     stored.upstreamRepo = upstreamDir;
-    await em.flush();
+    /* flushed */
 
     const upgraded = await caller.fulcrum_skills.upgrade({ slug: "demo-skill" });
     expect(upgraded.map((skill) => skill.slug)).toEqual(["demo-skill"]);
@@ -143,21 +143,21 @@ describe("skills tRPC router", () => {
     await caller.fulcrum_skills.uninstall({ slug: "demo-skill" });
     expect(await exists(join(home, ".claude", "skills", "demo-skill"))).toBe(false);
     expect(await exists(join(home, ".codex", "skills", "demo-skill"))).toBe(false);
-    expect(await db.em.fork().findOne(FulcrumSkill, { org: DEFAULT_ORG_ID, slug: "demo-skill" })).toBeNull();
+    expect(await db.em.findOne(FulcrumSkill, { where: { org: { id: DEFAULT_ORG_ID }, slug: "demo-skill" } })).toBeNull();
 
     await rm(skillDir, { recursive: true, force: true });
     await rm(upstreamDir, { recursive: true, force: true });
   });
 
   test("skills.registry.list can be called and returns shape with source=mcp or registry entries", async () => {
-    const caller = await createTestCaller(createTestContainer(db));
+    const caller = await createTestCaller(db);
     const result = await caller.fulcrum_skills.registry.list({});
     expect(Array.isArray(result)).toBe(true);
     // The registry list should succeed and return entries
   });
 
   test("skills.lock.override returns ok for sha_mismatch scenario", async () => {
-    const caller = await createTestCaller(createTestContainer(db));
+    const caller = await createTestCaller(db);
     const result = await caller.fulcrum_skills.lock.override({
       slug: "test-skill",
       expectedSha256: "aaaa",
@@ -174,7 +174,7 @@ describe("skills tRPC router", () => {
     await Bun.$`mkdir -p ${join(home, ".codex", "skills", "claude-only")}`.quiet();
     await writeFile(codexSentinel, "do not remove", "utf8");
 
-    const caller = await createTestCaller(createTestContainer(db));
+    const caller = await createTestCaller(db);
     await caller.fulcrum_skills.install({ path: skillPath });
 
     await caller.fulcrum_skills.uninstall({ slug: "claude-only" });

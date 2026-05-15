@@ -14,9 +14,9 @@
  */
 
 import type { EntityManager } from "typeorm";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
-import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
+import { Document } from "@knowledge-workspace/infrastructure/database/entities/docs/Document.ts";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -77,16 +77,16 @@ export class MemoryDigestJob {
     const sinceDate = since ?? new Date(Date.now() - DEFAULT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
     // Fetch memories in window
-    const memories = await this.em.find(
-      Memory,
-      {
-        org: orgId,
+    const { MoreThanOrEqual } = await import("typeorm");
+    const memories = await this.em.find(Memory, {
+      where: {
+        org: { id: orgId },
         projectId,
-        createdAt: { $gte: sinceDate },
+        createdAt: MoreThanOrEqual(sinceDate),
         archived: false,
-      },
-      { orderBy: { createdAt: "ASC" } },
-    );
+      } as never,
+      order: { createdAt: "ASC" },
+    });
 
     // Cron mode: skip if < 10 memories
     if (cronMode && memories.length < MIN_MEMORIES_FOR_CRON) {
@@ -117,7 +117,7 @@ export class MemoryDigestJob {
     }
 
     // Write doc
-    const orgRef = this.em.getReference(Org, orgId);
+    const orgRef = { id: orgId } as Org;
     const doc = this.em.create(Document, {
       org: orgRef,
       projectId,
@@ -136,8 +136,7 @@ export class MemoryDigestJob {
       archived: false,
       updatedAt: new Date(),
     });
-    this.em.persist(doc);
-    await this.em.flush();
+    await this.em.save(doc);
 
     return {
       docId: doc.id,

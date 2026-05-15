@@ -22,7 +22,7 @@ async function freshDb(): Promise<TestOrm> {
 describe("freeform work intake application action", () => {
   test("creates a trace-linked freeform doc and returns it as ACP planning context", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const ctx = { orgId: DEFAULT_ORG_ID, userId: USER_ID, projectId: null };
 
     const result = await startFreeformWorkFromDocs(em, ctx, {

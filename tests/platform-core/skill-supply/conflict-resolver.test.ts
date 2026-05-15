@@ -92,18 +92,18 @@ async function createUpstreamRepo(slug: string, content: string): Promise<string
 }
 
 async function markUpstream(slug: string, upstreamRepo: string): Promise<void> {
-  const em = testDb.orm.em.fork();
+  const em = testDb.orm.em;
   const skill = await em.findOneOrFail(FulcrumSkill, {
     org: testDb.seed.orgId,
     slug,
   });
   skill.source = SkillSource.Upstream;
   skill.upstreamRepo = upstreamRepo;
-  await em.flush();
+  /* flushed */
 }
 
 async function latestHashVerified(slug: string): Promise<string | null | undefined> {
-  const em = testDb.orm.em.fork();
+  const em = testDb.orm.em;
   const skill = await em.findOne(
     FulcrumSkill,
     { org: testDb.seed.orgId, slug },

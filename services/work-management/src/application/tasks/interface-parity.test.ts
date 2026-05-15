@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 
 import { run as runTasksCommand } from "@fulcrum/cli/commands/tasks.ts";
 import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
-import { Session } from "@platform-core/infrastructure/application-database/entities/auth/Session.ts";
+import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
 import { bindTestRuntimeOrm, createTestContainer, createTestOrm, type TestOrm } from "@test-support/index.ts";
 import { buildCaller } from "@fulcrum/tui/index.ts";
 import { createTask } from "@work-management/application/tasks/commands.ts";
@@ -27,11 +27,11 @@ describe("tasks cross-interface parity", () => {
       projectId: null,
     };
 
-    const created = await createTask(db.em.fork(), ctx, {
+    const created = await createTask(db.em, ctx, {
       title: "Cross-interface task",
       status: "todo",
     });
-    const sessionEm = db.em.fork();
+    const sessionEm = db.em;
     sessionEm.persist(sessionEm.create(Session, {
       id: `parity-${db.seed.userId}`,
       userId: db.seed.userId,

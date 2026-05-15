@@ -15,7 +15,7 @@ describe("review workbench UAT/code review handoff action", () => {
   test("opens UAT and code review prompts only after final QA passes", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await seedProject(em);
       const ctx = { orgId: ORG_ID, userId: USER_ID, projectId: PROJECT_ID };
       await seedProjectDoc(em, {
@@ -97,7 +97,7 @@ describe("review workbench UAT/code review handoff action", () => {
   test("blocks UAT and code review prompt when final QA still requires automated feedback", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await seedProject(em);
       const ctx = { orgId: ORG_ID, userId: USER_ID, projectId: PROJECT_ID };
       const task = await createTask(em, ctx, {

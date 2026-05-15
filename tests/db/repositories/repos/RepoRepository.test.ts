@@ -1,31 +1,32 @@
 import { describe, expect, test } from "bun:test";
 
 import { createTestOrm } from "@test-support/application-database.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Repo } from "@platform-core/infrastructure/application-database/entities/repos/Repo.ts";
-import { RepoRepository } from "@platform-core/infrastructure/application-database/repositories/repos/RepoRepository.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Repo } from "@integration-hub/infrastructure/database/entities/repos/Repo.ts";
+import { RepoRepository } from "@integration-hub/infrastructure/database/repositories/repos/RepoRepository.ts";
 
-async function createOrg(repo: RepoRepository, slug: string): Promise<Org> {
-  const em = repo.getEntityManager();
+async function createOrg(em: import("typeorm").EntityManager, slug: string): Promise<Org> {
   const now = new Date();
-  const org = em.create(Org, {
-    name: slug,
-    slug,
-    createdAt: now,
-    updatedAt: now,
-  });
-  em.persist(org);
-  await em.flush();
+  const org = em.create(Org, { name: slug, slug, createdAt: now, updatedAt: now });
+  await em.save(org);
   return org;
+}
+
+function makeRepo(em: import("typeorm").EntityManager): RepoRepository {
+  const inner = em.getRepository(Repo);
+  const repo = Object.create(RepoRepository.prototype) as RepoRepository;
+  Object.defineProperty(repo, "repos", { value: inner });
+  return repo;
 }
 
 describe("RepoRepository", () => {
   test("creates and lists repos scoped to one org", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Repo) as RepoRepository;
-      const orgA = await createOrg(repo, "repo-repository-create-a");
-      const orgB = await createOrg(repo, "repo-repository-create-b");
+      const em = db.em;
+      const repo = makeRepo(em);
+      const orgA = await createOrg(em, "repo-repository-create-a");
+      const orgB = await createOrg(em, "repo-repository-create-b");
 
       const alpha = await repo.create({
         orgId: orgA.id,
@@ -57,9 +58,10 @@ describe("RepoRepository", () => {
   test("gets repos only inside the requested org", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Repo) as RepoRepository;
-      const orgA = await createOrg(repo, "repo-repository-get-a");
-      const orgB = await createOrg(repo, "repo-repository-get-b");
+      const em = db.em;
+      const repo = makeRepo(em);
+      const orgA = await createOrg(em, "repo-repository-get-a");
+      const orgB = await createOrg(em, "repo-repository-get-b");
       const alpha = await repo.create({
         orgId: orgA.id,
         name: "Alpha",
@@ -80,9 +82,10 @@ describe("RepoRepository", () => {
   test("updates repos only inside the requested org", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Repo) as RepoRepository;
-      const orgA = await createOrg(repo, "repo-repository-update-a");
-      const orgB = await createOrg(repo, "repo-repository-update-b");
+      const em = db.em;
+      const repo = makeRepo(em);
+      const orgA = await createOrg(em, "repo-repository-update-a");
+      const orgB = await createOrg(em, "repo-repository-update-b");
       const alpha = await repo.create({
         orgId: orgA.id,
         name: "Alpha",
@@ -91,11 +94,7 @@ describe("RepoRepository", () => {
         defaultBranch: "main",
       });
 
-      expect(await repo.update({
-        orgId: orgB.id,
-        id: alpha.id,
-        name: "Cross Org",
-      })).toBeNull();
+      expect(await repo.update({ orgId: orgB.id, id: alpha.id, name: "Cross Org" })).toBeNull();
 
       const updated = await repo.update({
         orgId: orgA.id,
@@ -120,9 +119,10 @@ describe("RepoRepository", () => {
   test("archives repos only inside the requested org and hides them from default list", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Repo) as RepoRepository;
-      const orgA = await createOrg(repo, "repo-repository-archive-a");
-      const orgB = await createOrg(repo, "repo-repository-archive-b");
+      const em = db.em;
+      const repo = makeRepo(em);
+      const orgA = await createOrg(em, "repo-repository-archive-a");
+      const orgB = await createOrg(em, "repo-repository-archive-b");
       const alpha = await repo.create({
         orgId: orgA.id,
         name: "Alpha",

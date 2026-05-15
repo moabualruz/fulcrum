@@ -4,9 +4,9 @@ import {
   RoutingRuleSource,
   type RoutingConditions,
   type RoutingRule,
-} from "@platform-core/infrastructure/application-database/entities/router/RoutingRule.ts";
+} from "@execution-orchestration/infrastructure/database/entities/router/RoutingRule.ts";
 import type { EventRepository } from "@platform-core/infrastructure/application-database/repositories/core/EventRepository.ts";
-import type { RoutingRuleRepository } from "@platform-core/infrastructure/application-database/repositories/router/RoutingRuleRepository.ts";
+import type { RoutingRuleRepository } from "@execution-orchestration/infrastructure/database/repositories/router/RoutingRuleRepository.ts";
 import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import {
   detectRoutingConflicts,

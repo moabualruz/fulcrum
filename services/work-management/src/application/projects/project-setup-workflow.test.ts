@@ -41,7 +41,7 @@ describe("Workflow project hierarchy and setup", () => {
   test("supports workspace/project/subproject/deep child hierarchy and aggregate dashboard scope", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const workspace = await createProject(em, ctx, {
         slug: "workspace",
         name: "Workspace",
@@ -92,7 +92,7 @@ describe("Workflow project hierarchy and setup", () => {
     const repoPath = await mkdtemp(join(tmpdir(), "fulcrum-workflow-repo-"));
     const db = await createTestOrm();
     try {
-      const result = await createProjectFromSetup(db.em.fork(), ctx, {
+      const result = await createProjectFromSetup(db.em, ctx, {
         name: "Agent OS",
         slug: "agent-os",
         kind: "project",
@@ -114,7 +114,7 @@ describe("Workflow project hierarchy and setup", () => {
   test("project commands mutate project and task rows through scoped application service paths", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const project = await createProject(em, ctx, {
         slug: "command-mutations",
         name: "Command Mutations",
@@ -189,7 +189,7 @@ describe("Workflow project hierarchy and setup", () => {
   test("setup without repo still records template workflow and missing repo trace", async () => {
     const db = await createTestOrm();
     try {
-      const result = await createProjectFromSetup(db.em.fork(), ctx, {
+      const result = await createProjectFromSetup(db.em, ctx, {
         name: "No Repo Setup",
         template: AGENT_OS_SOFTWARE_PROJECT_TEMPLATE_ID,
         trustMode: "trusted",
@@ -207,7 +207,7 @@ describe("Workflow project hierarchy and setup", () => {
   test("project read models list rows, options, activity, board, calendar, and gantt from real rows", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const project = await createProject(em, ctx, {
         slug: "read-model",
         name: "Read Model",

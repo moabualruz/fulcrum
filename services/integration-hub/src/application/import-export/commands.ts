@@ -52,7 +52,7 @@ async function execute<T extends Record<string, unknown>>(
   sql: string,
   params: unknown[] = [],
 ): Promise<T[]> {
-  return await em.getConnection().execute(sql, params) as T[];
+  return await em.query(sql, params) as T[];
 }
 
 async function tableNames(em: EntityManager): Promise<string[]> {
@@ -272,5 +272,5 @@ export async function runImportManifest(
   manifest: ImportManifest,
   onConflict: "skip" | "update" | "error",
 ) {
-  return await em.transactional((tx) => importManifestRows(tx as EntityManager, manifest, onConflict));
+  return await em.transaction((tx) => importManifestRows(tx as EntityManager, manifest, onConflict));
 }

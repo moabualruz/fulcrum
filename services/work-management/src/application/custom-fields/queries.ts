@@ -1,7 +1,7 @@
 import type { EntityManager } from "typeorm";
 import { z } from "zod";
 
-import { CustomFieldDef } from "@platform-core/infrastructure/application-database/entities/tasks/CustomFieldDef.ts";
+import { CustomFieldDef } from "@work-management/infrastructure/database/entities/tasks/CustomFieldDef.ts";
 
 export const CustomFieldTypeSchema = z.enum([
   "text",
@@ -58,10 +58,9 @@ export async function listCustomFieldDefs(
   input?: { entityType?: "task" },
 ): Promise<CustomFieldDefOutput[]> {
   if (input?.entityType && input.entityType !== "task") return [];
-  const fields = await em.find(
-    CustomFieldDef,
-    { org: ctx.orgId, archived: false } as never,
-    { orderBy: { position: "ASC", name: "ASC", id: "ASC" } },
-  );
+  const fields = await em.find(CustomFieldDef, {
+    where: { org: { id: ctx.orgId }, archived: false } as never,
+    order: { position: "ASC", name: "ASC", id: "ASC" },
+  });
   return fields.map(serializeCustomFieldDef);
 }

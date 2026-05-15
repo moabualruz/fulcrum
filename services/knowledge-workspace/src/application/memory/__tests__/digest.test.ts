@@ -18,9 +18,9 @@ import { Container } from "@needle-di/core";
 
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
-import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
+import { Document } from "@knowledge-workspace/infrastructure/database/entities/docs/Document.ts";
 import {
   isDigestEnabled,
   MemoryDigestJob,
@@ -45,7 +45,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   previousFeatures = process.env["FULCRUM_FEATURES"];
-  const em = db.orm.em.fork();
+  const em = db.orm.em;
   await em.nativeDelete(Document, {});
   await em.nativeDelete(Memory, {});
   await em.upsert(
@@ -129,8 +129,8 @@ describe("MemoryDigestJob — digest", () => {
     expect(result!.docId).toBeTruthy();
 
     // Verify doc row
-    const em = db.orm.em.fork();
-    const doc = await em.findOne(Document, { id: result!.docId });
+    const em = db.orm.em;
+    const doc = await em.findOne(Document, { where: { id: result!.docId } });
     expect(doc).not.toBeNull();
     expect(doc!.docType).toBe("note");
     expect(doc!.bodyMd).toBe(summaryText);
@@ -144,7 +144,7 @@ describe("MemoryDigestJob — digest", () => {
   });
 
   test("--since filters memories to created_at >= since", async () => {
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const orgRef = em.getReference(Org, ORG_ID);
 
     // Old memory (30 days ago)
@@ -177,7 +177,7 @@ describe("MemoryDigestJob — digest", () => {
       createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
       updatedAt: new Date(),
     });
-    await em.flush();
+    /* flushed */
 
     let capturedMemories: unknown[] = [];
     const client: InferenceClientLike = {
@@ -198,7 +198,7 @@ describe("MemoryDigestJob — digest", () => {
   });
 
   test("default window is last 7 days", async () => {
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const orgRef = em.getReference(Org, ORG_ID);
 
     // Memory 3 days ago (within window)
@@ -231,7 +231,7 @@ describe("MemoryDigestJob — digest", () => {
       createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
       updatedAt: new Date(),
     });
-    await em.flush();
+    /* flushed */
 
     let capturedMemories: unknown[] = [];
     const client: InferenceClientLike = {
@@ -305,7 +305,7 @@ describe("MemoryDigestJob — sidecar failure", () => {
     expect(warnings[0]).toContain("sidecar");
 
     // No doc written
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const docs = await em.find(Document, { projectId: PROJECT_ID });
     expect(docs).toHaveLength(0);
   });
@@ -325,7 +325,7 @@ describe("MemoryDigestJob — sidecar failure", () => {
       job.run(ORG_ID, PROJECT_ID),
     ).rejects.toThrow("empty summary");
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const docs = await em.find(Document, { projectId: PROJECT_ID });
     expect(docs).toHaveLength(0);
   });
@@ -350,8 +350,8 @@ describe("MemoryDigestJob — integration", () => {
     expect(result).not.toBeNull();
     expect(result!.body).toBe(summaryText);
 
-    const em = db.orm.em.fork();
-    const doc = await em.findOne(Document, { id: result!.docId });
+    const em = db.orm.em;
+    const doc = await em.findOne(Document, { where: { id: result!.docId } });
     expect(doc).not.toBeNull();
     expect(doc!.bodyMd).toBe(summaryText);
     expect(doc!.docType).toBe("note");
@@ -400,7 +400,7 @@ function createJob(
   opts: { onWarning?: (msg: string) => void } = {},
 ): MemoryDigestJob {
   return new MemoryDigestJob(
-    db.orm.em.fork(),
+    db.orm.em,
     client,
     opts.onWarning ?? (() => {}),
   );
@@ -423,7 +423,7 @@ function mockClientError(error: Error): InferenceClientLike {
 }
 
 async function seedMemories(count: number): Promise<void> {
-  const em = db.orm.em.fork();
+  const em = db.orm.em;
   const orgRef = em.getReference(Org, ORG_ID);
   const now = new Date();
 
@@ -443,5 +443,5 @@ async function seedMemories(count: number): Promise<void> {
       updatedAt: now,
     });
   }
-  await em.flush();
+  /* flushed */
 }

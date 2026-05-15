@@ -1,4 +1,4 @@
-import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
+import type { DiContainer } from "@platform-core/interface/runtime-container.ts";
 import { createWorkflowApiCallerFromEnv } from "@workflow-coordination/interface/http/workflow-api-client.ts";
 import {
   buildCliTuiCallerContext,

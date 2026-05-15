@@ -140,7 +140,7 @@ describe("/projects/[id]/reports +page.server.ts", () => {
   test("final QA gate, UAT handoff, and UAT decision actions run shared report services with project and trace", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Reports Final QA Project"],
@@ -401,7 +401,7 @@ describe("/projects/[id]/reports +page.server.ts", () => {
   test("reviewSession actions save and reload persisted review workbench workbench sessions", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Reports Review Session Project"],

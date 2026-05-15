@@ -6,7 +6,7 @@
 import type { EntityManager } from "typeorm";
 import type { LegacyDatabaseHandle } from "@platform-core/application/legacy/web-runtime.ts";
 import { randomUUID } from "node:crypto";
-import { AgentProfile } from "@platform-core/infrastructure/application-database/entities/sandbox/AgentProfile.ts";
+import { AgentProfile } from "@execution-orchestration/infrastructure/database/entities/sandbox/AgentProfile.ts";
 import { appendEventOrm, ormSqlConnection } from "@platform-core/application/orm-helpers.ts";
 import { listProjectOptions, type ProjectOption } from "@work-management/application/projects/queries.ts";
 import { listOpenTaskOptions, type TaskOption } from "@work-management/application/tasks/queries.ts";
@@ -172,14 +172,13 @@ export async function testProfileAction(
   passed: boolean,
 ): Promise<{ ok: boolean }> {
   const profile = await em.findOne(AgentProfile, {
-    id: profileId,
-    org: orgId,
+    where: { id: profileId, org: { id: orgId } },
   } as never);
   if (profile) {
     profile.testPassed = passed;
     profile.lastTestedAt = new Date();
     profile.updatedAt = new Date();
-    await em.flush();
+    await em.save(AgentProfile, profile);
   }
 
   await appendEventOrm(em, {

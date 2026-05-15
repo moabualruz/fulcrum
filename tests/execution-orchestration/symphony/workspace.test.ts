@@ -18,9 +18,9 @@ import { PGlite } from "@electric-sql/pglite";
 
 import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
 import { DEFAULT_ORG_ID, SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
-import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
+import { AgentRun } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
 import { Migration20260501104413_auth } from "@platform-core/infrastructure/application-database/migrations/Migration20260501104413_auth.ts";
 import { Migration20260501120537_events_org_id_backfill } from "@platform-core/infrastructure/application-database/migrations/Migration20260501120537_events_org_id_backfill.ts";
 import { Migration20260501120538_events_org_id_notnull } from "@platform-core/infrastructure/application-database/migrations/Migration20260501120538_events_org_id_notnull.ts";
@@ -141,7 +141,7 @@ async function buildMigratedOrm(): Promise<BlankOrm> {
 }
 
 async function seedRun(orm: MikroORM): Promise<AgentRun> {
-  const em = orm.em.fork();
+  const em = orm.em;
   const org = em.getReference(Org, DEFAULT_ORG_ID);
   const task = em.create(Task, {
     id: TASK_ID,
@@ -163,8 +163,7 @@ async function seedRun(orm: MikroORM): Promise<AgentRun> {
     iterationCount: 0,
   });
 
-  em.persist([task, run]);
-  await em.flush();
+  await em.save([task, run]);
   return run;
 }
 
@@ -279,7 +278,7 @@ describe("Symphony workspace lifecycle", () => {
       );
       expect(await exists(workspacePath)).toBe(true);
 
-      const reloaded = await lastDb.orm.em.fork().findOneOrFail(AgentRun, RUN_ID);
+      const reloaded = await lastDb.orm.em.findOneOrFail(AgentRun, RUN_ID);
       expect(reloaded.workspacePath).toBe(workspacePath);
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -296,7 +295,7 @@ describe("Symphony workspace lifecycle", () => {
       await destroyWorkspace(run, { em: db.orm.em, root, keepOnFailure: false });
 
       expect(await exists(workspacePath)).toBe(false);
-      const reloaded = await db.orm.em.fork().findOneOrFail(AgentRun, RUN_ID);
+      const reloaded = await db.orm.em.findOneOrFail(AgentRun, RUN_ID);
       expect(reloaded.workspacePath).toBeNull();
     } finally {
       await db.close();
@@ -315,7 +314,7 @@ describe("Symphony workspace lifecycle", () => {
       await destroyWorkspace(run, { em: db.orm.em, root, keepOnFailure: true });
 
       expect(await exists(workspacePath)).toBe(true);
-      const reloaded = await db.orm.em.fork().findOneOrFail(AgentRun, RUN_ID);
+      const reloaded = await db.orm.em.findOneOrFail(AgentRun, RUN_ID);
       expect(reloaded.workspacePath).toBe(workspacePath);
     } finally {
       await db.close();
@@ -387,7 +386,7 @@ describe("orchestration.getWorkspacePath tRPC procedure", () => {
           session: mockSession() as unknown as import("better-auth").Session,
           orgId: DEFAULT_ORG_ID,
           userId: "user-workspace-test",
-          em: db.orm.em.fork(),
+          em: db.orm.em,
           container: null,
         }),
       );

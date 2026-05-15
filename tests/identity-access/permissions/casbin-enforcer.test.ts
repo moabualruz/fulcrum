@@ -49,9 +49,9 @@ afterEach(() => {
 });
 
 beforeEach(async () => {
-  const em = orm.em.fork();
+  const em = orm.em;
   await em.nativeDelete(CasbinRule, {});
-  repo = orm.em.fork().getRepository(CasbinRule) as CasbinRuleRepository;
+  repo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,7 +76,7 @@ describe("CasbinEnforcerService — enforce()", () => {
 
   it("returns true for user with explicit allow p-rule", async () => {
     // Add allow rule: alice can read data1
-    const freshRepo = orm.em.fork().getRepository(CasbinRule) as CasbinRuleRepository;
+    const freshRepo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
     const adapter = new FulcrumCasbinAdapter(freshRepo);
     await adapter.addPolicy("p", "p", ["org-a", "alice", "data1", "read"]);
 
@@ -86,7 +86,7 @@ describe("CasbinEnforcerService — enforce()", () => {
   });
 
   it("returns false when user has allow for different resource", async () => {
-    const freshRepo = orm.em.fork().getRepository(CasbinRule) as CasbinRuleRepository;
+    const freshRepo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
     const adapter = new FulcrumCasbinAdapter(freshRepo);
     await adapter.addPolicy("p", "p", ["org-a", "alice", "data1", "read"]);
 
@@ -97,7 +97,7 @@ describe("CasbinEnforcerService — enforce()", () => {
   });
 
   it("owner role via g-rule + p-rule allows access", async () => {
-    const freshRepo = orm.em.fork().getRepository(CasbinRule) as CasbinRuleRepository;
+    const freshRepo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
     const adapter = new FulcrumCasbinAdapter(freshRepo);
     // Grant owner role to bob
     await adapter.addPolicy("g", "g", ["bob", "role:owner", "org-a"]);
@@ -110,7 +110,7 @@ describe("CasbinEnforcerService — enforce()", () => {
   });
 
   it("returns false for user without the required role", async () => {
-    const freshRepo = orm.em.fork().getRepository(CasbinRule) as CasbinRuleRepository;
+    const freshRepo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
     const adapter = new FulcrumCasbinAdapter(freshRepo);
     await adapter.addPolicy("g", "g", ["bob", "role:owner", "org-a"]);
     await adapter.addPolicy("p", "p", ["org-a", "role:owner", "task", "write"]);
@@ -122,7 +122,7 @@ describe("CasbinEnforcerService — enforce()", () => {
   });
 
   it("scopes role owner policy to the request org", async () => {
-    const freshRepo = orm.em.fork().getRepository(CasbinRule) as CasbinRuleRepository;
+    const freshRepo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
     const adapter = new FulcrumCasbinAdapter(freshRepo);
     await adapter.addPolicy("g", "g", ["bob", "role:owner", "org-a"]);
     await adapter.addPolicy("p", "p", ["org-a", "role:owner", "task", "write"]);
@@ -134,7 +134,7 @@ describe("CasbinEnforcerService — enforce()", () => {
   });
 
   it("does not let an org-scoped allow bleed across actions", async () => {
-    const freshRepo = orm.em.fork().getRepository(CasbinRule) as CasbinRuleRepository;
+    const freshRepo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
     const adapter = new FulcrumCasbinAdapter(freshRepo);
     await adapter.addPolicy("p", "p", ["org-a", "alice", "task", "write"]);
 
@@ -157,7 +157,7 @@ describe("CasbinEnforcerService — hasRuleFor()", () => {
   });
 
   it("returns true when a p-rule exists for that subject+resource", async () => {
-    const freshRepo = orm.em.fork().getRepository(CasbinRule) as CasbinRuleRepository;
+    const freshRepo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
     const adapter = new FulcrumCasbinAdapter(freshRepo);
     await adapter.addPolicy("p", "p", ["org-a", "alice", "task", "read"]);
 
@@ -167,7 +167,7 @@ describe("CasbinEnforcerService — hasRuleFor()", () => {
   });
 
   it("returns false when rule exists for different subject", async () => {
-    const freshRepo = orm.em.fork().getRepository(CasbinRule) as CasbinRuleRepository;
+    const freshRepo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
     const adapter = new FulcrumCasbinAdapter(freshRepo);
     await adapter.addPolicy("p", "p", ["org-a", "alice", "task", "read"]);
 
@@ -177,7 +177,7 @@ describe("CasbinEnforcerService — hasRuleFor()", () => {
   });
 
   it("only finds subject/resource rules in the request org", async () => {
-    const freshRepo = orm.em.fork().getRepository(CasbinRule) as CasbinRuleRepository;
+    const freshRepo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
     const adapter = new FulcrumCasbinAdapter(freshRepo);
     await adapter.addPolicy("p", "p", ["org-a", "alice", "task", "write"]);
 
@@ -209,7 +209,7 @@ describe("assertPermission casbin gate — flag OFF passthrough", () => {
 describe("assertPermission casbin gate — flag ON deny", () => {
   it("flag ON + explicit DENY (no allow rule) → FORBIDDEN behavior", async () => {
     // Add a rule for alice on task but not for bob
-    const freshRepo = orm.em.fork().getRepository(CasbinRule) as CasbinRuleRepository;
+    const freshRepo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
     const adapter = new FulcrumCasbinAdapter(freshRepo);
     await adapter.addPolicy("p", "p", ["org-a", "alice", "task", "write"]);
 
@@ -237,7 +237,7 @@ describe("assertPermission casbin gate — flag ON deny", () => {
     // Import the checkCasbinGate utility from enforcer
     const { checkCasbinGate } = await import("@identity-access/application/permissions/enforcer.ts");
 
-    const freshRepo = orm.em.fork().getRepository(CasbinRule) as CasbinRuleRepository;
+    const freshRepo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
     const adapter = new FulcrumCasbinAdapter(freshRepo);
     await adapter.addPolicy("p", "p", ["org-a", "alice", "task", "write"]);
 
@@ -250,7 +250,7 @@ describe("assertPermission casbin gate — flag ON deny", () => {
   it("checkCasbinGate allows when enforce returns true", async () => {
     const { checkCasbinGate } = await import("@identity-access/application/permissions/enforcer.ts");
 
-    const freshRepo = orm.em.fork().getRepository(CasbinRule) as CasbinRuleRepository;
+    const freshRepo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
     const adapter = new FulcrumCasbinAdapter(freshRepo);
     await adapter.addPolicy("p", "p", ["org-a", "alice", "task", "write"]);
 
@@ -270,7 +270,7 @@ describe("assertPermission casbin gate — flag ON deny", () => {
   it("denies only inside the org that owns the matching policy row", async () => {
     const { checkCasbinGate } = await import("@identity-access/application/permissions/enforcer.ts");
 
-    const freshRepo = orm.em.fork().getRepository(CasbinRule) as CasbinRuleRepository;
+    const freshRepo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
     const adapter = new FulcrumCasbinAdapter(freshRepo);
     await adapter.addPolicy("p", "p", ["org-a", "alice", "task", "write"]);
 

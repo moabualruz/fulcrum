@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { defaultProductDbStatus } from "@platform-core/application/db/commands.ts";
+import { defaultDatabaseStatus } from "@platform-core/interface/database-status.ts";
 
 export function createDbCommand(): Command {
   const command = new Command("db");
@@ -10,7 +10,7 @@ export function createDbCommand(): Command {
   pingCommand.option("--json", "Emit JSON output");
   pingCommand.action(async (options) => {
     try {
-      printGeneratedResult(defaultProductDbStatus(), options);
+      printGeneratedResult(defaultDatabaseStatus(), options);
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);

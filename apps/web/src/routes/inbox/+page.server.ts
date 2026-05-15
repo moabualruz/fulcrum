@@ -1,4 +1,7 @@
 import { redirect, type Actions, type ServerLoad } from "@sveltejs/kit";
+import { createNotificationApiCaller } from "@notification-center/interface/http/notification-api-client.ts";
+import { createAuditApiClient } from "@workflow-coordination/interface/http/audit-api-client.ts";
+import { cookieHeaders, publicApiBaseUrl } from "$lib/server/public-api";
 
 interface SessionEvent {
   locals: { session?: unknown; orgId?: string | null; userId?: string | null };
@@ -48,74 +51,25 @@ export interface InboxData {
 
 const PAGE_SIZE = 20;
 
-function baseUrl(url: URL): string {
-  return `${url.protocol}//${url.host}`;
-}
-
-function extractApiError(body: unknown): string {
-  const record = body as { error?: { message?: string }; message?: string } | null;
-  return record?.error?.message ?? record?.message ?? "Request failed";
-}
-
-function publicApiBaseUrl(env: Record<string, string | undefined> = process.env): string | null {
-  const raw = env["FULCRUM_SERVER_URL"] ?? env["FULCRUM_PUBLIC_API_URL"];
-  return raw ? raw.replace(/\/+$/, "") : null;
-}
-
-function publicNotificationUrl(event: SessionEvent, path: string): string | null {
+function notificationApi(event: SessionEvent) {
   if (!event.locals.orgId || !event.locals.userId) return null;
-  const base = publicApiBaseUrl() ?? baseUrl(event.url);
-  const url = new URL(path, base);
-  url.searchParams.set("orgId", event.locals.orgId);
-  url.searchParams.set("userId", event.locals.userId);
-  return url.toString();
+  return createNotificationApiCaller({
+    baseUrl: publicApiBaseUrl(event.url),
+    orgId: event.locals.orgId,
+    userId: event.locals.userId,
+    fetch: event.fetch,
+    headers: cookieHeaders(event.request as Request),
+  }).notify;
 }
 
-function publicAuditUrl(event: SessionEvent, activityPage: number): string | null {
+function auditApi(event: SessionEvent) {
   if (!event.locals.orgId || !event.locals.userId) return null;
-  const base = publicApiBaseUrl() ?? baseUrl(event.url);
-  const url = new URL("/api/v1/audit", base);
-  url.searchParams.set("orgId", event.locals.orgId);
-  url.searchParams.set("userId", event.locals.userId);
-  url.searchParams.set("limit", String(PAGE_SIZE));
-  url.searchParams.set("offset", String((activityPage - 1) * PAGE_SIZE));
-  return url.toString();
-}
-
-async function publicNotificationRequest(
-  event: SessionEvent,
-  path: string,
-  method: "GET" | "PATCH" = "GET",
-): Promise<unknown> {
-  const target = publicNotificationUrl(event, path);
-  if (!target) throw new Error("Notification scope is required.");
-  const response = await event.fetch(target, {
-    method,
-    credentials: "include",
-    headers: {
-      "content-type": "application/json",
-      cookie: event.request.headers.get("cookie") ?? "",
-    },
+  return createAuditApiClient({
+    baseUrl: publicApiBaseUrl(event.url),
+    orgId: event.locals.orgId,
+    fetch: event.fetch,
+    headers: cookieHeaders(event.request as Request),
   });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(extractApiError(body));
-  return body;
-}
-
-async function publicAuditRequest(event: SessionEvent, activityPage: number): Promise<unknown> {
-  const target = publicAuditUrl(event, activityPage);
-  if (!target) throw new Error("Audit scope is required.");
-  const response = await event.fetch(target, {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      "content-type": "application/json",
-      cookie: event.request.headers.get("cookie") ?? "",
-    },
-  });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(extractApiError(body));
-  return body;
 }
 
 function normalizeNotification(row: Record<string, unknown>): NotificationRow {
@@ -159,21 +113,27 @@ export const load: ServerLoad = async (event) => {
 
   const activityPageRaw = parseInt(sessionEvent.url.searchParams.get("activity_page") ?? "1", 10);
   const activityPage = Number.isNaN(activityPageRaw) || activityPageRaw < 1 ? 1 : activityPageRaw;
+  const notify = notificationApi(sessionEvent);
+  const audit = auditApi(sessionEvent);
+  if (!notify) throw new Error("Notification scope is required.");
+  if (!audit) throw new Error("Audit scope is required.");
 
   const [unreadResult, listResult, activityResult] = await Promise.all([
-    publicNotificationRequest(sessionEvent, "/api/v1/notifications/unread-count"),
-    publicNotificationRequest(sessionEvent, "/api/v1/notifications"),
-    publicAuditRequest(sessionEvent, activityPage),
+    notify.unreadCount(),
+    notify.list(),
+    audit.queryPage({
+      userId: sessionEvent.locals.userId ?? undefined,
+      limit: PAGE_SIZE,
+      offset: (activityPage - 1) * PAGE_SIZE,
+    }),
   ]);
 
   const count = Number((unreadResult as { count?: unknown })?.count ?? 0);
-  const items = Array.isArray((listResult as { data?: unknown })?.data)
-    ? ((listResult as { data: Record<string, unknown>[] }).data)
-    : Array.isArray((listResult as { items?: unknown })?.items)
-    ? ((listResult as { items: Record<string, unknown>[] }).items)
+  const items = Array.isArray(listResult)
+    ? (listResult as Record<string, unknown>[])
     : [];
-  const activityItems = Array.isArray((activityResult as { data?: unknown })?.data)
-    ? ((activityResult as { data: Record<string, unknown>[] }).data)
+  const activityItems = Array.isArray(activityResult.data)
+    ? (activityResult.data as Record<string, unknown>[])
     : [];
   const activityTotal = Number((activityResult as { total?: unknown })?.total ?? activityItems.length);
 
@@ -190,7 +150,9 @@ export const actions: Actions = {
   markAllRead: async (event) => {
     const actionEvent = event as ActionEvent;
     if (!actionEvent.locals.session) throw redirect(302, "/auth/login");
-    await publicNotificationRequest(actionEvent, "/api/v1/notifications/mark-all-read", "PATCH");
+    const notify = notificationApi(actionEvent);
+    if (!notify) throw new Error("Notification scope is required.");
+    await notify.markAllRead();
     return { markedRead: true };
   },
 };

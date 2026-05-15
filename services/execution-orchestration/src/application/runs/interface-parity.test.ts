@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 
 import { run as runSymphonyCommand } from "@fulcrum/cli/symphony.ts";
 import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
-import { Session } from "@platform-core/infrastructure/application-database/entities/auth/Session.ts";
+import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
 import { bindTestRuntimeOrm, createTestContainer, createTestOrm, type TestOrm } from "@test-support/index.ts";
 import { buildCaller } from "@fulcrum/tui/index.ts";
 import { dispatchRun } from "@execution-orchestration/application/runs/commands.ts";
@@ -30,7 +30,7 @@ function jsonLine<T>(lines: string[]): T {
 }
 
 async function ensureSession(db: TestOrm): Promise<void> {
-  const em = db.em.fork();
+  const em = db.em;
   em.persist(em.create(Session, {
     id: `parity-${crypto.randomUUID()}`,
     userId: db.seed.userId,
@@ -41,7 +41,7 @@ async function ensureSession(db: TestOrm): Promise<void> {
     ipAddress: null,
     userAgent: "test",
   }));
-  await em.flush();
+  /* flushed */
 }
 
 describe("runs cross-interface parity", () => {
@@ -51,7 +51,7 @@ describe("runs cross-interface parity", () => {
     bindTestRuntimeOrm(container, db);
     const ctx: AppContext = { orgId: db.seed.orgId, userId: db.seed.userId, projectId: null };
 
-    const created = await dispatchRun(db.em.fork(), ctx, {
+    const created = await dispatchRun(db.em, ctx, {
       agentName: "codex",
       prompt: "architecture.5-run-parity",
     });

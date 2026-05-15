@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { DataSource, MoreThanOrEqual } from "typeorm";
+import { DataSource, LessThan, MoreThanOrEqual } from "typeorm";
 
 import {
   OrganizationMemberEntity,
@@ -26,6 +26,13 @@ export interface ErrorLogPublicRow {
   context: Record<string, unknown>;
 }
 
+export interface ErrorLogPublicPage {
+  data: ErrorLogPublicRow[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export class ErrorLogPermissionError extends Error {}
 
 export class ErrorLogStore {
@@ -35,18 +42,35 @@ export class ErrorLogStore {
     orgId: string;
     userId: string;
     limit?: number;
+    offset?: number;
     since?: Date;
   }): Promise<ErrorLogPublicRow[]> {
+    const page = await this.listPage(input);
+    return page.data;
+  }
+
+  async listPage(input: {
+    orgId: string;
+    userId: string;
+    limit?: number;
+    offset?: number;
+    since?: Date;
+  }): Promise<ErrorLogPublicPage> {
     await this.requireAdminAccess(input);
-    const rows = await this.errorLogRepository().find({
-      where: {
-        orgId: input.orgId,
-        ...(input.since ? { occurredAt: MoreThanOrEqual(input.since) } : {}),
-      },
+    const limit = normalizeLimit(input.limit);
+    const offset = normalizeOffset(input.offset);
+    const [rows, total] = await this.errorLogRepository().findAndCount({
+      where: errorLogWhere(input),
       order: { occurredAt: "DESC", id: "ASC" },
-      take: normalizeLimit(input.limit),
+      take: limit,
+      skip: offset,
     });
-    return rows.map(serializeErrorLog);
+    return {
+      data: rows.map(serializeErrorLog),
+      total,
+      limit,
+      offset,
+    };
   }
 
   async get(input: { orgId: string; userId: string; id: string }): Promise<ErrorLogPublicRow | null> {
@@ -55,9 +79,9 @@ export class ErrorLogStore {
     return row ? serializeErrorLog(row) : null;
   }
 
-  async clear(input: { orgId: string; userId: string }): Promise<number> {
+  async clear(input: { orgId: string; userId: string; before?: Date }): Promise<number> {
     await this.requireAdminAccess(input);
-    const result = await this.errorLogRepository().delete({ orgId: input.orgId });
+    const result = await this.errorLogRepository().delete(errorLogWhere(input, { before: true }));
     return Number(result.affected ?? 0);
   }
 
@@ -111,6 +135,22 @@ export class ErrorLogStore {
 function normalizeLimit(limit: number | undefined): number {
   if (!Number.isFinite(limit ?? 0) || !limit || limit < 1) return 50;
   return Math.min(Math.trunc(limit), 200);
+}
+
+function normalizeOffset(offset: number | undefined): number {
+  if (!Number.isFinite(offset ?? 0) || !offset || offset < 1) return 0;
+  return Math.trunc(offset);
+}
+
+function errorLogWhere(
+  input: { orgId: string; since?: Date; before?: Date },
+  options: { before?: boolean } = {},
+) {
+  return {
+    orgId: input.orgId,
+    ...(input.since ? { occurredAt: MoreThanOrEqual(input.since) } : {}),
+    ...(options.before && input.before ? { occurredAt: LessThan(input.before) } : {}),
+  };
 }
 
 function serializeErrorLog(row: FulcrumErrorLog): ErrorLogPublicRow {

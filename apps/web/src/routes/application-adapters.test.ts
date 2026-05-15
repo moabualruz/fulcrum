@@ -20,6 +20,20 @@ type RuntimeSurface = {
 
 const SURFACES: Surface[] = [
   {
+    name: "auth login",
+    file: "auth/login/+page.server.ts",
+    applicationModule: null,
+    helperModule: "@identity-access/interface/auth-feature",
+    keys: ["saasAuthEnabled"],
+  },
+  {
+    name: "auth signup",
+    file: "auth/signup/+page.server.ts",
+    applicationModule: null,
+    helperModule: "@identity-access/interface/auth-feature",
+    keys: ["_isSaasAuthEnabled"],
+  },
+  {
     name: "dashboard",
     file: "+page.server.ts",
     applicationModule: null,
@@ -35,7 +49,8 @@ const SURFACES: Surface[] = [
   {
     name: "runs",
     file: "runs/+page.server.ts",
-    applicationModule: "application/runs/queries",
+    applicationModule: null,
+    helperModule: "@execution-orchestration/interface/run-pages",
     keys: ["activeProjectId", "filter", "streamed", "data", "runs", "projects", "tasks"],
   },
   {
@@ -48,8 +63,23 @@ const SURFACES: Surface[] = [
   {
     name: "artifacts",
     file: "artifacts/+page.server.ts",
-    applicationModule: "application/artifacts/queries",
+    applicationModule: null,
+    helperModule: "$lib/server/artifact-api",
     keys: ["activeProjectId", "filter", "streamed", "data", "artifacts"],
+  },
+  {
+    name: "run artifacts",
+    file: "runs/[id]/artifacts/+page.server.ts",
+    applicationModule: null,
+    helperModule: "$lib/server/artifact-api",
+    keys: ["runId", "activeProjectId", "streamed", "data", "artifacts"],
+  },
+  {
+    name: "project artifacts",
+    file: "projects/[id]/artifacts/+page.server.ts",
+    applicationModule: null,
+    helperModule: "$lib/server/artifact-api",
+    keys: ["projectId", "activeProjectId", "streamed", "data", "artifacts", "stats"],
   },
   {
     name: "audit",
@@ -57,6 +87,13 @@ const SURFACES: Surface[] = [
     applicationModule: null,
     helperModule: "@workflow-coordination/interface/http/audit-api-client",
     keys: ["events", "total", "page", "actor", "kind", "verb", "project", "dateFrom", "dateTo"],
+  },
+  {
+    name: "inbox",
+    file: "inbox/+page.server.ts",
+    applicationModule: null,
+    helperModule: "@notification-center/interface/http/notification-api-client",
+    keys: ["notifications", "unreadCount", "activity", "activityPage", "activityTotal"],
   },
   {
     name: "memory",
@@ -70,6 +107,76 @@ const SURFACES: Surface[] = [
     applicationModule: null,
     helperModule: "$lib/server/search-api",
     keys: ["q", "kinds", "dateFrom", "dateTo", "hits", "grouped", "savedSearches"],
+  },
+  {
+    name: "project custom fields settings",
+    file: "projects/[id]/settings/fields/+page.server.ts",
+    applicationModule: null,
+    helperModule: "$lib/server/custom-field-api",
+    keys: ["fields", "projectId"],
+  },
+  {
+    name: "project saved views settings",
+    file: "projects/[id]/settings/views/+page.server.ts",
+    applicationModule: null,
+    helperModule: "$lib/server/saved-view-api",
+    keys: ["views", "projectId"],
+  },
+  {
+    name: "project document templates settings",
+    file: "projects/[id]/settings/templates/+page.server.ts",
+    applicationModule: null,
+    helperModule: "@knowledge-workspace/interface/document-templates",
+    keys: ["templates", "projectId"],
+  },
+  {
+    name: "settings error logs",
+    file: "settings/errors/+page.server.ts",
+    applicationModule: null,
+    helperModule: "$lib/server/error-log-api",
+    keys: ["page", "streamed", "data", "errors", "total", "pageSize"],
+  },
+  {
+    name: "settings notification retention",
+    file: "settings/notifications/+page.server.ts",
+    applicationModule: null,
+    helperModule: "@workflow-coordination/interface/http/audit-api-client",
+    keys: ["retainDays", "saved", "retentionPolicy"],
+  },
+  {
+    name: "settings connectors",
+    file: "settings/connectors/+page.server.ts",
+    applicationModule: null,
+    helperModule: "$lib/server/connector-api",
+    keys: ["connectors", "syncLog", "saveOk", "syncOk"],
+  },
+  {
+    name: "settings billing",
+    file: "settings/billing/+page.server.ts",
+    applicationModule: null,
+    helperModule: "@identity-access/interface/auth-feature",
+    keys: ["billingEnabled"],
+  },
+  {
+    name: "settings inference",
+    file: "settings/inference/+page.server.ts",
+    applicationModule: null,
+    helperModule: "@platform-core/interface/http/inference-api-client",
+    keys: ["activeProjectId", "streamed", "inference", "health"],
+  },
+  {
+    name: "settings document templates",
+    file: "settings/templates/+page.server.ts",
+    applicationModule: null,
+    helperModule: "@knowledge-workspace/interface/document-templates",
+    keys: ["templates", "projectId"],
+  },
+  {
+    name: "settings database migrations",
+    file: "settings/database/migrations/+page.server.ts",
+    applicationModule: null,
+    helperModule: "@platform-core/interface/database-status",
+    keys: ["database", "status", "history"],
   },
   {
     name: "tasks",

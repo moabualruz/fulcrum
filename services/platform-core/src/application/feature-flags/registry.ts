@@ -15,7 +15,7 @@
  * Used by the FeatureFlag entity, API flag routes, and interface surfaces.
  */
 
-import type { FeatureFlagRepository } from "@platform-core/infrastructure/application-database/repositories/auth/FeatureFlagRepository.ts";
+import type { FeatureFlagRepository } from "@identity-access/infrastructure/database/repositories/auth/FeatureFlagRepository.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Registered feature flags
@@ -233,25 +233,19 @@ export class FlagRegistry {
       // Per-user scope (org + user + flag)
       if (orgId && userId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        row = await this._flagRepo.findOne({ flag, orgId, userId } as any, {
-          refresh: true,
-        });
+        row = await this._flagRepo.findOne({ flag, orgId, userId } as any);
       }
 
       // Per-org scope (org + flag, no user)
       if (!row && orgId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        row = await this._flagRepo.findOne({ flag, orgId, userId: null } as any, {
-          refresh: true,
-        });
+        row = await this._flagRepo.findOne({ flag, orgId, userId: null } as any);
       }
 
       // Global scope (no org, no user)
       if (!row) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        row = await this._flagRepo.findOne({ flag, orgId: null, userId: null } as any, {
-          refresh: true,
-        });
+        row = await this._flagRepo.findOne({ flag, orgId: null, userId: null } as any);
       }
 
       // DB row found — return its value (repo wins over env var)

@@ -7,7 +7,7 @@ import {
   type NotificationQuietHoursLike,
   type NotifyFanoutRepositories,
 } from "@notification-center/application/delivery-runtime/fanout-worker.ts";
-import { DeliveryStatus } from "@platform-core/infrastructure/application-database/entities/notifications/index.ts";
+import { DeliveryStatus } from "@notification-center/infrastructure/database/entities/notifications/index.ts";
 import type { NotificationRuleLike } from "@notification-center/application/delivery-runtime/rule-engine.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-00000000000a";

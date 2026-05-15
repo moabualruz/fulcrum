@@ -1,7 +1,7 @@
 import type { EntityManager } from "typeorm";
 import { randomUUID } from "node:crypto";
 
-import type { AgentRunRepository } from "@platform-core/infrastructure/application-database/repositories/orchestration/AgentRunRepository.ts";
+import type { AgentRunRepository } from "@execution-orchestration/infrastructure/database/repositories/orchestration/AgentRunRepository.ts";
 import type { EventRepository } from "@platform-core/infrastructure/application-database/repositories/core/EventRepository.ts";
 import { ormSqlConnection } from "@platform-core/application/orm-helpers.ts";
 import type { OrchestrationApplicationContext } from "@execution-orchestration/application/orchestration/types.ts";
@@ -25,41 +25,34 @@ export async function claimRunState(
   instanceId: string,
 ): Promise<ClaimRunStateResult> {
   const [{ AgentRun }, { Event }, { Org }] = await Promise.all([
-    import("@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts"),
+    import("@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts"),
     import("@platform-core/infrastructure/application-database/entities/core/Event.ts"),
-    import("@platform-core/infrastructure/application-database/entities/auth/Org.ts"),
+    import("@identity-access/infrastructure/database/entities/auth/Org.ts"),
   ]);
 
-  const fork = em.fork();
-  return await fork.transactional(async (tx) => {
-    const agentRunRepo = tx.getRepository(AgentRun) as AgentRunRepository;
-    const eventsRepo = tx.getRepository(Event) as EventRepository;
-    const org = tx.getReference(Org, orgId);
-    const candidate = await agentRunRepo.findOne(
-      {
-        org: orgId,
-        task: taskId,
-        orchestrationState: "unclaimed",
-      } as never,
-      { orderBy: { createdAt: "ASC", id: "ASC" }, fields: ["id"] },
-    );
+  return await em.transaction(async (tx) => {
+    const agentRunRepo = tx.getRepository(AgentRun);
+    const candidate = await agentRunRepo.findOne({
+      where: { org: { id: orgId }, task: { id: taskId }, orchestrationState: "unclaimed" } as never,
+      order: { createdAt: "ASC", id: "ASC" },
+      select: ["id"],
+    });
     if (!candidate) throw new OrchestrationStateMutationConflict(taskId);
 
-    const updatedCount = await agentRunRepo.nativeUpdate(
+    const result = await agentRunRepo.update(
       { id: candidate.id, orchestrationState: "unclaimed" } as never,
       { orchestrationState: "claimed", claimedBy: instanceId } as never,
     );
-    if (updatedCount === 0) throw new OrchestrationStateMutationConflict(taskId);
+    if ((result.affected ?? 0) === 0) throw new OrchestrationStateMutationConflict(taskId);
 
-    eventsRepo.create({
-      org,
+    await tx.save(Event, {
+      org: { id: orgId } as typeof Org.prototype,
       subjectKind: "agent_run",
       subjectId: candidate.id,
       verb: "state_changed",
       payload: { from: "unclaimed", to: "claimed" },
       createdAt: new Date(),
     });
-    await tx.flush();
     return { runId: candidate.id };
   });
 }
@@ -84,19 +77,16 @@ export async function transitionRunForRetry(
   },
 ): Promise<void> {
   const [{ AgentRun }, { Event }, { Org }] = await Promise.all([
-    import("@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts"),
+    import("@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts"),
     import("@platform-core/infrastructure/application-database/entities/core/Event.ts"),
-    import("@platform-core/infrastructure/application-database/entities/auth/Org.ts"),
+    import("@identity-access/infrastructure/database/entities/auth/Org.ts"),
   ]);
-  const fork = em.fork();
-  await fork.transactional(async (tx) => {
+  await em.transaction(async (tx) => {
     const agentRunRepo = tx.getRepository(AgentRun);
-    const eventsRepo = tx.getRepository(Event);
-    const org = tx.getReference(Org, run.orgId);
-    const updatedCount = await agentRunRepo.nativeUpdate(
+    const result = await agentRunRepo.update(
       {
         id: run.id,
-        org: run.orgId,
+        org: { id: run.orgId } as never,
         orchestrationState: run.orchestrationState,
       } as never,
       {
@@ -107,16 +97,15 @@ export async function transitionRunForRetry(
         lastErrorKind: input.lastErrorKind,
       } as never,
     );
-    if (updatedCount === 0) return;
-    eventsRepo.create({
-      org,
+    if ((result.affected ?? 0) === 0) return;
+    await tx.save(Event, {
+      org: { id: run.orgId } as typeof Org.prototype,
       subjectKind: "agent_run",
       subjectId: run.id,
       verb: "state_changed",
       payload: { from: run.orchestrationState, to: input.nextState },
       createdAt: input.now,
     });
-    await tx.flush();
   });
 }
 

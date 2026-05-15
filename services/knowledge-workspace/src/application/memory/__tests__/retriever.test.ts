@@ -4,16 +4,16 @@ import { Container } from "@needle-di/core";
 
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
 import type {
   MemoryImportance,
   MemoryKind,
-} from "@platform-core/infrastructure/application-database/entities/memory/enums.ts";
+} from "@knowledge-workspace/infrastructure/database/entities/memory/enums.ts";
 import {
   MEMORY_IMPORTANCE_BOOSTS,
   MemoryRepository,
-} from "@platform-core/infrastructure/application-database/repositories/memory/MemoryRepository.ts";
+} from "@knowledge-workspace/infrastructure/database/repositories/memory/MemoryRepository.ts";
 import { MemoryRetriever, RetrieverOptsSchema } from "../retriever.ts";
 
 const ORG_A = "00000000-0000-0000-0000-000000000001";
@@ -33,7 +33,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  const em = db.orm.em.fork();
+  const em = db.orm.em;
   await em.nativeDelete(Memory, {});
   await em.upsert(Org, {
     id: ORG_B,
@@ -155,7 +155,7 @@ describe("MemoryRetriever", () => {
       body: `bounded candidate marker ${index}`,
       createdAt: daysAgo(index),
     })));
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const repo = em.getRepository(Memory) as MemoryRepository;
     const queries: Array<{ getQuery: () => string }> = [];
     const originalCreateQueryBuilder = repo.createQueryBuilder.bind(repo);
@@ -186,7 +186,7 @@ describe("MemoryRetriever", () => {
       body: `empty candidate marker ${index}`,
       createdAt: daysAgo(index),
     })));
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const repo = em.getRepository(Memory) as MemoryRepository;
     const queries: Array<{ getQuery: () => string }> = [];
     const originalCreateQueryBuilder = repo.createQueryBuilder.bind(repo);
@@ -370,7 +370,7 @@ interface MemorySeed {
 }
 
 async function seedMemories(seeds: MemorySeed[]): Promise<void> {
-  const em = db.orm.em.fork();
+  const em = db.orm.em;
   for (const seed of seeds) {
     const orgId = seed.orgId ?? ORG_A;
     const memory = em.create(Memory, {
@@ -390,7 +390,7 @@ async function seedMemories(seeds: MemorySeed[]): Promise<void> {
     });
     em.persist(memory);
   }
-  await em.flush();
+  /* flushed */
   em.clear();
 }
 
@@ -409,7 +409,7 @@ function idFor(group: number, index: number): string {
 }
 
 function createRetriever(): MemoryRetriever {
-  const container = new Container();
-  registerDbBindings(container, db.orm, db.orm.em.fork());
+  const container = null;
+  registerDbBindings(container, db.orm, db.orm.em);
   return container.get(MemoryRetriever);
 }

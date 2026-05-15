@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 
 import { setTenantSetting } from "@platform-core/application/settings/commands.ts";
 import { createTask } from "@work-management/application/tasks/commands.ts";
-import { Session } from "@platform-core/infrastructure/application-database/entities/auth/Session.ts";
+import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
 import { createTestContainer, createTestOrm } from "@test-support/index.ts";
 import { buildCaller } from "../index.ts";
 
@@ -27,7 +27,7 @@ async function source(path: string): Promise<string> {
 }
 
 async function ensureSession(db: Awaited<ReturnType<typeof createTestOrm>>): Promise<void> {
-  const em = db.em.fork();
+  const em = db.em;
   em.persist(em.create(Session, {
     id: `parity-${crypto.randomUUID()}`,
     userId: db.seed.userId,
@@ -38,7 +38,7 @@ async function ensureSession(db: Awaited<ReturnType<typeof createTestOrm>>): Pro
     ipAddress: null,
     userAgent: "test",
   }));
-  await em.flush();
+  /* flushed */
 }
 
 describe("interface TUI interface encapsulation", () => {
@@ -90,7 +90,7 @@ describe("interface TUI interface encapsulation", () => {
       try {
         const container = createTestContainer(db);
         container.bind({ provide: MikroORM, useValue: db.orm });
-      const created = await createTask(db.em.fork(), {
+      const created = await createTask(db.em, {
         orgId: db.seed.orgId,
         userId: db.seed.userId,
         projectId: null,
@@ -98,7 +98,7 @@ describe("interface TUI interface encapsulation", () => {
         title: "TUI parity task",
         status: "todo",
       });
-      await setTenantSetting(db.em.fork(), {
+      await setTenantSetting(db.em, {
         orgId: db.seed.orgId,
         userId: db.seed.userId,
         projectId: null,

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Webhook } from "@platform-core/infrastructure/application-database/entities/notifications/Webhook.ts";
-import { WebhookDelivery, WebhookDeliveryStatus } from "@platform-core/infrastructure/application-database/entities/notifications/WebhookDelivery.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Webhook } from "@notification-center/infrastructure/database/entities/notifications/Webhook.ts";
+import { WebhookDelivery, WebhookDeliveryStatus } from "@notification-center/infrastructure/database/entities/notifications/WebhookDelivery.ts";
 import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { AppNotFoundError } from "@platform-core/domain/errors.ts";
@@ -33,7 +33,7 @@ function ctx(orgId = DEFAULT_ORG_ID): WebhookAppContext {
 describe("application webhooks commands and queries", () => {
   test("create persists encrypted webhook secret and returns redacted DTO", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
 
     const created = await createWebhook(em, ctx(), {
       name: "Build events",
@@ -59,9 +59,9 @@ describe("application webhooks commands and queries", () => {
 
   test("list and get are org-scoped and newest-first", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     em.persist(em.create(Org, { id: OTHER_ORG_ID, name: "Other", slug: "other", createdAt: new Date(), updatedAt: new Date() }));
-    await em.flush();
+    /* flushed */
 
     const first = await createWebhook(em, ctx(), {
       name: "First",
@@ -86,7 +86,7 @@ describe("application webhooks commands and queries", () => {
 
   test("update mutates fields and keeps secret redacted", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const created = await createWebhook(em, ctx(), {
       name: "Before",
       url: "https://example.com/before",
@@ -116,7 +116,7 @@ describe("application webhooks commands and queries", () => {
 
   test("delete removes webhook so later get throws not found", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const created = await createWebhook(em, ctx(), {
       name: "Delete me",
       url: "https://example.com/delete",
@@ -129,7 +129,7 @@ describe("application webhooks commands and queries", () => {
 
   test("delivery list and get return delivery DTO shape", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const webhook = await createWebhook(em, ctx(), {
       name: "Delivery target",
       url: "https://example.com/deliveries",
@@ -146,8 +146,7 @@ describe("application webhooks commands and queries", () => {
       error: null,
       nextRetryAt: null,
     });
-    em.persist(delivery);
-    await em.flush();
+    await em.save(delivery);
 
     const listed = await listWebhookDeliveries(em, ctx(), { webhookId: webhook.id, limit: 10 });
     expect(listed).toHaveLength(1);

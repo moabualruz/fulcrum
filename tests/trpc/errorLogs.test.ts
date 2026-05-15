@@ -57,7 +57,7 @@ function session() {
 }
 
 function caller(rows: ErrorLogRecord[], authenticated = true) {
-  const container = new Container();
+  const container = null;
   container.bind({ provide: ErrorLogStore, useValue: new MemoryErrorLogStore(rows) });
   return t.createCallerFactory(appRouter)(
     createContext({

@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { Credential } from "@platform-core/infrastructure/application-database/entities/platform/Credential.ts";
-import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
-import { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
+import { TaskRepository } from "@work-management/infrastructure/database/repositories/tasks/TaskRepository.ts";
 import { createTestOrm } from "@test-support/application-database.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
@@ -33,7 +33,7 @@ function mockSession() {
 }
 
 function callerFor(repo: TaskRepository) {
-  const container = new Container();
+  const container = null;
   container.bind({ provide: TaskRepository, useValue: repo });
 
   return createCaller(
@@ -58,7 +58,7 @@ describe("JSON import/export tRPC procedures", () => {
   test("dataExport.create returns manifest JSON with entity counts and redacted credentials", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const repo = em.getRepository(Task) as TaskRepository;
       const caller = callerFor(repo);
 
@@ -71,7 +71,7 @@ describe("JSON import/export tRPC procedures", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      await em.flush();
+      /* flushed */
       await em.getConnection().execute(
         `
           insert into credentials (id, org_id, user_id, name, encrypted_value, algo, kdf, provider, archived)
@@ -117,7 +117,7 @@ describe("JSON import/export tRPC procedures", () => {
   test("dataImport.preflight reports counts and UUID collisions", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as TaskRepository;
       const caller = callerFor(repo);
       const task = await caller.tasks.create({ title: "Existing" });
       const exportResult = await caller.dataExport.create();
@@ -139,7 +139,7 @@ describe("JSON import/export tRPC procedures", () => {
   test("dataImport.run supports dry-run, update idempotence, and error collisions", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as TaskRepository;
       const caller = callerFor(repo);
       const created = await caller.tasks.create({ title: "Before import", status: "todo" });
       const exported = JSON.parse((await caller.dataExport.create()).json);

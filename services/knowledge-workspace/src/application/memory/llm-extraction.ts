@@ -15,10 +15,10 @@
  */
 
 import type { EntityManager } from "typeorm";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
-import { MemoryLink } from "@platform-core/infrastructure/application-database/entities/memory/MemoryLink.ts";
-import type { MemoryImportance, MemoryKind, MemoryLinkTargetKind } from "@platform-core/infrastructure/application-database/entities/memory/enums.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
+import { MemoryLink } from "@knowledge-workspace/infrastructure/database/entities/memory/MemoryLink.ts";
+import type { MemoryImportance, MemoryKind, MemoryLinkTargetKind } from "@knowledge-workspace/infrastructure/database/entities/memory/enums.ts";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -63,7 +63,7 @@ async function isDuplicate(
 ): Promise<boolean> {
   // Try pg_trgm similarity first
   try {
-    const result = await em.getConnection().execute(
+    const result = await em.query(
       `SELECT 1 FROM memories
        WHERE org_id = ? AND (project_id = ? OR project_id IS NULL)
          AND similarity(body, ?) > ?
@@ -115,7 +115,7 @@ export class LlmExtractionJob {
 
     if (!facts || facts.length === 0) return;
 
-    const orgRef = this.em.getReference(Org, orgId);
+    const orgRef = { id: orgId } as Org;
     const now = new Date();
 
     for (const fact of facts) {
@@ -145,8 +145,7 @@ export class LlmExtractionJob {
         createdAt: now,
         updatedAt: now,
       });
-      this.em.persist(memory);
-      await this.em.flush();
+      await this.em.save(memory);
 
       const link = this.em.create(MemoryLink, {
         org: orgRef,
@@ -154,8 +153,7 @@ export class LlmExtractionJob {
         targetKind,
         targetId,
       });
-      this.em.persist(link);
-      await this.em.flush();
+      await this.em.save(link);
     }
   }
 

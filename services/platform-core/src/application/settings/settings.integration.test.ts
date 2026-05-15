@@ -49,7 +49,7 @@ function ctx(userId: string): AppContext {
 describe("settings commands and queries with migrated PGlite data", () => {
   test("feature flags, backups, secrets, errors, telemetry, and import helpers persist real rows", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const userId = testDb.seed.userId;
     const appCtx = ctx(userId);
 

@@ -22,10 +22,10 @@ import { PGlite } from "@electric-sql/pglite";
 import { Container } from "@needle-di/core";
 
 import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
-import { OrgMember } from "@platform-core/infrastructure/application-database/entities/auth/OrgMember.ts";
-import { OrgMemberRepository } from "@platform-core/infrastructure/application-database/repositories/auth/OrgMemberRepository.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
+import { OrgMember } from "@identity-access/infrastructure/database/entities/auth/OrgMember.ts";
+import { OrgMemberRepository } from "@identity-access/infrastructure/database/repositories/auth/OrgMemberRepository.ts";
 import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
@@ -61,7 +61,7 @@ function mockSession(userId: string, orgId: string) {
 
 function makeCaller(userId: string, orgId: string = TEST_ORG_ID) {
   const session = mockSession(userId, orgId);
-  const em = orm.em.fork();
+  const em = orm.em;
   const orgMemberRepo = em.getRepository(OrgMember) as OrgMemberRepository;
 
   const ctx = createContext({
@@ -70,7 +70,7 @@ function makeCaller(userId: string, orgId: string = TEST_ORG_ID) {
     userId,
     em: em as unknown as import("@mikro-orm/postgresql").EntityManager,
     container: (() => {
-      const c = new Container();
+      const c = null;
       c.bind({ provide: OrgMemberRepository, useValue: orgMemberRepo });
       c.bind({
         provide: FlagRegistry,
@@ -98,7 +98,7 @@ beforeAll(async () => {
 
   await orm.schema.create();
 
-  const seedEm = orm.em.fork();
+  const seedEm = orm.em;
   const now = new Date();
 
   const org = seedEm.create(Org, {
@@ -272,11 +272,11 @@ describe("orgs.members.updateRole", () => {
     expect(result.ok).toBe(true);
 
     // Verify via DB
-    const em = orm.em.fork();
-    const membership = await em.findOne(OrgMember, {
+    const em = orm.em;
+    const membership = await em.findOne(OrgMember, { where: {
       orgId: TEST_ORG_ID,
       userId: TEST_GUEST_ID,
-    });
+    } });
     expect((membership as { role: string }).role).toBe("member");
 
     // Restore
@@ -303,7 +303,7 @@ describe("orgs.members.updateRole", () => {
 describe("orgs.members.remove", () => {
   it("owner can remove a member", async () => {
     // Add a temporary member to remove
-    const addEm = orm.em.fork();
+    const addEm = orm.em;
     const tempUserId = "6e599624-560d-4858-b967-f1c2b015790f";
     const tempUser = addEm.create(User, {
       id: tempUserId,
@@ -327,7 +327,7 @@ describe("orgs.members.remove", () => {
     expect(result.ok).toBe(true);
 
     // Verify removed
-    const verifyEm = orm.em.fork();
+    const verifyEm = orm.em;
     const membership = await verifyEm.findOne(OrgMember, {
       orgId: TEST_ORG_ID,
       userId: tempUserId,
@@ -337,7 +337,7 @@ describe("orgs.members.remove", () => {
 
   it("admin can remove a member", async () => {
     // Add a temporary guest to remove
-    const addEm = orm.em.fork();
+    const addEm = orm.em;
     const tempUserId = "6dfb8d86-5348-4c26-98ac-a1d05b9b8c17";
     const tempUser = addEm.create(User, {
       id: tempUserId,
@@ -397,7 +397,7 @@ describe("orgs.members.remove", () => {
     expect(error?.code).toBe("BAD_REQUEST");
 
     // Restore owner2
-    const restoreEm = orm.em.fork();
+    const restoreEm = orm.em;
     const restoredMember = restoreEm.create(OrgMember, {
       userId: TEST_OWNER2_ID,
       orgId: TEST_ORG_ID,

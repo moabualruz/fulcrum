@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
 import type { Session } from "better-auth";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
 import { createTestOrm } from "@test-support/application-database.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
@@ -49,7 +49,7 @@ describe("memory tRPC CRUD and search", () => {
   test("create, get, list, update, delete memories inside the caller org", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
       const projectId = "22222222-2222-4222-8222-222222222222";
 
@@ -111,7 +111,7 @@ describe("memory tRPC CRUD and search", () => {
   test("create rejects non-manual client source values", async () => {
     const db = await createTestOrm();
     try {
-      const caller = callerFor(db.em.fork());
+      const caller = callerFor(db.em);
 
       await expect(caller.memories.create({
         body: "Hook-owned memory",
@@ -125,14 +125,13 @@ describe("memory tRPC CRUD and search", () => {
   test("update requires forceEdit for heuristic or llm memories", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const memory = em.create(Memory, {
         org: em.getReference(Org, ORG_ID),
         body: "Heuristic extracted fact",
         source: "heuristic",
       });
-      em.persist(memory);
-      await em.flush();
+      await em.save(memory);
 
       const caller = callerFor(em);
       await expect(caller.memories.update({ id: memory.id, body: "Manual edit" }))
@@ -147,7 +146,7 @@ describe("memory tRPC CRUD and search", () => {
   test("all procedures enforce org isolation", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
       const otherOrgCaller = callerFor(em, OTHER_ORG_ID);
       const created = await caller.memories.create({ body: "Org scoped memory" });
@@ -164,7 +163,7 @@ describe("memory tRPC CRUD and search", () => {
   test("search ranks matching memories with BM25 scoring", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
       const older = new Date("2026-04-01T00:00:00.000Z");
       const newer = new Date("2026-05-01T00:00:00.000Z");
@@ -192,8 +191,7 @@ describe("memory tRPC CRUD and search", () => {
           createdAt: newer,
         }),
       ];
-      em.persist(rows);
-      await em.flush();
+      await em.save(rows);
 
       const result = await caller.memories.search({
         query: "alpha",

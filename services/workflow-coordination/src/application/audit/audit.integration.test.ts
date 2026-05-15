@@ -12,7 +12,7 @@ describe("application audit", () => {
   test("handles CRUD, not-found, validation, and scoping", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const event = await recordAuditEvent(em, ctx, { action: "created", subjectKind: "task", subjectId: "33333333-3333-4333-8333-333333333333" });
       expect((await queryAuditEvents(em, ctx, { subjectKind: "task" })).items).toHaveLength(1);
       await expect(getAuditEvent(em, ctx, event.id)).resolves.toMatchObject({ id: event.id });

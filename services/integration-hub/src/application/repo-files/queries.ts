@@ -1,8 +1,8 @@
 import type { EntityManager } from "typeorm";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { RepoBlameLine } from "@platform-core/infrastructure/application-database/entities/repos/RepoBlameLine.ts";
-import { RepoTreeEntry } from "@platform-core/infrastructure/application-database/entities/repos/RepoTreeEntry.ts";
+import { RepoBlameLine } from "@integration-hub/infrastructure/database/entities/repos/RepoBlameLine.ts";
+import { RepoTreeEntry } from "@integration-hub/infrastructure/database/entities/repos/RepoTreeEntry.ts";
 import { AppNotFoundError } from "@platform-core/domain/errors.ts";
 import { getRepo } from "@integration-hub/application/repos/queries.ts";
 import type { AppContext } from "@integration-hub/domain/repository.ts";
@@ -187,7 +187,7 @@ export async function listTreeChildren(
   parentPath: string | null,
 ): Promise<RepoFileRow[]> {
   await getRepo(em, ctx, repoId);
-  const rows = await em.find(RepoTreeEntry, { org: ctx.orgId, repo: repoId } as never, { orderBy: { kind: "ASC", path: "ASC" } });
+  const rows = await em.find(RepoTreeEntry, { where: { org: ctx.orgId, repo: repoId } as never, order: { kind: "ASC", path: "ASC" } });
   return rows
     .map((row) => serializeTreeEntry(row, branch))
     .filter((row) => row.parent_path === parentPath);
@@ -237,7 +237,7 @@ export async function getBlameForFile(
   path: string,
 ): Promise<RepoFileBlameRow[]> {
   await getRepo(em, ctx, repoId);
-  const rows = await em.find(RepoBlameLine, { org: ctx.orgId, repo: repoId, path } as never, { orderBy: { lineNumber: "ASC" } });
+  const rows = await em.find(RepoBlameLine, { where: { org: ctx.orgId, repo: repoId, path } as never, order: { lineNumber: "ASC" } });
   return rows.map((row) => ({
     id: row.id,
     repo_id: row.repo.id,
@@ -253,7 +253,7 @@ export async function getBlameForFile(
 
 export async function listIndexedBranches(em: EntityManager, ctx: AppContext, repoId: string): Promise<string[]> {
   const repo = await getRepo(em, ctx, repoId);
-  const commitRows = await em.find(RepoTreeEntry, { org: ctx.orgId, repo: repoId } as never, { fields: ["commitSha"] as never, orderBy: { commitSha: "ASC" } });
+  const commitRows = await em.find(RepoTreeEntry, { where: { org: ctx.orgId, repo: repoId } as never, order: { commitSha: "ASC" } });
   const branches = new Set(commitRows.map((row) => row.commitSha).filter(Boolean));
   if (repo.defaultBranch) branches.add(repo.defaultBranch);
   if (repo.currentBranch) branches.add(repo.currentBranch);

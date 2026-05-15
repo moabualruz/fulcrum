@@ -1,46 +1,107 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { getRetentionPolicy, upsertRetentionPolicy } from "@workflow-coordination/application/audit/web-queries.ts";
-import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
+import { describe, expect, test } from "bun:test";
 
-let db: TestOrm;
-let orgId: string;
+type RouteEvent = Parameters<typeof import("./+page.server.ts").load>[0];
 
-beforeEach(async () => {
-  db = await createTestOrm();
-  orgId = db.seed.orgId;
-});
+interface FetchCall {
+  url: string;
+  method: string;
+  cookie: string | null;
+  body: string | null;
+}
 
-afterEach(async () => {
-  await db.close();
-});
+function routeEvent(fetchImpl: typeof fetch, input: {
+  orgId?: string | null;
+  cookie?: string;
+  form?: FormData;
+} = {}): RouteEvent {
+  const url = new URL("http://localhost/settings/notifications");
+  return {
+    locals: {
+      orgId: input.orgId ?? "org-1",
+      activeProjectId: null,
+    },
+    url,
+    fetch: fetchImpl,
+    request: new Request(url, {
+      method: input.form ? "POST" : "GET",
+      headers: input.cookie ? { cookie: input.cookie } : undefined,
+      body: input.form,
+    }),
+  } as unknown as RouteEvent;
+}
+
+function retentionFetch(calls: FetchCall[], response: Record<string, unknown> | null = { retainDays: 30 }): typeof fetch {
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    calls.push({
+      url: input.toString(),
+      method: init?.method ?? "GET",
+      cookie: new Headers(init?.headers).get("cookie"),
+      body: typeof init?.body === "string" ? init.body : null,
+    });
+    return Response.json(response);
+  }) as typeof fetch;
+}
 
 describe("/settings/notifications retention policy", () => {
-  test("load returns null when no policy set", async () => {
-    const result = await getRetentionPolicy(db.em.fork(), orgId);
-    expect(result).toBeNull();
+  test("load reads retention policy through the audit public API", async () => {
+    const calls: FetchCall[] = [];
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
+
+    const result = await mod.load(routeEvent(retentionFetch(calls), { cookie: "sid=notify" }));
+
+    expect(result).toEqual({ retainDays: 30, saved: false });
+    expect(calls).toEqual([
+      {
+        url: "http://localhost/api/v1/audit/retention-policy?orgId=org-1",
+        method: "GET",
+        cookie: "sid=notify",
+        body: null,
+      },
+    ]);
   });
 
-  test("save sets retainDays and returns policy", async () => {
-    const policy = await upsertRetentionPolicy(db.em.fork(), orgId, 30);
-    expect(policy.retain_days).toBe(30);
-    expect(policy.org_id).toBe(orgId);
+  test("load accepts snake_case retain_days from older API responses", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
+
+    const result = await mod.load(routeEvent(retentionFetch([], { retain_days: 45 })));
+
+    expect(result).toEqual({ retainDays: 45, saved: false });
   });
 
-  test("save updates existing policy", async () => {
-    await upsertRetentionPolicy(db.em.fork(), orgId, 30);
-    const updated = await upsertRetentionPolicy(db.em.fork(), orgId, 90);
-    expect(updated.retain_days).toBe(90);
+  test("save writes sanitized retainDays through the audit public API", async () => {
+    const calls: FetchCall[] = [];
+    const form = new FormData();
+    form.set("retain_days", "90");
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
+
+    const result = await mod.actions.retention(routeEvent(retentionFetch(calls, { retainDays: 90 }), {
+      form,
+      orgId: "org-2",
+      cookie: "sid=save",
+    }) as Parameters<typeof mod.actions.retention>[0]);
+
+    expect(result).toEqual({ retainDays: 90, saved: true });
+    expect(calls).toEqual([
+      {
+        url: "http://localhost/api/v1/audit/retention-policy?orgId=org-2",
+        method: "PATCH",
+        cookie: "sid=save",
+        body: JSON.stringify({ retainDays: 90 }),
+      },
+    ]);
   });
 
-  test("retain_days=0 accepted as keep-forever", async () => {
-    const policy = await upsertRetentionPolicy(db.em.fork(), orgId, 0);
-    expect(policy.retain_days).toBe(0);
-  });
+  test("save treats invalid retain_days as keep-forever", async () => {
+    const calls: FetchCall[] = [];
+    const form = new FormData();
+    form.set("retain_days", "not-a-number");
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
 
-  test("getRetentionPolicy retrieves after upsert", async () => {
-    await upsertRetentionPolicy(db.em.fork(), orgId, 60);
-    const result = await getRetentionPolicy(db.em.fork(), orgId);
-    expect(result).not.toBeNull();
-    expect(result!.retain_days).toBe(60);
+    const result = await mod.actions.retention(routeEvent(retentionFetch(calls, { retainDays: 0 }), {
+      form,
+    }) as Parameters<typeof mod.actions.retention>[0]);
+
+    expect(result).toEqual({ retainDays: 0, saved: true });
+    expect(calls[0]?.body).toBe(JSON.stringify({ retainDays: 0 }));
   });
 });

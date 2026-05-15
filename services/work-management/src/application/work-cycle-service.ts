@@ -1,4 +1,5 @@
 import type { EntityManager } from "typeorm";
+import { Not } from "typeorm";
 
 import {
   AppConflictError,
@@ -6,10 +7,10 @@ import {
   AppNotFoundError,
   AppValidationError,
 } from "@platform-core/domain/errors.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
-import { MetricsCache } from "@platform-core/infrastructure/application-database/entities/tasks/MetricsCache.ts";
-import { Sprint, SprintStatus } from "@platform-core/infrastructure/application-database/entities/tasks/Sprint.ts";
+import { MetricsCache } from "@work-management/infrastructure/database/entities/tasks/MetricsCache.ts";
+import { Sprint, SprintStatus } from "@work-management/infrastructure/database/entities/tasks/Sprint.ts";
 import type { CloseSprintResult, MetricsSnapshot, SprintOutput } from "@work-management/domain/work-cycle.ts";
 
 interface SprintContext {
@@ -31,9 +32,7 @@ export class WorkCycleService {
     const where: Record<string, unknown> = { org: orgId };
     if (input?.projectId) where.projectId = input.projectId;
     if (input?.status) where.status = input.status;
-    const sprints = await this.em.find(Sprint, where as never, {
-      orderBy: { startDate: "ASC", id: "ASC" },
-    });
+    const sprints = await this.em.find(Sprint, { where: where as never, order: { startDate: "ASC", id: "ASC" } });
     return sprints.map(serializeSprint);
   }
 
@@ -53,7 +52,7 @@ export class WorkCycleService {
     capacityPoints?: number | null;
   }): Promise<SprintOutput> {
     const sprint = this.em.create(Sprint, {
-      org: this.em.getReference(Org, orgId),
+      org: { id: orgId } as Org,
       projectId: input.projectId,
       name: input.name,
       goal: input.goal ?? null,
@@ -62,8 +61,7 @@ export class WorkCycleService {
       status: SprintStatus.planned,
       capacityPoints: input.capacityPoints ?? null,
     });
-    this.em.persist(sprint);
-    await this.em.flush();
+    await this.em.save(sprint);
     return serializeSprint(sprint);
   }
 
@@ -85,7 +83,6 @@ export class WorkCycleService {
     if (sprint.startDate >= sprint.endDate) {
       throw new AppValidationError("start_date must be before end_date");
     }
-    await this.em.flush();
     return serializeSprint(sprint);
   }
 
@@ -94,7 +91,6 @@ export class WorkCycleService {
     if (!sprint) return null;
     const output = serializeSprint(sprint);
     this.em.remove(sprint);
-    await this.em.flush();
     return output;
   }
 
@@ -116,7 +112,6 @@ export class WorkCycleService {
       sprint,
       payload: { sprint_id: sprint.id, project_id: sprint.projectId, org_id: ctx.orgId },
     });
-    await this.em.flush();
     return serializeSprint(sprint);
   }
 
@@ -128,7 +123,7 @@ export class WorkCycleService {
     const sprint = await findSprint(this.em, ctx.orgId, input.id);
     if (!sprint) throw new AppNotFoundError("Sprint not found.");
 
-    const rows = await this.em.getConnection().execute(
+    const rows = await this.em.query(
       `select id, status, points from tasks where org_id = ? and sprint_id = ? and deleted_at is null order by id`,
       [ctx.orgId, sprint.id],
     ) as Array<{ id: string; status: string | null; points: number | null }>;
@@ -141,7 +136,7 @@ export class WorkCycleService {
       .filter((task) => (dispositionByTask.get(task.id) ?? input.unfinishedDisposition) === "backlog")
       .map((task) => task.id);
     if (backlogTaskIds.length > 0) {
-      await this.em.getConnection().execute(
+      await this.em.query(
         `update tasks set sprint_id = null, updated_at = now() where org_id = ? and id in (${backlogTaskIds.map(() => "?").join(", ")})`,
         [ctx.orgId, ...backlogTaskIds],
       );
@@ -152,14 +147,14 @@ export class WorkCycleService {
       .filter((task) => (dispositionByTask.get(task.id) ?? input.unfinishedDisposition) === "next-sprint")
       .map((task) => task.id);
     if (nextSprintTaskIds.length > 0) {
-      const nextSprint = await this.em.findOne(Sprint, {
-        org: ctx.orgId,
+      const nextSprint = await this.em.findOne(Sprint, { where: {
+        org: { id: ctx.orgId },
         projectId: sprint.projectId,
         status: SprintStatus.planned,
-        id: { $ne: sprint.id },
-      }, { orderBy: { startDate: "ASC" } });
+        id: Not(sprint.id),
+      } as never, order: { startDate: "ASC" } });
       const targetSprintId = nextSprint?.id ?? null;
-      await this.em.getConnection().execute(
+      await this.em.query(
         `update tasks set sprint_id = ${targetSprintId ? "?" : "null"}, updated_at = now() where org_id = ? and id in (${nextSprintTaskIds.map(() => "?").join(", ")})`,
         [...(targetSprintId ? [targetSprintId] : []), ctx.orgId, ...nextSprintTaskIds],
       );
@@ -180,7 +175,7 @@ export class WorkCycleService {
       wipCount: rows.filter((task) => ["in_progress", "active"].includes(task.status ?? "")).length,
     });
     sprint.status = SprintStatus.completed;
-    this.em.persist(metrics);
+    await this.em.save(metrics);
     await emitSprintEvent(ctx, {
       verb: "sprint.closed",
       sprint,
@@ -199,7 +194,6 @@ export class WorkCycleService {
         },
       },
     });
-    await this.em.flush();
 
     return {
       closed: true,
@@ -225,7 +219,7 @@ export class WorkCycleService {
     const sprint = await findSprint(this.em, orgId, sprintId);
     if (!sprint) throw new AppNotFoundError("Sprint not found.");
 
-    const rows = await this.em.getConnection().execute(
+    const rows = await this.em.query(
       `select coalesce(sum(points), 0) as total_points from tasks where org_id = ? and sprint_id = ? and deleted_at is null`,
       [orgId, sprintId],
     ) as Array<{ total_points: number }>;
@@ -246,7 +240,6 @@ export class WorkCycleService {
     if (summary !== undefined) {
       sprint.closedSummary = { ...(sprint.closedSummary as Record<string, unknown> ?? {}), summary };
     }
-    await this.em.flush();
     return serializeSprint(sprint);
   }
 
@@ -254,7 +247,7 @@ export class WorkCycleService {
     const sprint = await findSprint(this.em, orgId, sprintId);
     if (!sprint) throw new AppNotFoundError("Sprint not found.");
     await assertTaskInOrg(this.em, orgId, taskId);
-    await this.em.getConnection().execute(
+    await this.em.query(
       `update tasks
        set sprint_id = ?,
            project_id = case
@@ -272,7 +265,7 @@ export class WorkCycleService {
     const sprint = await findSprint(this.em, orgId, sprintId);
     if (!sprint) throw new AppNotFoundError("Sprint not found.");
     await assertTaskInOrg(this.em, orgId, taskId);
-    await this.em.getConnection().execute(
+    await this.em.query(
       `update tasks set sprint_id = null, updated_at = now() where org_id = ? and id = ? and sprint_id = ?`,
       [orgId, taskId, sprint.id],
     );
@@ -311,18 +304,18 @@ async function emitSprintEvent(ctx: SprintContext, input: {
     throw new AppInvariantError("EntityManager could not be resolved.");
   }
   const event = em.create(Event, {
-    org: em.getReference(Org, ctx.orgId),
+    org: { id: ctx.orgId } as Org,
     verb: input.verb,
     subjectKind: "sprint",
     subjectId: input.sprint.id,
     payload: input.payload,
     createdAt: new Date(),
   });
-  em.persist(event);
+  await em.save(event);
 }
 
 async function assertTaskInOrg(em: EntityManager, orgId: string, taskId: string): Promise<void> {
-  const rows = await em.getConnection().execute(
+  const rows = await em.query(
     `select id from tasks where org_id = ? and id = ? and deleted_at is null`,
     [orgId, taskId],
   );

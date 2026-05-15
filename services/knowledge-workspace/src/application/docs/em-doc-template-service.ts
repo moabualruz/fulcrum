@@ -6,7 +6,7 @@
  */
 
 import type { EntityManager } from "typeorm";
-import type { DocType } from "@platform-core/infrastructure/application-database/entities/docs/enums.ts";
+import type { DocType } from "@knowledge-workspace/infrastructure/database/entities/docs/enums.ts";
 import type { DocTemplateRow, DocTemplateService } from "./doc-template-service.ts";
 import { builtinTemplateRow, builtinTemplateRows } from "./template-seeds.ts";
 
@@ -14,7 +14,7 @@ export class EntityManagerDocTemplateService implements DocTemplateService {
   constructor(private readonly em: EntityManager) {}
 
   async list(orgId: string, projectId?: string | null): Promise<DocTemplateRow[]> {
-    const { DocTemplate } = await import("@platform-core/infrastructure/application-database/entities/docs/DocTemplate.ts");
+    const { DocTemplate } = await import("@knowledge-workspace/infrastructure/database/entities/docs/DocTemplate.ts");
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: Record<string, unknown> = projectId
@@ -22,7 +22,7 @@ export class EntityManagerDocTemplateService implements DocTemplateService {
       : { org: orgId, projectId: null } as any;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rows = await this.em.find(DocTemplate, where as any, { orderBy: { docType: "ASC" } });
+    const rows = await this.em.find(DocTemplate, { where: where as any, order: { docType: "ASC" } });
     return withBuiltInDefaults(orgId, rows.map(toRow));
   }
 
@@ -31,7 +31,7 @@ export class EntityManagerDocTemplateService implements DocTemplateService {
     projectId: string | null,
     docType: DocType,
   ): Promise<DocTemplateRow | null> {
-    const { DocTemplate } = await import("@platform-core/infrastructure/application-database/entities/docs/DocTemplate.ts");
+    const { DocTemplate } = await import("@knowledge-workspace/infrastructure/database/entities/docs/DocTemplate.ts");
 
     if (projectId) {
       const specific = await this.em.findOne(DocTemplate, {
@@ -73,7 +73,7 @@ function withBuiltInDefaults(
 }
 
 function toRow(
-  tmpl: import("@platform-core/infrastructure/application-database/entities/docs/DocTemplate.ts").DocTemplate,
+  tmpl: import("@knowledge-workspace/infrastructure/database/entities/docs/DocTemplate.ts").DocTemplate,
 ): DocTemplateRow {
   const orgId =
     typeof tmpl.org === "object" && tmpl.org !== null && "id" in tmpl.org

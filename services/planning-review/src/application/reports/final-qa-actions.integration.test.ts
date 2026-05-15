@@ -15,7 +15,7 @@ describe("review-orchestration final QA report action", () => {
   test("passes only after docs, success criteria, runs, artifacts, dependencies, and QA approvals line up", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await seedProject(em);
       const ctx = { orgId: ORG_ID, userId: USER_ID, projectId: PROJECT_ID };
       await seedProjectDoc(em, {
@@ -117,7 +117,7 @@ describe("review-orchestration final QA report action", () => {
   test("fails and keeps automated feedback active when latest QA verdict is REVISE", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await seedProject(em);
       const ctx = { orgId: ORG_ID, userId: USER_ID, projectId: PROJECT_ID };
       const task = await createTask(em, ctx, {

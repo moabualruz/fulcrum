@@ -153,6 +153,14 @@ async function assertErrorLogRoundTrip(source: FulcrumTypeOrmConnectionSource, u
     await expect(controller.list({ ...scope, limit: 1 })).resolves.toEqual([
       expect.objectContaining({ id: after.id, errorMessage: "new boom", context: { route: "runs" } }),
     ]);
+    await expect(controller.list({ ...scope, limit: 1, offset: 1, includeTotal: "true" })).resolves.toEqual({
+      data: [
+        expect.objectContaining({ id: before.id, errorMessage: "old boom" }),
+      ],
+      total: 2,
+      limit: 1,
+      offset: 1,
+    });
     await expect(controller.list({ ...scope, since: "2026-05-14T00:00:00.000Z" })).resolves.toEqual([
       expect.objectContaining({ id: after.id }),
     ]);
@@ -163,7 +171,14 @@ async function assertErrorLogRoundTrip(source: FulcrumTypeOrmConnectionSource, u
       orgId: `workspace-error-log-${source}`,
       userId: `member-error-log-${source}`,
     })).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(controller.clear(scope)).resolves.toEqual({ ok: true, deleted: 2 });
+    await expect(controller.clear({ ...scope, before: "2026-05-13T12:00:00.000Z" })).resolves.toEqual({
+      ok: true,
+      deleted: 1,
+    });
+    await expect(controller.list(scope)).resolves.toEqual([
+      expect.objectContaining({ id: after.id, errorMessage: "new boom" }),
+    ]);
+    await expect(controller.clear(scope)).resolves.toEqual({ ok: true, deleted: 1 });
     await expect(controller.list(scope)).resolves.toEqual([]);
   } finally {
     await dataSource.destroy();

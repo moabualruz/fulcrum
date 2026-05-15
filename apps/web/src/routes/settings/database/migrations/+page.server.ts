@@ -1,10 +1,10 @@
 import { fail } from "@sveltejs/kit";
 import type { PageServerLoad, Actions } from "./$types";
 import {
-  defaultProductDbStatus,
-  type ProductDbConnectionSummary,
-  type ProductDbStatus,
-} from "@platform-core/application/db/commands.ts";
+  defaultDatabaseStatus,
+  type DatabaseConnectionSummary,
+  type DatabaseStatus,
+} from "@platform-core/interface/database-status.ts";
 
 /** Shape of a migration row for the client. */
 export interface MigrationRow {
@@ -19,13 +19,13 @@ export interface MigrationPageData {
   history: MigrationRow[];
   status: { current: string | null; pending: string[]; pastDue: number };
   database: {
-    backend: ProductDbStatus["backend"];
-    connection: ProductDbConnectionSummary;
+    backend: DatabaseStatus["backend"];
+    connection: DatabaseConnectionSummary;
   };
 }
 
 export const load: PageServerLoad = (): MigrationPageData => {
-  const database = defaultProductDbStatus();
+  const database = defaultDatabaseStatus();
   return {
     database: {
       backend: database.backend,

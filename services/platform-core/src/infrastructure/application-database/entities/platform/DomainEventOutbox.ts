@@ -7,7 +7,7 @@ import {
   JoinColumn,
 } from "typeorm";
 
-import { Org } from "../auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 
 @Entity("domain_event_outbox")
 @Index() // expression: CREATE INDEX "domain_event_outbox_pending" ON "domain_event_outbox" ("processed_at", "created_at") WHERE "processed_at" IS NULL

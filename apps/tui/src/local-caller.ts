@@ -1,4 +1,4 @@
-import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
+import type { DiContainer } from "@platform-core/interface/runtime-container.ts";
 import { createAgentRunApiCallerFromEnv } from "@execution-orchestration/interface/http/agent-run-api-client.ts";
 import { createNotificationApiCallerFromEnv } from "@notification-center/interface/http/notification-api-client.ts";
 import { createWebhookApiCallerFromEnv } from "@integration-hub/interface/http/webhook-api-client.ts";

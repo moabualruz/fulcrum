@@ -1,27 +1,48 @@
-import { Container } from "@needle-di/core";
-import { MikroORM } from "@mikro-orm/postgresql";
-
-import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
+import type { DataSource } from "typeorm";
 import type { SeedResult } from "@platform-core/infrastructure/application-database/seed.ts";
 import type { TestOrm } from "./application-database.ts";
+import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
 
-export type TestContainer = Container & {
+export type TestContainer = DiContainer & {
   __fulcrumTestSeed?: SeedResult;
 };
 
-function unwrapOrm(input: MikroORM | TestOrm): { orm: MikroORM; seed?: SeedResult } {
-  if ("orm" in input) return { orm: input.orm, seed: input.seed };
-  return { orm: input };
+/**
+ * Minimal DiContainer backed by a Map.
+ * Replaces needle-di Container after MikroORM → TypeORM migration.
+ */
+class SimpleContainer implements DiContainer {
+  private readonly _map = new Map<unknown, unknown>();
+
+  get<T>(token: abstract new (...args: never) => T): T;
+  get(token: unknown): unknown;
+  get(token: unknown): unknown {
+    if (!this._map.has(token)) {
+      throw new Error(`TestContainer: no binding for ${String(token)}`);
+    }
+    return this._map.get(token);
+  }
+
+  has(token: unknown): boolean {
+    return this._map.has(token);
+  }
+
+  bind(binding: { provide: unknown; useValue: unknown }): void {
+    this._map.set(binding.provide, binding.useValue);
+  }
 }
 
-export function createTestContainer(input: MikroORM | TestOrm): TestContainer {
-  const { orm, seed } = unwrapOrm(input);
-  const container = new Container() as TestContainer;
-  registerDbBindings(container, orm);
-  container.__fulcrumTestSeed = seed;
+export function createTestContainer(input: TestOrm): TestContainer {
+  const container = new SimpleContainer() as unknown as TestContainer;
+  const ds: DataSource = input.ds;
+
+  container.bind({ provide: "DataSource", useValue: ds });
+  container.bind({ provide: "EntityManager", useValue: ds.manager });
+
+  container.__fulcrumTestSeed = input.seed;
   return container;
 }
 
-export function bindTestRuntimeOrm(container: Container, input: MikroORM | TestOrm): void {
-  container.bind({ provide: MikroORM, useValue: unwrapOrm(input).orm });
+export function bindTestRuntimeDs(container: DiContainer, ds: DataSource): void {
+  container.bind({ provide: "DataSource", useValue: ds });
 }

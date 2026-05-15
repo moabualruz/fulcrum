@@ -5,8 +5,8 @@ import {
 } from "@integration-hub/application/webhooks/encryption.ts";
 import type { EntityManager } from "typeorm";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Webhook } from "@platform-core/infrastructure/application-database/entities/notifications/Webhook.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Webhook } from "@notification-center/infrastructure/database/entities/notifications/Webhook.ts";
 import { AppNotFoundError, AppValidationError } from "@platform-core/domain/errors.ts";
 import { projectWebhook } from "@integration-hub/application/webhooks/queries.ts";
 import type {
@@ -98,15 +98,14 @@ export async function createWebhook(
 ): Promise<WebhookDto> {
   validateWebhookInput(input);
   const webhook = em.create(Webhook, {
-    org: em.getReference(Org, ctx.orgId),
+    org: { id: ctx.orgId } as Org,
     name: input.name,
     url: input.url,
     encryptedSecret: input.secret ? await encryptWebhookSecret(input.secret, cryptoOptions) : null,
     eventsFilter: input.eventsFilter ?? null,
     enabled: input.enabled ?? true,
   });
-  em.persist(webhook);
-  await em.flush();
+  await em.save(webhook);
   return projectWebhook(webhook);
 }
 
@@ -116,7 +115,7 @@ export async function updateWebhook(
   input: UpdateWebhookInput,
   cryptoOptions: WebhookSecretCryptoOptions = {},
 ): Promise<WebhookDto> {
-  const webhook = await em.findOne(Webhook, { id: input.id, org: { id: ctx.orgId } });
+  const webhook = await em.findOne(Webhook, { where: { id: input.id, org: { id: ctx.orgId } } as never });
   if (!webhook) throw new AppNotFoundError("Webhook not found.");
 
   validateWebhookInput(input, { partial: true });
@@ -125,8 +124,6 @@ export async function updateWebhook(
   if (input.secret !== undefined) webhook.encryptedSecret = await encryptWebhookSecret(input.secret, cryptoOptions);
   if (input.eventsFilter !== undefined) webhook.eventsFilter = input.eventsFilter;
   if (input.enabled !== undefined) webhook.enabled = input.enabled;
-
-  await em.flush();
   return projectWebhook(webhook);
 }
 
@@ -135,10 +132,9 @@ export async function deleteWebhook(
   ctx: WebhookAppContext,
   id: string,
 ): Promise<{ ok: true }> {
-  const webhook = await em.findOne(Webhook, { id, org: { id: ctx.orgId } });
+  const webhook = await em.findOne(Webhook, { where: { id, org: { id: ctx.orgId } } as never });
   if (!webhook) throw new AppNotFoundError("Webhook not found.");
   em.remove(webhook);
-  await em.flush();
   return { ok: true };
 }
 

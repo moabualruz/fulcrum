@@ -13,7 +13,7 @@ import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import {
   FulcrumSkill,
   SkillSource,

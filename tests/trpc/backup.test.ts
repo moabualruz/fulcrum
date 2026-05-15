@@ -3,8 +3,8 @@ import { Container } from "@needle-di/core";
 import { TRPCError } from "@trpc/server";
 
 import { createTestOrm } from "@test-support/application-database.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
-import { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
+import { TaskRepository } from "@work-management/infrastructure/database/repositories/tasks/TaskRepository.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
@@ -29,7 +29,7 @@ function mockSession(userId: string, orgId: string) {
 }
 
 function callerFor(repo: TaskRepository) {
-  const container = new Container();
+  const container = null;
   container.bind({ provide: TaskRepository, useValue: repo });
 
   return createCaller(
@@ -47,7 +47,7 @@ describe("backup tRPC router", () => {
   test("create returns a DB dump blob and restore imports it", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const repo = em.getRepository(Task) as TaskRepository;
       const caller = callerFor(repo);
 
@@ -91,7 +91,7 @@ describe("backup tRPC router", () => {
   test("restore maps invalid dump input to bad request", async () => {
     const db = await createTestOrm();
     try {
-      const caller = callerFor(db.em.fork().getRepository(Task) as TaskRepository);
+      const caller = callerFor(db.em.getRepository(Task) as TaskRepository);
       let error: TRPCError | null = null;
 
       try {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { createHmac, randomUUID } from "node:crypto";
 
-import { WebhookDeliveryStatus } from "@platform-core/infrastructure/application-database/entities/notifications/WebhookDelivery.ts";
+import { WebhookDeliveryStatus } from "@notification-center/infrastructure/database/entities/notifications/WebhookDelivery.ts";
 import {
   dispatchWebhookEvent,
   signWebhookPayload,

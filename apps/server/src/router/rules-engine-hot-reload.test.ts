@@ -4,8 +4,8 @@ import {
   RoutingRuleSource,
   type RoutingConditions,
   type RoutingRule,
-} from "@platform-core/infrastructure/application-database/entities/router/RoutingRule.ts";
-import type { RoutingRuleRepository } from "@platform-core/infrastructure/application-database/repositories/router/RoutingRuleRepository.ts";
+} from "@execution-orchestration/infrastructure/database/entities/router/RoutingRule.ts";
+import type { RoutingRuleRepository } from "@execution-orchestration/infrastructure/database/repositories/router/RoutingRuleRepository.ts";
 import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import { RoutingEventBus } from "./event-bus.ts";
 import { RulesEngine, type TaskFacts } from "./rules-engine.ts";

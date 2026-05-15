@@ -1,5 +1,5 @@
 import { assertEmbeddingDimension, DEFAULT_EMBEDDING_DIMENSION } from "@platform-core/application/inference/model-metadata.ts";
-import type { MemoryImportance } from "@platform-core/infrastructure/application-database/entities/memory/enums.ts";
+import type { MemoryImportance } from "@knowledge-workspace/infrastructure/database/entities/memory/enums.ts";
 import { cosineSimilarity, hybridScore, normalizeBm25 } from "./hybrid-scoring.ts";
 
 const DEFAULT_K1 = 1.5;

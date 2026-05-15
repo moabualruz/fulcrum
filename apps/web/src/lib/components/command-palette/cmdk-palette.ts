@@ -1,4 +1,4 @@
-import type { SearchQueryInput, SearchQueryOutput } from "@knowledge-workspace/application/search/query";
+import type { SearchQueryInput, SearchQueryOutput } from "@knowledge-workspace/interface/search-contracts.ts";
 
 export interface CmdkSearchResult {
   id: string;
@@ -17,7 +17,7 @@ export interface CmdkSearchOutput extends Omit<SearchQueryOutput, "results"> {
 
 export interface CmdkSearchClient {
   query(input: SearchQueryInput): Promise<CmdkSearchOutput>;
-  /** P11#16: Record click telemetry. No-op when search-click-telemetry flag OFF. */
+  /** Record click telemetry. No-op when search-click-telemetry flag is disabled. */
   recordClick?(input: { query: string; resultKind: string; resultId: string; position: number }): void;
 }
 

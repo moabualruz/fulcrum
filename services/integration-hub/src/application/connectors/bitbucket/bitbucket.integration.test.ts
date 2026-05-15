@@ -12,7 +12,7 @@ describe("application connectors bitbucket", () => {
   test("handles CRUD, not-found, validation, and scoping", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const created = await upsertBitbucketPullRequest(em, ctx, { repoSlug: "fulcrum", pullRequestId: "7", title: "Sync", state: "open" });
       expect(await listBitbucketPullRequests(em, ctx, { repoSlug: "fulcrum" })).toHaveLength(1);
       await expect(getBitbucketPullRequest(em, ctx, created.id)).resolves.toMatchObject({ id: created.id, title: "Sync" });

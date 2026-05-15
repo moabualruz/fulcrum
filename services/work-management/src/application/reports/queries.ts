@@ -1,8 +1,8 @@
 import type { EntityManager } from "typeorm";
 
-import { MetricsCache } from "@platform-core/infrastructure/application-database/entities/tasks/MetricsCache.ts";
-import { Sprint } from "@platform-core/infrastructure/application-database/entities/tasks/Sprint.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { MetricsCache } from "@work-management/infrastructure/database/entities/tasks/MetricsCache.ts";
+import { Sprint } from "@work-management/infrastructure/database/entities/tasks/Sprint.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import { WorkMetricsService } from "@work-management/application/work-metrics-service.ts";
 import { AppNotFoundError } from "@platform-core/domain/errors.ts";
 import { getProjectOrNull } from "@work-management/application/projects/queries.ts";
@@ -21,7 +21,7 @@ export async function listReportSnapshots(
   _ctx: AppContext,
   input: { projectId: string },
 ): Promise<ReportSnapshotDto[]> {
-  const rows = await em.find(MetricsCache, { projectId: input.projectId } as never, { orderBy: { date: "ASC", id: "ASC" } });
+  const rows = await em.find(MetricsCache, { where: { projectId: input.projectId } as never, order: { date: "ASC", id: "ASC" } });
   return rows.map((row) => serializeReportSnapshot(row, _ctx.orgId));
 }
 
@@ -74,20 +74,18 @@ export async function getSprintBurndown(
   const tasks = await em.createQueryBuilder(Task, "task")
     .select(["points", "status"])
     .where({ org: ctx.orgId, sprint: input.sprintId, deletedAt: null } as never)
-    .execute<Array<{ points: number | null; status: string | null }>>("all", false);
-  const totalPoints = tasks.reduce((sum, task) => sum + (task.points ?? 0), 0);
+    .getRawMany<{ points: number | null; status: string | null }>();
+  const totalPoints = tasks.reduce((sum: number, task: { points: number | null; status: string | null }) => sum + (task.points ?? 0), 0);
   if (totalPoints === 0) return [];
 
   const totalDays = daysBetween(sprint.startDate, sprint.endDate);
-  const cached = await em.find(MetricsCache, {
+  const cached = await em.find(MetricsCache, { where: {
     projectId: input.projectId,
     sprint: input.sprintId,
-  } as never, {
-    orderBy: { date: "ASC" },
-  });
+  } as never, order: { date: "ASC" } });
   const actualMap = new Map(cached.map((row) => [dateStr(row.date), row.pointsRemaining]));
   const doneStatuses = new Set(["done", "completed", "closed"]);
-  const donePoints = tasks.reduce((sum, task) => {
+  const donePoints = tasks.reduce((sum: number, task: { points: number | null; status: string | null }) => {
     return doneStatuses.has(task.status ?? "") ? sum + (task.points ?? 0) : sum;
   }, 0);
   const fallbackRemaining = totalPoints - donePoints;

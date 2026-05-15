@@ -12,7 +12,7 @@ describe("application connectors github", () => {
   test("handles CRUD, not-found, validation, and scoping", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const created = await upsertGithubConnectorState(em, ctx, { installationId: "9", repoFullName: "mkh/fulcrum", cursor: "c1" });
       expect(await listGithubConnectorStates(em, ctx, { repoFullName: "mkh/fulcrum" })).toHaveLength(1);
       await expect(getGithubConnectorState(em, ctx, created.id)).resolves.toMatchObject({ id: created.id, cursor: "c1" });

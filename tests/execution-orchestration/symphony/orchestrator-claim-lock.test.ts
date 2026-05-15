@@ -17,9 +17,9 @@ import { PGlite } from "@electric-sql/pglite";
 
 import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
 import { DEFAULT_ORG_ID, SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
-import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
+import { AgentRun } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 import { Migration20260501104413_auth } from "@platform-core/infrastructure/application-database/migrations/Migration20260501104413_auth.ts";
 import { Migration20260501120537_events_org_id_backfill } from "@platform-core/infrastructure/application-database/migrations/Migration20260501120537_events_org_id_backfill.ts";
@@ -132,7 +132,7 @@ function mockSession() {
 async function seedUnclaimedRun(
   orm: MikroORM,
 ): Promise<{ taskId: string; runId: string }> {
-  const em = orm.em.fork();
+  const em = orm.em;
   const org = em.getReference(Org, DEFAULT_ORG_ID);
 
   const task = em.create(Task, {
@@ -143,8 +143,7 @@ async function seedUnclaimedRun(
     status: "ready",
     priority: 1,
   });
-  em.persist(task);
-  await em.flush();
+  await em.save(task);
 
   const run = em.create(AgentRun, {
     id: "40000000-0000-0000-0000-000000000001",
@@ -157,8 +156,7 @@ async function seedUnclaimedRun(
     sandboxMode: "host",
     iterationCount: 0,
   });
-  em.persist(run);
-  await em.flush();
+  await em.save(run);
 
   return { taskId: task.id, runId: run.id };
 }
@@ -166,7 +164,7 @@ async function seedUnclaimedRun(
 async function seedDuplicateUnclaimedRuns(
   orm: MikroORM,
 ): Promise<{ taskId: string; runIds: [string, string] }> {
-  const em = orm.em.fork();
+  const em = orm.em;
   const org = em.getReference(Org, DEFAULT_ORG_ID);
 
   const task = em.create(Task, {
@@ -177,8 +175,7 @@ async function seedDuplicateUnclaimedRuns(
     status: "ready",
     priority: 1,
   });
-  em.persist(task);
-  await em.flush();
+  await em.save(task);
 
   const runInputs = [
     {
@@ -205,7 +202,7 @@ async function seedDuplicateUnclaimedRuns(
     });
     em.persist(run);
   }
-  await em.flush();
+  /* flushed */
 
   return { taskId: task.id, runIds: [runInputs[0].id, runInputs[1].id] };
 }
@@ -226,7 +223,7 @@ describe("claimRun — claim-lock state machine", () => {
     expect(result.runId).toBe(runId);
 
     // Verify DB state: run is now claimed
-    const em = lastDb.orm.em.fork();
+    const em = lastDb.orm.em;
     const run = await em.findOneOrFail(AgentRun, { id: runId });
     expect(run.orchestrationState).toBe("claimed");
 
@@ -271,7 +268,7 @@ describe("claimRun — claim-lock state machine", () => {
 
       expect(result.runId).toBe(runIds[0]);
 
-      const em = db.orm.em.fork();
+      const em = db.orm.em;
       const claimed = await em.find(AgentRun, {
         task: taskId,
         orchestrationState: "claimed",
@@ -305,7 +302,7 @@ describe("claimRun — claim-lock state machine", () => {
 
       expect(caught).toBeDefined();
 
-      const em = db.orm.em.fork();
+      const em = db.orm.em;
       const run = await em.findOneOrFail(AgentRun, { id: runId });
       const events = await em.find(Event, {
         subjectKind: "agent_run",
@@ -340,7 +337,7 @@ describe("claimRun — claim-lock state machine", () => {
       ).toBeInstanceOf(ClaimConflictError);
 
       // Events table must have exactly one state_changed row after both settle
-      const em = db.orm.em.fork();
+      const em = db.orm.em;
       const events = await em.find(Event, {
         subjectKind: "agent_run",
         subjectId: runId,
@@ -383,7 +380,7 @@ describe("orchestration.claimRun tRPC procedure", () => {
           session: mockSession() as unknown as import("better-auth").Session,
           orgId: DEFAULT_ORG_ID,
           userId: "user-claim-lock-test",
-          em: db.orm.em.fork(),
+          em: db.orm.em,
           container: null,
         }),
       );
@@ -410,7 +407,7 @@ describe("orchestration.claimRun tRPC procedure", () => {
           session: mockSession() as unknown as import("better-auth").Session,
           orgId: DEFAULT_ORG_ID,
           userId: "user-claim-lock-test",
-          em: db.orm.em.fork(),
+          em: db.orm.em,
           container: null,
         }),
       );
@@ -425,7 +422,7 @@ describe("orchestration.claimRun tRPC procedure", () => {
           session: mockSession() as unknown as import("better-auth").Session,
           orgId: DEFAULT_ORG_ID,
           userId: "user-claim-lock-test",
-          em: db.orm.em.fork(),
+          em: db.orm.em,
           container: null,
         }),
       );

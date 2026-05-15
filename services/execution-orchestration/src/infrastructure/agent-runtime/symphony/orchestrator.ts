@@ -11,7 +11,7 @@
  * Pillar 3, slice 06 — callable from the orchestrator poll loop (wired in slice 10).
  */
 
-import { UniqueConstraintViolationException } from "typeorm";
+import { QueryFailedError } from "typeorm";
 import type { EntityManager } from "typeorm";
 
 import {
@@ -151,7 +151,7 @@ export async function dispatchRunWithHooks<T>(
 function isClaimConflict(error: unknown): boolean {
   if (error instanceof ClaimConflictError) return true;
   if (error instanceof OrchestrationStateMutationConflict) return true;
-  if (error instanceof UniqueConstraintViolationException) return true;
+  if (error instanceof QueryFailedError && (error as QueryFailedError & { code?: string }).code === "23505") return true;
 
   const message = String((error as { message?: unknown }).message ?? error);
   return message.includes("agent_runs_claimed_unique");

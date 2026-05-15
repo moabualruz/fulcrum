@@ -11,7 +11,7 @@ import {
   UpdateDateColumn,
   JoinColumn,
 } from "typeorm";
-import { Org } from "../auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 
 @Entity("webhook_subscriptions")
 @Index("idx_webhook_subscriptions_org_active", ["org", "active"])

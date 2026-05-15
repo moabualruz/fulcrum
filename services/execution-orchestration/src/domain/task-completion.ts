@@ -1,4 +1,4 @@
-import type { TaskDependencies } from "@platform-core/infrastructure/application-database/entities/tasks/schemas.ts";
+import type { TaskDependencies } from "@work-management/infrastructure/database/entities/tasks/schemas.ts";
 import type { Column } from "@execution-orchestration/domain/dependency-order.ts";
 
 export interface CompletableTask {

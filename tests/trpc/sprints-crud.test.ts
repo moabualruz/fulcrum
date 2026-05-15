@@ -4,9 +4,9 @@ import { Container } from "@needle-di/core";
 
 import { createTestOrm } from "@test-support/application-database.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
-import { MetricsCache } from "@platform-core/infrastructure/application-database/entities/tasks/MetricsCache.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
-import { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
+import { MetricsCache } from "@work-management/infrastructure/database/entities/tasks/MetricsCache.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
+import { TaskRepository } from "@work-management/infrastructure/database/repositories/tasks/TaskRepository.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
@@ -32,7 +32,7 @@ function mockSession() {
 }
 
 function callerFor(repo: TaskRepository) {
-  const container = new Container();
+  const container = null;
   container.bind({ provide: TaskRepository, useValue: repo });
 
   return createCaller(
@@ -63,7 +63,7 @@ describe("sprints tRPC CRUD", () => {
   test("create validates date order and sets planned status", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as TaskRepository;
       const caller = callerFor(repo);
 
       await expect(
@@ -102,7 +102,7 @@ describe("sprints tRPC CRUD", () => {
   test("start rejects second active sprint before hitting the DB constraint", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as TaskRepository;
       const caller = callerFor(repo);
       const active = await caller.sprints.create({
         projectId: PROJECT_ID,
@@ -127,7 +127,7 @@ describe("sprints tRPC CRUD", () => {
   test("addTask and removeTask update task sprint assignment", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as TaskRepository;
       const caller = callerFor(repo);
       const sprint = await caller.sprints.create({
         projectId: PROJECT_ID,
@@ -157,7 +157,7 @@ describe("sprints tRPC CRUD", () => {
   test("close moves unfinished tasks to backlog, writes metrics, and emits sprint.closed", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as TaskRepository;
       const caller = callerFor(repo);
       const sprint = await caller.sprints.create({
         projectId: PROJECT_ID,

@@ -1,13 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import type { EntityManager } from "typeorm";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { ContextSnapshot } from "@platform-core/infrastructure/application-database/entities/memory/ContextSnapshot.ts";
-import { AgentRunRepository } from "@platform-core/infrastructure/application-database/repositories/orchestration/AgentRunRepository.ts";
-import { DocumentRepository } from "@platform-core/infrastructure/application-database/repositories/docs/DocumentRepository.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { ContextSnapshot } from "@knowledge-workspace/infrastructure/database/entities/memory/ContextSnapshot.ts";
+import { AgentRunRepository } from "@execution-orchestration/infrastructure/database/repositories/orchestration/AgentRunRepository.ts";
+import { DocumentRepository } from "@knowledge-workspace/infrastructure/database/repositories/docs/DocumentRepository.ts";
 import { FulcrumSkillRepository } from "@platform-core/infrastructure/application-database/repositories/skills/FulcrumSkillRepository.ts";
-import { RepoRepository } from "@platform-core/infrastructure/application-database/repositories/repos/RepoRepository.ts";
-import { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
+import { RepoRepository } from "@integration-hub/infrastructure/database/repositories/repos/RepoRepository.ts";
+import { TaskRepository } from "@work-management/infrastructure/database/repositories/tasks/TaskRepository.ts";
 import { MemoryRetriever } from "@knowledge-workspace/application/memory/retriever.ts";
 import { readSkillContent } from "@platform-core/application/skill-supply/loader.ts";
 
@@ -291,15 +291,14 @@ export class ContextAssembler {
 
     const em = this.snapshotWriterOrEm as EntityManager;
     const snapshot = em.create(ContextSnapshot, {
-      org: em.getReference(Org, bundle.orgId),
+      org: { id: bundle.orgId } as Org,
       runId,
       taskId: bundle.taskId,
       bundleBlob: bundle as unknown as Record<string, unknown>,
       tokenCount: bundle.tokenCount,
       sliceSizes: sizes,
     });
-    em.persist(snapshot);
-    await em.flush();
+    await em.save(snapshot);
     return snapshot.id;
   }
 }

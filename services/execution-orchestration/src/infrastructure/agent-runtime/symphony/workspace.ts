@@ -9,10 +9,11 @@ import { mkdir, readdir, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import type { EntityManager } from "typeorm";
-import type { AgentRun as AgentRunType } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
+import { In, Not, IsNull } from "typeorm";
+import type { AgentRun as AgentRunType } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import type { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import type { AgentRun } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
 import {
   GetWorkspacePathInputSchema,
   WorkspacePathSchema,
@@ -105,10 +106,9 @@ export async function createWorkspace(
   run.workspacePath = workspacePath;
 
   if (opts.em) {
-    const fork = opts.em.fork();
-    const managedRun = await findManagedRun(fork, run.id);
+    const managedRun = await findManagedRun(opts.em, run.id);
     managedRun.workspacePath = workspacePath;
-    await fork.flush();
+    await opts.em.save(managedRun);
   }
 
   return workspacePath;
@@ -124,10 +124,9 @@ export async function destroyWorkspace(
 
   if (opts.keepOnFailure === true && isFailedRun(run)) {
     if (opts.em) {
-      const fork = opts.em.fork();
-      const managedRun = await findManagedRun(fork, run.id);
+      const managedRun = await findManagedRun(opts.em, run.id);
       managedRun.workspacePath = workspacePath;
-      await fork.flush();
+      await opts.em.save(managedRun);
     }
     return;
   }
@@ -136,10 +135,9 @@ export async function destroyWorkspace(
   run.workspacePath = undefined;
 
   if (opts.em) {
-    const fork = opts.em.fork();
-    const managedRun = await findManagedRun(fork, run.id);
+    const managedRun = await findManagedRun(opts.em, run.id);
     managedRun.workspacePath = undefined;
-    await fork.flush();
+    await opts.em.save(managedRun);
   }
 }
 
@@ -166,15 +164,11 @@ export async function getWorkspacePath(
 ): Promise<WorkspacePath> {
   const input = GetWorkspacePathInputSchema.parse({ orgId, runId });
   const { AgentRun } = await import(
-    "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts"
+    "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts"
   );
-  const fork = em.fork();
-  const org = fork.getReference(Org, input.orgId);
-  const run = await fork.findOneOrFail(AgentRun, {
-    id: input.runId,
-    org,
-  }, {
-    fields: ["id", "workspacePath"],
+  const run = await em.findOneOrFail(AgentRun, {
+    where: { id: input.runId, org: { id: input.orgId } } as never,
+    select: ["id", "workspacePath"] as never,
   });
 
   return WorkspacePathSchema.parse({
@@ -218,15 +212,15 @@ export async function sweepTerminalWorkspaces(
   opts: SweepOptions = {},
 ): Promise<number> {
   const { AgentRun } = await import(
-    "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts"
+    "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts"
   );
-  const fork = em.fork();
-
-  const terminalRuns = await fork.find(AgentRun, {
-    org: orgId,
-    orchestrationState: { $in: [...TERMINAL_ORCHESTRATION_STATES] },
-    workspacePath: { $ne: null },
-  } as never) as AgentRunType[];
+  const terminalRuns = await em.find(AgentRun, {
+    where: {
+      org: { id: orgId },
+      orchestrationState: In([...TERMINAL_ORCHESTRATION_STATES]),
+      workspacePath: Not(IsNull()),
+    } as never,
+  }) as AgentRunType[];
 
   let swept = 0;
 
@@ -242,9 +236,9 @@ export async function sweepTerminalWorkspaces(
     if (!opts.dryRun) {
       try {
         await rm(workspacePath, { recursive: true, force: true });
-        const managed = await findManagedRun(fork, run.id);
+        const managed = await findManagedRun(em, run.id);
         managed.workspacePath = undefined;
-        await fork.flush();
+        await em.save(managed);
       } catch {
         // Non-fatal: log and continue sweep
         console.error(`sweepTerminalWorkspaces: failed to remove ${workspacePath}`);
@@ -281,9 +275,9 @@ function isFailedRun(run: AgentRun): boolean {
 
 async function findManagedRun(em: EntityManager, runId: string): Promise<AgentRun> {
   const { AgentRun } = await import(
-    "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts"
+    "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts"
   );
-  return em.findOneOrFail(AgentRun, runId);
+  return em.findOneOrFail(AgentRun, { where: { id: runId } as never });
 }
 
 function realpathIfExists(path: string): string {

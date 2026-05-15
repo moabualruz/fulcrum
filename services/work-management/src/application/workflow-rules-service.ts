@@ -9,7 +9,7 @@
 
 import type { EntityManager } from "typeorm";
 
-import { Project, type WorkflowConfig } from "@platform-core/infrastructure/application-database/entities/tasks/Project.ts";
+import { Project, type WorkflowConfig } from "@work-management/infrastructure/database/entities/tasks/Project.ts";
 import { AppNotFoundError, AppValidationError } from "@platform-core/domain/errors.ts";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -62,7 +62,6 @@ export class WorkflowRulesService {
   ): Promise<void> {
     const project = await this.findProject(orgId, projectId);
     project.workflowConfig = { ...(project.workflowConfig ?? {}), transitions };
-    await this.em.flush();
   }
 
   async validateTransition(
@@ -137,8 +136,6 @@ export class WorkflowRulesService {
         transitions: this.getDefaultWorkflow(methodology),
       };
     }
-
-    await this.em.flush();
   }
 
   // ── Enabled task types ────────────────────────────────────────────────────────
@@ -160,6 +157,5 @@ export class WorkflowRulesService {
 
     const project = await this.findProject(orgId, projectId);
     project.enabledTaskTypes = types;
-    await this.em.flush();
   }
 }

@@ -262,7 +262,7 @@ describe("fulcrum inference CLI", () => {
 
   test("local inference client resolves token binding before class token", async () => {
     const cap = capture();
-    const container = new Container();
+    const container = null;
     container.bind({
       provide: INFERENCE_CLIENT_TOKEN,
       useValue: {

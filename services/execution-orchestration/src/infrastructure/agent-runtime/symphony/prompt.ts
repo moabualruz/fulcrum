@@ -10,9 +10,8 @@ import { Liquid, UndefinedVariableError } from "liquidjs";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { WorkflowDefinition } from "@platform-core/infrastructure/application-database/entities/orchestration/WorkflowDefinition.ts";
-import type { WorkflowDefinitionRepository } from "@platform-core/infrastructure/application-database/repositories/orchestration/WorkflowDefinitionRepository.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { WorkflowDefinition } from "@execution-orchestration/infrastructure/database/entities/orchestration/WorkflowDefinition.ts";
 import { WorkflowConfigSchema, type WorkflowConfig } from "./schemas.ts";
 
 export { WorkflowConfigSchema } from "./schemas.ts";
@@ -85,24 +84,14 @@ export async function loadWorkflowDef(
   projectId: string | null,
   name = "default",
 ): Promise<WorkflowDefinition | null> {
-  const fork = em.fork();
-  const repo = fork.getRepository(
-    WorkflowDefinition,
-  ) as WorkflowDefinitionRepository;
-  const org = fork.getReference(Org, orgId);
-
   if (projectId !== null) {
-    const projectWorkflow = await repo.findOne({
-      org,
-      projectId,
-      name,
+    const projectWorkflow = await em.findOne(WorkflowDefinition, {
+      where: { org: { id: orgId }, projectId, name } as never,
     });
     if (projectWorkflow) return projectWorkflow;
   }
 
-  return repo.findOne({
-    org,
-    projectId: null,
-    name,
+  return em.findOne(WorkflowDefinition, {
+    where: { org: { id: orgId }, projectId: null as never, name } as never,
   });
 }

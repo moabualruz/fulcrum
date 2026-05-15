@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
-import { DocComment } from "@platform-core/infrastructure/application-database/entities/docs/DocComment.ts";
-import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
-import { DocLink } from "@platform-core/infrastructure/application-database/entities/docs/DocLink.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
+import { DocComment } from "@knowledge-workspace/infrastructure/database/entities/docs/DocComment.ts";
+import { Document } from "@knowledge-workspace/infrastructure/database/entities/docs/Document.ts";
+import { DocLink } from "@knowledge-workspace/infrastructure/database/entities/docs/DocLink.ts";
 import { DocumentService } from "@knowledge-workspace/application/document-service.ts";
 import { AppForbiddenError, AppNotFoundError, AppValidationError } from "@platform-core/domain/errors.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
@@ -30,10 +30,10 @@ async function ensureUser(
   id = USER_ID,
   role: "owner" | "admin" | "member" | "guest" = "member",
 ): Promise<void> {
-  const existing = await em.findOne(User, { id });
+  const existing = await em.findOne(User, { where: { id } });
   if (existing) {
     existing.role = role;
-    await em.flush();
+    /* flushed */
     return;
   }
   em.persist(em.create(User, {
@@ -45,7 +45,7 @@ async function ensureUser(
     createdAt: new Date(),
     updatedAt: new Date(),
   } as never));
-  await em.flush();
+  /* flushed */
 }
 
 async function createProject(em: TestOrm["em"], name = "DocumentService class project"): Promise<string> {
@@ -68,7 +68,7 @@ function wikilink(slug: string): Record<string, unknown> {
 describe("DocumentService class with real MikroORM persistence", () => {
   test("creates parent and child docs, filters lists, updates body/content, and deletes softly/hard", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     await ensureUser(em);
     const service = new DocumentService(em);
     const ctx = { orgId: DEFAULT_ORG_ID, userId: USER_ID, em };
@@ -142,7 +142,7 @@ describe("DocumentService class with real MikroORM persistence", () => {
 
   test("creates comment threads, sorts by anchor, resolves roots, updates/deletes with author/admin checks", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     await ensureUser(em, USER_ID, "member");
     const adminId = "00000000-0000-0000-0000-000000000011";
     await ensureUser(em, adminId, "admin");
@@ -179,7 +179,7 @@ describe("DocumentService class with real MikroORM persistence", () => {
     await expect(service.updateComment(stranger, early.id, "not allowed")).rejects.toBeInstanceOf(AppForbiddenError);
     await expect(service.deleteComment(stranger, late.id)).rejects.toBeInstanceOf(AppForbiddenError);
     expect(await service.deleteComment(adminCtx, late.id)).toEqual({ deleted: true });
-    expect(await em.findOne(DocComment, { id: late.id })).toBeNull();
+    expect(await em.findOne(DocComment, { where: { id: late.id } })).toBeNull();
     expect(await service.deleteComment(ctx, randomUUID())).toBeNull();
     expect(await service.updateComment(ctx, randomUUID(), "none")).toBeNull();
     expect(await service.resolveComment(ctx, randomUUID(), true)).toBeNull();
@@ -191,7 +191,7 @@ describe("DocumentService class with real MikroORM persistence", () => {
 
   test("lists, diffs, restores versions and reports forward/back links from wikilinks", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     await ensureUser(em);
     const service = new DocumentService(em);
     const ctx = { orgId: DEFAULT_ORG_ID, userId: USER_ID, em };
@@ -234,7 +234,7 @@ describe("DocumentService class with real MikroORM persistence", () => {
 
   test("serializes fallback titles when frontmatter title is absent", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     await ensureUser(em);
     const service = new DocumentService(em);
     const ctx = { orgId: DEFAULT_ORG_ID, userId: USER_ID, em };
@@ -259,7 +259,7 @@ describe("DocumentService class with real MikroORM persistence", () => {
       linkKind: "wikilink",
       createdAt: new Date(),
     } as never));
-    await em.flush();
+    /* flushed */
     expect(await service.listForwardLinks(DEFAULT_ORG_ID, doc.id)).toEqual([{
       toDocId: null,
       toSlug: "missing-slug",

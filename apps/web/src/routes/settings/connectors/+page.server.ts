@@ -12,77 +12,100 @@
 
 import { error, fail, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import {
-  CONNECTOR_NAMES,
-  isConnectorEnabled,
-  listConnectors,
-  listSyncLog,
-  saveConnectorConfig,
-  syncConnector,
-  type ConnectorName,
-} from "@integration-hub/application/connectors/web-actions.ts";
-import { AppInvariantError, AppValidationError } from "@platform-core/domain/errors.ts";
+import { createConnectorApiForEvent } from "$lib/server/connector-api";
 
-export { isConnectorEnabled as _isConnectorEnabled, listSyncLog as _listSyncLog };
+export const CONNECTOR_NAMES = ["confluence", "notion", "github-issues"] as const;
+export type ConnectorName = (typeof CONNECTOR_NAMES)[number];
 
-export const load: PageServerLoad = async ({ locals }) => {
-  if (!locals.session) throw redirect(302, "/auth/login");
+interface ConnectorDescriptor {
+  name: string;
+  enabled: boolean;
+  config?: {
+    host?: string;
+    email?: string;
+    token?: string;
+  };
+}
 
+interface ConnectorRunRow {
+  id?: string;
+  connectorId?: string;
+  connector_id?: string;
+  status?: string;
+  summary?: { message?: string } | null;
+  startedAt?: string | null;
+  started_at?: string | null;
+  createdAt?: string | null;
+  created_at?: string | null;
+}
+
+export const load: PageServerLoad = async (event) => {
+  if (!event.locals.session) throw redirect(302, "/auth/login");
+  const api = createConnectorApiForEvent(event);
+  const [connectors, syncRuns] = await Promise.all([
+    api.connectors.list() as Promise<ConnectorDescriptor[]>,
+    api.connectors.runs.list() as Promise<ConnectorRunRow[]>,
+  ]);
   return {
-    connectors: listConnectors(),
-    syncLog: listSyncLog(),
+    connectors,
+    syncLog: syncRuns.map(toSyncLogEntry),
   };
 };
 
 export const actions: Actions = {
-  save: async ({ locals, request }) => {
-    if (!locals.session) throw redirect(302, "/auth/login");
+  save: async (event) => {
+    if (!event.locals.session) throw redirect(302, "/auth/login");
 
-    const form = await request.formData();
-    const name = String(form.get("name") ?? "").trim() as ConnectorName;
+    const form = await event.request.formData();
+    const name = String(form.get("name") ?? "").trim();
 
-    if (!CONNECTOR_NAMES.includes(name)) return fail(400, { saveError: "Unknown connector" });
-    if (!isConnectorEnabled(name)) throw error(403, `connector-${name} feature not enabled`);
+    if (!isConnectorName(name)) return fail(400, { saveError: "Unknown connector" });
 
     const host = stringField(form, "host").trim();
     const email = stringField(form, "email").trim();
     const token = stringField(form, "token").trim();
 
+    const api = createConnectorApiForEvent(event);
+    const connector = await api.connectors.get({ id: name }) as ConnectorDescriptor;
+    if (!connector.enabled) throw error(403, `connector-${name} feature not enabled`);
     if (!host) return fail(400, { saveError: "Host is required", name });
     if (!token) return fail(400, { saveError: "Token is required", name });
 
-    try {
-      await saveConnectorConfig({ name, host, email, token });
-    } catch (errorValue) {
-      return mapConnectorError(errorValue, "saveError", name);
-    }
+    await api.connectors.enable({ id: name, config: { host, email, token } });
+    return { saveOk: true, name };
   },
 
-  sync: async ({ locals, request }) => {
-    if (!locals.session) throw redirect(302, "/auth/login");
+  sync: async (event) => {
+    if (!event.locals.session) throw redirect(302, "/auth/login");
 
-    const form = await request.formData();
-    const name = String(form.get("name") ?? "").trim() as ConnectorName;
+    const form = await event.request.formData();
+    const name = String(form.get("name") ?? "").trim();
 
-    if (!CONNECTOR_NAMES.includes(name)) return fail(400, { syncError: "Unknown connector" });
-    if (!isConnectorEnabled(name)) throw error(403, `connector-${name} feature not enabled`);
+    if (!isConnectorName(name)) return fail(400, { syncError: "Unknown connector" });
 
-    try {
-      await syncConnector(name);
-    } catch (errorValue) {
-      return mapConnectorError(errorValue, "syncError", name);
-    }
+    const api = createConnectorApiForEvent(event);
+    const connector = await api.connectors.get({ id: name }) as ConnectorDescriptor;
+    if (!connector.enabled) throw error(403, `connector-${name} feature not enabled`);
+    await api.connectors.sync({ id: name, trigger: "manual" });
+    return { syncOk: true, name };
   },
 };
 
-function mapConnectorError(errorValue: unknown, key: "saveError" | "syncError", name: ConnectorName) {
-  const message = errorValue instanceof Error ? errorValue.message : String(errorValue);
-  if (errorValue instanceof AppValidationError) return fail(400, { [key]: message, name });
-  if (errorValue instanceof AppInvariantError) return fail(501, { [key]: message, name });
-  throw errorValue;
+function isConnectorName(value: string): value is ConnectorName {
+  return CONNECTOR_NAMES.includes(value as ConnectorName);
 }
 
 function stringField(form: FormData, key: string): string {
   const value = form.get(key);
   return typeof value === "string" ? value : "";
+}
+
+function toSyncLogEntry(row: ConnectorRunRow) {
+  return {
+    id: row.id ?? "",
+    connectorName: row.connectorId ?? row.connector_id ?? "",
+    status: row.status ?? "queued",
+    message: row.summary?.message ?? "",
+    startedAt: row.startedAt ?? row.started_at ?? row.createdAt ?? row.created_at ?? "",
+  };
 }

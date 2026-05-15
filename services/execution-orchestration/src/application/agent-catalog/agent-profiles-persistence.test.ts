@@ -3,8 +3,8 @@ import { chmod, mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { AgentProfile } from "@platform-core/infrastructure/application-database/entities/sandbox/AgentProfile.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { AgentProfile } from "@execution-orchestration/infrastructure/database/entities/sandbox/AgentProfile.ts";
 import { createTestCaller, createTestContainer, createTestOrm, type TestOrm } from "@test-support/index.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
@@ -21,7 +21,7 @@ async function writeVersionScript(dir: string, name: string, exitCode: number): 
 
 async function setupProfile(name: string, cliPath: string): Promise<TestOrm> {
   const db = await createTestOrm();
-  const em = db.em.fork();
+  const em = db.em;
   const orgRef = em.getReference(Org, ORG_ID);
   const profile = em.create(AgentProfile, {
     org: orgRef,
@@ -32,8 +32,7 @@ async function setupProfile(name: string, cliPath: string): Promise<TestOrm> {
     maxIterations: 10,
     defaultTimeout: 600000,
   });
-  em.persist(profile);
-  await em.flush();
+  await em.save(profile);
   em.clear();
   return db;
 }
@@ -57,7 +56,7 @@ describe("agents.testProfile persistence", () => {
     const result = await caller.agents.testProfile({ name: "agent-ok" });
 
     expect(result.testPassed).toBe(true);
-    const stored = await db.em.fork().findOneOrFail(AgentProfile, { org: ORG_ID, name: "agent-ok" });
+    const stored = await db.em.findOneOrFail(AgentProfile, { org: ORG_ID, name: "agent-ok" });
     expect(stored.testPassed).toBe(true);
     expect(stored.lastTestedAt).toBeInstanceOf(Date);
   });
@@ -73,7 +72,7 @@ describe("agents.testProfile persistence", () => {
     const result = await caller.agents.testProfile({ name: "agent-fail" });
 
     expect(result.testPassed).toBe(false);
-    const stored = await db.em.fork().findOneOrFail(AgentProfile, { org: ORG_ID, name: "agent-fail" });
+    const stored = await db.em.findOneOrFail(AgentProfile, { org: ORG_ID, name: "agent-fail" });
     expect(stored.testPassed).toBe(false);
     expect(stored.lastTestedAt).toBeInstanceOf(Date);
   });

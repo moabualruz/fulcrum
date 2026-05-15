@@ -8,8 +8,8 @@
 
 import type { EntityManager } from "typeorm";
 
-import { TaskRecurrenceRule } from "@platform-core/infrastructure/application-database/entities/tasks/TaskRecurrenceRule.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { TaskRecurrenceRule } from "@work-management/infrastructure/database/entities/tasks/TaskRecurrenceRule.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { AppNotFoundError, AppValidationError } from "@platform-core/domain/errors.ts";
 import type { WorkItemService } from "@work-management/application/work-item-service.ts";
 
@@ -112,7 +112,7 @@ export class WorkItemRecurrenceService {
     };
 
     const rule = this.em.create(TaskRecurrenceRule, {
-      org: this.em.getReference(Org, orgId),
+      org: { id: orgId } as Org,
       sourceTaskId,
       triggerType: config.triggerType,
       cronExpression: config.cronExpression ?? null,
@@ -126,8 +126,7 @@ export class WorkItemRecurrenceService {
       nextRunAt: calculateNextRunAt(config),
     } as never);
 
-    this.em.persist(rule);
-    await this.em.flush();
+    await this.em.save(rule);
     return this.serialize(rule);
   }
 
@@ -170,8 +169,6 @@ export class WorkItemRecurrenceService {
         rule.nextRunAt = next;
       }
     }
-
-    await this.em.flush();
   }
 
   /** Trigger on_complete recurrence rules when a task is completed */
@@ -195,7 +192,6 @@ export class WorkItemRecurrenceService {
     }
 
     if (rules.length > 0) {
-      await this.em.flush();
     }
   }
 
@@ -210,7 +206,6 @@ export class WorkItemRecurrenceService {
     }
 
     this.em.remove(rule);
-    await this.em.flush();
   }
 
   async list(orgId: string, taskId: string): Promise<RecurrenceRuleOutput[]> {

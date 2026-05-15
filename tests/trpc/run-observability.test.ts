@@ -42,7 +42,7 @@ describe("run observability", () => {
   test("orchestration.getRun returns context, artifacts, audit, memory, follow-up, and recovery buckets", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const conn = em.getConnection();
       await conn.execute(`INSERT INTO projects (id, org_id, name) VALUES (?, ?, ?)`, [PROJECT_ID, ORG_ID, "Run Project"]);
       await conn.execute(

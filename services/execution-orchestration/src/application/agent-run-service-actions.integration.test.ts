@@ -58,7 +58,7 @@ async function eventRows(em: TestOrm["em"], subjectId?: string): Promise<Array<{
 describe("run service actions with real MikroORM persistence", () => {
   test("dispatches, enqueues, cancels, retries, and records events", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const projectId = await createProject(em);
     const task = await createTaskAction(em, {
       orgId: DEFAULT_ORG_ID,
@@ -127,7 +127,7 @@ describe("run service actions with real MikroORM persistence", () => {
 
   test("cancel is idempotent for terminal or missing runs and retry rejects unknown run", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const unknown = randomUUID();
 
     expect(await cancelRunAction(em, unknown, DEFAULT_ORG_ID)).toEqual({ ok: true });

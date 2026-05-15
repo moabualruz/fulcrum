@@ -1,13 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MikroORM } from "typeorm";
 
 import { createTask } from "@work-management/application/tasks/commands.ts";
 import { listTasks } from "@work-management/application/tasks/queries.ts";
 import type { AppContext } from "@work-management/application/tasks/types.ts";
 import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Session } from "@platform-core/infrastructure/application-database/entities/auth/Session.ts";
-import { Project } from "@platform-core/infrastructure/application-database/entities/tasks/Project.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
+import { Project } from "@work-management/infrastructure/database/entities/tasks/Project.ts";
 import { createTestContainer, createTestOrm, type TestOrm } from "@test-support/index.ts";
 import {
   TaskPublicApiController,
@@ -28,7 +27,6 @@ async function api(): Promise<TaskPublicApiController> {
   if (!db) throw new Error("db not initialized");
   process.env["FULCRUM_FEATURES"] = "public-api";
   const container = createTestContainer(db);
-  container.bind({ provide: MikroORM, useValue: db.orm });
   await createLocalCaller({ container, requireSession: true });
   return new TaskPublicApiController(
     new TaskPublicApiService({
@@ -36,7 +34,7 @@ async function api(): Promise<TaskPublicApiController> {
       application: {
         listTasks: async (input) => {
           return await listTasks(
-            db!.em.fork(),
+            db!.em,
             { orgId: input.orgId, userId: input.userId, projectId: input.projectId },
             { includeDeleted: input.includeDeleted },
           );
@@ -51,7 +49,7 @@ async function api(): Promise<TaskPublicApiController> {
 }
 
 async function createOrgProjectAndSession(db: TestOrm): Promise<{ orgId: string; projectId: string }> {
-  const em = db.em.fork();
+  const em = db.em;
   const orgId = crypto.randomUUID();
   const projectId = crypto.randomUUID();
   const org = em.create(Org, {
@@ -61,15 +59,15 @@ async function createOrgProjectAndSession(db: TestOrm): Promise<{ orgId: string;
     createdAt: new Date(),
     updatedAt: new Date(),
   });
-  em.persist(org);
-  em.persist(em.create(Project, {
+  await em.save(org);
+  await em.save(Project, {
     id: projectId,
     org,
     name: "REST Parity Project",
     workflowConfig: {},
     enabledTaskTypes: [],
-  }));
-  em.persist(em.create(Session, {
+  });
+  await em.save(Session, {
     id: `parity-${crypto.randomUUID()}`,
     userId: db.seed.userId,
     orgId,
@@ -78,8 +76,7 @@ async function createOrgProjectAndSession(db: TestOrm): Promise<{ orgId: string;
     createdAt: new Date(),
     ipAddress: null,
     userAgent: "test",
-  }));
-  await em.flush();
+  });
   return { orgId, projectId };
 }
 
@@ -88,7 +85,7 @@ describe("interface REST interface parity", () => {
     db = await createTestOrm();
     const { orgId, projectId } = await createOrgProjectAndSession(db);
     const ctx: AppContext = { orgId, userId: db.seed.userId, projectId: null };
-    const task = await createTask(db.em.fork(), ctx, {
+    const task = await createTask(db.em, ctx, {
       projectId,
       title: "REST parity task",
       status: "todo",

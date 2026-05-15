@@ -1,7 +1,7 @@
 import type { EntityManager } from "typeorm";
 
-import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
-import type { MemoryKind, MemorySource } from "@platform-core/infrastructure/application-database/entities/memory/enums.ts";
+import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
+import type { MemoryKind, MemorySource } from "@knowledge-workspace/infrastructure/database/entities/memory/enums.ts";
 import { rankMemoryMatches } from "@knowledge-workspace/application/memory/retrieval/scoring.ts";
 import { createMemory } from "@knowledge-workspace/application/memory/commands.ts";
 import { AppNotFoundError } from "@platform-core/domain/errors.ts";
@@ -58,11 +58,12 @@ export async function listMemories(
   ctx: MemoryApplicationContext,
   input: ListMemoriesInput = {},
 ): Promise<MemoryDto[]> {
-  const memories = await em.find(Memory, listWhere(ctx.orgId, input), {
-    orderBy: { createdAt: "DESC", id: "ASC" },
-    limit: input.limit ?? 50,
-    offset: input.offset ?? 0,
-  } as never);
+  const memories = await em.find(Memory, {
+    where: listWhere(ctx.orgId, input) as never,
+    order: { createdAt: "DESC", id: "ASC" },
+    take: input.limit ?? 50,
+    skip: input.offset ?? 0,
+  });
   return filterTags(memories, input.tags).map(serializeMemory);
 }
 
@@ -102,9 +103,10 @@ export async function searchMemories(
   ctx: MemoryApplicationContext,
   input: SearchMemoryInput,
 ): Promise<RankedMemoryDto[]> {
-  const candidates = await em.find(Memory, listWhere(ctx.orgId, input), {
-    orderBy: { createdAt: "DESC", id: "ASC" },
-  } as never);
+  const candidates = await em.find(Memory, {
+    where: listWhere(ctx.orgId, input) as never,
+    order: { createdAt: "DESC", id: "ASC" },
+  });
   return rankMemoryMatches(
     input.query,
     filterTags(candidates, input.tags),

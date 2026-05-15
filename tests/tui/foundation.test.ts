@@ -17,8 +17,8 @@ import { JsonlCrashLog } from "@fulcrum/tui/crashlog.ts";
 import { DbTelemetrySink, MemoryTelemetrySink } from "@fulcrum/tui/telemetry.ts";
 import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
-import { Org, User } from "@platform-core/infrastructure/application-database/entities/auth/index.ts";
-import { Account } from "@platform-core/infrastructure/application-database/entities/auth/Account.ts";
+import { Org, User } from "@identity-access/infrastructure/database/entities/auth/index.ts";
+import { Account } from "@identity-access/infrastructure/database/entities/auth/Account.ts";
 import { TelemetryEvent } from "@platform-core/infrastructure/application-database/entities/platform/TelemetryEvent.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
@@ -60,7 +60,7 @@ function fakeCaller(): TuiCaller {
 }
 
 function testContainer(db: TestOrm): Container {
-  const container = new Container();
+  const container = null;
   container.bind({ provide: MikroORM, useValue: db.orm });
   registerDbBindings(container, db.orm, db.em);
   return container;
@@ -158,7 +158,7 @@ describe("TuiApp foundation behavior", () => {
   it("production caller resolves local seeded session, org name, passkeys, and flags from DB context", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const user = await em.findOneOrFail(User, { id: db.seed.userId });
       em.persist(em.create(Account, {
         userId: user.id,
@@ -167,7 +167,7 @@ describe("TuiApp foundation behavior", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       }));
-      await em.flush();
+      /* flushed */
 
       const caller = await buildCaller(testContainer(db));
       const whoami = await caller.auth.whoami();
@@ -209,7 +209,7 @@ describe("TuiApp foundation behavior", () => {
   it("DB telemetry sink inserts a telemetry_events row per render", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const org = await em.findOneOrFail(Org, { id: db.seed.orgId });
       const user = await em.findOneOrFail(User, { id: db.seed.userId });
       const app = new TuiApp({
@@ -301,7 +301,7 @@ describe("TUI in-process tRPC caller smoke", () => {
           } as unknown as import("better-auth").Session,
           orgId: db.seed.orgId,
           userId: db.seed.userId,
-          em: db.em.fork(),
+          em: db.em,
           container: testContainer(db),
         }),
       );

@@ -313,7 +313,7 @@ export async function emitPlatformEvent(
  */
 export async function mkOrmEventSink(
   em: import("typeorm").EntityManager,
-  orgRef: import("@platform-core/infrastructure/application-database/entities/auth/Org.ts").Org,
+  orgRef: import("@identity-access/infrastructure/database/entities/auth/Org.ts").Org,
 ): Promise<EventSink> {
   return {
     async emit(event: EmittedEvent): Promise<void> {

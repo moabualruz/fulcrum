@@ -47,7 +47,7 @@ function session() {
 }
 
 function caller(repo = new MemoryThemeSettingsRepository()) {
-  const container = new Container();
+  const container = null;
   container.bind({ provide: ThemeSettingsRepository, useValue: repo });
   return t.createCallerFactory(appRouter)(
     createContext({

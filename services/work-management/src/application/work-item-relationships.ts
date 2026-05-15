@@ -12,10 +12,10 @@
 
 import type { EntityManager } from "typeorm";
 
-import { TaskRelationship } from "@platform-core/infrastructure/application-database/entities/tasks/TaskRelationship.ts";
-import { TaskWatcher } from "@platform-core/infrastructure/application-database/entities/tasks/TaskWatcher.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { TaskRelationship } from "@work-management/infrastructure/database/entities/tasks/TaskRelationship.ts";
+import { TaskWatcher } from "@work-management/infrastructure/database/entities/tasks/TaskWatcher.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { AppConflictError, AppNotFoundError, AppValidationError } from "@platform-core/domain/errors.ts";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -133,8 +133,7 @@ export class WorkItemRelationshipService {
       createdBy,
     } as never);
 
-    this.em.persist(rel);
-    await this.em.flush();
+    await this.em.save(rel);
     return this.serialize(rel);
   }
 
@@ -149,7 +148,6 @@ export class WorkItemRelationshipService {
     }
 
     this.em.remove(rel);
-    await this.em.flush();
   }
 
   async listForTask(orgId: string, taskId: string): Promise<RelationshipOutput[]> {
@@ -218,13 +216,11 @@ export class WorkItemRelationshipService {
       createdBy: sourceTaskId, // system action — use sourceTaskId as actor reference
     } as never);
 
-    this.em.persist(rel);
-    await this.em.flush();
+    await this.em.save(rel);
 
     // Auto-close: set source task to a canceled-category status
     if (opts.autoClose) {
       (sourceTask as Task & { status: string | null }).status = "Canceled";
-      await this.em.flush();
     }
 
     // Transfer watchers from source to target
@@ -249,8 +245,7 @@ export class WorkItemRelationshipService {
             userId: watcher.userId,
             source: "manual",
           } as never);
-          this.em.persist(newWatcher);
-    await this.em.flush();
+          await this.em.save(newWatcher);
         }
       }
     }

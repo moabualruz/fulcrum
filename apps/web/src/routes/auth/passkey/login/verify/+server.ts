@@ -1,6 +1,6 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 
-import { verifyAuthenticationResponse } from "@identity-access/application/auth/passkey.ts";
+import { verifyAuthenticationResponse } from "@identity-access/interface/passkey.ts";
 import {
   clearLoginChallengeCookie,
   originFromUrl,

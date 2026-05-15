@@ -1,1 +1,1 @@
-export * from "@knowledge-workspace/application/document-actions.ts";
+export * from "@knowledge-workspace/interface/document-actions.ts";

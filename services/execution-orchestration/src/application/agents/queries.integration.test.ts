@@ -25,7 +25,7 @@ function ctx(projectId: string): AppContext {
 describe("agent profile application queries with migrated PGlite data", () => {
   test("upserts, masks secrets, joins project/task options, records tests, and lists recent runs", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const projectId = randomUUID();
     const taskId = randomUUID();
 

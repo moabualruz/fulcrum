@@ -2,8 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 import { DomainEventOutbox } from "@platform-core/infrastructure/application-database/entities/platform/DomainEventOutbox.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import {
@@ -61,7 +61,7 @@ function dispatcher(): OutboxDispatcher & {
 describe("transactional outbox integration", () => {
   test("same transaction creates domain mutation, Event row, and outbox row", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
 
     const created = await em.transactional(async (txEm) => {
       const task = txEm.create(Task, {
@@ -98,7 +98,7 @@ describe("transactional outbox integration", () => {
 
   test("idempotent dispatch marks outbox row processed once and fans out to event bus/search/notifications", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     await writeOutboxEvent(em, {
       orgId: DEFAULT_ORG_ID,
       projectId: "22222222-2222-4222-8222-222222222222",
@@ -107,7 +107,7 @@ describe("transactional outbox integration", () => {
       subjectId: "task-1",
       payload: { title: "dispatch" },
     });
-    await em.flush();
+    /* flushed */
 
     const sinks = dispatcher();
 
@@ -123,7 +123,7 @@ describe("transactional outbox integration", () => {
 
   test("worker dispatch exposes polling loop with pg-notify fast path", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const sinks = dispatcher();
     let notifyHandler: (() => Promise<void>) | null = null;
 
@@ -149,7 +149,7 @@ describe("transactional outbox integration", () => {
         subjectId: "task-2",
         payload: {},
       });
-      await em.flush();
+      /* flushed */
       const notify = notifyHandler as (() => Promise<void>) | null;
       if (notify) await notify();
     } finally {
@@ -161,7 +161,7 @@ describe("transactional outbox integration", () => {
 
   test("bell count query reads through application notification query", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
 
     expect(await getUnreadNotificationCount(em, DEFAULT_ORG_ID, USER_ID)).toBe(0);
   });

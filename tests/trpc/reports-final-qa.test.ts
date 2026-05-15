@@ -476,7 +476,7 @@ function caller() {
     orgId: ORG_ID,
     userId: USER_ID,
     em: { marker: "reports-trpc-em" } as never,
-    container: new Container(),
+    container: null,
   }));
 }
 

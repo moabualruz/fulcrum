@@ -43,7 +43,7 @@ async function taskEvents(em: TestOrm["em"], taskId: string): Promise<Array<{ ve
 describe("task service actions with real MikroORM persistence", () => {
   test("creates, updates, moves status, deletes, and records task events", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const projectId = await createProject(em);
 
     const created = await createTaskAction(em, {
@@ -116,7 +116,7 @@ describe("task service actions with real MikroORM persistence", () => {
 
   test("rejects invalid status and stale status transitions without changing persisted rows", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const projectId = await createProject(em);
     const created = await createTaskAction(em, {
       orgId: DEFAULT_ORG_ID,

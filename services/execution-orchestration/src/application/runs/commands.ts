@@ -1,8 +1,8 @@
 import type { EntityManager } from "typeorm";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { AgentRun } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import { cancelRunAction, retryRunAction } from "@execution-orchestration/application/agent-run-service-actions.ts";
 import { AppValidationError } from "@platform-core/domain/errors.ts";
 import { appendEventOrm, enqueueJobOrm } from "@platform-core/application/orm-helpers.ts";
@@ -11,15 +11,14 @@ import type { AppContext, DispatchRunInput, RunDto } from "@execution-orchestrat
 
 export async function dispatchRun(em: EntityManager, ctx: AppContext, input: DispatchRunInput): Promise<RunDto> {
   if (!input.agentName?.trim()) throw new AppValidationError("Run agentName is required.");
-  return await em.transactional(async (txEm) => {
+  return await em.transaction(async (txEm: import("typeorm").EntityManager) => {
     const run = txEm.create(AgentRun, {
-      org: txEm.getReference(Org, ctx.orgId),
+      org: { id: ctx.orgId } as Org,
       agentName: input.agentName,
       status: "queued",
       threadId: input.prompt ?? null,
-    });
-    txEm.persist(run);
-    await txEm.flush();
+    } as never);
+    await txEm.save(run);
     return serializeRun(run);
   });
 }
@@ -46,17 +45,16 @@ export async function dispatchTaskRun(
 ): Promise<{ id: string; task_id: string; agent: string; status: string }> {
   if (!input.taskId?.trim()) throw new AppValidationError("Run taskId is required.");
   if (!input.agent?.trim()) throw new AppValidationError("Run agent is required.");
-  return await em.transactional(async (txEm) => {
+  return await em.transaction(async (txEm: import("typeorm").EntityManager) => {
     const run = txEm.create(AgentRun, {
-      org: txEm.getReference(Org, ctx.orgId),
-      task: txEm.getReference(Task, input.taskId),
+      org: { id: ctx.orgId } as Org,
+      task: { id: input.taskId } as Task,
       agentName: input.agent,
       agentVersion: input.model ?? null,
       threadId: input.prompt ?? null,
       status: "queued",
-    });
-    txEm.persist(run);
-    await txEm.flush();
+    } as never);
+    await txEm.save(run);
     await enqueueJobOrm(txEm, {
       orgId: ctx.orgId,
       projectId: ctx.projectId ?? null,

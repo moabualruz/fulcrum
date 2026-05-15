@@ -1,6 +1,6 @@
 import type { EntityManager } from "typeorm";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 import { SkillConflict, SkillConflictStatus } from "@platform-core/infrastructure/application-database/entities/skills/SkillConflict.ts";
 import { resolveConflict } from "@platform-core/application/skill-supply/conflict-resolver.ts";
@@ -43,8 +43,8 @@ export async function overrideSkillConflict(
   ctx: AppContext,
   input: { conflictId: string; auditNote: string; resolution: "local" | "upstream" },
 ): Promise<{ ok: true }> {
-  const scopedEm = em.fork();
-  const conflict = await scopedEm.findOne(SkillConflict, { id: input.conflictId });
+  const scopedEm = em;
+  const conflict = await scopedEm.findOne(SkillConflict, { where: { id: input.conflictId } });
   if (!conflict) throw new Error(`Conflict ${input.conflictId} not found`);
   conflict.status = SkillConflictStatus.Overridden;
   conflict.auditNote = input.auditNote;
@@ -56,7 +56,6 @@ export async function overrideSkillConflict(
       // Resolution may fail if upstream repo is unavailable; audit note still records override.
     }
   }
-  await scopedEm.flush();
   return { ok: true };
 }
 
@@ -90,8 +89,8 @@ async function recordLockOverrideAudit(
 ): Promise<void> {
   if (!em) return;
   try {
-    const auditEm = em.fork();
-    const org = await auditEm.findOne(Org, { id: ctx.orgId });
+    const auditEm = em;
+    const org = await auditEm.findOne(Org, { where: { id: ctx.orgId } });
     if (!org) return;
     const event = auditEm.create(Event, {
       org,
@@ -106,8 +105,7 @@ async function recordLockOverrideAudit(
         auditNote: input.auditNote ?? null,
       },
     } as never);
-    auditEm.persist(event);
-    await auditEm.flush();
+    await auditEm.save(event);
   } catch {
     // Audit is best-effort.
   }

@@ -83,7 +83,7 @@ function session() {
 }
 
 function caller(nextStore = store) {
-  const container = new Container();
+  const container = null;
   container.bind({ provide: TelemetryStore, useValue: nextStore });
 
   return createCaller(

@@ -3,9 +3,9 @@ import { TRPCError } from "@trpc/server";
 import type { Session } from "better-auth";
 
 import { createTestOrm } from "@test-support/application-database.ts";
-import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
-import { DocVersion } from "@platform-core/infrastructure/application-database/entities/docs/DocVersion.ts";
-import { SearchDocument } from "@platform-core/infrastructure/application-database/entities/search/SearchDocument.ts";
+import { Document } from "@knowledge-workspace/infrastructure/database/entities/docs/Document.ts";
+import { DocVersion } from "@knowledge-workspace/infrastructure/database/entities/docs/DocVersion.ts";
+import { SearchDocument } from "@knowledge-workspace/infrastructure/database/entities/search/SearchDocument.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
@@ -46,7 +46,7 @@ describe("docs CRUD tRPC", () => {
   test("create, list, get, update, soft-delete, and hard-delete docs inside the caller org", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       const created = await caller.docs.create({
@@ -127,7 +127,7 @@ describe("docs CRUD tRPC", () => {
   test("list filters docs by scope, docType, archived, and parentId within org", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       const parent = await caller.docs.create({ title: "Parent", docType: "wiki" });
@@ -152,7 +152,7 @@ describe("docs CRUD tRPC", () => {
   test("docs.get throws NOT_FOUND when requested doc is missing", async () => {
     const db = await createTestOrm();
     try {
-      const caller = callerFor(db.em.fork());
+      const caller = callerFor(db.em);
       await expect(caller.docs.get({ slug: "missing" })).rejects.toMatchObject({
         code: "NOT_FOUND",
       });

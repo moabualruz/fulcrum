@@ -1,7 +1,7 @@
 import type { EntityManager } from "typeorm";
 import { readFile } from "node:fs/promises";
 
-import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
+import { AgentRun } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
 import { AppForbiddenError, AppNotFoundError } from "@platform-core/domain/errors.ts";
 import { previewContext } from "@knowledge-workspace/application/context/queries.ts";
 import { ormSqlConnection } from "@platform-core/application/orm-helpers.ts";
@@ -10,19 +10,19 @@ import { listOpenTaskOptions, type TaskOption } from "@work-management/applicati
 import type { AppContext, RunDetailDto, RunDto } from "@execution-orchestration/application/runs/types.ts";
 
 export async function listRuns(em: EntityManager, ctx: AppContext): Promise<RunDto[]> {
-  const runs = await em.find(AgentRun, { org: ctx.orgId } as never, { orderBy: { createdAt: "DESC", id: "ASC" } });
+  const runs = await em.find(AgentRun, { where: { org: { id: ctx.orgId } } as never, order: { createdAt: "DESC", id: "ASC" } });
   return runs.map(serializeRun);
 }
 
 export async function getRun(em: EntityManager, ctx: AppContext, id: string): Promise<RunDto> {
-  const run = await em.findOne(AgentRun, { id } as never);
+  const run = await em.findOne(AgentRun, { where: { id } as never });
   if (!run) throw new AppNotFoundError(`Run not found: ${id}`);
   if (run.org.id !== ctx.orgId) throw new AppForbiddenError(`Run does not belong to org: ${ctx.orgId}`);
   return serializeRun(run);
 }
 
 export async function getRunDetail(em: EntityManager, ctx: AppContext, id: string): Promise<RunDetailDto> {
-  const run = await em.findOne(AgentRun, { id } as never, { populate: ["task"] as never });
+  const run = await em.findOne(AgentRun, { where: { id } as never, relations: { task: true } as never });
   if (!run) throw new AppNotFoundError(`Run not found: ${id}`);
   if (run.org.id !== ctx.orgId) throw new AppForbiddenError(`Run does not belong to org: ${ctx.orgId}`);
   const projectId = run.task?.projectId ?? ctx.projectId ?? null;

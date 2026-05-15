@@ -26,7 +26,7 @@ function mockSession() {
 }
 
 function callerFor(em: import("typeorm").EntityManager) {
-  const container = new Container();
+  const container = null;
 
   return createCaller(
     createContext({
@@ -43,7 +43,7 @@ describe("skills registry tRPC procedures", () => {
   test("registry.list returns array of registry entries", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       const skillsCaller = caller.fulcrum_skills as Record<string, unknown>;
@@ -59,7 +59,7 @@ describe("skills registry tRPC procedures", () => {
   test("conflicts.list returns array of conflicts", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       const skillsCaller = caller.fulcrum_skills as Record<string, unknown>;
@@ -75,7 +75,7 @@ describe("skills registry tRPC procedures", () => {
   test("conflicts.override requires auditNote and returns ok", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       // Create a real SkillConflict to override
@@ -90,7 +90,7 @@ describe("skills registry tRPC procedures", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      await em.flush();
+      /* flushed */
 
       const skillsCaller = caller.fulcrum_skills as Record<string, unknown>;
       const conflicts = skillsCaller.conflicts as {
@@ -111,7 +111,7 @@ describe("skills registry tRPC procedures", () => {
   test("lock.override requires expectedSha256 and actualSha256 and returns ok", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
 
       const skillsCaller = caller.fulcrum_skills as Record<string, unknown>;

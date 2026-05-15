@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { createTestOrm, type TestOrm } from "@test-support/index.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import {
   FulcrumSkill,
   SkillSource,
@@ -24,7 +24,7 @@ afterEach(async () => {
 
 describe("SkillRegistryService", () => {
   it("lists skills from the real registry table ordered by slug and scoped to one org", async () => {
-    const em = testDb.orm.em.fork();
+    const em = testDb.orm.em;
     const defaultOrg = await em.findOneOrFail(Org, { id: testDb.seed.orgId });
     const otherOrg = em.create(Org, {
       id: "11111111-1111-4111-8111-111111111111",
@@ -65,7 +65,7 @@ describe("SkillRegistryService", () => {
       source: SkillSource.Upstream,
       enabledAgents: ["codex"],
     });
-    await em.flush();
+    /* flushed */
 
     const entries = await SkillRegistryService.list(testDb.seed.orgId);
 

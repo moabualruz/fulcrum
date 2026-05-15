@@ -3,11 +3,11 @@ import { Container } from "@needle-di/core";
 import { z } from "zod";
 
 import { createTestOrm } from "@test-support/application-database.ts";
-import { MetricsCache } from "@platform-core/infrastructure/application-database/entities/tasks/MetricsCache.ts";
-import { Sprint, SprintStatus } from "@platform-core/infrastructure/application-database/entities/tasks/Sprint.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
+import { MetricsCache } from "@work-management/infrastructure/database/entities/tasks/MetricsCache.ts";
+import { Sprint, SprintStatus } from "@work-management/infrastructure/database/entities/tasks/Sprint.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { TaskRepository } from "@work-management/infrastructure/database/repositories/tasks/TaskRepository.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
@@ -33,7 +33,7 @@ function mockSession() {
 }
 
 function callerFor(em: import("@mikro-orm/postgresql").EntityManager) {
-  const container = new Container();
+  const container = null;
   const repo = em.getRepository(Task) as TaskRepository;
   container.bind({ provide: TaskRepository, useValue: repo });
 
@@ -74,7 +74,7 @@ describe("reports.burndown tRPC", () => {
   test("returns ideal line: day 0 = capacity, day N = 0, linear interpolation", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const org = em.getReference(Org, ORG_ID);
 
       // Create sprint: 3 days (Jan 1-4, daysBetween = 3)
@@ -87,8 +87,7 @@ describe("reports.burndown tRPC", () => {
         status: SprintStatus.active,
         capacityPoints: 12,
       });
-      em.persist(sprint);
-      await em.flush();
+      await em.save(sprint);
 
       // Insert tasks with 12 total points via raw SQL
       await insertTask(em, { sprintId: sprint.id, points: 8, title: "T1" });
@@ -107,8 +106,7 @@ describe("reports.burndown tRPC", () => {
         date: new Date("2025-01-02"),
         pointsRemaining: 8,
       });
-      em.persist([mc0, mc1]);
-      await em.flush();
+      await em.save([mc0, mc1]);
 
       const caller = callerFor(em);
       const result = await caller.reports.burndown({
@@ -143,7 +141,7 @@ describe("reports.burndown tRPC", () => {
   test("fallback: returns same shape when cache is empty (on-demand computation)", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const org = em.getReference(Org, ORG_ID);
 
       const sprint = em.create(Sprint, {
@@ -155,8 +153,7 @@ describe("reports.burndown tRPC", () => {
         status: SprintStatus.active,
         capacityPoints: 10,
       });
-      em.persist(sprint);
-      await em.flush();
+      await em.save(sprint);
 
       // Task but NO metrics_cache entries
       await insertTask(em, { sprintId: sprint.id, points: 10, title: "T3" });
@@ -185,7 +182,7 @@ describe("reports.burndown tRPC", () => {
   test("returns empty for nonexistent sprint", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
       const result = await caller.reports.burndown({
         projectId: PROJECT_ID,
@@ -200,7 +197,7 @@ describe("reports.burndown tRPC", () => {
   test("chart load time < 100ms from metrics_cache", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const org = em.getReference(Org, ORG_ID);
 
       const sprint = em.create(Sprint, {
@@ -212,8 +209,7 @@ describe("reports.burndown tRPC", () => {
         status: SprintStatus.active,
         capacityPoints: 20,
       });
-      em.persist(sprint);
-      await em.flush();
+      await em.save(sprint);
 
       // Insert task via raw SQL
       await insertTask(em, { sprintId: sprint.id, points: 20, title: "T-perf" });
@@ -229,7 +225,7 @@ describe("reports.burndown tRPC", () => {
           pointsRemaining: Math.max(0, Math.round(20 - d * 1.5)),
         }));
       }
-      await em.flush();
+      /* flushed */
 
       const caller = callerFor(em);
       const start = performance.now();

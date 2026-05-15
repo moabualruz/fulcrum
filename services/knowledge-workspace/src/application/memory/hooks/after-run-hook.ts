@@ -1,9 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import type { EntityManager } from "typeorm";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
-import { MemoryLink } from "@platform-core/infrastructure/application-database/entities/memory/MemoryLink.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
+import { MemoryLink } from "@knowledge-workspace/infrastructure/database/entities/memory/MemoryLink.ts";
 import { HeuristicExtractor, type HeuristicMemory } from "../extractor-heuristic.ts";
 
 export interface AfterRunMemoryContext {
@@ -27,17 +27,17 @@ export class AfterRunMemoryHook {
     if (candidates.length === 0) return;
 
     const em = this.em as EntityManager;
-    const orgRef = em.getReference(Org, orgId);
+    const orgRef = { id: orgId } as Org;
     const now = new Date();
 
     for (const candidate of candidates) {
       const sourceRef = sourceRefFor(runId, candidate);
-      let memory = await em.findOne(Memory, {
+      let memory = await em.findOne(Memory, { where: {
         org: orgId,
         kind: candidate.kind,
         body: candidate.body,
         source: "heuristic",
-      } as never);
+      } as never });
 
       if (!memory) {
         memory = em.create(Memory, {
@@ -54,15 +54,14 @@ export class AfterRunMemoryHook {
           createdAt: now,
           updatedAt: now,
         });
-        em.persist(memory);
-        await em.flush();
+        await em.save(memory);
       }
 
-      const existingLink = await em.findOne(MemoryLink, {
+      const existingLink = await em.findOne(MemoryLink, { where: {
         memory: memory.id,
         targetKind: "agent_run",
         targetId: runId,
-      } as never);
+      } as never });
 
       if (!existingLink) {
         const link = em.create(MemoryLink, {
@@ -71,8 +70,7 @@ export class AfterRunMemoryHook {
           targetKind: "agent_run" as const,
           targetId: runId,
         });
-        em.persist(link);
-        await em.flush();
+        await em.save(link);
       }
     }
   }

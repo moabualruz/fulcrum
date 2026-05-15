@@ -39,7 +39,7 @@ async function freshDb(): Promise<TestOrm> {
 describe("approved plan breakdown command materialization", () => {
   test("persists approved plan docs, tasks, and dependency edges with real PGlite data", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const ctx = { orgId: DEFAULT_ORG_ID, userId: USER_ID, projectId: PROJECT_ID };
     const breakdown = buildApprovedPlanBreakdown({
       planId: "plan-real",

@@ -5,7 +5,7 @@ import {
   type DocTemplateService,
 } from "@knowledge-workspace/application/docs/doc-template-service.ts";
 import { EntityManagerDocTemplateService } from "@knowledge-workspace/application/docs/em-doc-template-service.ts";
-import type { DocType } from "@platform-core/infrastructure/application-database/entities/docs/enums.ts";
+import type { DocType } from "@knowledge-workspace/infrastructure/database/entities/docs/enums.ts";
 import { AppInvariantError } from "@platform-core/domain/errors.ts";
 import { WorkItemTemplateService } from "@work-management/application/work-item-templates.ts";
 import type { AppContext, CreateTemplateInput, TemplateDto } from "@work-management/application/templates/types.ts";

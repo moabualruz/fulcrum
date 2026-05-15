@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { AppForbiddenError, AppNotFoundError, AppValidationError } from "@platform-core/domain/errors.ts";
@@ -29,7 +29,7 @@ function ctx(orgId = DEFAULT_ORG_ID): AppContext {
 describe("application sprints commands and queries", () => {
   test("createSprint, listSprints, and getSprint round-trip through MikroORM", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const created = await createSprint(em, ctx(), {
       name: "Sprint 1",
       projectId: ctx().projectId!,
@@ -44,7 +44,7 @@ describe("application sprints commands and queries", () => {
 
   test("createSprint validation failure throws AppValidationError", async () => {
     const testDb = await freshDb();
-    await expect(createSprint(testDb.em.fork(), ctx(), {
+    await expect(createSprint(testDb.em, ctx(), {
       name: "",
       projectId: ctx().projectId!,
       startDate: new Date("2026-05-15T00:00:00Z"),
@@ -54,14 +54,14 @@ describe("application sprints commands and queries", () => {
 
   test("getSprint not-found throws AppNotFoundError", async () => {
     const testDb = await freshDb();
-    await expect(getSprint(testDb.em.fork(), ctx(), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")).rejects.toBeInstanceOf(AppNotFoundError);
+    await expect(getSprint(testDb.em, ctx(), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")).rejects.toBeInstanceOf(AppNotFoundError);
   });
 
   test("cross-org sprint access throws AppForbiddenError", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     em.persist(em.create(Org, { id: OTHER_ORG_ID, name: "Other", slug: "other", createdAt: new Date(), updatedAt: new Date() }));
-    await em.flush();
+    /* flushed */
     const other = await createSprint(em, ctx(OTHER_ORG_ID), {
       name: "Other sprint",
       projectId: ctx().projectId!,

@@ -32,7 +32,7 @@ function makeEm(
 import { WorkItemAutomationService } from "@work-management/application/work-item-automations.ts";
 import type { EventBus } from "@platform-core/application/subscriptions/event-bus.ts";
 import { createTestOrm } from "@test-support/application-database.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 
 function makeEventBus(): EventBus {
   return {
@@ -242,13 +242,12 @@ describe("WorkItemAutomationService", () => {
     it("persists, updates, lists, and deletes automations through the real database", async () => {
       const testDb = await createTestOrm();
       try {
-        const em = testDb.em.fork();
+        const em = testDb.em;
         const org = em.create(Org, {
           slug: "automation-real-org",
           name: "Automation Real Org",
         } as never);
-        em.persist(org);
-        await em.flush();
+        await em.save(org);
         const projectId = "11111111-2222-4333-8444-555555555555";
         const service = new WorkItemAutomationService(em, makeEventBus());
 

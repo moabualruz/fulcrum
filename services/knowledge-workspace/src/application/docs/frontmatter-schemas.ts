@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { DOC_TYPES, type DocType } from "@platform-core/infrastructure/application-database/entities/docs/enums.ts";
+import { DOC_TYPES, type DocType } from "@knowledge-workspace/infrastructure/database/entities/docs/enums.ts";
 
 export const AdrFrontmatterSchema = z
   .object({

@@ -1,9 +1,9 @@
 import type { EntityManager } from "typeorm";
 
 import { deleteArtifact } from "@workflow-coordination/infrastructure/artifacts/storage.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
-import { Artifact } from "@platform-core/infrastructure/application-database/entities/sandbox/Artifact.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { AgentRun } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
+import { Artifact } from "@execution-orchestration/infrastructure/database/entities/sandbox/Artifact.ts";
 import { deleteArtifactAction } from "@workflow-coordination/application/artifact-service-actions.ts";
 import { AppValidationError } from "@platform-core/domain/errors.ts";
 import { getArtifactDetail, serializeArtifact } from "@workflow-coordination/application/artifacts/queries.ts";
@@ -14,15 +14,14 @@ export type ArtifactLifecycleState = "created" | "pending_review" | "accepted" |
 export async function createArtifact(em: EntityManager, ctx: AppContext, input: CreateArtifactInput): Promise<ArtifactDto> {
   if (!input.filename?.trim()) throw new AppValidationError("Artifact filename is required.");
   if (!input.path?.trim()) throw new AppValidationError("Artifact path is required.");
-  return await em.transactional(async (txEm) => {
-    const run = txEm.create(AgentRun, {
-      org: txEm.getReference(Org, ctx.orgId),
+  return await em.transaction(async (txEm: EntityManager) => {
+    const run = await txEm.save(AgentRun, {
+      org: { id: ctx.orgId } as Org,
       agentName: "artifact-system",
       status: "succeeded",
     });
-    txEm.persist(run);
-    const artifact = txEm.create(Artifact, {
-      org: txEm.getReference(Org, ctx.orgId),
+    const artifactEntity = txEm.create(Artifact, {
+      org: { id: ctx.orgId } as Org,
       run,
       filename: input.filename,
       path: input.path,
@@ -31,10 +30,9 @@ export async function createArtifact(em: EntityManager, ctx: AppContext, input: 
         ...(input.metadataJson ?? {}),
         lifecycleState: String(input.metadataJson?.["lifecycleState"] ?? "created"),
       },
-    });
-    txEm.persist(artifact);
-    await txEm.flush();
-    return serializeArtifact(artifact);
+    } as never);
+    const artifact = await txEm.save(artifactEntity);
+    return serializeArtifact(artifact as Artifact);
   });
 }
 
@@ -43,7 +41,7 @@ export async function transitionArtifactLifecycle(
   ctx: AppContext,
   input: { id: string; state: ArtifactLifecycleState },
 ): Promise<ArtifactDto> {
-  const artifact = await em.findOne(Artifact, { id: input.id } as never);
+  const artifact = await em.findOne(Artifact, { where: { id: input.id } as never });
   if (!artifact) throw new AppValidationError(`Artifact not found: ${input.id}`);
   if (artifact.org.id !== ctx.orgId) throw new AppValidationError(`Artifact not found: ${input.id}`);
   artifact.metadataJson = {
@@ -51,8 +49,7 @@ export async function transitionArtifactLifecycle(
     lifecycleState: input.state,
     lifecycleChangedAt: new Date().toISOString(),
   };
-  em.persist(artifact);
-  await em.flush();
+  await em.save(artifact);
   return serializeArtifact(artifact);
 }
 
@@ -81,8 +78,8 @@ export async function deleteArtifactForWeb(
     await deleteArtifactAction(em, input.id, ctx.orgId);
     return;
   }
-  await em.getConnection().execute(
-    `UPDATE artifacts SET archived = true WHERE id = ? AND org_id = ?`,
+  await em.query(
+    `UPDATE artifacts SET archived = true WHERE id = $1 AND org_id = $2`,
     [input.id, ctx.orgId],
   );
 }

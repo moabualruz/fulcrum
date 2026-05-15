@@ -61,7 +61,7 @@ async function freshDb(name: string): Promise<{ db: TestStore; em: EntityManager
 
   // ORM EntityManager from the same PGlite instance
   const orm = await initOrm({ pglite });
-  const em = orm.em.fork();
+  const em = orm.em;
 
   return {
     db, em, orgId: org.id,

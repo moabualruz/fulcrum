@@ -2,8 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
 import { randomUUID } from "node:crypto";
 
-import { OrgMember, User } from "@platform-core/infrastructure/application-database/entities/auth/index.ts";
-import { SavedView } from "@platform-core/infrastructure/application-database/entities/tasks/SavedView.ts";
+import { OrgMember, User } from "@identity-access/infrastructure/database/entities/auth/index.ts";
+import { SavedView } from "@work-management/infrastructure/database/entities/tasks/SavedView.ts";
 import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
@@ -23,7 +23,7 @@ afterEach(async () => {
 
 async function setupDb() {
   db = await createTestOrm();
-  const em = db.em.fork();
+  const em = db.em;
   const now = new Date();
   const member = em.create(User, {
     id: MEMBER_USER_ID,
@@ -47,8 +47,7 @@ async function setupDb() {
     createdAt: now,
     updatedAt: now,
   });
-  em.persist([member, membership, outsider]);
-  await em.flush();
+  await em.save([member, membership, outsider]);
   return db;
 }
 
@@ -67,7 +66,7 @@ function caller(testDb: TestOrm, userId: string) {
       } as import("better-auth").Session,
       orgId: DEFAULT_ORG_ID,
       userId,
-      em: testDb.em.fork(),
+      em: testDb.em,
       container: null,
     }),
   );
@@ -195,10 +194,10 @@ describe("saved searches", () => {
 
   test("view_type constraint accepts search and still rejects wrong types", async () => {
     const testDb = await setupDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const valid = em.create(SavedView, {
       org: em.getReference(
-        (await import("@platform-core/infrastructure/application-database/entities/auth/Org.ts")).Org,
+        (await import("@identity-access/infrastructure/database/entities/auth/Org.ts")).Org,
         DEFAULT_ORG_ID,
       ),
       name: "Direct search",

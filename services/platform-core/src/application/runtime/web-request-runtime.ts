@@ -3,9 +3,10 @@ import type { FlagRegistry } from "@platform-core/application/feature-flags/regi
 import type { ApplicationPersistence, ApplicationOrm } from "@platform-core/application/runtime/local-database.ts";
 import { initDatabase } from "@platform-core/application/runtime/local-database.ts";
 import { __resetDataSourceForTest } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
-import { FeatureFlag } from "@platform-core/infrastructure/application-database/entities/auth/FeatureFlag.ts";
-import { FeatureFlagRepository } from "@platform-core/infrastructure/application-database/repositories/auth/FeatureFlagRepository.ts";
+import { FeatureFlag } from "@identity-access/infrastructure/database/entities/auth/FeatureFlag.ts";
+import { FeatureFlagRepository } from "@identity-access/infrastructure/database/repositories/auth/FeatureFlagRepository.ts";
 
+import type { DiContainer } from "./di-container.ts";
 export type { DiContainer } from "./di-container.ts";
 
 export interface WebRequestRuntime {

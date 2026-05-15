@@ -3,9 +3,9 @@ import { MikroORM } from "typeorm";
 
 import { run as runSearchCommand } from "@fulcrum/cli/commands/search.ts";
 import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Session } from "@platform-core/infrastructure/application-database/entities/auth/Session.ts";
-import { SearchDocument } from "@platform-core/infrastructure/application-database/entities/search/SearchDocument.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
+import { SearchDocument } from "@knowledge-workspace/infrastructure/database/entities/search/SearchDocument.ts";
 import { createTestContainer, createTestOrm, type TestOrm } from "@test-support/index.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
@@ -30,7 +30,7 @@ function jsonLine<T>(lines: string[]): T {
 }
 
 async function ensureSession(db: TestOrm): Promise<void> {
-  const em = db.em.fork();
+  const em = db.em;
   em.persist(em.create(Session, {
     id: `parity-${crypto.randomUUID()}`,
     userId: db.seed.userId,
@@ -41,7 +41,7 @@ async function ensureSession(db: TestOrm): Promise<void> {
     ipAddress: null,
     userAgent: "test",
   }));
-  await em.flush();
+  /* flushed */
 }
 
 describe("search cross-interface parity", () => {
@@ -51,7 +51,7 @@ describe("search cross-interface parity", () => {
     container.bind({ provide: MikroORM, useValue: db.orm });
     const entityId = crypto.randomUUID();
     const phrase = "interface-search-parity";
-    const em = db.em.fork();
+    const em = db.em;
     const row = em.create(SearchDocument, {
       org: em.getReference(Org, db.seed.orgId),
       entityKind: "task",
@@ -64,11 +64,10 @@ describe("search cross-interface parity", () => {
       metadata: { source: "application" },
       updatedAt: new Date("2026-05-07T00:00:00.000Z"),
     });
-    em.persist(row);
-    await em.flush();
+    await em.save(row);
     await ensureSession(db);
 
-    const appHit = (await searchDocuments(db.em.fork(), phrase, {
+    const appHit = (await searchDocuments(db.em, phrase, {
       orgId: db.seed.orgId,
       sourceKinds: ["task"],
       limit: 5,
@@ -78,7 +77,7 @@ describe("search cross-interface parity", () => {
       session: { userId: db.seed.userId, orgId: db.seed.orgId, activeOrganizationId: db.seed.orgId } as never,
       orgId: db.seed.orgId,
       userId: db.seed.userId,
-      em: db.em.fork(),
+      em: db.em,
       container: null,
       legacyStore: {
         query: async (sql: string, params?: readonly unknown[]) => {

@@ -4,7 +4,7 @@ import { getDoc } from "@knowledge-workspace/application/docs/queries.ts";
 import { DocumentService } from "@knowledge-workspace/application/document-service.ts";
 import { AppNotFoundError } from "@platform-core/domain/errors.ts";
 import type { AppContext } from "@knowledge-workspace/application/docs/types.ts";
-import type { DocType } from "@platform-core/infrastructure/application-database/entities/docs/enums.ts";
+import type { DocType } from "@knowledge-workspace/infrastructure/database/entities/docs/enums.ts";
 
 export interface DocsEditScope {
   em: EntityManager;

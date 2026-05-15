@@ -10,7 +10,7 @@
  * Body templates are plain markdown strings (not TipTap JSON).
  */
 
-import type { DocType } from "@platform-core/infrastructure/application-database/entities/docs/enums.ts";
+import type { DocType } from "@knowledge-workspace/infrastructure/database/entities/docs/enums.ts";
 import type { DocTemplateRow } from "./doc-template-service.ts";
 
 export interface TemplateSeed {

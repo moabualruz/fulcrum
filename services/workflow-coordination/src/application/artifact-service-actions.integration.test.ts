@@ -84,7 +84,7 @@ async function insertArtifact(
 describe("artifact service with real MikroORM persistence", () => {
   test("lists, filters, reads detail content, computes stats, and deletes rows", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const projectId = await createProject(em);
     const runId = await createRun(em);
     scratch = await mkdtemp(join(tmpdir(), "fulcrum-artifact-service-"));
@@ -147,7 +147,7 @@ describe("artifact service with real MikroORM persistence", () => {
 
   test("returns null content for missing text body and null detail for unknown artifact", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const projectId = await createProject(em);
     const runId = await createRun(em);
     const id = await insertArtifact(em, {

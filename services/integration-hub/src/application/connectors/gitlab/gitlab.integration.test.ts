@@ -12,7 +12,7 @@ describe("application connectors gitlab", () => {
   test("handles CRUD, not-found, validation, and scoping", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const created = await upsertGitlabMergeRequest(em, ctx, { repoPath: "group/fulcrum", mergeRequestIid: "8", title: "Sync", state: "opened" });
       expect(await listGitlabMergeRequests(em, ctx, { repoPath: "group/fulcrum" })).toHaveLength(1);
       await expect(getGitlabMergeRequest(em, ctx, created.id)).resolves.toMatchObject({ id: created.id, title: "Sync" });

@@ -15,7 +15,7 @@ export async function listRegistrySkills(
   ctx: AppContext,
 ): Promise<SkillRegistryEntryDto[]> {
   if (!em) return SkillRegistryService.list(ctx.orgId);
-  const skills = await em.find(FulcrumSkill, { org: ctx.orgId }, { orderBy: { slug: "ASC" } });
+  const skills = await em.find(FulcrumSkill, { where: { org: { id: ctx.orgId } } as never, order: { slug: "ASC" } });
   return skills.map((skill) => ({
     slug: skill.slug,
     name: skill.name,
@@ -26,7 +26,7 @@ export async function listRegistrySkills(
 }
 
 export async function listSkillConflicts(em: EntityManager): Promise<SkillConflictDto[]> {
-  const conflicts = await em.fork().find(SkillConflict, {}, { orderBy: { createdAt: "DESC" } });
+  const conflicts = await em.find(SkillConflict, { where: {}, order: { createdAt: "DESC" } });
   return conflicts.map((c) => ({
     id: c.id,
     slug: c.slug,

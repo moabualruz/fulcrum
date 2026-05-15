@@ -9,9 +9,9 @@
  */
 
 import { Injectable } from "@nestjs/common";
-import type { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
-import { MemoryRepository } from "@platform-core/infrastructure/application-database/repositories/memory/MemoryRepository.ts";
-import type { MemoryImportance, MemoryKind, MemorySource } from "@platform-core/infrastructure/application-database/entities/memory/enums.ts";
+import type { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
+import { MemoryRepository } from "@knowledge-workspace/infrastructure/database/repositories/memory/MemoryRepository.ts";
+import type { MemoryImportance, MemoryKind, MemorySource } from "@knowledge-workspace/infrastructure/database/entities/memory/enums.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -80,14 +80,7 @@ export class MemoryService {
    * orgId guard ensures only org members can promote.
    */
   async promote(memoryId: string, orgId: string): Promise<void> {
-    const em = this.repo.getEntityManager();
-    // nativeUpdate: patch only global=true; projectId intentionally NOT cleared
-    await em.nativeUpdate(
-      // Entity class reference — use the Memory entity constructor name
-      "Memory" as never,
-      { id: memoryId, orgId },
-      { global: true },
-    );
+    await this.repo.update({ id: memoryId, orgId } as never, { global: true } as never);
   }
 
   /**
@@ -105,11 +98,12 @@ export class MemoryService {
     return this.repo.findOne({ id, orgId } as never);
   }
 
+
   /**
    * Create a new memory.
    */
   async create(orgId: string, data: CreateMemoryInput): Promise<MemoryRow> {
-    const em = this.repo.getEntityManager();
+    const em = this.repo.manager;
     const memory = this.repo.create({
       orgId,
       body: data.body,
@@ -120,12 +114,7 @@ export class MemoryService {
       tags: data.tags ?? [],
       sourceRef: data.sourceRef ?? {},
     } as never);
-    if ("persistAndFlush" in em && typeof em.persistAndFlush === "function") {
-      await em.persistAndFlush(memory as never);
-      return memory;
-    }
-    em.persist(memory as never);
-    await em.flush();
+    await em.save(memory as never);
     return memory;
   }
 
@@ -133,11 +122,6 @@ export class MemoryService {
    * Delete a memory by ID (org-scoped for safety).
    */
   async delete(orgId: string, id: string): Promise<void> {
-    const em = this.repo.getEntityManager();
-    await em.nativeUpdate(
-      "Memory" as never,
-      { id, orgId },
-      { archived: true },
-    );
+    await this.repo.update({ id, orgId } as never, { archived: true } as never);
   }
 }

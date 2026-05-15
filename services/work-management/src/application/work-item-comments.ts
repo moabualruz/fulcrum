@@ -11,13 +11,14 @@
  */
 
 import type { EntityManager } from "typeorm";
+import { In } from "typeorm";
 
 import { AppConflictError, AppNotFoundError } from "@platform-core/domain/errors.ts";
-import { TaskComment } from "@platform-core/infrastructure/application-database/entities/tasks/TaskComment.ts";
-import { TaskWatcher } from "@platform-core/infrastructure/application-database/entities/tasks/TaskWatcher.ts";
-import { CommentReaction } from "@platform-core/infrastructure/application-database/entities/tasks/CommentReaction.ts";
-import { OrgMember } from "@platform-core/infrastructure/application-database/entities/auth/OrgMember.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { TaskComment } from "@work-management/infrastructure/database/entities/tasks/TaskComment.ts";
+import { TaskWatcher } from "@work-management/infrastructure/database/entities/tasks/TaskWatcher.ts";
+import { CommentReaction } from "@work-management/infrastructure/database/entities/tasks/CommentReaction.ts";
+import { OrgMember } from "@identity-access/infrastructure/database/entities/auth/OrgMember.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -170,7 +171,7 @@ export class WorkItemCommentService {
     if (teamIds.length === 0) return [];
 
     // T-05-06: validate org scope — fetch members of this org only
-    const members = await this.em.find(OrgMember, { orgId });
+    const members = await this.em.find(OrgMember, { where: { orgId } as never });
     const memberIds = members.map((m) => m.userId);
 
     // Return member IDs for any team ID that belongs to the org.
@@ -192,15 +193,14 @@ export class WorkItemCommentService {
     source: string = "manual",
   ): Promise<void> {
     try {
-      const orgRef = this.em.getReference(Org, orgId);
+      const orgRef = { id: orgId } as Org;
       const watcher = this.em.create(TaskWatcher, {
         org: orgRef,
         taskId,
         userId,
         source,
       });
-      this.em.persist(watcher);
-    await this.em.flush();
+      await this.em.save(watcher);
     } catch (err: unknown) {
       // Unique constraint violation → already watching, silently ignore
       if (
@@ -218,19 +218,14 @@ export class WorkItemCommentService {
   }
 
   async unsubscribe(orgId: string, taskId: string, userId: string): Promise<void> {
-    const watcher = await this.em.findOne(TaskWatcher, { taskId, userId });
+    const watcher = await this.em.findOne(TaskWatcher, { where: { taskId, userId } as never });
     if (watcher) {
       this.em.remove(watcher);
-    await this.em.flush();
     }
   }
 
   async listWatchers(orgId: string, taskId: string): Promise<WatcherOutput[]> {
-    const watchers = await this.em.find(
-      TaskWatcher,
-      { taskId, org: orgId },
-      { orderBy: { createdAt: "ASC" } },
-    );
+    const watchers = await this.em.find(TaskWatcher, { where: { taskId, org: { id: orgId } } as never, order: { createdAt: "ASC" } });
     return watchers.map(serializeWatcher);
   }
 
@@ -267,7 +262,7 @@ export class WorkItemCommentService {
     parentCommentId?: string,
   ): Promise<CommentOutput> {
     // T-05-05: authorId from caller (ctx.userId), never from user input
-    const orgRef = this.em.getReference(Org, orgId);
+    const orgRef = { id: orgId } as Org;
     const comment = this.em.create(TaskComment, {
       org: orgRef,
       taskId,
@@ -275,8 +270,7 @@ export class WorkItemCommentService {
       body,
       parentCommentId: parentCommentId ?? null,
     });
-    this.em.persist(comment);
-    await this.em.flush();
+    await this.em.save(comment);
 
     // Auto-subscribe author
     await this.subscribe(orgId, taskId, authorId, "create");
@@ -298,16 +292,12 @@ export class WorkItemCommentService {
   }
 
   async listComments(orgId: string, taskId: string): Promise<CommentOutput[]> {
-    const comments = await this.em.find(
-      TaskComment,
-      { org: orgId, taskId },
-      { orderBy: { createdAt: "ASC" } },
-    );
+    const comments = await this.em.find(TaskComment, { where: { org: { id: orgId }, taskId } as never, order: { createdAt: "ASC" } });
 
     const commentIds = comments.map((c) => c.id);
     const reactions =
       commentIds.length > 0
-        ? await this.em.find(CommentReaction, { commentId: { $in: commentIds } })
+        ? await this.em.find(CommentReaction, { where: { commentId: In(commentIds) } })
         : [];
 
     return comments.map((c) => serializeComment(c, reactions));
@@ -318,16 +308,12 @@ export class WorkItemCommentService {
    * D-01 threading requirement.
    */
   async getThreaded(orgId: string, taskId: string): Promise<CommentOutput[]> {
-    const comments = await this.em.find(
-      TaskComment,
-      { org: orgId, taskId },
-      { orderBy: { createdAt: "ASC" } },
-    );
+    const comments = await this.em.find(TaskComment, { where: { org: { id: orgId }, taskId } as never, order: { createdAt: "ASC" } });
 
     const commentIds = comments.map((c) => c.id);
     const reactions =
       commentIds.length > 0
-        ? await this.em.find(CommentReaction, { commentId: { $in: commentIds } })
+        ? await this.em.find(CommentReaction, { where: { commentId: In(commentIds) } })
         : [];
 
     // Build map for O(n) tree construction
@@ -353,26 +339,24 @@ export class WorkItemCommentService {
 
   async deleteComment(orgId: string, commentId: string): Promise<void> {
     // Cascade delete: find comment + all descendants
-    const comment = await this.em.findOne(TaskComment, {
+    const comment = await this.em.findOne(TaskComment, { where: {
       id: commentId,
       org: orgId,
-    });
+    } as never });
     if (!comment) {
       throw new AppNotFoundError("Comment not found");
     }
 
     // Delete all replies first (MikroORM may not cascade JSON relations)
-    const replies = await this.em.find(TaskComment, {
+    const replies = await this.em.find(TaskComment, { where: {
       parentCommentId: commentId,
-      org: orgId,
-    });
+      org: { id: orgId },
+    } as never });
     for (const reply of replies) {
       this.em.remove(reply);
-    await this.em.flush();
     }
 
     this.em.remove(comment);
-    await this.em.flush();
   }
 
   async resolveComment(
@@ -380,10 +364,10 @@ export class WorkItemCommentService {
     commentId: string,
     userId: string,
   ): Promise<CommentOutput> {
-    const comment = await this.em.findOne(TaskComment, {
+    const comment = await this.em.findOne(TaskComment, { where: {
       id: commentId,
       org: orgId,
-    });
+    } as never });
     if (!comment) {
       throw new AppNotFoundError("Comment not found");
     }
@@ -391,16 +375,15 @@ export class WorkItemCommentService {
     comment.resolved = true;
     comment.resolvedBy = userId;
     comment.resolvedAt = new Date();
-    await this.em.flush();
 
     return serializeComment(comment, []);
   }
 
   async unresolveComment(orgId: string, commentId: string): Promise<CommentOutput> {
-    const comment = await this.em.findOne(TaskComment, {
+    const comment = await this.em.findOne(TaskComment, { where: {
       id: commentId,
       org: orgId,
-    });
+    } as never });
     if (!comment) {
       throw new AppNotFoundError("Comment not found");
     }
@@ -408,7 +391,6 @@ export class WorkItemCommentService {
     comment.resolved = false;
     comment.resolvedBy = null;
     comment.resolvedAt = null;
-    await this.em.flush();
 
     return serializeComment(comment, []);
   }
@@ -422,8 +404,7 @@ export class WorkItemCommentService {
         userId,
         emoji,
       });
-      this.em.persist(reaction);
-    await this.em.flush();
+      await this.em.save(reaction);
       return serializeReaction(reaction);
     } catch (err: unknown) {
       if (
@@ -440,14 +421,13 @@ export class WorkItemCommentService {
   }
 
   async removeReaction(commentId: string, userId: string, emoji: string): Promise<void> {
-    const reaction = await this.em.findOne(CommentReaction, {
+    const reaction = await this.em.findOne(CommentReaction, { where: {
       commentId,
       userId,
       emoji,
-    });
+    } as never });
     if (reaction) {
       this.em.remove(reaction);
-    await this.em.flush();
     }
   }
 }

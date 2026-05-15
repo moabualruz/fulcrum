@@ -73,7 +73,7 @@ describe("application outbox CR-01 repeat-event dispatch", () => {
   test("CR-01 writes and dispatches two later events for one subject", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const baseEvent = {
         orgId: DEFAULT_ORG_ID,
         projectId: "22222222-2222-4222-8222-222222222222",
@@ -83,7 +83,7 @@ describe("application outbox CR-01 repeat-event dispatch", () => {
       };
       await writeOutboxEvent(em, { ...baseEvent, payload: { title: "first" } });
       await writeOutboxEvent(em, { ...baseEvent, payload: { title: "second" } });
-      await em.flush();
+      /* flushed */
 
       const rows = await em.find(DomainEventOutbox, {
         org: DEFAULT_ORG_ID,

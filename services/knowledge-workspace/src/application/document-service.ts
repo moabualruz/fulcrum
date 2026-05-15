@@ -1,13 +1,13 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { EntityManager } from "typeorm";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
-import { DocComment } from "@platform-core/infrastructure/application-database/entities/docs/DocComment.ts";
-import { DocLink } from "@platform-core/infrastructure/application-database/entities/docs/DocLink.ts";
-import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
-import { DocVersion } from "@platform-core/infrastructure/application-database/entities/docs/DocVersion.ts";
-import type { DocType, LinkKind, Scope } from "@platform-core/infrastructure/application-database/entities/docs/enums.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
+import { DocComment } from "@knowledge-workspace/infrastructure/database/entities/docs/DocComment.ts";
+import { DocLink } from "@knowledge-workspace/infrastructure/database/entities/docs/DocLink.ts";
+import { Document } from "@knowledge-workspace/infrastructure/database/entities/docs/Document.ts";
+import { DocVersion } from "@knowledge-workspace/infrastructure/database/entities/docs/DocVersion.ts";
+import type { DocType, LinkKind, Scope } from "@knowledge-workspace/infrastructure/database/entities/docs/enums.ts";
 import { archiveDocIndex, indexDoc, removeDocIndex } from "@knowledge-workspace/application/docs/search-indexer.ts";
 import { applyNarrationToDoc } from "@knowledge-workspace/application/docs/llm-narrator.ts";
 import { diffDocVersionsHtml, reconstructDocVersion } from "@knowledge-workspace/application/docs/version-reconstructor.ts";
@@ -94,21 +94,18 @@ export class DocumentService {
     limit?: number;
     offset?: number;
   }): Promise<DocOutput[]> {
-    const docs = await this.em.find(
-      Document,
-      {
-        org: orgId,
+    const docs = await this.em.find(Document, {
+      where: {
+        org: { id: orgId },
         archived: input?.archived ?? false,
         ...(input?.scope ? { scope: input.scope } : {}),
         ...(input?.docType ? { docType: input.docType } : {}),
-        ...(input && "parentId" in input ? { parent: input.parentId } : {}),
+        ...(input && "parentId" in input ? { parent: { id: input.parentId ?? undefined } } : {}),
       } as never,
-      {
-        orderBy: { sortPosition: "ASC", updatedAt: "DESC", id: "ASC" },
-        limit: input?.limit ?? 50,
-        offset: input?.offset ?? 0,
-      },
-    );
+      order: { sortPosition: "ASC", updatedAt: "DESC", id: "ASC" },
+      take: input?.limit ?? 50,
+      skip: input?.offset ?? 0,
+    });
     return docs.map(serializeDoc);
   }
 
@@ -144,7 +141,7 @@ export class DocumentService {
     const frontmatter = { ...(input.frontmatter ?? {}), title: input.title };
     const doc = this.em.create(Document, {
       id: randomUUID(),
-      org: this.em.getReference(Org, ctx.orgId),
+      org: { id: ctx.orgId } as Org,
       parent,
       projectId: input.projectId ?? null,
       scope: input.scope ?? "project",
@@ -157,11 +154,10 @@ export class DocumentService {
       externalId: await uniqueSlug(this.em, ctx.orgId, input.title),
       updatedAt: new Date(),
     });
-    this.em.persist(doc);
+    await this.em.save(doc);
     await writeDocVersion(this.em, { orgId: ctx.orgId, doc, authorId: ctx.userId });
     await upsertSearchDocument(this.em, ctx.orgId, doc.id, ctx.userId);
     persistExplicitDocLinks(this.em, ctx.orgId, doc, input.links);
-    await this.em.flush();
     return serializeDoc(doc);
   }
 
@@ -207,11 +203,10 @@ export class DocumentService {
     }
     doc.updatedAt = new Date();
 
-    this.em.persist(doc);
+    await this.em.save(doc);
     await syncDocWikilinks(this.em, ctx.orgId, doc, doc.contentJson);
     await writeDocVersion(this.em, { orgId: ctx.orgId, doc, authorId: ctx.userId });
     await upsertSearchDocument(this.em, ctx.orgId, doc.id, ctx.userId);
-    await this.em.flush();
     return serializeDoc(doc);
   }
 
@@ -222,15 +217,13 @@ export class DocumentService {
     if (hard) {
       await removeDocIndex(this.em, ctx.orgId, doc.id);
       this.em.remove(doc);
-      await this.em.flush();
       return { deleted: true };
     }
 
     doc.archived = true;
     doc.updatedAt = new Date();
-    this.em.persist(doc);
+    await this.em.save(doc);
     await archiveDocIndex(this.em, ctx.orgId, doc.id);
-    await this.em.flush();
     return serializeDoc(doc);
   }
 
@@ -242,14 +235,11 @@ export class DocumentService {
       throw new AppNotFoundError("Document not found.");
     }
 
-    const comments = await this.em.find(DocComment, {
+    const comments = await this.em.find(DocComment, { where: {
       org: ctx.orgId,
       doc: docId,
       resolved: resolved ?? false,
-    } as never, {
-      populate: ["org", "doc", "author", "parentComment"],
-      orderBy: { createdAt: "ASC", id: "ASC" },
-    });
+    } as never, relations: ["org", "doc", "author", "parentComment"], order: { createdAt: "ASC", id: "ASC" } });
 
     const roots = comments
       .filter((c) => c.parentComment === null)
@@ -292,10 +282,10 @@ export class DocumentService {
       }
     }
 
-    const author = await this.em.findOne(User, { orgId: ctx.orgId, id: ctx.userId });
+    const author = await this.em.findOne(User, { where: { org: { id: ctx.orgId }, id: ctx.userId  } as never });
     const comment = this.em.create(DocComment, {
       id: randomUUID(),
-      org: this.em.getReference(Org, ctx.orgId),
+      org: { id: ctx.orgId } as Org,
       doc,
       anchorRange: input.anchorRange ?? null,
       author,
@@ -305,8 +295,7 @@ export class DocumentService {
       createdAt: new Date(),
       updatedAt: new Date(),
     } as never);
-    this.em.persist(comment);
-    await this.em.flush();
+    await this.em.save(comment);
     return serializeComment(comment);
   }
 
@@ -318,8 +307,7 @@ export class DocumentService {
     }
     comment.bodyMd = bodyMd;
     comment.updatedAt = new Date();
-    this.em.persist(comment);
-    await this.em.flush();
+    await this.em.save(comment);
     return serializeComment(comment);
   }
 
@@ -328,7 +316,6 @@ export class DocumentService {
     if (!comment) return null;
     await assertCommentDeleteAllowed(this.em, ctx, comment);
     this.em.remove(comment);
-    await this.em.flush();
     return { deleted: true };
   }
 
@@ -340,8 +327,7 @@ export class DocumentService {
     }
     comment.resolved = resolved;
     comment.updatedAt = new Date();
-    this.em.persist(comment);
-    await this.em.flush();
+    await this.em.save(comment);
     return serializeComment(comment);
   }
 
@@ -355,13 +341,10 @@ export class DocumentService {
     createdAt: Date;
   }>> {
     await requireDoc(this.em, ctx.orgId, docId);
-    const versions = await this.em.find(DocVersion, {
+    const versions = await this.em.find(DocVersion, { where: {
       org: ctx.orgId,
       doc: docId,
-    } as never, {
-      populate: ["author"],
-      orderBy: { versionNum: "DESC" },
-    });
+    } as never, relations: ["author"], order: { versionNum: "DESC" } });
     return versions.map((v) => ({
       id: v.id,
       versionNum: v.versionNum,
@@ -373,13 +356,11 @@ export class DocumentService {
 
   async getVersion(ctx: DocContext, docId: string, versionNum: number): Promise<VersionOutput | null> {
     await requireDoc(this.em, ctx.orgId, docId);
-    const version = await this.em.findOne(DocVersion, {
+    const version = await this.em.findOne(DocVersion, { where: {
       org: ctx.orgId,
       doc: docId,
       versionNum,
-    } as never, {
-      populate: ["author", "restoreOf"],
-    });
+    } as never, relations: ["author", "restoreOf"] });
     return version ? serializeVersion(version) : null;
   }
 
@@ -397,7 +378,7 @@ export class DocumentService {
     doc.bodyMd = reconstructed.bodyMd;
     doc.contentJson = reconstructed.contentJson;
     doc.updatedAt = new Date();
-    this.em.persist(doc);
+    await this.em.save(doc);
     await syncDocWikilinks(this.em, ctx.orgId, doc, doc.contentJson);
     await writeDocVersion(this.em, {
       orgId: ctx.orgId,
@@ -406,7 +387,6 @@ export class DocumentService {
       restoreOf: reconstructed.version,
     });
     await upsertSearchDocument(this.em, ctx.orgId, doc.id, ctx.userId);
-    await this.em.flush();
     return serializeDoc(doc);
   }
 
@@ -418,14 +398,11 @@ export class DocumentService {
     slug: string;
     linkKind: "wikilink";
   }>> {
-    const links = await this.em.find(DocLink, {
+    const links = await this.em.find(DocLink, { where: {
       org: orgId,
       toDoc: docId,
       linkKind: "wikilink",
-    } as never, {
-      populate: ["fromDoc"],
-      orderBy: { createdAt: "ASC", id: "ASC" },
-    });
+    } as never, relations: ["fromDoc"], order: { createdAt: "ASC", id: "ASC" } });
 
     return links.map((link) => {
       const from = link.fromDoc;
@@ -444,14 +421,11 @@ export class DocumentService {
     toSlug: string;
     linkKind: "wikilink";
   }>> {
-    const links = await this.em.find(DocLink, {
+    const links = await this.em.find(DocLink, { where: {
       org: orgId,
       fromDoc: docId,
       linkKind: "wikilink",
-    } as never, {
-      populate: ["toDoc"],
-      orderBy: { createdAt: "ASC", id: "ASC" },
-    });
+    } as never, relations: ["toDoc"], order: { createdAt: "ASC", id: "ASC" } });
 
     return links.map((link) => ({
       toDocId: link.toDoc?.id ?? null,
@@ -463,7 +437,7 @@ export class DocumentService {
 
 // ── Pure helpers (moved from router) ─────────────────────────────
 
-function persistExplicitDocLinks(
+async function persistExplicitDocLinks(
   em: EntityManager,
   orgId: string,
   doc: Document,
@@ -474,14 +448,14 @@ function persistExplicitDocLinks(
     targetId?: string;
     linkKind?: LinkKind;
   }> | undefined,
-): void {
+): Promise<void> {
   for (const link of links ?? []) {
     const targetKind = link.targetKind ?? link.kind;
     const targetId = link.targetId ?? link.id;
     if (!targetKind || !targetId) continue;
     const linkKind = link.linkKind ?? linkKindForTarget(targetKind);
-    em.persist(em.create(DocLink, {
-      org: em.getReference(Org, orgId),
+    await em.save(em.create(DocLink, {
+      org: { id: orgId } as Org,
       fromDoc: doc,
       toDoc: null,
       toSlug: `${targetKind}:${targetId}`,
@@ -613,7 +587,7 @@ async function upsertSearchDocument(
   docId: string,
   authorId: string | null = null,
 ): Promise<void> {
-  const doc = await em.findOne(Document, { org: orgId, id: docId } as never, { populate: ["org"] });
+  const doc = await em.findOne(Document, { where: { org: orgId, id: docId } as never, relations: ["org"] });
   if (!doc) return;
   await indexDoc(em, doc, authorId);
 }
@@ -645,9 +619,7 @@ function anchorPosition(comment: DocComment): number {
 }
 
 async function findComment(em: EntityManager, orgId: string, id: string): Promise<DocComment | null> {
-  return em.findOne(DocComment, { org: orgId, id } as never, {
-    populate: ["org", "doc", "author", "parentComment"],
-  });
+  return em.findOne(DocComment, { where: { org: orgId, id } as never, relations: ["org", "doc", "author", "parentComment"] });
 }
 
 async function assertCommentDeleteAllowed(
@@ -656,7 +628,7 @@ async function assertCommentDeleteAllowed(
   comment: DocComment,
 ): Promise<void> {
   if (comment.author?.id === ctx.userId) return;
-  const user = await em.findOne(User, { orgId: ctx.orgId, id: ctx.userId });
+  const user = await em.findOne(User, { where: { org: { id: ctx.orgId }, id: ctx.userId  } as never });
   if (user?.role === "owner" || user?.role === "admin") return;
   throw new AppForbiddenError("Only the author or an org admin can delete this comment.");
 }

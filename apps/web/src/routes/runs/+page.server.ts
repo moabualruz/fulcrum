@@ -1,7 +1,7 @@
 import { redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { dispatchRun } from "@execution-orchestration/application/runs/commands.ts";
-import { loadRunsPageData } from "@execution-orchestration/application/runs/queries.ts";
+import { dispatchRun } from "@execution-orchestration/interface/run-actions.ts";
+import { loadRunsPageData } from "@execution-orchestration/interface/run-pages.ts";
 import {
   type RunRange,
 } from "$lib/components/runs/runs-filters";

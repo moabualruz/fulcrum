@@ -1,10 +1,10 @@
 import type { EntityManager } from "typeorm";
 
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
-import type { TaskDependencies } from "@platform-core/infrastructure/application-database/entities/tasks/schemas.ts";
-import { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
+import type { TaskDependencies } from "@work-management/infrastructure/database/entities/tasks/schemas.ts";
+import { TaskRepository } from "@work-management/infrastructure/database/repositories/tasks/TaskRepository.ts";
 import { AppConflictError, AppNotFoundError, AppValidationError } from "@platform-core/domain/errors.ts";
 import { CreateTaskInputSchema, UpdateTaskInputSchema } from "@work-management/application/work-item-schema.ts";
 import { findVisibleTask, serializeTask } from "@work-management/application/work-item-queries.ts";
@@ -16,8 +16,8 @@ export async function createTask(
   input: CreateTaskInput,
 ): Promise<TaskDto> {
   const parsed = parseOrThrow(CreateTaskInputSchema, input);
-  return await em.transactional(async (txEm) => {
-    const repo = txEm.getRepository(Task) as TaskRepository;
+  return await em.transaction(async (txEm: EntityManager) => {
+    const repo = txEm.getRepository(Task) as unknown as TaskRepository;
     const parent = parsed.parentId ? await findVisibleTask(txEm, ctx, parsed.parentId) : null;
     const projectId = parsed.projectId ?? ctx.projectId ?? null;
     assertProjectCompatible(projectId, parent);
@@ -37,14 +37,12 @@ export async function createTask(
     task.parent = parent;
     task.taskType = parsed.taskType ?? "task";
     task.customFields = withWorkGrouping(task.customFields, parsed);
-    txEm.persist(task);
-    await txEm.flush();
+    await txEm.save(task);
     emitTaskEvent(txEm, ctx, {
       verb: "created",
       taskId: task.id,
       payload: { title: task.title, status: task.status },
     });
-    await txEm.flush();
     return serializeTask(task);
   });
 }
@@ -56,7 +54,7 @@ export async function updateTask(
   input: UpdateTaskInput,
 ): Promise<TaskDto> {
   const parsed = parseOrThrow(UpdateTaskInputSchema.omit({ id: true }), input);
-  return await em.transactional(async (txEm) => {
+  return await em.transaction(async (txEm: EntityManager) => {
     const task = await findVisibleTask(txEm, ctx, taskId);
     const { expectedStatus, ...patch } = parsed;
     if (expectedStatus !== undefined && task.status !== expectedStatus) {
@@ -64,7 +62,7 @@ export async function updateTask(
     }
     const previousStatus = task.status;
     applyTaskPatch(task, patch);
-    txEm.persist(task);
+    await txEm.save(task);
     if (patch.status !== undefined && patch.status !== previousStatus) {
       emitTaskEvent(txEm, ctx, {
         verb: "status_changed",
@@ -72,7 +70,6 @@ export async function updateTask(
         payload: { from: previousStatus, to: patch.status, task: task.id },
       });
     }
-    await txEm.flush();
     return serializeTask(task);
   });
 }
@@ -82,12 +79,11 @@ export async function deleteTask(
   ctx: AppContext,
   taskId: string,
 ): Promise<TaskDto> {
-  return await em.transactional(async (txEm) => {
+  return await em.transaction(async (txEm: EntityManager) => {
     const task = await findVisibleTask(txEm, ctx, taskId);
     task.deletedAt = new Date();
     task.updatedAt = task.deletedAt;
-    txEm.persist(task);
-    await txEm.flush();
+    await txEm.save(task);
     return serializeTask(task);
   });
 }
@@ -101,18 +97,17 @@ export async function bulkUpdate(
   if (ids.length > 200) {
     throw new AppValidationError("Bulk operations are limited to 200 tasks at a time.");
   }
-  return await em.transactional(async (txEm) => {
+  return await em.transaction(async (txEm: EntityManager) => {
     const tasks = await findBulkTasksOrThrow(txEm, ctx, ids);
     for (const task of tasks) {
       applyBulkPatch(task, patch);
-      txEm.persist(task);
+      await txEm.save(task);
       emitTaskEvent(txEm, ctx, {
         verb: "bulk_updated",
         taskId: task.id,
         payload: { patch },
       });
     }
-    await txEm.flush();
     return { updated: ids.length };
   });
 }
@@ -125,20 +120,19 @@ export async function bulkDelete(
   if (ids.length > 200) {
     throw new AppValidationError("Bulk operations are limited to 200 tasks at a time.");
   }
-  return await em.transactional(async (txEm) => {
+  return await em.transaction(async (txEm: EntityManager) => {
     const tasks = await findBulkTasksOrThrow(txEm, ctx, ids);
     const deletedAt = new Date();
     for (const task of tasks) {
       task.deletedAt = deletedAt;
       task.updatedAt = deletedAt;
-      txEm.persist(task);
+      await txEm.save(task);
       emitTaskEvent(txEm, ctx, {
         verb: "bulk_deleted",
         taskId: task.id,
         payload: { deletedAt },
       });
     }
-    await txEm.flush();
     return { deleted: ids.length };
   });
 }
@@ -149,7 +143,7 @@ export async function setParent(
   taskId: string,
   parentId: string | null,
 ): Promise<TaskDto> {
-  return await em.transactional(async (txEm) => {
+  return await em.transaction(async (txEm: EntityManager) => {
     const task = await findVisibleTask(txEm, ctx, taskId);
     const parent = parentId ? await findVisibleTask(txEm, ctx, parentId) : null;
     await assertParentDoesNotCycle(txEm, ctx, task.id, parentId);
@@ -158,13 +152,12 @@ export async function setParent(
     const previousParentId = task.parent?.id ?? null;
     task.parent = parent;
     task.updatedAt = new Date();
-    txEm.persist(task);
+    await txEm.save(task);
     emitTaskEvent(txEm, ctx, {
       verb: "parent_changed",
       taskId: task.id,
       payload: { previousParentId, parentId },
     });
-    await txEm.flush();
     return serializeTask(task);
   });
 }
@@ -175,7 +168,7 @@ export async function setDependencies(
   taskId: string,
   dependencies: TaskDependencies,
 ): Promise<TaskDto> {
-  return await em.transactional(async (txEm) => {
+  return await em.transaction(async (txEm: EntityManager) => {
     const task = await findVisibleTask(txEm, ctx, taskId);
     const referencedIds = new Set([...dependencies.blocks, ...dependencies.blocked_by]);
     referencedIds.delete(task.id);
@@ -188,7 +181,6 @@ export async function setDependencies(
       ...(ctx.projectId ? { projectId: ctx.projectId } : {}),
       deletedAt: null,
     } as never);
-    await txEm.populate(tasks, ["dependencies"] as never);
     const knownIds = new Set(tasks.map((candidate) => candidate.id));
     if ([...referencedIds].some((id) => !knownIds.has(id))) {
       throw new AppNotFoundError("One or more tasks were not found.");
@@ -210,7 +202,7 @@ export async function setDependencies(
       ) {
         candidate.dependencies = nextDependencies;
         candidate.updatedAt = new Date();
-        txEm.persist(candidate);
+        await txEm.save(candidate);
       }
     }
 
@@ -219,7 +211,6 @@ export async function setDependencies(
       taskId: task.id,
       payload: { dependencies: task.dependencies },
     });
-    await txEm.flush();
     return serializeTask(task);
   });
 }
@@ -411,7 +402,7 @@ function dependenciesForTask(taskId: string, edges: Map<string, Set<string>>): T
   return { blocks, blocked_by: normalizedUnique(blockedBy) };
 }
 
-function emitTaskEvent(
+async function emitTaskEvent(
   em: EntityManager,
   ctx: AppContext,
   input: {
@@ -419,14 +410,14 @@ function emitTaskEvent(
     taskId: string;
     payload: Record<string, unknown>;
   },
-): void {
+): Promise<void> {
   const event = em.create(Event, {
-    org: em.getReference(Org, ctx.orgId),
+    org: { id: ctx.orgId } as Org,
     verb: input.verb,
     subjectKind: "task",
     subjectId: input.taskId,
     payload: input.payload,
     createdAt: new Date(),
   });
-  em.persist(event);
+  await em.save(event);
 }

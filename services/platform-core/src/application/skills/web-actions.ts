@@ -1,6 +1,6 @@
 import type { EntityManager } from "typeorm";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import {
   FulcrumSkill,
   SkillConflict,
@@ -47,8 +47,8 @@ export interface ResolveConflictInput {
 const INITIAL_VERSION = "0.0.0";
 
 export async function listWebSkills(scope: SkillsWebScope): Promise<SkillRow[]> {
-  const em = scope.em.fork();
-  const skills = await em.find(FulcrumSkill, { org: scope.ctx.orgId }, { orderBy: { slug: "ASC" } });
+  const em = scope.em;
+  const skills = await em.find(FulcrumSkill, { where: { org: { id: scope.ctx.orgId } } as never, order: { slug: "ASC" } });
   const rows: SkillRow[] = [];
   for (const skill of skills) {
     rows.push(await serializeWebSkill(em, scope.ctx.orgId, skill));
@@ -60,35 +60,33 @@ export async function installWebSkill(scope: SkillsWebScope, input: InstallSkill
   const slug = input.slug.trim();
   if (!slug) throw new Error("slug is required");
 
-  const em = scope.em.fork();
+  const em = scope.em;
   const skill = em.create(FulcrumSkill, {
-    org: em.getReference(Org, scope.ctx.orgId),
+    org: { id: scope.ctx.orgId } as Org,
     name: slug,
     slug,
     source: input.upstreamRepo ? SkillSource.Upstream : SkillSource.Local,
     upstreamRepo: input.upstreamRepo ?? undefined,
     enabledAgents: [],
   });
-  em.persist(skill);
-  em.persist(em.create(SkillVersion, {
+  await em.save(skill);
+  await em.save(em.create(SkillVersion, {
     skill,
     version: INITIAL_VERSION,
     hashVerified: null,
   }));
-  await em.flush();
   return serializeWebSkill(em, scope.ctx.orgId, skill);
 }
 
 export async function upgradeWebSkill(scope: SkillsWebScope, slug: string): Promise<SkillRow> {
-  const em = scope.em.fork();
+  const em = scope.em;
   const skill = await findSkill(em, scope.ctx.orgId, slug);
   const latest = await latestVersion(em, skill);
   const next = bumpPatch(latest?.version ?? INITIAL_VERSION);
   const version = latest?.version === next
     ? latest
     : em.create(SkillVersion, { skill, version: next, hashVerified: latest?.hashVerified ?? null });
-  em.persist(version);
-  await em.flush();
+  await em.save(version);
   return serializeWebSkill(em, scope.ctx.orgId, skill);
 }
 
@@ -102,10 +100,9 @@ export async function upgradeAllWebSkills(scope: SkillsWebScope): Promise<SkillR
 }
 
 export async function uninstallWebSkill(scope: SkillsWebScope, slug: string): Promise<void> {
-  const em = scope.em.fork();
+  const em = scope.em;
   const skill = await findSkill(em, scope.ctx.orgId, slug);
   em.remove(skill);
-  await em.flush();
 }
 
 export async function updateWebSkillEnabledAgents(
@@ -113,10 +110,9 @@ export async function updateWebSkillEnabledAgents(
   slug: string,
   enabledAgents: string[],
 ): Promise<SkillRow> {
-  const em = scope.em.fork();
+  const em = scope.em;
   const skill = await findSkill(em, scope.ctx.orgId, slug);
   skill.enabledAgents = enabledAgents;
-  await em.flush();
   return serializeWebSkill(em, scope.ctx.orgId, skill);
 }
 
@@ -124,12 +120,12 @@ export async function resolveWebSkillConflict(
   scope: SkillsWebScope,
   input: ResolveConflictInput,
 ): Promise<SkillRow> {
-  const em = scope.em.fork();
+  const em = scope.em;
   const skill = await findSkill(em, scope.ctx.orgId, input.slug);
-  const conflict = await em.findOne(SkillConflict, {
+  const conflict = await em.findOne(SkillConflict, { where: {
     slug: input.slug,
     status: SkillConflictStatus.Open,
-  } as never, { orderBy: { createdAt: "DESC" } });
+  } as never, order: { createdAt: "DESC" } });
   if (!conflict) throw new Error(`skill '${input.slug}' has no conflict`);
 
   conflict.status = SkillConflictStatus.Resolved;
@@ -138,26 +134,25 @@ export async function resolveWebSkillConflict(
     const latest = await latestVersion(em, skill);
     if (latest) latest.hashVerified = conflict.upstreamHash ?? conflict.actualSha256 ?? latest.hashVerified;
   }
-  await em.flush();
   return serializeWebSkill(em, scope.ctx.orgId, skill);
 }
 
 async function findSkill(em: EntityManager, orgId: string, slug: string): Promise<FulcrumSkill> {
-  const skill = await em.findOne(FulcrumSkill, { org: orgId, slug });
+  const skill = await em.findOne(FulcrumSkill, { where: { org: { id: orgId }, slug } as never });
   if (!skill) throw new Error(`skill '${slug}' not found`);
   return skill;
 }
 
 async function latestVersion(em: EntityManager, skill: FulcrumSkill): Promise<SkillVersion | null> {
-  const versions = await em.find(SkillVersion, { skill } as never);
+  const versions = await em.find(SkillVersion, { where: { skill: { id: skill.id } } as never });
   return versions.sort((a, b) => compareVersion(b.version, a.version))[0] ?? null;
 }
 
 async function openConflict(em: EntityManager, slug: string): Promise<UpstreamConflict | null> {
-  const conflict = await em.findOne(SkillConflict, {
+  const conflict = await em.findOne(SkillConflict, { where: {
     slug,
     status: SkillConflictStatus.Open,
-  } as never, { orderBy: { createdAt: "DESC" } });
+  } as never, order: { createdAt: "DESC" } });
   if (!conflict) return null;
   return {
     local_content: conflict.localHash ?? conflict.actualSha256 ?? "",

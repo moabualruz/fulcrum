@@ -4,8 +4,8 @@ import type {
   MemoryImportance,
   MemoryKind,
   MemorySource,
-} from "@platform-core/infrastructure/application-database/entities/memory/enums.ts";
-import { MemoryRepository } from "@platform-core/infrastructure/application-database/repositories/memory/MemoryRepository.ts";
+} from "@knowledge-workspace/infrastructure/database/entities/memory/enums.ts";
+import { MemoryRepository } from "@knowledge-workspace/infrastructure/database/repositories/memory/MemoryRepository.ts";
 
 export interface HeuristicMemory {
   kind: MemoryKind;

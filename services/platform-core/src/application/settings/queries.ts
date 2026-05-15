@@ -1,10 +1,10 @@
 import type { EntityManager } from "typeorm";
-import { FeatureFlag } from "@platform-core/infrastructure/application-database/entities/auth/FeatureFlag.ts";
+import { FeatureFlag } from "@identity-access/infrastructure/database/entities/auth/FeatureFlag.ts";
 import { FeatureFlagRollout } from "@platform-core/infrastructure/application-database/entities/platform/FeatureFlagRollout.ts";
 import { Credential } from "@platform-core/infrastructure/application-database/entities/platform/Credential.ts";
 import { ErrorLog } from "@platform-core/infrastructure/application-database/entities/platform/ErrorLog.ts";
 import { TelemetryEvent } from "@platform-core/infrastructure/application-database/entities/platform/TelemetryEvent.ts";
-import { ConnectorCredential } from "@platform-core/infrastructure/application-database/entities/settings/ConnectorCredential.ts";
+import { ConnectorCredential } from "@integration-hub/infrastructure/database/entities/settings/ConnectorCredential.ts";
 import { createExportManifest, type ImportManifest } from "@integration-hub/application/import-export/commands.ts";
 import { TELEMETRY_OPT_IN_KEY } from "@platform-core/application/telemetry/commands.ts";
 import { TenantSetting } from "@platform-core/infrastructure/application-database/entities/TenantSetting.ts";
@@ -74,17 +74,17 @@ function backupHistory(value: unknown): BackupSummaryDto[] {
 }
 
 async function tenantSetting(em: EntityManager, orgId: string, key: string): Promise<TenantSetting | null> {
-  return em.findOne(TenantSetting, { orgId, key });
+  return em.findOne(TenantSetting, { where: { orgId, key } as never });
 }
 
 export async function getTenantSetting(em: EntityManager, ctx: AppContext, key: string): Promise<TenantSettingDto> {
-  const row = await em.findOne(FeatureFlag, { orgId: ctx.orgId, flag: key, userId: null });
+  const row = await em.findOne(FeatureFlag, { where: { org: { id: ctx.orgId }, flag: key, userId: null  } as never });
   if (!row) throw new AppNotFoundError(`Tenant setting not found: ${key}`);
   return serializeTenantSetting(row);
 }
 
 export async function listCredentials(em: EntityManager, ctx: AppContext, input: { provider?: string } = {}): Promise<CredentialDto[]> {
-  return (await em.find(ConnectorCredential, { org: ctx.orgId, ...(input.provider ? { provider: input.provider } : {}) } as never, { orderBy: { provider: "ASC", id: "ASC" } })).map(serializeCredential);
+  return (await em.find(ConnectorCredential, { where: { org: ctx.orgId, ...(input.provider ? { provider: input.provider } : {}) } as never, order: { provider: "ASC", id: "ASC" } })).map(serializeCredential);
 }
 
 export async function getCredential(em: EntityManager, ctx: AppContext, id: string): Promise<CredentialDto> {
@@ -146,10 +146,11 @@ export async function listSettingsErrors(
   const page = Math.max(1, input.page);
   const pageSize = Math.max(1, input.pageSize);
   const where = { org: ctx.orgId } as never;
-  const [rows, total] = await em.findAndCount(ErrorLog, where, {
-    orderBy: { occurredAt: "DESC" },
-    limit: pageSize,
-    offset: (page - 1) * pageSize,
+  const [rows, total] = await em.findAndCount(ErrorLog, {
+    where,
+    order: { occurredAt: "DESC" },
+    take: pageSize,
+    skip: (page - 1) * pageSize,
   });
   return {
     errors: rows.map((row) => ({
@@ -168,8 +169,8 @@ export async function listSettingsErrors(
 }
 
 export async function listSettingsFeatureFlags(em: EntityManager, ctx: AppContext): Promise<{ flags: SettingsFeatureFlagDto[] }> {
-  const rows = await em.find(FeatureFlag, { orgId: ctx.orgId, userId: null } as never, { orderBy: { flag: "ASC" } });
-  const rollouts = await em.find(FeatureFlagRollout, { org: ctx.orgId } as never, { populate: ["flag"] as never });
+  const rows = await em.find(FeatureFlag, { where: { orgId: ctx.orgId, userId: null } as never, order: { flag: "ASC" } });
+  const rollouts = await em.find(FeatureFlagRollout, { where: { org: ctx.orgId } as never, relations: ["flag"] });
   const byFlagId = new Map(rollouts.map((rollout) => [(rollout.flag as unknown as { id: string }).id, rollout]));
   return {
     flags: rows.map((row) => {
@@ -188,7 +189,7 @@ export async function listSettingsFeatureFlags(em: EntityManager, ctx: AppContex
 }
 
 export async function listSettingsSecrets(em: EntityManager, ctx: AppContext): Promise<{ credentials: SettingsSecretDto[] }> {
-  const rows = await em.find(Credential, { org: ctx.orgId } as never, { orderBy: { createdAt: "DESC" } });
+  const rows = await em.find(Credential, { where: { org: ctx.orgId } as never, order: { createdAt: "DESC" } });
   return {
     credentials: rows.map((row) => ({
       id: row.id,

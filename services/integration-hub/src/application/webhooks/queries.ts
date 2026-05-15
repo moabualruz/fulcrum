@@ -1,7 +1,7 @@
 import type { EntityManager } from "typeorm";
 
-import { Webhook } from "@platform-core/infrastructure/application-database/entities/notifications/Webhook.ts";
-import { WebhookDelivery } from "@platform-core/infrastructure/application-database/entities/notifications/WebhookDelivery.ts";
+import { Webhook } from "@notification-center/infrastructure/database/entities/notifications/Webhook.ts";
+import { WebhookDelivery } from "@notification-center/infrastructure/database/entities/notifications/WebhookDelivery.ts";
 import { AppNotFoundError } from "@platform-core/domain/errors.ts";
 import type {
   DeliveryDto,
@@ -13,12 +13,12 @@ import type {
 } from "@integration-hub/domain/webhook.ts";
 
 export async function listWebhooks(em: EntityManager, ctx: WebhookAppContext): Promise<WebhookDto[]> {
-  const rows = await em.find(Webhook, { org: { id: ctx.orgId } }, { orderBy: { createdAt: "DESC" } });
+  const rows = await em.find(Webhook, { where: { org: { id: ctx.orgId } }, order: { createdAt: "DESC" } });
   return rows.map(projectWebhook);
 }
 
 export async function getWebhook(em: EntityManager, ctx: WebhookAppContext, id: string): Promise<WebhookDto> {
-  const row = await em.findOne(Webhook, { id, org: { id: ctx.orgId } });
+  const row = await em.findOne(Webhook, { where: { id, org: { id: ctx.orgId } } as never });
   if (!row) throw new AppNotFoundError("Webhook not found.");
   return projectWebhook(row);
 }
@@ -28,11 +28,11 @@ export async function listWebhookDeliveries(
   ctx: WebhookAppContext,
   input: ListWebhookDeliveriesInput,
 ): Promise<DeliveryDto[]> {
-  const rows = await em.find(
-    WebhookDelivery,
-    { webhook: { id: input.webhookId }, org: { id: ctx.orgId } },
-    { limit: input.limit ?? 50, orderBy: { createdAt: "DESC" } },
-  );
+  const rows = await em.find(WebhookDelivery, {
+    where: { webhook: { id: input.webhookId }, org: { id: ctx.orgId } } as never,
+    take: input.limit ?? 50,
+    order: { createdAt: "DESC" },
+  });
   return rows.map(projectDelivery);
 }
 
@@ -41,7 +41,7 @@ export async function getWebhookDelivery(
   ctx: WebhookAppContext,
   id: string,
 ): Promise<DeliveryDto> {
-  const row = await em.findOne(WebhookDelivery, { id, org: { id: ctx.orgId } });
+  const row = await em.findOne(WebhookDelivery, { where: { id, org: { id: ctx.orgId } } as never });
   if (!row) throw new AppNotFoundError("Webhook delivery not found.");
   return projectDelivery(row);
 }

@@ -1,50 +1,39 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
-
-function baseUrl(url: URL): string {
-  return `${url.protocol}//${url.host}`;
-}
+import {
+  createNotificationApiCaller,
+  NotificationApiError,
+} from "@notification-center/interface/http/notification-api-client.ts";
+import { cookieHeaders, publicApiBaseUrl } from "$lib/server/public-api";
 
 function unwrapCount(body: unknown): number {
   return Math.max(0, Number((body as { count?: unknown })?.count ?? 0));
 }
 
-function extractMessage(body: unknown): string {
-  const error = (body as { error?: { message?: string } })?.error;
-  return error?.message ?? (body as { message?: string })?.message ?? "Bell count request failed.";
-}
-
-function publicApiBaseUrl(env: Record<string, string | undefined> = process.env): string | null {
-  const raw = env["FULCRUM_SERVER_URL"] ?? env["FULCRUM_PUBLIC_API_URL"];
-  return raw ? raw.replace(/\/+$/, "") : null;
-}
-
-function publicUnreadCountUrl(base: string, locals: App.Locals): string | null {
+function notificationScope(locals: App.Locals): { orgId: string; userId: string } | null {
   if (!locals.orgId || !locals.userId) return null;
-  const url = new URL("/api/v1/notifications/unread-count", base);
-  url.searchParams.set("orgId", locals.orgId);
-  url.searchParams.set("userId", locals.userId);
-  return url.toString();
+  return { orgId: locals.orgId, userId: locals.userId };
 }
 
 export const GET: RequestHandler = async ({ fetch, locals, request, url }) => {
-  const publicBase = publicApiBaseUrl();
-  const publicUrl = publicUnreadCountUrl(publicBase ?? baseUrl(url), locals);
-  if (!publicUrl) {
+  const scope = notificationScope(locals);
+  if (!scope) {
     return json({ error: "Notification scope is required." }, { status: 401 });
   }
-  const response = await fetch(publicUrl, {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      "content-type": "application/json",
-      cookie: request.headers.get("cookie") ?? "",
-    },
-  });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) {
-    return json({ error: extractMessage(body) }, { status: response.status });
+
+  try {
+    const api = createNotificationApiCaller({
+      baseUrl: publicApiBaseUrl(url),
+      orgId: scope.orgId,
+      userId: scope.userId,
+      fetch,
+      headers: cookieHeaders(request),
+    });
+    const body = await api.notify.unreadCount();
+    return json({ count: unwrapCount(body) });
+  } catch (error) {
+    const status = error instanceof NotificationApiError ? error.status : 502;
+    const message = error instanceof Error ? error.message : "Bell count request failed.";
+    return json({ error: message }, { status });
   }
-  const count = unwrapCount(body);
-  return json({ count });
 };

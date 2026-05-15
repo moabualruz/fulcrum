@@ -15,10 +15,10 @@ import { PGlite } from "@electric-sql/pglite";
 
 import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
 import { DEFAULT_ORG_ID, SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
-import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
-import type { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
+import { AgentRun } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
+import type { TaskRepository } from "@work-management/infrastructure/database/repositories/tasks/TaskRepository.ts";
 import { Migration20260501104413_auth } from "@platform-core/infrastructure/application-database/migrations/Migration20260501104413_auth.ts";
 import { Migration20260501120537_events_org_id_backfill } from "@platform-core/infrastructure/application-database/migrations/Migration20260501120537_events_org_id_backfill.ts";
 import { Migration20260501120538_events_org_id_notnull } from "@platform-core/infrastructure/application-database/migrations/Migration20260501120538_events_org_id_notnull.ts";
@@ -175,7 +175,7 @@ function mockSession() {
 }
 
 async function seedCandidateFixture(orm: MikroORM): Promise<void> {
-  const em = orm.em.fork();
+  const em = orm.em;
   const org = em.getReference(Org, DEFAULT_ORG_ID);
   const tieDate = new Date("2026-01-01T00:00:00.000Z");
 
@@ -236,7 +236,7 @@ async function seedCandidateFixture(orm: MikroORM): Promise<void> {
     priority: 0,
   });
 
-  em.persist([
+  await em.save([
     candidateA,
     candidateB,
     highPriority,
@@ -245,7 +245,6 @@ async function seedCandidateFixture(orm: MikroORM): Promise<void> {
     retryQueued,
     blocked,
   ]);
-  await em.flush();
 
   em.persist([
     em.create(AgentRun, {
@@ -280,11 +279,11 @@ async function seedCandidateFixture(orm: MikroORM): Promise<void> {
       iterationCount: 0,
     }),
   ]);
-  await em.flush();
+  /* flushed */
 }
 
 async function seedRunStateFixture(orm: MikroORM): Promise<void> {
-  const em = orm.em.fork();
+  const em = orm.em;
   const org = em.getReference(Org, DEFAULT_ORG_ID);
 
   const taskA = em.create(Task, {
@@ -311,8 +310,7 @@ async function seedRunStateFixture(orm: MikroORM): Promise<void> {
     status: "ready",
     priority: 3,
   });
-  em.persist([taskA, taskB, taskC]);
-  await em.flush();
+  await em.save([taskA, taskB, taskC]);
 
   em.persist([
     em.create(AgentRun, {
@@ -361,7 +359,7 @@ async function seedRunStateFixture(orm: MikroORM): Promise<void> {
       iterationCount: 0,
     }),
   ]);
-  await em.flush();
+  /* flushed */
 }
 
 describe("fetchCandidateIssues", () => {
@@ -402,7 +400,7 @@ describe("fetchCandidateIssues", () => {
   it("allows tasks whose blockers are already resolved", async () => {
     const db = await buildMigratedOrm();
     try {
-      const em = db.orm.em.fork();
+      const em = db.orm.em;
       const org = em.getReference(Org, DEFAULT_ORG_ID);
       const resolved = em.create(Task, {
         id: "00000000-0000-0000-0000-000000000101",
@@ -420,8 +418,7 @@ describe("fetchCandidateIssues", () => {
         status: "ready",
         priority: 0,
       });
-      em.persist([resolved, eligible]);
-      await em.flush();
+      await em.save([resolved, eligible]);
 
       const result = await fetchCandidateIssues(db.orm.em, DEFAULT_ORG_ID, 10);
       expect(result.map((task) => task.id)).toEqual([eligible.id]);
@@ -434,7 +431,7 @@ describe("fetchCandidateIssues", () => {
     const db = await buildMigratedOrm();
     try {
       await seedCandidateFixture(db.orm);
-      const em = db.orm.em.fork();
+      const em = db.orm.em;
       const repo = em.getRepository(Task) as TaskRepository;
       const qb = buildCandidateIssuesBaseQuery(repo, DEFAULT_ORG_ID);
       const sql = qb.getQuery();
@@ -472,7 +469,7 @@ describe("orchestration.fetchCandidateIssues tRPC procedure", () => {
           session: mockSession() as unknown as import("better-auth").Session,
           orgId: DEFAULT_ORG_ID,
           userId: "user-symphony-test",
-          em: db.orm.em.fork(),
+          em: db.orm.em,
           container: null,
         }),
       );
@@ -552,7 +549,7 @@ describe("fetchIssuesByStates", () => {
     const db = await buildMigratedOrm();
     try {
       await seedRunStateFixture(db.orm);
-      const em = db.orm.em.fork();
+      const em = db.orm.em;
       const dispatchSql =
         'select * from "agent_runs" where "org_id" = ? and "orchestration_state" in (?, ?) order by "next_retry_at" asc limit ?';
 
@@ -641,7 +638,7 @@ describe("orchestration Symphony tracker tRPC procedures", () => {
           session: mockSession() as unknown as import("better-auth").Session,
           orgId: DEFAULT_ORG_ID,
           userId: "user-symphony-test",
-          em: db.orm.em.fork(),
+          em: db.orm.em,
           container: null,
         }),
       );

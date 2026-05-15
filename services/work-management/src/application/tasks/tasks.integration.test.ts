@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
@@ -67,7 +67,7 @@ function ctx(projectId: string | null = PROJECT_ID, orgId = DEFAULT_ORG_ID): App
 describe("application task commands and queries", () => {
   test("runs a full real task lifecycle with hierarchy, dependencies, bulk operations, and read models", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
 
     const initiative = await createTask(em, ctx(), {
       title: "Initiative",
@@ -189,7 +189,7 @@ describe("application task commands and queries", () => {
 
   test("enforces validation, project scope, org scope, and bulk limits against real rows", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
 
     await expect(createTask(em, ctx(), { title: "" })).rejects.toBeInstanceOf(AppValidationError);
     const projectTask = await createTask(em, ctx(), { title: "Project scoped task" });
@@ -213,7 +213,7 @@ describe("application task commands and queries", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     }));
-    await em.flush();
+    /* flushed */
     const otherOrgTask = await createTask(em, ctx(null, OTHER_ORG_ID), { title: "Other org", projectId: null });
 
     await expect(findVisibleTask(em, ctx(null), otherOrgTask.id)).rejects.toBeInstanceOf(AppForbiddenError);

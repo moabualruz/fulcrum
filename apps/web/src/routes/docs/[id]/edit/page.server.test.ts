@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { __setApplicationScopeForTest } from "../../../../lib/server/application-scope.ts";
-import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
+import { Document } from "@knowledge-workspace/infrastructure/database/entities/docs/Document.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { createDoc } from "@knowledge-workspace/application/docs/commands.ts";
 
@@ -32,7 +32,7 @@ async function seedDoc(
   } = {},
 ): Promise<{ id: string; db: TestOrm }> {
   const db = await createTestOrm();
-  const created = await createDoc(db.em.fork(), {
+  const created = await createDoc(db.em, {
     orgId: db.seed.orgId,
     userId: db.seed.userId,
   }, {
@@ -47,7 +47,7 @@ async function seedDoc(
     },
   });
   const restoreScope = __setApplicationScopeForTest({
-    em: db.em.fork(),
+    em: db.em,
     orgId: db.seed.orgId,
     userId: db.seed.userId,
   });
@@ -59,7 +59,7 @@ async function seedDoc(
 }
 
 async function getDoc(db: TestOrm, id: string): Promise<Document | null> {
-  return db.em.fork().findOne(Document, { id } as never);
+  return db.em.findOne(Document, { id } as never);
 }
 
 describe("/docs/[id]/edit +page.server.ts", () => {

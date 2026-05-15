@@ -22,7 +22,7 @@ async function freshDb(): Promise<TestOrm> {
 describe("freeform docs planning prompt application action", () => {
   test("loads persisted freeform docs into ACP planning context with document workspace breadcrumbs", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const ctx = { orgId: DEFAULT_ORG_ID, userId: USER_ID, projectId: null };
     const root = await createDoc(em, ctx, {
       title: "Project Brief",

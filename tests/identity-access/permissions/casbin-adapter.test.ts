@@ -70,11 +70,11 @@ afterEach(() => {
 
 beforeEach(async () => {
   // Wipe casbin_rule table between tests
-  const em = orm.em.fork();
+  const em = orm.em;
   await em.nativeDelete(CasbinRule, {});
 
   // Fresh repo + adapter per test
-  repo = orm.em.fork().getRepository(CasbinRule) as CasbinRuleRepository;
+  repo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
   adapter = new FulcrumCasbinAdapter(repo);
 });
 
@@ -195,7 +195,7 @@ describe("FulcrumCasbinAdapter — savePolicy", () => {
     await adapter.savePolicy(model);
 
     // Fresh adapter from same repo — load should see the saved rules
-    const freshRepo = orm.em.fork().getRepository(CasbinRule) as CasbinRuleRepository;
+    const freshRepo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
     const freshAdapter = new FulcrumCasbinAdapter(freshRepo);
     const model2 = newModel(RBAC_MODEL_TEXT);
     await freshAdapter.loadPolicy(model2);

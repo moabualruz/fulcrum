@@ -50,19 +50,19 @@ async function projectIdForTask(db: DbHandle, taskId: string | null): Promise<st
       [taskId],);
     return rows[0]?.project_id ?? null;
   }
-  const rows = await assertEm(db).getConnection().execute(
+  const rows = await assertEm(db).query(
     `SELECT project_id FROM tasks WHERE id = ?`,
     [taskId],) as Array<{ project_id: string | null }>;
   return rows[0]?.project_id ?? null;
 }
 
 function assertEm(db: DbHandle) {
-  if ("persist" in db && typeof (db as { persist: unknown }).persist === "function") {
+  if ("query" in db && "save" in db && typeof (db as { save: unknown }).save === "function") {
     return db as EntityManager;
   }
   if ("em" in db) {
     const em = (db as { em?: unknown }).em;
-    if (em && typeof (em as { persist?: unknown }).persist === "function") {
+    if (em && typeof (em as { save?: unknown }).save === "function") {
       return em as EntityManager;
     }
   }
@@ -82,7 +82,7 @@ async function tableColumns(db: DbHandle, tableName: string): Promise<Set<string
       [tableName],);
     return new Set(rows.map((row) => row.column_name));
   }
-  const rows = await assertEm(db).getConnection().execute(
+  const rows = await assertEm(db).query(
     `SELECT column_name
        FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = ?`,
@@ -92,7 +92,7 @@ async function tableColumns(db: DbHandle, tableName: string): Promise<Set<string
 
 async function newAgentRunId(db: DbHandle): Promise<string> {
   if (isSqlExecutor(db)) return newUlid();
-  const rows = await assertEm(db).getConnection().execute(
+  const rows = await assertEm(db).query(
     `SELECT data_type
        FROM information_schema.columns
       WHERE table_schema = 'public'
@@ -175,7 +175,7 @@ async function appendServiceEvent(
     return;
   }
   const id = randomUUID();
-  await assertEm(db).getConnection().execute(
+  await assertEm(db).query(
     `INSERT INTO events (id, org_id, project_id, actor, subject_kind, subject_id, verb, payload, created_at)
      VALUES (?, ?, ?, 'system', ?, ?, ?, ?::jsonb, now())`,
     [id, input.orgId, input.projectId ?? null, input.subjectKind, input.subjectId, input.verb, JSON.stringify(input.payload ?? {})],);
@@ -206,17 +206,16 @@ export async function dispatchRunAction(
     return { id, task_id: input.taskId, agent: input.agent, status: "queued" };
   }
   const em = assertEm(db);
-  const conn = em.getConnection();
   const id = await newAgentRunId(db);
-  const insert = runInsert(columns, input, id, null, false);
-  await conn.execute(insert.sql, insert.params as never);
+  const insert = runInsert(columns, input, id, null, true);
+  await em.query(insert.sql, insert.params as never);
 
   // Inline job enqueue via EntityManager connection.
   const jobId = randomUUID();
-  await conn.execute(
+  await em.query(
     `INSERT INTO jobs
        (id, org_id, project_id, queue, kind, payload, status, max_attempts, available_at)
-     VALUES (?, ?, ?, ?, ?, ?::jsonb, 'queued', ?, ?)`,
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, 'queued', $7, $8)`,
     [
       jobId,
       input.orgId,
@@ -269,11 +268,10 @@ export async function cancelRunAction(
     return { ok: true };
   }
   const em = assertEm(db);
-  const conn = em.getConnection();
-  const rows = await conn.execute(
+  const rows = await em.query(
     `UPDATE agent_runs
         SET status = 'cancelled'${endedAssignment}
-      WHERE id = ? AND org_id = ? AND status IN ('queued', 'running')
+      WHERE id = $1 AND org_id = $2 AND status IN ('queued', 'running')
       RETURNING org_id, ${taskExpr} AS task_id, ${projectExpr} AS project_id`,
     [id, orgId],) as Array<RunScopeRow>;
   const row = rows[0];
@@ -342,9 +340,8 @@ export async function retryRunAction(
     return { id: newId };
   }
   const em = assertEm(db);
-  const conn = em.getConnection();
-  const sourceRows = await conn.execute(
-    runSourceSelect(columns, false),
+  const sourceRows = await em.query(
+    runSourceSelect(columns, true),
     [id, orgId],) as Array<RunSourceRow>;
   const source = sourceRows[0];
   if (!source) throw new Error(`retryRunAction: run not found: ${id}`);
@@ -357,15 +354,15 @@ export async function retryRunAction(
     agent: source.agent ?? "",
     model: source.model,
     prompt: source.prompt,
-  }, newId, id, false);
-  await conn.execute(insert.sql, insert.params as never);
+  }, newId, id, true);
+  await em.query(insert.sql, insert.params as never);
 
   // Inline job enqueue via EntityManager connection
   const jobId = randomUUID();
-  await conn.execute(
+  await em.query(
     `INSERT INTO jobs
        (id, org_id, project_id, queue, kind, payload, status, max_attempts, available_at)
-     VALUES (?, ?, ?, ?, ?, ?::jsonb, 'queued', ?, ?)`,
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, 'queued', $7, $8)`,
     [
       jobId,
       source.org_id,

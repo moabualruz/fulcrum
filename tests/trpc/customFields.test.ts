@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
 import { Container } from "@needle-di/core";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { CustomFieldDef } from "@platform-core/infrastructure/application-database/entities/tasks/CustomFieldDef.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
-import { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { CustomFieldDef } from "@work-management/infrastructure/database/entities/tasks/CustomFieldDef.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
+import { TaskRepository } from "@work-management/infrastructure/database/repositories/tasks/TaskRepository.ts";
 import { createTestOrm } from "@test-support/application-database.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
@@ -32,7 +32,7 @@ function mockSession(userId: string, orgId: string) {
 }
 
 function callerFor(repo: TaskRepository, orgId = ORG_ID) {
-  const container = new Container();
+  const container = null;
   container.bind({ provide: TaskRepository, useValue: repo });
 
   return createCaller(
@@ -69,8 +69,7 @@ async function createField(
     archived: false,
     position: input.position ?? 0,
   });
-  em.persist(field);
-  await em.flush();
+  await em.save(field);
   return field;
 }
 
@@ -78,7 +77,7 @@ describe("custom field tRPC procedures", () => {
   test("customFieldDefs.list returns task custom field definitions ordered by position", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as TaskRepository;
       const caller = callerFor(repo);
 
       await createField(repo, {
@@ -111,7 +110,7 @@ describe("custom field tRPC procedures", () => {
   test("taskCustomFields.set stores validated text, number, date, and select values", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as TaskRepository;
       const caller = callerFor(repo);
       const task = await caller.tasks.create({ title: "Custom field task" });
       const customer = await createField(repo, { slug: "customer", name: "Customer", type: "text" });
@@ -154,7 +153,7 @@ describe("custom field tRPC procedures", () => {
   test("taskCustomFields.set rejects invalid type, number constraints, and select options", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as TaskRepository;
       const caller = callerFor(repo);
       const task = await caller.tasks.create({ title: "Validation task" });
       const requiredText = await createField(repo, {
@@ -193,7 +192,7 @@ describe("custom field tRPC procedures", () => {
   test("taskCustomFields.clear removes optional values and rejects required field clearing", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.fork().getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as TaskRepository;
       const caller = callerFor(repo);
       const task = await caller.tasks.create({ title: "Clear task" });
       const optionalField = await createField(repo, { slug: "tag", name: "Tag", type: "text" });

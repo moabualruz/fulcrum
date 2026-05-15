@@ -41,7 +41,7 @@ describe("context.preview tRPC", () => {
   test("returns deterministic source refs with explicit global inclusion", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const conn = em.getConnection();
       await conn.execute(
         `INSERT INTO projects (id, org_id, name) VALUES (?, ?, ?)`,

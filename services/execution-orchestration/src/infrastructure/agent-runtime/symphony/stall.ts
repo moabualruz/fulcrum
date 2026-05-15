@@ -1,6 +1,7 @@
 import type { EntityManager } from "typeorm";
+import { LessThan } from "typeorm";
 
-import type { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
+import type { AgentRun } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
 import type { WorkflowConfig } from "./schemas.ts";
 import {
   scheduleRetry,
@@ -49,19 +50,15 @@ export async function scanForStalledRuns(
   opts: StallScanOptions = {},
 ): Promise<number> {
   const { AgentRun } = await import(
-    "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts"
+    "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts"
   );
   const now = opts.now?.() ?? new Date();
   const cutoff = new Date(now.getTime() - config.stallTimeoutMs);
-  const fork = em.fork();
-
   // DB-level filter on startedAt (preserves index usage + existing test contract).
   // This is the broad net: all runs whose startedAt predates the cutoff.
-  const runs = await fork.find(AgentRun, {
-    org: orgId,
-    orchestrationState: "running",
-    startedAt: { $lt: cutoff },
-  } as never);
+  const runs = await em.find(AgentRun, {
+    where: { org: { id: orgId }, orchestrationState: "running", startedAt: LessThan(cutoff) } as never,
+  });
 
   // In-process refinement for lastCodexTimestamp (SYM-19):
   // If lastCodexTimestamp is set and is more recent than the cutoff,

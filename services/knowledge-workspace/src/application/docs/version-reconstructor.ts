@@ -2,7 +2,7 @@ import type { EntityManager } from "typeorm";
 import { Node, Schema } from "@tiptap/pm/model";
 import { Transform, Step } from "@tiptap/pm/transform";
 
-import { DocVersion } from "@platform-core/infrastructure/application-database/entities/docs/DocVersion.ts";
+import { DocVersion } from "@knowledge-workspace/infrastructure/database/entities/docs/DocVersion.ts";
 import { AppInvariantError, AppNotFoundError } from "@platform-core/domain/errors.ts";
 
 export interface ReconstructDocVersionInput {
@@ -81,26 +81,22 @@ export async function reconstructDocVersion(
     throw new AppNotFoundError("Document version not found.");
   }
 
-  const snapshot = await em.findOne(DocVersion, {
+  const snapshot = await em.findOne(DocVersion, { where: {
     org: input.orgId,
     doc: input.docId,
     versionNum: { $lte: input.versionNum },
     snapshot: { $ne: null },
-  } as never, {
-    orderBy: { versionNum: "DESC" },
-  });
+  } as never, order: { versionNum: "DESC" } });
   if (!snapshot?.snapshot) {
     throw new AppInvariantError("No snapshot found for document version.");
   }
 
   let contentJson = jsonClone(snapshot.snapshot);
-  const deltas = await em.find(DocVersion, {
+  const deltas = await em.find(DocVersion, { where: {
     org: input.orgId,
     doc: input.docId,
     versionNum: { $gt: snapshot.versionNum, $lte: input.versionNum },
-  } as never, {
-    orderBy: { versionNum: "ASC" },
-  });
+  } as never, order: { versionNum: "ASC" } });
   for (const version of deltas) {
     contentJson = version.snapshot ? jsonClone(version.snapshot) : applyDelta(contentJson, version.delta, pmSchema);
   }

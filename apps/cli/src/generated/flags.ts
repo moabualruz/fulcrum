@@ -1,5 +1,5 @@
 import { Command, Option } from "commander";
-import { FEATURE_FLAGS } from "@platform-core/application/feature-flags/registry.ts";
+import { FEATURE_FLAGS } from "@platform-core/interface/feature-flags.ts";
 import { createFeatureExperimentApiCallerFromEnv } from "@platform-core/interface/http/feature-experiment-api-client.ts";
 
 export function createFlagsCommand(): Command {

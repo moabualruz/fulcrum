@@ -19,7 +19,7 @@ import {
 import { createTask } from "@work-management/application/tasks/commands.ts";
 import type { AppContext } from "@work-management/application/tasks/types.ts";
 import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
-import { TaskWatcher } from "@platform-core/infrastructure/application-database/entities/tasks/TaskWatcher.ts";
+import { TaskWatcher } from "@work-management/infrastructure/database/entities/tasks/TaskWatcher.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
 const USER_ID = "00000000-0000-0000-0000-000000000010";
@@ -74,7 +74,7 @@ describe("task CSV application", () => {
 
   test("web CSV upload creates real tasks and export returns persisted scoped rows", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
 
     const imported = await importTasksFromCsvUpload(em, appCtx(), {
       bytes: new TextEncoder().encode("Title,Status,Priority,Description\nImported A,in_progress,3,Alpha\nImported B,done,1,Beta\n"),
@@ -102,7 +102,7 @@ describe("task CSV application", () => {
 describe("relationship application commands", () => {
   test("wrap WorkItemRelationshipService CRUD, blocker views, duplicate watcher transfer, and trace summary", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const ctx = { orgId: DEFAULT_ORG_ID, userId: USER_ID };
 
     const source = await createTask(em, appCtx(), { title: "Source blocker", status: "pending" });
@@ -135,7 +135,7 @@ describe("relationship application commands", () => {
       userId: USER_ID,
       source: "manual",
     } as never));
-    await em.flush();
+    /* flushed */
 
     const duplicateRel = await markTaskAsDuplicate(em, ctx, {
       sourceTaskId: duplicate.id,

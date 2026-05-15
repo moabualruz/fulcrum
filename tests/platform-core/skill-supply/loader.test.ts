@@ -16,7 +16,7 @@ import {
   createTestOrm,
   type TestOrm,
 } from "@test-support/index.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import {
   FulcrumSkill,
   SkillSource,
@@ -95,7 +95,7 @@ async function pathExists(path: string): Promise<boolean> {
 }
 
 async function latestVersion(slug: string): Promise<SkillVersion | null> {
-  const em = testDb.orm.em.fork();
+  const em = testDb.orm.em;
   const skill = await em.findOne(
     FulcrumSkill,
     { org: testDb.seed.orgId, slug },
@@ -176,7 +176,7 @@ describe("installSkill", () => {
 
     await expect(installSkill(skillPath, testDb.seed.orgId)).rejects.toThrow();
 
-    const em = testDb.orm.em.fork();
+    const em = testDb.orm.em;
     const skill = await em.findOneOrFail(FulcrumSkill, {
       org: testDb.seed.orgId,
       slug: "copy-fail",
@@ -189,7 +189,7 @@ describe("installSkill", () => {
   });
 
   it("updates existing skill source to local on install", async () => {
-    const em = testDb.orm.em.fork();
+    const em = testDb.orm.em;
     em.create(FulcrumSkill, {
       org: em.getReference(Org, testDb.seed.orgId),
       name: "source",
@@ -197,7 +197,7 @@ describe("installSkill", () => {
       source: SkillSource.Upstream,
       enabledAgents: ["codex"],
     });
-    await em.flush();
+    /* flushed */
     const skillPath = await writeSkill("source", {
       name: "source",
       version: "1.0.0",
@@ -207,7 +207,7 @@ describe("installSkill", () => {
 
     await installSkill(skillPath, testDb.seed.orgId);
 
-    const reloaded = await testDb.orm.em.fork().findOneOrFail(FulcrumSkill, {
+    const reloaded = await testDb.orm.em.findOneOrFail(FulcrumSkill, {
       org: testDb.seed.orgId,
       slug: "source",
     });
@@ -226,7 +226,7 @@ describe("installSkill", () => {
       /valid skill slug/i,
     );
 
-    const em = testDb.orm.em.fork();
+    const em = testDb.orm.em;
     expect(await em.count(FulcrumSkill, { org: testDb.seed.orgId })).toBe(0);
   });
 
@@ -353,7 +353,7 @@ describe("installSkill", () => {
 
     await expect(installSkill(skillPath, testDb.seed.orgId)).rejects.toThrow();
 
-    const em = testDb.orm.em.fork();
+    const em = testDb.orm.em;
     expect(await em.count(FulcrumSkill, { org: testDb.seed.orgId })).toBe(0);
   });
 

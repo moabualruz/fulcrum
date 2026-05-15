@@ -41,7 +41,7 @@ async function seedDb(): Promise<{ em: EntityManager; orgId: string; close: () =
   await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const orm = await initOrm({ pglite });
-  const em = orm.em.fork();
+  const em = orm.em;
   return {
     em, orgId: org.id,
     async close() { await orm.close(true); await db.close(); },

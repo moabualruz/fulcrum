@@ -1,4 +1,4 @@
-import type { TaskDependencies } from "@platform-core/infrastructure/application-database/entities/tasks/schemas.ts";
+import type { TaskDependencies } from "@work-management/infrastructure/database/entities/tasks/schemas.ts";
 import type { TipTapJson } from "@platform-core/infrastructure/application-database/tasks-rich-text.ts";
 
 export interface AppContext {

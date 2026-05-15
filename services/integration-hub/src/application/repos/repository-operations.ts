@@ -1,10 +1,10 @@
 import type { EntityManager } from "typeorm";
 import { basename, resolve } from "node:path";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
-import { Repo } from "@platform-core/infrastructure/application-database/entities/repos/Repo.ts";
-import { RepoRepository } from "@platform-core/infrastructure/application-database/repositories/repos/RepoRepository.ts";
+import { Repo } from "@integration-hub/infrastructure/database/entities/repos/Repo.ts";
+import { RepoRepository } from "@integration-hub/infrastructure/database/repositories/repos/RepoRepository.ts";
 import { REPO_SYNC_LOCAL_TASK } from "@integration-hub/application/repos/workers/sync-local.ts";
 import { REPO_SYNC_REMOTE_TASK } from "@integration-hub/application/repos/workers/sync-remote.ts";
 import type { AppContext } from "@integration-hub/domain/repository.ts";
@@ -121,7 +121,6 @@ export async function registerRepository(
     repoId: created.id,
     payload: { kind: created.kind, slug: created.slug },
   });
-  await em.flush();
   return serializeRepository(created);
 }
 
@@ -142,7 +141,6 @@ export async function requestRepositorySync(
     repoId: updated.id,
     payload: { kind: updated.kind },
   });
-  await em.flush();
   return serializeRepository(updated);
 }
 
@@ -168,7 +166,6 @@ export async function enqueueRepositorySync(
     repoId: repo.id,
     payload: { kind: updated?.kind ?? repo.kind, taskName: result.taskName, jobKey: result.jobKey },
   });
-  await em.flush();
   return result;
 }
 
@@ -194,7 +191,6 @@ export async function unregisterRepository(
     repoId: archived.id,
     payload: { slug: archived.slug },
   });
-  await em.flush();
   return serializeRepository(archived);
 }
 
@@ -214,7 +210,7 @@ export async function createRepoTask(input: {
 }
 
 function repoRepo(em: EntityManager): RepoRepository {
-  return em.getRepository(Repo) as RepoRepository;
+  return em.getRepository(Repo) as unknown as RepoRepository;
 }
 
 function serializeRepository(repo: Repo): RepositoryOutput {
@@ -275,12 +271,12 @@ async function emitRepoEvent(
   },
 ): Promise<void> {
   const event = em.create(Event, {
-    org: em.getReference(Org, ctx.orgId),
+    org: { id: ctx.orgId } as Org,
     verb: input.verb,
     subjectKind: "repo",
     subjectId: input.repoId,
     payload: input.payload ?? {},
     createdAt: new Date(),
   });
-  em.persist(event);
+  await em.save(event);
 }

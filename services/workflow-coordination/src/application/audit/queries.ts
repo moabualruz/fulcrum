@@ -1,8 +1,9 @@
 import type { EntityManager } from "typeorm";
+import { Between, LessThanOrEqual, MoreThanOrEqual } from "typeorm";
 
-import { AuditEvent } from "@platform-core/infrastructure/application-database/entities/audit/AuditEvent.ts";
+import { AuditEvent } from "@workflow-coordination/infrastructure/database/entities/audit/AuditEvent.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
-import { EventRetentionPolicy } from "@platform-core/infrastructure/application-database/entities/notifications/EventRetentionPolicy.ts";
+import { EventRetentionPolicy } from "@notification-center/infrastructure/database/entities/notifications/EventRetentionPolicy.ts";
 import { AppForbiddenError, AppNotFoundError } from "@platform-core/domain/errors.ts";
 import type {
   AppContext,
@@ -40,14 +41,21 @@ export async function queryAuditEvents(
   const orgId = input.orgId ?? ctx.orgId;
   const limit = input.limit ?? 50;
   const offset = input.offset ?? 0;
-  const rows = await em.find(Event, buildEventWhere(orgId, input), {
-    populate: ["org", "user"],
-    orderBy: { createdAt: "DESC" },
+
+  const eventWhere = buildEventWhere(orgId, input);
+  const rows = await em.find(Event, {
+    where: eventWhere as never,
+    relations: ["org", "user"],
+    order: { createdAt: "DESC" },
   });
+
+  const auditWhere: Record<string, unknown> = { org: { id: orgId } };
+  if (input.subjectKind) auditWhere["subjectKind"] = input.subjectKind;
   const legacyRows = await em.find(AuditEvent, {
-    org: orgId,
-    ...(input.subjectKind ? { subjectKind: input.subjectKind } : {}),
-  } as never, { orderBy: { createdAt: "DESC", id: "ASC" } });
+    where: auditWhere as never,
+    order: { createdAt: "DESC", id: "ASC" },
+  });
+
   const filtered = [
     ...rows.filter((event) => projectMatches(event, input.projectId)).map(serializeEvent),
     ...legacyRows.filter((event) => !input.projectId || event.projectId === input.projectId).map(serializeAuditEvent),
@@ -79,7 +87,7 @@ export async function queryAuditEventRows(
 }
 
 export async function getAuditEvent(em: EntityManager, ctx: AppContext, id: string): Promise<AuditEventDto> {
-  const row = await em.findOne(AuditEvent, { id } as never);
+  const row = await em.findOne(AuditEvent, { where: { id } as never });
   if (!row) throw new AppNotFoundError(`Audit event not found: ${id}`);
   if (row.org.id !== ctx.orgId) throw new AppForbiddenError("Audit event is outside org scope.");
   return serializeAuditEvent(row);
@@ -115,12 +123,12 @@ export async function listRetentionPolicies(
   ctx: AppContext,
   input: { orgId?: string; projectId?: string | null } = {},
 ): Promise<RetentionPolicyDto[]> {
+  const where: Record<string, unknown> = { org: { id: input.orgId ?? ctx.orgId } };
+  if (input.projectId !== undefined) where["projectId"] = input.projectId;
   const rows = await em.find(EventRetentionPolicy, {
-    org: input.orgId ?? ctx.orgId,
-    ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
-  }, {
-    populate: ["org"],
-    orderBy: { projectId: "ASC" },
+    where: where as never,
+    relations: ["org"],
+    order: { projectId: "ASC" },
   });
   return rows.map(serializeRetentionPolicy);
 }
@@ -130,7 +138,10 @@ export async function findRetentionPolicy(
   orgId: string,
   projectId: string | null,
 ): Promise<EventRetentionPolicy | null> {
-  return em.findOne(EventRetentionPolicy, { org: orgId, projectId }, { populate: ["org"] });
+  return em.findOne(EventRetentionPolicy, {
+    where: { org: { id: orgId }, projectId } as never,
+    relations: ["org"],
+  });
 }
 
 export function serializeEvent(event: Event): AuditEventDto {
@@ -173,17 +184,20 @@ function buildEventWhere(orgId: string, filter: AuditRouteQueryInput = {}) {
     from: filter.since ? new Date(filter.since) : defaultDateRange().from,
     to: filter.until ? new Date(filter.until) : undefined,
   };
-  const createdAt: Record<string, Date> = {};
-  if (range.from) createdAt.$gte = range.from;
-  if (range.to) createdAt.$lte = range.to;
 
-  return {
-    org: orgId,
-    ...(filter.userId ? { user: filter.userId } : {}),
-    ...(filter.subjectKind ? { subjectKind: filter.subjectKind } : {}),
-    ...(filter.verb ? { verb: filter.verb } : {}),
-    ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
-  };
+  const where: Record<string, unknown> = { org: { id: orgId } };
+  if (filter.userId) where["user"] = { id: filter.userId };
+  if (filter.subjectKind) where["subjectKind"] = filter.subjectKind;
+  if (filter.verb) where["verb"] = filter.verb;
+  if (range.from && range.to) {
+    where["createdAt"] = Between(range.from, range.to);
+  } else if (range.from) {
+    where["createdAt"] = MoreThanOrEqual(range.from);
+  } else if (range.to) {
+    where["createdAt"] = LessThanOrEqual(range.to);
+  }
+
+  return where;
 }
 
 function defaultDateRange(): { from: Date; to?: Date } {

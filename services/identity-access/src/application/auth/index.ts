@@ -19,7 +19,7 @@ import { organization, magicLink, emailOTP } from "better-auth/plugins";
 import type { DBAdapter } from "@better-auth/core/db/adapter";
 
 import { MikroOrmBetterAuthAdapter } from "./adapter.ts";
-import { FeatureFlag } from "@platform-core/infrastructure/application-database/entities/auth/FeatureFlag.ts";
+import { FeatureFlag } from "@identity-access/infrastructure/database/entities/auth/FeatureFlag.ts";
 import { DEFAULT_ADMIN_EMAIL } from "@platform-core/infrastructure/application-database/seed.ts";
 
 /** Name of the feature flag that gates SaaS-only auth providers. */
@@ -37,7 +37,7 @@ async function isFlagEnabled(em: EntityManager, flag: string): Promise<boolean> 
   // DB lookup — global flag (orgId IS NULL, userId IS NULL)
   // Use FilterQuery cast to satisfy MikroORM v7 strict type checker
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const row = await em.fork().findOne(FeatureFlag, { flag, orgId: null, userId: null } as any);
+  const row = await em.findOne(FeatureFlag, { where: { flag, orgId: null, userId: null } as never });
   return row?.enabled ?? false;
 }
 

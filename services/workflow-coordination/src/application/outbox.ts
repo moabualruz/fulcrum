@@ -1,8 +1,9 @@
 import type { EntityManager } from "typeorm";
+import { IsNull } from "typeorm";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
-import { Notification } from "@platform-core/infrastructure/application-database/entities/notifications/Notification.ts";
+import { Notification } from "@notification-center/infrastructure/database/entities/notifications/Notification.ts";
 import { DomainEventOutbox } from "@platform-core/infrastructure/application-database/entities/platform/DomainEventOutbox.ts";
 
 export interface OutboxEventInput {
@@ -76,11 +77,11 @@ export async function writeOutboxEvent(
   input: OutboxEventInput,
 ): Promise<DomainEventOutbox> {
   const serialized = serializeOutboxEvent(input);
-  const org = em.getReference(Org, serialized.orgId);
-  const existing = await em.findOne(DomainEventOutbox, { eventKey: serialized.eventKey } as never);
+  const existing = await em.findOne(DomainEventOutbox, { where: { eventKey: serialized.eventKey } as never });
   if (existing) return existing;
 
-  const event = em.create(Event, {
+  const org = { id: serialized.orgId } as Org;
+  const event = await em.save(em.create(Event, {
     org,
     projectId: serialized.projectId,
     verb: serialized.verb,
@@ -88,8 +89,8 @@ export async function writeOutboxEvent(
     subjectId: serialized.subjectId,
     payload: serialized.payload,
     createdAt: new Date(),
-  });
-  const outbox = em.create(DomainEventOutbox, {
+  } as never));
+  const outbox = await em.save(em.create(DomainEventOutbox, {
     org,
     projectId: serialized.projectId,
     verb: serialized.verb,
@@ -97,9 +98,8 @@ export async function writeOutboxEvent(
     subjectId: serialized.subjectId,
     eventKey: serialized.eventKey,
     payload: serialized.payload,
-  });
-  em.persist([event, outbox]);
-  await em.flush();
+  } as never));
+  void event; // saved for audit trail
   return outbox;
 }
 
@@ -107,11 +107,10 @@ export async function dispatchPendingOutboxEvents(
   em: EntityManager,
   dispatcher: OutboxDispatcher,
 ): Promise<{ dispatched: number }> {
-  const rows = await em.find(
-    DomainEventOutbox,
-    { processedAt: null } as never,
-    { orderBy: { createdAt: "ASC" } },
-  );
+  const rows = await em.find(DomainEventOutbox, {
+    where: { processedAt: IsNull() } as never,
+    order: { createdAt: "ASC" },
+  });
   let dispatched = 0;
 
   for (const row of rows) {
@@ -129,11 +128,10 @@ export async function dispatchPendingOutboxEvents(
     await dispatcher.notifications?.handleEvent(event);
     row.processedAt = new Date();
     row.attempts += 1;
-    em.persist(row);
+    await em.save(row);
     dispatched += 1;
   }
 
-  if (dispatched > 0) await em.flush();
   return { dispatched };
 }
 
@@ -173,8 +171,10 @@ export async function getUnreadNotificationCount(
   userId: string,
 ): Promise<number> {
   return await em.count(Notification, {
-    org: orgId,
-    userId,
-    readAt: null,
-  } as never);
+    where: {
+      org: { id: orgId },
+      userId,
+      readAt: IsNull(),
+    } as never,
+  });
 }

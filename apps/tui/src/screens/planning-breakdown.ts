@@ -1,6 +1,6 @@
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
-import type { WorkflowAcceptanceCycleInput } from "@workflow-coordination/application/workflow-acceptance-cycle.ts";
+import type { WorkflowAcceptanceCycleInput } from "@workflow-coordination/interface/workflow-cycle.ts";
 
 export interface WorkflowCycleResultView {
   traceId?: string;

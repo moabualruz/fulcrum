@@ -103,7 +103,7 @@ async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: str
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   // EntityManager for migrated action functions
   const orm = await initOrm({ pglite });
-  const em = orm.em.fork();
+  const em = orm.em;
   const linked = await createDocumentAction(em, {
     orgId: org.id,
     projectId: null,
@@ -148,7 +148,7 @@ async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: str
     ],
   );
   const restoreScope = __setApplicationScopeForTest({
-    em: orm.em.fork(),
+    em: orm.em,
     orgId: org.id,
     userId: null,
   });

@@ -6,8 +6,8 @@ import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
 import {
   getPayloadSchema,
   isPayloadSchemaRegistered,
@@ -40,7 +40,7 @@ function callerFor(em: import("@mikro-orm/postgresql").EntityManager, userId: st
       orgId: ORG_ID,
       userId,
       em,
-      container: new Container(),
+      container: null,
     }),
   );
 }
@@ -75,7 +75,7 @@ describe("audit tRPC router", () => {
   test("query filters by kind, verb, project, user, and date range with newest-first pagination", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await persistEvent(em, {
         id: "00000000-0000-4000-8000-000000000101",
         userId: db.seed.userId,
@@ -112,7 +112,7 @@ describe("audit tRPC router", () => {
         projectId: PROJECT_ID,
         createdAt: new Date("2026-01-01T12:00:00Z"),
       });
-      await em.flush();
+      /* flushed */
 
       const caller = callerFor(em, db.seed.userId);
       const firstPage = await caller.audit.query({
@@ -156,7 +156,7 @@ describe("audit tRPC router", () => {
   test("export returns CSV headers and JSON rows for filtered audit events", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await persistEvent(em, {
         id: "00000000-0000-4000-8000-000000000201",
         userId: db.seed.userId,
@@ -165,7 +165,7 @@ describe("audit tRPC router", () => {
         subjectId: "task-3",
         createdAt: new Date("2026-03-01T10:00:00Z"),
       });
-      await em.flush();
+      /* flushed */
 
       const caller = callerFor(em, db.seed.userId);
       const csv = await caller.audit.export({
@@ -209,7 +209,7 @@ describe("audit tRPC router", () => {
   test("retentionPolicy set/get/list round-trips retainDays including zero forever", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em, db.seed.userId);
 
       const updated = await caller.audit.retentionPolicy.set({

@@ -29,7 +29,7 @@ describe("application repos", () => {
   test("handles CRUD, not-found, validation, and scoping", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const repo = await registerRepo(em, ctx, { slug: "fulcrum", name: "Fulcrum", kind: "local", localPath: "/repo" });
       await insertRepoTreeEntry(em, ctx, { repoId: repo.id, commitSha: "abc", path: "apps/cli/src/main.ts", kind: "file" });
       expect(await listRepos(em, ctx)).toHaveLength(1);
@@ -45,7 +45,7 @@ describe("application repos", () => {
   test("repository operations derive local and remote repo fields", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const local = await registerRepository(em, ctx, { kind: "local", path: "/tmp/Fulcrum App" });
       const remote = await registerRepository(em, ctx, { kind: "remote", url: "git@github.com:moabualruz/fulcrum.git" });
 
@@ -73,7 +73,7 @@ describe("application repos", () => {
   test("repository operations sync and unregister mutate repo and record events", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const repo = await registerRepository(em, ctx, { kind: "local", path: "/tmp/fulcrum" });
 
       const synced = await requestRepositorySync(em, ctx, repo.id);
@@ -102,7 +102,7 @@ describe("application repos", () => {
   test("repository operations map repo status buckets", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const staleNoSync = await registerRepository(em, ctx, { kind: "local", path: "/tmp/stale-no-sync" });
       const synced = await registerRepository(em, ctx, { kind: "local", path: "/tmp/synced" });
       const staleOld = await registerRepository(em, ctx, { kind: "local", path: "/tmp/stale-old" });
@@ -128,7 +128,7 @@ describe("application repos", () => {
   test("repository operations enqueue sync uses injected queue and existing DTO", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const repo = await registerRepository(em, ctx, { kind: "remote", url: "https://github.com/moabualruz/fulcrum.git" });
       const calls: unknown[] = [];
       const queue = {
@@ -159,7 +159,7 @@ describe("application repos", () => {
   test("repo page read models derive cards, task counts, branches, commits, and write gate from real rows", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `INSERT INTO projects (id, org_id, slug, name, created_at, updated_at)
          VALUES (?, ?, 'repo-page-project', 'Repo Page Project', now(), now())`,

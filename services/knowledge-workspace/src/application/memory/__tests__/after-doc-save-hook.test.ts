@@ -16,9 +16,9 @@ import { Container } from "@needle-di/core";
 
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
-import { MemoryLink } from "@platform-core/infrastructure/application-database/entities/memory/MemoryLink.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
+import { MemoryLink } from "@knowledge-workspace/infrastructure/database/entities/memory/MemoryLink.ts";
 import { AfterDocSaveMemoryHook, type DocSaveCtx } from "../hooks/after-doc-save-hook.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
@@ -41,7 +41,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  const em = db.orm.em.fork();
+  const em = db.orm.em;
   await em.nativeDelete(MemoryLink, {});
   await em.nativeDelete(Memory, {});
   // Ensure the target organization exists before hook writes.
@@ -54,8 +54,8 @@ beforeEach(async () => {
 
 describe("AfterDocSaveMemoryHook", () => {
   test("resolves through needle-di", () => {
-    const container = new Container();
-    registerDbBindings(container, db.orm, db.orm.em.fork());
+    const container = null;
+    registerDbBindings(container, db.orm, db.orm.em);
     const hook = container.get(AfterDocSaveMemoryHook);
     expect(hook).toBeInstanceOf(AfterDocSaveMemoryHook);
   });
@@ -64,7 +64,7 @@ describe("AfterDocSaveMemoryHook", () => {
     const hook = createHook();
     await hook.handle(DOC_ID, "No extractable content here", {}, BASE_CTX);
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const memories = await em.find(Memory, {});
     expect(memories).toHaveLength(0);
   });
@@ -79,7 +79,7 @@ describe("AfterDocSaveMemoryHook", () => {
       BASE_CTX,
     );
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const memories = await em.find(Memory, { kind: "decision" });
     expect(memories).toHaveLength(2);
     expect(memories.map((m) => m.body).sort()).toEqual([
@@ -94,7 +94,7 @@ describe("AfterDocSaveMemoryHook", () => {
     const hook = createHook();
     await hook.handle(DOC_ID, "", { blockers: ["waiting on review"] }, BASE_CTX);
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const blockers = await em.find(Memory, { kind: "blocker" });
     expect(blockers).toHaveLength(1);
     expect(blockers[0]?.body).toBe("waiting on review");
@@ -104,7 +104,7 @@ describe("AfterDocSaveMemoryHook", () => {
     const hook = createHook();
     await hook.handle(DOC_ID, "", { tags: ["architecture", "memory"] }, BASE_CTX);
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const notes = await em.find(Memory, { kind: "note" });
     expect(notes).toHaveLength(2);
     expect(notes.map((m) => m.body).sort()).toEqual(["architecture", "memory"]);
@@ -114,7 +114,7 @@ describe("AfterDocSaveMemoryHook", () => {
     const hook = createHook();
     await hook.handle(DOC_ID, "", { links: "some-doc-slug" }, BASE_CTX);
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const links = await em.find(Memory, { kind: "link" });
     expect(links).toHaveLength(1);
     expect(links[0]?.body).toBe("some-doc-slug");
@@ -124,7 +124,7 @@ describe("AfterDocSaveMemoryHook", () => {
     const hook = createHook();
     await hook.handle(DOC_ID, "", { status: "in-progress" }, BASE_CTX);
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const notes = await em.find(Memory, { kind: "note" });
     expect(notes).toHaveLength(1);
     expect(notes[0]?.body).toBe("in-progress");
@@ -136,7 +136,7 @@ describe("AfterDocSaveMemoryHook", () => {
     const body = "## Decisions\n- use PGlite\n- keep local-first\n\n## Other\nstuff";
     await hook.handle(DOC_ID, body, {}, BASE_CTX);
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const decisions = await em.find(Memory, { kind: "decision" });
     expect(decisions).toHaveLength(2);
     expect(decisions.map((m) => m.body).sort()).toEqual([
@@ -151,7 +151,7 @@ describe("AfterDocSaveMemoryHook", () => {
     const body = "## Blockers\n- waiting on review\n- need schema migration";
     await hook.handle(DOC_ID, body, {}, BASE_CTX);
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const blockers = await em.find(Memory, { kind: "blocker" });
     expect(blockers).toHaveLength(2);
     expect(blockers.every((m) => m.importance === "high")).toBe(true);
@@ -162,7 +162,7 @@ describe("AfterDocSaveMemoryHook", () => {
     const body = "## Action Items\n- review PR\n- update docs";
     await hook.handle(DOC_ID, body, {}, BASE_CTX);
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const notes = await em.find(Memory, { kind: "note" });
     expect(notes).toHaveLength(2);
     expect(notes.map((m) => m.body).sort()).toEqual(["review PR", "update docs"]);
@@ -173,7 +173,7 @@ describe("AfterDocSaveMemoryHook", () => {
     const hook = createHook();
     await hook.handle(DOC_ID, "See [[My Doc]] and [[Architecture]]", {}, BASE_CTX);
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const links = await em.find(Memory, { kind: "link" });
     expect(links).toHaveLength(2);
     expect(links.map((m) => m.body).sort()).toEqual(["Architecture", "My Doc"]);
@@ -189,7 +189,7 @@ describe("AfterDocSaveMemoryHook", () => {
       BASE_CTX,
     );
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const memories = await em.find(Memory, {});
     const links = await em.find(MemoryLink, {}, { populate: ["memory"] });
 
@@ -208,7 +208,7 @@ describe("AfterDocSaveMemoryHook", () => {
     await hook.handle(DOC_ID, body, fm, BASE_CTX);
     await hook.handle(DOC_ID, body, fm, BASE_CTX);
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const memories = await em.find(Memory, {});
     const memoryLinks = await em.find(MemoryLink, {});
 
@@ -223,7 +223,7 @@ describe("AfterDocSaveMemoryHook", () => {
     const hook = createHook();
     await hook.handle(DOC_ID, "[[Doc Ref]]", {}, BASE_CTX);
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const memories = await em.find(Memory, {});
     expect(memories.length).toBeGreaterThan(0);
     expect(memories.every((m) => m.projectId === PROJECT_ID)).toBe(true);
@@ -231,7 +231,7 @@ describe("AfterDocSaveMemoryHook", () => {
 });
 
 function createHook(): AfterDocSaveMemoryHook {
-  const container = new Container();
-  registerDbBindings(container, db.orm, db.orm.em.fork());
+  const container = null;
+  registerDbBindings(container, db.orm, db.orm.em);
   return container.get(AfterDocSaveMemoryHook);
 }

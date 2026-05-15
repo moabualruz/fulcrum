@@ -3,7 +3,7 @@ import { Injectable } from "@nestjs/common";
 import {
   DeliveryStatus,
   type NotificationRule,
-} from "@platform-core/infrastructure/application-database/entities/notifications/index.ts";
+} from "@notification-center/infrastructure/database/entities/notifications/index.ts";
 
 export type NotificationChannel =
   | "in-app"
@@ -145,7 +145,7 @@ export class NotificationRuleEngine {
   }
 }
 
-injectable()(NotificationRuleEngine);
+Injectable()(NotificationRuleEngine);
 
 export function matchEvent(rule: NotificationRuleLike, event: NotificationEventLike): boolean {
   const pattern = rule.eventPattern ?? {};

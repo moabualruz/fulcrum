@@ -46,7 +46,7 @@ describe("docs.links tRPC", () => {
   test("listBacklinks returns org-scoped docs linking to current doc", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
       const target = await caller.docs.create({ title: "Target Doc" });
       const source = await caller.docs.create({ title: "Source Doc" });
@@ -69,7 +69,7 @@ describe("docs.links tRPC", () => {
   test("listForwardLinks returns outbound wikilinks for current doc", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
       const target = await caller.docs.create({ title: "Target Doc" });
       const source = await caller.docs.create({ title: "Source Doc" });

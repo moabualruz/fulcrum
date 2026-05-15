@@ -11,8 +11,8 @@
 import type { EntityManager } from "typeorm";
 import { randomUUID } from "node:crypto";
 import type { ProductDb } from "../db/types.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Sprint, type MetricsSnapshot } from "@platform-core/infrastructure/application-database/entities/tasks/Sprint.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Sprint, type MetricsSnapshot } from "@work-management/infrastructure/database/entities/tasks/Sprint.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 import { eventDispatcher } from "../event-dispatcher.ts";
 
@@ -24,7 +24,7 @@ export type DbHandle = EntityManager | ProductDb;
 
 /** Type guard: is this an EntityManager? */
 function isEntityManager(db: DbHandle): db is EntityManager {
-  return "persist" in db && typeof (db as EntityManager).persist === "function";
+  return "save" in db && typeof (db as EntityManager).save === "function";
 }
 
 function isProductDb(db: DbHandle): db is ProductDb {
@@ -65,15 +65,13 @@ async function taskPointExpressionForProductDb(db: ProductDb): Promise<string> {
 }
 
 async function taskPointExpressionForEm(em: EntityManager): Promise<string> {
-  const rows = await em.execute<{ column_name: string }[]>(
+  const rows = await em.query<{ column_name: string }[]>(
     `SELECT column_name
        FROM information_schema.columns
       WHERE table_name = 'tasks'
         AND column_name IN ('points', 'story_points', 'estimate_points')`,
-    [],
-    "all",
   );
-  return taskPointExpression(rows.map((row) => row.column_name));
+  return taskPointExpression((rows as unknown as { column_name: string }[]).map((row) => row.column_name));
 }
 
 // ── Row interfaces (unchanged data contracts) ───────────────────────
@@ -389,8 +387,7 @@ export async function createLocalOrg(
     createdAt: new Date(),
     updatedAt: new Date(),
   });
-  em.persist(org);
-  await em.flush();
+  await em.save(org);
   return orgToRow(org);
 }
 
@@ -430,7 +427,7 @@ export async function createProject(
   const em = assertEm(db);
   const id = randomUUID();
   const now = new Date();
-  await em.execute(
+  await em.query(
     `INSERT INTO projects (id, org_id, slug, name, description, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [id, input.orgId, input.slug, input.name, input.description ?? null, now, now],
@@ -443,11 +440,7 @@ export async function createProject(
     subjectId: id,
     verb: "created",
   });
-  const rows = await em.execute<{ id: string; org_id: string; slug: string; name: string; description: string | null; created_at: Date; updated_at: Date }[]>(
-    `SELECT * FROM projects WHERE id = ?`,
-    [id],
-    "all",
-  );
+  const rows = await em.query<{ id: string; org_id: string; slug: string; name: string; description: string | null; created_at: Date; updated_at: Date }[]>(`SELECT * FROM projects WHERE id = ?`, [id]);
   if (rows.length === 0) throw new Error(`project insert lost: ${id}`);
   const r = rows[0]!;
   return {
@@ -509,7 +502,7 @@ export async function createTask(
   const priority = input.priority ?? 0;
   const now = new Date();
 
-  await em.execute(
+  await em.query(
     `INSERT INTO tasks (id, org_id, project_id, parent_id, title, description, status, priority, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [id, input.orgId, input.projectId ?? null, input.parentId ?? null, input.title, input.description ?? null, status, priority, now, now],
@@ -525,9 +518,7 @@ export async function createTask(
     payload: { title: input.title, status },
   });
 
-  const rows = await em.execute<Record<string, unknown>[]>(
-    `SELECT * FROM tasks WHERE id = ?`, [id], "all",
-  );
+  const rows = await em.query(`SELECT * FROM tasks WHERE id = ?`, [id]);
   if (rows.length === 0) throw new Error(`task insert lost: ${id}`);
   return rawToTaskRow(rows[0]!);
 }
@@ -562,7 +553,7 @@ export async function appendEvent(
   const repo = em.getRepository(Event);
   const event = repo.create({
     id,
-    org: em.getReference(Org, input.orgId),
+    org: { id: input.orgId } as Org,
     projectId: input.projectId ?? undefined,
     actor: input.actor,
     subjectKind: input.subjectKind,
@@ -571,8 +562,7 @@ export async function appendEvent(
     payload: input.payload ?? {},
     createdAt: new Date(),
   });
-  em.persist(event);
-  await em.flush();
+  await em.save(event);
   return eventToRow(event);
 }
 
@@ -589,10 +579,7 @@ export async function listEventsForProject(
   }
   const em = assertEm(db);
   const repo = em.getRepository(Event);
-  const events = await repo.find(
-    { projectId } as never,
-    { orderBy: { createdAt: "ASC", id: "ASC" } },
-  );
+  const events = await repo.find({ where: { projectId } as never, order: { createdAt: "ASC", id: "ASC" } });
   return events.map(eventToRow);
 }
 
@@ -631,11 +618,10 @@ export async function listEventsFiltered(
   }
 
   const em = assertEm(db);
-  const rows = await em.execute<Record<string, unknown>[]>(
+  const rows = await em.query(
     `SELECT * FROM events WHERE ${conditions.join(" AND ")} ORDER BY created_at DESC, id ASC LIMIT ?`,
     params,
-    "all",
-  );
+  ) as Record<string, unknown>[];
   return rows.map(rawToEventRow);
 }
 
@@ -654,17 +640,13 @@ export async function listReposForProject(
     return rows.map(rawToRepoRow);
   }
   const em = assertEm(db);
-  const rows = await em.execute<Record<string, unknown>[]>(
-    `SELECT id, org_id, project_id, slug, name, kind, remote_url, local_path, current_branch,
+  const rows = await em.query(`SELECT id, org_id, project_id, slug, name, kind, remote_url, local_path, current_branch,
             sync_status,
             COALESCE(last_touched_at, now()) AS created_at,
             COALESCE(last_touched_at, now()) AS updated_at
        FROM repos
       WHERE project_id = ? AND org_id = ?
-      ORDER BY last_touched_at DESC, id ASC`,
-    [projectId, orgId],
-    "all",
-  );
+      ORDER BY last_touched_at DESC, id ASC`, [projectId, orgId]);
   return rows.map(rawToRepoRow);
 }
 
@@ -674,7 +656,7 @@ export async function linkRepoToProject(db: DbHandle, repoId: string, projectId:
     return { ok: true };
   }
   const em = assertEm(db);
-  await em.execute(`UPDATE repos SET project_id = ? WHERE id = ?`, [projectId, repoId]);
+  await em.query(`UPDATE repos SET project_id = ? WHERE id = ?`, [projectId, repoId]);
   return { ok: true };
 }
 
@@ -731,7 +713,7 @@ export async function createSprint(
   const repo = em.getRepository(Sprint);
   const sprint = repo.create({
     id,
-    org: em.getReference(Org, input.orgId),
+    org: { id: input.orgId } as Org,
     projectId: input.projectId,
     name: input.name,
     goal: input.goal ?? null,
@@ -742,8 +724,7 @@ export async function createSprint(
     createdAt: now,
     updatedAt: now,
   });
-  em.persist(sprint);
-  await em.flush();
+  await em.save(sprint);
 
   await eventDispatcher.dispatch(em, {
     orgId: input.orgId,
@@ -794,7 +775,7 @@ export async function updateSprint(
   }
   const em = assertEm(db);
   const repo = em.getRepository(Sprint);
-  const sprint = await repo.findOne({ id: input.id });
+  const sprint = await repo.findOne({ where: { id: input.id } });
   if (!sprint) throw new Error(`sprint not found: ${input.id}`);
 
   if (input.name !== undefined) sprint.name = input.name;
@@ -804,8 +785,6 @@ export async function updateSprint(
   if (input.startDate !== undefined) sprint.startDate = input.startDate ? new Date(input.startDate) : sprint.startDate;
   if (input.endDate !== undefined) sprint.endDate = input.endDate ? new Date(input.endDate) : sprint.endDate;
   sprint.updatedAt = new Date();
-
-  await em.flush();
   return sprintToRow(sprint);
 }
 
@@ -822,10 +801,7 @@ export async function listSprints(
   }
   const em = assertEm(db);
   const repo = em.getRepository(Sprint);
-  const sprints = await repo.find(
-    { projectId },
-    { orderBy: { createdAt: "DESC", id: "ASC" } },
-  );
+  const sprints = await repo.find({ where: { projectId }, order: { createdAt: "DESC", id: "ASC" } });
   return sprints.map(sprintToRow);
 }
 
@@ -861,21 +837,19 @@ export async function addTaskToSprint(
   }
   const em = assertEm(db);
   const sprintRepo = em.getRepository(Sprint);
-  const sprint = await sprintRepo.findOne({ id: input.sprintId });
+  const sprint = await sprintRepo.findOne({ where: { id: input.sprintId } });
   if (!sprint) throw new Error(`sprint not found: ${input.sprintId}`);
 
   const orgId = typeof sprint.org === "string" ? sprint.org : sprint.org?.id ?? "";
 
-  const taskRows = await em.execute<Record<string, unknown>[]>(
-    `SELECT * FROM tasks WHERE id = ?`, [input.taskId], "all",
-  );
+  const taskRows = await em.query(`SELECT * FROM tasks WHERE id = ?`, [input.taskId]);
   const task = taskRows[0];
   if (!task) throw new Error(`task not found: ${input.taskId}`);
   if (task.org_id !== orgId || task.project_id !== sprint.projectId) {
     throw new Error(`task ${input.taskId} is outside sprint scope ${input.sprintId}`);
   }
 
-  await em.execute(
+  await em.query(
     `UPDATE tasks SET sprint_id = ?, updated_at = now()
       WHERE id = ? AND org_id = ? AND project_id = ?`,
     [sprint.id, input.taskId, orgId, sprint.projectId],
@@ -921,18 +895,14 @@ export async function removeTaskFromSprint(
   }
   const em = assertEm(db);
   const sprintRepo = em.getRepository(Sprint);
-  const sprint = await sprintRepo.findOne({ id: input.sprintId });
+  const sprint = await sprintRepo.findOne({ where: { id: input.sprintId } });
   if (!sprint) throw new Error(`sprint not found: ${input.sprintId}`);
 
   const orgId = typeof sprint.org === "string" ? sprint.org : sprint.org?.id ?? "";
 
-  const rows = await em.execute<Record<string, unknown>[]>(
-    `UPDATE tasks SET sprint_id = NULL, updated_at = now()
+  const rows = await em.query(`UPDATE tasks SET sprint_id = NULL, updated_at = now()
       WHERE id = ? AND org_id = ? AND project_id = ? AND sprint_id = ?
-      RETURNING *`,
-    [input.taskId, orgId, sprint.projectId, sprint.id],
-    "all",
-  );
+      RETURNING *`, [input.taskId, orgId, sprint.projectId, sprint.id]);
   if (rows.length === 0) throw new Error(`task not found in sprint: ${input.taskId}`);
 
   await eventDispatcher.dispatch(em, {
@@ -963,15 +933,11 @@ export async function listBacklogTasks(
     return rows.map(rawToTaskRow);
   }
   const em = assertEm(db);
-  const rows = await em.execute<Record<string, unknown>[]>(
-    `SELECT * FROM tasks
+  const rows = await em.query(`SELECT * FROM tasks
       WHERE project_id = ?
         AND sprint_id IS NULL
         AND status NOT IN ('completed', 'cancelled')
-      ORDER BY priority DESC, updated_at DESC, id ASC`,
-    [projectId],
-    "all",
-  );
+      ORDER BY priority DESC, updated_at DESC, id ASC`, [projectId]);
   return rows.map(rawToTaskRow);
 }
 
@@ -987,13 +953,9 @@ export async function listSprintTasks(
     return rows.map(rawToTaskRow);
   }
   const em = assertEm(db);
-  const rows = await em.execute<Record<string, unknown>[]>(
-    `SELECT * FROM tasks
+  const rows = await em.query(`SELECT * FROM tasks
       WHERE sprint_id = ?
-      ORDER BY priority DESC, updated_at DESC, id ASC`,
-    [sprintId],
-    "all",
-  );
+      ORDER BY priority DESC, updated_at DESC, id ASC`, [sprintId]);
   return rows.map(rawToTaskRow);
 }
 
@@ -1008,11 +970,7 @@ export async function sprintCapacityUsed(db: DbHandle, sprintId: string): Promis
   }
   const em = assertEm(db);
   const pointsExpression = await taskPointExpressionForEm(em);
-  const rows = await em.execute<{ used: number | string | null }[]>(
-    `SELECT COALESCE(SUM(${pointsExpression}), 0) AS used FROM tasks WHERE sprint_id = ?`,
-    [sprintId],
-    "all",
-  );
+  const rows = await em.query<{ used: number | string | null }[]>(`SELECT COALESCE(SUM(${pointsExpression}), 0) AS used FROM tasks WHERE sprint_id = ?`, [sprintId]);
   return Number(rows[0]?.used ?? 0);
 }
 
@@ -1074,25 +1032,21 @@ export async function closeSprint(
   }
   const em = assertEm(db);
   const repo = em.getRepository(Sprint);
-  const sprint = await repo.findOne({ id: sprintId });
+  const sprint = await repo.findOne({ where: { id: sprintId } });
   if (!sprint) throw new Error(`sprint not found: ${sprintId}`);
   if (sprint.status === "completed") throw new Error(`sprint already closed: ${sprintId}`);
 
   const pointsExpression = await taskPointExpressionForEm(em);
-  const metricRows = await em.execute<{
+  const metricRows = await em.query<{
     completed_points: number | string | null;
     total_tasks: number | string;
     completed_tasks: number | string;
-  }[]>(
-    `SELECT
+  }[]>(`SELECT
         COALESCE(SUM(CASE WHEN status = 'completed' THEN ${pointsExpression} ELSE 0 END), 0) AS completed_points,
         COUNT(*) AS total_tasks,
         COUNT(*) FILTER (WHERE status = 'completed') AS completed_tasks
       FROM tasks
-      WHERE sprint_id = ?`,
-    [sprint.id],
-    "all",
-  );
+      WHERE sprint_id = ?`, [sprint.id]);
   const metricRow = metricRows[0];
   const completedPoints = Number(metricRow?.completed_points ?? 0);
   const metrics: MetricsSnapshot = {
@@ -1107,7 +1061,6 @@ export async function closeSprint(
   sprint.closedAt = new Date();
   sprint.metricsSnapshot = metrics;
   sprint.updatedAt = new Date();
-  await em.flush();
 
   const orgId = typeof sprint.org === "string" ? sprint.org : sprint.org?.id ?? "";
   const event = await eventDispatcher.dispatch(em, {
@@ -1142,11 +1095,7 @@ export async function checkEventHandled(
     return rows.length > 0;
   }
   const em = assertEm(db);
-  const rows = await em.execute<{ event_id: string }[]>(
-    `SELECT event_id FROM event_handler_log WHERE event_id = ? AND handler = ?`,
-    [eventId, handler],
-    "all",
-  );
+  const rows = await em.query<{ event_id: string }[]>(`SELECT event_id FROM event_handler_log WHERE event_id = ? AND handler = ?`, [eventId, handler]);
   return rows.length > 0;
 }
 
@@ -1165,7 +1114,7 @@ export async function markEventHandled(
     return;
   }
   const em = assertEm(db);
-  await em.execute(
+  await em.query(
     `INSERT INTO event_handler_log (event_id, handler)
       VALUES (?, ?)
       ON CONFLICT (event_id, handler) DO NOTHING`,
@@ -1188,11 +1137,10 @@ export async function setSprintRetroDocId(
   }
   const em = assertEm(db);
   const repo = em.getRepository(Sprint);
-  const sprint = await repo.findOne({ id: sprintId });
+  const sprint = await repo.findOne({ where: { id: sprintId } });
   if (!sprint) throw new Error(`sprint not found: ${sprintId}`);
   sprint.retroDocId = docId;
   sprint.updatedAt = new Date();
-  await em.flush();
   return sprintToRow(sprint);
 }
 
@@ -1246,11 +1194,7 @@ export async function listTasks(
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
   const limit = filters.limit ?? 50;
   params.push(limit + 1);
-  const rows = await em.execute<Record<string, unknown>[]>(
-    `SELECT * FROM tasks ${where} ORDER BY id ASC LIMIT ?`,
-    params,
-    "all",
-  );
+  const rows = await em.query(`SELECT * FROM tasks ${where} ORDER BY id ASC LIMIT ?`, params);
   const hasMore = rows.length > limit;
   const data = hasMore ? rows.slice(0, limit) : rows;
   const cursor = hasMore ? (data[data.length - 1]! as Record<string, unknown>).id as string : null;
@@ -1320,11 +1264,10 @@ export async function updateTask(
   if (sets.length === 0) throw new Error("updateTask: no fields to update");
   sets.push("updated_at = now()");
   params.push(input.id);
-  const rows = await em.execute<Record<string, unknown>[]>(
+  const rows = await em.query(
     `UPDATE tasks SET ${sets.join(", ")} WHERE id = ? RETURNING *`,
     params,
-    "all",
-  );
+  ) as Record<string, unknown>[];
   if (rows.length === 0) throw new Error(`task not found: ${input.id}`);
   const task = rawToTaskRow(rows[0]!);
 
@@ -1362,11 +1305,7 @@ export async function listCustomFields(
     return rows.map(rawToCustomFieldRow);
   }
   const em = assertEm(db);
-  const rows = await em.execute<Record<string, unknown>[]>(
-    `SELECT * FROM custom_field_defs WHERE project_id = ? ORDER BY position ASC, id ASC`,
-    [projectId],
-    "all",
-  );
+  const rows = await em.query(`SELECT * FROM custom_field_defs WHERE project_id = ? ORDER BY position ASC, id ASC`, [projectId]);
   return rows.map(rawToCustomFieldRow);
 }
 
@@ -1397,14 +1336,12 @@ export async function createCustomField(
   }
   const em = assertEm(db);
   const id = randomUUID();
-  await em.execute(
+  await em.query(
     `INSERT INTO custom_field_defs (id, org_id, project_id, name, slug, type, config_json, position)
      VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?)`,
     [id, input.orgId, input.projectId, input.name, input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), input.fieldType, JSON.stringify({ options: input.options ?? [] }), input.position ?? 0],
   );
-  const rows = await em.execute<Record<string, unknown>[]>(
-    `SELECT * FROM custom_field_defs WHERE id = ?`, [id], "all",
-  );
+  const rows = await em.query(`SELECT * FROM custom_field_defs WHERE id = ?`, [id]);
   if (rows.length === 0) throw new Error(`custom_field insert lost: ${id}`);
   return rawToCustomFieldRow(rows[0]!);
 }
@@ -1423,11 +1360,7 @@ export async function listSavedViews(
     return rows.map(rawToSavedViewRow);
   }
   const em = assertEm(db);
-  const rows = await em.execute<Record<string, unknown>[]>(
-    `SELECT * FROM saved_views WHERE project_id = ? ORDER BY name ASC, id ASC`,
-    [projectId],
-    "all",
-  );
+  const rows = await em.query(`SELECT * FROM saved_views WHERE project_id = ? ORDER BY name ASC, id ASC`, [projectId]);
   return rows.map(rawToSavedViewRow);
 }
 
@@ -1459,14 +1392,12 @@ export async function createSavedView(
   }
   const em = assertEm(db);
   const id = randomUUID();
-  await em.execute(
+  await em.query(
     `INSERT INTO saved_views (id, org_id, project_id, scope, name, query_json, order_by, view_type, created_by, default_for)
      VALUES (?, ?, ?, 'project', ?, ?::jsonb, ?::jsonb, 'list', (SELECT id FROM users ORDER BY created_at ASC LIMIT 1), ?)`,
     [id, input.orgId, input.projectId, input.name, JSON.stringify(input.filters ?? {}), JSON.stringify(input.sortBy ? [{ field: input.sortBy }] : []), input.isDefault ? "project" : null],
   );
-  const rows = await em.execute<Record<string, unknown>[]>(
-    `SELECT * FROM saved_views WHERE id = ?`, [id], "all",
-  );
+  const rows = await em.query(`SELECT * FROM saved_views WHERE id = ?`, [id]);
   if (rows.length === 0) throw new Error(`saved_view insert lost: ${id}`);
   return rawToSavedViewRow(rows[0]!);
 }
@@ -1495,11 +1426,7 @@ export async function findApiKeyByHash(
     };
   }
   const em = assertEm(db);
-  const rows = await em.execute<Record<string, unknown>[]>(
-    `UPDATE api_keys SET last_used_at = now() WHERE key_hash = ? RETURNING *`,
-    [keyHash],
-    "all",
-  );
+  const rows = await em.query(`UPDATE api_keys SET last_used_at = now() WHERE key_hash = ? RETURNING *`, [keyHash]);
   if (rows.length === 0) return undefined;
   const r = rows[0]!;
   return {

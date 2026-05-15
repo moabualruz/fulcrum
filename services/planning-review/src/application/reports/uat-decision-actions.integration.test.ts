@@ -26,7 +26,7 @@ describe("review workbench UAT/code review decision action", () => {
     const artifactStore = await mkdtemp(join(tmpdir(), "fulcrum-uat-e2e-"));
     process.env.FULCRUM_ARTIFACT_STORE = artifactStore;
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const ctx = { orgId: ORG_ID, userId: USER_ID, projectId: PROJECT_ID };
       await seedReadyFinalQaProject(em, ctx, "trace-uat-approval");
 
@@ -126,7 +126,7 @@ describe("review workbench UAT/code review decision action", () => {
   test("requested changes schedule feedback runs instead of generating E2E artifacts", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const ctx = { orgId: ORG_ID, userId: USER_ID, projectId: PROJECT_ID };
       const { taskId } = await seedReadyFinalQaProject(em, ctx, "trace-uat-changes");
 
@@ -163,7 +163,7 @@ describe("review workbench UAT/code review decision action", () => {
     const artifactStore = await mkdtemp(join(tmpdir(), "fulcrum-uat-auto-e2e-"));
     process.env.FULCRUM_ARTIFACT_STORE = artifactStore;
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const ctx = { orgId: ORG_ID, userId: USER_ID, projectId: PROJECT_ID };
       await seedReadyFinalQaProject(em, ctx, "trace-uat-auto");
       await em.getConnection().execute(
@@ -244,7 +244,7 @@ describe("review workbench UAT/code review decision action", () => {
     const artifactStore = await mkdtemp(join(tmpdir(), "fulcrum-uat-playwright-e2e-"));
     process.env.FULCRUM_ARTIFACT_STORE = artifactStore;
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const ctx = { orgId: ORG_ID, userId: USER_ID, projectId: PROJECT_ID };
       await seedReadyFinalQaProject(em, ctx, "trace-uat-playwright");
 
@@ -318,7 +318,7 @@ describe("review workbench UAT/code review decision action", () => {
     const artifactStore = await mkdtemp(join(tmpdir(), "fulcrum-uat-coverage-e2e-"));
     process.env.FULCRUM_ARTIFACT_STORE = artifactStore;
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const ctx = { orgId: ORG_ID, userId: USER_ID, projectId: PROJECT_ID };
       const seeded = await seedReadyFinalQaProject(em, ctx, "trace-uat-coverage", [
         {

@@ -3,9 +3,9 @@ import { Container } from "@needle-di/core";
 
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
-import { MemoryLink } from "@platform-core/infrastructure/application-database/entities/memory/MemoryLink.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
+import { MemoryLink } from "@knowledge-workspace/infrastructure/database/entities/memory/MemoryLink.ts";
 import { AfterRunMemoryHook, type AfterRunMemoryContext } from "../hooks/after-run-hook.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
@@ -22,7 +22,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  const em = db.orm.em.fork();
+  const em = db.orm.em;
   await em.nativeDelete(MemoryLink, {});
   await em.nativeDelete(Memory, {});
   await em.upsert(
@@ -34,8 +34,8 @@ beforeEach(async () => {
 
 describe("AfterRunMemoryHook", () => {
   test("resolves through needle-di", () => {
-    const container = new Container();
-    registerDbBindings(container, db.orm, db.orm.em.fork());
+    const container = null;
+    registerDbBindings(container, db.orm, db.orm.em);
 
     expect(container.get(AfterRunMemoryHook)).toBeInstanceOf(AfterRunMemoryHook);
   });
@@ -51,7 +51,7 @@ describe("AfterRunMemoryHook", () => {
 
     await hook.handle(RUN_ID, transcript, createCtx());
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     const memories = await em.find(Memory, {}, { orderBy: { kind: "ASC", body: "ASC" } });
     const links = await em.find(MemoryLink, {}, { populate: ["memory"] });
 
@@ -88,7 +88,7 @@ describe("AfterRunMemoryHook", () => {
     await hook.handle(RUN_ID, transcript, createCtx());
     await hook.handle(RUN_ID, transcript, createCtx());
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     expect(await em.count(Memory, {})).toBe(1);
     expect(await em.count(MemoryLink, {})).toBe(1);
   });
@@ -98,15 +98,15 @@ describe("AfterRunMemoryHook", () => {
 
     await hook.handle(RUN_ID, "", createCtx());
 
-    const em = db.orm.em.fork();
+    const em = db.orm.em;
     expect(await em.count(Memory, {})).toBe(0);
     expect(await em.count(MemoryLink, {})).toBe(0);
   });
 });
 
 function createHook(): AfterRunMemoryHook {
-  const container = new Container();
-  registerDbBindings(container, db.orm, db.orm.em.fork());
+  const container = null;
+  registerDbBindings(container, db.orm, db.orm.em);
   return container.get(AfterRunMemoryHook);
 }
 

@@ -33,7 +33,7 @@ export async function requestAppScope(
   let em = scope?.em ?? null;
   if (!em) {
     const db = await initDatabase();
-    em = db.em.fork();
+    em = db.em;
   }
   return await resolveApplicationScope(
     { ...scope, em } satisfies ApplicationScopeInput,

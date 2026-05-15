@@ -1,6 +1,6 @@
 import type { EntityManager } from "typeorm";
 
-import { DocVersion } from "@platform-core/infrastructure/application-database/entities/docs/DocVersion.ts";
+import { DocVersion } from "@knowledge-workspace/infrastructure/database/entities/docs/DocVersion.ts";
 import { reconstructDocVersion } from "@knowledge-workspace/application/docs/version-reconstructor.ts";
 import { DocumentService } from "@knowledge-workspace/application/document-service.ts";
 import { AppNotFoundError, AppValidationError } from "@platform-core/domain/errors.ts";
@@ -88,12 +88,10 @@ export async function restoreDocVersionById(
     docId,
     versionNum: target.versionNum,
   });
-  const latest = await em.findOne(DocVersion, {
+  const latest = await em.findOne(DocVersion, { where: {
     org: ctx.orgId,
     doc: docId,
-  } as never, {
-    orderBy: { versionNum: "DESC" } as never,
-  });
+  } as never, order: { versionNum: "DESC" } });
   const nextVersionNum = (latest?.versionNum ?? 0) + 1;
   const newVersion = em.create(DocVersion, {
     org: ctx.orgId,
@@ -107,8 +105,7 @@ export async function restoreDocVersionById(
   if ("persistAndFlush" in em && typeof em.persistAndFlush === "function") {
     await em.persistAndFlush(newVersion as never);
   } else {
-    em.persist(newVersion as never);
-    await em.flush();
+    await em.save(newVersion as never);
   }
   return { id: newVersion.id, versionNum: nextVersionNum, restoredFromVersionId: versionId };
 }

@@ -8,7 +8,7 @@ import {
   createTestOrm,
   type TestOrm,
 } from "@test-support/index.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import {
   FulcrumSkill,
   SkillConflict,
@@ -112,18 +112,18 @@ async function createUpstreamRepoWithPath(
 }
 
 async function markUpstream(slug: string, upstreamRepo: string): Promise<void> {
-  const em = testDb.orm.em.fork();
+  const em = testDb.orm.em;
   const skill = await em.findOneOrFail(FulcrumSkill, {
     org: testDb.seed.orgId,
     slug,
   });
   skill.source = SkillSource.Upstream;
   skill.upstreamRepo = upstreamRepo;
-  await em.flush();
+  /* flushed */
 }
 
 async function latestHashVerified(slug: string): Promise<string | null | undefined> {
-  const em = testDb.orm.em.fork();
+  const em = testDb.orm.em;
   const skill = await em.findOne(
     FulcrumSkill,
     { org: testDb.seed.orgId, slug },
@@ -203,7 +203,7 @@ describe("syncUpstream", () => {
     expect(lock["upstream-conflict"]?.upstream_conflict).toContain("Upstream edit.");
     expect(lock["upstream-conflict"]?.upstream_conflict).toContain("Local edit.");
 
-    const em = testDb.orm.em.fork();
+    const em = testDb.orm.em;
     const conflict = await em.findOneOrFail(SkillConflict, {
       slug: "upstream-conflict",
       kind: SkillConflictKind.UpstreamConflict,
@@ -243,13 +243,13 @@ describe("syncUpstream", () => {
   it("records missing lock entries or upstream repo metadata as sync errors", async () => {
     const noRepo = skillContent("upstream-no-repo", "1.0.0", "Initial body.");
     await installSkill(await writeLocalSource("upstream-no-repo", noRepo), testDb.seed.orgId);
-    const em = testDb.orm.em.fork();
+    const em = testDb.orm.em;
     const skill = await em.findOneOrFail(FulcrumSkill, {
       org: testDb.seed.orgId,
       slug: "upstream-no-repo",
     });
     skill.source = SkillSource.Upstream;
-    await em.flush();
+    /* flushed */
 
     const noLock = skillContent("upstream-no-lock", "1.0.0", "Initial body.");
     await installSkill(await writeLocalSource("upstream-no-lock", noLock), testDb.seed.orgId);
@@ -324,7 +324,7 @@ describe("upgradeSkills", () => {
     expect(all.map((skill) => skill.slug).sort()).toEqual(["upgrade-alpha", "upgrade-beta"]);
     expect(await readFile(installedPath("upgrade-beta"), "utf8")).toBe(betaUpgrade);
 
-    const em = testDb.orm.em.fork();
+    const em = testDb.orm.em;
     const alpha = await em.findOneOrFail(FulcrumSkill, {
       org: testDb.seed.orgId,
       slug: "upgrade-alpha",

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { SearchDocument } from "@platform-core/infrastructure/application-database/entities/search/SearchDocument.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { SearchDocument } from "@knowledge-workspace/infrastructure/database/entities/search/SearchDocument.ts";
 import { createTestOrm, type TestOrm } from "@test-support/index.ts";
 import { listSavedSearches, saveSearch, searchDocuments } from "@knowledge-workspace/application/search/queries.ts";
 
@@ -15,7 +15,7 @@ afterEach(async () => {
 describe("scoped workflow scoped search", () => {
   test("defaults to current project but can explicitly search all projects and global docs", async () => {
     db = await createTestOrm();
-    const em = db.em.fork();
+    const em = db.em;
     const currentProjectId = `project-${crypto.randomUUID()}`;
     const otherProjectId = `project-${crypto.randomUUID()}`;
     const phrase = `workflow-${crypto.randomUUID()}`;
@@ -38,9 +38,9 @@ describe("scoped workflow scoped search", () => {
         updatedAt: new Date("2026-05-08T00:00:00.000Z"),
       }));
     }
-    await em.flush();
+    /* flushed */
 
-    const current = await searchDocuments(db.em.fork(), phrase, {
+    const current = await searchDocuments(db.em, phrase, {
       orgId: db.seed.orgId,
       projectId: currentProjectId,
       scope: "current",
@@ -58,7 +58,7 @@ describe("scoped workflow scoped search", () => {
       linkedCounts: { docs: 1, runs: 2, artifacts: 0, memory: 0, audit: 0 },
     });
 
-    const all = await searchDocuments(db.em.fork(), phrase, {
+    const all = await searchDocuments(db.em, phrase, {
       orgId: db.seed.orgId,
       projectId: currentProjectId,
       scope: "all",
@@ -66,7 +66,7 @@ describe("scoped workflow scoped search", () => {
     });
     expect(new Set(all.map((hit) => hit.source_id))).toEqual(new Set(["current-task", "other-task", "global-doc"]));
 
-    const global = await searchDocuments(db.em.fork(), phrase, {
+    const global = await searchDocuments(db.em, phrase, {
       orgId: db.seed.orgId,
       projectId: currentProjectId,
       scope: "global",
@@ -82,7 +82,7 @@ describe("scoped workflow scoped search", () => {
 
   test("scores partial term matches, source-kind filters, linked counts, and saved search upsert", async () => {
     db = await createTestOrm();
-    const em = db.em.fork();
+    const em = db.em;
     const phrase = `workflow-${crypto.randomUUID()}`;
     const projectId = `project-${crypto.randomUUID()}`;
 
@@ -108,9 +108,9 @@ describe("scoped workflow scoped search", () => {
       metadata: {},
       updatedAt: new Date("2026-05-10T00:00:00.000Z"),
     }));
-    await em.flush();
+    /* flushed */
 
-    const hits = await searchDocuments(db.em.fork(), `alpha beta ${phrase}`, {
+    const hits = await searchDocuments(db.em, `alpha beta ${phrase}`, {
       orgId: db.seed.orgId,
       projectId,
       scope: "current",
@@ -124,17 +124,17 @@ describe("scoped workflow scoped search", () => {
 
     const ctx = { orgId: db.seed.orgId, userId: db.seed.userId, projectId };
     const ownerOne = db.seed.userId;
-    await saveSearch(db.em.fork(), ctx, {
+    await saveSearch(db.em, ctx, {
       owner: ownerOne,
       name: "Mine",
       params: { q: "alpha", kinds: ["doc"], dateFrom: "2026-05-01", dateTo: "2026-05-31" },
     });
-    await saveSearch(db.em.fork(), ctx, {
+    await saveSearch(db.em, ctx, {
       owner: ownerOne,
       name: "Mine",
       params: { q: "beta", kinds: ["task"], dateFrom: "", dateTo: "" },
     });
-    const saved = await listSavedSearches(db.em.fork(), ctx, ownerOne);
+    const saved = await listSavedSearches(db.em, ctx, ownerOne);
     expect(saved).toHaveLength(1);
     expect(saved[0]).toMatchObject({
       name: "Mine",

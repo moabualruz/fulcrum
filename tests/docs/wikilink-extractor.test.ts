@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { DocLink } from "@platform-core/infrastructure/application-database/entities/docs/DocLink.ts";
+import { DocLink } from "@knowledge-workspace/infrastructure/database/entities/docs/DocLink.ts";
 import { createTestOrm } from "@test-support/application-database.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
@@ -52,7 +52,7 @@ describe("wikilink extraction", () => {
   test("docs.update upserts wikilinks idempotently", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
       const target = await caller.docs.create({ title: "Target Doc" });
       const source = await caller.docs.create({ title: "Source Doc" });
@@ -73,7 +73,7 @@ describe("wikilink extraction", () => {
   test("docs.update removes stale wikilinks", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const caller = callerFor(em);
       const keep = await caller.docs.create({ title: "Keep Doc" });
       const stale = await caller.docs.create({ title: "Stale Doc" });

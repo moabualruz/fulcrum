@@ -53,7 +53,8 @@ export async function dbMigrate(
   container: Container | null,
   input: DbMigrateInput = {},
 ): Promise<void> {
-  const service = requireContainer(container).get(MigratorService);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = requireContainer(container).get(MigratorService as any) as MigratorService;
   await service.migrate(input.targetVersion, input.force ?? false);
 }
 
@@ -63,7 +64,8 @@ export async function dbMigrate(
 export async function dbStatus(
   container: Container | null,
 ): Promise<MigrationStatus> {
-  return requireContainer(container).get(MigratorService).status();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (requireContainer(container).get(MigratorService as any) as MigratorService).status();
 }
 
 /**
@@ -72,7 +74,8 @@ export async function dbStatus(
 export async function dbHistory(
   container: Container | null,
 ): Promise<SchemaMigration[]> {
-  return requireContainer(container).get(MigratorService).history();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (requireContainer(container).get(MigratorService as any) as MigratorService).history();
 }
 
 /**

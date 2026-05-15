@@ -3,7 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { resolveArtifactStoreRoot } from "@workflow-coordination/infrastructure/artifacts/storage.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { AppForbiddenError, AppNotFoundError, AppValidationError } from "@platform-core/domain/errors.ts";
@@ -54,7 +54,7 @@ async function createArtifactGraph(em: TestOrm["em"]) {
 describe("application artifacts commands and queries", () => {
   test("createArtifact, listArtifacts, and getArtifact round-trip through MikroORM", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const created = await createArtifact(em, ctx(), {
       filename: "summary.md",
       path: "/tmp/summary.md",
@@ -68,26 +68,26 @@ describe("application artifacts commands and queries", () => {
 
   test("createArtifact validation failure throws AppValidationError", async () => {
     const testDb = await freshDb();
-    await expect(createArtifact(testDb.em.fork(), ctx(), { filename: "", path: "" })).rejects.toBeInstanceOf(AppValidationError);
+    await expect(createArtifact(testDb.em, ctx(), { filename: "", path: "" })).rejects.toBeInstanceOf(AppValidationError);
   });
 
   test("getArtifact not-found throws AppNotFoundError", async () => {
     const testDb = await freshDb();
-    await expect(getArtifact(testDb.em.fork(), ctx(), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")).rejects.toBeInstanceOf(AppNotFoundError);
+    await expect(getArtifact(testDb.em, ctx(), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")).rejects.toBeInstanceOf(AppNotFoundError);
   });
 
   test("cross-org artifact access throws AppForbiddenError", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     em.persist(em.create(Org, { id: OTHER_ORG_ID, name: "Other", slug: "other", createdAt: new Date(), updatedAt: new Date() }));
-    await em.flush();
+    /* flushed */
     const other = await createArtifact(em, ctx(OTHER_ORG_ID), { filename: "other.txt", path: "/tmp/other.txt" });
     await expect(getArtifact(em, ctx(), other.id)).rejects.toBeInstanceOf(AppForbiddenError);
   });
 
   test("artifact rows, stats, and detail content use real artifact tables and storage guard", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const { projectId, taskId, runId } = await createArtifactGraph(em);
     const bodyPath = "application-artifacts/readme.txt";
     const fullPath = join(resolveArtifactStoreRoot(), bodyPath);

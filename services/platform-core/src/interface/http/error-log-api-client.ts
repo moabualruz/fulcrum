@@ -24,15 +24,20 @@ export function createErrorLogApiCaller(options: ErrorLogApiClientOptions) {
           method: "GET",
           query: scopedQuery(options, input),
         }),
+      listPage: async (input: JsonRecord = {}) =>
+        await request("/api/v1/error-logs", {
+          method: "GET",
+          query: scopedQuery(options, { ...input, includeTotal: true }),
+        }),
       get: async (input: JsonRecord) =>
         await request(`/api/v1/error-logs/${encodeURIComponent(requiredInput(input, "id"))}`, {
           method: "GET",
           query: scopedQuery(options, {}),
         }),
-      clear: async () =>
+      clear: async (input: JsonRecord = {}) =>
         await request("/api/v1/error-logs", {
           method: "DELETE",
-          query: scopedQuery(options, {}),
+          query: scopedQuery(options, input),
         }),
     },
   };

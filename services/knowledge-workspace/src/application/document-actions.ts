@@ -59,7 +59,7 @@ async function queryRows<T>(
     return db.query<T>(sql, params as never);
   }
   const normalized = sqlForManager(sql, params);
-  return db.getConnection().execute(normalized.sql, normalized.params) as Promise<T[]>;
+  return db.query(normalized.sql, normalized.params) as Promise<T[]>;
 }
 
 async function tableColumns(db: DocumentDb, tableName: string): Promise<Set<string>> {

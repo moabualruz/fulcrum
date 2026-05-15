@@ -39,7 +39,7 @@ describe("artifacts lifecycle tRPC", () => {
   test("accepts and rejects artifacts without losing source metadata", async () => {
     const db = await createTestOrm();
     try {
-      const caller = callerFor(db.em.fork());
+      const caller = callerFor(db.em);
       await db.em.getConnection().execute(
         `INSERT INTO orgs (id, name, slug) VALUES (?, ?, ?)`,
         [ORG_ID, "Artifact Org", "artifact-org"],

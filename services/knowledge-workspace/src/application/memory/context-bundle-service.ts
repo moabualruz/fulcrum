@@ -15,9 +15,9 @@
  */
 
 import { Injectable } from "@nestjs/common";
-import type { MemoryRepository } from "@platform-core/infrastructure/application-database/repositories/memory/MemoryRepository";
-import type { DocumentRepository } from "@platform-core/infrastructure/application-database/repositories/docs/DocumentRepository";
-import type { AgentRunRepository } from "@platform-core/infrastructure/application-database/repositories/orchestration/AgentRunRepository";
+import type { MemoryRepository } from "@knowledge-workspace/infrastructure/database/repositories/memory/MemoryRepository";
+import type { DocumentRepository } from "@knowledge-workspace/infrastructure/database/repositories/docs/DocumentRepository";
+import type { AgentRunRepository } from "@execution-orchestration/infrastructure/database/repositories/orchestration/AgentRunRepository";
 
 // ---------------------------------------------------------------------------
 // Token budget constants

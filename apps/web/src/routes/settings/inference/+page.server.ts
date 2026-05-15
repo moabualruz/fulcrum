@@ -4,7 +4,7 @@ import type {
   HealthResult,
   InferenceBackendInfo,
   InferenceModel,
-} from "@platform-core/application/inference/protocol.ts";
+} from "@platform-core/interface/http/inference-api-client.ts";
 import { createInferenceApiCaller } from "@platform-core/interface/http/inference-api-client.ts";
 
 export type BackendStatus = "healthy" | "degraded" | "unreachable";

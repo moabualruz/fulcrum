@@ -4,10 +4,10 @@ import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
-import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { AgentRun } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import {
   dispatchLifecycleHook,
@@ -92,7 +92,7 @@ async function seedTask(
   db: TestOrm,
   input: Partial<Task> = {},
 ): Promise<Task> {
-  const em = db.em.fork();
+  const em = db.em;
   const task = em.create(Task, {
     org: em.getReference(Org, ORG_ID),
     status: "ready",
@@ -100,8 +100,7 @@ async function seedTask(
     blockedByIds: [],
     ...input,
   });
-  em.persist(task);
-  await em.flush();
+  await em.save(task);
   return task;
 }
 
@@ -109,7 +108,7 @@ async function seedRun(
   db: TestOrm,
   input: Partial<AgentRun> = {},
 ): Promise<AgentRun> {
-  const em = db.em.fork();
+  const em = db.em;
   const task = input.task ?? await seedTask(db);
   const run = em.create(AgentRun, {
     org: em.getReference(Org, ORG_ID),
@@ -118,8 +117,7 @@ async function seedRun(
     attemptCount: 0,
     ...input,
   });
-  em.persist(run);
-  await em.flush();
+  await em.save(run);
   return run;
 }
 
@@ -247,7 +245,7 @@ maxAttempts: 5
       ClaimConflictError,
     );
 
-    const events = await db.em.fork().find(Event, {
+    const events = await db.em.find(Event, {
       org: ORG_ID,
       subjectKind: "agent_run",
       subjectId: firstRun.id,
@@ -414,7 +412,7 @@ maxAttempts: 5
       { now: () => now },
     );
 
-    const updated = await db.em.fork().findOneOrFail(AgentRun, run.id);
+    const updated = await db.em.findOneOrFail(AgentRun, run.id);
     expect(updated.orchestrationState).toBe("retry_queued");
     expect(updated.attemptCount).toBe(2);
     expect(updated.lastErrorKind).toBe("turn_failed");
@@ -451,7 +449,7 @@ maxAttempts: 5
     const db = await testDb();
     const task = await seedTask(db);
     const run = await seedRun(db, { task });
-    const em = db.em.fork();
+    const em = db.em;
     const managedRun = await em.findOneOrFail(AgentRun, run.id, { populate: ["task"] });
     const managedTask = managedRun.task!;
 
@@ -1052,10 +1050,10 @@ Prompt`);
       const run = await seedRun(db, { orchestrationState: "unclaimed" });
 
       // Mutate directly on AgentRun entity
-      const em = db.em.fork();
+      const em = db.em;
       const managed = await em.findOneOrFail(AgentRun, run.id);
       managed.orchestrationState = "running";
-      await em.flush();
+      /* flushed */
 
       const refreshed = await refreshRunningIssues(db.em, ORG_ID);
       const found = refreshed.active.find((r) => r.id === run.id);
@@ -1170,7 +1168,7 @@ Prompt`);
     test("REQUIRED: AgentRun entity has attemptLifecycleState field", async () => {
       const db = await testDb();
       const run = await seedRun(db);
-      const em = db.em.fork();
+      const em = db.em;
       const managed = await em.findOneOrFail(AgentRun, run.id);
       // Field must exist (may be undefined/null initially)
       expect("attemptLifecycleState" in managed).toBe(true);
@@ -1194,7 +1192,7 @@ Prompt`);
     test("REQUIRED: AgentRun has lastCodexTimestamp field for stall cutoff", async () => {
       const db = await testDb();
       const run = await seedRun(db);
-      const em = db.em.fork();
+      const em = db.em;
       const managed = await em.findOneOrFail(AgentRun, run.id);
       expect("lastCodexTimestamp" in managed).toBe(true);
     });
@@ -1239,7 +1237,7 @@ Prompt`);
         { now: () => now },
       );
 
-      const updated = await db.em.fork().findOneOrFail(AgentRun, run.id);
+      const updated = await db.em.findOneOrFail(AgentRun, run.id);
       expect(updated.orchestrationState).toBe("retry_queued");
       // Continuation retry uses fixed 1000ms delay, not exponential
       expect(updated.nextRetryAt?.toISOString()).toBe("2026-05-03T12:00:01.000Z");
@@ -1353,9 +1351,9 @@ Prompt`);
       expect(await pathExists(terminalDryRunPath)).toBe(false);
       expect(await pathExists(runningPath)).toBe(true);
 
-      const refreshedRunning = await db.em.fork().findOneOrFail(AgentRun, running.id);
+      const refreshedRunning = await db.em.findOneOrFail(AgentRun, running.id);
       expect(refreshedRunning.workspacePath).toBe(runningPath);
-      const refreshedSucceeded = await db.em.fork().findOneOrFail(AgentRun, succeeded.id);
+      const refreshedSucceeded = await db.em.findOneOrFail(AgentRun, succeeded.id);
       expect(refreshedSucceeded.workspacePath).toBeNull();
 
       await rm(scratchRoot, { recursive: true, force: true });
@@ -1480,7 +1478,7 @@ Prompt`);
       try {
         const caller = orchestrationRouter.createCaller(
           createContext({
-            em: db.em.fork(),
+            em: db.em,
             orgId: ORG_ID,
             session: {
               id: "s1",
@@ -1524,7 +1522,7 @@ Prompt`);
       try {
         const caller = orchestrationRouter.createCaller(
           createContext({
-            em: db.em.fork(),
+            em: db.em,
             orgId: ORG_ID,
             session: {
               id: "s1",
@@ -1550,7 +1548,7 @@ Prompt`);
         await dispatchRun({ taskId: task.id, orgId: ORG_ID });
 
         // Verify agent_runs row was created
-        const runs = await db.em.fork().find(AgentRun, { task: task.id } as never);
+        const runs = await db.em.find(AgentRun, { task: task.id } as never);
         expect(runs.length).toBeGreaterThanOrEqual(1);
       } finally {
         await db.close();
@@ -1655,11 +1653,11 @@ Prompt`);
       });
 
       // Update lastCodexTimestamp to be very recent (within stall window)
-      const em = db.em.fork();
+      const em = db.em;
       const managed = await em.findOneOrFail(AgentRun, run.id);
       (managed as AgentRun & { lastCodexTimestamp?: Date }).lastCodexTimestamp =
         new Date("2026-05-03T11:59:59.000Z");
-      await em.flush();
+      /* flushed */
 
       const onStalled = mock(async () => undefined);
 
@@ -1687,7 +1685,7 @@ Prompt`);
       });
 
       // Ensure lastCodexTimestamp is null (default)
-      const em = db.em.fork();
+      const em = db.em;
       const managed = await em.findOneOrFail(AgentRun, run.id);
       expect((managed as AgentRun & { lastCodexTimestamp?: Date }).lastCodexTimestamp).toBeFalsy();
 

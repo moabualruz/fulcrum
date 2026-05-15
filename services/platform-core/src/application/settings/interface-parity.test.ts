@@ -3,7 +3,7 @@ import { MikroORM } from "typeorm";
 
 import { run as runSettingsCommand } from "@fulcrum/cli/settings.ts";
 import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
-import { Session } from "@platform-core/infrastructure/application-database/entities/auth/Session.ts";
+import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
 import { createTestContainer, createTestOrm, type TestOrm } from "@test-support/index.ts";
 import { buildCaller } from "@fulcrum/tui/index.ts";
 import { setTenantSetting } from "@platform-core/application/settings/commands.ts";
@@ -23,7 +23,7 @@ function jsonLine<T>(lines: string[]): T {
 }
 
 async function ensureSession(db: TestOrm): Promise<void> {
-  const em = db.em.fork();
+  const em = db.em;
   em.persist(em.create(Session, {
     id: `parity-${crypto.randomUUID()}`,
     userId: db.seed.userId,
@@ -34,7 +34,7 @@ async function ensureSession(db: TestOrm): Promise<void> {
     ipAddress: null,
     userAgent: "test",
   }));
-  await em.flush();
+  /* flushed */
 }
 
 describe("settings cross-interface parity", () => {
@@ -44,12 +44,12 @@ describe("settings cross-interface parity", () => {
     container.bind({ provide: MikroORM, useValue: db.orm });
     const ctx: AppContext = { orgId: db.seed.orgId, userId: db.seed.userId, projectId: null };
 
-    const created = await setTenantSetting(db.em.fork(), ctx, {
+    const created = await setTenantSetting(db.em, ctx, {
       key: "public-api",
       value: { enabled: true },
     });
     await ensureSession(db);
-    const appSetting = await getTenantSetting(db.em.fork(), ctx, "public-api");
+    const appSetting = await getTenantSetting(db.em, ctx, "public-api");
 
     const localCaller = await createLocalCaller({ container, requireSession: true });
     const trpcFlag = ((await localCaller.flags.list()) as Array<{ name: string; enabled: boolean }>)

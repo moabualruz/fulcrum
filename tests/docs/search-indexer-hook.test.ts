@@ -79,7 +79,7 @@ describe("docs search index hook", () => {
   test("indexes on doc save", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await installP11SearchColumns(em);
       const caller = callerFor(em);
 
@@ -110,7 +110,7 @@ describe("docs search index hook", () => {
   test("updates index on doc edit", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await installP11SearchColumns(em);
       const caller = callerFor(em);
 
@@ -137,7 +137,7 @@ describe("docs search index hook", () => {
   test("archives index row on soft delete and removes it on hard delete", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await installP11SearchColumns(em);
       const caller = callerFor(em);
 

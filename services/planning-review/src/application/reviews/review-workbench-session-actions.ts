@@ -297,13 +297,13 @@ async function nextRevision(
   projectId: string,
   reviewId: string,
 ): Promise<number> {
-  const rows = await em.getConnection().execute<Array<{ revision: number | string | null }>>(
+  const rows = await em.query<Array<{ revision: number | string | null }>>(
     `select coalesce(max((payload->>'revision')::int), 0) as revision
        from events
-      where org_id = ?
-        and project_id = ?
+      where org_id = $1
+        and project_id = $2
         and subject_kind = 'review_session'
-        and subject_id = ?`,
+        and subject_id = $3`,
     [orgId, projectId, reviewId],
   );
   return Number(rows[0]?.revision ?? 0) + 1;
@@ -324,8 +324,7 @@ async function loadLatestSessionEvent(
     params.push(input.traceId);
     filters.push("payload->>'traceId' = ?");
   }
-  const rows = await em.getConnection().execute<ReviewSessionEventRow[]>(
-    `select id, payload
+  const rows = await em.query(`select id, payload
        from events
       where org_id = ?
         and project_id = ?
@@ -333,9 +332,7 @@ async function loadLatestSessionEvent(
         and verb in ('review_session_saved', 'review_session_annotation_added')
         and (${filters.join(" or ")})
       order by (payload->>'revision')::int desc, created_at desc
-      limit 1`,
-    params,
-  );
+      limit 1`, params, );
   return rows[0] ?? null;
 }
 

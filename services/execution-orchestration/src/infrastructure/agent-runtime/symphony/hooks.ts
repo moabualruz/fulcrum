@@ -1,8 +1,8 @@
 import type { EntityManager } from "typeorm";
 
-import type { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
-import type { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
-import type { EventRepository } from "@platform-core/infrastructure/application-database/repositories/core/EventRepository.ts";
+import type { AgentRun } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
+import type { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
+import type { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 
 export const DEFAULT_HOOK_TIMEOUT_MS = 60_000;
 
@@ -146,26 +146,22 @@ async function emitHookDispatchedEvent(
 ): Promise<void> {
   const [{ Event }, { Org }] = await Promise.all([
     import("@platform-core/infrastructure/application-database/entities/core/Event.ts"),
-    import("@platform-core/infrastructure/application-database/entities/auth/Org.ts"),
+    import("@identity-access/infrastructure/database/entities/auth/Org.ts"),
   ]);
-  const fork = em.fork();
-  const eventsRepo = fork.getRepository(Event) as EventRepository;
   const orgId = entityId(ctx.run.org) ?? entityId(ctx.task.org);
 
   if (!orgId) {
     throw new Error("Cannot emit hook_dispatched event without org id");
   }
 
-  eventsRepo.create({
-    org: fork.getReference(Org, orgId),
+  await em.save(Event, {
+    org: { id: orgId } as Org,
     subjectKind: "agent_run",
     subjectId: ctx.run.id,
     verb: "hook_dispatched",
     payload: { hookName, durationMs },
     createdAt: new Date(),
   });
-
-  await fork.flush();
 }
 
 function entityId(entity: { id?: string } | string | undefined): string | undefined {

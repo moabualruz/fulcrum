@@ -7,6 +7,7 @@ import { initDataSource, __resetDataSourceForTest } from "@platform-core/infrast
 import { dbCanRunOnCurrentBinary } from "@platform-core/infrastructure/application-database/doctor-checks.ts";
 import { SchemaMigrationRepository } from "@platform-core/infrastructure/application-database/repositories/SchemaMigrationRepository.ts";
 
+import type { DiContainer } from "./di-container.ts";
 export type { DiContainer } from "./di-container.ts";
 
 export interface LocalApplicationContainer {
@@ -34,13 +35,10 @@ export async function buildLocalApplicationContainer(): Promise<LocalApplication
 
 export async function verifyLocalApplicationMigrations(container: DiContainer): Promise<void> {
   const dataSource = container.get(DataSource);
-  const queryRunner = dataSource.createQueryRunner();
-  const pending = await queryRunner.getPendingMigrations();
-  await queryRunner.release();
+  const hasPending = await dataSource.showMigrations();
 
-  if (pending.length > 0) {
-    const names = pending.map((m) => m.name).join(", ");
-    throw new Error(`migrations pending: ${names}. Run \`fulcrum db migrate\` before \`fulcrum web\`.`);
+  if (hasPending) {
+    throw new Error(`Migrations pending. Run \`fulcrum db migrate\` before \`fulcrum web\`.`);
   }
 
   const schemaMigrationRepo = new SchemaMigrationRepository(dataSource.getRepository(

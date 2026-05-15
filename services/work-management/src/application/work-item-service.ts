@@ -7,12 +7,12 @@ import {
   AppValidationError,
 } from "@platform-core/domain/errors.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
-import { type TaskDependencies } from "@platform-core/infrastructure/application-database/entities/tasks/schemas.ts";
-import { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
+import { type TaskDependencies } from "@work-management/infrastructure/database/entities/tasks/schemas.ts";
+import { TaskRepository } from "@work-management/infrastructure/database/repositories/tasks/TaskRepository.ts";
 import { tipTapDocToText, type TipTapJson } from "@platform-core/infrastructure/application-database/tasks-rich-text.ts";
-import { FieldDependencyRule } from "@platform-core/infrastructure/application-database/entities/tasks/FieldDependencyRule.ts";
+import { FieldDependencyRule } from "@work-management/infrastructure/database/entities/tasks/FieldDependencyRule.ts";
 import { WorkflowRulesService } from "@work-management/application/workflow-rules-service.ts";
 import { WorkItemCommentService } from "@work-management/application/work-item-comments.ts";
 
@@ -78,10 +78,7 @@ export class WorkItemService {
     const repo = this.repo();
     const task = await repo.get({ orgId, id: taskId });
     if (!task) return [];
-    const children = await repo.find(
-      { org: orgId, parent: taskId, deletedAt: null } as never,
-      { orderBy: { createdAt: "ASC", id: "ASC" } },
-    );
+    const children = await this.em.find(Task, { where: { org: { id: orgId }, parent: taskId, deletedAt: null } as never, order: { createdAt: "ASC", id: "ASC" } });
     return children.map(serializeTask);
   }
 
@@ -98,7 +95,7 @@ export class WorkItemService {
   }): Promise<TaskOutput> {
     const repo = this.repo();
     const task = repo.create({ orgId, ...input });
-    await repo.getEntityManager().flush();
+    
     return serializeTask(task);
   }
 
@@ -147,8 +144,7 @@ export class WorkItemService {
 
     if (isStartingNow) {
       task.startedAt = new Date();
-      this.em.persist(task);
-      await this.em.flush();
+      await this.em.save(task);
     }
 
     // D-08: Watcher auto-subscribe on assignee change
@@ -164,7 +160,6 @@ export class WorkItemService {
     // HIGH-03: Inline field dependency validation
     if (input.projectId ?? current.projectId) {
       const projectId = (input.projectId ?? current.projectId)!;
-      await this.em.populate(task, ["customFields"] as never);
       await validateFieldDependencies(this.em, orgId, projectId, task);
     }
 
@@ -183,12 +178,11 @@ export class WorkItemService {
       throw new AppValidationError("Bulk operations are limited to 200 tasks at a time.");
     }
     const repo = this.repo();
-    await repo.getEntityManager().transactional(async (txEm) => {
-      const txRepo = txEm.getRepository(Task) as TaskRepository;
-      const tasks = await findBulkTasksOrThrow(txRepo, ctx.orgId, ids);
+    await this.em.transaction(async (txEm) => {
+      const tasks = await findBulkTasksOrThrow(txEm, ctx.orgId, ids);
       for (const task of tasks) {
         applyBulkPatch(task, patch);
-        txEm.persist(task);
+        await txEm.save(task);
         await emitTaskEvent({ ...ctx, em: txEm as EntityManager }, {
           verb: "bulk_updated",
           taskId: task.id,
@@ -196,7 +190,7 @@ export class WorkItemService {
         });
       }
       if (patch.projectId !== undefined) {
-        await txEm.getConnection().execute(
+        await txEm.query(
           `insert into projects (id, org_id, name)
            select ?, ?, 'Untitled project'
            where ? is not null
@@ -205,7 +199,7 @@ export class WorkItemService {
            on conflict do nothing`,
           [patch.projectId, ctx.orgId, patch.projectId, ctx.orgId, patch.projectId, ctx.orgId, patch.projectId],
         );
-        await txEm.getConnection().execute(
+        await txEm.query(
           `update tasks
            set project_id = case
              when ? is null then null
@@ -227,15 +221,13 @@ export class WorkItemService {
     if (ids.length > 200) {
       throw new AppValidationError("Bulk operations are limited to 200 tasks at a time.");
     }
-    const repo = this.repo();
-    await repo.getEntityManager().transactional(async (txEm) => {
-      const txRepo = txEm.getRepository(Task) as TaskRepository;
-      const tasks = await findBulkTasksOrThrow(txRepo, ctx.orgId, ids);
+    await this.em.transaction(async (txEm) => {
+      const tasks = await findBulkTasksOrThrow(txEm, ctx.orgId, ids);
       const deletedAt = new Date();
       for (const task of tasks) {
         task.deletedAt = deletedAt;
         task.updatedAt = deletedAt;
-        txEm.persist(task);
+        await txEm.save(task);
         await emitTaskEvent({ ...ctx, em: txEm as EntityManager }, {
           verb: "bulk_deleted",
           taskId: task.id,
@@ -259,13 +251,13 @@ export class WorkItemService {
     const previousParentId = task.parent?.id ?? null;
     task.parent = parent;
     task.updatedAt = new Date();
-    repo.getEntityManager().persist(task);
+    await this.em.save(task);
     await emitTaskEvent(ctx, {
       verb: "parent_changed",
       taskId: task.id,
       payload: { previousParentId, parentId },
     });
-    await repo.getEntityManager().flush();
+    
     return serializeTask(task);
   }
 
@@ -284,7 +276,7 @@ export class WorkItemService {
       throw new AppConflictError("Task dependency cycle rejected.");
     }
 
-    const tasks = await repo.find({ org: ctx.orgId, deletedAt: null } as never);
+    const tasks = await this.em.find(Task, { where: { org: { id: ctx.orgId }, deletedAt: null } as never });
     const knownIds = new Set(tasks.map((c) => c.id));
     if ([...referencedIds].some((id) => !knownIds.has(id))) return null;
 
@@ -303,7 +295,7 @@ export class WorkItemService {
       ) {
         candidate.dependencies = nextDependencies;
         candidate.updatedAt = new Date();
-        repo.getEntityManager().persist(candidate);
+        await this.em.save(candidate);
       }
     }
 
@@ -312,14 +304,14 @@ export class WorkItemService {
       taskId: task.id,
       payload: { dependencies: task.dependencies },
     });
-    await repo.getEntityManager().flush();
+    
     return serializeTask(task);
   }
 
   // ── Private ────────────────────────────────────────────────────
 
   private repo(): TaskRepository {
-    return this.em.getRepository(Task) as TaskRepository;
+    return this.em.getRepository(Task) as unknown as TaskRepository;
   }
 }
 
@@ -371,8 +363,9 @@ function applyBulkPatch(task: Task, patch: BulkTaskPatch): void {
   task.updatedAt = new Date();
 }
 
-async function findBulkTasksOrThrow(repo: TaskRepository, orgId: string, ids: string[]): Promise<Task[]> {
-  const tasks = await repo.find({ org: orgId, id: { $in: ids }, deletedAt: null } as never);
+async function findBulkTasksOrThrow(em: EntityManager, orgId: string, ids: string[]): Promise<Task[]> {
+  const { In } = await import("typeorm");
+  const tasks = await em.find(Task, { where: { org: { id: orgId }, id: In(ids), deletedAt: null } as never });
   if (tasks.length !== ids.length) {
     throw new AppNotFoundError("One or more tasks were not found.");
   }
@@ -493,12 +486,12 @@ async function emitTaskEvent(ctx: {
 }): Promise<void> {
   if (!ctx.em) return;
   const event = ctx.em.create(Event, {
-    org: ctx.em.getReference(Org, ctx.orgId),
+    org: { id: ctx.orgId } as Org,
     verb: input.verb,
     subjectKind: "task",
     subjectId: input.taskId,
     payload: input.payload,
     createdAt: new Date(),
   });
-  ctx.em.persist(event);
+  await ctx.em.save(event);
 }

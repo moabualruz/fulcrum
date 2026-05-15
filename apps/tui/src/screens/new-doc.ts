@@ -13,7 +13,7 @@
 
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
-import type { DocTemplateRow } from "@knowledge-workspace/application/docs/doc-template-service.ts";
+import type { DocTemplateRow } from "@knowledge-workspace/interface/document-templates.ts";
 import { TUI_DOC_TYPES } from "./docs-types.ts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────

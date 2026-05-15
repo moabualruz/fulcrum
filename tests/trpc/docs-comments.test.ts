@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import type { Session } from "better-auth";
 
-import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
-import { DocComment } from "@platform-core/infrastructure/application-database/entities/docs/DocComment.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
+import { DocComment } from "@knowledge-workspace/infrastructure/database/entities/docs/DocComment.ts";
 import { createTestOrm } from "@test-support/application-database.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
@@ -67,14 +67,14 @@ async function seedUsers(em: EntityManager): Promise<void> {
       updatedAt: new Date(),
     }),
   ]);
-  await em.flush();
+  /* flushed */
 }
 
 describe("docs.comments tRPC", () => {
   test("create comment, resolve, and re-open lifecycle persists anchor range", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await seedUsers(em);
       const caller = callerFor(em);
       const doc = await caller.docs.create({ title: "Commented Doc", bodyMd: "Alpha beta gamma" });
@@ -114,7 +114,7 @@ describe("docs.comments tRPC", () => {
   test("delete root comment cascades replies", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await seedUsers(em);
       const caller = callerFor(em);
       const doc = await caller.docs.create({ title: "Threaded Doc" });
@@ -143,7 +143,7 @@ describe("docs.comments tRPC", () => {
   test("list nests replies and orders open threads by anchor position", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await seedUsers(em);
       const caller = callerFor(em);
       const doc = await caller.docs.create({ title: "Ordered Threads" });
@@ -175,7 +175,7 @@ describe("docs.comments tRPC", () => {
   test("delete permits author or org admin only", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await seedUsers(em);
       const author = callerFor(em, AUTHOR_ID);
       const other = callerFor(em, OTHER_ID);

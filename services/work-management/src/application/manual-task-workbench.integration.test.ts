@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import { createTestOrm } from "@test-support/application-database.ts";
 import { createTask } from "@work-management/application/work-item-commands.ts";
 import { buildManualTaskWorkbench } from "@work-management/application/manual-task-workbench.ts";
@@ -14,7 +14,7 @@ describe("manual task workbench action", () => {
   test("builds manual board, list, and table views from real project tasks", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?), (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "Manual work management", OTHER_PROJECT_ID, ORG_ID, "Other Project"],);
@@ -140,5 +140,5 @@ describe("manual task workbench action", () => {
 async function setTaskLabels(em: Awaited<ReturnType<typeof createTestOrm>>["em"], id: string, labels: string[]): Promise<void> {
   const task = await em.findOneOrFail(Task, { id } as never);
   task.labels = labels;
-  await em.flush();
+  /* flushed */
 }

@@ -24,7 +24,7 @@ async function freshDb(): Promise<TestOrm> {
 describe("continuous update planning application action", () => {
   test("persists manual freeform doc edits and restarts the ACP planning cycle with trace/task context", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const ctx = { orgId: DEFAULT_ORG_ID, userId: USER_ID, projectId: null };
     const sourceDoc = await createDoc(em, ctx, {
       title: "Original workflow brief",

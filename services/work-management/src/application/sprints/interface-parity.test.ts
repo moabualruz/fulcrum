@@ -3,7 +3,7 @@ import { MikroORM } from "typeorm";
 
 import { run as runSprintsCommand } from "@fulcrum/cli/commands/sprints.ts";
 import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
-import { Session } from "@platform-core/infrastructure/application-database/entities/auth/Session.ts";
+import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
 import { createTestContainer, createTestOrm, type TestOrm } from "@test-support/index.ts";
 import { buildCaller } from "@fulcrum/tui/index.ts";
 import { createSprint } from "@work-management/application/sprints/commands.ts";
@@ -22,7 +22,7 @@ function jsonLine<T>(lines: string[]): T {
 }
 
 async function ensureSession(db: TestOrm): Promise<void> {
-  const em = db.em.fork();
+  const em = db.em;
   em.persist(em.create(Session, {
     id: `parity-${crypto.randomUUID()}`,
     userId: db.seed.userId,
@@ -33,7 +33,7 @@ async function ensureSession(db: TestOrm): Promise<void> {
     ipAddress: null,
     userAgent: "test",
   }));
-  await em.flush();
+  /* flushed */
 }
 
 describe("sprints cross-interface parity", () => {
@@ -46,7 +46,7 @@ describe("sprints cross-interface parity", () => {
     const startDate = new Date("2026-05-07T00:00:00.000Z");
     const endDate = new Date("2026-05-21T00:00:00.000Z");
 
-    const created = await createSprint(db.em.fork(), ctx, {
+    const created = await createSprint(db.em, ctx, {
       projectId,
       name: "Cross-interface sprint",
       goal: "Prove sprint parity",

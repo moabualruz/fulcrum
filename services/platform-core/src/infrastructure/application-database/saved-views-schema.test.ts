@@ -5,7 +5,7 @@ import type { EntityName } from "typeorm";
 
 import { createTestOrm } from "@test-support/application-database.ts";
 import { DEFAULT_ORG_ID } from "./seed.ts";
-import { SavedView } from "./entities/tasks/SavedView.ts";
+import { SavedView } from "@work-management/infrastructure/database/entities/tasks/SavedView.ts";
 
 function metadataFor(em: EntityManager, entity: EntityName<unknown>) {
   return em.getMetadata().get(entity) as unknown as {

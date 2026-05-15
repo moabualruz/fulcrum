@@ -7,14 +7,14 @@
 
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
-import type { DoctorCheckResult } from "@platform-core/application/health-checks/types.ts";
+import type { DoctorCheckResult } from "@platform-core/interface/doctor-results.ts";
 
 // ---------------------------------------------------------------------------
 // TuiDoctorCheck Zod shape (re-exported for CLI / web consumers)
 // ---------------------------------------------------------------------------
 
-export { DoctorCheckResultSchema as TuiDoctorCheckSchema } from "@platform-core/application/health-checks/types.ts";
-export type { DoctorCheckResult as TuiDoctorCheck } from "@platform-core/application/health-checks/types.ts";
+export { DoctorCheckResultSchema as TuiDoctorCheckSchema } from "@platform-core/interface/doctor-results.ts";
+export type { DoctorCheckResult as TuiDoctorCheck } from "@platform-core/interface/doctor-results.ts";
 
 // ---------------------------------------------------------------------------
 // Status badge helpers

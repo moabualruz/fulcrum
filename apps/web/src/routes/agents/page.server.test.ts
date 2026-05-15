@@ -55,10 +55,25 @@ let profilePayload = () => ({
 });
 
 const AGENT_QUERY_MODULES = [
+  "@execution-orchestration/interface/agent-profile-pages.ts",
+  "services/execution-orchestration/src/interface/agent-profile-pages.ts",
+  "/Users/mkh/workspace/fulcrum/services/execution-orchestration/src/interface/agent-profile-pages.ts",
+  "file:///Users/mkh/workspace/fulcrum/services/execution-orchestration/src/interface/agent-profile-pages.ts",
   "@execution-orchestration/application/agents/queries.ts",
   "services/execution-orchestration/src/application/agents/queries.ts",
   "/Users/mkh/workspace/fulcrum/services/execution-orchestration/src/application/agents/queries.ts",
   "file:///Users/mkh/workspace/fulcrum/services/execution-orchestration/src/application/agents/queries.ts",
+] as const;
+
+const RUN_COMMAND_MODULES = [
+  "@execution-orchestration/interface/run-actions.ts",
+  "services/execution-orchestration/src/interface/run-actions.ts",
+  "/Users/mkh/workspace/fulcrum/services/execution-orchestration/src/interface/run-actions.ts",
+  "file:///Users/mkh/workspace/fulcrum/services/execution-orchestration/src/interface/run-actions.ts",
+  "@execution-orchestration/application/runs/commands.ts",
+  "services/execution-orchestration/src/application/runs/commands.ts",
+  "/Users/mkh/workspace/fulcrum/services/execution-orchestration/src/application/runs/commands.ts",
+  "file:///Users/mkh/workspace/fulcrum/services/execution-orchestration/src/application/runs/commands.ts",
 ] as const;
 
 const APPLICATION_SCOPE_MODULES = [
@@ -187,6 +202,12 @@ function installRouteMocks() {
         testedProfiles.push(name);
         return { test_passed: true };
       },
+    }));
+  }
+
+  for (const moduleId of RUN_COMMAND_MODULES) {
+    mock.module(moduleId, () => ({
+      dispatchTaskRun: async () => ({ id: "run-1" }),
     }));
   }
 }

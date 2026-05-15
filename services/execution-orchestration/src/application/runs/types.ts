@@ -1,4 +1,4 @@
-import type { AgentRunOrchestrationState } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
+import type { AgentRunOrchestrationState } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
 
 export interface AppContext {
   orgId: string;

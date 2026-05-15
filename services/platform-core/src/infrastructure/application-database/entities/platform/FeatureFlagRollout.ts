@@ -12,9 +12,9 @@ import {
   UpdateDateColumn,
   JoinColumn,
 } from "typeorm";
-import { Org } from "../auth/Org.ts";
-import { User } from "../auth/User.ts";
-import { FeatureFlag } from "../auth/FeatureFlag.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
+import { FeatureFlag } from "@identity-access/infrastructure/database/entities/auth/FeatureFlag.ts";
 
 @Entity("feature_flag_rollouts")
 @Unique("uq_feature_flag_rollouts_org_flag", ["org", "flag"])

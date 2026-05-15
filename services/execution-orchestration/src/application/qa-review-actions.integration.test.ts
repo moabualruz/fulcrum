@@ -14,7 +14,7 @@ describe("review-orchestration QA review actions", () => {
   test("records a REVISE verdict against success criteria and schedules a feedback run", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "QA Review Project"],);
@@ -111,7 +111,7 @@ describe("review-orchestration QA review actions", () => {
   test("blocks approval while dependencies are unresolved and marks resolved approvals ready for final review", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await em.getConnection().execute(
         `insert into projects (id, org_id, name) values (?, ?, ?)`,
         [PROJECT_ID, ORG_ID, "QA Approval Project"],);

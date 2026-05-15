@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { AppConflictError, AppNotFoundError } from "@platform-core/domain/errors.ts";
 import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
-import { TaskWatcher } from "@platform-core/infrastructure/application-database/entities/tasks/TaskWatcher.ts";
+import { TaskWatcher } from "@work-management/infrastructure/database/entities/tasks/TaskWatcher.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { WorkItemRelationshipService } from "@work-management/application/work-item-relationships.ts";
 import { WorkItemService } from "@work-management/application/work-item-service.ts";
@@ -27,7 +27,7 @@ afterEach(async () => {
 describe("WorkItemRelationshipService integration", () => {
   test("creates, lists, detects cycles, and deletes persisted task relationships", async () => {
     const testDb = db!;
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const tasks = new WorkItemService(em);
     const relationships = new WorkItemRelationshipService(em);
 
@@ -73,7 +73,7 @@ describe("WorkItemRelationshipService integration", () => {
 
   test("marks duplicates, auto-closes source task, and transfers only missing watchers", async () => {
     const testDb = db!;
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const tasks = new WorkItemService(em);
     const relationships = new WorkItemRelationshipService(em);
 
@@ -99,7 +99,7 @@ describe("WorkItemRelationshipService integration", () => {
       userId: testDb.seed.userId,
       source: "manual",
     } as never));
-    await em.flush();
+    /* flushed */
 
     const relation = await relationships.markAsDuplicate(DEFAULT_ORG_ID, duplicate.id, canonical.id, {
       autoClose: true,

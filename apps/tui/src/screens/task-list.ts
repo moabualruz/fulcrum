@@ -5,16 +5,18 @@ import type {
   DependencyRunMode,
   DependencyRunPreview,
 } from "@execution-orchestration/domain/dependency-run-preview.ts";
-import type { DispatchDependencyRunForTasksOutput } from "@execution-orchestration/application/dependency-run-actions.ts";
-import type { DependencyRunLiveFeedbackOutput } from "@execution-orchestration/application/dependency-run-live-feedback.ts";
+import type {
+  DependencyRunLiveFeedbackOutput,
+  DispatchDependencyRunForTasksOutput,
+} from "@execution-orchestration/interface/dependency-run-contracts.ts";
 import type {
   RecordTaskQaReviewInput,
   TaskQaReviewOutput,
-} from "@execution-orchestration/application/qa-review-actions.ts";
+} from "@execution-orchestration/interface/dependency-run-contracts.ts";
 import type {
   ManualTaskWorkbenchInput,
   ManualTaskWorkbenchOutput,
-} from "@work-management/application/manual-task-workbench.ts";
+} from "@work-management/interface/manual-workbench.ts";
 import type { SubscriptionBridge, TuiSubscription } from "../subscriptions.ts";
 
 export interface TaskListFilters {

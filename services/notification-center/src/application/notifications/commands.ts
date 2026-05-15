@@ -1,5 +1,5 @@
 import type { EntityManager } from "typeorm";
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 import {
   Notification,
@@ -7,7 +7,7 @@ import {
   NotificationQuietHours,
   NotificationRule,
   PushSubscription,
-} from "@platform-core/infrastructure/application-database/entities/notifications/index.ts";
+} from "@notification-center/infrastructure/database/entities/notifications/index.ts";
 import { AppNotFoundError, AppValidationError } from "@platform-core/domain/errors.ts";
 import { writeOutboxEvent } from "@workflow-coordination/application/outbox.ts";
 import { getNotification, getNotificationRule, serializeMute, serializeNotification, serializeQuietHours, serializeRule } from "@notification-center/application/notifications/queries.ts";
@@ -41,34 +41,31 @@ async function writeNotificationOutboxEvent(
 
 export async function createNotification(em: EntityManager, ctx: AppContext, input: CreateNotificationInput): Promise<NotificationDto> {
   if (!ctx.userId || !input.eventId || !input.entityKind || !input.entityId || !input.title) throw new AppValidationError("Notification user, eventId, entityKind, entityId, and title are required.");
-  return await em.transactional(async (txEm) => {
+  return await em.transaction(async (txEm: EntityManager) => {
     const event = await txEm.findOne(Event, { id: input.eventId } as never) ??
       txEm.create(Event, {
         id: input.eventId,
-        org: txEm.getReference(Org, ctx.orgId),
+        org: { id: ctx.orgId } as Org,
         verb: "notification.created",
         subjectKind: input.entityKind,
         subjectId: input.entityId,
         payload: {},
         createdAt: new Date(),
       });
-    txEm.persist(event);
-    await txEm.flush();
-    const row = txEm.create(Notification, { org: txEm.getReference(Org, ctx.orgId), userId: ctx.userId!, eventId: input.eventId, entityKind: input.entityKind, entityId: input.entityId, title: input.title, body: input.body ?? "" });
-    txEm.persist(row);
-    await txEm.flush();
+    await txEm.save(event);
+    const row = txEm.create(Notification, { org: { id: ctx.orgId } as Org, userId: ctx.userId!, eventId: input.eventId, entityKind: input.entityKind, entityId: input.entityId, title: input.title, body: input.body ?? "" });
+    await txEm.save(row);
     return serializeNotification(row);
   });
 }
 
 export async function markNotificationRead(em: EntityManager, ctx: AppContext, id: string): Promise<NotificationDto> {
-  return await em.transactional(async (txEm) => {
+  return await em.transaction(async (txEm: EntityManager) => {
     const row = await txEm.findOne(Notification, { id, org: ctx.orgId, userId: ctx.userId } as never);
     if (!row) throw new AppNotFoundError("Notification not found.");
     if (row.readAt !== null) return serializeNotification(row);
     row.readAt = new Date();
-    txEm.persist(row);
-    await txEm.flush();
+    await txEm.save(row);
     await writeNotificationOutboxEvent(txEm, {
       orgId: ctx.orgId,
       verb: "notification.read",
@@ -84,14 +81,13 @@ export async function markAllNotificationsRead(
   em: EntityManager,
   ctx: AppContext,
 ): Promise<{ count: number }> {
-  return em.transactional(async (txEm) => {
+  return em.transaction(async (txEm: EntityManager) => {
     const rows = await txEm.find(Notification, { org: ctx.orgId, userId: ctx.userId, readAt: null } as never);
     const now = new Date();
     for (const row of rows) {
       row.readAt = now;
-      txEm.persist(row);
+      await txEm.save(row);
     }
-    await txEm.flush();
     if (rows.length > 0) {
       await writeNotificationOutboxEvent(txEm, {
         orgId: ctx.orgId,
@@ -110,7 +106,7 @@ export async function muteNotificationSubject(
   ctx: AppContext,
   input: NotificationMuteInput,
 ): Promise<NotificationMuteDto> {
-  return em.transactional(async (txEm) => {
+  return em.transaction(async (txEm: EntityManager) => {
     const existing = await txEm.findOne(NotificationMute, {
       org: ctx.orgId,
       userId: ctx.userId,
@@ -118,14 +114,13 @@ export async function muteNotificationSubject(
       subjectId: input.subjectId,
     } as never);
     const row = existing ?? txEm.create(NotificationMute, {
-      org: txEm.getReference(Org, ctx.orgId),
+      org: { id: ctx.orgId } as Org,
       userId: ctx.userId!,
       subjectKind: input.subjectKind,
       subjectId: input.subjectId,
     });
     row.mutedUntil = input.mutedUntil ?? null;
-    txEm.persist(row);
-    await txEm.flush();
+    await txEm.save(row);
     await writeNotificationOutboxEvent(txEm, {
       orgId: ctx.orgId,
       verb: "notification.muted",
@@ -142,7 +137,7 @@ export async function unmuteNotificationSubject(
   ctx: AppContext,
   input: NotificationSubjectInput,
 ): Promise<{ ok: true }> {
-  return em.transactional(async (txEm) => {
+  return em.transaction(async (txEm: EntityManager) => {
     const row = await txEm.findOne(NotificationMute, {
       org: ctx.orgId,
       userId: ctx.userId,
@@ -150,7 +145,6 @@ export async function unmuteNotificationSubject(
       subjectId: input.subjectId,
     } as never);
     if (row) txEm.remove(row);
-    await txEm.flush();
     await writeNotificationOutboxEvent(txEm, {
       orgId: ctx.orgId,
       verb: "notification.unmuted",
@@ -194,7 +188,7 @@ export async function createNotificationRule(
   const now = new Date();
   const eventPattern = withRuleTiming(input.eventPattern, input);
   const row = em.create(NotificationRule, {
-    org: em.getReference(Org, ctx.orgId),
+    org: { id: ctx.orgId } as Org,
     userId: ctx.userId!,
     name: input.name,
     subjectKind: input.subjectKind ?? null,
@@ -205,8 +199,7 @@ export async function createNotificationRule(
     createdAt: now,
     updatedAt: now,
   });
-  em.persist(row);
-  await em.flush();
+  await em.save(row);
   await writeNotificationOutboxEvent(em, {
     orgId: ctx.orgId,
     verb: "notification.rule_created",
@@ -222,7 +215,7 @@ export async function updateNotificationRule(
   ctx: AppContext,
   input: NotificationRuleUpdateInput,
 ): Promise<NotificationRuleDto> {
-  const row = await em.findOne(NotificationRule, { id: input.id, org: ctx.orgId, userId: ctx.userId } as never);
+  const row = await em.findOne(NotificationRule, { where: { id: input.id, org: ctx.orgId, userId: ctx.userId } as never });
   if (!row) throw new AppNotFoundError("Notification rule not found.");
   if (input.name !== undefined) row.name = input.name;
   if (input.subjectKind !== undefined) row.subjectKind = input.subjectKind;
@@ -241,7 +234,6 @@ export async function updateNotificationRule(
     row.active = input.enabled;
   }
   row.updatedAt = new Date();
-  await em.flush();
   await writeNotificationOutboxEvent(em, {
     orgId: ctx.orgId,
     verb: "notification.rule_updated",
@@ -257,9 +249,8 @@ export async function deleteNotificationRule(
   ctx: AppContext,
   id: string,
 ): Promise<{ ok: true }> {
-  const row = await em.findOne(NotificationRule, { id, org: ctx.orgId, userId: ctx.userId } as never);
+  const row = await em.findOne(NotificationRule, { where: { id, org: ctx.orgId, userId: ctx.userId } as never });
   if (row) em.remove(row);
-  await em.flush();
   await writeNotificationOutboxEvent(em, {
     orgId: ctx.orgId,
     verb: "notification.rule_deleted",
@@ -275,21 +266,20 @@ export async function upsertPushSubscription(
   ctx: AppContext,
   input: PushSubscriptionConfigInput,
 ): Promise<{ ok: true }> {
-  const existing = await em.findOne(PushSubscription, {
+  const existing = await em.findOne(PushSubscription, { where: {
     org: ctx.orgId,
     userId: ctx.userId,
     endpoint: input.endpoint,
-  } as never);
+  } as never });
   const row = existing ?? em.create(PushSubscription, {
-    org: em.getReference(Org, ctx.orgId),
+    org: { id: ctx.orgId } as Org,
     userId: ctx.userId!,
     endpoint: input.endpoint,
     p256dh: input.keys.p256dh,
     auth: input.keys.auth,
   });
   row.userAgent = input.userAgent ?? null;
-  em.persist(row);
-  await em.flush();
+  await em.save(row);
   await writeNotificationOutboxEvent(em, {
     orgId: ctx.orgId,
     verb: "notification.push_configured",
@@ -315,9 +305,9 @@ export async function setNotificationQuietHours(
   ctx: AppContext,
   input: QuietHoursSetInput,
 ) {
-  const row = await em.findOne(NotificationQuietHours, { org: ctx.orgId, userId: ctx.userId } as never) ??
+  const row = await em.findOne(NotificationQuietHours, { where: { org: ctx.orgId, userId: ctx.userId } as never }) ??
     em.create(NotificationQuietHours, {
-      org: em.getReference(Org, ctx.orgId),
+      org: { id: ctx.orgId } as Org,
       userId: ctx.userId!,
       startHour: input.startHour,
       endHour: input.endHour,
@@ -326,8 +316,7 @@ export async function setNotificationQuietHours(
   row.startHour = input.startHour;
   row.endHour = input.endHour;
   row.daysOfWeek = input.daysOfWeek;
-  em.persist(row);
-  await em.flush();
+  await em.save(row);
   await writeNotificationOutboxEvent(em, {
     orgId: ctx.orgId,
     verb: "notification.quiet_hours_set",

@@ -13,7 +13,7 @@
  */
 
 import type { EntityManager } from "typeorm";
-import { MetricsCache } from "@platform-core/infrastructure/application-database/entities/tasks/MetricsCache.ts";
+import { MetricsCache } from "@work-management/infrastructure/database/entities/tasks/MetricsCache.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 
 // ── Scope types ────────────────────────────────────────────────────
@@ -187,9 +187,7 @@ export class WorkMetricsService {
     dateRange: DateRange,
   ): Promise<BurndownPoint[]> {
     const where = this.buildScopeFilter(orgId, scopeType, scopeId, dateRange);
-    const rows = await this.em.find(MetricsCache, where as never, {
-      orderBy: { date: "ASC" },
-    });
+    const rows = await this.em.find(MetricsCache, { where: where as never, order: { date: "ASC" } });
     if (rows.length === 0) return [];
 
     const pointsTotal = (rows[0] as unknown as Record<string, number>)["pointsTotal"] ?? 0;
@@ -213,9 +211,7 @@ export class WorkMetricsService {
     dateRange: DateRange,
   ): Promise<BurnupPoint[]> {
     const where = this.buildScopeFilter(orgId, scopeType, scopeId, dateRange);
-    const rows = await this.em.find(MetricsCache, where as never, {
-      orderBy: { date: "ASC" },
-    });
+    const rows = await this.em.find(MetricsCache, { where: where as never, order: { date: "ASC" } });
     return rows.map((row) => {
       const r = row as unknown as Record<string, unknown>;
       return {
@@ -233,9 +229,7 @@ export class WorkMetricsService {
     dateRange: DateRange,
   ): Promise<CfdPoint[]> {
     const where = this.buildScopeFilter(orgId, scopeType, scopeId, dateRange);
-    const rows = await this.em.find(MetricsCache, where as never, {
-      orderBy: { date: "ASC" },
-    });
+    const rows = await this.em.find(MetricsCache, { where: where as never, order: { date: "ASC" } });
     return rows.map((row) => {
       const r = row as unknown as Record<string, unknown>;
       return {
@@ -252,9 +246,7 @@ export class WorkMetricsService {
     dateRange: DateRange,
   ): Promise<WipPoint[]> {
     const where = this.buildScopeFilter(orgId, scopeType, scopeId, dateRange);
-    const rows = await this.em.find(MetricsCache, where as never, {
-      orderBy: { date: "ASC" },
-    });
+    const rows = await this.em.find(MetricsCache, { where: where as never, order: { date: "ASC" } });
     return rows.map((row) => {
       const r = row as unknown as Record<string, unknown>;
       return {
@@ -279,10 +271,7 @@ export class WorkMetricsService {
       where["scopeType"] = "workspace";
     }
 
-    const rows = await this.em.find(MetricsCache, where as never, {
-      orderBy: { date: "DESC" },
-      limit: lastN,
-    });
+    const rows = await this.em.find(MetricsCache, { where: where as never, order: { date: "DESC" }, take: lastN });
 
     if (rows.length === 0) return [];
 
@@ -343,9 +332,7 @@ export class WorkMetricsService {
     dateRange: DateRange,
   ): Promise<CycleTimeEntry[]> {
     const where = this.buildEventFilter(orgId, scopeType, scopeId, dateRange, "task.status_changed");
-    const events = await this.em.find(Event, where as never, {
-      orderBy: { createdAt: "ASC" },
-    });
+    const events = await this.em.find(Event, { where: where as never, order: { createdAt: "ASC" } });
 
     // Group events by taskId
     const byTask = new Map<string, Array<{ toValue: string; at: Date }>>();
@@ -384,9 +371,7 @@ export class WorkMetricsService {
     // Lead time = task.createdAt → completed event
     // We query both task.created events and status_changed completed events
     const whereCompleted = this.buildEventFilter(orgId, scopeType, scopeId, dateRange, "task.status_changed");
-    const events = await this.em.find(Event, whereCompleted as never, {
-      orderBy: { createdAt: "ASC" },
-    });
+    const events = await this.em.find(Event, { where: whereCompleted as never, order: { createdAt: "ASC" } });
 
     const byTask = new Map<string, { createdAt?: Date; completedAt?: Date }>();
     for (const ev of events) {
@@ -427,9 +412,7 @@ export class WorkMetricsService {
     dateRange: DateRange,
   ): Promise<ThroughputEntry[]> {
     const where = this.buildEventFilter(orgId, scopeType, scopeId, dateRange, "task.status_changed");
-    const events = await this.em.find(Event, where as never, {
-      orderBy: { createdAt: "ASC" },
-    });
+    const events = await this.em.find(Event, { where: where as never, order: { createdAt: "ASC" } });
 
     // Count completed tasks per week
     const weekCounts = new Map<string, number>();
@@ -467,9 +450,7 @@ export class WorkMetricsService {
   ): Promise<BlockedEntry[]> {
     // Find tasks that transitioned to "blocked" and haven't transitioned out
     const where = this.buildEventFilter(orgId, scopeType, scopeId, undefined, "task.status_changed");
-    const events = await this.em.find(Event, where as never, {
-      orderBy: { createdAt: "ASC" },
-    });
+    const events = await this.em.find(Event, { where: where as never, order: { createdAt: "ASC" } });
 
     // Track last status per task
     const lastStatus = new Map<string, { status: string; at: Date }>();
@@ -501,9 +482,7 @@ export class WorkMetricsService {
   ): Promise<StaleEntry[]> {
     // Tasks with last activity older than thresholdDays
     const where = this.buildEventFilter(orgId, scopeType, scopeId);
-    const events = await this.em.find(Event, where as never, {
-      orderBy: { createdAt: "ASC" },
-    });
+    const events = await this.em.find(Event, { where: where as never, order: { createdAt: "ASC" } });
 
     // Last activity per task
     const lastActivity = new Map<string, Date>();

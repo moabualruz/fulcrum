@@ -3,8 +3,8 @@ import { MikroORM } from "@mikro-orm/postgresql";
 import { PGlite } from "@electric-sql/pglite";
 
 import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
-import { Account } from "@platform-core/infrastructure/application-database/entities/auth/Account.ts";
-import { Verification } from "@platform-core/infrastructure/application-database/entities/auth/Verification.ts";
+import { Account } from "@identity-access/infrastructure/database/entities/auth/Account.ts";
+import { Verification } from "@identity-access/infrastructure/database/entities/auth/Verification.ts";
 import {
   checkPasskeyAvailability,
   generateAuthenticationOptions,
@@ -431,7 +431,7 @@ describe("passkey WebAuthn helpers", () => {
     await orm.schema.create();
 
     try {
-      const store1 = new MikroOrmPasskeyStore(orm.em.fork());
+      const store1 = new MikroOrmPasskeyStore(orm.em);
       const userId = "00000000-0000-0000-0000-000000000111";
       await store1.saveChallenge({
         challengeId: userId,
@@ -452,7 +452,7 @@ describe("passkey WebAuthn helpers", () => {
         userVerificationRequired: true,
       });
 
-      const store2 = new MikroOrmPasskeyStore(orm.em.fork());
+      const store2 = new MikroOrmPasskeyStore(orm.em);
       expect(await store2.getChallenge({ challengeId: userId, purpose: "registration" }))
         .toMatchObject({ challenge: "persisted-challenge", userId });
       expect(await store2.getCredentialById("credential-1")).toMatchObject({
@@ -465,11 +465,11 @@ describe("passkey WebAuthn helpers", () => {
       });
 
       await store2.updateCredentialCounter("credential-1", 9);
-      const store3 = new MikroOrmPasskeyStore(orm.em.fork());
+      const store3 = new MikroOrmPasskeyStore(orm.em);
       expect(await store3.getCredentialById("credential-1")).toMatchObject({ counter: 9 });
 
       await store3.deleteChallenge({ challengeId: userId, purpose: "registration" });
-      const store4 = new MikroOrmPasskeyStore(orm.em.fork());
+      const store4 = new MikroOrmPasskeyStore(orm.em);
       expect(await store4.getChallenge({ challengeId: userId, purpose: "registration" })).toBeNull();
     } finally {
       await orm.close(true);

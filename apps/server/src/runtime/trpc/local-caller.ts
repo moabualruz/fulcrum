@@ -3,7 +3,7 @@ import type { Session as BetterAuthSession } from "better-auth";
 
 import { AppUnauthorizedError } from "@platform-core/domain/errors.ts";
 import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
-import { Session } from "@platform-core/infrastructure/application-database/entities/auth/Session.ts";
+import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";

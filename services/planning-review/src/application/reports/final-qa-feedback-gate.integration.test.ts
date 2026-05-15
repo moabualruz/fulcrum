@@ -15,7 +15,7 @@ describe("review orchestration final QA feedback gate", () => {
   test("runs automated feedback before final QA handoff and returns a passed final report", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await seedProject(em);
       const ctx = { orgId: ORG_ID, userId: USER_ID, projectId: PROJECT_ID };
       await seedProjectDoc(em, {
@@ -125,7 +125,7 @@ describe("review orchestration final QA feedback gate", () => {
   test("blocks handoff when feedback cannot be reviewed truthfully", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await seedProject(em);
       const ctx = { orgId: ORG_ID, userId: USER_ID, projectId: PROJECT_ID };
       await seedProjectDoc(em, {
@@ -203,7 +203,7 @@ describe("review orchestration final QA feedback gate", () => {
   test("skips the loop when final QA is already ready for handoff", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       await seedProject(em);
       const ctx = { orgId: ORG_ID, userId: USER_ID, projectId: PROJECT_ID };
       await seedProjectDoc(em, {

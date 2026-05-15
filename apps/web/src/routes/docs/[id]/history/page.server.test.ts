@@ -28,7 +28,7 @@ async function openDb() {
 }
 
 function em(db: TestOrm) {
-  return db.em.fork();
+  return db.em;
 }
 
 describe("/docs/[id]/history server logic", () => {

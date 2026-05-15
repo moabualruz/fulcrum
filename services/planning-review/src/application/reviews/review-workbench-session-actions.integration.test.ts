@@ -65,7 +65,7 @@ describe("persisted review workbench review workbench sessions", () => {
   test("saves versioned trace-linked review state and reloads latest workbench model", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const ctx = { orgId: ORG_ID, userId: USER_ID, projectId: PROJECT_ID };
       await seedProject(em);
 
@@ -184,7 +184,7 @@ describe("persisted review workbench review workbench sessions", () => {
   test("appends an inline annotation as a new persisted review-session revision", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
+      const em = db.em;
       const ctx = { orgId: ORG_ID, userId: USER_ID, projectId: PROJECT_ID };
       await seedProject(em);
 

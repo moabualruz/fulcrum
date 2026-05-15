@@ -34,7 +34,7 @@ function projectCtx(projectId: string): AppContext {
 describe("Workflow work item model and relationship hub", () => {
   test("creates typed work item hierarchy with cycle and module grouping", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const initiative = await createTask(em, projectCtx(PROJECT_A_ID), {
       title: "Agent OS",
       taskType: "initiative",
@@ -68,7 +68,7 @@ describe("Workflow work item model and relationship hub", () => {
 
   test("rejects invalid hierarchy and implicit cross-project parenting", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const subtask = await createTask(em, projectCtx(PROJECT_A_ID), { title: "Subtask", taskType: "subtask" });
     const epic = await createTask(em, projectCtx(PROJECT_A_ID), { title: "Epic", taskType: "epic" });
     const projectBTask = await createTask(em, projectCtx(PROJECT_B_ID), { title: "Other", taskType: "task" });
@@ -79,7 +79,7 @@ describe("Workflow work item model and relationship hub", () => {
 
   test("relationship hub returns typed modes, links, trace, and shared scoped views", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const epic = await createTask(em, projectCtx(PROJECT_A_ID), { title: "Epic", taskType: "epic" });
     const story = await createTask(em, projectCtx(PROJECT_A_ID), {
       title: "Story",
@@ -119,7 +119,7 @@ describe("Workflow work item model and relationship hub", () => {
 
   test("task detail loads current edge schema, child rows, events, and bulk mutations", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const parent = await createTask(em, projectCtx(PROJECT_A_ID), {
       title: "Parent task",
       taskType: "task",

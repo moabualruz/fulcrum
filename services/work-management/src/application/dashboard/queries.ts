@@ -1,7 +1,7 @@
 import type { EntityManager } from "typeorm";
 import type { SqlExecutor, SqlValue } from "@platform-core/infrastructure/application-database/sql.ts";
 
-import { Project } from "@platform-core/infrastructure/application-database/entities/tasks/Project.ts";
+import { Project } from "@work-management/infrastructure/database/entities/tasks/Project.ts";
 import { listDocs } from "@knowledge-workspace/application/docs/queries.ts";
 import { ormSqlConnection } from "@platform-core/application/orm-helpers.ts";
 import { listRuns } from "@execution-orchestration/application/runs/queries.ts";
@@ -39,7 +39,7 @@ export async function loadDashboard(
   const projectIds = typeof projectId === "string" ? await dashboardProjectIds(manager, orgId, projectId) : [];
   const ctx = { orgId, userId: null, projectId: undefined };
   const [projects, docs, runs, tasks] = await Promise.all([
-    manager.find(Project, { org: orgId } as never, { orderBy: { createdAt: "ASC", id: "ASC" } }),
+    manager.find(Project, { where: { org: orgId } as never, order: { createdAt: "ASC", id: "ASC" } }),
     listDocs(manager, ctx),
     listRuns(manager, ctx),
     listTasks(manager, ctx, {}),

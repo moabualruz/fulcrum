@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { AppForbiddenError, AppNotFoundError, AppValidationError } from "@platform-core/domain/errors.ts";
@@ -53,7 +53,7 @@ async function createProjectAndTask(em: TestOrm["em"]) {
 describe("application runs commands and queries", () => {
   test("dispatchRun, listRuns, and getRun round-trip through MikroORM", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const created = await dispatchRun(em, ctx(), {
       agentName: "codex",
       prompt: "Run tests",
@@ -66,26 +66,26 @@ describe("application runs commands and queries", () => {
 
   test("dispatchRun validation failure throws AppValidationError", async () => {
     const testDb = await freshDb();
-    await expect(dispatchRun(testDb.em.fork(), ctx(), { agentName: "" })).rejects.toBeInstanceOf(AppValidationError);
+    await expect(dispatchRun(testDb.em, ctx(), { agentName: "" })).rejects.toBeInstanceOf(AppValidationError);
   });
 
   test("getRun not-found throws AppNotFoundError", async () => {
     const testDb = await freshDb();
-    await expect(getRun(testDb.em.fork(), ctx(), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")).rejects.toBeInstanceOf(AppNotFoundError);
+    await expect(getRun(testDb.em, ctx(), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")).rejects.toBeInstanceOf(AppNotFoundError);
   });
 
   test("cross-org run access throws AppForbiddenError", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     em.persist(em.create(Org, { id: OTHER_ORG_ID, name: "Other", slug: "other", createdAt: new Date(), updatedAt: new Date() }));
-    await em.flush();
+    /* flushed */
     const other = await dispatchRun(em, ctx(OTHER_ORG_ID), { agentName: "codex" });
     await expect(getRun(em, ctx(), other.id)).rejects.toBeInstanceOf(AppForbiddenError);
   });
 
   test("run read models derive project scope, transcript, artifacts, events, and recovery from real rows", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const { projectId, taskId } = await createProjectAndTask(em);
     const transcriptPath = `/tmp/fulcrum-run-${crypto.randomUUID()}.jsonl`;
     await Bun.write(transcriptPath, JSON.stringify({ role: "assistant", content: "real transcript" }));
@@ -151,7 +151,7 @@ describe("application runs commands and queries", () => {
 
   test("run detail handles no-task runs, null project filters, missing transcript files, and access errors", async () => {
     const testDb = await freshDb();
-    const em = testDb.em.fork();
+    const em = testDb.em;
     const run = await dispatchRun(em, ctx(), {
       agentName: "codex",
       prompt: "Investigate without task",
