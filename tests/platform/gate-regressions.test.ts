@@ -69,7 +69,7 @@ function procedureEntries(): Array<[string, ProcedureDef]> {
   return Object.entries((appRouter as unknown as RouterIntrospection)._def.procedures);
 }
 
-describe("Phase 09 platform gate regressions", () => {
+describe("architecture platform gate regressions", () => {
   test("protected tRPC procedures carry permission metadata", () => {
     const missing = procedureEntries()
       .filter(([path]) => !PUBLIC_NO_PERMISSION_ALLOWLIST.has(path))
@@ -130,8 +130,8 @@ describe("Phase 09 platform gate regressions", () => {
 
     expect(steps.get("trpc:permissions")).toContain("tests/trpc/app-router-scaffold.test.ts");
     expect(steps.get("ci:schemas")).toContain("scripts/ci-schemas.ts");
-    expect(steps.get("symphony:lock")).toContain("tests/symphony/spec-lock.test.ts");
-    expect(steps.get("symphony:conformance")).toContain("src/orchestration/__tests__/symphony-conformance.test.ts");
+    expect(steps.get("symphony:lock")).toContain("tests/execution-orchestration/symphony/spec-lock.test.ts");
+    expect(steps.get("symphony:conformance")).toContain("services/execution-orchestration/src/infrastructure/agent-runtime/__tests__/symphony-conformance.test.ts");
   });
 
   test("compression and skills policy remain explicitly represented in CI tests", () => {

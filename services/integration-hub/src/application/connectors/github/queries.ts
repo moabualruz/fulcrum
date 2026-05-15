@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { GithubConnectorState } from "@platform-core/infrastructure/application-database/entities/connectors/GithubConnectorState.ts";
 import { AppForbiddenError, AppNotFoundError } from "@platform-core/domain/errors.ts";
 import type { AppContext, GithubConnectorStateDto } from "@integration-hub/application/connectors/github/types.ts";

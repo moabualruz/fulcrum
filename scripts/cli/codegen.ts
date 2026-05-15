@@ -231,11 +231,20 @@ type ExtractorContext = {
 };
 
 const WORKSPACE_IMPORT_PREFIXES: Record<string, string> = {
-  "@/": "src/",
+  "@agent-client-protocol/": "services/agent-client-protocol/src/",
+  "@execution-orchestration/": "services/execution-orchestration/src/",
   "@fulcrum/cli/": "apps/cli/src/",
   "@fulcrum/server/": "apps/server/src/",
   "@fulcrum/tui/": "apps/tui/src/",
   "@fulcrum/web/": "apps/web/src/",
+  "@identity-access/": "services/identity-access/src/",
+  "@integration-hub/": "services/integration-hub/src/",
+  "@knowledge-workspace/": "services/knowledge-workspace/src/",
+  "@notification-center/": "services/notification-center/src/",
+  "@planning-review/": "services/planning-review/src/",
+  "@platform-core/": "services/platform-core/src/",
+  "@workflow-coordination/": "services/workflow-coordination/src/",
+  "@work-management/": "services/work-management/src/",
 };
 
 function createExtractorContext(source: SourceFile, project: Project): ExtractorContext {
@@ -271,6 +280,36 @@ function createExtractorContext(source: SourceFile, project: Project): Extractor
         const importedDeclaration = lookupVariable(importedName, imported, context);
         if (importedDeclaration) {
           imports.set(bindingKey(current, localName), importedDeclaration);
+        }
+      }
+    }
+
+    for (const declaration of current.getExportDeclarations()) {
+      const specifier = declaration.getModuleSpecifierValue();
+      if (specifier === undefined) continue;
+      const exportedPath = resolveImportPath(path, specifier);
+      if (exportedPath === null) continue;
+      let exported: SourceFile;
+      try {
+        exported = project.addSourceFileAtPath(exportedPath);
+      } catch {
+        continue;
+      }
+      collect(exported);
+      const namedExports = declaration.getNamedExports();
+      if (namedExports.length === 0) {
+        for (const item of exported.getVariableDeclarations()) {
+          const exportedDeclaration = lookupVariable(item.getName(), exported, context) ?? item;
+          imports.set(bindingKey(current, item.getName()), exportedDeclaration);
+        }
+        continue;
+      }
+      for (const item of namedExports) {
+        const exportedName = item.getName();
+        const localName = item.getAliasNode()?.getText() ?? exportedName;
+        const exportedDeclaration = lookupVariable(exportedName, exported, context);
+        if (exportedDeclaration) {
+          imports.set(bindingKey(current, localName), exportedDeclaration);
         }
       }
     }

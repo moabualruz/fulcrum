@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
-import type { EntityName } from "@mikro-orm/core";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityName } from "typeorm";
+import type { EntityManager } from "typeorm";
 
 import { createTestOrm } from "@test-support/application-database.ts";
 import { DEFAULT_ORG_ID } from "./seed.ts";

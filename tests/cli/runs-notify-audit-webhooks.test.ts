@@ -135,6 +135,76 @@ describe("P14#08 generated domain CLI contracts", () => {
     expect(JSON.parse(h.lines[0] as string)).toEqual([runningRun]);
   });
 
+  it("runs list, show, and mutations prefer the configured Nest API", async () => {
+    const h = harness();
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      if (String(url).endsWith("/api/v1/runs/run-public/cancel?orgId=org-1")) {
+        return Response.json({ ok: true });
+      }
+      if (String(url).endsWith("/api/v1/runs/run-public/retry?orgId=org-1")) {
+        return Response.json({ id: "run-public-retry", status: "queued" });
+      }
+      if (String(url).endsWith("/api/v1/runs?orgId=org-1") && init?.method === "POST") {
+        return Response.json({ id: "run-public-dispatch", status: "queued", taskId: "task-1" });
+      }
+      if (String(url).endsWith("/api/v1/runs/run-public?orgId=org-1")) {
+        return Response.json({ id: "run-public", status: "running", agent: "codex" });
+      }
+      return Response.json([{ id: "run-public", status: "running", agent: "codex" }]);
+    }) as typeof globalThis.fetch;
+
+    await runPillar14Command("runs", ["list", "--status", "running", "--json"], {
+      caller: caller(),
+      env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3000", FULCRUM_ORG_ID: "org-1" },
+      fetch,
+      ...h,
+    });
+    await runPillar14Command("runs", ["show", "run-public", "--json"], {
+      caller: caller(),
+      env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3000", FULCRUM_ORG_ID: "org-1" },
+      fetch,
+      ...h,
+    });
+    await runPillar14Command("runs", ["cancel", "run-public", "--json"], {
+      caller: caller(),
+      env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3000", FULCRUM_ORG_ID: "org-1" },
+      fetch,
+      ...h,
+    });
+    await runPillar14Command("runs", ["retry", "run-public", "--json"], {
+      caller: caller(),
+      env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3000", FULCRUM_ORG_ID: "org-1" },
+      fetch,
+      ...h,
+    });
+    await runPillar14Command("runs", ["dispatch", "--task", "task-1", "--agent", "codex", "--json"], {
+      caller: caller(),
+      env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3000", FULCRUM_ORG_ID: "org-1" },
+      fetch,
+      ...h,
+    });
+
+    expect(h.exitCode).toBeUndefined();
+    expect(JSON.parse(h.lines[0] as string)).toEqual([{ id: "run-public", status: "running", agent: "codex" }]);
+    expect(JSON.parse(h.lines[1] as string)).toEqual({ id: "run-public", status: "running", agent: "codex" });
+    expect(JSON.parse(h.lines[2] as string)).toEqual({ ok: true });
+    expect(JSON.parse(h.lines[3] as string)).toEqual({ id: "run-public-retry", status: "queued" });
+    expect(JSON.parse(h.lines[4] as string)).toEqual({
+      id: "run-public-dispatch",
+      status: "queued",
+      taskId: "task-1",
+    });
+    expect(calls.map((call) => call.url)).toEqual([
+      "http://127.0.0.1:3000/api/v1/runs?orgId=org-1&status=running",
+      "http://127.0.0.1:3000/api/v1/runs/run-public?orgId=org-1",
+      "http://127.0.0.1:3000/api/v1/runs/run-public/cancel?orgId=org-1",
+      "http://127.0.0.1:3000/api/v1/runs/run-public/retry?orgId=org-1",
+      "http://127.0.0.1:3000/api/v1/runs?orgId=org-1",
+    ]);
+  });
+
   it("runs cancel accepts positional id and emits JSON", async () => {
     const h = harness();
     await runPillar14Command("runs", ["cancel", "run-1", "--json"], { caller: caller(), ...h });
@@ -269,6 +339,82 @@ describe("P14#08 generated domain CLI contracts", () => {
     });
   });
 
+  it("notify commands prefer the configured public API", async () => {
+    const h = harness();
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fakeCaller = {
+      ...caller(),
+      notify: {
+        list: async () => {
+          throw new Error("local notify caller should not be used");
+        },
+        markRead: async () => {
+          throw new Error("local notify caller should not be used");
+        },
+        markAllRead: async () => {
+          throw new Error("local notify caller should not be used");
+        },
+        mute: async () => {
+          throw new Error("local notify caller should not be used");
+        },
+      },
+    };
+    const fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      if (String(url).includes("/mark-all-read")) return Response.json({ count: 2 });
+      if (String(url).includes("/mark-read")) return Response.json(null, { status: 204 });
+      if (String(url).includes("/mutes")) return Response.json({ id: "mute-1", subjectKind: "task" });
+      return Response.json({ data: [{ id: "n-public", read: false }] });
+    }) as typeof globalThis.fetch;
+    const env = {
+      FULCRUM_PUBLIC_API_URL: "http://127.0.0.1:4321/base/",
+      FULCRUM_ORG_ID: "org-1",
+      FULCRUM_USER_ID: "user-1",
+    };
+
+    await runPillar14Command("notify", ["list", "--unread", "--json"], { caller: fakeCaller, env, fetch, ...h });
+    await runPillar14Command("notify", ["mark-read", "--id", "n-1", "--json"], { caller: fakeCaller, env, fetch, ...h });
+    await runPillar14Command("notify", ["mark-all-read", "--json"], { caller: fakeCaller, env, fetch, ...h });
+    await runPillar14Command("notify", [
+      "mute",
+      "--subject-kind",
+      "task",
+      "--subject-id",
+      "task-1",
+      "--json",
+    ], { caller: fakeCaller, env, fetch, ...h });
+
+    expect(h.exitCode).toBeUndefined();
+    expect(JSON.parse(h.lines[0] as string)).toEqual([{ id: "n-public", read: false }]);
+    expect(JSON.parse(h.lines[1] as string)).toEqual({ ok: true, id: "n-1" });
+    expect(JSON.parse(h.lines[2] as string)).toEqual({ count: 2 });
+    expect(JSON.parse(h.lines[3] as string)).toEqual({ id: "mute-1", subjectKind: "task" });
+    expect(calls.map((call) => call.url)).toEqual([
+      "http://127.0.0.1:4321/api/v1/notifications?orgId=org-1&userId=user-1&unread=true",
+      "http://127.0.0.1:4321/api/v1/notifications/n-1/mark-read?orgId=org-1&userId=user-1",
+      "http://127.0.0.1:4321/api/v1/notifications/mark-all-read?orgId=org-1&userId=user-1",
+      "http://127.0.0.1:4321/api/v1/notifications/mutes?orgId=org-1&userId=user-1",
+    ]);
+  });
+
+  it("notify watch reports a public API boundary gap", async () => {
+    const h = harness();
+    await runPillar14Command("notify", ["watch", "--json"], {
+      env: {
+        FULCRUM_PUBLIC_API_URL: "http://127.0.0.1:4321/base/",
+        FULCRUM_ORG_ID: "org-1",
+        FULCRUM_USER_ID: "user-1",
+      },
+      fetch: (async () => Response.json({ data: [] })) as unknown as typeof globalThis.fetch,
+      ...h,
+    });
+
+    expect(h.exitCode).toBe(1);
+    expect(JSON.parse(h.lines[0] as string).error.message).toBe(
+      "notify watch operation is not available through the configured public API.",
+    );
+  });
+
   it("notify list falls back to an empty result when Notification metadata is absent", async () => {
     const h = harness();
     const fakeCaller = caller();
@@ -293,6 +439,29 @@ describe("P14#08 generated domain CLI contracts", () => {
     expect(JSON.parse(h.lines[0] as string)).toEqual([auditEvent]);
   });
 
+  it("audit query uses the configured Nest API caller with generated CLI filters", async () => {
+    const h = harness();
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    await runPillar14Command("audit", ["query", "--kind", "task", "--since", "2026-01-01", "--json"], {
+      caller: caller(),
+      env: {
+        FULCRUM_PUBLIC_API_URL: "http://127.0.0.1:4321/base/",
+        FULCRUM_ORG_ID: "org-1",
+      },
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({ url: String(url), init: init ?? {} });
+        return Response.json({ data: [{ id: "audit-public", subjectKind: "task" }], total: 1 });
+      }) as typeof fetch,
+      ...h,
+    });
+
+    expect(h.exitCode).toBeUndefined();
+    expect(JSON.parse(h.lines[0] as string)).toEqual([{ id: "audit-public", subjectKind: "task" }]);
+    expect(calls.map((call) => call.url)).toEqual([
+      "http://127.0.0.1:4321/api/v1/audit?orgId=org-1&kind=task&since=2026-01-01T00%3A00%3A00.000Z",
+    ]);
+  });
+
   it("audit export writes valid JSON to output path", async () => {
     const dir = await mkdtemp(join(tmpdir(), "fulcrum-audit-export-"));
     try {
@@ -305,6 +474,43 @@ describe("P14#08 generated domain CLI contracts", () => {
 
       expect(h.exitCode).toBeUndefined();
       expect(JSON.parse(await readFile(output, "utf8"))).toEqual([auditEvent]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("audit export writes content returned by the configured Nest API caller", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "fulcrum-audit-public-export-"));
+    try {
+      const h = harness();
+      const calls: string[] = [];
+      const jsonOut = join(dir, "audit.json");
+      const csvOut = join(dir, "audit.csv");
+      const fetch = (async (url: string | URL | Request) => {
+        calls.push(String(url));
+        if (String(url).includes("format=csv")) return Response.json("id\npublic-csv\n");
+        return Response.json([{ id: "audit-public-export" }]);
+      }) as typeof globalThis.fetch;
+
+      await runPillar14Command("audit", ["export", "--format", "json", "--output", jsonOut], {
+        caller: caller(),
+        env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3000", FULCRUM_ORG_ID: "org-1" },
+        fetch,
+        ...h,
+      });
+      await runPillar14Command("audit", ["export", "--format", "csv", "--output", csvOut], {
+        caller: caller(),
+        env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3000", FULCRUM_ORG_ID: "org-1" },
+        fetch,
+        ...h,
+      });
+
+      expect(JSON.parse(await readFile(jsonOut, "utf8"))).toEqual([{ id: "audit-public-export" }]);
+      expect(await readFile(csvOut, "utf8")).toBe("id\npublic-csv\n");
+      expect(calls).toEqual([
+        "http://127.0.0.1:3000/api/v1/audit/export?orgId=org-1&format=json",
+        "http://127.0.0.1:3000/api/v1/audit/export?orgId=org-1&format=csv",
+      ]);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -332,7 +538,7 @@ describe("P14#08 generated domain CLI contracts", () => {
     try {
       const fakeCaller = caller();
       fakeCaller.audit.export = async (input: { format: "csv" | "json" }) =>
-        input.format === "csv" ? "id\nshape-1" : { rows: [auditEvent] };
+        input.format === "csv" ? { format: "csv", csv: "id\nshape-1" } : { format: "json", rows: [auditEvent] };
       const csvOut = join(dir, "audit.csv");
       const jsonOut = join(dir, "audit.json");
       const h = harness();
@@ -400,6 +606,60 @@ describe("P14#08 generated domain CLI contracts", () => {
     });
   });
 
+  it("webhooks commands prefer the configured public API", async () => {
+    const h = harness();
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const fakeCaller = {
+      ...caller(),
+      webhooks: {
+        list: async () => {
+          throw new Error("local webhooks caller should not be used");
+        },
+        test: async () => {
+          throw new Error("local webhooks caller should not be used");
+        },
+      },
+    };
+    const fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init });
+      if (String(url).includes("/api/v1/webhooks/wh-1/test")) {
+        return Response.json({ id: "delivery-1", webhookId: "wh-1", status: "pending" }, { status: 202 });
+      }
+      return Response.json([{ id: "wh-1", url: "https://example.test/hook" }]);
+    }) as typeof globalThis.fetch;
+
+    const env = {
+      FULCRUM_PUBLIC_API_URL: "http://127.0.0.1:4321/base/",
+      FULCRUM_ORG_ID: "org-1",
+    };
+    await runPillar14Command("webhooks", ["list", "--json"], { caller: fakeCaller, env, fetch, ...h });
+    await runPillar14Command("webhooks", ["test", "wh-1", "--json"], { caller: fakeCaller, env, fetch, ...h });
+
+    expect(h.exitCode).toBeUndefined();
+    expect(JSON.parse(h.lines[0] as string)).toEqual([{ id: "wh-1", url: "https://example.test/hook" }]);
+    expect(JSON.parse(h.lines[1] as string)).toEqual({ id: "delivery-1", webhookId: "wh-1", status: "pending" });
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:4321/api/v1/webhooks?orgId=org-1",
+        init: {
+          method: "GET",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: undefined,
+        },
+      },
+      {
+        url: "http://127.0.0.1:4321/api/v1/webhooks/wh-1/test?orgId=org-1",
+        init: {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: undefined,
+        },
+      },
+    ]);
+  });
+
   it("connectors enable jira returns JSON FeatureDisabledError and exits 1", async () => {
     const h = harness();
     await runPillar14Command("connectors", ["enable", "jira", "--json"], { caller: caller(), ...h });
@@ -419,6 +679,50 @@ describe("P14#08 generated domain CLI contracts", () => {
 
     expect(h.exitCode).toBeUndefined();
     expect(JSON.parse(h.lines[0] as string)).toEqual({ id: "sync-1", connector: "jira", status: "queued" });
+  });
+
+  it("connectors commands prefer the configured public API", async () => {
+    const h = harness();
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fakeCaller = {
+      ...caller(),
+      connectors: {
+        enable: async () => {
+          throw new Error("local connectors caller should not be used");
+        },
+        sync: async () => {
+          throw new Error("local connectors caller should not be used");
+        },
+      },
+    };
+    const fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      if (String(url).includes("/sync")) return Response.json({ id: "run-1", connectorId: "jira" });
+      return Response.json({ id: "jira", enabled: true });
+    }) as typeof globalThis.fetch;
+    const env = {
+      FULCRUM_PUBLIC_API_URL: "http://127.0.0.1:4321/base/",
+      FULCRUM_ORG_ID: "org-1",
+    };
+
+    await runPillar14Command("connectors", ["enable", "jira", "--json"], { caller: fakeCaller, env, fetch, ...h });
+    await runPillar14Command("connectors", ["sync", "jira", "--json"], { caller: fakeCaller, env, fetch, ...h });
+
+    expect(h.exitCode).toBeUndefined();
+    expect(JSON.parse(h.lines[0] as string)).toEqual({ id: "jira", enabled: true });
+    expect(JSON.parse(h.lines[1] as string)).toEqual({ id: "run-1", connectorId: "jira" });
+    expect(calls.map((call) => call.url)).toEqual([
+      "http://127.0.0.1:4321/api/v1/connectors/jira/enable",
+      "http://127.0.0.1:4321/api/v1/connectors/jira/sync",
+    ]);
+  });
+
+  it("generated domain commands require a caller or public API configuration", async () => {
+    const h = harness();
+    await runPillar14Command("runs", ["list", "--json"], { ...h });
+
+    expect(h.exitCode).toBe(1);
+    expect(JSON.parse(h.lines[0] as string).error.message).toContain("Public API caller is not configured");
   });
 
   it("flags set router-llm on is reflected by flags list", async () => {

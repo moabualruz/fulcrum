@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { resolveAgentRunConfig } from "@execution-orchestration/application/agent-catalog/resolve-agent-run-config.ts";
 import { runAgent } from "@execution-orchestration/infrastructure/agent-runtime/sandbox-runner.ts";

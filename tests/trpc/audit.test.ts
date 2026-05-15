@@ -1,17 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import { Container } from "@needle-di/core";
 
-import { createTestOrm } from "../../src/test-utils/db.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
-import { Event } from "../../src/db/entities/core/Event.ts";
-import { Org } from "../../src/db/entities/auth/Org.ts";
-import { User } from "../../src/db/entities/auth/User.ts";
+import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
 import {
   getPayloadSchema,
   isPayloadSchemaRegistered,
-} from "../../src/platform/audit-events.ts";
+} from "@platform-core/application/platform-operations/audit-events.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 
@@ -238,7 +238,7 @@ describe("audit tRPC router", () => {
   });
 });
 
-describe("Phase 09 audit event registry", () => {
+describe("architecture audit event registry", () => {
   const requiredKeys = [
     "user_setting.updated",
     "theme.updated",
@@ -268,7 +268,7 @@ describe("Phase 09 audit event registry", () => {
     "encrypted_value",
   ];
 
-  test("registers exact Phase 09 audit keys", () => {
+  test("registers exact architecture audit keys", () => {
     for (const key of requiredKeys) {
       const [subjectKind, ...verbParts] = key.split(".");
       expect(isPayloadSchemaRegistered(subjectKind!, verbParts.join("."))).toBe(true);

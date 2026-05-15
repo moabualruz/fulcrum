@@ -5,10 +5,10 @@
  *
  * Test strategy follows the events-backfill pattern:
  *   - Single ORM instance with real migrator (transactional:false for PGlite savepoint workaround).
- *   - PHASE 1: run all prerequisite migrations up to composite_indexes.
- *   - PHASE 2: run the P3#02 workflow-definitions migration.
- *   - PHASE 3: assert schema state — table, columns, indexes.
- *   - PHASE 4: assert migration DOWN reverts cleanly.
+ *   - STEP 1: run all prerequisite migrations up to composite_indexes.
+ *   - STEP 2: run the P3#02 workflow-definitions migration.
+ *   - STEP 3: assert schema state — table, columns, indexes.
+ *   - STEP 4: assert migration DOWN reverts cleanly.
  *
  * Per C6: No hand-written DDL in this file. Schema state verified via ORM
  *          metadata + pg_indexes system catalog queries (read-only planner calls).
@@ -19,45 +19,43 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { join } from "node:path";
 import { MikroORM, ReferenceKind } from "@mikro-orm/postgresql";
 import { Migrator } from "@mikro-orm/migrations";
 import { PGlite } from "@electric-sql/pglite";
-import { PGliteKyselyDialect } from "../../../src/db/PGliteKyselyDriver.ts";
+import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
 
 // Auth entities (needed for prerequisite migrations)
-import { Org } from "../../../src/db/entities/auth/Org.ts";
-import { User } from "../../../src/db/entities/auth/User.ts";
-import { Session } from "../../../src/db/entities/auth/Session.ts";
-import { Invitation } from "../../../src/db/entities/auth/Invitation.ts";
-import { OrgMember } from "../../../src/db/entities/auth/OrgMember.ts";
-import { FeatureFlag } from "../../../src/db/entities/auth/FeatureFlag.ts";
-import { Account } from "../../../src/db/entities/auth/Account.ts";
-import { Verification } from "../../../src/db/entities/auth/Verification.ts";
-import { Event } from "../../../src/db/entities/core/Event.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
+import { Session } from "@platform-core/infrastructure/application-database/entities/auth/Session.ts";
+import { Invitation } from "@platform-core/infrastructure/application-database/entities/auth/Invitation.ts";
+import { OrgMember } from "@platform-core/infrastructure/application-database/entities/auth/OrgMember.ts";
+import { FeatureFlag } from "@platform-core/infrastructure/application-database/entities/auth/FeatureFlag.ts";
+import { Account } from "@platform-core/infrastructure/application-database/entities/auth/Account.ts";
+import { Verification } from "@platform-core/infrastructure/application-database/entities/auth/Verification.ts";
+import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 
 // Stub tenant-scoped entities (needed for prerequisite migrations)
-import { Task } from "../../../src/db/entities/tasks/Task.ts";
-import { Document } from "../../../src/db/entities/docs/Document.ts";
-import { Memory } from "../../../src/db/entities/memory/Memory.ts";
-import { AgentRun } from "../../../src/db/entities/orchestration/AgentRun.ts";
-import { Artifact } from "../../../src/db/entities/artifacts/Artifact.ts";
-import { Repo } from "../../../src/db/entities/repos/Repo.ts";
-import { Job } from "../../../src/db/entities/jobs/Job.ts";
-import { SearchDocument } from "../../../src/db/entities/search/SearchDocument.ts";
-import { CasbinRule } from "../../../src/db/entities/flags/CasbinRule.ts";
-import { WebhookSubscription } from "../../../src/db/entities/flags/WebhookSubscription.ts";
-import { NotificationRule } from "../../../src/db/entities/flags/NotificationRule.ts";
-import { SchemaMigration } from "../../../src/db/entities/SchemaMigration.ts";
+import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
+import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
+import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
+import { Artifact } from "@platform-core/infrastructure/application-database/entities/artifacts/Artifact.ts";
+import { Repo } from "@platform-core/infrastructure/application-database/entities/repos/Repo.ts";
+import { Job } from "@platform-core/infrastructure/application-database/entities/jobs/Job.ts";
+import { SearchDocument } from "@platform-core/infrastructure/application-database/entities/search/SearchDocument.ts";
+import { CasbinRule } from "@platform-core/infrastructure/application-database/entities/flags/CasbinRule.ts";
+import { WebhookSubscription } from "@platform-core/infrastructure/application-database/entities/flags/WebhookSubscription.ts";
+import { NotificationRule } from "@platform-core/infrastructure/application-database/entities/flags/NotificationRule.ts";
+import { SchemaMigration } from "@platform-core/infrastructure/application-database/entities/SchemaMigration.ts";
 
 // P3#02 entities under test
-import { WorkflowDefinition } from "../../../src/db/entities/orchestration/WorkflowDefinition.ts";
-import { WorkflowDefinitionRepository } from "../../../src/db/repositories/orchestration/WorkflowDefinitionRepository.ts";
+import { WorkflowDefinition } from "@platform-core/infrastructure/application-database/entities/orchestration/WorkflowDefinition.ts";
+import { WorkflowDefinitionRepository } from "@platform-core/infrastructure/application-database/repositories/orchestration/WorkflowDefinitionRepository.ts";
 
 const WELL_KNOWN_ORG_ID = "00000000-0000-0000-0000-000000000001";
-const MIGRATION_PATH = new URL(
-  "../../../src/db/migrations",
-  import.meta.url,
-).pathname;
+const MIGRATION_PATH = join(process.cwd(), "services/platform-core/src/infrastructure/application-database/migrations");
 const P3_02_MIGRATION = "Migration20260502000001_orchestration_workflow_definitions";
 
 function makeOrmConfig(pglite: PGlite) {
@@ -95,7 +93,7 @@ function makeOrmConfig(pglite: PGlite) {
       pathTs: MIGRATION_PATH,
       // transactional:false / allOrNothing:false — test-only PGlite savepoint workaround.
       // PGliteKyselyDialect does not support savepoints; migrations must run outside
-      // a wrapping transaction. This setting MUST NOT appear in src/db/mikro-orm.config.ts.
+      // a wrapping transaction. This setting MUST NOT appear in services/platform-core/src/infrastructure/application-database/mikro-orm.config.ts.
       transactional: false,
       allOrNothing: false,
     },
@@ -111,7 +109,7 @@ beforeAll(async () => {
   pglite = new PGlite();
   orm = await MikroORM.init(makeOrmConfig(pglite));
 
-  // PHASE 1: run all prerequisite migrations (auth, events, composite_indexes, flag_stubs,
+  // STEP 1: run all prerequisite migrations (auth, events, composite_indexes, flag_stubs,
   //          schema_ledger, account_verification) — leaves tasks/agent_runs stub tables in place.
   await orm.migrator.up({
     to: "Migration20260501150000_account_verification",
@@ -125,7 +123,7 @@ beforeAll(async () => {
     `insert into "orgs" ("id", "name", "slug", "created_at", "updated_at") values ('${WELL_KNOWN_ORG_ID}', 'Local', 'local', now(), now()) on conflict do nothing`,
   );
 
-  // PHASE 2: run the P3#02 workflow-definitions migration.
+  // STEP 2: run the P3#02 workflow-definitions migration.
   await orm.migrator.up({ to: P3_02_MIGRATION });
 });
 

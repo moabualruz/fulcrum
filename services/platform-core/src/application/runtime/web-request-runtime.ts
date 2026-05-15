@@ -2,8 +2,9 @@ import { resolveDefaultOrgId } from "@identity-access/application/auth/default-o
 import type { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
 import type { ApplicationPersistence, ApplicationOrm } from "@platform-core/application/runtime/local-database.ts";
 import { initDatabase } from "@platform-core/application/runtime/local-database.ts";
-import { createFlagRegistry, registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
-import { __resetDefaultOrmForTest } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { __resetDataSourceForTest } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
+import { FeatureFlag } from "@platform-core/infrastructure/application-database/entities/auth/FeatureFlag.ts";
+import { FeatureFlagRepository } from "@platform-core/infrastructure/application-database/repositories/auth/FeatureFlagRepository.ts";
 
 export type { DiContainer } from "./di-container.ts";
 
@@ -14,7 +15,7 @@ export interface WebRequestRuntime {
 
 export interface WebRuntime {
   authHandler: ((req: Request) => Promise<Response>) | null;
-  orm: ApplicationOrm | { close: (force?: boolean) => Promise<void> };
+  orm: ApplicationOrm | { destroy: () => Promise<void> };
   flagRegistry?: FlagRegistry;
   createRequestContext?: () => WebRequestRuntime;
   em?: ApplicationPersistence;
@@ -32,11 +33,21 @@ export async function createDefaultWebRuntime(): Promise<WebRuntime> {
 
   const database = await initDatabase();
   const orm = database.orm;
-  const flagRegistry = createFlagRegistry(orm);
+  const em = database.em;
+
+  // Build FlagRegistry from DataSource directly (standalone, no NestJS DI).
+  let flagRegistry: FlagRegistry | undefined;
+  try {
+    const { FlagRegistry } = await import("@platform-core/application/feature-flags/registry.ts");
+    const flagRepo = new FeatureFlagRepository(orm.getRepository(FeatureFlag) as never);
+    flagRegistry = new FlagRegistry(flagRepo as never);
+  } catch {
+    // Flag registry unavailable — non-fatal.
+  }
 
   let authHandler: ((req: Request) => Promise<Response>) | null = null;
   try {
-    const svc = new AuthService(orm.em);
+    const svc = new AuthService(em);
     await svc.init();
     authHandler = svc.handler;
   } catch {
@@ -48,12 +59,12 @@ export async function createDefaultWebRuntime(): Promise<WebRuntime> {
     orm,
     flagRegistry,
     createRequestContext: () => {
-      const em = orm.em.fork();
+      // TypeORM EntityManager is not forked — share the manager from DataSource.
+      const requestEm = orm.manager;
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { Container } = require("@needle-di/core") as { Container: new () => DiContainer };
       const container = new Container();
-      registerDbBindings(container as never, orm, em, { flagRegistry });
-      return { em, container };
+      return { em: requestEm, container };
     },
   };
 }
@@ -67,23 +78,14 @@ export function createWebRequestRuntime(runtime: WebRuntime): WebRequestRuntime 
     throw new Error("Web runtime is missing request context bindings.");
   }
 
-  const maybeFork = runtime.em as ApplicationPersistence & {
-    fork?: () => ApplicationPersistence;
-  };
-
-  if (typeof maybeFork.fork === "function") {
-    throw new Error("Forkable web runtime must provide createRequestContext.");
-  }
-
   return {
     em: runtime.em,
     container: runtime.container,
   };
 }
 
-export function clearWebRequestRuntime(runtime: WebRequestRuntime | null): void {
-  const maybeClear = runtime?.em as (ApplicationPersistence & { clear?: () => void }) | null;
-  maybeClear?.clear?.();
+export function clearWebRequestRuntime(_runtime: WebRequestRuntime | null): void {
+  // TypeORM EntityManager does not need explicit clearing between requests.
 }
 
 export async function localDevSession(requestRuntime: WebRequestRuntime | null): Promise<LocalDevelopmentSession> {
@@ -104,8 +106,8 @@ export async function localDevSession(requestRuntime: WebRequestRuntime | null):
 }
 
 export async function closeWebRuntimeForTest(runtime: WebRuntime | null): Promise<void> {
-  const closedDefaultOrm = await __resetDefaultOrmForTest();
-  if (runtime?.orm && runtime.orm !== closedDefaultOrm) {
-    await runtime.orm.close(true);
+  __resetDataSourceForTest();
+  if (runtime?.orm && "destroy" in runtime.orm) {
+    await runtime.orm.destroy();
   }
 }

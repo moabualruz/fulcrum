@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { transitionRunForRetry } from "@execution-orchestration/application/orchestration/commands.ts";
 import type { AgentRunOrchestrationState, WorkflowConfig } from "./schemas.ts";

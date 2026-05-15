@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { createGracefulShutdown } from "../../src/platform/graceful-shutdown.ts";
+import { createGracefulShutdown } from "@platform-core/application/platform-operations/shutdown-coordinator.ts";
 
 describe("createGracefulShutdown", () => {
   test("runs shutdown hooks in infrastructure-safe order", async () => {

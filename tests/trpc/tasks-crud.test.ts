@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
 import { Container } from "@needle-di/core";
 
-import { createTestOrm } from "../../src/test-utils/db.ts";
-import { Event } from "../../src/db/entities/core/Event.ts";
-import { Task } from "../../src/db/entities/tasks/Task.ts";
-import { TaskRepository } from "../../src/db/repositories/tasks/TaskRepository.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
+import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
+import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
@@ -43,6 +43,19 @@ function callerFor(repo: TaskRepository, orgId = ORG_ID) {
       container,
     }),
   );
+}
+
+async function expectTrpcError(promise: Promise<unknown>, code: TRPCError["code"], message?: string): Promise<void> {
+  let error: TRPCError | null = null;
+  try {
+    await promise;
+  } catch (caught) {
+    if (caught instanceof TRPCError) error = caught;
+  }
+
+  expect(error).toBeInstanceOf(TRPCError);
+  expect(error?.code).toBe(code);
+  if (message !== undefined) expect(error?.message).toBe(message);
 }
 
 describe("tasks CRUD tRPC baseline", () => {
@@ -192,8 +205,11 @@ describe("tasks subtasks and dependencies tRPC", () => {
       await expect(caller.tasks.setParent({ taskId: c.id, parentId: b.id })).resolves
         .toMatchObject({ id: c.id, parentId: b.id });
 
-      await expect(caller.tasks.setParent({ taskId: a.id, parentId: c.id })).rejects
-        .toMatchObject({ code: "CONFLICT", message: "Task parent cycle rejected." });
+      await expectTrpcError(
+        caller.tasks.setParent({ taskId: a.id, parentId: c.id }),
+        "CONFLICT",
+        "Task parent cycle rejected.",
+      );
 
       const events = await repo.getEntityManager().find(Event, {
         org: ORG_ID,
@@ -249,15 +265,14 @@ describe("tasks subtasks and dependencies tRPC", () => {
         dependencies: { blocks: [b.id], blocked_by: [] },
       });
 
-      await expect(
+      await expectTrpcError(
         caller.tasks.setDependencies({
           taskId: b.id,
           dependencies: { blocks: [a.id], blocked_by: [] },
         }),
-      ).rejects.toMatchObject({
-        code: "CONFLICT",
-        message: "Task dependency cycle rejected.",
-      });
+        "CONFLICT",
+        "Task dependency cycle rejected.",
+      );
     } finally {
       await db.close();
     }

@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { STEPS } from "../../scripts/ci.ts";
 import { coverageStats, mergeLcov, renderMergedLcov } from "../../scripts/test-root-coverage.ts";
 
-describe("Phase 09 coverage threshold gates", () => {
+describe("architecture coverage threshold gates", () => {
   test("root coverage merge excludes test files from implementation coverage stats", () => {
     const coverage = new Map();
 
@@ -95,6 +95,16 @@ describe("Phase 09 coverage threshold gates", () => {
     expect(source).toContain("FULCRUM_ROOT_TEST_COVERAGE_THRESHOLD");
     expect(source).toContain('?? "0.80"');
     expect(source).toContain("exitCode = 99");
+  });
+
+  test("root test discovery includes service and non-web app tests after domain restructure", () => {
+    const source = readFileSync("scripts/test-root.ts", "utf8");
+
+    expect(source).toContain('"services"');
+    expect(source).toContain('"apps/cli"');
+    expect(source).toContain('"apps/server"');
+    expect(source).toContain('"apps/tui"');
+    expect(source).toContain('if (path === "apps/web") continue;');
   });
 
   test("local CI contains root and web coverage gates", () => {

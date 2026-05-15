@@ -3,7 +3,7 @@
  * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { isFeatureEnabled } from "@platform-core/application/legacy/web-runtime.ts";
 import { ormSqlConnection } from "@platform-core/application/orm-helpers.ts";
 

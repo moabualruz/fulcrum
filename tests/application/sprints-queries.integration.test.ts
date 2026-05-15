@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 
-import { DEFAULT_ORG_ID } from "../../src/db/seed.ts";
-import { createTestOrm, type TestOrm } from "../../src/test-utils/db.ts";
+import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import {
   getSprint,
   loadProjectBacklog,
   loadProjectSprintDetail,
   loadProjectSprints,
-} from "../../src/application/sprints/queries.ts";
+} from "@work-management/application/sprints/queries.ts";
 
 let db: TestOrm | null = null;
 
@@ -78,7 +78,7 @@ describe("sprint application queries with migrated PGlite data", () => {
       ],
     );
 
-    const ctx = { orgId: DEFAULT_ORG_ID, projectId };
+    const ctx = { orgId: DEFAULT_ORG_ID, userId: null, projectId };
     const backlog = await loadProjectBacklog(em, ctx);
     const sprints = await loadProjectSprints(em, ctx);
     const detail = await loadProjectSprintDetail(em, ctx, sprintId);
@@ -105,8 +105,8 @@ describe("sprint application queries with migrated PGlite data", () => {
     expect(detail.tasks.map((task) => task.id)).toEqual([sprintTaskId]);
     expect(sprint?.id).toBe(sprintId);
     await expect(loadProjectSprintDetail(em, ctx, randomUUID())).rejects.toThrow("Sprint not found");
-    await expect(loadProjectBacklog(em, { orgId: DEFAULT_ORG_ID, projectId: randomUUID() })).rejects.toThrow(
-      "Project not found",
-    );
+    await expect(
+      loadProjectBacklog(em, { orgId: DEFAULT_ORG_ID, userId: null, projectId: randomUUID() }),
+    ).rejects.toThrow("Project not found");
   });
 });

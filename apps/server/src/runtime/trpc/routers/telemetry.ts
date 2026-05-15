@@ -23,7 +23,7 @@ const PurgeOutputSchema = z.object({
 
 export { scrubTelemetryPayload, TelemetryStore, writeTelemetryEvent };
 
-function storeFromContext(context: { container: import("@platform-core/application/runtime/di-container.ts").DiContainer | null; em: import("@mikro-orm/postgresql").EntityManager | null; orgId: string; userId: string }): TelemetryStore {
+function storeFromContext(context: { container: import("@platform-core/application/runtime/di-container.ts").DiContainer | null; em: import("typeorm").EntityManager | null; orgId: string; userId: string }): TelemetryStore {
   if (context.container?.has(TelemetryStore)) return context.container.get(TelemetryStore);
   return createTelemetryStore({ em: context.em, orgId: context.orgId, userId: context.userId });
 }

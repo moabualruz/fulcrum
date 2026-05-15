@@ -3,7 +3,7 @@ import {
   encryptWebhookSecret,
   type WebhookSecretCryptoOptions,
 } from "@integration-hub/application/webhooks/encryption.ts";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
 import { Webhook } from "@platform-core/infrastructure/application-database/entities/notifications/Webhook.ts";

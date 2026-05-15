@@ -6,7 +6,7 @@
  * onTaskComplete() triggers on_complete recurrence rules.
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { TaskRecurrenceRule } from "@platform-core/infrastructure/application-database/entities/tasks/TaskRecurrenceRule.ts";
 import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";

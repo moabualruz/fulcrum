@@ -2,13 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
 import type { Session } from "better-auth";
 
-import { Org } from "../../src/db/entities/auth/Org.ts";
-import { Memory } from "../../src/db/entities/memory/Memory.ts";
-import { createTestOrm } from "../../src/test-utils/db.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
-import { rankMemoryMatches } from "../../src/memory/retrieval/scoring.ts";
+import { rankMemoryMatches } from "@knowledge-workspace/application/memory/retrieval/scoring.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 const ORG_ID = "00000000-0000-0000-0000-000000000001";

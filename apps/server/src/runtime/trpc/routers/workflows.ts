@@ -113,7 +113,7 @@ const WorkflowAcceptanceCycleOutputSchema = z.custom<WorkflowAcceptanceCycleResu
     (!result.generatedE2e || Array.isArray(result.generatedE2e.testFiles)),
   );
 }, "Workflow acceptance cycle result is invalid.");
-type EntityManager = import("@mikro-orm/postgresql").EntityManager;
+type EntityManager = import("typeorm").EntityManager;
 
 interface WorkflowsApplication {
   runAcceptanceCycle(input: WorkflowAcceptanceCycleInput): Promise<WorkflowAcceptanceCycleResult>;

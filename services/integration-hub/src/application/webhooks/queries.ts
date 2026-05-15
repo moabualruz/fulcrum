@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { Webhook } from "@platform-core/infrastructure/application-database/entities/notifications/Webhook.ts";
 import { WebhookDelivery } from "@platform-core/infrastructure/application-database/entities/notifications/WebhookDelivery.ts";

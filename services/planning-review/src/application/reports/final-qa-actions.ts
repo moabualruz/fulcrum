@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { AppValidationError } from "@platform-core/domain/errors.ts";
 import { listDocs } from "@knowledge-workspace/application/docs/queries.ts";

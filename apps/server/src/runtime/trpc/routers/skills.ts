@@ -67,7 +67,7 @@ const LockOverrideInputSchema = z.object({
   auditNote: z.string().optional(),
 });
 
-type EntityManager = import("@mikro-orm/postgresql").EntityManager;
+type EntityManager = import("typeorm").EntityManager;
 
 function appContext(ctx: { orgId: string }): { orgId: string } {
   return { orgId: ctx.orgId };

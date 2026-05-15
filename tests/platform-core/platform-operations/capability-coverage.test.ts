@@ -5,7 +5,7 @@ import {
   capabilitiesForRequirement,
   missingCrossCuttingSurfaces,
   requirementsWithoutCapabilities,
-} from "../../src/platform/cross-cutting-parity.ts";
+} from "@platform-core/application/platform-operations/capability-coverage.ts";
 
 const EXPECTED_CAPABILITIES = [
   "i18n",
@@ -24,7 +24,7 @@ const EXPECTED_CAPABILITIES = [
 const XCT_REQUIREMENTS = Array.from({ length: 12 }, (_, index) => `XCT-${String(index + 1).padStart(2, "0")}`);
 const TST_REQUIREMENTS = Array.from({ length: 10 }, (_, index) => `TST-${String(index + 1).padStart(2, "0")}`);
 
-describe("Phase 09 cross-cutting parity matrix", () => {
+describe("architecture cross-cutting parity matrix", () => {
   test("contains every cross-cutting capability", () => {
     const ids = CROSS_CUTTING_CAPABILITIES.map((capability) => capability.id);
 

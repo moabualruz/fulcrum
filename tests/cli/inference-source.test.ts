@@ -62,8 +62,8 @@ describe("inference CLI source command", () => {
   it("starts, reports status, and stops via injected lifecycle/client", async () => {
     const lifecycle = {
       ensureRunning: async () => ({ pid: 123, socketPath: "/tmp/fulcrum.sock", started: true }),
-      status: async () => ({ status: "running" as const, pid: 123, socketPath: "/tmp/fulcrum.sock" }),
-      stop: async () => ({ status: "stopped" as const, pid: 123, socketRemoved: true }),
+      status: async () => ({ status: "ok" as const, pid: 123, socketPath: "/tmp/fulcrum.sock" }),
+      stop: async () => ({ status: "stopped" as const, pid: 123, socketPath: "/tmp/fulcrum.sock", socketRemoved: true, pidFileRemoved: true }),
     };
     const client = { call: async () => health };
 
@@ -237,7 +237,18 @@ describe("inference CLI source command", () => {
         embed: async () => ({ vectors: [[1]], model: "mini", cached: false, dimensions: 1 }),
         generate: async () => ({ text: "ok", model: "mini", tokens: 1 }),
         backends: {
-          probe: async () => [{ backend: "ollama", status: "unavailable", reason: "missing" }],
+          probe: async () => [{
+            backend: "ollama" as const,
+            configured: true,
+            enabled: true,
+            status: "unavailable" as const,
+            reason: "missing",
+            model: null,
+            embedProbe: null,
+            generateProbe: null,
+            dimensions: null,
+            lastChecked: null,
+          }],
         },
       },
     };
@@ -249,6 +260,84 @@ describe("inference CLI source command", () => {
     const proof = createHarness({ staticProof: async () => "{\"ok\":true}\n" });
     await run(["static-proof", "--json"], proof.opts);
     expect(proof.stdout).toEqual(["{\"ok\":true}"]);
+  });
+
+  it("routes remote-capable operations through the configured inference public API", async () => {
+    process.env["FULCRUM_FEATURES"] = "embeddings";
+    const calls: Array<{ url: string; method: string | undefined; body: unknown }> = [];
+    const fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      const requestUrl = new URL(String(url));
+      const body = init?.body ? JSON.parse(String(init.body)) : null;
+      calls.push({ url: String(url), method: init?.method, body });
+      switch (requestUrl.pathname) {
+        case "/api/v1/inference/health":
+          return Response.json(health);
+        case "/api/v1/inference/backends/probe":
+          return Response.json([]);
+        case "/api/v1/inference/models/mini/pull":
+          return Response.json([{ pct: 100, downloaded: 10, total: 10 }]);
+        case "/api/v1/inference/embed":
+          return Response.json({ vectors: [[0.1, 0.2]], model: "mini", cached: false, dimensions: 2 });
+        case "/api/v1/inference/config":
+          return Response.json({ ok: true, config: { embeddings: "embedded" } });
+        case "/api/v1/inference/provider":
+          return Response.json({ ok: true, url: body?.url });
+        case "/api/v1/inference/provider/test":
+          return Response.json({ ok: true, latency_ms: 12 });
+        default:
+          return Response.json({ error: "unexpected route" }, { status: 500 });
+      }
+    }) as unknown as typeof globalThis.fetch;
+    const opts = {
+      env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3210/" },
+      fetch,
+    };
+
+    const status = createHarness(opts);
+    await run(["status", "--json"], status.opts);
+    expect(JSON.parse(status.stdout[0]!).status).toBe("ok");
+
+    const pull = createHarness(opts);
+    await run(["models", "pull", "mini"], pull.opts);
+    expect(pull.stdout).toEqual(["download mini 100% 10/10"]);
+
+    const embed = createHarness(opts);
+    await run(["embed", "hello", "--model", "mini", "--json"], embed.opts);
+    expect(JSON.parse(embed.stdout[0]!).dimensions).toBe(2);
+
+    const config = createHarness(opts);
+    await run(["config", "set", "embeddings", "embedded"], config.opts);
+    expect(config.stdout).toEqual(["embeddings: embedded"]);
+
+    const provider = createHarness(opts);
+    await run(["config", "set-provider", "--url", "https://llm.local", "--key", "secret"], provider.opts);
+    await run(["config", "test-provider", "--json"], provider.opts);
+
+    expect(calls).toEqual([
+      { method: "GET", url: "http://127.0.0.1:3210/api/v1/inference/health", body: null },
+      { method: "GET", url: "http://127.0.0.1:3210/api/v1/inference/backends/probe", body: null },
+      {
+        method: "POST",
+        url: "http://127.0.0.1:3210/api/v1/inference/models/mini/pull",
+        body: { force: false },
+      },
+      {
+        method: "POST",
+        url: "http://127.0.0.1:3210/api/v1/inference/embed",
+        body: { texts: ["hello"], model: "mini" },
+      },
+      {
+        method: "PATCH",
+        url: "http://127.0.0.1:3210/api/v1/inference/config",
+        body: { feature: "embeddings", backend: "embedded" },
+      },
+      {
+        method: "PATCH",
+        url: "http://127.0.0.1:3210/api/v1/inference/provider",
+        body: { url: "https://llm.local", key: "secret" },
+      },
+      { method: "POST", url: "http://127.0.0.1:3210/api/v1/inference/provider/test", body: null },
+    ]);
   });
 
   it("uses direct client methods for non-caller model and inference operations", async () => {

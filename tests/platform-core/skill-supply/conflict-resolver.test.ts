@@ -1,9 +1,3 @@
-/**
- * TDD — skills upstream conflict resolution.
- *
- * Closes (issue): .scratch/agent-os-vision/05-router-and-skills/issues/15-skills-conflict-resolver.md
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
@@ -13,21 +7,21 @@ import { $ } from "bun";
 import {
   createTestOrm,
   type TestOrm,
-} from "../../src/test-utils/index.ts";
+} from "@test-support/index.ts";
 import {
   FulcrumSkill,
   SkillSource,
-} from "../../src/db/entities/skills/index.ts";
+} from "@platform-core/infrastructure/application-database/entities/skills/index.ts";
 import {
   AGENT_DIRS,
   __setSkillsLoaderOrmForTest,
   installSkill,
-} from "../../src/skills/loader.ts";
-import { readSkillsLockFile, writeSkillsLockFile } from "../../src/skills/lock.ts";
+} from "@platform-core/application/skill-supply/loader.ts";
+import { readSkillsLockFile, writeSkillsLockFile } from "@platform-core/application/skill-supply/lock.ts";
 import {
   __setSkillsConflictResolverOrmForTest,
   resolveConflict,
-} from "../../src/skills/conflict-resolver.ts";
+} from "@platform-core/application/skill-supply/conflict-resolver.ts";
 
 let scratch: string;
 let originalHome: string | undefined;

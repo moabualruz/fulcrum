@@ -14,7 +14,7 @@
  * SYM-17: Active reconciliation updates snapshot.
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import type { CandidateIssue, WorkflowConfig } from "./schemas.ts";
 import {

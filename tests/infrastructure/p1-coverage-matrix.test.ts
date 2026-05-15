@@ -59,7 +59,7 @@ describe("P1 test coverage matrix", () => {
 });
 
 describe("scripts/ci.ts baseline gate", () => {
-  it("keeps the default CI gate at 23 product stages", () => {
+  it("keeps the default CI gate at 24 product stages", () => {
     const names = STEPS.map((step) => step.name);
     expect(names).toEqual([
       "install",
@@ -84,6 +84,7 @@ describe("scripts/ci.ts baseline gate", () => {
       "web:a11y",
       "web:e2e:smoke",
       "web:e2e:full",
+      "generated:e2e",
       "architecture:red",
     ]);
   });
@@ -92,6 +93,7 @@ describe("scripts/ci.ts baseline gate", () => {
     const names = STEPS.map((step) => step.name);
     expect(names).toContain("web:e2e:smoke");
     expect(names).toContain("web:e2e:full");
+    expect(names).toContain("generated:e2e");
   });
 
   it("runs root tests through the root test runner", () => {
@@ -111,13 +113,18 @@ describe("scripts/ci.ts baseline gate", () => {
     expect(CI_ENV["FULCRUM_HOME"]).toBeUndefined();
   });
 
-  it("uses a sandbox-safe Bun install cache for nested installs", () => {
+  it("runs nested web install with the sandboxed CI home and Bun's normal package cache", () => {
     const webInstallStep = STEPS.find((step) => step.name === "web:install");
     if (!webInstallStep) throw new Error("missing web:install step");
     const installEnv = envForStep(webInstallStep);
 
-    expect(installEnv["BUN_INSTALL_CACHE_DIR"]).toBeDefined();
-    expect(installEnv["BUN_INSTALL_CACHE_DIR"]!.startsWith(tmpdir())).toBe(true);
+    expect(webInstallStep.env).toBeUndefined();
+    expect(installEnv).toBe(CI_ENV);
+    expect(installEnv["HOME"]).toBeDefined();
+    expect(installEnv["HOME"]).not.toBe(homedir());
+    expect(installEnv["HOME"]!.startsWith(tmpdir())).toBe(true);
+    expect(installEnv["FULCRUM_HOME"]).toBeUndefined();
+    expect(installEnv["BUN_INSTALL_CACHE_DIR"]).toBeUndefined();
   });
 
   it("keeps Playwright smoke e2e on the host browser cache", () => {
@@ -129,13 +136,13 @@ describe("scripts/ci.ts baseline gate", () => {
     expect(e2eEnv["FULCRUM_HOME"]).toBeUndefined();
   });
 
-  it("does not hide the Bun compile cache from build:all", () => {
+  it("does not override Bun cache behavior for build:all", () => {
     const buildStep = STEPS.find((step) => step.name === "build:all");
     if (!buildStep) throw new Error("missing build:all step");
     const buildEnv = envForStep(buildStep);
 
     expect(buildStep.env).toBeUndefined();
     expect(buildEnv).toBe(CI_ENV);
-    expect(buildEnv["BUN_INSTALL_CACHE_DIR"]).not.toBe(envForStep(STEPS.find((step) => step.name === "web:install")!)["BUN_INSTALL_CACHE_DIR"]);
+    expect(buildEnv["BUN_INSTALL_CACHE_DIR"]).toBeUndefined();
   });
 });

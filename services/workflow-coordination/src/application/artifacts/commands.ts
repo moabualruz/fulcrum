@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { deleteArtifact } from "@workflow-coordination/infrastructure/artifacts/storage.ts";
 import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";

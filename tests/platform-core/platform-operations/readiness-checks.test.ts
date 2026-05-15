@@ -3,8 +3,8 @@ import { mkdtemp, mkdir, rm, writeFile, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { runPlatformDoctorChecks, type PlatformDoctorCheck } from "../../src/platform/doctor-checks.ts";
-import { classifyLocalReadiness } from "../../src/db/doctor-checks.ts";
+import { runPlatformDoctorChecks, type PlatformDoctorCheck } from "@platform-core/application/platform-operations/readiness-checks.ts";
+import { classifyLocalReadiness } from "@platform-core/infrastructure/application-database/doctor-checks.ts";
 
 async function tempDir(name: string): Promise<string> {
   return mkdtemp(join(tmpdir(), `fulcrum-platform-doctor-${name}-`));

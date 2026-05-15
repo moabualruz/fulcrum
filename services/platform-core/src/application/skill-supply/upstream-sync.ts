@@ -1,4 +1,4 @@
-import type { MikroORM } from "@mikro-orm/postgresql";
+import type { DataSource } from "typeorm";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
@@ -13,7 +13,7 @@ import {
   SkillConflictKind,
   SkillConflictStatus,
 } from "@platform-core/infrastructure/application-database/entities/skills/index.ts";
-import { initOrm } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { initDataSource } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 import { parseKernelMarkdown } from "@platform-core/application/platform-primitives/frontmatter-markdown.ts";
 import { AGENT_DIRS, type AgentName } from "./loader.ts";
 import { installSkill } from "./loader.ts";
@@ -30,32 +30,32 @@ const UpstreamSkillFrontmatter = z.object({
   version: z.string().min(1),
 });
 
-let testOrm: MikroORM | undefined;
+let testDataSource: DataSource | undefined;
 
 export function __setSkillsUpstreamSyncOrmForTest(
-  orm: MikroORM | undefined,
+  ds: DataSource | undefined,
 ): void {
-  testOrm = orm;
+  testDataSource = ds;
 }
 
-interface OrmHandle {
-  orm: MikroORM;
+interface DataSourceHandle {
+  dataSource: DataSource;
   close(): Promise<void>;
 }
 
-async function ormForSync(): Promise<OrmHandle> {
-  if (testOrm) {
+async function dsForSync(): Promise<DataSourceHandle> {
+  if (testDataSource) {
     return {
-      orm: testOrm,
+      dataSource: testDataSource,
       close: async () => undefined,
     };
   }
 
-  const orm = await initOrm();
+  const dataSource = await initDataSource();
   return {
-    orm,
+    dataSource,
     close: async () => {
-      await orm.close(true);
+      await dataSource.destroy();
     },
   };
 }
@@ -201,73 +201,37 @@ async function findSkillMarkdownRecursive(
   return null;
 }
 
-async function unifiedDiff(
-  slug: string,
-  localContent: string,
-  upstreamContent: string,
-): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "fulcrum-skill-diff-"));
-  const localPath = join(dir, `${slug}.local.SKILL.md`);
-  const upstreamPath = join(dir, `${slug}.upstream.SKILL.md`);
-  try {
-    await writeFile(localPath, localContent, "utf8");
-    await writeFile(upstreamPath, upstreamContent, "utf8");
-    const result = await runGit([
-      "diff",
-      "--no-index",
-      "--no-color",
-      "--",
-      localPath,
-      upstreamPath,
-    ]);
-    if (result.stdout.trim()) return result.stdout;
-    return [
-      `--- ${slug}.local.SKILL.md`,
-      `+++ ${slug}.upstream.SKILL.md`,
-      "@@",
-      localContent,
-      upstreamContent,
-    ].join("\n");
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-}
-
 async function updateHashVerified(
-  orm: MikroORM,
+  dataSource: DataSource,
   orgId: string,
   skill: FulcrumSkill,
   version: string,
   hash: string,
 ): Promise<void> {
-  const em = orm.em.fork();
-  const reloaded = await em.findOneOrFail(FulcrumSkill, {
-    org: orgId,
-    slug: skill.slug,
+  const skillRepo = dataSource.getRepository(FulcrumSkill);
+  const versionRepo = dataSource.getRepository(SkillVersion);
+
+  const reloaded = await skillRepo.findOneOrFail({
+    where: { org: { id: orgId }, slug: skill.slug },
   });
-  let skillVersion = await em.findOne(SkillVersion, {
-    skill: reloaded,
-    version,
+  let skillVersion = await versionRepo.findOne({
+    where: { skill: { id: reloaded.id }, version },
   });
   if (!skillVersion) {
-    skillVersion = em.create(SkillVersion, {
-      skill: reloaded,
-      version,
-      hashVerified: hash,
-    });
+    skillVersion = versionRepo.create({ skill: reloaded, version, hashVerified: hash });
   } else {
     skillVersion.hashVerified = hash;
   }
-  await em.flush();
+  await versionRepo.save(skillVersion);
 }
 
 async function upstreamSkillsForOrg(
-  orm: MikroORM,
+  dataSource: DataSource,
   orgId: string,
 ): Promise<FulcrumSkill[]> {
-  return orm.em.fork().find(FulcrumSkill, {
-    org: orgId,
-    source: SkillSource.Upstream,
+  const repo = dataSource.getRepository(FulcrumSkill);
+  return repo.find({
+    where: { org: { id: orgId }, source: SkillSource.Upstream },
   });
 }
 
@@ -278,9 +242,9 @@ export async function syncUpstream(
   const result: SyncResult = { merged: [], conflicts: [], errors: [] };
   if (!options.fetchUpstream) return result;
 
-  const ormHandle = await ormForSync();
+  const handle = await dsForSync();
   try {
-    const skills = await upstreamSkillsForOrg(ormHandle.orm, orgId);
+    const skills = await upstreamSkillsForOrg(handle.dataSource, orgId);
     const lock = await readSkillsLockFile();
 
     for (const skill of skills) {
@@ -310,18 +274,12 @@ export async function syncUpstream(
           parseKernelMarkdown(upstreamContent).frontmatter,
         );
         const upstreamHash = sha256(upstreamContent);
-        const clean = await installedSkillIsClean(
-          slug,
-          agents,
-          lockEntry.hash,
-        );
+        const clean = await installedSkillIsClean(slug, agents, lockEntry.hash);
 
         if (!clean) {
           const localContent = await readInstalledSkillContent(slug, agents) ?? "";
-          // Create structured SkillConflict artifact with kind=upstream_conflict
-          // instead of inline conflict diff in lock entry (D-22, D-23).
-          const em = ormHandle.orm.em.fork();
-          em.create(SkillConflict, {
+          const conflictRepo = handle.dataSource.getRepository(SkillConflict);
+          const conflict = conflictRepo.create({
             slug,
             kind: SkillConflictKind.UpstreamConflict,
             status: SkillConflictStatus.Open,
@@ -332,7 +290,7 @@ export async function syncUpstream(
             createdAt: new Date(),
             updatedAt: new Date(),
           });
-          await em.flush();
+          await conflictRepo.save(conflict);
           lock[slug] = {
             ...lockEntry,
             upstream_conflict: [
@@ -348,13 +306,7 @@ export async function syncUpstream(
         }
 
         await writeInstalledSkill(slug, agents, upstreamContent);
-        await updateHashVerified(
-          ormHandle.orm,
-          orgId,
-          skill,
-          parsed.version,
-          upstreamHash,
-        );
+        await updateHashVerified(handle.dataSource, orgId, skill, parsed.version, upstreamHash);
         lock[slug] = {
           version: parsed.version,
           hash: upstreamHash,
@@ -363,9 +315,7 @@ export async function syncUpstream(
         };
         result.merged.push(slug);
       } catch (error) {
-        console.warn(
-          `Failed to sync upstream skill ${slug}: ${(error as Error).message}`,
-        );
+        console.warn(`Failed to sync upstream skill ${slug}: ${(error as Error).message}`);
         result.errors.push(slug);
       } finally {
         await rm(cloneParent, { recursive: true, force: true });
@@ -375,31 +325,31 @@ export async function syncUpstream(
     await writeSkillsLockFile(lock);
     return result;
   } finally {
-    await ormHandle.close();
+    await handle.close();
   }
 }
 
 async function upstreamSkillRows(
-  orm: MikroORM,
+  dataSource: DataSource,
   orgId: string,
   slug: string | "all",
 ): Promise<FulcrumSkill[]> {
-  const where = {
-    org: orgId,
+  const repo = dataSource.getRepository(FulcrumSkill);
+  const where: Record<string, unknown> = {
+    org: { id: orgId },
     source: SkillSource.Upstream,
-    upstreamRepo: { $ne: null },
-    ...(slug === "all" ? {} : { slug }),
   };
-  return orm.em.fork().find(FulcrumSkill, where, { orderBy: { slug: "ASC" } });
+  if (slug !== "all") where["slug"] = slug;
+  return repo.find({ where, order: { slug: "ASC" } });
 }
 
 export async function upgradeSkills(
   orgId: string,
   slug: string | "all",
 ): Promise<FulcrumSkill[]> {
-  const ormHandle = await ormForSync();
+  const handle = await dsForSync();
   try {
-    const skills = await upstreamSkillRows(ormHandle.orm, orgId, slug);
+    const skills = await upstreamSkillRows(handle.dataSource, orgId, slug);
     const upgraded: FulcrumSkill[] = [];
 
     for (const skill of skills) {
@@ -412,15 +362,14 @@ export async function upgradeSkills(
         if (!upstreamPath) throw new Error(`missing SKILL.md for ${skill.slug}`);
 
         await installSkill(upstreamPath, orgId);
-        const em = ormHandle.orm.em.fork();
-        const reloaded = await em.findOneOrFail(FulcrumSkill, {
-          org: orgId,
-          slug: skill.slug,
+        const skillRepo = handle.dataSource.getRepository(FulcrumSkill);
+        const reloaded = await skillRepo.findOneOrFail({
+          where: { org: { id: orgId }, slug: skill.slug },
         });
         reloaded.source = SkillSource.Upstream;
         reloaded.upstreamRepo = skill.upstreamRepo;
         reloaded.upstreamRef = skill.upstreamRef;
-        await em.flush();
+        await skillRepo.save(reloaded);
         upgraded.push(reloaded);
       } finally {
         await rm(cloneParent, { recursive: true, force: true });
@@ -429,6 +378,6 @@ export async function upgradeSkills(
 
     return upgraded;
   } finally {
-    await ormHandle.close();
+    await handle.close();
   }
 }

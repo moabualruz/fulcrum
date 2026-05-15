@@ -1,9 +1,9 @@
 import { Container } from "@needle-di/core";
 import { MikroORM } from "@mikro-orm/postgresql";
 
-import { registerDbBindings } from "../db/db.module.ts";
-import type { SeedResult } from "../db/seed.ts";
-import type { TestOrm } from "./db.ts";
+import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
+import type { SeedResult } from "@platform-core/infrastructure/application-database/seed.ts";
+import type { TestOrm } from "./application-database.ts";
 
 export type TestContainer = Container & {
   __fulcrumTestSeed?: SeedResult;

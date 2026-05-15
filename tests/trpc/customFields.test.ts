@@ -2,11 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
 import { Container } from "@needle-di/core";
 
-import { Org } from "../../src/db/entities/auth/Org.ts";
-import { CustomFieldDef } from "../../src/db/entities/tasks/CustomFieldDef.ts";
-import { Task } from "../../src/db/entities/tasks/Task.ts";
-import { TaskRepository } from "../../src/db/repositories/tasks/TaskRepository.ts";
-import { createTestOrm } from "../../src/test-utils/db.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { CustomFieldDef } from "@platform-core/infrastructure/application-database/entities/tasks/CustomFieldDef.ts";
+import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";

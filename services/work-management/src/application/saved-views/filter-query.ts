@@ -7,7 +7,7 @@
  */
 
 import { z } from "zod";
-import type { FilterQuery } from "@mikro-orm/core";
+import type { FilterQuery } from "typeorm";
 import type { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
 
 // ─── Operator vocabulary ────────────────────────────────────────────────────

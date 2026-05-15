@@ -3,7 +3,7 @@
  * Canonical home; web layer re-exports from here.
  * Dependency direction: services use neutral persistence protocols (never web).
  */
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import type { SqlExecutor } from "@platform-core/infrastructure/application-database/sql.ts";
 
 type DbHandle = EntityManager | { em?: EntityManager } | SqlExecutor;

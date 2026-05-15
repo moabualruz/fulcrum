@@ -8,7 +8,7 @@
  * for backward compatibility — callers receive plain row objects.
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { randomUUID } from "node:crypto";
 import type { ProductDb } from "../db/types.ts";
 import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";

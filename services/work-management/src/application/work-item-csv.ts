@@ -8,7 +8,7 @@ import {
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { exportTasksToCsv } from "@integration-hub/application/data-exchange/csv-export.ts";
 import { importCsv, type SkippedRecord } from "@integration-hub/application/data-exchange/csv-import.ts";

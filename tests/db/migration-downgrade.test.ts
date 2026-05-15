@@ -1,12 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { readdir } from "node:fs/promises";
+import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { MikroORM, type Options } from "@mikro-orm/postgresql";
 
-import { createOrmConfig } from "../../src/db/mikro-orm.config.ts";
-import { SchemaMigration } from "../../src/db/entities/SchemaMigration.ts";
+import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { SchemaMigration } from "@platform-core/infrastructure/application-database/entities/SchemaMigration.ts";
 
-const MIGRATIONS_PATH = new URL("../../src/db/migrations", import.meta.url).pathname;
+const MIGRATIONS_PATH = join(process.cwd(), "services/platform-core/src/infrastructure/application-database/migrations");
 
 async function createMigratedOrm(): Promise<{ orm: MikroORM; pglite: PGlite }> {
   const pglite = new PGlite();

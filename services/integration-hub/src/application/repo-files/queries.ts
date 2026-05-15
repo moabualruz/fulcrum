@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { RepoBlameLine } from "@platform-core/infrastructure/application-database/entities/repos/RepoBlameLine.ts";

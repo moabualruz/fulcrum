@@ -6,7 +6,7 @@
  * Callers are responsible for deduplicating queue entries before enqueue.
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import {
   type WorkerTask,
   assertStringField,

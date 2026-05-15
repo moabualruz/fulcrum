@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { MikroORM } from "@mikro-orm/postgresql";
+import { MikroORM } from "typeorm";
 import { readFile } from "node:fs/promises";
 
 import { setTenantSetting } from "@platform-core/application/settings/commands.ts";

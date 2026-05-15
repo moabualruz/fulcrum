@@ -3,7 +3,7 @@
  * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { randomUUID } from "node:crypto";
 import { appendEventOrm, ormSqlConnection } from "@platform-core/application/orm-helpers.ts";
 

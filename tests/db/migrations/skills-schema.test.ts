@@ -8,10 +8,11 @@
  */
 
 import { describe, it, expect } from "bun:test";
+import { join } from "node:path";
 import { MikroORM, ReferenceKind } from "@mikro-orm/postgresql";
 import { Migrator } from "@mikro-orm/migrations";
 import { PGlite } from "@electric-sql/pglite";
-import { PGliteKyselyDialect } from "../../../src/db/PGliteKyselyDriver.ts";
+import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
 import {
   Account,
   FeatureFlag,
@@ -21,38 +22,38 @@ import {
   Session,
   User,
   Verification,
-} from "../../../src/db/entities/auth/index.ts";
-import { SchemaMigration } from "../../../src/db/entities/SchemaMigration.ts";
-import { Event } from "../../../src/db/entities/core/Event.ts";
-import { Task } from "../../../src/db/entities/tasks/Task.ts";
-import { Document } from "../../../src/db/entities/docs/Document.ts";
-import { Memory } from "../../../src/db/entities/memory/Memory.ts";
+} from "@platform-core/infrastructure/application-database/entities/auth/index.ts";
+import { SchemaMigration } from "@platform-core/infrastructure/application-database/entities/SchemaMigration.ts";
+import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
+import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
+import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
 import {
   AgentRun,
   WorkflowDefinition,
-} from "../../../src/db/entities/orchestration/index.ts";
-import { Artifact } from "../../../src/db/entities/artifacts/index.ts";
-import { Repo } from "../../../src/db/entities/repos/index.ts";
-import { Job } from "../../../src/db/entities/jobs/index.ts";
-import { SearchDocument } from "../../../src/db/entities/search/index.ts";
+} from "@platform-core/infrastructure/application-database/entities/orchestration/index.ts";
+import { Artifact } from "@platform-core/infrastructure/application-database/entities/artifacts/index.ts";
+import { Repo } from "@platform-core/infrastructure/application-database/entities/repos/index.ts";
+import { Job } from "@platform-core/infrastructure/application-database/entities/jobs/index.ts";
+import { SearchDocument } from "@platform-core/infrastructure/application-database/entities/search/index.ts";
 import {
   CasbinRule,
   NotificationRule,
   WebhookSubscription,
-} from "../../../src/db/entities/flags/index.ts";
+} from "@platform-core/infrastructure/application-database/entities/flags/index.ts";
 import {
   Credential,
   ErrorLog,
   ExperimentAssignment,
   FeatureFlagRollout,
   TelemetryEvent,
-} from "../../../src/db/entities/platform/index.ts";
+} from "@platform-core/infrastructure/application-database/entities/platform/index.ts";
 import {
   FulcrumSkill,
   SkillSource,
   SkillVersion,
-} from "../../../src/db/entities/skills/index.ts";
-import { FulcrumSkillRepository } from "../../../src/db/repositories/skills/index.ts";
+} from "@platform-core/infrastructure/application-database/entities/skills/index.ts";
+import { FulcrumSkillRepository } from "@platform-core/infrastructure/application-database/repositories/skills/index.ts";
 
 const ALL_ENTITIES = [
   SchemaMigration,
@@ -273,8 +274,8 @@ describe("skills registry migration class", () => {
       multipleStatements: false,
       entities: ALL_ENTITIES,
       migrations: {
-        path: new URL("../../../src/db/migrations", import.meta.url).pathname,
-        pathTs: new URL("../../../src/db/migrations", import.meta.url).pathname,
+        path: join(process.cwd(), "services/platform-core/src/infrastructure/application-database/migrations"),
+        pathTs: join(process.cwd(), "services/platform-core/src/infrastructure/application-database/migrations"),
         transactional: false,
         allOrNothing: false,
       },

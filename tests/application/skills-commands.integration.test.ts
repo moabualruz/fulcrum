@@ -4,14 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
-import { DEFAULT_ORG_ID } from "../../src/db/seed.ts";
+import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import {
   SkillConflict,
   SkillConflictKind,
   SkillConflictStatus,
-} from "../../src/db/entities/skills/SkillConflict.ts";
-import { overrideSkillConflict, overrideSkillLock } from "../../src/application/skills/commands.ts";
-import { createTestOrm, type TestOrm } from "../../src/test-utils/db.ts";
+} from "@platform-core/infrastructure/application-database/entities/skills/SkillConflict.ts";
+import { overrideSkillConflict, overrideSkillLock } from "@platform-core/application/skills/commands.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
 let db: TestOrm | null = null;
 let previousHome: string | undefined;
@@ -49,7 +49,7 @@ describe("skill application commands with real lock file and audit persistence",
       ["lock_override", "truthful-tests:old->new"],
     );
     expect(rows).toHaveLength(1);
-    expect(rows[0].payload).toMatchObject({ slug: "truthful-tests", auditNote: "verified by integration test" });
+    expect(rows[0]!.payload).toMatchObject({ slug: "truthful-tests", auditNote: "verified by integration test" });
   });
 
   test("overrideSkillConflict marks missing and local conflicts without resolving upstream", async () => {

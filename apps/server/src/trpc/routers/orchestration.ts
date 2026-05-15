@@ -1,6 +1,6 @@
 import { z } from "zod/v4";
 import { TRPCError } from "@trpc/server";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { router, publicProcedure } from "../trpc.ts";
 import { permissionedProcedure } from "../middleware.ts";
 import {

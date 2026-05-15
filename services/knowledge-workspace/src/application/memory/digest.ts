@@ -13,7 +13,7 @@
  * The job is feature-flagged and always scoped by organization.
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
 import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
 import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";

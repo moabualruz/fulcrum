@@ -3,11 +3,11 @@ import type { Session } from "better-auth";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
-import { ENTITY_MANAGER_TOKEN } from "../db/db.module.ts";
-import { Session as SessionEntity, User } from "../db/entities/auth/index.ts";
-import { DEFAULT_ADMIN_EMAIL, DEFAULT_ORG_ID } from "../db/seed.ts";
-import { adminSession, type TestSession } from "./auth.ts";
-import type { TestContainer } from "./container.ts";
+import { ENTITY_MANAGER_TOKEN } from "@platform-core/infrastructure/application-database/db.module.ts";
+import { Session as SessionEntity, User } from "@platform-core/infrastructure/application-database/entities/auth/index.ts";
+import { DEFAULT_ADMIN_EMAIL, DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
+import { adminSession, type TestSession } from "./auth-session.ts";
+import type { TestContainer } from "./application-container.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 

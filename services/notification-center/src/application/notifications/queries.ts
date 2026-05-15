@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 import {
   Notification,

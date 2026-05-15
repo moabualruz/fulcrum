@@ -2,12 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { Container } from "@needle-di/core";
 import { z } from "zod";
 
-import { createTestOrm } from "../../src/test-utils/db.ts";
-import { MetricsCache } from "../../src/db/entities/tasks/MetricsCache.ts";
-import { Sprint, SprintStatus } from "../../src/db/entities/tasks/Sprint.ts";
-import { Task } from "../../src/db/entities/tasks/Task.ts";
-import { Org } from "../../src/db/entities/auth/Org.ts";
-import { TaskRepository } from "../../src/db/repositories/tasks/TaskRepository.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
+import { MetricsCache } from "@platform-core/infrastructure/application-database/entities/tasks/MetricsCache.ts";
+import { Sprint, SprintStatus } from "@platform-core/infrastructure/application-database/entities/tasks/Sprint.ts";
+import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";

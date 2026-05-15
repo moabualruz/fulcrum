@@ -12,7 +12,7 @@
  * No raw SQL — MikroORM only (C6).
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { MetricsCache } from "@platform-core/infrastructure/application-database/entities/tasks/MetricsCache.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 

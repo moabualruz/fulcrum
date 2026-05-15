@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { Account } from "@platform-core/infrastructure/application-database/entities/auth/Account.ts";
 import { Invitation } from "@platform-core/infrastructure/application-database/entities/auth/Invitation.ts";

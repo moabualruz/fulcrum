@@ -3,11 +3,11 @@ import { Container } from "@needle-di/core";
 import { MikroORM } from "@mikro-orm/postgresql";
 import { PGlite } from "@electric-sql/pglite";
 
-import { createOrmConfig } from "../../src/db/mikro-orm.config.ts";
-import { registerDbBindings } from "../../src/db/db.module.ts";
-import { FeatureFlag } from "../../src/db/entities/auth/FeatureFlag.ts";
-import { FeatureFlagRepository } from "../../src/db/repositories/auth/FeatureFlagRepository.ts";
-import { FlagRegistry } from "../../src/flags/registry.ts";
+import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
+import { FeatureFlag } from "@platform-core/infrastructure/application-database/entities/auth/FeatureFlag.ts";
+import { FeatureFlagRepository } from "@platform-core/infrastructure/application-database/repositories/auth/FeatureFlagRepository.ts";
+import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
 
 let orm: MikroORM;
 

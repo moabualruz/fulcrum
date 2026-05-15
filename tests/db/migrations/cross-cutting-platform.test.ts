@@ -20,55 +20,56 @@
  *   7. Migration idempotent — applying then re-applying via Migrator is a no-op.
  *
  * C2: org_id NOT NULL + composite indexes mandatory per Q22.
- * C6: NO raw SQL outside src/db/migrations/ Migration class bodies.
+ * C6: NO raw SQL outside services/platform-core/src/infrastructure/application-database/migrations/ Migration class bodies.
  * C7: MikroORM v7 ES Stage-3 decorator pattern.
  *
  * Closes (issue): .scratch/agent-os-vision/17-cross-cutting-platform/issues/01-schema-migration-credentials-telemetry-errors-experiments.md
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { join } from "node:path";
 import { MikroORM, ReferenceKind } from "@mikro-orm/postgresql";
 import { Migrator } from "@mikro-orm/migrations";
 import { PGlite } from "@electric-sql/pglite";
-import { PGliteKyselyDialect } from "../../../src/db/PGliteKyselyDriver.ts";
+import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
 
 // Pillar 1 + supporting entities (FK targets)
-import { SchemaMigration } from "../../../src/db/entities/SchemaMigration.ts";
-import { Org } from "../../../src/db/entities/auth/Org.ts";
-import { User } from "../../../src/db/entities/auth/User.ts";
-import { Session } from "../../../src/db/entities/auth/Session.ts";
-import { Account } from "../../../src/db/entities/auth/Account.ts";
-import { Verification } from "../../../src/db/entities/auth/Verification.ts";
-import { Invitation } from "../../../src/db/entities/auth/Invitation.ts";
-import { OrgMember } from "../../../src/db/entities/auth/OrgMember.ts";
-import { FeatureFlag } from "../../../src/db/entities/auth/FeatureFlag.ts";
-import { Event } from "../../../src/db/entities/core/Event.ts";
+import { SchemaMigration } from "@platform-core/infrastructure/application-database/entities/SchemaMigration.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
+import { Session } from "@platform-core/infrastructure/application-database/entities/auth/Session.ts";
+import { Account } from "@platform-core/infrastructure/application-database/entities/auth/Account.ts";
+import { Verification } from "@platform-core/infrastructure/application-database/entities/auth/Verification.ts";
+import { Invitation } from "@platform-core/infrastructure/application-database/entities/auth/Invitation.ts";
+import { OrgMember } from "@platform-core/infrastructure/application-database/entities/auth/OrgMember.ts";
+import { FeatureFlag } from "@platform-core/infrastructure/application-database/entities/auth/FeatureFlag.ts";
+import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 
 // Stub tenant-scoped entities (registered so schema graph is complete)
-import { Task } from "../../../src/db/entities/tasks/Task.ts";
-import { Document } from "../../../src/db/entities/docs/Document.ts";
-import { Memory } from "../../../src/db/entities/memory/Memory.ts";
-import { AgentRun } from "../../../src/db/entities/orchestration/AgentRun.ts";
-import { Artifact } from "../../../src/db/entities/artifacts/Artifact.ts";
-import { Repo } from "../../../src/db/entities/repos/Repo.ts";
-import { Job } from "../../../src/db/entities/jobs/Job.ts";
-import { SearchDocument } from "../../../src/db/entities/search/SearchDocument.ts";
-import { CasbinRule } from "../../../src/db/entities/flags/CasbinRule.ts";
-import { WebhookSubscription } from "../../../src/db/entities/flags/WebhookSubscription.ts";
-import { NotificationRule } from "../../../src/db/entities/flags/NotificationRule.ts";
+import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
+import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
+import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
+import { Artifact } from "@platform-core/infrastructure/application-database/entities/artifacts/Artifact.ts";
+import { Repo } from "@platform-core/infrastructure/application-database/entities/repos/Repo.ts";
+import { Job } from "@platform-core/infrastructure/application-database/entities/jobs/Job.ts";
+import { SearchDocument } from "@platform-core/infrastructure/application-database/entities/search/SearchDocument.ts";
+import { CasbinRule } from "@platform-core/infrastructure/application-database/entities/flags/CasbinRule.ts";
+import { WebhookSubscription } from "@platform-core/infrastructure/application-database/entities/flags/WebhookSubscription.ts";
+import { NotificationRule } from "@platform-core/infrastructure/application-database/entities/flags/NotificationRule.ts";
 
 // Pillar 17 entities under test
-import { Credential } from "../../../src/db/entities/platform/Credential.ts";
-import { TelemetryEvent } from "../../../src/db/entities/platform/TelemetryEvent.ts";
-import { ErrorLog } from "../../../src/db/entities/platform/ErrorLog.ts";
-import { ExperimentAssignment } from "../../../src/db/entities/platform/ExperimentAssignment.ts";
-import { FeatureFlagRollout } from "../../../src/db/entities/platform/FeatureFlagRollout.ts";
+import { Credential } from "@platform-core/infrastructure/application-database/entities/platform/Credential.ts";
+import { TelemetryEvent } from "@platform-core/infrastructure/application-database/entities/platform/TelemetryEvent.ts";
+import { ErrorLog } from "@platform-core/infrastructure/application-database/entities/platform/ErrorLog.ts";
+import { ExperimentAssignment } from "@platform-core/infrastructure/application-database/entities/platform/ExperimentAssignment.ts";
+import { FeatureFlagRollout } from "@platform-core/infrastructure/application-database/entities/platform/FeatureFlagRollout.ts";
 
-import { CredentialRepository } from "../../../src/db/repositories/platform/CredentialRepository.ts";
-import { TelemetryEventRepository } from "../../../src/db/repositories/platform/TelemetryEventRepository.ts";
-import { ErrorLogRepository } from "../../../src/db/repositories/platform/ErrorLogRepository.ts";
-import { ExperimentAssignmentRepository } from "../../../src/db/repositories/platform/ExperimentAssignmentRepository.ts";
-import { FeatureFlagRolloutRepository } from "../../../src/db/repositories/platform/FeatureFlagRolloutRepository.ts";
+import { CredentialRepository } from "@platform-core/infrastructure/application-database/repositories/platform/CredentialRepository.ts";
+import { TelemetryEventRepository } from "@platform-core/infrastructure/application-database/repositories/platform/TelemetryEventRepository.ts";
+import { ErrorLogRepository } from "@platform-core/infrastructure/application-database/repositories/platform/ErrorLogRepository.ts";
+import { ExperimentAssignmentRepository } from "@platform-core/infrastructure/application-database/repositories/platform/ExperimentAssignmentRepository.ts";
+import { FeatureFlagRolloutRepository } from "@platform-core/infrastructure/application-database/repositories/platform/FeatureFlagRolloutRepository.ts";
 
 const ALL_ENTITIES = [
   SchemaMigration,
@@ -414,8 +415,8 @@ describe("Pillar 17 migration class — applies + idempotent", () => {
       multipleStatements: false,
       entities: ALL_ENTITIES,
       migrations: {
-        path: new URL("../../../src/db/migrations", import.meta.url).pathname,
-        pathTs: new URL("../../../src/db/migrations", import.meta.url).pathname,
+        path: join(process.cwd(), "services/platform-core/src/infrastructure/application-database/migrations"),
+        pathTs: join(process.cwd(), "services/platform-core/src/infrastructure/application-database/migrations"),
         transactional: false,
         allOrNothing: false,
       },

@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
 import { Project } from "@platform-core/infrastructure/application-database/entities/tasks/Project.ts";

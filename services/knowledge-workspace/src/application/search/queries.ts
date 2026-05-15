@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
 import { SearchDocument } from "@platform-core/infrastructure/application-database/entities/search/SearchDocument.ts";

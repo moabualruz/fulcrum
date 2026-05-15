@@ -11,8 +11,8 @@
  * Pillar 3, slice 06 — callable from the orchestrator poll loop (wired in slice 10).
  */
 
-import { UniqueConstraintViolationException } from "@mikro-orm/core";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import { UniqueConstraintViolationException } from "typeorm";
+import type { EntityManager } from "typeorm";
 
 import {
   claimRunState,

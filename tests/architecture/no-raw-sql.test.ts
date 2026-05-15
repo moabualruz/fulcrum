@@ -34,6 +34,8 @@ const WEB_DATA_HANDLE_PATTERN = /\b(openDatabase|getDatabase|getEm|getDefaultOrg
 
 const RAW_SQL_CALL_PATTERN = /\b(db|conn|connection|pglite)\.query\s*(?:<[^>]+>)?\(|\b(db|conn|connection|client|pglite)\.execute\s*(?:<[^>]+>)?\(|\.getKysely\b/;
 
+const INVOCATION_LAYER_ORM_PATTERN = /@mikro-orm|MikroORM|EntityManager|ENTITY_MANAGER_TOKEN|registerDbBindings|application-database/;
+
 const WEB_DATA_HANDLE_COMPOSITION_ROOTS = new Map([
   [
     "apps/web/src/lib/server/db.ts",
@@ -53,7 +55,7 @@ function ignored(path: string): boolean {
     path.includes("/tests/") ||
     path.includes("/node_modules/") ||
     path.includes("/.svelte-kit/") ||
-    path.includes("src/db/migrations/")
+    path.includes("services/platform-core/src/infrastructure/application-database/migrations/")
   );
 }
 
@@ -100,7 +102,7 @@ async function pathViolations(roots: readonly string[], pattern: RegExp, allowed
   return Array.from(new Set(found)).sort();
 }
 
-describe("Phase 9.5 raw EntityManager and SQL boundary", () => {
+describe("interface raw EntityManager and SQL boundary", () => {
   test("interface/runtime code does not use raw EntityManager access", async () => {
     const found = await rawEntityManagerViolations();
     expect(found).toEqual([]);
@@ -115,5 +117,13 @@ describe("Phase 9.5 raw EntityManager and SQL boundary", () => {
   test("interface roots do not use raw query or execute calls", async () => {
     const found = await pathViolations(SQL_INTERFACE_ROOTS, RAW_SQL_CALL_PATTERN, WEB_DATA_HANDLE_COMPOSITION_ROOTS);
     expect(found).toEqual(EXPECTED_RAW_SQL_CALL_FILES);
+  });
+
+  test("web CLI and TUI invocation layers do not reference ORM internals", async () => {
+    const found = await pathViolations(
+      ["apps/web/src/routes", "apps/web/src/lib", "apps/cli/src", "apps/tui/src"],
+      INVOCATION_LAYER_ORM_PATTERN,
+    );
+    expect(found).toEqual([]);
   });
 });

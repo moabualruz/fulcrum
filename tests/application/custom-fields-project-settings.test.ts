@@ -5,8 +5,8 @@ import {
   createCustomField,
   listCustomFields,
   updateCustomField,
-} from "../../src/application/custom-fields/project-settings.ts";
-import { createTestOrm } from "../../src/test-utils/db.ts";
+} from "@work-management/application/custom-fields/project-settings.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
 
 describe("custom field project settings application service", () => {
   it("creates, lists, updates, archives, and emits events against the current custom_field_defs schema", async () => {

@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { splitStatements } from "../../src/db/PGliteKyselyDriver.ts";
+import { splitStatements } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
 
 describe("splitStatements — basic cases", () => {
   it("splits simple multi-statement DDL on semicolons", () => {

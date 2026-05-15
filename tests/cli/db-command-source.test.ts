@@ -9,6 +9,8 @@ const originalConsoleLog = console.log;
 const originalConsoleError = console.error;
 const originalExit = process.exit;
 const originalFulcrumHome = process.env.FULCRUM_HOME;
+const originalDatabaseUrl = process.env.DATABASE_URL;
+const originalFulcrumDatabaseUrl = process.env.FULCRUM_DATABASE_URL;
 
 async function captureDbRun(args: readonly string[]): Promise<{
   stdout: string;
@@ -45,6 +47,10 @@ afterEach(() => {
   process.exit = originalExit;
   if (originalFulcrumHome === undefined) delete process.env.FULCRUM_HOME;
   else process.env.FULCRUM_HOME = originalFulcrumHome;
+  if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+  else process.env.DATABASE_URL = originalDatabaseUrl;
+  if (originalFulcrumDatabaseUrl === undefined) delete process.env.FULCRUM_DATABASE_URL;
+  else process.env.FULCRUM_DATABASE_URL = originalFulcrumDatabaseUrl;
 });
 
 describe("fulcrum db command source behavior", () => {
@@ -57,6 +63,31 @@ describe("fulcrum db command source behavior", () => {
     expect(result.stderr).toBe("");
     expect(JSON.parse(result.stdout)).toEqual({
       backend: "pglite",
+      connection: {
+        type: "local-pglite",
+        dataDir: process.env.FULCRUM_HOME + "/pglite.data",
+      },
+      current: null,
+      pending: [],
+      pastDue: 0,
+      ok: true,
+    });
+  });
+
+  test("status without a DB container shows redacted PostgreSQL connection when configured", async () => {
+    delete process.env.DATABASE_URL;
+    process.env.FULCRUM_DATABASE_URL = "postgresql://fulcrum:secret@127.0.0.1:5432/fulcrum";
+
+    const result = await captureDbRun(["status", "--json"]);
+
+    expect(result.exitCode).toBeNull();
+    expect(result.stderr).toBe("");
+    expect(JSON.parse(result.stdout)).toEqual({
+      backend: "postgres",
+      connection: {
+        type: "postgres",
+        url: "postgresql://fulcrum:***@127.0.0.1:5432/fulcrum",
+      },
       current: null,
       pending: [],
       pastDue: 0,
@@ -108,9 +139,9 @@ describe("fulcrum db command source behavior", () => {
     expect(result.stdout).toContain("--yes-reset-local-state");
   });
 
-  test("migrate rejects unsupported explicit product database backends before touching migrations", async () => {
+  test("migrate rejects explicit product database backend flags before touching migrations", async () => {
     await expect(run(["migrate", "--backend", "sqlite"], null)).rejects.toThrow(
-      "unsupported database backend: sqlite",
+      "FULCRUM_DATABASE_URL",
     );
   });
 

@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
 
-import { Event } from "../../src/db/entities/core/Event.ts";
-import { Org } from "../../src/db/entities/auth/Org.ts";
-import { Repo } from "../../src/db/entities/repos/Repo.ts";
-import { RepoRepository } from "../../src/db/repositories/repos/RepoRepository.ts";
+import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Repo } from "@platform-core/infrastructure/application-database/entities/repos/Repo.ts";
+import { RepoRepository } from "@platform-core/infrastructure/application-database/repositories/repos/RepoRepository.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
-import { createTestOrm } from "../../src/test-utils/db.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 const ORG_ID = "00000000-0000-0000-0000-000000000001";

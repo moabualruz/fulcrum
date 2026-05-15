@@ -6,9 +6,9 @@ import { join } from "node:path";
 import {
   buildProductKernelDoctorReport,
   buildReposDoctorReport,
-} from "../../src/infrastructure/doctor/legacy-db.ts";
-import { applyProductMigrations } from "../../src/db/product-migrations.ts";
-import { openLocalSqlStore } from "../../src/db/sql.ts";
+} from "@platform-core/infrastructure/doctor/product-store-report.ts";
+import { applyProductMigrations } from "@platform-core/infrastructure/application-database/product-migrations.ts";
+import { openLocalSqlStore } from "@platform-core/infrastructure/application-database/sql.ts";
 
 const originalFulcrumHome = process.env.FULCRUM_HOME;
 const originalDatabaseUrl = process.env.DATABASE_URL;
@@ -21,19 +21,20 @@ afterEach(() => {
 });
 
 describe("legacy DB doctor reports", () => {
-  test("reports absent engine for postgres configuration without opening a network connection", async () => {
+  test("reports configured PostgreSQL as the selected engine and redacts its URL", async () => {
     process.env.FULCRUM_HOME = await mkdtemp(join(tmpdir(), "fulcrum-doctor-postgres-home-"));
-    process.env.DATABASE_URL = "postgresql://example.invalid/fulcrum";
+    process.env.DATABASE_URL = "postgresql://fulcrum:secret@127.0.0.1:9/fulcrum";
 
     const report = await buildProductKernelDoctorReport();
 
-    expect(report).toEqual({
-      engine: "absent",
-      dbPath: "postgresql://example.invalid/fulcrum",
+    expect(report).toMatchObject({
+      engine: "postgres",
+      dbPath: "postgresql://fulcrum:***@127.0.0.1:9/fulcrum",
       schemaApplied: 0,
       rows: { orgs: 0, projects: 0, documents: 0, tasks: 0, agentRuns: 0 },
       latestEventAt: null,
     });
+    expect(report.error).toBeString();
   });
 
   test("reports absent pglite when the configured data directory has not been initialized", async () => {

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 
-import { DEFAULT_ORG_ID } from "../../src/db/seed.ts";
-import { EntityManagerDocTemplateService } from "../../src/docs/em-doc-template-service.ts";
-import { createTestOrm, type TestOrm } from "../../src/test-utils/db.ts";
+import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
+import { EntityManagerDocTemplateService } from "@knowledge-workspace/application/docs/em-doc-template-service.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
 let db: TestOrm | null = null;
 

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { AppNotFoundError, AppValidationError } from "@platform-core/domain/errors.ts";
 import { appendEventOrm } from "@platform-core/application/orm-helpers.ts";

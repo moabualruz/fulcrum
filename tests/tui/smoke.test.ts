@@ -280,7 +280,7 @@ describe("TuiApp — real keyboard workflows", () => {
       input: tty,
       caller: fakeCaller(),
       keybindings: {
-        "task.create": { key: "x" },
+        "task.create": { context: "global", key: "x" },
       },
       actions: {
         CreateItem: async () => {
@@ -379,11 +379,12 @@ describe("TuiApp — inference workflow", () => {
             cache_db_size: 4096,
           }),
           models: {
-            list: async () => [{ id: "llama3", kind: "chat", downloaded: false, sizeBytes: 2048 }],
+            list: async () => [{ id: "llama3", kind: "generate", downloaded: false, active: false, sizeBytes: 2048 }],
             pull: async () => pullEvents(),
           },
           config: {
             get: async () => ({ tasks: "local", docs: "external" }),
+            set: async () => ({ ok: true }),
           },
         },
       },
@@ -398,7 +399,7 @@ describe("TuiApp — inference workflow", () => {
       expect(text).toContain("11 ops/s");
       expect(text).toContain("75%");
       expect(text).toContain("4 KiB");
-      expect(text).toContain("llama3  chat  Download 2048 bytes");
+      expect(text).toContain("llama3  generate  Download 2048 bytes");
       expect(text).toContain("tasks: local");
       expect(text).toContain("http://127.0.0.1:11434");
       expect(text).toContain("API Key");
@@ -406,7 +407,7 @@ describe("TuiApp — inference workflow", () => {
       await app.pullInferenceModel("llama3");
       text = tty.plainText();
       expect(text).toContain("Last download llama3 100%");
-      expect(text).toContain("llama3  chat  downloaded 2048 bytes");
+      expect(text).toContain("llama3  generate  downloaded 2048 bytes");
     } finally {
       if (previousFeatures === undefined) delete process.env["FULCRUM_FEATURES"];
       else process.env["FULCRUM_FEATURES"] = previousFeatures;

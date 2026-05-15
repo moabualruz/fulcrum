@@ -8,7 +8,7 @@
  * D-80: Priority ordering
  */
 import { describe, it, expect, beforeEach, vi } from "bun:test";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { AppValidationError } from "@platform-core/domain/errors.ts";
 import { WorkItemService, type BulkTaskPatch } from "@work-management/application/work-item-service.ts";
 import type { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";

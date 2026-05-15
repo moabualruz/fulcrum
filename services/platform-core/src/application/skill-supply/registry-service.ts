@@ -6,9 +6,9 @@
  *       details.
  */
 
-import type { MikroORM } from "@mikro-orm/postgresql";
+import type { DataSource } from "typeorm";
 import { FulcrumSkill } from "@platform-core/infrastructure/application-database/entities/skills/FulcrumSkill.ts";
-import { initOrm } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { initDataSource } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 
 /** Source discriminator for a merged skill row. */
 export type SkillSourceValue = "local" | "upstream" | "mcp";
@@ -22,60 +22,51 @@ export interface SkillRegistryEntry {
   enabledAgents: string[];
 }
 
-interface OrmHandle {
-  orm: MikroORM;
+interface DataSourceHandle {
+  dataSource: DataSource;
   close(): Promise<void>;
 }
 
-let testOrm: MikroORM | undefined;
+let testDataSource: DataSource | undefined;
 
 export function __setRegistryServiceOrmForTest(
-  orm: MikroORM | undefined,
+  ds: DataSource | undefined,
 ): void {
-  testOrm = orm;
+  testDataSource = ds;
 }
 
-async function ormForRegistry(): Promise<OrmHandle> {
-  if (testOrm) {
+async function dsForRegistry(): Promise<DataSourceHandle> {
+  if (testDataSource) {
     return {
-      orm: testOrm,
+      dataSource: testDataSource,
       close: async () => undefined,
     };
   }
 
-  const orm = await initOrm();
+  const dataSource = await initDataSource();
   return {
-    orm,
+    dataSource,
     close: async () => {
-      await orm.close(true);
+      await dataSource.destroy();
     },
   };
 }
 
 /**
  * SkillRegistryService — merged skill listing from all sources.
- *
- * Currently queries FulcrumSkill (local/upstream/package) from the database.
- * MCP virtual skill integration will be added in a follow-up plan that
- * wires the McpVirtualSkill entity and buildMcpVirtualSkillDescriptors()
- * into the merged output.
  */
 export class SkillRegistryService {
   /**
    * List all skills from all sources: local, upstream, and MCP.
-   *
-   * Returns merged source values per D-17, D-20. MCP rows are globally
-   * visible with no per-agent support fields.
    */
   static async list(orgId: string): Promise<SkillRegistryEntry[]> {
-    const ormHandle = await ormForRegistry();
+    const handle = await dsForRegistry();
     try {
-      const em = ormHandle.orm.em.fork();
-      const skills = await em.find(
-        FulcrumSkill,
-        { org: orgId },
-        { orderBy: { slug: "ASC" } },
-      );
+      const repo = handle.dataSource.getRepository(FulcrumSkill);
+      const skills = await repo.find({
+        where: { org: { id: orgId } },
+        order: { slug: "ASC" },
+      });
 
       const entries: SkillRegistryEntry[] = skills.map((skill) => {
         const source = skill.source === "upstream"
@@ -92,7 +83,7 @@ export class SkillRegistryService {
 
       return entries;
     } finally {
-      await ormHandle.close();
+      await handle.close();
     }
   }
 }

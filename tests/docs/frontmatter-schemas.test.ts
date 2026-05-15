@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { ZodError } from "zod";
 
-import { DOC_TYPES } from "../../src/db/entities/docs/enums.ts";
+import { DOC_TYPES } from "@platform-core/infrastructure/application-database/entities/docs/enums.ts";
 import {
   AdrFrontmatterSchema,
   FrontmatterSchema,
@@ -14,8 +14,8 @@ import {
   ScratchFrontmatterSchema,
   SpecFrontmatterSchema,
   WikiFrontmatterSchema,
-} from "../../src/docs/frontmatter-schemas.ts";
-import { patchFrontmatterKey } from "../../src/utils/frontmatter.ts";
+} from "@knowledge-workspace/application/docs/frontmatter-schemas.ts";
+import { patchFrontmatterKey } from "@platform-core/application/runtime-support/frontmatter-patcher.ts";
 
 const VALID_FRONTMATTER = {
   spec: { status: "approved" },

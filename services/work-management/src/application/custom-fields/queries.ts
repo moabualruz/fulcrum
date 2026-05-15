@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { z } from "zod";
 
 import { CustomFieldDef } from "@platform-core/infrastructure/application-database/entities/tasks/CustomFieldDef.ts";

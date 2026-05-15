@@ -312,7 +312,7 @@ export async function emitPlatformEvent(
  * Import lazily so web-bundle SSR never statically loads entity decorators.
  */
 export async function mkOrmEventSink(
-  em: import("@mikro-orm/postgresql").EntityManager,
+  em: import("typeorm").EntityManager,
   orgRef: import("@platform-core/infrastructure/application-database/entities/auth/Org.ts").Org,
 ): Promise<EventSink> {
   return {

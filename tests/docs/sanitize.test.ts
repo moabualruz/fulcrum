@@ -5,7 +5,7 @@ import {
   renderDocToHtml,
   sanitizeDocHtml,
   sanitizeDocJsonFields,
-} from "../../src/docs/sanitize.ts";
+} from "@knowledge-workspace/application/docs/sanitize.ts";
 
 describe("docs sanitization pipeline", () => {
   test("sanitizeDocHtml strips script tags and their contents", () => {

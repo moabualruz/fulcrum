@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { randomUUID } from "node:crypto";
 
 import { createInMemoryTrafficRecorder, type TrafficEntry } from "@agent-client-protocol/application/traffic.ts";

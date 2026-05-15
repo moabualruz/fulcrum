@@ -1,15 +1,11 @@
 import { mkdir } from "node:fs/promises";
-import { Migrator } from "@mikro-orm/migrations";
-import { MikroORM } from "@mikro-orm/postgresql";
+import { DataSource } from "typeorm";
 
 import { resolveDatabaseConfig } from "@platform-core/application/db/database-config.ts";
 import { DEFAULT_ORG_ID } from "@platform-core/application/tenancy/defaults.ts";
-import {
-  registerDbBindings,
-  SchemaMigrationRepository,
-} from "@platform-core/infrastructure/application-database/db.module.ts";
+import { initDataSource, __resetDataSourceForTest } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 import { dbCanRunOnCurrentBinary } from "@platform-core/infrastructure/application-database/doctor-checks.ts";
-import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { SchemaMigrationRepository } from "@platform-core/infrastructure/application-database/repositories/SchemaMigrationRepository.ts";
 
 export type { DiContainer } from "./di-container.ts";
 
@@ -18,72 +14,38 @@ export interface LocalApplicationContainer {
   cleanup: () => Promise<void>;
 }
 
-type MigrationInfoLike = { name?: string };
-type MigratorCompat = {
-  getPendingMigrations?: () => Promise<MigrationInfoLike[]>;
-  getPending?: () => Promise<MigrationInfoLike[]>;
-};
-
 export async function buildLocalApplicationContainer(): Promise<LocalApplicationContainer> {
   const database = resolveDatabaseConfig();
-  if (database.backend === "postgres") {
-    const config = createOrmConfig({ debug: false });
-    const orm = await MikroORM.init({
-      ...config,
-      extensions: [Migrator],
-    });
-    const { Container } = await import("@needle-di/core");
-    const container = new Container();
-    container.bind({ provide: MikroORM, useValue: orm });
-    registerDbBindings(container, orm);
-    return {
-      container,
-      cleanup: async () => {
-        await orm.close(true);
-      },
-    };
-  }
+  const dataSource = await initDataSource();
 
-  await mkdir(database.dataDir, { recursive: true });
-  const [{ PGlite }, { PGliteKyselyDialect }] = await Promise.all([
-    import("@electric-sql/pglite"),
-    import("@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts"),
-  ]);
-  const pglite = new PGlite(database.dataDir);
-  await pglite.waitReady;
-  const dialect = new PGliteKyselyDialect(() => pglite);
-  const config = createOrmConfig({ pglite, debug: false });
-  const orm = await MikroORM.init({
-    ...config,
-    driverOptions: dialect,
-    extensions: [Migrator],
-  });
+  await dataSource.runMigrations();
 
+  const { Container } = await import("@needle-di/core");
   const container = new Container();
-  container.bind({ provide: MikroORM, useValue: orm });
-  registerDbBindings(container, orm);
+  container.bind({ provide: DataSource, useValue: dataSource });
 
   return {
     container,
     cleanup: async () => {
-      await orm.close(true);
-      await pglite.close();
+      await dataSource.destroy();
     },
   };
 }
 
 export async function verifyLocalApplicationMigrations(container: DiContainer): Promise<void> {
-  const orm = container.get(MikroORM);
-  const pending = await pendingMigrations(orm.migrator as MigratorCompat);
+  const dataSource = container.get(DataSource);
+  const queryRunner = dataSource.createQueryRunner();
+  const pending = await queryRunner.getPendingMigrations();
+  await queryRunner.release();
+
   if (pending.length > 0) {
-    const names = pending.map((migration) => migration.name ?? "(unknown)").join(", ");
+    const names = pending.map((m) => m.name).join(", ");
     throw new Error(`migrations pending: ${names}. Run \`fulcrum db migrate\` before \`fulcrum web\`.`);
   }
 
-  const { Container: NeedleDiContainer } = await import("@needle-di/core");
-  const compatibilityContainer = new NeedleDiContainer();
-  registerDbBindings(compatibilityContainer as never, orm, orm.em.fork());
-  const schemaMigrationRepo = compatibilityContainer.get(SchemaMigrationRepository);
+  const schemaMigrationRepo = new SchemaMigrationRepository(dataSource.getRepository(
+    (await import("@platform-core/infrastructure/application-database/entities/SchemaMigration.ts")).SchemaMigration
+  ) as never);
   const binaryCheck = await dbCanRunOnCurrentBinary(schemaMigrationRepo);
   if (binaryCheck.status === "fail") {
     throw new Error(binaryCheck.detail);
@@ -91,20 +53,14 @@ export async function verifyLocalApplicationMigrations(container: DiContainer): 
 }
 
 export async function startLocalWorkflowSupervisor(container: DiContainer): Promise<{ stop: () => void }> {
-  const orm = container.get(MikroORM);
+  const dataSource = container.get(DataSource);
   const [{ WorkflowConfigSchema }, { startSymphonyOrchestrator }] = await Promise.all([
     import("@execution-orchestration/infrastructure/agent-runtime/symphony/schemas.ts"),
     import("@execution-orchestration/infrastructure/agent-runtime/symphony/orchestrator.ts"),
   ]);
   return startSymphonyOrchestrator(
-    orm.em,
+    dataSource.manager,
     DEFAULT_ORG_ID,
     WorkflowConfigSchema.parse({}),
   );
-}
-
-async function pendingMigrations(migrator: MigratorCompat): Promise<MigrationInfoLike[]> {
-  if (migrator.getPendingMigrations) return migrator.getPendingMigrations();
-  if (migrator.getPending) return migrator.getPending();
-  return [];
 }

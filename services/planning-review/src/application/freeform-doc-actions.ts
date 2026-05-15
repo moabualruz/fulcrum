@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { createDoc } from "@knowledge-workspace/application/docs/commands.ts";
 import { getDoc, listDocs } from "@knowledge-workspace/application/docs/queries.ts";

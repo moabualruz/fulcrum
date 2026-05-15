@@ -31,12 +31,12 @@ import { AppError } from "@platform-core/domain/errors.ts";
 // ─────────────────────────────────────────────────────────────────────────────
 
 type CtxWithEm = {
-  em: import("@mikro-orm/postgresql").EntityManager | null;
+  em: import("typeorm").EntityManager | null;
   orgId: string;
   userId: string;
 };
 
-function requireEm(em: import("@mikro-orm/postgresql").EntityManager | null) {
+function requireEm(em: import("typeorm").EntityManager | null) {
   if (!em) {
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",

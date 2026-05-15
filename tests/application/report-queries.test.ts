@@ -12,7 +12,7 @@ import {
   getThroughputReport,
   getVelocityReport,
   getWipOverTimeReport,
-} from "../../src/application/reports/queries.ts";
+} from "@work-management/application/reports/queries.ts";
 
 const ctx = { orgId: "org-1", userId: "user-1" };
 const dateRange = {

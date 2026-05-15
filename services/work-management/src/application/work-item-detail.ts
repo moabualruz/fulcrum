@@ -3,7 +3,7 @@
  * Interface layers import this module or their local alias; SQL stays out of web/CLI/TUI.
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import type { TaskStatus } from "@work-management/application/work-item-service-actions.ts";
 import { TASK_STATUSES } from "@work-management/application/work-item-service-actions.ts";
 import { eventDispatcher } from "@platform-core/application/legacy/web-runtime.ts";

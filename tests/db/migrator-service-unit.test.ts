@@ -3,15 +3,15 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { Event } from "../../src/db/entities/core/Event.ts";
-import { SchemaMigration } from "../../src/db/entities/SchemaMigration.ts";
+import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
+import { SchemaMigration } from "@platform-core/infrastructure/application-database/entities/SchemaMigration.ts";
 import {
   LossyCheckFailedError,
   LossyDownProtectedError,
   MigratorService,
   MigrationChecksumMismatchError,
   MigrationFileMissingError,
-} from "../../src/db/migrator-service.ts";
+} from "@platform-core/infrastructure/application-database/migrator-service.ts";
 
 type FakeMigration = { name: string };
 
@@ -208,7 +208,7 @@ describe("MigratorService branch behavior with controlled collaborators", () => 
   test("status and history use the forked repository read paths", async () => {
     const current = "Migration20260512101010_current";
     const pending = "Migration20260512111111_pending";
-    const rows = [{ name: current, checksum: "checksum" }];
+    const rows = [{ version: 20260510101010, name: current, checksum: "checksum", appliedAt: new Date(0), direction: "up" as const }];
     const { service, repo } = buildFakeService({
       executed: [{ name: current }],
       pending: [{ name: pending }],

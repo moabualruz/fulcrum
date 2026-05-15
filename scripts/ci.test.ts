@@ -101,7 +101,7 @@ describe("ci STEPS — Symphony SPEC lock gate", () => {
   it("symphony:lock runs the focused SPEC lock test", () => {
     const step = STEPS.find((s) => s.name === "symphony:lock");
     expect(step).toBeDefined();
-    expect(step!.cmd).toEqual(["bun", "test", "tests/symphony/spec-lock.test.ts"]);
+    expect(step!.cmd).toEqual(["bun", "test", "tests/execution-orchestration/symphony/spec-lock.test.ts"]);
   });
 });
 
@@ -147,7 +147,7 @@ describe("ci STEPS — Phase 09 infrastructure gates", () => {
     expect(STEPS.find((s) => s.name === "graceful:shutdown")?.cmd).toEqual([
       "bun",
       "test",
-      "tests/platform/graceful-shutdown.test.ts",
+      "tests/platform-core/platform-operations/shutdown-coordinator.test.ts",
     ]);
   });
 });

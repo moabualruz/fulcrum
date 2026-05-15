@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { appendEventOrm } from "@platform-core/application/orm-helpers.ts";
 import { buildFinalQaReport } from "@planning-review/application/reports/final-qa-actions.ts";

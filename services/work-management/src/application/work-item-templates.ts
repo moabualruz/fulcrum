@@ -5,7 +5,7 @@
  * or project-scoped. apply() returns pre-filled fields without creating a task.
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { TaskTemplate } from "@platform-core/infrastructure/application-database/entities/tasks/TaskTemplate.ts";
 import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";

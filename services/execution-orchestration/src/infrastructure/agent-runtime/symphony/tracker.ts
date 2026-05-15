@@ -5,7 +5,7 @@
  * limited to migration classes and test-only planner introspection.
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import type { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
 import type { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";

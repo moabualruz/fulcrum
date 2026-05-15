@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { t } from "../trpc.ts";
 import { publicProcedure } from "../trpc.ts";

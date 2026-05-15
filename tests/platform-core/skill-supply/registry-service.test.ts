@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { createTestOrm, type TestOrm } from "../../src/test-utils/index.ts";
-import { Org } from "../../src/db/entities/auth/Org.ts";
+import { createTestOrm, type TestOrm } from "@test-support/index.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
 import {
   FulcrumSkill,
   SkillSource,
-} from "../../src/db/entities/skills/index.ts";
+} from "@platform-core/infrastructure/application-database/entities/skills/index.ts";
 import {
   __setRegistryServiceOrmForTest,
   SkillRegistryService,
-} from "../../src/skills/registry-service.ts";
+} from "@platform-core/application/skill-supply/registry-service.ts";
 
 let testDb: TestOrm;
 
@@ -30,6 +30,8 @@ describe("SkillRegistryService", () => {
       id: "11111111-1111-4111-8111-111111111111",
       name: "Other org",
       slug: "other-org",
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
     em.persist(otherOrg);
 

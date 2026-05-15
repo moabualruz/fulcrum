@@ -15,25 +15,25 @@ import { MikroORM as MikroORMRuntime, ReferenceKind } from "@mikro-orm/postgresq
 import { Migrator } from "@mikro-orm/migrations";
 import { PGlite } from "@electric-sql/pglite";
 
-import { createOrmConfig } from "../../../src/db/mikro-orm.config.ts";
-import { DEFAULT_ORG_ID, SeedService } from "../../../src/db/seed.ts";
-import { Org } from "../../../src/db/entities/auth/Org.ts";
-import { AgentRun } from "../../../src/db/entities/orchestration/AgentRun.ts";
-import { SearchDocument } from "../../../src/db/entities/search/SearchDocument.ts";
-import type { AgentRunRepository } from "../../../src/db/repositories/orchestration/AgentRunRepository.ts";
-import { Migration20260501104413_auth } from "../../../src/db/migrations/Migration20260501104413_auth.ts";
-import { Migration20260501120537_events_org_id_backfill } from "../../../src/db/migrations/Migration20260501120537_events_org_id_backfill.ts";
-import { Migration20260501120538_events_org_id_notnull } from "../../../src/db/migrations/Migration20260501120538_events_org_id_notnull.ts";
-import { Migration20260501130000_composite_indexes } from "../../../src/db/migrations/Migration20260501130000_composite_indexes.ts";
-import { Migration20260501130100_flag_stubs } from "../../../src/db/migrations/Migration20260501130100_flag_stubs.ts";
-import { Migration20260501140000_schema_migration_ledger } from "../../../src/db/migrations/Migration20260501140000_schema_migration_ledger.ts";
-import { Migration20260501150000_account_verification } from "../../../src/db/migrations/Migration20260501150000_account_verification.ts";
-import { Migration20260502000001_orchestration_workflow_definitions } from "../../../src/db/migrations/Migration20260502000001_orchestration_workflow_definitions.ts";
-import { Migration20260502030300_agent_runs_symphony_columns } from "../../../src/db/migrations/Migration20260502030300_agent_runs_symphony_columns.ts";
-import { Migration20260502050000_routing_rules } from "../../../src/db/migrations/Migration20260502050000_routing_rules.ts";
-import { Migration20260502050200_skills_registry } from "../../../src/db/migrations/Migration20260502050200_skills_registry.ts";
-import { Migration20260502070100_docs_document_columns } from "../../../src/db/migrations/Migration20260502070100_docs_document_columns.ts";
-import { Migration20260502070200_docs_related_tables } from "../../../src/db/migrations/Migration20260502070200_docs_related_tables.ts";
+import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { DEFAULT_ORG_ID, SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
+import { SearchDocument } from "@platform-core/infrastructure/application-database/entities/search/SearchDocument.ts";
+import type { AgentRunRepository } from "@platform-core/infrastructure/application-database/repositories/orchestration/AgentRunRepository.ts";
+import { Migration20260501104413_auth } from "@platform-core/infrastructure/application-database/migrations/Migration20260501104413_auth.ts";
+import { Migration20260501120537_events_org_id_backfill } from "@platform-core/infrastructure/application-database/migrations/Migration20260501120537_events_org_id_backfill.ts";
+import { Migration20260501120538_events_org_id_notnull } from "@platform-core/infrastructure/application-database/migrations/Migration20260501120538_events_org_id_notnull.ts";
+import { Migration20260501130000_composite_indexes } from "@platform-core/infrastructure/application-database/migrations/Migration20260501130000_composite_indexes.ts";
+import { Migration20260501130100_flag_stubs } from "@platform-core/infrastructure/application-database/migrations/Migration20260501130100_flag_stubs.ts";
+import { Migration20260501140000_schema_migration_ledger } from "@platform-core/infrastructure/application-database/migrations/Migration20260501140000_schema_migration_ledger.ts";
+import { Migration20260501150000_account_verification } from "@platform-core/infrastructure/application-database/migrations/Migration20260501150000_account_verification.ts";
+import { Migration20260502000001_orchestration_workflow_definitions } from "@platform-core/infrastructure/application-database/migrations/Migration20260502000001_orchestration_workflow_definitions.ts";
+import { Migration20260502030300_agent_runs_symphony_columns } from "@platform-core/infrastructure/application-database/migrations/Migration20260502030300_agent_runs_symphony_columns.ts";
+import { Migration20260502050000_routing_rules } from "@platform-core/infrastructure/application-database/migrations/Migration20260502050000_routing_rules.ts";
+import { Migration20260502050200_skills_registry } from "@platform-core/infrastructure/application-database/migrations/Migration20260502050200_skills_registry.ts";
+import { Migration20260502070100_docs_document_columns } from "@platform-core/infrastructure/application-database/migrations/Migration20260502070100_docs_document_columns.ts";
+import { Migration20260502070200_docs_related_tables } from "@platform-core/infrastructure/application-database/migrations/Migration20260502070200_docs_related_tables.ts";
 
 const MIGRATION_NAME = "Migration20260502070400_agent_runs_sandcastle_columns";
 const PREVIOUS_MIGRATION_NAME = "Migration20260502070200_docs_related_tables";
@@ -109,7 +109,7 @@ async function migrationsList(): Promise<MigrationObject[]> {
 
   try {
     const mod = await import(
-      "../../../src/db/migrations/Migration20260502070400_agent_runs_sandcastle_columns.ts"
+      "@platform-core/infrastructure/application-database/migrations/Migration20260502070400_agent_runs_sandcastle_columns.ts"
     );
     migrations.push({ name: MIGRATION_NAME, class: mod[MIGRATION_NAME] });
   } catch (error) {

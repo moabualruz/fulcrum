@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { DocVersion } from "@platform-core/infrastructure/application-database/entities/docs/DocVersion.ts";
 import { reconstructDocVersion } from "@knowledge-workspace/application/docs/version-reconstructor.ts";

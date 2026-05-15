@@ -1,13 +1,5 @@
 /**
- * P17 Issue #22 — Observability: audit events + performance budgets.
- *
- * TDD: RED written first; GREEN achieved by implementing src/platform/audit-events.ts.
- *
- * Test groups:
- *   A. Event schema registry — schemas registered for every P17 mutation.
- *   B. emitPlatformEvent — correct subject_kind + verb + payload; no plaintext secrets.
- *   C. Performance budget assertions (Bun.performance.now / measureP99).
- *   D. Event emitted from each P17 mutation surface.
+ * Observability audit events and performance budgets.
  */
 
 import { describe, expect, test } from "bun:test";
@@ -20,7 +12,7 @@ import {
   type EmittedEvent,
   type EventSink,
   type PlatformEventInput,
-} from "../../src/platform/audit-events.ts";
+} from "@platform-core/application/platform-operations/audit-events.ts";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -47,7 +39,7 @@ async function emit(
   } as PlatformEventInput);
 }
 
-// ─── A. Schema registry ───────────────────────────────────────────────────────
+// Schema registry
 
 describe("A. payload schema registry", () => {
   const required: [string, string][] = [
@@ -354,9 +346,9 @@ describe("C. performance budgets", () => {
   });
 });
 
-// ─── D. Emitter wired through P17 mutation surfaces (smoke tests) ─────────────
+// Emitter wired through mutation surfaces
 
-describe("D. P17 mutation → event emitted", () => {
+describe("mutation surfaces emit audit events", () => {
   /**
    * These tests verify the event shape produced by wrapping real logic
    * (without touching the actual tRPC procedures — wrappers call emitPlatformEvent).

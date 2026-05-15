@@ -6,7 +6,7 @@ import { AuditLogScreen } from "@fulcrum/tui/screens/audit.ts";
 import { ActivityFeedScreen } from "@fulcrum/tui/screens/activity.ts";
 import { NewDocScreen } from "@fulcrum/tui/screens/new-doc.ts";
 import { NotificationsScreen } from "@fulcrum/tui/screens/notifications.ts";
-import { NotificationRulesScreen } from "@fulcrum/tui/screens/notification-rules.ts";
+import { NotificationRulesScreen, type TuiNotificationRule, type TuiQuietHours } from "@fulcrum/tui/screens/notification-rules.ts";
 import { SearchScreen } from "@fulcrum/tui/screens/search.ts";
 import type { TuiSearchResult } from "@fulcrum/tui/screens/search.ts";
 import { SubscriptionBridge } from "@fulcrum/tui/subscriptions.ts";
@@ -188,11 +188,11 @@ describe("NotificationsScreen", () => {
 describe("NotificationRulesScreen", () => {
   test("loads, renders, creates, edits, toggles, deletes, and saves quiet hours through caller", async () => {
     const calls: unknown[] = [];
-    const rules = [
-      { id: "r-1", name: "Task assigned", enabled: true, channels: ["in-app"] as const },
-      { id: "r-2", name: "Run failed", enabled: false, channels: ["email"] as const },
+    const rules: TuiNotificationRule[] = [
+      { id: "r-1", name: "Task assigned", enabled: true, channels: ["in-app"] },
+      { id: "r-2", name: "Run failed", enabled: false, channels: ["email"] },
     ];
-    let quietHours = { id: "qh-1", tz: "UTC", startHour: 22, endHour: 7, daysOfWeek: [1, 2, 3, 4, 5] };
+    let quietHours: TuiQuietHours = { id: "qh-1", tz: "UTC", startHour: 22, endHour: 7, daysOfWeek: [1, 2, 3, 4, 5] };
     const screen = new NotificationRulesScreen({
       caller: {
         notify: {
@@ -312,13 +312,15 @@ describe("NewDocScreen", () => {
       caller: {
         templates: {
           list: async () => [
-            { id: "tpl-1", orgId: "org", docType: "decision", name: "Decision", bodyTemplate: "# Decision\n\nOutcome", frontmatterSchema: {}, createdAt: new Date(), updatedAt: new Date() },
-            { id: "tpl-2", orgId: "org", docType: "note", name: "Note", bodyTemplate: "# Note", frontmatterSchema: {}, createdAt: new Date(), updatedAt: new Date() },
+            { id: "tpl-1", orgId: "org", projectId: null, docType: "decision", name: "Decision", bodyTemplate: "# Decision\n\nOutcome", frontmatterTemplate: {}, frontmatterSchema: {}, isDefault: true, createdAt: new Date(), updatedAt: new Date() },
+            { id: "tpl-2", orgId: "org", projectId: null, docType: "note", name: "Note", bodyTemplate: "# Note", frontmatterTemplate: {}, frontmatterSchema: {}, isDefault: false, createdAt: new Date(), updatedAt: new Date() },
           ],
         },
       },
       onExit: () => { exited = true; },
-      onSave: (docType, body) => saves.push({ docType, body }),
+      onSave: (docType, body) => {
+        saves.push({ docType, body });
+      },
     });
 
     await screen.load();

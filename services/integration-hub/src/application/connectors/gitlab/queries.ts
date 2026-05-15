@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { GitlabMergeRequest } from "@platform-core/infrastructure/application-database/entities/connectors/GitlabMergeRequest.ts";
 import { AppForbiddenError, AppNotFoundError } from "@platform-core/domain/errors.ts";
 import type { AppContext, GitlabMergeRequestDto } from "@integration-hub/application/connectors/gitlab/types.ts";

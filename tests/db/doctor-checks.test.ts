@@ -6,7 +6,7 @@ import {
   dbCanRunOnCurrentBinary,
   dbMigrationVersion,
   type DoctorCheckResult,
-} from "../../src/db/doctor-checks.ts";
+} from "@platform-core/infrastructure/application-database/doctor-checks.ts";
 
 function repoWithRows(rows: Array<{ version: number; name: string; direction: string }>) {
   return {
@@ -55,11 +55,11 @@ describe("db doctor checks", () => {
     });
 
     await expect(
-      dbMigrationVersion(repoWithRows([{ version: 20260506095000, name: "phase95", direction: "up" }]) as never),
+      dbMigrationVersion(repoWithRows([{ version: 20260506095000, name: "interface", direction: "up" }]) as never),
     ).resolves.toEqual({
       check: "db.migrationVersion",
       status: "pass",
-      detail: "Current migration: v20260506095000 — phase95 (direction: up)",
+      detail: "Current migration: v20260506095000 — interface (direction: up)",
     });
   });
 

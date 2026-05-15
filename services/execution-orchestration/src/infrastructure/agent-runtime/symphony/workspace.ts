@@ -8,7 +8,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { mkdir, readdir, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import type { AgentRun as AgentRunType } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
 
 import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";

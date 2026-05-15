@@ -7,7 +7,7 @@
  *   - Doctor web performance checks: ssr_ttfb, nav_p95, bundle_size, build_time,
  *     lighthouse_score, kanban_load, table_scroll, cmdK_open checks.
  *
- * These are RED until the implementation in src/doctor/checks/web.ts + the
+ * These are RED until the implementation in platform health checks + the
  * autosave tRPC hook carry the new performance checks.
  */
 
@@ -18,7 +18,7 @@ import {
   type WebDoctorConfig,
   type WebPerfBudgets,
   PERF_BUDGETS,
-} from "../../src/doctor/checks/web.ts";
+} from "@platform-core/application/health-checks/checks/web.ts";
 
 // ---------------------------------------------------------------------------
 // Budget constants sanity

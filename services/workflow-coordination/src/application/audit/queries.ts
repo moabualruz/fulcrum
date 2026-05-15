@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { AuditEvent } from "@platform-core/infrastructure/application-database/entities/audit/AuditEvent.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";

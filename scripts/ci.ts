@@ -16,10 +16,8 @@ export interface Step {
 }
 
 const sandboxHome = join(tmpdir(), `fulcrum-ci-home-${process.pid}`);
-const webInstallCache = join(tmpdir(), `fulcrum-bun-install-cache-${process.pid}`);
 const hostHome = process.env["HOME"];
 mkdirSync(sandboxHome, { recursive: true });
-mkdirSync(webInstallCache, { recursive: true });
 
 export const CI_ENV: NodeJS.ProcessEnv = { ...process.env, HOME: sandboxHome };
 delete CI_ENV["FULCRUM_HOME"];
@@ -95,7 +93,7 @@ import { rmSync, writeFileSync } from "node:fs";
 const path = ".tmp-tsconfig-ci-quick-" + process.pid + ".json";
 writeFileSync(path, JSON.stringify({
   extends: "./tsconfig.json",
-  include: ["src/**/*.ts"],
+  include: ["services/**/*.ts", "apps/cli/src/**/*.ts", "apps/tui/src/**/*.ts", "apps/server/src/**/*.ts", "tests/**/*.ts"],
   exclude: ["node_modules", "dist", "apps/web/**", "**/*.test.ts", "**/*.spec.ts", "**/__tests__/**"],
 }));
 const result = spawnSync("bun", ["run", "--bun", "tsc", "--noEmit", "-p", path], { stdio: "inherit" });
@@ -120,20 +118,20 @@ export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[
     { name: "typecheck",        cmd: ["bun", "-e", QUICK_TYPECHECK_SCRIPT], tier: "quick", domain: "all", always: true },
 
     // ── T1: Unit (~30s) — fast unit tests, no DB ──
-    { name: "symphony:lock",    cmd: ["bun", "test", "tests/symphony/spec-lock.test.ts"], tier: "unit", domain: "all" },
-    { name: "symphony:conformance", cmd: ["bun", "test", "src/orchestration/__tests__/symphony-conformance.test.ts"], tier: "unit", domain: "all" },
+    { name: "symphony:lock",    cmd: ["bun", "test", "tests/execution-orchestration/symphony/spec-lock.test.ts"], tier: "unit", domain: "all" },
+    { name: "symphony:conformance", cmd: ["bun", "test", "services/execution-orchestration/src/infrastructure/agent-runtime/__tests__/symphony-conformance.test.ts"], tier: "unit", domain: "all" },
     { name: "trpc:permissions", cmd: ["bun", "test", "tests/trpc/app-router-scaffold.test.ts", "tests/trpc/router.test.ts"], tier: "unit", domain: "api" },
-    { name: "application:unit",  cmd: ["bun", "test", "src/application"], tier: "unit", domain: "application" },
+    { name: "application:unit",  cmd: ["bun", "test", "services"], tier: "unit", domain: "application" },
     { name: "test",             cmd: ["bun", "run", "scripts/test-root.ts"], tier: "unit", domain: "all" },
     { name: "license-audit",    cmd: ["bun", "run", "scripts/license-audit.ts"], tier: "unit", domain: "all" },
     { name: "ci:codegen",       cmd: ["bun", "run", "scripts/ci/codegen.ts"], tier: "unit", domain: "all" },
 
     // ── T2: Integration (~90s) — DB, web build, coverage ──
     { name: "migration:downgrade", cmd: ["bun", "test", "tests/db/migration-downgrade.test.ts"], tier: "integration", domain: "all" },
-    { name: "graceful:shutdown",   cmd: ["bun", "test", "tests/platform/graceful-shutdown.test.ts"], tier: "integration", domain: "all" },
+    { name: "graceful:shutdown",   cmd: ["bun", "test", "tests/platform-core/platform-operations/shutdown-coordinator.test.ts"], tier: "integration", domain: "all" },
     { name: "coverage:root",    cmd: ["bun", "run", "scripts/test-root.ts", "--root-coverage"], tier: "integration", domain: "all" },
     { name: "build:all",        cmd: ["bun", "run", "scripts/build-all.ts"], tier: "integration", domain: "all" },
-    { name: "web:install",      cmd: ["bun", "install", "--frozen-lockfile"], cwd: "apps/web", env: { BUN_INSTALL_CACHE_DIR: webInstallCache }, tier: "integration", domain: "web" },
+    { name: "web:install",      cmd: ["bun", "install", "--frozen-lockfile"], cwd: "apps/web", tier: "integration", domain: "web" },
     { name: "web:check",        cmd: ["bun", "run", "check"], cwd: "apps/web", env: { NODE_OPTIONS: "--max-old-space-size=12288" }, tier: "integration", domain: "web" },
     { name: "web:build",        cmd: ["bun", "run", "build"], cwd: "apps/web", tier: "integration", domain: "web" },
     { name: "web:test",         cmd: ["bun", "run", "web:test"], cwd: "apps/web", tier: "integration", domain: "web" },
@@ -144,9 +142,10 @@ export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[
     { name: "web:a11y",         cmd: ["bun", "run", "web:a11y"], cwd: "apps/web", env: home ? { HOME: home } : undefined, tier: "e2e", domain: "web" },
     { name: "web:e2e:smoke",    cmd: ["bun", "run", "web:e2e:smoke"], cwd: "apps/web", env: home ? { HOME: home } : undefined, tier: "e2e", domain: "web" },
     fullE2EStep,
+    { name: "generated:e2e",     cmd: ["bun", "run", "scripts/ci-generated-e2e.ts"], tier: "e2e", domain: "all" },
 
     // ── Phase 9.5 architecture closure gates ──
-    { name: "architecture:red", cmd: ["bun", "test", "src/architecture"], tier: "full", domain: "all" },
+    { name: "architecture:red", cmd: ["bun", "test", "tests/architecture"], tier: "full", domain: "all" },
   ];
 }
 

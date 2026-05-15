@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { WorkItemRecurrenceService, type RecurrenceConfig } from "@work-management/application/work-item-recurrence.ts";
 import { WorkItemService } from "@work-management/application/work-item-service.ts";

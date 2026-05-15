@@ -11,9 +11,9 @@ import type { MikroORM, Options } from "@mikro-orm/postgresql";
 import { MikroORM as MikroORMRuntime, ReferenceKind } from "@mikro-orm/postgresql";
 import { PGlite } from "@electric-sql/pglite";
 
-import { createOrmConfig } from "../../../src/db/mikro-orm.config.ts";
-import { DEFAULT_ORG_ID, SeedService } from "../../../src/db/seed.ts";
-import { Org } from "../../../src/db/entities/auth/Org.ts";
+import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { DEFAULT_ORG_ID, SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
 
 const MIGRATION_NAME = "Migration20260502050000_routing_rules";
 
@@ -38,12 +38,12 @@ interface TestDb {
 }
 
 async function loadRouterModules(): Promise<RouterModules> {
-  const entity = await import("../../../src/db/entities/router/RoutingRule.ts");
-  const repo = await import("../../../src/db/repositories/router/RoutingRuleRepository.ts");
-  const repoBarrel = await import("../../../src/db/repositories/router/index.ts");
+  const entity = await import("@platform-core/infrastructure/application-database/entities/router/RoutingRule.ts");
+  const repo = await import("@platform-core/infrastructure/application-database/repositories/router/RoutingRuleRepository.ts");
+  const repoBarrel = await import("@platform-core/infrastructure/application-database/repositories/router/index.ts");
   const payload = await import("@fulcrum/server/router/routing-event-payload.ts");
   const migration = await import(
-    "../../../src/db/migrations/Migration20260502050000_routing_rules.ts"
+    "@platform-core/infrastructure/application-database/migrations/Migration20260502050000_routing_rules.ts"
   );
 
   expect(migration[MIGRATION_NAME]).toBeDefined();

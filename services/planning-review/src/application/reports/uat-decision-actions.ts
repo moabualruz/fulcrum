@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { createStorageBackend } from "@workflow-coordination/infrastructure/artifacts/storage.ts";
 import { AppValidationError } from "@platform-core/domain/errors.ts";

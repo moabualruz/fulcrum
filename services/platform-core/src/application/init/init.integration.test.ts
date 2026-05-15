@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { PGlite } from "@electric-sql/pglite";
-import { MikroORM, type MikroORM as MikroORMType } from "@mikro-orm/postgresql";
+import { MikroORM, type MikroORM as MikroORMType } from "typeorm";
 
 import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
 import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";

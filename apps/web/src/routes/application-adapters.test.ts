@@ -41,7 +41,8 @@ const SURFACES: Surface[] = [
   {
     name: "docs",
     file: "docs/+page.server.ts",
-    applicationModule: "application/docs/queries",
+    applicationModule: null,
+    helperModule: "$lib/server/document-api",
     keys: ["activeProjectId", "kind", "q", "streamed", "data", "documents", "projectTree", "globalTree"],
   },
   {
@@ -62,6 +63,13 @@ const SURFACES: Surface[] = [
     file: "memory/+page.server.ts",
     applicationModule: "application/memory/queries",
     keys: ["activeProjectId", "scope", "kind", "streamed", "data", "memories"],
+  },
+  {
+    name: "search",
+    file: "search/+page.server.ts",
+    applicationModule: null,
+    helperModule: "$lib/server/search-api",
+    keys: ["q", "kinds", "dateFrom", "dateTo", "hits", "grouped", "savedSearches"],
   },
   {
     name: "tasks",
@@ -134,7 +142,7 @@ describe("web route application adapters", () => {
   }
 
   for (const surface of SURFACES) {
-    test(`${surface.name} loader uses application query module and preserves page data keys`, () => {
+    test(`${surface.name} loader uses an adapter module and preserves page data keys`, () => {
       const text = source(surface.file);
       if (surface.applicationModule) {
         expect(text).toContain(surface.applicationModule);

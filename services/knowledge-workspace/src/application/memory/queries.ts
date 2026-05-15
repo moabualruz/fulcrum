@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
 import type { MemoryKind, MemorySource } from "@platform-core/infrastructure/application-database/entities/memory/enums.ts";

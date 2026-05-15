@@ -18,7 +18,7 @@
  */
 
 import { Injectable } from "@nestjs/common";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import type { CustomAdapter, CleanedWhere, JoinConfig } from "@better-auth/core/db/adapter";
 
 import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";

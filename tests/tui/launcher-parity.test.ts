@@ -14,7 +14,7 @@ import {
 } from "@fulcrum/tui/index.ts";
 import { ScreenRegistry } from "@fulcrum/tui/screen-registry.ts";
 import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
-import { getDefaultKeybindings } from "../../src/keybindings/index.ts";
+import { getDefaultKeybindings } from "@platform-core/application/input-bindings/index.ts";
 import { buildTheme } from "@fulcrum/tui/theme/index.ts";
 
 function fakeCaller(): TuiCaller {

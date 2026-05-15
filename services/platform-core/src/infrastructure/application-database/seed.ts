@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { hashPassword } from "better-auth/crypto";
 import { Org } from "./entities/auth/Org.ts";
 import { Account, OrgMember, Session, User } from "./entities/auth/index.ts";

@@ -11,10 +11,10 @@ import {
   createLocalOrg,
   createProject,
   appendEvent,
-} from "../src/product-kernel/store/repositories.ts";
-import { createTaskAction } from "../src/services/tasks.ts";
+} from "../services/platform-core/src/infrastructure/product-store/store/repositories.ts";
+import { createTaskAction } from "../services/work-management/src/application/work-item-service-actions.ts";
 import { createDocumentAction } from "@fulcrum/web/lib/server/documents.ts";
-import { newUlid } from "../src/product-kernel/ids.ts";
+import { newUlid } from "../services/platform-core/src/infrastructure/product-store/ids.ts";
 
 const REPO = "/Users/mkh/workspace/fulcrum";
 

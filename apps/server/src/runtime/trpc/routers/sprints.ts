@@ -20,7 +20,7 @@ import { t } from "@fulcrum/server/trpc/trpc.ts";
 
 // ── Schemas ────────────────────────────────────────────────────────
 
-type EntityManager = import("@mikro-orm/postgresql").EntityManager;
+type EntityManager = import("typeorm").EntityManager;
 
 const SprintStatusSchema = z.enum(["planned", "active", "completed"]);
 const OrgIdSchema = z.string().regex(/^[0-9a-fA-F-]{36}$/);

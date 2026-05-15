@@ -111,7 +111,7 @@ Rule of thumb: **PreToolUse for prevention, PostToolUse for reaction, SessionSta
 
 ## 5. Recipe library
 
-Every recipe = subcommand of `fulcrum` binary: `fulcrum hook <name>`. Enable: `fulcrum hooks enable <name>` — writes native hook config **only for agents whose root dirs exist on disk** (detection-aware default), records intent at `~/.fulcrum/hooks/enabled/<name>`, and prints the per-agent snippet for review. Pass `--all` to write configs for all 5 supported agents regardless of whether their dirs exist (useful for cross-machine dotfiles setup). Disable: `fulcrum hooks disable <name>` — removes Fulcrum-managed native registrations and the marker, also detection-aware by default (`--all` to target all). Implementation in `src/hooks/<name>.ts`; this section explains *what each does and when to use.*
+Every recipe = subcommand of `fulcrum` binary: `fulcrum hook <name>`. Enable: `fulcrum hooks enable <name>` — writes native hook config **only for agents whose root dirs exist on disk** (detection-aware default), records intent at `~/.fulcrum/hooks/enabled/<name>`, and prints the per-agent snippet for review. Pass `--all` to write configs for all 5 supported agents regardless of whether their dirs exist (useful for cross-machine dotfiles setup). Disable: `fulcrum hooks disable <name>` — removes Fulcrum-managed native registrations and the marker, also detection-aware by default (`--all` to target all). Implementation in `services/platform-core/src/application/agent-hooks/<name>.ts`; this section explains *what each does and when to use.*
 
 | Recipe | Lifecycle | Purpose | Blocks? |
 |---|---|---|---|

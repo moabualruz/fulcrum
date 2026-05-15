@@ -2,11 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
 import { Container } from "@needle-di/core";
 
-import { createTestOrm } from "../../src/test-utils/db.ts";
-import { Event } from "../../src/db/entities/core/Event.ts";
-import { MetricsCache } from "../../src/db/entities/tasks/MetricsCache.ts";
-import { Task } from "../../src/db/entities/tasks/Task.ts";
-import { TaskRepository } from "../../src/db/repositories/tasks/TaskRepository.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
+import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
+import { MetricsCache } from "@platform-core/infrastructure/application-database/entities/tasks/MetricsCache.ts";
+import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
@@ -44,6 +44,19 @@ function callerFor(repo: TaskRepository) {
       container,
     }),
   );
+}
+
+async function expectTrpcError(promise: Promise<unknown>, code: TRPCError["code"], message?: string): Promise<void> {
+  let error: TRPCError | null = null;
+  try {
+    await promise;
+  } catch (caught) {
+    if (caught instanceof TRPCError) error = caught;
+  }
+
+  expect(error).toBeInstanceOf(TRPCError);
+  expect(error?.code).toBe(code);
+  if (message !== undefined) expect(error?.message).toBe(message);
 }
 
 describe("sprints tRPC CRUD", () => {
@@ -105,10 +118,7 @@ describe("sprints tRPC CRUD", () => {
       });
 
       await expect(caller.sprints.start({ id: active.id })).resolves.toMatchObject({ status: "active" });
-      await expect(caller.sprints.start({ id: planned.id })).rejects.toMatchObject({
-        code: "CONFLICT",
-        message: "at_most_one_active",
-      });
+      await expectTrpcError(caller.sprints.start({ id: planned.id }), "CONFLICT", "at_most_one_active");
     } finally {
       await db.close();
     }

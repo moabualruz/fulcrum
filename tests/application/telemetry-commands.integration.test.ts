@@ -7,13 +7,13 @@ import {
   recordTuiRenderTelemetry,
   scrubTelemetryPayload,
   writeTelemetryEvent,
-} from "../../src/application/telemetry/commands.ts";
-import { Org, User } from "../../src/db/entities/auth/index.ts";
-import { TenantSetting } from "../../src/db/entities/TenantSetting.ts";
-import { TelemetryEvent } from "../../src/db/entities/platform/TelemetryEvent.ts";
-import { DomainEventOutbox } from "../../src/db/entities/platform/DomainEventOutbox.ts";
-import { DEFAULT_ORG_ID } from "../../src/db/seed.ts";
-import { createTestOrm, type TestOrm } from "../../src/test-utils/db.ts";
+} from "@platform-core/application/telemetry/commands.ts";
+import { Org, User } from "@platform-core/infrastructure/application-database/entities/auth/index.ts";
+import { TenantSetting } from "@platform-core/infrastructure/application-database/entities/TenantSetting.ts";
+import { TelemetryEvent } from "@platform-core/infrastructure/application-database/entities/platform/TelemetryEvent.ts";
+import { DomainEventOutbox } from "@platform-core/infrastructure/application-database/entities/platform/DomainEventOutbox.ts";
+import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
 let db: TestOrm | null = null;
 

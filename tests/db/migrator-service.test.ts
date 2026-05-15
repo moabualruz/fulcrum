@@ -13,7 +13,7 @@
  * Suite 3: Checksum validation — mock file read; assert MigratorService
  *   refuses with 'migration.checksum-mismatch' when stored checksum differs.
  *
- * C6: No raw SQL outside src/db/migrations/. Schema via orm.schema.create().
+ * C6: No raw SQL outside services/platform-core/src/infrastructure/application-database/migrations/. Schema via orm.schema.create().
  * C7: MikroORM v7 `orm.migrator` (getter).
  * C8: needle-di Container for MigratorService.
  *
@@ -22,35 +22,36 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { readdir } from "node:fs/promises";
+import { join } from "node:path";
 import { MikroORM } from "@mikro-orm/postgresql";
 import { Migrator } from "@mikro-orm/migrations";
 import { PGlite } from "@electric-sql/pglite";
-import { PGliteKyselyDialect } from "../../src/db/PGliteKyselyDriver.ts";
+import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
 
 // Entities needed by these tests
-import { SchemaMigration } from "../../src/db/entities/SchemaMigration.ts";
-import { Org } from "../../src/db/entities/auth/Org.ts";
-import { User } from "../../src/db/entities/auth/User.ts";
-import { Session } from "../../src/db/entities/auth/Session.ts";
-import { Invitation } from "../../src/db/entities/auth/Invitation.ts";
-import { OrgMember } from "../../src/db/entities/auth/OrgMember.ts";
-import { FeatureFlag } from "../../src/db/entities/auth/FeatureFlag.ts";
-import { Event } from "../../src/db/entities/core/Event.ts";
-import { Task } from "../../src/db/entities/tasks/Task.ts";
-import { Document } from "../../src/db/entities/docs/Document.ts";
-import { Memory } from "../../src/db/entities/memory/Memory.ts";
-import { AgentRun } from "../../src/db/entities/orchestration/AgentRun.ts";
-import { Artifact } from "../../src/db/entities/artifacts/Artifact.ts";
-import { Repo } from "../../src/db/entities/repos/Repo.ts";
-import { Job } from "../../src/db/entities/jobs/Job.ts";
-import { SearchDocument } from "../../src/db/entities/search/SearchDocument.ts";
-import { CasbinRule } from "../../src/db/entities/flags/CasbinRule.ts";
-import { WebhookSubscription } from "../../src/db/entities/flags/WebhookSubscription.ts";
-import { NotificationRule } from "../../src/db/entities/flags/NotificationRule.ts";
+import { SchemaMigration } from "@platform-core/infrastructure/application-database/entities/SchemaMigration.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
+import { Session } from "@platform-core/infrastructure/application-database/entities/auth/Session.ts";
+import { Invitation } from "@platform-core/infrastructure/application-database/entities/auth/Invitation.ts";
+import { OrgMember } from "@platform-core/infrastructure/application-database/entities/auth/OrgMember.ts";
+import { FeatureFlag } from "@platform-core/infrastructure/application-database/entities/auth/FeatureFlag.ts";
+import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
+import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
+import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
+import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
+import { Artifact } from "@platform-core/infrastructure/application-database/entities/artifacts/Artifact.ts";
+import { Repo } from "@platform-core/infrastructure/application-database/entities/repos/Repo.ts";
+import { Job } from "@platform-core/infrastructure/application-database/entities/jobs/Job.ts";
+import { SearchDocument } from "@platform-core/infrastructure/application-database/entities/search/SearchDocument.ts";
+import { CasbinRule } from "@platform-core/infrastructure/application-database/entities/flags/CasbinRule.ts";
+import { WebhookSubscription } from "@platform-core/infrastructure/application-database/entities/flags/WebhookSubscription.ts";
+import { NotificationRule } from "@platform-core/infrastructure/application-database/entities/flags/NotificationRule.ts";
 
 // Repositories
-import { SchemaMigrationRepository } from "../../src/db/repositories/SchemaMigrationRepository.ts";
-import { EventRepository } from "../../src/db/repositories/core/EventRepository.ts";
+import { SchemaMigrationRepository } from "@platform-core/infrastructure/application-database/repositories/SchemaMigrationRepository.ts";
+import { EventRepository } from "@platform-core/infrastructure/application-database/repositories/core/EventRepository.ts";
 
 // Service under test
 import {
@@ -59,10 +60,10 @@ import {
   LossyDownProtectedError,
   MigrationChecksumMismatchError,
   MigrationFileMissingError,
-} from "../../src/db/migrator-service.ts";
-import { sha256Hex } from "../../src/db/migration-checksums.ts";
-import { dbMigrationVersion, dbCanRunOnCurrentBinary, MAX_KNOWN_MIGRATION_VERSION } from "../../src/db/doctor-checks.ts";
-import { PermissionNotAvailableError } from "../../src/db/db.router.ts";
+} from "@platform-core/infrastructure/application-database/migrator-service.ts";
+import { sha256Hex } from "@platform-core/infrastructure/application-database/migration-checksums.ts";
+import { dbMigrationVersion, dbCanRunOnCurrentBinary, MAX_KNOWN_MIGRATION_VERSION } from "@platform-core/infrastructure/application-database/doctor-checks.ts";
+import { PermissionNotAvailableError } from "@platform-core/infrastructure/application-database/db.router.ts";
 import { run as runDbCommand } from "@fulcrum/cli/commands/db.ts";
 
 // All entity classes for the test ORM
@@ -88,7 +89,7 @@ const ALL_ENTITIES = [
   NotificationRule,
 ];
 
-const MIGRATIONS_PATH = new URL("../../src/db/migrations", import.meta.url).pathname;
+const MIGRATIONS_PATH = join(process.cwd(), "services/platform-core/src/infrastructure/application-database/migrations");
 const DESTRUCTIVE_DOWN_SQL = /\b(drop\s+table|drop\s+column)\b/i;
 const LOSSY_FLAG = /static\s+(?:readonly\s+)?isLossy\s*=\s*true\b/;
 const pglitesByOrm = new WeakMap<MikroORM, PGlite>();
@@ -133,7 +134,7 @@ async function closeOrm(orm?: MikroORM): Promise<void> {
 /** Build a MigratorService backed by the given ORM instance. */
 function buildService(
   orm: MikroORM,
-  options: import("../../src/db/migrator-service.ts").MigratorServiceOptions = {},
+  options: import("@platform-core/infrastructure/application-database/migrator-service.ts").MigratorServiceOptions = {},
 ): MigratorService {
   const schemaMigrationRepo = orm.em.getRepository(SchemaMigration) as SchemaMigrationRepository;
   const eventRepo = orm.em.getRepository(Event) as EventRepository;
@@ -782,17 +783,17 @@ describe("MigratorService — round-trip up/down on all migration classes (P1#19
 
 describe("db.router — PermissionNotAvailableError (P1#19 round-2)", () => {
   it("dbMigrate throws PermissionNotAvailableError (not null-pointer)", async () => {
-    const { dbMigrate } = await import("../../src/db/db.router.ts");
+    const { dbMigrate } = await import("@platform-core/infrastructure/application-database/db.router.ts");
     await expect(dbMigrate(null)).rejects.toThrow(PermissionNotAvailableError);
   });
 
   it("dbStatus throws PermissionNotAvailableError", async () => {
-    const { dbStatus } = await import("../../src/db/db.router.ts");
+    const { dbStatus } = await import("@platform-core/infrastructure/application-database/db.router.ts");
     await expect(dbStatus(null)).rejects.toThrow(PermissionNotAvailableError);
   });
 
   it("dbHistory throws PermissionNotAvailableError", async () => {
-    const { dbHistory } = await import("../../src/db/db.router.ts");
+    const { dbHistory } = await import("@platform-core/infrastructure/application-database/db.router.ts");
     await expect(dbHistory(null)).rejects.toThrow(PermissionNotAvailableError);
   });
 

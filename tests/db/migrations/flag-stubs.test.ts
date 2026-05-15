@@ -15,34 +15,34 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { MikroORM, ReferenceKind } from "@mikro-orm/postgresql";
 import { PGlite } from "@electric-sql/pglite";
-import { PGliteKyselyDialect } from "../../../src/db/PGliteKyselyDriver.ts";
+import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
 
-import { Org } from "../../../src/db/entities/auth/Org.ts";
-import { User } from "../../../src/db/entities/auth/User.ts";
-import { Session } from "../../../src/db/entities/auth/Session.ts";
-import { Invitation } from "../../../src/db/entities/auth/Invitation.ts";
-import { OrgMember } from "../../../src/db/entities/auth/OrgMember.ts";
-import { FeatureFlag } from "../../../src/db/entities/auth/FeatureFlag.ts";
-import { Event } from "../../../src/db/entities/core/Event.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
+import { Session } from "@platform-core/infrastructure/application-database/entities/auth/Session.ts";
+import { Invitation } from "@platform-core/infrastructure/application-database/entities/auth/Invitation.ts";
+import { OrgMember } from "@platform-core/infrastructure/application-database/entities/auth/OrgMember.ts";
+import { FeatureFlag } from "@platform-core/infrastructure/application-database/entities/auth/FeatureFlag.ts";
+import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 
 // Stub tenant-scoped entities (registered for completeness — schema needs them all)
-import { Task } from "../../../src/db/entities/tasks/Task.ts";
-import { Document } from "../../../src/db/entities/docs/Document.ts";
-import { Memory } from "../../../src/db/entities/memory/Memory.ts";
-import { AgentRun } from "../../../src/db/entities/orchestration/AgentRun.ts";
-import { Artifact } from "../../../src/db/entities/artifacts/Artifact.ts";
-import { Repo } from "../../../src/db/entities/repos/Repo.ts";
-import { Job } from "../../../src/db/entities/jobs/Job.ts";
-import { SearchDocument } from "../../../src/db/entities/search/SearchDocument.ts";
+import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
+import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
+import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
+import { Artifact } from "@platform-core/infrastructure/application-database/entities/artifacts/Artifact.ts";
+import { Repo } from "@platform-core/infrastructure/application-database/entities/repos/Repo.ts";
+import { Job } from "@platform-core/infrastructure/application-database/entities/jobs/Job.ts";
+import { SearchDocument } from "@platform-core/infrastructure/application-database/entities/search/SearchDocument.ts";
 
 // Flag-stub entities under test
-import { CasbinRule } from "../../../src/db/entities/flags/CasbinRule.ts";
-import { WebhookSubscription } from "../../../src/db/entities/flags/WebhookSubscription.ts";
-import { NotificationRule } from "../../../src/db/entities/flags/NotificationRule.ts";
+import { CasbinRule } from "@platform-core/infrastructure/application-database/entities/flags/CasbinRule.ts";
+import { WebhookSubscription } from "@platform-core/infrastructure/application-database/entities/flags/WebhookSubscription.ts";
+import { NotificationRule } from "@platform-core/infrastructure/application-database/entities/flags/NotificationRule.ts";
 
-import { CasbinRuleRepository } from "../../../src/db/repositories/flags/CasbinRuleRepository.ts";
-import { WebhookSubscriptionRepository } from "../../../src/db/repositories/flags/WebhookSubscriptionRepository.ts";
-import { NotificationRuleRepository } from "../../../src/db/repositories/flags/NotificationRuleRepository.ts";
+import { CasbinRuleRepository } from "@platform-core/infrastructure/application-database/repositories/flags/CasbinRuleRepository.ts";
+import { WebhookSubscriptionRepository } from "@platform-core/infrastructure/application-database/repositories/flags/WebhookSubscriptionRepository.ts";
+import { NotificationRuleRepository } from "@platform-core/infrastructure/application-database/repositories/flags/NotificationRuleRepository.ts";
 
 let orm: MikroORM;
 

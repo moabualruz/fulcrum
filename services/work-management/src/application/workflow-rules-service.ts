@@ -7,7 +7,7 @@
  * Security: orgId scope enforced on every query (T-05-08 mitigation).
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { Project, type WorkflowConfig } from "@platform-core/infrastructure/application-database/entities/tasks/Project.ts";
 import { AppNotFoundError, AppValidationError } from "@platform-core/domain/errors.ts";

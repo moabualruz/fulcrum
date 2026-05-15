@@ -11,7 +11,7 @@ const REQUIRED_SERVER_TRPC_ROUTERS = [
   "webhooks",
 ] as const;
 
-describe("Phase 9.5 tRPC router completeness", () => {
+describe("interface tRPC router completeness", () => {
   test.each([...REQUIRED_SERVER_TRPC_ROUTERS])("%s router exists in server tRPC surface", (domain) => {
     const candidates = [
       join("apps", "server", "src", "router", `${domain}.ts`),

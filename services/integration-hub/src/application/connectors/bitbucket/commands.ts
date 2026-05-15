@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
 import { BitbucketPullRequest } from "@platform-core/infrastructure/application-database/entities/connectors/BitbucketPullRequest.ts";
 import { AppValidationError } from "@platform-core/domain/errors.ts";

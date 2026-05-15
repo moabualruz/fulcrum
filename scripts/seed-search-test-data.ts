@@ -10,11 +10,11 @@
  * returns all of them.
  */
 
-import { openPglite } from "../src/product-kernel/db/pglite.ts";
-import { runMigrations } from "../src/product-kernel/db/migrate.ts";
-import { createLocalOrg } from "../src/product-kernel/store/repositories.ts";
-import { indexSearchDocument } from "../src/product-kernel/search.ts";
-import type { ProductDb } from "../src/product-kernel/db/types.ts";
+import { openPglite } from "../services/platform-core/src/infrastructure/product-store/db/pglite.ts";
+import { applyProductMigrations } from "../services/platform-core/src/infrastructure/application-database/product-migrations.ts";
+import { createLocalOrg } from "../services/platform-core/src/infrastructure/product-store/store/repositories.ts";
+import { indexSearchDocument } from "../services/platform-core/src/infrastructure/product-store/search.ts";
+import type { ProductDb } from "../services/platform-core/src/infrastructure/product-store/db/types.ts";
 
 const COMMON_TERM = "fulcrum-searchable";
 
@@ -59,7 +59,7 @@ if (import.meta.main) {
   }
   const db = await openPglite(dbPath);
   try {
-    await runMigrations(db);
+    await applyProductMigrations(db);
     const org = await createLocalOrg(db, { slug: "default", name: "Local" });
     const result = await seedSearchTestData(db, org.id);
     console.log(JSON.stringify(result, null, 2));

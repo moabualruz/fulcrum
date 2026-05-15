@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { PGlite } from "@electric-sql/pglite";
 
-import { __resetDefaultOrmForTest, initOrm } from "../../src/db/mikro-orm.config.ts";
-import { resolveDatabaseConfig } from "../../src/config/database.ts";
+import { __resetDefaultOrmForTest, initOrm } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { resolveDatabaseConfig } from "@platform-core/application/db/database-config.ts";
 
 describe("initOrm", () => {
   afterEach(async () => {
@@ -72,6 +72,40 @@ describe("resolveDatabaseConfig", () => {
 
     expect(config.backend).toBe("postgres");
     expect(config.url).toBe("postgresql://fulcrum:fulcrum@127.0.0.1:5432/fulcrum");
+  });
+
+  test("FULCRUM_DATABASE_URL selects PostgreSQL without changing application code", () => {
+    const config = resolveDatabaseConfig({
+      env: { FULCRUM_DATABASE_URL: "postgresql://fulcrum:fulcrum@127.0.0.1:5432/fulcrum" },
+      config: {},
+    });
+
+    expect(config.backend).toBe("postgres");
+    expect(config.url).toBe("postgresql://fulcrum:fulcrum@127.0.0.1:5432/fulcrum");
+  });
+
+  test("FULCRUM_DATABASE_URL overrides persisted local PGlite config for seamless switching", () => {
+    const config = resolveDatabaseConfig({
+      env: { FULCRUM_DATABASE_URL: "postgresql://fulcrum:fulcrum@127.0.0.1:5432/fulcrum" },
+      config: {
+        db: {
+          backend: "pglite",
+          dataDir: "/tmp/fulcrum-home/pglite.data",
+        },
+      },
+    });
+
+    expect(config.backend).toBe("postgres");
+    expect(config.url).toBe("postgresql://fulcrum:fulcrum@127.0.0.1:5432/fulcrum");
+  });
+
+  test("rejects non-PostgreSQL DATABASE_URL values instead of silently using PGlite", () => {
+    expect(() =>
+      resolveDatabaseConfig({
+        env: { DATABASE_URL: "sqlite:///tmp/fulcrum.sqlite" },
+        config: {},
+      }),
+    ).toThrow("DATABASE_URL must be a postgres:// or postgresql:// connection string");
   });
 
   test("persisted db.backend can select PostgreSQL", () => {

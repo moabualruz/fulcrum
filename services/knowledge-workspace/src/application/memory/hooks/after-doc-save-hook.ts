@@ -16,7 +16,7 @@
  */
 
 import { Injectable } from "@nestjs/common";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
 import { MemoryLink } from "@platform-core/infrastructure/application-database/entities/memory/MemoryLink.ts";
 import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";

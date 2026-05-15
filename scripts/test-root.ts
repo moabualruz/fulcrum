@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { coverageStats, mergeLcov, renderMergedLcov, type CoverageMap } from "./test-root-coverage.ts";
 
-const ROOTS = ["scripts", "src", "tests"] as const;
+const ROOTS = ["scripts", "src", "services", "apps/cli", "apps/server", "apps/tui", "tests"] as const;
 const TEST_FILE = /\.(test|spec)\.(ts|tsx)$/;
 const SKIP_DIRS = new Set(["node_modules", ".svelte-kit", "dist", "coverage"]);
 const SKIP_PATHS = new Set(["tests/a11y"]);

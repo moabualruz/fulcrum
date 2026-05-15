@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { DocLink } from "../../src/db/entities/docs/DocLink.ts";
-import { createTestOrm } from "../../src/test-utils/db.ts";
+import { DocLink } from "@platform-core/infrastructure/application-database/entities/docs/DocLink.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";

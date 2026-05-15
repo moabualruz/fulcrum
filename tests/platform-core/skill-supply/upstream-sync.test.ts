@@ -1,9 +1,3 @@
-/**
- * TDD — skills upstream sync auto-merge + conflict lock.
- *
- * Closes (issue): .scratch/agent-os-vision/05-router-and-skills/issues/14-skills-upstream-sync.md
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -13,8 +7,8 @@ import { $ } from "bun";
 import {
   createTestOrm,
   type TestOrm,
-} from "../../src/test-utils/index.ts";
-import { Org } from "../../src/db/entities/auth/Org.ts";
+} from "@test-support/index.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
 import {
   FulcrumSkill,
   SkillConflict,
@@ -22,18 +16,18 @@ import {
   SkillConflictStatus,
   SkillSource,
   SkillVersion,
-} from "../../src/db/entities/skills/index.ts";
+} from "@platform-core/infrastructure/application-database/entities/skills/index.ts";
 import {
   AGENT_DIRS,
   __setSkillsLoaderOrmForTest,
   installSkill,
-} from "../../src/skills/loader.ts";
-import { readSkillsLockFile, writeSkillsLockFile } from "../../src/skills/lock.ts";
+} from "@platform-core/application/skill-supply/loader.ts";
+import { readSkillsLockFile, writeSkillsLockFile } from "@platform-core/application/skill-supply/lock.ts";
 import {
   __setSkillsUpstreamSyncOrmForTest,
   syncUpstream,
   upgradeSkills,
-} from "../../src/skills/upstream-sync.ts";
+} from "@platform-core/application/skill-supply/upstream-sync.ts";
 
 let scratch: string;
 let originalHome: string | undefined;

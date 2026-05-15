@@ -7,7 +7,7 @@
  *   3. search.query() returns [] with a valid { q } input for authenticated caller.
  *   4. All stub routers are present in the AppRouter type tree.
  *
- * Per C6: NO raw SQL strings outside src/db/migrations/.
+ * Per C6: NO raw SQL strings outside services/platform-core/src/infrastructure/application-database/migrations/.
  * Per C8: needle-di Container pattern; ctx.container = null in stubs (no repo).
  */
 
@@ -117,7 +117,7 @@ describe("stub routers — authenticated list() returns []", () => {
   });
 
   // Note: notifications.list is excluded here — it is a real implementation (Pillar 12 P12#05)
-  // that requires em in ctx. Its tests live in tests/notifications/.
+  // that requires em in ctx. Its tests live in tests/notification-center/delivery-runtime/.
 
   // Note: webhooks.list is excluded here — it is a real implementation (Pillar 13 P13#07)
   // that requires FULCRUM_FEATURES=outbound-webhooks. Its tests live in tests/trpc/webhooks.test.ts.

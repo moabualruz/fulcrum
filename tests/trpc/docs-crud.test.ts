@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
 import type { Session } from "better-auth";
 
-import { createTestOrm } from "../../src/test-utils/db.ts";
-import { Document } from "../../src/db/entities/docs/Document.ts";
-import { DocVersion } from "../../src/db/entities/docs/DocVersion.ts";
-import { SearchDocument } from "../../src/db/entities/search/SearchDocument.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
+import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
+import { DocVersion } from "@platform-core/infrastructure/application-database/entities/docs/DocVersion.ts";
+import { SearchDocument } from "@platform-core/infrastructure/application-database/entities/search/SearchDocument.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";

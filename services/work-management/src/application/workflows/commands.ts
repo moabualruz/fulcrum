@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import type { Methodology, TransitionGraph } from "@work-management/application/workflow-rules-service.ts";
 import { WorkflowRulesService } from "@work-management/application/workflow-rules-service.ts";

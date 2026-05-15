@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
 import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";

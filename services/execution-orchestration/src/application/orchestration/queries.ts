@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { ormSqlConnection } from "@platform-core/application/orm-helpers.ts";
 import type { OrchestrationApplicationContext } from "@execution-orchestration/application/orchestration/types.ts";

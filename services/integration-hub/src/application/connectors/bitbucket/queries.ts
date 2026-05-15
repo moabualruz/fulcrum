@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { BitbucketPullRequest } from "@platform-core/infrastructure/application-database/entities/connectors/BitbucketPullRequest.ts";
 import { AppForbiddenError, AppNotFoundError } from "@platform-core/domain/errors.ts";
 import type { AppContext, BitbucketPullRequestDto } from "@integration-hub/application/connectors/bitbucket/types.ts";

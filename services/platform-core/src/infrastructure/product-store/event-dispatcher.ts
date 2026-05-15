@@ -10,7 +10,7 @@
  */
 import { EventEmitter } from "node:events";
 import type { ProductDb } from "./db/types.ts";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import {
   appendEvent as rawAppendEvent,
   type AppendEventInput,

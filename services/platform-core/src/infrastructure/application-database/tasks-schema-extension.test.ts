@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
-import type { EntityName } from "@mikro-orm/core";
-import type { EntityManager, MikroORM, Options } from "@mikro-orm/postgresql";
-import { MikroORM as MikroORMRuntime } from "@mikro-orm/postgresql";
+import type { EntityName } from "typeorm";
+import type { EntityManager, MikroORM, Options } from "typeorm";
+import { MikroORM as MikroORMRuntime } from "typeorm";
 import { PGlite } from "@electric-sql/pglite";
 
 import { createTestOrm } from "@test-support/application-database.ts";

@@ -1,9 +1,3 @@
-/**
- * TDD — skills loader per-agent install + hash verification.
- *
- * Closes (issue): .scratch/agent-os-vision/05-router-and-skills/issues/13-skills-loader-per-agent-install.md
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
   access,
@@ -21,21 +15,21 @@ import { createHash } from "node:crypto";
 import {
   createTestOrm,
   type TestOrm,
-} from "../../src/test-utils/index.ts";
-import { Org } from "../../src/db/entities/auth/Org.ts";
+} from "@test-support/index.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
 import {
   FulcrumSkill,
   SkillSource,
   SkillVersion,
-} from "../../src/db/entities/skills/index.ts";
+} from "@platform-core/infrastructure/application-database/entities/skills/index.ts";
 import {
   AGENT_DIRS,
   __removeStaleSkillsLockForTest,
   __setSkillsLoaderProcessKillForTest,
   __setSkillsLoaderOrmForTest,
   installSkill,
-} from "../../src/skills/loader.ts";
-import { readSkillsLockFile } from "../../src/skills/lock.ts";
+} from "@platform-core/application/skill-supply/loader.ts";
+import { readSkillsLockFile } from "@platform-core/application/skill-supply/lock.ts";
 
 let scratch: string;
 let originalHome: string | undefined;

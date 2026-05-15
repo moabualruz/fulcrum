@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Session } from "better-auth";
 
-import { Document } from "../../src/db/entities/docs/Document.ts";
-import { configureDocNarrator } from "../../src/docs/llm-narrator.ts";
-import { createTestOrm } from "../../src/test-utils/db.ts";
+import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
+import { configureDocNarrator } from "@knowledge-workspace/application/docs/llm-narrator.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";

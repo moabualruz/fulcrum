@@ -198,7 +198,7 @@ describe("root CLI source dispatch", () => {
     expect(result.stderr).toContain("fulcrum: unknown command 'wat'");
   });
 
-  test("data command exits 2 for unknown subcommands after real container setup", async () => {
+  test("data command exits 2 for unknown subcommands at the command boundary", async () => {
     previousFulcrumHome = process.env.FULCRUM_HOME;
     process.env.FULCRUM_HOME = await mkdtemp(join(tmpdir(), "fulcrum-cli-data-unknown-"));
 
@@ -215,7 +215,7 @@ describe("root CLI source dispatch", () => {
     ["backup", ["backup", "bogus"], "fulcrum backup: missing required option --output"],
     ["errors", ["errors", "bogus"], "fulcrum errors: unknown command 'bogus'"],
     ["secrets", ["secrets", "bogus", "api-token"], "fulcrum secrets: unknown command 'bogus'"],
-  ])("%s invalid subcommand validates through a real local caller", async (_name, args, message) => {
+  ])("%s invalid subcommand validates at the command boundary", async (_name, args, message) => {
     previousFulcrumHome = process.env.FULCRUM_HOME;
     process.env.FULCRUM_HOME = await mkdtemp(join(tmpdir(), "fulcrum-cli-cross-cutting-"));
 
@@ -243,7 +243,7 @@ describe("root CLI source dispatch", () => {
     ["notify", ["notify", "list", "--json"]],
     ["webhooks", ["webhooks", "list", "--json"]],
     ["settings", ["settings", "list", "--json"]],
-  ])("%s non-help path builds a real DB container before command auth", async (_name, args) => {
+  ])("%s non-help path reaches the command auth/config boundary", async (_name, args) => {
     previousFulcrumHome = process.env.FULCRUM_HOME;
     process.env.FULCRUM_HOME = await mkdtemp(join(tmpdir(), "fulcrum-cli-non-help-"));
 
@@ -251,7 +251,7 @@ describe("root CLI source dispatch", () => {
 
     expect(result.exitCode).toBe(1);
     expect(`${result.stdout}\n${result.stderr}`).toMatch(
-      /UNAUTHORIZED|Authentication required|No active CLI session|No procedure found on path|relation "tasks" does not exist/i,
+      /UNAUTHORIZED|Authentication required|No active CLI session|API callers? (?:is|are) not configured|No procedure found on path|relation "tasks" does not exist/i,
     );
   });
 

@@ -18,7 +18,7 @@ export const load: PageServerLoad = ({ locals }) => {
 };
 
 export const actions: Actions = {
-  test: async ({ request }) => {
+  test: async ({ request, locals }) => {
     const form = await request.formData();
     const name = form.get("name") as string;
     if (!name) return { success: false, message: "Missing profile name" };

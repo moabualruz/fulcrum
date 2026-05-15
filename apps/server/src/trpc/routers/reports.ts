@@ -26,7 +26,7 @@ import { permissionedProcedure } from "../middleware.ts";
 import { t } from "../trpc.ts";
 import { AutomatedFeedbackLoopOutputSchema } from "@work-management/application/tasks/schema.ts";
 
-type EntityManager = import("@mikro-orm/postgresql").EntityManager;
+type EntityManager = import("typeorm").EntityManager;
 
 const BurndownInputSchema = z.object({
   projectId: z.uuid(),

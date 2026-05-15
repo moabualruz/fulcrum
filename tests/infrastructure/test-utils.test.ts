@@ -5,10 +5,10 @@ import {
   createTestContainer,
   createTestOrm,
   type TestOrm,
-} from "../../src/test-utils/index.ts";
-import { DEFAULT_ADMIN_EMAIL, DEFAULT_ORG_ID } from "../../src/db/seed.ts";
-import { UserRepository } from "../../src/db/db.module.ts";
-import { Session, User } from "../../src/db/entities/auth/index.ts";
+} from "@test-support/index.ts";
+import { DEFAULT_ADMIN_EMAIL, DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
+import { UserRepository } from "@platform-core/infrastructure/application-database/db.module.ts";
+import { Session, User } from "@platform-core/infrastructure/application-database/entities/auth/index.ts";
 
 let testDb: TestOrm;
 
@@ -20,7 +20,7 @@ afterAll(async () => {
   await testDb.close();
 });
 
-describe("src/test-utils/createTestOrm", () => {
+describe("tests/support/createTestOrm", () => {
   it("applies all migration classes and leaves no pending migrations", async () => {
     const pending = await testDb.orm.migrator.getPending();
     const executed = await testDb.orm.migrator.getExecuted();
@@ -42,7 +42,7 @@ describe("src/test-utils/createTestOrm", () => {
   });
 });
 
-describe("src/test-utils/createTestContainer", () => {
+describe("tests/support/createTestContainer", () => {
   it("registers repository bindings for P1 surfaces", () => {
     const container = createTestContainer(testDb);
     const userRepo = container.get(UserRepository);
@@ -52,7 +52,7 @@ describe("src/test-utils/createTestContainer", () => {
   });
 });
 
-describe("src/test-utils/createTestCaller", () => {
+describe("tests/support/createTestCaller", () => {
   it("creates an authenticated default caller for tRPC tests", async () => {
     const container = createTestContainer(testDb);
     const caller = await createTestCaller(container);

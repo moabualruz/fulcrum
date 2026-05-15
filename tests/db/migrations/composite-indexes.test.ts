@@ -11,7 +11,7 @@
  *     only sanity-checks the predicate compiles and runs.
  *
  * Per C2: composite indexes from day 1 — later pillars never need to add them.
- * Per C6: NO raw SQL outside src/db/migrations/. Schema via orm.schema.create().
+ * Per C6: NO raw SQL outside services/platform-core/src/infrastructure/application-database/migrations/. Schema via orm.schema.create().
  * Per C7: MikroORM v7 @Entity decorator-class pattern.
  *
  * Closes (issue): .scratch/agent-os-vision/01-foundation-reset/issues/03-composite-indexes-and-flag-stub-tables.md
@@ -20,34 +20,32 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { MikroORM, ReferenceKind } from "@mikro-orm/postgresql";
 import { PGlite } from "@electric-sql/pglite";
-import { PGliteKyselyDialect } from "../../../src/db/PGliteKyselyDriver.ts";
+import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
 
 // Pre-existing entities (P1#01 + P1#02)
-import { Org } from "../../../src/db/entities/auth/Org.ts";
-import { User } from "../../../src/db/entities/auth/User.ts";
-import { Session } from "../../../src/db/entities/auth/Session.ts";
-import { Invitation } from "../../../src/db/entities/auth/Invitation.ts";
-import { OrgMember } from "../../../src/db/entities/auth/OrgMember.ts";
-import { FeatureFlag } from "../../../src/db/entities/auth/FeatureFlag.ts";
-import { Event } from "../../../src/db/entities/core/Event.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
+import { Session } from "@platform-core/infrastructure/application-database/entities/auth/Session.ts";
+import { Invitation } from "@platform-core/infrastructure/application-database/entities/auth/Invitation.ts";
+import { OrgMember } from "@platform-core/infrastructure/application-database/entities/auth/OrgMember.ts";
+import { FeatureFlag } from "@platform-core/infrastructure/application-database/entities/auth/FeatureFlag.ts";
+import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 
 // New stub entities (P1#03 — under test)
-import { Task } from "../../../src/db/entities/tasks/Task.ts";
-import { Document } from "../../../src/db/entities/docs/Document.ts";
-import { Memory } from "../../../src/db/entities/memory/Memory.ts";
-import { AgentRun } from "../../../src/db/entities/orchestration/AgentRun.ts";
-import { Artifact } from "../../../src/db/entities/artifacts/Artifact.ts";
-import { Repo } from "../../../src/db/entities/repos/Repo.ts";
-import { Job } from "../../../src/db/entities/jobs/Job.ts";
-import { SearchDocument } from "../../../src/db/entities/search/SearchDocument.ts";
+import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
+import { Memory } from "@platform-core/infrastructure/application-database/entities/memory/Memory.ts";
+import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
+import { Artifact } from "@platform-core/infrastructure/application-database/entities/artifacts/Artifact.ts";
+import { Repo } from "@platform-core/infrastructure/application-database/entities/repos/Repo.ts";
+import { Job } from "@platform-core/infrastructure/application-database/entities/jobs/Job.ts";
+import { SearchDocument } from "@platform-core/infrastructure/application-database/entities/search/SearchDocument.ts";
 
 // Flag-stub entities (P1#03 — also part of metadata so schema includes them)
-import { CasbinRule } from "../../../src/db/entities/flags/CasbinRule.ts";
-import { WebhookSubscription } from "../../../src/db/entities/flags/WebhookSubscription.ts";
-import { NotificationRule } from "../../../src/db/entities/flags/NotificationRule.ts";
-
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { CasbinRule } from "@platform-core/infrastructure/application-database/entities/flags/CasbinRule.ts";
+import { WebhookSubscription } from "@platform-core/infrastructure/application-database/entities/flags/WebhookSubscription.ts";
+import { NotificationRule } from "@platform-core/infrastructure/application-database/entities/flags/NotificationRule.ts";
+import { productStoreMigrations } from "@platform-core/infrastructure/product-store/db/migrations/index.ts";
 
 const WELL_KNOWN_ORG_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -187,13 +185,10 @@ const PRODUCT_KERNEL_INDEX_SPECS = [
 describe("product-kernel tenant-scoped composite indexes", () => {
   for (const spec of PRODUCT_KERNEL_INDEX_SPECS) {
     it(`${spec.tableName} has ${spec.indexName} beginning with org_id`, () => {
-      const migrationText = readFileSync(
-        join(process.cwd(), "src/product-kernel/db/migrations/0004_tenant_settings.sql"),
-        "utf8",
-      ) + "\n" + readFileSync(
-        join(process.cwd(), "src/product-kernel/db/migrations/0004_sprints_and_metrics.sql"),
-        "utf8",
-      );
+      const migrationText = productStoreMigrations
+        .filter((migration) => migration.name === "0004_tenant_settings.sql" || migration.name === "0004_sprints_and_metrics.sql")
+        .map((migration) => migration.sql)
+        .join("\n");
       const columnsPattern = spec.columns.map((column) => `\\s*${column}\\s*`).join(",");
       expect(migrationText).toMatch(
         new RegExp(

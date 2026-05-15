@@ -29,7 +29,7 @@ const DocTemplateRowSchema = z.object({
   createdAt: z.union([z.string(), z.date().transform((date) => date.toISOString())]),
 });
 
-type EntityManager = import("@mikro-orm/postgresql").EntityManager;
+type EntityManager = import("typeorm").EntityManager;
 type Container = { get<T>(token: unknown): T; bind(b: unknown): void };
 
 // ─── Router ───────────────────────────────────────────────────────────────────

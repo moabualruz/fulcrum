@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { PGlite } from "@electric-sql/pglite";
-import { MikroORM, type Options } from "@mikro-orm/postgresql";
+import { MikroORM, type Options } from "typeorm";
 
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";

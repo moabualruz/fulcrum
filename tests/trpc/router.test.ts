@@ -7,7 +7,7 @@
  *   3. ctx.orgId + ctx.userId populated on every authenticated call.
  *   4. publicProcedure (health.ping) accessible without session.
  *
- * Per C6: NO raw SQL strings outside src/db/migrations/.
+ * Per C6: NO raw SQL strings outside services/platform-core/src/infrastructure/application-database/migrations/.
  * Per C8: needle-di Container pattern; ctx.container set in context.
  */
 
@@ -19,15 +19,15 @@ import { z } from "zod";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
-import { FlagRegistry } from "../../src/flags/registry.ts";
-import { CasbinRuleRepository } from "../../src/db/repositories/flags/CasbinRuleRepository.ts";
+import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
+import { CasbinRuleRepository } from "@platform-core/infrastructure/application-database/repositories/flags/CasbinRuleRepository.ts";
 import { protectedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { __setTaskApplicationForTest } from "@fulcrum/server/runtime/trpc/routers/tasks.ts";
 import { __setMemoryApplicationForTest } from "@fulcrum/server/runtime/trpc/routers/memory.ts";
 import {
   DOC_TEMPLATE_SERVICE_TOKEN,
   type DocTemplateService,
-} from "../../src/docs/doc-template-service.ts";
+} from "@knowledge-workspace/application/docs/doc-template-service.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 const LOCAL_ORG_ID = "00000000-0000-0000-0000-000000000001";

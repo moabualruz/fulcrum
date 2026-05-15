@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { checks } from "../../src/doctor/checks/tui.ts";
+import { checks } from "@platform-core/application/health-checks/checks/tui.ts";
 
 const realHome = process.env["FULCRUM_HOME"];
 

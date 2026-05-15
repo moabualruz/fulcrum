@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { Sprint } from "@platform-core/infrastructure/application-database/entities/tasks/Sprint.ts";
 import { WorkCycleService } from "@work-management/application/work-cycle-service.ts";

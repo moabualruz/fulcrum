@@ -18,3 +18,9 @@ eval-results/
 .claude/.cache/
 .codex/
 coverage/
+test-results/
+
+# Preserved temporary upstream repositories and baseline-copy experiments for
+# Phase 9.6 copy-first workflow/value mapping. Do not track archive folders;
+# track only copied/adapted files after they land in Fulcrum's real source tree.
+/.scratch/upstream-product-replacement/

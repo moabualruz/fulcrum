@@ -3,7 +3,7 @@
  * Canonical home for task actions; web layer re-exports from here.
  * Dependency direction: services use neutral persistence protocols (never web).
  */
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { randomUUID } from "node:crypto";
 import type { SqlExecutor } from "@platform-core/infrastructure/application-database/sql.ts";
 import { newUlid } from "@platform-core/application/platform-primitives/monotonic-id.ts";

@@ -186,7 +186,7 @@ const VersionDiffOutputSchema = z.object({ html: z.string() });
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-type EntityManager = import("@mikro-orm/postgresql").EntityManager;
+type EntityManager = import("typeorm").EntityManager;
 
 function requireEntityManager(ctx: Record<string, unknown>): EntityManager {
   const em = ctx["em"] as EntityManager | null | undefined;

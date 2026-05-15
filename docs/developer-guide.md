@@ -187,15 +187,15 @@ The minimal profile covers rules, policy, MCP registry setup, and recommended MC
 
 ### Hook dispatcher
 
-Hooks are TypeScript subcommands of the `fulcrum` binary. The CLI dispatcher routes `fulcrum hook <name>` to the handler in `src/hooks/<name>.ts`.
+Hooks are TypeScript subcommands of the `fulcrum` binary. The CLI dispatcher routes `fulcrum hook <name>` to the handler in `services/platform-core/src/application/agent-hooks/<name>.ts`.
 
 Each handler:
-1. Reads stdin as a JSON hook event envelope via `readHookEvent()` from `src/utils/io.ts`.
+1. Reads stdin as a JSON hook event envelope via `readHookEvent()` from `services/platform-core/src/application/runtime-support/hook-event-io.ts`.
 2. Extracts the relevant fields (`tool_input`, `tool_response`, `cwd`, etc.).
 3. Performs its action (spawn formatter, run lint, check policy, write log, etc.).
 4. Writes output per the hook contract (stdout for context injection, stderr for diagnostics, exit 2 to block).
 
-`deriveTool()` in `src/utils/io.ts` normalises Pi's proxy-shape `mcp(...)` calls to canonical `mcp__<server>__<tool>` form so `tool-output-router` policies apply to Pi without duplication.
+`deriveTool()` in `services/platform-core/src/application/runtime-support/hook-event-io.ts` normalises Pi's proxy-shape `mcp(...)` calls to canonical `mcp__<server>__<tool>` form so `tool-output-router` policies apply to Pi without duplication.
 
 Three agents (Claude Code, Codex, Gemini) call `fulcrum hook <name>` directly from native hook config. OpenCode and Pi use TypeScript shims (`shims/{opencode,pi}/fulcrum.ts`) that re-dispatch to the same binary.
 
@@ -214,7 +214,7 @@ The registry lives at `~/.fulcrum/state/global/mcp-registry.toml`. Schema versio
 
 ### Component lifecycle engine
 
-`src/components/catalog.ts` declares every managed component and profile. `planner.ts` converts desired operations into action plans. `executor.ts` applies plans through adapters and records state in `~/.fulcrum/state/global/components.db`.
+`services/platform-core/src/application/component-lifecycle/catalog.ts` declares every managed component and profile. `planner.ts` converts desired operations into action plans. `executor.ts` applies plans through adapters and records state in `~/.fulcrum/state/global/components.db`.
 
 Adapters own surface-specific behavior:
 
@@ -276,7 +276,7 @@ interface DoctorReport {
 
 ## Adding a new hook recipe
 
-1. **Write the handler** at `src/hooks/<name>.ts`. Contract:
+1. **Write the handler** at `services/platform-core/src/application/agent-hooks/<name>.ts`. Contract:
    - Read stdin via `readHookEvent()`.
    - All work in TypeScript; shell-out only for external CLIs.
    - Write diagnostics to stderr; context injection to stdout.
@@ -292,15 +292,15 @@ interface DoctorReport {
 
 5. **Register in hooks.ts** in the `RECIPES` table so `fulcrum hooks enable/disable <name>` can write native configs.
 
-6. **Write tests** at `src/hooks/<name>.test.ts`. Minimum: stdin envelope parse, happy-path behavior, missing-tool fail-open.
+6. **Write tests** at `services/platform-core/src/application/agent-hooks/<name>.test.ts`. Minimum: stdin envelope parse, happy-path behavior, missing-tool fail-open.
 
 7. **Run `bun run ci`** to confirm all six stages pass.
 
 Example skeleton:
 
 ```typescript
-// src/hooks/my-hook.ts
-import { readHookEvent } from "../utils/io.ts";
+// services/platform-core/src/application/agent-hooks/my-hook.ts
+import { readHookEvent } from "@platform-core/application/runtime-support/hook-event-io.ts";
 
 const event = await readHookEvent(process.stdin);
 if (!event) process.exit(0);
@@ -449,7 +449,7 @@ This checks out the tree SHA, computes `subpath_sha256`, and writes it back.
 ### What tests exist
 
 - `src/agents/registry.test.ts` — AGENTS array invariants (all 5 present, rootDir unique).
-- `src/utils/io.test.ts` — `readHookEvent` parse + `deriveTool` Pi proxy normalisation.
+- `services/platform-core/src/application/runtime-support/hook-event-io.test.ts` — `readHookEvent` parse + `deriveTool` Pi proxy normalisation.
 - `apps/cli/src/install.test.ts` — `assertNotAgentsPath`, `lockCavemanUltra`, sentinel-splice idempotency.
 - `apps/cli/src/uninstall.test.ts` — removal of managed artifacts; edited policy preserved.
 - `apps/cli/src/hooks.test.ts` — enable/disable detection-aware + `--all` overrides.
@@ -460,8 +460,8 @@ This checks out the tree SHA, computes `subpath_sha256`, and writes it back.
 - `apps/cli/src/package-surfaces.test.ts` — package surface discovery and source-only exclusions.
 - `apps/cli/src/package-mirror.test.ts` — per-agent mirror target planning and unsupported surface records.
 - `apps/cli/src/package-parity.test.ts` — source-vs-installed parity, missing targets, source-backup leaks.
-- `src/components/*.test.ts` — component catalog, planner, executor, ledger, and surface adapters.
-- `src/hooks/*.test.ts` — per-hook stdin parse, happy path, fail-open on missing tool.
+- `services/platform-core/src/application/component-lifecycle/*.test.ts` — component catalog, planner, executor, ledger, and surface adapters.
+- `services/platform-core/src/application/agent-hooks/*.test.ts` — per-hook stdin parse, happy path, fail-open on missing tool.
 
 ### Running tests
 

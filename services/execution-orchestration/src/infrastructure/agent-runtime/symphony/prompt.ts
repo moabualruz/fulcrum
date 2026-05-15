@@ -5,7 +5,7 @@
  * so template mistakes fail before dispatch instead of silently rendering empty.
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { Liquid, UndefinedVariableError } from "liquidjs";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";

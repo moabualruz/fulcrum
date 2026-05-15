@@ -17,7 +17,7 @@ import type { AppContext } from "@work-management/application/templates/types.ts
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 
-type EntityManager = import("@mikro-orm/postgresql").EntityManager;
+type EntityManager = import("typeorm").EntityManager;
 
 function requireEntityManager(ctx: Record<string, unknown>): EntityManager {
   const em = ctx["em"] as EntityManager | null | undefined;

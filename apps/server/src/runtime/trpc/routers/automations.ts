@@ -27,7 +27,7 @@ import { AppError } from "@platform-core/domain/errors.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 
-type EntityManager = import("@mikro-orm/postgresql").EntityManager;
+type EntityManager = import("typeorm").EntityManager;
 
 // ── Schemas ────────────────────────────────────────────────────────
 

@@ -2,7 +2,7 @@
  * Doc-comments tRPC router — schema/auth adapter over application docs service.
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 

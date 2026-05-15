@@ -100,13 +100,13 @@ async function getUserClass() {
 }
 
 type Ctx = {
-  em: import("@mikro-orm/postgresql").EntityManager | null;
+  em: import("typeorm").EntityManager | null;
   container: { get<T>(token: unknown): T } | null;
   orgId: string;
   userId: string;
 };
 
-function requireEm(ctx: { em: Ctx["em"] }): import("@mikro-orm/postgresql").EntityManager {
+function requireEm(ctx: { em: Ctx["em"] }): import("typeorm").EntityManager {
   if (!ctx.em) {
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
@@ -178,7 +178,7 @@ async function assertCanAct(ctx: Ctx, targetUserId: string): Promise<void> {
 }
 
 async function findCred(
-  em: import("@mikro-orm/postgresql").EntityManager,
+  em: import("typeorm").EntityManager,
   orgId: string,
   userId: string,
   name: string,

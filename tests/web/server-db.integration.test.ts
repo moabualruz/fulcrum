@@ -12,8 +12,8 @@ import {
   initDatabase,
   openDatabase,
 } from "../../apps/web/src/lib/server/db.ts";
-import { DEFAULT_ORG_ID, DEFAULT_ORG_NAME } from "../../src/db/seed.ts";
-import { __resetDefaultOrmForTest } from "../../src/db/mikro-orm.config.ts";
+import { DEFAULT_ORG_ID, DEFAULT_ORG_NAME } from "@platform-core/infrastructure/application-database/seed.ts";
+import { __resetDefaultOrmForTest } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
 
 let previousHome: string | undefined;
 
@@ -63,9 +63,9 @@ describe("web server database singleton with real PGlite state", () => {
     expect(await getDefaultOrgId(db)).toBe(DEFAULT_ORG_ID);
     expect(
       await getDefaultOrgId({
-        query: async (sql: string) => {
-          if (sql.includes("WHERE id")) return [];
-          return [{ id: "slug-default" }];
+        query: async <T = Record<string, unknown>>(sql: string): Promise<T[]> => {
+          if (sql.includes("WHERE id")) return [] as T[];
+          return [{ id: "slug-default" }] as T[];
         },
       }),
     ).toBe("slug-default");

@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { randomUUID } from "node:crypto";
 import { WorkCycleService } from "@work-management/application/work-cycle-service.ts";

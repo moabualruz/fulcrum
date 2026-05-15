@@ -10,7 +10,7 @@
  *   - Cycle detection max depth 50 prevents DoS (T-05-09 mitigation)
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { TaskRelationship } from "@platform-core/infrastructure/application-database/entities/tasks/TaskRelationship.ts";
 import { TaskWatcher } from "@platform-core/infrastructure/application-database/entities/tasks/TaskWatcher.ts";

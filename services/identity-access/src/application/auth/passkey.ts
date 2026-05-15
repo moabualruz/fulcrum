@@ -20,7 +20,7 @@
  * clear error message rather than crashing at import time.
  */
 
-import type { EntityManager, MikroORM } from "@mikro-orm/postgresql";
+import type { DataSource, EntityManager } from "typeorm";
 
 /** Result type for registration options generation. */
 export interface PasskeyRegistrationOptions {
@@ -391,7 +391,7 @@ export class MikroOrmPasskeyStore implements PasskeyStore {
 }
 
 class LazyMikroOrmPasskeyStore implements PasskeyStore {
-  private ormPromise: Promise<MikroORM> | null = null;
+  private ormPromise: Promise<DataSource> | null = null;
 
   async saveChallenge(challenge: PasskeyChallengeRecord): Promise<void> {
     await this.runInScope((store) => store.saveChallenge(challenge));
@@ -428,18 +428,14 @@ class LazyMikroOrmPasskeyStore implements PasskeyStore {
   }
 
   async runInScope<T>(callback: (store: PasskeyStore) => Promise<T>): Promise<T> {
-    const orm = await this.orm();
-    const em = orm.em.fork();
-    try {
-      return await callback(new MikroOrmPasskeyStore(em));
-    } finally {
-      em.clear();
-    }
+    const dataSource = await this.dataSource();
+    const em = dataSource.manager;
+    return await callback(new MikroOrmPasskeyStore(em));
   }
 
-  private async orm(): Promise<MikroORM> {
-    this.ormPromise ??= import("@platform-core/infrastructure/application-database/mikro-orm.config.ts")
-      .then(({ initOrm }) => initOrm())
+  private async dataSource(): Promise<DataSource> {
+    this.ormPromise ??= import("@platform-core/infrastructure/application-database/typeorm.config.ts")
+      .then(({ initDataSource }) => initDataSource())
       .catch((error) => {
         this.ormPromise = null;
         throw error;

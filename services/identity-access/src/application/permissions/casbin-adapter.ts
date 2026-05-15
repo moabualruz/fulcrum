@@ -16,7 +16,7 @@
 import { Injectable } from "@nestjs/common";
 import { Helper } from "casbin";
 import type { Adapter, Model } from "casbin";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import type { CasbinRuleRepository } from "@platform-core/infrastructure/application-database/repositories/flags/CasbinRuleRepository.ts";
 import { CasbinRule } from "@platform-core/infrastructure/application-database/entities/flags/CasbinRule.ts";
 

@@ -10,17 +10,17 @@ import {
   listTasksBlockedBy,
   markTaskAsDuplicate,
   summarizeEntityRelationships,
-} from "../../src/application/relationships/commands.ts";
+} from "@work-management/application/relationships/commands.ts";
 import {
   createTaskCsvApplication,
   exportTasksCsvForContext,
   importTasksFromCsvUpload,
-} from "../../src/application/tasks/csv.ts";
-import { createTask } from "../../src/application/tasks/commands.ts";
-import type { AppContext } from "../../src/application/tasks/types.ts";
-import { DEFAULT_ORG_ID } from "../../src/db/seed.ts";
-import { TaskWatcher } from "../../src/db/entities/tasks/TaskWatcher.ts";
-import { createTestOrm, type TestOrm } from "../../src/test-utils/db.ts";
+} from "@work-management/application/tasks/csv.ts";
+import { createTask } from "@work-management/application/tasks/commands.ts";
+import type { AppContext } from "@work-management/application/tasks/types.ts";
+import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
+import { TaskWatcher } from "@platform-core/infrastructure/application-database/entities/tasks/TaskWatcher.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
 const USER_ID = "00000000-0000-0000-0000-000000000010";
 const PROJECT_ID = "99999999-9999-4999-8999-999999999999";
@@ -100,7 +100,7 @@ describe("task CSV application", () => {
 });
 
 describe("relationship application commands", () => {
-  test("wrap RelationshipService CRUD, blocker views, duplicate watcher transfer, and trace summary", async () => {
+  test("wrap WorkItemRelationshipService CRUD, blocker views, duplicate watcher transfer, and trace summary", async () => {
     const testDb = await freshDb();
     const em = testDb.em.fork();
     const ctx = { orgId: DEFAULT_ORG_ID, userId: USER_ID };

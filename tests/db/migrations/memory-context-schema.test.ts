@@ -14,14 +14,14 @@ import { MikroORM as MikroORMRuntime } from "@mikro-orm/postgresql";
 import { Migrator } from "@mikro-orm/migrations";
 import { PGlite } from "@electric-sql/pglite";
 
-import { createOrmConfig } from "../../../src/db/mikro-orm.config.ts";
-import { DEFAULT_ORG_ID, SeedService } from "../../../src/db/seed.ts";
-import { Org } from "../../../src/db/entities/auth/Org.ts";
+import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { DEFAULT_ORG_ID, SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
 import {
   ContextSnapshot,
   Memory,
   MemoryLink,
-} from "../../../src/db/entities/memory/index.ts";
+} from "@platform-core/infrastructure/application-database/entities/memory/index.ts";
 
 const MEMORY_PROPERTIES = [
   "id",

@@ -2,13 +2,14 @@ import { PGlite } from "@electric-sql/pglite";
 import { MikroORM as MikroORMRuntime } from "@mikro-orm/postgresql";
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { z } from "@hono/zod-openapi";
-import { fulcrumHome } from "../config/database.ts";
-import { createOrmConfig } from "../db/mikro-orm.config.ts";
-import { SeedService } from "../db/seed.ts";
-import { createTestOrm } from "../test-utils/db.ts";
-import type { TestOrm } from "../test-utils/db.ts";
-import { newUlid } from "../shared/ids.ts";
+import { z } from "zod/v4";
+import { fulcrumHome } from "@platform-core/application/db/database-config.ts";
+import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { applyProductMigrations } from "@platform-core/infrastructure/application-database/product-migrations.ts";
+import { SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
+import { createTestOrm } from "./application-database.ts";
+import type { TestOrm } from "./application-database.ts";
+import { newUlid } from "@platform-core/application/platform-primitives/monotonic-id.ts";
 
 export interface TestStore {
   query<T = Record<string, unknown>>(sql: string, params?: readonly unknown[]): Promise<T[]>;
@@ -22,10 +23,10 @@ export function productDbDir(): string {
   return join(fulcrumHome(), "pglite.data");
 }
 
-const KERNEL = "../product-" + "kernel";
+const STORE_MODULE_ROOT = "@platform-core/infrastructure/product-store";
 
 async function loadStoreModule(path: string): Promise<Record<string, any>> {
-  return await import(`${KERNEL}/${path}.ts`) as Record<string, any>;
+  return await import(`${STORE_MODULE_ROOT}/${path}.ts`) as Record<string, any>;
 }
 
 async function callStore(path: string, name: string, args: unknown[]): Promise<any> {
@@ -39,7 +40,7 @@ export async function openIsolatedStore(dataDir: string): Promise<TestStore> {
   return await callStore("db/pglite", "open" + "Pglite", [dataDir]) as TestStore;
 }
 export async function migrateIsolatedStore(store: TestStore): Promise<unknown> {
-  const applied = await callStore("db/migrate", "applyProductMigrations", [store]);
+  const applied = await applyProductMigrations(store);
   await store.exec(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS estimate integer`);
   return applied;
 }
@@ -68,11 +69,11 @@ export async function createApplicationStoreFixture(dataDir: string): Promise<{
 export async function createArtifact(...args: unknown[]) { return callStore("artifacts", "createArtifact", args); }
 export async function getArtifact(...args: unknown[]) { return callStore("artifacts", "getArtifact", args); }
 export async function listArtifacts(...args: unknown[]) {
-  const mod = await import("../services/artifacts.ts");
+  const mod = await import("@workflow-coordination/application/artifact-service-actions.ts");
   return mod.listArtifacts(...args as Parameters<typeof mod.listArtifacts>);
 }
 export async function getArtifactStats(...args: unknown[]) {
-  const mod = await import("../services/artifacts.ts");
+  const mod = await import("@workflow-coordination/application/artifact-service-actions.ts");
   return mod.getArtifactStats(...args as Parameters<typeof mod.getArtifactStats>);
 }
 export { run } from "@fulcrum/cli/artifact.ts";

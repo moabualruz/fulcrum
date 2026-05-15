@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { WorkItemCommentService } from "@work-management/application/work-item-comments.ts";
 import type { AppContext, CommentWatcherDto, TaskCommentDto } from "@work-management/application/comments/types.ts";

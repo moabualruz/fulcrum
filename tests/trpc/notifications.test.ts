@@ -3,16 +3,16 @@ import { MikroORM, type EntityManager } from "@mikro-orm/postgresql";
 import { PGlite } from "@electric-sql/pglite";
 import { TRPCError } from "@trpc/server";
 
-import { PGliteKyselyDialect } from "../../src/db/PGliteKyselyDriver.ts";
-import { Org } from "../../src/db/entities/auth/Org.ts";
-import { User } from "../../src/db/entities/auth/User.ts";
-import { Event } from "../../src/db/entities/core/Event.ts";
+import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
+import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
 import {
   Notification,
   NotificationMute,
   NotificationQuietHours,
   NotificationRule,
-} from "../../src/db/entities/notifications/index.ts";
+} from "@platform-core/infrastructure/application-database/entities/notifications/index.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { notificationsRouter } from "@fulcrum/server/trpc/routers/notifications.ts";

@@ -26,25 +26,31 @@ const RESIDUAL_INTERFACE_ROOTS = [
   "apps/server/src/runtime/trpc",
 ];
 
-const TEST_FIXTURE_ROOTS = ["src", "apps/web/tests"];
-
-const EXPECTED_RUNTIME_DIRECT_ACCESS_FILES = [
-  "apps/web/src/routes/orchestration/+page.server.ts",
-  "apps/web/src/lib/server/db.ts",
-  "apps/server/src/trpc/context.ts",
-];
+const TEST_FIXTURE_ROOTS = ["tests/support", "apps/web/tests"];
 
 const NON_WEB_INVENTORY_ROOTS = [
-  "src/config",
-  "src/db",
-  "src/search",
-  "src/docs",
-  "src/collab",
-  "src/connectors",
-  "src/doctor/checks",
-  "src/orchestration/symphony",
-  "src/services",
-  "src/infrastructure/doctor",
+  "services/platform-core/src/application/db",
+  "services/platform-core/src/infrastructure/application-database",
+  "services/knowledge-workspace/src/application/search",
+  "services/knowledge-workspace/src/application/docs",
+  "services/knowledge-workspace/src/application/collaboration",
+  "services/integration-hub/src/application/external-connectors",
+  "services/platform-core/src/application/health-checks/checks",
+  "services/execution-orchestration/src/infrastructure/agent-runtime/symphony",
+  "services/platform-core/src/infrastructure/doctor",
+];
+
+const SERVICE_DOMAIN_ROOTS = [
+  "services/agent-client-protocol/src/domain",
+  "services/execution-orchestration/src/domain",
+  "services/identity-access/src/domain",
+  "services/integration-hub/src/domain",
+  "services/knowledge-workspace/src/domain",
+  "services/notification-center/src/domain",
+  "services/planning-review/src/domain",
+  "services/platform-core/src/domain",
+  "services/work-management/src/domain",
+  "services/workflow-coordination/src/domain",
 ];
 
 const LEGACY_DB_TERMS = [
@@ -91,26 +97,14 @@ const FORBIDDEN_INTERFACE_STUB_DATA_PROVIDERS = new RegExp(
 
 const RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS = new Map([
   [
-    "apps/web/src/lib/server/db.ts",
-    "web composition root owns current database singleton until route/helper callers move behind application services",
-  ],
-  [
     "apps/server/src/trpc/context.ts",
     "tRPC context composition root still carries EntityManager during staged router migration",
-  ],
-  [
-    "apps/cli/src/index.ts",
-    "CLI composition root may wire database bindings while command files migrate to caller/application adapters",
-  ],
-  [
-    "apps/cli/src/commands/init.ts",
-    "CLI init is the exact bootstrap exception that opens PGlite/MikroORM, runs migrations, and seeds the local org before application callers exist",
   ],
 ]);
 
 const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES: string[] = [];
 
-const PLAN21_ROUTER_FILES = [
+const SERVICE_ROUTER_FILES = [
   "apps/server/src/runtime/trpc/routers/comments.ts",
   "apps/server/src/runtime/trpc/routers/doc-templates.ts",
   "apps/server/src/runtime/trpc/routers/docs.ts",
@@ -119,7 +113,7 @@ const PLAN21_ROUTER_FILES = [
   "apps/server/src/runtime/trpc/routers/templates.ts",
 ];
 
-const PLAN44_CLI_FILES = [
+const LEGACY_CLI_FILES = [
   "apps/cli/src/docs-templates.ts",
   "apps/cli/src/commands/export.ts",
   "apps/cli/src/commands/import.ts",
@@ -133,14 +127,14 @@ const PLAN44_CLI_FILES = [
   "apps/cli/src/commands/pillar14-generated.ts",
 ];
 
-const PLAN45_CLI_FILES = [
+const RUNTIME_CLI_FILES = [
   "apps/cli/src/commands/comment.ts",
   "apps/cli/src/commands/context.ts",
   "apps/cli/src/commands/my-work.ts",
   "apps/cli/src/commands/repos.ts",
 ];
 
-const FORBIDDEN_PLAN44_CLI_DIRECT_ACCESS = new RegExp(
+const FORBIDDEN_CLI_DIRECT_ACCESS = new RegExp(
   [
     String.raw`from\s+["'][^"']*(@mikro-orm/postgresql|db/entities|db/repositories|db\.module|mikro-orm\.config)[^"']*["']`,
     String.raw`import\(["'][^"']*(@mikro-orm/postgresql|db/entities|db/repositories|db\.module|mikro-orm\.config)[^"']*["']\)`,
@@ -151,6 +145,18 @@ const FORBIDDEN_PLAN44_CLI_DIRECT_ACCESS = new RegExp(
     String.raw`\borm\.em\b`,
     String.raw`\bcontainer\.get\(ENTITY_MANAGER_TOKEN\)`,
   ].join("|"),
+);
+
+const FORBIDDEN_SERVICE_LEGACY_REPORT_CONTRACTS = new RegExp(
+  String.raw`from\s+["'][^"']*src/application/reports/types\.ts["']`,
+);
+
+const FORBIDDEN_DOMAIN_APPLICATION_IMPORT = new RegExp(
+  String.raw`from\s+["'][^"']*/application/[^"']*["']`,
+);
+
+const FORBIDDEN_WEB_TRPC_RUNTIME_IMPORT = new RegExp(
+  String.raw`(?:from|import\()\s*["'][^"']*(?:@trpc/server|@fulcrum/server/trpc)[^"']*["']`,
 );
 
 async function collectSourceFiles(root: string): Promise<string[]> {
@@ -226,21 +232,30 @@ async function testFixtureViolations(roots: readonly string[], pattern: RegExp):
   const files = Array.from(new Set((await Promise.all(roots.map(collectTestFiles))).flat()));
   const found: string[] = [];
   for (const file of files) {
-    if (relative(process.cwd(), file).startsWith("src/product-kernel/")) continue;
+    if (relative(process.cwd(), file).startsWith("services/platform-core/src/infrastructure/product-store/")) continue;
     const text = await readFile(file, "utf8");
     if (pattern.test(text)) found.push(relative(process.cwd(), file));
   }
   return found.sort();
 }
 
-describe("Phase 9.5 interface boundary", () => {
+async function testImportViolations(roots: readonly string[], pattern: RegExp): Promise<string[]> {
+  const files = Array.from(new Set((await Promise.all(roots.map(collectTestFiles))).flat()));
+  const found: string[] = [];
+  for (const file of files) {
+    const text = await readFile(file, "utf8");
+    if (pattern.test(text)) found.push(relative(process.cwd(), file));
+  }
+  return found.sort();
+}
+
+describe("interface interface boundary", () => {
   test("interfaces do not import product-kernel or open legacy database handles directly", async () => {
     expect(await violations(INTERFACE_ROOTS, FORBIDDEN_INTERFACE_ACCESS)).toEqual([]);
   });
 
   test("web API tRPC runtime adapters do not import product-kernel or open legacy database handles directly", async () => {
     const found = await violations(RUNTIME_ADAPTER_ROOTS, FORBIDDEN_INTERFACE_ACCESS);
-    expect(EXPECTED_RUNTIME_DIRECT_ACCESS_FILES.length).toBeGreaterThan(0);
     expect(found).toEqual([]);
   });
 
@@ -254,15 +269,13 @@ describe("Phase 9.5 interface boundary", () => {
     expect(found).toEqual([]);
   });
 
-  test("R-11 subscriptions do not import or depend on PGlite/pglite directly", async () => {
-    expect(await violations(["src/subscriptions"], /\bPGlite\b|\bpglite\b/)).toEqual([
-      "src/subscriptions/index.ts",
-    ]);
+  test("subscription transport does not import or depend on embedded database internals directly", async () => {
+    expect(await violations(["services/platform-core/src/application/subscriptions"], /\bPGlite\b|\bpglite\b/)).toEqual([]);
   });
 
   test("interface adapters do not use ORM/entity/repository access outside exact composition roots", async () => {
     const found = await residualDirectAccessViolations();
-    expect(RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS.size).toBe(4);
+    expect(RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS.size).toBe(1);
     expect(found).toEqual(EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES);
   });
 
@@ -270,15 +283,31 @@ describe("Phase 9.5 interface boundary", () => {
     expect(await violations(["apps/web/src/routes"], FORBIDDEN_INTERFACE_STUB_DATA_PROVIDERS)).toEqual([]);
   });
 
-  test("Plan 21 docs comments templates skills and sprints tRPC routers delegate persistence to application modules", async () => {
-    expect(await directAccessInExactFiles(PLAN21_ROUTER_FILES)).toEqual([]);
+  test("workflow milestone docs comments templates skills and sprints tRPC routers delegate persistence to application modules", async () => {
+    expect(await directAccessInExactFiles(SERVICE_ROUTER_FILES)).toEqual([]);
   });
 
-  test("Plan 44 residual CLI commands use caller/application boundaries for runtime domain work", async () => {
-    expect(await patternInExactFiles(PLAN44_CLI_FILES, FORBIDDEN_PLAN44_CLI_DIRECT_ACCESS)).toEqual([]);
+  test("workflow milestone residual CLI commands use caller/application boundaries for runtime domain work", async () => {
+    expect(await patternInExactFiles(LEGACY_CLI_FILES, FORBIDDEN_CLI_DIRECT_ACCESS)).toEqual([]);
   });
 
-  test("Plan 45 residual CLI commands use caller/application boundaries for runtime domain work", async () => {
-    expect(await patternInExactFiles(PLAN45_CLI_FILES, FORBIDDEN_PLAN44_CLI_DIRECT_ACCESS)).toEqual([]);
+  test("workflow milestone residual CLI commands use caller/application boundaries for runtime domain work", async () => {
+    expect(await patternInExactFiles(RUNTIME_CLI_FILES, FORBIDDEN_CLI_DIRECT_ACCESS)).toEqual([]);
+  });
+
+  test("services do not import deprecated report workflow contracts", async () => {
+    expect(await violations(["services"], FORBIDDEN_SERVICE_LEGACY_REPORT_CONTRACTS)).toEqual([]);
+  });
+
+  test("service domain layers do not depend on application layers", async () => {
+    expect(await violations(SERVICE_DOMAIN_ROOTS, FORBIDDEN_DOMAIN_APPLICATION_IMPORT)).toEqual([]);
+  });
+
+  test("web production code does not import tRPC runtime internals directly", async () => {
+    expect(await violations(["apps/web/src"], FORBIDDEN_WEB_TRPC_RUNTIME_IMPORT)).toEqual([]);
+  });
+
+  test("web tests use public API contracts instead of tRPC runtime internals", async () => {
+    expect(await testImportViolations(["apps/web/src", "apps/web/tests"], FORBIDDEN_WEB_TRPC_RUNTIME_IMPORT)).toEqual([]);
   });
 });

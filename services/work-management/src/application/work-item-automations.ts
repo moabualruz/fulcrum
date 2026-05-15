@@ -16,7 +16,7 @@
  *   MEDIUM-01: add_comment action uses WorkItemCommentService
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { Engine } from "json-rules-engine";
 
 import { ProjectAutomation } from "@platform-core/infrastructure/application-database/entities/tasks/ProjectAutomation.ts";

@@ -13,7 +13,7 @@
 
 import { createHash } from "node:crypto";
 import { Injectable } from "@nestjs/common";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { betterAuth } from "better-auth";
 import { organization, magicLink, emailOTP } from "better-auth/plugins";
 import type { DBAdapter } from "@better-auth/core/db/adapter";

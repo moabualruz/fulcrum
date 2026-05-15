@@ -5,7 +5,7 @@
  * Queries the doc_templates table via the forked EntityManager in tRPC context.
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import type { DocType } from "@platform-core/infrastructure/application-database/entities/docs/enums.ts";
 import type { DocTemplateRow, DocTemplateService } from "./doc-template-service.ts";
 import { builtinTemplateRow, builtinTemplateRows } from "./template-seeds.ts";

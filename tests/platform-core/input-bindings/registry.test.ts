@@ -3,12 +3,12 @@ import {
   KEYBINDING_ACTIONS,
   KeybindingAction,
   KeybindingMapSchema,
-} from "../../src/keybindings/schema.ts";
+} from "@platform-core/application/input-bindings/schema.ts";
 import {
   detectConflicts,
   getDefaultKeybindings,
   resolveKeybindings,
-} from "../../src/keybindings/defaults.ts";
+} from "@platform-core/application/input-bindings/defaults.ts";
 
 const requiredActions = [
   "navigate.projects",

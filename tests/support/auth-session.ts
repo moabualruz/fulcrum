@@ -1,7 +1,7 @@
 import type { Session } from "better-auth";
 
-import type { SeedResult } from "../db/seed.ts";
-import { DEFAULT_ADMIN_EMAIL, DEFAULT_ORG_ID } from "../db/seed.ts";
+import type { SeedResult } from "@platform-core/infrastructure/application-database/seed.ts";
+import { DEFAULT_ADMIN_EMAIL, DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 
 const DEFAULT_ADMIN_USER_ID = "00000000-0000-4000-8000-000000000001";
 

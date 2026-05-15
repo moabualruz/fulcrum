@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Component } from "svelte";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { openIsolatedStore, migrateIsolatedStore, createLocalOrg } from "../../src/test-support/product-fixtures.ts";
+import { openIsolatedStore, migrateIsolatedStore, createLocalOrg } from "@test-support/product-workspace-fixtures.ts";
 import { createDocumentAction } from "@fulcrum/web/lib/server/documents.ts";
-import { __resetDefaultOrmForTest, initOrm } from "../../src/db/mikro-orm.config.ts";
+import { __resetDefaultOrmForTest, initOrm } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
 import { __setApplicationScopeForTest } from "@fulcrum/web/lib/server/application-scope.ts";
 import * as serverDb from "@fulcrum/web/lib/server/db.ts";
 

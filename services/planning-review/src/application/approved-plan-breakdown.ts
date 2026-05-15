@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { createArtifact as createStoredArtifact } from "@workflow-coordination/application/artifacts/commands.ts";
 import { createDoc } from "@knowledge-workspace/application/docs/commands.ts";

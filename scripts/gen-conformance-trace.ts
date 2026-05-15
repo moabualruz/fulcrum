@@ -31,7 +31,7 @@ const CORE_FILES = [
   "workflow-runtime.ts",
 ] as const;
 
-const SYMPHONY_DIR = "src/orchestration/symphony";
+const SYMPHONY_DIR = "services/execution-orchestration/src/infrastructure/agent-runtime/symphony";
 
 const specPath = join(process.cwd(), "vendor/openai-symphony/SPEC.md");
 const tracePath = join(process.cwd(), "docs/symphony-conformance.md");
@@ -250,7 +250,7 @@ export function renderTrace(
     "| `codex.approval_policy` | `auto` (implementation-defined) | No interactive approval required by default; agents run autonomously. Operators override via `WORKFLOW.md` `codex.approval_policy`. |",
     "| `codex.thread_sandbox` | `noSandbox` (host mode) | Default is host-trust mode with an explicit trust-boundary warning on startup. Operators configure Docker/Podman/Vercel/Daytona/Modal/E2B via feature flags. |",
     "| `codex.turn_sandbox_policy` | implementation-defined | Pass-through to app-server; not enforced by Fulcrum orchestrator. |",
-    "| `noSandbox` host boundary | Trust warning emitted | `src/orchestration/sandbox-runner.ts` emits a visible warning when `noSandbox` is the effective provider, reminding operators that agent commands run with host OS access. |",
+    "| `noSandbox` host boundary | Trust warning emitted | `services/execution-orchestration/src/infrastructure/agent-runtime/sandbox-runner.ts` emits a visible warning when `noSandbox` is the effective provider, reminding operators that agent commands run with host OS access. |",
     "",
   ];
 

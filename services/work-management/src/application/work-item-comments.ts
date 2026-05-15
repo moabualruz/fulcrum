@@ -10,7 +10,7 @@
  *   - T-05-07: all queries org-scoped
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { AppConflictError, AppNotFoundError } from "@platform-core/domain/errors.ts";
 import { TaskComment } from "@platform-core/infrastructure/application-database/entities/tasks/TaskComment.ts";

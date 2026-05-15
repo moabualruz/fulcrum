@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { Org } from "../auth/Org.ts";
 import {

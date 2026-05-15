@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { MikroORM } from "@mikro-orm/postgresql";
 import { PGlite } from "@electric-sql/pglite";
-import { PGliteKyselyDialect } from "../../src/db/PGliteKyselyDriver.ts";
-import { Org } from "../../src/db/entities/auth/Org.ts";
-import { TenantSetting } from "../../src/db/entities/TenantSetting.ts";
-import { TenantSettingRepository } from "../../src/db/repositories/TenantSettingRepository.ts";
+import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { TenantSetting } from "@platform-core/infrastructure/application-database/entities/TenantSetting.ts";
+import { TenantSettingRepository } from "@platform-core/infrastructure/application-database/repositories/TenantSettingRepository.ts";
 
 describe("TenantSetting MikroORM entity", () => {
   it("maps tenant_settings with org-scoped key uniqueness", async () => {

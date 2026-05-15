@@ -1,9 +1,8 @@
-import { MikroORM, type EntityManager } from "@mikro-orm/postgresql";
+import { DataSource, type EntityManager, MoreThan } from "typeorm";
 import type { Session as BetterAuthSession } from "better-auth";
 
 import { AppUnauthorizedError } from "@platform-core/domain/errors.ts";
 import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
-import { ENTITY_MANAGER_TOKEN, registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
 import { Session } from "@platform-core/infrastructure/application-database/entities/auth/Session.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
@@ -38,12 +37,11 @@ export async function buildCliTuiCallerContext(container: DiContainer | null): P
   if (!container) return { container: null, em: null };
 
   try {
-    const orm = container.get(MikroORM);
-    const em = (container.get(ENTITY_MANAGER_TOKEN) as EntityManager).fork();
+    const dataSource = container.get(DataSource);
+    const em = dataSource.manager;
     const { Container: NeedleDiContainer } = await import("@needle-di/core");
     const requestContainer = new NeedleDiContainer() as unknown as DiContainer;
-    requestContainer.bind({ provide: MikroORM, useValue: orm });
-    registerDbBindings(requestContainer as never, orm, em);
+    requestContainer.bind({ provide: DataSource, useValue: dataSource });
     return { container: requestContainer, em };
   } catch {
     return { container, em: null };
@@ -57,11 +55,10 @@ export async function resolveCliTuiSession(
   if (!em) return null;
 
   try {
-    const session = await em.findOne(
-      Session,
-      { expiresAt: { $gt: new Date() } },
-      { orderBy: { createdAt: "DESC" } },
-    );
+    const session = await em.findOne(Session, {
+      where: { expiresAt: MoreThan(new Date()) },
+      order: { createdAt: "DESC" },
+    });
     if (!session) return null;
 
     return {

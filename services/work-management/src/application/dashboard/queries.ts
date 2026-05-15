@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import type { SqlExecutor, SqlValue } from "@platform-core/infrastructure/application-database/sql.ts";
 
 import { Project } from "@platform-core/infrastructure/application-database/entities/tasks/Project.ts";

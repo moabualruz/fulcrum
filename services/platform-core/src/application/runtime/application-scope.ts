@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { resolveRequestOrgId } from "@identity-access/application/auth/request-scope.ts";
 import { resolveProjectIdByKey } from "@work-management/application/projects/queries.ts";

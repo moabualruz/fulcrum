@@ -1,9 +1,3 @@
-/**
- * TDD — skills.lock.json schema + round-trip helpers.
- *
- * Closes (issue): .scratch/agent-os-vision/05-router-and-skills/issues/02-fulcrum-skills-schema-migration.md
- */
-
 import { afterEach, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -14,7 +8,7 @@ import {
   SkillsLockFile,
   writeSkillsLockFile,
   type SkillsLockFile as SkillsLockFileType,
-} from "../../src/skills/lock.ts";
+} from "@platform-core/application/skill-supply/lock.ts";
 
 let scratch: string | undefined;
 

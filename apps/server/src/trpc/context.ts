@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
 import { TRPCError } from "@trpc/server";
 import type { Session } from "better-auth";

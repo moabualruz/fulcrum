@@ -16,7 +16,7 @@
 
 import * as Y from "yjs";
 import { WebSocketServer, WebSocket } from "ws";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { YjsSnapshot } from "@platform-core/infrastructure/application-database/entities/tasks/YjsSnapshot.ts";
 
 // ── URL helper (MEDIUM-08) ─────────────────────────────────────────────────

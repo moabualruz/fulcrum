@@ -8,7 +8,7 @@
  * Security: orgId scope enforced on every query.
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { FieldDependencyRule } from "@platform-core/infrastructure/application-database/entities/tasks/FieldDependencyRule.ts";
 import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";

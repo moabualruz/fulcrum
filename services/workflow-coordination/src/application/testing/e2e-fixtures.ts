@@ -1,6 +1,6 @@
 import { indexSearchDocument } from "@platform-core/infrastructure/product-store/search.ts";
 import type { ProductDb } from "@platform-core/infrastructure/product-store/db/types.ts";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { indexSearchDocumentOrm } from "@platform-core/application/orm-helpers.ts";
 
 export interface E2eSeedTaskInput {

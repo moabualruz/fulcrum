@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import type { TRPCContext } from "../context.ts";
 import { t } from "../trpc.ts";

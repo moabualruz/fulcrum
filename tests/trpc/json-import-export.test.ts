@@ -4,11 +4,11 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { Credential } from "../../src/db/entities/platform/Credential.ts";
-import { User } from "../../src/db/entities/auth/User.ts";
-import { Task } from "../../src/db/entities/tasks/Task.ts";
-import { TaskRepository } from "../../src/db/repositories/tasks/TaskRepository.ts";
-import { createTestOrm } from "../../src/test-utils/db.ts";
+import { Credential } from "@platform-core/infrastructure/application-database/entities/platform/Credential.ts";
+import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
+import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";

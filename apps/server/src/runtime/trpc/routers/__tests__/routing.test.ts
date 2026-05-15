@@ -31,7 +31,7 @@ function mockSession() {
   };
 }
 
-function callerFor(em: import("@mikro-orm/postgresql").EntityManager) {
+function callerFor(em: import("typeorm").EntityManager) {
   const container = new Container();
   container.bind({
     provide: RoutingRuleRepository,

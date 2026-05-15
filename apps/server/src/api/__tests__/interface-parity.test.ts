@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MikroORM } from "@mikro-orm/postgresql";
+import { MikroORM } from "typeorm";
 
 import { createTask } from "@work-management/application/tasks/commands.ts";
 import { listTasks } from "@work-management/application/tasks/queries.ts";

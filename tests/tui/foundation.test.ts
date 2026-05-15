@@ -16,11 +16,11 @@ import { SubscriptionBridge } from "@fulcrum/tui/subscriptions.ts";
 import { JsonlCrashLog } from "@fulcrum/tui/crashlog.ts";
 import { DbTelemetrySink, MemoryTelemetrySink } from "@fulcrum/tui/telemetry.ts";
 import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
-import { registerDbBindings } from "../../src/db/db.module.ts";
-import { Org, User } from "../../src/db/entities/auth/index.ts";
-import { Account } from "../../src/db/entities/auth/Account.ts";
-import { TelemetryEvent } from "../../src/db/entities/platform/TelemetryEvent.ts";
-import { createTestOrm, type TestOrm } from "../../src/test-utils/db.ts";
+import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
+import { Org, User } from "@platform-core/infrastructure/application-database/entities/auth/index.ts";
+import { Account } from "@platform-core/infrastructure/application-database/entities/auth/Account.ts";
+import { TelemetryEvent } from "@platform-core/infrastructure/application-database/entities/platform/TelemetryEvent.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 

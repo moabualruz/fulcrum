@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { createTestOrm } from "../../../../src/test-utils/db.ts";
-import { Org } from "../../../../src/db/entities/auth/Org.ts";
-import { Repo } from "../../../../src/db/entities/repos/Repo.ts";
-import { RepoRepository } from "../../../../src/db/repositories/repos/RepoRepository.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Repo } from "@platform-core/infrastructure/application-database/entities/repos/Repo.ts";
+import { RepoRepository } from "@platform-core/infrastructure/application-database/repositories/repos/RepoRepository.ts";
 
 async function createOrg(repo: RepoRepository, slug: string): Promise<Org> {
   const em = repo.getEntityManager();

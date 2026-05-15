@@ -1,5 +1,5 @@
 import { AuthService } from "@identity-access/application/auth/index.ts";
-import { initOrm } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { initDataSource } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 
 export type BetterAuthPasskeyContext = Awaited<ReturnType<typeof loadBetterAuthPasskeyContext>>;
 
@@ -8,8 +8,8 @@ let authContextPromise: Promise<unknown> | null = null;
 export async function loadBetterAuthPasskeyContext(): Promise<unknown> {
   if (!authContextPromise) {
     authContextPromise = (async () => {
-      const orm = await initOrm();
-      const service = new AuthService(orm.em);
+      const dataSource = await initDataSource();
+      const service = new AuthService(dataSource.manager);
       await service.init();
       return service.instance.$context;
     })();

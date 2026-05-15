@@ -22,10 +22,10 @@ import { MikroORM as MikroORMRuntime } from "@mikro-orm/postgresql";
 import { Migrator } from "@mikro-orm/migrations";
 import { PGlite } from "@electric-sql/pglite";
 
-import { createTestOrm } from "../../../src/test-utils/db.ts";
-import { createOrmConfig } from "../../../src/db/mikro-orm.config.ts";
-import { DEFAULT_ORG_ID, SeedService } from "../../../src/db/seed.ts";
-import { Org } from "../../../src/db/entities/auth/Org.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
+import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { DEFAULT_ORG_ID, SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
 import {
   NotificationRule,
   Notification,
@@ -36,7 +36,7 @@ import {
   WebhookRuleConfig,
   PushSubscription,
   DeliveryStatus,
-} from "../../../src/db/entities/notifications/index.ts";
+} from "@platform-core/infrastructure/application-database/entities/notifications/index.ts";
 
 const NOTIFICATIONS_MIGRATION =
   "Migration20260502110300_notifications";

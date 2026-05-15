@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { performance } from "node:perf_hooks";
 
-import { DOC_TYPES } from "../../src/db/entities/docs/enums.ts";
+import { DOC_TYPES } from "@platform-core/infrastructure/application-database/entities/docs/enums.ts";
 import { Renderer } from "@fulcrum/tui/renderer.ts";
 import {
   DocsReaderEditorScreen,

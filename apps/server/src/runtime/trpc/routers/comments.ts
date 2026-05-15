@@ -36,7 +36,7 @@ import { t } from "@fulcrum/server/trpc/trpc.ts";
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-type EntityManager = import("@mikro-orm/postgresql").EntityManager;
+type EntityManager = import("typeorm").EntityManager;
 
 function requireEntityManager(ctx: Record<string, unknown>): EntityManager {
   const em = ctx["em"] as EntityManager | null | undefined;

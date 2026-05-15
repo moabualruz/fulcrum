@@ -34,7 +34,7 @@ import {
 } from "@work-management/application/reports/queries.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 // ── Shared schemas ─────────────────────────────────────────────────
 

@@ -133,7 +133,7 @@ class MockEntityManager {
 function makeService(em?: MockEntityManager) {
   const manager = em ?? new MockEntityManager();
   return {
-    service: new WorkItemCommentService(manager as unknown as import("@mikro-orm/postgresql").EntityManager),
+    service: new WorkItemCommentService(manager as unknown as import("typeorm").EntityManager),
     em: manager,
   };
 }
@@ -335,7 +335,7 @@ describe("WorkItemCommentService - reactions", () => {
         throw duplicateError;
       },
     };
-    const service = new WorkItemCommentService(em as unknown as import("@mikro-orm/postgresql").EntityManager);
+    const service = new WorkItemCommentService(em as unknown as import("typeorm").EntityManager);
 
     await expect(service.addReaction("comment-1", USER_A, "👍")).rejects.toBeInstanceOf(AppConflictError);
   });

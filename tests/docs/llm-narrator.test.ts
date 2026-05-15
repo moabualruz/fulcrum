@@ -4,7 +4,7 @@ import {
   applyNarrationToDoc,
   configureDocNarrator,
   parseNarrationFeature,
-} from "../../src/docs/llm-narrator.ts";
+} from "@knowledge-workspace/application/docs/llm-narrator.ts";
 
 type TipTapNode = { type?: string; attrs?: { readonly?: boolean; text?: string }; content?: TipTapNode[] };
 type TipTapDoc = { type?: string; content?: TipTapNode[] };

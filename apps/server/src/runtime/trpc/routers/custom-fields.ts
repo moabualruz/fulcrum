@@ -31,7 +31,7 @@ const ClearFieldInputSchema = z.object({
   fieldDefId: z.uuid(),
 });
 
-type EntityManager = import("@mikro-orm/postgresql").EntityManager;
+type EntityManager = import("typeorm").EntityManager;
 
 function requireEntityManager(em: EntityManager | null): EntityManager {
   if (em) return em;

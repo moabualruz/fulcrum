@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MikroORM } from "@mikro-orm/postgresql";
+import { MikroORM } from "typeorm";
 
 import { run as runArtifactsCommand } from "@fulcrum/cli/commands/artifacts.ts";
 import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";

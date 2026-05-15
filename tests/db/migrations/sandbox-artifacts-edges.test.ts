@@ -12,20 +12,20 @@ import { describe, expect, it } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { ReferenceKind } from "@mikro-orm/postgresql";
 
-import { createTestOrm } from "../../../src/test-utils/db.ts";
-import { DEFAULT_ORG_ID } from "../../../src/db/seed.ts";
-import { Org } from "../../../src/db/entities/auth/Org.ts";
-import { Task } from "../../../src/db/entities/tasks/Task.ts";
-import { AgentRun } from "../../../src/db/entities/orchestration/AgentRun.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
+import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { AgentRun } from "@platform-core/infrastructure/application-database/entities/orchestration/AgentRun.ts";
 
 const MIGRATION_NAME = "Migration20260502070500_artifacts_edges";
 const PREVIOUS_MIGRATION_NAME = "Migration20260502070400_agent_runs_sandcastle_columns";
 
 async function loadSandboxEntities() {
   const [artifactModule, compatArtifactModule, edgeModule] = await Promise.all([
-    import("../../../src/db/entities/sandbox/Artifact.ts").catch(() => undefined),
-    import("../../../src/db/entities/artifacts/Artifact.ts").catch(() => undefined),
-    import("../../../src/db/entities/sandbox/Edge.ts").catch(() => undefined),
+    import("@platform-core/infrastructure/application-database/entities/sandbox/Artifact.ts").catch(() => undefined),
+    import("@platform-core/infrastructure/application-database/entities/artifacts/Artifact.ts").catch(() => undefined),
+    import("@platform-core/infrastructure/application-database/entities/sandbox/Edge.ts").catch(() => undefined),
   ]);
 
   expect(artifactModule).toBeDefined();

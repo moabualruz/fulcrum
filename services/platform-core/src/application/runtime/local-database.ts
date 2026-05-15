@@ -1,21 +1,22 @@
 import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { resolveDatabaseConfig, type ResolvedDatabaseConfig } from "@platform-core/application/db/database-config.ts";
-import { __resetDefaultOrmForTest, initOrm } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { initDataSource, __resetDataSourceForTest as __resetDefaultOrmForTest } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 import { normalizeSqlParams } from "@platform-core/application/orm-helpers.ts";
 import { sqlAccess } from "@platform-core/application/legacy/orm-web-adapter.ts";
 import { DEFAULT_ORG_ID, DEFAULT_ORG_NAME, DEFAULT_ORG_SLUG } from "@platform-core/application/tenancy/defaults.ts";
+import type { DataSource } from "typeorm";
 
 export type OrmDbValue = string | number | boolean | null | Date | Uint8Array;
 export type ApplicationPersistence = EntityManager;
-export type ApplicationOrm = import("@mikro-orm/postgresql").MikroORM;
+export type ApplicationOrm = DataSource;
 
 export interface WebDatabaseHandle {
   query<T = Record<string, unknown>>(sql: string, params?: readonly OrmDbValue[]): Promise<T[]>;
   exec(sql: string): Promise<void>;
   close(): Promise<void>;
-  engine: "mikro-orm";
+  engine: "typeorm";
   em: ApplicationPersistence;
   orm: ApplicationOrm;
   pglite?: unknown;
@@ -35,40 +36,21 @@ export async function initDatabase(): Promise<WebDatabaseHandle> {
   const key = runtimeDbKey(config);
   if (_instanceKey && _instanceKey !== key) {
     await resetSingleton();
-    await __resetDefaultOrmForTest();
+    __resetDefaultOrmForTest();
   }
   if (_instance) return _instance;
   if (_initPromise) return _initPromise;
 
   _initPromise = (async () => {
-    if (config.backend === "postgres") {
-      const orm = await initOrm();
-      if (!(await hasExistingSchema(orm.em))) {
-        await orm.migrator.up();
-      }
-      const db = createOrmDb(orm, orm.em.fork(), async () => {
-        await orm.close(true);
-      });
-      await ensureDefaultOrg(db);
-      _instance = db;
-      _instanceKey = key;
-      return db;
+    const dataSource = await initDataSource();
+
+    if (!(await hasExistingSchema(dataSource.manager))) {
+      await dataSource.runMigrations();
     }
 
-    await mkdir(config.dataDir, { recursive: true });
-    const { PGlite } = await import("@electric-sql/pglite");
-    const { vector } = await import("@electric-sql/pglite/vector");
-    const pglite = new PGlite(config.dataDir, { extensions: { vector } });
-    await pglite.waitReady;
-    const orm = await initOrm({ pglite });
-    if (!(await hasExistingSchema(orm.em))) {
-      await orm.migrator.up();
-    }
-    const db = createOrmDb(orm, orm.em.fork(), async () => {
-      await orm.close(true);
-      await pglite.close();
+    const db = createOrmDb(dataSource, dataSource.manager, async () => {
+      await dataSource.destroy();
     });
-    db.pglite = pglite;
     await ensureDefaultOrg(db);
     _instance = db;
     _instanceKey = key;
@@ -119,7 +101,7 @@ export async function openDatabase(): Promise<WebDatabaseHandle> {
     close: async () => {
       if (isTempFulcrumHome()) {
         await resetSingleton();
-        await __resetDefaultOrmForTest();
+        __resetDefaultOrmForTest();
       }
     },
     engine: real.engine,
@@ -145,11 +127,11 @@ export function __resetDatabaseForTest(): void {
 }
 
 export {
-  closeDatabase as closeProduct\u0044b,
-  getDatabase as getProduct\u0044b,
-  initDatabase as initProduct\u0044b,
-  openDatabase as openProduct\u0044b,
-  __resetDatabaseForTest as __resetProduct\u0044bForTest,
+  closeDatabase as closeProductDb,
+  getDatabase as getProductDb,
+  initDatabase as initProductDb,
+  openDatabase as openProductDb,
+  __resetDatabaseForTest as __resetProductDbForTest,
 };
 
 function runtimeDbKey(config: ResolvedDatabaseConfig = resolveDatabaseConfig()): string {
@@ -187,10 +169,9 @@ function createOrmDb(
       await conn.execute(sql);
     },
     async close(): Promise<void> {
-      em.clear();
       await closeRuntime();
     },
-    engine: "mikro-orm",
+    engine: "typeorm",
     em,
     orm,
   };

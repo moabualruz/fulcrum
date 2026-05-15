@@ -13,7 +13,7 @@ name: Repo Watcher Sync Queues Work
 expected: |
   When a registered repository file is added, changed, or removed, Fulcrum detects the event within about 2 seconds, debounces bursts for the same path, and queues repo.sync.local work instead of running git sync inline.
 result: pass
-automation: src/tests/phase07-uat-automation.test.ts
+automation: tests/uat/repo-artifact-notification-automation.test.ts
 
 ## Tests
 
@@ -112,7 +112,7 @@ expected: Webhook integration settings show delivery status, attempt count, next
 result: pass
 evidence: src/web/src/routes/settings/integrations/webhooks/page.server.test.ts; src/web/src/routes/settings/integrations/webhooks/page.svelte.test.ts
 
-### 20. Phase 7 Cross-Surface Parity Smoke
+### 20. artifact workflow Cross-Surface Parity Smoke
 expected: Repo, artifact, and notification flows expose the same core fields across Web, CLI, and TUI: repo sync health, artifact provenance/retention, notification unseen/read state, and webhook delivery metadata.
 result: pass
 evidence: src/cli/__tests__/phase07-parity-smoke.test.ts; src/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts
@@ -132,6 +132,6 @@ blocked: 0
 
 ## Automation
 
-- unit/component/integration/UAT matrix: src/tests/phase07-uat-automation.test.ts
+- unit/component/integration/UAT matrix: tests/uat/repo-artifact-notification-automation.test.ts
 - browser E2E cycle spec: src/web/tests/e2e/phase07-repos-artifacts-notifications.spec.ts
 - focused phase suite: watcher, dashboard, artifact retention/pruning/search/security, repos API/CLI/TUI/Web, notification fanout/delivery/bell/settings, webhook debug UI, parity smoke

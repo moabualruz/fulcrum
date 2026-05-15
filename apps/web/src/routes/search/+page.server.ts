@@ -1,13 +1,34 @@
 import type { ServerLoad, Actions } from "@sveltejs/kit";
-import { requestAppScope } from "$lib/server/application-scope";
-import {
-  listSavedSearches,
-  saveSearch,
-  searchDocuments,
-} from "@knowledge-workspace/application/search/queries.ts";
-import type { SavedSearch, SearchHit, SearchParams } from "@knowledge-workspace/application/search/types.ts";
+import { createSearchApiForEvent } from "$lib/server/search-api";
+
+export interface SearchHit {
+  id: string;
+  source_kind: string;
+  source_id: string;
+  title: string;
+  body: string;
+  score: number;
+  updated_at: string;
+}
+
+export interface SavedSearch {
+  id: string;
+  name: string;
+  params: {
+    q: string;
+    kinds: string[];
+    dateFrom: string;
+    dateTo: string;
+  };
+}
 
 type GroupedSearchHits = Record<string, SearchHit[]>;
+type SearchApi = ReturnType<typeof createSearchApiForEvent>["search"];
+type SavedSearchRow = {
+  id: string;
+  name: string;
+  query_json?: string | Record<string, unknown> | null;
+};
 
 function groupBySourceKind(hits: SearchHit[]): GroupedSearchHits {
   const grouped: GroupedSearchHits = {};
@@ -18,37 +39,35 @@ function groupBySourceKind(hits: SearchHit[]): GroupedSearchHits {
   return grouped;
 }
 
-export const load: ServerLoad = async ({ url, locals }) => {
+export const load: ServerLoad = async (event) => {
+  const { url } = event;
   const q = (url.searchParams.get("q") ?? "").trim();
   const kindsParam = url.searchParams.get("kinds") ?? "";
   const kinds = kindsParam.length > 0 ? kindsParam.split(",").map((k) => k.trim()).filter(Boolean) : [];
   const dateFrom = (url.searchParams.get("date_from") ?? "").trim();
   const dateTo = (url.searchParams.get("date_to") ?? "").trim();
 
-  let em;
-  let orgId: string;
+  let searchApi: SearchApi;
   try {
-    const scope = await requestAppScope(locals);
-    em = scope.em;
-    orgId = scope.ctx.orgId;
+    searchApi = createSearchApiForEvent(event).search;
   } catch {
     return { q, kinds, dateFrom, dateTo, hits: [], grouped: {}, savedSearches: [] };
   }
 
-  const savedSearches: SavedSearch[] = await listSavedSearches(em, { orgId, userId: "local" }, "local")
+  const savedSearches = await searchApi.savedList()
+    .then((rows) => normalizeSavedSearches(rows as SavedSearchRow[]))
     .catch(() => []);
 
   if (q.length === 0) {
     return { q, kinds, dateFrom, dateTo, hits: [], grouped: {}, savedSearches };
   }
 
-  const filters = {
-    orgId,
+  const runSearch = searchApi.query;
+  let hits = await runSearch({
+    q,
     limit: 50,
-    ...(kinds.length > 0 ? { sourceKinds: kinds } : {}),
-  };
-
-  let hits = await searchDocuments(em, q, filters);
+    ...(kinds.length > 0 ? { kind: kinds.join(",") } : {}),
+  }) as SearchHit[];
 
   // Apply date range filter in memory (updated_at is an ISO string)
   if (dateFrom) {
@@ -63,7 +82,8 @@ export const load: ServerLoad = async ({ url, locals }) => {
 };
 
 export const actions: Actions = {
-  saveSearch: async ({ request, locals }) => {
+  saveSearch: async (event) => {
+    const { request } = event;
     const form = await request.formData();
     const name = (form.get("name") as string ?? "").trim();
     const q = (form.get("q") as string ?? "").trim();
@@ -74,13 +94,45 @@ export const actions: Actions = {
     if (!name) return { error: "name required" };
 
     try {
-      const { em, ctx } = await requestAppScope(locals);
-
-      const params: SearchParams = { q, kinds: kinds ? kinds.split(",") : [], dateFrom, dateTo };
-      await saveSearch(em, { ...ctx, userId: ctx.userId ?? "local" }, { owner: "local", name, params });
+      await createSearchApiForEvent(event).search.savedCreate({
+        name,
+        scope: "private",
+        queryJson: { q, kinds: kinds ? kinds.split(",") : [], dateFrom, dateTo },
+      });
       return { saved: true };
     } catch {
       return { error: "no org" };
     }
   },
 };
+
+function normalizeSavedSearches(rows: SavedSearchRow[]): SavedSearch[] {
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    params: normalizeSavedSearchParams(row.query_json),
+  }));
+}
+
+function normalizeSavedSearchParams(value: SavedSearchRow["query_json"]): SavedSearch["params"] {
+  const raw = typeof value === "string" ? parseJson(value) : value;
+  const record = isRecord(raw) ? raw : {};
+  return {
+    q: typeof record["q"] === "string" ? record["q"] : "",
+    kinds: Array.isArray(record["kinds"]) ? record["kinds"].filter((kind): kind is string => typeof kind === "string") : [],
+    dateFrom: typeof record["dateFrom"] === "string" ? record["dateFrom"] : "",
+    dateTo: typeof record["dateTo"] === "string" ? record["dateTo"] : "",
+  };
+}
+
+function parseJson(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}

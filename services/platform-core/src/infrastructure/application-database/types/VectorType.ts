@@ -1,4 +1,4 @@
-import { Type, type Platform, type EntityProperty } from "@mikro-orm/core";
+import { Type, type Platform, type EntityProperty } from "typeorm";
 
 export class VectorType extends Type<number[] | null, string | null> {
   override convertToDatabaseValue(value: number[] | null | undefined): string | null {

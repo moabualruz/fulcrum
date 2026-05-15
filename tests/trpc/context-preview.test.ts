@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Session } from "better-auth";
 
-import { createTestOrm } from "../../src/test-utils/db.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
@@ -82,8 +82,8 @@ describe("context.preview tRPC", () => {
       expect(preview.sourceRefs).toEqual([
         { kind: "task", id: TASK_ID, reason: "selected-task", scope: "project" },
         { kind: "doc", id: doc.id, reason: "project-doc", scope: "project" },
-        { kind: "memory", id: preview.bundle.memories[0]?.id, reason: "global-memory", scope: "global" },
-        { kind: "memory", id: preview.bundle.memories[1]?.id, reason: "project-memory", scope: "project" },
+        { kind: "memory", id: preview.bundle.memories[0]!.id, reason: "global-memory", scope: "global" },
+        { kind: "memory", id: preview.bundle.memories[1]!.id, reason: "project-memory", scope: "project" },
       ]);
       expect(preview.scope).toEqual({ projectId: PROJECT_ID, taskId: TASK_ID, includeGlobal: true });
       expect(preview.warnings).toEqual([]);

@@ -2,8 +2,8 @@ import type { EntityManager, MikroORM, Options } from "@mikro-orm/postgresql";
 import { MikroORM as MikroORMRuntime } from "@mikro-orm/postgresql";
 import { PGlite } from "@electric-sql/pglite";
 
-import { createOrmConfig } from "../db/mikro-orm.config.ts";
-import { SeedService, type SeedResult } from "../db/seed.ts";
+import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { SeedService, type SeedResult } from "@platform-core/infrastructure/application-database/seed.ts";
 
 export interface TestOrm {
   orm: MikroORM;

@@ -1,148 +1,170 @@
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { indexSearchDocument } from "@test-support/product-workspace-fixtures.ts";
-import { createLocalOrg } from "@test-support/product-workspace-fixtures.ts";
+import { describe, expect, test } from "bun:test";
 
-// Provide $lib/server/db using the test scratch database
-mock.module("$lib/server/db", () => {
-  const { join: j } = require("node:path");
-  const { openIsolatedStore: oP } = require("@test-support/product-workspace-fixtures.ts");
-  const { migrateIsolatedStore: rM } = require("@test-support/product-workspace-fixtures.ts");
-  return {
-    openIsolatedStore: async () => {
-      const scratch = process.env["FULCRUM_HOME"]!;
-      const dbDir = j(scratch, "pglite.data");
-      const { mkdirSync: mk } = require("node:fs");
-      mk(dbDir, { recursive: true });
-      const db = await oP(j(dbDir, "main"));
-      await rM(db);
-      return db;
-    },
-    getDefaultOrgId: async (db: { query: <T>(sql: string, p: unknown[]) => Promise<T[]> }) => {
-      const rows = await db.query<{ id: string }>(`SELECT id FROM orgs WHERE slug = $1`, ["default"]);
-      return rows[0]?.id ?? null;
-    },
-  };
-});
+interface SearchPayload {
+  q: string;
+  kinds: string[];
+  dateFrom: string;
+  dateTo: string;
+  hits: Array<{
+    id: string;
+    source_kind: string;
+    source_id: string;
+    title: string;
+    body: string;
+    score: number;
+    updated_at: string;
+  }>;
+  grouped: Record<string, SearchPayload["hits"]>;
+  savedSearches: Array<{
+    id: string;
+    name: string;
+    params: {
+      q: string;
+      kinds: string[];
+      dateFrom: string;
+      dateTo: string;
+    };
+  }>;
+}
 
-let scratch: string;
-
-beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-search-"));
-  process.env["FULCRUM_HOME"] = scratch;
-});
-
-afterEach(() => {
-  delete process.env["FULCRUM_HOME"];
-  rmSync(scratch, { recursive: true, force: true });
-});
-
-function eventFor(query: string, extra: Record<string, string> = {}): Parameters<typeof import("./+page.server.ts").load>[0] {
+function eventFor(
+  query: string,
+  extra: Record<string, string> = {},
+  fetchImpl: typeof fetch = fetchSearch(),
+): Parameters<typeof import("./+page.server.ts").load>[0] {
   const url = new URL("http://localhost/search");
-  if (query.length > 0) url.searchParams.set("q", query);
-  for (const [k, v] of Object.entries(extra)) {
-    url.searchParams.set(k, v);
+  if (query.trim().length > 0) url.searchParams.set("q", query);
+  for (const [key, value] of Object.entries(extra)) {
+    url.searchParams.set(key, value);
   }
-  return { url } as Parameters<typeof import("./+page.server.ts").load>[0];
+  return {
+    url,
+    locals: { orgId: "org-1", userId: "user-1" },
+    fetch: fetchImpl,
+    request: new Request(url, { headers: { cookie: "sid=test-session" } }),
+  } as unknown as Parameters<typeof import("./+page.server.ts").load>[0];
 }
 
-async function seedSearchIndex(): Promise<{ orgId: string }> {
-  const dbDir = join(scratch, "pglite.data");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(dbDir);
-  try {
-    await migrateIsolatedStore(db);
-    const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-    await indexSearchDocument(db, {
-      orgId: org.id,
-      sourceKind: "doc",
-      sourceId: "doc-1",
-      title: "Kernel notes",
-      body: "Fulcrum kernel search notes",
-    });
-    await indexSearchDocument(db, {
-      orgId: org.id,
-      sourceKind: "task",
-      sourceId: "task-1",
-      title: "Kernel task",
-      body: "Wire grouped search",
-    });
-    await indexSearchDocument(db, {
-      orgId: org.id,
-      sourceKind: "memory",
-      sourceId: "memory-1",
-      title: "Memory lane",
-      body: "Unrelated entry",
-    });
-    return { orgId: org.id };
-  } finally {
-    await db.close();
-  }
+function fetchSearch(calls: string[] = []): typeof fetch {
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input));
+    const headers = new Headers(init?.headers);
+    calls.push(`${init?.method ?? "GET"} ${url.pathname}${url.search} ${headers.get("authorization") ?? ""} ${headers.get("cookie") ?? ""}`);
+
+    if (url.pathname === "/api/v1/search/saved" && (init?.method ?? "GET") === "GET") {
+      return Response.json([
+        {
+          id: "saved-1",
+          name: "Kernel docs",
+          query_json: JSON.stringify({ q: "kernel", kinds: ["doc"], dateFrom: "2026-04-01", dateTo: "" }),
+        },
+      ]);
+    }
+    if (url.pathname === "/api/v1/search" && (init?.method ?? "GET") === "GET") {
+      const kind = url.searchParams.get("kind");
+      const hits = [
+        hit("doc-hit", "doc", "doc-1", "Kernel notes", "Fulcrum kernel search notes", "2026-04-30T10:00:00.000Z"),
+        hit("task-hit", "task", "task-1", "Kernel task", "Wire grouped search", "2026-04-29T10:00:00.000Z"),
+        hit("memory-hit", "memory", "memory-1", "Kernel memory", "Stored kernel concept", "2026-03-30T10:00:00.000Z"),
+      ];
+      const kinds = kind ? kind.split(",") : [];
+      return Response.json(kinds.length > 0 ? hits.filter((row) => kinds.includes(row.source_kind)) : hits);
+    }
+    if (url.pathname === "/api/v1/search/saved" && init?.method === "POST") {
+      const body = JSON.parse(String(init.body));
+      return Response.json({ id: "saved-new", name: body.name, query_json: body.query_json }, { status: 201 });
+    }
+    return Response.json({ message: `unexpected ${url.pathname}${url.search}` }, { status: 500 });
+  }) as typeof fetch;
 }
 
-describe("/search +page.server.ts load()", () => {
-  test("empty q returns an empty search model", async () => {
+function hit(id: string, sourceKind: string, sourceId: string, title: string, body: string, updatedAt: string) {
+  return {
+    id,
+    source_kind: sourceKind,
+    source_id: sourceId,
+    title,
+    body,
+    score: sourceKind === "doc" ? 1 : 0.5,
+    updated_at: updatedAt,
+  };
+}
+
+describe("/search +page.server.ts public API route", () => {
+  test("server route uses the search public API instead of direct application scope", () => {
+    const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
+    expect(source).toContain("createSearchApiForEvent");
+    expect(source).not.toContain("requestAppScope");
+    expect(source).not.toContain("@knowledge-workspace/application/search");
+  });
+
+  test("empty q returns an empty search model with saved searches from public API", async () => {
+    const calls: string[] = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.load(eventFor("   "));
+    const result = await mod.load(eventFor("   ", {}, fetchSearch(calls))) as SearchPayload;
     expect(result).toMatchObject({ q: "", hits: [], grouped: {} });
+    expect(result.savedSearches).toEqual([
+      {
+        id: "saved-1",
+        name: "Kernel docs",
+        params: { q: "kernel", kinds: ["doc"], dateFrom: "2026-04-01", dateTo: "" },
+      },
+    ]);
+    expect(calls).toEqual([
+      "GET /api/v1/search/saved?org_id=org-1&user_id=user-1 Bearer web-local sid=test-session",
+    ]);
   });
 
   test("q matching doc and task groups hits by source_kind", async () => {
-    await seedSearchIndex();
+    const calls: string[] = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    const result = await mod.load(eventFor("kernel"));
+    const result = await mod.load(eventFor("kernel", {}, fetchSearch(calls))) as SearchPayload;
     expect(result.grouped.doc).toHaveLength(1);
     expect(result.grouped.task).toHaveLength(1);
+    expect(calls).toContain("GET /api/v1/search?q=kernel&org_id=org-1&limit=50 Bearer web-local sid=test-session");
   });
 
-  test("q with no matches returns empty hits and grouped", async () => {
-    await seedSearchIndex();
+  test("kind facet is passed to the public API and filters to doc only", async () => {
+    const calls: string[] = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
-    const result = await mod.load(eventFor("nomatch"));
-    expect(result.hits).toHaveLength(0);
-    expect(result.grouped).toEqual({});
-  });
-
-  test("kind facet filters to doc only", async () => {
-    await seedSearchIndex();
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
-    const result = await mod.load(eventFor("kernel", { kinds: "doc" }));
+    const result = await mod.load(eventFor("kernel", { kinds: "doc" }, fetchSearch(calls))) as SearchPayload;
     expect(result.grouped.doc).toHaveLength(1);
     expect(result.grouped.task).toBeUndefined();
+    expect(calls).toContain("GET /api/v1/search?q=kernel&org_id=org-1&kind=doc&limit=50 Bearer web-local sid=test-session");
   });
 
-  test("savedSearches array is always returned", async () => {
-    await seedSearchIndex();
+  test("date facets still narrow public API hits locally", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
+    const result = await mod.load(eventFor("kernel", { date_from: "2026-04-01" })) as SearchPayload;
+    expect(result.hits.map((row) => row.id)).toEqual(["doc-hit", "task-hit"]);
+  });
+
+  test("saveSearch posts saved-search params through the public API", async () => {
+    const calls: string[] = [];
+    const form = new FormData();
+    form.set("name", "Saved kernel");
+    form.set("q", "kernel");
+    form.set("kinds", "doc,task");
+    form.set("date_from", "2026-04-01");
+    form.set("date_to", "2026-04-30");
+    const url = new URL("http://localhost/search?/saveSearch");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 4}`);
-    const result = await mod.load(eventFor(""));
-    expect(Array.isArray(result.savedSearches)).toBe(true);
-  });
+    const result = await mod.actions.saveSearch({
+      url,
+      locals: { orgId: "org-1", userId: "user-1" },
+      fetch: fetchSearch(calls),
+      request: new Request(url, {
+        method: "POST",
+        body: form,
+        headers: { cookie: "sid=test-session" },
+      }),
+    } as Parameters<typeof mod.actions.saveSearch>[0]);
 
-  test("fts returns results across 3+ kinds", async () => {
-    await seedSearchIndex();
-    // Add a third kind that matches 'kernel'
-    const dbDir = join(scratch, "pglite.data");
-    const db = await openIsolatedStore(dbDir);
-    try {
-      const orgRows = await db.query<{ id: string }>(`SELECT id FROM orgs WHERE slug = $1`, ["default"]);
-      const orgId = orgRows[0]!.id;
-      await indexSearchDocument(db, {
-        orgId,
-        sourceKind: "memory",
-        sourceId: "memory-kernel",
-        title: "Kernel memory",
-        body: "kernel concept stored here",
-      });
-    } finally {
-      await db.close();
-    }
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 5}`);
-    const result = await mod.load(eventFor("kernel"));
-    const kinds = Object.keys(result.grouped);
-    expect(kinds.length).toBeGreaterThanOrEqual(3);
+    expect(result).toEqual({ saved: true });
+    expect(calls).toEqual([
+      "POST /api/v1/search/saved Bearer web-local sid=test-session",
+    ]);
   });
 });

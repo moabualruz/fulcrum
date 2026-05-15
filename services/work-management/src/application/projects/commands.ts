@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { randomUUID } from "node:crypto";
 import { access } from "node:fs/promises";

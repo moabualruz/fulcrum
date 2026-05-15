@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { TenantSetting } from "@platform-core/infrastructure/application-database/entities/TenantSetting.ts";
 import type { Org, User } from "@platform-core/infrastructure/application-database/entities/auth/index.ts";

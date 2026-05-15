@@ -4,12 +4,12 @@ import { MikroORM as MikroORMRuntime } from "@mikro-orm/postgresql";
 import { Migrator } from "@mikro-orm/migrations";
 import { PGlite } from "@electric-sql/pglite";
 
-import { createOrmConfig } from "../../../src/db/mikro-orm.config.ts";
-import { DEFAULT_ORG_ID, SeedService } from "../../../src/db/seed.ts";
+import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { DEFAULT_ORG_ID, SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
 import {
   MetricsCache,
   Sprint,
-} from "../../../src/db/entities/tasks/index.ts";
+} from "@platform-core/infrastructure/application-database/entities/tasks/index.ts";
 
 const PROJECT_ID = "11111111-1111-1111-1111-111111111111";
 

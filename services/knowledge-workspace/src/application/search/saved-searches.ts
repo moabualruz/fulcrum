@@ -12,7 +12,7 @@ import { AppForbiddenError, AppInvariantError, AppNotFoundError } from "@platfor
 export interface SavedSearchContext {
   orgId: string;
   userId: string;
-  em: import("@mikro-orm/postgresql").EntityManager | null;
+  em: import("typeorm").EntityManager | null;
 }
 
 const SearchQueryJsonSchema = z.object({

@@ -7,7 +7,7 @@ _fulcrum_dynamic_ids() {
 
 _fulcrum() {
   local -a domains
-  domains=('agent_runs:fulcrum agent_runs' 'agents:fulcrum agents' 'artifacts:fulcrum artifacts' 'audit:fulcrum audit' 'auth:fulcrum auth' 'automations:fulcrum automations' 'backup:fulcrum backup' 'comments:fulcrum comments' 'connectors:fulcrum connectors' 'context:fulcrum context' 'credentials:fulcrum credentials' 'custom_fields:fulcrum custom_fields' 'customFieldDefs:fulcrum customFieldDefs' 'dataExport:fulcrum dataExport' 'dataImport:fulcrum dataImport' 'db:fulcrum db' 'doc_comments:fulcrum doc_comments' 'doc_links:fulcrum doc_links' 'doc_versions:fulcrum doc_versions' 'docs:fulcrum docs' 'doctor:fulcrum doctor' 'errorLogs:fulcrum errorLogs' 'flags:fulcrum flags' 'fulcrum_skills:fulcrum fulcrum_skills' 'health:fulcrum health' 'inference:fulcrum inference' 'invitations:fulcrum invitations' 'memories:fulcrum memories' 'notify:fulcrum notify' 'notifySubscriptions:fulcrum notifySubscriptions' 'orchestrationSubscriptions:fulcrum orchestrationSubscriptions' 'orgs:fulcrum orgs' 'projects:fulcrum projects' 'recurrence:fulcrum recurrence' 'relationships:fulcrum relationships' 'repo_branches:fulcrum repo_branches' 'repo_commits:fulcrum repo_commits' 'reports:fulcrum reports' 'repos:fulcrum repos' 'routing:fulcrum routing' 'runsSubscriptions:fulcrum runsSubscriptions' 'saved_views:fulcrum saved_views' 'search:fulcrum search' 'sprints:fulcrum sprints' 'taskCustomFields:fulcrum taskCustomFields' 'tasks:fulcrum tasks' 'telemetry:fulcrum telemetry' 'templates:fulcrum templates' 'theme:fulcrum theme' 'webhooks:fulcrum webhooks' 'workflows:fulcrum workflows')
+  domains=('agent_runs:fulcrum agent_runs' 'agents:fulcrum agents' 'artifacts:fulcrum artifacts' 'audit:fulcrum audit' 'auth:fulcrum auth' 'automations:fulcrum automations' 'backup:fulcrum backup' 'comments:fulcrum comments' 'connectors:fulcrum connectors' 'context:fulcrum context' 'credentials:fulcrum credentials' 'custom_fields:fulcrum custom_fields' 'customFieldDefs:fulcrum customFieldDefs' 'dataExport:fulcrum dataExport' 'dataImport:fulcrum dataImport' 'db:fulcrum db' 'doc_comments:fulcrum doc_comments' 'doc_links:fulcrum doc_links' 'doc_versions:fulcrum doc_versions' 'docs:fulcrum docs' 'doctor:fulcrum doctor' 'errorLogs:fulcrum errorLogs' 'flags:fulcrum flags' 'fulcrum_skills:fulcrum fulcrum_skills' 'health:fulcrum health' 'inference:fulcrum inference' 'invitations:fulcrum invitations' 'memories:fulcrum memories' 'notify:fulcrum notify' 'notifySubscriptions:fulcrum notifySubscriptions' 'orchestrationSubscriptions:fulcrum orchestrationSubscriptions' 'orgs:fulcrum orgs' 'planning:fulcrum planning' 'projects:fulcrum projects' 'recurrence:fulcrum recurrence' 'relationships:fulcrum relationships' 'repo_branches:fulcrum repo_branches' 'repo_commits:fulcrum repo_commits' 'reports:fulcrum reports' 'repos:fulcrum repos' 'routing:fulcrum routing' 'runsSubscriptions:fulcrum runsSubscriptions' 'saved_views:fulcrum saved_views' 'search:fulcrum search' 'sprints:fulcrum sprints' 'taskCustomFields:fulcrum taskCustomFields' 'tasks:fulcrum tasks' 'telemetry:fulcrum telemetry' 'templates:fulcrum templates' 'theme:fulcrum theme' 'webhooks:fulcrum webhooks' 'workflows:fulcrum workflows')
   if (( CURRENT == 2 )); then
     _describe 'fulcrum command' domains
     return
@@ -213,6 +213,10 @@ _fulcrum() {
       local -a values=('get:fulcrum orgs get' 'members list:fulcrum orgs members list' 'members remove:fulcrum orgs members remove' 'members update-role:fulcrum orgs members update-role' 'update:fulcrum orgs update' '--json:option')
       _describe 'command or option' values
       ;;
+    planning)
+      local -a values=('build-freeform-docs-planning-prompt:fulcrum planning build-freeform-docs-planning-prompt' 'generate-technical-planning-cycle:fulcrum planning generate-technical-planning-cycle' 'materialize-approved-plan-breakdown:fulcrum planning materialize-approved-plan-breakdown' 'preview-approved-plan-breakdown:fulcrum planning preview-approved-plan-breakdown' 'restart-planning-cycle-from-updates:fulcrum planning restart-planning-cycle-from-updates' 'start-freeform-work-from-docs:fulcrum planning start-freeform-work-from-docs' 'start-guided-acp-planning-session:fulcrum planning start-guided-acp-planning-session' '--json:option')
+      _describe 'command or option' values
+      ;;
     projects)
       local -a values=('create:fulcrum projects create' 'delete:fulcrum projects delete' 'get:fulcrum projects get' 'list:fulcrum projects list' 'stats:fulcrum projects stats' 'update:fulcrum projects update' '--json:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
@@ -250,7 +254,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     reports)
-      local -a values=('burndown:fulcrum reports burndown' '--json:option')
+      local -a values=('append-review-workbench-annotation:fulcrum reports append-review-workbench-annotation' 'apply-configured-uat-code-review-decision:fulcrum reports apply-configured-uat-code-review-decision' 'burndown:fulcrum reports burndown' 'final-qa:fulcrum reports final-qa' 'final-qa-feedback-gate:fulcrum reports final-qa-feedback-gate' 'load-review-workbench-session:fulcrum reports load-review-workbench-session' 'record-uat-code-review-decision:fulcrum reports record-uat-code-review-decision' 'review-workbench:fulcrum reports review-workbench' 'run-generated-e2e-regression-tests:fulcrum reports run-generated-e2e-regression-tests' 'save-review-workbench-session:fulcrum reports save-review-workbench-session' 'uat-code-review-handoff:fulcrum reports uat-code-review-handoff' '--json:option')
       _describe 'command or option' values
       ;;
     repos)
@@ -298,7 +302,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     tasks)
-      local -a values=('bulk-delete:fulcrum tasks bulk-delete' 'bulk-update:fulcrum tasks bulk-update' 'create:fulcrum tasks create' 'delete:fulcrum tasks delete' 'get:fulcrum tasks get' 'list:fulcrum tasks list' 'list-children:fulcrum tasks list-children' 'set-dependencies:fulcrum tasks set-dependencies' 'set-parent:fulcrum tasks set-parent' 'update:fulcrum tasks update' '--json:option')
+      local -a values=('bulk-delete:fulcrum tasks bulk-delete' 'bulk-update:fulcrum tasks bulk-update' 'create:fulcrum tasks create' 'delete:fulcrum tasks delete' 'dependency-run-live-feedback:fulcrum tasks dependency-run-live-feedback' 'dependency-run-live-feedback-stream:fulcrum tasks dependency-run-live-feedback-stream' 'dispatch-dependency-run:fulcrum tasks dispatch-dependency-run' 'get:fulcrum tasks get' 'list:fulcrum tasks list' 'list-children:fulcrum tasks list-children' 'manual-workbench:fulcrum tasks manual-workbench' 'preview-dependency-run:fulcrum tasks preview-dependency-run' 'record-qa-review:fulcrum tasks record-qa-review' 'run-automated-feedback-loop:fulcrum tasks run-automated-feedback-loop' 'run-dependency-run-worker-tick:fulcrum tasks run-dependency-run-worker-tick' 'set-dependencies:fulcrum tasks set-dependencies' 'set-parent:fulcrum tasks set-parent' 'update:fulcrum tasks update' '--json:option' '--watch:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
         _values 'ids' $(_fulcrum_dynamic_ids 'tasks')
         return
@@ -330,7 +334,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     workflows)
-      local -a values=('get-default:fulcrum workflows get-default' 'get-enabled-task-types:fulcrum workflows get-enabled-task-types' 'get-methodology:fulcrum workflows get-methodology' 'get-transitions:fulcrum workflows get-transitions' 'update-enabled-task-types:fulcrum workflows update-enabled-task-types' 'update-methodology:fulcrum workflows update-methodology' 'update-transitions:fulcrum workflows update-transitions' 'validate-transition:fulcrum workflows validate-transition' '--json:option')
+      local -a values=('get-default:fulcrum workflows get-default' 'get-enabled-task-types:fulcrum workflows get-enabled-task-types' 'get-methodology:fulcrum workflows get-methodology' 'get-transitions:fulcrum workflows get-transitions' 'run-acceptance-cycle:fulcrum workflows run-acceptance-cycle' 'update-enabled-task-types:fulcrum workflows update-enabled-task-types' 'update-methodology:fulcrum workflows update-methodology' 'update-transitions:fulcrum workflows update-transitions' 'validate-transition:fulcrum workflows validate-transition' '--json:option')
       _describe 'command or option' values
       ;;
   esac

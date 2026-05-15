@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 
-import { createTestOrm } from "../../../src/test-utils/db.ts";
-import { Org } from "../../../src/db/entities/auth/Org.ts";
-import { ConnectorSyncLog } from "../../../src/db/entities/connectors/index.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { ConnectorSyncLog } from "@platform-core/infrastructure/application-database/entities/connectors/index.ts";
 
 const CONNECTOR_ORG_ID = "11111111-1111-1111-1111-111111111111";
 

@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
 import { ContextSnapshot } from "@platform-core/infrastructure/application-database/entities/memory/ContextSnapshot.ts";

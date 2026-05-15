@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 

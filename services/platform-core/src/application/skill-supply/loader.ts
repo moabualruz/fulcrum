@@ -1,4 +1,4 @@
-import type { MikroORM } from "@mikro-orm/postgresql";
+import type { DataSource } from "typeorm";
 import {
   copyFile,
   mkdir,
@@ -19,7 +19,7 @@ import {
   SkillSource,
   SkillVersion,
 } from "@platform-core/infrastructure/application-database/entities/skills/index.ts";
-import { initOrm } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { initDataSource } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 import { parseKernelMarkdown } from "@platform-core/application/platform-primitives/frontmatter-markdown.ts";
 import {
   readSkillsLockFile,
@@ -47,11 +47,11 @@ const SkillFrontmatter = z.object({
   agents: z.array(z.string().min(1)).default(["*"]),
 });
 
-let testOrm: MikroORM | undefined;
+let testDataSource: DataSource | undefined;
 let processKill: (pid: number, signal?: NodeJS.Signals | 0) => true = process.kill;
 
-export function __setSkillsLoaderOrmForTest(orm: MikroORM | undefined): void {
-  testOrm = orm;
+export function __setSkillsLoaderOrmForTest(ds: DataSource | undefined): void {
+  testDataSource = ds;
 }
 
 export function __setSkillsLoaderProcessKillForTest(
@@ -60,24 +60,24 @@ export function __setSkillsLoaderProcessKillForTest(
   processKill = kill ?? process.kill;
 }
 
-interface OrmHandle {
-  orm: MikroORM;
+interface DataSourceHandle {
+  dataSource: DataSource;
   close(): Promise<void>;
 }
 
-async function ormForLoader(): Promise<OrmHandle> {
-  if (testOrm) {
+async function dsForLoader(): Promise<DataSourceHandle> {
+  if (testDataSource) {
     return {
-      orm: testOrm,
+      dataSource: testDataSource,
       close: async () => undefined,
     };
   }
 
-  const orm = await initOrm();
+  const dataSource = await initDataSource();
   return {
-    orm,
+    dataSource,
     close: async () => {
-      await orm.close(true);
+      await dataSource.destroy();
     },
   };
 }
@@ -171,7 +171,7 @@ async function copySkillToAgents(
 }
 
 async function upsertSkillRow(
-  orm: MikroORM,
+  dataSource: DataSource,
   orgId: string,
   input: {
     name: string;
@@ -181,15 +181,16 @@ async function upsertSkillRow(
     hashVerified: string | null;
   },
 ): Promise<FulcrumSkill> {
-  const em = orm.em.fork();
-  let skill = await em.findOne(FulcrumSkill, {
-    org: orgId,
-    slug: input.slug,
+  const skillRepo = dataSource.getRepository(FulcrumSkill);
+  const versionRepo = dataSource.getRepository(SkillVersion);
+
+  let skill = await skillRepo.findOne({
+    where: { org: { id: orgId }, slug: input.slug },
   });
 
   if (!skill) {
-    skill = em.create(FulcrumSkill, {
-      org: em.getReference(Org, orgId),
+    skill = skillRepo.create({
+      org: { id: orgId } as Org,
       name: input.name,
       slug: input.slug,
       source: SkillSource.Local,
@@ -200,13 +201,13 @@ async function upsertSkillRow(
     skill.source = SkillSource.Local;
     skill.enabledAgents = input.agents;
   }
+  await skillRepo.save(skill);
 
-  let version = await em.findOne(SkillVersion, {
-    skill,
-    version: input.version,
+  let version = await versionRepo.findOne({
+    where: { skill: { id: skill.id }, version: input.version },
   });
   if (!version) {
-    version = em.create(SkillVersion, {
+    version = versionRepo.create({
       skill,
       version: input.version,
       hashVerified: input.hashVerified,
@@ -214,43 +215,40 @@ async function upsertSkillRow(
   } else {
     version.hashVerified = input.hashVerified;
   }
-
-  await em.flush();
+  await versionRepo.save(version);
   return skill;
 }
 
 async function setLatestHashVerified(
-  orm: MikroORM,
+  dataSource: DataSource,
   orgId: string,
   slug: string,
   version: string,
   hashVerified: string | null,
 ): Promise<void> {
-  const em = orm.em.fork();
-  const skill = await em.findOneOrFail(FulcrumSkill, { org: orgId, slug });
-  let skillVersion = await em.findOne(SkillVersion, { skill, version });
+  const skillRepo = dataSource.getRepository(FulcrumSkill);
+  const versionRepo = dataSource.getRepository(SkillVersion);
+  const skill = await skillRepo.findOneOrFail({ where: { org: { id: orgId }, slug } });
+  let skillVersion = await versionRepo.findOne({ where: { skill: { id: skill.id }, version } });
   if (!skillVersion) {
-    skillVersion = em.create(SkillVersion, {
-      skill,
-      version,
-      hashVerified,
-    });
+    skillVersion = versionRepo.create({ skill, version, hashVerified });
   } else {
     skillVersion.hashVerified = hashVerified;
   }
-  await em.flush();
+  await versionRepo.save(skillVersion);
 }
 
 async function latestHashVerified(
-  orm: MikroORM,
+  dataSource: DataSource,
   orgId: string,
   slug: string,
   version: string,
 ): Promise<string | null> {
-  const em = orm.em.fork();
-  const skill = await em.findOne(FulcrumSkill, { org: orgId, slug });
+  const skillRepo = dataSource.getRepository(FulcrumSkill);
+  const versionRepo = dataSource.getRepository(SkillVersion);
+  const skill = await skillRepo.findOne({ where: { org: { id: orgId }, slug } });
   if (!skill) return null;
-  const skillVersion = await em.findOne(SkillVersion, { skill, version });
+  const skillVersion = await versionRepo.findOne({ where: { skill: { id: skill.id }, version } });
   return skillVersion?.hashVerified ?? null;
 }
 
@@ -354,17 +352,17 @@ export async function installSkill(path: string, orgId: string): Promise<Fulcrum
   const content = await readFile(path, "utf8");
   const parsed = parseSkillContent(content);
   const hash = sha256(content);
-  const ormHandle = await ormForLoader();
+  const handle = await dsForLoader();
 
   try {
     return await withSkillsLock(async () => {
       const previousHash = await latestHashVerified(
-        ormHandle.orm,
+        handle.dataSource,
         orgId,
         parsed.slug,
         parsed.version,
       );
-      await upsertSkillRow(ormHandle.orm, orgId, {
+      await upsertSkillRow(handle.dataSource, orgId, {
         ...parsed,
         hashVerified: null,
       });
@@ -377,7 +375,7 @@ export async function installSkill(path: string, orgId: string): Promise<Fulcrum
         await assertInstalledHashes(parsed.slug, parsed.agents, hash);
       } catch (error) {
         await setLatestHashVerified(
-          ormHandle.orm,
+          handle.dataSource,
           orgId,
           parsed.slug,
           parsed.version,
@@ -386,7 +384,7 @@ export async function installSkill(path: string, orgId: string): Promise<Fulcrum
         throw error;
       }
 
-      const skill = await upsertSkillRow(ormHandle.orm, orgId, {
+      const skill = await upsertSkillRow(handle.dataSource, orgId, {
         ...parsed,
         hashVerified: hash,
       });
@@ -401,29 +399,29 @@ export async function installSkill(path: string, orgId: string): Promise<Fulcrum
       return skill;
     });
   } finally {
-    await ormHandle.close();
+    await handle.close();
   }
 }
 
 export async function listInstalledSkills(orgId: string): Promise<FulcrumSkill[]> {
-  const ormHandle = await ormForLoader();
+  const handle = await dsForLoader();
   try {
-    return await ormHandle.orm.em.fork().find(
-      FulcrumSkill,
-      { org: orgId },
-      { orderBy: { slug: "ASC" } },
-    );
+    const skillRepo = handle.dataSource.getRepository(FulcrumSkill);
+    return await skillRepo.find({
+      where: { org: { id: orgId } },
+      order: { slug: "ASC" },
+    });
   } finally {
-    await ormHandle.close();
+    await handle.close();
   }
 }
 
 export async function uninstallSkill(slug: string, orgId: string): Promise<void> {
-  const ormHandle = await ormForLoader();
+  const handle = await dsForLoader();
   try {
     await withSkillsLock(async () => {
-      const em = ormHandle.orm.em.fork();
-      const skill = await em.findOneOrFail(FulcrumSkill, { org: orgId, slug });
+      const skillRepo = handle.dataSource.getRepository(FulcrumSkill);
+      const skill = await skillRepo.findOneOrFail({ where: { org: { id: orgId }, slug } });
       const agents = skill.enabledAgents.filter((agent): agent is AgentName => agent in AGENT_DIRS);
 
       await Promise.all(
@@ -436,17 +434,15 @@ export async function uninstallSkill(slug: string, orgId: string): Promise<void>
       const lock = await readSkillsLockFile();
       delete lock[slug];
       await writeSkillsLockFile(lock);
-      em.remove(skill);
-      await em.flush();
+      await skillRepo.remove(skill);
     });
   } finally {
-    await ormHandle.close();
+    await handle.close();
   }
 }
 
 /**
  * Read SKILL.md content for a given skill slug.
- * Returns file content or null if slug/file missing (logs warning).
  */
 export async function readSkillContent(
   slug: string,

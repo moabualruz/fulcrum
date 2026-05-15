@@ -27,47 +27,50 @@ async function filesMatching(roots: readonly string[], pattern: RegExp): Promise
   return found.sort();
 }
 
-describe("Phase 9.5 cross-phase security regressions", () => {
+describe("interface cross-phase security regressions", () => {
   test("CR-01 path traversal: workspace deletion validates real path before recursive rm", async () => {
-    const source = await readFile("src/orchestration/symphony/workspace.ts", "utf8");
+    const source = await readFile("services/execution-orchestration/src/infrastructure/agent-runtime/symphony/workspace.ts", "utf8");
 
     expect(source).toContain("realpath");
     expect(source).toMatch(/assertWorkspacePathInOrgRoot[\s\S]+rm\(/);
   });
 
   test("CR-02 XSS: Symphony HTTP dashboard escapes issue identifiers before HTML render", async () => {
-    const source = await readFile("src/orchestration/symphony/http-server.ts", "utf8");
+    const source = await readFile("services/execution-orchestration/src/infrastructure/agent-runtime/symphony/http-server.ts", "utf8");
 
     expect(source).toMatch(/escapeHtml|sanitize/);
     expect(source).not.toMatch(/<li>\$\{r\.issue_identifier\}/);
   });
 
   test("CR-03 deterministic IDs: Linear tracker has no module-level mutable candidate counter", async () => {
-    const source = await readFile("src/orchestration/symphony/linear-tracker.ts", "utf8");
+    const source = await readFile("services/execution-orchestration/src/infrastructure/agent-runtime/symphony/linear-tracker.ts", "utf8");
 
     expect(source).not.toMatch(/let\s+candidateIdCounter|candidateIdCounter\s*\+=/);
     expect(source).toContain("deterministicUuid");
   });
 
   test("CR-04 approval race: app-server approvals do not default to auto-approve on timeout", async () => {
-    const source = await readFile("src/orchestration/symphony/app-server-client.ts", "utf8");
+    const source = await readFile("services/execution-orchestration/src/infrastructure/agent-runtime/symphony/app-server-client.ts", "utf8");
 
     expect(source).not.toMatch(/async\s*\(\)\s*=>\s*["']approve["']/);
     expect(source).not.toMatch(/setTimeout\(\(\)\s*=>\s*res\(["']approve["']\)/);
   });
 
   test("WR-05 terminal workspace path validation occurs before sweep removal", async () => {
-    const source = await readFile("src/orchestration/symphony/workspace.ts", "utf8");
+    const source = await readFile("services/execution-orchestration/src/infrastructure/agent-runtime/symphony/workspace.ts", "utf8");
     const sweep = source.slice(source.indexOf("export async function sweepTerminalWorkspaces"));
 
     expect(sweep).toMatch(/assertWorkspacePathInOrgRoot[\s\S]+rm\(/);
   });
 });
 
-describe("Phase 9.5 additional architecture requirement gates", () => {
+describe("interface additional architecture requirement gates", () => {
   test("R-14 workers and notifications do not call getConnection().execute()", async () => {
     expect(await filesMatching(
-      ["src/workers", "src/notifications"],
+      [
+        "services/platform-core/src/application/jobs",
+        "services/notification-center/src/application/delivery-runtime",
+      ],
       /getConnection\(\)\.execute\(/,
     )).toEqual([]);
   });
@@ -78,16 +81,15 @@ describe("Phase 9.5 additional architecture requirement gates", () => {
 
   test("R-17 encrypt/decrypt functions exist in application crypto boundary", async () => {
     const candidates = [
-      "src/application/crypto.ts",
-      "src/application/webhooks/crypto.ts",
-      "src/application/webhooks/encryption.ts",
+      "services/integration-hub/src/application/webhooks/crypto.ts",
+      "services/integration-hub/src/application/webhooks/encryption.ts",
     ];
 
     expect(candidates.some((candidate) => existsSync(candidate))).toBe(true);
   });
 
   test("R-19 product-kernel API router has been removed", () => {
-    expect(existsSync("../test-support/product-fixtures.ts")).toBe(false);
+    expect(existsSync("@test-support/product-workspace-fixtures.ts")).toBe(false);
   });
 
   test("R-21 fulcrum settings command is registered in CLI help", async () => {

@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import type { Session } from "better-auth";
 
-import { User } from "../../src/db/entities/auth/User.ts";
-import { DocComment } from "../../src/db/entities/docs/DocComment.ts";
-import { createTestOrm } from "../../src/test-utils/db.ts";
+import { User } from "@platform-core/infrastructure/application-database/entities/auth/User.ts";
+import { DocComment } from "@platform-core/infrastructure/application-database/entities/docs/DocComment.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";

@@ -46,19 +46,38 @@ const FAKE_PROFILES = [
   },
 ];
 
+let scopeProjectIds: Array<string | null | undefined> = [];
+let testedProfiles: string[] = [];
+let profilePayload = () => ({
+  profiles: FAKE_PROFILES.map(maskProfileForTest),
+  projects: [],
+  tasks: [],
+});
+
+const AGENT_QUERY_MODULES = [
+  "@execution-orchestration/application/agents/queries.ts",
+  "services/execution-orchestration/src/application/agents/queries.ts",
+  "/Users/mkh/workspace/fulcrum/services/execution-orchestration/src/application/agents/queries.ts",
+  "file:///Users/mkh/workspace/fulcrum/services/execution-orchestration/src/application/agents/queries.ts",
+] as const;
+
+const APPLICATION_SCOPE_MODULES = [
+  "$lib/server/application-scope",
+  "$lib/server/application-scope.ts",
+  "/Users/mkh/workspace/fulcrum/apps/web/src/lib/server/application-scope.ts",
+  "file:///Users/mkh/workspace/fulcrum/apps/web/src/lib/server/application-scope.ts",
+] as const;
+
+installRouteMocks();
+
 beforeEach(() => {
-  mock.module("$lib/server/application-scope", () => ({
-    requestAppScope: async () => ({ em: {} as never, ctx: { orgId: "org1", userId: null, projectId: null } }),
-  }));
-  mock.module("../../../../application/agents/queries.ts", () => ({
-    listAgentProfilesPageData: async () => ({
-      profiles: FAKE_PROFILES.map(maskProfileForTest),
-      projects: [],
-      tasks: [],
-    }),
-    maskProfile: maskProfileForTest,
-    testProfile: async () => ({ test_passed: true }),
-  }));
+  scopeProjectIds = [];
+  testedProfiles = [];
+  profilePayload = () => ({
+    profiles: FAKE_PROFILES.map(maskProfileForTest),
+    projects: [],
+    tasks: [],
+  });
 });
 
 describe("/agents +page.server.ts", () => {
@@ -83,11 +102,7 @@ describe("/agents +page.server.ts", () => {
   });
 
   test("load returns empty array when no profiles", async () => {
-    mock.module("../../../../application/agents/queries.ts", () => ({
-      listAgentProfilesPageData: async () => ({ profiles: [], projects: [], tasks: [] }),
-      maskProfile: maskProfileForTest,
-      testProfile: async () => ({ test_passed: true }),
-    }));
+    profilePayload = () => ({ profiles: [], projects: [], tasks: [] });
 
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const result = await mod.load({
@@ -95,6 +110,24 @@ describe("/agents +page.server.ts", () => {
     } as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<ProfilesPayload>(result);
     expect(payload.profiles).toEqual([]);
+  });
+
+  test("test action scopes the profile check with route locals", async () => {
+    const form = new FormData();
+    form.set("name", "codex");
+    const request = new Request("http://localhost/agents?/test", {
+      method: "POST",
+      body: form,
+    });
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
+    const result = await mod.actions.test({
+      request,
+      locals: { activeProjectId: "project-1" },
+    } as Parameters<typeof mod.actions.test>[0]);
+
+    expect(result).toEqual({ ok: true, message: "codex: test passed" });
+    expect(scopeProjectIds).toEqual([undefined]);
+    expect(testedProfiles).toEqual(["codex"]);
   });
 
   test("maskProfile: caps last 4 of auth_env value", async () => {
@@ -135,6 +168,28 @@ describe("/agents +page.server.ts", () => {
     expect(masked.capabilities).toContain("code");
   });
 });
+
+function installRouteMocks() {
+  for (const moduleId of APPLICATION_SCOPE_MODULES) {
+    mock.module(moduleId, () => ({
+      requestAppScope: async (_locals: unknown, projectId?: string | null) => {
+        scopeProjectIds.push(projectId);
+        return { em: {} as never, ctx: { orgId: "org1", userId: null, projectId: projectId ?? null } };
+      },
+    }));
+  }
+
+  for (const moduleId of AGENT_QUERY_MODULES) {
+    mock.module(moduleId, () => ({
+      listAgentProfilesPageData: async () => profilePayload(),
+      maskProfile: maskProfileForTest,
+      testProfile: async (_em: unknown, _orgId: string, name: string) => {
+        testedProfiles.push(name);
+        return { test_passed: true };
+      },
+    }));
+  }
+}
 
 function maskProfileForTest(row: (typeof FAKE_PROFILES)[number]) {
   const auth_env: Record<string, string> = {};

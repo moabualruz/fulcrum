@@ -1,4 +1,4 @@
-import type { MikroORM } from "@mikro-orm/postgresql";
+import type { DataSource } from "typeorm";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
@@ -9,7 +9,7 @@ import {
   FulcrumSkill,
   SkillVersion,
 } from "@platform-core/infrastructure/application-database/entities/skills/index.ts";
-import { initOrm } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { initDataSource } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 import { parseKernelMarkdown } from "@platform-core/application/platform-primitives/frontmatter-markdown.ts";
 import { AGENT_DIRS, type AgentName } from "./loader.ts";
 import { readSkillsLockFile, writeSkillsLockFile } from "./lock.ts";
@@ -20,32 +20,32 @@ const SkillFrontmatter = z.object({
   version: z.string().min(1),
 });
 
-let testOrm: MikroORM | undefined;
+let testDataSource: DataSource | undefined;
 
 export function __setSkillsConflictResolverOrmForTest(
-  orm: MikroORM | undefined,
+  ds: DataSource | undefined,
 ): void {
-  testOrm = orm;
+  testDataSource = ds;
 }
 
-interface OrmHandle {
-  orm: MikroORM;
+interface DataSourceHandle {
+  dataSource: DataSource;
   close(): Promise<void>;
 }
 
-async function ormForResolve(): Promise<OrmHandle> {
-  if (testOrm) {
+async function dsForResolve(): Promise<DataSourceHandle> {
+  if (testDataSource) {
     return {
-      orm: testOrm,
+      dataSource: testDataSource,
       close: async () => undefined,
     };
   }
 
-  const orm = await initOrm();
+  const dataSource = await initDataSource();
   return {
-    orm,
+    dataSource,
     close: async () => {
-      await orm.close(true);
+      await dataSource.destroy();
     },
   };
 }
@@ -198,23 +198,23 @@ async function openEditor(path: string): Promise<void> {
 }
 
 async function updateHashVerified(
-  orm: MikroORM,
+  dataSource: DataSource,
   orgId: string,
   skill: FulcrumSkill,
   version: string,
   hash: string,
 ): Promise<FulcrumSkill> {
-  const em = orm.em.fork();
-  const reloaded = await em.findOneOrFail(FulcrumSkill, {
-    org: orgId,
-    slug: skill.slug,
+  const skillRepo = dataSource.getRepository(FulcrumSkill);
+  const versionRepo = dataSource.getRepository(SkillVersion);
+
+  const reloaded = await skillRepo.findOneOrFail({
+    where: { org: { id: orgId }, slug: skill.slug },
   });
-  let skillVersion = await em.findOne(SkillVersion, {
-    skill: reloaded,
-    version,
+  let skillVersion = await versionRepo.findOne({
+    where: { skill: { id: reloaded.id }, version },
   });
   if (!skillVersion) {
-    skillVersion = em.create(SkillVersion, {
+    skillVersion = versionRepo.create({
       skill: reloaded,
       version,
       hashVerified: hash,
@@ -222,7 +222,7 @@ async function updateHashVerified(
   } else {
     skillVersion.hashVerified = hash;
   }
-  await em.flush();
+  await versionRepo.save(skillVersion);
   return reloaded;
 }
 
@@ -231,12 +231,11 @@ export async function resolveConflict(
   resolution: ConflictResolution,
   orgId: string,
 ): Promise<FulcrumSkill> {
-  const ormHandle = await ormForResolve();
+  const handle = await dsForResolve();
   try {
-    const em = ormHandle.orm.em.fork();
-    const skill = await em.findOneOrFail(FulcrumSkill, {
-      org: orgId,
-      slug,
+    const skillRepo = handle.dataSource.getRepository(FulcrumSkill);
+    const skill = await skillRepo.findOneOrFail({
+      where: { org: { id: orgId }, slug },
     });
     const lock = await readSkillsLockFile();
     const lockEntry = lock[slug];
@@ -254,7 +253,7 @@ export async function resolveConflict(
       version = parsed.version;
       hash = sha256(upstreamContent);
       await writeInstalledSkill(slug, agents, upstreamContent);
-      await updateHashVerified(ormHandle.orm, orgId, skill, version, hash);
+      await updateHashVerified(handle.dataSource, orgId, skill, version, hash);
     } else if (resolution === "editor") {
       const path = await firstInstalledSkillPath(slug, agents);
       await openEditor(path);
@@ -264,7 +263,7 @@ export async function resolveConflict(
       );
       version = parsed.version;
       hash = sha256(content);
-      await updateHashVerified(ormHandle.orm, orgId, skill, version, hash);
+      await updateHashVerified(handle.dataSource, orgId, skill, version, hash);
     }
 
     lock[slug] = {
@@ -275,11 +274,8 @@ export async function resolveConflict(
     };
     await writeSkillsLockFile(lock);
 
-    return ormHandle.orm.em.fork().findOneOrFail(FulcrumSkill, {
-      org: orgId,
-      slug,
-    });
+    return skillRepo.findOneOrFail({ where: { org: { id: orgId }, slug } });
   } finally {
-    await ormHandle.close();
+    await handle.close();
   }
 }

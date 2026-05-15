@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { Container } from "@needle-di/core";
+import { TRPCError } from "@trpc/server";
 
-import { createTestOrm } from "../../src/test-utils/db.ts";
-import { Task } from "../../src/db/entities/tasks/Task.ts";
-import { TaskRepository } from "../../src/db/repositories/tasks/TaskRepository.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
+import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
+import { TaskRepository } from "@platform-core/infrastructure/application-database/repositories/tasks/TaskRepository.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
@@ -82,6 +83,24 @@ describe("backup tRPC router", () => {
         status: "ready",
         priority: 1,
       });
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("restore maps invalid dump input to bad request", async () => {
+    const db = await createTestOrm();
+    try {
+      const caller = callerFor(db.em.fork().getRepository(Task) as TaskRepository);
+      let error: TRPCError | null = null;
+
+      try {
+        await caller.backup.restore({ dump: "not-base64-json" });
+      } catch (e) {
+        if (e instanceof TRPCError) error = e;
+      }
+
+      expect(error?.code).toBe("BAD_REQUEST");
     } finally {
       await db.close();
     }

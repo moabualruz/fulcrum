@@ -1,4 +1,4 @@
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { FulcrumSkill } from "@platform-core/infrastructure/application-database/entities/skills/index.ts";
 import { SkillConflict } from "@platform-core/infrastructure/application-database/entities/skills/SkillConflict.ts";

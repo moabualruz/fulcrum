@@ -188,4 +188,618 @@ describe("ReportsScreen", () => {
     await screen.handleKey("6");
     expect(renderPlain((renderer) => screen.render(renderer))).toContain("Mon | TTTTT IIDD");
   });
+
+  test("renders final QA report and switches to it with key 7", async () => {
+    const screen = new ReportsScreen({
+      finalQaInput: {
+        projectId: "99999999-9999-4999-8999-999999999999",
+        traceId: "trace_tui_final_qa",
+      },
+      caller: {
+        reports: {
+          metrics: async () => ({
+            burndown: [],
+            velocity: [],
+            cycleTime: [],
+            throughput: [],
+            wip: {},
+            cfd: [],
+          }),
+          finalQa: async (input) => ({
+            projectId: input.projectId,
+            traceId: input.traceId,
+            status: "failed",
+            readyForUserAcceptance: false,
+            nextAction: "continue_automated_feedback",
+            summary: {
+              taskCount: 2,
+              docCount: 1,
+              runCount: 2,
+              artifactCount: 1,
+              successCriteriaCount: 3,
+              approvedTaskCount: 1,
+              blockedTaskCount: 1,
+              openFeedbackRunCount: 1,
+            },
+            checks: [
+              { id: "success-criteria-approved", label: "Success criteria approved", status: "fail", details: "1 task needs review" },
+              { id: "docs-present", label: "Docs present", status: "pass", details: "1 project doc" },
+            ],
+            taskResults: [],
+            markdown: "# Final QA Report\n\nStatus: failed",
+          }),
+        },
+      },
+    });
+
+    await screen.load();
+    await screen.handleKey("7");
+
+    const rendered = renderPlain((renderer) => screen.render(renderer));
+    expect(rendered).toContain("Final QA");
+    expect(rendered).toContain("status: failed");
+    expect(rendered).toContain("next: continue_automated_feedback");
+    expect(rendered).toContain("open feedback: 1");
+    expect(rendered).toContain("success-criteria-approved [fail]");
+  });
+
+  test("renders final QA feedback gate and switches to it with key g", async () => {
+    const calls: Array<{ method: string; input: unknown }> = [];
+    const screen = new ReportsScreen({
+      finalQaGateInput: {
+        projectId: "99999999-9999-4999-8999-999999999999",
+        traceId: "trace_tui_final_qa_gate",
+        workerId: "worker-tui",
+        reviewerAgent: "qa-reviewer",
+        feedbackAgent: "codex",
+        feedbackModel: "gpt-5.4",
+        maxIterations: 4,
+        cwd: "/tmp/fulcrum-work",
+        copyToWorktree: ["apps/tui/src/screens/reports.ts"],
+      },
+      caller: {
+        reports: {
+          metrics: async () => ({
+            burndown: [],
+            velocity: [],
+            cycleTime: [],
+            throughput: [],
+            wip: {},
+            cfd: [],
+          }),
+          finalQaFeedbackGate: async (input) => {
+            calls.push({ method: "finalQaFeedbackGate", input });
+            return {
+              projectId: input.projectId,
+              traceId: input.traceId,
+              loopAttempted: true,
+              readyForUserAcceptance: true,
+              nextAction: "prompt_uat_code_review",
+              feedbackLoop: {
+                iterations: 2,
+                exhausted: true,
+                stopReason: "automated_feedback_exhausted",
+              },
+              finalQa: {
+                status: "passed",
+                readyForUserAcceptance: true,
+                nextAction: "prompt_uat_code_review",
+                summary: {
+                  taskCount: 2,
+                  docCount: 1,
+                  runCount: 3,
+                  artifactCount: 1,
+                  successCriteriaCount: 4,
+                  approvedTaskCount: 2,
+                  blockedTaskCount: 0,
+                  openFeedbackRunCount: 0,
+                },
+              },
+            };
+          },
+        },
+      },
+    });
+
+    await screen.load();
+    await screen.handleKey("g");
+
+    const rendered = renderPlain((renderer) => screen.render(renderer));
+    expect(rendered).toContain("Final QA Gate");
+    expect(rendered).toContain("loop: attempted");
+    expect(rendered).toContain("stop: automated_feedback_exhausted");
+    expect(rendered).toContain("iterations: 2");
+    expect(calls).toEqual([{
+      method: "finalQaFeedbackGate",
+      input: {
+        projectId: "99999999-9999-4999-8999-999999999999",
+        traceId: "trace_tui_final_qa_gate",
+        workerId: "worker-tui",
+        reviewerAgent: "qa-reviewer",
+        feedbackAgent: "codex",
+        feedbackModel: "gpt-5.4",
+        maxIterations: 4,
+        cwd: "/tmp/fulcrum-work",
+        copyToWorktree: ["apps/tui/src/screens/reports.ts"],
+      },
+    }]);
+  });
+
+  test("renders UAT/code review handoff and switches to it with key 8", async () => {
+    const screen = new ReportsScreen({
+      finalQaInput: {
+        projectId: "99999999-9999-4999-8999-999999999999",
+        traceId: "trace_tui_uat",
+      },
+      uatHandoffInput: {
+        projectId: "99999999-9999-4999-8999-999999999999",
+        traceId: "trace_tui_uat",
+      },
+      caller: {
+        reports: {
+          metrics: async () => ({
+            burndown: [],
+            velocity: [],
+            cycleTime: [],
+            throughput: [],
+            wip: {},
+            cfd: [],
+          }),
+          finalQa: async (input) => ({
+            projectId: input.projectId,
+            traceId: input.traceId,
+            status: "passed",
+            readyForUserAcceptance: true,
+            nextAction: "prompt_uat_code_review",
+            summary: {
+              taskCount: 1,
+              docCount: 1,
+              runCount: 1,
+              artifactCount: 1,
+              successCriteriaCount: 2,
+              approvedTaskCount: 1,
+              blockedTaskCount: 0,
+              openFeedbackRunCount: 0,
+            },
+            checks: [],
+            taskResults: [],
+            markdown: "# Final QA Report\n\nStatus: passed",
+          }),
+          uatCodeReviewHandoff: async (input) => ({
+            projectId: input.projectId,
+            traceId: input.traceId,
+            status: "ready",
+            finalQaStatus: "passed",
+            nextAction: "prompt_user_for_uat_code_review",
+            reviewSessions: [
+              { id: "uat-trace_tui_uat", type: "uat", status: "pending_user_decision" },
+              { id: "code-review-trace_tui_uat", type: "code_review", status: "pending_user_decision" },
+            ],
+            decisionOptions: [
+              { id: "start_uat", label: "Start UAT" },
+              { id: "request_changes", label: "Request Changes" },
+            ],
+            promptMarkdown: "# UAT And Code Review Handoff",
+          }),
+        },
+      },
+    });
+
+    await screen.load();
+    await screen.handleKey("8");
+
+    const rendered = renderPlain((renderer) => screen.render(renderer));
+    expect(rendered).toContain("UAT / Code Review");
+    expect(rendered).toContain("status: ready");
+    expect(rendered).toContain("next: prompt_user_for_uat_code_review");
+    expect(rendered).toContain("uat-trace_tui_uat [uat]");
+    expect(rendered).toContain("start_uat");
+  });
+
+  test("renders UAT/code review decision and generated E2E artifact with key 9", async () => {
+    const calls: unknown[] = [];
+    const screen = new ReportsScreen({
+      uatDecisionInput: {
+        projectId: "99999999-9999-4999-8999-999999999999",
+        traceId: "trace_tui_approval",
+        decision: "approve_without_manual_review",
+        reviewType: "uat",
+        feedbackText: "Approved",
+      },
+      caller: {
+        reports: {
+          metrics: async () => ({
+            burndown: [],
+            velocity: [],
+            cycleTime: [],
+            throughput: [],
+            wip: {},
+            cfd: [],
+          }),
+          recordUatCodeReviewDecision: async (input) => {
+            calls.push(input);
+            return {
+              projectId: input.projectId,
+              traceId: input.traceId,
+              decision: input.decision,
+              reviewType: input.reviewType,
+              status: "approved",
+              nextAction: "real_data_e2e_generated",
+              generatedE2eTests: [{
+                artifactId: "artifact-e2e",
+                filename: "uat-trace_tui_approval.spec.ts",
+                path: "generated/e2e/uat-trace_tui_approval.spec.ts",
+                runner: "playwright",
+                storePath: "org/project/run/uat-trace_tui_approval.spec.ts",
+                bodyPath: "/tmp/fulcrum-artifacts/org/project/run/uat-trace_tui_approval.spec.ts",
+                coverageCases: [{
+                  id: "task-1:1",
+                  criterion: "TUI shows generated coverage cases.",
+                }],
+              }],
+              feedbackRuns: [],
+            };
+          },
+        },
+      },
+    });
+
+    await screen.load();
+    await screen.handleKey("9");
+
+    const rendered = renderPlain((renderer) => screen.render(renderer));
+    expect(rendered).toContain("UAT Decision");
+    expect(rendered).toContain("status: approved");
+    expect(rendered).toContain("next: real_data_e2e_generated");
+    expect(rendered).toContain("uat-trace_tui_approval.spec.ts");
+    expect(rendered).toContain("runner: playwright");
+    expect(rendered).toContain("coverage: 1 case(s)");
+    expect(rendered).toContain("/tmp/fulcrum-artifacts/org/project/run/uat-trace_tui_approval.spec.ts");
+    expect(calls).toEqual([{
+      projectId: "99999999-9999-4999-8999-999999999999",
+      traceId: "trace_tui_approval",
+      decision: "approve_without_manual_review",
+      reviewType: "uat",
+      feedbackText: "Approved",
+    }]);
+  });
+
+  test("renders configured auto-decision results and switches to it with key a", async () => {
+    const calls: unknown[] = [];
+    const screen = new ReportsScreen({
+      autoDecisionInput: {
+        projectId: "99999999-9999-4999-8999-999999999999",
+        traceId: "trace_tui_auto",
+      },
+      caller: {
+        reports: {
+          metrics: async () => ({
+            burndown: [],
+            velocity: [],
+            cycleTime: [],
+            throughput: [],
+            wip: {},
+            cfd: [],
+          }),
+          applyConfiguredUatCodeReviewDecision: async (input) => {
+            calls.push(input);
+            return {
+              projectId: input.projectId,
+              traceId: input.traceId,
+              settingKey: "reports.uatCodeReviewAutoDecision",
+              status: "applied",
+              nextAction: "real_data_e2e_generated",
+              config: {
+                enabled: true,
+                decision: "approve_without_manual_review",
+                reviewType: "code_review",
+              },
+              decision: {
+                status: "approved",
+                generatedE2eTests: [{
+                  artifactId: "artifact-auto-e2e",
+                  filename: "uat-trace_tui_auto.spec.ts",
+                  path: "generated/e2e/uat-trace_tui_auto.spec.ts",
+                  runner: "bun",
+                  storePath: "org/project/run/uat-trace_tui_auto.spec.ts",
+                  bodyPath: "/tmp/fulcrum-artifacts/org/project/run/uat-trace_tui_auto.spec.ts",
+                  coverageCases: [{ id: "task-1:1", criterion: "TUI renders auto-decision coverage." }],
+                }],
+              },
+            };
+          },
+        },
+      },
+    });
+
+    await screen.load();
+    await screen.handleKey("a");
+
+    const rendered = renderPlain((renderer) => screen.render(renderer));
+    expect(rendered).toContain("Auto Decision");
+    expect(rendered).toContain("status: applied");
+    expect(rendered).toContain("next: real_data_e2e_generated");
+    expect(rendered).toContain("setting: reports.uatCodeReviewAutoDecision");
+    expect(rendered).toContain("decision: approve_without_manual_review [code_review]");
+    expect(rendered).toContain("uat-trace_tui_auto.spec.ts");
+    expect(calls).toEqual([{
+      projectId: "99999999-9999-4999-8999-999999999999",
+      traceId: "trace_tui_auto",
+    }]);
+  });
+
+  test("renders generated E2E runner results and switches to it with key 0", async () => {
+    const calls: unknown[] = [];
+    const screen = new ReportsScreen({
+      e2eRunInput: {
+        projectId: "99999999-9999-4999-8999-999999999999",
+        traceId: "trace_tui_approval",
+        runner: "playwright",
+        planOnly: true,
+      },
+      caller: {
+        reports: {
+          metrics: async () => ({
+            burndown: [],
+            velocity: [],
+            cycleTime: [],
+            throughput: [],
+            wip: {},
+            cfd: [],
+          }),
+          runGeneratedE2eRegressionTests: async (input) => {
+            calls.push(input);
+            return {
+              projectId: input.projectId,
+              traceId: input.traceId,
+              runner: input.runner,
+              status: "planned",
+              command: ["bun", "run", "web:e2e:generated", "--", "/tmp/fulcrum-artifacts/org/project/run/uat-trace_tui_approval.spec.ts"],
+              cwd: "apps/web",
+              testFiles: ["/tmp/fulcrum-artifacts/org/project/run/uat-trace_tui_approval.spec.ts"],
+              artifactIds: ["artifact-e2e"],
+              stdout: "",
+              stderr: "",
+              exitCode: null,
+              ciCommand: ["bun", "run", "scripts/ci-generated-e2e.ts"],
+              ciEnv: { FULCRUM_GENERATED_E2E_RUNNER: "playwright" },
+            };
+          },
+        },
+      },
+    });
+
+    await screen.load();
+    await screen.handleKey("0");
+
+    const rendered = renderPlain((renderer) => screen.render(renderer));
+    expect(rendered).toContain("Generated E2E Run");
+    expect(rendered).toContain("status: planned");
+    expect(rendered).toContain("runner: playwright");
+    expect(rendered).toContain("cwd: apps/web");
+    expect(rendered).toContain("bun run web:e2e:generated -- /tmp/fulcrum-artifacts/org/project/run/uat-trace_tui_approval.spec.ts");
+    expect(rendered).toContain("ci: bun run scripts/ci-generated-e2e.ts");
+    expect(calls).toEqual([{
+      projectId: "99999999-9999-4999-8999-999999999999",
+      traceId: "trace_tui_approval",
+      runner: "playwright",
+      planOnly: true,
+    }]);
+  });
+
+  test("renders review workbench review workbench state and switches to it with key r", async () => {
+    const calls: unknown[] = [];
+    const screen = new ReportsScreen({
+      reviewWorkbenchInput: {
+        projectId: "99999999-9999-4999-8999-999999999999",
+        traceId: "trace_tui_review",
+        reviewId: "review_tui_1",
+        files: [],
+        annotations: [],
+        searchQuery: "trace",
+      },
+      caller: {
+        reports: {
+          metrics: async () => ({
+            burndown: [],
+            velocity: [],
+            cycleTime: [],
+            throughput: [],
+            wip: {},
+            cfd: [],
+          }),
+          reviewWorkbench: async (input) => {
+            calls.push(input);
+            return {
+              projectId: "99999999-9999-4999-8999-999999999999",
+              traceId: "trace_tui_review",
+              reviewId: "review_tui_1",
+              summary: {
+                fileCount: 2,
+                visibleFileCount: 1,
+                viewedFileCount: 1,
+                annotationCount: 2,
+                blockingAnnotationCount: 1,
+                suggestionCount: 1,
+                searchMatchCount: 3,
+                hasLiveOutput: true,
+              },
+              visibleFiles: [{ path: "src/app.ts", annotationCount: 2, searchMatchCount: 3, viewed: false }],
+              annotationGroups: [{ filePath: "src/app.ts", blockingCount: 1, suggestionCount: 1, annotations: [] }],
+              search: { query: "trace", groups: [{ filePath: "src/app.ts", matches: [{ id: "m1" }, { id: "m2" }, { id: "m3" }] }] },
+              suggestions: [{ annotationId: "ann-suggestion", filePath: "src/app.ts", lineStart: 2, lineEnd: 2, canApply: true }],
+              submission: { targets: [{ prRepo: "acme/fulcrum", annotationCount: 2 }], orphans: [{ reason: "full-stack", annotations: [{}] }] },
+              liveLog: { displayText: "running trace review", truncated: false, isWaiting: false },
+            };
+          },
+        },
+      },
+    });
+
+    await screen.load();
+    await screen.handleKey("r");
+
+    const rendered = renderPlain((renderer) => screen.render(renderer));
+    expect(calls).toEqual([{
+      projectId: "99999999-9999-4999-8999-999999999999",
+      traceId: "trace_tui_review",
+      reviewId: "review_tui_1",
+      files: [],
+      annotations: [],
+      searchQuery: "trace",
+    }]);
+    expect(rendered).toContain("Review Workbench");
+    expect(rendered).toContain("trace: trace_tui_review");
+    expect(rendered).toContain("files: 2 visible: 1 viewed: 1");
+    expect(rendered).toContain("annotations: 2 blocking: 1 suggestions: 1");
+    expect(rendered).toContain("search: trace matches: 3");
+    expect(rendered).toContain("src/app.ts annotations: 2 matches: 3");
+    expect(rendered).toContain("targets: 1 orphans: 1");
+    expect(rendered).toContain("running trace review");
+  });
+
+  test("renders persisted review session state and switches to it with key s", async () => {
+    const calls: unknown[] = [];
+    const screen = new ReportsScreen({
+      reviewSessionInput: {
+        projectId: "99999999-9999-4999-8999-999999999999",
+        reviewId: "review_tui_session",
+        searchQuery: "trace",
+      },
+      caller: {
+        reports: {
+          metrics: async () => ({
+            burndown: [],
+            velocity: [],
+            cycleTime: [],
+            throughput: [],
+            wip: {},
+            cfd: [],
+          }),
+          loadReviewWorkbenchSession: async (input) => {
+            calls.push(input);
+            return {
+              projectId: "99999999-9999-4999-8999-999999999999",
+              traceId: "trace_tui_review_session",
+              reviewId: "review_tui_session",
+              reviewType: "code_review",
+              title: "TUI persisted review",
+              status: "loaded",
+              revision: 3,
+              eventId: "event-tui-review-session",
+              model: {
+                summary: {
+                  fileCount: 2,
+                  visibleFileCount: 2,
+                  viewedFileCount: 0,
+                  annotationCount: 2,
+                  blockingAnnotationCount: 1,
+                  suggestionCount: 1,
+                  searchMatchCount: 4,
+                  hasLiveOutput: false,
+                },
+              },
+            };
+          },
+        },
+      },
+    });
+
+    await screen.load();
+    await screen.handleKey("s");
+
+    const rendered = renderPlain((renderer) => screen.render(renderer));
+    expect(calls).toEqual([{
+      projectId: "99999999-9999-4999-8999-999999999999",
+      reviewId: "review_tui_session",
+      searchQuery: "trace",
+    }]);
+    expect(rendered).toContain("Review Session");
+    expect(rendered).toContain("status: loaded");
+    expect(rendered).toContain("review: review_tui_session");
+    expect(rendered).toContain("trace: trace_tui_review_session");
+    expect(rendered).toContain("revision: 3");
+    expect(rendered).toContain("files: 2 visible: 2 viewed: 0");
+    expect(rendered).toContain("annotations: 2 blocking: 1 suggestions: 1");
+    expect(rendered).toContain("search matches: 4");
+  });
+
+  test("appends persisted review session annotations and renders annotated session state with key s", async () => {
+    const calls: unknown[] = [];
+    const screen = new ReportsScreen({
+      reviewAnnotationInput: {
+        projectId: "99999999-9999-4999-8999-999999999999",
+        reviewId: "review_tui_session",
+        annotationId: "ann-tui-inline",
+        type: "suggestion",
+        filePath: "src/app.ts",
+        lineStart: 2,
+        lineEnd: 2,
+        side: "new",
+        text: "Inline TUI review note.",
+        suggestedCode: "trace()",
+        searchQuery: "trace",
+      },
+      caller: {
+        reports: {
+          metrics: async () => ({
+            burndown: [],
+            velocity: [],
+            cycleTime: [],
+            throughput: [],
+            wip: {},
+            cfd: [],
+          }),
+          appendReviewWorkbenchAnnotation: async (input) => {
+            calls.push(input);
+            return {
+              projectId: "99999999-9999-4999-8999-999999999999",
+              traceId: "trace_tui_review_session",
+              reviewId: "review_tui_session",
+              reviewType: "code_review",
+              title: "TUI persisted review",
+              status: "annotated",
+              revision: 4,
+              eventId: "event-tui-review-annotation",
+              model: {
+                summary: {
+                  fileCount: 2,
+                  visibleFileCount: 2,
+                  viewedFileCount: 0,
+                  annotationCount: 3,
+                  blockingAnnotationCount: 1,
+                  suggestionCount: 2,
+                  searchMatchCount: 4,
+                  hasLiveOutput: false,
+                },
+              },
+            };
+          },
+        },
+      },
+    });
+
+    await screen.load();
+    await screen.handleKey("s");
+
+    const rendered = renderPlain((renderer) => screen.render(renderer));
+    expect(calls).toEqual([{
+      projectId: "99999999-9999-4999-8999-999999999999",
+      reviewId: "review_tui_session",
+      annotationId: "ann-tui-inline",
+      type: "suggestion",
+      filePath: "src/app.ts",
+      lineStart: 2,
+      lineEnd: 2,
+      side: "new",
+      text: "Inline TUI review note.",
+      suggestedCode: "trace()",
+      searchQuery: "trace",
+    }]);
+    expect(rendered).toContain("Review Session");
+    expect(rendered).toContain("status: annotated");
+    expect(rendered).toContain("review: review_tui_session");
+    expect(rendered).toContain("revision: 4");
+    expect(rendered).toContain("annotations: 3 blocking: 1 suggestions: 2");
+  });
 });
