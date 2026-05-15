@@ -1,10 +1,10 @@
 /**
  * tRPC assertPermission middleware.
  *
- * Phase 1 (this slice): validates that ctx.session is present.
+ * setup step (this slice): validates that ctx.session is present.
  *   - Missing session → TRPCError code='UNAUTHORIZED'.
  *
- * Phase 2 (Pillar 16 — gated `casbin-policies` flag): when the flag is ON,
+ * setup step (Pillar 16 — gated `casbin-policies` flag): when the flag is ON,
  *   resolves CasbinEnforcerService + FulcrumCasbinAdapter from ctx.container
  *   and calls checkCasbinGate for the current request context.
  *   - Flag OFF: Better-Auth path unchanged.
@@ -35,7 +35,9 @@ import {
   permission,
   type TrpcProcedureMeta,
 } from "./permissions.ts";
-import { FlagRegistry } from "@/flags/registry.ts";
+import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 
 /**
  * Resolved context when assertPermission passes.
@@ -112,8 +114,8 @@ function getCachedEnforcerService(AdapterCtor: any, EnforcerCtor: any, casbinRep
 /**
  * assertPermission middleware.
  *
- * Phase 1: session presence check only.
- * Phase 2: when `casbin-policies` flag is ON, calls checkCasbinGate() before
+ * setup step: session presence check only.
+ * setup step: when `casbin-policies` flag is ON, calls checkCasbinGate() before
  *   passing through to Better-Auth. When flag is OFF: existing session-only check.
  */
 export const assertPermission = t.middleware(async ({ ctx, next, path, meta }) => {
@@ -131,7 +133,7 @@ export const assertPermission = t.middleware(async ({ ctx, next, path, meta }) =
     });
   }
 
-  // Phase 2: casbin-policies flag check (Pillar 16 — issue #16).
+  // setup step: casbin-policies flag check (Pillar 16 — issue #16).
   // Dynamic imports keep casbin's @injectable() decorated classes out of the
   // web SSR bundle (Stage-3 decorators break Node.js ESM loader in web:build).
   // See web-bundle safety note in module JSDoc above.
@@ -145,9 +147,9 @@ export const assertPermission = t.middleware(async ({ ctx, next, path, meta }) =
         // Dynamic imports — excluded from web SSR static bundle (decorator safety).
         const [{ FulcrumCasbinAdapter }, { CasbinEnforcerService, checkCasbinGate }, { CasbinRuleRepository }] =
           await Promise.all([
-            import("@/permissions/casbin-adapter.ts"),
-            import("@/permissions/enforcer.ts"),
-            import("@/db/repositories/flags/CasbinRuleRepository.ts"),
+            import("@identity-access/application/permissions/casbin-adapter.ts"),
+            import("@identity-access/application/permissions/enforcer.ts"),
+            import("@platform-core/infrastructure/application-database/repositories/flags/CasbinRuleRepository.ts"),
           ]);
 
         const casbinRepo = ctx.container.get(CasbinRuleRepository);
@@ -166,10 +168,15 @@ export const assertPermission = t.middleware(async ({ ctx, next, path, meta }) =
             action,
           );
         } catch (e) {
-          if (e instanceof TRPCError && e.code === "FORBIDDEN" && hasEnvFeature(LOCAL_DEV_PERMISSION_BYPASS_FLAG)) {
+          const trpcError = e instanceof AppError ? appErrorToTrpcError(e) : e;
+          if (
+            trpcError instanceof TRPCError
+            && trpcError.code === "FORBIDDEN"
+            && hasEnvFeature(LOCAL_DEV_PERMISSION_BYPASS_FLAG)
+          ) {
             console.warn(`permission bypass resource=${resource} action=${action} user=${ctx.userId} org=${ctx.orgId}`);
           } else {
-            throw e;
+            throw trpcError;
           }
         }
       } catch (e) {

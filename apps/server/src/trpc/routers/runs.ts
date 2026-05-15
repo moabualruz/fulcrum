@@ -10,7 +10,7 @@
 import { z } from "zod/v4";
 import { t } from "../trpc.ts";
 import { permissionedProcedure } from "../middleware.ts";
-import { readTranscriptLines } from "@/orchestration/transcript-diff.ts";
+import { readTranscriptLines } from "@execution-orchestration/infrastructure/agent-runtime/transcript-diff.ts";
 
 const TranscriptLineSchema = z.object({
   ts: z.string(),

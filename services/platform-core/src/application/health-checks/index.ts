@@ -9,7 +9,7 @@ import { DoctorReportSchema, type DoctorReport, type DoctorCheckDef, type Doctor
 const VERSION = "1.0.0";
 
 /**
- * Discover and load all check modules from src/doctor/checks/*.ts.
+ * Discover and load all check modules from this service-owned checks directory.
  * Each module must export `checks: DoctorCheckDef[]`.
  */
 export async function discoverChecks(): Promise<DoctorCheckDef[]> {

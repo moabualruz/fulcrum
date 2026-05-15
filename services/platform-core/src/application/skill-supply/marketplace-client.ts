@@ -3,7 +3,7 @@
  * All functions gated behind FULCRUM_FEATURES=skill-marketplace.
  */
 
-import type { SqlExecutor } from "../db/sql.ts";
+import type { SqlExecutor } from "@platform-core/infrastructure/application-database/sql.ts";
 
 // ── Types ──────────────────────────────────────────────────────────────
 

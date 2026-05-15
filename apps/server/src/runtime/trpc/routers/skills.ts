@@ -9,17 +9,17 @@ import {
   syncFulcrumSkills,
   uninstallFulcrumSkill,
   upgradeFulcrumSkills,
-} from "@/application/skills/commands.ts";
+} from "@platform-core/application/skills/commands.ts";
 import {
   listRegistrySkills,
   listSkillConflicts,
   listSkills,
-} from "@/application/skills/queries.ts";
+} from "@platform-core/application/skills/queries.ts";
 import {
   SkillConflictOutputSchema,
   SkillOutputSchema,
   SkillRegistryEntrySchema,
-} from "@/application/skills/types.ts";
+} from "@platform-core/domain/skills.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 

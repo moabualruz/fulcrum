@@ -1,10 +1,10 @@
 /**
  * Gated remote telemetry batch POST with HMAC signing.
  *
- * C1: entire module behind FULCRUM_FEATURES=telemetry-remote.
+ * Entire module behind FULCRUM_FEATURES=telemetry-remote.
  *     When flag OFF → no outbound POST, TelemetryOutbox remains empty.
- * C2: TelemetryOutbox stores queued batch JSON, attempts, last_attempt_at, status.
- * D5: Flag name: "telemetry-remote" (lowercase-with-hyphens).
+ * TelemetryOutbox stores queued batch JSON, attempts, last_attempt_at, status.
+ * Flag name: "telemetry-remote" (lowercase-with-hyphens).
  *
  * Batch: up to 100 TelemetryEvent rows per POST (BATCH_MAX_SIZE).
  * Flush trigger: graphile-worker job `telemetry:flush` (30s schedule).
@@ -16,8 +16,6 @@
  *
  * No PII in payload: events carry only kind, aggregate payload, occurredAt.
  * User IDs are omitted from the remote batch — only org-scoped aggregates.
- *
- * Closes (issue): .scratch/agent-os-vision/17-cross-cutting-platform/issues/16-gated-telemetry-remote.md
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -56,7 +54,7 @@ export type OutboxStatus = "queued" | "retrying" | "sent" | "dead";
  * TelemetryOutbox in-process entry.
  *
  * Mirrors the telemetry_outbox DB entity. For the DB entity see:
- * src/db/entities/platform/TelemetryOutbox.ts (created by the companion
+ * services/platform-core/src/infrastructure/application-database/entities/platform/TelemetryOutbox.ts (created by the companion
  * migration; this file works against the in-process representation so tests
  * don't need a live DB).
  */

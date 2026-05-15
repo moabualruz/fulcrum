@@ -1,9 +1,9 @@
 import type { PageServerLoad, Actions } from "./$types";
 import { fail } from "@sveltejs/kit";
 import { requestAppScope } from "$lib/server/application-scope";
-import { importSettingsData, preflightSettingsDataImport } from "@/application/settings/commands.ts";
-import { createSettingsDataExport, SETTINGS_ENTITY_KINDS, type SettingsEntityKind } from "@/application/settings/queries.ts";
-import { AppError } from "@/application/errors.ts";
+import { importSettingsData, preflightSettingsDataImport } from "@platform-core/application/settings/commands.ts";
+import { createSettingsDataExport, SETTINGS_ENTITY_KINDS, type SettingsEntityKind } from "@platform-core/application/settings/queries.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 
 function appFail(error: unknown) {
   if (error instanceof AppError) return fail(error.kind === "validation" ? 400 : 500, { error: error.message });

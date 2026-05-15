@@ -3,7 +3,7 @@ import {
   resolveKeybindings,
   type KeybindingPlatform,
   type TenantSettingsReader,
-} from "@/keybindings/index.ts";
+} from "@platform-core/application/input-bindings/index.ts";
 
 export async function renderKeybindingHelp(options: {
   platform?: KeybindingPlatform;

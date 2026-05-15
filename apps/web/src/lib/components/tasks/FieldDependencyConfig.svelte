@@ -1,32 +1,24 @@
 <script lang="ts">
-  /**
-   * FieldDependencyConfig — Phase 05 Plan 12 (D-110).
-   *
-   * Admin UI for managing field dependency rules per project.
-   * CRUD via tRPC fieldDependencies router (wired or stubbed).
-   */
+  import {
+    createFieldDependencyRule,
+    deleteFieldDependencyRule,
+    listFieldDependencyRules,
+    type FieldDependencyRule,
+  } from "./field-dependency-api.js";
   import { cn } from "$lib/utils.js";
-
-  interface Rule {
-    id: string;
-    sourceFieldId: string;
-    sourceValue: string;
-    targetFieldId: string;
-    action: string;
-  }
 
   interface Props {
     projectId: string;
     orgId: string;
+    userId: string;
   }
 
-  let { projectId, orgId }: Props = $props();
+  let { projectId, orgId, userId }: Props = $props();
 
-  let rules = $state<Rule[]>([]);
+  let rules = $state<FieldDependencyRule[]>([]);
   let loading = $state(false);
   let saveError = $state("");
 
-  // New rule form state
   let newSourceField = $state("");
   let newSourceValue = $state("");
   let newTargetField = $state("");
@@ -42,15 +34,10 @@
   async function loadRules() {
     loading = true;
     try {
-      const res = await fetch(
-        "/api/trpc/fieldDependencies.list?input=" +
-          encodeURIComponent(JSON.stringify({ projectId, orgId }))
-      );
-      if (res.ok) {
-        const json = await res.json() as { result?: { data?: Rule[] } };
-        rules = json.result?.data ?? [];
-      }
-    } catch { /* best-effort */ }
+      rules = await listFieldDependencyRules(fetch, { orgId, userId, projectId });
+    } catch {
+      rules = [];
+    }
     finally { loading = false; }
   }
 
@@ -59,33 +46,19 @@
     adding = true;
     saveError = "";
     try {
-      const res = await fetch("/api/trpc/fieldDependencies.create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          "0": {
-            json: {
-              projectId,
-              orgId,
-              sourceFieldId: newSourceField,
-              sourceValue: newSourceValue,
-              targetFieldId: newTargetField,
-              action: newAction,
-            },
-          },
-        }),
+      await createFieldDependencyRule(fetch, { orgId, userId, projectId }, {
+        sourceFieldId: newSourceField,
+        sourceValue: newSourceValue,
+        targetFieldId: newTargetField,
+        action: newAction,
       });
-      if (!res.ok) {
-        saveError = "Failed to add rule.";
-      } else {
-        newSourceField = "";
-        newSourceValue = "";
-        newTargetField = "";
-        newAction = "require";
-        await loadRules();
-      }
+      newSourceField = "";
+      newSourceValue = "";
+      newTargetField = "";
+      newAction = "require";
+      await loadRules();
     } catch {
-      saveError = "Network error.";
+      saveError = "Failed to add rule.";
     } finally {
       adding = false;
     }
@@ -93,18 +66,13 @@
 
   async function deleteRule(ruleId: string) {
     try {
-      const res = await fetch("/api/trpc/fieldDependencies.delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ "0": { json: { ruleId, orgId } } }),
-      });
-      if (res.ok) {
-        rules = rules.filter((r) => r.id !== ruleId);
-      }
-    } catch { /* best-effort */ }
+      await deleteFieldDependencyRule(fetch, { orgId, userId }, ruleId);
+      rules = rules.filter((r) => r.id !== ruleId);
+    } catch {
+      saveError = "Failed to delete rule.";
+    }
   }
 
-  // Load on mount
   $effect(() => {
     void loadRules();
   });
@@ -140,7 +108,6 @@
     </ul>
   {/if}
 
-  <!-- Add rule form -->
   <form
     onsubmit={(e) => { e.preventDefault(); void addRule(); }}
     class="flex flex-col gap-2"

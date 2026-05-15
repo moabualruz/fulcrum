@@ -7,7 +7,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { removeAuthoredSkills, syncSkills } from "./skills.ts";
-import * as proc from "@/utils/proc.ts";
+import * as proc from "@platform-core/application/runtime-support/process-runner.ts";
 
 describe("skills sync — Claude Code plugin path", () => {
   let testHome: string;
@@ -20,7 +20,7 @@ describe("skills sync — Claude Code plugin path", () => {
     origRepoDir = process.env["FULCRUM_REPO_DIR"];
     process.env["HOME"] = testHome;
     // Point to real repo root so curated skills/<name>/SKILL.md exists.
-    process.env["FULCRUM_REPO_DIR"] = join(__dirname, "../..");
+    process.env["FULCRUM_REPO_DIR"] = join(__dirname, "../../..");
   });
 
   afterEach(async () => {
@@ -119,7 +119,7 @@ describe("skills sync — Codex scope and runtime HOME", () => {
     origHome = process.env["HOME"];
     origRepoDir = process.env["FULCRUM_REPO_DIR"];
     process.env["HOME"] = testHome;
-    process.env["FULCRUM_REPO_DIR"] = join(__dirname, "../..");
+    process.env["FULCRUM_REPO_DIR"] = join(__dirname, "../../..");
   });
 
   afterEach(async () => {
@@ -220,7 +220,7 @@ describe("skills sync — Codex scope and runtime HOME", () => {
 });
 
 describe("Claude Code plugin package", () => {
-  const root = join(__dirname, "../..");
+  const root = join(__dirname, "../../..");
 
   test("marketplace points at clean plugin package, not repo root", async () => {
     const marketplace = JSON.parse(
@@ -423,7 +423,7 @@ describe("skills list --installed", () => {
         "---\nname: alpha\ndescription: Alpha installed skill\n---\n",
       );
       const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", "skills", "list", "--installed"], {
-        cwd: join(__dirname, "../.."),
+        cwd: join(__dirname, "../../.."),
         stdout: "pipe",
         stderr: "pipe",
         env: { ...process.env, HOME: testHome },

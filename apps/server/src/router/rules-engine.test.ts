@@ -4,9 +4,9 @@ import {
   RoutingRuleSource,
   type RoutingConditions,
   type RoutingRule,
-} from "@/db/entities/router/RoutingRule.ts";
-import type { RoutingRuleRepository } from "@/db/repositories/router/RoutingRuleRepository.ts";
-import { DEFAULT_ORG_ID } from "@/db/seed.ts";
+} from "@platform-core/infrastructure/application-database/entities/router/RoutingRule.ts";
+import type { RoutingRuleRepository } from "@platform-core/infrastructure/application-database/repositories/router/RoutingRuleRepository.ts";
+import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import {
   configureRulesEngine,
   evaluateRules,

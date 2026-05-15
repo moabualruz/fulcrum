@@ -1,8 +1,8 @@
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requestAppScope } from "$lib/server/application-scope";
-import { getRepoCommitsPage } from "@/application/repos/queries.ts";
-import { AppError } from "@/application/errors.ts";
+import { getRepoCommitsPage } from "@integration-hub/application/repos/queries.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 
 export const _PAGE_SIZE = 50;
 

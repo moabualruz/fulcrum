@@ -5,7 +5,7 @@ import { join, relative } from "node:path";
 import {
   createCliBackupTables,
   type CliBackupStore,
-} from "@/application/backup/cli-backup.ts";
+} from "@platform-core/application/backup/cli-backup.ts";
 import { InteractiveRequiredError } from "./errors.ts";
 
 export interface BackupOptions {

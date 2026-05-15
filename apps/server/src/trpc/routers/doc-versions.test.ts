@@ -1,5 +1,5 @@
 /**
- * doc-versions tRPC router tests — Phase 06 Plan 08.
+ * doc-versions tRPC router tests — knowledge workflow.
  *
  * Tests: list, restore, diff procedures.
  * Self-contained: uses a mock EntityManager; does not require a real DB.

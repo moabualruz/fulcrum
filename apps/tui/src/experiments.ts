@@ -7,7 +7,7 @@
  */
 
 import { isFeatureEnabled } from "./feature-flags.ts";
-import type { AssignmentCounts, MetricsResult } from "@/flags/experiments.ts";
+import type { AssignmentCounts, MetricsResult } from "@platform-core/application/feature-flags/experiments.ts";
 
 export interface Experiment {
   id: string;

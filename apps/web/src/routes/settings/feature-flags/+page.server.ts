@@ -5,9 +5,9 @@ import {
   setSettingsFeatureFlagCohortRules,
   setSettingsFeatureFlagRollout,
   toggleSettingsFeatureFlag,
-} from "@/application/settings/commands.ts";
-import { listSettingsFeatureFlags } from "@/application/settings/queries.ts";
-import { AppError } from "@/application/errors.ts";
+} from "@platform-core/application/settings/commands.ts";
+import { listSettingsFeatureFlags } from "@platform-core/application/settings/queries.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 
 function appFail(error: unknown) {
   if (error instanceof AppError) return fail(error.kind === "validation" ? 400 : 500, { error: error.message });

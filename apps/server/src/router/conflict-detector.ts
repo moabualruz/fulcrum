@@ -9,7 +9,7 @@
 import {
   routingApplication,
   type RoutingApplication,
-} from "@/application/routing.ts";
+} from "@execution-orchestration/application/routing.ts";
 
 type RoutingRuleStore = Parameters<
   RoutingApplication["detectRoutingConflicts"]

@@ -1,7 +1,7 @@
 // Tests for I/O utilities — envelope parsing with error diagnostics.
 
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { readHookEvent } from "./io.ts";
+import { readHookEvent } from "./hook-event-io.ts";
 
 // Mock stdin and capture stderr
 let stderrOutput: string[] = [];

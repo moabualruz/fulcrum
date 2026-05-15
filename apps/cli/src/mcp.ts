@@ -2,7 +2,7 @@
 
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { which, run as runProc } from "@/utils/proc.ts";
+import { which, run as runProc } from "@platform-core/application/runtime-support/process-runner.ts";
 
 const DEEPWIKI_URL = "https://mcp.deepwiki.com/mcp";
 const BEGIN = "# BEGIN FULCRUM MCP deepwiki";

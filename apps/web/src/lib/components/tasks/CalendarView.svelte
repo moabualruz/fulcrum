@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * CalendarView.svelte — Phase 05 Plan 10 (D-63, D-64, D-65)
+   * CalendarView.svelte — task workflow (D-63, D-64, D-65)
    *
    * @event-calendar/core wrapper with:
    * - Month/week/day views (D-63)

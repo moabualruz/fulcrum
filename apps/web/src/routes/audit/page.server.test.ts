@@ -1,114 +1,102 @@
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { openIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { createLocalOrg, appendEvent } from "@/test-support/product-fixtures.ts";
+import { describe, expect, test } from "bun:test";
 
-mock.module("$lib/server/db", () => {
-  const { join: j } = require("node:path");
-  const { openIsolatedStore: oP } = require("../../../../test-support/product-fixtures.ts");
-  const { migrateIsolatedStore: rM } = require("../../../../test-support/product-fixtures.ts");
-  return {
-    openIsolatedStore: async () => {
-      const scratch = process.env["FULCRUM_HOME"]!;
-      const dbDir = j(scratch, "state", "product", "db");
-      const { mkdirSync: mk } = require("node:fs");
-      mk(dbDir, { recursive: true });
-      const db = await oP(j(dbDir, "main"));
-      await rM(db);
-      return db;
-    },
-  };
-});
-
-let scratch: string;
-
-beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-audit-"));
-  process.env["FULCRUM_HOME"] = scratch;
-});
-
-afterEach(() => {
-  delete process.env["FULCRUM_HOME"];
-  rmSync(scratch, { recursive: true, force: true });
-});
-
-function loadEvent(params: Record<string, string> = {}): Parameters<typeof import("./+page.server.ts").load>[0] {
+function loadEvent(fetch: typeof globalThis.fetch, params: Record<string, string> = {}, locals: Partial<App.Locals> = {}) {
   const url = new URL("http://localhost/audit");
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  return { url } as Parameters<typeof import("./+page.server.ts").load>[0];
-}
-
-async function setupDb(): Promise<{ orgId: string }> {
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(join(dbDir, "main"));
-  try {
-    await migrateIsolatedStore(db);
-    const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-    return { orgId: org.id };
-  } finally {
-    await db.close();
-  }
-}
-
-async function seedEvents(orgId: string): Promise<void> {
-  const dbDir = join(scratch, "state", "product", "db");
-  const db = await openIsolatedStore(join(dbDir, "main"));
-  try {
-    await db.query(
-      `INSERT INTO projects (id, org_id, slug, name, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, now(), now())`,
-      ["project-1", orgId, "project-1", "Project 1"],
-    );
-    await appendEvent(db, { orgId, actor: "system", subjectKind: "task", subjectId: "task-1", verb: "created" });
-    await appendEvent(db, { orgId, actor: "local", subjectKind: "doc", subjectId: "doc-1", verb: "updated" });
-    await appendEvent(db, { orgId, actor: "local", subjectKind: "task", subjectId: "task-2", verb: "closed" });
-    await appendEvent(db, { orgId, actor: "agent", projectId: "project-1", subjectKind: "task", subjectId: "task-3", verb: "updated" });
-  } finally {
-    await db.close();
-  }
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+  return {
+    url,
+    fetch,
+    locals: {
+      activeProjectId: null,
+      session: { userId: "user-1" },
+      orgId: "org-1",
+      em: null,
+      container: null,
+      ...locals,
+    },
+    request: new Request(url, {
+      headers: { cookie: "sid=session-1" },
+    }),
+  };
 }
 
 describe("/audit +page.server.ts load()", () => {
-  test("returns empty when no events", async () => {
-    await setupDb();
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.load(loadEvent());
-    expect(result.events).toHaveLength(0);
-    expect(result.total).toBe(0);
+  test("loads audit rows through the public audit API", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), init });
+      return Response.json({
+        data: [{
+          id: "audit-1",
+          orgId: "org-1",
+          projectId: "project-1",
+          userId: "user-1",
+          subjectKind: "task",
+          subjectId: "task-1",
+          verb: "created",
+          payload: { traceId: "trace-1" },
+          createdAt: "2026-05-15T10:00:00.000Z",
+        }],
+        total: 26,
+      });
+    }) as typeof globalThis.fetch;
+    const mod = await import(`./+page.server.ts?audit-public-api=${Date.now()}`);
+
+    const result = await mod.load(loadEvent(fetch, {
+      actor: "user-1",
+      kind: "task",
+      verb: "created",
+      project: "project-1",
+      date_from: "2026-05-01",
+      date_to: "2026-05-31",
+      page: "2",
+    }) as never);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe(
+      "http://localhost/api/v1/audit?orgId=org-1&projectId=project-1&userId=user-1&kind=task&verb=created&since=2026-05-01&until=2026-05-31&limit=25&offset=25",
+    );
+    expect(calls[0]?.init).toMatchObject({
+      method: "GET",
+      credentials: "include",
+      headers: expect.objectContaining({ cookie: "sid=session-1" }),
+    });
+    expect(result).toMatchObject({
+      total: 26,
+      page: 2,
+      actor: "user-1",
+      kind: "task",
+      verb: "created",
+      project: "project-1",
+      dateFrom: "2026-05-01",
+      dateTo: "2026-05-31",
+      events: [{
+        id: "audit-1",
+        org_id: "org-1",
+        project_id: "project-1",
+        actor: "user-1",
+        subject_kind: "task",
+        subject_id: "task-1",
+        verb: "created",
+        payload: { traceId: "trace-1" },
+        created_at: "2026-05-15T10:00:00.000Z",
+      }],
+    });
   });
 
-  test("returns all events unfiltered", async () => {
-    const { orgId } = await setupDb();
-    await seedEvents(orgId);
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    const result = await mod.load(loadEvent());
-    expect(result.events).toHaveLength(4);
-    expect(result.total).toBe(4);
-  });
+  test("maps public API failures to a route 502", async () => {
+    const fetch = (async () =>
+      Response.json({ message: "Audit public API application facade is not configured." }, { status: 500 })) as typeof globalThis.fetch;
+    const mod = await import(`./+page.server.ts?audit-public-api-failure=${Date.now()}`);
 
-  test("filter by kind=task returns only task events", async () => {
-    const { orgId } = await setupDb();
-    await seedEvents(orgId);
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
-    const result = await mod.load(loadEvent({ kind: "task" }));
-    expect(result.events).toHaveLength(3);
-    for (const ev of result.events) {
-      expect(ev.subject_kind).toBe("task");
+    let thrown: unknown;
+    try {
+      await mod.load(loadEvent(fetch) as never);
+    } catch (cause) {
+      thrown = cause;
     }
-  });
 
-  test("filter by verb and project returns only matching events", async () => {
-    const { orgId } = await setupDb();
-    await seedEvents(orgId);
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 5}`);
-    const result = await mod.load(loadEvent({ verb: "updated", project: "project-1" }));
-    expect(result.events).toHaveLength(1);
-    expect(result.events[0]!.verb).toBe("updated");
-    expect(result.events[0]!.project_id).toBe("project-1");
+    expect((thrown as { status?: number })?.status).toBe(502);
   });
 
   test("page exposes actor, subject kind, verb, date range, and project filters", async () => {
@@ -118,29 +106,10 @@ describe("/audit +page.server.ts load()", () => {
     }
   });
 
-  test("filter by actor=system returns only system events", async () => {
-    const { orgId } = await setupDb();
-    await seedEvents(orgId);
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
-    const result = await mod.load(loadEvent({ actor: "system" }));
-    expect(result.events).toHaveLength(1);
-    expect(result.events[0]!.actor).toBe("system");
-  });
+  test("route source does not use direct app scope or application queries", async () => {
+    const source = await Bun.file(new URL("./+page.server.ts", import.meta.url)).text();
 
-  test("pagination: page 2 of 26 events returns 1 row", async () => {
-    const { orgId } = await setupDb();
-    const dbDir = join(scratch, "state", "product", "db");
-    const db = await openIsolatedStore(join(dbDir, "main"));
-    try {
-      for (let i = 0; i < 26; i++) {
-        await appendEvent(db, { orgId, actor: "system", subjectKind: "doc", subjectId: `doc-${i}`, verb: "indexed" });
-      }
-    } finally {
-      await db.close();
-    }
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 4}`);
-    const result = await mod.load(loadEvent({ page: "2" }));
-    expect(result.events).toHaveLength(1);
-    expect(result.total).toBe(26);
+    expect(source).not.toContain("requestAppScope");
+    expect(source).not.toContain("queryAuditEventRows");
   });
 });

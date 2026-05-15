@@ -1,16 +1,11 @@
 <script lang="ts">
   /**
    * FilterBuilder — chip-based filter UI (Linear-style).
-   * D-69: uses shadcn-svelte primitives only (Popover, Badge, Button, Select).
-   * D-72: supports custom field references by field_id.
-   * D-79: labels grouped by group name.
-   * D-80: priority levels Urgent/High/Medium/Low/No Priority.
    */
   import { createEventDispatcher } from "svelte";
-  import type { SavedViewQuery, FilterClause, FilterOp } from "../../../../../filters/ast.ts";
-  import { SavedViewQuerySchema } from "../../../../../filters/ast.ts";
+  import type { SavedViewQuery, FilterClause, FilterOp } from "@work-management/application/saved-views/filter-query.ts";
+  import { SavedViewQuerySchema } from "@work-management/application/saved-views/filter-query.ts";
 
-  // shadcn-svelte primitives only (D-69)
   import * as Popover from "$lib/components/ui/popover/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
   import { Badge } from "$lib/components/ui/badge/index.js";
@@ -42,7 +37,7 @@
     export: SavedViewQuery;
   }>();
 
-  // ── Priority levels (D-80) ─────────────────────────────────────────
+  // ── Priority levels ─────────────────────────────────────────
   const PRIORITY_LEVELS = [
     { value: "0", label: "Urgent" },
     { value: "1", label: "High" },
@@ -339,7 +334,7 @@
   <!-- Spacer -->
   <div class="flex-1" />
 
-  <!-- Include archived toggle (D-114) -->
+  <!-- Include archived toggle -->
   <label class="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
     <input
       type="checkbox"
@@ -350,7 +345,7 @@
     Include archived
   </label>
 
-  <!-- Export button (D-120) -->
+  <!-- Export button -->
   <Button variant="outline" size="sm" class="h-7 text-xs" on:click={handleExport}>
     Export
   </Button>

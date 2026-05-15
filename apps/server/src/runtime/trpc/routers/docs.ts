@@ -10,7 +10,7 @@ import {
   restoreDocVersion,
   updateDoc,
   updateDocComment,
-} from "@/application/docs/commands.ts";
+} from "@knowledge-workspace/application/docs/commands.ts";
 import {
   diffDocVersions,
   getDoc,
@@ -20,12 +20,12 @@ import {
   listDocForwardLinks,
   listDocs,
   listDocVersions,
-} from "@/application/docs/queries.ts";
-import type { AppContext } from "@/application/docs/types.ts";
-import { DocTypeEnum, ScopeEnum } from "@/application/docs/types.ts";
-import { LinkKindEnum } from "@/domain/docs/enums.ts";
-import { appErrorToTrpcError } from "@/application/error-mapping.ts";
-import { AppError } from "@/application/errors.ts";
+} from "@knowledge-workspace/application/docs/queries.ts";
+import type { AppContext } from "@knowledge-workspace/application/docs/types.ts";
+import { DocTypeEnum, ScopeEnum } from "@knowledge-workspace/application/docs/types.ts";
+import { LinkKindEnum } from "@knowledge-workspace/domain/document-enums.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { docTemplatesRouter } from "./doc-templates.ts";
@@ -272,35 +272,35 @@ export const docsRouter = t.router({
       .query(async ({ ctx, input }) => {
         const em = optionalEntityManager(ctx);
         if (!em) return [];
-        return listDocComments(em, appContext(ctx), input.docId, input.resolved);
+        return mapAppError(() => listDocComments(em, appContext(ctx), input.docId, input.resolved));
       }),
 
     create: permissionedProcedure({ resource: "docs", action: "create" })
       .input(CreateCommentInputSchema)
       .output(CommentOutputSchema)
       .mutation(async ({ ctx, input }) => {
-        return createDocComment(requireEntityManager(ctx), appContext(ctx), input);
+        return mapAppError(() => createDocComment(requireEntityManager(ctx), appContext(ctx), input));
       }),
 
     update: permissionedProcedure({ resource: "docs", action: "update" })
       .input(UpdateCommentInputSchema)
       .output(CommentOutputSchema.nullable())
       .mutation(async ({ ctx, input }) => {
-        return updateDocComment(requireEntityManager(ctx), appContext(ctx), input.id, input.bodyMd);
+        return mapAppError(() => updateDocComment(requireEntityManager(ctx), appContext(ctx), input.id, input.bodyMd));
       }),
 
     delete: permissionedProcedure({ resource: "docs", action: "delete" })
       .input(DeleteCommentInputSchema)
       .output(DeleteCommentOutputSchema.nullable())
       .mutation(async ({ ctx, input }) => {
-        return deleteDocComment(requireEntityManager(ctx), appContext(ctx), input.id);
+        return mapAppError(() => deleteDocComment(requireEntityManager(ctx), appContext(ctx), input.id));
       }),
 
     resolve: permissionedProcedure({ resource: "docs", action: "resolve" })
       .input(ResolveCommentInputSchema)
       .output(CommentOutputSchema.nullable())
       .mutation(async ({ ctx, input }) => {
-        return resolveDocComment(requireEntityManager(ctx), appContext(ctx), input.id, input.resolved);
+        return mapAppError(() => resolveDocComment(requireEntityManager(ctx), appContext(ctx), input.id, input.resolved));
       }),
   }),
 
@@ -351,7 +351,7 @@ export const docsRouter = t.router({
       .query(async ({ ctx, input }) => {
         const em = optionalEntityManager(ctx);
         if (!em) return [];
-        return listDocBacklinks(em, appContext(ctx), input.docId);
+        return mapAppError(() => listDocBacklinks(em, appContext(ctx), input.docId));
       }),
 
     listForwardLinks: permissionedProcedure({ resource: "docs", action: "listForwardLinks" })
@@ -360,7 +360,7 @@ export const docsRouter = t.router({
       .query(async ({ ctx, input }) => {
         const em = optionalEntityManager(ctx);
         if (!em) return [];
-        return listDocForwardLinks(em, appContext(ctx), input.docId);
+        return mapAppError(() => listDocForwardLinks(em, appContext(ctx), input.docId));
       }),
   }),
 });

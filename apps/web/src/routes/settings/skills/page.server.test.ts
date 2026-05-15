@@ -1,9 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-
-let scratch: string;
+import { describe, expect, test } from "bun:test";
 
 interface SkillsPayload {
   skills: Array<{
@@ -11,7 +6,9 @@ interface SkillsPayload {
     slug: string;
     version: string;
     source: string;
+    content_hash: string | null;
     enabled_agents: string[];
+    upstream_conflict: null;
   }>;
 }
 
@@ -21,52 +18,103 @@ function streamedData<T>(result: unknown): Promise<T> {
   return stream as Promise<T>;
 }
 
-beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-skills-page-"));
-  process.env["FULCRUM_HOME"] = scratch;
-});
-
-afterEach(() => {
-  delete process.env["FULCRUM_HOME"];
-  rmSync(scratch, { recursive: true, force: true });
-});
+function loadEvent(fetch: typeof globalThis.fetch) {
+  return {
+    locals: {
+      activeProjectId: null,
+      session: { userId: "user-1" },
+      orgId: "org-1",
+      userId: "user-1",
+      em: null,
+      container: null,
+    },
+    fetch,
+    request: new Request("http://localhost/settings/skills", {
+      headers: { cookie: "sid=session-1" },
+    }),
+    url: new URL("http://localhost/settings/skills"),
+  };
+}
 
 describe("/settings/skills +page.server.ts load()", () => {
-  test("returns seeded skills sorted by slug ASC", async () => {
-    mock.module("$lib/server/application-scope", () => ({
-      requestAppScope: async () => ({ ctx: { orgId: "org1" } }),
-    }));
-    mock.module("../../../../../application/skills/queries.ts", () => ({
-      listRegistrySkills: async () => [],
-      listSkillConflicts: async () => [],
-      serializeSkill: (skill: unknown) => skill,
-      listSkills: async () => [
-        { id: "bat", name: "bat", slug: "bat", source: "upstream", upstreamRepo: "https://github.com/ex/bat", upstreamRef: null, enabledAgents: [] },
-        { id: "jq", name: "jq", slug: "jq", source: "local", upstreamRepo: null, upstreamRef: null, enabledAgents: [] },
-      ],
-    }));
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = mod.load({ locals: {} } as Parameters<typeof mod.load>[0]);
+  test("loads installed skills through the public skill API", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), init });
+      return new Response(
+        JSON.stringify([
+          {
+            id: "bat",
+            name: "bat",
+            slug: "bat",
+            source: "local",
+            version: "1.0.0",
+            hash: "sha-bat",
+            upstreamRepo: null,
+            upstreamRef: null,
+            enabledAgents: ["codex"],
+          },
+          {
+            id: "jq",
+            name: "jq",
+            slug: "jq",
+            source: "local",
+            version: "1.1.0",
+            hash: "sha-jq",
+            upstreamRepo: null,
+            upstreamRef: null,
+            enabledAgents: ["codex", "claude"],
+          },
+        ]),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as typeof globalThis.fetch;
+    const mod = await import(`./+page.server.ts?skills-public-list=${Date.now()}`);
+
+    const result = mod.load(loadEvent(fetch) as never);
     const payload = await streamedData<SkillsPayload>(result);
-    expect(Array.isArray(payload.skills)).toBe(true);
-    expect(payload.skills).toHaveLength(2);
-    expect(payload.skills[0]!.slug).toBe("bat");
-    expect(payload.skills[1]!.slug).toBe("jq");
+    expect(payload.skills).toEqual([
+      expect.objectContaining({
+        slug: "bat",
+        version: "1.0.0",
+        content_hash: "sha-bat",
+        enabled_agents: ["codex"],
+        upstream_conflict: null,
+      }),
+      expect.objectContaining({
+        slug: "jq",
+        version: "1.1.0",
+        content_hash: "sha-jq",
+        enabled_agents: ["codex", "claude"],
+        upstream_conflict: null,
+      }),
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe("http://localhost/api/v1/skills?orgId=org-1");
+    expect(calls[0]?.init).toMatchObject({
+      method: "GET",
+      credentials: "include",
+      headers: expect.objectContaining({ cookie: "sid=session-1" }),
+    });
   });
 
-  test("returns empty array when no skills installed", async () => {
-    mock.module("$lib/server/application-scope", () => ({
-      requestAppScope: async () => ({ ctx: { orgId: "org1" } }),
-    }));
-    mock.module("../../../../../application/skills/queries.ts", () => ({
-      listRegistrySkills: async () => [],
-      listSkillConflicts: async () => [],
-      serializeSkill: (skill: unknown) => skill,
-      listSkills: async () => [],
-    }));
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    const result = mod.load({ locals: {} } as Parameters<typeof mod.load>[0]);
+  test("returns empty array when no skills are installed", async () => {
+    const fetch = (async () =>
+      new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })) as typeof globalThis.fetch;
+    const mod = await import(`./+page.server.ts?skills-empty=${Date.now()}`);
+
+    const result = mod.load(loadEvent(fetch) as never);
     const payload = await streamedData<SkillsPayload>(result);
     expect(payload.skills).toEqual([]);
+  });
+
+  test("route source does not use direct application scope or skill queries", async () => {
+    const serverSource = await Bun.file(new URL("./+page.server.ts", import.meta.url)).text();
+
+    expect(serverSource).not.toContain("requestAppScope");
+    expect(serverSource).not.toContain("application/skills/queries");
   });
 });

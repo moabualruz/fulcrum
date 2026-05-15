@@ -6,7 +6,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
 import { join } from "node:path";
-import type { SqlExecutor } from "../db/sql.ts";
+import type { SqlExecutor } from "@platform-core/infrastructure/application-database/sql.ts";
 import {
   type MarketplaceListing,
   FeatureDisabledError,

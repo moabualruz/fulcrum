@@ -30,7 +30,7 @@ import { orchestrationRouter } from "./routers/orchestration.ts";
 import { notificationsRouter } from "./routers/notifications.ts";
 import { artifactsRouter } from "./routers/artifacts.ts";
 import { reposRouter } from "./routers/repos.ts";
-import { credentialsRouter } from "@/secrets/credentials-router.ts";
+import { credentialsRouter } from "../runtime/trpc/routers/credentials.ts";
 import { reportsRouter } from "./routers/reports.ts";
 import { webhooksRouter } from "./routers/webhooks.ts";
 import { commentsRouter } from "../runtime/trpc/routers/comments.ts";
@@ -39,11 +39,12 @@ import { relationshipsRouter } from "../runtime/trpc/routers/relationships.ts";
 import { templatesRouter } from "../runtime/trpc/routers/templates.ts";
 import { recurrenceRouter } from "../runtime/trpc/routers/recurrence.ts";
 import { automationsRouter } from "../runtime/trpc/routers/automations.ts";
+import { planningRouter } from "../runtime/trpc/routers/planning.ts";
 import {
   runsSubscriptionRouter,
   notifySubscriptionRouter,
   orchestrationSubscriptionRouter,
-} from "@/subscriptions/procedures.ts";
+} from "../runtime/trpc/routers/subscriptions.ts";
 
 // Extracted stub routers (formerly inline)
 import { projectsRouter } from "./routers/projects.ts";
@@ -121,12 +122,13 @@ export const appRouter = t.router({
   templates: templatesRouter,
   recurrence: recurrenceRouter,
   automations: automationsRouter,
+  planning: planningRouter,
   credentials: credentialsRouter,
 
   db: dbRouter,
   health: healthRouter,
 
-  // P13#02: WebSocket subscription routers.
+  // WebSocket subscription routers.
   runsSubscriptions: runsSubscriptionRouter,
   notifySubscriptions: notifySubscriptionRouter,
   orchestrationSubscriptions: orchestrationSubscriptionRouter,

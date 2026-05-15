@@ -3,7 +3,7 @@
 // --json support on domain commands, fulcrum init idempotency,
 // and error log dir writability.
 
-import { exists, which } from "../../utils/proc.ts";
+import { exists, which } from "@platform-core/application/runtime-support/process-runner.ts";
 import type { DoctorCheckDef } from "../types.ts";
 
 const SUBSYSTEM = "cli";

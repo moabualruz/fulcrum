@@ -5,7 +5,7 @@
  * webview (i.e. plain browser or bun test), __TAURI__ is absent and every
  * call throws a clear "Not running in Tauri desktop environment" error.
  *
- * IPC commands defined in src-tauri/src/main.rs:
+ * IPC commands defined in apps/desktop/src-tauri/src/main.rs:
  *   copy_artifact(sourcePath: string) → CopyArtifactResult
  *   check_for_updates()               → UpdateCheckResult
  *   check_feature_flag(flag: string)  → { enabled: boolean }

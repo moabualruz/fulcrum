@@ -2,17 +2,17 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { PGlite } from "@electric-sql/pglite";
 import { MikroORM, type Options } from "@mikro-orm/postgresql";
 
-import { Event } from "@/db/entities/core/Event.ts";
-import { Org } from "@/db/entities/auth/Org.ts";
+import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
 import {
   RoutingRule,
   RoutingRuleSource,
   type RoutingConditions,
-} from "@/db/entities/router/RoutingRule.ts";
-import { createOrmConfig } from "@/db/mikro-orm.config.ts";
-import type { EventRepository } from "@/db/repositories/core/EventRepository.ts";
-import type { RoutingRuleRepository } from "@/db/repositories/router/RoutingRuleRepository.ts";
-import { DEFAULT_ORG_ID, SeedService } from "@/db/seed.ts";
+} from "@platform-core/infrastructure/application-database/entities/router/RoutingRule.ts";
+import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import type { EventRepository } from "@platform-core/infrastructure/application-database/repositories/core/EventRepository.ts";
+import type { RoutingRuleRepository } from "@platform-core/infrastructure/application-database/repositories/router/RoutingRuleRepository.ts";
+import { DEFAULT_ORG_ID, SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
 import { autoAssign, configureAutoAssign } from "./auto-assign.ts";
 import { configureLlmFallback } from "./llm-fallback.ts";
 import { configureNoMatchPrompt, learnRule } from "./no-match-prompt.ts";

@@ -13,10 +13,10 @@ import {
   updateLlmGateConfig,
   updateRoutingDraft,
   updateRoutingRule,
-} from "@/application/routing.ts";
-import { appErrorToTrpcError } from "@/application/error-mapping.ts";
-import { AppError } from "@/application/errors.ts";
-import { RoutingRuleSource } from "@/domain/routing/types.ts";
+} from "@execution-orchestration/application/routing.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
+import { RoutingRuleSource } from "@execution-orchestration/domain/routing.ts";
 import { requireTrpcEntityManager } from "@fulcrum/server/trpc/context.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";

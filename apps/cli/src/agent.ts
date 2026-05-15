@@ -1,6 +1,8 @@
-import type { Container } from "@needle-di/core";
-
-import { createLocalCaller } from "./local-caller.ts";
+import {
+  createAgentRunApiCallerFromEnv,
+  type AgentRunApiEnvironment,
+} from "@execution-orchestration/interface/http/agent-run-api-client.ts";
+import { formatApiError } from "./api-errors.ts";
 
 const HELP = `fulcrum agent — agent run commands
 
@@ -16,9 +18,11 @@ interface ParsedArgs {
 }
 
 type AgentRunResult = {
-  runId: string;
-  state: string;
-  agent: string;
+  runId?: string;
+  id?: string;
+  state?: string;
+  status?: string;
+  agent?: string;
 };
 
 type AgentCaller = {
@@ -29,7 +33,8 @@ type AgentCaller = {
 
 export interface AgentRunOptions {
   caller?: AgentCaller;
-  container?: Container | null;
+  env?: AgentRunApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -59,18 +64,35 @@ export async function run(argv: readonly string[], opts: AgentRunOptions = {}): 
   const agent = flag(parsed, "agent") ?? "codex";
   const json = parsed.flags["--json"] !== undefined;
   try {
-    const caller = opts.caller ?? await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as AgentCaller;
+    const caller = await resolveCaller(opts);
     const result = await caller.orchestration.dispatchRun({ taskId, agentName: agent });
-    const status = result.state === "unclaimed" ? "queued" : result.state;
-    const output = { id: result.runId, task_id: taskId, agent: result.agent, status };
+    const rawStatus = result.state ?? result.status ?? "queued";
+    const status = rawStatus === "unclaimed" ? "queued" : rawStatus;
+    const output = {
+      id: result.runId ?? result.id,
+      task_id: taskId,
+      agent: result.agent ?? agent,
+      status,
+    };
     if (json) print(JSON.stringify(output, null, 2));
     else print(`${output.status}\t${output.agent}\t${output.id}`);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errorMessage(err);
     const notFound = /not found/i.test(message);
     printErr(notFound ? `task not found: ${taskId}` : message);
     exit(notFound ? 1 : 1);
   }
+}
+
+async function resolveCaller(opts: AgentRunOptions): Promise<AgentCaller> {
+  if (opts.caller) return opts.caller;
+  const apiCaller = createAgentRunApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error(
+      "Agent-run API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL and FULCRUM_ORG_ID.",
+    );
+  }
+  return apiCaller as AgentCaller;
 }
 
 function parseArgs(argv: readonly string[]): ParsedArgs {
@@ -105,4 +127,8 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
 function flag(parsed: ParsedArgs, name: string): string | undefined {
   const value = parsed.flags[`--${name}`];
   return typeof value === "string" ? value : undefined;
+}
+
+function errorMessage(error: unknown): string {
+  return formatApiError(error);
 }

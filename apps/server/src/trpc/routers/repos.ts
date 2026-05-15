@@ -1,9 +1,10 @@
 import { TRPCError } from "@trpc/server";
-import type { Container } from "@needle-di/core";
+/** Minimal DI container interface — fulfilled by needle-di Container at runtime. */
+type Container = { get<T>(token: unknown): T };
 import { z } from "zod";
 
-import * as repoApplication from "@/application/repos/trpc-adapter.ts";
-import type { AppContext } from "@/application/repos/types.ts";
+import * as repositoryOperations from "@integration-hub/application/repos/repository-operations.ts";
+import type { AppContext } from "@integration-hub/domain/repository.ts";
 import { optionalTrpcEntityManager, requireTrpcEntityManager, type TRPCContext } from "../context.ts";
 import { permissionedProcedure } from "../middleware.ts";
 import { t } from "../trpc.ts";
@@ -19,15 +20,15 @@ import {
 
 function resolveRepoTaskQueue(ctx: {
   container: Container | null;
-}): repoApplication.RepoTaskQueue {
+}): repositoryOperations.RepoTaskQueue {
   const token = "repoSyncQueue";
   const container = ctx.container as unknown as {
     has(token: unknown): boolean;
     get(token: unknown): unknown;
   } | null;
   if (container?.has(token)) {
-    const queue = container.get(token) as Partial<repoApplication.RepoTaskQueue>;
-    if (typeof queue.addJob === "function") return queue as repoApplication.RepoTaskQueue;
+    const queue = container.get(token) as Partial<repositoryOperations.RepoTaskQueue>;
+    if (typeof queue.addJob === "function") return queue as repositoryOperations.RepoTaskQueue;
   }
 
   throw new TRPCError({
@@ -51,35 +52,35 @@ export const reposRouter = t.router({
     .query(async ({ ctx, input }) => {
       const em = optionalTrpcEntityManager(ctx);
       if (!em) return [];
-      return repoApplication.listTrpcRepos(em, appContext(ctx), input);
+      return repositoryOperations.listRepositories(em, appContext(ctx), input);
     }),
 
   get: permissionedProcedure({ resource: "repos", action: "get" })
     .input(RepoIdInputSchema)
     .output(RepoOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
-      return repoApplication.getTrpcRepo(requireTrpcEntityManager(ctx), appContext(ctx), input.id);
+      return repositoryOperations.getRepository(requireTrpcEntityManager(ctx), appContext(ctx), input.id);
     }),
 
   register: permissionedProcedure({ resource: "repos", action: "register" })
     .input(RegisterRepoInputSchema)
     .output(RepoOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      return repoApplication.registerTrpcRepo(requireTrpcEntityManager(ctx), appContext(ctx), input);
+      return repositoryOperations.registerRepository(requireTrpcEntityManager(ctx), appContext(ctx), input);
     }),
 
   sync: permissionedProcedure({ resource: "repos", action: "sync" })
     .input(RepoIdInputSchema)
     .output(RepoOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
-      return repoApplication.syncTrpcRepo(requireTrpcEntityManager(ctx), appContext(ctx), input.id);
+      return repositoryOperations.requestRepositorySync(requireTrpcEntityManager(ctx), appContext(ctx), input.id);
     }),
 
   syncRepo: permissionedProcedure({ resource: "repos", action: "sync" })
     .input(SyncRepoInputSchema)
     .output(RepoSyncResultSchema.nullable())
     .mutation(async ({ ctx, input }) => {
-      return repoApplication.enqueueRepoSync(
+      return repositoryOperations.enqueueRepositorySync(
         requireTrpcEntityManager(ctx),
         appContext(ctx),
         input.repoId,
@@ -91,14 +92,14 @@ export const reposRouter = t.router({
     .input(SyncRepoInputSchema)
     .output(RepoStatusResultSchema.nullable())
     .query(async ({ ctx, input }) => {
-      return repoApplication.getTrpcRepoStatus(requireTrpcEntityManager(ctx), appContext(ctx), input.repoId);
+      return repositoryOperations.getRepositoryStatus(requireTrpcEntityManager(ctx), appContext(ctx), input.repoId);
     }),
 
   unregister: permissionedProcedure({ resource: "repos", action: "unregister" })
     .input(RepoIdInputSchema)
     .output(RepoOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
-      return repoApplication.unregisterTrpcRepo(requireTrpcEntityManager(ctx), appContext(ctx), input.id);
+      return repositoryOperations.unregisterRepository(requireTrpcEntityManager(ctx), appContext(ctx), input.id);
     }),
 });
 

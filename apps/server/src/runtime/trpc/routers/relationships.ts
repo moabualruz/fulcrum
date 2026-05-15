@@ -12,9 +12,9 @@ import {
   markTaskAsDuplicate,
   summarizeEntityRelationships,
   type RelationshipsAppContext,
-} from "@/application/relationships/commands.ts";
-import { relationshipBucketSchema } from "@/application/relationships/summary.ts";
-import { traceRefSchema, traceSpineSchema } from "@/application/trace/schemas.ts";
+} from "@work-management/application/relationships/commands.ts";
+import { relationshipBucketSchema } from "@work-management/application/relationships/summary.ts";
+import { traceRefSchema, traceSpineSchema } from "@workflow-coordination/domain/trace.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 

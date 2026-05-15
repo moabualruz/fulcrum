@@ -1,10 +1,6 @@
-/**
- * /settings/experiments — server page for A/B experiment admin UI.
- * Gated by FULCRUM_FEATURES=experiments (C1).
- * Flag OFF → 404.
- */
-
 import { error, fail, redirect } from "@sveltejs/kit";
+
+import { createFeatureExperimentApiCaller } from "@platform-core/interface/http/feature-experiment-api-client.ts";
 
 interface RouteLocals {
   session: unknown;
@@ -38,123 +34,91 @@ export interface ExperimentRow {
   createdAt: string;
 }
 
-function getBaseUrl(requestUrl: string): string {
-  const url = new URL(requestUrl);
-  return `${url.protocol}//${url.host}`;
+interface ExperimentApiRow {
+  id?: unknown;
+  name?: unknown;
+  description?: unknown;
+  variants?: unknown;
+  rolloutPercent?: unknown;
+  startDate?: unknown;
+  endDate?: unknown;
+  createdAt?: unknown;
 }
 
-function extractTrpcError(body: unknown): string {
-  if (!body || typeof body !== "object") return "Request failed";
-  if (Array.isArray(body)) {
-    const first = body[0] as { error?: { json?: { message?: string } } } | undefined;
-    if (first?.error?.json?.message) return first.error.json.message;
-  }
-  const errorBody = (body as { error?: unknown }).error;
-  if (typeof errorBody === "string") return errorBody;
-  if (errorBody && typeof errorBody === "object") {
-    const rec = errorBody as Record<string, unknown>;
-    if (typeof rec["message"] === "string") return rec["message"];
-    const json = rec["json"] as Record<string, unknown> | undefined;
-    if (json && typeof json["message"] === "string") return json["message"];
-  }
-  return "Request failed";
+function createExperimentCaller(event: LoadEvent | ActionEvent) {
+  return createFeatureExperimentApiCaller({
+    baseUrl: process.env["FULCRUM_SERVER_URL"] ?? process.env["FULCRUM_PUBLIC_API_URL"] ?? `${event.url.protocol}//${event.url.host}`,
+    fetch: event.fetch,
+    headers: cookieHeaders(event),
+  });
 }
 
-function unwrapTrpcData(body: unknown): unknown {
-  return (
-    (body as { result?: { data?: { json?: unknown } } })?.result?.data?.json ??
-    (body as { result?: { data?: unknown } })?.result?.data ??
-    body
-  );
+function cookieHeaders(event: LoadEvent | ActionEvent): Record<string, string> {
+  const cookie = event.request.headers.get("cookie");
+  return cookie ? { cookie } : {};
 }
 
-async function callTrpcQuery(
-  fetchFn: typeof fetch,
-  baseUrl: string,
-  procedure: string,
-  input: unknown,
-  cookieHeader: string,
-): Promise<{ ok: true; data: unknown } | { ok: false; error: string; status: number }> {
-  try {
-    const encodedInput = encodeURIComponent(JSON.stringify({ json: input }));
-    const response = await fetchFn(
-      `${baseUrl}/api/trpc/${procedure}?input=${encodedInput}`,
-      {
-        method: "GET",
-        credentials: "include",
-        headers: { "content-type": "application/json", cookie: cookieHeader },
-      },
-    );
-    const body = await response.json().catch(() => null);
-    if (!response.ok) return { ok: false, error: extractTrpcError(body), status: response.status };
-    return { ok: true, data: unwrapTrpcData(body) };
-  } catch (cause) {
-    return { ok: false, error: String(cause), status: 500 };
-  }
+function errorMessage(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
 }
 
-async function callTrpcMutation(
-  fetchFn: typeof fetch,
-  baseUrl: string,
-  procedure: string,
-  input: unknown,
-  cookieHeader: string,
-): Promise<{ ok: true; data: unknown } | { ok: false; error: string; status: number }> {
-  try {
-    const response = await fetchFn(`${baseUrl}/api/trpc/${procedure}`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json", cookie: cookieHeader },
-      body: JSON.stringify({ json: input }),
-    });
-    const body = await response.json().catch(() => null);
-    if (!response.ok) return { ok: false, error: extractTrpcError(body), status: response.status };
-    return { ok: true, data: unwrapTrpcData(body) };
-  } catch (cause) {
-    return { ok: false, error: String(cause), status: 500 };
-  }
+function statusFromMessage(message: string): number {
+  const lower = message.toLowerCase();
+  if (lower.includes("401") || lower.includes("unauthorized")) return 401;
+  if (lower.includes("403") || lower.includes("forbidden")) return 403;
+  if (lower.includes("404") || lower.includes("not found")) return 404;
+  return 500;
+}
+
+function normalizeExperiment(row: ExperimentApiRow): ExperimentRow | null {
+  if (typeof row.id !== "string" || typeof row.name !== "string") return null;
+
+  return {
+    id: row.id,
+    name: row.name,
+    description: typeof row.description === "string" ? row.description : "",
+    variants: Array.isArray(row.variants) ? row.variants.filter((variant): variant is string => typeof variant === "string") : [],
+    rolloutPercent: typeof row.rolloutPercent === "number" ? row.rolloutPercent : 100,
+    startDate: typeof row.startDate === "string" ? row.startDate : null,
+    endDate: typeof row.endDate === "string" ? row.endDate : null,
+    createdAt: typeof row.createdAt === "string" ? row.createdAt : "",
+  };
 }
 
 export async function load(event: LoadEvent) {
-  const { locals, fetch: fetchFn, request, url } = event;
-
-  if (!locals.session) {
+  if (!event.locals.session) {
     throw redirect(302, "/auth/login");
   }
 
-  const baseUrl = getBaseUrl(url.href);
-  const cookieHeader = request.headers.get("cookie") ?? "";
-
-  // Check experiments flag — 404 when OFF
-  const flagResult = await callTrpcQuery(fetchFn, baseUrl, "flags.experiments.list", {}, cookieHeader);
-  if (!flagResult.ok) {
-    if (flagResult.error === "FEATURE_DISABLED" || flagResult.status === 403) {
+  try {
+    const rows = await createExperimentCaller(event).flags.experiments.list();
+    const experiments = Array.isArray(rows)
+      ? rows.map((row) => normalizeExperiment(row as ExperimentApiRow)).filter((row): row is ExperimentRow => row !== null)
+      : [];
+    return { experiments };
+  } catch (cause) {
+    const message = errorMessage(cause);
+    const status = statusFromMessage(message);
+    if (status === 401) throw redirect(302, "/auth/login");
+    if (status === 404 || status === 403) {
       error(404, { message: "Experiments feature is not enabled." });
     }
-    if (flagResult.status === 401) throw redirect(302, "/auth/login");
-    error(500, { message: flagResult.error });
+    error(500, { message });
   }
-
-  const experiments = Array.isArray(flagResult.data)
-    ? (flagResult.data as ExperimentRow[])
-    : [];
-
-  return { experiments };
 }
 
 export const actions = {
   create: async (event: ActionEvent) => {
-    const { locals, fetch: fetchFn, request, url } = event;
-    if (!locals.session) throw redirect(302, "/auth/login");
+    if (!event.locals.session) throw redirect(302, "/auth/login");
 
-    const form = await request.formData();
+    const form = await event.request.formData();
     const name = String(form.get("name") ?? "").trim();
     const description = String(form.get("description") ?? "").trim();
     const variantsRaw = String(form.get("variants") ?? "").trim();
     const rolloutPercent = Number(form.get("rolloutPercent") ?? "100");
 
     if (!name) return fail(400, { createError: "Name is required." });
-    const variants = variantsRaw.split(",").map((v) => v.trim()).filter(Boolean);
+    const variants = variantsRaw.split(",").map((variant) => variant.trim()).filter(Boolean);
     if (variants.length < 2) return fail(400, { createError: "At least 2 variants required." });
 
     const uniqueVariants = new Set(variants);
@@ -162,20 +126,19 @@ export const actions = {
       return fail(400, { createError: "Variant names must be unique." });
     }
 
-    const baseUrl = getBaseUrl(url.href);
-    const cookieHeader = request.headers.get("cookie") ?? "";
-
-    const result = await callTrpcMutation(fetchFn, baseUrl, "flags.experiments.create", {
-      name,
-      description,
-      variants,
-      rolloutPercent,
-    }, cookieHeader);
-
-    if (!result.ok) {
-      return fail(result.status === 403 ? 403 : 400, { createError: result.error });
+    try {
+      await createExperimentCaller(event).flags.experiments.create({
+        name,
+        description,
+        variants,
+        rolloutPercent,
+      });
+      return { ok: true };
+    } catch (cause) {
+      const message = errorMessage(cause);
+      const status = statusFromMessage(message);
+      if (status === 401) throw redirect(302, "/auth/login");
+      return fail(status === 403 || status === 404 ? 404 : 400, { createError: message });
     }
-
-    return { ok: true };
   },
 };

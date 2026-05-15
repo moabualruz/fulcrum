@@ -3,9 +3,9 @@ import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
 import { actionFail, actionOk } from "$lib/feedback/action-result";
 import { BoardMoveSchema } from "$lib/server/boards.schema";
-import { createProjectTask, updateProjectTask } from "@/application/projects/commands.ts";
-import { completeProjectSprint, updateSprintGoal } from "@/application/sprints/commands.ts";
-import { loadProjectSprintDetail } from "@/application/sprints/queries.ts";
+import { createProjectTask, updateProjectTask } from "@work-management/application/projects/commands.ts";
+import { completeProjectSprint, updateSprintGoal } from "@work-management/application/sprints/commands.ts";
+import { loadProjectSprintDetail } from "@work-management/application/sprints/queries.ts";
 import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = async ({ params, locals }) => {

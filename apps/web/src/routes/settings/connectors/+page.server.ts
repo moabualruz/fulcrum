@@ -20,8 +20,8 @@ import {
   saveConnectorConfig,
   syncConnector,
   type ConnectorName,
-} from "@/application/connectors/web-actions.ts";
-import { AppInvariantError, AppValidationError } from "@/application/errors.ts";
+} from "@integration-hub/application/connectors/web-actions.ts";
+import { AppInvariantError, AppValidationError } from "@platform-core/domain/errors.ts";
 
 export { isConnectorEnabled as _isConnectorEnabled, listSyncLog as _listSyncLog };
 

@@ -3,28 +3,19 @@
 /**
  * fulcrum CLI entry-point.
  *
- * P1#19 (HIGH 3): The `db` subcommand requires a real needle-di Container
- * backed by a live MikroORM instance. We build the container here, at the
- * top level, so every subcommand receives a properly wired container rather
- * than null (which would throw at db.router.ts:get(MigratorService)).
- *
- * For commands that do not need a DB connection (e.g. `help`, `init`), we
- * still build the container lazily — only `db` subcommands trigger ORM init.
+ * Commands default to public API clients. Only local runtime entry points such
+ * as init, web, db migration, and interactive TUI startup open
+ * the local application container.
  */
 
-import { mkdir } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
-import { Container } from "@needle-di/core";
-import { MikroORM } from "@mikro-orm/postgresql";
-import { Migrator } from "@mikro-orm/migrations";
-import { createOrmConfig } from "@/db/mikro-orm.config.ts";
-import { resolveDatabaseConfig } from "@/config/database.ts";
 import {
-  registerDbBindings,
-  SchemaMigrationRepository,
-} from "@/db/db.module.ts";
-import { dbCanRunOnCurrentBinary } from "@/db/doctor-checks.ts";
+  buildLocalApplicationContainer,
+  startLocalWorkflowSupervisor,
+  verifyLocalApplicationMigrations,
+  type LocalApplicationContainer,
+} from "@platform-core/application/runtime/local-application-container.ts";
 
 const HELP = `fulcrum
 
@@ -94,84 +85,8 @@ export function resolveClientAssetPath(clientRoot: string, requestPath: string):
  *
  * Returns the container and a cleanup function to close the ORM.
  */
-export async function buildDbContainer(): Promise<{ container: Container; cleanup: () => Promise<void> }> {
-  const database = resolveDatabaseConfig();
-  if (database.backend === "postgres") {
-    const config = createOrmConfig({ debug: false });
-    const orm = await MikroORM.init({
-      ...config,
-      extensions: [Migrator],
-    });
-    const container = new Container();
-    container.bind({ provide: MikroORM, useValue: orm });
-    registerDbBindings(container, orm);
-    return {
-      container,
-      cleanup: async () => {
-        await orm.close(true);
-      },
-    };
-  }
-
-  await mkdir(database.dataDir, { recursive: true });
-  const [{ PGlite }, { PGliteKyselyDialect }] = await Promise.all([
-    import("@electric-sql/pglite"),
-    import("@/db/PGliteKyselyDriver.ts"),
-  ]);
-  const pglite = new PGlite(database.dataDir);
-  await pglite.waitReady;
-  const dialect = new PGliteKyselyDialect(() => pglite);
-  const config = createOrmConfig({ pglite, debug: false });
-  const orm = await MikroORM.init({
-    ...config,
-    driverOptions: dialect,
-    extensions: [Migrator],
-  });
-
-  const container = new Container();
-  container.bind({ provide: MikroORM, useValue: orm });
-  registerDbBindings(container, orm);
-
-  return {
-    container,
-    cleanup: async () => {
-      await orm.close(true);
-      await pglite.close();
-    },
-  };
-}
-
-type MigrationInfoLike = { name?: string };
-type MigratorCompat = {
-  getPendingMigrations?: () => Promise<MigrationInfoLike[]>;
-  getPending?: () => Promise<MigrationInfoLike[]>;
-};
-
-async function pendingMigrations(migrator: MigratorCompat): Promise<MigrationInfoLike[]> {
-  if (migrator.getPendingMigrations) return migrator.getPendingMigrations();
-  if (migrator.getPending) return migrator.getPending();
-  return [];
-}
-
-async function verifyMigrationCompatibility(
-  orm: MikroORM,
-  _container: Container,
-): Promise<void> {
-  const pending = await pendingMigrations(orm.migrator as MigratorCompat);
-  if (pending.length > 0) {
-    const names = pending.map((migration) => migration.name ?? "(unknown)").join(", ");
-    throw new Error(`migrations pending: ${names}. Run \`fulcrum db migrate\` before \`fulcrum web\`.`);
-  }
-
-  const compatibilityContainer = new Container();
-  registerDbBindings(compatibilityContainer, orm, orm.em.fork());
-  const schemaMigrationRepo = compatibilityContainer.get(SchemaMigrationRepository);
-  const binaryCheck = await dbCanRunOnCurrentBinary(schemaMigrationRepo);
-  if (binaryCheck.status === "fail") {
-    throw new Error(binaryCheck.detail);
-  }
-
-  console.log("Migrations up-to-date");
+export async function buildDbContainer(): Promise<LocalApplicationContainer> {
+  return buildLocalApplicationContainer();
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -183,11 +98,11 @@ async function runWeb(_argv: readonly string[]): Promise<void> {
   let cleanupOnStartupFailure = true;
 
   try {
-    console.log("MikroORM initialized");
-    console.log("needle-di container ready");
+    console.log("Application database initialized");
+    console.log("Application container ready");
 
-    const orm = container.get(MikroORM);
-    await verifyMigrationCompatibility(orm, container);
+    await verifyLocalApplicationMigrations(container);
+    console.log("Migrations up-to-date");
 
     const outputRoot = join(process.cwd(), "apps", "web", ".svelte-kit", "output");
     const serverIndex = join(outputRoot, "server", "index.js");
@@ -244,17 +159,7 @@ async function runWeb(_argv: readonly string[]): Promise<void> {
       },
     });
 
-    const [{ DEFAULT_ORG_ID }, { WorkflowConfigSchema }, { startSymphonyOrchestrator }] =
-      await Promise.all([
-        import("@/db/seed.ts"),
-        import("@/orchestration/symphony/schemas.ts"),
-        import("@/orchestration/symphony/orchestrator.ts"),
-      ]);
-    const symphony = startSymphonyOrchestrator(
-      orm.em,
-      DEFAULT_ORG_ID,
-      WorkflowConfigSchema.parse({}),
-    );
+    const workflowSupervisor = await startLocalWorkflowSupervisor(container);
 
     cleanupOnStartupFailure = false;
     console.log(`Web server listening on http://localhost:${listener.port}`);
@@ -263,7 +168,7 @@ async function runWeb(_argv: readonly string[]): Promise<void> {
       process.once("SIGINT", stop);
       process.once("SIGTERM", stop);
     }).finally(async () => {
-      symphony.stop();
+      workflowSupervisor.stop();
       listener.stop(true);
       await cleanup();
     });
@@ -296,28 +201,12 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
         return;
       }
 
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runProjects(rest, { container });
-      } finally {
-        await cleanup();
-      }
+      await runProjects(rest);
       return;
     }
     case "tasks": {
       const { run: runTasks } = await import("./commands/tasks.ts");
-      const [sub = "help"] = rest;
-      if (sub === "help" || sub === "--help" || sub === "-h") {
-        await runTasks(rest);
-        return;
-      }
-
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runTasks(rest, { container });
-      } finally {
-        await cleanup();
-      }
+      await runTasks(rest);
       return;
     }
     case "work": {
@@ -328,44 +217,17 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
         return;
       }
 
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runWork(rest, { container });
-      } finally {
-        await cleanup();
-      }
+      await runWork(rest);
       return;
     }
     case "sprints": {
       const { run: runSprints } = await import("./commands/sprints.ts");
-      const [sub = "help"] = rest;
-      if (sub === "help" || sub === "--help" || sub === "-h") {
-        await runSprints(rest);
-        return;
-      }
-
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runSprints(rest, { container });
-      } finally {
-        await cleanup();
-      }
+      await runSprints(rest);
       return;
     }
     case "auth": {
       const { run: runAuth } = await import("./commands/auth.ts");
-      const [sub = "help"] = rest;
-      if (sub === "help" || sub === "--help" || sub === "-h" || sub === "login" || sub === "logout") {
-        await runAuth(rest);
-        return;
-      }
-
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runAuth(rest, { container });
-      } finally {
-        await cleanup();
-      }
+      await runAuth(rest);
       return;
     }
     case "flags": {
@@ -376,60 +238,22 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
         return;
       }
 
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runFlags(rest, { container });
-      } finally {
-        await cleanup();
-      }
+      await runFlags(rest);
       return;
     }
     case "routing": {
       const { run: runRouting } = await import("./commands/routing.ts");
-      const [sub = "help"] = rest;
-      if (sub === "help" || sub === "--help" || sub === "-h") {
-        await runRouting(rest);
-        return;
-      }
-
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runRouting(rest, { container });
-      } finally {
-        await cleanup();
-      }
+      await runRouting(rest);
       return;
     }
     case "repos": {
       const { run: runRepos } = await import("./commands/repos.ts");
-      const [sub = "help"] = rest;
-      if (sub === "help" || sub === "--help" || sub === "-h") {
-        await runRepos(rest);
-        return;
-      }
-
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runRepos(rest, { container });
-      } finally {
-        await cleanup();
-      }
+      await runRepos(rest);
       return;
     }
     case "docs": {
       const { run: runDocsCommand } = await import("./commands/docs.ts");
-      const [sub = "help"] = rest;
-      if (sub === "help" || sub === "--help" || sub === "-h") {
-        await runDocsCommand(rest);
-        return;
-      }
-
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runDocsCommand(rest, { container });
-      } finally {
-        await cleanup();
-      }
+      await runDocsCommand(rest);
       return;
     }
     case "memory": {
@@ -439,13 +263,7 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
         await runMemory(rest);
         return;
       }
-
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runMemory(rest, { container });
-      } finally {
-        await cleanup();
-      }
+      await runMemory(rest);
       return;
     }
     case "search": {
@@ -456,28 +274,12 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
         return;
       }
 
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runSearch(rest, { container });
-      } finally {
-        await cleanup();
-      }
+      await runSearch(rest);
       return;
     }
     case "artifacts": {
       const { run: runArtifacts } = await import("./commands/artifacts.ts");
-      const [sub = "help"] = rest;
-      if (sub === "help" || sub === "--help" || sub === "-h") {
-        await runArtifacts(rest);
-        return;
-      }
-
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runArtifacts(rest, { container });
-      } finally {
-        await cleanup();
-      }
+      await runArtifacts(rest);
       return;
     }
     case "db": {
@@ -486,8 +288,6 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
         await runDb(rest, null);
         return;
       }
-      // Build a real container backed by a live ORM instance.
-      // PermissionNotAvailableError will surface loudly until P1#06 lands.
       const { container, cleanup } = await buildDbContainer();
       try {
         await runDb(rest, container);
@@ -498,18 +298,7 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     }
     case "symphony": {
       const { run: runSymphony } = await import("./commands/symphony.ts");
-      const [sub = "help"] = rest;
-      if (sub === "help" || sub === "--help" || sub === "-h" || sub === "conformance") {
-        await runSymphony(rest);
-        return;
-      }
-
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runSymphony(rest, { container });
-      } finally {
-        await cleanup();
-      }
+      await runSymphony(rest);
       return;
     }
     case "runs":
@@ -524,29 +313,12 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
         return;
       }
 
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runPillar14Command(cmd, rest, { container });
-      } finally {
-        await cleanup();
-      }
+      await runPillar14Command(cmd, rest);
       return;
     }
     case "settings": {
       const { run: runSettings } = await import("./settings.ts");
-      const helpOnly = rest.includes("--help") || rest.includes("-h") || rest[0] === "help";
-      if (helpOnly) {
-        await runSettings(rest);
-        return;
-      }
-
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        const { createLocalCaller } = await import("./local-caller.ts");
-        await runSettings(rest, { caller: await createLocalCaller({ container }) } as never);
-      } finally {
-        await cleanup();
-      }
+      await runSettings(rest);
       return;
     }
     case "components":
@@ -561,63 +333,30 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       return;
     }
     case "theme": {
-      const [{ runTheme }, { createLocalCaller }] = await Promise.all([
-        import("./commands/cross-cutting-platform.ts"),
-        import("./local-caller.ts"),
-      ]);
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runTheme(rest, { caller: await createLocalCaller({ container }) });
-      } finally {
-        await cleanup();
-      }
+      const { runTheme } = await import("./commands/cross-cutting-platform.ts");
+      await runTheme(rest);
       return;
     }
     case "telemetry": {
-      const [{ runTelemetry }, { createLocalCaller }] = await Promise.all([
-        import("./commands/cross-cutting-platform.ts"),
-        import("./local-caller.ts"),
-      ]);
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runTelemetry(rest, { caller: await createLocalCaller({ container }) });
-      } finally {
-        await cleanup();
-      }
+      const { runTelemetry } = await import("./commands/cross-cutting-platform.ts");
+      await runTelemetry(rest);
       return;
     }
     case "backup": {
-      const [{ runBackup }, { createLocalCaller }] = await Promise.all([
-        import("./commands/cross-cutting-platform.ts"),
-        import("./local-caller.ts"),
-      ]);
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runBackup(rest, { caller: await createLocalCaller({ container }) });
-      } finally {
-        await cleanup();
-      }
+      const { runBackup } = await import("./commands/cross-cutting-platform.ts");
+      await runBackup(rest);
       return;
     }
     case "data": {
-      const [{ runDataExport, runDataImport }, { createLocalCaller }] = await Promise.all([
-        import("./commands/cross-cutting-platform.ts"),
-        import("./local-caller.ts"),
-      ]);
+      const { runDataExport, runDataImport } = await import("./commands/cross-cutting-platform.ts");
       const [sub = "help", ...dataRest] = rest;
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        const caller = await createLocalCaller({ container });
-        if (sub === "export") {
-          await runDataExport(dataRest, { caller });
-          return;
-        }
-        if (sub === "import") {
-          await runDataImport(dataRest, { caller });
-          return;
-        }
-      } finally {
-        await cleanup();
+      if (sub === "export") {
+        await runDataExport(dataRest);
+        return;
+      }
+      if (sub === "import") {
+        await runDataImport(dataRest);
+        return;
       }
       console.error(`fulcrum data: unknown command '${sub}'`);
       process.exit(2);
@@ -632,26 +371,12 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
         await runSecretsInitKeyring(rest.slice(1));
         return;
       }
-      const { createLocalCaller } = await import("./local-caller.ts");
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runSecrets(rest, { caller: await createLocalCaller({ container }) });
-      } finally {
-        await cleanup();
-      }
+      await runSecrets(rest);
       return;
     }
     case "errors": {
-      const [{ runErrors }, { createLocalCaller }] = await Promise.all([
-        import("./commands/cross-cutting-platform.ts"),
-        import("./local-caller.ts"),
-      ]);
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runErrors(rest, { caller: await createLocalCaller({ container }) });
-      } finally {
-        await cleanup();
-      }
+      const { runErrors } = await import("./commands/cross-cutting-platform.ts");
+      await runErrors(rest);
       return;
     }
     case "doctor": {
@@ -669,19 +394,7 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       return;
     case "tui": {
       const { run: runTui } = await import("./commands/tui.ts");
-      const helpOnly = rest.includes("--help") || rest.includes("-h") || rest.includes("--no-tui");
-      const isTTY = process.stdout.isTTY && process.stdin.isTTY;
-      if (helpOnly || !isTTY) {
-        await runTui(rest);
-        return;
-      }
-
-      const { container, cleanup } = await buildDbContainer();
-      try {
-        await runTui(rest, { container });
-      } finally {
-        await cleanup();
-      }
+      await runTui(rest);
       return;
     }
     case "inference": {

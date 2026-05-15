@@ -4,8 +4,8 @@ import {
   upsertProjectConnector,
   syncProjectConnector,
   listProjectConnectors,
-} from "@/application/project-connectors/commands.ts";
-import { getProjectOrNull } from "@/application/projects/queries.ts";
+} from "@integration-hub/application/project-connectors/commands.ts";
+import { getProjectOrNull } from "@work-management/application/projects/queries.ts";
 import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = async ({ params, locals }) => {

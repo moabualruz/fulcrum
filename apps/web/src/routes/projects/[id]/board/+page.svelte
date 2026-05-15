@@ -13,31 +13,54 @@
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import type { DndMovePayload } from "$lib/components/board/board-column-handlers";
 
+  type ManualWorkbenchPayload = {
+    traceId?: string;
+    layout: string;
+    filtersApplied: number;
+    columns: Array<{ group: string; label: string; count: number }>;
+    listRows: Array<{ id: string; title: string; stateLabel: string; traceId?: string }>;
+  };
+
+  type BoardPayload = {
+    tasks: BoardTask[];
+    manualWorkbench?: ManualWorkbenchPayload;
+  };
+
   interface Props {
     data: {
       projectId: string;
       sprintFilter: string;
-      streamed: { data: Promise<{ tasks: BoardTask[] }> | { tasks: BoardTask[] } };
+      streamed: { data: Promise<BoardPayload> | BoardPayload };
     };
   }
   const { data }: Props = $props();
 
   let resolvedTasks = $state<BoardTask[]>([]);
+  let manualWorkbench = $state<ManualWorkbenchPayload | null>(null);
   let swimlane = $state<"none" | "assignee" | "label">("none");
 
   {
     const d = data.streamed.data;
-    if (!(d instanceof Promise)) resolvedTasks = d.tasks;
+    if (!(d instanceof Promise)) {
+      resolvedTasks = d.tasks;
+      manualWorkbench = d.manualWorkbench ?? null;
+    }
   }
 
   $effect(() => {
     const d = data.streamed.data;
     if (d instanceof Promise) {
       let cancelled = false;
-      void d.then((p) => { if (!cancelled) resolvedTasks = p.tasks; });
+      void d.then((p) => {
+        if (!cancelled) {
+          resolvedTasks = p.tasks;
+          manualWorkbench = p.manualWorkbench ?? null;
+        }
+      });
       return () => { cancelled = true; };
     }
     resolvedTasks = d.tasks;
+    manualWorkbench = d.manualWorkbench ?? null;
   });
 
   let sheetOpen = $state(false);
@@ -140,6 +163,31 @@
     <a href={`/projects/${data.projectId}/board`} class="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted">All</a>
   </div>
 </header>
+
+{#if manualWorkbench}
+  <section data-manual-workbench class="mb-3 rounded-md border border-border bg-muted/20 p-3">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h2 class="text-sm font-semibold">manual task workbench</h2>
+        <p class="text-xs text-muted-foreground">
+          Layout: {manualWorkbench.layout} - Trace: {manualWorkbench.traceId ?? "none"} - Filters: {manualWorkbench.filtersApplied}
+        </p>
+      </div>
+    </div>
+    <div class="mt-2 flex flex-wrap gap-2">
+      {#each manualWorkbench.columns as column (column.group)}
+        <span class="rounded border border-border px-2 py-1 text-xs">{column.label}: {column.count}</span>
+      {/each}
+    </div>
+    {#if manualWorkbench.listRows.length > 0}
+      <ul class="mt-2 space-y-1 text-xs">
+        {#each manualWorkbench.listRows.slice(0, 5) as row (row.id)}
+          <li>{row.title} - {row.stateLabel}</li>
+        {/each}
+      </ul>
+    {/if}
+  </section>
+{/if}
 
 {#await data.streamed.data}
   <RouteSkeleton kind="board" />

@@ -2,11 +2,10 @@ import { mkdtempSync, rmSync, readFileSync, statSync, mkdirSync } from "node:fs"
 import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, mock } from "bun:test";
-import { openIsolatedStore } from "../test-support/product-fixtures.ts";
-import type { TestStore } from "../test-support/product-fixtures.ts";
+import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import type { TestStore } from "@test-support/product-workspace-fixtures.ts";
 import { FeatureDisabledError, type MarketplaceListing } from "./marketplace-client.ts";
-import { readFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { productStoreMigrations } from "@platform-core/infrastructure/product-store/db/migrations/index.ts";
 
 // Lazy-import the module under test so env can be set first
 let publishSkill: typeof import("./marketplace-publisher.ts").publishSkill;
@@ -28,10 +27,10 @@ function uint8ArrayToBase64url(bytes: Uint8Array): string {
 
 async function runMinimalMigrations(database: TestStore): Promise<void> {
   // Run only base + marketplace migrations to avoid PGlite date-type issues in sprint migrations
-  const migrationsDir = join(dirname(new URL(import.meta.url).pathname), "../product-kernel/db/migrations");
   for (const name of ["0001_product_kernel.sql", "0004_marketplace.sql"]) {
-    const sql = await readFile(join(migrationsDir, name), "utf8");
-    await database.exec(sql);
+    const migration = productStoreMigrations.find((candidate) => candidate.name === name);
+    if (!migration) throw new Error(`Missing product-store migration ${name}`);
+    await database.exec(migration.sql);
   }
 }
 

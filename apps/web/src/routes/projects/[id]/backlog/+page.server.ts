@@ -1,7 +1,7 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { addTaskToSprint, removeTaskFromSprint } from "@/application/sprints/commands.ts";
-import { loadProjectBacklog } from "@/application/sprints/queries.ts";
+import { addTaskToSprint, removeTaskFromSprint } from "@work-management/application/sprints/commands.ts";
+import { loadProjectBacklog } from "@work-management/application/sprints/queries.ts";
 import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = async ({ params, locals }) => {

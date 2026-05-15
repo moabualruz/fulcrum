@@ -7,8 +7,8 @@
  */
 
 import type { MikroORM } from "@mikro-orm/postgresql";
-import { FulcrumSkill } from "../db/entities/skills/FulcrumSkill.ts";
-import { initOrm } from "../db/mikro-orm.config.ts";
+import { FulcrumSkill } from "@platform-core/infrastructure/application-database/entities/skills/FulcrumSkill.ts";
+import { initOrm } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
 
 /** Source discriminator for a merged skill row. */
 export type SkillSourceValue = "local" | "upstream" | "mcp";

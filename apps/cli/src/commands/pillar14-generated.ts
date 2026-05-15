@@ -1,14 +1,18 @@
 import { writeFile, readFile, stat as fsStat } from "node:fs/promises";
-import type { Container } from "@needle-di/core";
-import { TRPCError } from "@trpc/server";
 
-import { createLocalCaller } from "../local-caller.ts";
+import { apiErrorCode, formatUnknownError } from "../api-errors.ts";
+import { createAgentRunApiCallerFromEnv } from "@execution-orchestration/interface/http/agent-run-api-client.ts";
+import { createConnectorApiCallerFromEnv } from "@integration-hub/interface/http/connector-api-client.ts";
+import { createWebhookApiCallerFromEnv } from "@integration-hub/interface/http/webhook-api-client.ts";
+import { createNotificationApiCallerFromEnv } from "@notification-center/interface/http/notification-api-client.ts";
+import { createAuditApiClientFromEnv } from "@workflow-coordination/interface/http/audit-api-client.ts";
 
 export type Pillar14Domain = "runs" | "notify" | "audit" | "webhooks" | "connectors" | "flags";
 
 export interface Pillar14RunOptions {
   caller?: any;
-  container?: Container | null;
+  env?: Record<string, string | undefined>;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -228,6 +232,9 @@ async function runNotify(sub: string, argv: readonly string[], caller: any, io: 
   if (sub === "list") {
     const input = { unread: hasFlag(argv, "--unread") || undefined };
     if (hasFlag(argv, "--watch")) {
+      if (typeof caller.notify?.watch !== "function") {
+        throw new Error("notify watch operation is not available through the configured public API.");
+      }
       for await (const event of caller.notify.watch(input)) {
         emitJson(event, io);
       }
@@ -239,6 +246,9 @@ async function runNotify(sub: string, argv: readonly string[], caller: any, io: 
 
   if (sub === "watch") {
     const input = { unread: hasFlag(argv, "--unread") || undefined };
+    if (typeof caller.notify?.watch !== "function") {
+      throw new Error("notify watch operation is not available through the configured public API.");
+    }
     for await (const event of caller.notify.watch(input)) {
       emitJson(event, io);
     }
@@ -302,7 +312,7 @@ async function runAudit(sub: string, argv: readonly string[], caller: any, io: I
     requireValue(output, "audit export: missing --output");
     const result = await caller.audit.export({ format });
     if (format === "csv") {
-      const csv = typeof result === "string" ? result : result.csv;
+      const csv = typeof result === "string" ? result : result.csv ?? result.content;
       await writeFile(output, csv.endsWith("\n") ? csv : `${csv}\n`);
       return;
     }
@@ -375,7 +385,7 @@ function emitJson(value: unknown, io: Io): void {
 
 function emitError(error: unknown, jsonMode: boolean, io: Io): void {
   const code = errorCode(error);
-  const message = error instanceof Error ? error.message : String(error);
+  const message = formatUnknownError(error);
   if (jsonMode) {
     io.print(JSON.stringify({ error: { code, message } }));
   } else {
@@ -385,7 +395,8 @@ function emitError(error: unknown, jsonMode: boolean, io: Io): void {
 }
 
 function errorCode(error: unknown): string {
-  if (error instanceof TRPCError) return error.code;
+  const codeFromApiError = apiErrorCode(error);
+  if (codeFromApiError) return codeFromApiError;
   if (typeof error === "object" && error !== null && "code" in error) {
     const code = (error as { code?: unknown }).code;
     if (typeof code === "string") return code;
@@ -436,14 +447,54 @@ function normalizeAuditResult(result: any): unknown {
   if (Array.isArray(result)) return result;
   if (Array.isArray(result?.items)) return result.items;
   if (Array.isArray(result?.rows)) return result.rows;
+  if (result?.format === "json" && typeof result.content === "string") {
+    try {
+      return JSON.parse(result.content);
+    } catch {
+      return result.content;
+    }
+  }
   return result;
 }
 
 async function resolveCaller(opts: Pillar14RunOptions): Promise<any> {
-  if (opts.caller) return opts.caller;
+  const caller = opts.caller ?? {};
+  const agentRunApiCaller = createAgentRunApiCallerFromEnv(opts.env, opts.fetch);
+  const auditApiClient = createAuditApiClientFromEnv(opts.env, opts.fetch);
+  const connectorApiCaller = createConnectorApiCallerFromEnv(opts.env, opts.fetch);
+  const notificationApiCaller = createNotificationApiCallerFromEnv(opts.env, opts.fetch);
+  const webhookApiCaller = createWebhookApiCallerFromEnv(opts.env, opts.fetch);
+  const resolved = {
+    ...caller,
+    ...(agentRunApiCaller ? {
+      runs: { ...(caller.runs ?? {}), ...agentRunApiCaller.runs },
+      orchestration: { ...(caller.orchestration ?? {}), ...agentRunApiCaller.orchestration },
+      ...(caller.agent_runs
+        ? { agent_runs: { ...caller.agent_runs, ...agentRunApiCaller.agent_runs } }
+        : {}),
+    } : {}),
+    ...(auditApiClient ? { audit: auditApiClient } : {}),
+    ...(connectorApiCaller ? { connectors: connectorApiCaller.connectors } : {}),
+    ...(notificationApiCaller ? { notify: notificationApiCaller.notify } : {}),
+    ...(webhookApiCaller ? { webhooks: webhookApiCaller.webhooks } : {}),
+  };
+  if (!hasConfiguredCaller(resolved)) {
+    throw new Error(
+      "Public API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL for runs, notifications, audit, webhooks, or connectors commands.",
+    );
+  }
+  return resolved;
+}
 
-  return await createLocalCaller({
-    container: opts.container,
-    requireSession: true,
-  }) as any;
+function hasConfiguredCaller(caller: Record<string, unknown>): boolean {
+  return Boolean(
+    caller["runs"] ||
+      caller["agent_runs"] ||
+      caller["orchestration"] ||
+      caller["notify"] ||
+      caller["audit"] ||
+      caller["webhooks"] ||
+      caller["connectors"] ||
+      caller["flags"],
+  );
 }

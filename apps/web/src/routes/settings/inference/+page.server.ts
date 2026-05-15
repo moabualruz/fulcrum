@@ -1,25 +1,45 @@
-import { InferenceClient } from "@/inference/client.ts";
 import type {
+  FeatureBackendMap,
   GenerateOptions,
   HealthResult,
   InferenceBackendInfo,
   InferenceModel,
-} from "@/inference/protocol.ts";
-import { INFERENCE_CLIENT_TOKEN } from "@/inference/tokens.ts";
-import { getRoutingConfig } from "@/inference/routing-config.ts";
-import {
-  getHealth,
-  listModels,
-  listBackends,
-  listRouting,
-  isExternalLlmEnabled,
-  testEmbed,
-  testGenerate,
-  type HealthResponse,
-  type ModelInfo,
-  type BackendInfo,
-  type FeatureRouting,
-} from "../../../lib/server/inference-client.ts";
+} from "@platform-core/application/inference/protocol.ts";
+import { createInferenceApiCaller } from "@platform-core/interface/http/inference-api-client.ts";
+
+export type BackendStatus = "healthy" | "degraded" | "unreachable";
+
+export interface HealthResponse {
+  status: BackendStatus;
+  backends: BackendInfo[];
+  cache: CacheStats;
+}
+
+export interface BackendInfo {
+  name: string;
+  status: BackendStatus;
+  models_loaded: number;
+}
+
+export interface CacheStats {
+  embed_hit_rate: number;
+  gen_hit_rate: number;
+  db_size_bytes: number;
+}
+
+export interface ModelInfo {
+  id: string;
+  name: string;
+  size_bytes: number;
+  downloaded: boolean;
+  capabilities: string[];
+}
+
+export interface FeatureRouting {
+  feature: string;
+  backend: string;
+  model: string;
+}
 
 export interface InferencePageData {
   health: HealthResponse | null;
@@ -30,44 +50,53 @@ export interface InferencePageData {
   error: string | null;
 }
 
-interface ContainerLike {
-  has?: (token: unknown) => boolean;
-  get: (token: unknown) => unknown;
-}
-
 interface LocalsLike {
   activeProjectId?: string | null;
-  container?: ContainerLike | null;
 }
 
-interface LoadEvent {
+interface RouteEvent {
   locals?: LocalsLike;
+  fetch: typeof fetch;
+  request: {
+    headers: { get(name: string): string | null };
+    formData(): Promise<FormData>;
+  };
+  url: URL;
 }
 
-interface ActionEvent {
-  request: Request;
-  locals?: LocalsLike;
+interface LoadEvent extends Omit<RouteEvent, "request"> {
+  request: { headers: { get(name: string): string | null } };
 }
 
-function hasBinding(container: ContainerLike, token: unknown): boolean {
-  return container.has?.(token) ?? true;
+type InferenceCaller = ReturnType<typeof createInferenceApiCaller>["inference"];
+
+function baseUrl(event: LoadEvent | RouteEvent): string {
+  return process.env["FULCRUM_SERVER_URL"] ?? process.env["FULCRUM_PUBLIC_API_URL"] ?? `${event.url.protocol}//${event.url.host}`;
 }
 
-function boundInferenceClient(container?: ContainerLike | null): InferenceClient | null {
-  if (!container) return null;
-  if (hasBinding(container, INFERENCE_CLIENT_TOKEN)) {
-    const client = container.get(INFERENCE_CLIENT_TOKEN);
-    if (client instanceof InferenceClient || typeof (client as InferenceClient).health === "function") {
-      return client as InferenceClient;
-    }
-  }
-  if (hasBinding(container, InferenceClient)) {
-    const client = container.get(InferenceClient);
-    if (client instanceof InferenceClient || typeof (client as InferenceClient).health === "function") {
-      return client as InferenceClient;
-    }
-  }
-  return null;
+function cookieHeaders(event: LoadEvent | RouteEvent): Record<string, string> {
+  const cookie = event.request.headers.get("cookie");
+  return cookie ? { cookie } : {};
+}
+
+function createInferenceCaller(event: LoadEvent | RouteEvent): InferenceCaller {
+  return createInferenceApiCaller({
+    baseUrl: baseUrl(event),
+    fetch: event.fetch,
+    headers: cookieHeaders(event),
+  }).inference;
+}
+
+function backendStatus(backend: InferenceBackendInfo): BackendStatus {
+  if (backend.active) return "healthy";
+  if (backend.available) return "degraded";
+  return "unreachable";
+}
+
+function healthStatus(status: HealthResult["status"]): BackendStatus {
+  if (status === "ok" || status === "healthy") return "healthy";
+  if (status === "down" || status === "unreachable") return "unreachable";
+  return "degraded";
 }
 
 function modelToPageModel(model: InferenceModel): ModelInfo {
@@ -80,18 +109,24 @@ function modelToPageModel(model: InferenceModel): ModelInfo {
   };
 }
 
-function backendToPageBackend(backend: InferenceBackendInfo): BackendInfo {
+function backendToPageBackend(
+  backend: InferenceBackendInfo,
+  loadedModelCount: number,
+): BackendInfo {
   return {
     name: backend.id,
-    status: backend.active ? "healthy" : backend.available ? "degraded" : "unreachable",
-    models_loaded: backend.active ? 1 : 0,
+    status: backendStatus(backend),
+    models_loaded: backend.active ? loadedModelCount : 0,
   };
 }
 
-function healthToPageHealth(health: HealthResult): HealthResponse {
+function healthToPageHealth(
+  health: HealthResult,
+  backends: BackendInfo[],
+): HealthResponse {
   return {
-    status: health.status === "ok" ? "healthy" : health.status === "down" ? "unreachable" : "degraded",
-    backends: health.backends.map((name) => ({ name, status: "healthy", models_loaded: 0 })),
+    status: healthStatus(health.status),
+    backends,
     cache: {
       embed_hit_rate: 0,
       gen_hit_rate: 0,
@@ -100,58 +135,45 @@ function healthToPageHealth(health: HealthResult): HealthResponse {
   };
 }
 
-function localRouting(): FeatureRouting[] {
-  return Object.entries(getRoutingConfig()).map(([feature, backend]) => ({
+function routingToPageRouting(config: FeatureBackendMap): FeatureRouting[] {
+  return Object.entries(config).map(([feature, backend]) => ({
     feature,
     backend,
     model: backend,
   }));
 }
 
-function localExternalLlmEnabled(): boolean {
-  return (process.env["FULCRUM_FEATURES"] ?? "")
-    .split(",")
-    .map((feature) => feature.trim())
-    .includes("external-llm-provider");
-}
-
-async function loadFromBoundClient(client: InferenceClient): Promise<InferencePageData> {
-  const health = await client.health();
-  const [models, backends] = await Promise.all([
-    client.listModels().catch(() => [] as InferenceModel[]),
-    client.listBackends().catch(() => [] as InferenceBackendInfo[]),
-  ]);
-  const pageHealth = healthToPageHealth(health);
-  return {
-    health: pageHealth,
-    models: models.map(modelToPageModel),
-    backends: backends.length > 0 ? backends.map(backendToPageBackend) : pageHealth.backends,
-    routing: localRouting(),
-    externalLlmEnabled: localExternalLlmEnabled(),
-    error: null,
-  };
-}
-
-async function loadFromHttpSidecar(): Promise<InferencePageData> {
-  const [health, models, backends, routing, externalLlmEnabled] =
-    await Promise.all([
-      getHealth(),
-      listModels(),
-      listBackends(),
-      listRouting(),
-      isExternalLlmEnabled(),
-    ]);
-  return { health, models, backends, routing, externalLlmEnabled, error: null };
-}
-
-async function loadInferenceData(locals: LocalsLike): Promise<InferencePageData> {
+async function loadInferenceData(event: LoadEvent): Promise<InferencePageData> {
   try {
-    const client = boundInferenceClient(locals.container);
-    if (client) return await loadFromBoundClient(client);
-    if (!process.env["FULCRUM_INFERENCE_URL"]) {
-      return await loadFromBoundClient(new InferenceClient());
-    }
-    return await loadFromHttpSidecar();
+    const caller = createInferenceCaller(event);
+    const [health, models, backends, routing] = await Promise.all([
+      caller.health(),
+      caller.models.list(),
+      caller.backends.list(),
+      caller.config.get(),
+    ]);
+    const pageModels = models.map(modelToPageModel);
+    const pageBackends = backends.map((backend) =>
+      backendToPageBackend(backend, pageModels.length)
+    );
+    const resolvedBackends = pageBackends.length > 0
+      ? pageBackends
+      : health.backends.map((name) => ({
+        name,
+        status: "healthy" as BackendStatus,
+        models_loaded: health.models.length,
+      }));
+
+    return {
+      health: healthToPageHealth(health, resolvedBackends),
+      models: pageModels,
+      backends: resolvedBackends,
+      routing: routingToPageRouting(routing),
+      externalLlmEnabled: backends.some((backend) =>
+        backend.id === "openai-compatible" && backend.available
+      ),
+      error: null,
+    };
   } catch (err) {
     return {
       health: null,
@@ -159,60 +181,44 @@ async function loadInferenceData(locals: LocalsLike): Promise<InferencePageData>
       backends: [],
       routing: [],
       externalLlmEnabled: false,
-      error: err instanceof Error ? err.message : "Inference sidecar unreachable",
+      error: err instanceof Error ? err.message : "Inference API unreachable",
     };
   }
 }
 
-async function resolveActionClient(locals: LocalsLike): Promise<InferenceClient | null> {
-  return boundInferenceClient(locals.container);
-}
-
-export const load = async ({ locals = {} }: LoadEvent) => {
-  const inference = loadInferenceData(locals);
+export const load = async (event: LoadEvent) => {
+  const inference = loadInferenceData(event);
   return {
-    activeProjectId: locals?.activeProjectId ?? null,
+    activeProjectId: event.locals?.activeProjectId ?? null,
     streamed: {
       inference,
       health: inference.then((data) =>
-        data.health ?? ({ status: "unreachable" } as unknown as HealthResult | HealthResponse)
+        data.health ?? ({ status: "unreachable" } as HealthResponse)
       ),
     },
   };
 };
 
 export const actions = {
-  testEmbed: async ({ request, locals = {} }: ActionEvent) => {
-    const form = await request.formData();
+  testEmbed: async (event: RouteEvent) => {
+    const form = await event.request.formData();
     const text = String(form.get("text") ?? "");
-    const client = await resolveActionClient(locals);
-    if (!client) {
-      const result = await testEmbed(text);
-      return {
-        success: true,
-        dimensions: result.dimensions,
-        preview: result.embedding.slice(0, 8),
-        model: result.model,
-        cached: false,
-      };
-    }
-
-    const result = await client.embed([text]);
+    const result = await createInferenceCaller(event).embed({ texts: [text] });
     const preview = result.vectors[0] ?? [];
     return {
       success: true,
-      dimensions: preview.length,
-      preview,
+      dimensions: result.dimensions,
+      preview: preview.slice(0, 8),
       model: result.model,
       cached: result.cached,
     };
   },
-  testGenerate: async ({ request, locals = {} }: ActionEvent) => {
-    const form = await request.formData();
+  testGenerate: async (event: RouteEvent) => {
+    const form = await event.request.formData();
     const prompt = String(form.get("prompt") ?? "");
     const maxTokensValue = form.get("maxTokens");
     const schemaValue = form.get("schema");
-    const options: GenerateOptions = {};
+    const options: NonNullable<GenerateOptions> = {};
     if (typeof maxTokensValue === "string" && maxTokensValue.trim() !== "") {
       options.maxTokens = Number(maxTokensValue);
     }
@@ -220,20 +226,7 @@ export const actions = {
       options.schema = JSON.parse(schemaValue) as Record<string, unknown>;
     }
 
-    const client = await resolveActionClient(locals);
-    if (!client) {
-      const result = await testGenerate(prompt);
-      return {
-        success: true,
-        generateText: result.text,
-        text: result.text,
-        tokens: result.tokens_used,
-        model: result.model,
-        ...(options.schema ? { schemaValid: true } : {}),
-      };
-    }
-
-    const result = await client.generate(prompt, options);
+    const result = await createInferenceCaller(event).generate({ prompt, options });
     return {
       success: true,
       generateText: result.text,

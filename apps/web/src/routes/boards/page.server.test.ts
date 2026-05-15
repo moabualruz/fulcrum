@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { createProject } from "@/application/projects/commands.ts";
-import { createTask } from "@/application/tasks/commands.ts";
+import { createProject } from "@work-management/application/projects/commands.ts";
+import { createTask } from "@work-management/application/tasks/commands.ts";
 import { initDatabase, closeDatabase } from "$lib/server/db";
 
 interface EventRow {
@@ -18,9 +18,8 @@ interface EventRow {
   created_at: string;
 }
 
-// `+page.server.ts` opens `${productDbDir()}/main`, which honours
-// `FULCRUM_HOME`. Seed three tasks across two projects so the project
-// filter and event emissions can be asserted.
+// Seed the configured default PGlite data directory with three tasks across two
+// projects so the project filter and event emissions can be asserted.
 
 let scratch: string;
 

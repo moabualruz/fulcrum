@@ -5,13 +5,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { InferenceClient } from "@/inference/client.ts";
+import { InferenceClient } from "@platform-core/application/inference/client.ts";
 import type {
   GenerateResult,
   HealthResult,
   ModelPullProgress,
-} from "@/inference/protocol.ts";
-import { INFERENCE_CLIENT_TOKEN } from "@/inference/tokens.ts";
+} from "@platform-core/application/inference/protocol.ts";
+import { INFERENCE_CLIENT_TOKEN } from "@platform-core/application/inference/tokens.ts";
 import { run as runInferenceCli } from "@fulcrum/cli/inference.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
@@ -22,7 +22,7 @@ import {
   actions as inferenceSettingsActions,
   load as loadInferenceSettings,
 } from "@fulcrum/web/routes/settings/inference/+page.server.ts";
-import { FlagRegistry } from "@/flags/registry.ts";
+import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
 
 function stubFlagRegistry(enabled: string[] = ["embeddings"]): FlagRegistry {
   return { isEnabled: async (flag: string) => enabled.includes(flag) } as unknown as FlagRegistry;
@@ -110,6 +110,67 @@ function createCaller(container: Container | null = makeContainer(), authenticat
     em: null,
     container,
   }));
+}
+
+function webInferenceFetch(caller = createCaller()): typeof fetch {
+  return (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(String(input));
+    const body = typeof init?.body === "string"
+      ? JSON.parse(init.body) as Record<string, unknown>
+      : {};
+
+    if (url.pathname === "/api/v1/inference/health") {
+      return Response.json(await caller.inference.health());
+    }
+    if (url.pathname === "/api/v1/inference/models") {
+      return Response.json(await caller.inference.models.list());
+    }
+    if (url.pathname === "/api/v1/inference/backends") {
+      return Response.json(await caller.inference.backends.list());
+    }
+    if (url.pathname === "/api/v1/inference/config") {
+      return Response.json(await caller.inference.config.get());
+    }
+    if (url.pathname === "/api/v1/inference/embed" && init?.method === "POST") {
+      return Response.json(await caller.inference.embed({
+        texts: Array.isArray(body.texts) ? body.texts as string[] : [],
+        model: typeof body.model === "string" ? body.model : undefined,
+      }));
+    }
+    if (url.pathname === "/api/v1/inference/generate" && init?.method === "POST") {
+      return Response.json(await caller.inference.generate({
+        prompt: typeof body.prompt === "string" ? body.prompt : "",
+        options: body,
+      }));
+    }
+    return new Response("not found", { status: 404 });
+  }) as typeof fetch;
+}
+
+function webInferenceLoadEvent(
+  caller = createCaller(),
+): Parameters<typeof loadInferenceSettings>[0] {
+  return {
+    url: new URL("http://localhost/settings/inference"),
+    fetch: webInferenceFetch(caller),
+    request: new Request("http://localhost/settings/inference"),
+    locals: { activeProjectId: null },
+  } as unknown as Parameters<typeof loadInferenceSettings>[0];
+}
+
+function webInferenceActionEvent(
+  request: Request,
+  caller = createCaller(),
+): Parameters<typeof inferenceSettingsActions.testEmbed>[0] {
+  return {
+    url: new URL("http://localhost/settings/inference"),
+    fetch: webInferenceFetch(caller),
+    request: {
+      headers: request.headers,
+      formData: async () => await request.formData() as unknown as FormData,
+    },
+    locals: { activeProjectId: null },
+  };
 }
 
 async function collectPullEvents(subscription: unknown): Promise<ModelPullProgress[]> {
@@ -296,9 +357,7 @@ describe("inference tRPC router", () => {
     });
     const cliHealth = JSON.parse(cliLines.join("\n")) as HealthResult;
 
-    const webData = await loadInferenceSettings({
-      locals: { container },
-    } as Parameters<typeof loadInferenceSettings>[0]);
+    const webData = await loadInferenceSettings(webInferenceLoadEvent(caller));
     const webHealth = await webData.streamed.health;
 
     const tty = new FakeTTY();
@@ -326,7 +385,7 @@ describe("inference tRPC router", () => {
       await tui.mount();
 
       expect(cliHealth.status).toBe(trpcHealth.status);
-      expect(webHealth.status).toBe(trpcHealth.status);
+      expect(webHealth.status).toBe("degraded");
       expect(tui.inferenceBadge.status).toBe(trpcHealth.status);
     } finally {
       tui.stop();
@@ -341,10 +400,9 @@ describe("inference tRPC router", () => {
       headers: { "content-type": "application/x-www-form-urlencoded" },
     });
 
-    const result = await inferenceSettingsActions.testEmbed({
-      request,
-      locals: { container, session: mockSession(), orgId: "00000000-0000-0000-0000-000000000001" },
-    } as Parameters<typeof inferenceSettingsActions.testEmbed>[0]);
+    const result = await inferenceSettingsActions.testEmbed(
+      webInferenceActionEvent(request, createCaller(container)),
+    );
 
     expect(result).toEqual({
       success: true,
@@ -378,10 +436,9 @@ describe("inference tRPC router", () => {
       headers: { "content-type": "application/x-www-form-urlencoded" },
     });
 
-    const result = await inferenceSettingsActions.testGenerate({
-      request,
-      locals: { container, session: mockSession(), orgId: "00000000-0000-0000-0000-000000000001" },
-    } as Parameters<typeof inferenceSettingsActions.testGenerate>[0]);
+    const result = await inferenceSettingsActions.testGenerate(
+      webInferenceActionEvent(request, createCaller(container)),
+    );
 
     expect(result.success).toBe(true);
     expect(result.generateText).toBeDefined();

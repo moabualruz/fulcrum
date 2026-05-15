@@ -8,9 +8,11 @@ import {
   setFlagOverride,
   setFlagRollout,
   type AdminAppContext,
-} from "@/application/admin/queries.ts";
-import { experimentStore } from "@/flags/experiments.ts";
-import { FEATURE_FLAGS } from "@/flags/registry.ts";
+} from "@identity-access/application/admin/queries.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
+import { experimentStore } from "@platform-core/application/feature-flags/experiments.ts";
+import { FEATURE_FLAGS } from "@platform-core/application/feature-flags/registry.ts";
 import { isFeatureEnabled } from "@fulcrum/tui/feature-flags.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
@@ -22,9 +24,18 @@ function appContext({ orgId, userId, em, container }: AdminAppContext): AdminApp
   return { orgId, userId, em, container };
 }
 
+async function mapAppError<T>(fn: () => Promise<T> | T): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AppError) throw appErrorToTrpcError(error);
+    throw error;
+  }
+}
+
 export const flagsRouter = t.router({
   list: permissionedProcedure({ resource: "flags", action: "list" })
-    .query(async ({ ctx }) => listFeatureFlags(appContext(ctx))),
+    .query(async ({ ctx }) => mapAppError(() => listFeatureFlags(appContext(ctx)))),
 
   set: permissionedProcedure({ resource: "flags", action: "set" })
     .input(z.object({
@@ -33,7 +44,7 @@ export const flagsRouter = t.router({
       orgId: z.string().uuid().optional(),
       userId: z.string().optional(),
     }))
-    .mutation(async ({ ctx, input }): Promise<{ ok: boolean }> => setFeatureFlag(appContext(ctx), input)),
+    .mutation(async ({ ctx, input }): Promise<{ ok: boolean }> => mapAppError(() => setFeatureFlag(appContext(ctx), input))),
 
   evaluate: permissionedProcedure({ resource: "flags", action: "evaluate" })
     .input(z.object({
@@ -41,7 +52,7 @@ export const flagsRouter = t.router({
       orgId: z.string().uuid(),
       userId: z.string().min(1),
     }))
-    .query(async ({ ctx, input }): Promise<{ enabled: boolean }> => evaluateFlag(appContext(ctx), input)),
+    .query(async ({ ctx, input }): Promise<{ enabled: boolean }> => mapAppError(() => evaluateFlag(appContext(ctx), input))),
 
   setOverride: permissionedProcedure({ resource: "flags", action: "setOverride" })
     .input(z.object({
@@ -49,7 +60,7 @@ export const flagsRouter = t.router({
       orgId: z.string().uuid(),
       enabled: z.boolean(),
     }))
-    .mutation(async ({ ctx, input }): Promise<{ ok: true }> => setFlagOverride(appContext(ctx), input)),
+    .mutation(async ({ ctx, input }): Promise<{ ok: true }> => mapAppError(() => setFlagOverride(appContext(ctx), input))),
 
   setRollout: permissionedProcedure({ resource: "flags", action: "setRollout" })
     .input(z.object({
@@ -57,7 +68,7 @@ export const flagsRouter = t.router({
       rolloutPercent: rolloutPercentSchema,
       orgId: z.string().uuid().optional(),
     }))
-    .mutation(async ({ ctx, input }): Promise<{ ok: true }> => setFlagRollout(appContext(ctx), input)),
+    .mutation(async ({ ctx, input }): Promise<{ ok: true }> => mapAppError(() => setFlagRollout(appContext(ctx), input))),
 
   experiments: t.router({
     list: permissionedProcedure({ resource: "flags", action: "list" })

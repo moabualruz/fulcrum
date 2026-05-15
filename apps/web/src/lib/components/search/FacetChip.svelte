@@ -1,7 +1,5 @@
 <script lang="ts">
   /**
-   * FacetChip — Plan 06-09 (SRC-05, D-17)
-   *
    * Badge-style chip for active/inactive filter facets.
    * Active: --primary fill. Inactive: --secondary fill.
    */

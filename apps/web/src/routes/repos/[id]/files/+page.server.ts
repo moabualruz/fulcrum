@@ -1,8 +1,8 @@
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requestAppScope } from "$lib/server/application-scope";
-import { AppError } from "@/application/errors.ts";
-import { getRepoFilesPage, type FileTreeNode } from "@/application/repo-files/queries.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
+import { getRepoFilesPage, type FileTreeNode } from "@integration-hub/application/repo-files/queries.ts";
 
 export type { FileTreeNode };
 

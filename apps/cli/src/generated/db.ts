@@ -1,4 +1,5 @@
-import { Command, Option } from "commander";
+import { Command } from "commander";
+import { defaultProductDbStatus } from "@platform-core/application/db/commands.ts";
 
 export function createDbCommand(): Command {
   const command = new Command("db");
@@ -9,7 +10,7 @@ export function createDbCommand(): Command {
   pingCommand.option("--json", "Emit JSON output");
   pingCommand.action(async (options) => {
     try {
-      throw new Error("Generated tRPC invocation for db.ping requires an explicit surface adapter.");
+      printGeneratedResult(defaultProductDbStatus(), options);
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -22,4 +23,16 @@ export function createDbCommand(): Command {
   });
 
   return command;
+}
+
+function printGeneratedResult(result: unknown, options: { json?: boolean }): void {
+  if (options.json === true) {
+    console.log(JSON.stringify(result));
+    return;
+  }
+  if (typeof result === "object") {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  console.log(result);
 }

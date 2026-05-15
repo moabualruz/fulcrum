@@ -1,7 +1,8 @@
-import type { Container } from "@needle-di/core";
-import { TRPCError } from "@trpc/server";
-
-import { createLocalCaller } from "./local-caller.ts";
+import {
+  createSprintApiCallerFromEnv,
+  type SprintApiEnvironment,
+} from "@work-management/interface/http/sprint-api-client.ts";
+import { formatApiError } from "./api-errors.ts";
 
 type SprintsCaller = {
   sprints: {
@@ -12,7 +13,8 @@ type SprintsCaller = {
 
 export interface SprintsRunOptions {
   caller?: SprintsCaller;
-  container?: Container | null;
+  env?: SprintApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -36,9 +38,9 @@ export async function run(argv: readonly string[], opts: SprintsRunOptions = {})
   try {
     switch (verb) {
       case "add-task":
-        return runMove(rest, "add-task", opts, io);
+        return await runMove(rest, "add-task", opts, io);
       case "remove-task":
-        return runMove(rest, "remove-task", opts, io);
+        return await runMove(rest, "remove-task", opts, io);
       default:
         io.printErr(`fulcrum sprints: unknown verb '${verb}'`);
         io.printErr(HELP);
@@ -79,7 +81,16 @@ async function runMove(
 
 async function resolveCaller(opts: SprintsRunOptions): Promise<SprintsCaller> {
   if (opts.caller) return opts.caller;
-  return await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as SprintsCaller;
+  const apiCaller = createSprintApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error("Sprint API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL and FULCRUM_ORG_ID.");
+  }
+  return {
+    sprints: {
+      addTask: (input) => apiCaller.sprints.addTask({ id: input.sprintId, taskId: input.taskId }),
+      removeTask: (input) => apiCaller.sprints.removeTask({ id: input.sprintId, taskId: input.taskId }),
+    },
+  };
 }
 
 function flagValue(argv: readonly string[], flag: string): string | undefined {
@@ -98,6 +109,5 @@ function ioFor(opts: SprintsRunOptions): Required<Pick<SprintsRunOptions, "print
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof TRPCError) return `${error.code}: ${error.message}`;
-  return (error as Error).message;
+  return formatApiError(error);
 }

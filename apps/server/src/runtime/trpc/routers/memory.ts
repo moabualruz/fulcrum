@@ -1,14 +1,14 @@
 import { z } from "zod";
 
-import { createMemory, deleteMemory, promoteMemory, updateMemory } from "@/application/memory/commands.ts";
-import { getMemory, listMemories, searchMemories } from "@/application/memory/queries.ts";
-import { appErrorToTrpcError } from "@/application/error-mapping.ts";
-import { AppError } from "@/application/errors.ts";
+import { createMemory, deleteMemory, promoteMemory, updateMemory } from "@knowledge-workspace/application/memory/commands.ts";
+import { getMemory, listMemories, searchMemories } from "@knowledge-workspace/application/memory/queries.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 import {
   MEMORY_IMPORTANCE,
   MEMORY_KINDS,
   MEMORY_SOURCES,
-} from "@/domain/memory/enums.ts";
+} from "@knowledge-workspace/domain/memory-enums.ts";
 import { optionalTrpcEntityManager, requireTrpcEntityManager } from "@fulcrum/server/trpc/context.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";

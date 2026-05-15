@@ -3,10 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { createLocalOrg } from "@/test-support/product-fixtures.ts";
-import { initOrm } from "@/db/mikro-orm.config.ts";
+import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { createLocalOrg } from "@test-support/product-workspace-fixtures.ts";
+import { initOrm } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
 import { createDocumentAction } from "./documents";
 import { upsertDocLink, getBacklinks } from "./doc-links";
 
@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 async function seedDb(): Promise<{ em: EntityManager; orgId: string; close: () => Promise<void> }> {
-  const dbDir = join(scratch, "state", "product", "db");
+  const dbDir = join(scratch, "pglite.data");
   mkdirSync(dbDir, { recursive: true });
   const { PGlite } = await import("@electric-sql/pglite");
   const { vector } = await import("@electric-sql/pglite/vector");

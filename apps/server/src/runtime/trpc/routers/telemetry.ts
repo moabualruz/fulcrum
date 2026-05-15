@@ -6,7 +6,7 @@ import {
   scrubTelemetryPayload,
   TelemetryStore,
   writeTelemetryEvent,
-} from "@/application/telemetry/commands.ts";
+} from "@platform-core/application/telemetry/commands.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 
@@ -23,7 +23,7 @@ const PurgeOutputSchema = z.object({
 
 export { scrubTelemetryPayload, TelemetryStore, writeTelemetryEvent };
 
-function storeFromContext(context: { container: { has(token: unknown): boolean; get<T>(token: abstract new (...args: never) => T): T } | null; em: import("@mikro-orm/postgresql").EntityManager | null; orgId: string; userId: string }): TelemetryStore {
+function storeFromContext(context: { container: import("@platform-core/application/runtime/di-container.ts").DiContainer | null; em: import("@mikro-orm/postgresql").EntityManager | null; orgId: string; userId: string }): TelemetryStore {
   if (context.container?.has(TelemetryStore)) return context.container.get(TelemetryStore);
   return createTelemetryStore({ em: context.em, orgId: context.orgId, userId: context.userId });
 }

@@ -1,15 +1,15 @@
 /**
- * commentsRouter — Phase 05 Plan 03
+ * commentsRouter — task workflow
  *
  * Thin tRPC delegation layer for comments, watchers, and reactions.
- * All business logic lives in CommentService.
+ * All business logic lives in WorkItemCommentService.
  *
  * Security:
  *   T-05-05: userId comes from ctx.userId (authenticated context), never from input.
  *   T-05-07: orgId comes from ctx.orgId, enforcing org-scope isolation.
  *
  * NOTE: This router is NOT yet wired into apps/server/src/trpc/router.ts.
- *       Plan 06 owns that file exclusively (HIGH-06 fix).
+ *       workflow milestone owns that file exclusively (HIGH-06 fix).
  */
 
 import { TRPCError } from "@trpc/server";
@@ -24,13 +24,13 @@ import {
   subscribeTaskComment,
   unresolveTaskComment,
   unsubscribeTaskComment,
-} from "@/application/comments/commands.ts";
+} from "@work-management/application/comments/commands.ts";
 import {
   getThreadedTaskComments,
   listTaskComments,
   listTaskCommentWatchers,
-} from "@/application/comments/queries.ts";
-import type { AppContext } from "@/application/comments/types.ts";
+} from "@work-management/application/comments/queries.ts";
+import type { AppContext } from "@work-management/application/comments/types.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 

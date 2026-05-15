@@ -2,7 +2,7 @@
 // ~/.fulcrum/state/<project>/shell-commands.log. Write-only, never blocks.
 
 import { appendFile } from "node:fs/promises";
-import { readHookEvent, stateDir } from "../utils/io.ts";
+import { readHookEvent, stateDir } from "@platform-core/application/runtime-support/hook-event-io.ts";
 
 export async function runHook(): Promise<void> {
   const event = await readHookEvent();

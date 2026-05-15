@@ -2,7 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
-import type { AppContext, TaskDto } from "@/application/tasks/types.ts";
+import type { AppContext, TaskDto } from "@work-management/application/tasks/types.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
 const USER_ID = "00000000-0000-0000-0000-000000000010";

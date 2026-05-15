@@ -2,12 +2,12 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, join } from "node:path";
 
 let TMP: string;
 let SLUG: string;
 let SHA_FILE: string;
-const FULCRUM_REPO = resolve(import.meta.dir, "../..");
+const FULCRUM_REPO = process.cwd();
 
 async function gitInit() {
   // Initialize a fresh repo, commit one file, return HEAD sha.

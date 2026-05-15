@@ -1,5 +1,5 @@
 import type { PageServerLoad } from "./$types";
-import { listDocs } from "@/application/docs/queries.ts";
+import { listDocs } from "@knowledge-workspace/application/docs/queries.ts";
 import { buildDocTree, type FlatDoc } from "$lib/server/doc-tree";
 import { requestAppScope } from "$lib/server/application-scope";
 

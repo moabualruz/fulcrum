@@ -21,10 +21,10 @@ import {
   UpdateMemberRoleInputSchema,
   RemoveMemberInputSchema,
 } from "@fulcrum/server/trpc/schemas/orgs.ts";
-import { removeOrgMember, updateOrg, updateOrgMemberRole } from "@/application/orgs/commands.ts";
-import { getOrg, listOrgMembers, type OrgAppContext } from "@/application/orgs/queries.ts";
-import { appErrorToTrpcError } from "@/application/error-mapping.ts";
-import { AppError } from "@/application/errors.ts";
+import { removeOrgMember, updateOrg, updateOrgMemberRole } from "@identity-access/application/orgs/commands.ts";
+import { getOrg, listOrgMembers, type OrgAppContext } from "@identity-access/application/orgs/queries.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

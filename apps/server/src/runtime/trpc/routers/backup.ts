@@ -8,7 +8,9 @@ import {
   encodeBackupDump,
   restoreBackupDump,
   type AdminAppContext,
-} from "@/application/admin/queries.ts";
+} from "@identity-access/application/admin/queries.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 
@@ -31,11 +33,20 @@ function appContext({ orgId, userId, em, container }: AdminAppContext): AdminApp
   return { orgId, userId, em, container };
 }
 
+async function mapAppError<T>(fn: () => Promise<T> | T): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AppError) throw appErrorToTrpcError(error);
+    throw error;
+  }
+}
+
 export const backupRouter = t.router({
   create: permissionedProcedure({ resource: "backup", action: "create" })
     .output(BackupOutputSchema)
     .mutation(async ({ ctx }) => {
-      const dump = await createBackupDump(appContext(ctx));
+      const dump = await mapAppError(() => createBackupDump(appContext(ctx)));
       return {
         ok: true as const,
         format: BACKUP_FORMAT,
@@ -48,8 +59,8 @@ export const backupRouter = t.router({
     .input(RestoreInputSchema)
     .output(RestoreOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      const dump = decodeBackupDump(input.dump);
-      await restoreBackupDump(appContext(ctx), dump);
+      const dump = await mapAppError(() => decodeBackupDump(input.dump));
+      await mapAppError(() => restoreBackupDump(appContext(ctx), dump));
       return {
         ok: true as const,
         format: BACKUP_FORMAT,

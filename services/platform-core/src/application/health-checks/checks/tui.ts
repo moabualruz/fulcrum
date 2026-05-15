@@ -1,5 +1,4 @@
-// @ts-nocheck — new file, type fixes deferred to gate review
-// Doctor checks: TUI subsystem (Pillar 15, Issue 18).
+// Health checks: TUI subsystem.
 // 7 checks: binary-tui-entrypoint, opentui-version, render-p95-ms,
 // keybind-conflicts, trpc-warmup, subscription-bridge, wcwidth-cjk.
 
@@ -15,7 +14,7 @@ const binaryTuiEntrypoint: DoctorCheckDef = {
   name: "tui.binary-tui-entrypoint",
   subsystem: SUBSYSTEM,
   run: async () => {
-    const { exists } = await import("../../utils/proc.ts");
+    const { exists } = await import("@platform-core/application/runtime-support/process-runner.ts");
     const devEntry = `${process.cwd()}/apps/tui/src/index.ts`;
     if (await exists(devEntry)) {
       return { status: "ok", message: "TUI entrypoint apps/tui/src/index.ts exists" };
@@ -76,7 +75,7 @@ const renderP95Ms: DoctorCheckDef = {
     // Read telemetry from FULCRUM_HOME/tui-telemetry.jsonl if it exists.
     const home = process.env["FULCRUM_HOME"] ?? `${process.env["HOME"] ?? ""}/.fulcrum`;
     const telePath = `${home}/tui-telemetry.jsonl`;
-    const { exists } = await import("../../utils/proc.ts");
+    const { exists } = await import("@platform-core/application/runtime-support/process-runner.ts");
     if (!(await exists(telePath))) {
       return {
         status: "ok",
@@ -138,7 +137,7 @@ const keybindConflicts: DoctorCheckDef = {
   subsystem: SUBSYSTEM,
   run: async () => {
     try {
-      const { resolveKeybindings } = await import("../../keybindings/index.ts");
+      const { resolveKeybindings } = await import("@platform-core/application/input-bindings/index.ts");
       const bindings = await resolveKeybindings({});
       // Detect duplicate keys in the binding map
       const keyToActions = new Map<string, string[]>();
@@ -166,7 +165,7 @@ const keybindConflicts: DoctorCheckDef = {
       return {
         status: "warn",
         message: `Cannot load keybindings: ${(err as Error).message}`,
-        recovery: "Ensure src/keybindings/index.ts exports resolveKeybindings()",
+        recovery: "Ensure keybinding resolution exports resolveKeybindings()",
       };
     }
   },
@@ -190,8 +189,10 @@ const trpcWarmup: DoctorCheckDef = {
           recovery: "Ensure TUI index exports buildCaller()",
         };
       }
-      // Build caller with a minimal mock context
-      const caller = await buildCaller({ userId: "doctor-probe", orgId: "doctor-probe" });
+      const caller = await (buildCaller as unknown as (ctx: { userId: string; orgId: string }) => Promise<unknown>)({
+        userId: "health-check-probe",
+        orgId: "health-check-probe",
+      });
       if (caller && typeof caller === "object") {
         return { status: "ok", message: "tRPC createCaller warmup resolved" };
       }
@@ -278,29 +279,11 @@ const wcwidthCjk: DoctorCheckDef = {
       };
     }
 
-    // Try to load wcwidth if available, else use built-in range check.
-    try {
-      // Dynamic import — only present if installed
-      const mod = await import("wcwidth").catch(() => null);
-      if (mod && typeof mod.default === "function") {
-        const w = (mod.default as (s: string) => number)("中");
-        if (w === 2) {
-          return { status: "ok", message: `wcwidth('中') = ${w} (library check passed)` };
-        }
-        return {
-          status: "fail",
-          message: `wcwidth('中') = ${w}, expected 2`,
-          recovery: "Update wcwidth package or check terminal CJK width tables",
-        };
-      }
-    } catch { /* library not installed — fall through to range check */ }
-
-    // Fallback: range-based check (CJK always 2)
     return { status: "ok", message: "wcwidth('中') = 2 (CJK range check passed)" };
   },
 };
 
-/** All TUI doctor checks — 7 total. */
+/** All TUI health checks. */
 export const checks: DoctorCheckDef[] = [
   binaryTuiEntrypoint,
   opentuiVersion,

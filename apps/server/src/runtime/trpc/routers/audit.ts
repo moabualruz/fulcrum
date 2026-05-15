@@ -1,14 +1,14 @@
 import { z } from "zod";
 
-import { setRetentionPolicy } from "@/application/audit/commands.ts";
+import { setRetentionPolicy } from "@workflow-coordination/application/audit/commands.ts";
 import {
   exportAuditEvents,
   getRetentionPolicy,
   listRetentionPolicies,
   queryAuditEvents,
-} from "@/application/audit/queries.ts";
-import { appErrorToTrpcError } from "@/application/error-mapping.ts";
-import { AppError } from "@/application/errors.ts";
+} from "@workflow-coordination/application/audit/queries.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 import { requireTrpcEntityManager } from "@fulcrum/server/trpc/context.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";

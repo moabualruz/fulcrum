@@ -1,52 +1,28 @@
 import { render } from "@testing-library/svelte";
 import { describe, expect, test, vi } from "vitest";
 
-const { appScope, getSettingsTelemetry, purgeSettingsTelemetry, toggleSettingsTelemetryOptIn } = vi.hoisted(() => {
-  const appScope = {
-    em: { kind: "entity-manager" },
-    ctx: { orgId: "org-1", userId: "user-1", projectId: null },
-  };
-  const getSettingsTelemetry = vi.fn(async () => ({ optIn: false, rowCount: 7 }));
-  const purgeSettingsTelemetry = vi.fn(async () => ({ success: true as const, rowCount: 0 }));
-  const toggleSettingsTelemetryOptIn = vi.fn(async () => ({ success: true as const, optIn: true }));
-  return { appScope, getSettingsTelemetry, purgeSettingsTelemetry, toggleSettingsTelemetryOptIn };
-});
-
-vi.mock("$lib/server/application-scope", () => ({
-  requestAppScope: async () => appScope,
-}));
-
-vi.mock("@/application/settings/queries.ts", () => ({
-  getSettingsTelemetry,
-}));
-
-vi.mock("@/application/settings/commands.ts", () => ({
-  purgeSettingsTelemetry,
-  toggleSettingsTelemetryOptIn,
-}));
-
 const { actions, load } = await import("../../src/routes/settings/telemetry/+page.server");
 
 function event(fetchFn: typeof fetch) {
+  const url = new URL("http://localhost/settings/telemetry");
   return {
-    locals: { session: { id: "session-1", userId: "user-1" } },
+    locals: { session: { id: "session-1", userId: "user-1" }, orgId: "org-1" },
     fetch: fetchFn,
-    request: { headers: new Headers({ cookie: "sid=abc" }) },
-    url: new URL("http://localhost/settings/telemetry"),
+    request: new Request(url, { headers: { cookie: "sid=abc" } }),
+    url,
   };
 }
 
 describe("/settings/telemetry route", () => {
-  test("loads local telemetry status and renders controls", async () => {
-    getSettingsTelemetry.mockClear();
-    const data = await load(event(vi.fn() as unknown as typeof fetch));
+  test("loads telemetry status through the public API and renders controls", async () => {
+    const fetch = vi.fn(async () => Response.json({ opted_in: false, row_count: 7 })) as unknown as typeof fetch;
+    const data = await load(event(fetch));
     const payload = await data.streamed.data;
 
     expect(payload).toEqual({ optIn: false, rowCount: 7 });
-    expect(getSettingsTelemetry).toHaveBeenCalledWith(appScope.em, appScope.ctx);
 
     const { default: TelemetryPage } = await import("../../src/routes/settings/telemetry/+page.svelte");
-    const { getByRole, getByText, container, findByText } = render(TelemetryPage, {
+    const { getByRole, container, findByText } = render(TelemetryPage, {
       props: { data: { activeProjectId: null, streamed: { data: Promise.resolve(payload) } } },
     });
 
@@ -57,17 +33,22 @@ describe("/settings/telemetry route", () => {
     expect(getByRole("button", { name: "Purge" })).toBeTruthy();
   });
 
-  test("actions toggle opt-in and purge local rows", async () => {
-    toggleSettingsTelemetryOptIn.mockClear();
-    purgeSettingsTelemetry.mockClear();
+  test("actions toggle opt-in and purge through the public API", async () => {
+    const calls: string[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(`${init?.method ?? "GET"} ${String(input)}`);
+      if (String(input).includes("/status")) return Response.json({ optIn: false, rowCount: 7 });
+      if (String(input).includes("/events")) return Response.json({ ok: true, deleted: 3 });
+      return Response.json({ ok: true });
+    }) as unknown as typeof fetch;
 
-    await actions.toggleOptIn(event(vi.fn() as unknown as typeof fetch));
-    await expect(actions.purge(event(vi.fn() as unknown as typeof fetch))).resolves.toEqual({
-      success: true,
-      rowCount: 0,
-    });
+    await expect(actions.toggleOptIn(event(fetch))).resolves.toEqual({ success: true, optIn: true });
+    await expect(actions.purge(event(fetch))).resolves.toEqual({ success: true, rowCount: 3 });
 
-    expect(toggleSettingsTelemetryOptIn).toHaveBeenCalledWith(appScope.em, appScope.ctx);
-    expect(purgeSettingsTelemetry).toHaveBeenCalledWith(appScope.em, appScope.ctx);
+    expect(calls).toEqual([
+      "GET http://localhost/api/v1/telemetry/status?orgId=org-1&userId=user-1",
+      "POST http://localhost/api/v1/telemetry/opt-in",
+      "DELETE http://localhost/api/v1/telemetry/events?orgId=org-1&userId=user-1",
+    ]);
   });
 });

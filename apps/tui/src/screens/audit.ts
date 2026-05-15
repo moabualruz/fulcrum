@@ -41,6 +41,7 @@ export interface AuditQueryResult {
 export type AuditExportResult =
   | { format: "json"; rows: TuiAuditRow[] }
   | { format: "csv"; csv: string }
+  | { format: "json" | "csv"; content: string }
   | { jobId: string }
   | { ok: boolean };
 
@@ -161,6 +162,8 @@ export class AuditLogScreen {
     const result = await this.opts.caller.audit.export(input);
     if ("rows" in result) {
       await writeFile(outputPath, JSON.stringify(result.rows, dateReplacer, 2) + "\n", "utf8");
+    } else if ("content" in result && result.format === "json") {
+      await writeFile(outputPath, withTrailingNewline(result.content), "utf8");
     }
     this.lastExportPath = outputPath;
   }
@@ -198,4 +201,8 @@ function timestamp(date: Date): string {
 
 function dateReplacer(_key: string, value: unknown): unknown {
   return value instanceof Date ? value.toISOString() : value;
+}
+
+function withTrailingNewline(value: string): string {
+  return value.endsWith("\n") ? value : `${value}\n`;
 }

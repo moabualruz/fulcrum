@@ -7,7 +7,6 @@
  * - descriptorSha256 — SHA-256 of the pinned registry descriptor
  * - toolManifestHash — hash of the tool manifest (tools/list response)
  *
- * RED phase — imports from production modules (not yet created).
  */
 
 import { describe, it, expect } from "bun:test";

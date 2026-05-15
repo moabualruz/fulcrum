@@ -1,12 +1,13 @@
 import { error } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { actionOk } from "$lib/feedback/action-result";
-import { getRepoDashboard, getRepoDetail } from "@/repos/dashboard.ts";
+import { getRepoDashboard, getRepoDetail } from "@integration-hub/application/repos/dashboard.ts";
+import { queueRepositorySync } from "../repository-sync-api";
 
 const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
 
 function activeOrgId(locals: App.Locals): string {
-  return locals?.orgId ?? locals?.activeOrgId ?? DEFAULT_ORG_ID;
+  return locals?.orgId ?? DEFAULT_ORG_ID;
 }
 
 function isoDetail<T extends { updatedAt?: Date; committedAt?: Date; createdAt?: Date }>(rows: T[]): Array<Omit<T, "updatedAt" | "committedAt" | "createdAt"> & {
@@ -50,11 +51,8 @@ export const load: PageServerLoad = ({ params, locals }) => {
 };
 
 export const actions: Actions = {
-  sync: async ({ params, locals }) => {
-    const trpcProxy = locals?.trpcProxy;
-    if (trpcProxy?.repos?.syncRepo) {
-      await trpcProxy.repos.syncRepo.mutate({ repoId: params.id });
-    }
+  sync: async (event) => {
+    await queueRepositorySync(event, event.params.id);
     return actionOk("Repo sync queued");
   },
 };

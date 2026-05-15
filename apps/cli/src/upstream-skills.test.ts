@@ -9,7 +9,7 @@ import {
   syncUpstreamSkills,
   syncUpstreamSkillsBySource,
 } from "./upstream-skills.ts";
-import * as proc from "@/utils/proc.ts";
+import * as proc from "@platform-core/application/runtime-support/process-runner.ts";
 
 let TMP: string;
 let originalHome: string | undefined;

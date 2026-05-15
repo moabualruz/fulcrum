@@ -1,31 +1,21 @@
 import { describe, expect, test } from "bun:test";
-import type { DraftRow, EnrichedDecisionRow, LlmGateConfig, RoutingRuleRow } from "./routing.types";
+import type { DraftRow, EnrichedDecisionRow, RoutingRuleRow } from "./routing.types";
 
 // Tests for routing.server.ts / +page.server.ts.
 // We exercise loadRoutingPage() and the CRUD/dryRun actions via controlled
-// fetch mocks — no live tRPC server required.
+// fetch mocks.
 
 function fakeOkFetch(data: unknown): typeof fetch {
-  return async () =>
-    ({
-      ok: true,
-      status: 200,
-      json: async () => ({ result: { data: { json: data } } }),
-    }) as Response;
+  return async () => Response.json(data);
 }
 
 function fakeFail(status: number, msg: string): typeof fetch {
-  return async () =>
-    ({
-      ok: false,
-      status,
-      json: async () => ({ error: { json: { message: msg } } }),
-    }) as Response;
+  return async () => Response.json({ message: msg }, { status });
 }
 
 const BASE_LOAD_EVENT = {
-  locals: { session: { userId: "u1" } },
-  request: { headers: { get: () => null } },
+  locals: { session: { userId: "u1" }, orgId: "org-001", userId: "u1" },
+  request: { headers: { get: (name: string) => name === "cookie" ? "fulcrum_session=abc" : null } },
   url: new URL("http://localhost/settings/routing"),
   params: {},
 };
@@ -53,7 +43,7 @@ describe("routing +page.server.ts load()", () => {
       await mod.load({
         ...BASE_LOAD_EVENT,
         locals: { session: null },
-        fetch: fakeOkFetch({ rules: [], inheritedRules: [] }),
+        fetch: fakeOkFetch([]),
       });
     } catch (e) {
       threw = true;
@@ -62,9 +52,8 @@ describe("routing +page.server.ts load()", () => {
     expect(threw).toBe(true);
   });
 
-  test("returns rules and inheritedRules from tRPC", async () => {
+  test("returns rules from the public API", async () => {
     const mod = await import(`./+page.server.ts?t=${Date.now() + 1}`);
-    // routing.server calls routing.list which returns an array directly
     const fetchMock = fakeOkFetch([SAMPLE_RULE]);
     const result = await mod.load({ ...BASE_LOAD_EVENT, fetch: fetchMock });
     expect(Array.isArray(result.rules)).toBe(true);
@@ -72,7 +61,7 @@ describe("routing +page.server.ts load()", () => {
     expect(result.rules[0].name).toBe("Bug fixer");
   });
 
-  test("returns empty arrays when tRPC returns null", async () => {
+  test("returns empty arrays when the public API returns null", async () => {
     const mod = await import(`./+page.server.ts?t=${Date.now() + 2}`);
     const fetchMock = fakeOkFetch(null);
     const result = await mod.load({ ...BASE_LOAD_EVENT, fetch: fetchMock });
@@ -81,7 +70,7 @@ describe("routing +page.server.ts load()", () => {
 });
 
 describe("routing actions.create()", () => {
-  test("returns createError on tRPC failure", async () => {
+  test("returns createError on public API failure", async () => {
     const mod = await import(`./+page.server.ts?t=${Date.now() + 3}`);
     const fd = new FormData();
     fd.set("name", "Test rule");
@@ -179,7 +168,7 @@ describe("routing actions.test() — enriched test output", () => {
     expect(result).toMatchObject({ ok: true, testResult: enriched });
   });
 
-  test("returns testError on tRPC failure", async () => {
+  test("returns testError on public API failure", async () => {
     const mod = await import(`./+page.server.ts?t=${Date.now() + 9}`);
     const fd = new FormData();
     fd.set("taskId", "task-001");
@@ -193,7 +182,7 @@ describe("routing actions.test() — enriched test output", () => {
 });
 
 describe("routing actions.draftList()", () => {
-  test("calls routing.drafts.list and returns drafts array", async () => {
+  test("calls the public draft list API and returns drafts array", async () => {
     const mod = await import(`./+page.server.ts?t=${Date.now() + 10}`);
     const drafts: DraftRow[] = [
       {
@@ -218,7 +207,7 @@ describe("routing actions.draftList()", () => {
 });
 
 describe("routing actions.draftApprove()", () => {
-  test("calls routing.drafts.approve and returns ok", async () => {
+  test("calls the public draft approval API and returns ok", async () => {
     const mod = await import(`./+page.server.ts?t=${Date.now() + 11}`);
     const fd = new FormData();
     fd.set("draftId", "draft-001");
@@ -232,7 +221,7 @@ describe("routing actions.draftApprove()", () => {
 });
 
 describe("routing actions.draftDelete()", () => {
-  test("calls routing.drafts.delete and returns ok", async () => {
+  test("calls the public draft delete API and returns ok", async () => {
     const mod = await import(`./+page.server.ts?t=${Date.now() + 12}`);
     const fd = new FormData();
     fd.set("draftId", "draft-001");
@@ -246,7 +235,7 @@ describe("routing actions.draftDelete()", () => {
 });
 
 describe("routing actions.draftUpdate()", () => {
-  test("calls routing.drafts.update and returns ok", async () => {
+  test("calls the public draft update API and returns ok", async () => {
     const mod = await import(`./+page.server.ts?t=${Date.now() + 13}`);
     const fd = new FormData();
     fd.set("draftId", "draft-001");

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 import { createContext } from "../context.ts";
 import { reposRouter } from "./repos.ts";
-import { createTestContainer, createTestOrm } from "@/test-utils/index.ts";
+import { createTestContainer, createTestOrm } from "@test-support/index.ts";
 
 function session(userId: string, orgId: string) {
   return {
@@ -49,13 +49,14 @@ describe("reposRouter", () => {
       const queued = await caller.syncRepo({ repoId: registered.id });
       const status = await caller.statusRepo({ repoId: registered.id });
       const archived = await caller.unregister({ id: registered.id });
-      const events = await db.em.fork().getKysely<any>()
-        .selectFrom("events")
-        .select(["verb"])
-        .where("org_id", "=", db.seed.orgId)
-        .where("subject_id", "=", registered.id)
-        .orderBy("created_at", "asc")
-        .execute() as Array<{ verb: string }>;
+      const events = await db.em.fork().getConnection().execute<Array<{ verb: string }>>(
+        `SELECT verb
+           FROM events
+          WHERE org_id = ?
+            AND subject_id = ?
+          ORDER BY created_at ASC`,
+        [db.seed.orgId, registered.id],
+      );
 
       expect(listed.map((repo) => repo.id)).toContain(registered.id);
       expect(fetched).toMatchObject({ id: registered.id, slug: "fulcrum" });
@@ -86,8 +87,9 @@ describe("reposRouter", () => {
 
   test("router source stays a thin application adapter", () => {
     const source = readFileSync("apps/server/src/trpc/routers/repos.ts", "utf8");
-    expect(source).toContain("repoApplication.");
-    expect(source).not.toMatch(/ctx\.em|em\.find|em\.findOne|em\.create|em\.persist|em\.flush|em\.transactional|getRepository\(/);
+    expect(source).toContain("repositoryOperations.");
+    expect(source).not.toMatch(/ctx\.em|em\.find|em\.findOne|em\.create|em\.persist|em\.flush|em\.transactional/);
+    expect(source).not.toMatch(/(?<!repositoryOperations)\.getRepository\(/);
     expect(source).not.toMatch(/RepoRepository|db\/entities\/repos\/Repo|db\/entities\/auth\/Org|db\/entities\/core\/Event/);
   });
 });

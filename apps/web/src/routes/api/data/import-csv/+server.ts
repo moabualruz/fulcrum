@@ -4,8 +4,8 @@
 
 import type { RequestHandler } from "@sveltejs/kit";
 import { requestAppScope } from "$lib/server/application-scope";
-import { isFeatureEnabled } from "@/data/features.ts";
-import { importTasksFromCsvUpload } from "@/application/tasks/csv.ts";
+import { isFeatureEnabled } from "@integration-hub/application/data-exchange/features.ts";
+import { importTasksFromCsvUpload } from "@work-management/application/tasks/csv.ts";
 
 function jsonError(msg: string, status = 400): Response {
   return new Response(JSON.stringify({ error: msg }), {

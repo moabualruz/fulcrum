@@ -1,7 +1,8 @@
-import type { Container } from "@needle-di/core";
-import { TRPCError } from "@trpc/server";
-
-import { createLocalCaller } from "../local-caller.ts";
+import { formatApiError } from "../api-errors.ts";
+import {
+  createProjectApiCallerFromEnv,
+  type ProjectApiEnvironment,
+} from "@work-management/interface/http/project-api-client.ts";
 
 type ProjectsCaller = {
   projects: {
@@ -16,7 +17,8 @@ type ProjectsCaller = {
 
 export interface ProjectsRunOptions {
   caller?: ProjectsCaller;
-  container?: Container | null;
+  env?: ProjectApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -82,7 +84,20 @@ export async function run(argv: readonly string[], opts: ProjectsRunOptions = {}
 
 async function resolveCaller(opts: ProjectsRunOptions): Promise<ProjectsCaller> {
   if (opts.caller) return opts.caller;
-  return await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as ProjectsCaller;
+  const apiCaller = createProjectApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error("Project API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL plus FULCRUM_ORG_ID.");
+  }
+  return {
+    projects: {
+      list: async () => await apiCaller.projects.list() as unknown[],
+      get: async (input) => await apiCaller.projects.get(input),
+      create: async (input) => await apiCaller.projects.create(input),
+      update: async (input) => await apiCaller.projects.update(input as Record<string, unknown> & { id: string }),
+      delete: async (input) => await apiCaller.projects.delete(input),
+      stats: async (input) => await apiCaller.projects.stats(input),
+    },
+  };
 }
 
 function printOutput(value: unknown, argv: readonly string[], print: (line: string) => void): void {
@@ -113,6 +128,5 @@ function compact(input: Record<string, unknown>): Record<string, unknown> {
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof TRPCError) return `${error.code}: ${error.message}`;
-  return (error as Error).message;
+  return formatApiError(error);
 }

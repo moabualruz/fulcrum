@@ -14,16 +14,16 @@ import {
   getSprintVelocity,
   type BoardTask,
 } from "./product-queries.ts";
-import { openIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { productDbDir } from "@/test-support/product-fixtures.ts";
+import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { productDbDir } from "@test-support/product-workspace-fixtures.ts";
 import {
   createLocalOrg,
   createProject,
   createTask,
   createSprint,
-} from "@/test-support/product-fixtures.ts";
-import { makeId } from "@/test-support/product-fixtures.ts";
+} from "@test-support/product-workspace-fixtures.ts";
+import { makeId } from "@test-support/product-workspace-fixtures.ts";
 
 let scratch = "";
 let originalFulcrumHome: string | undefined;
@@ -42,7 +42,7 @@ afterEach(async () => {
 
 async function seed() {
   await Bun.write(join(productDbDir(), ".keep"), "");
-  const db = await openIsolatedStore(join(productDbDir(), "main"));
+  const db = await openIsolatedStore(productDbDir());
   await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Local" });
   const project = await createProject(db, { orgId: org.id, slug: "p1", name: "Alpha" });
@@ -102,7 +102,7 @@ describe("web product-queries", () => {
   test("listSprints returns sprints with aggregated estimates", async () => {
     const { project } = await seed();
     // seed a sprint with tasks
-    const db2 = await openIsolatedStore(join(productDbDir(), "main"));
+    const db2 = await openIsolatedStore(productDbDir());
     await migrateIsolatedStore(db2);
     const org = (await db2.query<{ id: string }>(`SELECT id FROM orgs WHERE slug = 'default'`))[0]!;
     const sprint = await createSprint(db2, {
@@ -138,7 +138,7 @@ describe("web product-queries", () => {
 
   test("listSprintTasks returns only tasks assigned to sprint", async () => {
     const { project } = await seed();
-    const db2 = await openIsolatedStore(join(productDbDir(), "main"));
+    const db2 = await openIsolatedStore(productDbDir());
     await migrateIsolatedStore(db2);
     const org = (await db2.query<{ id: string }>(`SELECT id FROM orgs WHERE slug = 'default'`))[0]!;
     const sprint = await createSprint(db2, {
@@ -161,7 +161,7 @@ describe("web product-queries", () => {
 
   test("getSprintVelocity returns completed sprint points", async () => {
     const { project } = await seed();
-    const db2 = await openIsolatedStore(join(productDbDir(), "main"));
+    const db2 = await openIsolatedStore(productDbDir());
     await migrateIsolatedStore(db2);
     const org = (await db2.query<{ id: string }>(`SELECT id FROM orgs WHERE slug = 'default'`))[0]!;
     const sprint = await createSprint(db2, {

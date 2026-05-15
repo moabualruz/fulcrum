@@ -1,19 +1,13 @@
 import { error, fail, redirect } from "@sveltejs/kit";
+import { isSaasAuthFeatureEnabled } from "@identity-access/application/auth/saas-auth-feature.ts";
 import type { Actions, PageServerLoad } from "./$types";
 
-/**
- * Resolve saas-auth flag — mirrors login/+page.server.ts.
- * Signup is a SaaS-only surface: accessible when flag ON, 404 when OFF.
- * D5: FULCRUM_FEATURES=saas-auth (or FULCRUM_FLAG_SAAS_AUTH=true) gates this route.
- */
-function isSaasAuthEnabled(): boolean {
-  if (process.env["FULCRUM_FLAG_SAAS_AUTH"] === "true") return true;
-  const features = (process.env["FULCRUM_FEATURES"] ?? "").split(",").map((f) => f.trim());
-  return features.includes("saas-auth");
+export function _isSaasAuthEnabled(): boolean {
+  return isSaasAuthFeatureEnabled();
 }
 
 export const load: PageServerLoad = async () => {
-  if (!isSaasAuthEnabled()) {
+  if (!_isSaasAuthEnabled()) {
     throw error(404, "Sign-up is not available");
   }
 };
@@ -42,7 +36,7 @@ function authErrorMessage(body: unknown): string {
 
 export const actions: Actions = {
   default: async ({ fetch, request }) => {
-    if (!isSaasAuthEnabled()) {
+    if (!_isSaasAuthEnabled()) {
       throw error(404, "Sign-up is not available");
     }
 

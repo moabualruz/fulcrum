@@ -17,8 +17,9 @@
 		"web:test": "vitest run",
 		"web:e2e": "bun run web:e2e:full",
 		"web:e2e:smoke": "playwright test tests/e2e/_smoke.spec.ts",
+		"web:e2e:generated": "playwright test --project=chromium",
 		"web:e2e:full": "playwright test tests/e2e/ --workers=1",
-		"web:a11y": "playwright test tests/a11y/phase08-routes.test.ts tests/a11y/phase09-cross-cutting.test.ts tests/e2e/phase09-accessibility.spec.ts --project=chromium",
+		"web:a11y": "playwright test tests/a11y/routes.test.ts tests/a11y/cross-cutting.test.ts tests/e2e/accessibility.spec.ts --project=chromium",
 		"i18n:extract": "bun run src/lib/i18n/extract.ts"
 	},
 	"devDependencies": {

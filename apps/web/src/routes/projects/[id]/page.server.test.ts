@@ -1,22 +1,20 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "@/test-support/product-fixtures.ts";
+import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
 import {
   createLocalOrg,
   createProject,
   createTask,
   type EventRow,
   type ProjectRow,
-} from "@/test-support/product-fixtures.ts";
+} from "@test-support/product-workspace-fixtures.ts";
 
-// `+page.server.ts` reads `productDbDir() + "/main"` (which honours
-// `FULCRUM_HOME`). Each test seeds a fresh temp DB there. `+page.server.ts`
-// imports from `sveltekit-superforms/server` so the client barrel
-// (SuperDebug.svelte → `$app/navigation`/`$app/stores`) is never loaded; no
-// SvelteKit virtual stubs are needed in this test.
+// Each test seeds the configured default PGlite data directory. `+page.server.ts`
+// imports from `sveltekit-superforms/server` so the client barrel is never
+// loaded; no SvelteKit virtual stubs are needed in this test.
 
 let scratch: string;
 
@@ -33,9 +31,7 @@ afterEach(() => {
 async function seedOneProject(
   overrides: { slug?: string; name?: string; description?: string | null } = {},
 ): Promise<{ id: string }> {
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(join(dbDir, "main"));
+  const db = await openIsolatedStore(join(scratch, "pglite.data"));
   await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const project = await createProject(db, {
@@ -84,9 +80,7 @@ describe("/projects/[id] +page.server.ts", () => {
   });
 
   test("load returns task summary metrics for the project only", async () => {
-    const dbDir = join(scratch, "state", "product", "db");
-    mkdirSync(dbDir, { recursive: true });
-    const db = await openIsolatedStore(join(dbDir, "main"));
+    const db = await openIsolatedStore(join(scratch, "pglite.data"));
     await migrateIsolatedStore(db);
     const org = await createLocalOrg(db, { slug: "default", name: "Default" });
     const alpha = await createProject(db, { orgId: org.id, slug: "alpha", name: "Alpha" });
@@ -130,8 +124,7 @@ describe("/projects/[id] +page.server.ts", () => {
     } as Parameters<typeof mod.actions.rename>[0]);
     expect((result as { form?: unknown }).form).toBeDefined();
     // Re-open the same DB to verify the persisted update.
-    const dbDir = join(scratch, "state", "product", "db");
-    const db = await openIsolatedStore(join(dbDir, "main"));
+    const db = await openIsolatedStore(join(scratch, "pglite.data"));
     await migrateIsolatedStore(db);
     try {
       const rows = await db.query<ProjectRow>(
@@ -214,8 +207,7 @@ describe("/projects/[id] +page.server.ts", () => {
       expect(caught.status).toBe(303);
       expect(caught.location).toBe("/projects");
     }
-    const dbDir = join(scratch, "state", "product", "db");
-    const db = await openIsolatedStore(join(dbDir, "main"));
+    const db = await openIsolatedStore(join(scratch, "pglite.data"));
     await migrateIsolatedStore(db);
     try {
       const rows = await db.query<ProjectRow>(

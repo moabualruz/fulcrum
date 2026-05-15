@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 
 // Tests for saas-auth feature flag gate on login page.
 
-describe("/auth/login — isSaasAuthEnabled()", () => {
+describe("/auth/login — _isSaasAuthEnabled()", () => {
   const orig = process.env["FULCRUM_FEATURES"];
   const origFlag = process.env["FULCRUM_FLAG_SAAS_AUTH"];
 
@@ -18,35 +18,35 @@ describe("/auth/login — isSaasAuthEnabled()", () => {
     delete process.env["FULCRUM_FEATURES"];
     delete process.env["FULCRUM_FLAG_SAAS_AUTH"];
     const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-    expect(mod.isSaasAuthEnabled()).toBe(false);
+    expect(mod._isSaasAuthEnabled()).toBe(false);
   });
 
   test("OFF when FULCRUM_FEATURES is empty", async () => {
     process.env["FULCRUM_FEATURES"] = "";
     delete process.env["FULCRUM_FLAG_SAAS_AUTH"];
     const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-    expect(mod.isSaasAuthEnabled()).toBe(false);
+    expect(mod._isSaasAuthEnabled()).toBe(false);
   });
 
   test("ON when FULCRUM_FEATURES=saas-auth", async () => {
     process.env["FULCRUM_FEATURES"] = "saas-auth";
     delete process.env["FULCRUM_FLAG_SAAS_AUTH"];
     const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-    expect(mod.isSaasAuthEnabled()).toBe(true);
+    expect(mod._isSaasAuthEnabled()).toBe(true);
   });
 
   test("ON when FULCRUM_FEATURES includes saas-auth among others", async () => {
     process.env["FULCRUM_FEATURES"] = "i18n,saas-auth,public-api";
     delete process.env["FULCRUM_FLAG_SAAS_AUTH"];
     const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-    expect(mod.isSaasAuthEnabled()).toBe(true);
+    expect(mod._isSaasAuthEnabled()).toBe(true);
   });
 
   test("ON when FULCRUM_FLAG_SAAS_AUTH=true (legacy flag)", async () => {
     delete process.env["FULCRUM_FEATURES"];
     process.env["FULCRUM_FLAG_SAAS_AUTH"] = "true";
     const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-    expect(mod.isSaasAuthEnabled()).toBe(true);
+    expect(mod._isSaasAuthEnabled()).toBe(true);
   });
 
   test("load returns saasAuthEnabled=false when OFF", async () => {

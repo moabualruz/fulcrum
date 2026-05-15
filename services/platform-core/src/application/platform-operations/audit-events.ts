@@ -1,9 +1,9 @@
-// @ts-nocheck — new file, type fixes deferred to gate review
+// @ts-nocheck -- zod schema effect typing stays broad around runtime validation helpers.
 /**
- * Platform audit-event emitter — P17 Issue #22.
+ * Platform audit-event emitter.
  *
  * Provides:
- *   - Zod schemas for every P17 event payload type (validated on emit).
+ *   - Zod schemas for every platform event payload type (validated on emit).
  *   - `emitPlatformEvent()` — low-level emitter backed by MikroORM Event entity
  *     or an injectable EventSink for testing.
  *   - `measureP99()` — utility: run fn N times, return p99 latency in ms.
@@ -57,7 +57,7 @@ export const VERBS = [
 export type Verb = (typeof VERBS)[number];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Per-event-type payload schemas  (NO plaintext secret values)
+// Per-event-type payload schemas: no plaintext secret values.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FORBIDDEN_PAYLOAD_KEYS = new Set([
@@ -267,7 +267,7 @@ export interface EventSink {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Emit a P17 platform audit event.
+ * Emit a platform audit event.
  *
  * Steps:
  *   1. Validate payload against registered Zod schema (throws if invalid or unregistered).
@@ -313,11 +313,11 @@ export async function emitPlatformEvent(
  */
 export async function mkOrmEventSink(
   em: import("@mikro-orm/postgresql").EntityManager,
-  orgRef: import("../db/entities/auth/Org.ts").Org,
+  orgRef: import("@platform-core/infrastructure/application-database/entities/auth/Org.ts").Org,
 ): Promise<EventSink> {
   return {
     async emit(event: EmittedEvent): Promise<void> {
-      const { Event: EventEntity } = await import("../db/entities/core/Event.ts");
+      const { Event: EventEntity } = await import("@platform-core/infrastructure/application-database/entities/core/Event.ts");
       const entity = em.create(EventEntity, {
         org: orgRef,
         verb: `${event.subjectKind}.${event.verb}`,

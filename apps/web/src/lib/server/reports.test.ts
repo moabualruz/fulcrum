@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { createTestOrm, type TestOrm } from "@/test-utils/db.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import {
   listSprints,
   loadBurndown,

@@ -3,8 +3,8 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import type { RequestHandler } from "./$types";
 import { requestAppScope } from "$lib/server/application-scope";
-import { getArtifactDetail } from "@/application/artifacts/queries.ts";
-import { assertArtifactPathInRoot, resolveArtifactStoreRoot } from "@/artifacts/storage.ts";
+import { getArtifactDetail } from "@workflow-coordination/application/artifacts/queries.ts";
+import { assertArtifactPathInRoot, resolveArtifactStoreRoot } from "@workflow-coordination/infrastructure/artifacts/storage.ts";
 
 const require = createRequire(import.meta.url);
 const { lookup } = require("mime-types") as { lookup: (filename: string) => string | false };

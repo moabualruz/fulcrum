@@ -7,8 +7,8 @@ import { superValidate } from "sveltekit-superforms/server";
 import { valibot } from "sveltekit-superforms/adapters";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
-import { deleteProject, updateProject } from "@/application/projects/commands.ts";
-import { loadProjectOverview } from "@/application/projects/queries.ts";
+import { deleteProject, updateProject } from "@work-management/application/projects/commands.ts";
+import { loadProjectOverview } from "@work-management/application/projects/queries.ts";
 import { requestAppScope } from "$lib/server/application-scope";
 
 // Detail-page rename uses a narrower schema than `ProjectFormSchema` — slug

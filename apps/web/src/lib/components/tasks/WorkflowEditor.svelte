@@ -1,34 +1,25 @@
 <script lang="ts">
   /**
-   * WorkflowEditor — visual transition graph editor (D-23, D-24).
-   *
-   * Renders status nodes in 5-category columns. Allowed transitions as directed
-   * arrows. Edit mode: click status → checkbox list for target statuses.
-   * Save: trpc.workflows.updateTransitions. Reset: trpc.workflows.getDefault.
-   *
-   * Security: T-05-33 — only project admins; permission check enforced in router.
+   * WorkflowEditor — visual transition graph editor.
    */
   import { onMount } from "svelte";
   import { cn } from "$lib/utils.js";
+  import {
+    fetchDefaultWorkflowTransitions,
+    fetchWorkflowTransitions,
+    saveWorkflowTransitions,
+    type Methodology,
+  } from "./workflow-settings-api";
 
   // ── Props ────────────────────────────────────────────────────────────────────
 
-  type Methodology = "scrum" | "kanban" | "none";
-
   interface Props {
     projectId: string;
+    orgId?: string;
     methodology?: Methodology;
-    /** Injected tRPC client */
-    trpc?: {
-    workflows: {
-      getTransitions: { query: (input: { projectId: string }) => Promise<Record<string, string[]>> };
-      updateTransitions: { mutate: (input: { projectId: string; transitions: Record<string, string[]> }) => Promise<void> };
-      getDefault: { query: (input: { methodology: string }) => Promise<Record<string, string[]>> };
-    };
-    } | null;
   }
 
-  let { projectId, methodology = "scrum", trpc = null }: Props = $props();
+  let { projectId, orgId = "", methodology = "scrum" }: Props = $props();
 
   // ── State ────────────────────────────────────────────────────────────────────
 
@@ -59,12 +50,12 @@
 
   // Default statuses per category (fallback when no custom statuses configured)
   const DEFAULT_STATUSES: StatusNode[] = [
-    { id: "backlog", name: "Backlog", category: "backlog" },
-    { id: "todo", name: "Todo", category: "unstarted" },
-    { id: "in_progress", name: "In Progress", category: "started" },
-    { id: "in_review", name: "In Review", category: "started" },
-    { id: "done", name: "Done", category: "completed" },
-    { id: "canceled", name: "Canceled", category: "canceled" },
+    { id: "Backlog", name: "Backlog", category: "backlog" },
+    { id: "Todo", name: "Todo", category: "unstarted" },
+    { id: "InProgress", name: "In Progress", category: "started" },
+    { id: "InReview", name: "In Review", category: "started" },
+    { id: "Done", name: "Done", category: "completed" },
+    { id: "Canceled", name: "Canceled", category: "canceled" },
   ];
 
   let statuses: StatusNode[] = DEFAULT_STATUSES;
@@ -82,11 +73,10 @@
   });
 
   async function loadTransitions() {
-    if (!trpc) return;
     loading = true;
     error = "";
     try {
-      transitions = await trpc.workflows.getTransitions.query({ projectId });
+      transitions = normalizeTransitions(await fetchWorkflowTransitions(fetch, { orgId, projectId }));
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : "Failed to load transitions";
     } finally {
@@ -95,12 +85,11 @@
   }
 
   async function save() {
-    if (!trpc) return;
     saving = true;
     error = "";
     successMsg = "";
     try {
-      await trpc.workflows.updateTransitions.mutate({ projectId, transitions });
+      transitions = normalizeTransitions(await saveWorkflowTransitions(fetch, { orgId, projectId }, transitions));
       successMsg = "Workflow saved";
       editingStatus = null;
     } catch (e: unknown) {
@@ -111,13 +100,12 @@
   }
 
   async function resetToDefault() {
-    if (!trpc) return;
     saving = true;
     error = "";
     try {
-      const defaults = await trpc.workflows.getDefault.query({ methodology });
+      const defaults = await fetchDefaultWorkflowTransitions(fetch, methodology);
       transitions = defaults;
-      await trpc.workflows.updateTransitions.mutate({ projectId, transitions });
+      transitions = normalizeTransitions(await saveWorkflowTransitions(fetch, { orgId, projectId }, normalizeTransitions(defaults)));
       successMsg = "Reset to default workflow";
       editingStatus = null;
     } catch (e: unknown) {
@@ -146,6 +134,31 @@
 
   function allTargets(from: string): StatusNode[] {
     return statuses.filter((s) => s.id !== from);
+  }
+
+  function normalizeTransitions(input: Record<string, string[]>): Record<string, string[]> {
+    return Object.fromEntries(
+      Object.entries(input).map(([from, targets]) => [
+        normalizeStatusId(from),
+        targets.map(normalizeStatusId),
+      ]),
+    );
+  }
+
+  function normalizeStatusId(value: string): string {
+    const aliases: Record<string, string> = {
+      backlog: "Backlog",
+      todo: "Todo",
+      in_progress: "InProgress",
+      inprogress: "InProgress",
+      in_review: "InReview",
+      inreview: "InReview",
+      done: "Done",
+      completed: "Done",
+      canceled: "Canceled",
+      cancelled: "Canceled",
+    };
+    return aliases[value.toLowerCase()] ?? value;
   }
 </script>
 

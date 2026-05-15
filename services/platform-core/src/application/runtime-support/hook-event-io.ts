@@ -1,6 +1,6 @@
 // I/O helpers shared across hook subcommands.
 
-import type { HookEvent } from "../types.ts";
+import type { HookEvent } from "./hook-types.ts";
 
 /**
  * Truncate input to ~80 chars, removing newlines for one-liner output.

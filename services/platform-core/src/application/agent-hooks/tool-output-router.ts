@@ -10,14 +10,14 @@
 //   leave-as-is   — no-op (default)
 
 import { parse as parseToml } from "smol-toml";
-import { readHookEvent, projectSlug, stateDir, deriveTool } from "../utils/io.ts";
+import { readHookEvent, projectSlug, stateDir, deriveTool } from "@platform-core/application/runtime-support/hook-event-io.ts";
 import type {
   HookEvent,
   PolicyDoc,
   PolicyProfile,
   Tier,
   ToolPolicy,
-} from "../types.ts";
+} from "@platform-core/application/runtime-support/hook-types.ts";
 
 const HEAD_LINES = Number(process.env["FULCRUM_HEAD_LINES"] ?? 20);
 

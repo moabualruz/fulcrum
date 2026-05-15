@@ -8,9 +8,9 @@ import { z } from "zod";
 import {
   FulcrumSkill,
   SkillVersion,
-} from "../db/entities/skills/index.ts";
-import { initOrm } from "../db/mikro-orm.config.ts";
-import { parseKernelMarkdown } from "../shared/markdown.ts";
+} from "@platform-core/infrastructure/application-database/entities/skills/index.ts";
+import { initOrm } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { parseKernelMarkdown } from "@platform-core/application/platform-primitives/frontmatter-markdown.ts";
 import { AGENT_DIRS, type AgentName } from "./loader.ts";
 import { readSkillsLockFile, writeSkillsLockFile } from "./lock.ts";
 

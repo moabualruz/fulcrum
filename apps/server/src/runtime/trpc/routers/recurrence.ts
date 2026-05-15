@@ -7,7 +7,7 @@ import {
   deleteRecurrenceRule,
   listRecurrenceRules,
   type RecurrenceAppContext,
-} from "@/application/recurrence/commands.ts";
+} from "@work-management/application/recurrence/commands.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 

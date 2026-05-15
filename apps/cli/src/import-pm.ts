@@ -3,10 +3,10 @@
  * Contains runImport, formatImportResult, NullCredentialRepository, FetchHttpClient.
  */
 
-import { importFromLinear } from "@/data/importers/linear.ts";
-import { importFromJira } from "@/data/importers/jira.ts";
-import { importFromPlane } from "@/data/importers/plane.ts";
-import type { CredentialRepository, HttpClient, ImportResult } from "@/data/importers/types.ts";
+import { importFromLinear } from "@integration-hub/application/importers/sources/linear.ts";
+import { importFromJira } from "@integration-hub/application/importers/sources/jira.ts";
+import { importFromPlane } from "@integration-hub/application/importers/sources/plane.ts";
+import type { CredentialRepository, HttpClient, ImportResult } from "@integration-hub/application/importers/sources/types.ts";
 
 export type { CredentialRepository, HttpClient, ImportResult };
 

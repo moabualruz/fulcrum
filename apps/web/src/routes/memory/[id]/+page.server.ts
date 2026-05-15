@@ -1,6 +1,6 @@
 import { error, redirect, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { getMemory, updateMemoryAction, deleteMemoryAction, MEMORY_SCOPES, type MemoryScope } from "@/application/memory/web-queries.ts";
+import { getMemory, updateMemoryAction, deleteMemoryAction, MEMORY_SCOPES, type MemoryScope } from "@knowledge-workspace/application/memory/web-queries.ts";
 import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = ({ params, locals }) => ({

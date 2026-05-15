@@ -2,7 +2,7 @@
 // Cross-platform stat via Node fs.
 
 import { stat } from "node:fs/promises";
-import { exists } from "../utils/proc.ts";
+import { exists } from "@platform-core/application/runtime-support/process-runner.ts";
 
 const STALE_AGE_SECONDS = 3600;
 

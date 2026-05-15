@@ -1,7 +1,7 @@
 import { redirect, type Actions, type ServerLoad } from "@sveltejs/kit";
 
 interface SessionEvent {
-  locals: { session?: unknown };
+  locals: { session?: unknown; orgId?: string | null; userId?: string | null };
   fetch: typeof fetch;
   request: { headers: { get(name: string): string | null } };
   url: URL;
@@ -52,22 +52,60 @@ function baseUrl(url: URL): string {
   return `${url.protocol}//${url.host}`;
 }
 
-function unwrapTrpcData(body: unknown): unknown {
-  return (
-    (body as { result?: { data?: { json?: unknown } } })?.result?.data?.json ??
-    (body as { result?: { data?: unknown } })?.result?.data ??
-    body
-  );
+function extractApiError(body: unknown): string {
+  const record = body as { error?: { message?: string }; message?: string } | null;
+  return record?.error?.message ?? record?.message ?? "Request failed";
 }
 
-function extractTrpcError(body: unknown): string {
-  const error = (body as { error?: { json?: { message?: string }; message?: string } })?.error;
-  return error?.json?.message ?? error?.message ?? "Request failed";
+function publicApiBaseUrl(env: Record<string, string | undefined> = process.env): string | null {
+  const raw = env["FULCRUM_SERVER_URL"] ?? env["FULCRUM_PUBLIC_API_URL"];
+  return raw ? raw.replace(/\/+$/, "") : null;
 }
 
-async function trpcQuery(event: SessionEvent, procedure: string, input: unknown): Promise<unknown> {
-  const encodedInput = encodeURIComponent(JSON.stringify(input));
-  const response = await event.fetch(`${baseUrl(event.url)}/api/trpc/${procedure}?input=${encodedInput}`, {
+function publicNotificationUrl(event: SessionEvent, path: string): string | null {
+  if (!event.locals.orgId || !event.locals.userId) return null;
+  const base = publicApiBaseUrl() ?? baseUrl(event.url);
+  const url = new URL(path, base);
+  url.searchParams.set("orgId", event.locals.orgId);
+  url.searchParams.set("userId", event.locals.userId);
+  return url.toString();
+}
+
+function publicAuditUrl(event: SessionEvent, activityPage: number): string | null {
+  if (!event.locals.orgId || !event.locals.userId) return null;
+  const base = publicApiBaseUrl() ?? baseUrl(event.url);
+  const url = new URL("/api/v1/audit", base);
+  url.searchParams.set("orgId", event.locals.orgId);
+  url.searchParams.set("userId", event.locals.userId);
+  url.searchParams.set("limit", String(PAGE_SIZE));
+  url.searchParams.set("offset", String((activityPage - 1) * PAGE_SIZE));
+  return url.toString();
+}
+
+async function publicNotificationRequest(
+  event: SessionEvent,
+  path: string,
+  method: "GET" | "PATCH" = "GET",
+): Promise<unknown> {
+  const target = publicNotificationUrl(event, path);
+  if (!target) throw new Error("Notification scope is required.");
+  const response = await event.fetch(target, {
+    method,
+    credentials: "include",
+    headers: {
+      "content-type": "application/json",
+      cookie: event.request.headers.get("cookie") ?? "",
+    },
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(extractApiError(body));
+  return body;
+}
+
+async function publicAuditRequest(event: SessionEvent, activityPage: number): Promise<unknown> {
+  const target = publicAuditUrl(event, activityPage);
+  if (!target) throw new Error("Audit scope is required.");
+  const response = await event.fetch(target, {
     method: "GET",
     credentials: "include",
     headers: {
@@ -76,23 +114,8 @@ async function trpcQuery(event: SessionEvent, procedure: string, input: unknown)
     },
   });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(extractTrpcError(body));
-  return unwrapTrpcData(body);
-}
-
-async function trpcMutation(event: ActionEvent, procedure: string, input: unknown): Promise<unknown> {
-  const response = await event.fetch(`${baseUrl(event.url)}/api/trpc/${procedure}`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "content-type": "application/json",
-      cookie: event.request.headers.get("cookie") ?? "",
-    },
-    body: JSON.stringify({ json: input }),
-  });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(extractTrpcError(body));
-  return unwrapTrpcData(body);
+  if (!response.ok) throw new Error(extractApiError(body));
+  return body;
 }
 
 function normalizeNotification(row: Record<string, unknown>): NotificationRow {
@@ -112,6 +135,24 @@ function normalizeNotification(row: Record<string, unknown>): NotificationRow {
   };
 }
 
+function normalizeActivity(row: Record<string, unknown>): ActivityRow {
+  return {
+    id: String(row["id"]),
+    org_id: String(row["orgId"]),
+    project_id: row["projectId"] ? String(row["projectId"]) : null,
+    actor: String(row["userId"] ?? "system"),
+    subject_kind: String(row["subjectKind"] ?? "event"),
+    subject_id: String(row["subjectId"] ?? ""),
+    verb: String(row["verb"] ?? ""),
+    payload: isRecord(row["payload"]) ? row["payload"] : {},
+    created_at: String(row["createdAt"]),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
 export const load: ServerLoad = async (event) => {
   const sessionEvent = event as SessionEvent;
   if (!sessionEvent.locals.session) throw redirect(302, "/auth/login");
@@ -119,22 +160,29 @@ export const load: ServerLoad = async (event) => {
   const activityPageRaw = parseInt(sessionEvent.url.searchParams.get("activity_page") ?? "1", 10);
   const activityPage = Number.isNaN(activityPageRaw) || activityPageRaw < 1 ? 1 : activityPageRaw;
 
-  const [unreadResult, listResult] = await Promise.all([
-    trpcQuery(sessionEvent, "notify.unreadCount", {}),
-    trpcQuery(sessionEvent, "notify.list", { limit: 50, offset: 0 }),
+  const [unreadResult, listResult, activityResult] = await Promise.all([
+    publicNotificationRequest(sessionEvent, "/api/v1/notifications/unread-count"),
+    publicNotificationRequest(sessionEvent, "/api/v1/notifications"),
+    publicAuditRequest(sessionEvent, activityPage),
   ]);
 
   const count = Number((unreadResult as { count?: unknown })?.count ?? 0);
-  const items = Array.isArray((listResult as { items?: unknown })?.items)
+  const items = Array.isArray((listResult as { data?: unknown })?.data)
+    ? ((listResult as { data: Record<string, unknown>[] }).data)
+    : Array.isArray((listResult as { items?: unknown })?.items)
     ? ((listResult as { items: Record<string, unknown>[] }).items)
     : [];
+  const activityItems = Array.isArray((activityResult as { data?: unknown })?.data)
+    ? ((activityResult as { data: Record<string, unknown>[] }).data)
+    : [];
+  const activityTotal = Number((activityResult as { total?: unknown })?.total ?? activityItems.length);
 
   return {
     notifications: items.map(normalizeNotification),
     unreadCount: Math.max(0, count),
-    activity: [],
+    activity: activityItems.map(normalizeActivity),
     activityPage,
-    activityTotal: 0,
+    activityTotal: Math.max(0, activityTotal),
   } satisfies InboxData;
 };
 
@@ -142,7 +190,7 @@ export const actions: Actions = {
   markAllRead: async (event) => {
     const actionEvent = event as ActionEvent;
     if (!actionEvent.locals.session) throw redirect(302, "/auth/login");
-    await trpcMutation(actionEvent, "notify.markAllRead", {});
+    await publicNotificationRequest(actionEvent, "/api/v1/notifications/mark-all-read", "PATCH");
     return { markedRead: true };
   },
 };

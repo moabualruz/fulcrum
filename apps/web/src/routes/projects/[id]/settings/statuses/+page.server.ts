@@ -5,8 +5,8 @@ import {
   updateProjectStatus,
   deleteProjectStatus,
   listProjectStatuses,
-} from "@/application/project-statuses/commands.ts";
-import { getProjectOrNull } from "@/application/projects/queries.ts";
+} from "@work-management/application/project-statuses/commands.ts";
+import { getProjectOrNull } from "@work-management/application/projects/queries.ts";
 import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = async ({ params, locals }) => {

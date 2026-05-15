@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Container } from "@needle-di/core";
 
-import { createTestOrm } from "@/test-utils/db.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
@@ -79,7 +79,7 @@ describe("skills registry tRPC procedures", () => {
       const caller = callerFor(em);
 
       // Create a real SkillConflict to override
-      const { SkillConflict, SkillConflictKind, SkillConflictStatus } = await import("@/db/entities/skills/SkillConflict.ts");
+      const { SkillConflict, SkillConflictKind, SkillConflictStatus } = await import("@platform-core/infrastructure/application-database/entities/skills/SkillConflict.ts");
       const conflict = em.create(SkillConflict, {
         slug: "test-skill",
         kind: SkillConflictKind.UpstreamConflict,

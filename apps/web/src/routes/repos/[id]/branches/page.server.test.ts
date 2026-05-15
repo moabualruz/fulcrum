@@ -3,10 +3,10 @@ import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { createLocalOrg } from "@/test-support/product-fixtures.ts";
-import { makeId } from "@/test-support/product-fixtures.ts";
+import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { createLocalOrg } from "@test-support/product-workspace-fixtures.ts";
+import { makeId } from "@test-support/product-workspace-fixtures.ts";
 
 let scratch: string;
 
@@ -27,9 +27,9 @@ afterEach(() => {
 });
 
 async function seedBranches(writeOps = false): Promise<string> {
-  const dbDir = join(scratch, "state", "product", "db");
+  const dbDir = join(scratch, "pglite.data");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(join(dbDir, "main"));
+  const db = await openIsolatedStore(dbDir);
   await migrateIsolatedStore(db);
   await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS name text not null default ''`);
   await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS kind text not null default 'local'`);

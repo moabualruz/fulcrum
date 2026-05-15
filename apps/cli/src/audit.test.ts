@@ -60,6 +60,50 @@ describe("fulcrum audit CLI", () => {
     expect(JSON.parse(logs.join(""))).toEqual([{ id: "evt_1", subject_kind: "task", verb: "created" }]);
   });
 
+  test("query requires the configured audit public API when no test client is injected", async () => {
+    await expect(run(["query", "--json"], {
+      env: {},
+      fetch: (async () => {
+        throw new Error("unexpected fetch");
+      }) as unknown as typeof fetch,
+    })).rejects.toThrow("Audit API caller is not configured");
+  });
+
+  test("query uses the configured Nest audit API", async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const { logs, restore } = captureConsole();
+    try {
+      await run(["query", "--project", "project-1", "--user", "user-1", "--kind", "task", "--limit", "10", "--json"], {
+        env: {
+          FULCRUM_SERVER_URL: "http://127.0.0.1:3000/",
+          FULCRUM_ORG_ID: "org-1",
+        },
+        fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+          calls.push({ url: String(url), init: init ?? {} });
+          return Response.json({
+            data: [{ id: "audit-public", subjectKind: "task", userId: "user-1" }],
+            total: 1,
+          });
+        }) as typeof fetch,
+      });
+    } finally {
+      restore();
+    }
+
+    expect(JSON.parse(logs.join(""))).toEqual([{ id: "audit-public", subjectKind: "task", userId: "user-1" }]);
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:3000/api/v1/audit?orgId=org-1&projectId=project-1&userId=user-1&kind=task&limit=10",
+        init: {
+          method: "GET",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: undefined,
+        },
+      },
+    ]);
+  });
+
   test("query without --json prints one event per line", async () => {
     const { logs, restore } = captureConsole();
     try {
@@ -104,6 +148,68 @@ describe("fulcrum audit CLI", () => {
     }
 
     expect(JSON.parse(logs.join(""))).toEqual([{ id: "evt_1" }]);
+  });
+
+  test("export uses the configured Nest audit API for immediate JSON export", async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const { logs, restore } = captureConsole();
+    try {
+      await run(["export", "--format", "json", "--project", "project-1", "--kind", "task"], {
+        env: {
+          FULCRUM_PUBLIC_API_URL: "http://127.0.0.1:4321/base/",
+          FULCRUM_ORG_ID: "org-1",
+        },
+        fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+          calls.push({ url: String(url), init: init ?? {} });
+          return Response.json([{ id: "audit-export", subjectKind: "task" }]);
+        }) as typeof fetch,
+      });
+    } finally {
+      restore();
+    }
+
+    expect(JSON.parse(logs.join(""))).toEqual([{ id: "audit-export", subjectKind: "task" }]);
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:4321/api/v1/audit/export?orgId=org-1&projectId=project-1&kind=task&format=json",
+        init: {
+          method: "GET",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: undefined,
+        },
+      },
+    ]);
+  });
+
+  test("export polls the configured Nest audit API when it returns a job", async () => {
+    tmp = await mkdtemp(join(tmpdir(), "fulcrum-audit-public-job-"));
+    const output = join(tmp, "audit.json");
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    await run(["export", "--format", "json", "--output", output], {
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3000",
+        FULCRUM_ORG_ID: "org-1",
+      },
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({ url: String(url), init: init ?? {} });
+        if (String(url).includes("/api/v1/audit/export/job-public")) {
+          return Response.json({
+            status: "completed",
+            format: "json",
+            content: '[{"id":"audit-public-job"}]',
+          });
+        }
+        return Response.json({ jobId: "job-public" });
+      }) as typeof fetch,
+      sleep: async () => {},
+    });
+
+    expect(JSON.parse(await readFile(output, "utf8"))).toEqual([{ id: "audit-public-job" }]);
+    expect(calls.map((call) => call.url)).toEqual([
+      "http://127.0.0.1:3000/api/v1/audit/export?orgId=org-1&format=json",
+      "http://127.0.0.1:3000/api/v1/audit/export/job-public?orgId=org-1",
+    ]);
   });
 
   test("export --format json --output writes to file", async () => {

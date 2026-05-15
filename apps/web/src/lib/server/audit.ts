@@ -1,1 +1,1 @@
-export * from "@/application/audit/web-queries.ts";
+export * from "@workflow-coordination/application/audit/web-queries.ts";

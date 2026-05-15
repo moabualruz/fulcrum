@@ -12,7 +12,7 @@ import {
   unmuteNotificationSubject,
   updateNotificationRule,
   upsertPushSubscription,
-} from "@/application/notifications/commands.ts";
+} from "@notification-center/application/notifications/commands.ts";
 import {
   getNotificationQuietHours,
   getNotificationRule,
@@ -20,9 +20,9 @@ import {
   listNotificationRules,
   listNotifications,
   unreadNotificationCount,
-} from "@/application/notifications/queries.ts";
-import type { AppContext } from "@/application/notifications/types.ts";
-import { AppNotFoundError } from "@/application/errors.ts";
+} from "@notification-center/application/notifications/queries.ts";
+import type { AppContext } from "@notification-center/domain/notification.ts";
+import { AppNotFoundError } from "@platform-core/domain/errors.ts";
 import { permissionedProcedure } from "../middleware.ts";
 import {
   ChannelNameSchema,

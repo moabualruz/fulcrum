@@ -29,13 +29,12 @@ describe("auth whoami parity", () => {
     });
   });
 
-  test("missing CLI session prints clear init/login next step", async () => {
+  test("missing public API config prints clear next step", async () => {
     const { run } = await import("./auth.ts");
     const errors: string[] = [];
     let exitCode: number | undefined;
 
     await run(["whoami", "--json"], {
-      container: null,
       print: () => undefined,
       printErr: (line) => errors.push(line),
       exit: (code) => {
@@ -45,7 +44,7 @@ describe("auth whoami parity", () => {
 
     expect(exitCode).toBe(1);
     expect(errors.join("\n")).toContain(
-      "No active CLI session found. Run fulcrum init or fulcrum auth login before protected auth commands.",
+      "Auth API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL.",
     );
   });
 });

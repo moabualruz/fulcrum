@@ -7,7 +7,7 @@ import {
   KNOWN_FLAGS,
   type FeatureFlag,
 } from "./feature-flags.ts";
-import { isEnvFeatureEnabled } from "@/flags/registry.ts";
+import { isEnvFeatureEnabled } from "@platform-core/application/feature-flags/registry.ts";
 
 describe("feature-flags", () => {
   const origEnv = process.env["FULCRUM_FEATURES"];

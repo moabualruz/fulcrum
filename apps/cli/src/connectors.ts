@@ -1,7 +1,8 @@
-import type { Container } from "@needle-di/core";
-import { TRPCError } from "@trpc/server";
-
-import { createLocalCaller } from "./local-caller.ts";
+import {
+  createConnectorApiCallerFromEnv,
+  type ConnectorApiEnvironment,
+} from "@integration-hub/interface/http/connector-api-client.ts";
+import { formatApiError } from "./api-errors.ts";
 
 export interface ConnectorSummary {
   kind: string;
@@ -31,7 +32,8 @@ type ConnectorsCaller = {
 
 export interface ConnectorsRunOptions {
   caller?: ConnectorsCaller;
-  container?: Container | null;
+  env?: ConnectorApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -97,7 +99,18 @@ export async function run(argv: readonly string[], opts: ConnectorsRunOptions = 
 
 async function resolveCaller(opts: ConnectorsRunOptions): Promise<ConnectorsCaller> {
   if (opts.caller) return opts.caller;
-  return await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as ConnectorsCaller;
+  const apiCaller = createConnectorApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error("Connector API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL.");
+  }
+  return {
+    connectors: {
+      list: () => apiCaller.connectors.list() as Promise<ConnectorSummary[]>,
+      runs: {
+        list: (input) => apiCaller.connectors.runs.list({ connectorId: input.kind }) as Promise<ConnectorRunSummary[]>,
+      },
+    },
+  };
 }
 
 function ioFor(opts: ConnectorsRunOptions): Required<Pick<ConnectorsRunOptions, "print" | "printErr" | "exit">> {
@@ -120,6 +133,5 @@ function validateFlags(argv: readonly string[], allowed: Set<string>, io: Requir
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof TRPCError) return `${error.code}: ${error.message}`;
-  return (error as Error).message;
+  return formatApiError(error);
 }

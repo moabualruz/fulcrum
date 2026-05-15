@@ -11,7 +11,7 @@
 //   - Idempotent: vendor commands are themselves incremental (`graphify
 //     update .`).
 
-import { which, run as runProc } from "@/utils/proc.ts";
+import { which, run as runProc } from "@platform-core/application/runtime-support/process-runner.ts";
 
 interface IndexCommand {
   /** Human label for log output. */

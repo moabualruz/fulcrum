@@ -7,13 +7,11 @@
  * - Exposes exact `expectedSha256` and `actualSha256` values
  * - Renders the skill unavailable until override with audit payload
  *
- * RED phase — imports from production modules (may not fully exist yet).
  */
 
 import { describe, it, expect } from "bun:test";
 
-// ── RED: imports from production modules ───────────────────────────────
-import { verifySkillLock } from "../skills/lock.ts";
+import { verifySkillLock } from "./lock.ts";
 
 // ── SHA-256 helper (shared across skills modules) ──────────────────────
 import { sha256Hex } from "./mcp-virtual-skills.ts";

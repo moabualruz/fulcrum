@@ -1,0 +1,203 @@
+import { randomUUID } from "node:crypto";
+import { IsNull } from "typeorm";
+import type { DataSource } from "typeorm";
+
+import {
+  type FulcrumProject,
+  FulcrumAcpSessionEntity,
+  FulcrumAgentRunEntity,
+  FulcrumDocumentEntity,
+  FulcrumProjectEntity,
+  FulcrumTaskDependencyEntity,
+  FulcrumTaskEntity,
+  FulcrumWorkspaceEntity,
+} from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
+
+export type ProjectPublicKind = "workspace" | "project" | "subproject";
+
+export interface ProjectPublicRow {
+  id: string;
+  orgId: string;
+  workspaceId: string;
+  kind: ProjectPublicKind;
+  slug: string;
+  name: string;
+  repoPath: string | null;
+  template: string | null;
+  memoryConfig: Record<string, unknown> | null;
+  memory_config: Record<string, unknown> | null;
+  traceId: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface ProjectPublicStats {
+  orgId: string;
+  projectId: string;
+  taskCount: number;
+  doneTaskCount: number;
+  openTaskCount: number;
+  traceId: string;
+}
+
+export class ProjectPublicStore {
+  constructor(private readonly dataSource: DataSource) {}
+
+  async listProjects(input: { orgId: string }): Promise<{ data: ProjectPublicRow[] }> {
+    const projects = await this.projectRepository().find({
+      where: { workspaceId: input.orgId },
+      order: { createdAt: "ASC", id: "ASC" },
+    });
+    return { data: projects.map((project) => toPublicRow(input.orgId, project)) };
+  }
+
+  async createProject(input: {
+    orgId: string;
+    kind?: ProjectPublicKind;
+    name: string;
+    slug?: string;
+    repoPath?: string;
+    template?: string;
+  }): Promise<ProjectPublicRow> {
+    const kind = input.kind ?? "project";
+    if (kind === "workspace") {
+      const workspace = await this.workspaceRepository().save({
+        id: randomUUID(),
+        slug: input.slug ?? slugify(input.name),
+        name: input.name,
+      });
+      return {
+        id: workspace.id,
+        orgId: workspace.id,
+        workspaceId: workspace.id,
+        kind,
+        slug: workspace.slug,
+        name: workspace.name,
+        repoPath: input.repoPath ?? null,
+        template: input.template ?? null,
+        memoryConfig: null,
+        memory_config: null,
+        traceId: `trace-workspace-${workspace.id}`,
+        createdAt: workspace.createdAt?.toISOString() ?? null,
+        updatedAt: workspace.updatedAt?.toISOString() ?? null,
+      };
+    }
+
+    const id = randomUUID();
+    const project = await this.projectRepository().save({
+      id,
+      workspaceId: input.orgId,
+      slug: input.slug ?? slugify(input.name),
+      name: input.name,
+      traceId: `trace-project-${id}`,
+    });
+    return toPublicRow(input.orgId, project, {
+      kind,
+      repoPath: input.repoPath ?? null,
+      template: input.template ?? null,
+    });
+  }
+
+  async getProject(input: { orgId: string; id: string }): Promise<ProjectPublicRow | null> {
+    const project = await this.findScopedProject(input);
+    return project ? toPublicRow(input.orgId, project) : null;
+  }
+
+  async patchProject(input: {
+    orgId: string;
+    id: string;
+    name?: string;
+    memoryConfig?: Record<string, unknown>;
+  }): Promise<ProjectPublicRow | null> {
+    const project = await this.findScopedProject(input);
+    if (!project) return null;
+
+    if (input.name !== undefined) project.name = input.name;
+    if (input.memoryConfig !== undefined) {
+      project.workflowConfig = {
+        ...(project.workflowConfig ?? {}),
+        memory_config: input.memoryConfig,
+      };
+    }
+    return toPublicRow(input.orgId, await this.projectRepository().save(project));
+  }
+
+  async deleteProject(input: { orgId: string; id: string }): Promise<void> {
+    const project = await this.findScopedProject(input);
+    if (!project) return;
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(FulcrumTaskDependencyEntity, { projectId: project.id });
+      await manager.delete(FulcrumAgentRunEntity, { projectId: project.id });
+      await manager.delete(FulcrumAcpSessionEntity, { projectId: project.id });
+      await manager.delete(FulcrumDocumentEntity, { projectId: project.id });
+      await manager.delete(FulcrumTaskEntity, { projectId: project.id });
+      await manager.delete(FulcrumProjectEntity, { id: project.id, workspaceId: input.orgId });
+    });
+  }
+
+  async projectStats(input: { orgId: string; id: string }): Promise<ProjectPublicStats | null> {
+    const project = await this.findScopedProject(input);
+    if (!project) return null;
+
+    const tasks = await this.taskRepository().findBy({ projectId: project.id, deletedAt: IsNull() });
+    const doneTaskCount = tasks.filter((task) => task.status === "done").length;
+    return {
+      orgId: input.orgId,
+      projectId: project.id,
+      taskCount: tasks.length,
+      doneTaskCount,
+      openTaskCount: tasks.length - doneTaskCount,
+      traceId: project.traceId,
+    };
+  }
+
+  private async findScopedProject(input: { orgId: string; id: string }): Promise<FulcrumProject | null> {
+    return await this.projectRepository().findOneBy({ id: input.id, workspaceId: input.orgId });
+  }
+
+  private workspaceRepository() {
+    return this.dataSource.getRepository(FulcrumWorkspaceEntity);
+  }
+
+  private projectRepository() {
+    return this.dataSource.getRepository(FulcrumProjectEntity);
+  }
+
+  private taskRepository() {
+    return this.dataSource.getRepository(FulcrumTaskEntity);
+  }
+}
+
+function toPublicRow(
+  orgId: string,
+  project: FulcrumProject,
+  overrides: Partial<Pick<ProjectPublicRow, "kind" | "repoPath" | "template">> = {},
+): ProjectPublicRow {
+  const memoryConfig = project.workflowConfig?.["memory_config"];
+  const publicMemoryConfig = isRecord(memoryConfig) ? memoryConfig : null;
+  return {
+    id: project.id,
+    orgId,
+    workspaceId: project.workspaceId,
+    kind: overrides.kind ?? "project",
+    slug: project.slug,
+    name: project.name,
+    repoPath: overrides.repoPath ?? null,
+    template: overrides.template ?? null,
+    memoryConfig: publicMemoryConfig,
+    memory_config: publicMemoryConfig,
+    traceId: project.traceId,
+    createdAt: project.createdAt?.toISOString() ?? null,
+    updatedAt: project.updatedAt?.toISOString() ?? null,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function slugify(value: string): string {
+  const slug = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || `project-${randomUUID()}`;
+}

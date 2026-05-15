@@ -1,0 +1,269 @@
+import type { AcpConfigState } from "@agent-client-protocol/application/config-store.ts";
+import { applySessionNotification, type AcpSessionState } from "@agent-client-protocol/application/session-store.ts";
+import type {
+  AgentConfig,
+  AuthenticateRequest,
+  AuthenticateResponse,
+  CancelNotification,
+  InitializeRequest,
+  InitializeResponse,
+  LoadSessionRequest,
+  LoadSessionResponse,
+  NewSessionRequest,
+  NewSessionResponse,
+  PermissionRequest,
+  PromptRequest,
+  PromptResponse,
+  SavedSession,
+  SessionNotification,
+} from "@agent-client-protocol/domain/protocol.ts";
+
+export interface AcpBridgeClient {
+  pendingPermissionRequest: PermissionRequest | null;
+  onSessionUpdate: ((notification: SessionNotification) => void) | null;
+  onTransportClose: ((reason?: string) => void) | null;
+  initialize(params: InitializeRequest): Promise<InitializeResponse>;
+  newSession(params: NewSessionRequest): Promise<NewSessionResponse>;
+  loadSession(params: LoadSessionRequest): Promise<LoadSessionResponse>;
+  prompt(params: PromptRequest): Promise<PromptResponse>;
+  cancel(params: CancelNotification): Promise<void>;
+  setMode(params: { sessionId: string; modeId: string }): Promise<void>;
+  unstable_setSessionModel(params: { sessionId: string; modelId: string }): Promise<void>;
+  authenticate(params: AuthenticateRequest): Promise<AuthenticateResponse>;
+  disconnect(): Promise<void>;
+  resolvePermission(optionId: string): void;
+  cancelPermission(): void;
+}
+
+export interface CreateAcpBridgeInput {
+  name: string;
+  config: AgentConfig;
+}
+
+export type CreateAcpBridge = (input: CreateAcpBridgeInput) => Promise<AcpBridgeClient>;
+
+export interface AcpSessionManagerOptions {
+  state: AcpSessionState;
+  config: AcpConfigState;
+  createBridge: CreateAcpBridge;
+  appVersion?: string;
+  canAccessFs?: boolean;
+}
+
+const PROTOCOL_VERSION = 1;
+
+export class AcpSessionManager {
+  private readonly state: AcpSessionState;
+  private readonly config: AcpConfigState;
+  private readonly createBridge: CreateAcpBridge;
+  private readonly appVersion: string;
+  private readonly canAccessFs: boolean;
+  private acpClient: AcpBridgeClient | null = null;
+
+  constructor(options: AcpSessionManagerOptions) {
+    this.state = options.state;
+    this.config = options.config;
+    this.createBridge = options.createBridge;
+    this.appVersion = options.appVersion ?? "0.1.0";
+    this.canAccessFs = options.canAccessFs ?? false;
+  }
+
+  async createSession(agentName: string, cwd: string): Promise<SavedSession> {
+    this.state.isLoading = true;
+    this.state.isConnecting = true;
+    this.state.error = null;
+
+    let bridge: AcpBridgeClient | null = null;
+    try {
+      const agentConfig = this.config.getAgent(agentName);
+      if (!agentConfig) throw new Error(`Agent '${agentName}' not found in config`);
+
+      bridge = await this.createBridge({ name: agentName, config: agentConfig });
+      this.installBridgeHandlers(bridge);
+      this.acpClient = bridge;
+
+      const initResponse = await bridge.initialize({
+        protocolVersion: PROTOCOL_VERSION,
+        clientCapabilities: {
+          fs: {
+            readTextFile: this.canAccessFs,
+            writeTextFile: this.canAccessFs,
+          },
+        },
+        clientInfo: {
+          name: "fulcrum",
+          title: "Fulcrum",
+          version: this.appVersion,
+        },
+      });
+
+      const sessionResponse = await bridge.newSession({
+        cwd,
+        mcpServers: [],
+      });
+
+      const session: SavedSession = {
+        id: this.state.createId(),
+        agentName,
+        sessionId: sessionResponse.sessionId,
+        title: `Session ${new Date(this.state.now()).toLocaleString()}`,
+        lastUpdated: this.state.now(),
+        cwd,
+        supportsLoadSession: readLoadSessionCapability(initResponse),
+      };
+
+      this.state.currentSession = session;
+      this.state.savedSessions.push(session);
+      this.state.isConnected = true;
+      this.state.messages = [];
+      this.state.toolCalls.clear();
+      applyModes(this.state, sessionResponse);
+      applyModels(this.state, sessionResponse);
+      return session;
+    } catch (error) {
+      this.state.error = error instanceof Error ? error.message : String(error);
+      if (bridge) {
+        try {
+          await bridge.disconnect();
+        } catch {
+          /* ignore cleanup failure */
+        }
+      }
+      this.acpClient = null;
+      throw error;
+    } finally {
+      this.state.isLoading = false;
+      this.state.isConnecting = false;
+    }
+  }
+
+  async sendPrompt(text: string): Promise<void> {
+    const client = this.requireClient();
+    const session = this.requireSession();
+    this.state.messages.push({
+      id: this.state.createId(),
+      role: "user",
+      content: text,
+      timestamp: this.state.now(),
+    });
+
+    this.state.isLoading = true;
+    try {
+      await client.prompt({
+        sessionId: session.sessionId,
+        prompt: [{ type: "text", text }],
+      });
+      if (this.state.messages.filter((message) => message.role === "user").length === 1) {
+        session.title = `${text.slice(0, 50)}${text.length > 50 ? "..." : ""}`;
+      }
+      session.lastUpdated = this.state.now();
+    } finally {
+      this.state.isLoading = false;
+    }
+  }
+
+  async cancelOperation(): Promise<void> {
+    const client = this.acpClient;
+    const session = this.state.currentSession;
+    if (!client || !session) return;
+    await client.cancel({ sessionId: session.sessionId });
+  }
+
+  resolvePermission(optionId: string): void {
+    this.acpClient?.resolvePermission(optionId);
+  }
+
+  cancelPermission(): void {
+    this.acpClient?.cancelPermission();
+  }
+
+  async setMode(modeId: string): Promise<void> {
+    const client = this.requireClient();
+    const session = this.requireSession();
+    await client.setMode({ sessionId: session.sessionId, modeId });
+    this.state.currentModeId = modeId;
+  }
+
+  async setModel(modelId: string): Promise<void> {
+    const client = this.requireClient();
+    const session = this.requireSession();
+    await client.unstable_setSessionModel({ sessionId: session.sessionId, modelId });
+    this.state.currentModelId = modelId;
+  }
+
+  async disconnect(): Promise<void> {
+    if (this.acpClient) {
+      await this.acpClient.disconnect();
+      this.acpClient = null;
+    }
+    this.state.disconnectState();
+  }
+
+  private installBridgeHandlers(bridge: AcpBridgeClient): void {
+    bridge.onSessionUpdate = (notification) => {
+      applySessionNotification(this.state, notification);
+    };
+    bridge.onTransportClose = (reason) => {
+      this.acpClient = null;
+      this.state.isConnected = false;
+      this.state.isLoading = false;
+      this.state.pendingPermission = null;
+      this.state.error = `Connection lost: ${reason ?? "transport closed"}`;
+    };
+  }
+
+  private requireClient(): AcpBridgeClient {
+    if (!this.acpClient) throw new Error("No active session");
+    return this.acpClient;
+  }
+
+  private requireSession(): SavedSession {
+    if (!this.state.currentSession) throw new Error("No active session");
+    return this.state.currentSession;
+  }
+}
+
+function readLoadSessionCapability(response: InitializeResponse): boolean {
+  const capabilities = toRecord(response.agentCapabilities);
+  return capabilities.loadSession === true;
+}
+
+function applyModes(state: AcpSessionState, response: NewSessionResponse): void {
+  const modes = toRecord(response.modes);
+  state.availableModes = arrayValue(modes.availableModes).flatMap((candidate) => {
+    const mode = toRecord(candidate);
+    const id = stringValue(mode.id);
+    const name = stringValue(mode.name);
+    if (!id || !name) return [];
+    return [{ id, name, description: optionalString(mode.description) }];
+  });
+  state.currentModeId = stringValue(modes.currentModeId);
+}
+
+function applyModels(state: AcpSessionState, response: NewSessionResponse): void {
+  const models = toRecord(response.models);
+  state.availableModels = arrayValue(models.availableModels).flatMap((candidate) => {
+    const model = toRecord(candidate);
+    const modelId = stringValue(model.modelId);
+    const name = stringValue(model.name);
+    if (!modelId || !name) return [];
+    return [{ modelId, name, description: optionalString(model.description) }];
+  });
+  state.currentModelId = stringValue(models.currentModelId);
+}
+
+function arrayValue(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function toRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+}

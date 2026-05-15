@@ -6,9 +6,9 @@ import {
   markInferenceModelDownloaded,
   markInferenceModelMissing,
   type AdminAppContext,
-} from "@/application/admin/queries.ts";
-import type { InferenceClient } from "@/inference/client.ts";
-import type { BackendHealth } from "@/inference/backends/types.ts";
+} from "@identity-access/application/admin/queries.ts";
+import type { InferenceClient } from "@platform-core/application/inference/client.ts";
+import type { BackendHealth } from "@platform-core/application/inference/backends/types.ts";
 import {
   BackendSchema,
   ClassifyResultSchema,
@@ -22,13 +22,13 @@ import {
   ModelPullProgressSchema,
   TokenizeResultSchema,
   type ModelPullProgress,
-} from "@/inference/protocol.ts";
+} from "@platform-core/application/inference/protocol.ts";
 import {
   getRoutingConfig,
   setRoutingConfig,
-} from "@/inference/routing-config.ts";
-import { INFERENCE_CLIENT_TOKEN } from "@/inference/tokens.ts";
-import { FlagRegistry } from "@/flags/registry.ts";
+} from "@platform-core/application/inference/routing-config.ts";
+import { INFERENCE_CLIENT_TOKEN } from "@platform-core/application/inference/tokens.ts";
+import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
 import { t, publicProcedure } from "@fulcrum/server/trpc/trpc.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import type { TRPCContext } from "@fulcrum/server/trpc/context.ts";
@@ -90,7 +90,7 @@ async function findBoundClient(container: TRPCContext["container"]): Promise<Inf
     return container.get(INFERENCE_CLIENT_TOKEN);
   }
 
-  const { InferenceClient } = await import("@/inference/client.ts");
+  const { InferenceClient } = await import("@platform-core/application/inference/client.ts");
   if (container.has(InferenceClient)) {
     return container.get(InferenceClient);
   }
@@ -99,7 +99,7 @@ async function findBoundClient(container: TRPCContext["container"]): Promise<Inf
 }
 
 async function createDefaultClient(): Promise<InferenceClient> {
-  const { InferenceClient } = await import("@/inference/client.ts");
+  const { InferenceClient } = await import("@platform-core/application/inference/client.ts");
   return new InferenceClient();
 }
 
@@ -306,7 +306,7 @@ export const inferenceRouter = t.router({
     probe: publicProcedure
       .output(z.array(BackendHealthSchema))
       .query(async () => {
-        const { probeConfiguredBackends } = await import("@/inference/backend-probes.ts");
+        const { probeConfiguredBackends } = await import("@platform-core/application/inference/backend-probes.ts");
         return probeConfiguredBackends() as Promise<BackendHealth[]>;
       }),
   }),
@@ -330,7 +330,7 @@ export const inferenceRouter = t.router({
       .output(ProviderTestResultSchema)
       .query(async ({ ctx }) => {
         const flagOn = await isEnabled(ctx, "external-llm-provider");
-        const { OpenAICompatibleBackend } = await import("@/inference/backends/openai-compatible.ts");
+        const { OpenAICompatibleBackend } = await import("@platform-core/application/inference/backends/openai-compatible.ts");
         const backend = new OpenAICompatibleBackend({ flagEnabled: flagOn });
         return backend.testConnection();
       }),

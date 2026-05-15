@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { Container } from "@needle-di/core";
 
 import { run } from "./inference.ts";
-import type { InferenceClient } from "@/inference/client.ts";
-import type { HealthResult } from "@/inference/protocol.ts";
-import { INFERENCE_CLIENT_TOKEN } from "@/inference/tokens.ts";
+import type { InferenceClient } from "@platform-core/application/inference/client.ts";
+import type { HealthResult } from "@platform-core/application/inference/protocol.ts";
+import { INFERENCE_CLIENT_TOKEN } from "@platform-core/application/inference/tokens.ts";
 
 const health: HealthResult = { status: "ok", backends: ["embedded"], models: [] };
 const cache = {
@@ -99,7 +99,7 @@ describe("fulcrum inference CLI", () => {
     ]);
   });
 
-  test("models rm deletes model via tRPC caller", async () => {
+  test("models rm deletes model through injected caller", async () => {
     const cap = capture();
     let observedInput: unknown;
 
@@ -168,7 +168,7 @@ describe("fulcrum inference CLI", () => {
     expect(payload.cache).toEqual(cache);
   });
 
-  test("embed --json emits vectors, model, and cached from tRPC caller", async () => {
+  test("embed --json emits vectors, model, and cached from injected caller", async () => {
     const cap = capture();
 
     await run(["embed", "hello", "--json"], {
@@ -190,7 +190,7 @@ describe("fulcrum inference CLI", () => {
     });
   });
 
-  test("embed --model forwards model id to tRPC caller", async () => {
+  test("embed --model forwards model id to injected caller", async () => {
     const cap = capture();
     let observedInput: unknown;
 
@@ -231,7 +231,7 @@ describe("fulcrum inference CLI", () => {
     ]);
   });
 
-  test("embed and generate use the local inference client when no tRPC caller is supplied", async () => {
+  test("embed and generate use the local inference client when no API caller is supplied", async () => {
     const embedCap = capture();
     await run(["embed", "hello", "--json"], {
       ...embedCap.opts,
@@ -286,7 +286,7 @@ describe("fulcrum inference CLI", () => {
     });
   });
 
-  test("generate --json emits text, model, and token count from tRPC caller", async () => {
+  test("generate --json emits text, model, and token count from injected caller", async () => {
     const cap = capture();
 
     await run(["generate", "The capital of France is", "--json"], {
@@ -326,7 +326,7 @@ describe("fulcrum inference CLI", () => {
     expect(cap.errors.join("\n")).toContain("fulcrum inference generate:");
   });
 
-  test("generate --schema passes schema to tRPC caller and returns structured JSON", async () => {
+  test("generate --schema passes schema to injected caller and returns structured JSON", async () => {
     const cap = capture();
     let observedInput: unknown;
     const schema = '{"type":"object","properties":{"agent":{"type":"string"}},"required":["agent"]}';
@@ -373,7 +373,7 @@ describe("fulcrum inference CLI", () => {
     expect(cap.errors.join("\n")).toContain("--schema value must be valid JSON");
   });
 
-  test("config list --json returns routing map via tRPC caller", async () => {
+  test("config list --json returns routing map via injected caller", async () => {
     const cap = capture();
     await run(["config", "list", "--json"], {
       ...cap.opts,
@@ -418,7 +418,7 @@ describe("fulcrum inference CLI", () => {
     expect(cap.lines).toEqual(["embeddings: ollama"]);
   });
 
-  test("config set updates routing via tRPC caller", async () => {
+  test("config set updates routing via injected caller", async () => {
     const cap = capture();
     let observedInput: unknown;
     await run(["config", "set", "embeddings", "ollama"], {

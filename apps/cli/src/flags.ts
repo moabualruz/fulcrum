@@ -11,7 +11,7 @@ import {
   getEnabledFeatures,
   type FeatureFlag,
 } from "@fulcrum/tui/feature-flags.ts";
-import { experimentStore } from "@/flags/experiments.ts";
+import { experimentStore } from "@platform-core/application/feature-flags/experiments.ts";
 
 const knownSet = new Set<string>(KNOWN_FLAGS);
 

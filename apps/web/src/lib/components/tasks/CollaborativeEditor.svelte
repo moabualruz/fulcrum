@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * CollaborativeEditor.svelte — TipTap + Yjs real-time collaborative editor (Plan 05-13, D-97).
+   * CollaborativeEditor.svelte — TipTap + Yjs real-time collaborative editor (workflow milestone, D-97).
    *
    * - Uses @tiptap/extension-collaboration (Yjs doc) for CRDT-based editing
    * - Uses @tiptap/extension-collaboration-cursor for user cursor presence

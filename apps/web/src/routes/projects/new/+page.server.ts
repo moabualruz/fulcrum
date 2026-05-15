@@ -3,8 +3,8 @@ import { superValidate } from "sveltekit-superforms";
 import { valibot } from "sveltekit-superforms/adapters";
 import type { Actions, PageServerLoad } from "./$types";
 import { ProjectFormSchema } from "$lib/server/projects.schema";
-import { createProject, createProjectFromSetup } from "@/application/projects/commands.ts";
-import { listProjectOptions } from "@/application/projects/queries.ts";
+import { createProject, createProjectFromSetup } from "@work-management/application/projects/commands.ts";
+import { listProjectOptions } from "@work-management/application/projects/queries.ts";
 import { requestAppScope } from "$lib/server/application-scope";
 import { setActiveProject } from "$lib/state/active-project";
 

@@ -2,8 +2,8 @@ import { access, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { join } from "node:path";
 
-import { FEATURE_FLAGS } from "../flags/registry.ts";
-import { KeyringStatus, loadOrCreateMasterKey, FALLBACK_FILENAME } from "../secrets/keyring.ts";
+import { FEATURE_FLAGS } from "@platform-core/application/feature-flags/registry.ts";
+import { KeyringStatus, loadOrCreateMasterKey, FALLBACK_FILENAME } from "@platform-core/application/secrets/keyring.ts";
 
 export type PlatformDoctorStatus = "pass" | "warn" | "fail" | "skip";
 

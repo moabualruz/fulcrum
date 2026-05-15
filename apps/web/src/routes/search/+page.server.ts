@@ -4,8 +4,8 @@ import {
   listSavedSearches,
   saveSearch,
   searchDocuments,
-} from "@/application/search/queries.ts";
-import type { SavedSearch, SearchHit, SearchParams } from "@/application/search/types.ts";
+} from "@knowledge-workspace/application/search/queries.ts";
+import type { SavedSearch, SearchHit, SearchParams } from "@knowledge-workspace/application/search/types.ts";
 
 type GroupedSearchHits = Record<string, SearchHit[]>;
 

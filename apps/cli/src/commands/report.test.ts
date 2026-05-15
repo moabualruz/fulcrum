@@ -31,6 +31,53 @@ describe("report command", () => {
     expect(parsed[0]).toHaveProperty("day");
   });
 
+  it("routes burndown through the configured public API", async () => {
+    const { run } = await import("./report.ts");
+    const lines: string[] = [];
+    const calls: Array<{ url: string; method: string | undefined }> = [];
+
+    await run(["burndown", "--project", "project-1", "--sprint", "sprint-1", "--json"], {
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3210/",
+        FULCRUM_ORG_ID: "org-1",
+      },
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({ url: String(url), method: init?.method });
+        return Response.json({ data: [{ date: "2026-05-15", remaining: 5 }] });
+      }) as typeof fetch,
+      print: (line) => lines.push(line),
+      printErr: () => undefined,
+      exit: () => undefined,
+    });
+
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:3210/api/v1/reports/burndown?orgId=org-1&projectId=project-1&sprintId=sprint-1",
+        method: "GET",
+      },
+    ]);
+    expect(JSON.parse(lines.join("\n"))).toEqual({ data: [{ date: "2026-05-15", remaining: 5 }] });
+  });
+
+  it("requires a configured public API without injected caller", async () => {
+    const { run } = await import("./report.ts");
+    const errors: string[] = [];
+    const exits: number[] = [];
+
+    await run(["burndown", "--project", "project-1", "--json"], {
+      env: {},
+      fetch: (async () => {
+        throw new Error("fetch should not run without API configuration");
+      }) as unknown as typeof fetch,
+      print: () => undefined,
+      printErr: (line) => errors.push(line),
+      exit: (code) => exits.push(code),
+    });
+
+    expect(errors.join("\n")).toContain("Report API caller is not configured");
+    expect(exits).toEqual([1]);
+  });
+
   it("outputs table for velocity --format table", async () => {
     const { run } = await import("./report.ts");
     const lines: string[] = [];

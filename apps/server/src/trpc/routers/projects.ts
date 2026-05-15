@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-import { createProject, createProjectFromSetup, deleteProject, updateProject } from "@/application/projects/commands.ts";
-import { getProjectOrNull, listProjectRows, loadProjectOverview } from "@/application/projects/queries.ts";
-import type { AppContext } from "@/application/tasks/types.ts";
+import { createProject, createProjectFromSetup, deleteProject, updateProject } from "@work-management/application/projects/commands.ts";
+import { getProjectOrNull, listProjectRows, loadProjectOverview } from "@work-management/application/projects/queries.ts";
+import type { AppContext } from "@work-management/application/tasks/types.ts";
 import { requireTrpcEntityManager, type TRPCContext } from "../context.ts";
 import { permissionedProcedure } from "../middleware.ts";
 import { t } from "../trpc.ts";

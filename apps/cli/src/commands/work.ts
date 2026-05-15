@@ -1,7 +1,16 @@
-import type { Container } from "@needle-di/core";
-import { TRPCError } from "@trpc/server";
-
-import { createLocalCaller } from "../local-caller.ts";
+import { formatApiError } from "../api-errors.ts";
+import {
+  createReportApiCallerFromEnv,
+  type ReportApiEnvironment,
+} from "@work-management/interface/http/report-api-client.ts";
+import {
+  createRelationshipApiCallerFromEnv,
+  type RelationshipApiEnvironment,
+} from "@work-management/interface/http/relationship-api-client.ts";
+import {
+  createTaskApiCallerFromEnv,
+  type TaskApiEnvironment,
+} from "@work-management/interface/http/task-api-client.ts";
 
 type WorkCaller = {
   work?: {
@@ -12,13 +21,22 @@ type WorkCaller = {
     report?(input: Record<string, unknown>): Promise<unknown>;
   };
   tasks?: {
+    get?(input: { id: string }): Promise<unknown>;
+    update?(input: Record<string, unknown>): Promise<unknown>;
     create(input: Record<string, unknown>): Promise<unknown>;
+  };
+  relationships?: {
+    create(input: Record<string, unknown>): Promise<unknown>;
+  };
+  reports?: {
+    burndown(input: Record<string, unknown>): Promise<unknown>;
   };
 };
 
 export interface WorkRunOptions {
   caller?: WorkCaller;
-  container?: Container | null;
+  env?: Record<string, string | undefined> & TaskApiEnvironment & RelationshipApiEnvironment & ReportApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -68,12 +86,30 @@ export async function run(argv: readonly string[], opts: WorkRunOptions = {}): P
         }), rest, io.print);
       }
       case "move":
-      case "link":
+        {
+          const caller = await resolveCaller(opts);
+          const fn = caller.work?.move ?? ((input: Record<string, unknown>) => caller.tasks?.update?.(input));
+          if (!fn) throw new Error("work move unavailable");
+          return printOutput(await fn({
+            id: requiredArg(rest, "move", "<id>"),
+            status: requiredFlag(rest, "--status"),
+          }), rest, io.print);
+        }
+      case "link": {
+        const caller = await resolveCaller(opts);
+        const fn = caller.work?.link ?? ((input: Record<string, unknown>) => caller.relationships?.create(input));
+        if (!fn) throw new Error("work link unavailable");
+        return printOutput(await fn({
+          sourceTaskId: requiredArg(rest, "link", "<id>"),
+          targetTaskId: requiredFlag(rest, "--to"),
+          type: requiredFlag(rest, "--type"),
+        }), rest, io.print);
+      }
       case "report": {
         const caller = await resolveCaller(opts);
-        const fn = caller.work?.[verb];
-        if (!fn) throw new Error(`work ${verb} unavailable`);
-        return printOutput(await fn(Object.fromEntries(flags(rest))), rest, io.print);
+        const fn = caller.work?.report ?? ((input: Record<string, unknown>) => caller.reports?.burndown(input));
+        if (!fn) throw new Error("work report unavailable");
+        return printOutput(await fn(compact({ projectId: flagValue(rest, "--project") })), rest, io.print);
       }
       case "help":
       case "--help":
@@ -98,17 +134,26 @@ async function createWork(caller: WorkCaller, input: Record<string, unknown>): P
 }
 
 async function inspectWork(caller: WorkCaller, input: { id: string; mode?: string }): Promise<unknown> {
+  if (caller.tasks?.get) return caller.tasks.get(input);
   if (!caller.work?.inspect) throw new Error("work inspect unavailable");
   return caller.work.inspect(input);
 }
 
 async function resolveCaller(opts: WorkRunOptions): Promise<WorkCaller> {
   if (opts.caller) return opts.caller;
-  return await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as WorkCaller;
-}
-
-function printOutput(value: unknown, argv: readonly string[], print: (line: string) => void): void {
-  print(argv.includes("--json") ? JSON.stringify(value) : JSON.stringify(value, null, 2));
+  const taskCaller = createTaskApiCallerFromEnv(opts.env, opts.fetch);
+  const relationshipCaller = createRelationshipApiCallerFromEnv(opts.env, opts.fetch);
+  const reportCaller = createReportApiCallerFromEnv(opts.env, opts.fetch);
+  if (!taskCaller && !relationshipCaller && !reportCaller) {
+    throw new Error(
+      "Work API callers are not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL plus FULCRUM_ORG_ID and FULCRUM_USER_ID.",
+    );
+  }
+  return {
+    tasks: taskCaller?.tasks,
+    relationships: relationshipCaller?.relationships,
+    reports: reportCaller?.reports,
+  } as WorkCaller;
 }
 
 function requiredArg(argv: readonly string[], command: string, label: string): string {
@@ -130,14 +175,8 @@ function requiredFlag(argv: readonly string[], flag: string): string {
   return value;
 }
 
-function flags(argv: readonly string[]): Array<[string, string]> {
-  const result: Array<[string, string]> = [];
-  for (let i = 0; i < argv.length; i++) {
-    const key = argv[i];
-    const value = argv[i + 1];
-    if (key?.startsWith("--") && value && !value.startsWith("-")) result.push([key.slice(2), value]);
-  }
-  return result;
+function printOutput(value: unknown, argv: readonly string[], print: (line: string) => void): void {
+  print(argv.includes("--json") ? JSON.stringify(value) : JSON.stringify(value, null, 2));
 }
 
 function compact(input: Record<string, unknown>): Record<string, unknown> {
@@ -145,6 +184,5 @@ function compact(input: Record<string, unknown>): Record<string, unknown> {
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof TRPCError) return `${error.code}: ${error.message}`;
-  return (error as Error).message;
+  return formatApiError(error);
 }

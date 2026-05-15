@@ -1,11 +1,10 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
-import type { Container } from "@needle-di/core";
+import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
 import { TRPCError } from "@trpc/server";
 import type { Session } from "better-auth";
 
-import type { LegacySymphonyStore } from "@/application/legacy/symphony.ts";
-
-export const FULCRUM_REQUEST_ID_HEADER = "x-fulcrum-request-id";
+import { FULCRUM_REQUEST_ID_HEADER } from "../public-api/request-id.ts";
+import type { LegacySymphonyStore } from "@platform-core/application/legacy/symphony.ts";
 
 /**
  * tRPC context shared by web, CLI, TUI, and tests.
@@ -19,7 +18,7 @@ export interface TrpcContext {
   userId: string | null;
   orgId: string | null;
   em: EntityManager | null;
-  container: Container | null;
+  container: DiContainer | null;
   legacyStore?: LegacySymphonyStore;
   requestId: string | null;
   responseHeaders: Headers | null;
@@ -32,7 +31,7 @@ export interface CreateContextInput {
   orgId: string | null;
   userId: string | null;
   em: EntityManager | null;
-  container: Container | null;
+  container: DiContainer | null;
   legacyStore?: LegacySymphonyStore;
   db?: LegacySymphonyStore;
   requestId?: string | null;

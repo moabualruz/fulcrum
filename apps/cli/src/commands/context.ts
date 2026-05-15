@@ -1,6 +1,7 @@
-import type { Container } from "@needle-di/core";
-
-import { createLocalCaller } from "../local-caller.ts";
+import {
+  createMemoryApiCallerFromEnv,
+  type MemoryApiEnvironment,
+} from "@knowledge-workspace/interface/http/memory-api-client.ts";
 
 type ContextCaller = {
   context: {
@@ -11,7 +12,8 @@ type ContextCaller = {
 
 export interface ContextRunOptions {
   caller?: ContextCaller;
-  container?: Container | null;
+  env?: MemoryApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -70,7 +72,7 @@ async function runAssemble(argv: readonly string[], opts: ResolvedOptions): Prom
 
   try {
     const caller = await resolveCaller(opts);
-    if (!caller.context.assemble) throw new Error("context.assemble procedure is not available");
+    if (!caller.context.assemble) throw new Error("context assemble operation is not available");
     const result = await caller.context.assemble({ task });
     const jsonMode = argv.includes("--json");
     if (jsonMode) {
@@ -97,9 +99,10 @@ async function runPreview(argv: readonly string[], opts: ResolvedOptions): Promi
   try {
     const caller = await resolveCaller(opts);
     const input = { projectId, taskId, includeGlobal: argv.includes("--include-global") };
-    const result = caller.context.preview
-      ? await caller.context.preview(input)
-      : await caller.context.assemble(input);
+    const preview = caller.context.preview;
+    const assemble = caller.context.assemble;
+    if (!preview && !assemble) throw new Error("context preview or assemble operation is not available");
+    const result = preview ? await preview(input) : await assemble!(input);
     opts.print(argv.includes("--json") ? JSON.stringify(result) : JSON.stringify(result, null, 2));
   } catch (err) {
     const msg = formatCliError(err);
@@ -117,10 +120,30 @@ function flagValue(argv: readonly string[], flag: string): string | undefined {
 async function resolveCaller(opts: ContextRunOptions): Promise<ContextCaller> {
   if (opts.caller) return opts.caller;
 
-  return await createLocalCaller({
-    container: opts.container,
-    requireSession: true,
-  }) as unknown as ContextCaller;
+  const apiCaller = createMemoryApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error(
+      "Context API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL and FULCRUM_API_TOKEN or FULCRUM_PUBLIC_API_TOKEN.",
+    );
+  }
+  return {
+    context: {
+      assemble: async (input) => await apiCaller.context.preview(contextPreviewInput(input)),
+      preview: async (input) => await apiCaller.context.preview(contextPreviewInput(input)),
+    },
+  };
+}
+
+function contextPreviewInput(input: Record<string, unknown>): Record<string, unknown> & { taskId: string } {
+  const taskId = input.taskId ?? input.task;
+  if (typeof taskId !== "string" || taskId.length === 0) {
+    throw new Error("taskId is required.");
+  }
+  return {
+    taskId,
+    budget: input.budget,
+    includeGlobal: input.includeGlobal,
+  };
 }
 
 function formatCliError(err: unknown): string {

@@ -8,7 +8,7 @@ import {
   uninstallCloudflarePackage,
   uninstallSuperpowersPackage,
 } from "./vendor-packages.ts";
-import * as proc from "@/utils/proc.ts";
+import * as proc from "@platform-core/application/runtime-support/process-runner.ts";
 import { isEnabled, loadRegistry } from "./mcp-registry.ts";
 
 let TMP: string;

@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "../test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "../test-support/product-fixtures.ts";
-import type { TestStore } from "../test-support/product-fixtures.ts";
+import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import type { TestStore } from "@test-support/product-workspace-fixtures.ts";
 import {
   type MarketplaceListing,
   FeatureDisabledError,

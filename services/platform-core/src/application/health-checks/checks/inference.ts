@@ -8,7 +8,7 @@
  * Follows same pattern as routing.ts doctor checks.
  */
 
-import { InferenceService } from "../../inference/service.ts";
+import { InferenceService } from "@platform-core/application/inference/service.ts";
 import type { DoctorCheckDef } from "../types.ts";
 
 // ---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ async function checkBackends(): Promise<{
 }
 
 // ---------------------------------------------------------------------------
-// Module entry — auto-discovered by src/doctor/index.ts
+// Module entry auto-discovered by the platform health-check orchestrator.
 // ---------------------------------------------------------------------------
 
 export const checks: DoctorCheckDef[] = [

@@ -1,10 +1,108 @@
-import type { Container } from "@needle-di/core";
+import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
+import { createWorkflowApiCallerFromEnv } from "@workflow-coordination/interface/http/workflow-api-client.ts";
+import {
+  buildCliTuiCallerContext,
+  createApplicationLocalCaller,
+  requireCliTuiSessionContext,
+} from "@fulcrum/server/runtime/trpc/local-caller.ts";
 
-import { createApplicationLocalCaller } from "@/application/cli-tui/caller-context.ts";
+type ConfiguredWorkflowApiCaller = Exclude<ReturnType<typeof createWorkflowApiCallerFromEnv>, null>;
+type MergedCaller<Base extends object, Overlay extends object> = Omit<Base, keyof Overlay> & Overlay;
+type NestedMerge<Base, Overlay extends object> = Base extends object ? Omit<Base, keyof Overlay> & Overlay : Overlay;
+type WorkflowApiOverlay<T extends object> = Omit<T, keyof ConfiguredWorkflowApiCaller> & {
+  planning: NestedMerge<
+    T extends { planning?: infer Planning } ? NonNullable<Planning> : never,
+    ConfiguredWorkflowApiCaller["planning"]
+  >;
+  tasks: NestedMerge<T extends { tasks?: infer Tasks } ? NonNullable<Tasks> : never, ConfiguredWorkflowApiCaller["tasks"]>;
+  reports: NestedMerge<
+    T extends { reports?: infer Reports } ? NonNullable<Reports> : never,
+    ConfiguredWorkflowApiCaller["reports"]
+  >;
+  workflows: NestedMerge<
+    T extends { workflows?: infer Workflows } ? NonNullable<Workflows> : never,
+    ConfiguredWorkflowApiCaller["workflows"]
+  >;
+};
 
 export async function createLocalCaller(options: {
-  container?: Container | null;
+  container?: DiContainer | null;
   requireSession?: boolean;
+  env?: Record<string, string | undefined>;
+  fetch?: typeof fetch;
 } = {}) {
-  return createApplicationLocalCaller(options);
+  const caller = await createApplicationLocalCaller(options);
+  return withWorkflowApiCaller(caller, options);
+}
+
+export async function createLocalSystemCaller(options: {
+  container?: DiContainer | null;
+  orgId: string;
+  userId: string;
+  userAgent?: string;
+}) {
+  const [{ t }, { appRouter }, { createContext }] = await Promise.all([
+    import("@fulcrum/server/trpc/trpc.ts"),
+    import("@fulcrum/server/trpc/router.ts"),
+    import("@fulcrum/server/trpc/context.ts"),
+  ]);
+  const cliContext = await buildCliTuiCallerContext(options.container ?? null);
+  const factory = t.createCallerFactory(appRouter);
+
+  return factory(
+    createContext({
+      session: localSession(options.orgId, options.userId, options.userAgent ?? "fulcrum-cli") as never,
+      orgId: options.orgId,
+      userId: options.userId,
+      em: cliContext.em,
+      container: cliContext.container,
+    }),
+  );
+}
+
+export function buildLocalCallerContext(container: DiContainer | null) {
+  return buildCliTuiCallerContext(container);
+}
+
+export function requireLocalSessionContext(options: {
+  container?: DiContainer | null;
+  missingSessionMessage?: string;
+  userAgent?: string;
+} = {}) {
+  return requireCliTuiSessionContext(options);
+}
+
+export function withWorkflowApiCaller<T extends object>(
+  caller: T,
+  options: {
+    env?: Record<string, string | undefined>;
+    fetch?: typeof fetch;
+  } = {},
+): WorkflowApiOverlay<T> {
+  const publicApiCaller = createWorkflowApiCallerFromEnv(options.env, options.fetch);
+  if (!publicApiCaller) return caller as unknown as WorkflowApiOverlay<T>;
+  const current = caller as { planning?: unknown; tasks?: unknown; reports?: unknown; workflows?: unknown };
+  return {
+    ...caller,
+    planning: { ...(current.planning ? current.planning as Record<string, unknown> : {}), ...publicApiCaller.planning },
+    tasks: { ...(current.tasks ? current.tasks as Record<string, unknown> : {}), ...publicApiCaller.tasks },
+    reports: { ...(current.reports ? current.reports as Record<string, unknown> : {}), ...publicApiCaller.reports },
+    workflows: { ...(current.workflows ? current.workflows as Record<string, unknown> : {}), ...publicApiCaller.workflows },
+  } as unknown as WorkflowApiOverlay<T>;
+}
+
+function localSession(orgId: string, userId: string, userAgent: string) {
+  const now = new Date();
+  return {
+    id: "cli-local-session",
+    userId,
+    orgId,
+    activeOrganizationId: orgId,
+    expiresAt: new Date(now.getTime() + 86_400_000),
+    createdAt: now,
+    updatedAt: now,
+    token: "cli-local-session",
+    ipAddress: null,
+    userAgent,
+  };
 }

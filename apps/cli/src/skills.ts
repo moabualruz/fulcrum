@@ -6,10 +6,10 @@
 
 import { mkdir, readdir, readFile, copyFile, writeFile, stat, rm, rename } from "node:fs/promises";
 import { join, basename, dirname, resolve } from "node:path";
-import { AGENTS } from "@/agents/registry.ts";
+import { AGENTS } from "@execution-orchestration/application/agent-catalog/registry.ts";
 import type { AgentId } from "./mcp-registry.ts";
-import { which, run as runProc } from "@/utils/proc.ts";
-import { pruneSourceBackupFiles } from "@/utils/source-clean.ts";
+import { which, run as runProc } from "@platform-core/application/runtime-support/process-runner.ts";
+import { pruneSourceBackupFiles } from "@platform-core/application/runtime-support/source-backup-pruner.ts";
 
 function repoRoot(): string {
   // When invoked from a clone, this binary's enclosing repo is the source of

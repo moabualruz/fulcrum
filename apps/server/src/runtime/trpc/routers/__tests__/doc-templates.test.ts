@@ -16,16 +16,16 @@ import {
   DOC_TEMPLATE_SERVICE_TOKEN,
   type DocTemplateRow,
   type DocTemplateService,
-} from "@/docs/doc-template-service.ts";
+} from "@knowledge-workspace/application/docs/doc-template-service.ts";
 import { run as runDocsTemplateCli } from "@fulcrum/cli/docs-templates.ts";
 import { TuiApp } from "@fulcrum/tui/index.ts";
 import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
-import { TEMPLATE_BODY_MAP, TEMPLATE_SEEDS } from "@/docs/template-seeds.ts";
-import { createTestOrm } from "@/test-utils/db.ts";
-import { DEFAULT_ORG_ID as SEEDED_ORG_ID } from "@/db/seed.ts";
-import { EntityManagerDocTemplateService } from "@/docs/em-doc-template-service.ts";
-import { Org } from "@/db/entities/auth/Org.ts";
-import { DocTemplate } from "@/db/entities/docs/DocTemplate.ts";
+import { TEMPLATE_BODY_MAP, TEMPLATE_SEEDS } from "@knowledge-workspace/application/docs/template-seeds.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
+import { DEFAULT_ORG_ID as SEEDED_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
+import { EntityManagerDocTemplateService } from "@knowledge-workspace/application/docs/em-doc-template-service.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { DocTemplate } from "@platform-core/infrastructure/application-database/entities/docs/DocTemplate.ts";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -272,7 +272,9 @@ describe("TEMPLATE_BODY_MAP (web new-doc wizard static data)", () => {
     // Non-scratch types have actual content
     const nonEmpty = DOC_TYPES.filter((dt) => dt !== "scratch");
     for (const dt of nonEmpty) {
-      expect(TEMPLATE_BODY_MAP[dt].length).toBeGreaterThan(0);
+      const body = TEMPLATE_BODY_MAP[dt];
+      expect(body).toBeDefined();
+      expect(body!.length).toBeGreaterThan(0);
     }
   });
 

@@ -3,7 +3,7 @@
  *
  * Responsibilities:
  *   1. Mount Better-Auth handler on /api/auth/** (AuthService.handler).
- *   2. Mount tRPC fetchRequestHandler on /api/trpc/** (appRouter + createContext).
+ *   2. Populate request-scoped runtime locals before SvelteKit routes run.
  *   3. Inject event.locals.session on every request (null if unauthenticated).
  *   4. Derive event.locals.orgId from the Better-Auth session payload.
  *   5. Set event.locals.activeProjectId from cookie.
@@ -12,20 +12,23 @@
  * module import time; ORM may not be ready at cold-start in some envs).
  *
  * C6: No raw SQL.
- * C8: needle-di Container exposed on locals; passed into tRPC context per C8.
- * C4: tRPC is the shared core — web, CLI, and TUI all resolve procedures here.
+ * C8: needle-di Container exposed on locals for server route handlers.
  */
 
 import type { Handle } from "@sveltejs/kit";
-import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
-import { Container } from "@needle-di/core";
-import type { EntityManager, MikroORM } from "@mikro-orm/postgresql";
 
 import { getActiveProject } from "./lib/state/active-project.ts";
-import type { FlagRegistry } from "../../../src/flags/registry.ts";
+import {
+  clearWebRequestRuntime,
+  closeWebRuntimeForTest,
+  createDefaultWebRuntime,
+  createWebRequestRuntime,
+  localDevSession,
+  type WebRequestRuntime,
+  type WebRuntime,
+} from "@platform-core/application/runtime/web-request-runtime.ts";
 import { dirForLocale, isI18nEnabled, normalizeLocale } from "$lib/i18n/index.ts";
-import { initDatabase, getDatabase } from "$lib/server/db";
-import { resolveDefaultOrgId } from "../../../src/application/auth/default-org.ts";
+import { initDatabase } from "$lib/server/db";
 
 // ─── Startup: initialise PGlite singleton (runs migrations once) ─────────────
 // This top-level await runs when the server module is first loaded, before any
@@ -33,39 +36,6 @@ import { resolveDefaultOrgId } from "../../../src/application/auth/default-org.t
 await initDatabase().catch((err) => {
   console.error("[hooks.server] Failed to init web database:", err);
 });
-
-// Lazy imports — tRPC router + context pull in the full ORM entity graph.
-// Importing eagerly breaks Vite SSR because the entity files use syntax
-// (e.g. Bun-specific APIs, .sql imports) that Vite's transform can't handle.
-let _appRouter: any = null;
-let _createContext: any = null;
-async function getTrpc() {
-  if (!_appRouter) {
-    const mod = await import("@fulcrum/server/trpc/router.ts");
-    _appRouter = mod.appRouter;
-  }
-  if (!_createContext) {
-    const mod = await import("@fulcrum/server/trpc/context.ts");
-    _createContext = mod.createContext;
-  }
-  return { appRouter: _appRouter, createContext: _createContext };
-}
-
-// Lazy auth initialiser — only wired when ORM is available.
-// Imported dynamically to avoid circular dep issues at SSR preload time.
-interface WebRequestRuntime {
-  em: EntityManager;
-  container: Container;
-}
-
-interface WebRuntime {
-  authHandler: ((req: Request) => Promise<Response>) | null;
-  orm: MikroORM;
-  flagRegistry?: FlagRegistry;
-  createRequestContext?: () => WebRequestRuntime;
-  em?: EntityManager;
-  container?: Container;
-}
 
 interface HydratedSession {
   session: App.Locals["session"];
@@ -77,68 +47,12 @@ let _runtimePromise: Promise<WebRuntime> | null = null;
 
 async function getWebRuntime(): Promise<WebRuntime> {
   if (!_runtimePromise) {
-    _runtimePromise = (async () => {
-      const { AuthService } = await import("../../../src/auth/index.ts");
-      const { createFlagRegistry, registerDbBindings } = await import("../../../src/db/db.module.ts");
-
-      const database = await initDatabase();
-      const orm = database.orm;
-      const flagRegistry = createFlagRegistry(orm);
-
-      let authHandler: ((req: Request) => Promise<Response>) | null = null;
-      try {
-        const svc = new AuthService(orm.em);
-        await svc.init();
-        authHandler = svc.handler;
-      } catch {
-        authHandler = null;
-      }
-
-      return {
-        authHandler,
-        orm,
-        flagRegistry,
-        createRequestContext: () => {
-          const em = orm.em.fork();
-          const container = new Container();
-          registerDbBindings(container, orm, em, { flagRegistry });
-          return { em, container };
-        },
-      };
-    })().catch((error) => {
+    _runtimePromise = createDefaultWebRuntime().catch((error) => {
       _runtimePromise = null;
       throw error;
     });
   }
   return _runtimePromise;
-}
-
-function createWebRequestRuntime(runtime: WebRuntime): WebRequestRuntime {
-  if (runtime.createRequestContext) {
-    return runtime.createRequestContext();
-  }
-
-  if (!runtime.em || !runtime.container) {
-    throw new Error("Web runtime is missing request context bindings.");
-  }
-
-  const maybeFork = runtime.em as EntityManager & {
-    fork?: () => EntityManager;
-  };
-
-  if (typeof maybeFork.fork === "function") {
-    throw new Error("Forkable web runtime must provide createRequestContext.");
-  }
-
-  return {
-    em: runtime.em,
-    container: runtime.container,
-  };
-}
-
-function clearWebRequestRuntime(runtime: WebRequestRuntime | null): void {
-  const maybeClear = runtime?.em as (EntityManager & { clear?: () => void }) | null;
-  maybeClear?.clear?.();
 }
 
 async function getAuthHandler(): Promise<((req: Request) => Promise<Response>) | null> {
@@ -186,21 +100,9 @@ function emptySession(): HydratedSession {
   return { session: null, orgId: null, userId: null };
 }
 
-async function localDevSession(requestRuntime: WebRequestRuntime | null): Promise<HydratedSession> {
-  return {
-    session: {
-      id: "local-dev-session",
-      userId: "local-admin",
-      expiresAt: new Date(Date.now() + 86400000),
-    } as App.Locals["session"],
-    orgId: requestRuntime?.em ? await resolveDefaultOrgId(requestRuntime.em) : null,
-    userId: "local-admin",
-  };
-}
-
 export async function __getWebRuntimeForTest(): Promise<{
-  em: EntityManager;
-  container: Container;
+  em: WebRequestRuntime["em"];
+  container: WebRequestRuntime["container"];
 }> {
   const runtime = await getWebRuntime();
   return createWebRequestRuntime(runtime);
@@ -213,11 +115,7 @@ export function __setWebRuntimeForTest(runtime: WebRuntime): void {
 export async function __closeWebRuntimeForTest(): Promise<void> {
   const runtime = await _runtimePromise?.catch(() => null);
   _runtimePromise = null;
-  const { __resetDefaultOrmForTest } = await import("../../../src/db/mikro-orm.config.ts");
-  const closedDefaultOrm = await __resetDefaultOrmForTest();
-  if (runtime?.orm && runtime.orm !== closedDefaultOrm) {
-    await runtime.orm.close(true);
-  }
+  await closeWebRuntimeForTest(runtime);
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -259,32 +157,9 @@ export const handle: Handle = async ({ event, resolve }) => {
       }
       const sessionState = await hydrateSession(request, runtime?.authHandler ?? null);
       const effectiveSessionState = !sessionState.session && !process.env["FULCRUM_REQUIRE_AUTH"]
-        ? await localDevSession(requestRuntime)
+        ? await localDevSession(requestRuntime) as HydratedSession
         : sessionState;
 
-      // 4. tRPC handler on /api/trpc/**
-      //    fetchRequestHandler passes the Request + context to appRouter.
-      if (url.pathname.startsWith("/api/trpc")) {
-        const trpc = await getTrpc();
-        return await fetchRequestHandler({
-          endpoint: "/api/trpc",
-          req: request,
-          router: trpc.appRouter,
-          createContext: ({ resHeaders }) =>
-            trpc.createContext({
-              session: effectiveSessionState.session,
-              orgId: effectiveSessionState.orgId,
-              userId: effectiveSessionState.userId,
-              em: requestRuntime?.em ?? null,
-              container: requestRuntime?.container ?? null,
-              db: getDatabase(),
-              responseHeaders: resHeaders,
-            }),
-        });
-      }
-
-      // 5. Session hydration for non-auth/non-trpc routes
-      //    Better-Auth reads the session cookie and validates it against the DB.
       const routeSessionState = url.pathname.startsWith("/auth") ? sessionState : effectiveSessionState;
       event.locals.session = routeSessionState.session;
       event.locals.orgId = routeSessionState.orgId;

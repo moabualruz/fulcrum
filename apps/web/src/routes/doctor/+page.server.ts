@@ -11,7 +11,7 @@
 import type { PageServerLoad } from "./$types";
 import { access, constants } from "node:fs/promises";
 import { join } from "node:path";
-import { sandboxProviderDoctorChecks } from "@/orchestration/sandbox-runner.ts";
+import { sandboxProviderDoctorChecks } from "@execution-orchestration/infrastructure/agent-runtime/sandbox-runner.ts";
 
 // ----------------------------------------------------------------------------
 // Shared types (mirrors PlatformDoctorCheck + db/secrets doctor shapes)

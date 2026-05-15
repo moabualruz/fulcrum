@@ -9,7 +9,7 @@
 	import FrontmatterYaml from "$lib/components/docs/FrontmatterYaml.svelte";
 	import { buttonVariants } from "$lib/components/ui/button";
 	import { cn } from "$lib/utils.js";
-	import type { DocType } from "@/domain/docs/enums.ts";
+	import type { DocType } from "@knowledge-workspace/domain/document-enums.ts";
 	import type { FrontmatterValue } from "$lib/components/docs/frontmatter-ui.ts";
 	import FeatureGate from "$lib/components/FeatureGate.svelte";
 	import PresenceAvatars from "$lib/collab/PresenceAvatars.svelte";

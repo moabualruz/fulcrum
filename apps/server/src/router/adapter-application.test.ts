@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
 
-import { AppConflictError, AppValidationError } from "@/application/errors.ts";
-import { appErrorToTrpcError } from "@/application/error-mapping.ts";
+import { AppConflictError, AppValidationError } from "@platform-core/domain/errors.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
 import type { RoutingDecision } from "./types.ts";
 
 const ORG_ID = "00000000-0000-4000-8000-000000000001";

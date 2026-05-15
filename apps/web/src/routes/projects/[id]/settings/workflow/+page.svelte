@@ -17,4 +17,4 @@
   </div>
 </header>
 
-<WorkflowEditor projectId={data.projectId} />
+<WorkflowEditor projectId={data.projectId} orgId={data.orgId} />

@@ -1,7 +1,7 @@
 // Package-manager policy — refuse npm/yarn when the repo declares pnpm or bun.
 
-import { readHookEvent } from "../utils/io.ts";
-import { exists } from "../utils/proc.ts";
+import { readHookEvent } from "@platform-core/application/runtime-support/hook-event-io.ts";
+import { exists } from "@platform-core/application/runtime-support/process-runner.ts";
 
 function deny(reason: string): never {
   process.stderr.write(`pm-policy: ${reason}\n`);

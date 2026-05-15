@@ -1,0 +1,101 @@
+import { describe, expect, test } from "bun:test";
+
+import { withWorkflowApiCaller } from "./local-caller.ts";
+
+describe("CLI workflow API caller", () => {
+  test("overlays planning, reports, and workflow-cycle calls with the configured Nest API caller", async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const caller = withWorkflowApiCaller({
+      planning: {
+        previewApprovedPlanBreakdown: async (_input: Record<string, unknown>) => ({ source: "local" }),
+      },
+      tasks: {
+        previewDependencyRun: async (_input: Record<string, unknown>) => ({ source: "local" }),
+        dependencyRunLiveFeedback: async (_input: Record<string, unknown>) => ({ source: "local" }),
+        runDependencyRunWorkerTick: async (_input: Record<string, unknown>) => ({ source: "local" }),
+        recordQaReview: async (_input: Record<string, unknown>) => ({ source: "local" }),
+      },
+      workflows: {
+        runAcceptanceCycle: async (_input: Record<string, unknown>) => ({ source: "local" }),
+      },
+      reports: {
+        finalQa: async (_input: Record<string, unknown>) => ({ source: "local" }),
+      },
+    }, {
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:4321/base/",
+      },
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({ url: String(url), init: init ?? {} });
+        if (String(url).includes("/workflows/cycles/acceptance-cycle/run")) {
+          return Response.json({ status: "accepted", traceId: "trace-cli" });
+        }
+        if (String(url).includes("/workflows/execution/dependency-run/worker-tick")) {
+          return Response.json({ claimed: false, traceId: "trace-cli" });
+        }
+        if (String(url).includes("/workflows/execution/dependency-run/preview")) {
+          return Response.json({ affectedTaskIds: ["task-1"], traceId: "trace-cli" });
+        }
+        if (String(url).includes("/workflows/execution/dependency-run/live-feedback")) {
+          return Response.json({ events: [], traceId: "trace-cli" });
+        }
+        if (String(url).includes("/workflows/execution/qa-review/record")) {
+          return Response.json({ status: "needs_feedback", traceId: "trace-cli" });
+        }
+        if (String(url).includes("/workflows/review/final-qa/report")) {
+          return Response.json({ status: "ready", traceId: "trace-cli" });
+        }
+        return Response.json({ title: "Preview", traceId: "trace-cli" });
+      }) as typeof fetch,
+    });
+
+    await expect(caller.planning.previewApprovedPlanBreakdown({
+      planId: "plan-1",
+      approvedPlanMarkdown: "# Plan",
+    })).resolves.toEqual({ title: "Preview", traceId: "trace-cli" });
+    await expect(caller.tasks.previewDependencyRun({
+      mode: "task",
+      targetTaskIds: ["task-1"],
+      tasks: [],
+      traceId: "trace-cli",
+    })).resolves.toEqual({ affectedTaskIds: ["task-1"], traceId: "trace-cli" });
+    await expect(caller.tasks.dependencyRunLiveFeedback({
+      projectId: "project-1",
+      traceId: "trace-cli",
+    })).resolves.toEqual({ events: [], traceId: "trace-cli" });
+    await expect(caller.tasks.runDependencyRunWorkerTick({
+      projectId: "project-1",
+      traceId: "trace-cli",
+      workerId: "worker-1",
+    })).resolves.toEqual({ claimed: false, traceId: "trace-cli" });
+    await expect(caller.tasks.recordQaReview({
+      workspaceId: "workspace-1",
+      workspaceSlug: "workspace",
+      workspaceName: "Workspace",
+      projectId: "project-1",
+      projectSlug: "project",
+      projectName: "Project",
+      taskId: "task-1",
+      traceId: "trace-cli",
+      reviewType: "code",
+      reviewText: "Needs one fix.",
+    })).resolves.toEqual({ status: "needs_feedback", traceId: "trace-cli" });
+    await expect(caller.workflows.runAcceptanceCycle({
+      project: { traceId: "trace-cli" },
+    })).resolves.toEqual({ status: "accepted", traceId: "trace-cli" });
+    await expect(caller.reports.finalQa({
+      projectId: "project-1",
+      traceId: "trace-cli",
+    })).resolves.toEqual({ status: "ready", traceId: "trace-cli" });
+
+    expect(calls.map((call) => call.url)).toEqual([
+      "http://127.0.0.1:4321/workflows/planning/approved-plan/preview",
+      "http://127.0.0.1:4321/workflows/execution/dependency-run/preview",
+      "http://127.0.0.1:4321/workflows/execution/dependency-run/live-feedback",
+      "http://127.0.0.1:4321/workflows/execution/dependency-run/worker-tick",
+      "http://127.0.0.1:4321/workflows/execution/qa-review/record",
+      "http://127.0.0.1:4321/workflows/cycles/acceptance-cycle/run",
+      "http://127.0.0.1:4321/workflows/review/final-qa/report",
+    ]);
+  });
+});

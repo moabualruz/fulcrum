@@ -1,8 +1,8 @@
 // Auto-format on edit — run language-appropriate formatter on the just-edited file.
 // Idempotent, non-blocking, fail-open per language.
 
-import { readHookEvent } from "../utils/io.ts";
-import { which, run } from "../utils/proc.ts";
+import { readHookEvent } from "@platform-core/application/runtime-support/hook-event-io.ts";
+import { which, run } from "@platform-core/application/runtime-support/process-runner.ts";
 
 interface Formatter {
   cmd: string;

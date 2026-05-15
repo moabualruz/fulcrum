@@ -1,25 +1,24 @@
 /**
  * /settings/billing — placeholder billing settings page.
  *
- * Gated by FULCRUM_FEATURES=saas-auth (C1, default OFF).
+ * Gated by the SaaS-auth feature flag.
  * Flag OFF → hidden from nav; direct navigation returns 404.
  * Flag ON → renders billing placeholder card.
  */
 
 import { error, redirect } from "@sveltejs/kit";
+import { isSaasAuthFeatureEnabled } from "@identity-access/application/auth/saas-auth-feature.ts";
 import type { PageServerLoad } from "./$types";
 
-function isSaasAuthEnabled(): boolean {
-  if (process.env["FULCRUM_FLAG_SAAS_AUTH"] === "true") return true;
-  const features = (process.env["FULCRUM_FEATURES"] ?? "").split(",").map((f) => f.trim());
-  return features.includes("saas-auth");
+export function _isSaasAuthEnabled(): boolean {
+  return isSaasAuthFeatureEnabled();
 }
 
 export const load: PageServerLoad = async ({ locals }) => {
   if (!locals.session) {
     throw redirect(302, "/auth/login");
   }
-  if (!isSaasAuthEnabled()) {
+  if (!_isSaasAuthEnabled()) {
     throw error(404, "Billing settings require saas-auth to be enabled");
   }
   return { billingEnabled: true };

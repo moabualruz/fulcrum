@@ -6,7 +6,7 @@
 
 - `io.ts` — file system helpers (read with default, write atomic, ensure dir, …).
 - `proc.ts` — process helpers: `which(cmd)`, `run(argv, opts)`. The vendor adapter mocks these in tests.
-- `source-clean.ts` — filter functions for excluding `.original.md`, `.backup.md`, `_archive`, `_template`, `.git`, `node_modules`, and worktree dirs from generated agent mirrors.
+- `source-backup-pruner.ts` — filter functions for excluding `.original.md`, `.backup.md`, `_archive`, `_template`, `.git`, `node_modules`, and worktree dirs from generated agent mirrors.
 
 ## Invariants
 
@@ -17,8 +17,8 @@
 
 ## Cross-context coupling
 
-- Imported by every other context. Imports nothing from `apps/cli/src/`, `src/components/`, `src/hooks/`, `src/agents/`, `src/repo/`.
+- Imported by every other context. Imports nothing from `apps/cli/src/`, platform agent hooks, or service application code.
 
 ## ADRs
 
-Context-scoped decisions will live under `src/utils/docs/adr/` when recorded. None recorded yet; create the directory lazily from `docs/adr/0000-template.md`.
+Context-scoped decisions will live under this runtime-support context when recorded. None recorded yet; create the directory lazily from `docs/adr/0000-template.md`.

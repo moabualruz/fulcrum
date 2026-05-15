@@ -7,8 +7,8 @@
 
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { AGENTS } from "@/agents/registry.ts";
-import { which, run as runProc } from "@/utils/proc.ts";
+import { AGENTS } from "@execution-orchestration/application/agent-catalog/registry.ts";
+import { which, run as runProc } from "@platform-core/application/runtime-support/process-runner.ts";
 
 const BEGIN = "<!-- BEGIN FULCRUM RULES -->";
 const END = "<!-- END FULCRUM RULES -->";
@@ -789,8 +789,8 @@ export async function run(args: string[]): Promise<void> {
   }
 
   console.log("1/4  Removing component profile profile.default");
-  const { planComponentOperation } = await import("@/components/planner.ts");
-  const { executeComponentPlan } = await import("@/components/executor.ts");
+  const { planComponentOperation } = await import("@platform-core/application/component-lifecycle/planner.ts");
+  const { executeComponentPlan } = await import("@platform-core/application/component-lifecycle/executor.ts");
   const plan = planComponentOperation({
     operation: "remove",
     target: "profile.default",

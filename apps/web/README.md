@@ -1,6 +1,6 @@
 # Fulcrum Web Shell
 
-SvelteKit + shadcn-svelte web UI for Fulcrum product kernel. Exports the supervisor, task system, memory, and context engine via HTTP.
+SvelteKit + shadcn-svelte web UI for Fulcrum product-store workflows. Exports the supervisor, task system, memory, and context engine via HTTP.
 
 ## Development
 
@@ -57,7 +57,7 @@ FULCRUM_RUN_E2E=1 bun run ci
 
 Runs Playwright against a temporary `FULCRUM_HOME` directory. Tests the full user journey: create project → create task → drag to in_progress → search via cmd+K → assert toast. Playwright specs live under `tests/e2e/`.
 
-See also: [Testing architecture](../../docs/product-kernel.md#web-shell-testing) in product kernel docs.
+See also: [Testing architecture](../../docs/product-kernel.md#web-shell-testing) in product-store docs.
 
 ## Rebuild from scratch
 

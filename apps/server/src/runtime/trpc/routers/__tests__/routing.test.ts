@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
 import { Container } from "@needle-di/core";
 
-import { createTestOrm } from "@/test-utils/db.ts";
-import { RoutingRule, RoutingRuleSource } from "@/db/entities/router/RoutingRule.ts";
-import { RoutingRuleRepository } from "@/db/repositories/router/RoutingRuleRepository.ts";
-import { Task } from "@/db/entities/tasks/Task.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
+import { RoutingRule, RoutingRuleSource } from "@platform-core/infrastructure/application-database/entities/router/RoutingRule.ts";
+import { RoutingRuleRepository } from "@platform-core/infrastructure/application-database/repositories/router/RoutingRuleRepository.ts";
+import { Task } from "@platform-core/infrastructure/application-database/entities/tasks/Task.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";

@@ -204,7 +204,7 @@ if (isVitestCli) {
 
     it("returns skip when pwa-offline flag is OFF", async () => {
       vi.stubEnv("FULCRUM_FEATURES", "");
-      const { checks } = await import("@/doctor/checks/web.ts");
+      const { checks } = await import("@platform-core/application/health-checks/checks/web.ts");
       const pwaCheck = checks.find((c) => c.name === "web.pwa_sw");
       expect(pwaCheck).toBeDefined();
       const result = await pwaCheck!.run();
@@ -214,7 +214,7 @@ if (isVitestCli) {
 
     it("returns ok when flag ON and SW registration path exists", async () => {
       vi.stubEnv("FULCRUM_FEATURES", "pwa-offline");
-      const { checks } = await import("@/doctor/checks/web.ts");
+      const { checks } = await import("@platform-core/application/health-checks/checks/web.ts");
       const pwaCheck = checks.find((c) => c.name === "web.pwa_sw");
       expect(pwaCheck).toBeDefined();
       const result = await pwaCheck!.run();

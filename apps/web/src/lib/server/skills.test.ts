@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { SkillConflict, SkillConflictKind, SkillConflictStatus } from "@/db/entities/skills/SkillConflict.ts";
-import { createTestOrm, type TestOrm } from "@/test-utils/db.ts";
+import { SkillConflict, SkillConflictKind, SkillConflictStatus } from "@platform-core/infrastructure/application-database/entities/skills/SkillConflict.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import {
   installSkill,
   listSkills,

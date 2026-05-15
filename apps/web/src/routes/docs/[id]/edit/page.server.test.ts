@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { __setApplicationScopeForTest } from "../../../../lib/server/application-scope.ts";
-import { Document } from "@/db/entities/docs/Document.ts";
-import { createTestOrm, type TestOrm } from "@/test-utils/db.ts";
-import { createDoc } from "@/application/docs/commands.ts";
+import { Document } from "@platform-core/infrastructure/application-database/entities/docs/Document.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
+import { createDoc } from "@knowledge-workspace/application/docs/commands.ts";
 
 let scratch: string;
 let cleanups: Array<() => Promise<void> | void> = [];

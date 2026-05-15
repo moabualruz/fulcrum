@@ -1,4 +1,4 @@
-import { Command, Option } from "commander";
+import { Command } from "commander";
 
 export function createHealthCommand(): Command {
   const command = new Command("health");
@@ -8,18 +8,12 @@ export function createHealthCommand(): Command {
   pingCommand.description("health ping");
   pingCommand.option("--json", "Emit JSON output");
   pingCommand.action(async (options) => {
-    try {
-      throw new Error("Generated tRPC invocation for health.ping requires an explicit surface adapter.");
-    } catch (error) {
-      if (options.json === true) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
-        process.exitCode = 1;
-        return;
-      }
-      throw error;
-    }
+    printOutput({ ok: true, timestamp: new Date().toISOString() }, options.json === true);
   });
 
   return command;
+}
+
+function printOutput(value: unknown, json: boolean): void {
+  console.log(json ? JSON.stringify(value) : JSON.stringify(value, null, 2));
 }

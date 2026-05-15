@@ -1,8 +1,8 @@
 // Lint gate — exit 2 with stderr feedback if the just-edited file has lint errors.
 // Multi-language; fail-open per language (skip if linter not installed).
 
-import { readHookEvent } from "../utils/io.ts";
-import { which, run } from "../utils/proc.ts";
+import { readHookEvent } from "@platform-core/application/runtime-support/hook-event-io.ts";
+import { which, run } from "@platform-core/application/runtime-support/process-runner.ts";
 
 const TABLE: Array<{ pattern: RegExp; cmd: string; args: (file: string) => string[] }> = [
   { pattern: /\.py$/,                cmd: "ruff",          args: (f) => ["check", "--quiet", f] },

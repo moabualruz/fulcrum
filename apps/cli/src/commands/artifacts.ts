@@ -1,7 +1,8 @@
-import type { Container } from "@needle-di/core";
-import { TRPCError } from "@trpc/server";
-
-import { createLocalCaller } from "../local-caller.ts";
+import { formatApiError } from "../api-errors.ts";
+import {
+  createArtifactApiCallerFromEnv,
+  type ArtifactApiEnvironment,
+} from "@workflow-coordination/interface/http/artifact-api-client.ts";
 
 type ArtifactsCaller = {
   artifacts: {
@@ -16,7 +17,8 @@ type ArtifactsCaller = {
 
 export interface ArtifactsRunOptions {
   caller?: ArtifactsCaller;
-  container?: Container | null;
+  env?: ArtifactApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -83,7 +85,11 @@ export async function run(argv: readonly string[], opts: ArtifactsRunOptions = {
 
 async function resolveCaller(opts: ArtifactsRunOptions): Promise<ArtifactsCaller> {
   if (opts.caller) return opts.caller;
-  return await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as ArtifactsCaller;
+  const apiCaller = createArtifactApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error("Artifact API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL.");
+  }
+  return apiCaller as ArtifactsCaller;
 }
 
 function printOutput(value: unknown, argv: readonly string[], print: (line: string) => void): void {
@@ -108,6 +114,5 @@ function compact(input: Record<string, unknown>): Record<string, unknown> {
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof TRPCError) return `${error.code}: ${error.message}`;
-  return (error as Error).message;
+  return formatApiError(error);
 }

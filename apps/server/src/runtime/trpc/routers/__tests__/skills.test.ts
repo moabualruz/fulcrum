@@ -3,13 +3,13 @@ import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { FulcrumSkill, SkillSource } from "@/db/entities/skills/index.ts";
-import { DEFAULT_ORG_ID } from "@/db/seed.ts";
-import { readSkillsLockFile } from "@/skills/lock.ts";
-import { __setSkillsConflictResolverOrmForTest } from "@/skills/conflict-resolver.ts";
-import { __setSkillsLoaderOrmForTest } from "@/skills/loader.ts";
-import { __setSkillsUpstreamSyncOrmForTest } from "@/skills/upstream-sync.ts";
-import { createTestCaller, createTestContainer, createTestOrm, type TestOrm } from "@/test-utils/index.ts";
+import { FulcrumSkill, SkillSource } from "@platform-core/infrastructure/application-database/entities/skills/index.ts";
+import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
+import { readSkillsLockFile } from "@platform-core/application/skill-supply/lock.ts";
+import { __setSkillsConflictResolverOrmForTest } from "@platform-core/application/skill-supply/conflict-resolver.ts";
+import { __setSkillsLoaderOrmForTest } from "@platform-core/application/skill-supply/loader.ts";
+import { __setSkillsUpstreamSyncOrmForTest } from "@platform-core/application/skill-supply/upstream-sync.ts";
+import { createTestCaller, createTestContainer, createTestOrm, type TestOrm } from "@test-support/index.ts";
 
 const SKILL_V1 = `---
 name: Demo Skill

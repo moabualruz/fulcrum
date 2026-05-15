@@ -1,15 +1,18 @@
 <script lang="ts">
   /**
-   * AutomationRuleList — CRUD UI for automation rules (D-89, D-92).
-   *
-   * Lists rules with enable/disable toggle and execution count.
-   * Add Rule form: trigger picker, optional condition builder, action picker.
-   * Templates button: 4 hardcoded templates from trpc.automations.templates.
-   *
-   * Security: T-05-34 — rules scoped to project; permission enforced in router.
+   * AutomationRuleList — CRUD UI for project automation rules.
    */
   import { onMount } from "svelte";
   import { cn } from "$lib/utils.js";
+  import {
+    createAutomationRule,
+    deleteAutomationRule,
+    listAutomationRules,
+    listAutomationTemplates,
+    updateAutomationRule,
+    type AutomationRule,
+    type AutomationTemplate,
+  } from "./automation-api";
 
   // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,52 +35,13 @@
     | "add_comment"
     | "subscribe_watcher";
 
-  interface AutomationRule {
-    id: string;
-    name: string;
-    triggerType: TriggerType;
-    triggerConfig: Record<string, unknown>;
-    actionType: ActionType;
-    actionConfig: Record<string, unknown>;
-    enabled: boolean;
-    executionCount: number;
-    condition?: { field: string; operator: string; value: string } | null;
-  }
-
-  interface AutomationTemplate {
-    id: string;
-    name: string;
-    description: string;
-    triggerType: TriggerType;
-    triggerConfig: Record<string, unknown>;
-    actionType: ActionType;
-    actionConfig: Record<string, unknown>;
-  }
-
-  // ── Props ────────────────────────────────────────────────────────────────────
-
   interface Props {
     projectId: string;
-    trpc?: {
-    automations: {
-      list: { query: (input: { projectId: string }) => Promise<AutomationRule[]> };
-      create: { mutate: (input: {
-        projectId: string;
-        name: string;
-        triggerType: TriggerType;
-        triggerConfig: Record<string, unknown>;
-        actionType: ActionType;
-        actionConfig: Record<string, unknown>;
-        condition?: { field: string; operator: string; value: string } | null;
-      }) => Promise<AutomationRule> };
-      update: { mutate: (input: { id: string; enabled?: boolean }) => Promise<AutomationRule> };
-      delete: { mutate: (input: { id: string }) => Promise<void> };
-      templates: { query: () => Promise<AutomationTemplate[]> };
-    };
-    } | null;
+    orgId?: string;
+    currentUserId?: string;
   }
 
-  let { projectId, trpc = null }: Props = $props();
+  let { projectId, orgId = "", currentUserId = "" }: Props = $props();
 
   // ── State ────────────────────────────────────────────────────────────────────
 
@@ -96,7 +60,7 @@
   let newAction: ActionType = "set_status";
   let newActionValue = "";
   let conditionField = "";
-  let conditionOperator = "eq";
+  let conditionOperator = "equals";
   let conditionValue = "";
   let useCondition = false;
   let submitting = false;
@@ -129,11 +93,10 @@
   });
 
   async function load() {
-    if (!trpc) return;
     loading = true;
     error = "";
     try {
-      rules = await trpc.automations.list.query({ projectId });
+      rules = await listAutomationRules(fetch, { orgId, userId: currentUserId, projectId });
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : "Failed to load automations";
     } finally {
@@ -142,9 +105,8 @@
   }
 
   async function loadTemplates() {
-    if (!trpc) return;
     try {
-      templates = await trpc.automations.templates.query();
+      templates = await listAutomationTemplates(fetch, { orgId, userId: currentUserId });
       showTemplates = true;
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : "Failed to load templates";
@@ -152,9 +114,8 @@
   }
 
   async function toggleEnabled(rule: AutomationRule) {
-    if (!trpc) return;
     try {
-      const updated = await trpc.automations.update.mutate({ id: rule.id, enabled: !rule.enabled });
+      const updated = await updateAutomationRule(fetch, { orgId, userId: currentUserId }, { id: rule.id, enabled: !rule.enabled });
       rules = rules.map((r) => (r.id === rule.id ? updated : r));
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : "Failed to update rule";
@@ -162,10 +123,9 @@
   }
 
   async function deleteRule(id: string) {
-    if (!trpc) return;
     deletingId = id;
     try {
-      await trpc.automations.delete.mutate({ id });
+      await deleteAutomationRule(fetch, { orgId, userId: currentUserId }, { id });
       rules = rules.filter((r) => r.id !== id);
       confirmDeleteId = null;
     } catch (e: unknown) {
@@ -176,16 +136,15 @@
   }
 
   async function createFromTemplate(tpl: AutomationTemplate) {
-    if (!trpc) return;
     submitting = true;
     try {
-      const created = await trpc.automations.create.mutate({
-        projectId,
+      const created = await createAutomationRule(fetch, { orgId, userId: currentUserId, projectId }, {
         name: tpl.name,
         triggerType: tpl.triggerType,
         triggerConfig: tpl.triggerConfig,
         actionType: tpl.actionType,
         actionConfig: tpl.actionConfig,
+        condition: tpl.condition ?? null,
       });
       rules = [...rules, created];
       showTemplates = false;
@@ -197,15 +156,14 @@
   }
 
   async function submitNewRule() {
-    if (!trpc || !newName.trim()) return;
+    if (!newName.trim()) return;
     submitting = true;
     error = "";
     try {
       const condition = useCondition && conditionField
         ? { field: conditionField, operator: conditionOperator, value: conditionValue }
         : null;
-      const created = await trpc.automations.create.mutate({
-        projectId,
+      const created = await createAutomationRule(fetch, { orgId, userId: currentUserId, projectId }, {
         name: newName.trim(),
         triggerType: newTrigger,
         triggerConfig: {},
@@ -230,8 +188,20 @@
     newActionValue = "";
     useCondition = false;
     conditionField = "";
-    conditionOperator = "eq";
+    conditionOperator = "equals";
     conditionValue = "";
+  }
+
+  function triggerLabel(triggerType: string): string {
+    return TRIGGER_LABELS[triggerType as TriggerType] ?? humanizeToken(triggerType);
+  }
+
+  function actionLabel(actionType: string): string {
+    return ACTION_LABELS[actionType as ActionType] ?? humanizeToken(actionType);
+  }
+
+  function humanizeToken(value: string): string {
+    return value.replace(/[._-]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
   }
 </script>
 
@@ -314,11 +284,11 @@
         <div class={cn("grid grid-cols-3 gap-2")}>
           <input bind:value={conditionField} placeholder="field" class={cn("h-8 rounded-md border border-input px-2 text-sm bg-background")} />
           <select bind:value={conditionOperator} class={cn("h-8 rounded-md border border-input px-2 text-sm bg-background")}>
-            <option value="eq">equals</option>
-            <option value="neq">not equals</option>
+            <option value="equals">equals</option>
+            <option value="not_equals">not equals</option>
             <option value="contains">contains</option>
-            <option value="gt">greater than</option>
-            <option value="lt">less than</option>
+            <option value="is_empty">is empty</option>
+            <option value="is_not_empty">is not empty</option>
           </select>
           <input bind:value={conditionValue} placeholder="value" class={cn("h-8 rounded-md border border-input px-2 text-sm bg-background")} />
         </div>
@@ -399,9 +369,9 @@
           <div class={cn("flex-1 min-w-0")}>
             <div class={cn("text-sm font-medium truncate")}>{rule.name}</div>
             <div class={cn("text-xs text-muted-foreground mt-0.5")}>
-              <span class={cn("bg-muted px-1.5 py-0.5 rounded")}>{TRIGGER_LABELS[rule.triggerType]}</span>
+              <span class={cn("bg-muted px-1.5 py-0.5 rounded")}>{triggerLabel(rule.triggerType)}</span>
               <span class={cn("mx-1")}>→</span>
-              <span class={cn("bg-muted px-1.5 py-0.5 rounded")}>{ACTION_LABELS[rule.actionType]}</span>
+              <span class={cn("bg-muted px-1.5 py-0.5 rounded")}>{actionLabel(rule.actionType)}</span>
             </div>
             {#if rule.executionCount > 0}
               <div class={cn("text-xs text-muted-foreground mt-1")}>

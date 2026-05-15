@@ -1,5 +1,5 @@
 import type { PageServerLoad } from "./$types";
-import { getArtifactStats, listArtifactRows } from "@/application/artifacts/queries.ts";
+import { getArtifactStats, listArtifactRows } from "@workflow-coordination/application/artifacts/queries.ts";
 import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = ({ params, locals }) => {

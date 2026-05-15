@@ -46,21 +46,16 @@
     pullActive[modelId] = true;
     pullProgress[modelId] = 0;
     try {
-      const res = await fetch(`/api/inference/models/${encodeURIComponent(modelId)}/pull`, { method: "POST" });
-      if (!res.ok || !res.body) throw new Error("Pull failed");
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const text = decoder.decode(value, { stream: true });
-        for (const line of text.split("\n")) {
-          if (line.startsWith("data:")) {
-            try {
-              const evt = JSON.parse(line.slice(5));
-              if (typeof evt.progress === "number") pullProgress[modelId] = evt.progress;
-            } catch { /* skip non-JSON lines */ }
-          }
+      const res = await fetch(`/api/v1/inference/models/${encodeURIComponent(modelId)}/pull`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force: false }),
+      });
+      if (!res.ok) throw new Error("Pull failed");
+      const events = await res.json();
+      if (Array.isArray(events)) {
+        for (const evt of events) {
+          if (typeof evt?.pct === "number") pullProgress[modelId] = evt.pct;
         }
       }
       pullProgress[modelId] = 100;
@@ -74,7 +69,7 @@
   async function handleRemove(modelId: string) {
     confirmRemoveModelId = null;
     try {
-      await fetch(`/api/inference/models/${encodeURIComponent(modelId)}`, { method: "DELETE" });
+      await fetch(`/api/v1/inference/models/${encodeURIComponent(modelId)}`, { method: "DELETE" });
     } catch { /* degrade gracefully */ }
   }
 
@@ -82,13 +77,14 @@
     testLoading["embed"] = true;
     embedResult = null;
     try {
-      const res = await fetch("/api/inference/test/embed", {
+      const res = await fetch("/api/v1/inference/embed", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: "test embedding" }),
+        body: JSON.stringify({ texts: ["test embedding"] }),
       });
       const data = await res.json();
-      embedResult = `${data.dimensions} dimensions, model: ${data.model}`;
+      const dimensions = data.dimensions ?? data.vectors?.[0]?.length ?? 0;
+      embedResult = `${dimensions} dimensions, model: ${data.model}`;
     } catch (e) {
       embedResult = `Error: ${e instanceof Error ? e.message : "unknown"}`;
     } finally {
@@ -100,13 +96,13 @@
     testLoading["generate"] = true;
     generateResult = null;
     try {
-      const res = await fetch("/api/inference/test/generate", {
+      const res = await fetch("/api/v1/inference/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: "Hello" }),
       });
       const data = await res.json();
-      generateResult = `"${data.text}" (${data.tokens_used} tokens, model: ${data.model})`;
+      generateResult = `"${data.text}" (${data.tokens} tokens, model: ${data.model})`;
     } catch (e) {
       generateResult = `Error: ${e instanceof Error ? e.message : "unknown"}`;
     } finally {
@@ -118,13 +114,14 @@
     testLoading["classify"] = true;
     classifyResult = null;
     try {
-      const res = await fetch("/api/inference/test/classify", {
+      const res = await fetch("/api/v1/inference/classify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: "great product" }),
+        body: JSON.stringify({ text: "great product", labels: ["positive", "negative"] }),
       });
       const data = await res.json();
-      classifyResult = `${data.label} (confidence: ${(data.confidence * 100).toFixed(1)}%, model: ${data.model})`;
+      const first = Array.isArray(data) ? data[0] : data;
+      classifyResult = `${first.label} (score: ${Number(first.score ?? 0).toFixed(2)})`;
     } catch (e) {
       classifyResult = `Error: ${e instanceof Error ? e.message : "unknown"}`;
     } finally {
@@ -136,7 +133,7 @@
     testLoading["tokenize"] = true;
     tokenizeResult = null;
     try {
-      const res = await fetch("/api/inference/test/tokenize", {
+      const res = await fetch("/api/v1/inference/tokenize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: "hello world" }),
@@ -152,7 +149,7 @@
 
   async function handleClearCache() {
     try {
-      await fetch("/api/inference/cache/clear", { method: "POST" });
+      await fetch("/api/v1/inference/cache/clear", { method: "POST" });
     } catch { /* degrade gracefully */ }
   }
 </script>
@@ -172,7 +169,7 @@
       data-inference-error
       class={cn("rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive mb-4")}
     >
-      <strong>Sidecar unavailable:</strong> {inference.error}
+      <strong>Inference API unavailable:</strong> {inference.error}
     </div>
   {/if}
 

@@ -1,7 +1,7 @@
 import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { rescheduleProjectTask } from "@/application/projects/commands.ts";
-import { loadProjectGantt } from "@/application/projects/queries.ts";
+import { rescheduleProjectTask } from "@work-management/application/projects/commands.ts";
+import { loadProjectGantt } from "@work-management/application/projects/queries.ts";
 import { actionFail, actionOk } from "../../../../lib/feedback/action-result";
 import { requestAppScope } from "$lib/server/application-scope";
 

@@ -1,9 +1,9 @@
 import type { Actions, PageServerLoad } from "./$types";
 import { error, fail } from "@sveltejs/kit";
 import { requestAppScope } from "$lib/server/application-scope";
-import { createRepoBranch, checkoutRepoBranch, deleteRepoBranch } from "@/application/repos/commands.ts";
-import { getRepoBranchesPage, REPO_WRITE_OPS_GATE } from "@/application/repos/queries.ts";
-import { AppError } from "@/application/errors.ts";
+import { createRepoBranch, checkoutRepoBranch, deleteRepoBranch } from "@integration-hub/application/repos/commands.ts";
+import { getRepoBranchesPage, REPO_WRITE_OPS_GATE } from "@integration-hub/application/repos/queries.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 
 function gated() {
   return fail(403, {

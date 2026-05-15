@@ -1,21 +1,9 @@
 <script lang="ts">
-  /**
-   * Portfolio dashboard — workspace-level project overview (Plan 05-13, D-93..D-96).
-   *
-   * Tabs: Projects | Workload | Scope
-   * - Projects: PortfolioTable with all projects progress/health
-   * - Workload: per-assignee stacked bars + resource allocation
-   * - Scope: scope creep + age charts
-   *
-   * Data from trpc.reports.progressRollup (workspace scope, D-94, D-95).
-   */
   import PortfolioTable from "$lib/components/reports/PortfolioTable.svelte";
   import WorkloadChart from "$lib/components/reports/WorkloadChart.svelte";
   import ResourceAllocation from "$lib/components/reports/ResourceAllocation.svelte";
   import ScopeChart from "$lib/components/reports/ScopeChart.svelte";
   import AgeChart from "$lib/components/reports/AgeChart.svelte";
-
-  // ── Tab state ─────────────────────────────────────────────────────────────
 
   type Tab = "projects" | "workload" | "scope";
   let activeTab = $state<Tab>("projects");
@@ -26,13 +14,7 @@
     { id: "scope", label: "Scope" },
   ];
 
-  // ── Mock/placeholder data (wired to tRPC in production) ──────────────────
-  // Real data fetching uses trpc.reports.progressRollup.query({ scopeType: 'workspace' })
-  // These are empty stubs — the page layout + components are wired; data from API.
-
   const portfolioRows = $state([
-    // Example structure for PortfolioTable
-    // Real data fetched via trpc.reports.progressRollup({ scopeType: 'workspace' })
   ] as Parameters<typeof PortfolioTable>[0]["rows"]);
 
   const workloadData = $state(
@@ -103,7 +85,7 @@
       <section>
         <h2 class="text-lg font-semibold mb-3">Resource Allocation</h2>
         <p class="text-sm text-muted-foreground mb-4">
-          Team members × projects. Red rows = over-allocated (D-96).
+          Team members × projects. Red rows show over-allocated contributors.
         </p>
         <ResourceAllocation data={resourceData} />
       </section>
@@ -114,7 +96,7 @@
       <section>
         <h2 class="text-lg font-semibold mb-3">Scope Creep</h2>
         <p class="text-sm text-muted-foreground mb-4">
-          Original vs current scope vs completed over time (D-46).
+          Original vs current scope vs completed over time.
         </p>
         <ScopeChart data={scopeData} height={320} />
       </section>
@@ -122,7 +104,7 @@
       <section>
         <h2 class="text-lg font-semibold mb-3">Task Age</h2>
         <p class="text-sm text-muted-foreground mb-4">
-          Days each task has been in its current status. Items &gt;14 days highlighted red (D-44).
+          Days each task has been in its current status. Items &gt;14 days are highlighted.
         </p>
         <AgeChart data={ageData} height={320} staleThreshold={14} />
       </section>

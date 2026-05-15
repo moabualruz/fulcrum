@@ -10,8 +10,8 @@ declare global {
 			userId?: string | null;
 			locale?: import("$lib/i18n").SupportedLocale;
 			i18nEnabled?: boolean;
-			em: import("@mikro-orm/postgresql").EntityManager | null;
-			container: import("../../../src/di/container.ts").Container | null;
+			em: import("@platform-core/application/runtime/application-scope.ts").ApplicationPersistence | null;
+			container: unknown | null;
 		}
 		interface PageData {
 			theme?: import("$lib/theme").ThemeSettings;

@@ -2,8 +2,8 @@ import type { EntityManager } from "@mikro-orm/postgresql";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { appErrorToTrpcError } from "@/application/error-mapping.ts";
-import { AppError } from "@/application/errors.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 import {
   createExportManifest,
   FORMAT,
@@ -13,7 +13,7 @@ import {
   SCHEMA_VERSION,
   writeExportJson,
   type ImportExportAppContext,
-} from "@/application/import-export/commands.ts";
+} from "@integration-hub/application/import-export/commands.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 

@@ -53,7 +53,12 @@
   {@const agents = Array.from(new Set(runs.map((r) => r.agent))).sort()}
   {@const projects = Array.from(new Set(runs.map((r) => r.project_id ?? ""))).sort()}
   <div class={cn("mb-3")}>
-    <InContextSearchBar kind="run" projectId={data.filter.project === "__any__" ? null : data.filter.project} placeholder="Search runs" />
+    <InContextSearchBar
+      kind="run"
+      projectId={data.filter.project === "__any__" ? null : data.filter.project}
+      orgId={data.orgId}
+      placeholder="Search runs"
+    />
   </div>
   <form
     data-runs-dispatch

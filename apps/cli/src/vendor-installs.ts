@@ -16,11 +16,11 @@
 //   - Fail-soft per tool: log warning and continue on any error.
 
 import { stat } from "node:fs/promises";
-import { AGENTS } from "@/agents/registry.ts";
+import { AGENTS } from "@execution-orchestration/application/agent-catalog/registry.ts";
 import type { AgentId } from "./mcp-registry.ts";
-import { which, run as runProc } from "@/utils/proc.ts";
-import { getComponent } from "@/components/catalog.ts";
-import { ComponentLedger } from "@/components/ledger.ts";
+import { which, run as runProc } from "@platform-core/application/runtime-support/process-runner.ts";
+import { getComponent } from "@platform-core/application/component-lifecycle/catalog.ts";
+import { ComponentLedger } from "@platform-core/application/component-lifecycle/ledger.ts";
 import { stripVendorRuleBlocks } from "./install.ts";
 
 async function isDir(p: string): Promise<boolean> {

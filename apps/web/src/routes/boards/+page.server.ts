@@ -7,8 +7,8 @@ import {
   createTask,
   deleteTask,
   updateTask,
-} from "@/application/tasks/commands.ts";
-import { listBoardTaskRows } from "@/application/tasks/queries.ts";
+} from "@work-management/application/tasks/commands.ts";
+import { listBoardTaskRows } from "@work-management/application/tasks/queries.ts";
 import {
   BoardCreateSchema,
   BoardDeleteSchema,

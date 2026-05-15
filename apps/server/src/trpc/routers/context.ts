@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { previewContext } from "@/application/context/queries.ts";
+import { previewContext } from "@knowledge-workspace/application/context/queries.ts";
 import { requireTrpcEntityManager } from "../context.ts";
 import { t } from "../trpc.ts";
 import { permissionedProcedure } from "../middleware.ts";

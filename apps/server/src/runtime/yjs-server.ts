@@ -1,8 +1,8 @@
 /**
- * yjs-server.ts — Yjs WebSocket server with auth + persistence (Plan 05-13).
+ * yjs-server.ts — Yjs WebSocket server with auth + persistence (workflow milestone).
  *
  * Dual-mode:
- *   - In-process: import { createYjsServer } and mount alongside Hono
+ *   - In-process: import { createYjsServer } and mount alongside the server runtime
  *   - Standalone: FULCRUM_YJS_STANDALONE=true -> runs own WS server on FULCRUM_YJS_PORT
  *
  * Auth: validates Authorization header or cookie on WebSocket upgrade.
@@ -11,13 +11,13 @@
  * Persistence: debounced save of Y.Doc state to YjsSnapshot entity in PostgreSQL.
  *
  * MEDIUM-08 fix: client URL is always read from FULCRUM_YJS_URL env var (never hardcoded).
- * LOW-04 fix: startYjsServer exported for Hono startup integration.
+ * LOW-04 fix: startYjsServer exported for startup integration.
  */
 
 import * as Y from "yjs";
 import { WebSocketServer, WebSocket } from "ws";
 import type { EntityManager } from "@mikro-orm/postgresql";
-import { YjsSnapshot } from "@/db/entities/tasks/YjsSnapshot.ts";
+import { YjsSnapshot } from "@platform-core/infrastructure/application-database/entities/tasks/YjsSnapshot.ts";
 
 // ── URL helper (MEDIUM-08) ─────────────────────────────────────────────────
 
@@ -232,7 +232,7 @@ export function createYjsServer(options: YjsServerOptions): YjsServerHandler {
 
 /**
  * Start Yjs server in standalone mode.
- * LOW-04: exported for Hono startup integration.
+ * LOW-04: exported for startup integration.
  *
  * Usage:
  *   import { startYjsServer } from './yjs-server.ts';

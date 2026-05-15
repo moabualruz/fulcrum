@@ -4,4 +4,4 @@ export {
   loadFeatures,
   getFeatureBackend,
   type FeatureFlag,
-} from "@/application/legacy/web-runtime.ts";
+} from "@platform-core/application/legacy/web-runtime.ts";

@@ -9,9 +9,11 @@ import {
   removeTaskFromSprint,
   startSprint,
   updateSprint,
-} from "@/application/sprints/commands.ts";
-import { getSprint, listSprints } from "@/application/sprints/queries.ts";
-import type { AppContext } from "@/application/sprints/types.ts";
+} from "@work-management/application/sprints/commands.ts";
+import { getSprint, listSprints } from "@work-management/application/sprints/queries.ts";
+import type { AppContext } from "@work-management/application/sprints/types.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 import { optionalTrpcEntityManager } from "@fulcrum/server/trpc/context.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
@@ -110,6 +112,15 @@ function appContext(ctx: { orgId: string; userId: string }): AppContext {
   return { orgId: ctx.orgId, userId: ctx.userId, projectId: null };
 }
 
+async function mapAppError<T>(fn: () => Promise<T> | T): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AppError) throw appErrorToTrpcError(error);
+    throw error;
+  }
+}
+
 // ── Router (thin delegation layer) ─────────────────────────────────
 
 export const sprintsRouter = t.router({
@@ -119,63 +130,63 @@ export const sprintsRouter = t.router({
     .query(async ({ ctx, input }) => {
       const em = optionalTrpcEntityManager(ctx);
       if (!em) return [];
-      return listSprints(em, appContext(ctx), input ?? undefined);
+      return mapAppError(() => listSprints(em, appContext(ctx), input ?? undefined));
     }),
 
   get: permissionedProcedure({ resource: "sprints", action: "get" })
     .input(SprintIdInputSchema)
     .output(SprintOutputSchema.nullable())
     .query(async ({ ctx, input }) => {
-      return getSprint(requireEntityManager(ctx), appContext(ctx), input.id);
+      return mapAppError(() => getSprint(requireEntityManager(ctx), appContext(ctx), input.id));
     }),
 
   create: permissionedProcedure({ resource: "sprints", action: "create" })
     .input(CreateSprintInputSchema)
     .output(SprintOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      return createSprint(requireEntityManager(ctx), appContext(ctx), input);
+      return mapAppError(() => createSprint(requireEntityManager(ctx), appContext(ctx), input));
     }),
 
   update: permissionedProcedure({ resource: "sprints", action: "update" })
     .input(UpdateSprintInputSchema)
     .output(SprintOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
-      return updateSprint(requireEntityManager(ctx), appContext(ctx), input);
+      return mapAppError(() => updateSprint(requireEntityManager(ctx), appContext(ctx), input));
     }),
 
   delete: permissionedProcedure({ resource: "sprints", action: "delete" })
     .input(SprintIdInputSchema)
     .output(SprintOutputSchema.nullable())
     .mutation(async ({ ctx, input }) => {
-      return deleteSprint(requireEntityManager(ctx), appContext(ctx), input.id);
+      return mapAppError(() => deleteSprint(requireEntityManager(ctx), appContext(ctx), input.id));
     }),
 
   start: permissionedProcedure({ resource: "sprints", action: "start" })
     .input(SprintIdInputSchema)
     .output(SprintOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      return startSprint(requireEntityManager(ctx), appContext(ctx), input.id);
+      return mapAppError(() => startSprint(requireEntityManager(ctx), appContext(ctx), input.id));
     }),
 
   close: permissionedProcedure({ resource: "sprints", action: "close" })
     .input(CloseSprintInputSchema)
     .output(CloseSprintOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      return closeSprint(requireEntityManager(ctx), appContext(ctx), input);
+      return mapAppError(() => closeSprint(requireEntityManager(ctx), appContext(ctx), input));
     }),
 
   addTask: permissionedProcedure({ resource: "sprints", action: "addTask" })
     .input(SprintTaskInputSchema)
     .output(MoveTaskOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      return addTaskToSprint(requireEntityManager(ctx), appContext(ctx), input.sprintId, input.taskId);
+      return mapAppError(() => addTaskToSprint(requireEntityManager(ctx), appContext(ctx), input.sprintId, input.taskId));
     }),
 
   removeTask: permissionedProcedure({ resource: "sprints", action: "removeTask" })
     .input(SprintTaskInputSchema)
     .output(MoveTaskOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      return removeTaskFromSprint(requireEntityManager(ctx), appContext(ctx), input.sprintId, input.taskId);
+      return mapAppError(() => removeTaskFromSprint(requireEntityManager(ctx), appContext(ctx), input.sprintId, input.taskId));
     }),
 });
 

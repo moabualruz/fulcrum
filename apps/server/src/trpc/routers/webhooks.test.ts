@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 
-import { Org } from "@/db/entities/auth/Org.ts";
-import { Webhook } from "@/db/entities/notifications/Webhook.ts";
-import { WebhookDelivery, WebhookDeliveryStatus } from "@/db/entities/notifications/WebhookDelivery.ts";
-import { createTestOrm, type TestOrm } from "@/test-utils/db.ts";
-import { adminSession } from "@/test-utils/auth.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
+import { Webhook } from "@platform-core/infrastructure/application-database/entities/notifications/Webhook.ts";
+import { WebhookDelivery, WebhookDeliveryStatus } from "@platform-core/infrastructure/application-database/entities/notifications/WebhookDelivery.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
+import { adminSession } from "@test-support/auth-session.ts";
 import { createContext } from "../context.ts";
 import { webhooksRouter } from "./webhooks.ts";
 
@@ -22,7 +22,7 @@ afterEach(async () => {
 
 async function freshCaller(): Promise<ReturnType<typeof webhooksRouter.createCaller>> {
   process.env["FULCRUM_FEATURES"] = "outbound-webhooks";
-  process.env["FULCRUM_WEBHOOK_SECRET_KEY"] = "phase-47-webhook-secret-key";
+  process.env["FULCRUM_WEBHOOK_SECRET_KEY"] = "webhook-test-secret-key";
   db = await createTestOrm();
   const seedManager = db.em.fork();
   seedManager.persist(seedManager.create(Org, {

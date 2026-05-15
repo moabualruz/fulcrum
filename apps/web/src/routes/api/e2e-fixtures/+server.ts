@@ -7,7 +7,7 @@ import {
   seedE2eProject,
   seedE2eSearchKindsOrm,
   seedE2eTask,
-} from "@/application/testing/e2e-fixtures.ts";
+} from "@workflow-coordination/application/testing/e2e-fixtures.ts";
 import { getE2eFixtureContext } from "$lib/server/db";
 
 export const POST: RequestHandler = async ({ request }) => {

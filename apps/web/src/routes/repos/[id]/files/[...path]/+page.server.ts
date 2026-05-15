@@ -1,8 +1,8 @@
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requestAppScope } from "$lib/server/application-scope";
-import { getRepoFileDetailPage } from "@/application/repo-files/queries.ts";
-import { AppError } from "@/application/errors.ts";
+import { getRepoFileDetailPage } from "@integration-hub/application/repo-files/queries.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 
 export const load: PageServerLoad = ({ params, url, locals }) => {
   const branch = url.searchParams.get("branch") ?? undefined;

@@ -1,13 +1,6 @@
 <script lang="ts">
   /**
    * MentionSuggestion — dual-source mention popup (users + teams).
-   * D-100: mention node includes type:'user'|'team' attribute for CommentService.extractMentions.
-   * D-101 / MEDIUM-03: shows both users and teams from org.
-   *
-   * Security T-05-17: only org members and org teams are shown.
-   *
-   * Usage: pass as `suggestion` option to @tiptap/extension-mention.
-   * Items are fetched from /api/trpc/orgs.members.list and /api/trpc/orgs.teams.list.
    */
 
   interface Props {

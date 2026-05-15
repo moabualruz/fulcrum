@@ -1,7 +1,7 @@
 import { redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { listAgentProfilesPageData, testProfile } from "@/application/agents/queries.ts";
-import { dispatchTaskRun } from "@/application/runs/commands.ts";
+import { listAgentProfilesPageData, testProfile } from "@execution-orchestration/application/agents/queries.ts";
+import { dispatchTaskRun } from "@execution-orchestration/application/runs/commands.ts";
 import { requestAppScope } from "$lib/server/application-scope";
 import { actionOk } from "$lib/feedback/action-result";
 

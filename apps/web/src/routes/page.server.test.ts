@@ -6,8 +6,8 @@ import type { EntityManager } from "@mikro-orm/postgresql";
 import {
   createIsolatedOrmFixture,
   type TestOrmFixture,
-} from "@/test-support/product-fixtures.ts";
-import type { TestStore } from "@/test-support/product-fixtures.ts";
+} from "@test-support/product-workspace-fixtures.ts";
+import type { TestStore } from "@test-support/product-workspace-fixtures.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-page-server-"));
 

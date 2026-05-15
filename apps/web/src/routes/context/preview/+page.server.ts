@@ -1,6 +1,6 @@
 import type { PageServerLoad } from "./$types";
 import { requestAppScope } from "$lib/server/application-scope";
-import { loadContextBundle, loadContextPreviewOptions } from "@/application/context/queries.ts";
+import { loadContextBundle, loadContextPreviewOptions } from "@knowledge-workspace/application/context/queries.ts";
 
 export const load: PageServerLoad = ({ url, locals }) => {
   const activeProjectId = locals?.activeProjectId ?? null;

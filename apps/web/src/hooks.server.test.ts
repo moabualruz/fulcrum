@@ -1,15 +1,14 @@
+import { readFile } from "node:fs/promises";
 import { afterAll, describe, expect, test } from "bun:test";
 import { Container } from "@needle-di/core";
 
 import { ACTIVE_PROJECT_COOKIE } from "./lib/state/active-project.ts";
+import { closeDatabase } from "./lib/server/db.ts";
 import {
   __closeWebRuntimeForTest,
   __setWebRuntimeForTest,
   handle,
 } from "./hooks.server.ts";
-import { FULCRUM_REQUEST_ID_HEADER } from "@fulcrum/server/trpc/context.ts";
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function createCookiesStub(initial?: string) {
   const store = new Map<string, string>();
@@ -40,6 +39,7 @@ function createRequestEvent(pathname = "/") {
 describe("hooks.server handle", () => {
   afterAll(async () => {
     await __closeWebRuntimeForTest();
+    await closeDatabase();
   });
 
   test("locals.activeProjectId is null when cookie unset", async () => {
@@ -158,7 +158,7 @@ describe("hooks.server handle", () => {
     expect(resolveCalls).toBe(0);
   });
 
-  test("hook-mounted tRPC responses include request id header", async () => {
+  test("/api/trpc requests are delegated to the route layer after locals are populated", async () => {
     __setWebRuntimeForTest({
       authHandler: null,
       orm: { close: async () => undefined } as never,
@@ -168,12 +168,21 @@ describe("hooks.server handle", () => {
       }),
     });
 
+    let resolveCalls = 0;
+    let observedLocals: App.Locals | null = null;
     const response = await handle({
       event: createRequestEvent("/api/trpc/health.ping") as never,
-      resolve: (() => new Response("app")) as never,
+      resolve: ((event) => {
+        resolveCalls += 1;
+        observedLocals = event.locals;
+        return new Response("route-layer");
+      }) as never,
     });
 
-    expect(response.headers.get(FULCRUM_REQUEST_ID_HEADER)).toMatch(UUID_RE);
+    expect(await response.text()).toBe("route-layer");
+    expect(resolveCalls).toBe(1);
+    expect(observedLocals?.em).not.toBeNull();
+    expect(observedLocals?.container).not.toBeNull();
   });
 
   test("request EntityManager is cleared when resolve throws", async () => {
@@ -233,5 +242,13 @@ describe("hooks.server handle", () => {
       if (previous === undefined) delete process.env["FULCRUM_FEATURES"];
       else process.env["FULCRUM_FEATURES"] = previous;
     }
+  });
+
+  test("hooks do not import or mount the server tRPC runtime", async () => {
+    const source = await readFile(new URL("./hooks.server.ts", import.meta.url), "utf8");
+
+    expect(source).not.toContain("@trpc/server");
+    expect(source).not.toContain("@fulcrum/server/trpc");
+    expect(source).not.toContain("fetchRequestHandler");
   });
 });

@@ -1,4 +1,5 @@
-import { Command, Option } from "commander";
+import { Command } from "commander";
+import { buildDoctorReport, discoverChecks } from "@platform-core/application/health-checks/index.ts";
 
 export function createDoctorCommand(): Command {
   const command = new Command("doctor");
@@ -8,35 +9,21 @@ export function createDoctorCommand(): Command {
   runCommand.description("doctor run");
   runCommand.option("--json", "Emit JSON output");
   runCommand.action(async (options) => {
-    try {
-      throw new Error("Generated tRPC invocation for doctor.run requires an explicit surface adapter.");
-    } catch (error) {
-      if (options.json === true) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
-        process.exitCode = 1;
-        return;
-      }
-      throw error;
-    }
+    printOutput(await buildDoctorReport(), options.json === true);
   });
 
   const subsystemsCommand = command.command("subsystems");
   subsystemsCommand.description("doctor subsystems");
   subsystemsCommand.option("--json", "Emit JSON output");
   subsystemsCommand.action(async (options) => {
-    try {
-      throw new Error("Generated tRPC invocation for doctor.subsystems requires an explicit surface adapter.");
-    } catch (error) {
-      if (options.json === true) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
-        process.exitCode = 1;
-        return;
-      }
-      throw error;
-    }
+    const checks = await discoverChecks();
+    const subsystems = [...new Set(checks.map((check) => check.subsystem))].sort();
+    printOutput(subsystems, options.json === true);
   });
 
   return command;
+}
+
+function printOutput(value: unknown, json: boolean): void {
+  console.log(json ? JSON.stringify(value) : JSON.stringify(value, null, 2));
 }

@@ -11,8 +11,8 @@
 
 import { tmpdir } from "node:os";
 import { parse as parseToml } from "smol-toml";
-import { readHookEvent, projectSlug } from "../utils/io.ts";
-import { spawnDetached } from "../utils/proc.ts";
+import { readHookEvent, projectSlug } from "@platform-core/application/runtime-support/hook-event-io.ts";
+import { spawnDetached } from "@platform-core/application/runtime-support/process-runner.ts";
 
 function globToRegExp(glob: string): RegExp {
   // Minimal globber: ** → .*, * → [^/]*, ? → [^/]

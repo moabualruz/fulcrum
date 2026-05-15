@@ -2,8 +2,8 @@
 // HEAD changed or working tree is dirty. SHA cached under os.tmpdir().
 
 import { tmpdir } from "node:os";
-import { run, which, exists } from "../utils/proc.ts";
-import { projectSlug } from "../utils/io.ts";
+import { projectSlug } from "@platform-core/application/runtime-support/hook-event-io.ts";
+import { run, which, exists } from "@platform-core/application/runtime-support/process-runner.ts";
 
 export async function runHook(): Promise<void> {
   const slug = projectSlug();

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { getRetentionPolicy, upsertRetentionPolicy } from "@/application/audit/web-queries.ts";
-import { createTestOrm, type TestOrm } from "@/test-utils/db.ts";
+import { getRetentionPolicy, upsertRetentionPolicy } from "@workflow-coordination/application/audit/web-queries.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
 let db: TestOrm;
 let orgId: string;

@@ -34,21 +34,24 @@ type PageProps = {
 
 const UNREAD_NOTIFICATION: NotificationRow = {
   id: "notif-1",
-  org_id: "org-1",
-  recipient: "local",
-  event_id: null,
-  subject_kind: "task",
-  subject_id: "task-1",
-  verb: "created",
-  actor: "system",
-  read_at: null,
-  created_at: "2026-04-30T10:00:00.000Z",
+  orgId: "org-1",
+  userId: "user-1",
+  ruleId: null,
+  eventId: "event-1",
+  title: "system",
+  body: "created",
+  entityKind: "task",
+  entityId: "task-1",
+  read: false,
+  readAt: null,
+  createdAt: "2026-04-30T10:00:00.000Z",
 };
 
 const READ_NOTIFICATION: NotificationRow = {
   ...UNREAD_NOTIFICATION,
   id: "notif-2",
-  read_at: "2026-04-30T11:00:00.000Z",
+  read: true,
+  readAt: "2026-04-30T11:00:00.000Z",
 };
 
 const ACTIVITY: ActivityRow = {

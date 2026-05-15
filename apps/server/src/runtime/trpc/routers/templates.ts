@@ -1,7 +1,7 @@
 /**
- * templatesRouter — Phase 05 Plan 04 (D-115).
+ * templatesRouter — task workflow (D-115).
  *
- * tRPC surface for TemplateService.
+ * tRPC surface for WorkItemTemplateService.
  */
 
 import { z } from "zod";
@@ -12,8 +12,8 @@ import {
   deleteTemplate,
   listTemplates,
   setDefaultTemplate,
-} from "@/application/templates/queries.ts";
-import type { AppContext } from "@/application/templates/types.ts";
+} from "@work-management/application/templates/queries.ts";
+import type { AppContext } from "@work-management/application/templates/types.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 

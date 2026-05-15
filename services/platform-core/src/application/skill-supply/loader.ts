@@ -13,14 +13,14 @@ import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 
-import { Org } from "../db/entities/auth/Org.ts";
+import { Org } from "@platform-core/infrastructure/application-database/entities/auth/Org.ts";
 import {
   FulcrumSkill,
   SkillSource,
   SkillVersion,
-} from "../db/entities/skills/index.ts";
-import { initOrm } from "../db/mikro-orm.config.ts";
-import { parseKernelMarkdown } from "../shared/markdown.ts";
+} from "@platform-core/infrastructure/application-database/entities/skills/index.ts";
+import { initOrm } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { parseKernelMarkdown } from "@platform-core/application/platform-primitives/frontmatter-markdown.ts";
 import {
   readSkillsLockFile,
   skillsLockPath,

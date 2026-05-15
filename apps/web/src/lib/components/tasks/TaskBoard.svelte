@@ -4,6 +4,9 @@
   import TaskCard, { type TaskCardTask } from "./TaskCard.svelte";
   import WipLimitIndicator from "./WipLimitIndicator.svelte";
   import SprintPlanningTray from "./SprintPlanningTray.svelte";
+  import { createQuickTask } from "./quick-create-api";
+  import { fetchTaskList, updateTaskListFields, type TaskListRow } from "./task-list-api";
+  import { assignTaskToSprint, listProjectSprints } from "./sprint-planning-api";
 
   type GroupByField = "status" | "assignee" | "priority" | "label" | "sprint";
   type Density = "compact" | "comfortable";
@@ -19,14 +22,15 @@
 
   interface Props {
     projectId: string;
+    orgId?: string;
+    currentUserId?: string;
     sprintId?: string;
     groupBy?: GroupByField;
     methodology?: Methodology;
   }
 
-  const { projectId, sprintId, groupBy = "status", methodology = "none" }: Props = $props();
+  const { projectId, orgId = "", currentUserId = "", sprintId, groupBy = "status", methodology = "none" }: Props = $props();
 
-  // ── UI state ──
   let density = $state<Density>("compact");
   let typeFilter = $state<TypeFilter>("all");
   let myWorkOnly = $state(false);
@@ -34,17 +38,14 @@
   let loading = $state(true);
   let error = $state<string | null>(null);
 
-  // Raw tasks from server
   let rawTasks = $state<TaskCardTask[]>([]);
   let wipLimits = $state<Record<string, number>>({});
   let currentSprints = $state<Array<{ id: string; name: string }>>([]);
   let selectedSprintId = $state<string | undefined>(sprintId);
 
-  // Quick-create state
   let quickCreateColumn = $state<string | null>(null);
   let quickCreateTitle = $state("");
 
-  // ── Derived: filtered tasks ──
   const filteredTasks = $derived(() => {
     let tasks = rawTasks;
     if (typeFilter !== "all") {
@@ -56,9 +57,8 @@
     return tasks;
   });
 
-  let currentUser: string | undefined;
+  let currentUser: string | undefined = currentUserId || undefined;
 
-  // ── Derived: columns built from groupBy ──
   const columns = $derived(() => buildColumns(filteredTasks(), groupBy, wipLimits, methodology));
 
   function buildColumns(
@@ -68,7 +68,7 @@
     meth: Methodology
   ): Column[] {
     if (by === "status" || by === "sprint") {
-      const statuses = ["pending", "in_progress", "blocked", "completed", "cancelled"];
+      const statuses = ["backlog", "todo", "in_progress", "in_review", "done", "cancelled"];
       return statuses.map((s) => ({
         id: s,
         label: s.replace("_", " "),
@@ -115,7 +115,6 @@
     return [];
   }
 
-  // ── DnD handlers ──
   function handleDndConsider(colId: string, e: CustomEvent<DndEvent<TaskCardTask>>) {
     const col = columns().find((c) => c.id === colId);
     if (col) col.items = e.detail.items;
@@ -130,23 +129,20 @@
     );
     if (!movedTask) return;
 
-    // Optimistic update
     rawTasks = rawTasks.map((t) =>
       t.id === movedTask.id ? applyGroupChange(t, groupBy, colId) : t
     );
 
-    // Persist via tRPC
     const patch = buildPatch(groupBy, colId);
     try {
-      await trpcMutation("tasks.update", { id: movedTask.id, ...patch });
+      await updateTaskListFields(fetch, { orgId, userId: currentUserId, projectId, taskId: movedTask.id, patch });
     } catch {
-      // revert on error — just re-fetch
       await loadTasks();
     }
   }
 
   function getFieldForGroup(task: TaskCardTask, by: GroupByField): string {
-    if (by === "status") return task.status ?? "pending";
+    if (by === "status") return task.status ?? "todo";
     if (by === "priority") return String(task.priority ?? 0);
     if (by === "assignee") return task.assignee ?? "Unassigned";
     if (by === "label") return task.labels?.[0] ?? "__none";
@@ -166,7 +162,6 @@
     return {};
   }
 
-  // ── Quick create ──
   async function submitQuickCreate(status: string) {
     if (!quickCreateTitle.trim()) {
       quickCreateColumn = null;
@@ -176,62 +171,19 @@
     quickCreateTitle = "";
     quickCreateColumn = null;
     try {
-      const created = await trpcMutation("tasks.create", { title, status, orgId: projectId });
-      if (created) rawTasks = [...rawTasks, created as unknown as TaskCardTask];
+      const created = await createQuickTask(fetch, { orgId, userId: currentUserId, projectId, title, status });
+      if (created?.id) await loadTasks();
     } catch {
-      // ignore — task creation failed silently
+      error = "Failed to create task";
     }
-  }
-
-  // ── tRPC helpers (raw fetch) ──
-  async function trpcQuery<T>(procedure: string, input?: unknown): Promise<T> {
-    const params = input !== undefined ? `?input=${encodeURIComponent(JSON.stringify(input))}` : "";
-    const res = await fetch(`/api/trpc/${procedure}${params}`);
-    if (!res.ok) throw new Error(`tRPC ${procedure} failed: ${res.status}`);
-    const json = (await res.json()) as { result?: { data?: T } };
-    return json.result?.data as T;
-  }
-
-  async function trpcMutation<T>(procedure: string, input: unknown): Promise<T> {
-    const res = await fetch(`/api/trpc/${procedure}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) throw new Error(`tRPC ${procedure} failed: ${res.status}`);
-    const json = (await res.json()) as { result?: { data?: T } };
-    return json.result?.data as T;
-  }
-
-  interface RawTask {
-    id: string;
-    title: string;
-    status: string | null;
-    priority: number | null;
-    points: number | null;
-    parentId: string | null;
-    dependencies: { blocks: string[]; blocked_by: string[] };
-    descriptionText?: string;
   }
 
   async function loadTasks() {
     loading = true;
     error = null;
     try {
-      const tasks = await trpcQuery<RawTask[]>("tasks.list");
-      rawTasks = (tasks ?? []).map(
-        (t): TaskCardTask => ({
-          id: t.id,
-          title: t.title,
-          status: t.status,
-          priority: t.priority,
-          points: t.points,
-          parentId: t.parentId,
-          dependencies: t.dependencies ?? { blocks: [], blocked_by: [] },
-          descriptionText: t.descriptionText,
-          taskType: t.parentId ? "subtask" : "task",
-        })
-      );
+      const tasks = await fetchTaskList(fetch, { orgId, userId: currentUserId, projectId });
+      rawTasks = (tasks ?? []).map(taskCardFromRow);
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to load tasks";
     } finally {
@@ -242,21 +194,32 @@
   async function loadSprints() {
     if (methodology !== "scrum") return;
     try {
-      const sprints = await trpcQuery<Array<{ id: string; name: string }>>(
-        "sprints.list",
-        { orgId: projectId }
-      );
+      const sprints = await listProjectSprints(fetch, { orgId, projectId });
       currentSprints = sprints ?? [];
     } catch {
-      // non-fatal
+      currentSprints = [];
     }
   }
 
-  // ── Init ──
   $effect(() => {
     void loadTasks();
     void loadSprints();
   });
+
+  function taskCardFromRow(task: TaskListRow): TaskCardTask {
+    return {
+      id: task.id,
+      title: task.title,
+      status: task.status,
+      priority: task.priority,
+      points: task.points,
+      parentId: task.parentId,
+      dependencies: { blocks: [], blocked_by: [] },
+      descriptionText: task.descriptionText ?? undefined,
+      assignee: task.assigneeId,
+      taskType: task.parentId ? "subtask" : "task",
+    };
+  }
 </script>
 
 <section data-task-board data-testid="kanban-board" data-project-id={projectId} class="flex h-full flex-col gap-3">
@@ -273,7 +236,6 @@
       My Work
     </label>
 
-    <!-- Type filter (D-112) -->
     <select
       data-type-filter
       bind:value={typeFilter}
@@ -286,7 +248,6 @@
       <option value="bug">⚠ Bugs</option>
     </select>
 
-    <!-- Density toggle (D-13) -->
     <div class="flex rounded-md border border-border overflow-hidden text-xs" role="group" aria-label="Card density">
       <button
         type="button"
@@ -366,7 +327,6 @@
                 {:else if methodology === "kanban"}
                   <span class="text-xs text-muted-foreground">{column.items.length}</span>
                 {/if}
-                <!-- Quick create (D-113) -->
                 <button
                   type="button"
                   data-quick-create={column.id}
@@ -396,7 +356,6 @@
               />
             {/if}
 
-            <!-- DnD zone (D-10) -->
             <div
               data-dnd-zone={column.id}
               class="flex flex-1 flex-col gap-2 overflow-y-auto rounded-md p-1 min-h-24"
@@ -417,15 +376,15 @@
       {/if}
     </div>
 
-    <!-- Sprint planning tray (D-26, D-27) -->
     {#if methodology === "scrum" && showTray && selectedSprintId}
       <SprintPlanningTray
         {projectId}
+        {orgId}
         sprintId={selectedSprintId}
         allTasks={rawTasks}
         onAssign={async (taskId) => {
           if (!selectedSprintId) return;
-          await trpcMutation("sprints.addTask", { sprintId: selectedSprintId, taskId });
+          await assignTaskToSprint(fetch, { orgId, sprintId: selectedSprintId, taskId });
           await loadTasks();
         }}
       />

@@ -73,7 +73,7 @@ export interface WebDoctorConfig {
   /** Is the FULCRUM_FEATURES=desktop-app flag enabled? */
   desktopAppEnabled: boolean;
   /**
-   * Injectable: check whether the Tauri binary exists in src-tauri/target/release/.
+   * Injectable: check whether the Tauri binary exists in the desktop app release directory.
    * Only called when desktopAppEnabled is true.
    */
   checkTauriBinary?: () => Promise<TauriBinaryInfo>;
@@ -114,8 +114,8 @@ async function checkTauriBuild(cfg: WebDoctorConfig): Promise<DoctorWebCheckEntr
       ...cfg,
       checkTauriBinary: async () => {
         const candidates = [
-          "src-tauri/target/release/fulcrum",
-          "src-tauri/target/release/fulcrum.exe",
+          "apps/desktop/src-tauri/target/release/fulcrum",
+          "apps/desktop/src-tauri/target/release/fulcrum.exe",
         ];
         for (const p of candidates) {
           try {

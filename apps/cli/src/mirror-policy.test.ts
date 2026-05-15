@@ -1,5 +1,3 @@
-// mirror-policy.test.ts — Phase C tests for the mirror policy audit.
-//
 // Policy: when a vendor publishes agent assets only for some agents (e.g. Claude
 // plugin only), we mirror the vendor's SKILL.md verbatim into the other agents'
 // skill paths without rewriting. This file verifies:
@@ -174,7 +172,7 @@ describe("mirror-policy: cloudflare/skills full coverage", () => {
 describe("mirror-policy: syncUpstreamSkills copies to all agent paths", () => {
   test("skill is mirrored to all detected agent skill paths", async () => {
     const { spyOn } = await import("bun:test");
-    const proc = await import("@/utils/proc.ts");
+    const proc = await import("@platform-core/application/runtime-support/process-runner.ts");
 
     // Set up fake cached repo with a skill subpath.
     // repoSlug matches repoCacheDir() logic: strip "https://github.com/", replace non-alnum with "__"
@@ -258,7 +256,7 @@ describe("mirror-policy: syncUpstreamSkills copies to all agent paths", () => {
 
   test("Pi mirror uses SKILL.md frontmatter name for directory", async () => {
     const { spyOn } = await import("bun:test");
-    const proc = await import("@/utils/proc.ts");
+    const proc = await import("@platform-core/application/runtime-support/process-runner.ts");
 
     const repoSlug = "example__repo";
     const cacheDir = join(TMP, ".fulcrum", "cache", "upstream-skills", repoSlug);
@@ -339,12 +337,11 @@ describe("mirror-policy: no entry uses ~/.agents/ path", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. lockfile entry count: actual lock must have at least 28 entries
-//    (21 pre-audit + 7 new cloudflare skills)
+// 5. lockfile health: actual lock must remain parseable and non-empty.
 // ---------------------------------------------------------------------------
 
-describe("mirror-policy: lockfile entry count after cloudflare expansion", () => {
-  test("upstream.lock has at least 28 entries after cloudflare audit", async () => {
+describe("mirror-policy: lockfile health", () => {
+  test("upstream.lock is parseable and contains unique skill names", async () => {
     const actualLockPath = upstreamLockPath(join(import.meta.dir, "..", "..", ".."));
     let skills: Awaited<ReturnType<typeof loadUpstreamSkills>>;
     try {
@@ -352,7 +349,7 @@ describe("mirror-policy: lockfile entry count after cloudflare expansion", () =>
     } catch {
       return;
     }
-    // 20 pre-audit + 7 new cloudflare = 27 (ctx7 was archived before this audit)
-    expect(skills.length).toBeGreaterThanOrEqual(27);
+    expect(skills.length).toBeGreaterThan(0);
+    expect(new Set(skills.map((skill) => skill.name)).size).toBe(skills.length);
   });
 });

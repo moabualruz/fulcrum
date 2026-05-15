@@ -9,8 +9,6 @@
  * - Retry on 503 (5xx exponential, max 3).
  * - Dead-letter on 4xx.
  * - Batch size ≤100 events; flush after 30s window.
- *
- * Closes: .scratch/agent-os-vision/17-cross-cutting-platform/issues/16-gated-telemetry-remote.md
  */
 
 import { createHmac } from "node:crypto";

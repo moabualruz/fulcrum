@@ -78,6 +78,54 @@ describe("fulcrum notify CLI", () => {
     expect(payload[0].subjectId).toBe("t1");
   });
 
+  test("notify list requires the configured notification public API when no test caller is injected", async () => {
+    const screen = io();
+    await runNotify(["list", "--json"], {
+      ...screen.opts,
+      env: {},
+      fetch: (async () => {
+        throw new Error("unexpected fetch");
+      }) as unknown as typeof fetch,
+    });
+
+    expect(screen.exits).toEqual([1]);
+    expect(screen.err.join("\n")).toContain("Notification API caller is not configured");
+  });
+
+  test("notify list uses the configured Nest notification API", async () => {
+    const screen = io();
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    await runNotify(["list", "--unread", "--limit", "5", "--json"], {
+      ...screen.opts,
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3000/",
+        FULCRUM_ORG_ID: "org-1",
+        FULCRUM_USER_ID: "user-1",
+      },
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({ url: String(url), init: init ?? {} });
+        return Response.json({
+          data: [{ id: "n-public", subjectKind: "task", subjectId: "task-1", read: false }],
+        });
+      }) as typeof fetch,
+    });
+
+    expect(JSON.parse(screen.out.join("\n"))).toEqual([
+      { id: "n-public", subjectKind: "task", subjectId: "task-1", read: false },
+    ]);
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:3000/api/v1/notifications?orgId=org-1&userId=user-1&unread=true&limit=5",
+        init: {
+          method: "GET",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: undefined,
+        },
+      },
+    ]);
+  });
+
   test("notify mark-read --all calls caller", async () => {
     const screen = io();
     await runNotify(["mark-read", "--all", "--json"], { ...screen.opts, caller: caller() });

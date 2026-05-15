@@ -1,6 +1,21 @@
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
 import type { TuiTask } from "./task-types.ts";
+import type {
+  DependencyRunMode,
+  DependencyRunPreview,
+} from "@execution-orchestration/domain/dependency-run-preview.ts";
+import type { DispatchDependencyRunForTasksOutput } from "@execution-orchestration/application/dependency-run-actions.ts";
+import type { DependencyRunLiveFeedbackOutput } from "@execution-orchestration/application/dependency-run-live-feedback.ts";
+import type {
+  RecordTaskQaReviewInput,
+  TaskQaReviewOutput,
+} from "@execution-orchestration/application/qa-review-actions.ts";
+import type {
+  ManualTaskWorkbenchInput,
+  ManualTaskWorkbenchOutput,
+} from "@work-management/application/manual-task-workbench.ts";
+import type { SubscriptionBridge, TuiSubscription } from "../subscriptions.ts";
 
 export interface TaskListFilters {
   status?: string;
@@ -12,13 +27,45 @@ export interface TaskListScreenOptions {
   caller: {
     tasks: {
       list: () => Promise<TuiTask[]>;
-      bulk: (input: { ids: string[]; status?: string; assignee?: string }) => Promise<{ ok: boolean }>;
+      bulk?: (input: { ids: string[]; status?: string; assignee?: string }) => Promise<{ ok: boolean }>;
+      previewDependencyRun?: (input: {
+        mode: DependencyRunMode;
+        targetTaskIds: string[];
+      }) => Promise<DependencyRunPreview>;
+      dispatchDependencyRun?: (input: {
+        mode: DependencyRunMode;
+        targetTaskIds: string[];
+        agent: string;
+      }) => Promise<DispatchDependencyRunForTasksOutput>;
+      dependencyRunLiveFeedback?: (input: {
+        traceId: string;
+        runGroupId?: string;
+      }) => Promise<DependencyRunLiveFeedbackOutput>;
+      dependencyRunLiveFeedbackStream?: (
+        input: {
+          projectId?: string;
+          traceId: string;
+          runGroupId?: string;
+        },
+      ) => Promise<DependencyRunLiveFeedbackSubscription> | DependencyRunLiveFeedbackSubscription;
+      recordQaReview?: (input: RecordTaskQaReviewInput) => Promise<TaskQaReviewOutput>;
+      manualWorkbench?: (input: ManualTaskWorkbenchInput) => Promise<ManualTaskWorkbenchOutput>;
     };
   };
+  subscriptions?: SubscriptionBridge;
   viewportRows?: number;
+  qaReviewInput?: Omit<RecordTaskQaReviewInput, "taskId">;
 }
 
 type Overlay = "none" | "bulk";
+const DEPENDENCY_RUN_FEEDBACK_EVENT = "tasks.dependencyRunLiveFeedbackStream";
+type DependencyRunLiveFeedbackSubscription = {
+  subscribe(observer: {
+    next(value: DependencyRunLiveFeedbackOutput): void;
+    error?(error: unknown): void;
+    complete?(): void;
+  }): TuiSubscription;
+};
 
 export class TaskListScreen {
   private tasks: TuiTask[] = [];
@@ -29,6 +76,12 @@ export class TaskListScreen {
   private cursor = 0;
   private scrollTop = 0;
   private overlay: Overlay = "none";
+  private runPreview: DependencyRunPreview | null = null;
+  private runDispatch: DispatchDependencyRunForTasksOutput | null = null;
+  private runFeedback: DependencyRunLiveFeedbackOutput | null = null;
+  private qaReview: TaskQaReviewOutput | null = null;
+  private workbench: ManualTaskWorkbenchOutput | null = null;
+  private feedbackSubscription: TuiSubscription | null = null;
 
   constructor(private readonly opts: TaskListScreenOptions) {}
 
@@ -54,17 +107,84 @@ export class TaskListScreen {
         const pointer = index === this.cursor ? c.bold(">") : " ";
         const checked = this.selected.has(task.id) ? "[x]" : "[ ]";
         const labels = task.labels?.length ? ` #${task.labels.join(" #")}` : "";
-        renderer.writeln(`${pointer} ${checked} ${task.title}  [${task.status}]  ${task.assignee ?? "unassigned"}${labels}`);
+        renderer.writeln(`${pointer} ${checked} ${task.title}  [${task.status}]  ${task.id}  ${task.assignee ?? "unassigned"}${labels}`);
       }
     }
 
     renderer.writeln();
-    renderer.writeln(c.dim("  / search  Esc clear  j/k navigate  Space select  B bulk  q back"));
+    renderer.writeln(c.dim("  / search  Esc clear  j/k navigate  Space select  V manual view  R run preview  D dispatch run  F run feedback  Q qa review  B bulk  q back"));
 
     if (this.overlay === "bulk") {
       renderer.writeln();
       renderer.writeln(c.bold("  Bulk update"));
       renderer.writeln(c.dim(`  ${this.selected.size} selected`));
+    }
+
+    if (this.runPreview) {
+      renderer.writeln();
+      renderer.writeln(c.bold("  Dependency run preview"));
+      renderer.writeln(`  Mode: ${this.runPreview.mode}  Trace: ${this.runPreview.traceId ?? "none"}`);
+      renderer.writeln(`  Ordered: ${this.runPreview.orderedTaskIds.join(" -> ") || "none"}`);
+      for (const task of this.runPreview.tasks) {
+        const selected = task.selected ? "selected" : "dependency";
+        const blockers = task.blockers.length ? ` blockers: ${task.blockers.join("; ")}` : "";
+        renderer.writeln(`  - ${task.title} [${task.column}] depth:${task.dependencyDepth} ${selected}${blockers}`);
+      }
+      for (const warning of this.runPreview.warnings) renderer.writeln(c.yellow(`  ! ${warning}`));
+      if (this.runPreview.blocked) renderer.writeln(c.red("  Blocked until warnings are resolved."));
+    }
+
+    if (this.workbench) {
+      renderer.writeln();
+      renderer.writeln(c.bold("  manual task workbench"));
+      renderer.writeln(`  Layout: ${this.workbench.layout}  Trace: ${this.workbench.traceId ?? "none"}  Filters: ${this.workbench.filtersApplied}`);
+      for (const column of this.workbench.columns) {
+        renderer.writeln(`  - ${column.label}  ${column.count}`);
+      }
+      for (const row of this.workbench.listRows.slice(0, 5)) {
+        renderer.writeln(`  * ${row.title} [${row.stateLabel}] ${row.cycleId ?? "no-cycle"} ${row.moduleId ?? "no-module"}`);
+      }
+    }
+
+    if (this.runDispatch) {
+      renderer.writeln();
+      renderer.writeln(c.bold("  Dependency run dispatched"));
+      renderer.writeln(`  Group: ${this.runDispatch.runGroupId}`);
+      for (const run of this.runDispatch.scheduledRuns) {
+        renderer.writeln(`  - run ${run.id} task:${run.taskId} agent:${run.agent} status:${run.status}`);
+      }
+      for (const skipped of this.runDispatch.skippedTasks) {
+        renderer.writeln(c.dim(`  - skipped ${skipped.title} [${skipped.column}]: ${skipped.reason}`));
+      }
+      for (const warning of this.runDispatch.warnings) renderer.writeln(c.yellow(`  ! ${warning}`));
+    }
+
+    if (this.runFeedback) {
+      const status = this.runFeedback.executorStatus;
+      renderer.writeln();
+      renderer.writeln(c.bold("  Dependency run feedback"));
+      renderer.writeln(`  Trace: ${this.runFeedback.traceId}`);
+      renderer.writeln(`  Queued: ${status.queuedTaskCount}  Running: ${status.runningTaskCount}  Succeeded: ${status.succeededTaskCount}  Failed: ${status.failedTaskCount}`);
+      for (const run of this.runFeedback.runs.slice(0, 5)) {
+        renderer.writeln(`  - ${run.queuePosition}. ${run.id} task:${run.taskId ?? "none"} status:${run.status}`);
+      }
+      for (const event of this.runFeedback.events.slice(-5)) {
+        renderer.writeln(`  * ${event.summary}${event.output ? ` — ${event.output}` : ""}`);
+      }
+    }
+
+    if (this.qaReview) {
+      renderer.writeln();
+      renderer.writeln(c.bold("  QA review recorded"));
+      renderer.writeln(`  Verdict: ${this.qaReview.verdict}`);
+      renderer.writeln(`  Next: ${this.qaReview.nextAction}`);
+      for (const criterion of this.qaReview.successCriteria) {
+        renderer.writeln(`  - ${criterion.text}`);
+      }
+      if (this.qaReview.feedbackRun) {
+        const run = this.qaReview.feedbackRun;
+        renderer.writeln(`  - feedback ${run.id} task:${run.taskId} agent:${run.agent} status:${run.status}`);
+      }
     }
   }
 
@@ -129,6 +249,65 @@ export class TaskListScreen {
       return true;
     }
 
+    if (key === "R" || key === "r") {
+      const preview = this.opts.caller.tasks.previewDependencyRun;
+      if (!preview) return false;
+      const targetTaskIds = this.previewTargetIds();
+      if (targetTaskIds.length === 0) return false;
+      this.runPreview = await preview({
+        mode: targetTaskIds.length > 1 ? "board" : "task",
+        targetTaskIds,
+      });
+      return true;
+    }
+
+    if (key === "D" || key === "d") {
+      const dispatch = this.opts.caller.tasks.dispatchDependencyRun;
+      if (!dispatch) return false;
+      const targetTaskIds = this.previewTargetIds();
+      if (targetTaskIds.length === 0) return false;
+      this.clearFeedbackSubscription();
+      this.runFeedback = null;
+      this.runDispatch = await dispatch({
+        mode: targetTaskIds.length > 1 ? "board" : "task",
+        targetTaskIds,
+        agent: "codex",
+      });
+      this.runPreview = this.runDispatch.preview;
+      return true;
+    }
+
+    if (key === "F" || key === "f") {
+      const loadFeedback = this.opts.caller.tasks.dependencyRunLiveFeedback;
+      if (!loadFeedback) return false;
+      const traceId = this.runDispatch?.runGroupId ?? this.runPreview?.traceId;
+      if (!traceId) return false;
+      const feedbackInput = { traceId, runGroupId: traceId };
+      this.runFeedback = await loadFeedback(feedbackInput);
+      await this.subscribeToFeedback({ ...feedbackInput, projectId: this.runFeedback.projectId });
+      return true;
+    }
+
+    if (key === "Q") {
+      const recordQaReview = this.opts.caller.tasks.recordQaReview;
+      const qaReviewInput = this.opts.qaReviewInput;
+      if (!recordQaReview || !qaReviewInput) return false;
+      const targetTaskId = this.previewTargetIds()[0];
+      if (!targetTaskId) return false;
+      this.qaReview = await recordQaReview({
+        taskId: targetTaskId,
+        ...qaReviewInput,
+      });
+      return true;
+    }
+
+    if (key === "V" || key === "v") {
+      const manualWorkbench = this.opts.caller.tasks.manualWorkbench;
+      if (!manualWorkbench) return false;
+      this.workbench = await manualWorkbench({ viewMode: "board" });
+      return true;
+    }
+
     return false;
   }
 
@@ -142,6 +321,7 @@ export class TaskListScreen {
   async submitBulkStatus(status: string): Promise<void> {
     const ids = [...this.selected];
     if (ids.length === 0) return;
+    if (!this.opts.caller.tasks.bulk) return;
     await this.opts.caller.tasks.bulk({ ids, status });
     this.tasks = this.tasks.map((task) => (this.selected.has(task.id) ? { ...task, status } : task));
     this.selected.clear();
@@ -155,6 +335,10 @@ export class TaskListScreen {
 
   get selectedTaskIds(): string[] {
     return [...this.selected];
+  }
+
+  dispose(): void {
+    this.clearFeedbackSubscription();
   }
 
   private get filteredTasks(): TuiTask[] {
@@ -183,6 +367,13 @@ export class TaskListScreen {
     ].filter((chip): chip is string => Boolean(chip));
   }
 
+  private previewTargetIds(): string[] {
+    const selected = [...this.selected];
+    if (selected.length > 0) return selected;
+    const task = this.filteredTasks[this.cursor];
+    return task ? [task.id] : [];
+  }
+
   private clampCursor(): void {
     this.cursor = Math.min(this.cursor, Math.max(0, this.filteredTasks.length - 1));
     this.keepCursorVisible();
@@ -192,5 +383,42 @@ export class TaskListScreen {
     const rows = this.opts.viewportRows ?? 20;
     if (this.cursor < this.scrollTop) this.scrollTop = this.cursor;
     if (this.cursor >= this.scrollTop + rows) this.scrollTop = this.cursor - rows + 1;
+  }
+
+  private async subscribeToFeedback(input: { projectId?: string; traceId: string; runGroupId?: string }): Promise<void> {
+    if (!this.runFeedback) return;
+    this.clearFeedbackSubscription();
+    const stream = this.opts.caller.tasks.dependencyRunLiveFeedbackStream;
+    if (stream) {
+      const feedbackStream = await stream(input);
+      let inactiveDuringSubscribe = false;
+      const subscription = feedbackStream.subscribe({
+        next: (payload) => {
+          this.applyFeedbackUpdate(payload);
+          if (!payload.executorStatus.active) inactiveDuringSubscribe = true;
+        },
+        error: () => this.clearFeedbackSubscription(),
+        complete: () => this.clearFeedbackSubscription(),
+      });
+      this.feedbackSubscription = subscription;
+      if (inactiveDuringSubscribe) this.clearFeedbackSubscription();
+      return;
+    }
+    if (!this.opts.subscriptions) return;
+    this.feedbackSubscription = this.opts.subscriptions.subscribe<DependencyRunLiveFeedbackOutput>(
+      DEPENDENCY_RUN_FEEDBACK_EVENT,
+      (payload) => this.applyFeedbackUpdate(payload),
+    );
+  }
+
+  private clearFeedbackSubscription(): void {
+    this.feedbackSubscription?.unsubscribe();
+    this.feedbackSubscription = null;
+  }
+
+  private applyFeedbackUpdate(payload: DependencyRunLiveFeedbackOutput): void {
+    if (payload.traceId !== this.runFeedback?.traceId) return;
+    this.runFeedback = payload;
+    if (!payload.executorStatus.active) this.clearFeedbackSubscription();
   }
 }

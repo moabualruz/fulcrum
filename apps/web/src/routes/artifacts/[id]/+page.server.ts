@@ -1,9 +1,9 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { requestAppScope } from "$lib/server/application-scope";
-import { deleteArtifactForWeb } from "@/application/artifacts/commands.ts";
-import { getArtifactDetail } from "@/application/artifacts/queries.ts";
-import { AppValidationError } from "@/application/errors.ts";
+import { deleteArtifactForWeb } from "@workflow-coordination/application/artifacts/commands.ts";
+import { getArtifactDetail } from "@workflow-coordination/application/artifacts/queries.ts";
+import { AppValidationError } from "@platform-core/domain/errors.ts";
 
 export const load: PageServerLoad = ({ params, locals }) => {
   return {

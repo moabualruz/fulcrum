@@ -36,9 +36,9 @@
 
 ## Cross-context coupling
 
-- Reads `AGENTS` from `src/agents/`.
-- Drives `src/components/` planner/executor for install, remove, enable, disable.
-- Calls `src/utils/` for io and process helpers.
+- Reads `AGENTS` from `services/execution-orchestration/src/application/agent-catalog/`.
+- Drives `services/platform-core/src/application/component-lifecycle/` planner/executor for install, remove, enable, disable.
+- Calls platform runtime-support helpers for process execution and source cleanup.
 
 ## ADRs
 

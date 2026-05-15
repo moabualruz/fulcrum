@@ -13,7 +13,7 @@ import {
   upsertTenantSetting,
   createCredential,
   listConnectorRuns,
-} from "@/application/legacy/web-runtime.ts";
+} from "@platform-core/application/legacy/web-runtime.ts";
 import { actionOk } from "$lib/feedback/action-result";
 
 function isConnectorLinearEnabled(): boolean {

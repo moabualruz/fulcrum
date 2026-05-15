@@ -1,5 +1,5 @@
 /**
- * yjs-server.test.ts — TDD tests for Yjs WebSocket server (Plan 05-13).
+ * yjs-server.test.ts — TDD tests for Yjs WebSocket server (workflow milestone).
  *
  * Tests:
  * - Auth rejection: WebSocket without valid session -> close 4401
@@ -20,7 +20,7 @@ const mockEm = {
   fork: vi.fn().mockReturnThis(),
 };
 
-vi.mock("../db/entities/tasks/YjsSnapshot.ts", () => ({
+vi.mock("@platform-core/infrastructure/application-database/entities/tasks/YjsSnapshot.ts", () => ({
   YjsSnapshot: class YjsSnapshot {
     docName!: string;
     state!: Buffer;

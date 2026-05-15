@@ -1,34 +1,26 @@
 <script lang="ts">
   /**
-   * SearchPage — Plan 06-09 (SRC-05, SRC-06, D-17, D-18)
-   *
    * Full search page: left panel (facets 240px) + right panel (results flex-1).
-   * Dual-layer: Orama client-side for instant results + tRPC search.query for authoritative.
-   * Facet groups: Kind, Project, Status — from search.query facets response.
+   * Facet groups: Kind, Project, Status.
    * Tabs: All / Docs / Tasks / Memories / Runs / Artifacts.
-   * Saved searches: bookmark icon → savedSearches.create.
-   *
-   * T-06-19: Orama index org-scoped; tRPC queries org-scoped.
+   * Saved searches: bookmark icon creates a public API saved search.
    */
   import { onMount } from "svelte";
   import FacetChip from "./FacetChip.svelte";
   import SavedSearchRow from "./SavedSearchRow.svelte";
+  import {
+    buildSearchFacets,
+    filterSearchResults,
+    highlightedSegments,
+    normalizeSearchHit,
+    searchPublicApiHeaders,
+    searchPublicApiPath,
+    type NormalizedSearchResult,
+  } from "./in-context-search";
 
   // ── Types ──────────────────────────────────────────────────────────────────
 
-  interface SearchResult {
-    id: string;
-    entityKind: string;
-    entityId: string;
-    title: string | null;
-    body: string | null;
-    labels: string[] | null;
-    metadata: Record<string, unknown> | null;
-    projectId: string | null;
-    status: string | null;
-    rank: number;
-    snippet: string;
-  }
+  type SearchResult = NormalizedSearchResult;
 
   interface SearchFacets {
     [group: string]: Record<string, number>;
@@ -47,6 +39,19 @@
     queryJson?: Record<string, unknown>;
   }
 
+  interface SavedSearchRow {
+    id: string;
+    name: string;
+    query_json?: string | Record<string, unknown>;
+  }
+
+  interface Props {
+    orgId?: string | null;
+    userId?: string | null;
+    projectId?: string | null;
+    apiToken?: string | null;
+  }
+
   type Tab = "all" | "doc" | "task" | "memory" | "run" | "artifact";
 
   const TABS: { id: Tab; label: string }[] = [
@@ -57,6 +62,13 @@
     { id: "run", label: "Runs" },
     { id: "artifact", label: "Artifacts" },
   ];
+
+  let {
+    orgId = null,
+    userId = null,
+    projectId = null,
+    apiToken = null,
+  }: Props = $props();
 
   // ── State ──────────────────────────────────────────────────────────────────
 
@@ -86,37 +98,71 @@
   ]);
 
   const visibleResults = $derived(
-    activeTab === "all"
-      ? results
-      : results.filter((r) => r.entityKind === activeTab),
+    filterSearchResults(
+      activeTab === "all"
+        ? results
+        : results.filter((r) => r.entityKind === activeTab),
+      { statuses: activeFilters.statuses },
+    ),
   );
+
+  function normalizeSavedSearch(row: SavedSearchRow): SavedSearch {
+    const queryJson = typeof row.query_json === "string"
+      ? parseJsonObject(row.query_json)
+      : row.query_json;
+    return {
+      id: row.id,
+      name: row.name,
+      ...(queryJson ? { queryJson } : {}),
+    };
+  }
+
+  function parseJsonObject(value: string): Record<string, unknown> | undefined {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed as Record<string, unknown>
+        : undefined;
+    } catch {
+      return undefined;
+    }
+  }
 
   // ── Search ─────────────────────────────────────────────────────────────────
 
   async function runServerSearch(): Promise<void> {
+    const trimmed = term.trim();
+    if (!trimmed) {
+      results = [];
+      facets = {};
+      total = 0;
+      loading = false;
+      error = "";
+      return;
+    }
     loading = true;
     error = "";
     try {
-      const input = {
-        term,
-        filters: {
-          kinds: activeFilters.kinds.length ? activeFilters.kinds : undefined,
-          projectIds: activeFilters.projectIds.length ? activeFilters.projectIds : undefined,
-          statuses: activeFilters.statuses.length ? activeFilters.statuses : undefined,
-          dateRange: activeFilters.dateRange,
-        },
-        facets: true,
-        limit: 50,
-        offset: 0,
+      const params: Record<string, string> = {
+        q: trimmed,
+        limit: "50",
       };
-      const qs = encodeURIComponent(JSON.stringify(input));
-      const res = await fetch(`/api/trpc/search.query?input=${qs}`);
-      if (!res.ok) throw new Error(`search.query failed: ${res.status}`);
-      const payload = await res.json();
-      const data = payload?.result?.data?.json ?? payload?.result?.data ?? payload;
-      results = data?.results ?? [];
-      total = data?.total ?? 0;
-      facets = data?.facets ?? {};
+      if (!orgId) throw new Error("Search scope is required.");
+      params.org_id = orgId;
+      const firstProjectId = activeFilters.projectIds[0] ?? projectId;
+      if (firstProjectId) params.project_id = firstProjectId;
+      if (activeFilters.kinds.length > 0) params.kind = activeFilters.kinds.join(",");
+      const res = await fetch(searchPublicApiPath("/api/v1/search", params), {
+        method: "GET",
+        credentials: "include",
+        headers: searchPublicApiHeaders(apiToken),
+      });
+      if (!res.ok) throw new Error(`Search failed: ${res.status}`);
+      const data = await res.json();
+      const nextResults = Array.isArray(data) ? data.map(normalizeSearchHit) : [];
+      results = nextResults;
+      total = filterSearchResults(nextResults, { statuses: activeFilters.statuses }).length;
+      facets = buildSearchFacets(nextResults);
     } catch (cause) {
       error = cause instanceof Error ? cause.message : "Search failed";
     } finally {
@@ -186,13 +232,17 @@
 
   async function loadSavedSearches(): Promise<void> {
     try {
-      const res = await fetch("/api/trpc/savedSearches.list?input={}");
+      if (!orgId || !userId) return;
+      const res = await fetch(searchPublicApiPath("/api/v1/search/saved", { org_id: orgId, user_id: userId }), {
+        method: "GET",
+        credentials: "include",
+        headers: searchPublicApiHeaders(apiToken),
+      });
       if (!res.ok) return;
-      const payload = await res.json();
-      const data = payload?.result?.data?.json ?? payload?.result?.data ?? payload;
-      savedSearches = Array.isArray(data) ? data : [];
+      const data = await res.json();
+      savedSearches = Array.isArray(data) ? data.map(normalizeSavedSearch) : [];
     } catch {
-      // non-critical — ignore
+      // Non-critical; search remains usable without saved rows.
     }
   }
 
@@ -202,17 +252,22 @@
     savingSearch = true;
     saveError = "";
     try {
-      const res = await fetch("/api/trpc/savedSearches.create", {
+      if (!orgId || !userId) throw new Error("Saved search scope is required.");
+      const res = await fetch("/api/v1/search/saved", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        credentials: "include",
+        headers: searchPublicApiHeaders(apiToken),
         body: JSON.stringify({
+          org_id: orgId,
+          user_id: userId,
           name,
-          queryJson: { term, filters: activeFilters },
+          query_json: { term, filters: activeFilters },
+          scope: "private",
+          ...(projectId ? { project_id: projectId } : {}),
         }),
       });
       if (!res.ok) throw new Error(`Create failed: ${res.status}`);
-      const payload = await res.json();
-      const created = payload?.result?.data?.json ?? payload?.result?.data ?? payload;
+      const created = normalizeSavedSearch(await res.json());
       if (created?.id) savedSearches = [...savedSearches, created];
     } catch (cause) {
       saveError = cause instanceof Error ? cause.message : "Save failed";
@@ -237,17 +292,6 @@
   onMount(() => {
     void loadSavedSearches();
   });
-
-  // ── Highlight helper ───────────────────────────────────────────────────────
-
-  function highlight(text: string, q: string): string {
-    if (!q.trim()) return text;
-    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return text.replace(
-      new RegExp(`(${escaped})`, "gi"),
-      '<mark class="text-primary bg-transparent font-medium">$1</mark>',
-    );
-  }
 
   function formatTimestamp(val: unknown): string {
     if (!val) return "";
@@ -275,6 +319,9 @@
           {#each savedSearches as s (s.id)}
             <SavedSearchRow
               search={s}
+              orgId={orgId}
+              userId={userId}
+              apiToken={apiToken}
               onLoad={loadSavedSearch}
               onDeleted={onSearchDeleted}
             />
@@ -476,14 +523,30 @@
                 <div class="flex items-center gap-2 mb-0.5">
                   <span
                     class="text-[14px] font-semibold leading-snug text-foreground truncate"
-                  >{@html highlight(result.title ?? result.entityId, term)}</span>
+                  >
+                    {#each highlightedSegments(result.title ?? result.entityId, term) as segment}
+                      {#if segment.match}
+                        <mark class="text-primary bg-transparent font-medium">{segment.text}</mark>
+                      {:else}
+                        {segment.text}
+                      {/if}
+                    {/each}
+                  </span>
                   <span class="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-secondary text-secondary-foreground border border-border">
                     {result.entityKind}
                   </span>
                 </div>
                 <p
                   class="text-[14px] font-normal text-muted-foreground truncate"
-                >{@html highlight(result.snippet || (result.body ?? ""), term)}</p>
+                >
+                  {#each highlightedSegments(result.snippet || (result.body ?? ""), term) as segment}
+                    {#if segment.match}
+                      <mark class="text-primary bg-transparent font-medium">{segment.text}</mark>
+                    {:else}
+                      {segment.text}
+                    {/if}
+                  {/each}
+                </p>
               </div>
               <span class="shrink-0 text-xs text-muted-foreground mt-0.5">
                 {formatTimestamp(result.metadata?.["updatedAt"] ?? result.metadata?.["createdAt"])}

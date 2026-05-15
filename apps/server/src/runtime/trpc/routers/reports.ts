@@ -1,7 +1,7 @@
 /**
- * reportsRouter — Plan 05-05.
+ * reportsRouter — workflow milestone.
  *
- * Exposes all ReportService analytics methods as tRPC queries + CSV export mutation.
+ * Exposes all WorkMetricsService analytics methods as tRPC queries + CSV export mutation.
  * Replaces legacy raw SQL reports page with tRPC-backed service (D-33, D-53, D-54, D-55).
  *
  * Workspace scope supported end-to-end (HIGH-01, D-53, D-95).
@@ -11,7 +11,7 @@
  * - All queries use permissionedProcedure with reports resource (T-05-11)
  * - orgId sourced from auth context, never from client input
  *
- * Note: Do NOT modify apps/server/src/trpc/router.ts — Plan 06 owns that wire-up (HIGH-06).
+ * Note: Do NOT modify apps/server/src/trpc/router.ts — workflow milestone owns that wire-up (HIGH-06).
  */
 
 import { TRPCError } from "@trpc/server";
@@ -31,7 +31,7 @@ import {
   getVelocityReport,
   getWipOverTimeReport,
   getWorkloadReport,
-} from "@/application/reports/queries.ts";
+} from "@work-management/application/reports/queries.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 import type { EntityManager } from "@mikro-orm/postgresql";

@@ -1,6 +1,6 @@
 import { Engine, type TopLevelCondition } from "json-rules-engine";
 
-import { initDefaultRoutingRuleRepository } from "@/application/routing.ts";
+import { initDefaultRoutingRuleRepository } from "@execution-orchestration/application/routing.ts";
 import type { TaskFacts } from "./types.ts";
 import { RoutingEventBus, routingEventBus } from "./event-bus.ts";
 

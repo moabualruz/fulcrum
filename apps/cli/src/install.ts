@@ -26,10 +26,10 @@
 import { mkdir, readFile, writeFile, copyFile, readdir, stat, appendFile, mkdtemp, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { which, run as runProc } from "@/utils/proc.ts";
-import { pruneSourceBackupFiles } from "@/utils/source-clean.ts";
-import { AGENTS } from "@/agents/registry.ts";
-import { patchJsonOwnedKey, patchTomlOwnedKey } from "@/utils/config-patcher.ts";
+import { which, run as runProc } from "@platform-core/application/runtime-support/process-runner.ts";
+import { pruneSourceBackupFiles } from "@platform-core/application/runtime-support/source-backup-pruner.ts";
+import { AGENTS } from "@execution-orchestration/application/agent-catalog/registry.ts";
+import { patchJsonOwnedKey, patchTomlOwnedKey } from "@platform-core/application/runtime-support/configuration-patcher.ts";
 import { FULCRUM_RULES_BEGIN as BEGIN, FULCRUM_RULES_END as END, replaceSentinelBlock } from "./vendor-rules.ts";
 
 // ---------------------------------------------------------------------------
@@ -893,8 +893,8 @@ export async function run(args: string[]): Promise<void> {
   }
 
   console.log(`2/4  Installing component profile ${target}`);
-  const { planComponentOperation } = await import("@/components/planner.ts");
-  const { executeComponentPlan } = await import("@/components/executor.ts");
+  const { planComponentOperation } = await import("@platform-core/application/component-lifecycle/planner.ts");
+  const { executeComponentPlan } = await import("@platform-core/application/component-lifecycle/executor.ts");
   const plan = planComponentOperation({
     operation: "install",
     target,

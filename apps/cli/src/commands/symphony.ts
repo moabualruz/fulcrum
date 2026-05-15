@@ -2,14 +2,17 @@
  * fulcrum symphony — orchestration CLI commands.
  */
 
-import { TRPCError } from "@trpc/server";
-import type { Container } from "@needle-di/core";
+import {
+  createAgentRunApiCallerFromEnv,
+  type AgentRunApiEnvironment,
+} from "@execution-orchestration/interface/http/agent-run-api-client.ts";
+import { formatCommandError } from "../api-errors.ts";
 
-import { DEFAULT_ORG_ID } from "@/db/seed.ts";
+import { DEFAULT_ORG_ID } from "@platform-core/application/tenancy/defaults.ts";
 import type {
   AgentRunIssue,
   CandidateIssue,
-} from "@/orchestration/symphony/tracker.ts";
+} from "@execution-orchestration/infrastructure/agent-runtime/symphony/tracker.ts";
 
 export interface SymphonyCaller {
   orchestration: {
@@ -44,7 +47,8 @@ export interface SymphonyCaller {
 
 export interface SymphonyRunOptions {
   caller?: SymphonyCaller;
-  container?: Container | null;
+  env?: AgentRunApiEnvironment;
+  fetch?: typeof fetch;
   orgId?: string;
   userId?: string;
   print?: (line: string) => void;
@@ -131,7 +135,7 @@ async function runConformance(
       "orchestrator.ts", "tracker.ts", "hooks.ts",
       "workspace.ts", "prompt.ts", "retry.ts",
     ] as const;
-    const symphonyDir = "src/orchestration/symphony";
+    const symphonyDir = "services/execution-orchestration/src/infrastructure/agent-runtime/symphony";
     const exports: Record<string, string[]> = {};
     for (const file of coreFiles) {
       const filePath = join(root, symphonyDir, file);
@@ -210,9 +214,8 @@ async function runRunsShow(
     return;
   }
 
-  const caller = await resolveCaller(opts);
-
   try {
+    const caller = await resolveCaller(opts);
     if (!caller.orchestration.getRun && caller.orchestration.getWorkspacePath) {
       const row = await caller.orchestration.getWorkspacePath({
         orgId: opts.orgId ?? DEFAULT_ORG_ID,
@@ -266,9 +269,7 @@ async function runRunsShow(
       print(excerpt(row.renderedPrompt));
     }
   } catch (err) {
-    const msg = err instanceof TRPCError
-      ? `${err.code}: ${err.message}`
-      : `Error: ${(err as Error).message}`;
+    const msg = formatCommandError(err);
     printErr(`fulcrum symphony runs show: ${msg}`);
     exit(1);
   }
@@ -290,9 +291,8 @@ async function runRunsList(
     return;
   }
 
-  const caller = await resolveCaller(opts);
-
   try {
+    const caller = await resolveCaller(opts);
     if (state !== "ready") {
       if (!caller.orchestration.fetchIssuesByStates) {
         throw new Error("orchestration.fetchIssuesByStates is unavailable");
@@ -334,9 +334,7 @@ async function runRunsList(
       );
     }
   } catch (err) {
-    const msg = err instanceof TRPCError
-      ? `${err.code}: ${err.message}`
-      : `Error: ${(err as Error).message}`;
+    const msg = formatCommandError(err);
     printErr(`fulcrum symphony runs list: ${msg}`);
     exit(1);
   }
@@ -345,42 +343,11 @@ async function runRunsList(
 async function resolveCaller(opts: SymphonyRunOptions): Promise<SymphonyCaller> {
   if (opts.caller) return opts.caller;
 
-  const { t } = await import("@fulcrum/server/trpc/trpc.ts");
-  const { appRouter } = await import("@fulcrum/server/trpc/router.ts");
-  const { createContext } = await import("@fulcrum/server/trpc/context.ts");
-  const { buildCliTuiCallerContext } = await import("@/application/cli-tui/caller-context.ts");
-
-  const container = opts.container ?? null;
-  const cliContext = buildCliTuiCallerContext(container);
-  const orgId = opts.orgId ?? DEFAULT_ORG_ID;
-  const userId = opts.userId ?? "admin-local-user";
-  const factory = t.createCallerFactory(appRouter);
-
-  return factory(
-    createContext({
-      session: localCliSession(orgId, userId) as never,
-      orgId,
-      userId,
-      em: cliContext.em,
-      container: cliContext.container,
-    }),
-  ) as unknown as SymphonyCaller;
-}
-
-function localCliSession(orgId: string, userId: string) {
-  const now = new Date();
-  return {
-    id: "cli-local-session",
-    userId,
-    orgId,
-    activeOrganizationId: orgId,
-    expiresAt: new Date(now.getTime() + 86_400_000),
-    createdAt: now,
-    updatedAt: now,
-    token: "cli-local-session",
-    ipAddress: null,
-    userAgent: "fulcrum-cli",
-  };
+  const apiCaller = createAgentRunApiCallerFromEnv(opts.env, opts.fetch);
+  if (apiCaller) return apiCaller as unknown as SymphonyCaller;
+  throw new Error(
+    "Agent-run API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL and FULCRUM_ORG_ID.",
+  );
 }
 
 function readFlag(argv: readonly string[], flag: string): string | undefined {
@@ -422,7 +389,7 @@ async function runConnector(
   }
 
   const { createLinearTrackerAdapter } = await import(
-    "@/orchestration/symphony/linear-tracker.ts"
+    "@execution-orchestration/infrastructure/agent-runtime/symphony/linear-tracker.ts"
   );
   const adapter = createLinearTrackerAdapter();
 

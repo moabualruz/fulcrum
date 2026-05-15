@@ -1,20 +1,10 @@
 <script lang="ts">
-  /**
-   * PortfolioTable.svelte — Portfolio-level project table (Plan 05-13, D-93).
-   *
-   * Shows all projects with: name, progress %, active sprint, overdue count, health status.
-   * Health = green/amber/red based on velocity trend.
-   * Data sourced from trpc.reports.progressRollup (workspace scope, D-94, D-95).
-   */
-
   interface ProjectRow {
     id: string;
     name: string;
-    /** 0–100 */
     progressPct: number;
     activeSprint?: string | null;
     overdueCount: number;
-    /** "green" | "amber" | "red" */
     health: "green" | "amber" | "red";
     totalTasks: number;
     completedTasks: number;

@@ -1,8 +1,8 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { addProjectRepo, linkProjectRepoToProject } from "@/application/repos/commands.ts";
-import { listProjectRepoCards } from "@/application/repos/queries.ts";
-import { getProjectOrNull } from "@/application/projects/queries.ts";
+import { addProjectRepo, linkProjectRepoToProject } from "@integration-hub/application/repos/commands.ts";
+import { listProjectRepoCards } from "@integration-hub/application/repos/queries.ts";
+import { getProjectOrNull } from "@work-management/application/projects/queries.ts";
 import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = async ({ params, locals }) => {

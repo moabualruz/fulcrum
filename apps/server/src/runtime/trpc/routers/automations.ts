@@ -1,5 +1,5 @@
 /**
- * automationsRouter — Phase 05 Plan 06
+ * automationsRouter — task workflow
  *
  * tRPC adapter for automation CRUD + predefined templates.
  *
@@ -16,14 +16,14 @@ import {
   deleteAutomation,
   updateAutomation,
   type AutomationCondition,
-} from "@/application/automations/commands.ts";
+} from "@work-management/application/automations/commands.ts";
 import {
   getAutomationTemplates,
   listAutomations,
   type AutomationAppContext,
-} from "@/application/automations/queries.ts";
-import { appErrorToTrpcError } from "@/application/error-mapping.ts";
-import { AppError } from "@/application/errors.ts";
+} from "@work-management/application/automations/queries.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 

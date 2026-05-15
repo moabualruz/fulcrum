@@ -1,6 +1,6 @@
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
-import { getAgentProfilePageData } from "@/application/agents/queries.ts";
+import { getAgentProfilePageData } from "@execution-orchestration/application/agents/queries.ts";
 import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = ({ params, locals }) => {

@@ -36,8 +36,14 @@ export interface BulkMutationInput {
 }
 
 export interface BulkMutationRequest {
-  procedure: "tasks.bulkUpdate" | "tasks.bulkDelete";
-  input: { ids: string[]; patch?: Record<string, unknown> };
+  kind: "update" | "delete" | "assignSprint";
+  input: { ids: string[]; patch?: Record<string, unknown>; sprintId?: string };
+}
+
+export interface BulkMutationScope {
+  orgId?: string;
+  userId?: string;
+  projectId?: string | null;
 }
 
 function taskValue(task: TaskViewRow, column: string): string | number {
@@ -135,23 +141,30 @@ export function nextTaskSelection(input: TaskSelectionInput): TaskSelectionState
 
 export function buildBulkMutationRequest(input: BulkMutationInput): BulkMutationRequest {
   const ids = [...input.ids];
-  if (input.action === "delete") return { procedure: "tasks.bulkDelete", input: { ids } };
+  if (input.action === "delete") return { kind: "delete", input: { ids } };
   if (input.action === "move") {
     const value = input.value as { projectId?: string | null; sprintId?: string | null };
+    if (value.sprintId) return { kind: "assignSprint", input: { ids, sprintId: value.sprintId } };
     return {
-      procedure: "tasks.bulkUpdate",
+      kind: "update",
       input: { ids, patch: { projectId: value.projectId ?? null, sprintId: value.sprintId ?? null } },
     };
   }
   if (input.action === "sprint") {
     return {
-      procedure: "tasks.bulkUpdate",
-      input: { ids, patch: { sprintId: input.value } },
+      kind: "assignSprint",
+      input: { ids, sprintId: String(input.value) },
+    };
+  }
+  if (input.action === "assignee") {
+    return {
+      kind: "update",
+      input: { ids, patch: { assigneeId: String(input.value) } },
     };
   }
 
   return {
-    procedure: "tasks.bulkUpdate",
+    kind: "update",
     input: { ids, patch: { [input.action]: input.value } },
   };
 }
@@ -159,14 +172,150 @@ export function buildBulkMutationRequest(input: BulkMutationInput): BulkMutation
 export async function submitBulkTaskMutation(
   fetchFn: typeof fetch,
   request: BulkMutationRequest,
+  scope: BulkMutationScope,
 ): Promise<unknown> {
-  const response = await fetchFn(`/api/trpc/${request.procedure}`, {
+  const scoped = requireBulkScope(scope);
+  const results: unknown[] = [];
+  for (const taskId of request.input.ids) {
+    if (request.kind === "delete") {
+      results.push(await deleteTask(fetchFn, scoped, taskId));
+    } else if (request.kind === "assignSprint") {
+      results.push(await assignTaskToSprint(fetchFn, scoped, taskId, request.input.sprintId));
+    } else {
+      results.push(await updateTask(fetchFn, scoped, taskId, request.input.patch ?? {}));
+    }
+  }
+  return results;
+}
+
+async function updateTask(
+  fetchFn: typeof fetch,
+  scope: Required<BulkMutationScope>,
+  taskId: string,
+  patch: Record<string, unknown>,
+): Promise<unknown> {
+  const response = await fetchFn(`/api/v1/tasks/${encodeURIComponent(taskId)}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(compact({
+      orgId: scope.orgId,
+      userId: scope.userId,
+      projectId: scope.projectId,
+      ...patch,
+    })),
+  });
+  return await parsePublicResponse(response);
+}
+
+async function deleteTask(
+  fetchFn: typeof fetch,
+  scope: Required<BulkMutationScope>,
+  taskId: string,
+): Promise<unknown> {
+  const query = new URLSearchParams(queryValues({
+    orgId: scope.orgId,
+    userId: scope.userId,
+    projectId: scope.projectId,
+  }));
+  const response = await fetchFn(`/api/v1/tasks/${encodeURIComponent(taskId)}?${query.toString()}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+  });
+  return await parsePublicResponse(response);
+}
+
+export async function submitBulkTaskCustomFieldPatch(
+  fetchFn: typeof fetch,
+  taskIds: readonly string[],
+  values: Record<string, unknown>,
+  scope: BulkMutationScope,
+): Promise<unknown[]> {
+  const scoped = requireBulkScope(scope);
+  const results: unknown[] = [];
+  for (const taskId of taskIds) {
+    for (const [fieldId, value] of Object.entries(values)) {
+      results.push(await setTaskCustomField(fetchFn, scoped, taskId, fieldId, value));
+    }
+  }
+  return results;
+}
+
+async function setTaskCustomField(
+  fetchFn: typeof fetch,
+  scope: Required<BulkMutationScope>,
+  taskId: string,
+  fieldId: string,
+  value: unknown,
+): Promise<unknown> {
+  const response = await fetchFn("/api/v1/task-custom-fields/set", {
     method: "POST",
     credentials: "include",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ json: request.input }),
+    body: JSON.stringify(compact({
+      orgId: scope.orgId,
+      userId: scope.userId,
+      taskId,
+      fieldId,
+      value,
+    })),
   });
-  const body = await response.json().catch(() => null);
+  return await parsePublicResponse(response);
+}
+
+async function assignTaskToSprint(
+  fetchFn: typeof fetch,
+  scope: Required<BulkMutationScope>,
+  taskId: string,
+  sprintId: string | undefined,
+): Promise<unknown> {
+  if (!sprintId?.trim()) throw new Error("Sprint id is required.");
+  const response = await fetchFn(`/api/v1/sprints/${encodeURIComponent(sprintId)}/tasks`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(compact({
+      orgId: scope.orgId,
+      taskId,
+    })),
+  });
+  return await parsePublicResponse(response);
+}
+
+async function parsePublicResponse(response: Response): Promise<unknown> {
+  const text = await response.text();
+  const body = text ? safeJson(text) : null;
   if (!response.ok) throw new Error("Bulk task operation failed");
-  return (body as { result?: { data?: { json?: unknown } } })?.result?.data?.json ?? body;
+  return body;
+}
+
+function requireBulkScope(scope: BulkMutationScope): Required<BulkMutationScope> {
+  const orgId = scope.orgId?.trim();
+  const userId = scope.userId?.trim();
+  if (!orgId || !userId) throw new Error("Organization and user scope are required.");
+  return { orgId, userId, projectId: scope.projectId ?? null };
+}
+
+function compact(input: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(input)
+      .filter(([, value]) => value !== undefined && value !== null)
+  );
+}
+
+function queryValues(input: Record<string, unknown>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(input)
+      .filter(([, value]) => value !== undefined && value !== null)
+      .map(([key, value]) => [key, String(value)]),
+  );
+}
+
+function safeJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }

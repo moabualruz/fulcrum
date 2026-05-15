@@ -1,22 +1,25 @@
 <script lang="ts">
   /**
-   * QuickCreateForm — Phase 05 Plan 12 (D-113).
+   * QuickCreateForm — task workflow (D-113).
    *
    * Compact floating form for rapid task creation.
    * Triggered by the `c` keyboard shortcut or a + button.
    * Enter submits, Esc closes. Stays open after submit for multi-create.
    *
-   * Duplicate detection (D-118): debounced title blur check via
-   * trpc.tasks.findSimilar — uses pg_trgm when available, falls back
-   * to ILIKE substring match (controlled by HAS_TRGM flag in schemas.ts).
    */
   import { cn } from "$lib/utils.js";
   import { page } from "$app/state";
+  import {
+    createQuickTask,
+    findSimilarTasks,
+    listProjectTemplates,
+  } from "./quick-create-api";
 
   interface Template {
     id: string;
     name: string;
-    template_data: Record<string, unknown>;
+    templateData?: Record<string, unknown>;
+    template_data?: Record<string, unknown>;
   }
 
   interface DuplicateTask {
@@ -31,6 +34,8 @@
     onClose: () => void;
     /** Pre-fill project from route context. Defaults to activeProjectId from layout. */
     projectId?: string;
+    orgId?: string;
+    currentUserId?: string;
     /** Pre-fill status (e.g. when triggered from a board column). */
     defaultStatus?: string;
     /** Pre-fill sprint id (e.g. when viewing a sprint). */
@@ -43,6 +48,8 @@
     open,
     onClose,
     projectId: propProjectId,
+    orgId = "",
+    currentUserId = "",
     defaultStatus,
     defaultSprintId,
     defaultAssigneeId,
@@ -76,14 +83,12 @@
     duplicatesDismissed = false;
     dupeDebounce = setTimeout(async () => {
       try {
-        const res = await fetch(
-          "/api/trpc/tasks.findSimilar?input=" +
-            encodeURIComponent(JSON.stringify({ title: title.trim(), projectId }))
-        );
-        if (res.ok) {
-          const json = await res.json() as { result?: { data?: DuplicateTask[] } };
-          duplicates = json.result?.data ?? [];
-        }
+        duplicates = await findSimilarTasks(fetch, {
+          orgId,
+          userId: currentUserId,
+          projectId,
+          title: title.trim(),
+        });
       } catch {
         // silently ignore — duplicate detection is best-effort
       }
@@ -97,17 +102,12 @@
   async function loadTemplates() {
     if (templates.length > 0) return;
     try {
-      const res = await fetch("/api/trpc/templates.list?input=" +
-        encodeURIComponent(JSON.stringify({ projectId })));
-      if (res.ok) {
-        const json = await res.json() as { result?: { data?: Template[] } };
-        templates = json.result?.data ?? [];
-      }
+      templates = await listProjectTemplates(fetch, { orgId, userId: currentUserId, projectId });
     } catch { /* best-effort */ }
   }
 
   function applyTemplate(tmpl: Template) {
-    const d = tmpl.template_data;
+    const d = tmpl.templateData ?? tmpl.template_data ?? {};
     if (typeof d.title === "string") title = d.title;
     if (typeof d.type === "string") type = d.type as typeof type;
     if (typeof d.priority === "string") priority = d.priority as typeof priority;
@@ -121,38 +121,27 @@
     submitting = true;
     submitError = "";
     try {
-      const body = {
-        title: title.trim(),
-        type,
-        status: defaultStatus ?? "todo",
+      await createQuickTask(fetch, {
+        orgId,
+        userId: currentUserId,
         projectId,
+        title: title.trim(),
+        status: defaultStatus ?? "todo",
         ...(assigneeId ? { assigneeId } : {}),
-        ...(priority !== "none" ? { priority } : {}),
-        ...(labels.length > 0 ? { labels } : {}),
-        ...(defaultSprintId ? { sprintId: defaultSprintId } : {}),
-        ...(showMore && dueDate ? { dueDate } : {}),
-        ...(showMore && estimation != null ? { estimation } : {}),
+        ...(priority !== "none" ? { priority: priorityValue(priority) } : {}),
+        ...(showMore && estimation != null ? { points: estimation } : {}),
         ...(showMore && description ? { description } : {}),
-      };
-      const res = await fetch("/api/trpc/tasks.create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ "0": { json: body } }),
       });
-      if (!res.ok) {
-        submitError = "Failed to create task.";
-      } else {
-        // Linear behavior: stay open for rapid multi-create
-        title = "";
-        duplicates = [];
-        duplicatesDismissed = false;
-        assigneeId = defaultAssigneeId ?? "";
-        priority = "none";
-        labels = [];
-        dueDate = "";
-        estimation = null;
-        description = "";
-      }
+      // Linear behavior: stay open for rapid multi-create
+      title = "";
+      duplicates = [];
+      duplicatesDismissed = false;
+      assigneeId = defaultAssigneeId ?? "";
+      priority = "none";
+      labels = [];
+      dueDate = "";
+      estimation = null;
+      description = "";
     } catch {
       submitError = "Network error. Please retry.";
     } finally {
@@ -179,6 +168,14 @@
     { value: "medium", label: "Medium" },
     { value: "low", label: "Low" },
   ] as const;
+
+  function priorityValue(value: typeof priority): number {
+    if (value === "urgent") return 4;
+    if (value === "high") return 3;
+    if (value === "medium") return 2;
+    if (value === "low") return 1;
+    return 0;
+  }
 </script>
 
 {#if open}

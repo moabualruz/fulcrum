@@ -1,56 +1,78 @@
-import { describe, expect, mock, test } from "bun:test";
+import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-const mockQuery = mock(() => Promise.resolve([]));
-const mockClose = mock(() => Promise.resolve());
+import {
+  addTaskToSprint,
+  createLocalOrg,
+  createProject,
+  createSprint,
+  createTask,
+  migrateIsolatedStore,
+  openIsolatedStore,
+} from "@test-support/product-workspace-fixtures.ts";
+import { closeDatabase } from "$lib/server/db";
 
-mock.module("$lib/server/db", () => ({
-  openIsolatedStore: () => Promise.resolve({ query: mockQuery, close: mockClose }),
-  getDefaultOrgId: () => Promise.resolve("org-1"),
-}));
+let scratch: string;
 
-mock.module("$lib/product-queries", () => ({
-  listBoardTasks: () =>
-    Promise.resolve([
-      { id: "t1", title: "In sprint", status: "pending", priority: 2, project_id: "p1", updated_at: "2026-05-01", sprint_id: "sprint-1" },
-      { id: "t2", title: "Not in sprint", status: "pending", priority: 1, project_id: "p1", updated_at: "2026-05-01", sprint_id: null },
-    ]),
-}));
+beforeEach(() => {
+  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-sprint-detail-"));
+  process.env["FULCRUM_HOME"] = scratch;
+});
 
-mock.module("$lib/server/tasks", () => ({
-  TASK_STATUSES: ["pending", "in_progress", "blocked", "completed", "cancelled"],
-  createTaskAction: mock(() => Promise.resolve({ id: "t-new" })),
-  moveTaskStatusAction: mock(() => Promise.resolve()),
-  updateTaskAction: mock(() => Promise.resolve()),
-}));
+afterEach(async () => {
+  await closeDatabase();
+  delete process.env["FULCRUM_HOME"];
+  rmSync(scratch, { recursive: true, force: true });
+});
 
-mock.module("$lib/server/boards.schema", () => ({
-  BoardMoveSchema: { type: "object" },
-}));
-
-mock.module("$lib/feedback/action-result", () => ({
-  actionOk: (msg: string) => ({ ok: true, message: msg }),
-  actionFail: (msg: string) => ({ ok: false, message: msg }),
-}));
+async function seedSprintDetail(): Promise<{ projectId: string; sprintId: string }> {
+  const dbDir = join(scratch, "pglite.data");
+  mkdirSync(dbDir, { recursive: true });
+  const db = await openIsolatedStore(dbDir);
+  await migrateIsolatedStore(db);
+  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
+  const project = await createProject(db, { orgId: org.id, slug: "alpha", name: "Alpha" });
+  const sprint = await createSprint(db, {
+    orgId: org.id,
+    projectId: project.id,
+    name: "Sprint 1",
+    goal: "Ship it",
+    startDate: "2026-05-01",
+    endDate: "2026-05-14",
+  });
+  const sprintTask = await createTask(db, {
+    orgId: org.id,
+    projectId: project.id,
+    title: "In sprint",
+    status: "pending",
+    priority: 2,
+  });
+  await createTask(db, {
+    orgId: org.id,
+    projectId: project.id,
+    title: "Not in sprint",
+    status: "pending",
+    priority: 1,
+  });
+  await addTaskToSprint(db, { sprintId: sprint.id, taskId: sprintTask.id });
+  await db.close();
+  return { projectId: project.id, sprintId: sprint.id };
+}
 
 describe("/projects/[id]/sprint/[sprintId] +page.server", () => {
   test("load returns only sprint-scoped tasks", async () => {
-    mockQuery.mockImplementation((sql: string) => {
-      if (sql.includes("FROM projects")) return Promise.resolve([{ id: "p1", name: "Alpha" }]);
-      if (sql.includes("FROM sprints")) return Promise.resolve([{
-        id: "sprint-1", name: "Sprint 1", goal: "Ship it", start_date: "2026-05-01", end_date: "2026-05-14", status: "active",
-      }]);
-      return Promise.resolve([]);
-    });
+    const { projectId, sprintId } = await seedSprintDetail();
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
+    const result = await mod.load({
+      params: { id: projectId, sprintId },
+      url: new URL(`http://localhost/projects/${projectId}/sprint/${sprintId}`),
+    } as Parameters<typeof mod.load>[0]);
 
-    const { load } = await import("./+page.server.ts");
-    const result = await load({
-      params: { id: "p1", sprintId: "sprint-1" },
-      url: new URL("http://localhost/projects/p1/sprint/sprint-1"),
-    } as never);
-
-    expect(result.sprint.id).toBe("sprint-1");
+    expect(result.sprint.id).toBe(sprintId);
     expect(result.sprint.goal).toBe("Ship it");
-    expect(result.tasks.every((t: { sprint_id?: string | null }) => t.sprint_id === "sprint-1")).toBe(true);
-    expect(result.tasks.find((t: { id: string }) => t.id === "t2")).toBeUndefined();
+    expect(result.tasks.every((task) => task.sprint_id === sprintId)).toBe(true);
+    expect(result.tasks.find((task) => task.title === "Not in sprint")).toBeUndefined();
   });
 });

@@ -1,8 +1,8 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { requestAppScope } from "$lib/server/application-scope";
-import { listTreeChildren } from "@/application/repo-files/queries.ts";
-import { AppError } from "@/application/errors.ts";
+import { listTreeChildren } from "@integration-hub/application/repo-files/queries.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 
 /** GET /api/repos/:id/tree?branch=main&parent=src */
 export const GET: RequestHandler = async ({ params, url, locals }) => {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
-  import { formatDate } from "@/i18n/index.ts";
+  import { formatDate } from "@platform-core/application/localization/index.ts";
   import type { TaskColumn, TaskSortDirection, TaskViewRow } from "./task-view-types";
   import {
     buildBulkMutationRequest,
@@ -19,9 +19,21 @@
     groupBy?: string | null;
     visibleColumns?: string[];
     locale?: string;
+    orgId?: string;
+    currentUserId?: string;
+    projectId?: string;
   }
 
-  const { tasks, sort, groupBy = null, visibleColumns, locale = "en" }: Props = $props();
+  const {
+    tasks,
+    sort,
+    groupBy = null,
+    visibleColumns,
+    locale = "en",
+    orgId = "",
+    currentUserId = "",
+    projectId,
+  }: Props = $props();
 
   const columns = $derived(visibleTaskColumns(visibleColumns));
   const rows = $derived(sort ? sortTaskRows(tasks, sort.column, sort.direction) : tasks);
@@ -66,7 +78,11 @@
 
     pending = true;
     try {
-      await submitBulkTaskMutation(fetch, buildBulkMutationRequest({ action, ids, value }));
+      await submitBulkTaskMutation(fetch, buildBulkMutationRequest({ action, ids, value }), {
+        orgId,
+        userId: currentUserId,
+        projectId: projectId ?? projectIdForSelection(ids),
+      });
       selectedIds = new Set();
       anchorId = null;
       bulkAction = null;
@@ -90,6 +106,10 @@
     } else {
       void runBulkAction(bulkAction, bulkValue);
     }
+  }
+
+  function projectIdForSelection(ids: string[]): string | null {
+    return tasks.find((task) => ids.includes(task.id))?.project_id ?? null;
   }
 </script>
 
@@ -178,7 +198,7 @@
                     </a>
                   {:else if column.key === "status"}
                     <form data-inline-status={task.id} action="?/update" method="POST">
-                      <input type="hidden" name="intent" value="tasks.update" />
+                      <input type="hidden" name="intent" value="update-task-status" />
                       <input type="hidden" name="id" value={task.id} />
                       <select name="status" class={cn("h-8 rounded-md border border-input bg-background px-2 text-xs")} aria-label={`Status for ${task.title}`}>
                         {#each ["pending", "in_progress", "blocked", "completed", "cancelled"] as status (status)}

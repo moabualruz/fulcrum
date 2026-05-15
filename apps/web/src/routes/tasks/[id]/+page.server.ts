@@ -1,10 +1,18 @@
 import { error, fail } from "@sveltejs/kit";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
-import { deleteTask, updateTask } from "@/application/tasks/commands.ts";
-import { getTask, listChildren } from "@/application/tasks/queries.ts";
+import { deleteTask, updateTask } from "@work-management/application/tasks/commands.ts";
+import { getTask, listChildren } from "@work-management/application/tasks/queries.ts";
+import {
+  dispatchDependencyRunForTasks,
+  previewDependencyRunForTasks,
+} from "@execution-orchestration/application/dependency-run-actions.ts";
+import {
+  loadDependencyRunLiveFeedbackForTasks,
+} from "@execution-orchestration/application/dependency-run-live-feedback.ts";
 import { actionOk, actionFail } from "$lib/feedback/action-result";
 import { requestAppScope } from "$lib/server/application-scope";
+import { createWebWorkflowApiCaller, workflowApiProjectMetadata } from "$lib/server/workflow-api";
 
 export const load: PageServerLoad = ({ params, locals }) => {
   return {
@@ -89,6 +97,99 @@ export const actions: Actions = {
       return actionOk("Saved");
     } catch (err) {
       return fail(400, actionFail((err as Error).message));
+    }
+  },
+
+  runPreview: async (event) => {
+    const { request, params, locals } = event;
+    const fd = await request.formData();
+    const raw = fdToRecord(fd);
+    try {
+      const projectId = locals?.activeProjectId ?? null;
+      const workflowApi = projectId ? createWebWorkflowApiCaller(event) : null;
+      if (workflowApi) {
+        const preview = await workflowApi.tasks.previewDependencyRun({
+          projectId,
+          mode: "task",
+          targetTaskIds: [params.id],
+          traceId: raw["traceId"] ?? undefined,
+        });
+        return { ok: true, mode: "runPreview", preview };
+      }
+      const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null, params.id);
+      const preview = await previewDependencyRunForTasks(em, ctx, {
+        mode: "task",
+        targetTaskIds: [params.id],
+        traceId: raw["traceId"] ?? undefined,
+      });
+      return { ok: true, mode: "runPreview", preview };
+    } catch (err) {
+      return fail(400, { ok: false, mode: "runPreview", message: (err as Error).message });
+    }
+  },
+
+  run: async (event) => {
+    const { request, params, locals } = event;
+    const fd = await request.formData();
+    const raw = fdToRecord(fd);
+    const agent = raw["agent"]?.trim() || "codex";
+    try {
+      const projectId = locals?.activeProjectId ?? null;
+      const workflowApi = projectId ? createWebWorkflowApiCaller(event) : null;
+      if (workflowApi) {
+        const dispatch = await workflowApi.tasks.dispatchDependencyRun({
+          ...workflowApiProjectMetadata(event, projectId),
+          mode: "task",
+          targetTaskIds: [params.id],
+          traceId: raw["traceId"] ?? undefined,
+          agent,
+          model: raw["model"] ?? undefined,
+          prompt: raw["prompt"] ?? undefined,
+        });
+        return { ok: true, mode: "run", dispatch };
+      }
+      const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null, params.id);
+      const dispatch = await dispatchDependencyRunForTasks(em, ctx, {
+        mode: "task",
+        targetTaskIds: [params.id],
+        traceId: raw["traceId"] ?? undefined,
+        agent,
+        model: raw["model"] ?? undefined,
+        prompt: raw["prompt"] ?? undefined,
+      });
+      return { ok: true, mode: "run", dispatch };
+    } catch (err) {
+      return fail(400, { ok: false, mode: "run", message: (err as Error).message });
+    }
+  },
+
+  runFeedback: async (event) => {
+    const { request, params, locals } = event;
+    const fd = await request.formData();
+    const raw = fdToRecord(fd);
+    try {
+      const projectId = locals?.activeProjectId ?? null;
+      const workflowApi = projectId ? createWebWorkflowApiCaller(event) : null;
+      if (workflowApi) {
+        const feedback = await workflowApi.tasks.dependencyRunLiveFeedback({
+          projectId,
+          traceId: raw["traceId"] ?? undefined,
+          runGroupId: raw["runGroupId"] ?? undefined,
+          runId: raw["runId"] ?? undefined,
+          taskId: params.id,
+        });
+        return { ok: true, mode: "runFeedback", feedback };
+      }
+      const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null, params.id);
+      const feedback = await loadDependencyRunLiveFeedbackForTasks(em, ctx, {
+        traceId: raw["traceId"] ?? undefined,
+        runGroupId: raw["runGroupId"] ?? undefined,
+        runId: raw["runId"] ?? undefined,
+        taskId: params.id,
+      });
+      return { ok: true, mode: "runFeedback", feedback };
+    } catch (err) {
+      return fail(400, { ok: false, mode: "runFeedback", message: (err as Error).message });
     }
   },
 };

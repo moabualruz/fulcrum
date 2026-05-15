@@ -1,5 +1,5 @@
 /**
- * Doctor check module for routing + skills subsystem (Pillar 5, issue #24).
+ * Health-check module for routing + skills subsystem.
  *
  * Three checks:
  *   1. routing_rules table exists and is reachable
@@ -9,7 +9,7 @@
  * Follows the same pattern as api.ts doctor checks.
  */
 
-import type { SqlExecutor } from "../../db/sql.ts";
+import type { SqlExecutor } from "@platform-core/infrastructure/application-database/sql.ts";
 
 // ---------------------------------------------------------------------------
 // Types

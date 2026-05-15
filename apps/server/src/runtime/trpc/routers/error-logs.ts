@@ -7,7 +7,7 @@ import {
   listErrorLogs,
   type AdminAppContext,
   type ErrorLogRecord,
-} from "@/application/admin/queries.ts";
+} from "@identity-access/application/admin/queries.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 

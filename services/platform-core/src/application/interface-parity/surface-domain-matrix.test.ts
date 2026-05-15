@@ -9,7 +9,7 @@ import {
   listMissingCliDomains,
   listMissingTuiDomains,
   listMissingWebRoutes,
-} from "./parity.ts";
+} from "./surface-domain-matrix.ts";
 
 const REQUIRED_CORE_DOMAINS = [
   "tasks",
@@ -31,8 +31,8 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-describe("Phase 08 surface parity matrix", () => {
-  test("includes every required Phase 08 core domain", () => {
+describe("surface domain parity matrix", () => {
+  test("includes every required surface core domain", () => {
     const names = REQUIRED_SURFACE_DOMAINS.map((domain) => domain.name);
 
     for (const domain of REQUIRED_CORE_DOMAINS) {
@@ -91,7 +91,7 @@ describe("Phase 08 surface parity matrix", () => {
   });
 
   test("reports missing Web routes from SvelteKit route inventory", async () => {
-    const routesRoot = new URL("../../apps/web/src/routes/", import.meta.url).pathname;
+    const routesRoot = new URL("../../../../../apps/web/src/routes/", import.meta.url).pathname;
     const candidates = [
       "projects/+page.svelte",
       "projects/[id]/sprints/+page.svelte",

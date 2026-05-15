@@ -1,5 +1,5 @@
 /**
- * CriticalPath.ts — Phase 05 Plan 10 (D-102, D-103, D-104)
+ * CriticalPath.ts — task workflow (D-102, D-103, D-104)
  *
  * Pure TypeScript CPM (Critical Path Method) algorithm.
  * No Svelte dependency — fully unit-testable.

@@ -1,1 +1,1 @@
-export * from "@/application/memory/web-queries.ts";
+export * from "@knowledge-workspace/application/memory/web-queries.ts";

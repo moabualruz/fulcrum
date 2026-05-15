@@ -6,12 +6,12 @@ import { superValidate } from "sveltekit-superforms/server";
 import { valibot } from "sveltekit-superforms/adapters";
 import type { Actions, PageServerLoad } from "./$types";
 import { DocumentFormSchema } from "$lib/server/documents.schema";
-import { createDocumentAction } from "@/application/docs/document-actions.ts";
+import { createDocumentAction } from "@knowledge-workspace/application/document-actions.ts";
 import { parseLabels } from "$lib/markdown/labels";
-import { TEMPLATE_BODY_MAP } from "@/docs/template-seeds.ts";
+import { TEMPLATE_BODY_MAP } from "@knowledge-workspace/application/docs/template-seeds.ts";
 import {
   DOC_TEMPLATE_SERVICE_TOKEN,
-} from "@/docs/doc-template-service.ts";
+} from "@knowledge-workspace/application/docs/doc-template-service.ts";
 import { requestAppScope } from "$lib/server/application-scope";
 
 // ─── Load ────────────────────────────────────────────────────────────────────
@@ -29,7 +29,7 @@ export const load: PageServerLoad = async (event) => {
     | Record<string, unknown>
     | undefined;
   const container = locals?.["container"] as
-    | import("@needle-di/core").Container
+    | { get<T>(token: unknown): T }
     | null
     | undefined;
   const orgId = locals?.["orgId"] as string | null | undefined;

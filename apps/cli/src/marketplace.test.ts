@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
-import { resetRegistry, seedRegistry } from "@/marketplace/registry.ts";
-import type { MarketplaceListing } from "@/marketplace/types.ts";
+import { resetRegistry, seedRegistry } from "@platform-core/application/skill-supply/marketplace/registry.ts";
+import type { MarketplaceListing } from "@platform-core/application/skill-supply/marketplace/types.ts";
 
 function makeListing(overrides: Partial<MarketplaceListing> = {}): MarketplaceListing {
   return {

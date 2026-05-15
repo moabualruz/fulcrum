@@ -1,8 +1,8 @@
 import type { PageServerLoad } from "./$types";
 import { error } from "@sveltejs/kit";
 import { requestAppScope } from "$lib/server/application-scope";
-import { getRepoCommitDetail } from "@/application/repos/queries.ts";
-import { AppError } from "@/application/errors.ts";
+import { getRepoCommitDetail } from "@integration-hub/application/repos/queries.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 
 export const load: PageServerLoad = ({ params, url, locals }) => ({
   activeProjectId: locals?.activeProjectId ?? null,

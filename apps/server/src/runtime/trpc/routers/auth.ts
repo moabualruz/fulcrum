@@ -24,13 +24,13 @@ import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { publicProcedure } from "@fulcrum/server/trpc/trpc.ts";
 import { optionalTrpcEntityManager, requireTrpcEntityManager } from "@fulcrum/server/trpc/context.ts";
-import { appErrorToTrpcError } from "@/application/error-mapping.ts";
-import { AppError } from "@/application/errors.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 import {
   acceptInvitation,
   createInvitation,
   resolveApplicationSessionContext,
-} from "@/application/auth/session-context.ts";
+} from "@identity-access/application/auth/session-context.ts";
 import {
   InviteInputSchema,
   AcceptInviteInputSchema,

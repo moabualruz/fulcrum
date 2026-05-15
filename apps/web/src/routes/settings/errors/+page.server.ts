@@ -1,8 +1,8 @@
 import { fail, type Actions, type ServerLoad } from "@sveltejs/kit";
 import { requestAppScope } from "$lib/server/application-scope";
-import { clearSettingsErrors } from "@/application/settings/commands.ts";
-import { listSettingsErrors } from "@/application/settings/queries.ts";
-import { AppError } from "@/application/errors.ts";
+import { clearSettingsErrors } from "@platform-core/application/settings/commands.ts";
+import { listSettingsErrors } from "@platform-core/application/settings/queries.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 
 const PAGE_SIZE = 20;
 

@@ -1,7 +1,7 @@
 /**
  * Re-export from canonical service layer.
  * Web consumers use $lib/server/runs — this file preserves that alias.
- * Actual logic lives in src/services/runs.ts.
+ * Actual logic lives in execution orchestration service modules.
  */
 export {
   type RunStatus,
@@ -9,4 +9,4 @@ export {
   dispatchRunAction,
   cancelRunAction,
   retryRunAction,
-} from "@/services/runs.ts";
+} from "@execution-orchestration/application/agent-run-service-actions.ts";

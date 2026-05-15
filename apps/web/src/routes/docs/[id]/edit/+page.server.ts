@@ -7,8 +7,8 @@ import { valibot } from "sveltekit-superforms/adapters";
 import { DocumentFormSchema } from "../../../../lib/server/documents.schema.ts";
 import { requestAppScope } from "../../../../lib/server/application-scope.ts";
 import { parseLabels, serializeLabels } from "../../../../lib/markdown/labels.ts";
-import { AppNotFoundError } from "@/application/errors.ts";
-import { loadWebEditDoc, saveWebEditDoc } from "@/application/docs/web-edit.ts";
+import { AppNotFoundError } from "@platform-core/domain/errors.ts";
+import { loadWebEditDoc, saveWebEditDoc } from "@knowledge-workspace/application/docs/web-edit.ts";
 
 interface LoadEvent {
   params: { id: string };

@@ -5,8 +5,8 @@ import {
   completeProjectSprint,
   createProjectSprint,
   startProjectSprint,
-} from "@/application/sprints/commands.ts";
-import { loadProjectSprints } from "@/application/sprints/queries.ts";
+} from "@work-management/application/sprints/commands.ts";
+import { loadProjectSprints } from "@work-management/application/sprints/queries.ts";
 import {
   CreateSprintSchema,
   StartSprintSchema,

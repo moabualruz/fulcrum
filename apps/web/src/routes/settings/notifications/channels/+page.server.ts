@@ -1,5 +1,9 @@
+import { error, fail, redirect } from "@sveltejs/kit";
+
+import { createNotificationApiCaller } from "@notification-center/interface/http/notification-api-client.ts";
+
 interface RouteEvent {
-  locals: { session?: unknown };
+  locals: { session?: unknown; orgId?: string | null; userId?: string | null };
   fetch: typeof fetch;
   request: {
     headers: { get(name: string): string | null };
@@ -8,70 +12,38 @@ interface RouteEvent {
   url: URL;
 }
 
-function fail(status: number, data: Record<string, unknown>) {
-  return { status, ...data };
-}
-
-function redirect(status: number, location: string): Response {
-  return new Response(null, { status, headers: { location } });
-}
-
 interface LoadEvent extends Omit<RouteEvent, "request"> {
   request: { headers: { get(name: string): string | null } };
 }
 
-function baseUrl(url: URL): string {
-  return `${url.protocol}//${url.host}`;
+type NotificationCaller = ReturnType<typeof createNotificationApiCaller>["notify"];
+
+function createNotificationCaller(event: LoadEvent | RouteEvent): NotificationCaller | null {
+  const { orgId, userId } = event.locals;
+  if (!orgId || !userId) return null;
+
+  return createNotificationApiCaller({
+    baseUrl: process.env["FULCRUM_SERVER_URL"] ?? process.env["FULCRUM_PUBLIC_API_URL"] ?? `${event.url.protocol}//${event.url.host}`,
+    orgId,
+    userId,
+    fetch: event.fetch,
+    headers: cookieHeaders(event),
+  }).notify;
 }
 
-function cookieHeader(event: LoadEvent | RouteEvent): string {
-  return event.request.headers.get("cookie") ?? "";
-}
-
-function unwrapTrpcData(body: unknown): unknown {
-  return (
-    (body as { result?: { data?: { json?: unknown } } })?.result?.data?.json ??
-    (body as { result?: { data?: unknown } })?.result?.data ??
-    body
-  );
-}
-
-function extractTrpcError(body: unknown): string {
-  const error = (body as { error?: { json?: { message?: string }; message?: string } })?.error;
-  return error?.json?.message ?? error?.message ?? "Request failed";
-}
-
-async function trpcQuery(event: LoadEvent, procedure: string): Promise<unknown> {
-  const response = await event.fetch(`${baseUrl(event.url)}/api/trpc/${procedure}?input=%7B%7D`, {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      "content-type": "application/json",
-      cookie: cookieHeader(event),
-    },
-  });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(extractTrpcError(body));
-  return unwrapTrpcData(body);
-}
-
-async function trpcMutation(event: RouteEvent, procedure: string, input: unknown): Promise<unknown> {
-  const response = await event.fetch(`${baseUrl(event.url)}/api/trpc/${procedure}`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "content-type": "application/json",
-      cookie: cookieHeader(event),
-    },
-    body: JSON.stringify({ json: input }),
-  });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(extractTrpcError(body));
-  return unwrapTrpcData(body);
+function cookieHeaders(event: LoadEvent | RouteEvent): Record<string, string> {
+  const cookie = event.request.headers.get("cookie");
+  return cookie ? { cookie } : {};
 }
 
 function requireSession(event: LoadEvent | RouteEvent): void {
   if (!event.locals.session) throw redirect(302, "/auth/login");
+}
+
+function requireNotificationCaller(event: LoadEvent | RouteEvent): NotificationCaller {
+  const caller = createNotificationCaller(event);
+  if (!caller) error(503, { message: "Notification API caller is not configured." });
+  return caller;
 }
 
 function maskSecret(secret: string): string {
@@ -79,17 +51,34 @@ function maskSecret(secret: string): string {
   return `${secret.slice(0, 4)}***`;
 }
 
+function messageFromError(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
+}
+
+async function configureChannel(
+  event: RouteEvent,
+  channel: "email" | "webhook" | "slack" | "discord" | "push",
+  input: Record<string, unknown>,
+): Promise<void> {
+  const caller = createNotificationCaller(event);
+  if (!caller) {
+    throw new Error("Notification API caller is not configured.");
+  }
+  await caller.channels.config({ channel, enabled: true, ...input });
+}
+
 export async function load(event: LoadEvent) {
   requireSession(event);
+  const caller = requireNotificationCaller(event);
   const [channels, rules, quietHours] = await Promise.all([
-    trpcQuery(event, "notify.channels.list"),
-    trpcQuery(event, "notify.rules.list"),
-    trpcQuery(event, "notify.quietHours.get"),
+    caller.channels.list(),
+    caller.rules.list(),
+    caller.quietHours.get(),
   ]);
   return {
     channels: Array.isArray(channels) ? channels : [],
     rules: Array.isArray(rules) ? rules : [],
-    quietHours,
+    quietHours: quietHours ?? null,
   };
 }
 
@@ -98,15 +87,13 @@ export const actions = {
     requireSession(event);
     const form = await event.request.formData();
     try {
-      await trpcMutation(event, "notify.channels.config", {
-        channel: "email",
-        enabled: true,
+      await configureChannel(event, "email", {
         email: String(form.get("email") ?? "").trim(),
         token: String(form.get("token") ?? "").trim(),
       });
       return { ok: true, emailVerified: Boolean(form.get("token")) };
     } catch (cause) {
-      return fail(400, { channelError: String((cause as Error).message ?? cause) });
+      return fail(400, { channelError: messageFromError(cause) });
     }
   },
 
@@ -115,15 +102,13 @@ export const actions = {
     const form = await event.request.formData();
     const secret = String(form.get("secret") ?? "").trim();
     try {
-      await trpcMutation(event, "notify.channels.config", {
-        channel: "webhook",
-        enabled: true,
+      await configureChannel(event, "webhook", {
         url: String(form.get("url") ?? "").trim(),
         secret,
       });
       return { ok: true, webhookSecretMasked: maskSecret(secret) };
     } catch (cause) {
-      return fail(400, { channelError: String((cause as Error).message ?? cause) });
+      return fail(400, { channelError: messageFromError(cause) });
     }
   },
 
@@ -131,14 +116,12 @@ export const actions = {
     requireSession(event);
     const form = await event.request.formData();
     try {
-      await trpcMutation(event, "notify.channels.config", {
-        channel: "slack",
-        enabled: true,
+      await configureChannel(event, "slack", {
         url: String(form.get("url") ?? "").trim(),
       });
       return { ok: true, channel: "slack" };
     } catch (cause) {
-      return fail(400, { channelError: String((cause as Error).message ?? cause) });
+      return fail(400, { channelError: messageFromError(cause) });
     }
   },
 
@@ -146,14 +129,12 @@ export const actions = {
     requireSession(event);
     const form = await event.request.formData();
     try {
-      await trpcMutation(event, "notify.channels.config", {
-        channel: "discord",
-        enabled: true,
+      await configureChannel(event, "discord", {
         url: String(form.get("url") ?? "").trim(),
       });
       return { ok: true, channel: "discord" };
     } catch (cause) {
-      return fail(400, { channelError: String((cause as Error).message ?? cause) });
+      return fail(400, { channelError: messageFromError(cause) });
     }
   },
 
@@ -161,14 +142,12 @@ export const actions = {
     requireSession(event);
     const form = await event.request.formData();
     try {
-      await trpcMutation(event, "notify.channels.config", {
-        channel: "push",
-        enabled: true,
+      await configureChannel(event, "push", {
         subscription: String(form.get("subscription") ?? "").trim(),
       });
       return { ok: true, channel: "push" };
     } catch (cause) {
-      return fail(400, { channelError: String((cause as Error).message ?? cause) });
+      return fail(400, { channelError: messageFromError(cause) });
     }
   },
 };

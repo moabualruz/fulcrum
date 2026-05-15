@@ -1,29 +1,4 @@
-/**
- * Invitation accept page — server load + form action.
- *
- * Routes:
- *   GET  /auth/invite/[token]  — show accept form (or error if token invalid)
- *   POST /auth/invite/[token]  — accept invite (create account if unauthenticated)
- *
- * Pillar 12: invitation accept page.
- * C4: Shared tRPC procedures via /api/trpc fetch calls.
- *
- * Unauthenticated flow:
- *   1. User provides email + name + password.
- *   2. Sign up via Better-Auth (/api/auth/sign-up/email).
- *   3. Call auth.acceptInvite tRPC mutation → creates OrgMember + marks invite accepted.
- *   4. Redirect to dashboard.
- *
- * Authenticated flow:
- *   1. Call auth.acceptInvite tRPC mutation directly (skip account creation).
- *   2. Redirect to dashboard.
- *
- * Error handling: load never throws on invalid token — returns { error } prop.
- */
-
 import { fail, redirect } from "@sveltejs/kit";
-
-// ── Type helpers ──────────────────────────────────────────────────────────────
 
 interface RouteLocals {
   session: unknown;
@@ -47,59 +22,43 @@ interface ActionEvent {
   fetch: typeof fetch;
 }
 
-// ── tRPC fetch helpers ────────────────────────────────────────────────────────
-
-function extractTrpcError(body: unknown): string {
+function extractApiError(body: unknown): string {
   if (!body || typeof body !== "object") return "Request failed";
-  if (Array.isArray(body)) {
-    const first = (body as Array<{ error?: { json?: { message?: string } } }>)[0];
-    if (first?.error?.json?.message) return first.error.json.message;
-  }
   const b = body as Record<string, unknown>;
   const err = b["error"];
   if (typeof err === "string") return err;
   if (err && typeof err === "object") {
     const e = err as Record<string, unknown>;
     if (typeof e["message"] === "string") return e["message"];
-    const json = e["json"] as Record<string, unknown> | undefined;
-    if (json && typeof json["message"] === "string") return json["message"];
   }
+  if (typeof b["message"] === "string") return b["message"];
   return "Request failed";
 }
 
-/**
- * Call a tRPC mutation via server-side fetch.
- */
-async function callTrpcMutation(
+async function acceptInvite(
   fetchFn: typeof fetch,
   baseUrl: string,
-  procedure: string,
-  input: unknown,
+  token: string,
   extraHeaders?: Record<string, string>,
 ): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
   try {
-    const response = await fetchFn(`${baseUrl}/api/trpc/${procedure}`, {
+    const response = await fetchFn(`${baseUrl}/api/v1/auth/accept-invite`, {
       method: "POST",
       credentials: "include",
       headers: {
         "content-type": "application/json",
         ...extraHeaders,
       },
-      body: JSON.stringify({ json: input }),
+      body: JSON.stringify({ token }),
     });
 
     const body = await response.json().catch(() => null);
 
     if (!response.ok) {
-      return { ok: false, error: extractTrpcError(body) };
+      return { ok: false, error: extractApiError(body) };
     }
 
-    const data =
-      (body as { result?: { data?: { json?: unknown } } })?.result?.data?.json ??
-      (body as { result?: { data?: unknown } })?.result?.data ??
-      body;
-
-    return { ok: true, data };
+    return { ok: true, data: body };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
@@ -110,13 +69,6 @@ function getBaseUrl(requestUrl: string): string {
   return `${u.protocol}//${u.host}`;
 }
 
-// ── Load ──────────────────────────────────────────────────────────────────────
-
-/**
- * Load — returns the token as a prop for the page.
- * Does NOT throw on invalid token — returns error prop instead.
- * Actual validation happens in the form action so we have request context.
- */
 export async function load(event: LoadEvent) {
   const { params, locals } = event;
   const token = params.token?.trim() ?? "";
@@ -134,8 +86,6 @@ export async function load(event: LoadEvent) {
   };
 }
 
-// ── Actions ───────────────────────────────────────────────────────────────────
-
 export const actions = {
   default: async (event: ActionEvent) => {
     const { params, locals, request, url, fetch: fetchFn } = event;
@@ -149,13 +99,11 @@ export const actions = {
     const form = await request.formData();
 
     if (isAuthenticated) {
-      // ── Authenticated path — skip account creation ──────────────────────
       const cookieHeader = request.headers.get("cookie") ?? "";
-      const acceptResult = await callTrpcMutation(
+      const acceptResult = await acceptInvite(
         fetchFn,
         baseUrl,
-        "auth.acceptInvite",
-        { token },
+        token,
         { cookie: cookieHeader },
       );
 
@@ -166,7 +114,6 @@ export const actions = {
       throw redirect(302, "/");
     }
 
-    // ── Unauthenticated path — create account then accept invite ──────────
     const email = String(form.get("email") ?? "").trim();
     const name = String(form.get("name") ?? "").trim();
     const password = String(form.get("password") ?? "").trim();
@@ -181,7 +128,6 @@ export const actions = {
       return fail(400, { error: "Password is required.", token, email, name });
     }
 
-    // Step 1: Create Better-Auth account.
     const signUpResponse = await fetchFn("/api/auth/sign-up/email", {
       method: "POST",
       credentials: "include",
@@ -191,19 +137,16 @@ export const actions = {
 
     if (!signUpResponse.ok) {
       const signUpBody = await signUpResponse.json().catch(() => null);
-      const msg = extractTrpcError(signUpBody) || "Could not create account";
+      const msg = extractApiError(signUpBody) || "Could not create account";
       return fail(400, { error: msg, token, email, name });
     }
 
-    // Forward the Set-Cookie header from sign-up so the session is available.
     const setCookie = signUpResponse.headers.get("set-cookie") ?? "";
 
-    // Step 2: Accept the invitation (creates OrgMember row + marks acceptedAt).
-    const acceptResult = await callTrpcMutation(
+    const acceptResult = await acceptInvite(
       fetchFn,
       baseUrl,
-      "auth.acceptInvite",
-      { token, name },
+      token,
       setCookie ? { cookie: setCookie } : undefined,
     );
 

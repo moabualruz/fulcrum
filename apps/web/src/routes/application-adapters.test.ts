@@ -53,7 +53,8 @@ const SURFACES: Surface[] = [
   {
     name: "audit",
     file: "audit/+page.server.ts",
-    applicationModule: "application/audit/queries",
+    applicationModule: null,
+    helperModule: "@workflow-coordination/interface/http/audit-api-client",
     keys: ["events", "total", "page", "actor", "kind", "verb", "project", "dateFrom", "dateTo"],
   },
   {

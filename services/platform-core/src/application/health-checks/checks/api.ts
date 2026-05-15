@@ -1,9 +1,9 @@
-// Doctor check module for API subsystem (Pillar 13).
+// Health-check module for API subsystem.
 // Registers 7 checks: trpc-router, zod-schemas, rest-surface,
 // webhook-dispatcher, pending-delivery-backlog, connector-reachability,
 // connector-run-health.
 
-import type { SqlExecutor } from "../../db/sql.ts";
+import type { SqlExecutor } from "@platform-core/infrastructure/application-database/sql.ts";
 
 // ---------------------------------------------------------------------------
 // Zod-compatible shape (no Zod dep — plain TS interface + runtime validator)
@@ -149,8 +149,8 @@ async function checkRestSurface(cfg: ApiDoctorConfig): Promise<DoctorApiCheckEnt
     return {
       name: "rest-surface",
       status: "fail",
-      message: "REST surface check not available (Hono public API not loaded)",
-      recovery: "Ensure Pillar 13 #04 public-api Hono setup is implemented.",
+      message: "REST surface check not available",
+      recovery: "Ensure the Nest public API health check is configured.",
     };
   }
   try {
@@ -160,7 +160,7 @@ async function checkRestSurface(cfg: ApiDoctorConfig): Promise<DoctorApiCheckEnt
         name: "rest-surface",
         status: "fail",
         message: `GET /api/v1/openapi.json returned ${result.status ?? "error"}: ${result.error ?? "unknown"}`,
-        recovery: "Check Hono app is serving; verify public-api flag is ON.",
+        recovery: "Check the Nest public API is serving; verify public-api flag is ON.",
       };
     }
     return {
@@ -173,7 +173,7 @@ async function checkRestSurface(cfg: ApiDoctorConfig): Promise<DoctorApiCheckEnt
       name: "rest-surface",
       status: "fail",
       message: `REST surface check threw: ${(err as Error).message}`,
-      recovery: "Check Hono app is serving; verify public-api flag is ON.",
+      recovery: "Check the Nest public API is serving; verify public-api flag is ON.",
     };
   }
 }

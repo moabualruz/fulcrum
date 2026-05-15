@@ -8,9 +8,9 @@ const config = {
 	},
 	kit: {
 		alias: {
-			'@': '../../src',
 			'@fulcrum/cli': '../cli/src',
 			'@fulcrum/server': '../server/src',
+			'@test-support': '../../tests/support',
 			'@fulcrum/tui': '../tui/src',
 			'@fulcrum/web': './src'
 		},

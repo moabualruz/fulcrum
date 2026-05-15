@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { createLocalOrg } from "@/test-support/product-fixtures.ts";
-import { makeId } from "@/test-support/product-fixtures.ts";
+import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { createLocalOrg } from "@test-support/product-workspace-fixtures.ts";
+import { makeId } from "@test-support/product-workspace-fixtures.ts";
 
 let scratch: string;
 
@@ -16,9 +16,9 @@ function streamedData<T>(result: unknown): Promise<T> {
 }
 
 async function seedRepo(scratch: string, rootPath: string) {
-  const dbDir = join(scratch, "state", "product", "db");
+  const dbDir = join(scratch, "pglite.data");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(join(dbDir, "main"));
+  const db = await openIsolatedStore(dbDir);
   await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const repoId = makeId();

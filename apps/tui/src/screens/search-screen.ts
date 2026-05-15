@@ -10,7 +10,7 @@
  * Wired to tRPC search.query and search.suggest procedures.
  */
 
-import { isEnabled } from "@/flags/index.ts";
+import { isEnabled } from "@platform-core/application/feature-flags/index.ts";
 import type { SearchMode, SearchOptions, SearchResult } from "../types.ts";
 
 /** tRPC caller shape for search procedures. */

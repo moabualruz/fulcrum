@@ -34,8 +34,8 @@
 
 - Reads `AGENTS` for per-agent shape conventions where envelopes differ.
 - Tool-output-router reads `config/tool-output-policy.toml`.
-- No reverse coupling: hooks never call `apps/cli/src/`, `src/components/`, or the lifecycle engine.
+- No reverse coupling: hooks never call `apps/cli/src/` or the lifecycle engine.
 
 ## ADRs
 
-Context-scoped decisions will live under `src/hooks/docs/adr/` when recorded. None recorded yet; create the directory lazily from `docs/adr/0000-template.md`.
+Context-scoped decisions will live under `services/platform-core/src/application/agent-hooks/docs/adr/` when recorded. None recorded yet; create the directory lazily from `docs/adr/0000-template.md`.

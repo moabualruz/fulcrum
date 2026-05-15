@@ -10,8 +10,8 @@
 
 import { z } from "zod";
 
-import { DocTypeEnum } from "@/application/docs/types.ts";
-import { listDocTemplates, resolveDocTemplate } from "@/application/templates/queries.ts";
+import { DocTypeEnum } from "@knowledge-workspace/application/docs/types.ts";
+import { listDocTemplates, resolveDocTemplate } from "@work-management/application/templates/queries.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 
@@ -30,7 +30,7 @@ const DocTemplateRowSchema = z.object({
 });
 
 type EntityManager = import("@mikro-orm/postgresql").EntityManager;
-type Container = import("@needle-di/core").Container;
+type Container = { get<T>(token: unknown): T; bind(b: unknown): void };
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 

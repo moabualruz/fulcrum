@@ -12,7 +12,9 @@ import {
   type LegacyThemeSettings,
   type ThemeKey,
   type ThemeSetting,
-} from "@/application/admin/queries.ts";
+} from "@identity-access/application/admin/queries.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 
@@ -51,27 +53,36 @@ function appContext({ orgId, userId, em, container }: AdminAppContext): AdminApp
   return { orgId, userId, em, container };
 }
 
+async function mapAppError<T>(fn: () => Promise<T> | T): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AppError) throw appErrorToTrpcError(error);
+    throw error;
+  }
+}
+
 export const themeRouter = t.router({
   get: permissionedProcedure({ resource: "theme", action: "getTheme" })
     .output(LegacyThemeSettingsSchema)
-    .query(async ({ ctx }) => getLegacyThemeSettings(appContext(ctx))),
+    .query(async ({ ctx }) => mapAppError(() => getLegacyThemeSettings(appContext(ctx)))),
 
   update: permissionedProcedure({ resource: "theme", action: "setTheme" })
     .input(LegacyThemeSettingsSchema)
     .output(LegacyThemeSettingsSchema)
-    .mutation(async ({ ctx, input }) => updateLegacyThemeSettings(appContext(ctx), input)),
+    .mutation(async ({ ctx, input }) => mapAppError(() => updateLegacyThemeSettings(appContext(ctx), input))),
 
   listThemes: permissionedProcedure({ resource: "theme", action: "listThemes" })
     .output(z.array(ThemeSettingSchema))
-    .query(async ({ ctx }) => listThemeSettings(appContext(ctx))),
+    .query(async ({ ctx }) => mapAppError(() => listThemeSettings(appContext(ctx)))),
 
   getTheme: permissionedProcedure({ resource: "theme", action: "getTheme" })
     .input(GetThemeInputSchema)
     .output(ThemeSettingSchema)
-    .query(async ({ ctx, input }) => getThemeSetting(appContext(ctx), input.key)),
+    .query(async ({ ctx, input }) => mapAppError(() => getThemeSetting(appContext(ctx), input.key))),
 
   setTheme: permissionedProcedure({ resource: "theme", action: "setTheme" })
     .input(SetThemeInputSchema)
     .output(ThemeSettingSchema)
-    .mutation(async ({ ctx, input }) => setThemeSetting(appContext(ctx), input)),
+    .mutation(async ({ ctx, input }) => mapAppError(() => setThemeSetting(appContext(ctx), input))),
 });

@@ -26,11 +26,11 @@ vi.mock("$lib/server/application-scope", () => ({
   requestAppScope: async () => appScope,
 }));
 
-vi.mock("@/application/settings/queries.ts", () => ({
+vi.mock("@platform-core/application/settings/queries.ts", () => ({
   listSettingsErrors,
 }));
 
-vi.mock("@/application/settings/commands.ts", () => ({
+vi.mock("@platform-core/application/settings/commands.ts", () => ({
   clearSettingsErrors,
 }));
 

@@ -1,7 +1,7 @@
 import { redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { dispatchRun } from "@/application/runs/commands.ts";
-import { loadRunsPageData } from "@/application/runs/queries.ts";
+import { dispatchRun } from "@execution-orchestration/application/runs/commands.ts";
+import { loadRunsPageData } from "@execution-orchestration/application/runs/queries.ts";
 import {
   type RunRange,
 } from "$lib/components/runs/runs-filters";
@@ -42,6 +42,8 @@ export const load: PageServerLoad = ({ url, locals }) => {
 
   return {
     activeProjectId: locals?.activeProjectId ?? null,
+    orgId: locals?.orgId ?? null,
+    userId: locals?.userId ?? null,
     filter,
     streamed: {
       data: (async () => {

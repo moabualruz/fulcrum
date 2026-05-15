@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import type { Component } from "svelte";
 import { beforeAll, describe, expect, test } from "bun:test";
 
@@ -29,5 +32,16 @@ describe("InContextSearchBar", () => {
     expect(body).toContain('placeholder="Search tasks"');
     expect(body).toContain("data-search-facets");
     expect(body).toContain("data-search-clear");
+  });
+
+  test("invokes the Nest search public API instead of the runtime tRPC route", () => {
+    const source = readFileSync(resolve(import.meta.dir, "InContextSearchBar.svelte"), "utf8");
+
+    expect(source).not.toContain("/api/trpc");
+    expect(source).toContain('"/api/v1/search"');
+    expect(source).toContain("org_id");
+    expect(source).toContain("project_id");
+    expect(source).toContain("kind");
+    expect(source).toContain("limit");
   });
 });

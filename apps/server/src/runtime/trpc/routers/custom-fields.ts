@@ -5,14 +5,14 @@ import {
   clearTaskCustomField,
   setTaskCustomField,
   TaskCustomFieldsOutputSchema,
-} from "@/application/custom-fields/commands.ts";
+} from "@work-management/application/custom-fields/commands.ts";
 import {
   CustomFieldDefOutputSchema,
   listCustomFieldDefs,
   type CustomFieldAppContext,
-} from "@/application/custom-fields/queries.ts";
-import { appErrorToTrpcError } from "@/application/error-mapping.ts";
-import { AppError } from "@/application/errors.ts";
+} from "@work-management/application/custom-fields/queries.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 

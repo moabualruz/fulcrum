@@ -2,7 +2,7 @@ import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { requestAppScope } from "$lib/server/application-scope";
 import { loadWorkflowDef } from "$lib/server/orchestration";
-import { upsertWorkflowDef } from "@/application/orchestration/commands.ts";
+import { upsertWorkflowDef } from "@execution-orchestration/application/orchestration/commands.ts";
 import { actionOk } from "$lib/feedback/action-result";
 
 export const load: PageServerLoad = ({ params, locals }) => {

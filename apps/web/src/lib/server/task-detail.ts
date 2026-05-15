@@ -7,4 +7,4 @@ export {
   type EdgeRow,
   type EventRow,
   type TaskDetailPayload,
-} from "@/application/tasks/task-detail.ts";
+} from "@work-management/application/tasks/task-detail.ts";

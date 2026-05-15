@@ -7,8 +7,8 @@ import {
   listSavedViews,
   VIEW_SCOPES,
   type ViewScope,
-} from "@/application/saved-views/queries.ts";
-import { getProjectOrNull } from "@/application/projects/queries.ts";
+} from "@work-management/application/saved-views/queries.ts";
+import { getProjectOrNull } from "@work-management/application/projects/queries.ts";
 import { requestAppScope } from "$lib/server/application-scope";
 
 export const load: PageServerLoad = async ({ params, locals }) => {

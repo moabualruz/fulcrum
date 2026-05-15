@@ -3,11 +3,11 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 import { mkdtemp, rm, writeFile, mkdir, utimes, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { existsSync } from "node:fs";
 
 let TMP: string;
-const FULCRUM_REPO = resolve(import.meta.dir, "../..");
+const FULCRUM_REPO = process.cwd();
 
 beforeAll(async () => {
   TMP = await mkdtemp(join(tmpdir(), "fulcrum-idx-check-"));

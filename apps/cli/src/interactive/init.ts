@@ -3,4 +3,4 @@ export {
   runInteractiveInit,
   type SeedResult,
   type InitOptions,
-} from "@/application/init/seed.ts";
+} from "@platform-core/application/init/seed.ts";
