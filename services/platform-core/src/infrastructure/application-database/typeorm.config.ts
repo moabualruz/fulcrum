@@ -1,4 +1,4 @@
-import { DataSource, type DataSourceOptions } from "typeorm";
+import { DataSource, EntitySchema, type DataSourceOptions } from "typeorm";
 import { PGliteDriver } from "typeorm-pglite";
 import { resolveDatabaseConfig } from "@platform-core/application/db/database-config.ts";
 import { FULCRUM_TYPEORM_MIGRATIONS_TABLE } from "@platform-core/infrastructure/database/typeorm-data-source.ts";
@@ -107,8 +107,118 @@ import { ArtifactRetentionPolicy } from "@workflow-coordination/infrastructure/d
 import { AuditEvent } from "@workflow-coordination/infrastructure/database/entities/audit/AuditEvent.ts";
 import { AuditExport } from "@workflow-coordination/infrastructure/database/entities/audit/AuditExport.ts";
 
+// EntitySchema entities — platform-core
+import { FulcrumJobEntity } from "@platform-core/infrastructure/database/job-queue.entities.ts";
+import { FulcrumErrorLogEntity } from "@platform-core/infrastructure/database/error-log.entities.ts";
+import { FulcrumTelemetrySettingEntity, FulcrumTelemetryEventEntity } from "@platform-core/infrastructure/database/telemetry.entities.ts";
+import { FulcrumThemeSettingEntity } from "@platform-core/infrastructure/database/theme-settings.entities.ts";
+import { FulcrumCredentialEntity } from "@platform-core/infrastructure/database/credential.entities.ts";
+import { FulcrumTenantSettingEntity } from "@platform-core/infrastructure/database/tenant-setting.entities.ts";
+import { PlatformFeatureFlagEntity } from "@platform-core/infrastructure/database/feature-flag.entities.ts";
+
+// EntitySchema entities — identity-access
+import { FulcrumInvitationEntity } from "@identity-access/infrastructure/database/invitation.entities.ts";
+import { OrganizationMemberEntity } from "@identity-access/infrastructure/database/organization.entities.ts";
+
+// EntitySchema entities — work-management
+import {
+  WorkManagementStateEntity,
+  WorkManagementLabelEntity,
+  WorkManagementTaskLabelEntity,
+  WorkManagementCycleEntity,
+  WorkManagementCycleTaskEntity,
+  WorkManagementModuleEntity,
+  WorkManagementModuleTaskEntity,
+  WorkManagementSavedViewEntity,
+  WorkManagementIntakeEntity,
+  WorkManagementNotificationEntity,
+  WorkManagementTaskCommentEntity,
+  WorkManagementCommentReactionEntity,
+  WorkManagementTaskWatcherEntity,
+  WorkManagementTaskTemplateEntity,
+  WorkManagementCustomFieldDefEntity,
+  WorkManagementFieldDependencyRuleEntity,
+} from "@work-management/infrastructure/database/work-structure.entities.ts";
+import { WorkManagementTaskRecurrenceRuleEntity } from "@work-management/infrastructure/database/task-recurrence.entities.ts";
+import { WorkAutomationEntity } from "@work-management/infrastructure/database/automation.entities.ts";
+
+// EntitySchema entities — knowledge-workspace
+import {
+  KnowledgeWorkspacePageEntity,
+  KnowledgeWorkspacePageHistoryEntity,
+  KnowledgeWorkspaceCommentEntity,
+  KnowledgeWorkspaceAttachmentEntity,
+  KnowledgeWorkspaceBacklinkEntity,
+  KnowledgeWorkspaceCollaborationStateEntity,
+  KnowledgeWorkspaceSearchEntryEntity,
+  KnowledgeWorkspaceSavedSearchEntity,
+} from "@knowledge-workspace/infrastructure/database/document.entities.ts";
+
+// EntitySchema entities — execution-orchestration
+import {
+  FulcrumContextBundleEntity,
+  FulcrumMemoryEntity,
+  FulcrumMemoryLinkEntity,
+  FulcrumRunEventEntity,
+} from "@execution-orchestration/infrastructure/database/run-context.entities.ts";
+import {
+  FulcrumRoutingRuleEntity,
+  FulcrumRoutingDraftEntity,
+} from "@execution-orchestration/infrastructure/database/routing.entities.ts";
+
+// EntitySchema entities — integration-hub
+import {
+  IntegrationRepositoryEntity,
+  IntegrationRepositoryBranchEntity,
+  IntegrationRepositoryCommitEntity,
+} from "@integration-hub/infrastructure/database/repository.entities.ts";
+import {
+  IntegrationConnectorStateEntity,
+  IntegrationConnectorRunEntity,
+} from "@integration-hub/infrastructure/database/connector.entities.ts";
+import {
+  IntegrationWebhookEntity,
+  IntegrationWebhookDeliveryEntity,
+} from "@integration-hub/infrastructure/database/webhook.entities.ts";
+
+// EntitySchema entities — notification-center
+import {
+  NotificationReadStateEntity,
+  NotificationRuleSettingsEntity,
+  NotificationQuietHoursSettingsEntity,
+  NotificationPushSubscriptionEntity,
+  NotificationChannelSettingsEntity,
+  NotificationMuteEntity,
+} from "@notification-center/infrastructure/database/notification.entities.ts";
+
+// EntitySchema entities — workflow-coordination
+import {
+  WorkflowAuditEventEntity,
+  WorkflowAuditRetentionPolicyEntity,
+} from "@workflow-coordination/infrastructure/database/audit-log.entities.ts";
+import {
+  FulcrumWorkspaceEntity,
+  FulcrumProjectEntity,
+  FulcrumTaskEntity,
+  FulcrumTaskDependencyEntity,
+  FulcrumDocumentEntity,
+  FulcrumAcpSessionEntity,
+  FulcrumAgentRunEntity,
+} from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
+
+// EntitySchema entities — planning-review
+import {
+  FulcrumArtifactEntity,
+  FulcrumPlanEntity,
+  FulcrumPlanPrototypeEntity,
+  FulcrumReviewSessionEntity,
+  FulcrumReviewAnnotationEntity,
+  FulcrumUatSessionEntity,
+  FulcrumGeneratedE2ETestEntity,
+} from "@planning-review/infrastructure/database/review-workflow.entities.ts";
+
 export function createDataSourceOptions(
-  extraEntities: Function[] = [],
+  extraEntities: (Function | EntitySchema)[] = [],
   env: Record<string, string | undefined> = process.env,
 ): DataSourceOptions {
   const database = resolveDatabaseConfig({ env });
@@ -126,7 +236,7 @@ export function createDataSourceOptions(
   };
 }
 
-export function getCoreEntities(): Function[] {
+export function getCoreEntities(): (Function | EntitySchema)[] {
   return [
     // platform-core
     Event,
@@ -224,6 +334,86 @@ export function getCoreEntities(): Function[] {
     ArtifactRetentionPolicy,
     AuditEvent,
     AuditExport,
+    // EntitySchema — platform-core
+    FulcrumJobEntity,
+    FulcrumErrorLogEntity,
+    FulcrumTelemetrySettingEntity,
+    FulcrumTelemetryEventEntity,
+    FulcrumThemeSettingEntity,
+    FulcrumCredentialEntity,
+    FulcrumTenantSettingEntity,
+    PlatformFeatureFlagEntity,
+    // EntitySchema — identity-access
+    FulcrumInvitationEntity,
+    OrganizationMemberEntity,
+    // EntitySchema — work-management
+    WorkManagementStateEntity,
+    WorkManagementLabelEntity,
+    WorkManagementTaskLabelEntity,
+    WorkManagementCycleEntity,
+    WorkManagementCycleTaskEntity,
+    WorkManagementModuleEntity,
+    WorkManagementModuleTaskEntity,
+    WorkManagementSavedViewEntity,
+    WorkManagementIntakeEntity,
+    WorkManagementNotificationEntity,
+    WorkManagementTaskCommentEntity,
+    WorkManagementCommentReactionEntity,
+    WorkManagementTaskWatcherEntity,
+    WorkManagementTaskTemplateEntity,
+    WorkManagementCustomFieldDefEntity,
+    WorkManagementFieldDependencyRuleEntity,
+    WorkManagementTaskRecurrenceRuleEntity,
+    WorkAutomationEntity,
+    // EntitySchema — knowledge-workspace
+    KnowledgeWorkspacePageEntity,
+    KnowledgeWorkspacePageHistoryEntity,
+    KnowledgeWorkspaceCommentEntity,
+    KnowledgeWorkspaceAttachmentEntity,
+    KnowledgeWorkspaceBacklinkEntity,
+    KnowledgeWorkspaceCollaborationStateEntity,
+    KnowledgeWorkspaceSearchEntryEntity,
+    KnowledgeWorkspaceSavedSearchEntity,
+    // EntitySchema — execution-orchestration
+    FulcrumContextBundleEntity,
+    FulcrumMemoryEntity,
+    FulcrumMemoryLinkEntity,
+    FulcrumRunEventEntity,
+    FulcrumRoutingRuleEntity,
+    FulcrumRoutingDraftEntity,
+    // EntitySchema — integration-hub
+    IntegrationRepositoryEntity,
+    IntegrationRepositoryBranchEntity,
+    IntegrationRepositoryCommitEntity,
+    IntegrationConnectorStateEntity,
+    IntegrationConnectorRunEntity,
+    IntegrationWebhookEntity,
+    IntegrationWebhookDeliveryEntity,
+    // EntitySchema — notification-center
+    NotificationReadStateEntity,
+    NotificationRuleSettingsEntity,
+    NotificationQuietHoursSettingsEntity,
+    NotificationPushSubscriptionEntity,
+    NotificationChannelSettingsEntity,
+    NotificationMuteEntity,
+    // EntitySchema — workflow-coordination
+    WorkflowAuditEventEntity,
+    WorkflowAuditRetentionPolicyEntity,
+    FulcrumWorkspaceEntity,
+    FulcrumProjectEntity,
+    FulcrumTaskEntity,
+    FulcrumTaskDependencyEntity,
+    FulcrumDocumentEntity,
+    FulcrumAcpSessionEntity,
+    FulcrumAgentRunEntity,
+    // EntitySchema — planning-review
+    FulcrumArtifactEntity,
+    FulcrumPlanEntity,
+    FulcrumPlanPrototypeEntity,
+    FulcrumReviewSessionEntity,
+    FulcrumReviewAnnotationEntity,
+    FulcrumUatSessionEntity,
+    FulcrumGeneratedE2ETestEntity,
   ];
 }
 
