@@ -386,7 +386,7 @@ export async function loadProjectGantt(
     const rows = await conn.execute<Array<{ id: string; source_task_id: string; target_task_id: string; type: string }>>(
       `SELECT r.id, r.source_task_id, r.target_task_id, r.type
          FROM task_relationships r
-         INNER JOIN tasks t ON t.id = r.source_task_id
+         INNER JOIN tasks t ON t.id::text = r.source_task_id
         WHERE t.project_id = $1
           ${relationshipDeletedPredicate}`,
       [projectId],

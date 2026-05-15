@@ -169,6 +169,8 @@ export class WorkItemRecurrenceService {
         next.setDate(next.getDate() + rule.intervalDays);
         rule.nextRunAt = next;
       }
+
+      await this.em.save(rule);
     }
   }
 
@@ -206,7 +208,7 @@ export class WorkItemRecurrenceService {
       throw new AppNotFoundError(`Recurrence rule ${ruleId} not found`);
     }
 
-    this.em.remove(rule);
+    await this.em.remove(rule);
   }
 
   async list(orgId: string, taskId: string): Promise<RecurrenceRuleOutput[]> {

@@ -46,62 +46,117 @@ function buildFakeService(options: FakeServiceOptions = {}) {
   const created: Array<{ entity: unknown; data: Record<string, unknown> }> = [];
   const flushed: string[] = [];
   const cleared: string[] = [];
-  const existingRows: Record<string, unknown>[] = [];
+  const runUpCalls: Array<{ to?: string }> = [];
+  const runDownCalls: string[] = [];
 
-  const repo = {
-    findAll: mock(async () => options.repoRows ?? []),
-    findOne: mock(async (query: { name: string }) => {
-      if (options.repoFindOne) return await options.repoFindOne(query);
+  // Schema migration repo (TypeORM Repository<SchemaMigration> shape)
+  const schemaMigrationRepo = {
+    findOne: mock(async (opts?: { where?: { name?: string } }) => {
+      const name = opts?.where?.name;
+      if (name && options.repoFindOne) return await options.repoFindOne({ name });
       return null;
     }),
-  };
-  const em = {
-    fork: mock(() => em),
-    getRepository: mock(() => repo),
-    create: mock((entity: unknown, data: Record<string, unknown>) => {
-      created.push({ entity, data });
-      existingRows.push(data);
+    find: mock(async (_opts?: unknown) => options.repoRows ?? []),
+    create: mock((data: Record<string, unknown>) => {
+      created.push({ entity: SchemaMigration, data });
       return data;
     }),
+    save: mock(async (_entity: unknown) => {}),
+  };
+
+  // Event repo (TypeORM Repository<Event> shape)
+  const eventRepo = {
+    create: mock((data: Record<string, unknown>) => {
+      created.push({ entity: Event, data });
+      return data;
+    }),
+    save: mock(async (_entity: unknown) => {}),
+  };
+
+  // org repo
+  const orgRepo = {
+    findOne: mock(async () => null),
+  };
+
+  // TypeORM DataSource mock
+  const executedMigrations = options.executed ?? [];
+  const pendingMigrations = options.pending ?? [];
+
+  const dataSource = {
+    // _getPendingMigrations reads this array
+    migrations: pendingMigrations.map((m) => ({ name: m.name, timestamp: 0, up: async () => {}, down: async () => {} })),
+    // _getExecutedMigrations queries migrations table
+    query: mock(async (sql: string) => {
+      if (sql.includes("FROM migrations") || sql.includes("from migrations")) {
+        return executedMigrations.map((m) => ({ name: m.name, timestamp: 0 }));
+      }
+      return [];
+    }),
+    runMigrations: mock(async (_opts?: unknown) => {
+      runUpCalls.push({});
+      return (options.upResult ?? []).map((m) => ({ name: m.name, timestamp: 0, up: async () => {}, down: async () => {} }));
+    }),
+    undoLastMigration: mock(async (_opts?: unknown) => {
+      runDownCalls.push("down");
+    }),
+    getRepository: mock((entity: unknown) => {
+      if (entity === SchemaMigration || (typeof entity === "function" && entity.name === "SchemaMigration")) {
+        return schemaMigrationRepo;
+      }
+      if (entity === Event || (typeof entity === "function" && entity.name === "Event")) {
+        return eventRepo;
+      }
+      return orgRepo;
+    }),
+  };
+
+  // Expose migrator-like facade for test assertions
+  const migrator = {
+    up: {
+      mock: {
+        calls: [] as unknown[][],
+      },
+    },
+    down: {
+      mock: {
+        calls: [] as unknown[][],
+      },
+    },
+    get _runUpCalls() { return runUpCalls; },
+    get _runDownCalls() { return runDownCalls; },
+  };
+
+  const em = {
     flush: mock(async () => {
       flushed.push("flush");
     }),
     clear: mock(() => {
       cleared.push("clear");
     }),
-    getReference: mock((_entity: unknown, id: string) => ({ id })),
-  };
-  const migrator = {
-    getPending: mock(async () => options.pending ?? []),
-    getExecuted: mock(async () => options.executed ?? []),
-    up: mock(async () => options.upResult ?? []),
-    down: mock(async () => options.downResult ?? []),
-  };
-  const orm = {
-    config: {
-      get: mock((key: string) => key === "migrations" ? { path: options.migrationsPath ?? "/tmp/migrations" } : undefined),
-    },
-    migrator,
-    em,
   };
 
   const service = new MigratorService(
-    orm as never,
-    repo as never,
-    repo as never,
+    dataSource as never,
+    schemaMigrationRepo as never,
+    { manager: { save: mock(async () => {}), create: eventRepo.create } } as never,
     {
       checksumReader: options.checksumReader,
       isLossyResolver: options.isLossyResolver,
     },
   );
 
-  return { service, migrator, repo, em, created, flushed, cleared, existingRows };
+  // Override migrations path if provided
+  if (options.migrationsPath) {
+    (service as any)._migrationsPath = options.migrationsPath;
+  }
+
+  return { service, migrator, repo: schemaMigrationRepo, em, created, flushed, cleared, existingRows: [] as Record<string, unknown>[], dataSource };
 }
 
 describe("MigratorService branch behavior with controlled collaborators", () => {
   test("migrates upward to a pending target prefix and records checksumed ledger rows", async () => {
     const target = "Migration20260512010101_pending_branch";
-    const { service, migrator, created, flushed } = buildFakeService({
+    const { service, dataSource, created } = buildFakeService({
       pending: [{ name: target }],
       upResult: [{ name: target }],
       checksumReader: async () => "checksum-a",
@@ -109,7 +164,7 @@ describe("MigratorService branch behavior with controlled collaborators", () => 
 
     await service.migrate("Migration20260512010101");
 
-    expect(migrator.up).toHaveBeenCalledWith({ to: "Migration20260512010101" });
+    expect(dataSource.runMigrations).toHaveBeenCalled();
     expect(created).toEqual([
       expect.objectContaining({
         entity: SchemaMigration,
@@ -121,7 +176,6 @@ describe("MigratorService branch behavior with controlled collaborators", () => 
         }),
       }),
     ]);
-    expect(flushed).toHaveLength(1);
   });
 
   test("updates an existing ledger row instead of inserting a duplicate", async () => {
@@ -144,7 +198,7 @@ describe("MigratorService branch behavior with controlled collaborators", () => 
   test("forced lossy downgrade emits the audit event before running down", async () => {
     const target = "Migration20260512030303_target";
     const lossy = "Migration20260512040404_lossy";
-    const { service, migrator, created } = buildFakeService({
+    const { service, dataSource, created } = buildFakeService({
       executed: [{ name: target }, { name: lossy }],
       downResult: [{ name: lossy }],
       isLossyResolver: async () => true,
@@ -153,7 +207,7 @@ describe("MigratorService branch behavior with controlled collaborators", () => 
 
     await service.migrate(target, true);
 
-    expect(migrator.down).toHaveBeenCalledWith({ to: target });
+    expect(dataSource.undoLastMigration).toHaveBeenCalled();
     expect(created).toEqual(expect.arrayContaining([
       expect.objectContaining({
         entity: Event,
@@ -174,13 +228,13 @@ describe("MigratorService branch behavior with controlled collaborators", () => 
   test("unforced lossy downgrade stops before calling migrator.down", async () => {
     const target = "Migration20260512050505_target";
     const lossy = "Migration20260512060606_lossy";
-    const { service, migrator } = buildFakeService({
+    const { service, dataSource } = buildFakeService({
       executed: [{ name: target }, { name: lossy }],
       isLossyResolver: async () => true,
     });
 
     await expect(service.migrate(target, false)).rejects.toThrow(LossyDownProtectedError);
-    expect(migrator.down).not.toHaveBeenCalled();
+    expect(dataSource.undoLastMigration).not.toHaveBeenCalled();
   });
 
   test("real migration lossiness resolver imports migration files and fails closed on missing files", async () => {

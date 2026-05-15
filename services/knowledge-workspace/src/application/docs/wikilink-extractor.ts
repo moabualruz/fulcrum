@@ -34,7 +34,7 @@ export async function syncDocWikilinks(
 ): Promise<void> {
   const slugs = extractWikilinkSlugs(contentJson);
   const existing = await em.find(DocLink, { where: {
-    org: orgId,
+    org: { id: orgId },
     fromDoc: fromDoc.id,
     linkKind: "wikilink",
   } as never, relations: ["toDoc"] });
@@ -46,7 +46,7 @@ export async function syncDocWikilinks(
 
   for (const slug of slugs) {
     const current = existing.find((link) => link.toSlug === slug);
-    const target = await em.findOne(Document, { where: { org: orgId, externalId: slug, archived: false } as never });
+    const target = await em.findOne(Document, { where: { org: { id: orgId }, externalId: slug, archived: false } as never });
     if (current) {
       current.toDoc = target;
       await em.save(current);

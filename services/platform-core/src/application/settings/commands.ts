@@ -128,7 +128,7 @@ export async function clearSettingsErrors(
   if (!input.before) throw new AppValidationError("before date required");
   const before = new Date(input.before);
   if (Number.isNaN(before.getTime())) throw new AppValidationError("before date is invalid");
-  const rows = await em.find(ErrorLog, { org: ctx.orgId, occurredAt: { $lt: before } } as never);
+  const rows = await em.find(ErrorLog, { org: { id: ctx.orgId }, occurredAt: { $lt: before } } as never);
   em.remove(rows);
   return { success: true as const };
 }
@@ -148,7 +148,7 @@ export async function toggleSettingsFeatureFlag(
 async function rolloutForFlag(em: EntityManager, ctx: AppContext, id: string): Promise<FeatureFlagRollout> {
   const flag = await em.findOne(FeatureFlag, { where: { id, orgId: ctx.orgId, userId: null } as never });
   if (!flag) throw new AppNotFoundError(`Feature flag not found: ${id}`);
-  let rollout = await em.findOne(FeatureFlagRollout, { where: { org: ctx.orgId, flag: id } as never });
+  let rollout = await em.findOne(FeatureFlagRollout, { where: { org: { id: ctx.orgId }, flag: id } as never });
   if (!rollout) {
     rollout = em.create(FeatureFlagRollout, {
       org: { id: ctx.orgId } as Org,
@@ -196,7 +196,7 @@ export async function addSettingsSecret(
 ): Promise<{ success: true }> {
   const userId = requireUserId(ctx);
   if (!input.name || !input.value) throw new AppValidationError("name and value required");
-  let credential = await em.findOne(Credential, { where: { org: ctx.orgId, user: userId, name: input.name } as never });
+  let credential = await em.findOne(Credential, { where: { org: { id: ctx.orgId }, user: userId, name: input.name } as never });
   if (!credential) {
     credential = em.create(Credential, {
       org: { id: ctx.orgId } as Org,
@@ -220,7 +220,7 @@ export async function rotateSettingsSecret(
   input: { id: string; value: string },
 ): Promise<{ success: true }> {
   if (!input.id || !input.value) throw new AppValidationError("id and value required");
-  const credential = await em.findOne(Credential, { where: { id: input.id, org: ctx.orgId } as never });
+  const credential = await em.findOne(Credential, { where: { id: input.id, org: { id: ctx.orgId } } as never });
   if (!credential) throw new AppNotFoundError(`Credential not found: ${input.id}`);
   credential.encryptedValue = encodedSecret(input.value);
   credential.lastUsedAt = new Date();
@@ -229,7 +229,7 @@ export async function rotateSettingsSecret(
 
 export async function toggleSettingsSecretArchive(em: EntityManager, ctx: AppContext, input: { id: string }): Promise<{ success: true }> {
   if (!input.id) throw new AppValidationError("id required");
-  const credential = await em.findOne(Credential, { where: { id: input.id, org: ctx.orgId } as never });
+  const credential = await em.findOne(Credential, { where: { id: input.id, org: { id: ctx.orgId } } as never });
   if (!credential) throw new AppNotFoundError(`Credential not found: ${input.id}`);
   credential.archived = !credential.archived;
   return { success: true as const };
@@ -237,7 +237,7 @@ export async function toggleSettingsSecretArchive(em: EntityManager, ctx: AppCon
 
 export async function deleteSettingsSecret(em: EntityManager, ctx: AppContext, input: { id: string }): Promise<{ success: true }> {
   if (!input.id) throw new AppValidationError("id required");
-  const credential = await em.findOne(Credential, { where: { id: input.id, org: ctx.orgId } as never });
+  const credential = await em.findOne(Credential, { where: { id: input.id, org: { id: ctx.orgId } } as never });
   if (!credential) throw new AppNotFoundError(`Credential not found: ${input.id}`);
   em.remove(credential);
   return { success: true as const };
@@ -250,7 +250,7 @@ export async function toggleSettingsTelemetryOptIn(em: EntityManager, ctx: AppCo
 }
 
 export async function purgeSettingsTelemetry(em: EntityManager, ctx: AppContext): Promise<{ success: true; rowCount: 0 }> {
-  const rows = await em.find(TelemetryEvent, { org: ctx.orgId } as never);
+  const rows = await em.find(TelemetryEvent, { org: { id: ctx.orgId } } as never);
   em.remove(rows);
   return { success: true as const, rowCount: 0 as const };
 }

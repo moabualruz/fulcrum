@@ -45,7 +45,7 @@ export async function listSavedSearches(
   owner: string,
 ): Promise<SavedSearch[]> {
   const rows = await em.find(SavedView, { where: {
-    org: ctx.orgId,
+    org: { id: ctx.orgId },
     viewType: "search",
     createdById: owner,
   } as never, order: { createdAt: "DESC", id: "ASC" } });
@@ -63,7 +63,7 @@ export async function saveSearch(
   input: { owner: string; name: string; params: SearchParams },
 ): Promise<void> {
   const existing = await em.findOne(SavedView, { where: {
-    org: ctx.orgId,
+    org: { id: ctx.orgId },
     viewType: "search",
     createdById: input.owner,
     name: input.name,

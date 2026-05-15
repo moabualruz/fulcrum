@@ -174,7 +174,7 @@ export class DocumentService {
     sortPosition?: number;
     archived?: boolean;
   }): Promise<DocOutput | null> {
-    const doc = await this.em.findOne(Document, { where: { org: ctx.orgId, id: input.id, archived: false } as never });
+    const doc = await this.em.findOne(Document, { where: { org: { id: ctx.orgId }, id: input.id, archived: false } as never });
     if (!doc) return null;
 
     if (input.parentId !== undefined) doc.parent = await resolveParent(this.em, ctx.orgId, input.parentId);
@@ -211,7 +211,7 @@ export class DocumentService {
   }
 
   async delete(ctx: DocContext, id: string, hard = false): Promise<DocOutput | { deleted: true } | null> {
-    const doc = await this.em.findOne(Document, { where: { org: ctx.orgId, id } as never });
+    const doc = await this.em.findOne(Document, { where: { org: { id: ctx.orgId }, id } as never });
     if (!doc) return null;
 
     if (hard) {
@@ -230,13 +230,13 @@ export class DocumentService {
   // ── Comments ───────────────────────────────────────────────────
 
   async listComments(ctx: DocContext, docId: string, resolved?: boolean): Promise<CommentOutput[]> {
-    const doc = await this.em.findOne(Document, { where: { org: ctx.orgId, id: docId } as never });
+    const doc = await this.em.findOne(Document, { where: { org: { id: ctx.orgId }, id: docId } as never });
     if (!doc) {
       throw new AppNotFoundError("Document not found.");
     }
 
     const comments = await this.em.find(DocComment, { where: {
-      org: ctx.orgId,
+      org: { id: ctx.orgId },
       doc: docId,
       resolved: resolved ?? false,
     } as never, relations: ["org", "doc", "author", "parentComment"], order: { createdAt: "ASC", id: "ASC" } });
@@ -265,7 +265,7 @@ export class DocumentService {
     bodyMd: string;
     parentCommentId?: string | null;
   }): Promise<CommentOutput> {
-    const doc = await this.em.findOne(Document, { where: { org: ctx.orgId, id: input.docId, archived: false } as never });
+    const doc = await this.em.findOne(Document, { where: { org: { id: ctx.orgId }, id: input.docId, archived: false } as never });
     if (!doc) {
       throw new AppNotFoundError("Document not found.");
     }
@@ -273,7 +273,7 @@ export class DocumentService {
     let parentComment: DocComment | null = null;
     if (input.parentCommentId) {
       parentComment = await this.em.findOne(DocComment, { where: {
-        org: ctx.orgId,
+        org: { id: ctx.orgId },
         doc: input.docId,
         id: input.parentCommentId,
       } as never });
@@ -342,7 +342,7 @@ export class DocumentService {
   }>> {
     await requireDoc(this.em, ctx.orgId, docId);
     const versions = await this.em.find(DocVersion, { where: {
-      org: ctx.orgId,
+      org: { id: ctx.orgId },
       doc: docId,
     } as never, relations: ["author"], order: { versionNum: "DESC" } });
     return versions.map((v) => ({
@@ -357,7 +357,7 @@ export class DocumentService {
   async getVersion(ctx: DocContext, docId: string, versionNum: number): Promise<VersionOutput | null> {
     await requireDoc(this.em, ctx.orgId, docId);
     const version = await this.em.findOne(DocVersion, { where: {
-      org: ctx.orgId,
+      org: { id: ctx.orgId },
       doc: docId,
       versionNum,
     } as never, relations: ["author", "restoreOf"] });
@@ -399,7 +399,7 @@ export class DocumentService {
     linkKind: "wikilink";
   }>> {
     const links = await this.em.find(DocLink, { where: {
-      org: orgId,
+      org: { id: orgId },
       toDoc: docId,
       linkKind: "wikilink",
     } as never, relations: ["fromDoc"], order: { createdAt: "ASC", id: "ASC" } });
@@ -422,7 +422,7 @@ export class DocumentService {
     linkKind: "wikilink";
   }>> {
     const links = await this.em.find(DocLink, { where: {
-      org: orgId,
+      org: { id: orgId },
       fromDoc: docId,
       linkKind: "wikilink",
     } as never, relations: ["toDoc"], order: { createdAt: "ASC", id: "ASC" } });
@@ -560,7 +560,7 @@ async function uniqueSlug(em: EntityManager, orgId: string, title: string): Prom
   const prefix = `${slugBase(title)}-${slugSuffix()}`;
   let slug = prefix;
   let counter = 2;
-  while (await em.findOne(Document, { where: { org: orgId, externalId: slug } as never })) {
+  while (await em.findOne(Document, { where: { org: { id: orgId }, externalId: slug } as never })) {
     slug = `${prefix}-${counter}`;
     counter += 1;
   }
@@ -573,8 +573,8 @@ async function findDocByInput(
   input: { id?: string; slug?: string; includeArchived?: boolean },
 ): Promise<Document | null> {
   const where = input.id
-    ? { org: orgId, id: input.id }
-    : { org: orgId, externalId: input.slug };
+    ? { org: { id: orgId }, id: input.id }
+    : { org: { id: orgId }, externalId: input.slug };
   return em.findOne(Document, { where: {
     ...where,
     ...(input.includeArchived ? {} : { archived: false }),
@@ -587,7 +587,7 @@ async function upsertSearchDocument(
   docId: string,
   authorId: string | null = null,
 ): Promise<void> {
-  const doc = await em.findOne(Document, { where: { org: orgId, id: docId } as never, relations: ["org"] });
+  const doc = await em.findOne(Document, { where: { org: { id: orgId }, id: docId } as never, relations: ["org"] });
   if (!doc) return;
   await indexDoc(em, doc, authorId);
 }
@@ -598,7 +598,7 @@ async function resolveParent(
   parentId: string | null | undefined,
 ): Promise<Document | null> {
   if (parentId === undefined || parentId === null) return null;
-  const parent = await em.findOne(Document, { where: { org: orgId, id: parentId, archived: false } as never });
+  const parent = await em.findOne(Document, { where: { org: { id: orgId }, id: parentId, archived: false } as never });
   if (!parent) {
     throw new AppNotFoundError("Parent document not found.");
   }
@@ -606,7 +606,7 @@ async function resolveParent(
 }
 
 async function requireDoc(em: EntityManager, orgId: string, docId: string): Promise<Document> {
-  const doc = await em.findOne(Document, { where: { org: orgId, id: docId, archived: false } as never });
+  const doc = await em.findOne(Document, { where: { org: { id: orgId }, id: docId, archived: false } as never });
   if (!doc) {
     throw new AppNotFoundError("Document not found.");
   }
@@ -619,7 +619,7 @@ function anchorPosition(comment: DocComment): number {
 }
 
 async function findComment(em: EntityManager, orgId: string, id: string): Promise<DocComment | null> {
-  return em.findOne(DocComment, { where: { org: orgId, id } as never, relations: ["org", "doc", "author", "parentComment"] });
+  return em.findOne(DocComment, { where: { org: { id: orgId }, id } as never, relations: ["org", "doc", "author", "parentComment"] });
 }
 
 async function assertCommentDeleteAllowed(

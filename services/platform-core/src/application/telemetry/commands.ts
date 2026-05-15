@@ -88,7 +88,7 @@ export class MikroTelemetryStore extends TelemetryStore {
   }
 
   async count(orgId = this.context.orgId): Promise<number> {
-    return this.em().count(TelemetryEvent, { org: orgId } as never);
+    return this.em().count(TelemetryEvent, { org: { id: orgId } } as never);
   }
 
   async write(event: TelemetryWriteInput): Promise<void> {
@@ -104,7 +104,7 @@ export class MikroTelemetryStore extends TelemetryStore {
 
   async purge(orgId = this.context.orgId): Promise<number> {
     const em = this.em();
-    const rows = await em.find(TelemetryEvent, { org: orgId } as never);
+    const rows = await em.find(TelemetryEvent, { org: { id: orgId } } as never);
     em.remove(rows);
     return rows.length;
   }

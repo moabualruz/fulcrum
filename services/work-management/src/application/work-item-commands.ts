@@ -213,6 +213,9 @@ export async function setDependencies(
       }
     }
 
+    // Recompute task dependencies from updated edges (task object may be stale in TypeORM)
+    task.dependencies = dependenciesForTask(task.id, edges);
+
     emitTaskEvent(txEm, ctx, {
       verb: "dependency_updated",
       taskId: task.id,

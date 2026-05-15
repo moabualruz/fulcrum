@@ -70,7 +70,7 @@ async function computeSnapshot(
   pointsRemaining: number;
   statusCounts: Record<string, number>;
 }> {
-  const taskWhere: Record<string, unknown> = { org: orgId };
+  const taskWhere: Record<string, unknown> = { org: { id: orgId } };
 
   if (scopeType === "project" && scopeId) {
     // Tasks within a project — use projectId field when available

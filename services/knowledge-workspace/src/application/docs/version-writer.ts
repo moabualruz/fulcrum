@@ -53,7 +53,7 @@ export async function writeDocVersion(
 ): Promise<DocVersion> {
   const now = input.now ?? new Date();
   const latest = await em.findOne(DocVersion, { where: {
-    org: input.orgId,
+    org: { id: input.orgId },
     doc: input.doc.id,
   } as never, order: { versionNum: "DESC" } });
   const versionNum = (latest?.versionNum ?? 0) + 1;

@@ -73,7 +73,7 @@ export async function reconstructDocVersion(
   const pmSchema = schema ?? makeDefaultSchema();
 
   const target = await em.findOne(DocVersion, {
-    org: input.orgId,
+    org: { id: input.orgId },
     doc: input.docId,
     versionNum: input.versionNum,
   } as never);
@@ -82,7 +82,7 @@ export async function reconstructDocVersion(
   }
 
   const snapshot = await em.findOne(DocVersion, { where: {
-    org: input.orgId,
+    org: { id: input.orgId },
     doc: input.docId,
     versionNum: { $lte: input.versionNum },
     snapshot: { $ne: null },
@@ -93,7 +93,7 @@ export async function reconstructDocVersion(
 
   let contentJson = jsonClone(snapshot.snapshot);
   const deltas = await em.find(DocVersion, { where: {
-    org: input.orgId,
+    org: { id: input.orgId },
     doc: input.docId,
     versionNum: { $gt: snapshot.versionNum, $lte: input.versionNum },
   } as never, order: { versionNum: "ASC" } });

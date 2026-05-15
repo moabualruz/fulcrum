@@ -318,7 +318,7 @@ export async function testRoutingRule(
 ): Promise<RoutingEnrichedDto> {
   await configureRouting(em);
   const { autoAssign } = await import("@fulcrum/server/router/auto-assign.ts");
-  const task = await em.findOne(Task, { where: { id: input.taskId, org: ctx.orgId  } as never });
+  const task = await em.findOne(Task, { where: { id: input.taskId, org: { id: ctx.orgId }  } as never });
   if (!task) throw new AppNotFoundError("Task not found.");
 
   const taskFacts = taskFactsFromTask(task);

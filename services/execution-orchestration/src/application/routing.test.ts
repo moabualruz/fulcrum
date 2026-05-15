@@ -44,16 +44,12 @@ describe("routing application service helpers", () => {
   it("records routing telemetry only for non-dry-run decisions", async () => {
     const persisted: unknown[] = [];
     const manager = {
-      getReference(_entity: unknown, id: string) {
-        return { id };
-      },
-      persist(event: unknown) {
+      async save(event: unknown) {
         persisted.push(event);
       },
-      async flush() {},
     };
     const eventRepository = {
-      getEntityManager() {
+      get manager() {
         return manager;
       },
       create(input: unknown) {
@@ -152,16 +148,12 @@ describe("routing application service helpers", () => {
     const savedRules: RoutingRule[] = [];
     const persistedRules: RoutingRule[] = [];
     const manager = {
-      getReference(_entity: unknown, id: string) {
-        return { id };
-      },
-      persist(rule: RoutingRule) {
+      async save(rule: RoutingRule) {
         persistedRules.push(rule);
       },
-      async flush() {},
     };
     const baseRepository = {
-      getEntityManager() {
+      get manager() {
         return manager;
       },
       create(input: Partial<RoutingRule>) {

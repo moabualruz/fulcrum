@@ -18,8 +18,8 @@ export class EntityManagerDocTemplateService implements DocTemplateService {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: Record<string, unknown> = projectId
-      ? { org: orgId, $or: [{ projectId }, { projectId: null }] } as any
-      : { org: orgId, projectId: null } as any;
+      ? { org: { id: orgId }, $or: [{ projectId }, { projectId: null }] } as any
+      : { org: { id: orgId }, projectId: null } as any;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows = await this.em.find(DocTemplate, { where: where as any, order: { docType: "ASC" } });
@@ -36,14 +36,14 @@ export class EntityManagerDocTemplateService implements DocTemplateService {
     if (projectId) {
       const specific = await this.em.findOne(DocTemplate, {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        org: orgId, projectId, docType, isDefault: true,
+        org: { id: orgId }, projectId, docType, isDefault: true,
       } as any);
       if (specific) return toRow(specific);
     }
 
     const fallback = await this.em.findOne(DocTemplate, {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      org: orgId, projectId: null, docType, isDefault: true,
+      org: { id: orgId }, projectId: null, docType, isDefault: true,
     } as any);
 
     return fallback ? toRow(fallback) : builtinTemplateRow(orgId, docType);

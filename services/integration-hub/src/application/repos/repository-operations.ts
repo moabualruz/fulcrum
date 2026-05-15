@@ -97,24 +97,30 @@ export async function registerRepository(
   ctx: AppContext,
   input: RegisterRepositoryInput,
 ): Promise<RepositoryOutput> {
-  const repoRepository = repoRepo(em);
-  const created = input.kind === "local"
-    ? repoRepository.create({
-      orgId: ctx.orgId,
+  const created = em.create(Repo, input.kind === "local"
+    ? {
+      org: { id: ctx.orgId } as Org,
       name: input.name ?? basename(resolve(input.path)),
       slug: input.slug ?? basename(resolve(input.path)),
       kind: "local",
       localPath: resolve(input.path),
       remoteUrl: null,
-    })
-    : repoRepository.create({
-      orgId: ctx.orgId,
+      syncStatus: "idle",
+      archived: false,
+      lastTouchedAt: new Date(),
+    }
+    : {
+      org: { id: ctx.orgId } as Org,
       name: input.name ?? slugFromRemoteUrl(input.url),
       slug: input.slug ?? slugFromRemoteUrl(input.url),
       kind: "remote",
       localPath: null,
       remoteUrl: input.url,
+      syncStatus: "idle",
+      archived: false,
+      lastTouchedAt: new Date(),
     });
+  await em.save(created);
 
   await emitRepoEvent(em, ctx, {
     verb: "repo.registered",
@@ -209,8 +215,65 @@ export async function createRepoTask(input: {
   };
 }
 
+/** Build a RepoRepository-compatible adapter from an EntityManager (works in tests without DI). */
 function repoRepo(em: EntityManager): RepoRepository {
-  return em.getRepository(Repo) as unknown as RepoRepository;
+  const repos = em.getRepository(Repo);
+  const adapter: RepoRepository = {
+    create(input: any) {
+      return repos.create({
+        org: { id: input.orgId } as Org,
+        name: input.name,
+        slug: input.slug,
+        kind: input.kind,
+        localPath: input.localPath ?? null,
+        remoteUrl: input.remoteUrl ?? null,
+        defaultBranch: input.defaultBranch ?? "main",
+        currentBranch: input.currentBranch ?? input.defaultBranch ?? "main",
+        syncStatus: "idle",
+        lastTouchedAt: new Date(),
+        archived: false,
+      });
+    },
+    async list(input: any) {
+      return repos.find({
+        where: {
+          org: { id: input.orgId },
+          ...(input.includeArchived ? {} : { archived: false }),
+        },
+        order: { lastTouchedAt: "DESC", name: "ASC" },
+        relations: ["org"],
+      });
+    },
+    async get(input: any) {
+      return repos.findOne({
+        where: { org: { id: input.orgId }, id: input.id },
+        relations: ["org"],
+      });
+    },
+    async update(input: any) {
+      const repo = await adapter.get(input);
+      if (!repo) return null;
+      if (input.name !== undefined) repo.name = input.name;
+      if (input.slug !== undefined) repo.slug = input.slug;
+      if (input.kind !== undefined) repo.kind = input.kind;
+      if (input.localPath !== undefined) repo.localPath = input.localPath;
+      if (input.remoteUrl !== undefined) repo.remoteUrl = input.remoteUrl;
+      if (input.defaultBranch !== undefined) repo.defaultBranch = input.defaultBranch;
+      if (input.currentBranch !== undefined) repo.currentBranch = input.currentBranch;
+      if (input.lastSyncAt !== undefined) repo.lastSyncAt = input.lastSyncAt;
+      if (input.syncStatus !== undefined) repo.syncStatus = input.syncStatus;
+      repo.lastTouchedAt = input.lastTouchedAt ?? new Date();
+      return repos.save(repo);
+    },
+    async archive(input: any) {
+      const repo = await adapter.get(input);
+      if (!repo) return null;
+      repo.archived = true;
+      repo.lastTouchedAt = new Date();
+      return repos.save(repo);
+    },
+  } as unknown as RepoRepository;
+  return adapter;
 }
 
 function serializeRepository(repo: Repo): RepositoryOutput {

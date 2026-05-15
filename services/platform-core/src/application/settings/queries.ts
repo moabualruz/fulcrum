@@ -84,7 +84,7 @@ export async function getTenantSetting(em: EntityManager, ctx: AppContext, key: 
 }
 
 export async function listCredentials(em: EntityManager, ctx: AppContext, input: { provider?: string } = {}): Promise<CredentialDto[]> {
-  return (await em.find(ConnectorCredential, { where: { org: ctx.orgId, ...(input.provider ? { provider: input.provider } : {}) } as never, order: { provider: "ASC", id: "ASC" } })).map(serializeCredential);
+  return (await em.find(ConnectorCredential, { where: { org: { id: ctx.orgId }, ...(input.provider ? { provider: input.provider } : {}) } as never, order: { provider: "ASC", id: "ASC" } })).map(serializeCredential);
 }
 
 export async function getCredential(em: EntityManager, ctx: AppContext, id: string): Promise<CredentialDto> {
@@ -145,7 +145,7 @@ export async function listSettingsErrors(
 ): Promise<{ errors: SettingsErrorDto[]; total: number; page: number; pageSize: number }> {
   const page = Math.max(1, input.page);
   const pageSize = Math.max(1, input.pageSize);
-  const where = { org: ctx.orgId } as never;
+  const where = { org: { id: ctx.orgId } } as never;
   const [rows, total] = await em.findAndCount(ErrorLog, {
     where,
     order: { occurredAt: "DESC" },
@@ -170,7 +170,7 @@ export async function listSettingsErrors(
 
 export async function listSettingsFeatureFlags(em: EntityManager, ctx: AppContext): Promise<{ flags: SettingsFeatureFlagDto[] }> {
   const rows = await em.find(FeatureFlag, { where: { orgId: ctx.orgId, userId: null } as never, order: { flag: "ASC" } });
-  const rollouts = await em.find(FeatureFlagRollout, { where: { org: ctx.orgId } as never, relations: ["flag"] });
+  const rollouts = await em.find(FeatureFlagRollout, { where: { org: { id: ctx.orgId } } as never, relations: ["flag"] });
   const byFlagId = new Map(rollouts.map((rollout) => [(rollout.flag as unknown as { id: string }).id, rollout]));
   return {
     flags: rows.map((row) => {
@@ -189,7 +189,7 @@ export async function listSettingsFeatureFlags(em: EntityManager, ctx: AppContex
 }
 
 export async function listSettingsSecrets(em: EntityManager, ctx: AppContext): Promise<{ credentials: SettingsSecretDto[] }> {
-  const rows = await em.find(Credential, { where: { org: ctx.orgId } as never, order: { createdAt: "DESC" } });
+  const rows = await em.find(Credential, { where: { org: { id: ctx.orgId } } as never, order: { createdAt: "DESC" } });
   return {
     credentials: rows.map((row) => ({
       id: row.id,
@@ -206,7 +206,7 @@ export async function getSettingsTelemetry(em: EntityManager, ctx: AppContext): 
   const setting = await tenantSetting(em, ctx.orgId, TELEMETRY_OPT_IN_KEY);
   return {
     optIn: setting?.value === true,
-    rowCount: await em.count(TelemetryEvent, { org: ctx.orgId } as never),
+    rowCount: await em.count(TelemetryEvent, { org: { id: ctx.orgId } } as never),
   };
 }
 

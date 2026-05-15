@@ -47,7 +47,7 @@ export async function listDocVersions(
 ): Promise<DocVersionListDto[]> {
   await assertDocBelongsToOrg(em, ctx, docId);
   const versions = await em.find(DocVersion, { where: {
-    org: ctx.orgId,
+    org: { id: ctx.orgId },
     doc: docId,
   } as never, relations: ["author", "restoreOf"], order: { versionNum: "DESC" } });
   return versions.map(serializeVersionForApplication);
@@ -70,7 +70,7 @@ export async function getDocVersionById(
 ): Promise<DocVersionListDto | null> {
   const version = await em.findOne(DocVersion, { where: {
     id: versionId,
-    org: ctx.orgId,
+    org: { id: ctx.orgId },
     doc: docId,
   } as never, relations: ["author", "restoreOf"] });
   return version ? serializeVersionForApplication(version) : null;
@@ -125,7 +125,7 @@ function requiredUserContext(ctx: AppContext): { orgId: string; userId: string; 
 async function assertDocBelongsToOrg(em: EntityManager, ctx: AppContext, docId: string): Promise<void> {
   const doc = await em.findOne(Document, {
     id: docId,
-    org: ctx.orgId,
+    org: { id: ctx.orgId },
     archived: false,
   } as never);
   if (!doc) throw new AppNotFoundError(`Document not found: ${docId}`);

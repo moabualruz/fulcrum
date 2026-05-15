@@ -75,7 +75,7 @@ export async function getProfile(
     return rows[0] ?? null;
   }
   const profile = await (db as EntityManager).findOne(AgentProfile, {
-    org: orgId,
+    org: { id: orgId },
     name,
   } as never);
   return profile ? serializeAgentProfile(profile) : null;

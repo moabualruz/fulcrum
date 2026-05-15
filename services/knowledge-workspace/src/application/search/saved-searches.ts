@@ -108,7 +108,7 @@ async function findVisibleSearch(
   const em = requireEntityManager(ctx);
   const view = await em.findOne(SavedView, { where: {
     id,
-    org: ctx.orgId,
+    org: { id: ctx.orgId },
     viewType: "search",
   } as never });
   if (!view) {

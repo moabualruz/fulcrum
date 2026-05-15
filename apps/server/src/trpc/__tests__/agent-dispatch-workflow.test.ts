@@ -28,7 +28,7 @@ function mockSession(): Session {
   } as unknown as Session;
 }
 
-function callerFor(em: import("@mikro-orm/postgresql").EntityManager) {
+function callerFor(em: import("typeorm").EntityManager) {
   return createCaller(createContext({
     session: mockSession(),
     orgId: ORG_ID,
@@ -38,7 +38,7 @@ function callerFor(em: import("@mikro-orm/postgresql").EntityManager) {
   }));
 }
 
-async function seedDispatchTask(em: import("@mikro-orm/postgresql").EntityManager, withRepo = true) {
+async function seedDispatchTask(em: import("typeorm").EntityManager, withRepo = true) {
   const conn = em.getConnection();
   await conn.execute(`INSERT INTO projects (id, org_id, name) VALUES (?, ?, ?)`, [PROJECT_ID, ORG_ID, "Agent Project"]);
   if (withRepo) {

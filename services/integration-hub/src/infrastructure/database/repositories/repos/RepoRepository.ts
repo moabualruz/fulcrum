@@ -51,8 +51,8 @@ export class RepoRepository {
     private readonly repos: Repository<Repo>,
   ) {}
 
-  create(input: RepoCreateInput): Repo {
-    return this.repos.create({
+  async create(input: RepoCreateInput): Promise<Repo> {
+    const entity = this.repos.create({
       id: randomUUID(),
       org: { id: input.orgId } as any,
       name: input.name,
@@ -66,6 +66,7 @@ export class RepoRepository {
       lastTouchedAt: new Date(),
       archived: false,
     });
+    return this.repos.save(entity);
   }
 
   async list(input: RepoListInput): Promise<Repo[]> {
@@ -75,12 +76,14 @@ export class RepoRepository {
         ...(input.includeArchived ? {} : { archived: false }),
       },
       order: { lastTouchedAt: "DESC", name: "ASC" },
+      relations: ["org"],
     });
   }
 
   async get(input: RepoGetInput): Promise<Repo | null> {
     return this.repos.findOne({
       where: { org: { id: input.orgId }, id: input.id },
+      relations: ["org"],
     });
   }
 

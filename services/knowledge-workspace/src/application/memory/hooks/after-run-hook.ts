@@ -33,7 +33,7 @@ export class AfterRunMemoryHook {
     for (const candidate of candidates) {
       const sourceRef = sourceRefFor(runId, candidate);
       let memory = await em.findOne(Memory, { where: {
-        org: orgId,
+        org: { id: orgId },
         kind: candidate.kind,
         body: candidate.body,
         source: "heuristic",

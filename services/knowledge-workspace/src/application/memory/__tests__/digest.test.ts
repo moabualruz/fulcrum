@@ -51,7 +51,7 @@ beforeEach(async () => {
   await em.upsert(
     Org,
     { id: ORG_ID, name: "Test", slug: "test", updatedAt: new Date() },
-    { onConflictFields: ["id"] },
+    ["id"],
   );
 });
 

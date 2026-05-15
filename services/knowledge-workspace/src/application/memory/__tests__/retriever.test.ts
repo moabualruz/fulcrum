@@ -40,7 +40,7 @@ beforeEach(async () => {
     name: "Other",
     slug: "other",
     updatedAt: BASE_NOW,
-  }, { onConflictFields: ["id"] });
+  }, ["id"]);
 });
 
 describe("MemoryRetriever", () => {

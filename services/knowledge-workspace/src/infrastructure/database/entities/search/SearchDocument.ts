@@ -56,7 +56,7 @@ export class SearchDocument {
   @Column({ type: "jsonb", nullable: true })
   metadata?: Record<string, unknown>;
 
-  @Column({ type: "timestamptz", nullable: true })
+  @Column({ type: "timestamptz", nullable: true, name: "updated_at" })
   updatedAt?: Date;
 
   @Column({ type: "varchar", name: "project_id", nullable: true })

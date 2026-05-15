@@ -61,7 +61,7 @@ export async function createNotification(em: EntityManager, ctx: AppContext, inp
 
 export async function markNotificationRead(em: EntityManager, ctx: AppContext, id: string): Promise<NotificationDto> {
   return await em.transaction(async (txEm: EntityManager) => {
-    const row = await txEm.findOne(Notification, { where: { id, org: ctx.orgId, userId: ctx.userId } as never });
+    const row = await txEm.findOne(Notification, { where: { id, org: { id: ctx.orgId }, userId: ctx.userId } as never });
     if (!row) throw new AppNotFoundError("Notification not found.");
     if (row.readAt !== null) return serializeNotification(row);
     row.readAt = new Date();
@@ -82,7 +82,7 @@ export async function markAllNotificationsRead(
   ctx: AppContext,
 ): Promise<{ count: number }> {
   return em.transaction(async (txEm: EntityManager) => {
-    const rows = await txEm.find(Notification, { org: ctx.orgId, userId: ctx.userId, readAt: null } as never);
+    const rows = await txEm.find(Notification, { org: { id: ctx.orgId }, userId: ctx.userId, readAt: null } as never);
     const now = new Date();
     for (const row of rows) {
       row.readAt = now;
@@ -108,7 +108,7 @@ export async function muteNotificationSubject(
 ): Promise<NotificationMuteDto> {
   return em.transaction(async (txEm: EntityManager) => {
     const existing = await txEm.findOne(NotificationMute, { where: {
-      org: ctx.orgId,
+      org: { id: ctx.orgId },
       userId: ctx.userId,
       subjectKind: input.subjectKind,
       subjectId: input.subjectId,
@@ -139,7 +139,7 @@ export async function unmuteNotificationSubject(
 ): Promise<{ ok: true }> {
   return em.transaction(async (txEm: EntityManager) => {
     const row = await txEm.findOne(NotificationMute, { where: {
-      org: ctx.orgId,
+      org: { id: ctx.orgId },
       userId: ctx.userId,
       subjectKind: input.subjectKind,
       subjectId: input.subjectId,
@@ -215,7 +215,7 @@ export async function updateNotificationRule(
   ctx: AppContext,
   input: NotificationRuleUpdateInput,
 ): Promise<NotificationRuleDto> {
-  const row = await em.findOne(NotificationRule, { where: { id: input.id, org: ctx.orgId, userId: ctx.userId } as never });
+  const row = await em.findOne(NotificationRule, { where: { id: input.id, org: { id: ctx.orgId }, userId: ctx.userId } as never });
   if (!row) throw new AppNotFoundError("Notification rule not found.");
   if (input.name !== undefined) row.name = input.name;
   if (input.subjectKind !== undefined) row.subjectKind = input.subjectKind;
@@ -249,7 +249,7 @@ export async function deleteNotificationRule(
   ctx: AppContext,
   id: string,
 ): Promise<{ ok: true }> {
-  const row = await em.findOne(NotificationRule, { where: { id, org: ctx.orgId, userId: ctx.userId } as never });
+  const row = await em.findOne(NotificationRule, { where: { id, org: { id: ctx.orgId }, userId: ctx.userId } as never });
   if (row) em.remove(row);
   await writeNotificationOutboxEvent(em, {
     orgId: ctx.orgId,
@@ -267,7 +267,7 @@ export async function upsertPushSubscription(
   input: PushSubscriptionConfigInput,
 ): Promise<{ ok: true }> {
   const existing = await em.findOne(PushSubscription, { where: {
-    org: ctx.orgId,
+    org: { id: ctx.orgId },
     userId: ctx.userId,
     endpoint: input.endpoint,
   } as never });
@@ -305,7 +305,7 @@ export async function setNotificationQuietHours(
   ctx: AppContext,
   input: QuietHoursSetInput,
 ) {
-  const row = await em.findOne(NotificationQuietHours, { where: { org: ctx.orgId, userId: ctx.userId } as never }) ??
+  const row = await em.findOne(NotificationQuietHours, { where: { org: { id: ctx.orgId }, userId: ctx.userId } as never }) ??
     em.create(NotificationQuietHours, {
       org: { id: ctx.orgId } as Org,
       userId: ctx.userId!,

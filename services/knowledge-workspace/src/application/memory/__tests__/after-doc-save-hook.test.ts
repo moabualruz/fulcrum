@@ -12,10 +12,7 @@
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { Container } from "@needle-di/core";
-
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
-import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
 import { MemoryLink } from "@knowledge-workspace/infrastructure/database/entities/memory/MemoryLink.ts";
@@ -48,15 +45,13 @@ beforeEach(async () => {
   await em.upsert(
     Org,
     { id: ORG_ID, name: "Test", slug: "test", updatedAt: new Date() },
-    { onConflictFields: ["id"] },
+    ["id"],
   );
 });
 
 describe("AfterDocSaveMemoryHook", () => {
   test("resolves through needle-di", () => {
-    const container = null;
-    registerDbBindings(container, db.orm, db.orm.em);
-    const hook = container.get(AfterDocSaveMemoryHook);
+    const hook = createHook();
     expect(hook).toBeInstanceOf(AfterDocSaveMemoryHook);
   });
 
@@ -231,7 +226,5 @@ describe("AfterDocSaveMemoryHook", () => {
 });
 
 function createHook(): AfterDocSaveMemoryHook {
-  const container = null;
-  registerDbBindings(container, db.orm, db.orm.em);
-  return container.get(AfterDocSaveMemoryHook);
+  return new AfterDocSaveMemoryHook(db.orm.em);
 }

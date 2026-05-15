@@ -166,7 +166,7 @@ export class WorkMetricsService {
     verb?: string,
   ): Record<string, unknown> {
     const where: Record<string, unknown> = {
-      org: orgId,
+      org: { id: orgId },
       subjectKind: "task",
     };
     if (verb) where["verb"] = verb;

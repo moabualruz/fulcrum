@@ -81,7 +81,7 @@ export class AfterDocSaveMemoryHook {
       // before it (partial-index arbiter syntax), which PGlite rejects. Use find-then-create
       // instead; the partial index on memories still enforces uniqueness at the DB level.
       let memory = await (this.em as EntityManager).findOne(Memory, {
-        org: ctx.orgId,
+        org: { id: ctx.orgId },
         projectId: ctx.projectId,
         kind: candidate.kind,
         body: candidate.body,

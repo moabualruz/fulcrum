@@ -187,7 +187,7 @@ export async function listTreeChildren(
   parentPath: string | null,
 ): Promise<RepoFileRow[]> {
   await getRepo(em, ctx, repoId);
-  const rows = await em.find(RepoTreeEntry, { where: { org: ctx.orgId, repo: repoId } as never, order: { kind: "ASC", path: "ASC" } });
+  const rows = await em.find(RepoTreeEntry, { where: { org: { id: ctx.orgId }, repo: repoId } as never, order: { kind: "ASC", path: "ASC" } });
   return rows
     .map((row) => serializeTreeEntry(row, branch))
     .filter((row) => row.parent_path === parentPath);
@@ -201,7 +201,7 @@ export async function getFileByPath(
   path: string,
 ): Promise<RepoFileRow | null> {
   await getRepo(em, ctx, repoId);
-  const row = await em.findOne(RepoTreeEntry, { where: { org: ctx.orgId, repo: repoId, path } as never });
+  const row = await em.findOne(RepoTreeEntry, { where: { org: { id: ctx.orgId }, repo: { id: repoId }, path } as never });
   return row ? serializeTreeEntry(row, branch) : null;
 }
 
@@ -213,7 +213,7 @@ export async function getFileContent(
   path: string,
 ): Promise<RepoFileContentRow | null> {
   await getRepo(em, ctx, repoId);
-  const row = await em.findOne(RepoTreeEntry, { where: { org: ctx.orgId, repo: repoId, path } as never });
+  const row = await em.findOne(RepoTreeEntry, { where: { org: { id: ctx.orgId }, repo: { id: repoId }, path } as never });
   if (!row) return null;
   const payload = row.payload ?? {};
   const content = typeof payload["content"] === "string" ? payload["content"] : null;
@@ -237,7 +237,7 @@ export async function getBlameForFile(
   path: string,
 ): Promise<RepoFileBlameRow[]> {
   await getRepo(em, ctx, repoId);
-  const rows = await em.find(RepoBlameLine, { where: { org: ctx.orgId, repo: repoId, path } as never, order: { lineNumber: "ASC" } });
+  const rows = await em.find(RepoBlameLine, { where: { org: { id: ctx.orgId }, repo: { id: repoId }, path } as never, order: { lineNumber: "ASC" } });
   return rows.map((row) => ({
     id: row.id,
     repo_id: row.repo.id,
@@ -253,7 +253,7 @@ export async function getBlameForFile(
 
 export async function listIndexedBranches(em: EntityManager, ctx: AppContext, repoId: string): Promise<string[]> {
   const repo = await getRepo(em, ctx, repoId);
-  const commitRows = await em.find(RepoTreeEntry, { where: { org: ctx.orgId, repo: repoId } as never, order: { commitSha: "ASC" } });
+  const commitRows = await em.find(RepoTreeEntry, { where: { org: { id: ctx.orgId }, repo: repoId } as never, order: { commitSha: "ASC" } });
   const branches = new Set(commitRows.map((row) => row.commitSha).filter(Boolean));
   if (repo.defaultBranch) branches.add(repo.defaultBranch);
   if (repo.currentBranch) branches.add(repo.currentBranch);

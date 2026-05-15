@@ -176,7 +176,7 @@ export class WorkItemCommentService {
 
     // Return member IDs for any team ID that belongs to the org.
     // When a dedicated Team entity exists, replace with:
-    //   em.find(TeamMember, { team: { id: { $in: teamIds }, org: orgId } })
+    //   em.find(TeamMember, { team: { id: { $in: teamIds }, org: { id: orgId } } })
     //   .then(members => members.map(m => m.userId))
     return memberIds;
   }
@@ -341,7 +341,7 @@ export class WorkItemCommentService {
     // Cascade delete: find comment + all descendants
     const comment = await this.em.findOne(TaskComment, { where: {
       id: commentId,
-      org: orgId,
+      org: { id: orgId },
     } as never });
     if (!comment) {
       throw new AppNotFoundError("Comment not found");
@@ -366,7 +366,7 @@ export class WorkItemCommentService {
   ): Promise<CommentOutput> {
     const comment = await this.em.findOne(TaskComment, { where: {
       id: commentId,
-      org: orgId,
+      org: { id: orgId },
     } as never });
     if (!comment) {
       throw new AppNotFoundError("Comment not found");
@@ -382,7 +382,7 @@ export class WorkItemCommentService {
   async unresolveComment(orgId: string, commentId: string): Promise<CommentOutput> {
     const comment = await this.em.findOne(TaskComment, { where: {
       id: commentId,
-      org: orgId,
+      org: { id: orgId },
     } as never });
     if (!comment) {
       throw new AppNotFoundError("Comment not found");

@@ -75,7 +75,7 @@ export function serializeNotification(row: Notification): NotificationDto {
 }
 
 export async function unreadNotificationCount(em: EntityManager, ctx: AppContext): Promise<number> {
-  return em.count(Notification, { org: ctx.orgId, userId: ctx.userId, readAt: null } as never);
+  return em.count(Notification, { org: { id: ctx.orgId }, userId: ctx.userId, readAt: null } as never);
 }
 
 export async function seedDefaultNotificationRules(
@@ -117,17 +117,17 @@ export async function seedDefaultNotificationRules(
 }
 
 export async function listNotificationMutes(em: EntityManager, ctx: AppContext): Promise<NotificationMuteDto[]> {
-  const rows = await em.find(NotificationMute, { where: { org: ctx.orgId, userId: ctx.userId } as never, order: { subjectKind: "ASC" } });
+  const rows = await em.find(NotificationMute, { where: { org: { id: ctx.orgId }, userId: ctx.userId } as never, order: { subjectKind: "ASC" } });
   return rows.map(serializeMute);
 }
 
 export async function listNotificationRules(em: EntityManager, ctx: AppContext): Promise<NotificationRuleDto[]> {
-  const rows = await em.find(NotificationRule, { where: { org: ctx.orgId, userId: ctx.userId } as never, order: { name: "ASC" } });
+  const rows = await em.find(NotificationRule, { where: { org: { id: ctx.orgId }, userId: ctx.userId } as never, order: { name: "ASC" } });
   return rows.map(serializeRule);
 }
 
 export async function getNotificationRule(em: EntityManager, ctx: AppContext, id: string): Promise<NotificationRuleDto | null> {
-  const row = await em.findOne(NotificationRule, { where: { id, org: ctx.orgId, userId: ctx.userId } as never });
+  const row = await em.findOne(NotificationRule, { where: { id, org: { id: ctx.orgId }, userId: ctx.userId } as never });
   return row ? serializeRule(row) : null;
 }
 
@@ -135,7 +135,7 @@ export async function getNotificationQuietHours(
   em: EntityManager,
   ctx: AppContext,
 ): Promise<NotificationQuietHoursDto | null> {
-  const row = await em.findOne(NotificationQuietHours, { where: { org: ctx.orgId, userId: ctx.userId } as never });
+  const row = await em.findOne(NotificationQuietHours, { where: { org: { id: ctx.orgId }, userId: ctx.userId } as never });
   return row ? serializeQuietHours(row) : null;
 }
 

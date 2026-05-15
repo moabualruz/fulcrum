@@ -74,7 +74,7 @@ async function isDuplicate(
   } catch {
     // pg_trgm not available — fall back to exact match
     const existing = await em.findOne(Memory, {
-      org: orgId,
+      org: { id: orgId },
       body,
     } as never);
     return existing !== null;

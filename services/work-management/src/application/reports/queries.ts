@@ -43,12 +43,16 @@ export function serializeReportSnapshot(row: MetricsCache, orgId: string): Repor
   };
 }
 
-function daysBetween(start: Date, end: Date): number {
-  return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000));
+function toDate(v: unknown): Date {
+  return v instanceof Date ? v : new Date(v as string);
 }
 
-function dateStr(date: Date): string {
-  return date.toISOString().slice(0, 10);
+function daysBetween(start: Date | string, end: Date | string): number {
+  return Math.max(1, Math.round((toDate(end).getTime() - toDate(start).getTime()) / 86_400_000));
+}
+
+function dateStr(date: Date | string): string {
+  return toDate(date).toISOString().slice(0, 10);
 }
 
 function toRouterBurndownPoint(point: { date: string; remaining: number; ideal: number }): BurndownPoint {
@@ -71,11 +75,12 @@ export async function getSprintBurndown(
   } as never });
   if (!sprint) return [];
 
-  const tasks = await em.createQueryBuilder(Task, "task")
-    .select(["points", "status"])
-    .where({ org: { id: ctx.orgId }, sprint: input.sprintId, deletedAt: null } as never)
-    .getRawMany<{ points: number | null; status: string | null }>();
-  const totalPoints = tasks.reduce((sum: number, task: { points: number | null; status: string | null }) => sum + (task.points ?? 0), 0);
+  const tasks = await em.find(Task, { where: {
+    org: { id: ctx.orgId },
+    sprint: input.sprintId,
+    deletedAt: null,
+  } as never, select: ["points", "status"] } as never);
+  const totalPoints = tasks.reduce((sum, task) => sum + (task.points ?? 0), 0 as number);
   if (totalPoints === 0) return [];
 
   const totalDays = daysBetween(sprint.startDate, sprint.endDate);
@@ -85,15 +90,15 @@ export async function getSprintBurndown(
   } as never, order: { date: "ASC" } });
   const actualMap = new Map(cached.map((row) => [dateStr(row.date), row.pointsRemaining]));
   const doneStatuses = new Set(["done", "completed", "closed"]);
-  const donePoints = tasks.reduce((sum: number, task: { points: number | null; status: string | null }) => {
+  const donePoints = tasks.reduce((sum, task) => {
     return doneStatuses.has(task.status ?? "") ? sum + (task.points ?? 0) : sum;
-  }, 0);
+  }, 0 as number);
   const fallbackRemaining = totalPoints - donePoints;
   const pointsPerDay = totalPoints / totalDays;
   const points: BurndownPoint[] = [];
 
   for (let day = 0; day <= totalDays; day += 1) {
-    const date = new Date(sprint.startDate.getTime() + day * 86_400_000);
+    const date = new Date(toDate(sprint.startDate).getTime() + day * 86_400_000);
     const ds = dateStr(date);
     const ideal = Math.round(Math.max(0, totalPoints - pointsPerDay * day) * 100) / 100;
     let pointsRemaining: number;

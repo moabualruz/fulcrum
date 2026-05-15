@@ -89,12 +89,12 @@ export async function restoreDocVersionById(
     versionNum: target.versionNum,
   });
   const latest = await em.findOne(DocVersion, { where: {
-    org: ctx.orgId,
+    org: { id: ctx.orgId },
     doc: docId,
   } as never, order: { versionNum: "DESC" } });
   const nextVersionNum = (latest?.versionNum ?? 0) + 1;
   const newVersion = em.create(DocVersion, {
-    org: ctx.orgId,
+    org: { id: ctx.orgId },
     doc: docId,
     versionNum: nextVersionNum,
     snapshot: reconstructed.contentJson,

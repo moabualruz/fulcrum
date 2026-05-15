@@ -179,7 +179,7 @@ export class ContextAssembler {
 
     const docs = (await this.documentRepository.find(
       {
-        org: orgId,
+        org: { id: orgId },
         archived: false,
         ...(projectId ? { $or: [{ projectId }, { scope: "global" }] } : {}),
       },
@@ -232,7 +232,7 @@ export class ContextAssembler {
     const repoRef = await readValue(task, "repo");
     const repoId = stringOrNull(customFields["repoId"] ?? task["repoId"] ?? readValueSync(repoRef, "id"));
     if (!repoId) return "";
-    const repoResult = await this.repoRepository.findOne({ org: orgId, id: repoId });
+    const repoResult = await this.repoRepository.findOne({ org: { id: orgId }, id: repoId });
     if (!repoResult) return "";
     const repo = recordFrom(repoResult);
 
@@ -257,7 +257,7 @@ export class ContextAssembler {
 
   private async skillPromptsSlice(orgId: string, agent: string | null): Promise<string> {
     const skills = (await this.skillRepository.find(
-      { org: orgId },
+      { org: { id: orgId } },
       { orderBy: { slug: "ASC" } },
     )).map(recordFrom);
     return skills

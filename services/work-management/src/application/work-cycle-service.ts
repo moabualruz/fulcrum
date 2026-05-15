@@ -277,14 +277,18 @@ export class WorkCycleService {
 // ── Pure helpers (moved from router) ─────────────────────────────
 
 export function serializeSprint(sprint: Sprint): SprintOutput {
+  // PGlite returns "date" columns as strings (e.g. "2026-05-07"), not Date objects.
+  // Coerce to Date to satisfy DTO/Zod schema expectations.
+  const toDate = (v: unknown): Date =>
+    v instanceof Date ? v : (typeof v === "string" ? new Date(v) : v as Date);
   return {
     id: sprint.id,
     orgId: (sprint.org as any)?.id ?? (sprint as any).org_id ?? "",
     projectId: sprint.projectId,
     name: sprint.name,
     goal: sprint.goal,
-    startDate: sprint.startDate,
-    endDate: sprint.endDate,
+    startDate: toDate(sprint.startDate),
+    endDate: toDate(sprint.endDate),
     status: sprint.status,
     capacityPoints: sprint.capacityPoints,
     createdAt: sprint.createdAt,

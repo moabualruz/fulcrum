@@ -1,4 +1,4 @@
-import { DataSource, type DataSourceOptions, type EntityManager } from "typeorm";
+import { DataSource, IsNull, type DataSourceOptions, type EntityManager } from "typeorm";
 import { PGlite } from "@electric-sql/pglite";
 import { EventEmitter } from "events";
 
@@ -136,14 +136,32 @@ export async function createTestOrm(
     return origClear?.apply(em, args);
   };
   if (!em.persist) {
+    // MikroORM em.persist() queues entity then em.flush() saves.
+    // Many tests call persist() without flush() expecting auto-save.
+    // Shim: persist immediately saves and also queues for flush() compat.
     (em as any).persist = (entity: unknown) => {
       (em as any).__pendingPersist = (em as any).__pendingPersist || [];
       (em as any).__pendingPersist.push(entity);
+      // Kick off immediate save (fire-and-forget) so FK is available for next await
+      const saveEntity = async (e: unknown) => {
+        if (Array.isArray(e)) {
+          for (const item of e) await ds.manager.save(item);
+        } else {
+          await ds.manager.save(e);
+        }
+      };
+      (em as any).__persistPromise = ((em as any).__persistPromise ?? Promise.resolve())
+        .then(() => saveEntity(entity))
+        .catch(() => {}); // suppress — flush() will report errors
       return em;
     };
   }
   if (!em.flush) {
     (em as any).flush = async () => {
+      // Wait for any in-flight persist saves
+      if ((em as any).__persistPromise) {
+        await (em as any).__persistPromise;
+      }
       const pending = (em as any).__pendingPersist || [];
       for (const entity of pending) {
         if (Array.isArray(entity)) {
@@ -185,24 +203,116 @@ export async function createTestOrm(
     (em as any).nativeDelete = async (entity: Function, criteria: unknown) => {
       if (criteria && typeof criteria === "object" && Object.keys(criteria as object).length === 0) {
         const meta = ds.getMetadata(entity);
-        await ds.query(`DELETE FROM "${meta.tableName}"`);
+        // Use TRUNCATE CASCADE to handle FK constraints between tables
+        await ds.query(`TRUNCATE TABLE "${meta.tableName}" CASCADE`);
       } else {
         await ds.getRepository(entity).delete(criteria as any);
       }
     };
   }
 
-  // MikroORM em.findOneOrFail(Entity, criteria, opts) → TypeORM em.findOneOrFail(Entity, { where })
-  const origFindOneOrFail = em.findOneOrFail?.bind(em);
-  if (origFindOneOrFail) {
-    (em as any).findOneOrFail = async (entity: Function, criteria: any, opts?: any) => {
-      // MikroORM: findOneOrFail(Entity, { id: "x" }) vs TypeORM: findOneOrFail(Entity, { where: { id: "x" } })
-      const where = criteria && typeof criteria === "object" && !("where" in criteria)
-        ? { where: criteria }
-        : criteria;
-      return origFindOneOrFail(entity as any, where);
+  /**
+   * Normalize MikroORM-style WHERE conditions for TypeORM.
+   * MikroORM allowed bare string/number values for FK relation fields:
+   *   { org: "uuid-string" } → TypeORM needs { org: { id: "uuid-string" } }
+   * Also wraps bare where objects (no "where" key) into { where: ... }.
+   * Also adds relations: ["org"] so row.org.id is always accessible.
+   */
+  function normalizeFindOptions(entityClass: Function, options: any): any {
+    if (!options || typeof options !== "object") return options;
+
+    // If options has no "where" key and looks like criteria, wrap it
+    let normalized = options;
+    if (!("where" in options) && !("take" in options) && !("skip" in options) &&
+        !("order" in options) && !("relations" in options) && !("select" in options)) {
+      normalized = { where: options };
+    }
+
+    // Get entity metadata to identify relation fields
+    let meta: any;
+    try { meta = ds.getMetadata(entityClass); } catch { return normalized; }
+    const relationNames = new Set<string>(
+      (meta.relations ?? []).map((r: any) => r.propertyName as string)
+    );
+
+    // Transform WHERE clause for TypeORM compat:
+    // - Bare string FK values → { id: value } (MikroORM compat)
+    // - null values → IsNull() (PGlite compat: literal null doesn't generate IS NULL correctly)
+    function transformWhere(where: any): any {
+      if (!where || typeof where !== "object" || Array.isArray(where)) return where;
+      const result: Record<string, any> = {};
+      for (const [key, value] of Object.entries(where)) {
+        if (relationNames.has(key) && (typeof value === "string" || typeof value === "number")) {
+          // Bare primitive for a relation field → wrap as { id: value }
+          result[key] = { id: value };
+        } else if (value === null) {
+          // null in WHERE → IsNull() for PGlite compat
+          result[key] = IsNull();
+        } else {
+          result[key] = value;
+        }
+      }
+      return result;
+    }
+
+    const out = { ...normalized };
+    if (out.where) {
+      if (Array.isArray(out.where)) {
+        out.where = out.where.map(transformWhere);
+      } else {
+        out.where = transformWhere(out.where);
+      }
+    }
+
+    // Auto-include direct ManyToOne/ManyToMany relations (not eager) so FK ids are accessible
+    // This ensures row.org.id, row.repo.id, etc. work without explicit relations in every query
+    if (!out.relations && relationNames.size > 0) {
+      const directRelations = (meta.relations ?? [])
+        .filter((r: any) => r.relationType === "many-to-one" || r.relationType === "one-to-one")
+        .map((r: any) => r.propertyName as string);
+      if (directRelations.length > 0) {
+        out.relations = directRelations;
+      }
+    }
+
+    return out;
+  }
+
+  /** Apply MikroORM compat find-shims to any EntityManager (main or txEm). */
+  function patchEntityManager(target: EntityManager & Record<string, unknown>): void {
+    const origFind = target.find.bind(target);
+    (target as any).find = async (entityClass: Function, options?: any) =>
+      origFind(entityClass as any, normalizeFindOptions(entityClass, options));
+
+    const origFindOne = target.findOne.bind(target);
+    (target as any).findOne = async (entityClass: Function, options?: any) =>
+      origFindOne(entityClass as any, normalizeFindOptions(entityClass, options));
+
+    const origFindAndCount = target.findAndCount.bind(target);
+    (target as any).findAndCount = async (entityClass: Function, options?: any) =>
+      origFindAndCount(entityClass as any, normalizeFindOptions(entityClass, options));
+
+    const origCount = target.count.bind(target);
+    (target as any).count = async (entityClass: Function, options?: any) =>
+      origCount(entityClass as any, normalizeFindOptions(entityClass, options));
+
+    const origFindOneOrFail = target.findOneOrFail?.bind(target);
+    if (origFindOneOrFail) {
+      (target as any).findOneOrFail = async (entityClass: Function, criteria: any) =>
+        origFindOneOrFail(entityClass as any, normalizeFindOptions(entityClass, criteria));
+    }
+
+    // Patch transaction() to apply shims to txEm too
+    const origTransaction = target.transaction.bind(target);
+    (target as any).transaction = async (cb: (txEm: EntityManager) => Promise<unknown>) => {
+      return origTransaction(async (txEm: EntityManager) => {
+        patchEntityManager(txEm as EntityManager & Record<string, unknown>);
+        return cb(txEm);
+      });
     };
   }
+
+  patchEntityManager(em);
 
   // MikroORM em.create(Entity, data) → TypeORM repo.create(data) — returns unsaved instance
   const origCreate = em.create.bind(em);
