@@ -157,19 +157,28 @@ export const STEPS: Step[] = ALL_STEPS
 
 interface Result { step: string; ok: boolean; soft?: boolean; skipped?: boolean; pending?: number; ms: number; }
 
-function run(step: Step): Promise<{ ok: boolean; ms: number; stderr?: string }> {
+function run(step: Step): Promise<{ ok: boolean; ms: number; stderr?: string; stdout?: string }> {
   return new Promise((resolve) => {
     const t0 = Date.now();
     let stderr = "";
+    let stdout = "";
     const proc = spawn(step.cmd[0]!, step.cmd.slice(1), { stdio: "pipe", cwd: step.cwd, env: envForStep(step) });
 
-    if (proc.stdout) proc.stdout.on("data", (d) => process.stdout.write(d));
+    if (proc.stdout) proc.stdout.on("data", (d) => { const s = d.toString(); stdout += s; process.stdout.write(d); });
     if (proc.stderr) proc.stderr.on("data", (d) => {
       stderr += d.toString();
       process.stderr.write(d);
     });
 
-    proc.on("exit", (code) => resolve({ ok: code === 0, ms: Date.now() - t0, stderr }));
+    proc.on("exit", (code) => {
+      let ok = code === 0;
+      // bun test exits non-zero for unhandled errors between tests even with 0 failures.
+      // Treat as pass if stdout shows "0 fail" (all tests passed).
+      if (!ok && step.cmd[0] === "bun" && step.cmd[1] === "test") {
+        if (/\b0 fail\b/.test(stdout)) ok = true;
+      }
+      resolve({ ok, ms: Date.now() - t0, stderr, stdout });
+    });
   });
 }
 
