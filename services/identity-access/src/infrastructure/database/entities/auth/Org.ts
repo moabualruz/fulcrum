@@ -17,14 +17,14 @@ export class Org {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   name!: string;
 
   /** URL-safe org identifier (e.g. "local", "acme-corp"). */
-  @Column()
+  @Column({ type: "varchar" })
   slug!: string;
 
-  @Column({ nullable: true, name: "avatar_url" })
+  @Column({ type: "varchar", nullable: true, name: "avatar_url" })
   avatarUrl?: string;
 
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })

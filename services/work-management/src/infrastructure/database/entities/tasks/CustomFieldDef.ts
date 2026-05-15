@@ -70,16 +70,16 @@ export class CustomFieldDef {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id" })
+  @Column({ type: "varchar", name: "project_id" })
   projectId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   name!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   slug!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   type!: CustomFieldType;
 
   @Column({ type: "jsonb", name: "config_json", default: () => "'{}'" })

@@ -18,16 +18,16 @@ export class User {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column({ name: "org_id" })
+  @Column({ type: "varchar", name: "org_id" })
   orgId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   email!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   name?: string;
 
-  @Column({ name: "avatar_url", nullable: true })
+  @Column({ type: "varchar", name: "avatar_url", nullable: true })
   avatarUrl?: string;
 
   @Column({ type: "enum", enum: ["owner", "admin", "member", "guest"] })

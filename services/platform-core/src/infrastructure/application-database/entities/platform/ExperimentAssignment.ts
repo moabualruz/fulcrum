@@ -29,10 +29,10 @@ export class ExperimentAssignment {
   @JoinColumn({ name: "user_id" })
   user!: User;
 
-  @Column({ name: "experiment_id" })
+  @Column({ type: "varchar", name: "experiment_id" })
   experimentId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   variant!: string;
 
   @Column({ type: "timestamptz", name: "assigned_at", default: () => "now()" })

@@ -20,9 +20,9 @@ export class SkillVersion {
   @JoinColumn({ name: "skill_id" })
   skill!: FulcrumSkill;
 
-  @Column()
+  @Column({ type: "varchar" })
   version!: string;
 
-  @Column({ name: "hash_verified", nullable: true })
+  @Column({ type: "varchar", name: "hash_verified", nullable: true })
   hashVerified: string | null = null;
 }

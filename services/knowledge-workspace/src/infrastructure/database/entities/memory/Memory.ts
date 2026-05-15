@@ -40,13 +40,13 @@ export class Memory {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id", nullable: true })
+  @Column({ type: "varchar", name: "project_id", nullable: true })
   projectId: string | null = null;
 
   @Column({ type: "boolean", name: "global", default: false })
   global: boolean = false;
 
-  @Column({ default: "note" })
+  @Column({ type: "varchar", default: "note" })
   kind: MemoryKind = "note";
 
   @Column({ type: "text", default: "" })
@@ -55,10 +55,10 @@ export class Memory {
   @Column({ type: "simple-array", default: "" })
   tags: string[] = [];
 
-  @Column({ default: "medium" })
+  @Column({ type: "varchar", default: "medium" })
   importance: MemoryImportance = "medium";
 
-  @Column()
+  @Column({ type: "varchar" })
   source!: MemorySource;
 
   @Column({ type: "jsonb", name: "source_ref", default: () => "'{}'" })

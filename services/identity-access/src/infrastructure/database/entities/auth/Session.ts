@@ -17,23 +17,23 @@ export class Session {
   @PrimaryColumn()
   id!: string;
 
-  @Column({ name: "user_id" })
+  @Column({ type: "varchar", name: "user_id" })
   userId!: string;
 
-  @Column({ name: "org_id" })
+  @Column({ type: "varchar", name: "org_id" })
   orgId!: string;
 
   // Nullable: users may be in multiple orgs; active org tracks context
-  @Column({ name: "active_organization_id", nullable: true })
+  @Column({ type: "varchar", name: "active_organization_id", nullable: true })
   activeOrganizationId?: string;
 
   @Column({ type: "timestamptz", name: "expires_at" })
   expiresAt!: Date;
 
-  @Column({ name: "ip_address", nullable: true })
+  @Column({ type: "varchar", name: "ip_address", nullable: true })
   ipAddress?: string;
 
-  @Column({ name: "user_agent", nullable: true })
+  @Column({ type: "varchar", name: "user_agent", nullable: true })
   userAgent?: string;
 
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })

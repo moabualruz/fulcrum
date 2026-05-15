@@ -19,13 +19,13 @@ export class TaskWatcher {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "task_id" })
+  @Column({ type: "varchar", name: "task_id" })
   taskId!: string;
 
-  @Column({ name: "user_id" })
+  @Column({ type: "varchar", name: "user_id" })
   userId!: string;
 
-  @Column({ default: "manual" })
+  @Column({ type: "varchar", default: "manual" })
   source: string = "manual";
 
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })

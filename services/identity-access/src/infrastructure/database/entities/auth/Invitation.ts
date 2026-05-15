@@ -17,20 +17,20 @@ export class Invitation {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column({ name: "org_id" })
+  @Column({ type: "varchar", name: "org_id" })
   orgId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   email!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   role: string = "member";
 
-  @Column()
+  @Column({ type: "varchar" })
   token!: string;
 
   // Who sent the invite (nullable — system-generated invites have no user)
-  @Column({ name: "invited_by", nullable: true })
+  @Column({ type: "varchar", name: "invited_by", nullable: true })
   invitedById?: string;
 
   @Column({ type: "timestamptz", name: "accepted_at", nullable: true })

@@ -24,13 +24,13 @@ export class ProviderCredential {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column()
+  @Column({ type: "varchar" })
   provider!: InferenceProvider;
 
-  @Column({ name: "base_url" })
+  @Column({ type: "varchar", name: "base_url" })
   baseUrl!: string;
 
-  @Column({ name: "secret_ref", nullable: true })
+  @Column({ type: "varchar", name: "secret_ref", nullable: true })
   secretRef?: string;
 
   @Column({ type: "boolean", default: false })

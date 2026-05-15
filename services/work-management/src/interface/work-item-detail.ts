@@ -2,6 +2,7 @@ import type { EntityManager } from "typeorm";
 
 import type { AppContext } from "@work-management/domain/work-item.ts";
 import type {
+  BoardTaskRow,
   EdgeRow,
   EventRow,
   ScopedWorkItems,
@@ -14,9 +15,11 @@ import type {
   WorkView,
   WorkItemLink,
 } from "@work-management/application/tasks/task-detail.ts";
+import type { TaskDto } from "@work-management/application/tasks/types.ts";
 import type { TaskStatus } from "@work-management/application/work-item-service-actions.ts";
 
 export type {
+  BoardTaskRow,
   EdgeRow,
   EventRow,
   ScopedWorkItems,
@@ -29,6 +32,32 @@ export type {
   WorkView,
   WorkItemLink,
 };
+
+export async function listBoardWorkItems(
+  em: EntityManager,
+  ctx: AppContext,
+): Promise<BoardTaskRow[]> {
+  const service = await import("@work-management/application/tasks/queries.ts");
+  return service.listBoardTaskRows(em, ctx);
+}
+
+export async function getWorkItem(
+  em: EntityManager,
+  ctx: AppContext,
+  id: string,
+): Promise<TaskDto> {
+  const service = await import("@work-management/application/tasks/queries.ts");
+  return service.getTask(em, ctx, id);
+}
+
+export async function listChildWorkItems(
+  em: EntityManager,
+  ctx: AppContext,
+  parentId: string,
+): Promise<TaskDto[]> {
+  const service = await import("@work-management/application/tasks/queries.ts");
+  return service.listChildren(em, ctx, parentId);
+}
 
 export async function getTaskDetail(
   em: EntityManager,

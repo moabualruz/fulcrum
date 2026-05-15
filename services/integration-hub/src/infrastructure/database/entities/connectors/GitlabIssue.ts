@@ -20,22 +20,22 @@ export class GitlabIssue {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id" })
+  @Column({ type: "varchar", name: "project_id" })
   projectId!: string;
 
-  @Column({ name: "repo_path" })
+  @Column({ type: "varchar", name: "repo_path" })
   repoPath!: string;
 
-  @Column({ name: "issue_iid" })
+  @Column({ type: "varchar", name: "issue_iid" })
   issueIid!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   title!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   state!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   url?: string | null;
 
   @Column({ type: "jsonb" })

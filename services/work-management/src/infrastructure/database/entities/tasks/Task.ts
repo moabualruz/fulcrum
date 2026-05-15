@@ -53,7 +53,7 @@ export class Task {
   @Column({ type: "timestamptz", name: "updated_at", default: () => "now()" })
   updatedAt!: Date;
 
-  @Column({ default: "Untitled task" })
+  @Column({ type: "varchar", default: "Untitled task" })
   title: string = "Untitled task";
 
   @Column({ type: "text", nullable: true })
@@ -69,16 +69,16 @@ export class Task {
   @Column({ type: "simple-array", name: "blocked_by_ids", default: "" })
   blockedByIds: string[] = [];
 
-  @Column({ name: "workflow_id", nullable: true })
+  @Column({ type: "varchar", name: "workflow_id", nullable: true })
   workflowId: string | null = null;
 
-  @Column({ name: "status", nullable: true })
+  @Column({ type: "varchar", name: "status", nullable: true })
   status: string | null = null;
 
   @Column({ type: "integer", name: "priority", nullable: true })
   priority: number | null = null;
 
-  @Column({ name: "sprint_id", nullable: true })
+  @Column({ type: "varchar", name: "sprint_id", nullable: true })
   sprint?: string | null;
 
   @Column({ type: "jsonb", name: "custom_fields", default: () => "'{}'" })
@@ -94,7 +94,7 @@ export class Task {
   @Column({ type: "jsonb", name: "dependencies", default: () => `'{"blocks": [], "blocked_by": []}'::jsonb` })
   dependencies: TaskDependencies = { blocks: [], blocked_by: [] };
 
-  @Column({ name: "external_id", nullable: true })
+  @Column({ type: "varchar", name: "external_id", nullable: true })
   externalId?: string | null;
 
   // P9#01 — optional repo association.
@@ -115,16 +115,16 @@ export class Task {
   @Column({ type: "timestamptz", name: "started_at", nullable: true })
   startedAt: Date | null = null;
 
-  @Column({ name: "assignee_id", nullable: true })
+  @Column({ type: "varchar", name: "assignee_id", nullable: true })
   assigneeId: string | null = null;
 
   @Column({ type: "simple-array", name: "labels", default: "" })
   labels: string[] = [];
 
-  @Column({ name: "project_id", nullable: true })
+  @Column({ type: "varchar", name: "project_id", nullable: true })
   projectId: string | null = null;
 
-  @Column({ name: "task_type", default: "task" })
+  @Column({ type: "varchar", name: "task_type", default: "task" })
   taskType: string = "task";
 
   @Column({ type: "integer", name: "sequence_number", nullable: true })
@@ -133,6 +133,6 @@ export class Task {
   @Column({ type: "timestamptz", name: "archived_at", nullable: true })
   archivedAt: Date | null = null;
 
-  @Column({ name: "template_id", nullable: true })
+  @Column({ type: "varchar", name: "template_id", nullable: true })
   templateId: string | null = null;
 }

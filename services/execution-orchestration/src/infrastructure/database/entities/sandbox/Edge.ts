@@ -24,19 +24,19 @@ export class Edge {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "from_kind" })
+  @Column({ type: "varchar", name: "from_kind" })
   fromKind!: string;
 
-  @Column({ name: "from_id" })
+  @Column({ type: "varchar", name: "from_id" })
   fromId!: string;
 
-  @Column({ name: "to_kind" })
+  @Column({ type: "varchar", name: "to_kind" })
   toKind!: string;
 
-  @Column({ name: "to_id" })
+  @Column({ type: "varchar", name: "to_id" })
   toId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   kind!: string;
 
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })

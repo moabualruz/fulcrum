@@ -22,11 +22,11 @@ export class NotificationQuietHours {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "user_id" })
+  @Column({ type: "varchar", name: "user_id" })
   userId!: string;
 
   /** IANA timezone (e.g. "America/New_York"). */
-  @Column({ default: "UTC" })
+  @Column({ type: "varchar", default: "UTC" })
   tz: string = "UTC";
 
   @Column({ type: "integer", name: "start_hour" })

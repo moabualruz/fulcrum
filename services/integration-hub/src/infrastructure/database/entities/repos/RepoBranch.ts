@@ -28,10 +28,10 @@ export class RepoBranch {
   @JoinColumn({ name: "repo_id" })
   repo!: Repo;
 
-  @Column()
+  @Column({ type: "varchar" })
   name!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   sha?: string | null;
 
   @Column({ type: "boolean", name: "is_default", default: false })

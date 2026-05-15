@@ -33,16 +33,16 @@ export class RoutingRule {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id", nullable: true })
+  @Column({ type: "varchar", name: "project_id", nullable: true })
   project: string | null = null;
 
-  @Column()
+  @Column({ type: "varchar" })
   name!: string;
 
   @Column({ type: "jsonb", name: "conditions_json" })
   conditionsJson: RoutingConditions = {};
 
-  @Column({ name: "action_agent" })
+  @Column({ type: "varchar", name: "action_agent" })
   actionAgent!: string;
 
   @Column({ type: "simple-array", name: "action_skill_set" })

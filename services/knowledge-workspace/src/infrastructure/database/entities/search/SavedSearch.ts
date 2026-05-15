@@ -27,25 +27,25 @@ export class SavedSearch {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "created_by" })
+  @Column({ type: "varchar", name: "created_by" })
   userId!: string;
 
-  @Column({ name: "created_by", select: false, insert: false, update: false })
+  @Column({ type: "varchar", name: "created_by", select: false, insert: false, update: false })
   createdById!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   name!: string;
 
   @Column({ type: "jsonb", name: "query_json" })
   queryJson!: Record<string, unknown>;
 
-  @Column({ default: "private" })
+  @Column({ type: "varchar", default: "private" })
   scope: SavedSearchScope = "private";
 
-  @Column({ name: "project_id", nullable: true })
+  @Column({ type: "varchar", name: "project_id", nullable: true })
   projectId: string | null = null;
 
-  @Column({ name: "view_type", default: "search" })
+  @Column({ type: "varchar", name: "view_type", default: "search" })
   viewType: string = "search";
 
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })

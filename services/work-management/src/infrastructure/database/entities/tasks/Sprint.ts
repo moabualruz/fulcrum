@@ -36,10 +36,10 @@ export class Sprint {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id" })
+  @Column({ type: "varchar", name: "project_id" })
   projectId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   name!: string;
 
   @Column({ type: "text", nullable: true })
@@ -52,7 +52,7 @@ export class Sprint {
   endDate!: Date;
 
   // Note: check constraint "status in ('planned','active','completed')" — handle in migration
-  @Column({ default: SprintStatus.planned })
+  @Column({ type: "varchar", default: SprintStatus.planned })
   status: SprintStatusValue = SprintStatus.planned;
 
   @Column({ type: "integer", name: "capacity_points", nullable: true })
@@ -64,7 +64,7 @@ export class Sprint {
   @Column({ type: "jsonb", name: "metrics_snapshot", nullable: true })
   metricsSnapshot: MetricsSnapshot | null = null;
 
-  @Column({ name: "retro_doc_id", nullable: true })
+  @Column({ type: "varchar", name: "retro_doc_id", nullable: true })
   retroDocId: string | null = null;
 
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })

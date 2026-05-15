@@ -21,7 +21,7 @@ export class RepoBlameLine {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id" })
+  @Column({ type: "varchar", name: "project_id" })
   projectId!: string;
 
   @ManyToOne(() => Repo, { onDelete: "CASCADE" })
@@ -34,13 +34,13 @@ export class RepoBlameLine {
   @Column({ type: "integer", name: "line_number" })
   lineNumber!: number;
 
-  @Column({ name: "commit_sha" })
+  @Column({ type: "varchar", name: "commit_sha" })
   commitSha!: string;
 
-  @Column({ name: "author_name" })
+  @Column({ type: "varchar", name: "author_name" })
   authorName!: string;
 
-  @Column({ name: "author_email", nullable: true })
+  @Column({ type: "varchar", name: "author_email", nullable: true })
   authorEmail?: string | null;
 
   @Column({ type: "timestamptz", name: "committed_at" })

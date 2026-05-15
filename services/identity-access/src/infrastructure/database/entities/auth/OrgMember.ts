@@ -18,13 +18,13 @@ export class OrgMember {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column({ name: "org_id" })
+  @Column({ type: "varchar", name: "org_id" })
   orgId!: string;
 
-  @Column({ name: "user_id" })
+  @Column({ type: "varchar", name: "user_id" })
   userId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   role: string = "member";
 
   @Column({ type: "timestamptz", name: "joined_at", default: () => "now()" })

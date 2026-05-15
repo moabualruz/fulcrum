@@ -20,16 +20,16 @@ export class GithubConnectorState {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id" })
+  @Column({ type: "varchar", name: "project_id" })
   projectId!: string;
 
-  @Column({ name: "installation_id" })
+  @Column({ type: "varchar", name: "installation_id" })
   installationId!: string;
 
-  @Column({ name: "repo_full_name" })
+  @Column({ type: "varchar", name: "repo_full_name" })
   repoFullName!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   cursor?: string | null;
 
   @Column({ type: "jsonb" })

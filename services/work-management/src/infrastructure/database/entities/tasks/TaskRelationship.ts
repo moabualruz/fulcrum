@@ -22,16 +22,16 @@ export class TaskRelationship {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "source_task_id" })
+  @Column({ type: "varchar", name: "source_task_id" })
   sourceTaskId!: string;
 
-  @Column({ name: "target_task_id" })
+  @Column({ type: "varchar", name: "target_task_id" })
   targetTaskId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   type!: string;
 
-  @Column({ name: "created_by" })
+  @Column({ type: "varchar", name: "created_by" })
   createdBy!: string;
 
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })

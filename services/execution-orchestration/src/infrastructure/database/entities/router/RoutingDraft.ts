@@ -45,7 +45,7 @@ export class RoutingDraft {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id", nullable: true })
+  @Column({ type: "varchar", name: "project_id", nullable: true })
   projectId: string | null = null;
 
   @Column({ type: "enum", enum: DraftStatus })
@@ -72,10 +72,10 @@ export class RoutingDraft {
   @Column({ type: "float" })
   confidence = 0;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   backend: string | null = null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   model: string | null = null;
 
   @Column({ type: "jsonb", name: "matching_active_rule_ids_json" })

@@ -44,13 +44,13 @@ export class Document {
   @JoinColumn({ name: "parent_id" })
   parent: Document | null = null;
 
-  @Column({ name: "project_id", nullable: true })
+  @Column({ type: "varchar", name: "project_id", nullable: true })
   projectId: string | null = null;
 
-  @Column({ name: "scope", default: "project" })
+  @Column({ type: "varchar", name: "scope", default: "project" })
   scope: Scope = "project";
 
-  @Column({ name: "doc_type", default: "note" })
+  @Column({ type: "varchar", name: "doc_type", default: "note" })
   docType: DocType = "note";
 
   @Column({ type: "jsonb", name: "frontmatter", default: () => "'{}'" })
@@ -68,7 +68,7 @@ export class Document {
   @Column({ type: "boolean", name: "archived", default: false })
   archived: boolean = false;
 
-  @Column({ name: "external_id", nullable: true })
+  @Column({ type: "varchar", name: "external_id", nullable: true })
   externalId: string | null = null;
 
   @Column({ type: "text", nullable: true, transformer: vectorTransformer })
@@ -77,7 +77,7 @@ export class Document {
   @Column({ type: "timestamptz", name: "updated_at", default: () => "now()" })
   updatedAt!: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   title?: string | null;
 
   @Column({ type: "jsonb", nullable: true, name: "context_summary" })

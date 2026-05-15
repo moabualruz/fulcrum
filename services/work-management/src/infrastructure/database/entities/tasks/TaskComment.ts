@@ -20,22 +20,22 @@ export class TaskComment {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "task_id" })
+  @Column({ type: "varchar", name: "task_id" })
   taskId!: string;
 
-  @Column({ name: "author_id" })
+  @Column({ type: "varchar", name: "author_id" })
   authorId!: string;
 
   @Column({ type: "jsonb", nullable: true })
   body: object | null = null;
 
-  @Column({ name: "parent_comment_id", nullable: true })
+  @Column({ type: "varchar", name: "parent_comment_id", nullable: true })
   parentCommentId: string | null = null;
 
   @Column({ type: "boolean", default: false })
   resolved: boolean = false;
 
-  @Column({ name: "resolved_by", nullable: true })
+  @Column({ type: "varchar", name: "resolved_by", nullable: true })
   resolvedBy: string | null = null;
 
   @Column({ type: "timestamptz", name: "resolved_at", nullable: true })

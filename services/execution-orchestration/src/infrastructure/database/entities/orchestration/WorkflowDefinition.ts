@@ -23,10 +23,10 @@ export class WorkflowDefinition {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id", nullable: true })
+  @Column({ type: "varchar", name: "project_id", nullable: true })
   projectId: string | null = null;
 
-  @Column({ name: "name" })
+  @Column({ type: "varchar", name: "name" })
   name!: string;
 
   @Column({ type: "text", name: "config_yaml" })

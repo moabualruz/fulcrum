@@ -22,13 +22,13 @@ export class NotificationMute {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "user_id" })
+  @Column({ type: "varchar", name: "user_id" })
   userId!: string;
 
-  @Column({ name: "subject_kind" })
+  @Column({ type: "varchar", name: "subject_kind" })
   subjectKind!: string;
 
-  @Column({ name: "subject_id" })
+  @Column({ type: "varchar", name: "subject_id" })
   subjectId!: string;
 
   /** null = muted permanently; Date = muted until this timestamp. */

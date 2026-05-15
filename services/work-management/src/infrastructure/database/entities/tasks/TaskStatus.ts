@@ -27,17 +27,17 @@ export class TaskStatus {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id" })
+  @Column({ type: "varchar", name: "project_id" })
   projectId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   name!: string;
 
-  @Column({ default: "#6B7280" })
+  @Column({ type: "varchar", default: "#6B7280" })
   color: string = "#6B7280";
 
   // Note: check constraint "category in ('unstarted','started','completed','cancelled')" — handle in migration
-  @Column()
+  @Column({ type: "varchar" })
   category!: TaskStatusCategory;
 
   @Column({ type: "integer", default: 0 })

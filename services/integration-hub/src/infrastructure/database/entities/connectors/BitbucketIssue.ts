@@ -20,22 +20,22 @@ export class BitbucketIssue {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id" })
+  @Column({ type: "varchar", name: "project_id" })
   projectId!: string;
 
-  @Column({ name: "repo_slug" })
+  @Column({ type: "varchar", name: "repo_slug" })
   repoSlug!: string;
 
-  @Column({ name: "issue_id" })
+  @Column({ type: "varchar", name: "issue_id" })
   issueId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   title!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   state!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   url?: string | null;
 
   @Column({ type: "jsonb" })

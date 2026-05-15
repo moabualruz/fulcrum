@@ -14,10 +14,10 @@ export class TenantSetting {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column({ name: "org_id" })
+  @Column({ type: "varchar", name: "org_id" })
   orgId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   key!: string;
 
   @Column({ type: "jsonb", default: () => "'{}'" })

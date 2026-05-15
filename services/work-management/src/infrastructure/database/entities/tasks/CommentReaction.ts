@@ -11,13 +11,13 @@ export class CommentReaction {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column({ name: "comment_id" })
+  @Column({ type: "varchar", name: "comment_id" })
   commentId!: string;
 
-  @Column({ name: "user_id" })
+  @Column({ type: "varchar", name: "user_id" })
   userId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   emoji!: string;
 
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })

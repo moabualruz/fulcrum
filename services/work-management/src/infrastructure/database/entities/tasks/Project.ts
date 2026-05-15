@@ -29,13 +29,13 @@ export class Project {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column()
+  @Column({ type: "varchar" })
   name!: string;
 
   @Column({ type: "jsonb", name: "workflow_config", nullable: true })
   workflowConfig: WorkflowConfig | null = null;
 
-  @Column({ name: "methodology", default: "kanban" })
+  @Column({ type: "varchar", name: "methodology", default: "kanban" })
   methodology: "scrum" | "kanban" | "none" = "kanban";
 
   @Column({ type: "jsonb", name: "enabled_task_types", nullable: true })

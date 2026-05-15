@@ -31,7 +31,7 @@ export class RepoFilesIndex {
   @Column({ type: "text" })
   path!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   kind!: string;
 
   @Column({ type: "bigint", nullable: true })

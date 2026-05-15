@@ -19,10 +19,10 @@ export class ConnectorSyncLog {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column()
+  @Column({ type: "varchar" })
   connector!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   status!: string;
 
   @Column({ type: "timestamptz", name: "last_run_at", default: () => "now()" })

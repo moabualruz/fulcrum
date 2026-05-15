@@ -20,16 +20,16 @@ export class ConnectorCredential {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id" })
+  @Column({ type: "varchar", name: "project_id" })
   projectId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   provider!: string;
 
-  @Column({ name: "account_id" })
+  @Column({ type: "varchar", name: "account_id" })
   accountId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   label!: string;
 
   @Column({ type: "text", name: "encrypted_secret" })

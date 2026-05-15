@@ -33,13 +33,13 @@ export class DocLink {
   @JoinColumn({ name: "to_doc_id" })
   toDoc: Document | null = null;
 
-  @Column({ name: "to_slug" })
+  @Column({ type: "varchar", name: "to_slug" })
   toSlug!: string;
 
-  @Column({ name: "link_kind", default: "wikilink" })
+  @Column({ type: "varchar", name: "link_kind", default: "wikilink" })
   linkKind: LinkKind = "wikilink";
 
-  @Column({ name: "anchor", nullable: true })
+  @Column({ type: "varchar", name: "anchor", nullable: true })
   anchor: string | null = null;
 
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })

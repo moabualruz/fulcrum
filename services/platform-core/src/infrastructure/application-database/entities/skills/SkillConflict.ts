@@ -24,7 +24,7 @@ export class SkillConflict {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   slug!: string;
 
   @Column({ type: "enum", enum: SkillConflictKind })
@@ -33,19 +33,19 @@ export class SkillConflict {
   @Column({ type: "enum", enum: SkillConflictStatus })
   status: SkillConflictStatus = SkillConflictStatus.Open;
 
-  @Column({ name: "local_hash", nullable: true })
+  @Column({ type: "varchar", name: "local_hash", nullable: true })
   localHash?: string;
 
-  @Column({ name: "upstream_hash", nullable: true })
+  @Column({ type: "varchar", name: "upstream_hash", nullable: true })
   upstreamHash?: string;
 
-  @Column({ name: "base_hash", nullable: true })
+  @Column({ type: "varchar", name: "base_hash", nullable: true })
   baseHash?: string;
 
-  @Column({ name: "expected_sha256", nullable: true })
+  @Column({ type: "varchar", name: "expected_sha256", nullable: true })
   expectedSha256?: string;
 
-  @Column({ name: "actual_sha256", nullable: true })
+  @Column({ type: "varchar", name: "actual_sha256", nullable: true })
   actualSha256?: string;
 
   @Column({ type: "text", name: "suggested_resolution", nullable: true })

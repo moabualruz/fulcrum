@@ -21,26 +21,26 @@ export class RepoTreeEntry {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id" })
+  @Column({ type: "varchar", name: "project_id" })
   projectId!: string;
 
   @ManyToOne(() => Repo, { onDelete: "CASCADE" })
   @JoinColumn({ name: "repo_id" })
   repo!: Repo;
 
-  @Column({ name: "commit_sha" })
+  @Column({ type: "varchar", name: "commit_sha" })
   commitSha!: string;
 
   @Column({ type: "text" })
   path!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   kind!: string;
 
   @Column({ type: "bigint", nullable: true })
   size?: number | null;
 
-  @Column({ name: "content_hash", nullable: true })
+  @Column({ type: "varchar", name: "content_hash", nullable: true })
   contentHash?: string | null;
 
   @Column({ type: "jsonb" })

@@ -30,10 +30,10 @@ export class ArtifactRetentionPolicy {
   @JoinColumn({ name: "project_id" })
   project?: Project | null;
 
-  @Column({ name: "scope_kind", default: "project" })
+  @Column({ type: "varchar", name: "scope_kind", default: "project" })
   scopeKind: ArtifactRetentionScopeKind = "project";
 
-  @Column({ name: "artifact_kind" })
+  @Column({ type: "varchar", name: "artifact_kind" })
   artifactKind!: ArtifactRetentionArtifactKind;
 
   @Column({ type: "integer", name: "retention_days", nullable: true })
@@ -51,7 +51,7 @@ export class ArtifactRetentionPolicy {
   @Column({ type: "text", nullable: true })
   notes?: string | null;
 
-  @Column({ name: "created_by", nullable: true })
+  @Column({ type: "varchar", name: "created_by", nullable: true })
   createdBy?: string | null;
 
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })

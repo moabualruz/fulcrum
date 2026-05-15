@@ -18,7 +18,7 @@ export class MetricsCache {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column({ name: "project_id" })
+  @Column({ type: "varchar", name: "project_id" })
   projectId!: string;
 
   @ManyToOne(() => Sprint, { onDelete: "CASCADE", nullable: true })
@@ -50,7 +50,7 @@ export class MetricsCache {
   updatedAt!: Date;
 
   // task workflow columns added by Migration20260505100000 (HIGH-01 fix)
-  @Column({ name: "scope_type", default: "sprint" })
+  @Column({ type: "varchar", name: "scope_type", default: "sprint" })
   scopeType: "sprint" | "project" | "epic" | "workspace" = "sprint";
 
   @Column({ type: "integer", name: "points_total", default: 0 })

@@ -35,7 +35,7 @@ export class WebhookDelivery {
   @JoinColumn({ name: "webhook_id" })
   webhook!: Webhook;
 
-  @Column({ name: "event_id", nullable: true })
+  @Column({ type: "varchar", name: "event_id", nullable: true })
   eventId: string | null = null;
 
   @Column({ type: "enum", enum: WebhookDeliveryStatus, name: "status", default: WebhookDeliveryStatus.Pending })

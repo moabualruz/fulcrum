@@ -23,7 +23,7 @@ export class EventRetentionPolicy {
   org!: Org;
 
   /** null = org-wide policy; UUID = project-scoped override. */
-  @Column({ name: "project_id", nullable: true })
+  @Column({ type: "varchar", name: "project_id", nullable: true })
   projectId: string | null = null;
 
   @Column({ type: "integer", name: "retain_days", default: 0 })

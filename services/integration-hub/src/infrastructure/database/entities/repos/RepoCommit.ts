@@ -29,13 +29,13 @@ export class RepoCommit {
   @JoinColumn({ name: "repo_id" })
   repo!: Repo;
 
-  @Column()
+  @Column({ type: "varchar" })
   sha!: string;
 
   @Column({ type: "text", nullable: true })
   message?: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   author?: string | null;
 
   @Column({ type: "timestamptz", name: "committed_at", nullable: true })

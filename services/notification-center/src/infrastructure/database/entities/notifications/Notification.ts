@@ -25,25 +25,25 @@ export class Notification {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "user_id" })
+  @Column({ type: "varchar", name: "user_id" })
   userId!: string;
 
-  @Column({ name: "rule_id", nullable: true })
+  @Column({ type: "varchar", name: "rule_id", nullable: true })
   ruleId: string | null = null;
 
-  @Column({ name: "event_id" })
+  @Column({ type: "varchar", name: "event_id" })
   eventId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   title!: string;
 
   @Column({ type: "text", default: "" })
   body: string = "";
 
-  @Column({ name: "entity_kind" })
+  @Column({ type: "varchar", name: "entity_kind" })
   entityKind!: string;
 
-  @Column({ name: "entity_id" })
+  @Column({ type: "varchar", name: "entity_id" })
   entityId!: string;
 
   @Column({ type: "timestamptz", name: "read_at", nullable: true })

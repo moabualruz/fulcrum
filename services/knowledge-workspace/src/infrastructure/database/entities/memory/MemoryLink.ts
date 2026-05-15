@@ -31,9 +31,9 @@ export class MemoryLink {
   @JoinColumn({ name: "memory_id" })
   memory!: Memory;
 
-  @Column({ name: "target_kind" })
+  @Column({ type: "varchar", name: "target_kind" })
   targetKind!: MemoryLinkTargetKind;
 
-  @Column({ name: "target_id" })
+  @Column({ type: "varchar", name: "target_id" })
   targetId!: string;
 }

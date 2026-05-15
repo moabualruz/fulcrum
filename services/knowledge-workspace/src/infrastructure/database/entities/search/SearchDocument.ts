@@ -35,16 +35,16 @@ export class SearchDocument {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "entity_kind" })
+  @Column({ type: "varchar", name: "entity_kind" })
   entityKind!: string;
 
-  @Column({ name: "entity_id" })
+  @Column({ type: "varchar", name: "entity_id" })
   entityId!: string;
 
   @Column({ type: "text", nullable: true, transformer: vectorTransformer })
   embedding?: number[];
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   title?: string;
 
   @Column({ type: "text", nullable: true })
@@ -59,9 +59,9 @@ export class SearchDocument {
   @Column({ type: "timestamptz", nullable: true })
   updatedAt?: Date;
 
-  @Column({ name: "project_id", nullable: true })
+  @Column({ type: "varchar", name: "project_id", nullable: true })
   projectId?: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   status?: string | null;
 }

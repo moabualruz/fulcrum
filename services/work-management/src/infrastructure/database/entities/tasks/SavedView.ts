@@ -43,14 +43,14 @@ export class SavedView {
   org!: Org;
 
   /** Nullable: org-scoped views have no project. */
-  @Column({ name: "project_id", nullable: true })
+  @Column({ type: "varchar", name: "project_id", nullable: true })
   projectId: string | null = null;
 
   // Note: check constraint "scope in ('private','project','org')" — handle in migration
-  @Column({ default: "private" })
+  @Column({ type: "varchar", default: "private" })
   scope: SavedViewScope = "private";
 
-  @Column()
+  @Column({ type: "varchar" })
   name!: string;
 
   @Column({ type: "jsonb", name: "query_json", default: () => "'{}'::jsonb" })
@@ -60,11 +60,11 @@ export class SavedView {
   orderBy: OrderByClause[] = [];
 
   // Note: check constraint "view_type in ('kanban','table','calendar','timeline','list','search')" — handle in migration
-  @Column({ name: "view_type", default: "list" })
+  @Column({ type: "varchar", name: "view_type", default: "list" })
   viewType: SavedViewType = "list";
 
   /** FK → users(id). Migration adds constraint conditionally. */
-  @Column({ name: "created_by" })
+  @Column({ type: "varchar", name: "created_by" })
   createdById!: string;
 
   /** Postgres text[] — user IDs granted read access. */
@@ -76,7 +76,7 @@ export class SavedView {
   sharedWithTeams: string[] = [];
 
   /** Free-form tag making this view the default for a given context, e.g. 'project-board'. */
-  @Column({ name: "default_for", nullable: true })
+  @Column({ type: "varchar", name: "default_for", nullable: true })
   defaultFor: string | null = null;
 
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })

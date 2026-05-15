@@ -26,7 +26,7 @@ export class TelemetryOutbox {
   @Column({ type: "timestamptz", name: "last_attempt_at", nullable: true })
   lastAttemptAt: Date | null = null;
 
-  @Column({ default: "queued" })
+  @Column({ type: "varchar", default: "queued" })
   status: TelemetryOutboxStatus = "queued";
 
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })

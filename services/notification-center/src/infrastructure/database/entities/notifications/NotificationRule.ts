@@ -25,16 +25,16 @@ export class NotificationRule {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "user_id", nullable: true })
+  @Column({ type: "varchar", name: "user_id", nullable: true })
   userId: string | null = null;
 
-  @Column({ name: "subject_kind", nullable: true })
+  @Column({ type: "varchar", name: "subject_kind", nullable: true })
   subjectKind: string | null = null;
 
   @Column({ type: "boolean", name: "active", default: true })
   active: boolean = true;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   name: string | null = null;
 
   @Column({ type: "jsonb", name: "event_pattern", nullable: true })

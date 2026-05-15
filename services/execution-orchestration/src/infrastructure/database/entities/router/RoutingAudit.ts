@@ -22,13 +22,13 @@ export class RoutingAudit {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "event_type" })
+  @Column({ type: "varchar", name: "event_type" })
   eventType!: string;
 
-  @Column({ name: "subject_type" })
+  @Column({ type: "varchar", name: "subject_type" })
   subjectType!: string;
 
-  @Column({ name: "subject_id" })
+  @Column({ type: "varchar", name: "subject_id" })
   subjectId!: string;
 
   @Column({ type: "jsonb", name: "payload_json" })

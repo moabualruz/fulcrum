@@ -15,13 +15,13 @@ export class SchemaMigration {
   @PrimaryColumn({ type: "bigint" })
   version!: number;
 
-  @Column({ unique: true })
+  @Column({ type: "varchar", unique: true })
   name!: string;
 
   @Column({ type: "timestamptz", name: "applied_at", default: () => "now()" })
   appliedAt!: Date;
 
-  @Column()
+  @Column({ type: "varchar" })
   checksum!: string;
 
   @Column({ type: "enum", enum: ["up", "down"], name: "direction" })

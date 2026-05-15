@@ -31,16 +31,16 @@ export class NotificationDelivery {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "rule_id" })
+  @Column({ type: "varchar", name: "rule_id" })
   ruleId!: string;
 
-  @Column({ name: "notification_id", nullable: true })
+  @Column({ type: "varchar", name: "notification_id", nullable: true })
   notificationId: string | null = null;
 
-  @Column({ name: "user_id" })
+  @Column({ type: "varchar", name: "user_id" })
   userId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   channel!: string;
 
   @Column({ type: "enum", enum: DeliveryStatus, name: "status", default: DeliveryStatus.Pending })

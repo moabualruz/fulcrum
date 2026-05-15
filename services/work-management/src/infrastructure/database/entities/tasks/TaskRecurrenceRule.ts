@@ -20,19 +20,19 @@ export class TaskRecurrenceRule {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "source_task_id" })
+  @Column({ type: "varchar", name: "source_task_id" })
   sourceTaskId!: string;
 
-  @Column({ name: "trigger_type" })
+  @Column({ type: "varchar", name: "trigger_type" })
   triggerType!: string;
 
-  @Column({ name: "cron_expression", nullable: true })
+  @Column({ type: "varchar", name: "cron_expression", nullable: true })
   cronExpression: string | null = null;
 
   @Column({ type: "integer", name: "interval_days", nullable: true })
   intervalDays: number | null = null;
 
-  @Column({ default: "UTC" })
+  @Column({ type: "varchar", default: "UTC" })
   timezone: string = "UTC";
 
   @Column({ type: "jsonb", name: "template_data", nullable: true })

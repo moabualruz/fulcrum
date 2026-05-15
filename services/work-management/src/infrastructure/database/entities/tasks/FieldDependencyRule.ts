@@ -19,19 +19,19 @@ export class FieldDependencyRule {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id" })
+  @Column({ type: "varchar", name: "project_id" })
   projectId!: string;
 
-  @Column({ name: "source_field_id" })
+  @Column({ type: "varchar", name: "source_field_id" })
   sourceFieldId!: string;
 
-  @Column({ name: "source_value" })
+  @Column({ type: "varchar", name: "source_value" })
   sourceValue!: string;
 
-  @Column({ name: "target_field_id" })
+  @Column({ type: "varchar", name: "target_field_id" })
   targetFieldId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   action!: string;
 
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })

@@ -23,15 +23,15 @@ export class FeatureFlag {
   id!: string;
 
   // Nullable: global flag rows have no org (apply to all orgs)
-  @Column({ name: "org_id", nullable: true })
+  @Column({ type: "varchar", name: "org_id", nullable: true })
   orgId: string | null = null;
 
   // Nullable: org-level flags have no user (apply to all users in the org)
-  @Column({ name: "user_id", nullable: true })
+  @Column({ type: "varchar", name: "user_id", nullable: true })
   userId: string | null = null;
 
   // Flag name — must match ^[a-z][a-z0-9-]*$ (D5 constraint, enforced in FlagRegistry)
-  @Column()
+  @Column({ type: "varchar" })
   flag!: string;
 
   @Column({ type: "boolean" })

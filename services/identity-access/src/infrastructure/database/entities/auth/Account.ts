@@ -106,15 +106,15 @@ export class Account {
   org: Org | null = null;
 
   /** References users.id with ON DELETE CASCADE at the migration boundary. */
-  @Column({ name: "user_id" })
+  @Column({ type: "varchar", name: "user_id" })
   userId!: string;
 
   /** OAuth provider identifier, e.g. "google", "github". */
-  @Column({ name: "provider_id" })
+  @Column({ type: "varchar", name: "provider_id" })
   providerId!: string;
 
   /** Provider-specific account/subject ID. */
-  @Column({ name: "account_id" })
+  @Column({ type: "varchar", name: "account_id" })
   accountId!: string;
 
   /** Short-lived access token (nullable — not always returned). */
@@ -134,7 +134,7 @@ export class Account {
   refreshTokenExpiresAt?: Date;
 
   /** Raw provider token scope string. */
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   scope?: string;
 
   /** OIDC id_token, if returned by provider. */

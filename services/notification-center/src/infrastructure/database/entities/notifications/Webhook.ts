@@ -25,7 +25,7 @@ export class Webhook {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column()
+  @Column({ type: "varchar" })
   name!: string;
 
   @Column({ type: "text" })

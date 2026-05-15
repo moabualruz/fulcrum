@@ -26,13 +26,13 @@ export class DocTemplate {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id", nullable: true })
+  @Column({ type: "varchar", name: "project_id", nullable: true })
   projectId: string | null = null;
 
-  @Column({ name: "doc_type" })
+  @Column({ type: "varchar", name: "doc_type" })
   docType!: DocType;
 
-  @Column({ name: "name" })
+  @Column({ type: "varchar", name: "name" })
   name!: string;
 
   @Column({ type: "jsonb", name: "frontmatter_template", default: () => "'{}'" })

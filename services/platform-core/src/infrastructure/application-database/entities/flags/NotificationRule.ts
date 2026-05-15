@@ -23,7 +23,7 @@ export class NotificationRule {
   org!: Org;
 
   /** Entity kind (e.g. "task", "doc") this rule matches. */
-  @Column({ name: "subject_kind" })
+  @Column({ type: "varchar", name: "subject_kind" })
   subjectKind!: string;
 
   @Column({ type: "boolean" })

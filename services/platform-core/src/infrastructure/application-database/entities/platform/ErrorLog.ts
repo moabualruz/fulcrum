@@ -30,22 +30,22 @@ export class ErrorLog {
   @Column({ type: "timestamptz", name: "occurred_at", default: () => "now()" })
   occurredAt!: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   os?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   arch?: string;
 
-  @Column({ name: "bun_version", nullable: true })
+  @Column({ type: "varchar", name: "bun_version", nullable: true })
   bunVersion?: string;
 
-  @Column({ name: "fulcrum_version", nullable: true })
+  @Column({ type: "varchar", name: "fulcrum_version", nullable: true })
   fulcrumVersion?: string;
 
   @Column({ type: "text", name: "recent_cli_command", nullable: true })
   recentCliCommand?: string;
 
-  @Column({ name: "recent_trpc_procedure", nullable: true })
+  @Column({ type: "varchar", name: "recent_trpc_procedure", nullable: true })
   recentTrpcProcedure?: string;
 
   @Column({ type: "text", name: "error_message" })

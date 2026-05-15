@@ -27,22 +27,22 @@ export class ModelCache {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "model_id" })
+  @Column({ type: "varchar", name: "model_id" })
   modelId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   kind!: ModelCacheKind;
 
-  @Column()
+  @Column({ type: "varchar" })
   source!: ModelCacheSource;
 
-  @Column({ name: "local_path", nullable: true })
+  @Column({ type: "varchar", name: "local_path", nullable: true })
   localPath?: string;
 
   @Column({ type: "bigint", name: "size_bytes", nullable: true })
   sizeBytes?: bigint;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   sha256?: string;
 
   @Column({ type: "boolean", default: false })

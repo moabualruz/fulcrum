@@ -20,19 +20,19 @@ export class AuditEvent {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id" })
+  @Column({ type: "varchar", name: "project_id" })
   projectId!: string;
 
-  @Column({ name: "actor_id" })
+  @Column({ type: "varchar", name: "actor_id" })
   actorId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   action!: string;
 
-  @Column({ name: "subject_kind" })
+  @Column({ type: "varchar", name: "subject_kind" })
   subjectKind!: string;
 
-  @Column({ name: "subject_id" })
+  @Column({ type: "varchar", name: "subject_id" })
   subjectId!: string;
 
   @Column({ type: "jsonb" })

@@ -15,19 +15,19 @@ export class McpVirtualSkill {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   slug!: string;
 
-  @Column({ name: "server_name" })
+  @Column({ type: "varchar", name: "server_name" })
   serverName!: string;
 
-  @Column({ name: "command_or_url" })
+  @Column({ type: "varchar", name: "command_or_url" })
   commandOrUrl!: string;
 
-  @Column({ name: "package_name", nullable: true })
+  @Column({ type: "varchar", name: "package_name", nullable: true })
   packageName?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   version?: string;
 
   @Column({ type: "jsonb", name: "env_hints_json", nullable: true })
@@ -36,13 +36,13 @@ export class McpVirtualSkill {
   @Column({ type: "jsonb", name: "tool_names_json" })
   toolNamesJson: string[] = [];
 
-  @Column({ name: "descriptor_sha256" })
+  @Column({ type: "varchar", name: "descriptor_sha256" })
   descriptorSha256!: string;
 
-  @Column({ name: "tool_manifest_hash", nullable: true })
+  @Column({ type: "varchar", name: "tool_manifest_hash", nullable: true })
   toolManifestHash?: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   source: string = "mcp";
 
   @Column({ type: "boolean", name: "invokable_by_fulcrum" })
@@ -54,9 +54,9 @@ export class McpVirtualSkill {
   @Column({ type: "timestamptz", name: "updated_at", default: () => "now()" })
   updatedAt!: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   description?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   vendor?: string;
 }

@@ -22,19 +22,19 @@ export class Job {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id", nullable: true })
+  @Column({ type: "varchar", name: "project_id", nullable: true })
   projectId?: string | null = null;
 
-  @Column({ default: "default" })
+  @Column({ type: "varchar", default: "default" })
   queue: string = "default";
 
-  @Column({ default: "generic" })
+  @Column({ type: "varchar", default: "generic" })
   kind: string = "generic";
 
   @Column({ type: "jsonb", default: () => "'{}'" })
   payload: Record<string, unknown> = {};
 
-  @Column()
+  @Column({ type: "varchar" })
   status: string = "pending";
 
   @Column({ type: "integer", name: "max_attempts", default: 3 })

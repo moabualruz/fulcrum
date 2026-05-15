@@ -28,7 +28,7 @@ export class TelemetryEvent {
   @JoinColumn({ name: "user_id" })
   user?: User;
 
-  @Column()
+  @Column({ type: "varchar" })
   kind!: string;
 
   @Column({ type: "jsonb" })

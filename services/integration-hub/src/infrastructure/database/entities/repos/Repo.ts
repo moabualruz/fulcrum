@@ -25,31 +25,31 @@ export class Repo {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column()
+  @Column({ type: "varchar" })
   name!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   slug!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   kind!: "local" | "remote";
 
-  @Column({ name: "local_path", nullable: true })
+  @Column({ type: "varchar", name: "local_path", nullable: true })
   localPath?: string | null;
 
-  @Column({ name: "remote_url", nullable: true })
+  @Column({ type: "varchar", name: "remote_url", nullable: true })
   remoteUrl?: string | null;
 
-  @Column({ name: "default_branch", nullable: true })
+  @Column({ type: "varchar", name: "default_branch", nullable: true })
   defaultBranch?: string | null;
 
-  @Column({ name: "current_branch", nullable: true })
+  @Column({ type: "varchar", name: "current_branch", nullable: true })
   currentBranch?: string | null;
 
   @Column({ type: "timestamptz", name: "last_sync_at", nullable: true })
   lastSyncAt?: Date | null;
 
-  @Column({ name: "sync_status", default: "idle" })
+  @Column({ type: "varchar", name: "sync_status", default: "idle" })
   syncStatus: string = "idle";
 
   @Column({ type: "timestamptz", name: "last_touched_at", nullable: true })

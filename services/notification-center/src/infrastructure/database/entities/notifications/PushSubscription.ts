@@ -22,7 +22,7 @@ export class PushSubscription {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "user_id" })
+  @Column({ type: "varchar", name: "user_id" })
   userId!: string;
 
   /** Full push endpoint URL (may be very long). */

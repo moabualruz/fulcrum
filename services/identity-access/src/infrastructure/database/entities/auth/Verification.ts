@@ -29,7 +29,7 @@ export class Verification {
   /**
    * The identifier this token is scoped to (e.g. email address, user ID).
    */
-  @Column()
+  @Column({ type: "varchar" })
   identifier!: string;
 
   /**

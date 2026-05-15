@@ -20,19 +20,19 @@ export class DomainEventOutbox {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id", nullable: true })
+  @Column({ type: "varchar", name: "project_id", nullable: true })
   projectId?: string | null;
 
-  @Column()
+  @Column({ type: "varchar" })
   verb!: string;
 
-  @Column({ name: "subject_kind" })
+  @Column({ type: "varchar", name: "subject_kind" })
   subjectKind!: string;
 
-  @Column({ name: "subject_id", nullable: true })
+  @Column({ type: "varchar", name: "subject_id", nullable: true })
   subjectId?: string | null;
 
-  @Column({ name: "event_key" })
+  @Column({ type: "varchar", name: "event_key" })
   eventKey!: string;
 
   @Column({ type: "jsonb" })

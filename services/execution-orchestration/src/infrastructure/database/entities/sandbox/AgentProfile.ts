@@ -23,13 +23,13 @@ export class AgentProfile {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column()
+  @Column({ type: "varchar" })
   name!: string;
 
-  @Column({ name: "cli_path", nullable: true })
+  @Column({ type: "varchar", name: "cli_path", nullable: true })
   cliPath?: string;
 
-  @Column({ name: "skill_folder", nullable: true })
+  @Column({ type: "varchar", name: "skill_folder", nullable: true })
   skillFolder?: string;
 
   @Column({ type: "simple-array", name: "default_flags", nullable: true })

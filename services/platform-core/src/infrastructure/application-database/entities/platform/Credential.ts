@@ -30,20 +30,20 @@ export class Credential {
   @JoinColumn({ name: "user_id" })
   user!: User;
 
-  @Column()
+  @Column({ type: "varchar" })
   name!: string;
 
   /** XSalsa20-Poly1305 ciphertext blob; keys never persisted in this column. */
   @Column({ type: "bytea", name: "encrypted_value" })
   encryptedValue!: Uint8Array;
 
-  @Column()
+  @Column({ type: "varchar" })
   algo: string = "nacl-secretbox";
 
-  @Column()
+  @Column({ type: "varchar" })
   kdf: string = "argon2id";
 
-  @Column()
+  @Column({ type: "varchar" })
   provider: string = "local";
 
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })

@@ -21,10 +21,10 @@ export class TaskTemplate {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id", nullable: true })
+  @Column({ type: "varchar", name: "project_id", nullable: true })
   projectId: string | null = null;
 
-  @Column()
+  @Column({ type: "varchar" })
   name!: string;
 
   @Column({ type: "text", nullable: true })
@@ -36,7 +36,7 @@ export class TaskTemplate {
   @Column({ type: "boolean", name: "is_default", default: false })
   isDefault: boolean = false;
 
-  @Column({ name: "created_by" })
+  @Column({ type: "varchar", name: "created_by" })
   createdBy!: string;
 
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })

@@ -22,7 +22,7 @@ export class WebhookRuleConfig {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "rule_id" })
+  @Column({ type: "varchar", name: "rule_id" })
   ruleId!: string;
 
   @Column({ type: "text" })

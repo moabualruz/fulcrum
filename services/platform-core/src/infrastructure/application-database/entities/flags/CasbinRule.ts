@@ -10,24 +10,24 @@ export class CasbinRule {
   id!: string;
 
   /** Policy type: "p" for permission, "g" for grouping (RBAC). */
-  @Column()
+  @Column({ type: "varchar" })
   ptype!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   v0?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   v1?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   v2?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   v3?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   v4?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   v5?: string;
 }

@@ -34,19 +34,19 @@ export class Artifact {
   @JoinColumn({ name: "task_id" })
   task?: Task;
 
-  @Column()
+  @Column({ type: "varchar" })
   filename!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   mime?: string;
 
   @Column({ type: "bigint", name: "size_bytes", nullable: true })
   sizeBytes?: bigint;
 
-  @Column()
+  @Column({ type: "varchar" })
   path!: string;
 
-  @Column({ name: "checksum_sha256", nullable: true })
+  @Column({ type: "varchar", name: "checksum_sha256", nullable: true })
   checksumSha256?: string;
 
   @Column({ type: "timestamptz", name: "retention_until", nullable: true })

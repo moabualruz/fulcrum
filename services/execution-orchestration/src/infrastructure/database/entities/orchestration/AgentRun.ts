@@ -41,10 +41,10 @@ export class AgentRun {
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })
   createdAt!: Date;
 
-  @Column({ name: "status", nullable: true })
+  @Column({ type: "varchar", name: "status", nullable: true })
   status?: string;
 
-  @Column({ name: "orchestration_state", nullable: true })
+  @Column({ type: "varchar", name: "orchestration_state", nullable: true })
   orchestrationState?: AgentRunOrchestrationState;
 
   @Column({ type: "integer", name: "attempt_count", default: 0 })
@@ -56,10 +56,10 @@ export class AgentRun {
   @Column({ type: "text", name: "workspace_path", nullable: true })
   workspacePath?: string;
 
-  @Column({ name: "last_error_kind", nullable: true })
+  @Column({ type: "varchar", name: "last_error_kind", nullable: true })
   lastErrorKind?: string;
 
-  @Column({ name: "sandbox_mode", default: "host" })
+  @Column({ type: "varchar", name: "sandbox_mode", default: "host" })
   sandboxMode: "host" | "docker" | "podman" = "host";
 
   @Column({ type: "integer", name: "iteration_count", default: 0 })
@@ -68,37 +68,37 @@ export class AgentRun {
   @Column({ type: "integer", name: "token_used", nullable: true })
   tokenUsed?: number;
 
-  @Column({ name: "transcript_path", nullable: true })
+  @Column({ type: "varchar", name: "transcript_path", nullable: true })
   transcriptPath?: string;
 
-  @Column({ name: "workspace_diff_path", nullable: true })
+  @Column({ type: "varchar", name: "workspace_diff_path", nullable: true })
   workspaceDiffPath?: string;
 
   @Column({ type: "boolean", name: "transcript_truncated", default: false })
   transcriptTruncated: boolean = false;
 
-  @Column({ name: "agent_name", nullable: true })
+  @Column({ type: "varchar", name: "agent_name", nullable: true })
   agentName?: string;
 
-  @Column({ name: "agent_version", nullable: true })
+  @Column({ type: "varchar", name: "agent_version", nullable: true })
   agentVersion?: string;
 
-  @Column({ name: "claimed_by", nullable: true })
+  @Column({ type: "varchar", name: "claimed_by", nullable: true })
   claimedBy?: string;
 
-  @Column({ name: "attempt_lifecycle_state", nullable: true })
+  @Column({ type: "varchar", name: "attempt_lifecycle_state", nullable: true })
   attemptLifecycleState?: AttemptLifecycleState;
 
   @Column({ type: "timestamptz", name: "last_codex_timestamp", nullable: true })
   lastCodexTimestamp?: Date;
 
-  @Column({ name: "thread_id", nullable: true })
+  @Column({ type: "varchar", name: "thread_id", nullable: true })
   threadId?: string;
 
-  @Column({ name: "turn_id", nullable: true })
+  @Column({ type: "varchar", name: "turn_id", nullable: true })
   turnId?: string;
 
-  @Column({ name: "session_id", nullable: true })
+  @Column({ type: "varchar", name: "session_id", nullable: true })
   sessionId?: string;
 
   @ManyToOne(() => SearchDocument, { nullable: true })

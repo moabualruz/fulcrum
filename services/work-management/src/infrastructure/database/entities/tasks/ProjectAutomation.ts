@@ -19,13 +19,13 @@ export class ProjectAutomation {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "project_id" })
+  @Column({ type: "varchar", name: "project_id" })
   projectId!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   name!: string;
 
-  @Column({ name: "trigger_type" })
+  @Column({ type: "varchar", name: "trigger_type" })
   triggerType!: string;
 
   @Column({ type: "jsonb", name: "trigger_config" })
@@ -34,7 +34,7 @@ export class ProjectAutomation {
   @Column({ type: "jsonb", nullable: true })
   condition: object | null = null;
 
-  @Column({ name: "action_type" })
+  @Column({ type: "varchar", name: "action_type" })
   actionType!: string;
 
   @Column({ type: "jsonb", name: "action_config" })

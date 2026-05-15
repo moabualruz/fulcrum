@@ -30,19 +30,19 @@ export class FulcrumSkill {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column()
+  @Column({ type: "varchar" })
   name!: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   slug!: string;
 
   @Column({ type: "enum", enum: SkillSource })
   source!: SkillSource;
 
-  @Column({ name: "upstream_repo", nullable: true })
+  @Column({ type: "varchar", name: "upstream_repo", nullable: true })
   upstreamRepo?: string;
 
-  @Column({ name: "upstream_ref", nullable: true })
+  @Column({ type: "varchar", name: "upstream_ref", nullable: true })
   upstreamRef?: string;
 
   @Column({ type: "jsonb", name: "enabled_agents" })

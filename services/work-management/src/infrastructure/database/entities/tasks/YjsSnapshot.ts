@@ -12,7 +12,7 @@ export class YjsSnapshot {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column({ name: "doc_name", unique: true })
+  @Column({ type: "varchar", name: "doc_name", unique: true })
   docName!: string;
 
   @Column({ type: "bytea" })

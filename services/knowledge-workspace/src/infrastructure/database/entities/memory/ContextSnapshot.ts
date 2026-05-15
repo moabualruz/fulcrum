@@ -23,10 +23,10 @@ export class ContextSnapshot {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  @Column({ name: "run_id", nullable: true })
+  @Column({ type: "varchar", name: "run_id", nullable: true })
   runId: string | null = null;
 
-  @Column({ name: "task_id", nullable: true })
+  @Column({ type: "varchar", name: "task_id", nullable: true })
   taskId: string | null = null;
 
   @Column({ type: "jsonb", name: "bundle_blob" })

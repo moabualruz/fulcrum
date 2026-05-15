@@ -28,19 +28,19 @@ export class Event {
   @JoinColumn({ name: "user_id" })
   user?: User;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   actor?: string;
 
-  @Column({ name: "project_id", nullable: true })
+  @Column({ type: "varchar", name: "project_id", nullable: true })
   projectId?: string;
 
-  @Column()
+  @Column({ type: "varchar" })
   verb!: string;
 
-  @Column({ name: "subject_kind" })
+  @Column({ type: "varchar", name: "subject_kind" })
   subjectKind!: string;
 
-  @Column({ name: "subject_id", nullable: true })
+  @Column({ type: "varchar", name: "subject_id", nullable: true })
   subjectId?: string;
 
   @Column({ type: "jsonb", nullable: true })
@@ -49,7 +49,7 @@ export class Event {
   @Column({ type: "timestamptz", name: "created_at", default: () => "now()" })
   createdAt!: Date;
 
-  @Column({ name: "field_name", nullable: true })
+  @Column({ type: "varchar", name: "field_name", nullable: true })
   fieldName?: string;
 
   @Column({ type: "jsonb", name: "from_value", nullable: true })
