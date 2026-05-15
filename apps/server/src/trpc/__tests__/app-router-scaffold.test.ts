@@ -21,7 +21,8 @@ const REQUIRED_ROUTERS = [
   "projects",
   "tasks",
   "sprints",
-  "custom_fields",
+  "customFieldDefs",
+  "taskCustomFields",
   "saved_views",
   "docs",
   "doc_versions",
@@ -71,10 +72,9 @@ const REQUIRED_PROCEDURES = [
   "sprints.create",
   "sprints.update",
   "sprints.delete",
-  "custom_fields.list",
-  "custom_fields.create",
-  "custom_fields.update",
-  "custom_fields.delete",
+  "customFieldDefs.list",
+  "taskCustomFields.set",
+  "taskCustomFields.clear",
   "saved_views.list",
   "saved_views.get",
   "saved_views.create",
@@ -231,7 +231,7 @@ function sourceFiles(dir: string): string[] {
 }
 
 function findMutationPermissionViolations(): string[] {
-  const root = new URL("../..", import.meta.url).pathname;
+  const root = new URL("../../../../..", import.meta.url).pathname;
   const files = [
     join(root, "apps/server/src/trpc/router.ts"),
     ...sourceFiles(join(root, "apps/server/src/trpc/routers")),
@@ -270,7 +270,7 @@ function findMutationPermissionViolations(): string[] {
 }
 
 function findProtectedProcedurePermissionViolations(): string[] {
-  const root = new URL("../..", import.meta.url).pathname;
+  const root = new URL("../../../../..", import.meta.url).pathname;
   const files = [
     ...sourceFiles(join(root, "apps/server/src/trpc/routers")),
     ...sourceFiles(join(root, "apps/server/src/trpc/routers")),
@@ -330,7 +330,7 @@ describe("P13.01 appRouter scaffold", () => {
   });
 
   it("documents public mutation allowlist entries as unauthenticated auth flows", () => {
-    const root = new URL("../..", import.meta.url).pathname;
+    const root = new URL("../../../../..", import.meta.url).pathname;
     for (const [key, reason] of Object.entries(PUBLIC_MUTATION_ALLOWLIST_COMMENTS)) {
       const [rel, procedure] = key.split(":");
       if (!rel || !procedure) throw new Error(`invalid allowlist key: ${key}`);
@@ -342,7 +342,7 @@ describe("P13.01 appRouter scaffold", () => {
   });
 
   it("keeps tRPC public schemas free of z.any()", () => {
-    const root = new URL("../..", import.meta.url).pathname;
+    const root = new URL("../../../../..", import.meta.url).pathname;
     const files = [
       join(root, "apps/server/src/trpc/router.ts"),
       ...sourceFiles(join(root, "apps/server/src/trpc/routers")),
