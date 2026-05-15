@@ -89,22 +89,19 @@ export async function transitionRunForRetry(
     import("@identity-access/infrastructure/database/entities/auth/Org.ts"),
   ]);
   await em.transaction(async (tx) => {
-    const agentRunRepo = tx.getRepository(AgentRun);
-    const result = await agentRunRepo.update(
-      { id: run.id, orchestrationState: run.orchestrationState } as never,
-      {
-        orchestrationState: input.nextState,
-        ...(input.exhausted ? { status: "failed" } : {}),
-        attemptCount: input.nextAttempt,
-        nextRetryAt: input.nextRetryAt,
-        lastErrorKind: input.lastErrorKind,
-      } as never,
-    );
-    if (result.affected !== undefined && result.affected === 0) return;
-    if (result.affected === undefined) {
-      const verify = await agentRunRepo.findOne({ where: { id: run.id, orchestrationState: input.nextState } as never });
-      if (!verify) return;
+    const params: unknown[] = [input.nextState, input.nextAttempt, input.nextRetryAt, input.lastErrorKind];
+    let sql = `UPDATE agent_runs SET orchestration_state = $1, attempt_count = $2, next_retry_at = $3, last_error_kind = $4`;
+    if (input.exhausted) {
+      params.push("failed");
+      sql += `, status = $${params.length}`;
     }
+    params.push(run.id, run.orchestrationState);
+    sql += ` WHERE id = $${params.length - 1} AND orchestration_state = $${params.length}`;
+    await tx.query(sql, params);
+    // Verify update took effect (PGlite doesn't return affected count)
+    const agentRunRepo = tx.getRepository(AgentRun);
+    const verify = await agentRunRepo.findOne({ where: { id: run.id, orchestrationState: input.nextState } as never });
+    if (!verify) return;
     await tx.save(Event, {
       org: { id: run.orgId } as typeof Org.prototype,
       subjectKind: "agent_run",

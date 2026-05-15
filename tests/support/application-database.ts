@@ -112,6 +112,9 @@ export async function createTestOrm(opts: CreateTestOrmOptions = {}): Promise<Te
   await truncateAllTables(ds);
   const seed = await new SeedService(ds.manager).run();
   const em = ds.manager as EntityManager & Record<string, unknown>;
+  // Reset pending state from previous test run (singleton em is shared)
+  (em as any).__pendingPersist = [];
+  (em as any).__persistPromise = undefined;
 
   // MikroORM compat shims (applied once, idempotent)
   if (!em.getConnection) {
@@ -188,6 +191,9 @@ export async function createTestOrm(opts: CreateTestOrmOptions = {}): Promise<Te
   }
   if (!em.nativeDelete) {
     (em as any).nativeDelete = async (entity: Function, criteria: unknown) => {
+      // Clear pending persist queue before deleting — prevents stale entities being re-inserted
+      (em as any).__pendingPersist = [];
+      (em as any).__persistPromise = undefined;
       if (criteria && typeof criteria === "object" && Object.keys(criteria as object).length === 0) {
         const meta = ds.getMetadata(entity);
         await ds.query(`TRUNCATE TABLE "${meta.tableName}" CASCADE`);
