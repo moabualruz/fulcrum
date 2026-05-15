@@ -97,11 +97,14 @@ async function ensureInitialized(debug: boolean): Promise<{ ds: DataSource; seed
 }
 
 async function truncateAllTables(ds: DataSource): Promise<void> {
-  const tables = ds.entityMetadatas
-    .map((m) => `"${m.tableName}"`)
-    .filter((t) => t !== `"${FULCRUM_TYPEORM_MIGRATIONS_TABLE}"`);
-  if (tables.length === 0) return;
-  await ds.query(`TRUNCATE ${tables.join(", ")} CASCADE`);
+  // Only truncate tables that actually exist in the database
+  const result = await ds.query(
+    `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename != $1`,
+    [FULCRUM_TYPEORM_MIGRATIONS_TABLE],
+  );
+  const existing = (result as Array<{ tablename: string }>).map((r) => `"${r.tablename}"`);
+  if (existing.length === 0) return;
+  await ds.query(`TRUNCATE ${existing.join(", ")} CASCADE`);
 }
 
 export async function createTestOrm(opts: CreateTestOrmOptions = {}): Promise<TestOrm> {
