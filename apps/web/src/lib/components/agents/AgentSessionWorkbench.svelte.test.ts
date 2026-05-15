@@ -28,6 +28,11 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain('data-session-model="gpt-5.5" data-selected="true"');
     expect(body).toContain("data-session-permission");
     expect(body).toContain('data-permission-option="allow_once"');
+    expect(body).toContain("data-session-resume");
+    expect(body).toContain('data-resume-session="row-2"');
+    expect(body).toContain("data-session-traffic-state");
+    expect(body).toContain('data-traffic-error="true"');
+    expect(body).toContain("tool/error");
     expect(body).toContain("Build the plan");
     expect(body).toContain("session/update");
     expect(body).not.toContain("data-session-empty");
@@ -100,14 +105,51 @@ function activeModel(): SessionWorkbenchModel {
           method: "session/update",
           payload: {},
         },
+        {
+          id: "traffic-2",
+          timestamp: 2,
+          direction: "out",
+          type: "response",
+          method: "tool/error",
+          payload: {},
+          error: true,
+        },
       ],
-      filteredEntries: [],
-      paused: false,
+      filteredEntries: [
+        {
+          id: "traffic-1",
+          timestamp: 1,
+          direction: "in",
+          type: "notification",
+          method: "session/update",
+          payload: {},
+        },
+        {
+          id: "traffic-2",
+          timestamp: 2,
+          direction: "out",
+          type: "response",
+          method: "tool/error",
+          payload: {},
+          error: true,
+        },
+      ],
+      paused: true,
       filter: "all",
       searchQuery: "",
-      summary: { total: 1, requests: 0, responses: 0, notifications: 1, errors: 0 },
+      summary: { total: 2, requests: 0, responses: 1, notifications: 1, errors: 1 },
     },
-    resumableSessions: [],
+    resumableSessions: [
+      {
+        id: "row-2",
+        sessionId: "agent-session-2",
+        title: "Older work",
+        agentName: "codex",
+        cwd: "/repo",
+        lastUpdated: 0,
+        supportsResume: true,
+      },
+    ],
   };
 }
 

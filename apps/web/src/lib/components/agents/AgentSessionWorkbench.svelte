@@ -92,15 +92,29 @@
         <div><dt class={cn("text-muted-foreground")}>Requests</dt><dd>{model.traffic.summary.requests}</dd></div>
         <div><dt class={cn("text-muted-foreground")}>Responses</dt><dd>{model.traffic.summary.responses}</dd></div>
         <div><dt class={cn("text-muted-foreground")}>Notifications</dt><dd>{model.traffic.summary.notifications}</dd></div>
+        <div><dt class={cn("text-muted-foreground")}>Errors</dt><dd>{model.traffic.summary.errors}</dd></div>
+        <div><dt class={cn("text-muted-foreground")}>Paused</dt><dd>{model.traffic.paused ? "Yes" : "No"}</dd></div>
       </dl>
-      {#if model.traffic.entries.length > 0}
+      <div data-session-traffic-state class={cn("grid grid-cols-2 gap-2 text-xs")}>
+        <div><span class={cn("text-muted-foreground")}>Filter</span> <span>{model.traffic.filter}</span></div>
+        <div><span class={cn("text-muted-foreground")}>Search</span> <span>{model.traffic.searchQuery || "none"}</span></div>
+      </div>
+      {#if model.traffic.filteredEntries.length > 0}
         <ol class={cn("space-y-1 text-xs")}>
-          {#each model.traffic.entries.slice(0, 3) as entry}
-            <li data-session-traffic-entry={entry.id} class={cn("truncate text-muted-foreground")}>
-              {entry.method}
+          {#each model.traffic.filteredEntries.slice(0, 5) as entry}
+            <li
+              data-session-traffic-entry={entry.id}
+              data-traffic-error={entry.error === true}
+              class={cn("grid grid-cols-[auto_auto_1fr] gap-2 text-muted-foreground")}
+            >
+              <span>{entry.direction}</span>
+              <span>{entry.type}</span>
+              <span class={cn("truncate")}>{entry.method}</span>
             </li>
           {/each}
         </ol>
+      {:else if model.traffic.entries.length > 0}
+        <p data-session-traffic-empty-filter class={cn("text-xs text-muted-foreground")}>No matching traffic</p>
       {/if}
     </div>
 
@@ -125,6 +139,27 @@
           </button>
         {/each}
       </div>
+    </div>
+  {/if}
+
+  {#if model.resumableSessions.length > 0}
+    <div data-session-resume class={cn("mt-4 rounded-md border border-border p-3")}>
+      <h3 class={cn("text-sm font-medium")}>Resumable sessions</h3>
+      <ol class={cn("mt-2 space-y-2")}>
+        {#each model.resumableSessions as session}
+          <li data-resumable-session={session.id} class={cn("flex flex-wrap items-center justify-between gap-2 text-sm")}>
+            <span>{session.title}</span>
+            <button
+              type="button"
+              disabled={!model.controls.canResume}
+              data-resume-session={session.id}
+              class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              Resume
+            </button>
+          </li>
+        {/each}
+      </ol>
     </div>
   {/if}
 

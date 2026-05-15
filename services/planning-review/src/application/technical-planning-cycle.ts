@@ -7,6 +7,10 @@ import {
   type ApprovedPlanArtifactKind,
 } from "@planning-review/application/approved-plan-breakdown.ts";
 import {
+  buildPlanningArtifactPreviews,
+  type PlanningArtifactPreview,
+} from "@planning-review/application/artifact-preview.ts";
+import {
   buildFreeformPlanningPromptFromDocs,
   type BuildFreeformPlanningPromptFromDocsInput,
 } from "@planning-review/application/freeform-doc-actions.ts";
@@ -76,6 +80,7 @@ export interface TechnicalPlanningCycleDraft {
   prompt: string;
   reviewPrompt: string;
   plan: TechnicalPlanningCyclePlan;
+  artifactPreviews: PlanningArtifactPreview[];
   breakdown: ApprovedPlanBreakdown;
 }
 
@@ -140,6 +145,7 @@ export function buildTechnicalPlanningCycleDraft(
     approvedPlanMarkdown: markdown,
     sourceDocRefs: input.context.sourceRefs,
   });
+  const artifactPreviews = buildPlanningArtifactPreviews({ artifacts: breakdown.artifacts });
 
   return {
     status: "ready_for_plan_review",
@@ -157,6 +163,7 @@ export function buildTechnicalPlanningCycleDraft(
       boilerplatePaths,
       sourceDocRefs: [...input.context.sourceRefs],
     },
+    artifactPreviews,
     breakdown,
   };
 }
@@ -193,6 +200,7 @@ export async function generateTechnicalPlanningCycle(
       sourceRefs: draft.plan.sourceDocRefs,
       prototypePaths: draft.plan.prototypePaths,
       boilerplatePaths: draft.plan.boilerplatePaths,
+      artifactPreviewIds: draft.artifactPreviews.map((preview) => preview.id),
       taskClientKeys: draft.breakdown.taskDrafts.map((task) => task.clientKey),
     },
   });

@@ -8,6 +8,7 @@ import { validateSync } from "class-validator";
 
 import {
   PlanningApprovedPlanRequestDto,
+  PlanningArtifactExecutionRequestDto,
   PlanningContinuousUpdateRequestDto,
   PlanningFreeformPromptRequestDto,
   PlanningFreeformStartRequestDto,
@@ -23,6 +24,7 @@ import {
   type PlanningFreeformPromptResult,
   type PlanningFreeformStartResult,
   type PlanningGuidedAcpStartResult,
+  type PersistedPlanningArtifactExecutionRecord,
   type PlanningContinuousUpdateResult,
   type PlanningTechnicalCycleResult,
 } from "@workflow-coordination/application/planning-preview.service.ts";
@@ -84,6 +86,12 @@ describe("Planning preview Nest controller", () => {
       Reflect.getMetadata(METHOD_METADATA, PlanningPreviewController.prototype.generateTechnicalPlanningCycle),
     ).toBe(RequestMethod.POST);
     expect(
+      Reflect.getMetadata(PATH_METADATA, PlanningPreviewController.prototype.recordArtifactExecution),
+    ).toBe("artifact-execution/record");
+    expect(
+      Reflect.getMetadata(METHOD_METADATA, PlanningPreviewController.prototype.recordArtifactExecution),
+    ).toBe(RequestMethod.POST);
+    expect(
       Reflect.getMetadata(PATH_METADATA, PlanningPreviewController.prototype.startFreeformWork),
     ).toBe("freeform/start");
     expect(
@@ -128,6 +136,9 @@ describe("Planning preview Nest controller", () => {
       },
       async generateTechnicalPlanningCycle() {
         throw new Error("unexpected technical planning call");
+      },
+      async recordArtifactExecution() {
+        throw new Error("unexpected artifact execution call");
       },
       async startFreeformWork() {
         throw new Error("unexpected freeform call");
@@ -185,6 +196,9 @@ describe("Planning preview Nest controller", () => {
       },
       async generateTechnicalPlanningCycle() {
         throw new Error("unexpected technical planning call");
+      },
+      async recordArtifactExecution() {
+        throw new Error("unexpected artifact execution call");
       },
       async startFreeformWork() {
         throw new Error("unexpected freeform call");
@@ -253,6 +267,7 @@ describe("Planning preview Nest controller", () => {
         dependencyUpdates: [],
         warnings: [],
       },
+      artifactPreviews: [],
     };
     const service = {
       seenPrompt: undefined as PlanningFreeformPromptRequestDto | undefined,
@@ -275,6 +290,9 @@ describe("Planning preview Nest controller", () => {
         this.seenTechnical = body;
         return technicalOutput;
       },
+      async recordArtifactExecution() {
+        throw new Error("unexpected artifact execution call");
+      },
       async startFreeformWork() {
         throw new Error("unexpected freeform call");
       },
@@ -291,6 +309,68 @@ describe("Planning preview Nest controller", () => {
     await expect(controller.generateTechnicalPlanningCycle(technicalInput)).resolves.toBe(technicalOutput);
     expect(service.seenPrompt).toBe(freeformPromptInput);
     expect(service.seenTechnical).toBe(technicalInput);
+  });
+
+  test("delegates artifact execution recording to the server-owned planning service", async () => {
+    const input = Object.assign(new PlanningArtifactExecutionRequestDto(), {
+      planId: "plan-technical-nest",
+      artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+      status: "passed" as const,
+      prototypeId: "prototype-plan-technical-nest-1",
+      artifactId: "artifact-plan-technical-nest-1",
+      traceId: "trace-technical-nest",
+      command: "bun",
+      args: ["run", "--cwd", "apps/web", "test"],
+      urlPath: "/planning",
+      checks: ["route visible"],
+      executedAt: "2026-05-15T12:00:00.000Z",
+    });
+    const output: PersistedPlanningArtifactExecutionRecord = {
+      planId: "plan-technical-nest",
+      artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+      status: "passed",
+      prototypeStatus: "validated",
+      prototypeId: "prototype-plan-technical-nest-1",
+      artifactId: "artifact-plan-technical-nest-1",
+      traceId: "trace-technical-nest",
+      command: "bun",
+      args: ["run", "--cwd", "apps/web", "test"],
+      urlPath: "/planning",
+      checks: ["route visible"],
+      executedAt: "2026-05-15T12:00:00.000Z",
+    };
+    const service = {
+      seen: undefined as PlanningArtifactExecutionRequestDto | undefined,
+      async previewApprovedPlan() {
+        throw new Error("unexpected preview call");
+      },
+      async materializeApprovedPlan() {
+        throw new Error("unexpected materialize call");
+      },
+      async buildFreeformDocsPlanningPrompt() {
+        throw new Error("unexpected freeform prompt call");
+      },
+      async generateTechnicalPlanningCycle() {
+        throw new Error("unexpected technical planning call");
+      },
+      async recordArtifactExecution(body: PlanningArtifactExecutionRequestDto) {
+        this.seen = body;
+        return output;
+      },
+      async startFreeformWork() {
+        throw new Error("unexpected freeform call");
+      },
+      async startGuidedAcpPlanning() {
+        throw new Error("unexpected guided ACP call");
+      },
+      async restartPlanningCycleFromUpdates() {
+        throw new Error("unexpected continuous update call");
+      },
+    };
+    const controller = new PlanningPreviewController(service);
+
+    await expect(controller.recordArtifactExecution(input)).resolves.toBe(output);
+    expect(service.seen).toBe(input);
   });
 
   test("delegates freeform and guided ACP starts to the server-owned planning service", async () => {
@@ -351,6 +431,9 @@ describe("Planning preview Nest controller", () => {
       },
       async generateTechnicalPlanningCycle() {
         throw new Error("unexpected technical planning call");
+      },
+      async recordArtifactExecution() {
+        throw new Error("unexpected artifact execution call");
       },
       async startFreeformWork(
         body: PlanningFreeformStartRequestDto,
@@ -493,6 +576,17 @@ describe("Planning preview Nest controller", () => {
       "projectId",
       "source",
       "userPrompt",
+    ]);
+
+    const artifactExecutionInvalid = Object.assign(new PlanningArtifactExecutionRequestDto(), {
+      planId: "",
+      artifactPath: "",
+      status: "",
+    });
+    expect(validateSync(artifactExecutionInvalid).map((error) => error.property).sort()).toEqual([
+      "artifactPath",
+      "planId",
+      "status",
     ]);
 
     const freeformInvalid = Object.assign(new PlanningFreeformStartRequestDto(), {

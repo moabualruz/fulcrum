@@ -195,6 +195,61 @@ describe("ACP ported session manager", () => {
     expect(state.currentSession?.title).toBe("Build a plan");
   });
 
+  test("resumes a saved ACP session through bridge load-session support", async () => {
+    const state = createAcpSessionState({ createId: () => "session-row-1", now: () => 2_000 });
+    state.savedSessions.push({
+      id: "saved-row-1",
+      agentName: "codex",
+      sessionId: "agent-session-1",
+      title: "Saved planning session",
+      lastUpdated: 1_000,
+      cwd: "/repo",
+      supportsLoadSession: true,
+    });
+    state.messages.push({ id: "message-1", role: "user", content: "stale", timestamp: 1 });
+    state.toolCalls.set("tool-1", { toolCallId: "tool-1", title: "stale", kind: "read", status: "pending" });
+
+    const bridge = new FakeBridge(
+      { agentCapabilities: { loadSession: true } },
+      { sessionId: "new-session-unused" },
+      {
+        sessionId: "agent-session-1",
+        modes: {
+          currentModeId: "review",
+          availableModes: [{ id: "review", name: "Review" }],
+        },
+        models: {
+          currentModelId: "gpt-5.4",
+          availableModels: [{ modelId: "gpt-5.4", name: "GPT-5.4" }],
+        },
+      },
+    );
+    const manager = new AcpSessionManager({
+      state,
+      config: createAcpConfigState({ config }),
+      createBridge: async () => bridge,
+      appVersion: "0.1.0-test",
+    });
+
+    const session = await manager.resumeSession("saved-row-1");
+
+    expect(bridge.initializeCalls[0]).toMatchObject({
+      protocolVersion: 1,
+      clientInfo: { name: "fulcrum", title: "Fulcrum", version: "0.1.0-test" },
+    });
+    expect(bridge.loadSessionCalls).toEqual([{ sessionId: "agent-session-1" }]);
+    const savedSession = state.savedSessions[0];
+    if (!savedSession) throw new Error("Expected resumed saved session.");
+    expect(session).toBe(savedSession);
+    expect(session.lastUpdated).toBe(2_000);
+    expect(state.currentSession).toBe(session);
+    expect(state.isConnected).toBe(true);
+    expect(state.messages).toEqual([]);
+    expect(state.toolCallList).toEqual([]);
+    expect(state.currentModeId).toBe("review");
+    expect(state.currentModelId).toBe("gpt-5.4");
+  });
+
   test("proxies mode/model/cancel/permission actions and handles unexpected close", async () => {
     const state = createAcpSessionState({ createId: () => "session-row-1" });
     const bridge = new FakeBridge({}, { sessionId: "agent-session-1" });

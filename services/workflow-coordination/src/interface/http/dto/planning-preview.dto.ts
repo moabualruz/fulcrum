@@ -6,6 +6,7 @@ import type {
   PlanningGuidedAcpStartInput,
   PlanningContinuousUpdateInput,
   PlanningTechnicalCycleInput,
+  PlanningArtifactExecutionInput,
 } from "@workflow-coordination/application/planning-preview.service.ts";
 
 export class PlanningApprovedPlanRequestDto implements BuildApprovedPlanBreakdownInput {
@@ -127,4 +128,20 @@ export class PlanningTechnicalCycleRequestDto implements PlanningTechnicalCycleI
   boilerplatePaths?: string[];
   successCriteria?: string[];
   taskSeeds?: PlanningTechnicalTaskSeedDto[];
+}
+
+export class PlanningArtifactExecutionRequestDto implements PlanningArtifactExecutionInput {
+  planId!: string;
+  artifactPath!: string;
+  status!: PlanningArtifactExecutionInput["status"];
+  prototypeId?: string;
+  artifactId?: string;
+  traceId?: string;
+  command?: string;
+  args?: string[];
+  urlPath?: string;
+  summary?: string;
+  outputRef?: string;
+  checks?: string[];
+  executedAt?: string;
 }

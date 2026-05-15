@@ -15,6 +15,15 @@ import {
   type TechnicalPlanningCycleSource,
   type TechnicalPlanningTaskSeed,
 } from "@planning-review/application/technical-planning-cycle";
+import {
+  buildPlanningArtifactPreviews,
+} from "@planning-review/application/artifact-preview";
+import {
+  buildPlanningArtifactExecutionRecord,
+  mergePlanningArtifactExecutionMetadata,
+  type PlanningArtifactExecutionInput,
+  type PlanningArtifactExecutionRecord,
+} from "@planning-review/application/artifact-execution";
 import { createInMemoryTrafficRecorder, type TrafficEntry } from "@agent-client-protocol/application/traffic";
 
 import {
@@ -29,6 +38,7 @@ import type {
 import {
   FulcrumArtifactEntity,
   FulcrumPlanEntity,
+  type FulcrumPlanPrototype,
   FulcrumPlanPrototypeEntity,
 } from "@planning-review/infrastructure/database/review-workflow.entities";
 import {
@@ -67,6 +77,13 @@ export interface PlanningTechnicalCycleInput extends PlanningFreeformPromptInput
 
 export interface PlanningTechnicalCycleResult extends TechnicalPlanningCycleDraft {
   eventId: string;
+}
+
+export type { PlanningArtifactExecutionInput, PlanningArtifactExecutionRecord };
+
+export interface PersistedPlanningArtifactExecutionRecord extends PlanningArtifactExecutionRecord {
+  prototypeId: string;
+  artifactId?: string;
 }
 
 export interface ApprovedPlanMaterializeInput extends BuildApprovedPlanBreakdownInput {
@@ -282,6 +299,7 @@ export class PlanningPreviewService {
       ];
       for (const [index, artifact] of artifactPaths.entries()) {
         const id = planningWorkflowId("artifact", draft.plan.planId, String(index + 1));
+        const preview = draft.artifactPreviews.find((candidate) => candidate.kind === artifact.kind && candidate.path === artifact.path);
         await manager.getRepository(FulcrumArtifactEntity).save({
           id,
           projectId: input.projectId,
@@ -303,6 +321,7 @@ export class PlanningPreviewService {
             eventId,
             source: draft.plan.source,
             traceId: draft.plan.traceId ?? null,
+            ...(preview ? { preview } : {}),
           },
         });
       }
@@ -313,6 +332,36 @@ export class PlanningPreviewService {
       prompt: planning.prompt,
       eventId,
     };
+  }
+
+  async recordArtifactExecution(
+    input: PlanningArtifactExecutionInput,
+  ): Promise<PersistedPlanningArtifactExecutionRecord> {
+    if (!this.dataSource) {
+      throw new Error("PlanningPreviewService requires a TypeORM DataSource to record artifact execution.");
+    }
+    const record = buildPlanningArtifactExecutionRecord(input);
+
+    return await this.dataSource.transaction(async (manager) => {
+      const prototype = await loadPlanPrototypeForArtifact(
+        manager,
+        record.planId,
+        record.artifactPath,
+        record.prototypeId,
+        record.artifactId,
+      );
+      if (!prototype) throw new Error(`Planning artifact not found: ${record.artifactPath}`);
+      await manager.getRepository(FulcrumPlanPrototypeEntity).save({
+        ...prototype,
+        status: record.prototypeStatus,
+        metadata: mergePlanningArtifactExecutionMetadata(prototype.metadata, record),
+      });
+      return {
+        ...record,
+        prototypeId: prototype.id,
+        artifactId: prototype.artifactId,
+      };
+    });
   }
 
   async materializeApprovedPlan(
@@ -327,6 +376,7 @@ export class PlanningPreviewService {
     const projectId = input.projectId;
     const docIds = new Map<string, string>;
     const taskIds = new Map<string, string>;
+    const artifactPreviews = buildPlanningArtifactPreviews({ artifacts: breakdown.artifacts });
 
     const materialization = await this.dataSource.transaction(async (manager) => {
       await manager.getRepository(FulcrumWorkspaceEntity).save({
@@ -370,6 +420,7 @@ export class PlanningPreviewService {
       const artifacts: ApprovedPlanMaterializationResult["artifacts"] = [];
       for (const [index, artifact] of breakdown.artifacts.entries()) {
         const id = planningWorkflowId("artifact", input.planId, String(index + 1));
+        const preview = artifactPreviews.find((candidate) => candidate.kind === artifact.kind && candidate.path === artifact.path);
         await manager.getRepository(FulcrumArtifactEntity).save({
           id,
           projectId,
@@ -390,6 +441,7 @@ export class PlanningPreviewService {
           metadata: {
             sourcePlanId: artifact.sourcePlanId,
             traceId: artifact.traceId ?? traceId,
+            ...(preview ? { preview } : {}),
           },
         });
         artifacts.push({...artifact, id });
@@ -640,6 +692,58 @@ function planningWorkflowId(prefix: string,...parts: string[]): string {
 function artifactTitle(path: string): string {
   const parts = path.split(/[\\/]/g).filter(Boolean);
   return parts.at(-1) ?? path;
+}
+
+async function loadPlanPrototypeForArtifact(
+  manager: EntityManager,
+  planId: string,
+  artifactPath: string,
+  prototypeId?: string,
+  artifactId?: string,
+): Promise<FulcrumPlanPrototype | null> {
+  if (prototypeId) {
+    const prototype = await manager.getRepository(FulcrumPlanPrototypeEntity).findOneBy({
+      id: prototypeId,
+      planId,
+    });
+    if (!prototype) return null;
+    if (prototype.outputRef === artifactPath) return prototype;
+    if (prototype.artifactId) {
+      const artifact = await manager.getRepository(FulcrumArtifactEntity).findOneBy({
+        id: prototype.artifactId,
+        bodyPath: artifactPath,
+      });
+      if (artifact) return prototype;
+    }
+    return null;
+  }
+
+  if (artifactId) {
+    const prototype = await manager.getRepository(FulcrumPlanPrototypeEntity).findOneBy({
+      planId,
+      artifactId,
+    });
+    if (!prototype) return null;
+    if (prototype.outputRef === artifactPath) return prototype;
+    const artifact = await manager.getRepository(FulcrumArtifactEntity).findOneBy({
+      id: artifactId,
+      bodyPath: artifactPath,
+    });
+    if (artifact) return prototype;
+    return null;
+  }
+
+  const prototypes = await manager.getRepository(FulcrumPlanPrototypeEntity).find({
+    where: { planId },
+  });
+  const byOutputRef = prototypes.find((prototype) => prototype.outputRef === artifactPath);
+  if (byOutputRef) return byOutputRef;
+
+  const artifacts = await manager.getRepository(FulcrumArtifactEntity).find({
+    where: { bodyPath: artifactPath },
+  });
+  const artifactIds = new Set(artifacts.map((artifact) => artifact.id));
+  return prototypes.find((prototype) => prototype.artifactId !== null && artifactIds.has(prototype.artifactId)) ?? null;
 }
 
 async function ensureWorkspaceProject(

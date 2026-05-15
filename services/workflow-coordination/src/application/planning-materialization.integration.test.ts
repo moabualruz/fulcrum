@@ -213,12 +213,19 @@ describe("Planning preview Nest materialization service", () => {
         kind: "prototype",
         bodyPath: "apps/web/src/routes/planning/+page.svelte",
       });
-      await expect(dataSource.getRepository(FulcrumPlanPrototypeEntity).findOneByOrFail({
+      const approvedPrototype = await dataSource.getRepository(FulcrumPlanPrototypeEntity).findOneByOrFail({
         id: "prototype-plan-nest-materialize-1",
-      })).resolves.toMatchObject({
+      });
+      expect(approvedPrototype).toMatchObject({
         planId: "plan-nest-materialize",
         artifactId: "artifact-plan-nest-materialize-1",
         status: "planned",
+      });
+      expect(approvedPrototype.metadata.preview).toMatchObject({
+        kind: "prototype",
+        path: "apps/web/src/routes/planning/+page.svelte",
+        mode: "web-route",
+        urlPath: "/planning",
       });
     } finally {
       await dataSource.destroy();
@@ -403,6 +410,22 @@ describe("Planning preview Nest materialization service", () => {
         "T1",
         "verify-end-to-end",
       ]);
+      expect(generated.artifactPreviews.map((preview) => ({
+        path: preview.path,
+        mode: preview.mode,
+        urlPath: preview.urlPath,
+      }))).toEqual([
+        {
+          path: "apps/web/src/routes/planning/workbench-prototype.tsx",
+          mode: "web-route",
+          urlPath: "/planning",
+        },
+        {
+          path: "services/planning-review/src/application/technical-planning-cycle.ts",
+          mode: "source-module",
+          urlPath: undefined,
+        },
+      ]);
 
       await expect(dataSource.getRepository(FulcrumPlanEntity).findOneByOrFail({
         id: "plan-build-plan",
@@ -432,11 +455,12 @@ describe("Planning preview Nest materialization service", () => {
       const prototypes = await dataSource.getRepository(FulcrumPlanPrototypeEntity).find({
         where: { planId: "plan-build-plan" },
       });
-      expect(prototypes.map((prototype) => ({
+      const sortedPrototypes = prototypes.sort((left, right) => String(left.outputRef).localeCompare(String(right.outputRef)));
+      expect(sortedPrototypes.map((prototype) => ({
         kind: prototype.kind,
         status: prototype.status,
         outputRef: prototype.outputRef,
-      })).sort((left, right) => String(left.outputRef).localeCompare(String(right.outputRef)))).toEqual([
+      }))).toEqual([
         {
           kind: "prototype",
           status: "draft",
@@ -447,7 +471,53 @@ describe("Planning preview Nest materialization service", () => {
           status: "draft",
           outputRef: "services/planning-review/src/application/technical-planning-cycle.ts",
         },
-      ].sort((left, right) => String(left.outputRef).localeCompare(String(right.outputRef))));
+      ]);
+      const prototypeRow = sortedPrototypes.find((prototype) =>
+        prototype.outputRef === "apps/web/src/routes/planning/workbench-prototype.tsx"
+      );
+      if (!prototypeRow) throw new Error("Expected generated prototype row.");
+      expect(prototypeRow.metadata.preview).toMatchObject({
+        path: "apps/web/src/routes/planning/workbench-prototype.tsx",
+        mode: "web-route",
+        urlPath: "/planning",
+      });
+
+      const execution = await service.recordArtifactExecution({
+        planId: "plan-build-plan",
+        artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+        prototypeId: prototypeRow.id,
+        artifactId: prototypeRow.artifactId ?? undefined,
+        status: "passed",
+        traceId: "trace-build-plan",
+        command: "bun",
+        args: ["run", "--cwd", "apps/web", "test"],
+        urlPath: "/planning",
+        summary: "Planning route preview was reviewed with trace context visible.",
+        checks: ["trace context visible", "review checks visible"],
+        executedAt: "2026-05-15T12:00:00.000Z",
+      });
+
+      expect(execution).toMatchObject({
+        prototypeId: prototypeRow.id,
+        artifactId: prototypeRow.artifactId,
+        status: "passed",
+        prototypeStatus: "validated",
+      });
+      const persistedPrototype = await dataSource.getRepository(FulcrumPlanPrototypeEntity).findOneByOrFail({
+        id: prototypeRow.id,
+      });
+      expect(persistedPrototype.status).toBe("validated");
+      expect(persistedPrototype.metadata.preview).toMatchObject({
+        path: "apps/web/src/routes/planning/workbench-prototype.tsx",
+        mode: "web-route",
+      });
+      expect(persistedPrototype.metadata.execution).toMatchObject({
+        status: "passed",
+        prototypeId: prototypeRow.id,
+        artifactId: prototypeRow.artifactId,
+        summary: "Planning route preview was reviewed with trace context visible.",
+      });
+      expect(persistedPrototype.metadata.executions).toHaveLength(1);
     } finally {
       await dataSource.destroy();
     }

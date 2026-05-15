@@ -32,6 +32,19 @@ const BREAKDOWN = {
   warnings: ["No prototype artifacts were declared."],
 };
 
+type PlanningContextFixture = {
+  sourceRefs: Array<{ kind: "doc"; id: string }>;
+  selectedDocs?: Array<{
+    id: string;
+    title: string;
+    breadcrumb?: string;
+    versionId?: string;
+    updatedAt?: string;
+    truncated?: boolean;
+  }>;
+  contextMarkdown: string;
+};
+
 type PageProps = {
   data: { defaultPlanId: string; defaultTraceId: string };
   form?: {
@@ -41,17 +54,11 @@ type PageProps = {
     freeformStart?: {
       status: "ready_for_planning";
       document: { id: string; title: string };
-      context: {
-        sourceRefs: Array<{ kind: "doc"; id: string }>;
-        contextMarkdown: string;
-      };
+      context: PlanningContextFixture;
       prompt: string;
     };
     freeformPrompt?: {
-      context: {
-        sourceRefs: Array<{ kind: "doc"; id: string }>;
-        contextMarkdown: string;
-      };
+      context: PlanningContextFixture;
       prompt: string;
     };
     guidedAcpStart?: {
@@ -65,10 +72,7 @@ type PageProps = {
       };
       permissionOptions: Array<{ optionId: string; name: string }>;
       traffic: { entries: Array<{ method: string }> };
-      context: {
-        sourceRefs: Array<{ kind: "doc"; id: string }>;
-        contextMarkdown: string;
-      };
+      context: PlanningContextFixture;
       prompt: string;
     };
     continuousUpdate?: {
@@ -76,11 +80,10 @@ type PageProps = {
       traceId?: string;
       acpSessionId?: string;
       targetTaskIds: string[];
+      targetTasks?: Array<{ id: string; title: string; status?: string | null }>;
+      missingTargetTaskIds?: string[];
       changedDocs: Array<{ id: string; title: string }>;
-      context: {
-        sourceRefs: Array<{ kind: "doc"; id: string }>;
-        contextMarkdown: string;
-      };
+      context: PlanningContextFixture;
       prompt: string;
     };
     technicalPlanning?: {
@@ -97,6 +100,16 @@ type PageProps = {
         prototypePaths: string[];
         boilerplatePaths: string[];
       };
+      artifactPreviews?: Array<{
+        id: string;
+        kind: string;
+        path: string;
+        label: string;
+        mode: string;
+        urlPath?: string;
+        run?: { command: string; args: string[] };
+        reviewChecks: string[];
+      }>;
       breakdown: typeof BREAKDOWN;
     };
     workflowCycle?: {
@@ -187,6 +200,14 @@ describe("/planning +page.svelte", () => {
           freeformPrompt: {
             context: {
               sourceRefs: [{ kind: "doc", id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }],
+              selectedDocs: [{
+                id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                title: "Brief",
+                breadcrumb: "Workspace / Brief",
+                versionId: "version-1",
+                updatedAt: "2026-05-15T00:00:00.000Z",
+                truncated: true,
+              }],
               contextMarkdown: "## Freeform Document: Brief",
             },
             prompt: "Use freeform docs.\n\nsubmit_plan",
@@ -196,6 +217,11 @@ describe("/planning +page.svelte", () => {
     });
 
     expect(body).toContain("data-freeform-planning-prompt");
+    expect(body).toContain("data-planning-context-sources");
+    expect(body).toContain('data-planning-context-doc="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"');
+    expect(body).toContain("Workspace / Brief");
+    expect(body).toContain("version-1");
+    expect(body).toContain("truncated");
     expect(body).toContain("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
     expect(body).toContain("Use freeform docs.");
     expect(body).toContain("submit_plan");
@@ -277,6 +303,8 @@ describe("/planning +page.svelte", () => {
             traceId: "trace_continuous_web",
             acpSessionId: "acp-session-web",
             targetTaskIds: ["task-alpha", "task-beta"],
+            targetTasks: [{ id: "task-alpha", title: "Task alpha", status: "blocked" }],
+            missingTargetTaskIds: ["task-beta"],
             changedDocs: [{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", title: "Updated web brief" }],
             context: {
               sourceRefs: [{ kind: "doc", id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }],
@@ -292,6 +320,12 @@ describe("/planning +page.svelte", () => {
     expect(body).toContain("ready_for_replanning");
     expect(body).toContain("trace_continuous_web");
     expect(body).toContain("acp-session-web");
+    expect(body).toContain("data-planning-task-reconciliation");
+    expect(body).toContain("data-reconciliation-target-id");
+    expect(body).toContain("Task alpha");
+    expect(body).toContain("blocked");
+    expect(body).toContain("Missing task-beta");
+    expect(body).toContain("data-reconciliation-changed-doc");
     expect(body).toContain("task-alpha");
     expect(body).toContain("Updated web brief");
     expect(body).toContain("Continue the Fulcrum workflow cycle");
@@ -319,6 +353,16 @@ describe("/planning +page.svelte", () => {
               prototypePaths: ["apps/web/src/routes/planning/workbench-prototype.tsx"],
               boilerplatePaths: ["services/planning-review/src/application/technical-planning-cycle.ts"],
             },
+            artifactPreviews: [{
+              id: "prototype-apps-web-src-routes-planning-workbench-prototype-tsx",
+              kind: "prototype",
+              path: "apps/web/src/routes/planning/workbench-prototype.tsx",
+              label: "prototype: workbench-prototype.tsx",
+              mode: "web-route",
+              urlPath: "/planning",
+              run: { command: "bun", args: ["run", "--cwd", "apps/web", "test"] },
+              reviewChecks: ["Prototype demonstrates the intended user flow before task materialization."],
+            }],
             breakdown: BREAKDOWN,
           },
         },
@@ -331,6 +375,12 @@ describe("/planning +page.svelte", () => {
     expect(body).toContain("trace_technical_web");
     expect(body).toContain("apps/web/src/routes/planning/workbench-prototype.tsx");
     expect(body).toContain("services/planning-review/src/application/technical-planning-cycle.ts");
+    expect(body).toContain("data-planning-artifact-previews");
+    expect(body).toContain('data-planning-artifact-preview="prototype-apps-web-src-routes-planning-workbench-prototype-tsx"');
+    expect(body).toContain("prototype: workbench-prototype.tsx");
+    expect(body).toContain("web-route");
+    expect(body).toContain("bun run --cwd apps/web test");
+    expect(body).toContain("Prototype demonstrates the intended user flow");
     expect(body).toContain("Review this generated technical plan");
     expect(body).toContain("Build planning route");
   });

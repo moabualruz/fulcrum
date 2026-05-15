@@ -84,6 +84,32 @@ describe("technical planning cycle", () => {
         sourcePlanId: "technical-cycle",
       },
     ]);
+    expect(result.artifactPreviews.map((preview) => ({
+      kind: preview.kind,
+      path: preview.path,
+      mode: preview.mode,
+      urlPath: preview.urlPath,
+      run: preview.run,
+    }))).toEqual([
+      {
+        kind: "prototype",
+        path: "apps/web/src/routes/planning/workbench-prototype.tsx",
+        mode: "web-route",
+        urlPath: "/planning",
+        run: { command: "bun", args: ["run", "--cwd", "apps/web", "test"] },
+      },
+      {
+        kind: "boilerplate",
+        path: "services/planning-review/src/application/technical-planning-cycle.ts",
+        mode: "source-module",
+        urlPath: undefined,
+        run: {
+          command: "bun",
+          args: ["-e", 'await import("./services/planning-review/src/application/technical-planning-cycle.ts")'],
+        },
+      },
+    ]);
+    expect(result.artifactPreviews[0]?.reviewChecks.join("\n")).toContain("Prototype demonstrates the intended user flow");
     expect(result.breakdown.taskDrafts.map((task) => ({
       key: task.clientKey,
       title: task.input.title,

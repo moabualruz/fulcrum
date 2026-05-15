@@ -12,6 +12,19 @@
     warnings?: string[];
   };
 
+  type PlanningContextPayload = {
+    sourceRefs?: Array<{ kind?: string; id?: string }>;
+    selectedDocs?: Array<{
+      id?: string;
+      title?: string;
+      breadcrumb?: string;
+      versionId?: string;
+      updatedAt?: string;
+      truncated?: boolean;
+    }>;
+    contextMarkdown?: string;
+  };
+
   type ActionForm = {
     ok?: boolean;
     mode?: "preview" | "materialize" | "freeformPrompt" | "freeformStart" | "guidedAcpStart" | "continuousUpdate" | "generate" | "workflowCycle";
@@ -21,17 +34,11 @@
     freeformStart?: {
       status?: string;
       document?: { id?: string; title?: string };
-      context?: {
-        sourceRefs?: Array<{ kind?: string; id?: string }>;
-        contextMarkdown?: string;
-      };
+      context?: PlanningContextPayload;
       prompt?: string;
     };
     freeformPrompt?: {
-      context?: {
-        sourceRefs?: Array<{ kind?: string; id?: string }>;
-        contextMarkdown?: string;
-      };
+      context?: PlanningContextPayload;
       prompt?: string;
     };
     guidedAcpStart?: {
@@ -46,10 +53,7 @@
       };
       permissionOptions?: Array<{ optionId?: string; name?: string }>;
       traffic?: { entries?: Array<{ method?: string }> };
-      context?: {
-        sourceRefs?: Array<{ kind?: string; id?: string }>;
-        contextMarkdown?: string;
-      };
+      context?: PlanningContextPayload;
       prompt?: string;
     };
     continuousUpdate?: {
@@ -60,10 +64,7 @@
       targetTasks?: Array<{ id?: string; title?: string; status?: string | null }>;
       missingTargetTaskIds?: string[];
       changedDocs?: Array<{ id?: string; title?: string }>;
-      context?: {
-        sourceRefs?: Array<{ kind?: string; id?: string }>;
-        contextMarkdown?: string;
-      };
+      context?: PlanningContextPayload;
       prompt?: string;
     };
     technicalPlanning?: {
@@ -80,6 +81,16 @@
         prototypePaths?: string[];
         boilerplatePaths?: string[];
       };
+      artifactPreviews?: Array<{
+        id?: string;
+        kind?: string;
+        path?: string;
+        label?: string;
+        mode?: string;
+        urlPath?: string;
+        run?: { command?: string; args?: string[] };
+        reviewChecks?: string[];
+      }>;
       breakdown?: Breakdown;
     };
     workflowCycle?: {
@@ -107,6 +118,7 @@
   let continuousUpdate = $derived(form?.continuousUpdate ?? null);
   let technicalPlanning = $derived(form?.technicalPlanning ?? null);
   let workflowCycle = $derived(form?.workflowCycle ?? null);
+  let contextSources = $derived(freeformStart?.context ?? freeformPrompt?.context ?? guidedAcpStart?.context ?? continuousUpdate?.context ?? null);
   const defaultWorkflowCycleJson = JSON.stringify({
     traceId: "trace_web",
     projectId: null,
@@ -552,6 +564,34 @@
     </p>
   {/if}
 
+  {#if contextSources?.sourceRefs?.length || contextSources?.selectedDocs?.length}
+    <section class="grid gap-3 border-t border-border pt-4" data-planning-context-sources>
+      <h2 class="text-lg font-semibold text-foreground">Context sources</h2>
+      {#if contextSources.selectedDocs?.length}
+        <ul class="grid gap-2">
+          {#each contextSources.selectedDocs as doc}
+            <li class="grid gap-1 rounded-md border border-border p-3 text-sm" data-planning-context-doc={doc.id}>
+              <div class="font-medium text-foreground">{doc.breadcrumb ?? doc.title ?? doc.id}</div>
+              <div class="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                {#if doc.id}<span>{doc.id}</span>{/if}
+                {#if doc.versionId}<span>{doc.versionId}</span>{/if}
+                {#if doc.updatedAt}<span>{doc.updatedAt}</span>{/if}
+                {#if doc.truncated}<span>truncated</span>{/if}
+              </div>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      {#if contextSources.sourceRefs?.length}
+        <div class="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          {#each contextSources.sourceRefs as ref}
+            <span data-planning-context-ref>{ref.kind}:{ref.id}</span>
+          {/each}
+        </div>
+      {/if}
+    </section>
+  {/if}
+
   {#if breakdown}
     <section class="grid gap-4 border-t border-border pt-4" data-planning-preview>
       <div class="flex flex-col gap-1">
@@ -648,6 +688,29 @@
           <h3 class="text-sm font-semibold uppercase tracking-normal text-muted-foreground">Boilerplate</h3>
           {#each technicalPlanning.plan.boilerplatePaths as path}
             <div>{path}</div>
+          {/each}
+        </section>
+      {/if}
+      {#if technicalPlanning.artifactPreviews?.length}
+        <section class="grid gap-2 text-sm text-foreground" data-planning-artifact-previews>
+          <h3 class="text-sm font-semibold uppercase tracking-normal text-muted-foreground">Artifact previews</h3>
+          {#each technicalPlanning.artifactPreviews as preview}
+            <article class="grid gap-1 rounded-md border border-border p-3" data-planning-artifact-preview={preview.id}>
+              <div class="font-medium">{preview.label ?? preview.path}</div>
+              <div class="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                {#if preview.kind}<span>{preview.kind}</span>{/if}
+                {#if preview.mode}<span>{preview.mode}</span>{/if}
+                {#if preview.urlPath}<span>{preview.urlPath}</span>{/if}
+                {#if preview.run}<span>{preview.run.command} {preview.run.args?.join(" ")}</span>{/if}
+              </div>
+              {#if preview.reviewChecks?.length}
+                <ul class="grid gap-1 text-xs text-muted-foreground">
+                  {#each preview.reviewChecks as check}
+                    <li data-planning-artifact-check>{check}</li>
+                  {/each}
+                </ul>
+              {/if}
+            </article>
           {/each}
         </section>
       {/if}
@@ -759,29 +822,36 @@
           <div>{continuousUpdate.acpSessionId}</div>
         {/if}
       </div>
-      {#if continuousUpdate.targetTaskIds?.length}
-        <div class="flex flex-wrap gap-2 text-xs text-muted-foreground">
-          {#each continuousUpdate.targetTaskIds as taskId}
-            <span>{taskId}</span>
-          {/each}
-        </div>
-      {/if}
-      {#if continuousUpdate.targetTasks?.length}
-        <div class="grid gap-1 text-sm text-foreground">
-          {#each continuousUpdate.targetTasks as task}
-            <div>{task.title ?? task.id} {task.status ?? ""}</div>
-          {/each}
-        </div>
-      {/if}
-      {#if continuousUpdate.missingTargetTaskIds?.length}
-        <div class="text-sm text-muted-foreground">Missing {continuousUpdate.missingTargetTaskIds.join(", ")}</div>
-      {/if}
-      {#if continuousUpdate.changedDocs?.length}
-        <div class="grid gap-1 text-sm text-foreground">
-          {#each continuousUpdate.changedDocs as doc}
-            <div>{doc.title ?? doc.id}</div>
-          {/each}
-        </div>
+      {#if continuousUpdate.targetTaskIds?.length || continuousUpdate.targetTasks?.length || continuousUpdate.missingTargetTaskIds?.length || continuousUpdate.changedDocs?.length}
+        <section class="grid gap-2 rounded-md border border-border p-3" data-planning-task-reconciliation>
+          <h3 class="text-sm font-semibold uppercase tracking-normal text-muted-foreground">Task reconciliation</h3>
+          {#if continuousUpdate.targetTaskIds?.length}
+            <div class="flex flex-wrap gap-2 text-xs text-muted-foreground">
+              {#each continuousUpdate.targetTaskIds as taskId}
+                <span data-reconciliation-target-id>{taskId}</span>
+              {/each}
+            </div>
+          {/if}
+          {#if continuousUpdate.targetTasks?.length}
+            <div class="grid gap-1 text-sm text-foreground">
+              {#each continuousUpdate.targetTasks as task}
+                <div data-reconciliation-target-task>{task.title ?? task.id} {task.status ?? ""}</div>
+              {/each}
+            </div>
+          {/if}
+          {#if continuousUpdate.missingTargetTaskIds?.length}
+            <div class="text-sm text-muted-foreground" data-reconciliation-missing>
+              Missing {continuousUpdate.missingTargetTaskIds.join(", ")}
+            </div>
+          {/if}
+          {#if continuousUpdate.changedDocs?.length}
+            <div class="grid gap-1 text-sm text-foreground">
+              {#each continuousUpdate.changedDocs as doc}
+                <div data-reconciliation-changed-doc>{doc.title ?? doc.id}</div>
+              {/each}
+            </div>
+          {/if}
+        </section>
       {/if}
       {#if continuousUpdate.context?.sourceRefs?.length}
         <div class="flex flex-wrap gap-2 text-xs text-muted-foreground">

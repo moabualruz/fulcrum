@@ -21,10 +21,11 @@ import {
   type PlanningContinuousUpdateResult,
   type PlanningTechnicalCycleInput,
   type PlanningTechnicalCycleResult,
+  type PersistedPlanningArtifactExecutionRecord,
 } from "@workflow-coordination/application/planning-preview.service.ts";
 
-import { PlanningApprovedPlanRequestDto, PlanningMaterializeRequestDto, PlanningFreeformPromptRequestDto, PlanningFreeformStartRequestDto, PlanningGuidedAcpStartRequestDto, PlanningContinuousChangedDocDto, PlanningContinuousUpdateRequestDto, PlanningTechnicalTaskSeedDto, PlanningTechnicalCycleRequestDto } from "./dto/planning-preview.dto.ts";
-export { PlanningApprovedPlanRequestDto, PlanningMaterializeRequestDto, PlanningFreeformPromptRequestDto, PlanningFreeformStartRequestDto, PlanningGuidedAcpStartRequestDto, PlanningContinuousChangedDocDto, PlanningContinuousUpdateRequestDto, PlanningTechnicalTaskSeedDto, PlanningTechnicalCycleRequestDto };
+import { PlanningApprovedPlanRequestDto, PlanningMaterializeRequestDto, PlanningFreeformPromptRequestDto, PlanningFreeformStartRequestDto, PlanningGuidedAcpStartRequestDto, PlanningContinuousChangedDocDto, PlanningContinuousUpdateRequestDto, PlanningTechnicalTaskSeedDto, PlanningTechnicalCycleRequestDto, PlanningArtifactExecutionRequestDto } from "./dto/planning-preview.dto.ts";
+export { PlanningApprovedPlanRequestDto, PlanningMaterializeRequestDto, PlanningFreeformPromptRequestDto, PlanningFreeformStartRequestDto, PlanningGuidedAcpStartRequestDto, PlanningContinuousChangedDocDto, PlanningContinuousUpdateRequestDto, PlanningTechnicalTaskSeedDto, PlanningTechnicalCycleRequestDto, PlanningArtifactExecutionRequestDto };
 
 type PlanningPreviewPort = Pick<
   PlanningPreviewService,
@@ -32,6 +33,7 @@ type PlanningPreviewPort = Pick<
   | "buildFreeformDocsPlanningPrompt"
   | "generateTechnicalPlanningCycle"
   | "previewApprovedPlan"
+  | "recordArtifactExecution"
   | "restartPlanningCycleFromUpdates"
   | "startFreeformWork"
   | "startGuidedAcpPlanning"
@@ -62,6 +64,12 @@ export class PlanningPreviewController {
     body: PlanningTechnicalCycleRequestDto,
   ): Promise<PlanningTechnicalCycleResult> {
     return await this.planning.generateTechnicalPlanningCycle(body);
+  }
+
+  async recordArtifactExecution(
+    body: PlanningArtifactExecutionRequestDto,
+  ): Promise<PersistedPlanningArtifactExecutionRecord> {
+    return await this.planning.recordArtifactExecution(body);
   }
 
   async startFreeformWork(
@@ -171,6 +179,19 @@ for (const property of ["selectedDocIds", "prototypePaths", "boilerplatePaths", 
   IsArray()(PlanningTechnicalCycleRequestDto.prototype, property);
   IsOptional()(PlanningTechnicalCycleRequestDto.prototype, property);
 }
+for (const property of ["planId", "artifactPath", "status"] as const) {
+  IsString()(PlanningArtifactExecutionRequestDto.prototype, property);
+  MinLength(1)(PlanningArtifactExecutionRequestDto.prototype, property);
+}
+IsIn(["ready", "passed", "failed", "blocked"])(PlanningArtifactExecutionRequestDto.prototype, "status");
+for (const property of ["prototypeId", "artifactId", "traceId", "command", "urlPath", "summary", "outputRef", "executedAt"] as const) {
+  IsString()(PlanningArtifactExecutionRequestDto.prototype, property);
+  IsOptional()(PlanningArtifactExecutionRequestDto.prototype, property);
+}
+for (const property of ["args", "checks"] as const) {
+  IsArray()(PlanningArtifactExecutionRequestDto.prototype, property);
+  IsOptional()(PlanningArtifactExecutionRequestDto.prototype, property);
+}
 for (const property of ["clientKey", "title"] as const) {
   IsString()(PlanningTechnicalTaskSeedDto.prototype, property);
   MinLength(1)(PlanningTechnicalTaskSeedDto.prototype, property);
@@ -196,6 +217,10 @@ const generateTechnicalPlanningCycleDescriptor = Object.getOwnPropertyDescriptor
   PlanningPreviewController.prototype,
   "generateTechnicalPlanningCycle",
 );
+const recordArtifactExecutionDescriptor = Object.getOwnPropertyDescriptor(
+  PlanningPreviewController.prototype,
+  "recordArtifactExecution",
+);
 const startFreeformWorkDescriptor = Object.getOwnPropertyDescriptor(
   PlanningPreviewController.prototype,
   "startFreeformWork",
@@ -209,7 +234,7 @@ const restartPlanningCycleFromUpdatesDescriptor = Object.getOwnPropertyDescripto
   "restartPlanningCycleFromUpdates",
 );
 
-if (!previewApprovedPlanDescriptor || !materializeApprovedPlanDescriptor || !buildFreeformDocsPlanningPromptDescriptor || !generateTechnicalPlanningCycleDescriptor || !startFreeformWorkDescriptor || !startGuidedAcpPlanningDescriptor || !restartPlanningCycleFromUpdatesDescriptor) {
+if (!previewApprovedPlanDescriptor || !materializeApprovedPlanDescriptor || !buildFreeformDocsPlanningPromptDescriptor || !generateTechnicalPlanningCycleDescriptor || !recordArtifactExecutionDescriptor || !startFreeformWorkDescriptor || !startGuidedAcpPlanningDescriptor || !restartPlanningCycleFromUpdatesDescriptor) {
   throw new Error("PlanningPreviewController route descriptor is missing");
 }
 
@@ -303,6 +328,28 @@ ApiOkResponse({ description: "Generated technical planning cycle" })(
   PlanningPreviewController.prototype,
   "generateTechnicalPlanningCycle",
   generateTechnicalPlanningCycleDescriptor,
+);
+
+Post("artifact-execution/record")(
+  PlanningPreviewController.prototype,
+  "recordArtifactExecution",
+  recordArtifactExecutionDescriptor,
+);
+Body()(PlanningPreviewController.prototype, "recordArtifactExecution", 0);
+ApiOperation({ summary: "Record a reviewable artifact execution result for a planning prototype" })(
+  PlanningPreviewController.prototype,
+  "recordArtifactExecution",
+  recordArtifactExecutionDescriptor,
+);
+ApiBody({ type: PlanningArtifactExecutionRequestDto })(
+  PlanningPreviewController.prototype,
+  "recordArtifactExecution",
+  recordArtifactExecutionDescriptor,
+);
+ApiOkResponse({ description: "Persisted planning artifact execution record" })(
+  PlanningPreviewController.prototype,
+  "recordArtifactExecution",
+  recordArtifactExecutionDescriptor,
 );
 
 Post("freeform/start")(
