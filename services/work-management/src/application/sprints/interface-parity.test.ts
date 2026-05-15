@@ -33,7 +33,7 @@ async function ensureSession(db: TestOrm): Promise<void> {
     ipAddress: null,
     userAgent: "test",
   }));
-  /* flushed */
+  await (em as any).flush();
 }
 
 describe("sprints cross-interface parity", () => {

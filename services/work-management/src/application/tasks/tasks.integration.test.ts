@@ -213,7 +213,7 @@ describe("application task commands and queries", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     }));
-    /* flushed */
+    await (em as any).flush();
     const otherOrgTask = await createTask(em, ctx(null, OTHER_ORG_ID), { title: "Other org", projectId: null });
 
     await expect(findVisibleTask(em, ctx(null), otherOrgTask.id)).rejects.toBeInstanceOf(AppForbiddenError);

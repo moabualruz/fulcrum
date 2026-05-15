@@ -87,7 +87,7 @@ describe("application reports commands and queries", () => {
       date: new Date("2026-05-02T00:00:00Z"),
       pointsRemaining: 4,
     }));
-    /* flushed */
+    await (em as any).flush();
 
     const cached = await getSprintBurndown(em, ctx(), { projectId: ctx().projectId!, sprintId: sprint.id });
     expect(cached.find((point) => point.date === "2026-05-02")).toMatchObject({ pointsRemaining: 4 });
