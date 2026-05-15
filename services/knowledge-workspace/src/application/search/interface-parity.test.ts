@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MikroORM } from "typeorm";
+import { DataSource } from "typeorm";
 
 import { run as runSearchCommand } from "@fulcrum/cli/commands/search.ts";
 import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
@@ -48,7 +48,7 @@ describe("search cross-interface parity", () => {
   test("application-indexed document reads identically through tRPC, CLI JSON, and TUI caller", async () => {
     db = await createTestOrm();
     const container = createTestContainer(db);
-    container.bind({ provide: MikroORM, useValue: db.orm });
+    container.bind({ provide: DataSource, useValue: db.ds });
     const entityId = crypto.randomUUID();
     const phrase = "interface-search-parity";
     const em = db.em;

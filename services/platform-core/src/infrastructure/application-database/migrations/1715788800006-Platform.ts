@@ -305,6 +305,32 @@ export class Platform1715788800006 implements MigrationInterface {
     `);
     await queryRunner.query(`CREATE INDEX "audit_exports_org_project" ON "audit_exports" ("org_id", "project_id")`);
 
+    // fulcrum_jobs (EntitySchema-based job queue)
+    await queryRunner.query(`
+      CREATE TABLE "fulcrum_jobs" (
+        "id"           varchar(128) PRIMARY KEY,
+        "org_id"       varchar(128) NOT NULL,
+        "project_id"   varchar(128),
+        "queue"        varchar(120) NOT NULL,
+        "kind"         varchar(120) NOT NULL,
+        "payload"      jsonb NOT NULL DEFAULT '{}'::jsonb,
+        "status"       varchar(40) NOT NULL DEFAULT 'queued',
+        "attempts"     integer NOT NULL DEFAULT 0,
+        "max_attempts" integer NOT NULL DEFAULT 3,
+        "available_at" timestamptz NOT NULL DEFAULT now(),
+        "locked_by"    varchar(160),
+        "locked_at"    timestamptz,
+        "last_error"   text,
+        "created_at"   timestamptz NOT NULL DEFAULT now(),
+        "updated_at"   timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT "fulcrum_jobs_status_check"
+          CHECK ("status" IN ('queued','running','succeeded','failed','cancelled'))
+      )
+    `);
+    await queryRunner.query(`CREATE INDEX "fulcrum_jobs_claim_idx" ON "fulcrum_jobs" ("queue", "status", "available_at", "created_at")`);
+    await queryRunner.query(`CREATE INDEX "fulcrum_jobs_scope_idx" ON "fulcrum_jobs" ("org_id", "project_id", "status")`);
+    await queryRunner.query(`CREATE INDEX "fulcrum_jobs_kind_idx" ON "fulcrum_jobs" ("queue", "kind")`);
+
     // fulcrum_skills
     await queryRunner.query(`
       CREATE TABLE "fulcrum_skills" (
@@ -369,6 +395,7 @@ export class Platform1715788800006 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS "model_cache"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "tenant_settings"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "jobs"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "fulcrum_jobs"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "webhook_subscriptions"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "casbin_rule"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "telemetry_outbox"`);

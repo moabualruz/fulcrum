@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MikroORM } from "typeorm";
+import { DataSource } from "typeorm";
 
 import { run as runSettingsCommand } from "@fulcrum/cli/settings.ts";
 import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
@@ -41,7 +41,7 @@ describe("settings cross-interface parity", () => {
   test("application-created feature setting reads through tRPC flags, CLI JSON, and TUI caller", async () => {
     db = await createTestOrm();
     const container = createTestContainer(db);
-    container.bind({ provide: MikroORM, useValue: db.orm });
+    container.bind({ provide: DataSource, useValue: db.ds });
     const ctx: AppContext = { orgId: db.seed.orgId, userId: db.seed.userId, projectId: null };
 
     const created = await setTenantSetting(db.em, ctx, {

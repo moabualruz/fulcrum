@@ -36,7 +36,7 @@ export class FulcrumSkill {
   @Column({ type: "varchar" })
   slug!: string;
 
-  @Column({ type: "enum", enum: SkillSource })
+  @Column({ type: "varchar" })
   source!: SkillSource;
 
   @Column({ type: "varchar", name: "upstream_repo", nullable: true })

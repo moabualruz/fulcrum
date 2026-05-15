@@ -39,6 +39,17 @@ function matchesCriteria(row: Entity, criteria: Record<string, unknown>): boolea
     ) {
       return (row[k] as { id: string }).id === v;
     }
+    // Handle nested object match: { org: { id: "..." } } matching { org: { id: "..." } }
+    if (
+      typeof row[k] === "object" &&
+      row[k] !== null &&
+      typeof v === "object" &&
+      v !== null &&
+      (v as { id?: string }).id !== undefined &&
+      (row[k] as { id?: string }).id !== undefined
+    ) {
+      return (row[k] as { id: string }).id === (v as { id: string }).id;
+    }
     return row[k] === v;
   });
 }
@@ -75,6 +86,11 @@ class MockEntityManager {
     Object.defineProperty(obj, "__tableName__", { value: clsName(cls), enumerable: false });
     this.pendingEntity = { entity: obj, tableName: clsName(cls) };
     return obj;
+  }
+
+  async save(entity: Entity): Promise<Entity> {
+    await this.persistAndFlush(entity);
+    return entity;
   }
 
   async persistAndFlush(entity: Entity): Promise<void> {
@@ -119,12 +135,33 @@ class MockEntityManager {
 
   async findOne(cls: Cls, criteria: Record<string, unknown>): Promise<Entity | null> {
     const rows = this.table(clsName(cls));
-    return rows.find((r) => matchesCriteria(r, criteria)) ?? null;
+    // TypeORM: findOne(Entity, { where: {...} }) — unwrap where clause
+    const where = (criteria && typeof criteria === "object" && "where" in criteria)
+      ? criteria.where as Record<string, unknown>
+      : criteria;
+    return rows.find((r) => matchesCriteria(r, where)) ?? null;
   }
 
   async find(cls: Cls, criteria: Record<string, unknown> = {}, _opts?: unknown): Promise<Entity[]> {
     const rows = this.table(clsName(cls));
-    return rows.filter((r) => matchesCriteria(r, criteria));
+    // TypeORM: find(Entity, { where: {...}, order: {...} }) — unwrap where
+    const where = (criteria && typeof criteria === "object" && "where" in criteria)
+      ? criteria.where as Record<string, unknown>
+      : criteria;
+    const filtered = rows.filter((r) => matchesCriteria(r, where));
+    // TypeORM order support
+    const order = (criteria as { order?: Record<string, "ASC"|"DESC"> }).order;
+    if (order) {
+      const [field, dir] = Object.entries(order)[0] ?? [];
+      if (field) {
+        filtered.sort((a, b) => {
+          const av = a[field], bv = b[field];
+          const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+          return dir === "DESC" ? -cmp : cmp;
+        });
+      }
+    }
+    return filtered;
   }
 }
 
@@ -330,6 +367,9 @@ describe("WorkItemCommentService - reactions", () => {
     duplicateError.code = "23505";
     const em = {
       create: () => ({ id: "reaction-1", commentId: "comment-1", userId: USER_A, emoji: "👍", createdAt: new Date() }),
+      save: async () => {
+        throw duplicateError;
+      },
       persist: () => undefined,
       flush: async () => {
         throw duplicateError;

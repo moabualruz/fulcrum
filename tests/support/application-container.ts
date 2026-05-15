@@ -1,7 +1,14 @@
-import type { DataSource } from "typeorm";
+import { DataSource } from "typeorm";
 import type { SeedResult } from "@platform-core/infrastructure/application-database/seed.ts";
 import type { TestOrm } from "./application-database.ts";
 import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
+
+/**
+ * MikroORM compat token — tests that did `container.bind({ provide: MikroORM, ... })`
+ * now bind the DataSource class instead. This symbol is also bound so old `container.get(MikroORM)`
+ * still resolves.
+ */
+export const MikroORM = DataSource;
 
 export type TestContainer = DiContainer & {
   __fulcrumTestSeed?: SeedResult;
@@ -38,6 +45,7 @@ export function createTestContainer(input: TestOrm): TestContainer {
 
   container.bind({ provide: "DataSource", useValue: ds });
   container.bind({ provide: "EntityManager", useValue: ds.manager });
+  container.bind({ provide: DataSource, useValue: ds }); // MikroORM compat: tests use DataSource class as DI token
 
   container.__fulcrumTestSeed = input.seed;
   return container;

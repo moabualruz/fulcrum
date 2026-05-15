@@ -22,3 +22,8 @@ export { ArtifactRepository } from "@workflow-coordination/infrastructure/databa
 export { RepoRepository } from "@integration-hub/infrastructure/database/repositories/repos/RepoRepository.ts";
 export { EventRepository } from "./repositories/core/EventRepository.ts";
 export { TenantSettingRepository } from "./repositories/TenantSettingRepository.ts";
+
+/** @deprecated MikroORM compat stub — no-op in TypeORM world */
+export function registerDbBindings(_container?: unknown): void {
+  // no-op: TypeORM uses DataSource injection, not needle-di bindings
+}

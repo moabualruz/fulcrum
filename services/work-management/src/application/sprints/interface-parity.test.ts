@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MikroORM } from "typeorm";
+import { DataSource } from "typeorm";
 
 import { run as runSprintsCommand } from "@fulcrum/cli/commands/sprints.ts";
 import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
@@ -40,7 +40,7 @@ describe("sprints cross-interface parity", () => {
   test("application-created sprint reads identically through tRPC, CLI JSON, and TUI caller", async () => {
     db = await createTestOrm();
     const container = createTestContainer(db);
-    container.bind({ provide: MikroORM, useValue: db.orm });
+    container.bind({ provide: DataSource, useValue: db.ds });
     const projectId = crypto.randomUUID();
     const ctx: AppContext = { orgId: db.seed.orgId, userId: db.seed.userId, projectId };
     const startDate = new Date("2026-05-07T00:00:00.000Z");

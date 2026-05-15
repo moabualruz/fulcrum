@@ -14,6 +14,10 @@ export interface TestOrm {
   em: EntityManager;
   seed: SeedResult;
   close: () => Promise<void>;
+  /** @deprecated MikroORM compat shim — use ds/em directly */
+  orm: { em: EntityManager; migrator?: unknown };
+  /** @deprecated MikroORM compat — use ds.query() instead */
+  pglite: { query: (sql: string, params?: unknown[]) => Promise<unknown> };
 }
 
 export interface CreateTestOrmOptions {
@@ -106,12 +110,78 @@ export async function createTestOrm(
 
   const seed = await new SeedService(ds.manager).run();
 
+  // MikroORM compat: patch em with getConnection/persist/flush/create/getReference/transactional/getMetadata
+  const em = ds.manager as EntityManager & Record<string, unknown>;
+  if (!em.getConnection) {
+    (em as any).getConnection = () => ({
+      execute: <T = unknown>(sql: string, params?: unknown[]): Promise<T> =>
+        ds.query(sql, params) as Promise<T>,
+    });
+  }
+  if (!em.persist) {
+    (em as any).persist = (entity: unknown) => {
+      (em as any).__pendingPersist = (em as any).__pendingPersist || [];
+      (em as any).__pendingPersist.push(entity);
+      return em;
+    };
+  }
+  if (!em.flush) {
+    (em as any).flush = async () => {
+      const pending = (em as any).__pendingPersist || [];
+      for (const entity of pending) {
+        if (Array.isArray(entity)) {
+          for (const e of entity) await ds.manager.save(e);
+        } else {
+          await ds.manager.save(entity);
+        }
+      }
+      (em as any).__pendingPersist = [];
+    };
+  }
+  if (!em.getReference) {
+    (em as any).getReference = (entityClass: Function, id: unknown) => {
+      const instance = Object.create(entityClass.prototype);
+      instance.id = id;
+      return instance;
+    };
+  }
+  if (!em.transactional) {
+    (em as any).transactional = async (cb: (txEm: EntityManager) => Promise<unknown>) => {
+      return ds.transaction(async (txEm: EntityManager) => {
+        // Patch the txEm too
+        if (!(txEm as any).getConnection) {
+          (txEm as any).getConnection = () => ({
+            execute: <T = unknown>(sql: string, params?: unknown[]): Promise<T> =>
+              txEm.query(sql, params) as Promise<T>,
+          });
+        }
+        return cb(txEm);
+      });
+    };
+  }
+  if (!em.getMetadata) {
+    (em as any).getMetadata = () => ds.entityMetadatas;
+  }
+  // MikroORM em.create(Entity, data) → TypeORM repo.create(data) — returns unsaved instance
+  const origCreate = em.create.bind(em);
+  (em as any).create = function mikroCreate(...args: unknown[]) {
+    // MikroORM: em.create(EntityClass, plainData) — 2 args with class first
+    // TypeORM: em.create(EntityClass, plainData) — same signature!
+    // But MikroORM returns a managed entity, TypeORM doesn't. Both accept same args.
+    return origCreate(...(args as [any, any]));
+  };
+
   return {
     ds,
-    em: ds.manager,
+    em: em as EntityManager,
     seed,
     close: async () => {
       await ds.destroy();
+    },
+    // MikroORM compat shims
+    orm: { em: em as EntityManager },
+    pglite: {
+      query: (sql: string, params?: unknown[]) => ds.query(sql, params),
     },
   };
 }

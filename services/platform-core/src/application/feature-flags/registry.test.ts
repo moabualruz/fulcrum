@@ -9,15 +9,10 @@
  *   5. Cache bust (via clearCache()) forces a fresh repo lookup.
  *   6. FLAG_DESCRIPTIONS exported for every registered flag.
  *   7. FEATURE_FLAGS list includes all expected flags.
- *
- * Uses MikroORM schema helpers and a forked entity manager for each operation.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
-import { MikroORM } from "@mikro-orm/postgresql";
-import { PGlite } from "@electric-sql/pglite";
+import { describe, it, expect, afterAll, beforeEach } from "bun:test";
 
-import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
 import { FeatureFlag } from "@identity-access/infrastructure/database/entities/auth/FeatureFlag.ts";
 import { FeatureFlagRepository } from "@identity-access/infrastructure/database/repositories/auth/FeatureFlagRepository.ts";
 import {
@@ -27,47 +22,36 @@ import {
   isEnvFeatureEnabled,
   type FeatureFlagName,
 } from "@platform-core/application/feature-flags/registry.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
-let orm: MikroORM;
+let db: TestOrm;
 let registry: FlagRegistry;
-let pglite: PGlite;
 
-beforeAll(async () => {
-  pglite = new PGlite();
-  const dialect = new PGliteKyselyDialect(() => pglite);
-
-  orm = await MikroORM.init({
-    dbName: "postgres",
-    driverOptions: dialect,
-    entities: [FeatureFlag],
-    debug: false,
-  });
-
-  await orm.schema.create();
-
-  // FlagRegistry gets a forked EM-backed repo; we'll refresh it in beforeEach
-  const repo = orm.em.getRepository(FeatureFlag) as FeatureFlagRepository;
+// Init once before all tests
+const dbPromise = createTestOrm().then((testOrm) => {
+  db = testOrm;
+  const rawRepo = db.ds.getRepository(FeatureFlag);
+  // Create a thin adapter matching FeatureFlagRepository.findOne(where) interface
+  const repo = { findOne: (where: any) => rawRepo.findOne({ where }) } as unknown as FeatureFlagRepository;
   registry = new FlagRegistry(repo);
+  return testOrm;
+});
+
+// Ensure DB is ready before any test
+beforeEach(async () => {
+  await dbPromise;
+  // Wipe feature_flags table between tests
+  await db.ds.query(`DELETE FROM feature_flags`);
+  // Rebuild registry with fresh repo adapter
+  const freshRawRepo = db.ds.getRepository(FeatureFlag);
+  const freshRepo = { findOne: (where: any) => freshRawRepo.findOne({ where }) } as unknown as FeatureFlagRepository;
+  registry = new FlagRegistry(freshRepo);
+  registry.clearCache();
+  delete process.env["FULCRUM_FEATURES"];
 });
 
 afterAll(async () => {
-  if (orm) await orm.close(true);
-  if (pglite) await pglite.close();
-});
-
-beforeEach(async () => {
-  // Wipe feature_flags table between tests using a fresh fork
-  const em = orm.em;
-  await em.nativeDelete(FeatureFlag, {});
-
-  // Rebuild registry with fresh fork repo so identity map is fresh
-  const freshRepo = orm.em.getRepository(FeatureFlag) as FeatureFlagRepository;
-  registry = new FlagRegistry(freshRepo);
-
-  // Clear registry cache
-  registry.clearCache();
-  // Reset any env vars set in previous tests
-  delete process.env["FULCRUM_FEATURES"];
+  await db?.close();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -180,13 +164,13 @@ describe("canonical env feature flag bridge", () => {
 
 describe("FlagRegistry.isEnabled — DB repo override", () => {
   it("returns true when a global DB row has enabled=true (no orgId/userId)", async () => {
-    const em = orm.em;
-    const flagRow = em.create(FeatureFlag, {
+    const repo = db.ds.getRepository(FeatureFlag);
+    const flagRow = repo.create({
       flag: "pgvector",
       enabled: true,
       createdAt: new Date(),
     });
-    await em.save(flagRow);
+    await repo.save(flagRow);
 
     registry.clearCache();
     const result = await registry.isEnabled("pgvector");
@@ -194,13 +178,13 @@ describe("FlagRegistry.isEnabled — DB repo override", () => {
   });
 
   it("returns false when a global DB row has enabled=false", async () => {
-    const em = orm.em;
-    const flagRow = em.create(FeatureFlag, {
+    const repo = db.ds.getRepository(FeatureFlag);
+    const flagRow = repo.create({
       flag: "casbin-policies",
       enabled: false,
       createdAt: new Date(),
     });
-    await em.save(flagRow);
+    await repo.save(flagRow);
 
     registry.clearCache();
     const result = await registry.isEnabled("casbin-policies");
@@ -209,14 +193,14 @@ describe("FlagRegistry.isEnabled — DB repo override", () => {
 
   it("org-scoped DB row returns true for that orgId", async () => {
     const orgId = "00000000-0000-0000-0000-000000000001";
-    const em = orm.em;
-    const flagRow = em.create(FeatureFlag, {
+    const repo = db.ds.getRepository(FeatureFlag);
+    const flagRow = repo.create({
       flag: "saas-auth",
       enabled: true,
       orgId,
       createdAt: new Date(),
     });
-    await em.save(flagRow);
+    await repo.save(flagRow);
 
     registry.clearCache();
     const result = await registry.isEnabled("saas-auth", { orgId });
@@ -225,14 +209,14 @@ describe("FlagRegistry.isEnabled — DB repo override", () => {
 
   it("org-scoped DB row does NOT affect a different orgId", async () => {
     const orgId = "00000000-0000-0000-0000-000000000001";
-    const em = orm.em;
-    const flagRow = em.create(FeatureFlag, {
+    const repo = db.ds.getRepository(FeatureFlag);
+    const flagRow = repo.create({
       flag: "saas-auth",
       enabled: true,
       orgId,
       createdAt: new Date(),
     });
-    await em.save(flagRow);
+    await repo.save(flagRow);
 
     registry.clearCache();
     const result = await registry.isEnabled("saas-auth", {
@@ -244,15 +228,15 @@ describe("FlagRegistry.isEnabled — DB repo override", () => {
   it("per-user DB row (orgId+userId) returns true for that user", async () => {
     const orgId = "00000000-0000-0000-0000-000000000001";
     const userId = "00000000-0000-0000-0000-000000000002";
-    const em = orm.em;
-    const flagRow = em.create(FeatureFlag, {
+    const repo = db.ds.getRepository(FeatureFlag);
+    const flagRow = repo.create({
       flag: "connector-linear",
       enabled: true,
       orgId,
       userId,
       createdAt: new Date(),
     });
-    await em.save(flagRow);
+    await repo.save(flagRow);
 
     registry.clearCache();
     const result = await registry.isEnabled("connector-linear", { orgId, userId });
@@ -266,20 +250,16 @@ describe("FlagRegistry.isEnabled — DB repo override", () => {
 
 describe("FlagRegistry.isEnabled — resolution order", () => {
   it("DB row enabled=false wins over env var presence (repo overrides env)", async () => {
-    // env var says enabled
     process.env["FULCRUM_FEATURES"] = "notify-email";
-    // DB row says disabled
-    const em = orm.em;
-    const flagRow = em.create(FeatureFlag, {
+    const repo = db.ds.getRepository(FeatureFlag);
+    const flagRow = repo.create({
       flag: "notify-email",
       enabled: false,
       createdAt: new Date(),
     });
-    await em.save(flagRow);
+    await repo.save(flagRow);
 
     registry.clearCache();
-    // Resolution order is repo -> env -> false.
-    // DB row with enabled=false → DB wins over env var
     const result = await registry.isEnabled("notify-email");
     expect(result).toBe(false);
   });
@@ -298,72 +278,66 @@ describe("FlagRegistry.isEnabled — resolution order", () => {
 
 describe("FlagRegistry — cache", () => {
   it("second call returns same result without extra repo call (cache hit)", async () => {
-    // Insert a row to make the first call non-trivial
-    const em = orm.em;
-    const flagRow = em.create(FeatureFlag, {
+    const repo = db.ds.getRepository(FeatureFlag);
+    const flagRow = repo.create({
       flag: "memory-llm-extract",
       enabled: true,
       createdAt: new Date(),
     });
-    await em.save(flagRow);
+    await repo.save(flagRow);
 
     registry.clearCache();
     const first = await registry.isEnabled("memory-llm-extract");
     expect(first).toBe(true);
 
-    // Now delete the row from DB — cache should still return true
-    const em2 = orm.em;
-    await em2.nativeDelete(FeatureFlag, { flag: "memory-llm-extract" });
+    // Delete the row from DB — cache should still return true
+    await repo.delete({ flag: "memory-llm-extract" });
 
     const second = await registry.isEnabled("memory-llm-extract");
     expect(second).toBe(true); // cached result
   });
 
   it("clearCache() forces fresh repo lookup", async () => {
-    const em = orm.em;
-    const flagRow = em.create(FeatureFlag, {
+    const repo = db.ds.getRepository(FeatureFlag);
+    const flagRow = repo.create({
       flag: "memory-llm-extract",
       enabled: true,
       createdAt: new Date(),
     });
-    await em.save(flagRow);
+    await repo.save(flagRow);
 
     registry.clearCache();
     await registry.isEnabled("memory-llm-extract"); // populate cache
 
     // Delete row and bust cache
-    const em2 = orm.em;
-    await em2.nativeDelete(FeatureFlag, { flag: "memory-llm-extract" });
+    await repo.delete({ flag: "memory-llm-extract" });
 
-    // Rebuild registry with fresh fork repo (new identity map)
-    const freshRepo = orm.em.getRepository(FeatureFlag) as FeatureFlagRepository;
-    registry = new FlagRegistry(freshRepo);
-    // clearCache on new registry (already empty, but explicit)
+    // Rebuild registry with fresh repo
+    const freshRawRepo2 = db.ds.getRepository(FeatureFlag);
+    const freshRepo2 = { findOne: (where: any) => freshRawRepo2.findOne({ where }) } as unknown as FeatureFlagRepository;
+    registry = new FlagRegistry(freshRepo2);
     registry.clearCache();
 
     const result = await registry.isEnabled("memory-llm-extract");
-    expect(result).toBe(false); // fresh lookup → no row → false
+    expect(result).toBe(false);
   });
 
-  it("bustFlag() refreshes rows changed by another EntityManager", async () => {
-    const seedEm = orm.em;
-    const flagRow = seedEm.create(FeatureFlag, {
+  it("bustFlag() refreshes rows changed by another path", async () => {
+    const repo = db.ds.getRepository(FeatureFlag);
+    const flagRow = repo.create({
       flag: "casbin-policies",
       enabled: false,
       createdAt: new Date(),
     });
-    seedEm.persist(flagRow);
-    await seedEm.flush();
+    await repo.save(flagRow);
 
     registry.clearCache();
     expect(await registry.isEnabled("casbin-policies")).toBe(false);
 
-    const updateEm = orm.em;
-    const row = await updateEm.findOneOrFail(FeatureFlag, {
-      flag: "casbin-policies",
-    });
-    row.enabled = true;
-    await updateEm.flush();
+    // Update via raw query to simulate another code path
+    await db.ds.query(
+      `UPDATE feature_flags SET enabled = true WHERE flag = 'casbin-policies'`,
+    );
 
     registry.bustFlag("casbin-policies");
 

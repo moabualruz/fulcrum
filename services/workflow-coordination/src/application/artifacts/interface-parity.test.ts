@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MikroORM } from "typeorm";
+import { DataSource } from "typeorm";
 
 import { run as runArtifactsCommand } from "@fulcrum/cli/commands/artifacts.ts";
 import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
@@ -65,7 +65,7 @@ describe("artifacts cross-interface parity", () => {
   test("application-created artifact reads identically through tRPC, CLI JSON, and TUI caller", async () => {
     db = await createTestOrm();
     const container = createTestContainer(db);
-    container.bind({ provide: MikroORM, useValue: db.orm });
+    container.bind({ provide: DataSource, useValue: db.ds });
     const orgId = await createOrg(db);
     const ctx: AppContext = { orgId, userId: db.seed.userId, projectId: null };
 
