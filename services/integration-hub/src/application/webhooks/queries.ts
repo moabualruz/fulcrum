@@ -13,7 +13,7 @@ import type {
 } from "@integration-hub/domain/webhook.ts";
 
 export async function listWebhooks(em: EntityManager, ctx: WebhookAppContext): Promise<WebhookDto[]> {
-  const rows = await em.find(Webhook, { where: { org: { id: ctx.orgId } }, order: { createdAt: "DESC" } });
+  const rows = await em.find(Webhook, { where: { org: { id: ctx.orgId } }, order: { createdAt: "DESC", id: "DESC" } });
   return rows.map(projectWebhook);
 }
 

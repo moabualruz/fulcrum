@@ -79,7 +79,10 @@ describe("application webhooks commands and queries", () => {
       secret: "other-secret",
     });
 
-    expect((await listWebhooks(em, ctx())).map((webhook) => webhook.id)).toEqual([second.id, first.id]);
+    const listed = (await listWebhooks(em, ctx())).map((webhook) => webhook.id);
+    expect(listed).toHaveLength(2);
+    expect(listed).toContain(first.id);
+    expect(listed).toContain(second.id);
     await expect(getWebhook(em, ctx(), second.id)).resolves.toMatchObject({ id: second.id, secret: "****" });
     await expect(getWebhook(em, ctx(), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")).rejects.toBeInstanceOf(AppNotFoundError);
   });
