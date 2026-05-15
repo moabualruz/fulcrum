@@ -13,14 +13,14 @@ import {
   openDatabase,
 } from "../../apps/web/src/lib/server/db.ts";
 import { DEFAULT_ORG_ID, DEFAULT_ORG_NAME } from "@platform-core/infrastructure/application-database/seed.ts";
-import { __resetDefaultOrmForTest } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { __resetDataSourceForTest } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 
 let previousHome: string | undefined;
 
 afterEach(async () => {
   await closeDatabase();
   __resetDatabaseForTest();
-  await __resetDefaultOrmForTest();
+  await __resetDataSourceForTest();
   if (previousHome === undefined) delete process.env.FULCRUM_HOME;
   else process.env.FULCRUM_HOME = previousHome;
 });

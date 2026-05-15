@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
 import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
 import { createLocalOrg } from "@test-support/product-workspace-fixtures.ts";
-import { initOrm } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { initDataSource } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 import { createDocumentAction } from "./documents";
 import { upsertDocLink, getBacklinks } from "./doc-links";
 
@@ -40,7 +40,7 @@ async function seedDb(): Promise<{ em: EntityManager; orgId: string; close: () =
   };
   await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const orm = await initOrm({ pglite });
+  const orm = await initDataSource({ pglite });
   const em = orm.em;
   return {
     em, orgId: org.id,
