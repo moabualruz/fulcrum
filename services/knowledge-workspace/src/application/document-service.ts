@@ -157,7 +157,7 @@ export class DocumentService {
     await this.em.save(doc);
     await writeDocVersion(this.em, { orgId: ctx.orgId, doc, authorId: ctx.userId });
     await upsertSearchDocument(this.em, ctx.orgId, doc.id, ctx.userId);
-    persistExplicitDocLinks(this.em, ctx.orgId, doc, input.links);
+    await persistExplicitDocLinks(this.em, ctx.orgId, doc, input.links);
     return serializeDoc(doc);
   }
 

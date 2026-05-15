@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, afterEach, describe, expect, mock, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -80,6 +80,12 @@ afterEach(async () => {
   while (dbs.length > 0) {
     await dbs.pop()!.close();
   }
+});
+
+afterAll(async () => {
+  dbs.length = 0;
+  const { destroyTestOrm } = await import("@test-support/application-database.ts");
+  await destroyTestOrm();
 });
 
 async function testDb(): Promise<TestOrm> {

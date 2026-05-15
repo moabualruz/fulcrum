@@ -147,7 +147,12 @@ export class SearchQueryService {
       entityId: row.entity_id,
       title: row.title,
       body: row.body,
-      labels: row.labels,
+      // TypeORM simple-array stores as comma-separated text; normalize to array
+      labels: row.labels == null
+        ? null
+        : Array.isArray(row.labels)
+          ? row.labels
+          : String(row.labels).split(",").map((s) => s.trim()).filter(Boolean),
       metadata: row.metadata,
       projectId: row.project_id,
       status: row.status,

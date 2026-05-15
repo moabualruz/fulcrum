@@ -96,6 +96,15 @@ async function ensureInitialized(debug: boolean): Promise<{ ds: DataSource; seed
   return { ds: _cachedDs!, seed: _cachedSeed! };
 }
 
+export async function destroyTestOrm(): Promise<void> {
+  if (_cachedDs?.isInitialized) {
+    await _cachedDs.destroy().catch(() => {});
+    _cachedDs = null;
+    _cachedSeed = null;
+    _initPromise = null;
+  }
+}
+
 async function truncateAllTables(ds: DataSource): Promise<void> {
   // Only truncate tables that actually exist in the database
   const result = await ds.query(
