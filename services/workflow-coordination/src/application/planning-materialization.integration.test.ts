@@ -339,6 +339,57 @@ describe("Planning preview Nest materialization service", () => {
         model: "gpt-5.4",
         status: "ready_for_acp_prompt",
       });
+
+      await service.recordGuidedAcpSessionAction({
+        acpSessionId: "acp-guided-nest",
+        action: "resume_session",
+        projectId: "project-freeform-nest",
+        traceId: "trace-freeform-nest",
+      });
+      await service.recordGuidedAcpSessionAction({
+        acpSessionId: "acp-guided-nest",
+        action: "resolve_permission",
+        projectId: "project-freeform-nest",
+        traceId: "trace-freeform-nest",
+        optionId: "allow_once",
+      });
+      await service.recordGuidedAcpSessionAction({
+        acpSessionId: "acp-guided-nest",
+        action: "cancel_operation",
+        projectId: "project-freeform-nest",
+        traceId: "trace-freeform-nest",
+      });
+      const selectorAction = await service.recordGuidedAcpSessionAction({
+        acpSessionId: "acp-guided-nest",
+        action: "set_mode",
+        projectId: "project-freeform-nest",
+        traceId: "trace-freeform-nest",
+        modeId: "review",
+      });
+
+      expect(selectorAction).toMatchObject({
+        status: "session_action_recorded",
+        session: {
+          acpSessionId: "acp-guided-nest",
+          modeId: "review",
+          sessionStatus: "selector_updated",
+        },
+        action: { type: "set_mode", method: "session/set_mode", modeId: "review" },
+      });
+      expect(selectorAction.traffic.entries.map((entry) => entry.method)).toEqual([
+        "session/new",
+        "session/prompt",
+        "session/load",
+        "session/request_permission",
+        "session/cancel",
+        "session/set_mode",
+      ]);
+      await expect(dataSource.getRepository(FulcrumAcpSessionEntity).findOneByOrFail({
+        id: "acp-guided-nest",
+      })).resolves.toMatchObject({
+        mode: "review",
+        status: "selector_updated",
+      });
     } finally {
       await dataSource.destroy();
     }
@@ -517,13 +568,127 @@ describe("Planning preview Nest materialization service", () => {
       });
       expect(persistedPrototype.metadata.executions).toHaveLength(1);
 
+      const sandboxExecution = await service.runArtifactExecution({
+        planId: "plan-build-plan",
+        artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+        prototypeId: prototypeRow.id,
+        traceId: "trace-build-plan",
+        cwd: process.cwd(),
+        summary: "",
+        outputRef: "",
+        timeoutMs: 10_000,
+      }, {
+        now: () => new Date("2026-05-15T12:02:00.000Z"),
+        runAgent: async (request, runnerDeps) => {
+          expect(request.runId).toStartWith("artifact-run-1778846520000-");
+          expect(request.worktree.cwd).toBe(process.cwd());
+          expect(request.worktree.copyToWorktree).toEqual([
+            "apps/web/src/routes/planning/workbench-prototype.tsx",
+          ]);
+          expect(request.contextBundle).toMatchObject({
+            planId: "plan-build-plan",
+            artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+            traceId: "trace-build-plan",
+            command: "bun",
+            args: ["-e", 'await import("./apps/web/src/routes/planning/workbench-prototype.tsx")'],
+          });
+          expect(runnerDeps?.agentProvider?.name).toBe("planning-artifact-command");
+          return {
+            transcript: "prototype imported\nCOMPLETE\n",
+            exitCode: 0,
+            filesChanged: [],
+            artifacts: [],
+            durationMs: 25,
+            iterationCount: 1,
+            exitReason: "complete",
+            tokenUsed: 0,
+            transcriptPath: "/tmp/fulcrum-agent-run/transcripts/artifact-run.jsonl",
+            workspaceDiffPath: "/tmp/fulcrum-agent-run/diffs/artifact-run.diff",
+            transcriptTruncated: false,
+          };
+        },
+      });
+      expect(sandboxExecution).toMatchObject({
+        prototypeId: prototypeRow.id,
+        artifactId: prototypeRow.artifactId,
+        status: "passed",
+        prototypeStatus: "validated",
+        runner: "sandbox-agent",
+        exitCode: 0,
+        exitReason: "complete",
+        command: "bun",
+        args: ["-e", 'await import("./apps/web/src/routes/planning/workbench-prototype.tsx")'],
+        outputRef: "/tmp/fulcrum-agent-run/transcripts/artifact-run.jsonl",
+        executedAt: "2026-05-15T12:02:00.000Z",
+      });
+      expect(sandboxExecution.history).toHaveLength(2);
+      const rerunPrototype = await dataSource.getRepository(FulcrumPlanPrototypeEntity).findOneByOrFail({
+        id: prototypeRow.id,
+      });
+      expect(rerunPrototype.metadata.execution).toMatchObject({
+        status: "passed",
+        summary: "Artifact command completed in the sandbox runner.",
+        outputRef: "/tmp/fulcrum-agent-run/transcripts/artifact-run.jsonl",
+      });
+      expect(rerunPrototype.metadata.executions).toHaveLength(2);
+
+      const failedSandboxExecution = await service.runArtifactExecution({
+        planId: "plan-build-plan",
+        artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+        prototypeId: prototypeRow.id,
+        traceId: "trace-build-plan",
+        command: "bun",
+        args: ["test", "apps/web/src/routes/planning/page.svelte.test.ts"],
+        executedAt: "2026-05-15T12:03:00.000Z",
+      }, {
+        runAgent: async () => {
+          throw new Error("runner unavailable");
+        },
+      });
+      expect(failedSandboxExecution).toMatchObject({
+        prototypeId: prototypeRow.id,
+        status: "failed",
+        prototypeStatus: "failed",
+        runner: "sandbox-agent",
+        exitCode: null,
+        summary: "Artifact command failed before completion: runner unavailable",
+      });
+      expect(failedSandboxExecution.history).toHaveLength(3);
+      const failedPrototype = await dataSource.getRepository(FulcrumPlanPrototypeEntity).findOneByOrFail({
+        id: prototypeRow.id,
+      });
+      expect(failedPrototype.metadata.execution).toMatchObject({
+        status: "failed",
+        summary: "Artifact command failed before completion: runner unavailable",
+      });
+      expect(failedPrototype.metadata.executions).toHaveLength(3);
+
       const boilerplateRow = sortedPrototypes.find((prototype) =>
         prototype.outputRef === "services/planning-review/src/application/technical-planning-cycle.ts"
       );
       if (!boilerplateRow) throw new Error("Expected generated boilerplate row.");
+      const plannedBoilerplateExecution = await service.runArtifactExecution({
+        planId: "plan-build-plan",
+        artifactPath: "services/planning-review/src/application/technical-planning-cycle.ts",
+        prototypeId: boilerplateRow.id,
+        planOnly: true,
+        executedAt: "2026-05-15T12:03:30.000Z",
+      });
+      expect(plannedBoilerplateExecution).toMatchObject({
+        prototypeId: boilerplateRow.id,
+        artifactId: boilerplateRow.artifactId,
+        status: "ready",
+        prototypeStatus: "ready",
+        runner: "not-run",
+        runId: null,
+        exitCode: null,
+        summary: "Artifact execution is ready to run: 'bun' '-e' 'await import(\"./services/planning-review/src/application/technical-planning-cycle.ts\")'.",
+      });
+      expect(plannedBoilerplateExecution.history).toHaveLength(1);
       const boilerplateExecution = await service.recordArtifactExecution({
         planId: "plan-build-plan",
         artifactPath: "services/planning-review/src/application/technical-planning-cycle.ts",
+        artifactId: "stale-artifact-id",
         status: "blocked",
         traceId: "trace-build-plan",
         summary: "Import blocked by review dependency.",

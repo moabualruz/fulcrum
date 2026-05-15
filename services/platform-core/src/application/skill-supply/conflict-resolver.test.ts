@@ -35,8 +35,8 @@ beforeEach(async () => {
   process.env["HOME"] = scratch;
   process.env["FULCRUM_HOME"] = join(scratch, ".fulcrum");
   testDb = await createTestOrm();
-  __setSkillsLoaderOrmForTest(testDb.orm);
-  __setSkillsConflictResolverOrmForTest(testDb.orm);
+  __setSkillsLoaderOrmForTest(testDb.ds);
+  __setSkillsConflictResolverOrmForTest(testDb.ds);
 });
 
 afterEach(async () => {
@@ -92,7 +92,7 @@ async function createUpstreamRepo(slug: string, content: string): Promise<string
 }
 
 async function markUpstream(slug: string, upstreamRepo: string): Promise<void> {
-  const em = testDb.orm.em;
+  const em = testDb.em;
   const skill = await em.findOneOrFail(FulcrumSkill, {
     org: testDb.seed.orgId,
     slug,
@@ -103,7 +103,7 @@ async function markUpstream(slug: string, upstreamRepo: string): Promise<void> {
 }
 
 async function latestHashVerified(slug: string): Promise<string | null | undefined> {
-  const em = testDb.orm.em;
+  const em = testDb.em;
   const skill = await em.findOne(
     FulcrumSkill,
     { org: testDb.seed.orgId, slug },

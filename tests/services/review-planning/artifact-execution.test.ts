@@ -4,6 +4,7 @@ import {
   buildPlanningArtifactExecutionRecord,
   mergePlanningArtifactExecutionMetadata,
 } from "@planning-review/application/artifact-execution.ts";
+import { buildPlanningArtifactRunId } from "@workflow-coordination/application/planning-preview.service.ts";
 
 describe("planning artifact execution records", () => {
   test("normalizes execution results into persisted prototype metadata", () => {
@@ -64,5 +65,33 @@ describe("planning artifact execution records", () => {
       artifactPath: "",
       status: "ready",
     })).toThrow("artifactPath is required.");
+  });
+
+  test("keeps artifact run ids unique for long paths", () => {
+    const longPath = [
+      "apps/web/src/routes/projects",
+      "very-long-feature-name-that-would-otherwise-truncate-the-unique-run-suffix",
+      "nested-workflow-review-panel-with-a-long-generated-artifact-name",
+      "workbench-prototype.tsx",
+    ].join("/");
+
+    const first = buildPlanningArtifactRunId({
+      planId: "plan-build-plan-with-a-long-readable-human-title",
+      artifactPath: longPath,
+      now: new Date("2026-05-15T12:00:00.000Z"),
+      nonce: "first-run",
+    });
+    const second = buildPlanningArtifactRunId({
+      planId: "plan-build-plan-with-a-long-readable-human-title",
+      artifactPath: longPath,
+      now: new Date("2026-05-15T12:00:00.000Z"),
+      nonce: "second-run",
+    });
+
+    expect(first).toStartWith("artifact-run-1778846400000-first-run");
+    expect(second).toStartWith("artifact-run-1778846400000-second-run");
+    expect(first.length).toBeLessThanOrEqual(128);
+    expect(second.length).toBeLessThanOrEqual(128);
+    expect(first).not.toBe(second);
   });
 });

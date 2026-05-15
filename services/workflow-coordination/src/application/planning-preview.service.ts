@@ -1,8 +1,18 @@
 import "reflect-metadata";
 
+import type { AgentProvider } from "@ai-hero/sandcastle";
 import { Inject, Injectable } from "@nestjs/common";
 import { DataSource, type EntityManager } from "typeorm";
 
+import {
+  runAgent as runSandboxAgent,
+  SandboxProviderUnavailableError,
+  type SandboxRunnerDeps,
+} from "@execution-orchestration/infrastructure/agent-runtime/sandbox-runner.ts";
+import type {
+  AgentRunRequest,
+  AgentRunResult,
+} from "@execution-orchestration/infrastructure/agent-runtime/types.ts";
 import {
   buildAcpPlanningPromptWithFreeformDocs,
   buildFreeformDocsPlanningContext,
@@ -24,7 +34,7 @@ import {
   type PlanningArtifactExecutionInput,
   type PlanningArtifactExecutionRecord,
 } from "@planning-review/application/artifact-execution";
-import { createInMemoryTrafficRecorder, type TrafficEntry } from "@agent-client-protocol/application/traffic";
+import { createInMemoryTrafficRecorder, type TrafficEntry, type TrafficEntryInput } from "@agent-client-protocol/application/traffic";
 
 import {
   previewApprovedPlanBreakdown,
@@ -84,6 +94,45 @@ export type { PlanningArtifactExecutionInput, PlanningArtifactExecutionRecord };
 export interface PersistedPlanningArtifactExecutionRecord extends Omit<PlanningArtifactExecutionRecord, "artifactId"> {
   prototypeId: string;
   artifactId?: string | null;
+}
+
+export interface PlanningArtifactRunInput {
+  planId: string;
+  artifactPath: string;
+  prototypeId?: string;
+  artifactId?: string;
+  traceId?: string;
+  command?: string;
+  args?: string[];
+  urlPath?: string;
+  summary?: string;
+  outputRef?: string;
+  checks?: string[];
+  executedAt?: string;
+  cwd?: string;
+  branch?: string;
+  copyToWorktree?: string[];
+  timeoutMs?: number;
+  planOnly?: boolean;
+}
+
+export interface PlanningArtifactRunOutput extends PersistedPlanningArtifactExecutionRecord {
+  runner: "sandbox-agent" | "not-run";
+  runId: string | null;
+  exitCode: number | null;
+  durationMs: number;
+  transcript: string;
+  history: PersistedPlanningArtifactExecutionRecord[];
+  exitReason?: AgentRunResult["exitReason"];
+  transcriptPath?: string;
+  workspaceDiffPath?: string;
+}
+
+export interface PlanningArtifactRunDeps {
+  runAgent?: (request: AgentRunRequest, deps?: SandboxRunnerDeps) => Promise<AgentRunResult>;
+  now?: () => Date;
+  createRunId?: (input: { planId: string; artifactPath: string; now: Date }) => string;
+  sandboxDeps?: Omit<SandboxRunnerDeps, "agentProvider">;
 }
 
 export interface ApprovedPlanMaterializeInput extends BuildApprovedPlanBreakdownInput {
@@ -173,6 +222,45 @@ export interface PlanningGuidedAcpStartResult {
   traffic: { entries: TrafficEntry[] };
   context: FreeformPlanningContext;
   prompt: string;
+}
+
+export type PlanningGuidedAcpSessionAction =
+  | "resume_session"
+  | "cancel_operation"
+  | "resolve_permission"
+  | "cancel_permission"
+  | "set_mode"
+  | "set_model";
+
+export interface PlanningGuidedAcpSessionActionInput {
+  acpSessionId: string;
+  action: PlanningGuidedAcpSessionAction;
+  projectId?: string | null;
+  traceId?: string;
+  optionId?: string;
+  modeId?: string;
+  modelId?: string;
+}
+
+export interface PlanningGuidedAcpSessionActionResult {
+  status: "session_action_recorded";
+  session: {
+    acpSessionId: string;
+    projectId: string | null;
+    traceId: string;
+    agentName: string;
+    modeId: string;
+    modelId?: string;
+    sessionStatus: string;
+  };
+  action: {
+    type: PlanningGuidedAcpSessionAction;
+    method: string;
+    optionId?: string;
+    modeId?: string;
+    modelId?: string;
+  };
+  traffic: { entries: TrafficEntry[] };
 }
 
 export type ContinuousUpdateTrigger = "manual_doc_edit" | "acp_session_update";
@@ -366,6 +454,200 @@ export class PlanningPreviewService {
         prototypeId: prototype.id,
         artifactId: prototype.artifactId,
       };
+    });
+  }
+
+  async runArtifactExecution(
+    input: PlanningArtifactRunInput,
+    deps: PlanningArtifactRunDeps = {},
+  ): Promise<PlanningArtifactRunOutput> {
+    if (!this.dataSource) {
+      throw new Error("PlanningPreviewService requires a TypeORM DataSource to run artifact execution.");
+    }
+    const planId = input.planId.trim();
+    if (!planId) throw new Error("planId is required.");
+    const artifactPath = input.artifactPath.trim();
+    if (!artifactPath) throw new Error("artifactPath is required.");
+
+    const runPlan = await this.dataSource.transaction(async (manager) => {
+      const prototype = await loadPlanPrototypeForArtifact(
+        manager,
+        planId,
+        artifactPath,
+        input.prototypeId,
+        input.artifactId,
+      );
+      if (!prototype) throw new Error(`Planning artifact not found: ${artifactPath}`);
+      return buildArtifactRunPlan(prototype, { ...input, planId, artifactPath });
+    });
+    const now = deps.now?.() ?? new Date();
+    const executedAt = input.executedAt?.trim() || now.toISOString();
+
+    if (input.planOnly || !runPlan.command) {
+      const status: PlanningArtifactExecutionInput["status"] = runPlan.command ? "ready" : "blocked";
+      const record = await this.recordArtifactExecution({
+        planId,
+        artifactPath,
+        prototypeId: runPlan.prototype.id,
+        artifactId: runPlan.prototype.artifactId ?? undefined,
+        status,
+        traceId: runPlan.traceId,
+        command: runPlan.command,
+        args: runPlan.args,
+        urlPath: runPlan.urlPath,
+        summary: trimmed(input.summary) ?? (runPlan.command
+          ? `Artifact execution is ready to run: ${formatCommand(runPlan.command, runPlan.args)}.`
+          : "No runnable artifact command was available from the preview metadata."),
+        outputRef: trimmed(input.outputRef),
+        checks: runPlan.checks,
+        executedAt,
+      });
+      return {
+        ...record,
+        runner: "not-run",
+        runId: null,
+        exitCode: null,
+        durationMs: 0,
+        transcript: "",
+        history: await this.loadArtifactExecutionHistory({
+          planId,
+          artifactPath,
+          prototypeId: record.prototypeId,
+        }),
+      };
+    }
+
+    const timeoutMs = normalizedPositiveInteger(input.timeoutMs) ?? 60_000;
+    const runId = deps.createRunId?.({ planId, artifactPath, now })
+      ?? buildPlanningArtifactRunId({ planId, artifactPath, now });
+    const branch = input.branch?.trim() || `agent/${runId}`;
+    const copyToWorktree = input.copyToWorktree
+      ? normalizeStringArray(input.copyToWorktree)
+      : [artifactPath];
+    const request: AgentRunRequest = {
+      runId,
+      worktree: {
+        cwd: input.cwd?.trim() || process.cwd(),
+        branch,
+        ...(copyToWorktree.length ? { copyToWorktree } : {}),
+      },
+      agentProfile: {
+        name: "planning-artifact-command",
+        cliPath: runPlan.command,
+        defaultFlags: runPlan.args,
+        skillFolder: ".",
+        authEnvVars: [],
+        sandcastleProvider: "noSandbox",
+        maxIterations: 1,
+        defaultTimeout: timeoutMs,
+      },
+      prompt: [
+        `Run planning artifact command for ${artifactPath}.`,
+        "Finish by putting COMPLETE alone on the final non-empty line when the command passes.",
+      ].join("\n"),
+      contextBundle: {
+        planId,
+        artifactPath,
+        traceId: runPlan.traceId,
+        command: runPlan.command,
+        args: runPlan.args,
+        checks: runPlan.checks,
+      },
+      timeout: timeoutMs,
+      opts: { maxIterations: 1 },
+    };
+    const runner = deps.runAgent ?? runSandboxAgent;
+    let result: AgentRunResult;
+    try {
+      result = await runner(request, {
+        ...deps.sandboxDeps,
+        agentProvider: artifactCommandAgentProvider(runPlan.command, runPlan.args),
+      });
+    } catch (error) {
+      const status = artifactRunErrorStatus(error);
+      const record = await this.recordArtifactExecution({
+        planId,
+        artifactPath,
+        prototypeId: runPlan.prototype.id,
+        artifactId: runPlan.prototype.artifactId ?? undefined,
+        status,
+        traceId: runPlan.traceId,
+        command: runPlan.command,
+        args: runPlan.args,
+        urlPath: runPlan.urlPath,
+        summary: trimmed(input.summary) ?? summarizeArtifactRunError(error),
+        outputRef: trimmed(input.outputRef),
+        checks: runPlan.checks,
+        executedAt,
+      });
+      return {
+        ...record,
+        runner: "sandbox-agent",
+        runId,
+        exitCode: null,
+        durationMs: 0,
+        transcript: summarizeArtifactRunError(error),
+        history: await this.loadArtifactExecutionHistory({
+          planId,
+          artifactPath,
+          prototypeId: record.prototypeId,
+        }),
+      };
+    }
+    const status: PlanningArtifactExecutionInput["status"] =
+      result.exitCode === 0 && result.exitReason === "complete" ? "passed" : "failed";
+    const record = await this.recordArtifactExecution({
+      planId,
+      artifactPath,
+      prototypeId: runPlan.prototype.id,
+      artifactId: runPlan.prototype.artifactId ?? undefined,
+      status,
+      traceId: runPlan.traceId,
+      command: runPlan.command,
+      args: runPlan.args,
+      urlPath: runPlan.urlPath,
+      summary: trimmed(input.summary) ?? summarizeArtifactRun(result),
+      outputRef: trimmed(input.outputRef) ?? result.transcriptPath ?? result.workspaceDiffPath,
+      checks: runPlan.checks,
+      executedAt,
+    });
+    return {
+      ...record,
+      runner: "sandbox-agent",
+      runId,
+      exitCode: result.exitCode,
+      durationMs: result.durationMs,
+      transcript: result.transcript,
+      history: await this.loadArtifactExecutionHistory({
+        planId,
+        artifactPath,
+        prototypeId: record.prototypeId,
+      }),
+      exitReason: result.exitReason,
+      ...(result.transcriptPath ? { transcriptPath: result.transcriptPath } : {}),
+      ...(result.workspaceDiffPath ? { workspaceDiffPath: result.workspaceDiffPath } : {}),
+    };
+  }
+
+  async loadArtifactExecutionHistory(input: {
+    planId: string;
+    artifactPath: string;
+    prototypeId?: string;
+    artifactId?: string;
+  }): Promise<PersistedPlanningArtifactExecutionRecord[]> {
+    if (!this.dataSource) {
+      throw new Error("PlanningPreviewService requires a TypeORM DataSource to load artifact execution history.");
+    }
+    return await this.dataSource.transaction(async (manager) => {
+      const prototype = await loadPlanPrototypeForArtifact(
+        manager,
+        input.planId,
+        input.artifactPath,
+        input.prototypeId,
+        input.artifactId,
+      );
+      if (!prototype) return [];
+      return artifactExecutionHistoryForPrototype(prototype);
     });
   }
 
@@ -594,6 +876,69 @@ export class PlanningPreviewService {
     };
   }
 
+  async recordGuidedAcpSessionAction(
+    input: PlanningGuidedAcpSessionActionInput,
+  ): Promise<PlanningGuidedAcpSessionActionResult> {
+    if (!this.dataSource) {
+      throw new Error("PlanningPreviewService requires a TypeORM DataSource to record guided ACP session actions.");
+    }
+    const acpSessionId = input.acpSessionId.trim();
+    if (!acpSessionId) throw new Error("acpSessionId is required.");
+    const action = guidedAcpSessionAction(input.action);
+
+    return await this.dataSource.transaction(async (manager) => {
+      const repository = manager.getRepository(FulcrumAcpSessionEntity);
+      const session = await repository.findOneBy({ id: acpSessionId });
+      if (!session) throw new Error(`ACP session not found: ${acpSessionId}`);
+      if (input.projectId && session.projectId && input.projectId !== session.projectId) {
+        throw new Error(`ACP session '${acpSessionId}' does not belong to project '${input.projectId}'.`);
+      }
+
+      const traceId = input.traceId?.trim() || session.traceId;
+      const traffic = createInMemoryTrafficRecorder();
+      for (const entry of normalizeTrafficLog(session.trafficLog)) {
+        traffic.addEntry(toTrafficInput(entry));
+      }
+      const actionTraffic = guidedAcpActionTraffic({
+        action,
+        acpSessionId,
+        traceId,
+        requestId: traffic.entries.length + 1,
+        optionId: input.optionId,
+        modeId: input.modeId,
+        modelId: input.modelId,
+      });
+      traffic.addEntry(actionTraffic.entry);
+
+      const mode = action === "set_mode" ? requiredActionValue(input.modeId, "modeId") : session.mode;
+      const model = action === "set_model" ? requiredActionValue(input.modelId, "modelId") : session.model;
+      const sessionStatus = guidedAcpSessionStatus(action);
+      await repository.save({
+        ...session,
+        traceId,
+        mode,
+        model,
+        status: sessionStatus,
+        trafficLog: traffic.entries,
+      });
+
+      return {
+        status: "session_action_recorded",
+        session: {
+          acpSessionId,
+          projectId: session.projectId,
+          traceId,
+          agentName: session.agentName,
+          modeId: mode,
+          ...(model ? { modelId: model } : {}),
+          sessionStatus,
+        },
+        action: actionTraffic.action,
+        traffic: { entries: traffic.entries },
+      };
+    });
+  }
+
   async restartPlanningCycleFromUpdates(
     input: PlanningContinuousUpdateInput,): Promise<PlanningContinuousUpdateResult> {
     if (!this.dataSource) {
@@ -694,6 +1039,22 @@ function planningWorkflowId(prefix: string,...parts: string[]): string {
   return `${prefix}-${normalized}`.slice(0, 128);
 }
 
+export function buildPlanningArtifactRunId(input: {
+  planId: string;
+  artifactPath: string;
+  now?: Date;
+  nonce?: string;
+}): string {
+  const timestamp = String((input.now ?? new Date()).getTime());
+  const nonce = input.nonce?.trim() || crypto.randomUUID();
+  const anchor = planningWorkflowId("artifact-run", timestamp, nonce).slice(0, 80);
+  const suffixBudget = Math.max(0, 127 - anchor.length);
+  const suffix = planningWorkflowId("artifact", input.planId, input.artifactPath)
+    .replace(/^artifact-/, "")
+    .slice(0, suffixBudget);
+  return suffix ? `${anchor}-${suffix}` : anchor;
+}
+
 function artifactTitle(path: string): string {
   const parts = path.split(/[\\/]/g).filter(Boolean);
   return parts.at(-1) ?? path;
@@ -728,14 +1089,14 @@ async function loadPlanPrototypeForArtifact(
       planId,
       artifactId,
     });
-    if (!prototype) return null;
-    if (prototype.outputRef === artifactPath) return prototype;
-    const artifact = await manager.getRepository(FulcrumArtifactEntity).findOneBy({
-      id: artifactId,
-      bodyPath: artifactPath,
-    });
-    if (artifact) return prototype;
-    return null;
+    if (prototype) {
+      if (prototype.outputRef === artifactPath) return prototype;
+      const artifact = await manager.getRepository(FulcrumArtifactEntity).findOneBy({
+        id: artifactId,
+        bodyPath: artifactPath,
+      });
+      if (artifact) return prototype;
+    }
   }
 
   const prototypes = await manager.getRepository(FulcrumPlanPrototypeEntity).find({
@@ -749,6 +1110,155 @@ async function loadPlanPrototypeForArtifact(
   });
   const artifactIds = new Set(artifacts.map((artifact) => artifact.id));
   return prototypes.find((prototype) => prototype.artifactId !== null && artifactIds.has(prototype.artifactId)) ?? null;
+}
+
+interface ResolvedArtifactRunPlan {
+  prototype: FulcrumPlanPrototype;
+  command?: string;
+  args: string[];
+  urlPath?: string;
+  traceId?: string;
+  checks: string[];
+}
+
+function buildArtifactRunPlan(
+  prototype: FulcrumPlanPrototype,
+  input: PlanningArtifactRunInput,
+): ResolvedArtifactRunPlan {
+  const metadata = prototype.metadata ?? {};
+  const preview = objectRecord(metadata.preview);
+  const previewRun = objectRecord(preview?.run);
+  const command = trimmed(input.command) ?? stringProperty(previewRun, "command");
+  const args = input.args
+    ? normalizeStringArray(input.args)
+    : normalizeStringArray(stringArrayProperty(previewRun, "args"));
+  const checks = input.checks
+    ? normalizeStringArray(input.checks)
+    : normalizeStringArray(stringArrayProperty(preview, "reviewChecks"));
+  const urlPath = trimmed(input.urlPath) ?? stringProperty(preview, "urlPath");
+  const traceId = trimmed(input.traceId) ?? stringProperty(preview, "traceId") ?? stringProperty(metadata, "traceId");
+  return {
+    prototype,
+    ...(command ? { command } : {}),
+    args,
+    ...(urlPath ? { urlPath } : {}),
+    ...(traceId ? { traceId } : {}),
+    checks,
+  };
+}
+
+function artifactExecutionHistoryForPrototype(
+  prototype: FulcrumPlanPrototype,
+): PersistedPlanningArtifactExecutionRecord[] {
+  const metadata = prototype.metadata ?? {};
+  const executions = Array.isArray(metadata.executions) ? metadata.executions : [];
+  return executions
+    .map((entry) => persistedArtifactExecutionFromUnknown(entry, prototype))
+    .filter((entry): entry is PersistedPlanningArtifactExecutionRecord => entry !== null);
+}
+
+function persistedArtifactExecutionFromUnknown(
+  entry: unknown,
+  prototype: FulcrumPlanPrototype,
+): PersistedPlanningArtifactExecutionRecord | null {
+  const record = objectRecord(entry);
+  const planId = stringProperty(record, "planId");
+  const artifactPath = stringProperty(record, "artifactPath");
+  const status = stringProperty(record, "status");
+  if (!planId || !artifactPath || !status) return null;
+  try {
+    const built = buildPlanningArtifactExecutionRecord({
+      planId,
+      artifactPath,
+      status: status as PlanningArtifactExecutionInput["status"],
+      prototypeId: stringProperty(record, "prototypeId") ?? prototype.id,
+      artifactId: stringProperty(record, "artifactId") ?? prototype.artifactId ?? undefined,
+      traceId: stringProperty(record, "traceId"),
+      command: stringProperty(record, "command"),
+      args: stringArrayProperty(record, "args"),
+      urlPath: stringProperty(record, "urlPath"),
+      summary: stringProperty(record, "summary"),
+      outputRef: stringProperty(record, "outputRef"),
+      checks: stringArrayProperty(record, "checks"),
+      executedAt: stringProperty(record, "executedAt"),
+    });
+    return {
+      ...built,
+      prototypeId: prototype.id,
+      artifactId: prototype.artifactId,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function artifactCommandAgentProvider(command: string, args: readonly string[]): AgentProvider {
+  return {
+    name: "planning-artifact-command",
+    env: {},
+    captureSessions: false,
+    buildPrintCommand: () => ({
+      command: `${formatCommand(command, args)} && printf '\\nCOMPLETE\\n'`,
+    }),
+    parseStreamLine: (line) => [{ type: "text", text: line }],
+  };
+}
+
+function summarizeArtifactRun(result: AgentRunResult): string {
+  if (result.exitCode === 0 && result.exitReason === "complete") {
+    return "Artifact command completed in the sandbox runner.";
+  }
+  return `Artifact command failed with exit code ${result.exitCode} and exit reason ${result.exitReason}.`;
+}
+
+function artifactRunErrorStatus(error: unknown): PlanningArtifactExecutionInput["status"] {
+  return error instanceof SandboxProviderUnavailableError ? "blocked" : "failed";
+}
+
+function summarizeArtifactRunError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (error instanceof SandboxProviderUnavailableError) {
+    return `Artifact command was blocked by the sandbox runner: ${message}`;
+  }
+  return `Artifact command failed before completion: ${message}`;
+}
+
+function formatCommand(command: string, args: readonly string[]): string {
+  return [command,...args].map(shellQuote).join(" ");
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function normalizedPositiveInteger(value: number | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  if (!Number.isFinite(value) || value <= 0) return undefined;
+  return Math.floor(value);
+}
+
+function normalizeStringArray(values: readonly string[] | undefined): string[] {
+  return (values ?? []).map((value) => value.trim()).filter(Boolean);
+}
+
+function stringArrayProperty(record: Record<string, unknown> | undefined, key: string): string[] {
+  const value = record?.[key];
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+function stringProperty(record: Record<string, unknown> | undefined, key: string): string | undefined {
+  return trimmed(record?.[key]);
+}
+
+function trimmed(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function objectRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
 }
 
 async function ensureWorkspaceProject(
@@ -927,6 +1437,162 @@ async function loadTaskSummaries(
     });
   }
   return summaries;
+}
+
+function guidedAcpSessionAction(action: string): PlanningGuidedAcpSessionAction {
+  switch (action) {
+    case "resume_session":
+    case "cancel_operation":
+    case "resolve_permission":
+    case "cancel_permission":
+    case "set_mode":
+    case "set_model":
+      return action;
+    default:
+      throw new Error("action must be resume_session, cancel_operation, resolve_permission, cancel_permission, set_mode, or set_model.");
+  }
+}
+
+function guidedAcpActionTraffic(input: {
+  action: PlanningGuidedAcpSessionAction;
+  acpSessionId: string;
+  traceId: string;
+  requestId: number;
+  optionId?: string;
+  modeId?: string;
+  modelId?: string;
+}): {
+  entry: TrafficEntryInput;
+  action: PlanningGuidedAcpSessionActionResult["action"];
+} {
+  const basePayload = { acpSessionId: input.acpSessionId, traceId: input.traceId };
+  switch (input.action) {
+    case "resume_session":
+      return {
+        entry: {
+          direction: "out",
+          type: "request",
+          method: "session/load",
+          requestId: input.requestId,
+          payload: basePayload,
+        },
+        action: { type: input.action, method: "session/load" },
+      };
+    case "cancel_operation":
+      return {
+        entry: {
+          direction: "out",
+          type: "notification",
+          method: "session/cancel",
+          payload: basePayload,
+        },
+        action: { type: input.action, method: "session/cancel" },
+      };
+    case "resolve_permission": {
+      const optionId = requiredActionValue(input.optionId, "optionId");
+      return {
+        entry: {
+          direction: "out",
+          type: "response",
+          method: "session/request_permission",
+          requestId: input.requestId,
+          payload: { ...basePayload, outcome: { outcome: "selected", optionId } },
+        },
+        action: { type: input.action, method: "session/request_permission", optionId },
+      };
+    }
+    case "cancel_permission":
+      return {
+        entry: {
+          direction: "out",
+          type: "response",
+          method: "session/request_permission",
+          requestId: input.requestId,
+          payload: { ...basePayload, outcome: { outcome: "cancelled" } },
+        },
+        action: { type: input.action, method: "session/request_permission" },
+      };
+    case "set_mode": {
+      const modeId = requiredActionValue(input.modeId, "modeId");
+      return {
+        entry: {
+          direction: "out",
+          type: "request",
+          method: "session/set_mode",
+          requestId: input.requestId,
+          payload: { ...basePayload, modeId },
+        },
+        action: { type: input.action, method: "session/set_mode", modeId },
+      };
+    }
+    case "set_model": {
+      const modelId = requiredActionValue(input.modelId, "modelId");
+      return {
+        entry: {
+          direction: "out",
+          type: "request",
+          method: "session/set_model",
+          requestId: input.requestId,
+          payload: { ...basePayload, modelId },
+        },
+        action: { type: input.action, method: "session/set_model", modelId },
+      };
+    }
+  }
+}
+
+function guidedAcpSessionStatus(action: PlanningGuidedAcpSessionAction): string {
+  switch (action) {
+    case "resume_session":
+      return "resuming_session";
+    case "cancel_operation":
+      return "operation_cancelled";
+    case "resolve_permission":
+      return "permission_resolved";
+    case "cancel_permission":
+      return "permission_cancelled";
+    case "set_mode":
+    case "set_model":
+      return "selector_updated";
+  }
+}
+
+function requiredActionValue(value: string | undefined, key: string): string {
+  const trimmed = value?.trim();
+  if (!trimmed) throw new Error(`${key} is required for this ACP session action.`);
+  return trimmed;
+}
+
+function normalizeTrafficLog(value: unknown): TrafficEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((candidate) => {
+    const entry = candidate as Partial<TrafficEntry> | null;
+    if (!entry || typeof entry !== "object") return [];
+    if (entry.direction !== "in" && entry.direction !== "out") return [];
+    if (entry.type !== "request" && entry.type !== "response" && entry.type !== "notification") return [];
+    if (typeof entry.method !== "string" || !entry.method) return [];
+    return [{
+      id: typeof entry.id === "string" ? entry.id : "",
+      timestamp: typeof entry.timestamp === "number" ? entry.timestamp : 0,
+      direction: entry.direction,
+      type: entry.type,
+      method: entry.method,
+      requestId: entry.requestId,
+      payload: entry.payload,
+      ...(entry.error === true ? { error: true } : {}),
+    }];
+  });
+}
+
+function toTrafficInput(entry: TrafficEntry): TrafficEntryInput {
+  return {
+    direction: entry.direction,
+    type: entry.type,
+    method: entry.method,
+    requestId: entry.requestId,
+    payload: entry.payload,
+    ...(entry.error === true ? { error: true } : {}),
+  };
 }
 
 async function updateContinuousAcpSession(

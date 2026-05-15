@@ -11,6 +11,10 @@ import {
   DocumentCommentCreateBodyDto,
   DocumentCommentIdParamsDto,
   DocumentCommentPatchBodyDto,
+  DocumentAttachmentCreateBodyDto,
+  DocumentAttachmentIdParamsDto,
+  DocumentCollaborationProviderParamsDto,
+  DocumentCollaborationStatePatchBodyDto,
   DocumentLinkCreateBodyDto,
   DocumentLinkIdParamsDto,
   DocumentVersionDiffQueryDto,
@@ -26,6 +30,7 @@ import {
 
 const DOC_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const COMMENT_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const ATTACHMENT_ID = "attachment-1";
 const LINK_ID = "doc-link-1";
 
 describe("document public Nest API", () => {
@@ -69,6 +74,33 @@ describe("document public Nest API", () => {
       "comments/:commentId/resolve",
     );
     expect(Reflect.getMetadata(METHOD_METADATA, DocumentPublicApiController.prototype.deleteComment)).toBe(
+      RequestMethod.DELETE,
+    );
+    expect(Reflect.getMetadata(PATH_METADATA, DocumentPublicApiController.prototype.listAttachments)).toBe(
+      ":id/attachments",
+    );
+    expect(Reflect.getMetadata(METHOD_METADATA, DocumentPublicApiController.prototype.createAttachment)).toBe(
+      RequestMethod.POST,
+    );
+    expect(Reflect.getMetadata(PATH_METADATA, DocumentPublicApiController.prototype.deleteAttachment)).toBe(
+      "attachments/:attachmentId",
+    );
+    expect(Reflect.getMetadata(METHOD_METADATA, DocumentPublicApiController.prototype.deleteAttachment)).toBe(
+      RequestMethod.DELETE,
+    );
+    expect(Reflect.getMetadata(PATH_METADATA, DocumentPublicApiController.prototype.listCollaborationStates)).toBe(
+      ":id/collaboration",
+    );
+    expect(Reflect.getMetadata(PATH_METADATA, DocumentPublicApiController.prototype.patchCollaborationState)).toBe(
+      ":id/collaboration/:provider",
+    );
+    expect(Reflect.getMetadata(METHOD_METADATA, DocumentPublicApiController.prototype.patchCollaborationState)).toBe(
+      RequestMethod.PATCH,
+    );
+    expect(Reflect.getMetadata(PATH_METADATA, DocumentPublicApiController.prototype.deleteCollaborationState)).toBe(
+      ":id/collaboration/:provider",
+    );
+    expect(Reflect.getMetadata(METHOD_METADATA, DocumentPublicApiController.prototype.deleteCollaborationState)).toBe(
       RequestMethod.DELETE,
     );
     expect(Reflect.getMetadata(PATH_METADATA, DocumentPublicApiController.prototype.listBacklinks)).toBe(
@@ -152,19 +184,38 @@ describe("document public Nest API", () => {
     await expect(controller.listDocuments({})).resolves.toEqual([
       expect.objectContaining({ id: DOC_ID, type: "note" }),
     ]);
-    await expect(controller.createDocument({ title: "Doc", type: "note", bodyMd: "hello" })).resolves.toEqual(
+    await expect(controller.createDocument({
+      title: "Doc",
+      type: "spec",
+      bodyMd: "hello",
+      frontmatter: { kind: "spec", labels: ["alpha"] },
+    })).resolves.toEqual(
       expect.objectContaining({ id: DOC_ID, type: "note" }),
     );
     await expect(controller.getDocument({ id: DOC_ID })).resolves.toEqual(expect.objectContaining({ id: DOC_ID }));
-    await expect(controller.patchDocument({ id: DOC_ID }, { title: "Updated", type: "page" })).resolves.toEqual(
+    await expect(controller.patchDocument(
+      { id: DOC_ID },
+      { title: "Updated", type: "adr", frontmatter: { kind: "adr", labels: ["beta"] } },
+    )).resolves.toEqual(
       expect.objectContaining({ title: "Updated", type: "page" }),
     );
     await expect(controller.deleteDocument({ id: DOC_ID })).resolves.toBeUndefined();
 
     expect(list).toHaveBeenCalledWith({});
-    expect(create).toHaveBeenCalledWith({ title: "Doc", docType: "note", bodyMd: "hello" });
+    expect(create).toHaveBeenCalledWith({
+      title: "Doc",
+      docType: "spec",
+      bodyMd: "hello",
+      frontmatter: { kind: "spec", labels: ["alpha"] },
+    });
     expect(get).toHaveBeenCalledWith({ id: DOC_ID });
-    expect(update).toHaveBeenCalledWith({ id: DOC_ID, title: "Updated", docType: "page", bodyMd: undefined });
+    expect(update).toHaveBeenCalledWith({
+      id: DOC_ID,
+      title: "Updated",
+      docType: "adr",
+      bodyMd: undefined,
+      frontmatter: { kind: "adr", labels: ["beta"] },
+    });
     expect(remove).toHaveBeenCalledWith({ id: DOC_ID });
   });
 
@@ -175,6 +226,12 @@ describe("document public Nest API", () => {
       updateComment: mock(async () => ({ id: COMMENT_ID, bodyMd: "updated", status: "open" })),
       resolveComment: mock(async () => ({ id: COMMENT_ID, status: "resolved" })),
       deleteComment: mock(async () => ({ id: COMMENT_ID })),
+      listAttachments: mock(async () => [{ id: ATTACHMENT_ID, docId: DOC_ID, fileName: "brief.pdf" }]),
+      createAttachment: mock(async () => ({ id: ATTACHMENT_ID, docId: DOC_ID, fileName: "brief.pdf" })),
+      deleteAttachment: mock(async () => ({ id: ATTACHMENT_ID })),
+      listCollaborationStates: mock(async () => [{ id: "collab-1", docId: DOC_ID, provider: "hocuspocus" }]),
+      upsertCollaborationState: mock(async () => ({ id: "collab-1", docId: DOC_ID, provider: "hocuspocus" })),
+      deleteCollaborationState: mock(async () => ({ id: "collab-1", provider: "hocuspocus" })),
       listBacklinks: mock(async () => [{ id: "link-1", targetDocId: DOC_ID }]),
       listForwardLinks: mock(async () => [{ id: "link-2", sourceDocId: DOC_ID }]),
       createLink: mock(async () => ({ id: LINK_ID, sourceDocId: DOC_ID, targetDocId: "target-doc" })),
@@ -211,6 +268,37 @@ describe("document public Nest API", () => {
       expect.objectContaining({ status: "resolved" }),
     );
     await expect(controller.deleteComment({ commentId: COMMENT_ID })).resolves.toBeUndefined();
+    await expect(controller.listAttachments({ id: DOC_ID })).resolves.toEqual([
+      expect.objectContaining({ id: ATTACHMENT_ID, fileName: "brief.pdf" }),
+    ]);
+    await expect(controller.createAttachment(
+      { id: DOC_ID },
+      {
+        fileName: "brief.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 42,
+        storagePath: "attachments/brief.pdf",
+        checksumSha256: "abc123",
+        traceId: "trace-attachment",
+      },
+    )).resolves.toEqual(expect.objectContaining({ id: ATTACHMENT_ID }));
+    await expect(controller.deleteAttachment({ attachmentId: ATTACHMENT_ID })).resolves.toBeUndefined();
+    await expect(controller.listCollaborationStates({ id: DOC_ID })).resolves.toEqual([
+      expect.objectContaining({ id: "collab-1", provider: "hocuspocus" }),
+    ]);
+    await expect(controller.patchCollaborationState(
+      { id: DOC_ID, provider: "hocuspocus" },
+      {
+        stateVector: "state-vector",
+        documentState: "document-state",
+        activeClientIds: ["client-1"],
+        traceId: "trace-collab",
+      },
+    )).resolves.toEqual(expect.objectContaining({ id: "collab-1", provider: "hocuspocus" }));
+    await expect(controller.deleteCollaborationState({
+      id: DOC_ID,
+      provider: "hocuspocus",
+    })).resolves.toBeUndefined();
     await expect(controller.listBacklinks({ id: DOC_ID })).resolves.toEqual([
       expect.objectContaining({ targetDocId: DOC_ID }),
     ]);
@@ -269,6 +357,27 @@ describe("document public Nest API", () => {
     });
     expect(store.resolveComment).toHaveBeenCalledWith({ commentId: COMMENT_ID, resolved: true });
     expect(store.deleteComment).toHaveBeenCalledWith({ commentId: COMMENT_ID });
+    expect(store.listAttachments).toHaveBeenCalledWith({ docId: DOC_ID });
+    expect(store.createAttachment).toHaveBeenCalledWith({
+      docId: DOC_ID,
+      fileName: "brief.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 42,
+      storagePath: "attachments/brief.pdf",
+      checksumSha256: "abc123",
+      traceId: "trace-attachment",
+    });
+    expect(store.deleteAttachment).toHaveBeenCalledWith({ attachmentId: ATTACHMENT_ID });
+    expect(store.listCollaborationStates).toHaveBeenCalledWith({ docId: DOC_ID });
+    expect(store.upsertCollaborationState).toHaveBeenCalledWith({
+      docId: DOC_ID,
+      provider: "hocuspocus",
+      stateVector: "state-vector",
+      documentState: "document-state",
+      activeClientIds: ["client-1"],
+      traceId: "trace-collab",
+    });
+    expect(store.deleteCollaborationState).toHaveBeenCalledWith({ docId: DOC_ID, provider: "hocuspocus" });
     expect(store.listBacklinks).toHaveBeenCalledWith({ docId: DOC_ID });
     expect(store.listForwardLinks).toHaveBeenCalledWith({ docId: DOC_ID });
     expect(store.createLink).toHaveBeenCalledWith({
@@ -315,13 +424,51 @@ describe("document public Nest API", () => {
     const invalidParams = Object.assign(new DocumentIdParamsDto(), { id: "not-a-uuid" });
     const commentParams = Object.assign(new DocumentCommentIdParamsDto(), { commentId: COMMENT_ID });
     const invalidCommentParams = Object.assign(new DocumentCommentIdParamsDto(), { commentId: "comment-1" });
-    const body = Object.assign(new DocumentCreateBodyDto(), { title: "Doc", type: "note", bodyMd: "hello" });
-    const invalidBody = Object.assign(new DocumentCreateBodyDto(), { title: "", type: "unknown" });
-    const patch = Object.assign(new DocumentPatchBodyDto(), { title: "Updated", type: "page" });
-    const invalidPatch = Object.assign(new DocumentPatchBodyDto(), { title: "", type: "unknown" });
+    const body = Object.assign(new DocumentCreateBodyDto(), {
+      title: "Doc",
+      type: "spec",
+      bodyMd: "hello",
+      frontmatter: { kind: "spec", labels: ["alpha"] },
+    });
+    const invalidBody = Object.assign(new DocumentCreateBodyDto(), { title: "" });
+    const patch = Object.assign(new DocumentPatchBodyDto(), {
+      title: "Updated",
+      type: "adr",
+      frontmatter: { kind: "adr", labels: ["beta"] },
+    });
+    const invalidPatch = Object.assign(new DocumentPatchBodyDto(), { title: "" });
     const commentBody = Object.assign(new DocumentCommentCreateBodyDto(), { authorId: "user-1", bodyMd: "note" });
     const invalidCommentBody = Object.assign(new DocumentCommentCreateBodyDto(), { authorId: "", bodyMd: "" });
     const commentPatch = Object.assign(new DocumentCommentPatchBodyDto(), { bodyMd: "updated", status: "open" });
+    const attachmentParams = Object.assign(new DocumentAttachmentIdParamsDto(), { attachmentId: ATTACHMENT_ID });
+    const invalidAttachmentParams = Object.assign(new DocumentAttachmentIdParamsDto(), { attachmentId: "" });
+    const attachmentBody = Object.assign(new DocumentAttachmentCreateBodyDto(), {
+      fileName: "brief.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 42,
+      storagePath: "attachments/brief.pdf",
+      checksumSha256: "abc123",
+    });
+    const invalidAttachmentBody = Object.assign(new DocumentAttachmentCreateBodyDto(), {
+      fileName: "",
+      mimeType: "",
+      sizeBytes: -1,
+      storagePath: "",
+    });
+    const collaborationParams = Object.assign(new DocumentCollaborationProviderParamsDto(), {
+      id: DOC_ID,
+      provider: "hocuspocus",
+    });
+    const invalidCollaborationParams = Object.assign(new DocumentCollaborationProviderParamsDto(), {
+      id: DOC_ID,
+      provider: "",
+    });
+    const collaborationBody = Object.assign(new DocumentCollaborationStatePatchBodyDto(), {
+      stateVector: "state-vector",
+      documentState: "document-state",
+      activeClientIds: ["client-1"],
+      traceId: "trace-collab",
+    });
     const linkParams = Object.assign(new DocumentLinkIdParamsDto(), { linkId: LINK_ID });
     const invalidLinkParams = Object.assign(new DocumentLinkIdParamsDto(), { linkId: "" });
     const linkBody = Object.assign(new DocumentLinkCreateBodyDto(), {
@@ -344,12 +491,24 @@ describe("document public Nest API", () => {
     expect(validateSync(commentParams)).toHaveLength(0);
     expect(validateSync(invalidCommentParams).map((error) => error.property)).toEqual(["commentId"]);
     expect(validateSync(body)).toHaveLength(0);
-    expect(validateSync(invalidBody).map((error) => error.property)).toEqual(["title", "type"]);
+    expect(validateSync(invalidBody).map((error) => error.property)).toEqual(["title"]);
     expect(validateSync(patch)).toHaveLength(0);
-    expect(validateSync(invalidPatch).map((error) => error.property)).toEqual(["title", "type"]);
+    expect(validateSync(invalidPatch).map((error) => error.property)).toEqual(["title"]);
     expect(validateSync(commentBody)).toHaveLength(0);
     expect(validateSync(invalidCommentBody).map((error) => error.property)).toEqual(["authorId", "bodyMd"]);
     expect(validateSync(commentPatch)).toHaveLength(0);
+    expect(validateSync(attachmentParams)).toHaveLength(0);
+    expect(validateSync(invalidAttachmentParams).map((error) => error.property)).toEqual(["attachmentId"]);
+    expect(validateSync(attachmentBody)).toHaveLength(0);
+    expect(validateSync(invalidAttachmentBody).map((error) => error.property)).toEqual([
+      "fileName",
+      "mimeType",
+      "sizeBytes",
+      "storagePath",
+    ]);
+    expect(validateSync(collaborationParams)).toHaveLength(0);
+    expect(validateSync(invalidCollaborationParams).map((error) => error.property)).toEqual(["provider"]);
+    expect(validateSync(collaborationBody)).toHaveLength(0);
     expect(validateSync(linkParams)).toHaveLength(0);
     expect(validateSync(invalidLinkParams).map((error) => error.property)).toEqual(["linkId"]);
     expect(validateSync(linkBody)).toHaveLength(0);

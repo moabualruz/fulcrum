@@ -88,6 +88,37 @@ export interface GuidedAcpPlanningResult extends FreeformPlanningPromptResult {
   eventId?: string;
 }
 
+export interface GuidedAcpSessionActionInput {
+  acpSessionId: string;
+  action: "resume_session" | "cancel_operation" | "resolve_permission" | "cancel_permission" | "set_mode" | "set_model";
+  projectId?: string | null;
+  traceId?: string;
+  optionId?: string;
+  modeId?: string;
+  modelId?: string;
+}
+
+export interface GuidedAcpSessionActionResult {
+  status: "session_action_recorded";
+  session?: {
+    acpSessionId?: string;
+    projectId?: string | null;
+    traceId?: string;
+    agentName?: string;
+    modeId?: string;
+    modelId?: string;
+    sessionStatus?: string;
+  };
+  action?: {
+    type?: string;
+    method?: string;
+    optionId?: string;
+    modeId?: string;
+    modelId?: string;
+  };
+  traffic?: { entries?: Array<{ method?: string }> };
+}
+
 export interface ContinuousUpdateInput {
   trigger: "manual_doc_edit" | "acp_session_update";
   userPrompt: string;
@@ -125,6 +156,45 @@ export interface TechnicalPlanningInput {
   prototypePaths?: string[];
   boilerplatePaths?: string[];
   successCriteria?: string[];
+}
+
+export interface PlanningArtifactRunInput {
+  planId: string;
+  artifactPath: string;
+  prototypeId?: string;
+  artifactId?: string;
+  traceId?: string;
+  command?: string;
+  args?: string[];
+  urlPath?: string;
+  summary?: string;
+  outputRef?: string;
+  checks?: string[];
+  executedAt?: string;
+  cwd?: string;
+  branch?: string;
+  copyToWorktree?: string[];
+  timeoutMs?: number;
+  planOnly?: boolean;
+}
+
+export interface PlanningArtifactRunResult {
+  status?: string;
+  runner?: string;
+  runId?: string | null;
+  exitCode?: number | null;
+  durationMs?: number;
+  traceId?: string;
+  summary?: string;
+  outputRef?: string | null;
+  transcript?: string;
+  history?: Array<{
+    status?: string;
+    traceId?: string;
+    summary?: string;
+    outputRef?: string | null;
+    executedAt?: string;
+  }>;
 }
 
 interface PlanningBreakdownTask {
@@ -173,8 +243,10 @@ export interface PlanningBreakdownScreenOptions {
   freeformInput?: FreeformPlanningPromptInput;
   freeformStartInput?: FreeformWorkStartInput;
   guidedAcpInput?: GuidedAcpPlanningInput;
+  guidedAcpSessionActionInput?: GuidedAcpSessionActionInput;
   continuousUpdateInput?: ContinuousUpdateInput;
   technicalPlanningInput?: TechnicalPlanningInput;
+  artifactExecutionInput?: PlanningArtifactRunInput;
   workflowCycleInput?: WorkflowAcceptanceCycleInput;
   caller: {
     planning: {
@@ -183,8 +255,10 @@ export interface PlanningBreakdownScreenOptions {
       buildFreeformDocsPlanningPrompt?(input: FreeformPlanningPromptInput): Promise<FreeformPlanningPromptResult>;
       startFreeformWorkFromDocs?(input: FreeformWorkStartInput): Promise<FreeformWorkStartResult>;
       startGuidedAcpPlanningSession?(input: GuidedAcpPlanningInput): Promise<GuidedAcpPlanningResult>;
+      recordGuidedAcpSessionAction?(input: GuidedAcpSessionActionInput): Promise<GuidedAcpSessionActionResult>;
       restartPlanningCycleFromUpdates?(input: ContinuousUpdateInput): Promise<ContinuousUpdateResult>;
       generateTechnicalPlanningCycle?(input: TechnicalPlanningInput): Promise<TechnicalPlanningResult>;
+      runArtifactExecution?(input: PlanningArtifactRunInput): Promise<PlanningArtifactRunResult>;
     };
     workflows?: {
       runAcceptanceCycle(input: WorkflowAcceptanceCycleInput): Promise<WorkflowCycleResultView>;
@@ -198,8 +272,10 @@ export class PlanningBreakdownScreen {
   private freeformPrompt: FreeformPlanningPromptResult | null = null;
   private freeformStart: FreeformWorkStartResult | null = null;
   private guidedAcpStart: GuidedAcpPlanningResult | null = null;
+  private guidedAcpSessionAction: GuidedAcpSessionActionResult | null = null;
   private continuousUpdate: ContinuousUpdateResult | null = null;
   private technicalPlanning: TechnicalPlanningResult | null = null;
+  private artifactExecution: PlanningArtifactRunResult | null = null;
   private workflowCycle: WorkflowCycleResultView | null = null;
   private error: string | null = null;
 
@@ -212,8 +288,10 @@ export class PlanningBreakdownScreen {
       this.freeformPrompt = null;
       this.freeformStart = null;
       this.guidedAcpStart = null;
+      this.guidedAcpSessionAction = null;
       this.continuousUpdate = null;
       this.technicalPlanning = null;
+      this.artifactExecution = null;
       this.workflowCycle = null;
       this.error = null;
     } catch (error) {
@@ -222,8 +300,10 @@ export class PlanningBreakdownScreen {
       this.freeformPrompt = null;
       this.freeformStart = null;
       this.guidedAcpStart = null;
+      this.guidedAcpSessionAction = null;
       this.continuousUpdate = null;
       this.technicalPlanning = null;
+      this.artifactExecution = null;
       this.workflowCycle = null;
       this.error = error instanceof Error ? error.message : String(error);
     }
@@ -335,6 +415,18 @@ export class PlanningBreakdownScreen {
       }
     }
 
+    if (this.guidedAcpSessionAction) {
+      renderer.writeln();
+      renderer.writeln(c.bold("  Guided ACP action"));
+      renderer.infoRow("Status", this.guidedAcpSessionAction.status);
+      renderer.infoRow("Session", this.guidedAcpSessionAction.session?.acpSessionId ?? "(none)");
+      renderer.infoRow("Action", this.guidedAcpSessionAction.action?.method ?? "(none)");
+      renderer.infoRow("State", this.guidedAcpSessionAction.session?.sessionStatus ?? "(unknown)");
+      for (const entry of this.guidedAcpSessionAction.traffic?.entries ?? []) {
+        renderer.writeln(`  ${entry.method ?? "(traffic)"}`);
+      }
+    }
+
     if (this.continuousUpdate) {
       renderer.writeln();
       renderer.writeln(c.bold("  Continuous update"));
@@ -381,6 +473,36 @@ export class PlanningBreakdownScreen {
       }
     }
 
+    if (this.artifactExecution) {
+      renderer.writeln();
+      renderer.writeln(c.bold("  Artifact execution"));
+      renderer.infoRow("Status", this.artifactExecution.status ?? "(unknown)");
+      renderer.infoRow("Runner", this.artifactExecution.runner ?? "(unknown)");
+      renderer.infoRow("Run", this.artifactExecution.runId ?? "(not run)");
+      renderer.infoRow(
+        "Exit",
+        this.artifactExecution.exitCode === undefined || this.artifactExecution.exitCode === null
+          ? "(none)"
+          : `${this.artifactExecution.exitCode}`,
+      );
+      renderer.infoRow("Trace", this.artifactExecution.traceId ?? "(none)");
+      renderer.infoRow("Duration", `${this.artifactExecution.durationMs ?? 0}ms`);
+      if (this.artifactExecution.summary) renderer.writeln(`  ${this.artifactExecution.summary}`);
+      if (this.artifactExecution.outputRef) renderer.writeln(`  output ${this.artifactExecution.outputRef}`);
+      for (const line of this.artifactExecution.transcript?.split("\n").filter(Boolean).slice(0, 6) ?? []) {
+        renderer.writeln(`  ${line}`);
+      }
+      if (this.artifactExecution.history?.length) {
+        renderer.writeln(c.bold("  Artifact execution history"));
+        for (const entry of this.artifactExecution.history.slice(0, 5)) {
+          renderer.writeln(
+            `  ${entry.status ?? "unknown"} ${entry.executedAt ?? ""} ${entry.summary ?? entry.outputRef ?? ""}`
+              .trimEnd(),
+          );
+        }
+      }
+    }
+
     if (this.workflowCycle) {
       renderer.writeln();
       renderer.writeln(c.bold("  Workflow cycle"));
@@ -393,7 +515,7 @@ export class PlanningBreakdownScreen {
     }
 
     renderer.writeln();
-    renderer.writeln(c.dim("  r refresh  a acp  n new freeform  u update  g generate  x run cycle  m materialize  c context  q back"));
+    renderer.writeln(c.dim("  r refresh  a acp  p acp action  n new freeform  u update  g generate  e execute artifact  x run cycle  m materialize  c context  q back"));
   }
 
   async handleKey(key: string): Promise<boolean> {
@@ -417,12 +539,20 @@ export class PlanningBreakdownScreen {
       await this.startGuidedAcpPlanning();
       return true;
     }
+    if (key === "p") {
+      await this.recordGuidedAcpSessionAction();
+      return true;
+    }
     if (key === "u") {
       await this.restartContinuousUpdate();
       return true;
     }
     if (key === "g") {
       await this.generateTechnicalPlanning();
+      return true;
+    }
+    if (key === "e") {
+      await this.runArtifactExecution();
       return true;
     }
     if (key === "x") {
@@ -505,6 +635,26 @@ export class PlanningBreakdownScreen {
     }
   }
 
+  private async recordGuidedAcpSessionAction(): Promise<void> {
+    const record = this.opts.caller.planning.recordGuidedAcpSessionAction;
+    if (!record) {
+      this.error = "Planning guided ACP session action caller unavailable.";
+      return;
+    }
+    const input = this.guidedAcpSessionActionInput();
+    if (!input) {
+      this.error = "Planning guided ACP session action input unavailable.";
+      return;
+    }
+    try {
+      this.guidedAcpSessionAction = await record(input);
+      this.error = null;
+    } catch (error) {
+      this.guidedAcpSessionAction = null;
+      this.error = error instanceof Error ? error.message : String(error);
+    }
+  }
+
   private async restartContinuousUpdate(): Promise<void> {
     const restart = this.opts.caller.planning.restartPlanningCycleFromUpdates;
     if (!restart) {
@@ -542,6 +692,52 @@ export class PlanningBreakdownScreen {
       this.technicalPlanning = null;
       this.error = error instanceof Error ? error.message : String(error);
     }
+  }
+
+  private async runArtifactExecution(): Promise<void> {
+    const runArtifact = this.opts.caller.planning.runArtifactExecution;
+    if (!runArtifact) {
+      this.error = "Planning artifact execution caller unavailable.";
+      return;
+    }
+    const input = this.artifactExecutionInput();
+    if (!input) {
+      this.error = "Planning artifact execution input unavailable.";
+      return;
+    }
+    try {
+      this.artifactExecution = await runArtifact(input);
+      this.error = null;
+    } catch (error) {
+      this.artifactExecution = null;
+      this.error = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  private artifactExecutionInput(): PlanningArtifactRunInput | null {
+    const generatedPlan = this.technicalPlanning?.plan;
+    const generatedPath = generatedPlan?.prototypePaths[0] ?? generatedPlan?.boilerplatePaths[0];
+    if (generatedPlan && generatedPath) {
+      return {
+        ...this.opts.artifactExecutionInput,
+        planId: generatedPlan.planId,
+        artifactPath: generatedPath,
+        traceId: generatedPlan.traceId ?? this.opts.artifactExecutionInput?.traceId ?? this.opts.input.traceId,
+      };
+    }
+    return this.opts.artifactExecutionInput ?? null;
+  }
+
+  private guidedAcpSessionActionInput(): GuidedAcpSessionActionInput | null {
+    if (this.opts.guidedAcpSessionActionInput) return this.opts.guidedAcpSessionActionInput;
+    const session = this.guidedAcpStart?.session;
+    if (!session?.acpSessionId) return null;
+    return {
+      acpSessionId: session.acpSessionId,
+      action: "resume_session",
+      projectId: this.opts.guidedAcpInput?.projectId ?? null,
+      traceId: this.opts.guidedAcpInput?.traceId,
+    };
   }
 
   private async runWorkflowCycle(): Promise<void> {

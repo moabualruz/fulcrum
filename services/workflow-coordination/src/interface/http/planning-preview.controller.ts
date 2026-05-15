@@ -1,31 +1,27 @@
 import "reflect-metadata";
 
-import { Body, Controller, Inject, Post } from "@nestjs/common";
+import { Body, Controller, HttpCode, Inject, Post } from "@nestjs/common";
 import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
-import { IsArray, IsIn, IsOptional, IsString, MinLength } from "class-validator";
+import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Min, MinLength } from "class-validator";
 
 import type { BuildApprovedPlanBreakdownInput } from "@planning-review/application/approved-plan-breakdown.ts";
 
 import {
   PlanningPreviewService,
-  type ApprovedPlanMaterializeInput,
   type ApprovedPlanMaterializeResult,
   type ApprovedPlanPreview,
-  type PlanningFreeformPromptInput,
   type PlanningFreeformPromptResult,
-  type PlanningFreeformStartInput,
   type PlanningFreeformStartResult,
-  type PlanningGuidedAcpStartInput,
   type PlanningGuidedAcpStartResult,
-  type PlanningContinuousUpdateInput,
+  type PlanningGuidedAcpSessionActionResult,
   type PlanningContinuousUpdateResult,
-  type PlanningTechnicalCycleInput,
   type PlanningTechnicalCycleResult,
+  type PlanningArtifactRunOutput,
   type PersistedPlanningArtifactExecutionRecord,
 } from "@workflow-coordination/application/planning-preview.service.ts";
 
-import { PlanningApprovedPlanRequestDto, PlanningMaterializeRequestDto, PlanningFreeformPromptRequestDto, PlanningFreeformStartRequestDto, PlanningGuidedAcpStartRequestDto, PlanningContinuousChangedDocDto, PlanningContinuousUpdateRequestDto, PlanningTechnicalTaskSeedDto, PlanningTechnicalCycleRequestDto, PlanningArtifactExecutionRequestDto } from "./dto/planning-preview.dto.ts";
-export { PlanningApprovedPlanRequestDto, PlanningMaterializeRequestDto, PlanningFreeformPromptRequestDto, PlanningFreeformStartRequestDto, PlanningGuidedAcpStartRequestDto, PlanningContinuousChangedDocDto, PlanningContinuousUpdateRequestDto, PlanningTechnicalTaskSeedDto, PlanningTechnicalCycleRequestDto, PlanningArtifactExecutionRequestDto };
+import { PlanningApprovedPlanRequestDto, PlanningMaterializeRequestDto, PlanningFreeformPromptRequestDto, PlanningFreeformStartRequestDto, PlanningGuidedAcpStartRequestDto, PlanningGuidedAcpSessionActionRequestDto, PlanningContinuousChangedDocDto, PlanningContinuousUpdateRequestDto, PlanningTechnicalTaskSeedDto, PlanningTechnicalCycleRequestDto, PlanningArtifactExecutionRequestDto, PlanningArtifactRunRequestDto } from "./dto/planning-preview.dto.ts";
+export { PlanningApprovedPlanRequestDto, PlanningMaterializeRequestDto, PlanningFreeformPromptRequestDto, PlanningFreeformStartRequestDto, PlanningGuidedAcpStartRequestDto, PlanningGuidedAcpSessionActionRequestDto, PlanningContinuousChangedDocDto, PlanningContinuousUpdateRequestDto, PlanningTechnicalTaskSeedDto, PlanningTechnicalCycleRequestDto, PlanningArtifactExecutionRequestDto, PlanningArtifactRunRequestDto };
 
 type PlanningPreviewPort = Pick<
   PlanningPreviewService,
@@ -34,6 +30,8 @@ type PlanningPreviewPort = Pick<
   | "generateTechnicalPlanningCycle"
   | "previewApprovedPlan"
   | "recordArtifactExecution"
+  | "recordGuidedAcpSessionAction"
+  | "runArtifactExecution"
   | "restartPlanningCycleFromUpdates"
   | "startFreeformWork"
   | "startGuidedAcpPlanning"
@@ -72,6 +70,12 @@ export class PlanningPreviewController {
     return await this.planning.recordArtifactExecution(body);
   }
 
+  async runArtifactExecution(
+    body: PlanningArtifactRunRequestDto,
+  ): Promise<PlanningArtifactRunOutput> {
+    return await this.planning.runArtifactExecution(body);
+  }
+
   async startFreeformWork(
     body: PlanningFreeformStartRequestDto,
   ): Promise<PlanningFreeformStartResult> {
@@ -82,6 +86,12 @@ export class PlanningPreviewController {
     body: PlanningGuidedAcpStartRequestDto,
   ): Promise<PlanningGuidedAcpStartResult> {
     return await this.planning.startGuidedAcpPlanning(body);
+  }
+
+  async recordGuidedAcpSessionAction(
+    body: PlanningGuidedAcpSessionActionRequestDto,
+  ): Promise<PlanningGuidedAcpSessionActionResult> {
+    return await this.planning.recordGuidedAcpSessionAction(body);
   }
 
   async restartPlanningCycleFromUpdates(
@@ -149,6 +159,18 @@ IsString()(PlanningGuidedAcpStartRequestDto.prototype, "permissionMode");
 IsOptional()(PlanningGuidedAcpStartRequestDto.prototype, "permissionMode");
 IsArray()(PlanningGuidedAcpStartRequestDto.prototype, "selectedDocIds");
 IsOptional()(PlanningGuidedAcpStartRequestDto.prototype, "selectedDocIds");
+for (const property of ["acpSessionId", "action"] as const) {
+  IsString()(PlanningGuidedAcpSessionActionRequestDto.prototype, property);
+  MinLength(1)(PlanningGuidedAcpSessionActionRequestDto.prototype, property);
+}
+IsIn(["resume_session", "cancel_operation", "resolve_permission", "cancel_permission", "set_mode", "set_model"])(
+  PlanningGuidedAcpSessionActionRequestDto.prototype,
+  "action",
+);
+for (const property of ["projectId", "traceId", "optionId", "modeId", "modelId"] as const) {
+  IsString()(PlanningGuidedAcpSessionActionRequestDto.prototype, property);
+  IsOptional()(PlanningGuidedAcpSessionActionRequestDto.prototype, property);
+}
 for (const property of ["workspaceId", "workspaceSlug", "workspaceName", "projectId", "projectSlug", "projectName", "trigger", "userPrompt"] as const) {
   IsString()(PlanningContinuousUpdateRequestDto.prototype, property);
   MinLength(1)(PlanningContinuousUpdateRequestDto.prototype, property);
@@ -190,8 +212,27 @@ for (const property of ["prototypeId", "artifactId", "traceId", "command", "urlP
 }
 for (const property of ["args", "checks"] as const) {
   IsArray()(PlanningArtifactExecutionRequestDto.prototype, property);
+  IsString({ each: true })(PlanningArtifactExecutionRequestDto.prototype, property);
   IsOptional()(PlanningArtifactExecutionRequestDto.prototype, property);
 }
+for (const property of ["planId", "artifactPath"] as const) {
+  IsString()(PlanningArtifactRunRequestDto.prototype, property);
+  MinLength(1)(PlanningArtifactRunRequestDto.prototype, property);
+}
+for (const property of ["prototypeId", "artifactId", "traceId", "command", "urlPath", "summary", "outputRef", "executedAt", "cwd", "branch"] as const) {
+  IsString()(PlanningArtifactRunRequestDto.prototype, property);
+  IsOptional()(PlanningArtifactRunRequestDto.prototype, property);
+}
+for (const property of ["args", "checks", "copyToWorktree"] as const) {
+  IsArray()(PlanningArtifactRunRequestDto.prototype, property);
+  IsString({ each: true })(PlanningArtifactRunRequestDto.prototype, property);
+  IsOptional()(PlanningArtifactRunRequestDto.prototype, property);
+}
+IsInt()(PlanningArtifactRunRequestDto.prototype, "timeoutMs");
+Min(1)(PlanningArtifactRunRequestDto.prototype, "timeoutMs");
+IsOptional()(PlanningArtifactRunRequestDto.prototype, "timeoutMs");
+IsBoolean()(PlanningArtifactRunRequestDto.prototype, "planOnly");
+IsOptional()(PlanningArtifactRunRequestDto.prototype, "planOnly");
 for (const property of ["clientKey", "title"] as const) {
   IsString()(PlanningTechnicalTaskSeedDto.prototype, property);
   MinLength(1)(PlanningTechnicalTaskSeedDto.prototype, property);
@@ -221,6 +262,10 @@ const recordArtifactExecutionDescriptor = Object.getOwnPropertyDescriptor(
   PlanningPreviewController.prototype,
   "recordArtifactExecution",
 );
+const runArtifactExecutionDescriptor = Object.getOwnPropertyDescriptor(
+  PlanningPreviewController.prototype,
+  "runArtifactExecution",
+);
 const startFreeformWorkDescriptor = Object.getOwnPropertyDescriptor(
   PlanningPreviewController.prototype,
   "startFreeformWork",
@@ -229,12 +274,16 @@ const startGuidedAcpPlanningDescriptor = Object.getOwnPropertyDescriptor(
   PlanningPreviewController.prototype,
   "startGuidedAcpPlanning",
 );
+const recordGuidedAcpSessionActionDescriptor = Object.getOwnPropertyDescriptor(
+  PlanningPreviewController.prototype,
+  "recordGuidedAcpSessionAction",
+);
 const restartPlanningCycleFromUpdatesDescriptor = Object.getOwnPropertyDescriptor(
   PlanningPreviewController.prototype,
   "restartPlanningCycleFromUpdates",
 );
 
-if (!previewApprovedPlanDescriptor || !materializeApprovedPlanDescriptor || !buildFreeformDocsPlanningPromptDescriptor || !generateTechnicalPlanningCycleDescriptor || !recordArtifactExecutionDescriptor || !startFreeformWorkDescriptor || !startGuidedAcpPlanningDescriptor || !restartPlanningCycleFromUpdatesDescriptor) {
+if (!previewApprovedPlanDescriptor || !materializeApprovedPlanDescriptor || !buildFreeformDocsPlanningPromptDescriptor || !generateTechnicalPlanningCycleDescriptor || !recordArtifactExecutionDescriptor || !runArtifactExecutionDescriptor || !startFreeformWorkDescriptor || !startGuidedAcpPlanningDescriptor || !recordGuidedAcpSessionActionDescriptor || !restartPlanningCycleFromUpdatesDescriptor) {
   throw new Error("PlanningPreviewController route descriptor is missing");
 }
 
@@ -247,6 +296,7 @@ Post("approved-plan/preview")(
   "previewApprovedPlan",
   previewApprovedPlanDescriptor,
 );
+HttpCode(200)(PlanningPreviewController.prototype, "previewApprovedPlan", previewApprovedPlanDescriptor);
 Body()(PlanningPreviewController.prototype, "previewApprovedPlan", 0);
 ApiOperation({ summary: "Preview an approved plan breakdown through the cycle planning model" })(
   PlanningPreviewController.prototype,
@@ -269,6 +319,7 @@ Post("approved-plan/materialize")(
   "materializeApprovedPlan",
   materializeApprovedPlanDescriptor,
 );
+HttpCode(200)(PlanningPreviewController.prototype, "materializeApprovedPlan", materializeApprovedPlanDescriptor);
 Body()(PlanningPreviewController.prototype, "materializeApprovedPlan", 0);
 ApiOperation({ summary: "Materialize an approved plan through the cycle TypeORM planning model" })(
   PlanningPreviewController.prototype,
@@ -291,6 +342,7 @@ Post("freeform/prompt")(
   "buildFreeformDocsPlanningPrompt",
   buildFreeformDocsPlanningPromptDescriptor,
 );
+HttpCode(200)(PlanningPreviewController.prototype, "buildFreeformDocsPlanningPrompt", buildFreeformDocsPlanningPromptDescriptor);
 Body()(PlanningPreviewController.prototype, "buildFreeformDocsPlanningPrompt", 0);
 ApiOperation({ summary: "Build an ACP planning prompt from persisted freeform docs" })(
   PlanningPreviewController.prototype,
@@ -313,6 +365,7 @@ Post("technical-cycle/generate")(
   "generateTechnicalPlanningCycle",
   generateTechnicalPlanningCycleDescriptor,
 );
+HttpCode(200)(PlanningPreviewController.prototype, "generateTechnicalPlanningCycle", generateTechnicalPlanningCycleDescriptor);
 Body()(PlanningPreviewController.prototype, "generateTechnicalPlanningCycle", 0);
 ApiOperation({ summary: "Generate a reviewable technical planning cycle from docs" })(
   PlanningPreviewController.prototype,
@@ -335,6 +388,7 @@ Post("artifact-execution/record")(
   "recordArtifactExecution",
   recordArtifactExecutionDescriptor,
 );
+HttpCode(200)(PlanningPreviewController.prototype, "recordArtifactExecution", recordArtifactExecutionDescriptor);
 Body()(PlanningPreviewController.prototype, "recordArtifactExecution", 0);
 ApiOperation({ summary: "Record a reviewable artifact execution result for a planning prototype" })(
   PlanningPreviewController.prototype,
@@ -352,11 +406,35 @@ ApiOkResponse({ description: "Persisted planning artifact execution record" })(
   recordArtifactExecutionDescriptor,
 );
 
+Post("artifact-execution/run")(
+  PlanningPreviewController.prototype,
+  "runArtifactExecution",
+  runArtifactExecutionDescriptor,
+);
+HttpCode(200)(PlanningPreviewController.prototype, "runArtifactExecution", runArtifactExecutionDescriptor);
+Body()(PlanningPreviewController.prototype, "runArtifactExecution", 0);
+ApiOperation({ summary: "Run a reviewable planning artifact command through the sandbox runner" })(
+  PlanningPreviewController.prototype,
+  "runArtifactExecution",
+  runArtifactExecutionDescriptor,
+);
+ApiBody({ type: PlanningArtifactRunRequestDto })(
+  PlanningPreviewController.prototype,
+  "runArtifactExecution",
+  runArtifactExecutionDescriptor,
+);
+ApiOkResponse({ description: "Persisted planning artifact sandbox execution result" })(
+  PlanningPreviewController.prototype,
+  "runArtifactExecution",
+  runArtifactExecutionDescriptor,
+);
+
 Post("freeform/start")(
   PlanningPreviewController.prototype,
   "startFreeformWork",
   startFreeformWorkDescriptor,
 );
+HttpCode(200)(PlanningPreviewController.prototype, "startFreeformWork", startFreeformWorkDescriptor);
 Body()(PlanningPreviewController.prototype, "startFreeformWork", 0);
 ApiOperation({ summary: "Start cycle planning from a freeform freeform document" })(
   PlanningPreviewController.prototype,
@@ -379,6 +457,7 @@ Post("guided-acp/start")(
   "startGuidedAcpPlanning",
   startGuidedAcpPlanningDescriptor,
 );
+HttpCode(200)(PlanningPreviewController.prototype, "startGuidedAcpPlanning", startGuidedAcpPlanningDescriptor);
 Body()(PlanningPreviewController.prototype, "startGuidedAcpPlanning", 0);
 ApiOperation({ summary: "Start cycle guided ACP planning from selected docs" })(
   PlanningPreviewController.prototype,
@@ -396,11 +475,35 @@ ApiOkResponse({ description: "Guided ACP planning session start" })(
   startGuidedAcpPlanningDescriptor,
 );
 
+Post("guided-acp/session-action")(
+  PlanningPreviewController.prototype,
+  "recordGuidedAcpSessionAction",
+  recordGuidedAcpSessionActionDescriptor,
+);
+HttpCode(200)(PlanningPreviewController.prototype, "recordGuidedAcpSessionAction", recordGuidedAcpSessionActionDescriptor);
+Body()(PlanningPreviewController.prototype, "recordGuidedAcpSessionAction", 0);
+ApiOperation({ summary: "Record a guided ACP session action and return updated traffic" })(
+  PlanningPreviewController.prototype,
+  "recordGuidedAcpSessionAction",
+  recordGuidedAcpSessionActionDescriptor,
+);
+ApiBody({ type: PlanningGuidedAcpSessionActionRequestDto })(
+  PlanningPreviewController.prototype,
+  "recordGuidedAcpSessionAction",
+  recordGuidedAcpSessionActionDescriptor,
+);
+ApiOkResponse({ description: "Guided ACP session action result" })(
+  PlanningPreviewController.prototype,
+  "recordGuidedAcpSessionAction",
+  recordGuidedAcpSessionActionDescriptor,
+);
+
 Post("continuous-update/restart")(
   PlanningPreviewController.prototype,
   "restartPlanningCycleFromUpdates",
   restartPlanningCycleFromUpdatesDescriptor,
 );
+HttpCode(200)(PlanningPreviewController.prototype, "restartPlanningCycleFromUpdates", restartPlanningCycleFromUpdatesDescriptor);
 Body()(PlanningPreviewController.prototype, "restartPlanningCycleFromUpdates", 0);
 ApiOperation({ summary: "Restart cycle planning from continuous document and agent-session updates" })(
   PlanningPreviewController.prototype,

@@ -9,20 +9,28 @@ import {
 import {
   type KnowledgeWorkspaceBacklink,
   KnowledgeWorkspaceBacklinkEntity,
+  type KnowledgeWorkspaceAttachment,
+  KnowledgeWorkspaceAttachmentEntity,
+  type KnowledgeWorkspaceCollaborationState,
+  KnowledgeWorkspaceCollaborationStateEntity,
   type KnowledgeWorkspaceComment,
   KnowledgeWorkspaceCommentEntity,
   type KnowledgeWorkspacePage,
   KnowledgeWorkspacePageEntity,
   type KnowledgeWorkspacePageHistory,
   KnowledgeWorkspacePageHistoryEntity,
+  type KnowledgeWorkspaceSearchEntry,
+  KnowledgeWorkspaceSearchEntryEntity,
 } from "@knowledge-workspace/infrastructure/database/document.entities.ts";
 
 export interface DocumentPublicRow {
   id: string;
   projectId: string;
+  parentId: string | null;
   title: string;
   type: string;
   bodyMd: string;
+  frontmatter: Record<string, unknown>;
   traceId: string;
   createdAt: string | null;
   updatedAt: string | null;
@@ -40,6 +48,31 @@ export interface DocumentCommentPublicRow {
   status: string;
   traceId: string;
   createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface DocumentAttachmentPublicRow {
+  id: string;
+  docId: string;
+  pageId: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  storagePath: string;
+  checksumSha256: string | null;
+  traceId: string;
+  createdAt: string | null;
+}
+
+export interface DocumentCollaborationStatePublicRow {
+  id: string;
+  docId: string;
+  pageId: string;
+  provider: string;
+  stateVector: string | null;
+  documentState: string | null;
+  activeClientIds: string[];
+  traceId: string;
   updatedAt: string | null;
 }
 
@@ -84,7 +117,8 @@ export class DocumentPublicStore {
       },
       order: { createdAt: "ASC", id: "ASC" },
     });
-    return documents.map(toPublicRow);
+    const pagesByDocumentId = await this.pagesByDocumentId(documents.map((document) => document.id));
+    return documents.map((document) => toPublicRow(document, pagesByDocumentId.get(document.id)));
   }
 
   async listTemplates(input: {
@@ -113,6 +147,7 @@ export class DocumentPublicStore {
     title: string;
     docType?: string;
     bodyMd?: string;
+    frontmatter?: Record<string, unknown>;
   }): Promise<DocumentPublicRow | null> {
     if (!input.projectId) return null;
     const project = await this.dataSource.getRepository(FulcrumProjectEntity).findOneBy({ id: input.projectId });
@@ -127,12 +162,20 @@ export class DocumentPublicStore {
       sourceType: input.docType ?? "note",
       traceId: `trace-document-${id}`,
     });
-    return toPublicRow(document);
+    const page = await this.ensurePageForDocument(document.id);
+    if (page && input.frontmatter !== undefined) {
+      page.editorJson = withFrontmatter(page.editorJson, input.frontmatter);
+      await this.pageRepository().save(page);
+    }
+    if (page) await this.upsertSearchEntry(document, page);
+    return toPublicRow(document, page ?? undefined);
   }
 
   async get(input: { id: string }): Promise<DocumentPublicRow | null> {
     const document = await this.documentRepository().findOneBy({ id: input.id });
-    return document ? toPublicRow(document) : null;
+    if (!document) return null;
+    const page = await this.pageForDocument(document.id);
+    return toPublicRow(document, page ?? undefined);
   }
 
   async update(input: {
@@ -140,6 +183,7 @@ export class DocumentPublicStore {
     title?: string;
     docType?: string;
     bodyMd?: string;
+    frontmatter?: Record<string, unknown>;
   }): Promise<DocumentPublicRow | null> {
     const document = await this.documentRepository().findOneBy({ id: input.id });
     if (!document) return null;
@@ -153,18 +197,22 @@ export class DocumentPublicStore {
     if (page) {
       if (input.title !== undefined) page.title = input.title;
       if (input.bodyMd !== undefined) page.bodyMd = input.bodyMd;
+      if (input.frontmatter !== undefined) page.editorJson = withFrontmatter(page.editorJson, input.frontmatter);
       page.traceId = document.traceId;
       await this.pageRepository().save(page);
+      await this.upsertSearchEntry(saved, page);
     }
-    return toPublicRow(saved);
+    return toPublicRow(saved, page ?? undefined);
   }
 
   async delete(input: { id: string }): Promise<DocumentPublicRow | null> {
     const document = await this.documentRepository().findOneBy({ id: input.id });
     if (!document) return null;
+    const page = await this.pageForDocument(document.id);
+    if (page) await this.deleteSearchEntry(page.id);
 
     await this.documentRepository().remove(document);
-    return toPublicRow(document);
+    return toPublicRow(document, page ?? undefined);
   }
 
   async listComments(input: {
@@ -242,6 +290,103 @@ export class DocumentPublicStore {
 
     await this.commentRepository().remove(comment);
     return toCommentPublicRow(comment, page);
+  }
+
+  async listAttachments(input: { docId: string }): Promise<DocumentAttachmentPublicRow[]> {
+    const page = await this.pageForDocument(input.docId);
+    if (!page) return [];
+    const attachments = await this.attachmentRepository().find({
+      where: { pageId: page.id },
+      order: { createdAt: "ASC", id: "ASC" },
+    });
+    return attachments.map((attachment) => toAttachmentPublicRow(attachment, page));
+  }
+
+  async createAttachment(input: {
+    docId: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    storagePath: string;
+    checksumSha256?: string | null;
+    traceId?: string;
+  }): Promise<DocumentAttachmentPublicRow | null> {
+    const page = await this.ensurePageForDocument(input.docId);
+    if (!page) return null;
+    const attachment = await this.attachmentRepository().save({
+      id: randomUUID(),
+      pageId: page.id,
+      fileName: input.fileName,
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes,
+      storagePath: input.storagePath,
+      checksumSha256: input.checksumSha256 ?? null,
+      traceId: input.traceId ?? page.traceId,
+    });
+    return toAttachmentPublicRow(attachment, page);
+  }
+
+  async deleteAttachment(input: { attachmentId: string }): Promise<DocumentAttachmentPublicRow | null> {
+    const attachment = await this.attachmentRepository().findOneBy({ id: input.attachmentId });
+    if (!attachment) return null;
+    const page = await this.pageRepository().findOneBy({ id: attachment.pageId });
+    if (!page) return null;
+
+    await this.attachmentRepository().remove(attachment);
+    return toAttachmentPublicRow(attachment, page);
+  }
+
+  async listCollaborationStates(input: { docId: string }): Promise<DocumentCollaborationStatePublicRow[]> {
+    const page = await this.pageForDocument(input.docId);
+    if (!page) return [];
+    const states = await this.collaborationRepository().find({
+      where: { pageId: page.id },
+      order: { provider: "ASC", id: "ASC" },
+    });
+    return states.map((state) => toCollaborationStatePublicRow(state, page));
+  }
+
+  async upsertCollaborationState(input: {
+    docId: string;
+    provider: string;
+    stateVector?: string | null;
+    documentState?: string | null;
+    activeClientIds?: string[];
+    traceId?: string;
+  }): Promise<DocumentCollaborationStatePublicRow | null> {
+    const page = await this.ensurePageForDocument(input.docId);
+    if (!page) return null;
+    const existing = await this.collaborationRepository().findOneBy({
+      pageId: page.id,
+      provider: input.provider,
+    });
+    const state = await this.collaborationRepository().save({
+      id: existing?.id ?? randomUUID(),
+      pageId: page.id,
+      provider: input.provider,
+      stateVector: input.stateVector ?? existing?.stateVector ?? null,
+      documentState: input.documentState ?? existing?.documentState ?? null,
+      activeClientIds: input.activeClientIds ?? existing?.activeClientIds ?? [],
+      traceId: input.traceId ?? existing?.traceId ?? page.traceId,
+      updatedAt: new Date(),
+    });
+    return toCollaborationStatePublicRow(state, page);
+  }
+
+  async deleteCollaborationState(input: {
+    docId: string;
+    provider: string;
+  }): Promise<DocumentCollaborationStatePublicRow | null> {
+    const page = await this.pageForDocument(input.docId);
+    if (!page) return null;
+    const state = await this.collaborationRepository().findOneBy({
+      pageId: page.id,
+      provider: input.provider,
+    });
+    if (!state) return null;
+
+    await this.collaborationRepository().remove(state);
+    return toCollaborationStatePublicRow(state, page);
   }
 
   async listBacklinks(input: { docId: string }): Promise<DocumentLinkPublicRow[]> {
@@ -429,6 +574,14 @@ export class DocumentPublicStore {
     return this.dataSource.getRepository(KnowledgeWorkspaceCommentEntity);
   }
 
+  private attachmentRepository() {
+    return this.dataSource.getRepository(KnowledgeWorkspaceAttachmentEntity);
+  }
+
+  private collaborationRepository() {
+    return this.dataSource.getRepository(KnowledgeWorkspaceCollaborationStateEntity);
+  }
+
   private backlinkRepository() {
     return this.dataSource.getRepository(KnowledgeWorkspaceBacklinkEntity);
   }
@@ -437,8 +590,18 @@ export class DocumentPublicStore {
     return this.dataSource.getRepository(KnowledgeWorkspacePageHistoryEntity);
   }
 
+  private searchRepository() {
+    return this.dataSource.getRepository(KnowledgeWorkspaceSearchEntryEntity);
+  }
+
   private async pageForDocument(documentId: string): Promise<KnowledgeWorkspacePage | null> {
     return await this.pageRepository().findOneBy({ documentId });
+  }
+
+  private async pagesByDocumentId(documentIds: string[]): Promise<Map<string, KnowledgeWorkspacePage>> {
+    if (documentIds.length === 0) return new Map();
+    const pages = await this.pageRepository().findBy({ documentId: In(documentIds) });
+    return new Map(pages.map((page) => [page.documentId, page]));
   }
 
   private async ensurePageForDocument(documentId: string): Promise<KnowledgeWorkspacePage | null> {
@@ -494,19 +657,57 @@ export class DocumentPublicStore {
       traceId: page.traceId,
     });
   }
+
+  private async upsertSearchEntry(
+    document: FulcrumDocument,
+    page: KnowledgeWorkspacePage,
+  ): Promise<KnowledgeWorkspaceSearchEntry> {
+    const existing = await this.searchRepository().findOneBy({ pageId: page.id });
+    return await this.searchRepository().save({
+      id: existing?.id ?? randomUUID(),
+      pageId: page.id,
+      projectId: document.projectId,
+      sourceKind: "page",
+      title: document.title,
+      searchText: document.bodyMd,
+      excerpt: excerptFrom(document.bodyMd),
+      traceId: document.traceId,
+      updatedAt: new Date(),
+    });
+  }
+
+  private async deleteSearchEntry(pageId: string): Promise<void> {
+    const existing = await this.searchRepository().findOneBy({ pageId });
+    if (existing) await this.searchRepository().remove(existing);
+  }
 }
 
-function toPublicRow(document: FulcrumDocument): DocumentPublicRow {
+function toPublicRow(document: FulcrumDocument, page?: KnowledgeWorkspacePage): DocumentPublicRow {
   return {
     id: document.id,
     projectId: document.projectId,
+    parentId: document.parentId,
     title: document.title,
     type: document.sourceType,
     bodyMd: document.bodyMd,
+    frontmatter: frontmatterFor(document, page),
     traceId: document.traceId,
     createdAt: document.createdAt?.toISOString() ?? null,
     updatedAt: document.updatedAt?.toISOString() ?? null,
   };
+}
+
+function frontmatterFor(document: FulcrumDocument, page?: KnowledgeWorkspacePage): Record<string, unknown> {
+  const raw = page?.editorJson?.["frontmatter"];
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw as Record<string, unknown>;
+  return { title: document.title, kind: document.sourceType };
+}
+
+function withFrontmatter(
+  editorJson: Record<string, unknown>,
+  frontmatter: Record<string, unknown>,
+): Record<string, unknown> {
+  return { ...editorJson, frontmatter };
 }
 
 function toCommentPublicRow(
@@ -526,6 +727,41 @@ function toCommentPublicRow(
     traceId: comment.traceId,
     createdAt: comment.createdAt?.toISOString() ?? null,
     updatedAt: comment.updatedAt?.toISOString() ?? null,
+  };
+}
+
+function toAttachmentPublicRow(
+  attachment: KnowledgeWorkspaceAttachment,
+  page: KnowledgeWorkspacePage,
+): DocumentAttachmentPublicRow {
+  return {
+    id: attachment.id,
+    docId: page.documentId,
+    pageId: attachment.pageId,
+    fileName: attachment.fileName,
+    mimeType: attachment.mimeType,
+    sizeBytes: Number(attachment.sizeBytes),
+    storagePath: attachment.storagePath,
+    checksumSha256: attachment.checksumSha256,
+    traceId: attachment.traceId,
+    createdAt: attachment.createdAt?.toISOString() ?? null,
+  };
+}
+
+function toCollaborationStatePublicRow(
+  state: KnowledgeWorkspaceCollaborationState,
+  page: KnowledgeWorkspacePage,
+): DocumentCollaborationStatePublicRow {
+  return {
+    id: state.id,
+    docId: page.documentId,
+    pageId: state.pageId,
+    provider: state.provider,
+    stateVector: state.stateVector,
+    documentState: state.documentState,
+    activeClientIds: state.activeClientIds,
+    traceId: state.traceId,
+    updatedAt: state.updatedAt?.toISOString() ?? null,
   };
 }
 
@@ -570,4 +806,8 @@ function resolvedStatus(value: boolean | string | undefined): string | undefined
 
 function slugOf(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "doc";
+}
+
+function excerptFrom(value: string): string {
+  return value.replace(/\s+/g, " ").trim().slice(0, 240);
 }

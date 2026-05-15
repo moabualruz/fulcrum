@@ -64,6 +64,24 @@ export function createDocumentApiCaller(options: DocumentApiClientOptions) {
         }),
       deleteComment: async (input: JsonRecord & { id?: string; commentId?: string }) =>
         await request(`/api/v1/docs/comments/${encodeURIComponent(requiredCommentId(input))}`, { method: "DELETE" }),
+      listAttachments: async (input: JsonRecord & { id?: string; docId?: string }) =>
+        await request(`/api/v1/docs/${encodeURIComponent(requiredId(input))}/attachments`, { method: "GET" }),
+      createAttachment: async (input: JsonRecord & { id?: string; docId?: string }) =>
+        await request(`/api/v1/docs/${encodeURIComponent(requiredId(input))}/attachments`, {
+          method: "POST",
+          body: attachmentBody(input),
+        }),
+      deleteAttachment: async (input: JsonRecord & { id?: string; attachmentId?: string }) =>
+        await request(`/api/v1/docs/attachments/${encodeURIComponent(requiredAttachmentId(input))}`, { method: "DELETE" }),
+      listCollaborationStates: async (input: JsonRecord & { id?: string; docId?: string }) =>
+        await request(`/api/v1/docs/${encodeURIComponent(requiredId(input))}/collaboration`, { method: "GET" }),
+      updateCollaborationState: async (input: JsonRecord & { id?: string; docId?: string; provider: string }) =>
+        await request(`/api/v1/docs/${encodeURIComponent(requiredId(input))}/collaboration/${encodeURIComponent(input.provider)}`, {
+          method: "PATCH",
+          body: collaborationStateBody(input),
+        }),
+      deleteCollaborationState: async (input: JsonRecord & { id?: string; docId?: string; provider: string }) =>
+        await request(`/api/v1/docs/${encodeURIComponent(requiredId(input))}/collaboration/${encodeURIComponent(input.provider)}`, { method: "DELETE" }),
       listBacklinks: async (input: JsonRecord & { id?: string; docId?: string }) =>
         await request(`/api/v1/docs/${encodeURIComponent(requiredId(input))}/backlinks`, { method: "GET" }),
       listForwardLinks: async (input: JsonRecord & { id?: string; docId?: string }) =>
@@ -146,6 +164,7 @@ function documentBody(input: JsonRecord): JsonRecord {
     title: input.title,
     type: input.type ?? input.docType ?? input.doc_type,
     bodyMd: input.bodyMd ?? input.body_md,
+    frontmatter: input.frontmatter,
   });
 }
 
@@ -167,6 +186,26 @@ function commentPatchBody(input: JsonRecord): JsonRecord {
   });
 }
 
+function attachmentBody(input: JsonRecord): JsonRecord {
+  return compact({
+    fileName: input.fileName ?? input.file_name,
+    mimeType: input.mimeType ?? input.mime_type,
+    sizeBytes: input.sizeBytes ?? input.size_bytes,
+    storagePath: input.storagePath ?? input.storage_path,
+    checksumSha256: input.checksumSha256 ?? input.checksum_sha256,
+    traceId: input.traceId ?? input.trace_id,
+  });
+}
+
+function collaborationStateBody(input: JsonRecord): JsonRecord {
+  return compact({
+    stateVector: input.stateVector ?? input.state_vector,
+    documentState: input.documentState ?? input.document_state,
+    activeClientIds: input.activeClientIds ?? input.active_client_ids,
+    traceId: input.traceId ?? input.trace_id,
+  });
+}
+
 function linkBody(input: JsonRecord): JsonRecord {
   return compact({
     sourceDocId: input.sourceDocId ?? input.source_doc_id,
@@ -185,6 +224,12 @@ function requiredId(input: JsonRecord & { id?: string; docId?: string }): string
 function requiredCommentId(input: JsonRecord & { id?: string; commentId?: string }): string {
   const id = input.commentId ?? input.id;
   if (!id) throw new Error("Comment id is required.");
+  return id;
+}
+
+function requiredAttachmentId(input: JsonRecord & { id?: string; attachmentId?: string }): string {
+  const id = input.attachmentId ?? input.id;
+  if (!id) throw new Error("Attachment id is required.");
   return id;
 }
 

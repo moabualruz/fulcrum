@@ -160,8 +160,40 @@ export async function createTestOrm(
     };
   }
   if (!em.getMetadata) {
-    (em as any).getMetadata = () => ds.entityMetadatas;
+    (em as any).getMetadata = () => {
+      const metas = ds.entityMetadatas;
+      return Object.assign(metas, {
+        get: (entity: Function | string) => {
+          const name = typeof entity === "string" ? entity : entity.name;
+          return metas.find((m) => m.name === name || m.target === entity);
+        },
+      });
+    };
   }
+  // MikroORM em.nativeDelete(Entity, criteria) → TypeORM em.delete(Entity, criteria)
+  if (!em.nativeDelete) {
+    (em as any).nativeDelete = async (entity: Function, criteria: unknown) => {
+      if (criteria && typeof criteria === "object" && Object.keys(criteria as object).length === 0) {
+        // Empty criteria → delete all rows
+        await ds.getRepository(entity).clear();
+      } else {
+        await ds.getRepository(entity).delete(criteria as any);
+      }
+    };
+  }
+
+  // MikroORM em.findOneOrFail(Entity, criteria, opts) → TypeORM em.findOneOrFail(Entity, { where })
+  const origFindOneOrFail = em.findOneOrFail?.bind(em);
+  if (origFindOneOrFail) {
+    (em as any).findOneOrFail = async (entity: Function, criteria: any, opts?: any) => {
+      // MikroORM: findOneOrFail(Entity, { id: "x" }) vs TypeORM: findOneOrFail(Entity, { where: { id: "x" } })
+      const where = criteria && typeof criteria === "object" && !("where" in criteria)
+        ? { where: criteria }
+        : criteria;
+      return origFindOneOrFail(entity as any, where);
+    };
+  }
+
   // MikroORM em.create(Entity, data) → TypeORM repo.create(data) — returns unsaved instance
   const origCreate = em.create.bind(em);
   (em as any).create = function mikroCreate(...args: unknown[]) {
@@ -181,7 +213,10 @@ export async function createTestOrm(
     // MikroORM compat shims
     orm: { em: em as EntityManager },
     pglite: {
-      query: (sql: string, params?: unknown[]) => ds.query(sql, params),
+      query: async (sql: string, params?: unknown[]) => {
+        const rows = await ds.query(sql, params);
+        return { rows };
+      },
     },
   };
 }

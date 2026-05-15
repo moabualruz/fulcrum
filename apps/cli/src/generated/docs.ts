@@ -131,6 +131,156 @@ export function createDocsCommand(): Command {
     }
   });
 
+  const attachmentsCommand = command.command("attachments");
+  attachmentsCommand.description("Generated docs attachment commands.");
+
+  const attachmentsCreateCommand = attachmentsCommand.command("create");
+  attachmentsCreateCommand.description("docs attachments create");
+  attachmentsCreateCommand.option("--json", "Emit JSON output");
+  attachmentsCreateCommand.option("--doc-id <string>", "doc id");
+  attachmentsCreateCommand.option("--file-name <string>", "file name");
+  attachmentsCreateCommand.option("--mime-type <string>", "MIME type");
+  attachmentsCreateCommand.option("--size-bytes <number>", "size in bytes", Number.parseFloat);
+  attachmentsCreateCommand.option("--storage-path <string>", "storage path");
+  attachmentsCreateCommand.option("--checksum-sha256 <string>", "SHA-256 checksum");
+  attachmentsCreateCommand.option("--trace-id <string>", "trace id");
+  attachmentsCreateCommand.action(async (options) => {
+    try {
+      const result = await documentClient().createAttachment(compact({
+        docId: requiredOption(options, "docId"),
+        fileName: requiredOption(options, "fileName"),
+        mimeType: requiredOption(options, "mimeType"),
+        sizeBytes: requiredNumberOption(options, "sizeBytes"),
+        storagePath: requiredOption(options, "storagePath"),
+        checksumSha256: options.checksumSha256,
+        traceId: options.traceId,
+      }));
+      printGeneratedResult(result, options);
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const attachmentsListCommand = attachmentsCommand.command("list");
+  attachmentsListCommand.description("docs attachments list");
+  attachmentsListCommand.option("--json", "Emit JSON output");
+  attachmentsListCommand.option("--doc-id <string>", "doc id");
+  attachmentsListCommand.action(async (options) => {
+    try {
+      const result = await documentClient().listAttachments({ docId: requiredOption(options, "docId") });
+      printGeneratedResult(result, options);
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const attachmentsDeleteCommand = attachmentsCommand.command("delete");
+  attachmentsDeleteCommand.description("docs attachments delete");
+  attachmentsDeleteCommand.option("--json", "Emit JSON output");
+  attachmentsDeleteCommand.option("--attachment-id <string>", "attachment id");
+  attachmentsDeleteCommand.action(async (options) => {
+    try {
+      const result = await documentClient().deleteAttachment({ attachmentId: requiredOption(options, "attachmentId") });
+      printGeneratedResult(result ?? { ok: true }, options);
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const collaborationCommand = command.command("collaboration");
+  collaborationCommand.description("Generated docs collaboration commands.");
+
+  const collaborationListCommand = collaborationCommand.command("list");
+  collaborationListCommand.description("docs collaboration list");
+  collaborationListCommand.option("--json", "Emit JSON output");
+  collaborationListCommand.option("--doc-id <string>", "doc id");
+  collaborationListCommand.action(async (options) => {
+    try {
+      const result = await documentClient().listCollaborationStates({ docId: requiredOption(options, "docId") });
+      printGeneratedResult(result, options);
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const collaborationUpdateCommand = collaborationCommand.command("update");
+  collaborationUpdateCommand.description("docs collaboration update");
+  collaborationUpdateCommand.option("--json", "Emit JSON output");
+  collaborationUpdateCommand.option("--doc-id <string>", "doc id");
+  collaborationUpdateCommand.option("--provider <string>", "provider");
+  collaborationUpdateCommand.option("--state-vector <string>", "state vector");
+  collaborationUpdateCommand.option("--document-state <string>", "document state");
+  collaborationUpdateCommand.option("--active-client-ids-json <json>", "active client IDs JSON array");
+  collaborationUpdateCommand.option("--trace-id <string>", "trace id");
+  collaborationUpdateCommand.action(async (options) => {
+    try {
+      const result = await documentClient().updateCollaborationState(compact({
+        docId: requiredOption(options, "docId"),
+        provider: requiredOption(options, "provider"),
+        stateVector: options.stateVector,
+        documentState: options.documentState,
+        activeClientIds: jsonArrayOption(options, "activeClientIdsJson"),
+        traceId: options.traceId,
+      }) as Record<string, unknown> & { provider: string });
+      printGeneratedResult(result, options);
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const collaborationDeleteCommand = collaborationCommand.command("delete");
+  collaborationDeleteCommand.description("docs collaboration delete");
+  collaborationDeleteCommand.option("--json", "Emit JSON output");
+  collaborationDeleteCommand.option("--doc-id <string>", "doc id");
+  collaborationDeleteCommand.option("--provider <string>", "provider");
+  collaborationDeleteCommand.action(async (options) => {
+    try {
+      const result = await documentClient().deleteCollaborationState({
+        docId: requiredOption(options, "docId"),
+        provider: requiredOption(options, "provider"),
+      });
+      printGeneratedResult(result ?? { ok: true }, options);
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   const createCommand = command.command("create");
   createCommand.description("docs create");
   createCommand.option("--json", "Emit JSON output");
@@ -469,6 +619,16 @@ function jsonObjectOption(options: Record<string, unknown>, key: string): Record
     throw new Error(`${key} must be a JSON object.`);
   }
   return parsed as Record<string, unknown>;
+}
+
+function jsonArrayOption(options: Record<string, unknown>, key: string): unknown[] | undefined {
+  const value = options[key];
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  const parsed = JSON.parse(value) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error(`${key} must be a JSON array.`);
+  }
+  return parsed;
 }
 
 function requiredOption(options: Record<string, unknown>, key: string): string {

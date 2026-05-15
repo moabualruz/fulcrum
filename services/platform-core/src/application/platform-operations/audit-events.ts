@@ -325,8 +325,7 @@ export async function mkOrmEventSink(
         subjectId: event.subjectId,
         payload: event.payload,
       });
-      em.persist(entity);
-      await em.flush();
+      await em.save(entity);
     },
   };
 }

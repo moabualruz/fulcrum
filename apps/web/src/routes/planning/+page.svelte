@@ -27,7 +27,7 @@
 
   type ActionForm = {
     ok?: boolean;
-    mode?: "preview" | "materialize" | "freeformPrompt" | "freeformStart" | "guidedAcpStart" | "continuousUpdate" | "generate" | "workflowCycle";
+    mode?: "preview" | "materialize" | "freeformPrompt" | "freeformStart" | "guidedAcpStart" | "guidedAcpSessionAction" | "continuousUpdate" | "generate" | "artifactExecution" | "workflowCycle";
     error?: string;
     preview?: Breakdown;
     materialized?: { breakdown?: Breakdown; materialization?: { docs?: Array<{ id: string }>; tasks?: Array<{ id: string }> } };
@@ -45,6 +45,8 @@
       status?: string;
       session?: {
         acpSessionId?: string;
+        projectId?: string;
+        traceId?: string;
         agentName?: string;
         cwd?: string;
         modeId?: string;
@@ -55,6 +57,26 @@
       traffic?: { entries?: Array<{ method?: string }> };
       context?: PlanningContextPayload;
       prompt?: string;
+    };
+    guidedAcpSessionAction?: {
+      status?: string;
+      session?: {
+        acpSessionId?: string;
+        projectId?: string | null;
+        traceId?: string;
+        agentName?: string;
+        modeId?: string;
+        modelId?: string;
+        sessionStatus?: string;
+      };
+      action?: {
+        type?: string;
+        method?: string;
+        optionId?: string;
+        modeId?: string;
+        modelId?: string;
+      };
+      traffic?: { entries?: Array<{ method?: string }> };
     };
     continuousUpdate?: {
       status?: string;
@@ -93,6 +115,31 @@
       }>;
       breakdown?: Breakdown;
     };
+    artifactExecution?: {
+      planId?: string;
+      artifactPath?: string;
+      status?: string;
+      prototypeStatus?: string;
+      traceId?: string;
+      command?: string;
+      args?: string[];
+      summary?: string;
+      outputRef?: string;
+      executedAt?: string;
+      runner?: string;
+      runId?: string | null;
+      exitCode?: number | null;
+      durationMs?: number;
+      history?: Array<{
+        status?: string;
+        prototypeStatus?: string;
+        command?: string;
+        args?: string[];
+        summary?: string;
+        outputRef?: string;
+        executedAt?: string;
+      }>;
+    };
     workflowCycle?: {
       traceId?: string;
       finalQa?: { status?: string };
@@ -115,8 +162,10 @@
   let freeformStart = $derived(form?.freeformStart ?? null);
   let freeformPrompt = $derived(form?.freeformPrompt ?? null);
   let guidedAcpStart = $derived(form?.guidedAcpStart ?? null);
+  let guidedAcpSessionAction = $derived(form?.guidedAcpSessionAction ?? null);
   let continuousUpdate = $derived(form?.continuousUpdate ?? null);
   let technicalPlanning = $derived(form?.technicalPlanning ?? null);
+  let artifactExecution = $derived(form?.artifactExecution ?? null);
   let workflowCycle = $derived(form?.workflowCycle ?? null);
   let contextSources = $derived(freeformStart?.context ?? freeformPrompt?.context ?? guidedAcpStart?.context ?? continuousUpdate?.context ?? null);
   const defaultWorkflowCycleJson = JSON.stringify({
@@ -710,12 +759,81 @@
                   {/each}
                 </ul>
               {/if}
+              <form method="POST" action="?/runArtifactExecution" class="flex flex-wrap items-center gap-2 pt-1" data-planning-artifact-run-form>
+                <input type="hidden" name="artifactPlanId" value={technicalPlanning.plan?.planId ?? ""} />
+                <input type="hidden" name="artifactPath" value={preview.path ?? ""} />
+                <input type="hidden" name="artifactTraceId" value={technicalPlanning.plan?.traceId ?? preview.traceId ?? ""} />
+                <input type="hidden" name="artifactCommand" value={preview.run?.command ?? ""} />
+                <input type="hidden" name="artifactArgs" value={JSON.stringify(preview.run?.args ?? [])} />
+                <input type="hidden" name="artifactUrlPath" value={preview.urlPath ?? ""} />
+                <input type="hidden" name="artifactChecks" value={JSON.stringify(preview.reviewChecks ?? [])} />
+                <button
+                  type="submit"
+                  class="rounded-md border border-border px-3 py-1 text-xs font-medium text-foreground"
+                  disabled={!technicalPlanning.plan?.planId || !preview.path || !preview.run?.command}
+                >Run</button>
+              </form>
             </article>
           {/each}
         </section>
       {/if}
       {#if technicalPlanning.reviewPrompt}
         <pre class="overflow-auto rounded-md border border-border bg-background p-3 text-sm text-foreground">{technicalPlanning.reviewPrompt}</pre>
+      {/if}
+    </section>
+  {/if}
+
+  {#if artifactExecution}
+    <section class="grid gap-3 border-t border-border pt-4" data-planning-artifact-execution>
+      <h2 class="text-lg font-semibold text-foreground">Artifact execution</h2>
+      <div class="grid gap-1 text-sm text-foreground">
+        {#if artifactExecution.artifactPath}
+          <div data-planning-artifact-execution-path>{artifactExecution.artifactPath}</div>
+        {/if}
+        {#if artifactExecution.status}
+          <div data-planning-artifact-execution-status>{artifactExecution.status}</div>
+        {/if}
+        {#if artifactExecution.prototypeStatus}
+          <div>{artifactExecution.prototypeStatus}</div>
+        {/if}
+        {#if artifactExecution.runner}
+          <div>{artifactExecution.runner}</div>
+        {/if}
+        {#if artifactExecution.runId}
+          <div>{artifactExecution.runId}</div>
+        {/if}
+        {#if artifactExecution.exitCode !== undefined && artifactExecution.exitCode !== null}
+          <div>exit {artifactExecution.exitCode}</div>
+        {/if}
+        {#if artifactExecution.summary}
+          <div>{artifactExecution.summary}</div>
+        {/if}
+        {#if artifactExecution.outputRef}
+          <div>{artifactExecution.outputRef}</div>
+        {/if}
+      </div>
+      {#if artifactExecution.history?.length}
+        <section class="grid gap-2 text-sm text-foreground" data-planning-artifact-execution-history>
+          <h3 class="text-sm font-semibold uppercase tracking-normal text-muted-foreground">Execution history</h3>
+          {#each artifactExecution.history as item}
+            <article class="grid gap-1 rounded-md border border-border p-3" data-planning-artifact-execution-history-item>
+              <div class="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                {#if item.status}<span>{item.status}</span>{/if}
+                {#if item.prototypeStatus}<span>{item.prototypeStatus}</span>{/if}
+                {#if item.executedAt}<span>{item.executedAt}</span>{/if}
+              </div>
+              {#if item.command}
+                <div class="text-xs text-muted-foreground">{item.command} {item.args?.join(" ")}</div>
+              {/if}
+              {#if item.summary}
+                <div>{item.summary}</div>
+              {/if}
+              {#if item.outputRef}
+                <div class="text-xs text-muted-foreground">{item.outputRef}</div>
+              {/if}
+            </article>
+          {/each}
+        </section>
       {/if}
     </section>
   {/if}
@@ -806,7 +924,89 @@
           {/each}
         </div>
       {/if}
+      {#if guidedAcpStart.session?.acpSessionId}
+        <div class="flex flex-wrap gap-2" data-guided-acp-session-actions>
+          <form method="POST">
+            <input type="hidden" name="acpSessionId" value={guidedAcpStart.session.acpSessionId} />
+            <input type="hidden" name="projectId" value={guidedAcpStart.session.projectId ?? ""} />
+            <input type="hidden" name="traceId" value={guidedAcpStart.session.traceId ?? ""} />
+            <input type="hidden" name="acpSessionAction" value="resume_session" />
+            <button class="inline-flex h-9 items-center rounded-md border border-input px-3 text-sm font-medium text-foreground" type="submit" formaction="?/guidedAcpSessionAction">
+              Resume
+            </button>
+          </form>
+          <form method="POST">
+            <input type="hidden" name="acpSessionId" value={guidedAcpStart.session.acpSessionId} />
+            <input type="hidden" name="projectId" value={guidedAcpStart.session.projectId ?? ""} />
+            <input type="hidden" name="traceId" value={guidedAcpStart.session.traceId ?? ""} />
+            <input type="hidden" name="acpSessionAction" value="cancel_operation" />
+            <button class="inline-flex h-9 items-center rounded-md border border-input px-3 text-sm font-medium text-foreground" type="submit" formaction="?/guidedAcpSessionAction">
+              Cancel
+            </button>
+          </form>
+          <form method="POST" class="flex flex-wrap gap-2">
+            <input type="hidden" name="acpSessionId" value={guidedAcpStart.session.acpSessionId} />
+            <input type="hidden" name="projectId" value={guidedAcpStart.session.projectId ?? ""} />
+            <input type="hidden" name="traceId" value={guidedAcpStart.session.traceId ?? ""} />
+            <input type="hidden" name="acpSessionAction" value="set_mode" />
+            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm" name="modeId" value={guidedAcpStart.session.modeId ?? "planning"} />
+            <button class="inline-flex h-9 items-center rounded-md border border-input px-3 text-sm font-medium text-foreground" type="submit" formaction="?/guidedAcpSessionAction">
+              Set Mode
+            </button>
+          </form>
+          <form method="POST" class="flex flex-wrap gap-2">
+            <input type="hidden" name="acpSessionId" value={guidedAcpStart.session.acpSessionId} />
+            <input type="hidden" name="projectId" value={guidedAcpStart.session.projectId ?? ""} />
+            <input type="hidden" name="traceId" value={guidedAcpStart.session.traceId ?? ""} />
+            <input type="hidden" name="acpSessionAction" value="set_model" />
+            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm" name="modelId" value={guidedAcpStart.session.modelId ?? ""} />
+            <button class="inline-flex h-9 items-center rounded-md border border-input px-3 text-sm font-medium text-foreground" type="submit" formaction="?/guidedAcpSessionAction">
+              Set Model
+            </button>
+          </form>
+          {#each guidedAcpStart.permissionOptions ?? [] as option}
+            <form method="POST">
+              <input type="hidden" name="acpSessionId" value={guidedAcpStart.session.acpSessionId} />
+              <input type="hidden" name="projectId" value={guidedAcpStart.session.projectId ?? ""} />
+              <input type="hidden" name="traceId" value={guidedAcpStart.session.traceId ?? ""} />
+              <input type="hidden" name="acpSessionAction" value="resolve_permission" />
+              <input type="hidden" name="acpPermissionOptionId" value={option.optionId ?? ""} />
+              <button class="inline-flex h-9 items-center rounded-md border border-input px-3 text-sm font-medium text-foreground" type="submit" formaction="?/guidedAcpSessionAction">
+                {option.name ?? option.optionId}
+              </button>
+            </form>
+          {/each}
+          <form method="POST">
+            <input type="hidden" name="acpSessionId" value={guidedAcpStart.session.acpSessionId} />
+            <input type="hidden" name="projectId" value={guidedAcpStart.session.projectId ?? ""} />
+            <input type="hidden" name="traceId" value={guidedAcpStart.session.traceId ?? ""} />
+            <input type="hidden" name="acpSessionAction" value="cancel_permission" />
+            <button class="inline-flex h-9 items-center rounded-md border border-input px-3 text-sm font-medium text-foreground" type="submit" formaction="?/guidedAcpSessionAction">
+              Cancel Permission
+            </button>
+          </form>
+        </div>
+      {/if}
       <pre class="overflow-auto rounded-md border border-border bg-background p-3 text-sm text-foreground">{guidedAcpStart.prompt}</pre>
+    </section>
+  {/if}
+
+  {#if guidedAcpSessionAction}
+    <section class="grid gap-3 border-t border-border pt-4" data-guided-acp-session-action>
+      <h2 class="text-lg font-semibold text-foreground">Guided ACP action</h2>
+      <div class="grid gap-1 text-sm text-foreground">
+        <div>{guidedAcpSessionAction.status}</div>
+        <div>{guidedAcpSessionAction.session?.acpSessionId}</div>
+        <div>{guidedAcpSessionAction.session?.sessionStatus}</div>
+        <div>{guidedAcpSessionAction.action?.method}</div>
+      </div>
+      {#if guidedAcpSessionAction.traffic?.entries?.length}
+        <div class="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          {#each guidedAcpSessionAction.traffic.entries as entry}
+            <span>{entry.method}</span>
+          {/each}
+        </div>
+      {/if}
     </section>
   {/if}
 

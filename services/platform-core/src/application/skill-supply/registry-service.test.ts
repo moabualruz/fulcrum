@@ -14,7 +14,7 @@ let testDb: TestOrm;
 
 beforeEach(async () => {
   testDb = await createTestOrm();
-  __setRegistryServiceOrmForTest(testDb.orm);
+  __setRegistryServiceOrmForTest(testDb.ds);
 });
 
 afterEach(async () => {
@@ -24,8 +24,8 @@ afterEach(async () => {
 
 describe("SkillRegistryService", () => {
   it("lists skills from the real registry table ordered by slug and scoped to one org", async () => {
-    const em = testDb.orm.em;
-    const defaultOrg = await em.findOneOrFail(Org, { id: testDb.seed.orgId });
+    const em = testDb.em;
+    const defaultOrg = await em.findOneOrFail(Org, { where: { id: testDb.seed.orgId } });
     const otherOrg = em.create(Org, {
       id: "11111111-1111-4111-8111-111111111111",
       name: "Other org",
@@ -33,39 +33,40 @@ describe("SkillRegistryService", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-    em.persist(otherOrg);
+    await em.save(otherOrg);
 
-    em.create(FulcrumSkill, {
-      org: defaultOrg,
-      name: "Zulu Local",
-      slug: "zulu",
-      source: SkillSource.Local,
-      enabledAgents: ["codex", "claude"],
-    });
-    em.create(FulcrumSkill, {
-      org: defaultOrg,
-      name: "Alpha Upstream",
-      slug: "alpha",
-      source: SkillSource.Upstream,
-      upstreamRepo: "owner/repo",
-      upstreamRef: "main",
-      enabledAgents: ["opencode"],
-    });
-    em.create(FulcrumSkill, {
-      org: defaultOrg,
-      name: "Package Skill",
-      slug: "package-skill",
-      source: SkillSource.Package,
-      enabledAgents: ["gemini"],
-    });
-    em.create(FulcrumSkill, {
-      org: otherOrg,
-      name: "Hidden Other Org",
-      slug: "hidden",
-      source: SkillSource.Upstream,
-      enabledAgents: ["codex"],
-    });
-    /* flushed */
+    await em.save([
+      em.create(FulcrumSkill, {
+        org: defaultOrg,
+        name: "Zulu Local",
+        slug: "zulu",
+        source: SkillSource.Local,
+        enabledAgents: ["codex", "claude"],
+      }),
+      em.create(FulcrumSkill, {
+        org: defaultOrg,
+        name: "Alpha Upstream",
+        slug: "alpha",
+        source: SkillSource.Upstream,
+        upstreamRepo: "owner/repo",
+        upstreamRef: "main",
+        enabledAgents: ["opencode"],
+      }),
+      em.create(FulcrumSkill, {
+        org: defaultOrg,
+        name: "Package Skill",
+        slug: "package-skill",
+        source: SkillSource.Package,
+        enabledAgents: ["gemini"],
+      }),
+      em.create(FulcrumSkill, {
+        org: otherOrg,
+        name: "Hidden Other Org",
+        slug: "hidden",
+        source: SkillSource.Upstream,
+        enabledAgents: ["codex"],
+      }),
+    ]);
 
     const entries = await SkillRegistryService.list(testDb.seed.orgId);
 

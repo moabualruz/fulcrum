@@ -43,7 +43,7 @@ beforeEach(async () => {
   process.env["HOME"] = scratch;
   process.env["FULCRUM_HOME"] = join(scratch, ".fulcrum");
   testDb = await createTestOrm();
-  __setSkillsLoaderOrmForTest(testDb.orm);
+  __setSkillsLoaderOrmForTest(testDb.ds);
 });
 
 afterEach(async () => {
@@ -95,7 +95,7 @@ async function pathExists(path: string): Promise<boolean> {
 }
 
 async function latestVersion(slug: string): Promise<SkillVersion | null> {
-  const em = testDb.orm.em;
+  const em = testDb.em;
   const skill = await em.findOne(
     FulcrumSkill,
     { org: testDb.seed.orgId, slug },
@@ -176,7 +176,7 @@ describe("installSkill", () => {
 
     await expect(installSkill(skillPath, testDb.seed.orgId)).rejects.toThrow();
 
-    const em = testDb.orm.em;
+    const em = testDb.em;
     const skill = await em.findOneOrFail(FulcrumSkill, {
       org: testDb.seed.orgId,
       slug: "copy-fail",
@@ -189,7 +189,7 @@ describe("installSkill", () => {
   });
 
   it("updates existing skill source to local on install", async () => {
-    const em = testDb.orm.em;
+    const em = testDb.em;
     em.create(FulcrumSkill, {
       org: em.getReference(Org, testDb.seed.orgId),
       name: "source",
@@ -207,7 +207,7 @@ describe("installSkill", () => {
 
     await installSkill(skillPath, testDb.seed.orgId);
 
-    const reloaded = await testDb.orm.em.findOneOrFail(FulcrumSkill, {
+    const reloaded = await testDb.em.findOneOrFail(FulcrumSkill, {
       org: testDb.seed.orgId,
       slug: "source",
     });
@@ -226,7 +226,7 @@ describe("installSkill", () => {
       /valid skill slug/i,
     );
 
-    const em = testDb.orm.em;
+    const em = testDb.em;
     expect(await em.count(FulcrumSkill, { org: testDb.seed.orgId })).toBe(0);
   });
 
@@ -353,7 +353,7 @@ describe("installSkill", () => {
 
     await expect(installSkill(skillPath, testDb.seed.orgId)).rejects.toThrow();
 
-    const em = testDb.orm.em;
+    const em = testDb.em;
     expect(await em.count(FulcrumSkill, { org: testDb.seed.orgId })).toBe(0);
   });
 

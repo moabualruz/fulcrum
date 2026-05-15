@@ -384,6 +384,46 @@ describe("/planning +page.server.ts", () => {
     });
   });
 
+  test("guidedAcpSessionAction action records session controls through planning public workflow API", async () => {
+    const route = await import(`./+page.server.ts?cachebust=${Date.now() + 52}`);
+    const response = {
+      status: "session_action_recorded",
+      session: {
+        acpSessionId: "acp-guided-web",
+        projectId: "99999999-9999-4999-8999-999999999999",
+        traceId: "trace_guided_acp",
+        agentName: "codex",
+        modeId: "review",
+        modelId: "gpt-5.5",
+        sessionStatus: "selector_updated",
+      },
+      action: { type: "set_mode", method: "session/set_mode", modeId: "review" },
+      traffic: { entries: [{ method: "session/new" }, { method: "session/set_mode" }] },
+    };
+    const fetchFn = mock(async () => jsonResponse(response));
+    const fd = new FormData();
+    fd.set("acpSessionId", "acp-guided-web");
+    fd.set("projectId", "99999999-9999-4999-8999-999999999999");
+    fd.set("traceId", "trace_guided_acp");
+    fd.set("acpSessionAction", "set_mode");
+    fd.set("modeId", "review");
+
+    const result = await route.actions.guidedAcpSessionAction(event(fetchFn as unknown as typeof fetch, fd) as never);
+
+    expect(result).toMatchObject({ ok: true, mode: "guidedAcpSessionAction", guidedAcpSessionAction: response });
+    expect(fetchFn).toHaveBeenCalledWith(
+      "http://localhost/workflows/planning/guided-acp/session-action",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(jsonBody(fetchFn.mock.calls[0]?.[1])).toEqual({
+      acpSessionId: "acp-guided-web",
+      action: "set_mode",
+      projectId: "99999999-9999-4999-8999-999999999999",
+      traceId: "trace_guided_acp",
+      modeId: "review",
+    });
+  });
+
   test("continuousUpdate action restarts the cycle from edited freeform docs through planning public workflow API", async () => {
     const route = await import(`./+page.server.ts?cachebust=${Date.now() + 6}`);
     const response = {
@@ -522,6 +562,60 @@ describe("/planning +page.server.ts", () => {
       prototypePaths: ["apps/web/src/routes/planning/workbench-prototype.tsx"],
       boilerplatePaths: ["services/planning-review/src/application/technical-planning-cycle.ts"],
       successCriteria: ["Prototype and boilerplate artifacts are visible before approval."],
+    });
+  });
+
+  test("runArtifactExecution action delegates artifact runs through planning public workflow API", async () => {
+    const route = await import(`./+page.server.ts?cachebust=${Date.now() + 17}`);
+    const response = {
+      planId: "technical-plan-web",
+      artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+      status: "passed",
+      prototypeStatus: "validated",
+      traceId: "trace_technical_web",
+      command: "bun",
+      args: ["-e", 'await import("./apps/web/src/routes/planning/workbench-prototype.tsx")'],
+      runner: "sandbox-agent",
+      runId: "artifact-run-web",
+      exitCode: 0,
+      durationMs: 25,
+      summary: "Artifact command completed in the sandbox runner.",
+      outputRef: "/tmp/fulcrum-agent-run/transcripts/artifact-run.jsonl",
+      history: [{
+        status: "passed",
+        prototypeStatus: "validated",
+        command: "bun",
+        args: ["-e", 'await import("./apps/web/src/routes/planning/workbench-prototype.tsx")'],
+        summary: "Artifact command completed in the sandbox runner.",
+        outputRef: "/tmp/fulcrum-agent-run/transcripts/artifact-run.jsonl",
+        executedAt: "2026-05-15T12:00:00.000Z",
+      }],
+    };
+    const fetchFn = mock(async () => jsonResponse(response));
+    const fd = new FormData();
+    fd.set("artifactPlanId", "technical-plan-web");
+    fd.set("artifactPath", "apps/web/src/routes/planning/workbench-prototype.tsx");
+    fd.set("artifactTraceId", "trace_technical_web");
+    fd.set("artifactCommand", "bun");
+    fd.set("artifactArgs", JSON.stringify(["-e", 'await import("./apps/web/src/routes/planning/workbench-prototype.tsx")']));
+    fd.set("artifactChecks", JSON.stringify(["Prototype demonstrates the intended user flow before task materialization."]));
+    fd.set("artifactTimeoutMs", "30000");
+
+    const result = await route.actions.runArtifactExecution(event(fetchFn as unknown as typeof fetch, fd) as never);
+
+    expect(result).toEqual({ ok: true, mode: "artifactExecution", artifactExecution: response });
+    expect(fetchFn).toHaveBeenCalledWith(
+      "http://localhost/workflows/planning/artifact-execution/run",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(jsonBody(fetchFn.mock.calls[0]?.[1])).toEqual({
+      planId: "technical-plan-web",
+      artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+      traceId: "trace_technical_web",
+      command: "bun",
+      args: ["-e", 'await import("./apps/web/src/routes/planning/workbench-prototype.tsx")'],
+      checks: ["Prototype demonstrates the intended user flow before task materialization."],
+      timeoutMs: 30000,
     });
   });
 

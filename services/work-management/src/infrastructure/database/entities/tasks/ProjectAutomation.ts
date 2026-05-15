@@ -15,7 +15,7 @@ export class ProjectAutomation {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @ManyToOne(() => Org, { onDelete: "CASCADE" })
+  @ManyToOne(() => Org, { onDelete: "CASCADE", eager: true })
   @JoinColumn({ name: "org_id" })
   org!: Org;
 

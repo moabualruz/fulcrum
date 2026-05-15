@@ -35,10 +35,16 @@ export function createWorkflowApiCaller(options: WorkflowApiClientOptions) {
         await request("/workflows/planning/approved-plan/preview", { method: "POST", body: input }),
       materializeApprovedPlanBreakdown: async (input: JsonRecord) =>
         await request("/workflows/planning/approved-plan/materialize", { method: "POST", body: input }),
+      recordArtifactExecution: async (input: JsonRecord) =>
+        await request("/workflows/planning/artifact-execution/record", { method: "POST", body: input }),
+      runArtifactExecution: async (input: JsonRecord) =>
+        await request("/workflows/planning/artifact-execution/run", { method: "POST", body: input }),
       startFreeformWorkFromDocs: async (input: JsonRecord) =>
         await request("/workflows/planning/freeform/start", { method: "POST", body: input }),
       startGuidedAcpPlanningSession: async (input: JsonRecord) =>
         await request("/workflows/planning/guided-acp/start", { method: "POST", body: input }),
+      recordGuidedAcpSessionAction: async (input: JsonRecord) =>
+        await request("/workflows/planning/guided-acp/session-action", { method: "POST", body: input }),
       restartPlanningCycleFromUpdates: async (input: JsonRecord) =>
         await request("/workflows/planning/continuous-update/restart", { method: "POST", body: input }),
     },

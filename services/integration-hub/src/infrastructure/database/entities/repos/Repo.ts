@@ -21,7 +21,7 @@ export class Repo {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @ManyToOne(() => Org)
+  @ManyToOne(() => Org, { eager: true })
   @JoinColumn({ name: "org_id" })
   org!: Org;
 

@@ -41,8 +41,8 @@ beforeEach(async () => {
   process.env["HOME"] = scratch;
   process.env["FULCRUM_HOME"] = join(scratch, ".fulcrum");
   testDb = await createTestOrm();
-  __setSkillsLoaderOrmForTest(testDb.orm);
-  __setSkillsUpstreamSyncOrmForTest(testDb.orm);
+  __setSkillsLoaderOrmForTest(testDb.ds);
+  __setSkillsUpstreamSyncOrmForTest(testDb.ds);
 });
 
 afterEach(async () => {
@@ -112,7 +112,7 @@ async function createUpstreamRepoWithPath(
 }
 
 async function markUpstream(slug: string, upstreamRepo: string): Promise<void> {
-  const em = testDb.orm.em;
+  const em = testDb.em;
   const skill = await em.findOneOrFail(FulcrumSkill, {
     org: testDb.seed.orgId,
     slug,
@@ -123,7 +123,7 @@ async function markUpstream(slug: string, upstreamRepo: string): Promise<void> {
 }
 
 async function latestHashVerified(slug: string): Promise<string | null | undefined> {
-  const em = testDb.orm.em;
+  const em = testDb.em;
   const skill = await em.findOne(
     FulcrumSkill,
     { org: testDb.seed.orgId, slug },
@@ -203,7 +203,7 @@ describe("syncUpstream", () => {
     expect(lock["upstream-conflict"]?.upstream_conflict).toContain("Upstream edit.");
     expect(lock["upstream-conflict"]?.upstream_conflict).toContain("Local edit.");
 
-    const em = testDb.orm.em;
+    const em = testDb.em;
     const conflict = await em.findOneOrFail(SkillConflict, {
       slug: "upstream-conflict",
       kind: SkillConflictKind.UpstreamConflict,
@@ -243,7 +243,7 @@ describe("syncUpstream", () => {
   it("records missing lock entries or upstream repo metadata as sync errors", async () => {
     const noRepo = skillContent("upstream-no-repo", "1.0.0", "Initial body.");
     await installSkill(await writeLocalSource("upstream-no-repo", noRepo), testDb.seed.orgId);
-    const em = testDb.orm.em;
+    const em = testDb.em;
     const skill = await em.findOneOrFail(FulcrumSkill, {
       org: testDb.seed.orgId,
       slug: "upstream-no-repo",
@@ -324,7 +324,7 @@ describe("upgradeSkills", () => {
     expect(all.map((skill) => skill.slug).sort()).toEqual(["upgrade-alpha", "upgrade-beta"]);
     expect(await readFile(installedPath("upgrade-beta"), "utf8")).toBe(betaUpgrade);
 
-    const em = testDb.orm.em;
+    const em = testDb.em;
     const alpha = await em.findOneOrFail(FulcrumSkill, {
       org: testDb.seed.orgId,
       slug: "upgrade-alpha",

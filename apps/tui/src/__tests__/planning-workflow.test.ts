@@ -13,9 +13,11 @@ describe("TUI planning workflow", () => {
     const freeformCalls: unknown[] = [];
     const freeformStartCalls: unknown[] = [];
     const guidedAcpCalls: unknown[] = [];
+    const guidedAcpActionCalls: unknown[] = [];
     const continuousUpdateCalls: unknown[] = [];
     const technicalPlanningCalls: unknown[] = [];
     const workflowCycleCalls: unknown[] = [];
+    const artifactExecutionCalls: unknown[] = [];
     const screen = new PlanningBreakdownScreen({
       input: {
         planId: "plan_1",
@@ -50,6 +52,13 @@ describe("TUI planning workflow", () => {
         modelId: "gpt-5.5",
         permissionMode: "review_each_tool",
       },
+      guidedAcpSessionActionInput: {
+        acpSessionId: "acp-guided-tui",
+        action: "resolve_permission",
+        projectId: "project-1",
+        traceId: "trace_guided_acp_tui",
+        optionId: "allow_once",
+      },
       continuousUpdateInput: {
         trigger: "manual_doc_edit",
         userPrompt: "Replan from updated TUI docs.",
@@ -75,6 +84,15 @@ describe("TUI planning workflow", () => {
         prototypePaths: ["apps/web/src/routes/planning/workbench-prototype.tsx"],
         boilerplatePaths: ["services/planning-review/src/application/technical-planning-cycle.ts"],
         successCriteria: ["Prototype and boilerplate artifacts are visible before approval."],
+      },
+      artifactExecutionInput: {
+        planId: "technical-plan-tui",
+        artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+        traceId: "trace_artifact_tui",
+        command: "bun",
+        args: ["test", "apps/web/src/routes/planning/page.svelte.test.ts"],
+        checks: ["Prototype renders"],
+        timeoutMs: 120000,
       },
       workflowCycleInput: {
         workspace: { id: "workspace-tui-cycle", slug: "tui-cycle", name: "TUI Cycle" },
@@ -203,6 +221,30 @@ describe("TUI planning workflow", () => {
               prompt: "TUI guided ACP prompt with submit_plan",
             };
           },
+          recordGuidedAcpSessionAction: async (input: unknown) => {
+            guidedAcpActionCalls.push(input);
+            return {
+              status: "session_action_recorded",
+              session: {
+                acpSessionId: "acp-guided-tui",
+                traceId: "trace_guided_acp_tui",
+                agentName: "codex",
+                modeId: "planning",
+                sessionStatus: "permission_resolved",
+              },
+              action: {
+                type: "resolve_permission",
+                method: "session/request_permission",
+                optionId: "allow_once",
+              },
+              traffic: {
+                entries: [
+                  { method: "session/new" },
+                  { method: "session/request_permission" },
+                ],
+              },
+            };
+          },
           restartPlanningCycleFromUpdates: async (input: unknown) => {
             continuousUpdateCalls.push(input);
             return {
@@ -253,6 +295,27 @@ describe("TUI planning workflow", () => {
                 dependencyUpdates: [],
                 warnings: [],
               },
+            };
+          },
+          runArtifactExecution: async (input: unknown) => {
+            artifactExecutionCalls.push(input);
+            return {
+              status: "passed",
+              runner: "sandbox-agent",
+              runId: "run-artifact-tui",
+              exitCode: 0,
+              durationMs: 1250,
+              traceId: "trace_artifact_tui",
+              summary: "Prototype rendered.",
+              outputRef: "artifacts/planning/run-artifact-tui.log",
+              transcript: "ok\nCOMPLETE",
+              history: [{
+                status: "passed",
+                traceId: "trace_artifact_tui",
+                summary: "Prototype rendered.",
+                outputRef: "artifacts/planning/run-artifact-tui.log",
+                executedAt: "2026-05-15T10:00:00.000Z",
+              }],
             };
           },
         },
@@ -358,6 +421,21 @@ describe("TUI planning workflow", () => {
     expect(tty.plainText()).toContain("session/new");
     expect(tty.plainText()).toContain("TUI guided ACP prompt with submit_plan");
 
+    await screen.handleKey("p");
+    tty.clear();
+    screen.render(renderer);
+
+    expect(guidedAcpActionCalls).toEqual([{
+      acpSessionId: "acp-guided-tui",
+      action: "resolve_permission",
+      projectId: "project-1",
+      traceId: "trace_guided_acp_tui",
+      optionId: "allow_once",
+    }]);
+    expect(tty.plainText()).toContain("Guided ACP action");
+    expect(tty.plainText()).toContain("permission_resolved");
+    expect(tty.plainText()).toContain("session/request_permission");
+
     await screen.handleKey("u");
     tty.clear();
     screen.render(renderer);
@@ -404,6 +482,26 @@ describe("TUI planning workflow", () => {
     expect(tty.plainText()).toContain("trace_technical_tui");
     expect(tty.plainText()).toContain("apps/web/src/routes/planning/workbench-prototype.tsx");
     expect(tty.plainText()).toContain("Review this generated technical plan");
+
+    await screen.handleKey("e");
+    tty.clear();
+    screen.render(renderer);
+
+    expect(artifactExecutionCalls).toEqual([{
+      planId: "technical-plan-tui",
+      artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+      traceId: "trace_technical_tui",
+      command: "bun",
+      args: ["test", "apps/web/src/routes/planning/page.svelte.test.ts"],
+      checks: ["Prototype renders"],
+      timeoutMs: 120000,
+    }]);
+    expect(tty.plainText()).toContain("Artifact execution");
+    expect(tty.plainText()).toContain("passed");
+    expect(tty.plainText()).toContain("sandbox-agent");
+    expect(tty.plainText()).toContain("run-artifact-tui");
+    expect(tty.plainText()).toContain("Prototype rendered.");
+    expect(tty.plainText()).toContain("artifacts/planning/run-artifact-tui.log");
 
     await screen.handleKey("x");
     tty.clear();
@@ -460,6 +558,7 @@ describe("TUI planning workflow", () => {
     const calls: unknown[] = [];
     const materializeCalls: unknown[] = [];
     const workflowCycleCalls: unknown[] = [];
+    const artifactExecutionCalls: unknown[] = [];
     const planningInput = {
       planId: "plan_nav",
       approvedPlanMarkdown: "# Nav Approved Plan",
@@ -503,12 +602,18 @@ describe("TUI planning workflow", () => {
         e2eRunner: "bun",
       },
     } as const;
+    const artifactExecutionInput = {
+      planId: "plan-nav-cycle",
+      artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+      traceId: "trace_nav_artifact",
+      planOnly: true,
+    } as const;
     const tty = new FakeTTY({ columns: 120, rows: 40 });
     const app = new TuiApp({
       output: tty,
       input: tty,
       caller: {
-        ...makePlanningCaller(calls, materializeCalls),
+        ...makePlanningCaller(calls, materializeCalls, artifactExecutionCalls),
         workflows: {
           runAcceptanceCycle: async (input: WorkflowAcceptanceCycleInput) => {
             workflowCycleCalls.push(input);
@@ -524,6 +629,7 @@ describe("TUI planning workflow", () => {
         },
       },
       planningInput,
+      planningArtifactExecutionInput: artifactExecutionInput,
       workflowCycleInput,
     } as never);
 
@@ -550,6 +656,15 @@ describe("TUI planning workflow", () => {
     expect(tty.plainText()).toContain("task_nav");
 
     tty.clear();
+    tty.inject("e");
+    await tick();
+
+    expect(artifactExecutionCalls).toEqual([artifactExecutionInput]);
+    expect(tty.plainText()).toContain("Artifact execution");
+    expect(tty.plainText()).toContain("ready");
+    expect(tty.plainText()).toContain("trace_nav_artifact");
+
+    tty.clear();
     tty.inject("x");
     await tick();
 
@@ -560,9 +675,89 @@ describe("TUI planning workflow", () => {
 
     app.stop();
   });
+
+  test("artifact execution uses the latest technical plan artifact", async () => {
+    const artifactExecutionCalls: unknown[] = [];
+    const screen = new PlanningBreakdownScreen({
+      input: {
+        planId: "initial-plan",
+        approvedPlanMarkdown: "# Approved Plan",
+        traceId: "trace_initial",
+      },
+      technicalPlanningInput: {
+        source: "freeform_docs",
+        userPrompt: "Create executable artifacts.",
+        traceId: "trace_technical_artifact",
+        planId: "technical-plan",
+        prototypePaths: ["apps/web/src/routes/planning/review-workbench.tsx"],
+        boilerplatePaths: ["services/planning-review/src/application/review-scaffold.ts"],
+        successCriteria: ["Technical artifact runs."],
+      },
+      artifactExecutionInput: {
+        planId: "default-plan",
+        artifactPath: "apps/web/src/routes/planning/default-prototype.tsx",
+        traceId: "trace_default",
+        planOnly: true,
+      },
+      caller: {
+        planning: {
+          previewApprovedPlanBreakdown: async () => ({
+            title: "Approved Plan",
+            taskDrafts: [],
+          }),
+          generateTechnicalPlanningCycle: async () => ({
+            status: "ready_for_plan_review",
+            prompt: "Create",
+            reviewPrompt: "Review",
+            plan: {
+              planId: "technical-plan",
+              title: "Technical plan",
+              traceId: "trace_technical_artifact",
+              source: "freeform_docs",
+              markdown: "# Technical Plan",
+              prototypePaths: ["apps/web/src/routes/planning/review-workbench.tsx"],
+              boilerplatePaths: ["services/planning-review/src/application/review-scaffold.ts"],
+            },
+            breakdown: {
+              title: "Technical plan",
+              taskDrafts: [],
+            },
+          }),
+          runArtifactExecution: async (input) => {
+            artifactExecutionCalls.push(input);
+            return {
+              status: "ready",
+              runner: "not-run",
+              runId: null,
+              exitCode: null,
+              durationMs: 0,
+              traceId: "trace_technical_artifact",
+              summary: "Technical artifact is ready.",
+              history: [],
+            };
+          },
+        },
+      },
+    });
+
+    await screen.load();
+    await screen.handleKey("g");
+    await screen.handleKey("e");
+
+    expect(artifactExecutionCalls).toEqual([{
+      planId: "technical-plan",
+      artifactPath: "apps/web/src/routes/planning/review-workbench.tsx",
+      traceId: "trace_technical_artifact",
+      planOnly: true,
+    }]);
+  });
 });
 
-function makePlanningCaller(calls: unknown[], materializeCalls: unknown[]): TuiCaller {
+function makePlanningCaller(
+  calls: unknown[],
+  materializeCalls: unknown[],
+  artifactExecutionCalls: unknown[] = [],
+): TuiCaller {
   return {
     auth: { whoami: async () => ({ userId: "u1", orgId: "org1", email: "planning@example.com", role: "admin" }) },
     flags: { list: async () => [], set: async () => ({ ok: true }) },
@@ -597,6 +792,21 @@ function makePlanningCaller(calls: unknown[], materializeCalls: unknown[]): TuiC
             tasks: [{ clientKey: "T1", id: "task_nav" }],
             dependencyUpdates: [],
           },
+        };
+      },
+      runArtifactExecution: async (input) => {
+        artifactExecutionCalls.push(input);
+        return {
+          status: "ready",
+          runner: "not-run",
+          runId: null,
+          exitCode: null,
+          durationMs: 0,
+          traceId: "trace_nav_artifact",
+          summary: "Artifact execution is ready to run.",
+          outputRef: null,
+          transcript: "",
+          history: [{ status: "ready", traceId: "trace_nav_artifact", summary: "Artifact execution is ready to run." }],
         };
       },
     },

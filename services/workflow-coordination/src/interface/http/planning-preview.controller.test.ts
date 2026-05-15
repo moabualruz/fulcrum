@@ -3,16 +3,18 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 
 import { RequestMethod } from "@nestjs/common";
-import { METHOD_METADATA, MODULE_METADATA, PATH_METADATA } from "@nestjs/common/constants";
+import { HTTP_CODE_METADATA, METHOD_METADATA, MODULE_METADATA, PATH_METADATA } from "@nestjs/common/constants";
 import { validateSync } from "class-validator";
 
 import {
   PlanningApprovedPlanRequestDto,
   PlanningArtifactExecutionRequestDto,
+  PlanningArtifactRunRequestDto,
   PlanningContinuousUpdateRequestDto,
   PlanningFreeformPromptRequestDto,
   PlanningFreeformStartRequestDto,
   PlanningGuidedAcpStartRequestDto,
+  PlanningGuidedAcpSessionActionRequestDto,
   PlanningMaterializeRequestDto,
   PlanningPreviewController,
   PlanningTechnicalCycleRequestDto,
@@ -24,6 +26,7 @@ import {
   type PlanningFreeformPromptResult,
   type PlanningFreeformStartResult,
   type PlanningGuidedAcpStartResult,
+  type PlanningArtifactRunOutput,
   type PersistedPlanningArtifactExecutionRecord,
   type PlanningContinuousUpdateResult,
   type PlanningTechnicalCycleResult,
@@ -92,6 +95,18 @@ describe("Planning preview Nest controller", () => {
       Reflect.getMetadata(METHOD_METADATA, PlanningPreviewController.prototype.recordArtifactExecution),
     ).toBe(RequestMethod.POST);
     expect(
+      Reflect.getMetadata(HTTP_CODE_METADATA, PlanningPreviewController.prototype.recordArtifactExecution),
+    ).toBe(200);
+    expect(
+      Reflect.getMetadata(PATH_METADATA, PlanningPreviewController.prototype.runArtifactExecution),
+    ).toBe("artifact-execution/run");
+    expect(
+      Reflect.getMetadata(METHOD_METADATA, PlanningPreviewController.prototype.runArtifactExecution),
+    ).toBe(RequestMethod.POST);
+    expect(
+      Reflect.getMetadata(HTTP_CODE_METADATA, PlanningPreviewController.prototype.runArtifactExecution),
+    ).toBe(200);
+    expect(
       Reflect.getMetadata(PATH_METADATA, PlanningPreviewController.prototype.startFreeformWork),
     ).toBe("freeform/start");
     expect(
@@ -102,6 +117,12 @@ describe("Planning preview Nest controller", () => {
     ).toBe("guided-acp/start");
     expect(
       Reflect.getMetadata(METHOD_METADATA, PlanningPreviewController.prototype.startGuidedAcpPlanning),
+    ).toBe(RequestMethod.POST);
+    expect(
+      Reflect.getMetadata(PATH_METADATA, PlanningPreviewController.prototype.recordGuidedAcpSessionAction),
+    ).toBe("guided-acp/session-action");
+    expect(
+      Reflect.getMetadata(METHOD_METADATA, PlanningPreviewController.prototype.recordGuidedAcpSessionAction),
     ).toBe(RequestMethod.POST);
     expect(
       Reflect.getMetadata(PATH_METADATA, PlanningPreviewController.prototype.restartPlanningCycleFromUpdates),
@@ -140,11 +161,17 @@ describe("Planning preview Nest controller", () => {
       async recordArtifactExecution() {
         throw new Error("unexpected artifact execution call");
       },
+      async runArtifactExecution() {
+        throw new Error("unexpected artifact run call");
+      },
       async startFreeformWork() {
         throw new Error("unexpected freeform call");
       },
       async startGuidedAcpPlanning() {
         throw new Error("unexpected guided ACP call");
+      },
+      async recordGuidedAcpSessionAction() {
+        throw new Error("unexpected guided ACP session action call");
       },
       async restartPlanningCycleFromUpdates() {
         throw new Error("unexpected continuous update call");
@@ -200,11 +227,17 @@ describe("Planning preview Nest controller", () => {
       async recordArtifactExecution() {
         throw new Error("unexpected artifact execution call");
       },
+      async runArtifactExecution() {
+        throw new Error("unexpected artifact run call");
+      },
       async startFreeformWork() {
         throw new Error("unexpected freeform call");
       },
       async startGuidedAcpPlanning() {
         throw new Error("unexpected guided ACP call");
+      },
+      async recordGuidedAcpSessionAction() {
+        throw new Error("unexpected guided ACP session action call");
       },
       async restartPlanningCycleFromUpdates() {
         throw new Error("unexpected continuous update call");
@@ -293,11 +326,17 @@ describe("Planning preview Nest controller", () => {
       async recordArtifactExecution() {
         throw new Error("unexpected artifact execution call");
       },
+      async runArtifactExecution() {
+        throw new Error("unexpected artifact run call");
+      },
       async startFreeformWork() {
         throw new Error("unexpected freeform call");
       },
       async startGuidedAcpPlanning() {
         throw new Error("unexpected guided ACP call");
+      },
+      async recordGuidedAcpSessionAction() {
+        throw new Error("unexpected guided ACP session action call");
       },
       async restartPlanningCycleFromUpdates() {
         throw new Error("unexpected continuous update call");
@@ -357,11 +396,17 @@ describe("Planning preview Nest controller", () => {
         this.seen = body;
         return output;
       },
+      async runArtifactExecution() {
+        throw new Error("unexpected artifact run call");
+      },
       async startFreeformWork() {
         throw new Error("unexpected freeform call");
       },
       async startGuidedAcpPlanning() {
         throw new Error("unexpected guided ACP call");
+      },
+      async recordGuidedAcpSessionAction() {
+        throw new Error("unexpected guided ACP session action call");
       },
       async restartPlanningCycleFromUpdates() {
         throw new Error("unexpected continuous update call");
@@ -370,6 +415,78 @@ describe("Planning preview Nest controller", () => {
     const controller = new PlanningPreviewController(service);
 
     await expect(controller.recordArtifactExecution(input)).resolves.toBe(output);
+    expect(service.seen).toBe(input);
+  });
+
+  test("delegates artifact execution runs to the server-owned planning service", async () => {
+    const input = Object.assign(new PlanningArtifactRunRequestDto(), {
+      planId: "plan-technical-nest",
+      artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+      prototypeId: "prototype-plan-technical-nest-1",
+      traceId: "trace-technical-nest",
+      command: "bun",
+      args: ["-e", "await import('./apps/web/src/routes/planning/workbench-prototype.tsx')"],
+      copyToWorktree: ["apps/web/src/routes/planning/workbench-prototype.tsx"],
+      timeoutMs: 30_000,
+    });
+    const output: PlanningArtifactRunOutput = {
+      planId: "plan-technical-nest",
+      artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+      status: "passed",
+      prototypeStatus: "validated",
+      prototypeId: "prototype-plan-technical-nest-1",
+      artifactId: "artifact-plan-technical-nest-1",
+      traceId: "trace-technical-nest",
+      command: "bun",
+      args: ["-e", "await import('./apps/web/src/routes/planning/workbench-prototype.tsx')"],
+      checks: ["Prototype has a runnable preview command or explicit replacement."],
+      executedAt: "2026-05-15T12:00:00.000Z",
+      runner: "sandbox-agent",
+      runId: "artifact-run-plan-technical-nest-workbench",
+      exitCode: 0,
+      exitReason: "complete",
+      durationMs: 42,
+      transcript: "ok\nCOMPLETE\n",
+      history: [],
+      transcriptPath: "/tmp/fulcrum-agent-run/transcripts/run.jsonl",
+    };
+    const service = {
+      seen: undefined as PlanningArtifactRunRequestDto | undefined,
+      async previewApprovedPlan() {
+        throw new Error("unexpected preview call");
+      },
+      async materializeApprovedPlan() {
+        throw new Error("unexpected materialize call");
+      },
+      async buildFreeformDocsPlanningPrompt() {
+        throw new Error("unexpected freeform prompt call");
+      },
+      async generateTechnicalPlanningCycle() {
+        throw new Error("unexpected technical planning call");
+      },
+      async recordArtifactExecution() {
+        throw new Error("unexpected artifact execution call");
+      },
+      async runArtifactExecution(body: PlanningArtifactRunRequestDto) {
+        this.seen = body;
+        return output;
+      },
+      async startFreeformWork() {
+        throw new Error("unexpected freeform call");
+      },
+      async startGuidedAcpPlanning() {
+        throw new Error("unexpected guided ACP call");
+      },
+      async recordGuidedAcpSessionAction() {
+        throw new Error("unexpected guided ACP session action call");
+      },
+      async restartPlanningCycleFromUpdates() {
+        throw new Error("unexpected continuous update call");
+      },
+    };
+    const controller = new PlanningPreviewController(service);
+
+    await expect(controller.runArtifactExecution(input)).resolves.toBe(output);
     expect(service.seen).toBe(input);
   });
 
@@ -416,9 +533,17 @@ describe("Planning preview Nest controller", () => {
       traceId: "trace-continuous-nest",
       acpSessionId: "acp-nest",
     });
+    const sessionActionInput = Object.assign(new PlanningGuidedAcpSessionActionRequestDto(), {
+      acpSessionId: "acp-nest",
+      action: "resolve_permission" as const,
+      projectId: "project-nest",
+      traceId: "trace-guided-nest",
+      optionId: "allow_once",
+    });
     const service = {
       seenFreeform: undefined as PlanningFreeformStartRequestDto | undefined,
       seenGuided: undefined as PlanningGuidedAcpStartRequestDto | undefined,
+      seenSessionAction: undefined as PlanningGuidedAcpSessionActionRequestDto | undefined,
       seenContinuous: undefined as PlanningContinuousUpdateRequestDto | undefined,
       async previewApprovedPlan() {
         throw new Error("unexpected preview call");
@@ -434,6 +559,9 @@ describe("Planning preview Nest controller", () => {
       },
       async recordArtifactExecution() {
         throw new Error("unexpected artifact execution call");
+      },
+      async runArtifactExecution() {
+        throw new Error("unexpected artifact run call");
       },
       async startFreeformWork(
         body: PlanningFreeformStartRequestDto,
@@ -475,6 +603,22 @@ describe("Planning preview Nest controller", () => {
           prompt: "submit_plan",
         };
       },
+      async recordGuidedAcpSessionAction(body: PlanningGuidedAcpSessionActionRequestDto) {
+        this.seenSessionAction = body;
+        return {
+          status: "session_action_recorded" as const,
+          session: {
+            acpSessionId: "acp-nest",
+            projectId: "project-nest",
+            traceId: "trace-guided-nest",
+            agentName: "codex",
+            modeId: "plan",
+            sessionStatus: "permission_resolved",
+          },
+          action: { type: "resolve_permission" as const, method: "session/request_permission", optionId: "allow_once" },
+          traffic: { entries: [{ id: "traffic-1", timestamp: 1, direction: "out" as const, type: "response" as const, method: "session/request_permission", payload: {} }] },
+        };
+      },
       async restartPlanningCycleFromUpdates(
         body: PlanningContinuousUpdateRequestDto,
       ): Promise<PlanningContinuousUpdateResult> {
@@ -514,6 +658,10 @@ describe("Planning preview Nest controller", () => {
       status: "ready_for_acp_prompt",
       session: { acpSessionId: "acp-nest" },
     });
+    await expect(controller.recordGuidedAcpSessionAction(sessionActionInput)).resolves.toMatchObject({
+      status: "session_action_recorded",
+      action: { method: "session/request_permission", optionId: "allow_once" },
+    });
     await expect(controller.restartPlanningCycleFromUpdates(continuousInput)).resolves.toMatchObject({
       status: "ready_for_replanning",
       changedDocs: [{ id: "doc-nest" }],
@@ -521,6 +669,7 @@ describe("Planning preview Nest controller", () => {
     expect(service.seenFreeform).toBe(freeformInput);
     expect(service.seenFreeform?.parentId).toBe("parent-doc-nest");
     expect(service.seenGuided).toBe(guidedInput);
+    expect(service.seenSessionAction).toBe(sessionActionInput);
     expect(service.seenContinuous).toBe(continuousInput);
   });
 
@@ -589,6 +738,42 @@ describe("Planning preview Nest controller", () => {
       "status",
     ]);
 
+    const artifactExecutionArrayInvalid = Object.assign(new PlanningArtifactExecutionRequestDto(), {
+      planId: "plan-nest",
+      artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+      status: "passed" as const,
+      args: [1],
+      checks: [false],
+    });
+    expect(validateSync(artifactExecutionArrayInvalid).map((error) => error.property).sort()).toEqual([
+      "args",
+      "checks",
+    ]);
+
+    const artifactRunInvalid = Object.assign(new PlanningArtifactRunRequestDto(), {
+      planId: "",
+      artifactPath: "",
+      timeoutMs: 0,
+    });
+    expect(validateSync(artifactRunInvalid).map((error) => error.property).sort()).toEqual([
+      "artifactPath",
+      "planId",
+      "timeoutMs",
+    ]);
+
+    const artifactRunArrayInvalid = Object.assign(new PlanningArtifactRunRequestDto(), {
+      planId: "plan-nest",
+      artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+      args: [1],
+      checks: [false],
+      copyToWorktree: [{}],
+    });
+    expect(validateSync(artifactRunArrayInvalid).map((error) => error.property).sort()).toEqual([
+      "args",
+      "checks",
+      "copyToWorktree",
+    ]);
+
     const freeformInvalid = Object.assign(new PlanningFreeformStartRequestDto(), {
       workspaceId: "",
       workspaceSlug: "",
@@ -631,6 +816,15 @@ describe("Planning preview Nest controller", () => {
       "workspaceId",
       "workspaceName",
       "workspaceSlug",
+    ]);
+
+    const actionInvalid = Object.assign(new PlanningGuidedAcpSessionActionRequestDto(), {
+      acpSessionId: "",
+      action: "missing",
+    });
+    expect(validateSync(actionInvalid).map((error) => error.property).sort()).toEqual([
+      "acpSessionId",
+      "action",
     ]);
   });
 

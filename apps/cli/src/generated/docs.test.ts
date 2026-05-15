@@ -44,6 +44,22 @@ describe("generated document commands", () => {
         return Response.json({ id: "comment-1", docId: "doc-1", bodyMd: body?.bodyMd, status: "open" });
       }
       if (String(url).includes("/doc-1/comments")) return Response.json([{ id: "comment-1", status: "open" }]);
+      if (String(url).includes("/attachments/attachment-1") && init?.method === "DELETE") {
+        return new Response(null, { status: 204 });
+      }
+      if (String(url).includes("/doc-1/attachments") && init?.method === "POST") {
+        return Response.json({ id: "attachment-1", docId: "doc-1", fileName: body?.fileName });
+      }
+      if (String(url).includes("/doc-1/attachments")) return Response.json([{ id: "attachment-1", fileName: "brief.pdf" }]);
+      if (String(url).includes("/doc-1/collaboration/hocuspocus") && init?.method === "PATCH") {
+        return Response.json({ id: "collab-1", docId: "doc-1", provider: "hocuspocus" });
+      }
+      if (String(url).includes("/doc-1/collaboration/hocuspocus") && init?.method === "DELETE") {
+        return new Response(null, { status: 204 });
+      }
+      if (String(url).includes("/doc-1/collaboration")) {
+        return Response.json([{ id: "collab-1", provider: "hocuspocus" }]);
+      }
       if (String(url).includes("/doc-1/backlinks")) return Response.json([{ id: "link-1", targetDocId: "doc-1" }]);
       if (String(url).includes("/doc-1/forward-links")) return Response.json([{ id: "link-2", sourceDocId: "doc-1" }]);
       if (String(url).includes("/doc-1/versions/diff")) {
@@ -113,6 +129,39 @@ describe("generated document commands", () => {
       "--json",
     ]);
     await runGeneratedDocsCommand(["comments", "resolve", "--comment-id", "comment-1", "--json"]);
+    await runGeneratedDocsCommand([
+      "attachments",
+      "create",
+      "--doc-id",
+      "doc-1",
+      "--file-name",
+      "brief.pdf",
+      "--mime-type",
+      "application/pdf",
+      "--size-bytes",
+      "42",
+      "--storage-path",
+      "docs/brief.pdf",
+      "--json",
+    ]);
+    await runGeneratedDocsCommand(["attachments", "list", "--doc-id", "doc-1", "--json"]);
+    await runGeneratedDocsCommand(["collaboration", "list", "--doc-id", "doc-1", "--json"]);
+    await runGeneratedDocsCommand([
+      "collaboration",
+      "update",
+      "--doc-id",
+      "doc-1",
+      "--provider",
+      "hocuspocus",
+      "--state-vector",
+      "state-vector",
+      "--document-state",
+      "document-state",
+      "--active-client-ids-json",
+      "[\"client-1\"]",
+      "--json",
+    ]);
+    await runGeneratedDocsCommand(["collaboration", "delete", "--doc-id", "doc-1", "--provider", "hocuspocus", "--json"]);
     await runGeneratedDocsCommand(["links", "list-backlinks", "--doc-id", "doc-1", "--json"]);
     await runGeneratedDocsCommand(["links", "list-forward-links", "--doc-id", "doc-1", "--json"]);
     await runGeneratedDocsCommand(["versions", "list", "--doc-id", "doc-1", "--json"]);
@@ -154,6 +203,11 @@ describe("generated document commands", () => {
       ["GET", "http://127.0.0.1:3210/api/v1/docs/doc-1/comments"],
       ["PATCH", "http://127.0.0.1:3210/api/v1/docs/comments/comment-1"],
       ["PATCH", "http://127.0.0.1:3210/api/v1/docs/comments/comment-1/resolve"],
+      ["POST", "http://127.0.0.1:3210/api/v1/docs/doc-1/attachments"],
+      ["GET", "http://127.0.0.1:3210/api/v1/docs/doc-1/attachments"],
+      ["GET", "http://127.0.0.1:3210/api/v1/docs/doc-1/collaboration"],
+      ["PATCH", "http://127.0.0.1:3210/api/v1/docs/doc-1/collaboration/hocuspocus"],
+      ["DELETE", "http://127.0.0.1:3210/api/v1/docs/doc-1/collaboration/hocuspocus"],
       ["GET", "http://127.0.0.1:3210/api/v1/docs/doc-1/backlinks"],
       ["GET", "http://127.0.0.1:3210/api/v1/docs/doc-1/forward-links"],
       ["GET", "http://127.0.0.1:3210/api/v1/docs/doc-1/versions"],
@@ -182,7 +236,18 @@ describe("generated document commands", () => {
     expect(calls[8]?.body).toMatchObject({
       resolved: true,
     });
-    expect(calls[16]?.body).toMatchObject({
+    expect(calls[9]?.body).toMatchObject({
+      fileName: "brief.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 42,
+      storagePath: "docs/brief.pdf",
+    });
+    expect(calls[12]?.body).toMatchObject({
+      stateVector: "state-vector",
+      documentState: "document-state",
+      activeClientIds: ["client-1"],
+    });
+    expect(calls[21]?.body).toMatchObject({
       title: "Planning note revised",
       type: "page",
       bodyMd: "revised context",
@@ -197,6 +262,11 @@ describe("generated document commands", () => {
       [{ id: "comment-1", status: "open" }],
       { id: "comment-1", bodyMd: "Updated note", status: "open" },
       { id: "comment-1", status: "resolved" },
+      { id: "attachment-1", docId: "doc-1", fileName: "brief.pdf" },
+      [{ id: "attachment-1", fileName: "brief.pdf" }],
+      [{ id: "collab-1", provider: "hocuspocus" }],
+      { id: "collab-1", docId: "doc-1", provider: "hocuspocus" },
+      { ok: true },
       [{ id: "link-1", targetDocId: "doc-1" }],
       [{ id: "link-2", sourceDocId: "doc-1" }],
       [{ id: "version-1", version: 1 }],

@@ -3,10 +3,49 @@ import { describe, expect, test } from "bun:test";
 import {
   withAgentRunApiCaller,
   withAuditApiCaller,
+  withDocumentApiCaller,
   withNotificationApiCaller,
   withWebhookApiCaller,
   withWorkflowApiCaller,
 } from "./local-caller.ts";
+
+describe("TUI document API caller", () => {
+  test("overlays document calls with the configured Nest API caller", async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const caller = withDocumentApiCaller({
+      docs: {
+        templates: {
+          list: async () => [],
+        },
+      },
+    }, {
+      env: {
+        FULCRUM_PUBLIC_API_URL: "http://127.0.0.1:4321/base/",
+        FULCRUM_ORG_ID: "org-1",
+      },
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({ url: String(url), init: init ?? {} });
+        if (String(url).includes("/attachments")) return Response.json([{ id: "attachment-1" }]);
+        if (String(url).includes("/collaboration")) return Response.json([{ id: "state-1" }]);
+        if (String(url).includes("/doc-1")) return Response.json({ id: "doc-1", title: "Doc" });
+        return Response.json([{ id: "doc-1", title: "Doc" }]);
+      }) as typeof fetch,
+    });
+
+    await expect(caller.docs.templates.list({})).resolves.toEqual([]);
+    await expect(caller.docs.list({ projectId: "project-1" })).resolves.toEqual([{ id: "doc-1", title: "Doc" }]);
+    await expect(caller.docs.get({ id: "doc-1" })).resolves.toEqual({ id: "doc-1", title: "Doc" });
+    await expect(caller.docs.listAttachments({ docId: "doc-1" })).resolves.toEqual([{ id: "attachment-1" }]);
+    await expect(caller.docs.listCollaborationStates({ docId: "doc-1" })).resolves.toEqual([{ id: "state-1" }]);
+
+    expect(calls.map((call) => call.url)).toEqual([
+      "http://127.0.0.1:4321/api/v1/docs?orgId=org-1&projectId=project-1",
+      "http://127.0.0.1:4321/api/v1/docs/doc-1",
+      "http://127.0.0.1:4321/api/v1/docs/doc-1/attachments",
+      "http://127.0.0.1:4321/api/v1/docs/doc-1/collaboration",
+    ]);
+  });
+});
 
 describe("TUI notification API caller", () => {
   test("overlays notification calls with the configured Nest API caller", async () => {
@@ -212,6 +251,9 @@ describe("TUI workflow API caller", () => {
         if (String(url).includes("/workflows/planning/freeform/start")) {
           return Response.json({ status: "ready_for_planning", traceId: "trace-1" });
         }
+        if (String(url).includes("/workflows/planning/artifact-execution/run")) {
+          return Response.json({ status: "passed", runner: "sandbox-agent", traceId: "trace-1" });
+        }
         return Response.json({ title: "Preview", traceId: "trace-1" });
       }) as typeof fetch,
     });
@@ -252,6 +294,11 @@ describe("TUI workflow API caller", () => {
     await expect(caller.workflows.runAcceptanceCycle({
       project: { traceId: "trace-1" },
     })).resolves.toEqual({ status: "accepted", traceId: "trace-1" });
+    await expect(caller.planning.runArtifactExecution({
+      planId: "plan-1",
+      artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+      traceId: "trace-1",
+    })).resolves.toEqual({ status: "passed", runner: "sandbox-agent", traceId: "trace-1" });
 
     expect(calls.map((call) => call.url)).toEqual([
       "http://127.0.0.1:4321/workflows/planning/approved-plan/preview",
@@ -259,6 +306,7 @@ describe("TUI workflow API caller", () => {
       "http://127.0.0.1:4321/workflows/execution/dependency-run/preview",
       "http://127.0.0.1:4321/workflows/execution/dependency-run/dispatch",
       "http://127.0.0.1:4321/workflows/cycles/acceptance-cycle/run",
+      "http://127.0.0.1:4321/workflows/planning/artifact-execution/run",
     ]);
     expect(calls.every((call) => call.init.method === "POST")).toBe(true);
   });

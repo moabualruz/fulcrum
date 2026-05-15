@@ -1,24 +1,36 @@
 import { error, fail } from "@sveltejs/kit";
-// Server-only superforms entry — avoids the client `SuperDebug.svelte`
-// import graph (which pulls in `$app/navigation`/`$app/stores`) in the
-// test harness.
 import { superValidate } from "sveltekit-superforms/server";
 import { valibot } from "sveltekit-superforms/adapters";
 import { DocumentFormSchema } from "../../../../lib/server/documents.schema.ts";
-import { requestServiceScope } from "$lib/server/request-service-scope";
 import { parseLabels, serializeLabels } from "../../../../lib/markdown/labels.ts";
-import { AppNotFoundError } from "@platform-core/domain/errors.ts";
-import { loadWebEditDoc, saveWebEditDoc } from "@knowledge-workspace/interface/document-pages.ts";
+import { createDocumentApiForEvent } from "$lib/server/document-api";
 
 interface LoadEvent {
   params: { id: string };
   locals: App.Locals;
+  fetch: typeof fetch;
+  request: Request;
+  url: URL;
 }
 
 interface ActionEvent {
   params: { id: string };
   locals: App.Locals;
+  fetch: typeof fetch;
   request: Request;
+  url: URL;
+}
+
+interface PublicDocument {
+  id: string;
+  projectId?: string | null;
+  project_id?: string | null;
+  type?: string;
+  docType?: string;
+  title: string;
+  bodyMd?: string;
+  body_md?: string;
+  frontmatter?: Record<string, unknown>;
 }
 
 function extractLabels(fm: Record<string, unknown>): string[] {
@@ -28,9 +40,10 @@ function extractLabels(fm: Record<string, unknown>): string[] {
     : [];
 }
 
-export const load = async ({ params, locals }: LoadEvent) => {
-  const scope = await requestServiceScope(locals);
-  const doc = await loadWebEditDoc(scope, params.id).catch(mapNotFound);
+export const load = async (event: LoadEvent) => {
+  const { params } = event;
+  const publicDoc = await createDocumentApiForEvent(event).docs.get({ id: params.id }).catch(mapNotFound) as PublicDocument;
+  const doc = toEditableDocument(publicDoc);
   const form = await superValidate(
     {
       title: doc.title,
@@ -45,22 +58,40 @@ export const load = async ({ params, locals }: LoadEvent) => {
 };
 
 export const actions = {
-  default: async ({ params, request, locals }: ActionEvent) => {
+  default: async (event: ActionEvent) => {
+    const { params, request } = event;
     const form = await superValidate(request, valibot(DocumentFormSchema));
     if (!form.valid) return fail(400, { form });
-    const scope = await requestServiceScope(locals);
-    await saveWebEditDoc(scope, {
+    await createDocumentApiForEvent(event).docs.update({
       id: params.id!,
       title: form.data.title,
-      kind: form.data.kind,
-      labels: parseLabels(form.data.labels ?? ""),
-      body: form.data.body,
+      type: form.data.kind,
+      bodyMd: form.data.body,
+      frontmatter: {
+        title: form.data.title,
+        kind: form.data.kind,
+        labels: parseLabels(form.data.labels ?? ""),
+      },
     }).catch(mapNotFound);
     return { form };
   },
 };
 
 function mapNotFound(errorValue: unknown): never {
-  if (errorValue instanceof AppNotFoundError) throw error(404, "Document not found");
+  const message = errorValue instanceof Error ? errorValue.message : String(errorValue);
+  if (/not found/i.test(message)) throw error(404, "Document not found");
   throw errorValue;
+}
+
+function toEditableDocument(doc: PublicDocument) {
+  const body = doc.bodyMd ?? doc.body_md ?? "";
+  const frontmatter = doc.frontmatter ?? {};
+  return {
+    id: doc.id,
+    project_id: doc.projectId ?? doc.project_id ?? null,
+    kind: typeof frontmatter.kind === "string" ? frontmatter.kind : doc.docType ?? doc.type ?? "note",
+    title: doc.title,
+    body,
+    frontmatter,
+  };
 }

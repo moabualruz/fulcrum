@@ -49,7 +49,7 @@ type PageProps = {
   data: { defaultPlanId: string; defaultTraceId: string };
   form?: {
     ok: boolean;
-    mode: "preview" | "materialize" | "freeformPrompt" | "freeformStart" | "guidedAcpStart" | "continuousUpdate" | "generate" | "workflowCycle";
+    mode: "preview" | "materialize" | "freeformPrompt" | "freeformStart" | "guidedAcpStart" | "guidedAcpSessionAction" | "continuousUpdate" | "generate" | "workflowCycle";
     preview?: typeof BREAKDOWN;
     freeformStart?: {
       status: "ready_for_planning";
@@ -65,6 +65,8 @@ type PageProps = {
       status: "ready_for_acp_prompt";
       session: {
         acpSessionId: string;
+        projectId?: string;
+        traceId?: string;
         agentName: string;
         modeId: string;
         modelId?: string;
@@ -74,6 +76,20 @@ type PageProps = {
       traffic: { entries: Array<{ method: string }> };
       context: PlanningContextFixture;
       prompt: string;
+    };
+    guidedAcpSessionAction?: {
+      status: "session_action_recorded";
+      session: {
+        acpSessionId: string;
+        projectId?: string | null;
+        traceId: string;
+        agentName: string;
+        modeId: string;
+        modelId?: string;
+        sessionStatus: string;
+      };
+      action: { type: string; method: string; optionId?: string; modeId?: string; modelId?: string };
+      traffic: { entries: Array<{ method: string }> };
     };
     continuousUpdate?: {
       status: "ready_for_replanning";
@@ -264,6 +280,8 @@ describe("/planning +page.svelte", () => {
             status: "ready_for_acp_prompt",
             session: {
               acpSessionId: "acp-guided-web",
+              projectId: "project-web",
+              traceId: "trace_guided_acp",
               agentName: "codex",
               modeId: "planning",
               modelId: "gpt-5.5",
@@ -288,7 +306,45 @@ describe("/planning +page.svelte", () => {
     expect(body).toContain("gpt-5.5");
     expect(body).toContain("review_each_tool");
     expect(body).toContain("session/new");
+    expect(body).toContain("data-guided-acp-session-actions");
+    expect(body).toContain('formaction="?/guidedAcpSessionAction"');
+    expect(body).toContain('name="acpSessionAction" value="resume_session"');
+    expect(body).toContain('name="acpSessionAction" value="cancel_operation"');
+    expect(body).toContain('name="acpSessionAction" value="resolve_permission"');
+    expect(body).toContain('name="acpSessionAction" value="cancel_permission"');
     expect(body).toContain("ACP guided session with submit_plan");
+  });
+
+  test("renders guided ACP session action result returned from the server action", () => {
+    const { body } = render(Page, {
+      props: {
+        data: { defaultPlanId: "plan_web", defaultTraceId: "trace_web" },
+        form: {
+          ok: true,
+          mode: "guidedAcpSessionAction",
+          guidedAcpSessionAction: {
+            status: "session_action_recorded",
+            session: {
+              acpSessionId: "acp-guided-web",
+              projectId: "project-web",
+              traceId: "trace_guided_acp",
+              agentName: "codex",
+              modeId: "review",
+              modelId: "gpt-5.5",
+              sessionStatus: "selector_updated",
+            },
+            action: { type: "set_mode", method: "session/set_mode", modeId: "review" },
+            traffic: { entries: [{ method: "session/new" }, { method: "session/set_mode" }] },
+          },
+        },
+      },
+    });
+
+    expect(body).toContain("data-guided-acp-session-action");
+    expect(body).toContain("session_action_recorded");
+    expect(body).toContain("acp-guided-web");
+    expect(body).toContain("selector_updated");
+    expect(body).toContain("session/set_mode");
   });
 
   test("renders continuous update replanning prompt returned from the server action", () => {
@@ -376,12 +432,72 @@ describe("/planning +page.svelte", () => {
     expect(body).toContain("services/planning-review/src/application/technical-planning-cycle.ts");
     expect(body).toContain("data-planning-artifact-previews");
     expect(body).toContain('data-planning-artifact-preview="prototype-apps-web-src-routes-planning-workbench-prototype-tsx"');
+    expect(body).toContain("data-planning-artifact-run-form");
+    expect(body).toContain('name="artifactPlanId" value="technical-plan-web"');
+    expect(body).toContain('name="artifactArgs" value="[&quot;-e&quot;,&quot;await import(\\&quot;./apps/web/src/routes/planning/workbench-prototype.tsx\\&quot;)&quot;]"');
     expect(body).toContain("prototype: workbench-prototype.tsx");
     expect(body).toContain("source-module");
     expect(body).toContain("bun -e await import");
     expect(body).toContain("Prototype demonstrates the intended user flow");
     expect(body).toContain("Review this generated technical plan");
     expect(body).toContain("Build planning route");
+  });
+
+  test("renders artifact execution result history returned from the server action", () => {
+    const { body } = render(Page, {
+      props: {
+        data: { defaultPlanId: "plan_web", defaultTraceId: "trace_web" },
+        form: {
+          ok: true,
+          mode: "artifactExecution",
+          artifactExecution: {
+            planId: "technical-plan-web",
+            artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+            status: "passed",
+            prototypeStatus: "validated",
+            traceId: "trace_technical_web",
+            command: "bun",
+            args: ["-e", 'await import("./apps/web/src/routes/planning/workbench-prototype.tsx")'],
+            runner: "sandbox-agent",
+            runId: "artifact-run-web",
+            exitCode: 0,
+            durationMs: 25,
+            summary: "Artifact command completed in the sandbox runner.",
+            outputRef: "/tmp/fulcrum-agent-run/transcripts/artifact-run.jsonl",
+            history: [{
+              status: "ready",
+              prototypeStatus: "ready",
+              command: "bun",
+              args: ["-e", 'await import("./apps/web/src/routes/planning/workbench-prototype.tsx")'],
+              summary: "Artifact execution is ready to run.",
+              executedAt: "2026-05-15T12:00:00.000Z",
+            }, {
+              status: "passed",
+              prototypeStatus: "validated",
+              command: "bun",
+              args: ["-e", 'await import("./apps/web/src/routes/planning/workbench-prototype.tsx")'],
+              summary: "Artifact command completed in the sandbox runner.",
+              outputRef: "/tmp/fulcrum-agent-run/transcripts/artifact-run.jsonl",
+              executedAt: "2026-05-15T12:01:00.000Z",
+            }],
+          },
+        },
+      },
+    });
+
+    expect(body).toContain("data-planning-artifact-execution");
+    expect(body).toContain("data-planning-artifact-execution-history");
+    expect(body).toContain("data-planning-artifact-execution-history-item");
+    expect(body).toContain("apps/web/src/routes/planning/workbench-prototype.tsx");
+    expect(body).toContain("passed");
+    expect(body).toContain("validated");
+    expect(body).toContain("sandbox-agent");
+    expect(body).toContain("artifact-run-web");
+    expect(body).toContain("exit 0");
+    expect(body).toContain("Artifact command completed in the sandbox runner.");
+    expect(body).toContain("/tmp/fulcrum-agent-run/transcripts/artifact-run.jsonl");
+    expect(body).toContain("2026-05-15T12:00:00.000Z");
+    expect(body).toContain("2026-05-15T12:01:00.000Z");
   });
 
   test("renders full workflow cycle result returned from the server action", () => {

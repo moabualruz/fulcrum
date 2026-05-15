@@ -280,6 +280,92 @@ export function createPlanningCommand(): Command {
     }
   });
 
+  const recordGuidedAcpSessionActionCommand = command.command("record-guided-acp-session-action");
+  recordGuidedAcpSessionActionCommand.description("planning recordGuidedAcpSessionAction");
+  recordGuidedAcpSessionActionCommand.option("--json", "Emit JSON output");
+  recordGuidedAcpSessionActionCommand.option("--project-id <string>", "project-id");
+  recordGuidedAcpSessionActionCommand.option("--acp-session-id <string>", "acp-session-id");
+  recordGuidedAcpSessionActionCommand.addOption(new Option("--action <choice>", "action").choices(["resume_session", "cancel_operation", "resolve_permission", "cancel_permission", "set_mode", "set_model"]));
+  recordGuidedAcpSessionActionCommand.option("--trace-id <string>", "trace-id");
+  recordGuidedAcpSessionActionCommand.option("--option-id <string>", "permission option-id");
+  recordGuidedAcpSessionActionCommand.option("--mode-id <string>", "mode-id");
+  recordGuidedAcpSessionActionCommand.option("--model-id <string>", "model-id");
+  recordGuidedAcpSessionActionCommand.action(async (options) => {
+    try {
+      const result = await planningClient().recordGuidedAcpSessionAction(compact({
+        acpSessionId: requiredOption(options, "acpSessionId"),
+        action: requiredOption(options, "action"),
+        projectId: options.projectId,
+        traceId: options.traceId,
+        optionId: options.optionId,
+        modeId: options.modeId,
+        modelId: options.modelId,
+      }));
+      printGeneratedResult(result, options);
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
+  const runArtifactExecutionCommand = command.command("run-artifact-execution");
+  runArtifactExecutionCommand.description("planning runArtifactExecution");
+  runArtifactExecutionCommand.option("--json", "Emit JSON output");
+  runArtifactExecutionCommand.option("--plan-id <string>", "plan-id");
+  runArtifactExecutionCommand.option("--artifact-path <string>", "artifact-path");
+  runArtifactExecutionCommand.option("--prototype-id <string>", "prototype-id");
+  runArtifactExecutionCommand.option("--artifact-id <string>", "artifact-id");
+  runArtifactExecutionCommand.option("--trace-id <string>", "trace-id");
+  runArtifactExecutionCommand.option("--command <string>", "command");
+  runArtifactExecutionCommand.option("--args-json <json>", "args JSON array");
+  runArtifactExecutionCommand.option("--url-path <string>", "url-path");
+  runArtifactExecutionCommand.option("--summary <string>", "summary");
+  runArtifactExecutionCommand.option("--output-ref <string>", "output-ref");
+  runArtifactExecutionCommand.option("--checks-json <json>", "checks JSON array");
+  runArtifactExecutionCommand.option("--executed-at <string>", "executed-at");
+  runArtifactExecutionCommand.option("--cwd <string>", "cwd");
+  runArtifactExecutionCommand.option("--branch <string>", "branch");
+  runArtifactExecutionCommand.option("--copy-to-worktree-json <json>", "copy-to-worktree JSON array");
+  runArtifactExecutionCommand.option("--timeout-ms <number>", "timeout-ms", integerOption);
+  runArtifactExecutionCommand.option("--plan-only", "Record readiness without running the artifact command");
+  runArtifactExecutionCommand.action(async (options) => {
+    try {
+      const result = await planningClient().runArtifactExecution(compact({
+        planId: requiredOption(options, "planId"),
+        artifactPath: requiredOption(options, "artifactPath"),
+        prototypeId: options.prototypeId,
+        artifactId: options.artifactId,
+        traceId: options.traceId,
+        command: options.command,
+        args: jsonStringArrayOption(options, "argsJson"),
+        urlPath: options.urlPath,
+        summary: options.summary,
+        outputRef: options.outputRef,
+        checks: jsonStringArrayOption(options, "checksJson"),
+        executedAt: options.executedAt,
+        cwd: options.cwd,
+        branch: options.branch,
+        copyToWorktree: jsonStringArrayOption(options, "copyToWorktreeJson"),
+        timeoutMs: options.timeoutMs,
+        planOnly: options.planOnly === true ? true : undefined,
+      }));
+      printGeneratedResult(result, options);
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   return command;
 }
 
@@ -329,6 +415,19 @@ function jsonArrayOption(options: Record<string, unknown>, key: string): unknown
   if (typeof value !== "string" || !value.trim()) return undefined;
   const parsed = JSON.parse(value) as unknown;
   if (!Array.isArray(parsed)) throw new Error(`${key} must be a JSON array.`);
+  return parsed;
+}
+
+function jsonStringArrayOption(options: Record<string, unknown>, key: string): string[] | undefined {
+  const values = jsonArrayOption(options, key);
+  if (!values) return undefined;
+  if (values.some((value) => typeof value !== "string")) throw new Error(`${key} must be a JSON string array.`);
+  return values as string[];
+}
+
+function integerOption(value: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) throw new Error(`${value} must be an integer.`);
   return parsed;
 }
 

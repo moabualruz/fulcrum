@@ -75,6 +75,23 @@ interface GuidedAcpStartInput {
 }
 
 type GuidedAcpPermissionMode = NonNullable<GuidedAcpStartInput["permissionMode"]>;
+type GuidedAcpSessionAction =
+  | "resume_session"
+  | "cancel_operation"
+  | "resolve_permission"
+  | "cancel_permission"
+  | "set_mode"
+  | "set_model";
+
+interface GuidedAcpSessionActionInput {
+  acpSessionId: string;
+  action: GuidedAcpSessionAction;
+  projectId?: string | null;
+  traceId?: string;
+  optionId?: string;
+  modeId?: string;
+  modelId?: string;
+}
 
 interface ContinuousUpdateChangedDocInput {
   id?: string;
@@ -110,6 +127,18 @@ interface TechnicalPlanningInput {
   prototypePaths?: string[];
   boilerplatePaths?: string[];
   successCriteria?: string[];
+}
+
+interface ArtifactExecutionInput {
+  planId: string;
+  artifactPath: string;
+  traceId?: string;
+  command?: string;
+  args?: string[];
+  urlPath?: string;
+  checks?: string[];
+  timeoutMs?: number;
+  planOnly?: boolean;
 }
 
 type WorkflowCycleInput = Record<string, unknown>;
@@ -165,6 +194,19 @@ function parseSourceDocRefs(raw: string): { ok: true; value: SourceDocRef[] } | 
 
 function parseCsv(raw: string): string[] {
   return raw.split(",").map((part) => part.trim()).filter(Boolean);
+}
+
+function parseJsonStringArray(raw: string, key: string): string[] | undefined {
+  if (!raw.trim()) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed) || !parsed.every((item) => typeof item === "string")) {
+      throw new Error();
+    }
+    return parsed.map((item) => item.trim()).filter(Boolean);
+  } catch {
+    throw new Error(`${key} must be a JSON string array`);
+  }
 }
 
 function optionalPositiveInteger(fd: FormData, key: string): number | undefined {
@@ -288,6 +330,36 @@ function guidedAcpPermissionMode(
   return { ok: false, error: "acpPermissionMode must be review_each_tool, allow_workspace, or read_only" };
 }
 
+function guidedAcpSessionActionInput(fd: FormData): { ok: true; value: GuidedAcpSessionActionInput } | { ok: false; error: string } {
+  const acpSessionId = field(fd, "acpSessionId");
+  const action = field(fd, "acpSessionAction");
+  if (!acpSessionId) return { ok: false, error: "acpSessionId is required" };
+  if (!isGuidedAcpSessionAction(action)) {
+    return { ok: false, error: "acpSessionAction must be resume_session, cancel_operation, resolve_permission, cancel_permission, set_mode, or set_model" };
+  }
+  return {
+    ok: true,
+    value: {
+      acpSessionId,
+      action,
+      projectId: optionalNullableField(fd, "projectId"),
+      traceId: optionalField(fd, "traceId"),
+      optionId: optionalField(fd, "acpPermissionOptionId"),
+      modeId: optionalField(fd, "modeId"),
+      modelId: optionalField(fd, "modelId"),
+    },
+  };
+}
+
+function isGuidedAcpSessionAction(value: string): value is GuidedAcpSessionAction {
+  return value === "resume_session" ||
+    value === "cancel_operation" ||
+    value === "resolve_permission" ||
+    value === "cancel_permission" ||
+    value === "set_mode" ||
+    value === "set_model";
+}
+
 function continuousUpdateInput(fd: FormData): { ok: true; value: ContinuousUpdateInput } | { ok: false; error: string } {
   const trigger = field(fd, "continuousTrigger");
   const userPrompt = field(fd, "continuousUserPrompt");
@@ -348,6 +420,32 @@ function technicalPlanningInput(fd: FormData): { ok: true; value: TechnicalPlann
         prototypePaths: parseCsv(field(fd, "prototypePaths")),
         boilerplatePaths: parseCsv(field(fd, "boilerplatePaths")),
         successCriteria: parseCsv(field(fd, "successCriteria")),
+      },
+    };
+  } catch (error) {
+    return { ok: false, error: (error as Error).message };
+  }
+}
+
+function artifactExecutionInput(fd: FormData): { ok: true; value: ArtifactExecutionInput } | { ok: false; error: string } {
+  const planId = field(fd, "artifactPlanId") || field(fd, "planId");
+  const artifactPath = field(fd, "artifactPath");
+  if (!planId) return { ok: false, error: "artifactPlanId is required" };
+  if (!artifactPath) return { ok: false, error: "artifactPath is required" };
+
+  try {
+    return {
+      ok: true,
+      value: {
+        planId,
+        artifactPath,
+        traceId: optionalField(fd, "artifactTraceId"),
+        command: optionalField(fd, "artifactCommand"),
+        args: parseJsonStringArray(rawField(fd, "artifactArgs"), "artifactArgs"),
+        urlPath: optionalField(fd, "artifactUrlPath"),
+        checks: parseJsonStringArray(rawField(fd, "artifactChecks"), "artifactChecks"),
+        timeoutMs: optionalPositiveInteger(fd, "artifactTimeoutMs"),
+        planOnly: field(fd, "artifactPlanOnly") === "true" ? true : undefined,
       },
     };
   } catch (error) {
@@ -439,6 +537,20 @@ function actionError(mode: string, error: unknown) {
 }
 
 export const actions: Actions = {
+  runArtifactExecution: async (event) => {
+    const actionEvent = event as PlanningActionEvent;
+    const parsed = artifactExecutionInput(await actionEvent.request.formData());
+    if (!parsed.ok) return fail(400, { ok: false, mode: "artifactExecution", error: parsed.error });
+    try {
+      const artifactExecution = await createPlanningWorkflowApi(actionEvent).planning.runArtifactExecution(
+        apiInput(parsed.value),
+      );
+      return { ok: true, mode: "artifactExecution", artifactExecution };
+    } catch (error) {
+      return actionError("artifactExecution", error);
+    }
+  },
+
   workflowCycle: async (event) => {
     const actionEvent = event as PlanningActionEvent;
     const parsed = workflowCycleInput(await actionEvent.request.formData());
@@ -500,6 +612,20 @@ export const actions: Actions = {
       return { ok: true, mode: "guidedAcpStart", guidedAcpStart };
     } catch (error) {
       return actionError("guidedAcpStart", error);
+    }
+  },
+
+  guidedAcpSessionAction: async (event) => {
+    const actionEvent = event as PlanningActionEvent;
+    const parsed = guidedAcpSessionActionInput(await actionEvent.request.formData());
+    if (!parsed.ok) return fail(400, { ok: false, mode: "guidedAcpSessionAction", error: parsed.error });
+    try {
+      const guidedAcpSessionAction = await createPlanningWorkflowApi(actionEvent).planning.recordGuidedAcpSessionAction(
+        apiInput(parsed.value),
+      );
+      return { ok: true, mode: "guidedAcpSessionAction", guidedAcpSessionAction };
+    } catch (error) {
+      return actionError("guidedAcpSessionAction", error);
     }
   },
 

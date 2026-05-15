@@ -74,6 +74,6 @@ describe("planning artifact previews", () => {
       },
     ]);
     expect(previews[0]?.reviewChecks.join("\n")).toContain("Prototype demonstrates the intended user flow");
-    expect(previews[1]?.reviewChecks.join("\n")).toContain("Boilerplate can be imported or tested");
+    expect(previews[2]?.reviewChecks.join("\n")).toContain("Boilerplate can be imported or tested");
   });
 });

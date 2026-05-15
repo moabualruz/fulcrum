@@ -4,9 +4,11 @@ import type {
   PlanningFreeformPromptInput,
   PlanningFreeformStartInput,
   PlanningGuidedAcpStartInput,
+  PlanningGuidedAcpSessionActionInput,
   PlanningContinuousUpdateInput,
   PlanningTechnicalCycleInput,
   PlanningArtifactExecutionInput,
+  PlanningArtifactRunInput,
 } from "@workflow-coordination/application/planning-preview.service.ts";
 
 export class PlanningApprovedPlanRequestDto implements BuildApprovedPlanBreakdownInput {
@@ -83,6 +85,16 @@ export class PlanningGuidedAcpStartRequestDto implements PlanningGuidedAcpStartI
   maxDocChars?: number;
 }
 
+export class PlanningGuidedAcpSessionActionRequestDto implements PlanningGuidedAcpSessionActionInput {
+  acpSessionId!: string;
+  action!: PlanningGuidedAcpSessionActionInput["action"];
+  projectId?: string | null;
+  traceId?: string;
+  optionId?: string;
+  modeId?: string;
+  modelId?: string;
+}
+
 export class PlanningContinuousChangedDocDto {
   id?: string;
   title?: string;
@@ -144,4 +156,24 @@ export class PlanningArtifactExecutionRequestDto implements PlanningArtifactExec
   outputRef?: string;
   checks?: string[];
   executedAt?: string;
+}
+
+export class PlanningArtifactRunRequestDto implements PlanningArtifactRunInput {
+  planId!: string;
+  artifactPath!: string;
+  prototypeId?: string;
+  artifactId?: string;
+  traceId?: string;
+  command?: string;
+  args?: string[];
+  urlPath?: string;
+  summary?: string;
+  outputRef?: string;
+  checks?: string[];
+  executedAt?: string;
+  cwd?: string;
+  branch?: string;
+  copyToWorktree?: string[];
+  timeoutMs?: number;
+  planOnly?: boolean;
 }

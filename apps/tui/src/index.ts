@@ -46,6 +46,10 @@ import {
   type FreeformWorkStartResult,
   type GuidedAcpPlanningInput,
   type GuidedAcpPlanningResult,
+  type GuidedAcpSessionActionInput,
+  type GuidedAcpSessionActionResult,
+  type PlanningArtifactRunInput,
+  type PlanningArtifactRunResult,
   type PlanningBreakdownInput,
   type PlanningBreakdownMaterializationResult,
   type PlanningBreakdownResult,
@@ -66,6 +70,7 @@ import {
   requireTuiSessionContext,
   withAgentRunApiCaller,
   withAuditApiCaller,
+  withDocumentApiCaller,
   withNotificationApiCaller,
   withWorkflowApiCaller,
   withWebhookApiCaller,
@@ -173,6 +178,15 @@ export interface TuiCaller {
     };
   };
   docs?: {
+    list?: (input?: Record<string, unknown>) => Promise<unknown[]>;
+    get?: (input: { id: string }) => Promise<unknown>;
+    create?: (input: Record<string, unknown>) => Promise<unknown>;
+    update?: (input: Record<string, unknown> & { id: string }) => Promise<unknown>;
+    delete?: (input: { id: string }) => Promise<unknown>;
+    listComments?: (input: { id?: string; docId?: string }) => Promise<unknown[]>;
+    listBacklinks?: (input: { id?: string; docId?: string }) => Promise<unknown[]>;
+    listAttachments?: (input: { id?: string; docId?: string }) => Promise<unknown[]>;
+    listCollaborationStates?: (input: { id?: string; docId?: string }) => Promise<unknown[]>;
     templates: {
       list: (input: Record<string, never>) => Promise<Array<{
         id: string;
@@ -236,8 +250,10 @@ export interface TuiCaller {
     buildFreeformDocsPlanningPrompt?: (input: FreeformPlanningPromptInput) => Promise<FreeformPlanningPromptResult>;
     startFreeformWorkFromDocs?: (input: FreeformWorkStartInput) => Promise<FreeformWorkStartResult>;
     startGuidedAcpPlanningSession?: (input: GuidedAcpPlanningInput) => Promise<GuidedAcpPlanningResult>;
+    recordGuidedAcpSessionAction?: (input: GuidedAcpSessionActionInput) => Promise<GuidedAcpSessionActionResult>;
     restartPlanningCycleFromUpdates?: (input: ContinuousUpdateInput) => Promise<ContinuousUpdateResult>;
     generateTechnicalPlanningCycle?: (input: TechnicalPlanningInput) => Promise<TechnicalPlanningResult>;
+    runArtifactExecution?: (input: PlanningArtifactRunInput) => Promise<PlanningArtifactRunResult>;
   };
   workflows?: {
     runAcceptanceCycle?: (input: WorkflowAcceptanceCycleInput) => Promise<WorkflowCycleResultView>;
@@ -301,6 +317,9 @@ export interface TuiAppOptions {
 
   /** Planning generation input used when requesting prototype and boilerplate review artifacts. */
   technicalPlanningInput?: TechnicalPlanningInput;
+
+  /** Artifact execution input used when running a planning artifact from the planning screen. */
+  planningArtifactExecutionInput?: PlanningArtifactRunInput;
 
   /** Full workflow-cycle input used when running the acceptance cycle from planning. */
   workflowCycleInput?: WorkflowAcceptanceCycleInput;
@@ -440,6 +459,14 @@ function defaultTechnicalPlanningInput(): TechnicalPlanningInput {
   };
 }
 
+function defaultPlanningArtifactExecutionInput(): PlanningArtifactRunInput {
+  return {
+    planId: "tui-planning",
+    artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+    traceId: "tui-planning",
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TuiApp
 // ─────────────────────────────────────────────────────────────────────────────
@@ -462,6 +489,7 @@ export class TuiApp {
   private readonly guidedAcpInput: GuidedAcpPlanningInput;
   private readonly continuousUpdateInput: ContinuousUpdateInput;
   private readonly technicalPlanningInput: TechnicalPlanningInput;
+  private readonly planningArtifactExecutionInput: PlanningArtifactRunInput;
   private readonly workflowCycleInput?: WorkflowAcceptanceCycleInput;
   private keyHandler: ((key: string) => void) | null = null;
 
@@ -536,6 +564,7 @@ export class TuiApp {
     this.guidedAcpInput = opts.guidedAcpInput ?? defaultGuidedAcpInput();
     this.continuousUpdateInput = opts.continuousUpdateInput ?? defaultContinuousUpdateInput();
     this.technicalPlanningInput = opts.technicalPlanningInput ?? defaultTechnicalPlanningInput();
+    this.planningArtifactExecutionInput = opts.planningArtifactExecutionInput ?? defaultPlanningArtifactExecutionInput();
     this.workflowCycleInput = opts.workflowCycleInput;
   }
 
@@ -1356,6 +1385,7 @@ export class TuiApp {
           guidedAcpInput: this.guidedAcpInput,
           continuousUpdateInput: this.continuousUpdateInput,
           technicalPlanningInput: this.technicalPlanningInput,
+          artifactExecutionInput: this.planningArtifactExecutionInput,
           workflowCycleInput: this.workflowCycleInput,
         });
         await this.planningScreen.load();
@@ -1503,8 +1533,10 @@ export async function buildCaller(
   const publicApiCaller = withWorkflowApiCaller(
     withWebhookApiCaller(
       withAuditApiCaller(
-        withNotificationApiCaller(
-          withAgentRunApiCaller(caller as unknown as TuiCaller),
+        withDocumentApiCaller(
+          withNotificationApiCaller(
+            withAgentRunApiCaller(caller as unknown as TuiCaller),
+          ),
         ),
       ),
     ),

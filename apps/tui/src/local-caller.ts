@@ -1,5 +1,6 @@
 import type { DiContainer } from "@platform-core/interface/runtime-container.ts";
 import { createAgentRunApiCallerFromEnv } from "@execution-orchestration/interface/http/agent-run-api-client.ts";
+import { createDocumentApiCallerFromEnv } from "@knowledge-workspace/interface/http/document-api-client.ts";
 import { createNotificationApiCallerFromEnv } from "@notification-center/interface/http/notification-api-client.ts";
 import { createWebhookApiCallerFromEnv } from "@integration-hub/interface/http/webhook-api-client.ts";
 import { createAuditApiClientFromEnv } from "@workflow-coordination/interface/http/audit-api-client.ts";
@@ -13,6 +14,7 @@ type ConfiguredApiCaller<T extends (...args: never[]) => unknown> = Exclude<Retu
 type MergedCaller<Base extends object, Overlay extends object> = Omit<Base, keyof Overlay> & Overlay;
 type NestedMerge<Base, Overlay extends object> = Base extends object ? Omit<Base, keyof Overlay> & Overlay : Overlay;
 type NotificationApiCaller = ConfiguredApiCaller<typeof createNotificationApiCallerFromEnv>;
+type DocumentApiCaller = ConfiguredApiCaller<typeof createDocumentApiCallerFromEnv>;
 type AgentRunApiCaller = ConfiguredApiCaller<typeof createAgentRunApiCallerFromEnv>;
 type WebhookApiCaller = ConfiguredApiCaller<typeof createWebhookApiCallerFromEnv>;
 type AuditApiClient = ConfiguredApiCaller<typeof createAuditApiClientFromEnv>;
@@ -47,6 +49,24 @@ export function withNotificationApiCaller<T extends object>(
   const publicApiCaller = createNotificationApiCallerFromEnv(options.env, options.fetch);
   if (!publicApiCaller) return caller as unknown as MergedCaller<T, NotificationApiCaller>;
   return { ...caller, notify: publicApiCaller.notify } as unknown as MergedCaller<T, NotificationApiCaller>;
+}
+
+export function withDocumentApiCaller<T extends object>(
+  caller: T,
+  options: {
+    env?: Record<string, string | undefined>;
+    fetch?: typeof fetch;
+  } = {},
+): MergedCaller<T, { docs: NestedMerge<T extends { docs?: infer Docs } ? NonNullable<Docs> : never, DocumentApiCaller["docs"]> }> {
+  const publicApiCaller = createDocumentApiCallerFromEnv(options.env, options.fetch);
+  if (!publicApiCaller) {
+    return caller as unknown as MergedCaller<T, { docs: NestedMerge<T extends { docs?: infer Docs } ? NonNullable<Docs> : never, DocumentApiCaller["docs"]> }>;
+  }
+  const current = caller as { docs?: unknown };
+  return {
+    ...caller,
+    docs: { ...(current.docs ? current.docs as Record<string, unknown> : {}), ...publicApiCaller.docs },
+  } as unknown as MergedCaller<T, { docs: NestedMerge<T extends { docs?: infer Docs } ? NonNullable<Docs> : never, DocumentApiCaller["docs"]> }>;
 }
 
 export function withAgentRunApiCaller<T extends object>(

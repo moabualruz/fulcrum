@@ -25,7 +25,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { IsIn, IsOptional, IsString, IsUUID, MinLength } from "class-validator";
+import { IsArray, IsNumber, IsObject, IsOptional, IsString, IsUUID, Min, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
 
 import { DocumentPublicStore } from "@knowledge-workspace/infrastructure/database/document-public-store.ts";
@@ -33,8 +33,8 @@ import { KNOWLEDGE_WORKSPACE_ENTITIES } from "@knowledge-workspace/infrastructur
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
-import { DocumentListQueryDto, DocumentTemplateQueryDto, DocumentIdParamsDto, DocumentCommentIdParamsDto, DocumentLinkIdParamsDto, DocumentVersionParamsDto, DocumentVersionIdParamsDto, DocumentVersionDiffQueryDto, DocumentCommentListQueryDto, DocumentCreateBodyDto, DocumentPatchBodyDto, DocumentCommentCreateBodyDto, DocumentCommentPatchBodyDto, DocumentCommentResolveBodyDto, DocumentLinkCreateBodyDto } from "./dto/document.dto.ts";
-export { DocumentListQueryDto, DocumentTemplateQueryDto, DocumentIdParamsDto, DocumentCommentIdParamsDto, DocumentLinkIdParamsDto, DocumentVersionParamsDto, DocumentVersionIdParamsDto, DocumentVersionDiffQueryDto, DocumentCommentListQueryDto, DocumentCreateBodyDto, DocumentPatchBodyDto, DocumentCommentCreateBodyDto, DocumentCommentPatchBodyDto, DocumentCommentResolveBodyDto, DocumentLinkCreateBodyDto };
+import { DocumentListQueryDto, DocumentTemplateQueryDto, DocumentIdParamsDto, DocumentCommentIdParamsDto, DocumentAttachmentIdParamsDto, DocumentCollaborationProviderParamsDto, DocumentLinkIdParamsDto, DocumentVersionParamsDto, DocumentVersionIdParamsDto, DocumentVersionDiffQueryDto, DocumentCommentListQueryDto, DocumentCreateBodyDto, DocumentPatchBodyDto, DocumentCommentCreateBodyDto, DocumentCommentPatchBodyDto, DocumentCommentResolveBodyDto, DocumentAttachmentCreateBodyDto, DocumentCollaborationStatePatchBodyDto, DocumentLinkCreateBodyDto } from "./dto/document.dto.ts";
+export { DocumentListQueryDto, DocumentTemplateQueryDto, DocumentIdParamsDto, DocumentCommentIdParamsDto, DocumentAttachmentIdParamsDto, DocumentCollaborationProviderParamsDto, DocumentLinkIdParamsDto, DocumentVersionParamsDto, DocumentVersionIdParamsDto, DocumentVersionDiffQueryDto, DocumentCommentListQueryDto, DocumentCreateBodyDto, DocumentPatchBodyDto, DocumentCommentCreateBodyDto, DocumentCommentPatchBodyDto, DocumentCommentResolveBodyDto, DocumentAttachmentCreateBodyDto, DocumentCollaborationStatePatchBodyDto, DocumentLinkCreateBodyDto };
 
 export const DOCUMENT_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.documentPublicApi.options");
 
@@ -72,6 +72,7 @@ export class DocumentPublicApiService {
       title: body.title,
       docType: body.type,
       bodyMd: body.bodyMd,
+      frontmatter: body.frontmatter,
     };
     if (body.projectId !== undefined) input["projectId"] = body.projectId;
     const doc = await this.requireApplication().create(input);
@@ -93,6 +94,7 @@ export class DocumentPublicApiService {
       title: body.title,
       docType: body.type,
       bodyMd: body.bodyMd,
+      frontmatter: body.frontmatter,
     });
     if (!doc) throw new NotFoundException({ error: "Not found", code: "NOT_FOUND" });
     return normalizeDocument(doc);
@@ -169,6 +171,60 @@ export class DocumentPublicApiService {
   async deleteComment(params: DocumentCommentIdParamsDto): Promise<void> {
     const comment = await this.requireStore().deleteComment({ commentId: params.commentId });
     if (!comment) throw new NotFoundException({ error: "Not found", code: "NOT_FOUND" });
+  }
+
+  async listAttachments(params: DocumentIdParamsDto): Promise<unknown[]> {
+    return await this.requireStore().listAttachments({ docId: params.id });
+  }
+
+  async createAttachment(
+    params: DocumentIdParamsDto,
+    body: DocumentAttachmentCreateBodyDto,
+  ): Promise<unknown> {
+    const attachment = await this.requireStore().createAttachment({
+      docId: params.id,
+      fileName: body.fileName,
+      mimeType: body.mimeType,
+      sizeBytes: body.sizeBytes,
+      storagePath: body.storagePath,
+      checksumSha256: body.checksumSha256,
+      traceId: body.traceId,
+    });
+    if (!attachment) throw new NotFoundException({ error: "Not found", code: "NOT_FOUND" });
+    return attachment;
+  }
+
+  async deleteAttachment(params: DocumentAttachmentIdParamsDto): Promise<void> {
+    const attachment = await this.requireStore().deleteAttachment({ attachmentId: params.attachmentId });
+    if (!attachment) throw new NotFoundException({ error: "Not found", code: "NOT_FOUND" });
+  }
+
+  async listCollaborationStates(params: DocumentIdParamsDto): Promise<unknown[]> {
+    return await this.requireStore().listCollaborationStates({ docId: params.id });
+  }
+
+  async patchCollaborationState(
+    params: DocumentCollaborationProviderParamsDto,
+    body: DocumentCollaborationStatePatchBodyDto,
+  ): Promise<unknown> {
+    const state = await this.requireStore().upsertCollaborationState({
+      docId: params.id,
+      provider: params.provider,
+      stateVector: body.stateVector,
+      documentState: body.documentState,
+      activeClientIds: body.activeClientIds,
+      traceId: body.traceId,
+    });
+    if (!state) throw new NotFoundException({ error: "Not found", code: "NOT_FOUND" });
+    return state;
+  }
+
+  async deleteCollaborationState(params: DocumentCollaborationProviderParamsDto): Promise<void> {
+    const state = await this.requireStore().deleteCollaborationState({
+      docId: params.id,
+      provider: params.provider,
+    });
+    if (!state) throw new NotFoundException({ error: "Not found", code: "NOT_FOUND" });
   }
 
   async listBacklinks(params: DocumentIdParamsDto): Promise<unknown[]> {
@@ -350,6 +406,36 @@ export class DocumentPublicApiController {
     await this.documents.deleteComment(params);
   }
 
+  async listAttachments(params: DocumentIdParamsDto): Promise<unknown[]> {
+    return await this.documents.listAttachments(params);
+  }
+
+  async createAttachment(
+    params: DocumentIdParamsDto,
+    body: DocumentAttachmentCreateBodyDto,
+  ): Promise<unknown> {
+    return await this.documents.createAttachment(params, body);
+  }
+
+  async deleteAttachment(params: DocumentAttachmentIdParamsDto): Promise<void> {
+    await this.documents.deleteAttachment(params);
+  }
+
+  async listCollaborationStates(params: DocumentIdParamsDto): Promise<unknown[]> {
+    return await this.documents.listCollaborationStates(params);
+  }
+
+  async patchCollaborationState(
+    params: DocumentCollaborationProviderParamsDto,
+    body: DocumentCollaborationStatePatchBodyDto,
+  ): Promise<unknown> {
+    return await this.documents.patchCollaborationState(params, body);
+  }
+
+  async deleteCollaborationState(params: DocumentCollaborationProviderParamsDto): Promise<void> {
+    await this.documents.deleteCollaborationState(params);
+  }
+
   async listBacklinks(params: DocumentIdParamsDto): Promise<unknown[]> {
     return await this.documents.listBacklinks(params);
   }
@@ -434,7 +520,7 @@ IsOptional()(DocumentListQueryDto.prototype, "projectId");
 IsString()(DocumentListQueryDto.prototype, "projectId");
 MinLength(1)(DocumentListQueryDto.prototype, "projectId");
 IsOptional()(DocumentListQueryDto.prototype, "type");
-IsIn(["page", "wiki", "note", "template"])(DocumentListQueryDto.prototype, "type");
+IsString()(DocumentListQueryDto.prototype, "type");
 
 IsOptional()(DocumentTemplateQueryDto.prototype, "projectId");
 IsString()(DocumentTemplateQueryDto.prototype, "projectId");
@@ -445,6 +531,10 @@ MinLength(1)(DocumentTemplateQueryDto.prototype, "docType");
 
 IsUUID()(DocumentIdParamsDto.prototype, "id");
 IsUUID()(DocumentCommentIdParamsDto.prototype, "commentId");
+IsString()(DocumentAttachmentIdParamsDto.prototype, "attachmentId");
+MinLength(1)(DocumentAttachmentIdParamsDto.prototype, "attachmentId");
+IsString()(DocumentCollaborationProviderParamsDto.prototype, "provider");
+MinLength(1)(DocumentCollaborationProviderParamsDto.prototype, "provider");
 IsString()(DocumentVersionParamsDto.prototype, "version");
 MinLength(1)(DocumentVersionParamsDto.prototype, "version");
 IsString()(DocumentVersionIdParamsDto.prototype, "versionId");
@@ -463,17 +553,21 @@ MinLength(1)(DocumentCreateBodyDto.prototype, "projectId");
 IsString()(DocumentCreateBodyDto.prototype, "title");
 MinLength(1)(DocumentCreateBodyDto.prototype, "title");
 IsOptional()(DocumentCreateBodyDto.prototype, "type");
-IsIn(["page", "wiki", "note", "template"])(DocumentCreateBodyDto.prototype, "type");
+IsString()(DocumentCreateBodyDto.prototype, "type");
 IsOptional()(DocumentCreateBodyDto.prototype, "bodyMd");
 IsString()(DocumentCreateBodyDto.prototype, "bodyMd");
+IsOptional()(DocumentCreateBodyDto.prototype, "frontmatter");
+IsObject()(DocumentCreateBodyDto.prototype, "frontmatter");
 
 IsOptional()(DocumentPatchBodyDto.prototype, "title");
 IsString()(DocumentPatchBodyDto.prototype, "title");
 MinLength(1)(DocumentPatchBodyDto.prototype, "title");
 IsOptional()(DocumentPatchBodyDto.prototype, "type");
-IsIn(["page", "wiki", "note", "template"])(DocumentPatchBodyDto.prototype, "type");
+IsString()(DocumentPatchBodyDto.prototype, "type");
 IsOptional()(DocumentPatchBodyDto.prototype, "bodyMd");
 IsString()(DocumentPatchBodyDto.prototype, "bodyMd");
+IsOptional()(DocumentPatchBodyDto.prototype, "frontmatter");
+IsObject()(DocumentPatchBodyDto.prototype, "frontmatter");
 
 IsString()(DocumentCommentCreateBodyDto.prototype, "authorId");
 MinLength(1)(DocumentCommentCreateBodyDto.prototype, "authorId");
@@ -491,6 +585,27 @@ for (const property of ["bodyMd", "status"] as const) {
 }
 IsOptional()(DocumentCommentPatchBodyDto.prototype, "selection");
 IsOptional()(DocumentCommentResolveBodyDto.prototype, "resolved");
+
+IsString()(DocumentAttachmentCreateBodyDto.prototype, "fileName");
+MinLength(1)(DocumentAttachmentCreateBodyDto.prototype, "fileName");
+IsString()(DocumentAttachmentCreateBodyDto.prototype, "mimeType");
+MinLength(1)(DocumentAttachmentCreateBodyDto.prototype, "mimeType");
+IsNumber()(DocumentAttachmentCreateBodyDto.prototype, "sizeBytes");
+Min(0)(DocumentAttachmentCreateBodyDto.prototype, "sizeBytes");
+IsString()(DocumentAttachmentCreateBodyDto.prototype, "storagePath");
+MinLength(1)(DocumentAttachmentCreateBodyDto.prototype, "storagePath");
+for (const property of ["checksumSha256", "traceId"] as const) {
+  IsOptional()(DocumentAttachmentCreateBodyDto.prototype, property);
+  IsString()(DocumentAttachmentCreateBodyDto.prototype, property);
+  MinLength(1)(DocumentAttachmentCreateBodyDto.prototype, property);
+}
+
+for (const property of ["stateVector", "documentState", "traceId"] as const) {
+  IsOptional()(DocumentCollaborationStatePatchBodyDto.prototype, property);
+  IsString()(DocumentCollaborationStatePatchBodyDto.prototype, property);
+}
+IsOptional()(DocumentCollaborationStatePatchBodyDto.prototype, "activeClientIds");
+IsArray()(DocumentCollaborationStatePatchBodyDto.prototype, "activeClientIds");
 
 IsString()(DocumentLinkIdParamsDto.prototype, "linkId");
 MinLength(1)(DocumentLinkIdParamsDto.prototype, "linkId");
@@ -552,6 +667,30 @@ const deleteCommentDescriptor = Object.getOwnPropertyDescriptor(
   DocumentPublicApiController.prototype,
   "deleteComment",
 );
+const listAttachmentsDescriptor = Object.getOwnPropertyDescriptor(
+  DocumentPublicApiController.prototype,
+  "listAttachments",
+);
+const createAttachmentDescriptor = Object.getOwnPropertyDescriptor(
+  DocumentPublicApiController.prototype,
+  "createAttachment",
+);
+const deleteAttachmentDescriptor = Object.getOwnPropertyDescriptor(
+  DocumentPublicApiController.prototype,
+  "deleteAttachment",
+);
+const listCollaborationStatesDescriptor = Object.getOwnPropertyDescriptor(
+  DocumentPublicApiController.prototype,
+  "listCollaborationStates",
+);
+const patchCollaborationStateDescriptor = Object.getOwnPropertyDescriptor(
+  DocumentPublicApiController.prototype,
+  "patchCollaborationState",
+);
+const deleteCollaborationStateDescriptor = Object.getOwnPropertyDescriptor(
+  DocumentPublicApiController.prototype,
+  "deleteCollaborationState",
+);
 const listBacklinksDescriptor = Object.getOwnPropertyDescriptor(
   DocumentPublicApiController.prototype,
   "listBacklinks",
@@ -610,6 +749,12 @@ if (
   !patchCommentDescriptor ||
   !resolveCommentDescriptor ||
   !deleteCommentDescriptor ||
+  !listAttachmentsDescriptor ||
+  !createAttachmentDescriptor ||
+  !deleteAttachmentDescriptor ||
+  !listCollaborationStatesDescriptor ||
+  !patchCollaborationStateDescriptor ||
+  !deleteCollaborationStateDescriptor ||
   !listBacklinksDescriptor ||
   !listForwardLinksDescriptor ||
   !createLinkDescriptor ||
@@ -833,6 +978,144 @@ ApiNoContentResponse({ description: "Deleted doc comment" })(
   DocumentPublicApiController.prototype,
   "deleteComment",
   deleteCommentDescriptor,
+);
+
+Get(":id/attachments")(DocumentPublicApiController.prototype, "listAttachments", listAttachmentsDescriptor);
+Param()(DocumentPublicApiController.prototype, "listAttachments", 0);
+ApiOperation({ summary: "List doc attachments" })(
+  DocumentPublicApiController.prototype,
+  "listAttachments",
+  listAttachmentsDescriptor,
+);
+ApiParam({ name: "id", required: true })(
+  DocumentPublicApiController.prototype,
+  "listAttachments",
+  listAttachmentsDescriptor,
+);
+ApiOkResponse({ description: "Doc attachments" })(
+  DocumentPublicApiController.prototype,
+  "listAttachments",
+  listAttachmentsDescriptor,
+);
+
+Post(":id/attachments")(DocumentPublicApiController.prototype, "createAttachment", createAttachmentDescriptor);
+Param()(DocumentPublicApiController.prototype, "createAttachment", 0);
+Body()(DocumentPublicApiController.prototype, "createAttachment", 1);
+ApiOperation({ summary: "Create doc attachment metadata" })(
+  DocumentPublicApiController.prototype,
+  "createAttachment",
+  createAttachmentDescriptor,
+);
+ApiParam({ name: "id", required: true })(
+  DocumentPublicApiController.prototype,
+  "createAttachment",
+  createAttachmentDescriptor,
+);
+ApiCreatedResponse({ description: "Created doc attachment metadata" })(
+  DocumentPublicApiController.prototype,
+  "createAttachment",
+  createAttachmentDescriptor,
+);
+
+Delete("attachments/:attachmentId")(
+  DocumentPublicApiController.prototype,
+  "deleteAttachment",
+  deleteAttachmentDescriptor,
+);
+HttpCode(204)(DocumentPublicApiController.prototype, "deleteAttachment", deleteAttachmentDescriptor);
+Param()(DocumentPublicApiController.prototype, "deleteAttachment", 0);
+ApiOperation({ summary: "Delete doc attachment metadata" })(
+  DocumentPublicApiController.prototype,
+  "deleteAttachment",
+  deleteAttachmentDescriptor,
+);
+ApiParam({ name: "attachmentId", required: true })(
+  DocumentPublicApiController.prototype,
+  "deleteAttachment",
+  deleteAttachmentDescriptor,
+);
+ApiNoContentResponse({ description: "Deleted doc attachment metadata" })(
+  DocumentPublicApiController.prototype,
+  "deleteAttachment",
+  deleteAttachmentDescriptor,
+);
+
+Get(":id/collaboration")(
+  DocumentPublicApiController.prototype,
+  "listCollaborationStates",
+  listCollaborationStatesDescriptor,
+);
+Param()(DocumentPublicApiController.prototype, "listCollaborationStates", 0);
+ApiOperation({ summary: "List doc collaboration states" })(
+  DocumentPublicApiController.prototype,
+  "listCollaborationStates",
+  listCollaborationStatesDescriptor,
+);
+ApiParam({ name: "id", required: true })(
+  DocumentPublicApiController.prototype,
+  "listCollaborationStates",
+  listCollaborationStatesDescriptor,
+);
+ApiOkResponse({ description: "Doc collaboration states" })(
+  DocumentPublicApiController.prototype,
+  "listCollaborationStates",
+  listCollaborationStatesDescriptor,
+);
+
+Patch(":id/collaboration/:provider")(
+  DocumentPublicApiController.prototype,
+  "patchCollaborationState",
+  patchCollaborationStateDescriptor,
+);
+Param()(DocumentPublicApiController.prototype, "patchCollaborationState", 0);
+Body()(DocumentPublicApiController.prototype, "patchCollaborationState", 1);
+ApiOperation({ summary: "Update doc collaboration state" })(
+  DocumentPublicApiController.prototype,
+  "patchCollaborationState",
+  patchCollaborationStateDescriptor,
+);
+ApiParam({ name: "id", required: true })(
+  DocumentPublicApiController.prototype,
+  "patchCollaborationState",
+  patchCollaborationStateDescriptor,
+);
+ApiParam({ name: "provider", required: true })(
+  DocumentPublicApiController.prototype,
+  "patchCollaborationState",
+  patchCollaborationStateDescriptor,
+);
+ApiOkResponse({ description: "Updated doc collaboration state" })(
+  DocumentPublicApiController.prototype,
+  "patchCollaborationState",
+  patchCollaborationStateDescriptor,
+);
+
+Delete(":id/collaboration/:provider")(
+  DocumentPublicApiController.prototype,
+  "deleteCollaborationState",
+  deleteCollaborationStateDescriptor,
+);
+HttpCode(204)(DocumentPublicApiController.prototype, "deleteCollaborationState", deleteCollaborationStateDescriptor);
+Param()(DocumentPublicApiController.prototype, "deleteCollaborationState", 0);
+ApiOperation({ summary: "Delete doc collaboration state" })(
+  DocumentPublicApiController.prototype,
+  "deleteCollaborationState",
+  deleteCollaborationStateDescriptor,
+);
+ApiParam({ name: "id", required: true })(
+  DocumentPublicApiController.prototype,
+  "deleteCollaborationState",
+  deleteCollaborationStateDescriptor,
+);
+ApiParam({ name: "provider", required: true })(
+  DocumentPublicApiController.prototype,
+  "deleteCollaborationState",
+  deleteCollaborationStateDescriptor,
+);
+ApiNoContentResponse({ description: "Deleted doc collaboration state" })(
+  DocumentPublicApiController.prototype,
+  "deleteCollaborationState",
+  deleteCollaborationStateDescriptor,
 );
 
 Get(":id/backlinks")(DocumentPublicApiController.prototype, "listBacklinks", listBacklinksDescriptor);

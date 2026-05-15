@@ -45,6 +45,9 @@ describe("CLI workflow API caller", () => {
         if (String(url).includes("/workflows/review/final-qa/report")) {
           return Response.json({ status: "ready", traceId: "trace-cli" });
         }
+        if (String(url).includes("/workflows/planning/artifact-execution/run")) {
+          return Response.json({ status: "passed", traceId: "trace-cli", runner: "sandbox-agent" });
+        }
         return Response.json({ title: "Preview", traceId: "trace-cli" });
       }) as typeof fetch,
     });
@@ -87,6 +90,11 @@ describe("CLI workflow API caller", () => {
       projectId: "project-1",
       traceId: "trace-cli",
     })).resolves.toEqual({ status: "ready", traceId: "trace-cli" });
+    await expect(caller.planning.runArtifactExecution({
+      planId: "plan-1",
+      artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+      traceId: "trace-cli",
+    })).resolves.toEqual({ status: "passed", traceId: "trace-cli", runner: "sandbox-agent" });
 
     expect(calls.map((call) => call.url)).toEqual([
       "http://127.0.0.1:4321/workflows/planning/approved-plan/preview",
@@ -96,6 +104,7 @@ describe("CLI workflow API caller", () => {
       "http://127.0.0.1:4321/workflows/execution/qa-review/record",
       "http://127.0.0.1:4321/workflows/cycles/acceptance-cycle/run",
       "http://127.0.0.1:4321/workflows/review/final-qa/report",
+      "http://127.0.0.1:4321/workflows/planning/artifact-execution/run",
     ]);
   });
 });

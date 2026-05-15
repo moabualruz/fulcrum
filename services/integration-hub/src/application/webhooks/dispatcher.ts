@@ -33,8 +33,11 @@ export interface DispatchWebhookEventInput {
 export interface WebhookDispatcherEntityManager {
   find<T>(entity: { new (...args: never[]): T }, where: unknown): Promise<T[]>;
   create<T>(entity: { new (...args: never[]): T }, data: Partial<T>): T;
-  persist(entity: unknown): void;
-  flush(): Promise<void>;
+  save<T>(entity: T): Promise<T>;
+  /** @deprecated MikroORM compat — use save() */
+  persist?(entity: unknown): void;
+  /** @deprecated MikroORM compat — use save() */
+  flush?(): Promise<void>;
 }
 
 type DispatchableWebhook = Webhook & {
@@ -77,8 +80,7 @@ export async function dispatchWebhookEvent(input: DispatchWebhookEventInput): Pr
       nextRetryAt: null,
     });
 
-    input.em.persist(delivery);
-    await input.em.flush();
+    await input.em.save(delivery);
     deliveries.push(delivery);
 
     await deliverWithRetry({
