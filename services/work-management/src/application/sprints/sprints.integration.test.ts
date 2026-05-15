@@ -61,7 +61,7 @@ describe("application sprints commands and queries", () => {
     const testDb = await freshDb();
     const em = testDb.em;
     em.persist(em.create(Org, { id: OTHER_ORG_ID, name: "Other", slug: "other", createdAt: new Date(), updatedAt: new Date() }));
-    /* flushed */
+    await (em as any).flush();
     const other = await createSprint(em, ctx(OTHER_ORG_ID), {
       name: "Other sprint",
       projectId: ctx().projectId!,

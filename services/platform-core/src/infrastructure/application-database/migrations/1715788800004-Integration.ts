@@ -14,6 +14,7 @@ export class Integration1715788800004 implements MigrationInterface {
       CREATE TABLE "repos" (
         "id"             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "org_id"         uuid NOT NULL REFERENCES "orgs" ("id"),
+        "project_id"     varchar,
         "name"           varchar NOT NULL,
         "slug"           varchar NOT NULL,
         "kind"           varchar NOT NULL,

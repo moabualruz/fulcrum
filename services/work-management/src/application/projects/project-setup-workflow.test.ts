@@ -164,7 +164,7 @@ describe("Workflow project hierarchy and setup", () => {
         deleted_at: Date | string | null;
       }>>(
         `SELECT p.name, p.description, t.title, t.status, t.priority, t.start_date, t.due_date, t.deleted_at
-           FROM projects p JOIN tasks t ON t.project_id = p.id
+           FROM projects p JOIN tasks t ON t.project_id = p.id::text
           WHERE p.id = ? AND t.id = ?`,
         [project.id, task.id],
       );
