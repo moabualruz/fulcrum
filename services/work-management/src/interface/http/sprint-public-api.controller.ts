@@ -32,9 +32,11 @@ import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/fe
 import { SprintPublicStore } from "@work-management/infrastructure/database/sprint-public-store.ts";
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 
+import { SprintListQueryDto, SprintRequestContextDto, SprintIdParamsDto, SprintCreateBodyDto, SprintPatchBodyDto, SprintTaskParamsDto, SprintTaskBodyDto, SprintListResponseDto, SprintStatus } from "./dto/sprint.dto.ts";
+export { SprintListQueryDto, SprintRequestContextDto, SprintIdParamsDto, SprintCreateBodyDto, SprintPatchBodyDto, SprintTaskParamsDto, SprintTaskBodyDto, SprintListResponseDto, SprintStatus };
+
 export const SPRINT_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.sprintPublicApi.options");
 
-export type SprintStatus = "planning" | "active" | "completed" | "cancelled";
 
 export interface SprintPublicApplication {
   listSprints(input: { orgId: string; projectId: string }): Promise<SprintListResponseDto>;
@@ -59,47 +61,6 @@ export interface SprintPublicApplication {
 export interface SprintPublicApiOptions {
   application?: SprintPublicApplication;
   featuresEnv?: string;
-}
-
-export class SprintListQueryDto {
-  orgId!: string;
-  project_id?: string;
-  projectId?: string;
-}
-
-export class SprintRequestContextDto {
-  orgId!: string;
-}
-
-export class SprintIdParamsDto {
-  id!: string;
-}
-
-export class SprintCreateBodyDto {
-  orgId!: string;
-  projectId?: string;
-  name!: string;
-  status?: SprintStatus;
-}
-
-export class SprintPatchBodyDto {
-  orgId!: string;
-  name?: string;
-  status?: SprintStatus;
-}
-
-export class SprintTaskParamsDto {
-  id!: string;
-  taskId!: string;
-}
-
-export class SprintTaskBodyDto {
-  orgId!: string;
-  taskId!: string;
-}
-
-export class SprintListResponseDto {
-  data!: unknown[];
 }
 
 export class SprintPublicApiService {

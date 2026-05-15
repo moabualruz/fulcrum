@@ -28,35 +28,13 @@ import {
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
+import { FieldDependencyListQueryDto, FieldDependencyIdParamsDto, FieldDependencyCreateDto, FieldDependencyDeleteQueryDto } from "./dto/field-dependency.dto.ts";
+export { FieldDependencyListQueryDto, FieldDependencyIdParamsDto, FieldDependencyCreateDto, FieldDependencyDeleteQueryDto };
+
 export const FIELD_DEPENDENCY_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.fieldDependencyPublicApi.options");
 
 export interface FieldDependencyPublicApiOptions {
   featuresEnv?: string;
-}
-
-export class FieldDependencyListQueryDto {
-  orgId!: string;
-  userId!: string;
-  projectId!: string;
-}
-
-export class FieldDependencyIdParamsDto {
-  id!: string;
-}
-
-export class FieldDependencyCreateDto {
-  orgId!: string;
-  userId!: string;
-  projectId!: string;
-  sourceFieldId!: string;
-  sourceValue!: string;
-  targetFieldId!: string;
-  action!: FieldDependencyAction;
-}
-
-export class FieldDependencyDeleteQueryDto {
-  orgId!: string;
-  userId!: string;
 }
 
 export class FieldDependencyPublicApiService {

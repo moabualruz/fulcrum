@@ -12,31 +12,13 @@ import { TaskCommentStore } from "@work-management/infrastructure/database/task-
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
+import { TaskCommentTaskScopeDto, TaskCommentIdScopeDto, TaskCommentCreateDto, TaskCommentReactionDto } from "./dto/task-comment.dto.ts";
+export { TaskCommentTaskScopeDto, TaskCommentIdScopeDto, TaskCommentCreateDto, TaskCommentReactionDto };
+
 export const TASK_COMMENT_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.taskCommentPublicApi.options");
 
 export interface TaskCommentPublicApiOptions {
   featuresEnv?: string;
-}
-
-export class TaskCommentTaskScopeDto {
-  orgId!: string;
-  userId!: string;
-  taskId!: string;
-}
-
-export class TaskCommentIdScopeDto {
-  orgId!: string;
-  userId!: string;
-  commentId!: string;
-}
-
-export class TaskCommentCreateDto extends TaskCommentTaskScopeDto {
-  body!: Record<string, unknown>;
-  parentCommentId?: string | null;
-}
-
-export class TaskCommentReactionDto extends TaskCommentIdScopeDto {
-  emoji!: string;
 }
 
 export class TaskCommentPublicApiService {

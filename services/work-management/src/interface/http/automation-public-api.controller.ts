@@ -29,55 +29,13 @@ import {
   type AutomationTemplate,
 } from "@work-management/infrastructure/database/automation-store.ts";
 
+import { AutomationListQueryDto, AutomationContextQueryDto, AutomationIdParamsDto, AutomationConditionDto, AutomationCreateDto, AutomationUpdateDto } from "./dto/automation.dto.ts";
+export { AutomationListQueryDto, AutomationContextQueryDto, AutomationIdParamsDto, AutomationConditionDto, AutomationCreateDto, AutomationUpdateDto };
+
 export const AUTOMATION_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.automationPublicApi.options");
 
 export interface AutomationPublicApiOptions {
   featuresEnv?: string;
-}
-
-export class AutomationListQueryDto {
-  orgId!: string;
-  userId!: string;
-  projectId!: string;
-}
-
-export class AutomationContextQueryDto {
-  orgId!: string;
-  userId!: string;
-}
-
-export class AutomationIdParamsDto {
-  id!: string;
-}
-
-export class AutomationConditionDto {
-  field!: string;
-  operator!: AutomationCondition["operator"];
-  value?: unknown;
-}
-
-export class AutomationCreateDto {
-  orgId!: string;
-  userId!: string;
-  projectId!: string;
-  name!: string;
-  triggerType!: string;
-  triggerConfig?: Record<string, unknown> | null;
-  condition?: AutomationConditionDto | null;
-  actionType!: string;
-  actionConfig?: Record<string, unknown> | null;
-}
-
-export class AutomationUpdateDto {
-  orgId!: string;
-  userId!: string;
-  name?: string;
-  triggerType?: string;
-  triggerConfig?: Record<string, unknown> | null;
-  condition?: AutomationConditionDto | null;
-  actionType?: string;
-  actionConfig?: Record<string, unknown> | null;
-  enabled?: boolean;
 }
 
 export class AutomationPublicApiService {

@@ -31,42 +31,15 @@ import {
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
+import { AgentRunRouteParamsDto, AgentRunListQueryDto, AgentRunIssueListQueryDto, AgentRunRefreshResponseDto, AgentRunDispatchBodyDto } from "./dto/agent-run.dto.ts";
+export { AgentRunRouteParamsDto, AgentRunListQueryDto, AgentRunIssueListQueryDto, AgentRunRefreshResponseDto, AgentRunDispatchBodyDto };
+
 export const AGENT_RUN_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.agentRunPublicApi.options");
 
 export interface AgentRunPublicApiOptions {
   store?: LegacySymphonyStore;
   orgId?: string;
   featuresEnv?: string;
-}
-
-export class AgentRunRouteParamsDto {
-  identifier!: string;
-}
-
-export class AgentRunListQueryDto {
-  orgId?: string;
-  status?: string;
-  limit?: number;
-  offset?: number;
-}
-
-export class AgentRunIssueListQueryDto {
-  orgId?: string;
-  states?: string;
-  limit?: number;
-}
-
-export class AgentRunRefreshResponseDto {
-  runs!: unknown[];
-  count!: number;
-}
-
-export class AgentRunDispatchBodyDto {
-  projectId?: string;
-  taskId?: string;
-  agent?: string;
-  traceId?: string;
-  dependencyTree?: string[];
 }
 
 export class AgentRunPublicApiService {

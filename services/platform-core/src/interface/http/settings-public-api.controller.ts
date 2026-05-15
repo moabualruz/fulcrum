@@ -16,23 +16,13 @@ import { DataSource } from "typeorm";
 
 import { TenantSettingStore } from "@platform-core/infrastructure/database/tenant-setting-store.ts";
 
+import { SettingsScopeQueryDto, SettingsKeyParamsDto, SettingsValueDto } from "./dto/settings.dto.ts";
+export { SettingsScopeQueryDto, SettingsKeyParamsDto, SettingsValueDto };
+
 export const SETTINGS_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.settingsPublicApi.options");
 
 export interface SettingsPublicApiOptions {
   featuresEnv?: string;
-}
-
-export class SettingsScopeQueryDto {
-  orgId!: string;
-  userId?: string;
-}
-
-export class SettingsKeyParamsDto {
-  key!: string;
-}
-
-export class SettingsValueDto extends SettingsScopeQueryDto {
-  value!: unknown;
 }
 
 type SettingsPort = Pick<TenantSettingStore, "list" | "get" | "set">;

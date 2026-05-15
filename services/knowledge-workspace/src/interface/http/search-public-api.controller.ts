@@ -36,6 +36,9 @@ import {
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
+import { SearchQueryDto, SearchSuggestQueryDto, SearchListSavedQueryDto, SearchCreateSavedRequestDto, SearchSavedIdParamsDto, SearchUpdateSavedRequestDto, SearchDeleteSavedQueryDto, SearchClickBodyDto, SearchSnapshotQueryDto, SearchSuggestionsResponseDto } from "./dto/search.dto.ts";
+export { SearchQueryDto, SearchSuggestQueryDto, SearchListSavedQueryDto, SearchCreateSavedRequestDto, SearchSavedIdParamsDto, SearchUpdateSavedRequestDto, SearchDeleteSavedQueryDto, SearchClickBodyDto, SearchSnapshotQueryDto, SearchSuggestionsResponseDto };
+
 export const SEARCH_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.searchPublicApi.options");
 
 export interface SearchPublicApplication {
@@ -82,72 +85,6 @@ export interface SearchPublicApiOptions {
   application?: SearchPublicApplication;
   featuresEnv?: string;
   authenticate?: (authorization: string | undefined) => Promise<string | null>;
-}
-
-export class SearchQueryDto {
-  q!: string;
-  org_id!: string;
-  project_id?: string;
-  kind?: string;
-  limit?: number | string;
-}
-
-export class SearchSuggestQueryDto {
-  prefix!: string;
-  org_id!: string;
-  kind?: string;
-  limit?: number | string;
-}
-
-export class SearchListSavedQueryDto {
-  org_id!: string;
-  user_id!: string;
-}
-
-export class SearchCreateSavedRequestDto {
-  org_id!: string;
-  user_id!: string;
-  name!: string;
-  query_json!: Record<string, unknown>;
-  scope!: "private" | "project" | "org";
-  project_id?: string;
-}
-
-export class SearchSavedIdParamsDto {
-  id!: string;
-}
-
-export class SearchUpdateSavedRequestDto {
-  org_id!: string;
-  user_id!: string;
-  name?: string;
-  query_json?: Record<string, unknown>;
-  scope?: "private" | "project" | "org";
-  project_id?: string;
-}
-
-export class SearchDeleteSavedQueryDto {
-  org_id!: string;
-  user_id!: string;
-}
-
-export class SearchClickBodyDto {
-  org_id!: string;
-  user_id!: string;
-  project_id?: string;
-  query!: string;
-  result_id!: string;
-  result_kind!: string;
-  position?: number | string;
-}
-
-export class SearchSnapshotQueryDto {
-  org_id!: string;
-  project_id?: string;
-}
-
-export class SearchSuggestionsResponseDto {
-  suggestions!: string[];
 }
 
 export class SearchPublicApiService {

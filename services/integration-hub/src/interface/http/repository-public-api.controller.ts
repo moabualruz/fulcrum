@@ -32,6 +32,9 @@ import { INTEGRATION_HUB_REPOSITORY_ENTITIES } from "@integration-hub/infrastruc
 import { RepositoryPublicStore } from "@integration-hub/infrastructure/database/repository-public-store.ts";
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 
+import { RepositoryListQueryDto, RepositoryRequestContextDto, RepositoryReadModelListQueryDto, RepositoryIdParamsDto, RepositoryReadModelIdParamsDto, RepositoryCreateBodyDto } from "./dto/repository.dto.ts";
+export { RepositoryListQueryDto, RepositoryRequestContextDto, RepositoryReadModelListQueryDto, RepositoryIdParamsDto, RepositoryReadModelIdParamsDto, RepositoryCreateBodyDto };
+
 export const REPOSITORY_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.repositoryPublicApi.options");
 
 export interface RepositoryPublicApplication {
@@ -64,40 +67,6 @@ export interface RepositoryPublicApiOptions {
   application?: RepositoryPublicApplication;
   featuresEnv?: string;
   orgId?: string;
-}
-
-export class RepositoryListQueryDto {
-  orgId!: string;
-  includeArchived?: boolean | string;
-}
-
-export class RepositoryRequestContextDto {
-  orgId!: string;
-}
-
-export class RepositoryReadModelListQueryDto extends RepositoryRequestContextDto {
-  repoId?: string;
-  branch?: string;
-  limit?: string | number;
-}
-
-export class RepositoryIdParamsDto {
-  id!: string;
-}
-
-export class RepositoryReadModelIdParamsDto {
-  id!: string;
-}
-
-export class RepositoryCreateBodyDto {
-  orgId!: string;
-  projectId?: string | null;
-  name!: string;
-  slug?: string;
-  kind?: "local" | "remote";
-  localPath?: string | null;
-  remoteUrl?: string | null;
-  defaultBranch?: string | null;
 }
 
 export class RepositoryPublicApiService {

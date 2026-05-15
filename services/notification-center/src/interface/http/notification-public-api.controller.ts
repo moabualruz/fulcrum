@@ -25,6 +25,9 @@ import { NOTIFICATION_CENTER_ENTITIES } from "@notification-center/infrastructur
 import { NotificationPublicStore } from "@notification-center/infrastructure/database/notification-public-store.ts";
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 
+import { NotificationListQueryDto, NotificationMarkReadParamsDto, NotificationChannelParamsDto, NotificationChannelConfigBodyDto, NotificationRuleParamsDto, NotificationRuleCreateBodyDto, NotificationRulePatchBodyDto, NotificationQuietHoursSetBodyDto, NotificationMuteParamsDto, NotificationMuteBodyDto, NotificationListResponseDto, NotificationUnreadCountResponseDto, NotificationMarkAllReadResponseDto, NotificationSettingsResponseDto } from "./dto/notification.dto.ts";
+export { NotificationListQueryDto, NotificationMarkReadParamsDto, NotificationChannelParamsDto, NotificationChannelConfigBodyDto, NotificationRuleParamsDto, NotificationRuleCreateBodyDto, NotificationRulePatchBodyDto, NotificationQuietHoursSetBodyDto, NotificationMuteParamsDto, NotificationMuteBodyDto, NotificationListResponseDto, NotificationUnreadCountResponseDto, NotificationMarkAllReadResponseDto, NotificationSettingsResponseDto };
+
 export const NOTIFICATION_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.notificationPublicApi.options");
 
 export interface NotificationPublicApplication {
@@ -66,96 +69,6 @@ export interface NotificationPublicApplication {
 export interface NotificationPublicApiOptions {
   application?: NotificationPublicApplication;
   featuresEnv?: string;
-}
-
-export class NotificationListQueryDto {
-  orgId!: string;
-  userId!: string;
-  unread?: boolean | string;
-  limit?: number | string;
-  offset?: number | string;
-}
-
-export class NotificationMarkReadParamsDto {
-  id!: string;
-}
-
-export class NotificationChannelParamsDto {
-  channel!: string;
-}
-
-export class NotificationChannelConfigBodyDto {
-  enabled?: boolean;
-  email?: string;
-  token?: string;
-  url?: string;
-  secret?: string;
-  subscription?: string;
-}
-
-export class NotificationRuleParamsDto {
-  id!: string;
-}
-
-export class NotificationRuleCreateBodyDto {
-  name!: string;
-  subjectKind?: string | null;
-  eventPattern?: Record<string, unknown>;
-  channels?: string[];
-  enabled?: boolean;
-  deliveryMode?: "immediate" | "digest" | "delayed";
-  digestWindowSeconds?: number | null;
-  delaySeconds?: number | null;
-  critical?: boolean;
-}
-
-export class NotificationRulePatchBodyDto {
-  name?: string;
-  subjectKind?: string | null;
-  eventPattern?: Record<string, unknown>;
-  channels?: string[];
-  enabled?: boolean;
-  deliveryMode?: "immediate" | "digest" | "delayed";
-  digestWindowSeconds?: number | null;
-  delaySeconds?: number | null;
-  critical?: boolean;
-}
-
-export class NotificationQuietHoursSetBodyDto {
-  tz!: string;
-  startHour!: number;
-  endHour!: number;
-  daysOfWeek!: number[];
-}
-
-export class NotificationMuteParamsDto {
-  subjectKind!: string;
-  subjectId!: string;
-}
-
-export class NotificationMuteBodyDto {
-  subjectKind!: string;
-  subjectId!: string;
-  mutedUntil?: string | null;
-}
-
-export class NotificationListResponseDto {
-  data!: unknown[];
-}
-
-export class NotificationUnreadCountResponseDto {
-  count!: number;
-}
-
-export class NotificationMarkAllReadResponseDto {
-  count!: number;
-}
-
-export class NotificationSettingsResponseDto {
-  channels!: unknown[];
-  rules!: unknown[];
-  quietHours!: unknown | null;
-  mutes!: unknown[];
 }
 
 export class NotificationPublicApiService {

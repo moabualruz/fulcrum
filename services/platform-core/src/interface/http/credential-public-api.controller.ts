@@ -20,47 +20,14 @@ import {
 } from "@platform-core/infrastructure/database/credential-store.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
+import { CredentialListQueryDto, CredentialNameParamsDto, CredentialReadQueryDto, CredentialSetDto, CredentialRotateDto, CredentialTargetDto } from "./dto/credential.dto.ts";
+export { CredentialListQueryDto, CredentialNameParamsDto, CredentialReadQueryDto, CredentialSetDto, CredentialRotateDto, CredentialTargetDto };
+
 export const CREDENTIAL_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.credentialPublicApi.options");
 
 export interface CredentialPublicApiOptions {
   featuresEnv?: string;
   keyring?: KeyringConfig;
-}
-
-export class CredentialListQueryDto {
-  orgId!: string;
-  userId!: string;
-  includeArchived?: boolean;
-}
-
-export class CredentialNameParamsDto {
-  name!: string;
-}
-
-export class CredentialReadQueryDto {
-  orgId!: string;
-  userId!: string;
-  targetUserId?: string;
-}
-
-export class CredentialSetDto {
-  orgId!: string;
-  userId!: string;
-  name!: string;
-  value!: string;
-}
-
-export class CredentialRotateDto {
-  orgId!: string;
-  userId!: string;
-  targetUserId?: string;
-  newValue!: string;
-}
-
-export class CredentialTargetDto {
-  orgId!: string;
-  userId!: string;
-  targetUserId?: string;
 }
 
 export class CredentialPublicApiService {

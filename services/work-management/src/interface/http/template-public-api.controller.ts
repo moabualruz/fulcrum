@@ -27,41 +27,13 @@ import {
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
+import { TemplateListQueryDto, TemplateIdParamsDto, TemplateCreateDto, TemplateApplyDto, TemplateDefaultDto } from "./dto/template.dto.ts";
+export { TemplateListQueryDto, TemplateIdParamsDto, TemplateCreateDto, TemplateApplyDto, TemplateDefaultDto };
+
 export const TEMPLATE_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.templatePublicApi.options");
 
 export interface TemplatePublicApiOptions {
   featuresEnv?: string;
-}
-
-export class TemplateListQueryDto {
-  orgId!: string;
-  userId!: string;
-  projectId?: string;
-}
-
-export class TemplateIdParamsDto {
-  id!: string;
-}
-
-export class TemplateCreateDto {
-  orgId!: string;
-  userId!: string;
-  projectId?: string | null;
-  name!: string;
-  description?: string | null;
-  templateData!: Record<string, unknown>;
-}
-
-export class TemplateApplyDto {
-  orgId!: string;
-  userId!: string;
-  overrides?: Record<string, unknown>;
-}
-
-export class TemplateDefaultDto {
-  orgId!: string;
-  userId!: string;
-  projectId!: string;
 }
 
 export class TemplatePublicApiService {

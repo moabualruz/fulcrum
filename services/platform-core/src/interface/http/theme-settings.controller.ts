@@ -31,35 +31,13 @@ import { FULCRUM_THEME_SETTING_ENTITIES } from "@platform-core/infrastructure/da
 import { ThemeSettingsStore } from "@platform-core/infrastructure/database/theme-settings-store.ts";
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 
+import { ThemeSettingsQueryDto, ThemeTokenParamsDto, ThemeTokenUpsertDto, ThemeProfileUpdateDto } from "./dto/theme.dto.ts";
+export { ThemeSettingsQueryDto, ThemeTokenParamsDto, ThemeTokenUpsertDto, ThemeProfileUpdateDto };
+
 export const THEME_SETTINGS_API_OPTIONS = Symbol.for("fulcrum.themeSettingsApi.options");
 
 export interface ThemeSettingsApiOptions {
   featuresEnv?: string;
-}
-
-export class ThemeSettingsQueryDto implements ThemeScope {
-  orgId!: string;
-  userId!: string;
-}
-
-export class ThemeTokenParamsDto {
-  key!: string;
-}
-
-export class ThemeTokenUpsertDto extends ThemeSettingsQueryDto {
-  value!: string;
-}
-
-export class ThemeProfileUpdateDto extends ThemeSettingsQueryDto implements Partial<ThemeProfileSettings> {
-  accentHue?: number;
-  accentSaturation?: number;
-  accentLightness?: number;
-  radius?: number;
-  fontFamily?: ThemeProfileSettings["fontFamily"];
-  colorScheme?: ThemeProfileSettings["colorScheme"];
-  compactMode?: boolean;
-  animationSpeed?: ThemeProfileSettings["animationSpeed"];
-  preset?: ThemeProfileSettings["preset"];
 }
 
 type ThemeSettingsPort = Pick<

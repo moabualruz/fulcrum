@@ -13,23 +13,13 @@ import {
   type DocumentWorkspacePageTreeOutput,
 } from "@workflow-coordination/application/document-workspace.service.ts";
 
+import { DocumentWorkspacePageTreeRequestDto, DocumentWorkspacePageOperationsRequestDto } from "./dto/document-workspace.dto.ts";
+export { DocumentWorkspacePageTreeRequestDto, DocumentWorkspacePageOperationsRequestDto };
+
 type DocumentWorkspacePageTreePort = Pick<
   DocumentWorkspaceService,
   "previewPageTree" | "previewPageOperations"
 >;
-
-export class DocumentWorkspacePageTreeRequestDto {
-  pages!: FulcrumDocTreePage[];
-  breadcrumbPageId?: string | null;
-}
-
-export class DocumentWorkspacePageOperationsRequestDto implements DocumentWorkspacePageOperationsInput {
-  pages!: DocumentWorkspacePageOperationsInput["pages"];
-  rootPageId!: string;
-  accessibleTreePageIds!: string[];
-  sidebar!: DocumentWorkspacePageOperationsInput["sidebar"];
-  recent!: DocumentWorkspacePageOperationsInput["recent"];
-}
 
 export class DocumentWorkspaceController {
   constructor(private readonly docs: DocumentWorkspacePageTreePort) {}

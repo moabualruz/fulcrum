@@ -20,20 +20,13 @@ import {
   type TelemetryStatusRow,
 } from "@platform-core/infrastructure/database/telemetry-store.ts";
 
+import { TelemetryScopeQueryDto, TelemetryScopeBodyDto } from "./dto/telemetry.dto.ts";
+export { TelemetryScopeQueryDto, TelemetryScopeBodyDto };
+
 export const TELEMETRY_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.telemetryPublicApi.options");
 
 export interface TelemetryPublicApiOptions {
   featuresEnv?: string;
-}
-
-export class TelemetryScopeQueryDto {
-  orgId!: string;
-  userId!: string;
-}
-
-export class TelemetryScopeBodyDto {
-  orgId!: string;
-  userId!: string;
 }
 
 export class TelemetryPublicApiService {

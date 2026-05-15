@@ -53,6 +53,9 @@ import {
 import { getRoutingConfig, setRoutingConfig } from "@platform-core/application/inference/routing-config.ts";
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 
+import { InferenceTextRequestDto, InferenceEmbedRequestDto, InferenceGenerateRequestDto, InferenceClassifyRequestDto, InferenceModelParamsDto, InferenceModelPullRequestDto, InferenceConfigSetRequestDto, InferenceProviderSetRequestDto } from "./dto/inference.dto.ts";
+export { InferenceTextRequestDto, InferenceEmbedRequestDto, InferenceGenerateRequestDto, InferenceClassifyRequestDto, InferenceModelParamsDto, InferenceModelPullRequestDto, InferenceConfigSetRequestDto, InferenceProviderSetRequestDto };
+
 const MAX_TEXT_ITEMS = 64;
 const MAX_TEXT_CHARS = 20_000;
 const MAX_LABELS = 100;
@@ -76,46 +79,6 @@ export interface InferencePublicApiOptions {
   application?: InferenceApplicationPort;
   featuresEnv?: string;
   probeBackends?: () => Promise<BackendHealth[]>;
-}
-
-export class InferenceTextRequestDto {
-  text!: string;
-  model?: string;
-}
-
-export class InferenceEmbedRequestDto {
-  texts!: string[];
-  model?: string;
-}
-
-export class InferenceGenerateRequestDto {
-  prompt!: string;
-  model?: string;
-  maxTokens?: number;
-  temperature?: number;
-}
-
-export class InferenceClassifyRequestDto {
-  text!: string;
-  labels!: string[];
-}
-
-export class InferenceModelParamsDto {
-  modelId!: string;
-}
-
-export class InferenceModelPullRequestDto {
-  force?: boolean;
-}
-
-export class InferenceConfigSetRequestDto {
-  feature!: InferenceFeatureKey;
-  backend!: BackendId;
-}
-
-export class InferenceProviderSetRequestDto {
-  url!: string;
-  key!: string;
 }
 
 export class InferencePublicApiService {

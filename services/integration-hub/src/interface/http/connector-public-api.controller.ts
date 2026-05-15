@@ -40,42 +40,14 @@ import {
 } from "@integration-hub/infrastructure/database/connector-store.ts";
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 
+import { ConnectorListQueryDto, ConnectorParamsDto, ConnectorStateBodyDto, ConnectorSyncBodyDto, ConnectorRunListQueryDto, ConnectorRunParamsDto, ConnectorRunQueryDto } from "./dto/connector.dto.ts";
+export { ConnectorListQueryDto, ConnectorParamsDto, ConnectorStateBodyDto, ConnectorSyncBodyDto, ConnectorRunListQueryDto, ConnectorRunParamsDto, ConnectorRunQueryDto };
+
 export const CONNECTOR_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.connectorPublicApi.options");
 
 export interface ConnectorPublicApiOptions {
   featuresEnv?: string;
   env?: NodeJS.ProcessEnv;
-}
-
-export class ConnectorListQueryDto {
-  orgId?: string;
-}
-
-export class ConnectorParamsDto {
-  id!: string;
-}
-
-export class ConnectorStateBodyDto {
-  orgId!: string;
-  config?: Record<string, unknown>;
-}
-
-export class ConnectorSyncBodyDto {
-  orgId!: string;
-  trigger?: string;
-}
-
-export class ConnectorRunListQueryDto {
-  orgId!: string;
-  connectorId?: string;
-}
-
-export class ConnectorRunParamsDto {
-  id!: string;
-}
-
-export class ConnectorRunQueryDto {
-  orgId!: string;
 }
 
 export class ConnectorPublicApiService {

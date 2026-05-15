@@ -20,6 +20,9 @@ import { ReportPublicStore } from "@work-management/infrastructure/database/repo
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
+import { ReportBurndownQueryDto, ReportVelocityQueryDto, ReportResponseDto } from "./dto/report.dto.ts";
+export { ReportBurndownQueryDto, ReportVelocityQueryDto, ReportResponseDto };
+
 export const REPORT_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.reportPublicApi.options");
 
 export interface ReportPublicApplication {
@@ -30,24 +33,6 @@ export interface ReportPublicApplication {
 export interface ReportPublicApiOptions {
   application?: ReportPublicApplication;
   featuresEnv?: string;
-}
-
-export class ReportBurndownQueryDto {
-  orgId!: string;
-  project_id?: string;
-  projectId?: string;
-  sprint_id?: string;
-  sprintId?: string;
-}
-
-export class ReportVelocityQueryDto {
-  orgId!: string;
-  project_id?: string;
-  projectId?: string;
-}
-
-export class ReportResponseDto {
-  data!: unknown[];
 }
 
 export class ReportPublicApiService {

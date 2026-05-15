@@ -24,6 +24,9 @@ import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/fe
 import { WORKFLOW_AUDIT_ENTITIES } from "@workflow-coordination/infrastructure/database/audit-log.entities.ts";
 import { AuditPublicStore } from "@workflow-coordination/infrastructure/database/audit-public-store.ts";
 
+import { AuditListQueryDto, AuditExportQueryDto, AuditExportStatusParamDto, AuditExportStatusQueryDto, AuditExportStatusResponseDto, AuditListResponseDto, AuditRetentionPolicyQueryDto, AuditRetentionPolicySetBodyDto, AuditRetentionPolicyResponseDto } from "./dto/audit.dto.ts";
+export { AuditListQueryDto, AuditExportQueryDto, AuditExportStatusParamDto, AuditExportStatusQueryDto, AuditExportStatusResponseDto, AuditListResponseDto, AuditRetentionPolicyQueryDto, AuditRetentionPolicySetBodyDto, AuditRetentionPolicyResponseDto };
+
 export const AUDIT_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.auditPublicApi.options");
 
 export interface AuditPublicApplication {
@@ -65,61 +68,6 @@ export interface AuditPublicApiOptions {
 
 export interface HeaderWritableResponse {
   setHeader(name: string, value: string): void;
-}
-
-export class AuditListQueryDto {
-  orgId!: string;
-  projectId?: string;
-  userId?: string;
-  kind?: string;
-  subjectId?: string;
-  verb?: string;
-  since?: string;
-  until?: string;
-  limit?: number | string;
-  offset?: number | string;
-}
-
-export class AuditExportQueryDto extends AuditListQueryDto {
-  format?: "json" | "csv";
-}
-
-export class AuditExportStatusParamDto {
-  jobId!: string;
-}
-
-export class AuditExportStatusQueryDto {
-  orgId!: string;
-}
-
-export class AuditExportStatusResponseDto {
-  status!: "queued" | "running" | "completed" | "failed";
-  format?: "json" | "csv";
-  content?: string;
-  error?: string;
-}
-
-export class AuditListResponseDto {
-  data!: unknown[];
-  total!: number;
-}
-
-export class AuditRetentionPolicyQueryDto {
-  orgId!: string;
-  projectId?: string;
-}
-
-export class AuditRetentionPolicySetBodyDto {
-  retainDays!: number | string;
-}
-
-export class AuditRetentionPolicyResponseDto {
-  id!: string;
-  orgId!: string;
-  projectId!: string | null;
-  retainDays!: number;
-  createdAt!: string;
-  updatedAt!: string;
 }
 
 export class AuditPublicApiService {

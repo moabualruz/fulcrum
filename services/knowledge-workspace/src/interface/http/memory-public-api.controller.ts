@@ -47,23 +47,12 @@ import { MemoryPublicStore } from "@knowledge-workspace/infrastructure/database/
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
+import { MemoryListQueryDto, CreateMemoryBodyDto, MemorySearchQueryDto, MemoryPatchBodyDto, MemoryIdParamsDto, MemoryDeleteQueryDto, MemoryDigestBodyDto, ContextPreviewQueryDto, MEMORY_KINDS, MEMORY_IMPORTANCE, MEMORY_SOURCE, PublicMemoryKind, PublicMemoryImportance, PublicMemorySource } from "./dto/memory.dto.ts";
+export { MemoryListQueryDto, CreateMemoryBodyDto, MemorySearchQueryDto, MemoryPatchBodyDto, MemoryIdParamsDto, MemoryDeleteQueryDto, MemoryDigestBodyDto, ContextPreviewQueryDto, PublicMemoryKind, PublicMemoryImportance, PublicMemorySource };
+
 export const MEMORY_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.memoryPublicApi.options");
 
-const MEMORY_KINDS = [
-  "note",
-  "decision",
-  "blocker",
-  "file_ref",
-  "section_anchor",
-  "link",
-  "fact",
-] as const;
-const MEMORY_IMPORTANCE = ["low", "medium", "high"] as const;
-const MEMORY_SOURCE = ["heuristic", "llm", "manual"] as const;
 
-export type PublicMemoryKind = (typeof MEMORY_KINDS)[number];
-export type PublicMemoryImportance = (typeof MEMORY_IMPORTANCE)[number];
-export type PublicMemorySource = (typeof MEMORY_SOURCE)[number];
 
 export interface MemoryPublicApplication {
   list(input: unknown): Promise<unknown>;
@@ -90,59 +79,6 @@ export interface MemoryPublicApiOptions {
   context?: ContextPreviewPublicApplication;
   digestClient?: MemoryDigestClient;
   featuresEnv?: string;
-}
-
-export class MemoryListQueryDto {
-  projectId?: string;
-  global?: boolean | string;
-  kind?: PublicMemoryKind;
-  tags?: string;
-  importance?: PublicMemoryImportance;
-  archived?: boolean | string;
-  source?: PublicMemorySource;
-  limit?: number | string;
-  offset?: number | string;
-}
-
-export class CreateMemoryBodyDto {
-  projectId?: string | null;
-  global?: boolean;
-  kind?: PublicMemoryKind;
-  body!: string;
-  tags?: string[];
-  importance?: PublicMemoryImportance;
-  source?: "manual";
-  sourceRef?: Record<string, unknown>;
-}
-
-export class MemorySearchQueryDto extends MemoryListQueryDto {
-  query!: string;
-}
-
-export class MemoryPatchBodyDto {
-  body?: string;
-  tags?: string[];
-  importance?: PublicMemoryImportance;
-  forceEdit?: boolean;
-}
-
-export class MemoryIdParamsDto {
-  id!: string;
-}
-
-export class MemoryDeleteQueryDto {
-  confirm?: string;
-}
-
-export class MemoryDigestBodyDto {
-  projectId!: string;
-  since?: string;
-}
-
-export class ContextPreviewQueryDto {
-  taskId!: string;
-  budget?: number | string;
-  includeGlobal?: boolean | string;
 }
 
 export class MemoryPublicApiService {

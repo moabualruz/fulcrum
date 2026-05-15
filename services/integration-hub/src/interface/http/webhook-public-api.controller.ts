@@ -33,6 +33,9 @@ import { WebhookPublicStore } from "@integration-hub/infrastructure/database/web
 import { AppError, AppNotFoundError } from "@platform-core/domain/errors.ts";
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 
+import { WebhookListQueryDto, WebhookParamsDto, WebhookDeliveryParamsDto, WebhookDeliveryListQueryDto, WebhookCreateBodyDto, WebhookUpdateBodyDto } from "./dto/webhook.dto.ts";
+export { WebhookListQueryDto, WebhookParamsDto, WebhookDeliveryParamsDto, WebhookDeliveryListQueryDto, WebhookCreateBodyDto, WebhookUpdateBodyDto };
+
 export const WEBHOOK_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.webhookPublicApi.options");
 
 export interface WebhookPublicApplication {
@@ -50,40 +53,6 @@ export interface WebhookPublicApplication {
 export interface WebhookPublicApiOptions {
   application?: WebhookPublicApplication;
   featuresEnv?: string;
-}
-
-export class WebhookListQueryDto {
-  orgId!: string;
-  includeDisabled?: boolean | string;
-}
-
-export class WebhookParamsDto {
-  id!: string;
-}
-
-export class WebhookDeliveryParamsDto {
-  deliveryId!: string;
-}
-
-export class WebhookDeliveryListQueryDto {
-  orgId!: string;
-  limit?: number | string;
-}
-
-export class WebhookCreateBodyDto {
-  name!: string;
-  url!: string;
-  secret?: string;
-  eventsFilter?: WebhookEventType[];
-  enabled?: boolean;
-}
-
-export class WebhookUpdateBodyDto {
-  name?: string;
-  url?: string;
-  secret?: string;
-  eventsFilter?: WebhookEventType[];
-  enabled?: boolean;
 }
 
 export class WebhookPublicApiService {

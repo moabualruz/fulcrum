@@ -16,20 +16,13 @@ import { IsBoolean, IsOptional, IsString, MinLength } from "class-validator";
 import { getEventBus } from "@platform-core/application/subscriptions/event-bus.ts";
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 
+import { SubscriptionStreamQueryDto, RunUpdateStreamQueryDto } from "./dto/subscription.dto.ts";
+export { SubscriptionStreamQueryDto, RunUpdateStreamQueryDto };
+
 export const SUBSCRIPTION_EVENT_STREAM_OPTIONS = Symbol.for("fulcrum.subscriptionEventStream.options");
 
 export interface SubscriptionEventStreamOptions {
   featuresEnv?: string;
-}
-
-export class SubscriptionStreamQueryDto {
-  orgId!: string;
-  userId!: string;
-  once?: boolean;
-}
-
-export class RunUpdateStreamQueryDto extends SubscriptionStreamQueryDto {
-  runId!: string;
 }
 
 interface EventStreamResponse {

@@ -35,6 +35,9 @@ import {
 } from "@work-management/infrastructure/database/project-public-store.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
+import { ProjectListQueryDto, ProjectRequestContextDto, ProjectIdParamsDto, ProjectCreateBodyDto, ProjectPatchBodyDto } from "./dto/project.dto.ts";
+export { ProjectListQueryDto, ProjectRequestContextDto, ProjectIdParamsDto, ProjectCreateBodyDto, ProjectPatchBodyDto };
+
 export const PROJECT_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.projectPublicApi.options");
 
 export interface ProjectPublicApplication {
@@ -61,33 +64,6 @@ export interface ProjectPublicApplication {
 export interface ProjectPublicApiOptions {
   application?: ProjectPublicApplication;
   featuresEnv?: string;
-}
-
-export class ProjectListQueryDto {
-  orgId!: string;
-}
-
-export class ProjectRequestContextDto {
-  orgId!: string;
-}
-
-export class ProjectIdParamsDto {
-  id!: string;
-}
-
-export class ProjectCreateBodyDto {
-  orgId!: string;
-  kind?: ProjectPublicKind;
-  name!: string;
-  slug?: string;
-  repoPath?: string;
-  template?: string;
-}
-
-export class ProjectPatchBodyDto {
-  orgId!: string;
-  name?: string;
-  memory_config?: Record<string, unknown>;
 }
 
 export class ProjectPublicApiService {

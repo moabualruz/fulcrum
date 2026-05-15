@@ -33,13 +33,12 @@ import { SavedViewPublicStore } from "@work-management/infrastructure/database/s
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
+import { SavedViewListQueryDto, CreateSavedViewBodyDto, SavedViewIdParamsDto, PatchSavedViewBodyDto, SAVED_VIEW_SCOPES, SAVED_VIEW_TYPES, PublicSavedViewScope, PublicSavedViewType } from "./dto/saved-view.dto.ts";
+export { SavedViewListQueryDto, CreateSavedViewBodyDto, SavedViewIdParamsDto, PatchSavedViewBodyDto, PublicSavedViewScope, PublicSavedViewType };
+
 export const SAVED_VIEW_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.savedViewPublicApi.options");
 
-const SAVED_VIEW_SCOPES = ["private", "project", "org"] as const;
-const SAVED_VIEW_TYPES = ["kanban", "table", "calendar", "timeline", "list"] as const;
 
-export type PublicSavedViewScope = (typeof SAVED_VIEW_SCOPES)[number];
-export type PublicSavedViewType = (typeof SAVED_VIEW_TYPES)[number];
 
 export interface SavedViewPublicApplication {
   list(input?: unknown): Promise<unknown>;
@@ -52,35 +51,6 @@ export interface SavedViewPublicApplication {
 export interface SavedViewPublicApiOptions {
   application?: SavedViewPublicApplication;
   featuresEnv?: string;
-}
-
-export class SavedViewListQueryDto {
-  orgId?: string;
-  projectId?: string;
-}
-
-export class CreateSavedViewBodyDto {
-  orgId!: string;
-  projectId?: string;
-  name!: string;
-  scope?: PublicSavedViewScope;
-  viewType?: PublicSavedViewType;
-  filters?: Record<string, unknown>;
-  sortBy?: string | null;
-  isDefault?: boolean;
-}
-
-export class SavedViewIdParamsDto {
-  id!: string;
-}
-
-export class PatchSavedViewBodyDto {
-  name?: string;
-  scope?: PublicSavedViewScope;
-  viewType?: PublicSavedViewType;
-  filters?: Record<string, unknown>;
-  sortBy?: string | null;
-  isDefault?: boolean;
 }
 
 export class SavedViewPublicApiService {

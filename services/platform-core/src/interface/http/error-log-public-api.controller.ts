@@ -22,32 +22,13 @@ import {
 } from "@platform-core/infrastructure/database/error-log-store.ts";
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 
+import { ErrorLogListQueryDto, ErrorLogScopeQueryDto, ErrorLogClearQueryDto, ErrorLogParamsDto } from "./dto/error-log.dto.ts";
+export { ErrorLogListQueryDto, ErrorLogScopeQueryDto, ErrorLogClearQueryDto, ErrorLogParamsDto };
+
 export const ERROR_LOG_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.errorLogPublicApi.options");
 
 export interface ErrorLogPublicApiOptions {
   featuresEnv?: string;
-}
-
-export class ErrorLogListQueryDto {
-  orgId!: string;
-  userId!: string;
-  limit?: number;
-  offset?: number;
-  since?: string;
-  includeTotal?: boolean | string;
-}
-
-export class ErrorLogScopeQueryDto {
-  orgId!: string;
-  userId!: string;
-}
-
-export class ErrorLogClearQueryDto extends ErrorLogScopeQueryDto {
-  before?: string;
-}
-
-export class ErrorLogParamsDto {
-  id!: string;
 }
 
 export class ErrorLogPublicApiService {

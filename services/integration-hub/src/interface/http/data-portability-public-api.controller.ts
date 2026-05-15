@@ -29,34 +29,13 @@ import {
 } from "@integration-hub/infrastructure/database/data-portability-store.ts";
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 
+import { DataPortabilityScopeDto, BackupRestoreDto, DataExportCreateDto, DataImportPreflightQueryDto, DataImportRunDto } from "./dto/data-portability.dto.ts";
+export { DataPortabilityScopeDto, BackupRestoreDto, DataExportCreateDto, DataImportPreflightQueryDto, DataImportRunDto };
+
 export const DATA_PORTABILITY_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.dataPortabilityPublicApi.options");
 
 export interface DataPortabilityPublicApiOptions {
   featuresEnv?: string;
-}
-
-export class DataPortabilityScopeDto {
-  orgId!: string;
-  userId!: string;
-}
-
-export class BackupRestoreDto extends DataPortabilityScopeDto {
-  dump!: string;
-}
-
-export class DataExportCreateDto extends DataPortabilityScopeDto {
-  outputPath?: string;
-  pretty?: boolean;
-}
-
-export class DataImportPreflightQueryDto extends DataPortabilityScopeDto {
-  path!: string;
-}
-
-export class DataImportRunDto extends DataPortabilityScopeDto {
-  importId!: string;
-  dryRun?: boolean;
-  onConflict?: "skip" | "update" | "error";
 }
 
 export class DataPortabilityPublicApiService {

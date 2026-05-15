@@ -24,26 +24,14 @@ import {
 } from "@platform-core/application/feature-flags/experiments.ts";
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 
+import { FeatureExperimentCreateDto, FeatureExperimentParamsDto, FeatureExperimentMetricsQueryDto } from "./dto/feature-experiment.dto.ts";
+export { FeatureExperimentCreateDto, FeatureExperimentParamsDto, FeatureExperimentMetricsQueryDto };
+
 export const FEATURE_EXPERIMENT_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.featureExperimentPublicApi.options");
 
 export interface FeatureExperimentPublicApiOptions {
   featuresEnv?: string;
   store?: ExperimentStore;
-}
-
-export class FeatureExperimentCreateDto {
-  name!: string;
-  description?: string;
-  variants!: string[];
-  rolloutPercent?: number;
-}
-
-export class FeatureExperimentParamsDto {
-  experimentId!: string;
-}
-
-export class FeatureExperimentMetricsQueryDto {
-  conversionKind!: string;
 }
 
 export class FeatureExperimentPublicApiService {

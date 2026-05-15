@@ -17,29 +17,17 @@ import { FULCRUM_INVITATION_ENTITIES } from "@identity-access/infrastructure/dat
 import { InvitationPermissionError } from "@identity-access/infrastructure/database/invitation-store.ts";
 import {
   FULCRUM_IDENTITY_ACCESS_ENTITIES,
-  type OrganizationRole,
 } from "@identity-access/infrastructure/database/organization.entities.ts";
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
+
+import { AuthScopeDto, AuthInviteDto, AuthAcceptInviteDto } from "./dto/auth.dto.ts";
+export { AuthScopeDto, AuthInviteDto, AuthAcceptInviteDto };
 
 export const AUTH_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.authPublicApi.options");
 
 export interface AuthPublicApiOptions {
   featuresEnv?: string;
-}
-
-export class AuthScopeDto {
-  orgId!: string;
-  userId!: string;
-}
-
-export class AuthInviteDto extends AuthScopeDto {
-  email!: string;
-  role!: OrganizationRole;
-}
-
-export class AuthAcceptInviteDto {
-  token!: string;
 }
 
 export class AuthPublicApiService {

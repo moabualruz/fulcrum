@@ -12,46 +12,13 @@ import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastr
 import type { TraceRef } from "@workflow-coordination/domain/trace.ts";
 import { RelationshipStore, type RelationshipRow, type RelationshipType } from "@work-management/infrastructure/database/relationship-store.ts";
 
+import { RelationshipTaskScopeDto, RelationshipProjectScopeDto, RelationshipCreateDto, RelationshipDeleteDto, RelationshipDuplicateDto, RelationshipSummaryDto } from "./dto/relationship.dto.ts";
+export { RelationshipTaskScopeDto, RelationshipProjectScopeDto, RelationshipCreateDto, RelationshipDeleteDto, RelationshipDuplicateDto, RelationshipSummaryDto };
+
 export const RELATIONSHIP_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.relationshipPublicApi.options");
 
 export interface RelationshipPublicApiOptions {
   featuresEnv?: string;
-}
-
-export class RelationshipTaskScopeDto {
-  orgId!: string;
-  taskId!: string;
-}
-
-export class RelationshipProjectScopeDto {
-  orgId!: string;
-  projectId!: string;
-}
-
-export class RelationshipCreateDto {
-  orgId!: string;
-  sourceTaskId!: string;
-  targetTaskId!: string;
-  type!: RelationshipType;
-}
-
-export class RelationshipDeleteDto {
-  orgId!: string;
-  relationshipId!: string;
-}
-
-export class RelationshipDuplicateDto {
-  orgId!: string;
-  sourceTaskId!: string;
-  targetTaskId!: string;
-  autoClose?: boolean;
-  transferWatchers?: boolean;
-}
-
-export class RelationshipSummaryDto {
-  orgId!: string;
-  projectId!: string;
-  entity!: TraceRef;
 }
 
 export class RelationshipPublicApiService {

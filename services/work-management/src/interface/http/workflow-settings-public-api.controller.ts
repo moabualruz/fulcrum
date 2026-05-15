@@ -15,6 +15,9 @@ import {
   type WorkflowTransitionGraph,
 } from "@work-management/infrastructure/database/workflow-settings-store.ts";
 
+import { WorkflowDefaultRequestDto, WorkflowProjectScopeDto, WorkflowTaskTypesUpdateDto, WorkflowMethodologyUpdateDto, WorkflowTransitionsUpdateDto, WorkflowTransitionValidationDto } from "./dto/workflow-settings.dto.ts";
+export { WorkflowDefaultRequestDto, WorkflowProjectScopeDto, WorkflowTaskTypesUpdateDto, WorkflowMethodologyUpdateDto, WorkflowTransitionsUpdateDto, WorkflowTransitionValidationDto };
+
 export const WORKFLOW_SETTINGS_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.workflowSettingsPublicApi.options");
 
 export interface WorkflowSettingsApplication {
@@ -31,33 +34,6 @@ export interface WorkflowSettingsApplication {
 export interface WorkflowSettingsPublicApiOptions {
   application?: WorkflowSettingsApplication;
   featuresEnv?: string;
-}
-
-export class WorkflowDefaultRequestDto {
-  methodology!: WorkflowMethodology;
-}
-
-export class WorkflowProjectScopeDto {
-  orgId!: string;
-  projectId!: string;
-}
-
-export class WorkflowTaskTypesUpdateDto extends WorkflowProjectScopeDto {
-  types!: string[];
-}
-
-export class WorkflowMethodologyUpdateDto extends WorkflowProjectScopeDto {
-  methodology!: WorkflowMethodology;
-  resetWorkflow?: boolean;
-}
-
-export class WorkflowTransitionsUpdateDto extends WorkflowProjectScopeDto {
-  transitions!: WorkflowTransitionGraph;
-}
-
-export class WorkflowTransitionValidationDto extends WorkflowProjectScopeDto {
-  fromStatus!: string;
-  toStatus!: string;
 }
 
 export class WorkflowSettingsPublicApiService {

@@ -33,9 +33,11 @@ import { KNOWLEDGE_WORKSPACE_ENTITIES } from "@knowledge-workspace/infrastructur
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
+import { DocumentListQueryDto, DocumentTemplateQueryDto, DocumentIdParamsDto, DocumentCommentIdParamsDto, DocumentLinkIdParamsDto, DocumentVersionParamsDto, DocumentVersionIdParamsDto, DocumentVersionDiffQueryDto, DocumentCommentListQueryDto, DocumentCreateBodyDto, DocumentPatchBodyDto, DocumentCommentCreateBodyDto, DocumentCommentPatchBodyDto, DocumentCommentResolveBodyDto, DocumentLinkCreateBodyDto } from "./dto/document.dto.ts";
+export { DocumentListQueryDto, DocumentTemplateQueryDto, DocumentIdParamsDto, DocumentCommentIdParamsDto, DocumentLinkIdParamsDto, DocumentVersionParamsDto, DocumentVersionIdParamsDto, DocumentVersionDiffQueryDto, DocumentCommentListQueryDto, DocumentCreateBodyDto, DocumentPatchBodyDto, DocumentCommentCreateBodyDto, DocumentCommentPatchBodyDto, DocumentCommentResolveBodyDto, DocumentLinkCreateBodyDto };
+
 export const DOCUMENT_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.documentPublicApi.options");
 
-export type PublicDocumentType = "page" | "wiki" | "note" | "template";
 
 export interface DocumentPublicApplication {
   list(input?: unknown): Promise<unknown>;
@@ -48,84 +50,6 @@ export interface DocumentPublicApplication {
 export interface DocumentPublicApiOptions {
   application?: DocumentPublicApplication;
   featuresEnv?: string;
-}
-
-export class DocumentListQueryDto {
-  orgId?: string;
-  projectId?: string;
-  type?: PublicDocumentType;
-}
-
-export class DocumentTemplateQueryDto {
-  projectId?: string;
-  docType?: string;
-}
-
-export class DocumentIdParamsDto {
-  id!: string;
-}
-
-export class DocumentCommentIdParamsDto {
-  commentId!: string;
-}
-
-export class DocumentLinkIdParamsDto {
-  linkId!: string;
-}
-
-export class DocumentVersionParamsDto extends DocumentIdParamsDto {
-  version!: string;
-}
-
-export class DocumentVersionIdParamsDto extends DocumentIdParamsDto {
-  versionId!: string;
-}
-
-export class DocumentVersionDiffQueryDto {
-  fromVersion!: string;
-  toVersion!: string;
-}
-
-export class DocumentCommentListQueryDto {
-  resolved?: string;
-}
-
-export class DocumentCreateBodyDto {
-  projectId?: string;
-  title!: string;
-  type?: PublicDocumentType;
-  bodyMd?: string;
-}
-
-export class DocumentPatchBodyDto {
-  title?: string;
-  type?: PublicDocumentType;
-  bodyMd?: string;
-}
-
-export class DocumentCommentCreateBodyDto {
-  authorId!: string;
-  bodyMd!: string;
-  parentCommentId?: string;
-  selection?: Record<string, unknown> | null;
-  traceId?: string;
-}
-
-export class DocumentCommentPatchBodyDto {
-  bodyMd?: string;
-  selection?: Record<string, unknown> | null;
-  status?: string;
-}
-
-export class DocumentCommentResolveBodyDto {
-  resolved?: boolean | string;
-}
-
-export class DocumentLinkCreateBodyDto {
-  sourceDocId!: string;
-  targetDocId!: string;
-  linkType?: string;
-  traceId?: string;
 }
 
 export class DocumentPublicApiService {

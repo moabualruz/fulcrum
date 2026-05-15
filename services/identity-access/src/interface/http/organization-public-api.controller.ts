@@ -9,7 +9,6 @@ import { DataSource } from "typeorm";
 
 import {
   FULCRUM_IDENTITY_ACCESS_ENTITIES,
-  type OrganizationRole,
 } from "@identity-access/infrastructure/database/organization.entities.ts";
 import {
   LastOrganizationOwnerError,
@@ -21,27 +20,13 @@ import {
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
+import { OrganizationScopeDto, OrganizationUpdateDto, OrganizationMemberParamsDto, OrganizationMemberRoleDto } from "./dto/organization.dto.ts";
+export { OrganizationScopeDto, OrganizationUpdateDto, OrganizationMemberParamsDto, OrganizationMemberRoleDto };
+
 export const ORGANIZATION_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.organizationPublicApi.options");
 
 export interface OrganizationPublicApiOptions {
   featuresEnv?: string;
-}
-
-export class OrganizationScopeDto {
-  orgId!: string;
-  userId!: string;
-}
-
-export class OrganizationUpdateDto extends OrganizationScopeDto {
-  name!: string;
-}
-
-export class OrganizationMemberParamsDto {
-  userId!: string;
-}
-
-export class OrganizationMemberRoleDto extends OrganizationScopeDto {
-  role!: OrganizationRole;
 }
 
 export class OrganizationPublicApiService {

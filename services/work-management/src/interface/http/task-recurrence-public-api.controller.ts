@@ -21,32 +21,13 @@ import {
 } from "@work-management/infrastructure/database/task-recurrence-store.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
+import { TaskRecurrenceListQueryDto, TaskRecurrenceCreateDto, TaskRecurrenceDeleteParamsDto, TaskRecurrenceDeleteQueryDto } from "./dto/task-recurrence.dto.ts";
+export { TaskRecurrenceListQueryDto, TaskRecurrenceCreateDto, TaskRecurrenceDeleteParamsDto, TaskRecurrenceDeleteQueryDto };
+
 export const TASK_RECURRENCE_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.taskRecurrencePublicApi.options");
 
 export interface TaskRecurrencePublicApiOptions {
   featuresEnv?: string;
-}
-
-export class TaskRecurrenceListQueryDto {
-  orgId!: string;
-  taskId!: string;
-}
-
-export class TaskRecurrenceCreateDto extends TaskRecurrenceListQueryDto {
-  triggerType!: TaskRecurrenceTrigger;
-  cronExpression?: string;
-  includeSubtasks?: boolean;
-  intervalDays?: number;
-  maxOccurrences?: number;
-  timezone?: string;
-}
-
-export class TaskRecurrenceDeleteParamsDto {
-  ruleId!: string;
-}
-
-export class TaskRecurrenceDeleteQueryDto {
-  orgId!: string;
 }
 
 export class TaskRecurrencePublicApiService {
