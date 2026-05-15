@@ -39,7 +39,7 @@ export async function loadDashboard(
   const projectIds = typeof projectId === "string" ? await dashboardProjectIds(manager, orgId, projectId) : [];
   const ctx = { orgId, userId: null, projectId: undefined };
   const [projects, docs, runs, tasks] = await Promise.all([
-    manager.find(Project, { where: { org: orgId } as never, order: { createdAt: "ASC", id: "ASC" } }),
+    manager.find(Project, { where: { org: { id: orgId } } as never, order: { createdAt: "ASC", id: "ASC" } }),
     listDocs(manager, ctx),
     listRuns(manager, ctx),
     listTasks(manager, ctx, {}),

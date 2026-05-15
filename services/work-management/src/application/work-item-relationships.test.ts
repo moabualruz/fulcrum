@@ -29,6 +29,8 @@ function makeMockEm(overrides: Partial<Record<string, any>> = {}): any {
   const flush = vi.fn().mockResolvedValue(undefined);
   const remove = vi.fn();
 
+  const save = vi.fn().mockImplementation(async (entity: unknown) => entity);
+
   return {
     findOne,
     find,
@@ -38,6 +40,7 @@ function makeMockEm(overrides: Partial<Record<string, any>> = {}): any {
     removeAndFlush,
     remove,
     flush,
+    save,
     ...overrides,
   };
 }
@@ -66,7 +69,7 @@ describe("WorkItemRelationshipService", () => {
       const svc = new WorkItemRelationshipService(em);
       const result = await svc.create("org-1", "task-A", "task-B", "blocks", "user-1");
       expect(result).toBeDefined();
-      expect(em.persist).toHaveBeenCalled();
+      expect(em.save).toHaveBeenCalled();
     });
 
     it("rejects cross-org task access", async () => {

@@ -34,7 +34,7 @@ export class WorkItemTemplateService {
   private serialize(t: TaskTemplate): TemplateOutput {
     return {
       id: t.id,
-      orgId: (t.org as Org).id,
+      orgId: (t.org as Org)?.id ?? (t as any).org_id ?? "",
       projectId: t.projectId,
       name: t.name,
       description: t.description,
@@ -68,13 +68,11 @@ export class WorkItemTemplateService {
   }
 
   async list(orgId: string, projectId: string): Promise<TemplateOutput[]> {
-    const templates = await this.em.find(TaskTemplate, {
-      org: { id: orgId },
-      $or: [
-        { projectId },
-        { projectId: null }, // workspace-scoped
-      ],
-    } as never);
+    const { IsNull } = await import("typeorm");
+    const templates = await this.em.find(TaskTemplate, { where: [
+      { org: { id: orgId }, projectId },
+      { org: { id: orgId }, projectId: IsNull() }, // workspace-scoped
+    ] as never });
 
     return templates.map((t) => this.serialize(t));
   }
@@ -109,7 +107,7 @@ export class WorkItemTemplateService {
       throw new AppNotFoundError(`Template ${templateId} not found`);
     }
 
-    this.em.remove(template);
+    await this.em.remove(template);
   }
 
   async setDefault(
@@ -126,6 +124,7 @@ export class WorkItemTemplateService {
 
     for (const t of existing) {
       t.isDefault = false;
+      await this.em.save(t);
     }
 
     const template = await this.em.findOne(TaskTemplate, { where: {
@@ -138,5 +137,6 @@ export class WorkItemTemplateService {
     }
 
     template.isDefault = true;
+    await this.em.save(template);
   }
 }

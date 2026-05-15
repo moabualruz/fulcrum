@@ -45,10 +45,10 @@ export class WorkItemRelationshipService {
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   private async findTaskInOrg(orgId: string, taskId: string): Promise<Task> {
-    const task = await this.em.findOne(Task, {
+    const task = await this.em.findOne(Task, { where: {
       id: taskId,
       org: { id: orgId },
-    } as never);
+    } as never });
 
     if (!task) {
       throw new AppNotFoundError(`Task ${taskId} not found in org ${orgId}`);
@@ -60,7 +60,7 @@ export class WorkItemRelationshipService {
   private serialize(rel: TaskRelationship): RelationshipOutput {
     return {
       id: rel.id,
-      orgId: (rel.org as Org).id,
+      orgId: (rel.org as Org)?.id ?? (rel as any).org_id ?? "",
       sourceTaskId: rel.sourceTaskId,
       targetTaskId: rel.targetTaskId,
       type: rel.type,
@@ -86,11 +86,11 @@ export class WorkItemRelationshipService {
 
       visited.add(currentId);
 
-      const outgoing = await this.em.find(TaskRelationship, {
+      const outgoing = await this.em.find(TaskRelationship, { where: {
         sourceTaskId: currentId,
         type: "blocks",
         org: { id: orgId },
-      } as never);
+      } as never });
 
       for (const rel of outgoing) {
         stack.push({ id: rel.targetTaskId, depth: depth + 1 });
@@ -138,10 +138,10 @@ export class WorkItemRelationshipService {
   }
 
   async delete(orgId: string, relationshipId: string): Promise<void> {
-    const rel = await this.em.findOne(TaskRelationship, {
+    const rel = await this.em.findOne(TaskRelationship, { where: {
       id: relationshipId,
       org: { id: orgId },
-    } as never);
+    } as never });
 
     if (!rel) {
       throw new AppNotFoundError(`Relationship ${relationshipId} not found`);
@@ -151,34 +151,31 @@ export class WorkItemRelationshipService {
   }
 
   async listForTask(orgId: string, taskId: string): Promise<RelationshipOutput[]> {
-    const rels = await this.em.find(TaskRelationship, {
-      $or: [
-        { sourceTaskId: taskId },
-        { targetTaskId: taskId },
-      ],
-      org: { id: orgId },
-    } as never);
+    const rels = await this.em.find(TaskRelationship, { where: [
+      { sourceTaskId: taskId, org: { id: orgId } },
+      { targetTaskId: taskId, org: { id: orgId } },
+    ] as never });
 
     return rels.map((r) => this.serialize(r));
   }
 
   async listBlockers(orgId: string, taskId: string): Promise<RelationshipOutput[]> {
-    const rels = await this.em.find(TaskRelationship, {
+    const rels = await this.em.find(TaskRelationship, { where: {
       targetTaskId: taskId,
       type: "blocks",
       org: { id: orgId },
-    } as never);
+    } as never });
 
     return rels.map((r) => this.serialize(r));
   }
 
   /** D-123: reverse query — tasks that THIS task blocks */
   async listBlockedBy(orgId: string, taskId: string): Promise<RelationshipOutput[]> {
-    const rels = await this.em.find(TaskRelationship, {
+    const rels = await this.em.find(TaskRelationship, { where: {
       sourceTaskId: taskId,
       type: "blocks",
       org: { id: orgId },
-    } as never);
+    } as never });
 
     return rels.map((r) => this.serialize(r));
   }
@@ -187,10 +184,10 @@ export class WorkItemRelationshipService {
     // All tasks that are targets of 'blocks' relationships in the org.
     // Note: tasks don't have projectId on this entity version; filter by org scope.
     // When Project-Task FK exists, add projectId filter here.
-    const rels = await this.em.find(TaskRelationship, {
+    const rels = await this.em.find(TaskRelationship, { where: {
       type: "blocks",
       org: { id: orgId },
-    } as never);
+    } as never });
 
     return rels.map((r) => this.serialize(r));
   }
@@ -221,22 +218,23 @@ export class WorkItemRelationshipService {
     // Auto-close: set source task to a canceled-category status
     if (opts.autoClose) {
       (sourceTask as Task & { status: string | null }).status = "Canceled";
+      await this.em.save(sourceTask);
     }
 
     // Transfer watchers from source to target
     if (opts.transferWatchers) {
-      const sourceWatchers = await this.em.find(TaskWatcher, {
+      const sourceWatchers = await this.em.find(TaskWatcher, { where: {
         taskId: sourceTaskId,
         org: { id: orgId },
-      } as never);
+      } as never });
 
       for (const watcher of sourceWatchers) {
         // Check if target already has this watcher
-        const existing = await this.em.findOne(TaskWatcher, {
+        const existing = await this.em.findOne(TaskWatcher, { where: {
           taskId: targetTaskId,
           userId: watcher.userId,
           org: { id: orgId },
-        } as never);
+        } as never });
 
         if (!existing) {
           const newWatcher = this.em.create(TaskWatcher, {

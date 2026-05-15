@@ -36,10 +36,10 @@ export class WorkflowRulesService {
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   private async findProject(orgId: string, projectId: string): Promise<Project> {
-    const project = await this.em.findOne(Project, {
+    const project = await this.em.findOne(Project, { where: {
       id: projectId,
       org: { id: orgId },
-    } as never);
+    } as never });
 
     if (!project) {
       throw new AppNotFoundError(`Project ${projectId} not found in org ${orgId}`);
@@ -136,6 +136,8 @@ export class WorkflowRulesService {
         transitions: this.getDefaultWorkflow(methodology),
       };
     }
+
+    await this.em.save(project);
   }
 
   // ── Enabled task types ────────────────────────────────────────────────────────

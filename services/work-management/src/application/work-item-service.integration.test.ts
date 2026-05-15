@@ -223,7 +223,7 @@ describe("WorkItemService class with real MikroORM persistence", () => {
       action: "require",
       createdAt: new Date(),
     } as never));
-    /* flushed */
+    await (em as any).flush();
 
     await em.getConnection().execute(
       `UPDATE tasks SET custom_fields = ?::jsonb WHERE id = ?`,

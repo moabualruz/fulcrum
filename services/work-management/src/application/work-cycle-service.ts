@@ -29,7 +29,7 @@ export class WorkCycleService {
     projectId?: string;
     status?: string;
   }): Promise<SprintOutput[]> {
-    const where: Record<string, unknown> = { org: orgId };
+    const where: Record<string, unknown> = { org: { id: orgId } };
     if (input?.projectId) where.projectId = input.projectId;
     if (input?.status) where.status = input.status;
     const sprints = await this.em.find(Sprint, { where: where as never, order: { startDate: "ASC", id: "ASC" } });
@@ -97,12 +97,12 @@ export class WorkCycleService {
   async start(ctx: SprintContext, id: string): Promise<SprintOutput> {
     const sprint = await findSprint(this.em, ctx.orgId, id);
     if (!sprint) throw new AppNotFoundError("Sprint not found.");
-    const active = await this.em.findOne(Sprint, {
-      org: ctx.orgId,
+    const active = await this.em.findOne(Sprint, { where: {
+      org: { id: ctx.orgId },
       projectId: sprint.projectId,
       status: SprintStatus.active,
-      id: { $ne: sprint.id },
-    } as never);
+      id: Not(sprint.id),
+    } as never });
     if (active) {
       throw new AppConflictError("at_most_one_active");
     }
@@ -240,6 +240,7 @@ export class WorkCycleService {
     if (summary !== undefined) {
       sprint.closedSummary = { ...(sprint.closedSummary as Record<string, unknown> ?? {}), summary };
     }
+    await this.em.save(sprint);
     return serializeSprint(sprint);
   }
 
@@ -278,7 +279,7 @@ export class WorkCycleService {
 export function serializeSprint(sprint: Sprint): SprintOutput {
   return {
     id: sprint.id,
-    orgId: sprint.org.id,
+    orgId: (sprint.org as any)?.id ?? (sprint as any).org_id ?? "",
     projectId: sprint.projectId,
     name: sprint.name,
     goal: sprint.goal,
@@ -291,7 +292,7 @@ export function serializeSprint(sprint: Sprint): SprintOutput {
 }
 
 async function findSprint(em: EntityManager, orgId: string, id: string): Promise<Sprint | null> {
-  return em.findOne(Sprint, { where: { org: orgId, id } as never });
+  return em.findOne(Sprint, { where: { org: { id: orgId }, id } as never });
 }
 
 async function emitSprintEvent(ctx: SprintContext, input: {

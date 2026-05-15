@@ -16,11 +16,11 @@ export const TaskCustomFieldsOutputSchema = z.object({
 export type TaskCustomFieldsOutput = z.infer<typeof TaskCustomFieldsOutputSchema>;
 
 async function findFieldDef(em: EntityManager, orgId: string, id: string): Promise<CustomFieldDef | null> {
-  return em.findOne(CustomFieldDef, { where: { id, org: orgId, archived: false } as never });
+  return em.findOne(CustomFieldDef, { where: { id, org: { id: orgId }, archived: false } as never });
 }
 
 async function findTask(em: EntityManager, orgId: string, id: string): Promise<Task | null> {
-  return em.findOne(Task, { where: { id, org: orgId, deletedAt: null } as never });
+  return em.findOne(Task, { where: { id, org: { id: orgId }, deletedAt: null } as never });
 }
 
 function failValidation(field: CustomFieldDef, reason: string): never {

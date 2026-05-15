@@ -131,12 +131,13 @@ export class WorkItemAutomationService {
     }
 
     const projectScope = await this.resolveAutomationProjectScope(orgId, projectId);
-    const automations = await this.em.find(ProjectAutomation, {
+    const { In } = await import("typeorm");
+    const automations = await this.em.find(ProjectAutomation, { where: {
       org: { id: orgId },
-      projectId: { $in: projectScope.map((project) => project.id) },
+      projectId: In(projectScope.map((project) => project.id)),
       triggerType: event.verb,
       enabled: true,
-    } as never);
+    } as never });
     const projectById = new Map(projectScope.map((project) => [project.id, project]));
     const targetProject = projectById.get(projectId) ?? { id: projectId, path: "", depth: 0 };
 
@@ -396,10 +397,10 @@ export class WorkItemAutomationService {
     actionConfig?: object | null;
     enabled?: boolean;
   }): Promise<AutomationOutput | null> {
-    const automation = await this.em.findOne(ProjectAutomation, {
+    const automation = await this.em.findOne(ProjectAutomation, { where: {
       id: input.id,
       org: { id: orgId },
-    } as never);
+    } as never });
     if (!automation) return null;
 
     if (input.name !== undefined) automation.name = input.name;
@@ -411,16 +412,17 @@ export class WorkItemAutomationService {
     if (input.enabled !== undefined) automation.enabled = input.enabled;
     automation.updatedAt = new Date();
 
+    await this.em.save(automation);
     return serializeAutomation(automation);
   }
 
   async delete(orgId: string, id: string): Promise<{ deleted: true } | null> {
-    const automation = await this.em.findOne(ProjectAutomation, {
+    const automation = await this.em.findOne(ProjectAutomation, { where: {
       id,
       org: { id: orgId },
-    } as never);
+    } as never });
     if (!automation) return null;
-    this.em.remove(automation);
+    await this.em.remove(automation);
     return { deleted: true };
   }
 }

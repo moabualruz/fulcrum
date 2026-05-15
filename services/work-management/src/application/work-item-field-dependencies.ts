@@ -116,6 +116,6 @@ export class WorkItemFieldDependencyService {
     if (!rule) {
       throw new AppNotFoundError(`Rule ${ruleId} not found`);
     }
-    this.em.remove(rule);
+    await this.em.remove(rule);
   }
 }

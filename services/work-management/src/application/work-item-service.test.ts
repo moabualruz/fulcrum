@@ -65,6 +65,9 @@ function makeMockEm(tasks: Task[]): EntityManager {
     getRepository: vi.fn(() => makeMockRepo(tasks, () => txEmBox.em)),
     persist: vi.fn(),
     flush: vi.fn(async () => {}),
+    save: vi.fn(async (entity: unknown) => entity),
+    query: vi.fn(async () => []),
+    find: vi.fn(async () => tasks),
     getReference: vi.fn((_Entity: unknown, id: string) => ({ id })) as unknown as EntityManager["getReference"],
     create: vi.fn((_Entity: unknown, data: unknown) => data) as unknown as EntityManager["create"],
   } as unknown as EntityManager;
@@ -74,9 +77,15 @@ function makeMockEm(tasks: Task[]): EntityManager {
     getRepository: vi.fn(() => makeMockRepo(tasks, () => mockEmBox.em)),
     persist: vi.fn(),
     flush: vi.fn(async () => {}),
+    save: vi.fn(async (entity: unknown) => entity),
+    query: vi.fn(async () => []),
+    find: vi.fn(async () => tasks),
     getReference: vi.fn((_Entity: unknown, id: string) => ({ id })) as unknown as EntityManager["getReference"],
     create: vi.fn((_Entity: unknown, data: unknown) => data) as unknown as EntityManager["create"],
     transactional: vi.fn(async (cb: (em: EntityManager) => Promise<void>) => {
+      await cb(txEm);
+    }),
+    transaction: vi.fn(async (cb: (em: EntityManager) => Promise<void>) => {
       await cb(txEm);
     }),
   } as unknown as EntityManager;
@@ -101,7 +110,7 @@ describe("WorkItemService - bulk operations (TSK-11, D-75)", () => {
     expect(result.updated).toBe(55);
 
     // All tasks should have status updated
-    expect(em.transactional).toHaveBeenCalledTimes(1);
+    expect(em.transaction).toHaveBeenCalledTimes(1);
   });
 
   it("rejects bulk operations exceeding 200 tasks (D-75)", async () => {
@@ -129,7 +138,7 @@ describe("WorkItemService - bulk operations (TSK-11, D-75)", () => {
     );
     expect(result.updated).toBe(2);
     // Transaction was used (single flush pattern)
-    expect(em.transactional).toHaveBeenCalledTimes(1);
+    expect(em.transaction).toHaveBeenCalledTimes(1);
   });
 
   it("bulk deletes tasks and returns deleted count", async () => {

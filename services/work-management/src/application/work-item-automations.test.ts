@@ -17,8 +17,13 @@ function makeEm(
     create: vi.fn((_, data) => ({ ...data, id: "auto-1", executionCount: 0 })),
     persist: vi.fn(),
     flush: vi.fn().mockResolvedValue(undefined),
+    save: vi.fn().mockImplementation(async (entity: unknown) => entity),
     remove: vi.fn(),
     getReference: vi.fn((_, id) => ({ id })),
+    query: vi.fn().mockImplementation(async (sql: string) => {
+      if (sql.includes("FROM projects")) return options.projectAncestry ?? [];
+      return [];
+    }),
     getConnection: vi.fn(() => ({
       execute: vi.fn((sql: string) => {
         if (sql.includes("FROM projects")) return Promise.resolve(options.projectAncestry ?? []);

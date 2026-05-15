@@ -10,7 +10,6 @@ import { Event } from "@platform-core/infrastructure/application-database/entiti
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import { type TaskDependencies } from "@work-management/infrastructure/database/entities/tasks/schemas.ts";
-import { TaskRepository } from "@work-management/infrastructure/database/repositories/tasks/TaskRepository.ts";
 import { tipTapDocToText, type TipTapJson } from "@platform-core/infrastructure/application-database/tasks-rich-text.ts";
 import { FieldDependencyRule } from "@work-management/infrastructure/database/entities/tasks/FieldDependencyRule.ts";
 import { WorkflowRulesService } from "@work-management/application/workflow-rules-service.ts";
@@ -63,22 +62,26 @@ export class WorkItemService {
   // ── Queries ────────────────────────────────────────────────────
 
   async list(orgId: string, includeDeleted = false): Promise<TaskOutput[]> {
-    const repo = this.repo();
-    const tasks = await repo.list({ orgId, includeDeleted });
+    const { IsNull } = await import("typeorm");
+    const tasks = await this.em.find(Task, {
+      where: {
+        org: { id: orgId },
+        ...(includeDeleted ? {} : { deletedAt: IsNull() }),
+      },
+      order: { createdAt: "DESC", id: "ASC" },
+    });
     return tasks.map(serializeTask);
   }
 
   async get(orgId: string, id: string): Promise<TaskOutput | null> {
-    const repo = this.repo();
-    const task = await repo.get({ orgId, id });
+    const task = await this.findTask(orgId, id);
     return task ? serializeTask(task) : null;
   }
 
   async listChildren(orgId: string, taskId: string): Promise<TaskOutput[]> {
-    const repo = this.repo();
-    const task = await repo.get({ orgId, id: taskId });
+    const task = await this.findTask(orgId, taskId);
     if (!task) return [];
-    const children = await this.em.find(Task, { where: { org: { id: orgId }, parent: taskId, deletedAt: null } as never, order: { createdAt: "ASC", id: "ASC" } });
+    const children = await this.em.find(Task, { where: { org: { id: orgId }, parent: { id: taskId }, deletedAt: null } as never, order: { createdAt: "ASC", id: "ASC" } });
     return children.map(serializeTask);
   }
 
@@ -93,10 +96,29 @@ export class WorkItemService {
     priority?: number | null;
     points?: number | null;
   }): Promise<TaskOutput> {
-    const repo = this.repo();
-    const task = repo.create({ orgId, ...input });
-    
-    return serializeTask(task);
+    const { randomUUID } = await import("node:crypto");
+    const { textToTipTapDoc } = await import("@platform-core/infrastructure/application-database/tasks-rich-text.ts");
+    const now = new Date();
+    const taskRepo = this.em.getRepository(Task);
+    const task = taskRepo.create({
+      id: randomUUID(),
+      org: { id: orgId } as Org,
+      title: input.title,
+      description: input.description ?? null,
+      tiptapContent: input.tiptapContent ?? textToTipTapDoc(input.descriptionText ?? input.description ?? ""),
+      status: input.status ?? "todo",
+      priority: input.priority ?? null,
+      points: input.points ?? null,
+      customFields: {},
+      dependencies: { blocks: [], blocked_by: [] },
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    });
+    const saved = await taskRepo.save(task);
+    // Reload with eager org relation
+    const loaded = await taskRepo.findOne({ where: { id: saved.id } });
+    return serializeTask(loaded ?? saved);
   }
 
   async update(orgId: string, input: {
@@ -111,10 +133,8 @@ export class WorkItemService {
     assigneeId?: string | null;
     projectId?: string | null;
   }): Promise<TaskOutput | null> {
-    const repo = this.repo();
-
     // Fetch current task to determine field changes
-    const current = await repo.get({ orgId, id: input.id });
+    const current = await this.findTask(orgId, input.id);
     if (!current) return null;
 
     // D-24: Transition validation — only when status changes and projectId is known
@@ -139,19 +159,28 @@ export class WorkItemService {
       STARTED_STATUSES.has(input.status ?? "") &&
       !current.startedAt;
 
-    const task = await repo.update({ orgId, ...input });
-    if (!task) return null;
+    // Apply updates
+    const { textToTipTapDoc } = await import("@platform-core/infrastructure/application-database/tasks-rich-text.ts");
+    if (input.title !== undefined) current.title = input.title;
+    if (input.description !== undefined) current.description = input.description;
+    if (input.descriptionText !== undefined) current.tiptapContent = textToTipTapDoc(input.descriptionText);
+    if (input.tiptapContent !== undefined) current.tiptapContent = input.tiptapContent;
+    if (input.status !== undefined) current.status = input.status;
+    if (input.priority !== undefined) current.priority = input.priority;
+    if (input.points !== undefined) current.points = input.points;
+    current.updatedAt = new Date();
 
     if (isStartingNow) {
-      task.startedAt = new Date();
-      await this.em.save(task);
+      current.startedAt = new Date();
     }
+
+    await this.em.save(current);
 
     // D-08: Watcher auto-subscribe on assignee change
     if (input.assigneeId !== undefined && input.assigneeId !== current.assigneeId && input.assigneeId) {
       try {
         const commentService = new WorkItemCommentService(this.em);
-        await commentService.subscribe(orgId, task.id, input.assigneeId, "assign");
+        await commentService.subscribe(orgId, current.id, input.assigneeId, "assign");
       } catch {
         // Non-fatal: watcher subscription is best-effort
       }
@@ -160,16 +189,19 @@ export class WorkItemService {
     // HIGH-03: Inline field dependency validation
     if (input.projectId ?? current.projectId) {
       const projectId = (input.projectId ?? current.projectId)!;
-      await validateFieldDependencies(this.em, orgId, projectId, task);
+      await validateFieldDependencies(this.em, orgId, projectId, current);
     }
 
-    return serializeTask(task);
+    return serializeTask(current);
   }
 
   async delete(orgId: string, id: string): Promise<TaskOutput | null> {
-    const repo = this.repo();
-    const task = await repo.delete({ orgId, id });
-    return task ? serializeTask(task) : null;
+    const task = await this.findTask(orgId, id);
+    if (!task) return null;
+    task.deletedAt = new Date();
+    task.updatedAt = task.deletedAt;
+    await this.em.save(task);
+    return serializeTask(task);
   }
 
   async bulkUpdate(ctx: TaskContext, ids: string[], patch: BulkTaskPatch): Promise<{ updated: number }> {
@@ -177,7 +209,6 @@ export class WorkItemService {
     if (ids.length > 200) {
       throw new AppValidationError("Bulk operations are limited to 200 tasks at a time.");
     }
-    const repo = this.repo();
     await this.em.transaction(async (txEm) => {
       const tasks = await findBulkTasksOrThrow(txEm, ctx.orgId, ids);
       for (const task of tasks) {
@@ -193,7 +224,7 @@ export class WorkItemService {
         await txEm.query(
           `insert into projects (id, org_id, name)
            select ?, ?, 'Untitled project'
-           where ? is not null
+           where ?::text is not null
              and exists (select 1 from sprints where org_id = ? and project_id = ?)
              and not exists (select 1 from projects where org_id = ? and id = ?)
            on conflict do nothing`,
@@ -202,7 +233,7 @@ export class WorkItemService {
         await txEm.query(
           `update tasks
            set project_id = case
-             when ? is null then null
+             when ?::text is null then null
              when exists (select 1 from projects where org_id = ? and id = ?) then ?
              when exists (select 1 from sprints where org_id = ? and project_id = ?) then ?
              else project_id
@@ -239,14 +270,13 @@ export class WorkItemService {
   }
 
   async setParent(ctx: TaskContext, taskId: string, parentId: string | null): Promise<TaskOutput | null> {
-    const repo = this.repo();
-    const task = await findTaskOrNull(repo, ctx.orgId, taskId);
+    const task = await this.findTask(ctx.orgId, taskId);
     if (!task) return null;
 
-    const parent = parentId ? await findTaskOrNull(repo, ctx.orgId, parentId) : null;
+    const parent = parentId ? await this.findTask(ctx.orgId, parentId) : null;
     if (parentId && !parent) return null;
 
-    await assertParentDoesNotCycle({ repo, orgId: ctx.orgId, taskId: task.id, parentId });
+    await this.assertParentDoesNotCycle(ctx.orgId, task.id, parentId);
 
     const previousParentId = task.parent?.id ?? null;
     task.parent = parent;
@@ -266,8 +296,7 @@ export class WorkItemService {
     taskId: string,
     dependencies: TaskDependencies,
   ): Promise<TaskOutput | null> {
-    const repo = this.repo();
-    const task = await findTaskOrNull(repo, ctx.orgId, taskId);
+    const task = await this.findTask(ctx.orgId, taskId);
     if (!task) return null;
 
     const referencedIds = new Set([...dependencies.blocks, ...dependencies.blocked_by]);
@@ -299,19 +328,46 @@ export class WorkItemService {
       }
     }
 
+    // Re-read the task from the updated tasks array
+    const updatedTask = tasks.find((t) => t.id === task.id) ?? task;
+
     await emitTaskEvent(ctx, {
       verb: "dependency_updated",
-      taskId: task.id,
-      payload: { dependencies: task.dependencies },
+      taskId: updatedTask.id,
+      payload: { dependencies: updatedTask.dependencies },
     });
-    
-    return serializeTask(task);
+
+    return serializeTask(updatedTask);
   }
 
   // ── Private ────────────────────────────────────────────────────
 
-  private repo(): TaskRepository {
-    return this.em.getRepository(Task) as unknown as TaskRepository;
+  private async findTask(orgId: string, id: string, includeDeleted = false): Promise<Task | null> {
+    const { IsNull } = await import("typeorm");
+    return this.em.findOne(Task, {
+      where: {
+        org: { id: orgId },
+        id,
+        ...(includeDeleted ? {} : { deletedAt: IsNull() }),
+      },
+    });
+  }
+
+  private async assertParentDoesNotCycle(orgId: string, taskId: string, parentId: string | null): Promise<void> {
+    let cursor = parentId;
+    const seen = new Set<string>();
+    while (cursor) {
+      if (cursor === taskId || seen.has(cursor)) {
+        throw new AppConflictError("Task parent cycle rejected.");
+      }
+      seen.add(cursor);
+      const { IsNull } = await import("typeorm");
+      const ancestor = await this.em.findOne(Task, {
+        where: { org: { id: orgId }, id: cursor, deletedAt: IsNull() },
+        relations: ["parent"],
+      });
+      cursor = ancestor?.parent?.id ?? null;
+    }
   }
 }
 
@@ -320,7 +376,7 @@ export class WorkItemService {
 export function serializeTask(task: Task): TaskOutput {
   return {
     id: task.id,
-    orgId: task.org.id,
+    orgId: (task.org as any)?.id ?? (task as any).org_id ?? "",
     title: task.title,
     description: task.description,
     descriptionText: tipTapDocToText(task.tiptapContent as TipTapJson),
@@ -374,28 +430,6 @@ async function findBulkTasksOrThrow(em: EntityManager, orgId: string, ids: strin
 
 export function normalizedUnique(ids: string[]): string[] {
   return [...new Set(ids)].sort();
-}
-
-async function findTaskOrNull(repo: TaskRepository, orgId: string, id: string): Promise<Task | null> {
-  return repo.get({ orgId, id });
-}
-
-async function assertParentDoesNotCycle(input: {
-  repo: TaskRepository;
-  orgId: string;
-  taskId: string;
-  parentId: string | null;
-}): Promise<void> {
-  let cursor = input.parentId;
-  const seen = new Set<string>();
-  while (cursor) {
-    if (cursor === input.taskId || seen.has(cursor)) {
-      throw new AppConflictError("Task parent cycle rejected.");
-    }
-    seen.add(cursor);
-    const parent = await findTaskOrNull(input.repo, input.orgId, cursor);
-    cursor = parent?.parent?.id ?? null;
-  }
 }
 
 function assertDependencyGraphDoesNotCycle(edges: Map<string, Set<string>>): void {
@@ -453,11 +487,11 @@ async function validateFieldDependencies(
   projectId: string,
   task: Task,
 ): Promise<void> {
-  const rules = await em.find(FieldDependencyRule, {
-    org: orgId,
+  const rules = await em.find(FieldDependencyRule, { where: {
+    org: { id: orgId },
     projectId,
     action: "require",
-  } as never);
+  } as never });
 
   const missingFields: string[] = [];
   for (const rule of rules) {

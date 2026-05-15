@@ -11,8 +11,14 @@ export async function listTasks(
   ctx: AppContext,
   input: ListTasksInput = {},
 ): Promise<TaskDto[]> {
-  const repo = em.getRepository(Task) as unknown as TaskRepository;
-  const tasks = await repo.list({ orgId: ctx.orgId, includeDeleted: input.includeDeleted });
+  const { IsNull } = await import("typeorm");
+  const tasks = await em.find(Task, {
+    where: {
+      org: { id: ctx.orgId },
+      ...(input.includeDeleted ? {} : { deletedAt: IsNull() }),
+    },
+    order: { createdAt: "DESC", id: "ASC" },
+  });
   const scopedTasks = ctx.projectId
     ? tasks.filter((task) => task.projectId === ctx.projectId)
     : tasks;
@@ -85,12 +91,12 @@ export async function findVisibleTask(
   taskId: string,
   options: { includeDeleted?: boolean } = {},
 ): Promise<Task> {
-  const task = await em.findOne(Task, {
+  const task = await em.findOne(Task, { where: {
     id: taskId,
     ...(options.includeDeleted ? {} : { deletedAt: null }),
-  } as never);
+  } as never });
   if (!task) throw new AppNotFoundError(`Task not found: ${taskId}`);
-  if (task.org.id !== ctx.orgId) {
+  if (((task.org as any)?.id ?? (task as any).org_id) !== ctx.orgId) {
     throw new AppForbiddenError(`Task does not belong to org: ${ctx.orgId}`);
   }
   if (ctx.projectId && task.projectId !== ctx.projectId) {
@@ -102,7 +108,7 @@ export async function findVisibleTask(
 export function serializeTask(task: Task): TaskDto {
   return {
     id: task.id,
-    orgId: task.org.id,
+    orgId: (task.org as any)?.id ?? (task as any).org_id ?? "",
     projectId: task.projectId ?? null,
     title: task.title,
     description: task.description,

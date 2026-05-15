@@ -140,5 +140,5 @@ describe("manual task workbench action", () => {
 async function setTaskLabels(em: Awaited<ReturnType<typeof createTestOrm>>["em"], id: string, labels: string[]): Promise<void> {
   const task = await em.findOneOrFail(Task, { id } as never);
   task.labels = labels;
-  /* flushed */
+  await em.save(task);
 }

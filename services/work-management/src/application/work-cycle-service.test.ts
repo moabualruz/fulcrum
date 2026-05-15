@@ -8,6 +8,8 @@ function makeMockEm(sprint: Record<string, unknown> | null = null) {
     find: vi.fn().mockResolvedValue([]),
     persist: vi.fn(),
     flush: vi.fn().mockResolvedValue(undefined),
+    save: vi.fn().mockImplementation(async (entity: unknown) => entity),
+    query: vi.fn().mockResolvedValue([{ total_points: 30 }]),
     getConnection: vi.fn().mockReturnValue({
       execute: vi.fn().mockResolvedValue([{ total_points: 30 }]),
     }),
@@ -77,7 +79,7 @@ describe("WorkCycleService - retrospective", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const svc = new WorkCycleService(em as any);
     const result = await svc.saveRetrospective("org-1", "sprint-1", "Great sprint", "Velocity up");
-    expect(em.flush).toHaveBeenCalled();
+    expect(em.save).toHaveBeenCalled();
     expect(result).not.toBeNull();
     expect((sprint.retrospectiveNotes as unknown as Record<string, string>)?.notes).toBe("Great sprint");
   });
@@ -93,7 +95,7 @@ describe("WorkCycleService - retrospective", () => {
     const svc = new WorkCycleService(em as any);
     const result = await svc.saveRetrospective("org-1", "sprint-1", "Rollover notes", "closed");
     expect(result).not.toBeNull();
-    expect(em.flush).toHaveBeenCalled();
+    expect(em.save).toHaveBeenCalled();
     expect((sprint.retrospectiveNotes as unknown as Record<string, string>)?.notes).toBe("Rollover notes");
   });
 });

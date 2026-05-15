@@ -72,7 +72,7 @@ export class WorkItemRecurrenceService {
   private serialize(rule: TaskRecurrenceRule): RecurrenceRuleOutput {
     return {
       id: rule.id,
-      orgId: (rule.org as Org).id,
+      orgId: (rule.org as Org)?.id ?? (rule as any).org_id ?? "",
       sourceTaskId: rule.sourceTaskId,
       triggerType: rule.triggerType,
       cronExpression: rule.cronExpression,
@@ -134,13 +134,14 @@ export class WorkItemRecurrenceService {
   async processDue(): Promise<void> {
     const now = new Date();
 
-    const rules = await this.em.find(TaskRecurrenceRule, {
-      nextRunAt: { $lte: now },
+    const { LessThanOrEqual } = await import("typeorm");
+    const rules = await this.em.find(TaskRecurrenceRule, { where: {
+      nextRunAt: LessThanOrEqual(now),
       enabled: true,
-    } as never);
+    } as never });
 
     for (const rule of rules) {
-      const orgId = (rule.org as Org).id;
+      const orgId = (rule.org as Org)?.id ?? (rule as any).org_id;
       const data = (rule.templateData ?? {}) as Record<string, unknown>;
 
       // Clone task via WorkItemService
@@ -173,12 +174,12 @@ export class WorkItemRecurrenceService {
 
   /** Trigger on_complete recurrence rules when a task is completed */
   async onTaskComplete(orgId: string, taskId: string): Promise<void> {
-    const rules = await this.em.find(TaskRecurrenceRule, {
+    const rules = await this.em.find(TaskRecurrenceRule, { where: {
       sourceTaskId: taskId,
       triggerType: "on_complete",
       enabled: true,
       org: { id: orgId },
-    } as never);
+    } as never });
 
     const now = new Date();
     for (const rule of rules) {
@@ -196,10 +197,10 @@ export class WorkItemRecurrenceService {
   }
 
   async delete(orgId: string, ruleId: string): Promise<void> {
-    const rule = await this.em.findOne(TaskRecurrenceRule, {
+    const rule = await this.em.findOne(TaskRecurrenceRule, { where: {
       id: ruleId,
       org: { id: orgId },
-    } as never);
+    } as never });
 
     if (!rule) {
       throw new AppNotFoundError(`Recurrence rule ${ruleId} not found`);
@@ -209,10 +210,10 @@ export class WorkItemRecurrenceService {
   }
 
   async list(orgId: string, taskId: string): Promise<RecurrenceRuleOutput[]> {
-    const rules = await this.em.find(TaskRecurrenceRule, {
+    const rules = await this.em.find(TaskRecurrenceRule, { where: {
       sourceTaskId: taskId,
       org: { id: orgId },
-    } as never);
+    } as never });
 
     return rules.map((r) => this.serialize(r));
   }

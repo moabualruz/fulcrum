@@ -66,14 +66,14 @@ export async function getSprintBurndown(
 ): Promise<BurndownPoint[]> {
   const sprint = await em.findOne(Sprint, { where: {
     id: input.sprintId,
-    org: ctx.orgId,
+    org: { id: ctx.orgId },
     projectId: input.projectId,
   } as never });
   if (!sprint) return [];
 
   const tasks = await em.createQueryBuilder(Task, "task")
     .select(["points", "status"])
-    .where({ org: ctx.orgId, sprint: input.sprintId, deletedAt: null } as never)
+    .where({ org: { id: ctx.orgId }, sprint: input.sprintId, deletedAt: null } as never)
     .getRawMany<{ points: number | null; status: string | null }>();
   const totalPoints = tasks.reduce((sum: number, task: { points: number | null; status: string | null }) => sum + (task.points ?? 0), 0);
   if (totalPoints === 0) return [];

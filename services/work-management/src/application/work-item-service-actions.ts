@@ -104,6 +104,8 @@ function assertEm(db: DbHandle) {
 }
 
 function isSqlExecutor(db: DbHandle): db is SqlExecutor {
+  // EntityManager also has .query() — distinguish by checking for TypeORM-specific methods
+  if ("getRepository" in db || "findOne" in db || "save" in db || "transaction" in db) return false;
   return !("em" in db) && "query" in db && typeof (db as { query: unknown }).query === "function";
 }
 

@@ -22,15 +22,23 @@ export async function createTask(
     const projectId = parsed.projectId ?? ctx.projectId ?? null;
     assertProjectCompatible(projectId, parent);
     assertAllowedParent(parsed.taskType ?? "task", parent?.taskType ?? null);
+    const { textToTipTapDoc } = await import("@platform-core/infrastructure/application-database/tasks-rich-text.ts");
+    const { Org } = await import("@identity-access/infrastructure/database/entities/auth/Org.ts");
+    const now = new Date();
     const task = repo.create({
-      orgId: ctx.orgId,
+      id: crypto.randomUUID(),
+      org: { id: ctx.orgId } as InstanceType<typeof Org>,
       title: parsed.title,
-      description: parsed.description,
-      descriptionText: parsed.descriptionText,
-      tiptapContent: parsed.tiptapContent,
-      status: parsed.status,
-      priority: parsed.priority,
-      points: parsed.points,
+      description: parsed.description ?? null,
+      tiptapContent: parsed.tiptapContent ?? textToTipTapDoc(parsed.descriptionText ?? parsed.description ?? ""),
+      status: parsed.status ?? "todo",
+      priority: parsed.priority ?? null,
+      points: parsed.points ?? null,
+      customFields: {},
+      dependencies: { blocks: [], blocked_by: [] },
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
     });
     task.assigneeId = parsed.assigneeId ?? null;
     task.projectId = projectId;
@@ -176,11 +184,11 @@ export async function setDependencies(
       throw new AppConflictError("Task dependency cycle rejected.");
     }
 
-    const tasks = await txEm.find(Task, {
-      org: ctx.orgId,
+    const tasks = await txEm.find(Task, { where: {
+      org: { id: ctx.orgId },
       ...(ctx.projectId ? { projectId: ctx.projectId } : {}),
       deletedAt: null,
-    } as never);
+    } as never });
     const knownIds = new Set(tasks.map((candidate) => candidate.id));
     if ([...referencedIds].some((id) => !knownIds.has(id))) {
       throw new AppNotFoundError("One or more tasks were not found.");
@@ -309,12 +317,13 @@ function applyBulkPatch(task: Task, patch: BulkTaskPatch): void {
 }
 
 async function findBulkTasksOrThrow(em: EntityManager, ctx: AppContext, ids: string[]): Promise<Task[]> {
-  const tasks = await em.find(Task, {
-    org: ctx.orgId,
+  const { In } = await import("typeorm");
+  const tasks = await em.find(Task, { where: {
+    org: { id: ctx.orgId },
     ...(ctx.projectId ? { projectId: ctx.projectId } : {}),
-    id: { $in: ids },
+    id: In(ids),
     deletedAt: null,
-  } as never);
+  } as never });
   if (tasks.length !== ids.length) {
     throw new AppNotFoundError("One or more tasks were not found.");
   }

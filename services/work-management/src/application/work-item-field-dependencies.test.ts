@@ -43,8 +43,10 @@ function makeMockEm(rules: ReturnType<typeof makeRule>[] = [makeRule()]) {
   const getReference = vi.fn((_cls: unknown, id: string) => ({ id }));
   const create = vi.fn((_cls: unknown, data: unknown) => ({ ...data as object, id: "new-rule-1", createdAt: new Date() }));
 
+  const save = vi.fn().mockImplementation(async (entity: unknown) => entity);
+
   return {
-    em: { persist, remove, flush, findOne, find, getReference, create } as unknown as ConstructorParameters<typeof WorkItemFieldDependencyService>[0],
+    em: { persist, remove, flush, findOne, find, getReference, create, save } as unknown as ConstructorParameters<typeof WorkItemFieldDependencyService>[0],
     persist,
     remove,
     flush,
@@ -52,6 +54,7 @@ function makeMockEm(rules: ReturnType<typeof makeRule>[] = [makeRule()]) {
     find,
     getReference,
     create,
+    save,
   };
 }
 
@@ -120,7 +123,7 @@ describe("WorkItemFieldDependencyService.listRules", () => {
 
 describe("WorkItemFieldDependencyService.createRule", () => {
   it("persists and flushes a new rule", async () => {
-    const { em, persist, flush } = makeMockEm([]);
+    const { em, save } = makeMockEm([]);
 
     const svc = new WorkItemFieldDependencyService(em);
     await svc.createRule("org-1", {
@@ -131,15 +134,14 @@ describe("WorkItemFieldDependencyService.createRule", () => {
       action: "require",
     });
 
-    expect(persist).toHaveBeenCalledTimes(1);
-    expect(flush).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("WorkItemFieldDependencyService.deleteRule", () => {
   it("finds and removes the rule then flushes", async () => {
     const rule = makeRule();
-    const { em, findOne, remove, flush } = makeMockEm([]);
+    const { em, findOne, remove } = makeMockEm([]);
     findOne.mockResolvedValue(rule);
 
     const svc = new WorkItemFieldDependencyService(em);
@@ -147,7 +149,6 @@ describe("WorkItemFieldDependencyService.deleteRule", () => {
 
     expect(findOne).toHaveBeenCalledTimes(1);
     expect(remove).toHaveBeenCalledWith(rule);
-    expect(flush).toHaveBeenCalledTimes(1);
   });
 
   it("throws when rule not found", async () => {

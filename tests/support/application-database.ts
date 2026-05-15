@@ -59,9 +59,15 @@ function buildEphemeralPgDriver() {
       }
       const hasParams =
         params !== undefined && Array.isArray(params) && params.length > 0;
+      // Auto-convert ? placeholders to $1, $2, … for PGlite compatibility
+      let finalSql = sqlQuery;
+      if (hasParams && sqlQuery.includes("?")) {
+        let idx = 0;
+        finalSql = sqlQuery.replace(/\?/g, () => `$${++idx}`);
+      }
       const queryPromise = hasParams
-        ? pg.query(sqlQuery, params)
-        : pg.exec(sqlQuery).then((results) => results[results.length - 1] || { rows: [] });
+        ? pg.query(finalSql, params)
+        : pg.exec(finalSql).then((results) => results[results.length - 1] || { rows: [] });
       return queryPromise
         .then((results) => {
           if (cb) cb(null, results);
@@ -112,6 +118,23 @@ export async function createTestOrm(
 
   // MikroORM compat: patch em with getConnection/persist/flush/create/getReference/transactional/getMetadata
   const em = ds.manager as EntityManager & Record<string, unknown>;
+  // MikroORM em.getConnection().execute(sql, params) → TypeORM ds.query(sql, params)
+  if (!em.getConnection) {
+    (em as any).getConnection = () => ({
+      execute: async (sql: string, params?: unknown[]) => {
+        // MikroORM uses ? placeholders; TypeORM/PGlite uses $1, $2, …
+        let idx = 0;
+        const pgSql = sql.replace(/\?/g, () => `$${++idx}`);
+        return ds.query(pgSql, params);
+      },
+    });
+  }
+  // MikroORM em.clear() (no args) → no-op in TypeORM (no identity map to clear)
+  const origClear = (em as any).clear;
+  (em as any).clear = (...args: unknown[]) => {
+    if (args.length === 0) return; // MikroORM no-arg clear → no-op
+    return origClear?.apply(em, args);
+  };
   if (!em.persist) {
     (em as any).persist = (entity: unknown) => {
       (em as any).__pendingPersist = (em as any).__pendingPersist || [];
@@ -161,8 +184,8 @@ export async function createTestOrm(
   if (!em.nativeDelete) {
     (em as any).nativeDelete = async (entity: Function, criteria: unknown) => {
       if (criteria && typeof criteria === "object" && Object.keys(criteria as object).length === 0) {
-        // Empty criteria → delete all rows
-        await ds.getRepository(entity).clear();
+        const meta = ds.getMetadata(entity);
+        await ds.query(`DELETE FROM "${meta.tableName}"`);
       } else {
         await ds.getRepository(entity).delete(criteria as any);
       }

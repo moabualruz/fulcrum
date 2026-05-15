@@ -99,7 +99,7 @@ describe("WorkItemRelationshipService integration", () => {
       userId: testDb.seed.userId,
       source: "manual",
     } as never));
-    /* flushed */
+    await (em as any).flush();
 
     const relation = await relationships.markAsDuplicate(DEFAULT_ORG_ID, duplicate.id, canonical.id, {
       autoClose: true,
@@ -113,12 +113,10 @@ describe("WorkItemRelationshipService integration", () => {
     });
     expect((await tasks.get(DEFAULT_ORG_ID, duplicate.id))?.status).toBe("Canceled");
 
-    const canonicalWatchers = await em.find(TaskWatcher, {
+    const canonicalWatchers = await em.find(TaskWatcher, { where: {
       org: { id: DEFAULT_ORG_ID },
       taskId: canonical.id,
-    } as never, {
-      orderBy: { userId: "ASC" },
-    });
+    } as never, order: { userId: "ASC" } });
     expect(canonicalWatchers.map((watcher) => ({
       userId: watcher.userId,
       source: watcher.source,

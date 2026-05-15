@@ -32,6 +32,7 @@ function makeMockEm(project: ReturnType<typeof makeProject> | null = makeProject
   return {
     findOne: vi.fn().mockResolvedValue(project),
     flush: vi.fn().mockResolvedValue(undefined),
+    save: vi.fn().mockImplementation(async (entity: unknown) => entity),
     create: vi.fn(),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
@@ -113,7 +114,7 @@ describe("WorkflowRulesService", () => {
       const svc = new WorkflowRulesService(em);
       await svc.updateMethodology("org-1", "proj-1", "scrum", false);
       expect(project.methodology).toBe("scrum");
-      expect(em.flush).toHaveBeenCalled();
+      expect(em.save).toHaveBeenCalled();
     });
 
     it("updateMethodology resets workflow_config when resetWorkflow=true", async () => {
