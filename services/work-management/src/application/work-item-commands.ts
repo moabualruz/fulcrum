@@ -17,17 +17,16 @@ export async function createTask(
 ): Promise<TaskDto> {
   const parsed = parseOrThrow(CreateTaskInputSchema, input);
   return await em.transaction(async (txEm: EntityManager) => {
-    const repo = txEm.getRepository(Task) as unknown as TaskRepository;
     const parent = parsed.parentId ? await findVisibleTask(txEm, ctx, parsed.parentId) : null;
     const projectId = parsed.projectId ?? ctx.projectId ?? null;
     assertProjectCompatible(projectId, parent);
     assertAllowedParent(parsed.taskType ?? "task", parent?.taskType ?? null);
     const { textToTipTapDoc } = await import("@platform-core/infrastructure/application-database/tasks-rich-text.ts");
-    const { Org } = await import("@identity-access/infrastructure/database/entities/auth/Org.ts");
     const now = new Date();
-    const task = repo.create({
+    const taskRepo = txEm.getRepository(Task);
+    const task = taskRepo.create({
       id: crypto.randomUUID(),
-      org: { id: ctx.orgId } as InstanceType<typeof Org>,
+      org: { id: ctx.orgId } as any,
       title: parsed.title,
       description: parsed.description ?? null,
       tiptapContent: parsed.tiptapContent ?? textToTipTapDoc(parsed.descriptionText ?? parsed.description ?? ""),
