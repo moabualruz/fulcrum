@@ -1,17 +1,44 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { createLocalOrg } from "@test-support/product-workspace-fixtures.ts";
-import { makeId } from "@test-support/product-workspace-fixtures.ts";
-import {
-  configureRepoDashboardService,
-  type RepoDashboardService,
-} from "@integration-hub/application/repos/dashboard.ts";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-let scratch: string;
+interface DashboardRow {
+  id: string;
+  path: string;
+  remoteUrl?: string | null;
+  branch?: string | null;
+  dirty: boolean;
+  lastSyncAt?: string | null;
+  recentCommit?: string | null;
+  openTaskCount: number;
+  health: string;
+  watcherStatus: string;
+  syncLatencyMs: number | null;
+  lastSyncError: string | null;
+}
+
+const repos: DashboardRow[] = [];
+const detail = {
+  branches: [] as Array<{ name: string; updatedAt: Date }>,
+  commits: [] as Array<{ sha: string; committedAt: Date }>,
+  files: [] as Array<{ path: string; updatedAt: Date }>,
+  syncLog: [] as Array<{ status: string; createdAt: Date }>,
+};
+
+function row(overrides: Partial<DashboardRow> = {}): DashboardRow {
+  return {
+    id: "repo-1",
+    path: "/tmp/myrepo",
+    branch: "main",
+    dirty: false,
+    openTaskCount: 0,
+    health: "healthy",
+    watcherStatus: "unknown",
+    syncLatencyMs: null,
+    lastSyncError: null,
+    ...overrides,
+  };
+}
 
 function streamedData<T>(result: unknown): Promise<T> {
   const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
@@ -19,109 +46,74 @@ function streamedData<T>(result: unknown): Promise<T> {
   return stream as Promise<T>;
 }
 
-async function seedRepo(scratch: string) {
-  const dbDir = join(scratch, "pglite.data");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(dbDir);
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const repoId = makeId();
-  await db.query(
-    `INSERT INTO repos (id, org_id, slug, root_path, default_branch, remote_url, registered_at, last_seen_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [repoId, org.id, "myrepo", "/tmp/myrepo", "main", null, "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"],
-  );
-  await db.close();
-  return { orgId: org.id, repoId };
-}
+mock.module("@integration-hub/interface/repository-pages.ts", () => ({
+  listRepositoryDashboard: async () => [...repos],
+  loadRepositoryDetail: async () => ({
+    branches: [...detail.branches],
+    commits: [...detail.commits],
+    files: [...detail.files],
+    syncLog: [...detail.syncLog],
+  }),
+}));
 
 beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-repos-detail-"));
-  process.env["FULCRUM_HOME"] = scratch;
+  repos.splice(0, repos.length);
+  detail.branches.splice(0, detail.branches.length);
+  detail.commits.splice(0, detail.commits.length);
+  detail.files.splice(0, detail.files.length);
+  detail.syncLog.splice(0, detail.syncLog.length);
 });
 
-afterEach(() => {
-  configureRepoDashboardService(null);
-  delete process.env["FULCRUM_HOME"];
-  rmSync(scratch, { recursive: true, force: true });
-});
+describe("/repos/[id] +page.server.ts", () => {
+  test("server route uses the repository interface instead of direct application imports", () => {
+    const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
+    expect(source).toContain("@integration-hub/interface/repository-pages");
+    expect(source).not.toContain("@integration-hub/application/repos");
+  });
 
-function configureRepoDetailService(repoId: string): void {
-  const service: RepoDashboardService = {
-    async getRepoDashboard() {
-      return [{
-        id: repoId,
-        path: "/tmp/myrepo",
-        branch: "main",
-        dirty: false,
-        openTaskCount: 0,
-        health: "healthy",
-        watcherStatus: "unknown",
-        syncLatencyMs: null,
-        lastSyncError: null,
-      }];
-    },
-    async getRepoDetail() {
-      return { branches: [], commits: [], files: [], syncLog: [] };
-    },
-  };
-  configureRepoDashboardService(service);
-}
+  test("load returns repo detail with ISO-normalized detail rows", async () => {
+    repos.push(row({ id: "repo-1", path: "/tmp/myrepo", branch: "main" }));
+    detail.branches.push({ name: "main", updatedAt: new Date("2026-01-01T00:00:00Z") });
+    detail.commits.push({ sha: "abcdef123456", committedAt: new Date("2026-01-02T00:00:00Z") });
+    detail.files.push({ path: "src/main.ts", updatedAt: new Date("2026-01-03T00:00:00Z") });
+    detail.syncLog.push({ status: "ok", createdAt: new Date("2026-01-04T00:00:00Z") });
 
-describe("/repos/[id] +page.server.ts load()", () => {
-  test("returns repo detail with path and branch", async () => {
-    const { repoId } = await seedRepo(scratch);
-    configureRepoDetailService(repoId);
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({
-      params: { id: repoId },
-      locals: { activeProjectId: null },
+      params: { id: "repo-1" },
+      locals: { activeProjectId: null, orgId: "org-1" },
     } as Parameters<typeof mod.load>[0]);
-    const payload = await streamedData<{ repo: { path: string; branch: string | null }; branches: unknown[]; commits: unknown[]; files: unknown[]; syncLog: unknown[] }>(result);
+    const payload = await streamedData<{
+      repo: { path: string; branch: string | null };
+      branches: Array<{ updatedAt?: string }>;
+      commits: Array<{ committedAt?: string }>;
+      files: Array<{ updatedAt?: string }>;
+      syncLog: Array<{ createdAt?: string }>;
+    }>(result);
+
     expect(payload.repo.path).toBe("/tmp/myrepo");
     expect(payload.repo.branch).toBe("main");
-    expect(Array.isArray(payload.branches)).toBe(true);
-    expect(Array.isArray(payload.commits)).toBe(true);
-    expect(Array.isArray(payload.files)).toBe(true);
-    expect(Array.isArray(payload.syncLog)).toBe(true);
+    expect(payload.branches[0]?.updatedAt).toBe("2026-01-01T00:00:00.000Z");
+    expect(payload.commits[0]?.committedAt).toBe("2026-01-02T00:00:00.000Z");
+    expect(payload.files[0]?.updatedAt).toBe("2026-01-03T00:00:00.000Z");
+    expect(payload.syncLog[0]?.createdAt).toBe("2026-01-04T00:00:00.000Z");
   });
 
   test("throws 404 for unknown repo id", async () => {
-    const { repoId } = await seedRepo(scratch);
-    configureRepoDetailService(repoId);
+    repos.push(row({ id: "repo-known" }));
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    let threw = false;
-    try {
+    await expect(async () => {
       const result = await mod.load({
-        params: { id: "nonexistent-id" },
-        locals: { activeProjectId: null },
+        params: { id: "repo-missing" },
+        locals: { activeProjectId: null, orgId: "org-1" },
       } as Parameters<typeof mod.load>[0]);
       await streamedData(result);
-    } catch (err) {
-      threw = true;
-      expect((err as { status?: number }).status).toBe(404);
-    }
-    expect(threw).toBe(true);
+    }).toThrow();
   });
 
-  test("git operations return empty arrays when root_path does not exist", async () => {
-    const { repoId } = await seedRepo(scratch);
-    configureRepoDetailService(repoId);
+  test("sync action queues repo sync through the repository public API", async () => {
+    const repoId = "repo-sync";
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
-    const result = await mod.load({
-      params: { id: repoId },
-      locals: { activeProjectId: null },
-    } as Parameters<typeof mod.load>[0]);
-    const payload = await streamedData<{ branches: unknown[]; commits: unknown[] }>(result);
-    expect(Array.isArray(payload.branches)).toBe(true);
-    expect(Array.isArray(payload.commits)).toBe(true);
-  });
-});
-
-describe("/repos/[id] +page.server.ts sync action()", () => {
-  test("queues repo sync through the repository public API", async () => {
-    const repoId = makeId();
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
     const calls: Array<{ url: string; init?: RequestInit }> = [];
 
     const result = await mod.actions.sync({

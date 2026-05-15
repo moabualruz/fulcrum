@@ -3,9 +3,8 @@
 // Gated behind FULCRUM_FEATURES=import-csv.
 
 import type { RequestHandler } from "@sveltejs/kit";
-import { requestAppScope } from "$lib/server/application-scope";
-import { isFeatureEnabled } from "@integration-hub/application/data-exchange/features.ts";
-import { importTasksFromCsvUpload } from "@work-management/application/tasks/csv.ts";
+import { isDataExchangeFeatureEnabled } from "@integration-hub/interface/data-exchange-features.ts";
+import { importTasksFromCsvUpload } from "@work-management/interface/task-csv.ts";
 
 function jsonError(msg: string, status = 400): Response {
   return new Response(JSON.stringify({ error: msg }), {
@@ -15,7 +14,7 @@ function jsonError(msg: string, status = 400): Response {
 }
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-  if (!isFeatureEnabled("import-csv")) {
+  if (!isDataExchangeFeatureEnabled("import-csv")) {
     return jsonError("Feature import-csv not enabled", 403);
   }
 
@@ -44,7 +43,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   }
 
   try {
-    const { em, ctx } = await requestAppScope(locals);
+    const { em, ctx } = await requestScopedApp(locals);
     const result = await importTasksFromCsvUpload(em, ctx, {
       bytes: await file.arrayBuffer(),
       columnMap,
@@ -58,3 +57,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     return jsonError((err as Error).message);
   }
 };
+
+async function requestScopedApp(locals: App.Locals) {
+  const { requestAppScope } = await import("$lib/server/application-scope");
+  return requestAppScope(locals);
+}

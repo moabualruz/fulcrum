@@ -1,14 +1,19 @@
 import type { Actions, PageServerLoad } from "./$types";
 import { error, fail } from "@sveltejs/kit";
-import { requestAppScope } from "$lib/server/application-scope";
-import { createRepoBranch, checkoutRepoBranch, deleteRepoBranch } from "@integration-hub/application/repos/commands.ts";
-import { getRepoBranchesPage, REPO_WRITE_OPS_GATE } from "@integration-hub/application/repos/queries.ts";
+import {
+  checkoutRepositoryBranch,
+  createRepositoryBranch,
+  deleteRepositoryBranch,
+  loadRepositoryBranchesPage,
+  REPOSITORY_WRITE_ACTIONS_GATE,
+} from "@integration-hub/interface/repository-pages.ts";
 import { AppError } from "@platform-core/domain/errors.ts";
+import { requestRepositoryScope } from "../../repository-request-scope";
 
 function gated() {
   return fail(403, {
     ok: false,
-    ...REPO_WRITE_OPS_GATE,
+    ...REPOSITORY_WRITE_ACTIONS_GATE,
   });
 }
 
@@ -17,8 +22,8 @@ export const load: PageServerLoad = ({ params, locals }) => ({
   streamed: {
     data: (async () => {
       try {
-        const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
-        return await getRepoBranchesPage(em, ctx, params.id);
+        const { em, ctx } = await requestRepositoryScope(locals, locals?.activeProjectId ?? null);
+        return await loadRepositoryBranchesPage(em, ctx, params.id);
       } catch (e) {
         if (e instanceof AppError && e.kind === "not_found") throw error(404, e.message);
         throw e;
@@ -33,8 +38,8 @@ export const actions: Actions = {
     const name = String(form.get("name") ?? "").trim();
     try {
       if (!name) return fail(400, { ok: false, message: "branch name required" });
-      const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
-      await createRepoBranch(em, ctx, { repoId: params.id, name });
+      const { em, ctx } = await requestRepositoryScope(locals, locals?.activeProjectId ?? null);
+      await createRepositoryBranch(em, ctx, { repoId: params.id, name });
       return { ok: true };
     } catch (e) {
       if (e instanceof AppError && e.kind === "forbidden") return gated();
@@ -45,8 +50,8 @@ export const actions: Actions = {
     const form = await request.formData();
     const name = String(form.get("name") ?? "").trim();
     try {
-      const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
-      await checkoutRepoBranch(em, ctx, { repoId: params.id, name });
+      const { em, ctx } = await requestRepositoryScope(locals, locals?.activeProjectId ?? null);
+      await checkoutRepositoryBranch(em, ctx, { repoId: params.id, name });
       return { ok: true };
     } catch (e) {
       if (e instanceof AppError && e.kind === "forbidden") return gated();
@@ -57,8 +62,8 @@ export const actions: Actions = {
     const form = await request.formData();
     const name = String(form.get("name") ?? "").trim();
     try {
-      const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
-      await deleteRepoBranch(em, ctx, { repoId: params.id, name });
+      const { em, ctx } = await requestRepositoryScope(locals, locals?.activeProjectId ?? null);
+      await deleteRepositoryBranch(em, ctx, { repoId: params.id, name });
       return { ok: true };
     } catch (e) {
       if (e instanceof AppError && e.kind === "forbidden") return gated();

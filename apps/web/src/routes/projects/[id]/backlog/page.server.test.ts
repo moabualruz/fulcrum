@@ -1,109 +1,97 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import {
-  createLocalOrg,
-  createProject,
-  createTask,
-  createSprint,
-  addTaskToSprint,
-} from "@test-support/product-workspace-fixtures.ts";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-let scratch: string;
+const appScope = { em: { kind: "mock-em" }, ctx: { orgId: "org-1", userId: "user-1", projectId: "project-1" } };
+const calls: string[] = [];
+const pageData = {
+  project: { id: "project-1", name: "Project" },
+  sprints: [{ id: "sprint-1", name: "Sprint 1", status: "active", capacity_points: 20 }],
+  backlogTasks: [{ id: "task-1", title: "Backlog task", status: "pending", priority: 5, estimate_points: null, sprint_id: null }],
+};
 
-beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-backlog-route-"));
-  process.env["FULCRUM_HOME"] = scratch;
-});
-
-afterEach(() => {
-  delete process.env["FULCRUM_HOME"];
-  rmSync(scratch, { recursive: true, force: true });
-});
-
-async function seedDb() {
-  const dbDir = join(scratch, "pglite.data");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(dbDir);
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const project = await createProject(db, { orgId: org.id, slug: "proj", name: "TestProject" });
-  return { db, orgId: org.id, projectId: project.id };
+function form(data: Record<string, string>): Request {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(data)) fd.set(key, value);
+  return new Request("http://localhost/projects/project-1/backlog", { method: "POST", body: fd });
 }
 
-describe("backlog route loader", () => {
+mock.module("$lib/server/application-scope", () => ({
+  requestAppScope: async (_locals: unknown, projectId: string) => ({
+    ...appScope,
+    ctx: { ...appScope.ctx, projectId },
+  }),
+}));
+
+mock.module("@work-management/interface/project-backlog.ts", () => ({
+  loadProjectBacklog: async () => pageData,
+  addTaskToSprint: async (_em: unknown, _ctx: unknown, sprintId: string, taskId: string) => {
+    calls.push(`add:${sprintId}:${taskId}`);
+    return { moved: true };
+  },
+  removeTaskFromSprint: async (_em: unknown, _ctx: unknown, sprintId: string, taskId: string) => {
+    calls.push(`remove:${sprintId}:${taskId}`);
+    return { moved: true };
+  },
+}));
+
+beforeEach(() => {
+  calls.splice(0, calls.length);
+});
+
+describe("/projects/[id]/backlog +page.server.ts", () => {
+  test("server route uses the work-management interface instead of direct application imports", () => {
+    const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
+    expect(source).toContain("@work-management/interface/project-backlog");
+    expect(source).not.toContain("@work-management/application/sprints");
+    expect(source).not.toContain("$lib/server/application-scope");
+  });
+
   test("load returns backlog tasks and sprints", async () => {
-    const { db, orgId, projectId } = await seedDb();
-    try {
-      const sprint = await createSprint(db, { orgId, projectId, name: "Sprint 1", capacityPoints: 20 });
-      const t1 = await createTask(db, { orgId, projectId, title: "Backlog task", priority: 5 });
-      const t2 = await createTask(db, { orgId, projectId, title: "Sprinted task", priority: 3 });
-      const t3 = await createTask(db, { orgId, projectId, title: "Done task", status: "completed" });
-      await addTaskToSprint(db, { sprintId: sprint.id, taskId: t2.id });
-      await db.close();
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
+    const result = await mod.load({
+      params: { id: "project-1" },
+      locals: { orgId: "org-1" },
+    } as Parameters<typeof mod.load>[0]);
 
-      // Dynamic import after env is set
-      const mod = await import("./+page.server.ts");
-      const result = await mod.load({
-        params: { id: projectId },
-      } as any);
-
-      expect(result.project.name).toBe("TestProject");
-      expect(result.sprints.length).toBe(1);
-      expect(result.sprints[0].name).toBe("Sprint 1");
-      // Backlog should only have t1 (not sprinted t2, not completed t3)
-      expect(result.backlogTasks.length).toBe(1);
-      expect(result.backlogTasks[0].title).toBe("Backlog task");
-    } finally {
-      // db already closed
-    }
+    expect(result.project.name).toBe("Project");
+    expect(result.sprints).toHaveLength(1);
+    expect(result.backlogTasks[0]?.title).toBe("Backlog task");
   });
 
-  test("addTask action assigns task to sprint", async () => {
-    const { db, orgId, projectId } = await seedDb();
-    try {
-      const sprint = await createSprint(db, { orgId, projectId, name: "S1" });
-      const task = await createTask(db, { orgId, projectId, title: "Move me" });
-      await db.close();
+  test("addTask action assigns task to sprint through the service boundary", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
+    const result = await mod.actions.addTask({
+      request: form({ sprintId: "sprint-1", taskId: "task-1" }),
+      params: { id: "project-1" },
+      locals: {},
+    } as Parameters<typeof mod.actions.addTask>[0]);
 
-      const mod = await import("./+page.server.ts");
-      const fd = new FormData();
-      fd.set("sprintId", sprint.id);
-      fd.set("taskId", task.id);
-      const result = await mod.actions.addTask({
-        request: new Request("http://localhost/?/addTask", { method: "POST", body: fd }),
-        params: { id: projectId },
-      } as any);
-
-      expect(result).toEqual({ ok: true });
-    } finally {
-      // db already closed
-    }
+    expect(result).toEqual({ ok: true });
+    expect(calls).toEqual(["add:sprint-1:task-1"]);
   });
 
-  test("removeTask action unassigns task from sprint", async () => {
-    const { db, orgId, projectId } = await seedDb();
-    try {
-      const sprint = await createSprint(db, { orgId, projectId, name: "S1" });
-      const task = await createTask(db, { orgId, projectId, title: "Remove me" });
-      await addTaskToSprint(db, { sprintId: sprint.id, taskId: task.id });
-      await db.close();
+  test("removeTask action unassigns task from sprint through the service boundary", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
+    const result = await mod.actions.removeTask({
+      request: form({ sprintId: "sprint-1", taskId: "task-1" }),
+      params: { id: "project-1" },
+      locals: {},
+    } as Parameters<typeof mod.actions.removeTask>[0]);
 
-      const mod = await import("./+page.server.ts");
-      const fd = new FormData();
-      fd.set("sprintId", sprint.id);
-      fd.set("taskId", task.id);
-      const result = await mod.actions.removeTask({
-        request: new Request("http://localhost/?/removeTask", { method: "POST", body: fd }),
-        params: { id: projectId },
-      } as any);
+    expect(result).toEqual({ ok: true });
+    expect(calls).toEqual(["remove:sprint-1:task-1"]);
+  });
 
-      expect(result).toEqual({ ok: true });
-    } finally {
-      // db already closed
-    }
+  test("actions validate required sprint and task ids", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
+    const result = await mod.actions.addTask({
+      request: form({ sprintId: "", taskId: "" }),
+      params: { id: "project-1" },
+      locals: {},
+    } as Parameters<typeof mod.actions.addTask>[0]);
+
+    expect(result.status).toBe(400);
+    expect(result.data.error).toBe("sprintId and taskId required");
   });
 });

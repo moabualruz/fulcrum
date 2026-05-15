@@ -272,11 +272,12 @@ describe("web route application adapters", () => {
     expect(text).not.toMatch(/\.(query|execute)\(/);
   });
 
-  test("dashboard helper composes ORM/application queries without raw handles", () => {
+  test("dashboard helper uses service interface without raw handles", () => {
     const text = readFileSync(join(webRoot, "lib/server/dashboard.ts"), "utf8");
-    expect(text).toContain("application/docs/queries");
-    expect(text).toContain("application/runs/queries");
-    expect(text).toContain("application/tasks/queries");
+    expect(text).toContain("@work-management/interface/dashboard");
+    expect(text).not.toContain("application/docs/queries");
+    expect(text).not.toContain("application/runs/queries");
+    expect(text).not.toContain("application/tasks/queries");
     expect(text).not.toMatch(new RegExp(`open${productDbToken}|get${productDbToken}|Orm${productDbToken}|${productDbToken}`));
     expect(text).not.toMatch(/\.(query|execute)\(/);
   });

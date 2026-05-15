@@ -1,12 +1,11 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { addTaskToSprint, removeTaskFromSprint } from "@work-management/application/sprints/commands.ts";
-import { loadProjectBacklog } from "@work-management/application/sprints/queries.ts";
-import { requestAppScope } from "$lib/server/application-scope";
+import { addTaskToSprint, loadProjectBacklog, removeTaskFromSprint } from "@work-management/interface/project-backlog.ts";
+import { requestProjectScope } from "../project-request-scope";
 
 export const load: PageServerLoad = async ({ params, locals }) => {
   try {
-    const { em, ctx } = await requestAppScope(locals, params.id);
+    const { em, ctx } = await requestProjectScope(locals, params.id);
     return await loadProjectBacklog(em, ctx);
   } catch {
     throw error(404, "Project not found");
@@ -21,7 +20,7 @@ export const actions: Actions = {
     if (!sprintId || !taskId) return fail(400, { error: "sprintId and taskId required" });
 
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestProjectScope(locals, params.id);
       await addTaskToSprint(em, ctx, sprintId, taskId);
       return { ok: true };
     } catch (e) {
@@ -35,7 +34,7 @@ export const actions: Actions = {
     if (!sprintId || !taskId) return fail(400, { error: "sprintId and taskId required" });
 
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestProjectScope(locals, params.id);
       await removeTaskFromSprint(em, ctx, sprintId, taskId);
       return { ok: true };
     } catch (e) {

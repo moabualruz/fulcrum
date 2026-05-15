@@ -1,13 +1,12 @@
 import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { rescheduleProjectTask } from "@work-management/application/projects/commands.ts";
-import { loadProjectCalendar } from "@work-management/application/projects/queries.ts";
+import { loadProjectCalendar, rescheduleProjectTask } from "@work-management/interface/project-timeline.ts";
 import { actionFail, actionOk } from "../../../../lib/feedback/action-result";
-import { requestAppScope } from "$lib/server/application-scope";
+import { requestProjectScope } from "../project-request-scope";
 
 export const load: PageServerLoad = async ({ params, locals }) => {
   const projectId = params.id;
-  const { em, ctx } = await requestAppScope(locals, projectId);
+  const { em, ctx } = await requestProjectScope(locals, projectId);
   return loadProjectCalendar(em, ctx);
 };
 
@@ -21,7 +20,7 @@ export const actions: Actions = {
     if (typeof id !== "string" || !id) return fail(400, actionFail("missing id"));
 
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestProjectScope(locals, params.id);
       await rescheduleProjectTask(em, ctx, {
         taskId: id,
         ...(typeof start_date === "string" && start_date ? { startDate: start_date } : {}),

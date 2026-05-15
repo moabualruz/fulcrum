@@ -1,7 +1,7 @@
 import { error } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { actionOk } from "$lib/feedback/action-result";
-import { getRepoDashboard, getRepoDetail } from "@integration-hub/application/repos/dashboard.ts";
+import { listRepositoryDashboard, loadRepositoryDetail } from "@integration-hub/interface/repository-pages.ts";
 import { queueRepositorySync } from "../repository-sync-api";
 
 const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
@@ -32,8 +32,8 @@ export const load: PageServerLoad = ({ params, locals }) => {
     streamed: {
       data: (async () => {
         const [repos, detail] = await Promise.all([
-          getRepoDashboard(orgId),
-          getRepoDetail(orgId, params.id),
+          listRepositoryDashboard(orgId),
+          loadRepositoryDetail(orgId, params.id),
         ]);
         const repo = repos.find((row) => row.id === params.id);
         if (!repo) throw error(404, "Repo not found");

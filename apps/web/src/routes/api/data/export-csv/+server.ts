@@ -2,9 +2,8 @@
 // Gated behind FULCRUM_FEATURES=export-csv.
 
 import type { RequestHandler } from "@sveltejs/kit";
-import { requestAppScope } from "$lib/server/application-scope";
-import { isFeatureEnabled } from "@integration-hub/application/data-exchange/features.ts";
-import { exportTasksCsvForContext } from "@work-management/application/tasks/csv.ts";
+import { isDataExchangeFeatureEnabled } from "@integration-hub/interface/data-exchange-features.ts";
+import { exportTasksCsvForContext } from "@work-management/interface/task-csv.ts";
 
 function jsonError(msg: string, status = 400): Response {
   return new Response(JSON.stringify({ error: msg }), {
@@ -14,7 +13,7 @@ function jsonError(msg: string, status = 400): Response {
 }
 
 export const GET: RequestHandler = async ({ url, locals }) => {
-  if (!isFeatureEnabled("export-csv")) {
+  if (!isDataExchangeFeatureEnabled("export-csv")) {
     return jsonError("Feature export-csv not enabled", 403);
   }
 
@@ -23,7 +22,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
     return jsonError(`Unknown entity: ${entity}`);
   }
 
-  const { em, ctx } = await requestAppScope(locals);
+  const { em, ctx } = await requestScopedApp(locals);
   const result = await exportTasksCsvForContext(em, ctx);
 
   return new Response(result.bytes, {
@@ -34,3 +33,8 @@ export const GET: RequestHandler = async ({ url, locals }) => {
     },
   });
 };
+
+async function requestScopedApp(locals: App.Locals) {
+  const { requestAppScope } = await import("$lib/server/application-scope");
+  return requestAppScope(locals);
+}

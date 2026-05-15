@@ -1,8 +1,8 @@
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
-import { requestAppScope } from "$lib/server/application-scope";
-import { getRepoCommitsPage } from "@integration-hub/application/repos/queries.ts";
+import { loadRepositoryCommitsPage } from "@integration-hub/interface/repository-pages.ts";
 import { AppError } from "@platform-core/domain/errors.ts";
+import { requestRepositoryScope } from "../../repository-request-scope";
 
 export const _PAGE_SIZE = 50;
 
@@ -26,8 +26,8 @@ export const load: PageServerLoad = ({ params, url, locals }) => {
     streamed: {
       data: (async () => {
         try {
-          const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
-          return await getRepoCommitsPage(em, ctx, { repoId: params.id, page, pageSize: _PAGE_SIZE });
+          const { em, ctx } = await requestRepositoryScope(locals, locals?.activeProjectId ?? null);
+          return await loadRepositoryCommitsPage(em, ctx, { repoId: params.id, page, pageSize: _PAGE_SIZE });
         } catch (e) {
           if (e instanceof AppError && e.kind === "not_found") throw error(404, e.message);
           throw e;

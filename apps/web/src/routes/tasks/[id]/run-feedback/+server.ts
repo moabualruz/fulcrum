@@ -4,10 +4,9 @@ import {
   dependencyRunLiveFeedbackTopic,
   loadDependencyRunLiveFeedbackForTasks,
   type DependencyRunLiveFeedbackOutput,
-} from "@execution-orchestration/application/dependency-run-live-feedback.ts";
-import { DependencyRunLiveFeedbackOutputSchema } from "@work-management/application/tasks/schema.ts";
-import { getEventBus } from "@platform-core/application/subscriptions/event-bus.ts";
-import { requestAppScope } from "$lib/server/application-scope";
+  DependencyRunLiveFeedbackOutputSchema,
+} from "@execution-orchestration/interface/dependency-run-live-feedback.ts";
+import { subscribeToProcessEvent } from "@platform-core/interface/subscription-events.ts";
 import { webWorkflowApiUrl } from "$lib/server/workflow-api";
 
 export const GET: RequestHandler = async (event) => {
@@ -45,7 +44,7 @@ export const GET: RequestHandler = async (event) => {
     });
   }
 
-  const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null, params.id);
+  const { em, ctx } = await requestScopedApp(locals, locals?.activeProjectId ?? null, params.id);
   const encoder = new TextEncoder();
   let unsubscribe: (() => void) | null = null;
 
@@ -78,7 +77,7 @@ export const GET: RequestHandler = async (event) => {
         projectId: initial.projectId,
         traceId: initial.traceId,
       });
-      unsubscribe = getEventBus().subscribe<DependencyRunLiveFeedbackOutput>(topic, (event) => {
+      unsubscribe = await subscribeToProcessEvent<DependencyRunLiveFeedbackOutput>(topic, (event) => {
         const feedback = DependencyRunLiveFeedbackOutputSchema.parse(event.payload);
         send(feedback);
         if (!feedback.executorStatus.active) close();
@@ -98,3 +97,8 @@ export const GET: RequestHandler = async (event) => {
     },
   });
 };
+
+async function requestScopedApp(locals: App.Locals, projectId?: string | null, taskId?: string) {
+  const { requestAppScope } = await import("$lib/server/application-scope");
+  return requestAppScope(locals, projectId, taskId);
+}

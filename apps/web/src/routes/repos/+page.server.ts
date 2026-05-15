@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from "./$types";
 import { actionOk } from "$lib/feedback/action-result";
-import { requestAppScope } from "$lib/server/application-scope";
-import { listRepoPageRows } from "@integration-hub/application/repos/queries.ts";
+import { listRepositoryPageRows } from "@integration-hub/interface/repository-pages.ts";
+import { requestRepositoryScope } from "./repository-request-scope";
 import { queueRepositorySync } from "./repository-sync-api";
 
 export const load: PageServerLoad = ({ locals }) => {
@@ -11,8 +11,8 @@ export const load: PageServerLoad = ({ locals }) => {
     activeProjectId,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestAppScope(locals, activeProjectId);
-        return { repos: await listRepoPageRows(em, ctx) };
+        const { em, ctx } = await requestRepositoryScope(locals, activeProjectId);
+        return { repos: await listRepositoryPageRows(em, ctx) };
       })(),
     },
   };
